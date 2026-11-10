@@ -15,14 +15,11 @@
   reparse sources or implement conflicting outcome, cost or ownership semantics.
 - Preserve historical research and logs. Put new implementation evidence in evidence/.
 - Update the support matrix and decision ledger when contracts or support change.
-- No publishing, deployment, remote pushes or agent delegation without Karl's request,
-  except for the standing review authorization below.
-- Karl explicitly authorizes independent reviews and rechecks by Sol (Codex) and
-  Opus (Claude), including the ongoing review/fix/review loop, without asking again
-  for each review. Reviewers may inspect the project and build/test disposable
-  copies. Their live-workspace writes must be limited to assigned review reports
-  and evidence under evidence/. They may not change implementation or delegate
-  further. Existing privacy, browser and resource restrictions still apply.
+- Build work follows docs/build-plan.md. Builders work in their own worktrees on
+  one assigned chunk, push its branch and open a pull request. Reviewers review
+  one pull request and do not change its branch. The manager merges passing pull
+  requests into main. Builders and reviewers do not start further agents.
+- No package publishing or deployment without Karl's request.
 - Keep agent preview/browser access disabled. CLI/compiler checks need no browser.
   Follow Karl's pc-tools restrictions for any separately authorised browser work.
 - Use CodeGraph first if a .codegraph directory exists; do not create an index.
