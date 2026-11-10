@@ -104,7 +104,7 @@ aims for under about 400 changed lines outside tests. Anything larger is cut aga
 - Builders alternate between Opus 5.5 medium and Sol 6.1 medium so both are exercised.
 - The reviewer is always the other model from the builder.
 - Chunks that continue the same area go to the same model where practical, since it already knows that code's shape.
-- No more than **four** builders run at once. The trials filled `/tmp` and the test suite is heavy; this cap is a starting value to adjust from observation.
+- At most **four** builders run at once. That is a ceiling, not a target: a wave uses only as many as it has genuinely disjoint chunks for.
 
 ## 6. Checks
 
@@ -130,7 +130,9 @@ Settled with Karl on 10 November 2026:
 2. The planning documents (`docs/mega-plan.md`, this file, and the TLC baseline under `evidence/builtin-checker/`) are committed to `main`, so every worktree starts with them.
 3. Pull requests are merged on GitHub with a normal merge, not a squash.
 
-Still open: the cap of four parallel builders is a starting value.
+4. At most four builders at once, as a ceiling and not a target.
+5. Trial models and scope files are copied to the git-ignored `evidence/project-fit/trial-models/` for use as regression inputs. They are local to this machine and are not committed.
+6. The manager decides almost everything itself and reports briefly (section 10).
 
 ## 8. Waves
 
@@ -190,14 +192,18 @@ The manager keeps this table current. It is the single record of who holds which
 
 Status values: cut, building, in review (round 1 or 2), changes needed, merged, escalated, dropped.
 
-## 10. Escalation to Karl
+## 10. Deciding and reporting
 
-The manager stops a chunk and asks when:
+The manager is expected to decide nearly everything itself: how to cut chunks,
+who builds and reviews, how to resolve a clash, when to narrow or reassign a
+chunk, and how to handle a failed assumption. Decisions are recorded in the
+ledger or a chunk's change note, not sent to Karl for approval.
 
-- a chunk cannot meet its "done when" without leaving its owned paths in a way that collides with another open chunk;
-- a pull request fails two review rounds;
-- a finding contradicts a decision in the mega plan;
-- an unverified assumption in mega-plan section 7 turns out false;
-- anything would lose work, weaken an acceptance criterion or need a removal Karl has not asked for.
+Karl is asked only for a major decision the manager cannot work out: one that
+changes what the product is or does (a mega-plan decision), loses work, or needs
+a removal he has not asked for. Other chunks keep running while it is open.
 
-Other chunks keep running while one is escalated.
+Reports to Karl are short:
+
+- a few lines of progress when something lands or changes state;
+- a brief summary at the end of each wave: what merged, what is next, anything decided on his behalf that he might want to know.
