@@ -1,0 +1,6 @@
+// One source flow, no hand-written state machine.
+op approval() -> Bool;
+flow decision() -> Unit {
+  call approval() as allowed;
+  if allowed { assert true; } else { assert false; }
+}

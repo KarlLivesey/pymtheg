@@ -1,0 +1,21 @@
+// Exploratory local specification. The unknown payment decision is deliberate.
+type Receipt = { providerId: String };
+type PaymentErrors = Declined | Unavailable | OutcomeUnknown;
+op customer() -> Unit effects(remote.Customers) cost remote_calls exact 1 stable;
+op price() -> Unit effects(remote.Prices) cost remote_calls exact 1;
+op stock() -> Unit effects(remote.Inventory) cost remote_calls exact 1;
+op capture(key: String) -> Result<Receipt, PaymentErrors>
+effects(remote.Payments) cost remote_calls exact 1;
+flow quote(N: Nat) -> Unit bound N <= 200
+effects(remote.Customers, remote.Prices, remote.Inventory) budget remote_calls <= 500 {
+  for i in N { call customer(); call price(); call stock(); }
+}
+flow payment(key: String) -> Result<Receipt, PaymentErrors> effects(remote.Payments) {
+  call capture(key) as result;
+  match result {
+    Ok(receipt) => { return Ok(receipt); }
+    Declined => { return Declined; }
+    Unavailable => { return Unavailable; }
+    OutcomeUnknown => { unknown "reconcile before retry or cancellation"; return OutcomeUnknown; }
+  }
+}

@@ -1,0 +1,89 @@
+// ILLUSTRATIVE SYNTAX ONLY. No parser/compiler exists for this file.
+// This sketch contains intentionally unresolved behaviour to test the design.
+program CheckoutDesign
+
+type CustomerId
+type OrderId
+type Sku
+type Money = Decimal where value >= 0
+type Customer = { id: CustomerId, active: Bool, suspended: Bool }
+type Item = { sku: Sku, quantity: UInt where value > 0 }
+type Basket = List<Item> where count <= 200
+type QuoteLine = { item: Item, price: Money, available: UInt }
+
+rule MayPurchase(customer: Customer) -> Bool =
+    customer.active and not customer.suspended
+
+resource Reservation {
+    states Held, Consumed, Released
+    transitions Held -> Consumed, Held -> Released
+    terminal Consumed, Released
+    obligation owner must reach a terminal state or transfer ownership
+}
+
+external Customers.get(id: CustomerId) -> Result<Customer, Missing | Unavailable>
+    effects remote(Customers)
+    cost remote_calls = 1
+
+external Prices.get(sku: Sku) -> Result<Money, Missing | Unavailable>
+    effects remote(Prices)
+    cost remote_calls = 1
+
+external Inventory.available(sku: Sku) -> Result<UInt, Unavailable>
+    effects remote(Inventory)
+    cost remote_calls = 1
+
+external Payments.capture(key: OrderId, amount: Money)
+    -> Result<Receipt, Declined | Unavailable | OutcomeUnknown>
+    effects remote(Payments)
+    cost remote_calls = 1
+    contract same key and same amount reuse one provider capture
+    // Provider deduplication and its retention window must be established.
+
+flow quote(customerId: CustomerId, items: Basket) -> Result<List<QuoteLine>, QuoteError> {
+    // Intentionally inefficient: target structural bound is 3 * items.count.
+    let lines = collect item in items {
+        let customer = call Customers.get(customerId)
+            on error -> unknown "Missing customer vs unavailable: fail or retry?"
+        require MayPurchase(customer)
+        let price = call Prices.get(item.sku)
+            on error -> unknown "Partial quote or fail the whole quote?"
+        let available = call Inventory.available(item.sku)
+            on error -> unknown "What stock freshness does quoting require?"
+        yield QuoteLine { item, price, available }
+    }
+    return Ok(lines)
+}
+
+flow checkout(orderId: OrderId, take reservation: Reservation[Held], amount: Money)
+    -> Result<Receipt, CheckoutError>
+    effects remote(Payments), state(reservation)
+{
+    retry attempts <= 3 {
+        match call Payments.capture(key = orderId, amount = amount) {
+            Ok(receipt) -> {
+                transition reservation Held -> Consumed
+                return Ok(receipt)
+            }
+            Declined -> {
+                unknown "Release reservation; model release failure before returning."
+            }
+            Unavailable -> {
+                unknown "Is no provider effect guaranteed, or must this be OutcomeUnknown?"
+            }
+            OutcomeUnknown -> {
+                unknown "Reconcile using orderId; never infer that a timeout means unpaid."
+            }
+        }
+    }
+    unknown "What happens after all three attempts, including the initial one?"
+}
+
+on cancellation of checkout {
+    unknown "Enter a cleanup lifecycle; decide refund/release ordering and failure recovery."
+}
+
+// Receipt, QuoteError, and CheckoutError are also deliberately undefined:
+// even this partial sketch must report unresolved types as incomplete.
+// Repeated calls in quote do not imply reads are safe to hoist: decide whether
+// customer permissions are stable during quoting, or deliberately rechecked.

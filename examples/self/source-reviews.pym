@@ -1,0 +1,80 @@
+// Two plans link the same source. A semantic edit changes what the component
+// means; a formatting edit changes its bytes while keeping that meaning.
+// This is a finite design model: two plans, two meanings and three byte versions.
+// Review is an explicit user action. No eventual-review or implementation proof
+// is claimed. The stored hash/SQLite implementation has separate host tests.
+machine IndependentSourceReviews {
+  state meaning: Nat in 0..1 = 0;
+  state bytes: Nat in 0..2 = 0;
+  state expectedA: Nat in 0..1 = 0;
+  state expectedB: Nat in 0..1 = 0;
+  state bytesA: Nat in 0..2 = 0;
+  state bytesB: Nat in 0..2 = 0;
+  state consentB: Bool = false;
+  event changeMeaning when meaning == 0 { meaning = 1; bytes = 1; }
+  event changeFormatting when meaning == 1 && bytes == 1 { bytes = 2; }
+  event reviewA when expectedA != meaning || bytesA != bytes {
+    expectedA = meaning; bytesA = bytes;
+  }
+  event reviewB when expectedB != meaning || bytesB != bytes {
+    expectedB = meaning; bytesB = bytes; consentB = true;
+  }
+  invariant noImplicitAcknowledgement = consentB || expectedB == 0;
+  invariant keepUnreviewedSource = consentB || bytesB == 0;
+}
+
+// Deliberate counter-design: refreshing the shared source row silently updates
+// every plan's baseline. A review of plan A now launders a change for plan B.
+machine SharedSourceReviewBug {
+  state meaning: Nat in 0..1 = 0;
+  state expectedA: Nat in 0..1 = 0;
+  state expectedB: Nat in 0..1 = 0;
+  state consentB: Bool = false;
+  event changeMeaning when meaning == 0 { meaning = 1; }
+  event reviewA when expectedA != meaning {
+    expectedA = meaning; expectedB = meaning;
+  }
+  event reviewB when expectedB != meaning {
+    expectedB = meaning; consentB = true;
+  }
+  invariant noImplicitAcknowledgement = consentB || expectedB == 0;
+}
+
+// A current catalogue must not substitute new bytes under an old review label.
+// Even a harmless formatting edit must leave the old retained source available.
+machine OverwrittenSourceBytesBug {
+  state bytes: Nat in 0..1 = 0;
+  state storedForB: Nat in 0..1 = 0;
+  state consentB: Bool = false;
+  event formatOnly when bytes == 0 { bytes = 1; }
+  event captureForA when bytes != storedForB { storedForB = bytes; }
+  event reviewB when bytes != storedForB { storedForB = bytes; consentB = true; }
+  invariant keepUnreviewedSource = consentB || storedForB == 0;
+}
+
+// Rechecking after a catalogue selection must bind the save to the version the
+// user actually selected. Edits can race selection; the guard rejects that save.
+machine RevalidatedSourceSelection {
+  state source: Nat in 0..2 = 0;
+  state selected: Nat in 0..2 = 0;
+  state atSave: Nat in 0..2 = 0;
+  state saved: Bool = false;
+  event edit when source < 2 { source = source + 1; }
+  event select when !saved { selected = source; }
+  event save when !saved && selected == source { saved = true; atSave = source; }
+  invariant noStaleSave = !saved || selected == atSave;
+}
+
+// Post-save source edits are allowed: the invariant compares against the source
+// at publication, not the mutable file forever. Removing the save guard exposes
+// the actual race, including a change between selection and publication.
+machine StaleSourceSelectionBug {
+  state source: Nat in 0..2 = 0;
+  state selected: Nat in 0..2 = 0;
+  state atSave: Nat in 0..2 = 0;
+  state saved: Bool = false;
+  event edit when source < 2 { source = source + 1; }
+  event select when !saved { selected = source; }
+  event save when !saved { saved = true; atSave = source; }
+  invariant noStaleSave = !saved || selected == atSave;
+}

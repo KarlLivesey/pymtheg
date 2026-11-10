@@ -1,0 +1,99 @@
+{
+  "retrieved": "2026-11-08T11:38:38.714363+00:00",
+  "quint_version": "0.33.1",
+  "results": [
+    {
+      "tool": "quint-typescript-simulator",
+      "case": "double-charge",
+      "invariant": "noDoubleCharge",
+      "exit_code": 1,
+      "expected_violation": true,
+      "matched_expectation": true,
+      "log": "quint-double-charge.txt",
+      "max_samples": 1000,
+      "max_steps": 6,
+      "seed": "42"
+    },
+    {
+      "tool": "tlc-exhaustive",
+      "case": "double-charge",
+      "invariant": "NoDoubleCharge",
+      "exit_code": 12,
+      "expected_violation": true,
+      "matched_expectation": true,
+      "log": "tlc-double-charge.txt",
+      "states_generated": 6,
+      "distinct_states": 5
+    },
+    {
+      "tool": "quint-typescript-simulator",
+      "case": "stock-leak",
+      "invariant": "terminalReleasesStock",
+      "exit_code": 1,
+      "expected_violation": true,
+      "matched_expectation": true,
+      "log": "quint-stock-leak.txt",
+      "max_samples": 1000,
+      "max_steps": 6,
+      "seed": "42"
+    },
+    {
+      "tool": "tlc-exhaustive",
+      "case": "stock-leak",
+      "invariant": "TerminalReleasesStock",
+      "exit_code": 12,
+      "expected_violation": true,
+      "matched_expectation": true,
+      "log": "tlc-stock-leak.txt",
+      "states_generated": 4,
+      "distinct_states": 4
+    },
+    {
+      "tool": "quint-typescript-simulator",
+      "case": "missing-refund",
+      "invariant": "cancelledRefunded",
+      "exit_code": 1,
+      "expected_violation": true,
+      "matched_expectation": true,
+      "log": "quint-missing-refund.txt",
+      "max_samples": 1000,
+      "max_steps": 6,
+      "seed": "42"
+    },
+    {
+      "tool": "tlc-exhaustive",
+      "case": "missing-refund",
+      "invariant": "CancelledRefunded",
+      "exit_code": 12,
+      "expected_violation": true,
+      "matched_expectation": true,
+      "log": "tlc-missing-refund.txt",
+      "states_generated": 8,
+      "distinct_states": 7
+    },
+    {
+      "tool": "quint-typescript-simulator",
+      "case": "fixed",
+      "invariant": "safety",
+      "exit_code": 0,
+      "expected_violation": false,
+      "matched_expectation": true,
+      "log": "quint-fixed.txt",
+      "max_samples": 1000,
+      "max_steps": 6,
+      "seed": "42"
+    },
+    {
+      "tool": "tlc-exhaustive",
+      "case": "fixed",
+      "invariant": "Safety",
+      "exit_code": 0,
+      "expected_violation": false,
+      "matched_expectation": true,
+      "log": "tlc-fixed.txt",
+      "states_generated": 13,
+      "distinct_states": 8
+    }
+  ],
+  "tlc_jar_sha256": "936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88"
+}

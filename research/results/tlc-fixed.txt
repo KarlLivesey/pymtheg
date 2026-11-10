@@ -1,0 +1,22 @@
+Command: java -Xmx512m -XX:ActiveProcessorCount=1 -cp /tmp/spec-language-research/tla2tools.jar tlc2.TLC -workers 1 -metadir /tmp/checkout-tlc-fnf_fmb4 -config examples/fixed.cfg examples/Checkout.tla
+Exit code: 0
+
+TLC2 Version 2.19 of 08 August 2024 (rev: 5a47802)
+Warning: Please run the Java VM which executes TLC with a throughput optimized garbage collector by passing the "-XX:+UseParallelGC" property.
+(Use the -nowarning option to disable this warning.)
+Running breadth-first search Model-Checking with fp 64 and seed 7056465614667020651 with 1 worker on 1 cores with 512MB heap and 64MB offheap memory [pid: 501127] (Linux 7.3.3-1-cachyos amd64, Arch Linux 27.0.1.0.3 x86_64, MSBDiskFPSet, DiskStateQueue).
+Parsing file /home/user/.t3/scratch/2026-11-08-right-so-there-might-be-e279b705/examples/Checkout.tla
+Parsing file /tmp/Naturals.tla
+Semantic processing of module Naturals
+Semantic processing of module Checkout
+Starting... (2026-11-08 11:38:42)
+Computing initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-08 11:38:42.
+Model checking completed. No error has been found.
+  Estimates of the probability that TLC did not check all reachable states
+  because two distinct states had the same fingerprint:
+  calculated (optimistic):  val = 2.2E-18
+13 states generated, 8 distinct states found, 0 states left on queue.
+The depth of the complete state graph search is 4.
+The average outdegree of the complete state graph is 1 (minimum is 0, the maximum 3 and the 95th percentile is 3).
+Finished in 00s at (2026-11-08 11:38:42)

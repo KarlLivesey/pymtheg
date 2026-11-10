@@ -1,0 +1,38 @@
+// Two initializers can both stage before either publishes. Publication must
+// create the destination only if absent; a prior read of absence is not enough.
+// This finite model has two candidate IDs and does not prove filesystem behavior.
+machine AtomicInitialization {
+  state stagedFirst: Bool = false;
+  state stagedSecond: Bool = false;
+  state marker: Nat in 0..2 = 0;
+  state firstPublished: Nat in 0..2 = 0;
+  event stageFirst when marker == 0 && !stagedFirst { stagedFirst = true; }
+  event stageSecond when marker == 0 && !stagedSecond { stagedSecond = true; }
+  event publishFirst when marker == 0 && stagedFirst {
+    marker = 1; firstPublished = 1; stagedFirst = false;
+  }
+  event publishSecond when marker == 0 && stagedSecond {
+    marker = 2; firstPublished = 2; stagedSecond = false;
+  }
+  event abandonFirst when stagedFirst { stagedFirst = false; }
+  event abandonSecond when stagedSecond { stagedSecond = false; }
+  invariant identityIsStable = marker == firstPublished;
+}
+
+// Deliberate counter-design: a second writer publishes using its stale
+// pre-publication check. It changes the identity another initializer installed.
+machine OverwritingInitialization {
+  state stagedFirst: Bool = false;
+  state stagedSecond: Bool = false;
+  state marker: Nat in 0..2 = 0;
+  state firstPublished: Nat in 0..2 = 0;
+  event stageFirst when marker == 0 && !stagedFirst { stagedFirst = true; }
+  event stageSecond when marker == 0 && !stagedSecond { stagedSecond = true; }
+  event publishFirst when marker == 0 && stagedFirst {
+    marker = 1; firstPublished = 1; stagedFirst = false;
+  }
+  event overwriteFromStaleCheck when marker == 1 && stagedSecond {
+    marker = 2; stagedSecond = false;
+  }
+  invariant identityIsStable = marker == firstPublished;
+}

@@ -1,0 +1,46 @@
+// A finite abstraction of the type-inventory boundary, not a conformance proof.
+// Two retained types represent the production cap of 100,000. Three source
+// files each contain at most one type; the last file may be empty or overflow.
+// Reaching a cap does not establish that unread files have no more types.
+machine PrematureLimitStop {
+  state examined: Nat in 0..3 = 0;
+  state retained: Nat in 0..2 = 0;
+  state omitted: Bool = false;
+  state finished: Bool = false;
+  state complete: Bool = false;
+
+  event keepType when examined < 2 && !finished {
+    examined = examined + 1;
+    retained = retained + 1;
+  }
+  event stopAtLimit when retained == 2 && !finished {
+    finished = true;
+    complete = true;
+  }
+  invariant completeMeansCovered = !complete || (examined == 3 && !omitted);
+}
+
+machine InspectBeyondLimit {
+  state examined: Nat in 0..3 = 0;
+  state retained: Nat in 0..2 = 0;
+  state omitted: Bool = false;
+  state finished: Bool = false;
+  state complete: Bool = false;
+
+  event keepType when examined < 2 && !finished {
+    examined = examined + 1;
+    retained = retained + 1;
+  }
+  event emptyTail when examined == 2 && !finished {
+    examined = 3;
+  }
+  event overflowingTail when examined == 2 && !finished {
+    examined = 3;
+    omitted = true;
+  }
+  event finishScan when examined == 3 && !finished {
+    finished = true;
+    complete = !omitted;
+  }
+  invariant completeMeansCovered = !complete || (examined == 3 && !omitted);
+}

@@ -1,0 +1,5 @@
+// Shared data contracts, used by multiple parts of the design.
+type Customer = { id: String, suspended: Bool };
+type Cart = { customer: Customer, items: List<Nat> };
+type PaymentError = Declined | OutcomeUnknown;
+type Receipt = { paymentId: String };

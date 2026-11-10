@@ -1,0 +1,51 @@
+Command: /tmp/spec-language-research/node_modules/.bin/quint run examples/checkout.qnt --backend=typescript --step=buggyStep --invariant=noDoubleCharge --max-samples=1000 --max-steps=6 --seed=42 --verbosity=3
+Exit code: 1
+
+An example execution:
+
+[Frame 0]
+q::initAndInvariant => true
+└─ init => true
+
+[State 0]
+{
+  attempts: 0,
+  captures: 0,
+  lastEvent: "stock reserved",
+  phase: "Waiting",
+  refunds: 0,
+  reserved: true
+}
+
+[Frame 1]
+q::stepAndInvariant => true
+└─ buggyStep => true
+
+[State 1]
+{
+  attempts: 1,
+  captures: 1,
+  lastEvent: "provider accepted; response lost",
+  phase: "Waiting",
+  refunds: 0,
+  reserved: true
+}
+
+[Frame 2]
+q::stepAndInvariant => false
+└─ buggyStep => true
+
+[State 2]
+{
+  attempts: 2,
+  captures: 2,
+  lastEvent: "provider accepted; response lost",
+  phase: "Waiting",
+  refunds: 0,
+  reserved: true
+}
+
+[violation] Found an issue (8ms at 1000 traces/second).
+Use --verbosity=3 to show executions.
+Use --seed=0x95 --backend=typescript to reproduce.
+error: Invariant violated

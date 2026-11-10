@@ -1,0 +1,18 @@
+// Contract output is a pure projection; executing an explicitly selected plugin owns a process.
+resource Emitter {
+  states Running, Reaped; initial Running; terminal Reaped;
+  Running -> Reaped; Reaped -> Reaped;
+}
+type OutputError = Failed | Cancelled | TimedOut;
+op runEmitter(borrow child: Emitter) -> Result<Unit, OutputError>
+effects(process.Emitter) cost plugin_runs exact 1;
+flow output(take child: Emitter) -> Result<Unit, OutputError>
+effects(process.Emitter, state.Emitter) budget plugin_runs <= 1 {
+  call runEmitter(borrow child) as generated;
+  match generated {
+    Ok(value) => { transition child -> Reaped; return Ok(unit); }
+    Failed => { transition child -> Reaped; return Failed; }
+    Cancelled => { transition child -> Reaped; return Cancelled; }
+    TimedOut => { transition child -> Reaped; return TimedOut; }
+  }
+} on cancel { transition child -> Reaped; }

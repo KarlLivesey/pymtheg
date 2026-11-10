@@ -1,0 +1,44 @@
+Command: java -Xmx512m -XX:ActiveProcessorCount=1 -cp /tmp/spec-language-research/tla2tools.jar tlc2.TLC -workers 1 -metadir /tmp/checkout-tlc-2tllnsy1 -config examples/missing-refund.cfg examples/Checkout.tla
+Exit code: 12
+
+TLC2 Version 2.19 of 08 August 2024 (rev: 5a47802)
+Warning: Please run the Java VM which executes TLC with a throughput optimized garbage collector by passing the "-XX:+UseParallelGC" property.
+(Use the -nowarning option to disable this warning.)
+Running breadth-first search Model-Checking with fp 35 and seed 4445627122746319874 with 1 worker on 1 cores with 512MB heap and 64MB offheap memory [pid: 501069] (Linux 7.3.3-1-cachyos amd64, Arch Linux 27.0.1.0.3 x86_64, MSBDiskFPSet, DiskStateQueue).
+Parsing file /home/user/.t3/scratch/2026-11-08-right-so-there-might-be-e279b705/examples/Checkout.tla
+Parsing file /tmp/Naturals.tla
+Semantic processing of module Naturals
+Semantic processing of module Checkout
+Starting... (2026-11-08 11:38:41)
+Computing initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-08 11:38:41.
+Error: Invariant CancelledRefunded is violated.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+/\ refunds = 0
+/\ lastEvent = "stock reserved"
+/\ attempts = 0
+/\ reserved = TRUE
+/\ phase = "Waiting"
+/\ captures = 0
+
+State 2: <Pay line 17, col 3 to line 25, col 61 of module Checkout>
+/\ refunds = 0
+/\ lastEvent = "provider accepted; response lost"
+/\ attempts = 1
+/\ reserved = TRUE
+/\ phase = "Waiting"
+/\ captures = 1
+
+State 3: <Cancel line 28, col 3 to line 34, col 29 of module Checkout>
+/\ refunds = 0
+/\ lastEvent = "cancelled"
+/\ attempts = 1
+/\ reserved = TRUE
+/\ phase = "Cancelled"
+/\ captures = 1
+
+8 states generated, 7 distinct states found, 3 states left on queue.
+The depth of the complete state graph search is 3.
+The average outdegree of the complete state graph is 2 (minimum is 0, the maximum 3 and the 95th percentile is 3).
+Finished in 00s at (2026-11-08 11:38:41)

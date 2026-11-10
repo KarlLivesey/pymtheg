@@ -1,0 +1,4 @@
+import "domain.pym";
+// One authoritative policy. Consumers reuse it rather than copy its body.
+rule canQuote(quantity: Nat) -> Bool = quantity > 0 && quantity <= 200;
+rule canBuy(customer: Customer) -> Bool = !customer.suspended;

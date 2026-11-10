@@ -1,0 +1,23 @@
+// Count discovery work independently of elapsed time and selected source count.
+// Workload: root has design/ and target/; design has one source; target has up
+// to 1,000 unrelated specification files. Every raw source is parsed once when
+// caller discovery traverses it, even though only the selected source is typed.
+op inspectEntry() -> Unit cost directory_entries exact 1 cost directory_reads exact 0 cost source_parses exact 0;
+op listDirectory() -> Unit cost directory_entries exact 0 cost directory_reads exact 1 cost source_parses exact 0;
+op parseSource() -> Unit cost directory_entries exact 0 cost directory_reads exact 0 cost source_parses exact 1;
+
+flow includeGeneratedTree(generated: Nat) -> Unit bound generated <= 1000 {
+  // List root, design and generated output directories.
+  for directory in 3 { call listDirectory(); }
+  // Two root directory entries plus the selected source.
+  for entry in 3 { call inspectEntry(); }
+  call parseSource();
+  for source in generated { call inspectEntry(); call parseSource(); }
+}
+
+flow selectSourceTree() -> Unit budget directory_entries <= 3 {
+  // The target entry is inspected, but its directory is not entered.
+  for directory in 2 { call listDirectory(); }
+  for entry in 3 { call inspectEntry(); }
+  call parseSource();
+}

@@ -1,0 +1,69 @@
+{
+  "name": "pymtheg",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "bin": {
+    "pymtheg": "dist/cli/main.js"
+  },
+  "scripts": {
+    "build": "node scripts/schema.mjs && tsc && tsc -p web/tsconfig.json && vite build --configLoader runner --config web/vite.config.ts",
+    "test": "npm run build:core && node --test --test-concurrency=4 test/*.test.mjs",
+    "check": "node dist/cli/main.js check",
+    "bench": "npm run build && node test/bench.mjs",
+    "test:backend": "npm run build && node --test --test-concurrency=1 test/*.integration.mjs",
+    "format": "prettier --write \"src/**/*.ts\" \"test/*.mjs\" \"web/src/**/*.{ts,tsx,css}\" package.json tsconfig.json docs/report.schema.json",
+    "format:check": "prettier --check \"src/**/*.ts\" \"test/*.mjs\" \"web/src/**/*.{ts,tsx,css}\" package.json tsconfig.json docs/report.schema.json",
+    "capture": "npm run build && node test/capture.mjs",
+    "build:core": "tsc",
+    "studio": "node dist/cli/main.js studio",
+    "pack:local": "npm run build && npm pack --ignore-scripts --pack-destination /tmp",
+    "test:gui": "node scripts/gui-check.mjs"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.11.0",
+    "@guidepup/virtual-screen-reader": "0.33.0",
+    "@modelcontextprotocol/client": "2.4.0",
+    "@playwright/test": "1.56.1",
+    "@types/node": "24.13.3",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "esbuild": "0.25.12",
+    "prettier": "3.6.2",
+    "vite": "7.2.2"
+  },
+  "optionalDependencies": {
+    "@informalsystems/quint": "0.33.1"
+  },
+  "dependencies": {
+    "@codemirror/autocomplete": "6.18.6",
+    "@codemirror/commands": "6.8.1",
+    "@codemirror/language": "6.11.3",
+    "@codemirror/search": "6.5.11",
+    "@codemirror/state": "6.5.2",
+    "@codemirror/view": "6.38.6",
+    "@lezer/highlight": "1.2.5",
+    "@modelcontextprotocol/server": "2.4.0",
+    "ajv": "8.17.1",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "react-markdown": "10.1.0",
+    "remark-gfm": "4.0.1",
+    "typescript": "5.9.3",
+    "zod": "4.2.0"
+  },
+  "files": [
+    "dist/",
+    "dist-web/",
+    "docs/",
+    "examples/mvp/",
+    "examples/self/",
+    "pymtheg",
+    "README.md",
+    "examples/workbench/",
+    "examples/plugins/"
+  ]
+}

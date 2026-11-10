@@ -1,0 +1,20 @@
+// A late provider effect and independently failing compensation.
+// Pending reconciliation is deliberately not terminal. No eventual progress claim.
+machine Reconciliation {
+  state requestInFlight: Bool = false;
+  state cancelling: Bool = false;
+  state settled: Bool = false;
+  state captured: Bool = false;
+  state refunded: Bool = false;
+  event submit when !requestInFlight && !cancelling && !captured {
+    requestInFlight = true;
+  }
+  event cancel when !cancelling { cancelling = true; }
+  event lateProviderEffect when requestInFlight {
+    requestInFlight = false; captured = true;
+  }
+  event refundSuccess when cancelling && captured && !refunded { refunded = true; }
+  event refundFailure when cancelling && captured && !refunded { refunded = false; }
+  event finish when cancelling && !requestInFlight && (!captured || refunded) { settled = true; }
+  invariant terminalHasNoPendingEffect = !settled || (!requestInFlight && (!captured || refunded));
+}

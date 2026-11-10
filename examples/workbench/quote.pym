@@ -1,0 +1,11 @@
+import "policy.pym";
+import "catalogue.pym";
+flow quote(quantity: Nat) -> Unit
+effects(remote.Catalogue, remote.Stock) bound quantity <= 200
+budget remote_calls <= 500 {
+  let allowed = canQuote(quantity);
+  if allowed {
+    for item in quantity { call currentPrice(); call stockLevel(); }
+  }
+  return unit;
+}

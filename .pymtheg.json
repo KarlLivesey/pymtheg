@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "defaultFile": "examples/mvp/checkout.pym",
+  "scenarios": {
+    "decision": {
+      "file": "examples/mvp/flow-assertion.pym",
+      "entry": "decision",
+      "maxSteps": 20,
+      "scope": {"results":{"approval":[true,false]}}
+    },
+    "task retry": {"file":"examples/mvp/task-buggy.pym","entry":"TaskRunner","maxSteps":12}
+  }
+}

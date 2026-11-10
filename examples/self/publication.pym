@@ -1,0 +1,10 @@
+// Interrupted staging must preserve the previously published report.
+machine Publication {
+  state previousValid: Bool = true;
+  state staged: Bool = false;
+  state finished: Bool = false;
+  event stage when !finished { staged = true; }
+  event interrupted when staged { staged = false; finished = true; }
+  event publish when staged { staged = false; finished = true; previousValid = true; }
+  invariant readableReport = previousValid;
+}

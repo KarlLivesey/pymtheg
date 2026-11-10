@@ -1,0 +1,23 @@
+// Local work/outcome analysis complements the task event machines.
+type TaskErrors = Rejected | Unavailable | OutcomeUnknown;
+op submitJob(key: String) -> Result<Unit, TaskErrors>
+effects(remote.Queue) cost queue_calls exact 1;
+flow blindRetry(key: String) -> Result<Unit, TaskErrors>
+effects(remote.Queue) budget queue_calls <= 1 {
+  retry 3 on OutcomeUnknown {
+    call submitJob(key) as result;
+    match result {
+      Ok(value) => { return Ok(unit); }
+      Rejected => { return Rejected; }
+      Unavailable => { return Unavailable; }
+      OutcomeUnknown => { }
+    }
+  }
+  return OutcomeUnknown;
+}
+// Stop and preserve uncertain knowledge; a caller must reconcile before retrying.
+flow reconcileFirst(key: String) -> Result<Unit, TaskErrors>
+effects(remote.Queue) budget queue_calls <= 1 {
+  call submitJob(key) as result;
+  propagate result;
+}

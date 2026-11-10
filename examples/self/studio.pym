@@ -1,0 +1,31 @@
+// A session owns cleanup across success, errors and cancellation.
+resource Worker {
+  states Running, Reaped;
+  initial Running;
+  terminal Reaped;
+  Running -> Reaped;
+  Reaped -> Reaped;
+}
+type AnalysisError = InvalidSource | Cancelled;
+op launch() -> Worker effects(state.Worker) creates result cost parses exact 0;
+op analyse() -> Result<Unit,AnalysisError> cost parses exact 1;
+flow checkBuffer() -> Result<Unit,AnalysisError> effects(state.Worker) {
+  call launch() as worker;
+  call analyse() as result;
+  transition worker -> Reaped;
+  propagate result;
+} on cancel { transition worker -> Reaped; }
+
+// Old snapshots remain inspectable, but cannot be labelled current after edits.
+machine SnapshotGate {
+  state version: Nat in 0..1 = 0;
+  state captured: Nat in 0..1 = 0;
+  state running: Bool = false;
+  state currentEvidence: Bool = false;
+  state staleEvidence: Bool = false;
+  event request when !running { captured = version; running = true; currentEvidence = false; }
+  event edit when version == 0 { version = 1; currentEvidence = false; }
+  event publishCurrent when running && captured == version { running = false; currentEvidence = true; }
+  event preserveOld when running && captured != version { running = false; staleEvidence = true; }
+  invariant currentMeansSameSource = !currentEvidence || captured == version;
+}

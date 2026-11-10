@@ -1,0 +1,31 @@
+// This models authoring work counters, not elapsed time or semantic verification.
+// Assumptions: at most 1,000 interface references, 16 distinct shapes and
+// at most 512 expanded nodes in each supported guided shape.
+op expandNode() -> Unit cost form_nodes exact 1 cost symbol_records exact 0;
+op describeSymbol() -> Unit cost symbol_records exact 1 cost form_nodes exact 0;
+flow repeatedShapes(references: Nat, nodes: Nat) -> Unit
+bound references <= 1000 bound nodes <= 512 {
+  for reference in references { for node in nodes { call expandNode(); } }
+}
+flow sharedShapes(types: Nat, nodes: Nat) -> Unit
+bound types <= 16 bound nodes <= 512 budget form_nodes <= 8192 {
+  for type in types { for node in nodes { call expandNode(); } }
+}
+flow metadataChunk(symbols: Nat) -> Unit
+bound symbols <= 64 budget symbol_records <= 64 {
+  for symbol in symbols { call describeSymbol(); }
+}
+
+// Completed source checks remain useful when guided metadata is cancelled,
+// but the whole request must not be rendered as a completed success.
+machine AuthoringSession {
+  state sourceChecked: Bool = false;
+  state controlsReady: Bool = false;
+  state cancelled: Bool = false;
+  state reportedComplete: Bool = false;
+  event checkSource when !cancelled && !reportedComplete { sourceChecked = true; }
+  event prepareControls when sourceChecked && !cancelled && !reportedComplete { controlsReady = true; }
+  event cancel when !reportedComplete { cancelled = true; }
+  event report when sourceChecked && controlsReady && !cancelled { reportedComplete = true; }
+  invariant honestCompletion = !reportedComplete || (sourceChecked && controlsReady && !cancelled);
+}

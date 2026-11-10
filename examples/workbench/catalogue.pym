@@ -1,0 +1,3 @@
+// Environment contracts; no networking is implemented by this specification.
+op currentPrice() -> Unit effects(remote.Catalogue) cost remote_calls exact 1 stable atomic;
+op stockLevel() -> Unit effects(remote.Stock) cost remote_calls exact 1 stable atomic;

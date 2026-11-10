@@ -1,0 +1,17 @@
+// One checkout, at most two submissions. Provider effect != observed response.
+// Events are atomic; cleanup here is guaranteed. See checkout-late.pym for failures.
+machine Checkout {
+  state phase: Nat in 0..4 = 0;
+  state reserved: Bool = true;
+  state captures: Nat in 0..2 = 0;
+  state refunds: Nat in 0..2 = 0;
+  state attempts: Nat in 0..2 = 0;
+  event submit when phase == 0 && attempts < 2 { phase = 1; attempts = attempts + 1; }
+  event providerEffect when phase == 1 { phase = 2; captures = 1; }
+  event responseLost when phase == 2 { phase = 0; }
+  event responseDelivered when phase == 2 { phase = 3; reserved = false; }
+  event cancel when phase == 0 { phase = 4; reserved = false; refunds = captures; }
+  invariant noDoubleCharge = captures <= 1;
+  invariant terminalReleasesStock = (phase != 3 && phase != 4) || !reserved;
+  invariant cancelledRefunded = phase != 4 || captures == refunds;
+}

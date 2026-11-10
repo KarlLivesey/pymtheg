@@ -1,0 +1,7 @@
+// Structural comparisons, not a claim to infer arbitrary CPU complexity.
+rule Nonnegative(x: Int) -> Bool = x >= 0;
+rule DuplicatePolicy(value: Int) -> Bool = value >= 0;
+op compare(left: Nat, right: Nat) -> Bool cost comparisons exact 1;
+flow nestedScan(N: Nat) -> Unit bound N <= 200 budget comparisons <= 40000 {
+  for i in N { for j in N { call compare(i, j) as equal; } }
+}

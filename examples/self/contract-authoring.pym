@@ -1,0 +1,85 @@
+// Finite model of the distinction between authoring and checking, not a proof
+// that Studio implements it. Phase 0=draft, 1=parsed, 2=preview, 3=applied.
+// Version 0..2 bounds edits. A field can parse while its rule remains unknown.
+// A check may finish after another edit; its version must still match.
+machine PrematureRulePublication {
+  state version: Nat in 0..2 = 0;
+  state phase: Nat in 0..3 = 0;
+  state hasUnknown: Bool = true;
+  state pending: Bool = false;
+  state requestedVersion: Nat in 0..2 = 0;
+  state requestedUnknown: Bool = true;
+  state checkedVersion: Nat in 0..2 = 0;
+  state checkedComplete: Bool = false;
+  state published: Bool = false;
+
+  event parseField when phase == 0 { phase = 1; }
+  event preview when phase == 1 { phase = 2; }
+  event apply when phase == 2 { phase = 3; }
+  event answerRule when hasUnknown && version < 2 {
+    version = version + 1;
+    hasUnknown = false;
+    phase = 0;
+    checkedComplete = false;
+    published = false;
+  }
+  event edit when version < 2 {
+    version = version + 1;
+    phase = 0;
+    checkedComplete = false;
+    published = false;
+  }
+  event startCheck when phase == 3 && !pending {
+    pending = true;
+    requestedVersion = version;
+    requestedUnknown = hasUnknown;
+  }
+  event finishCheck when pending {
+    pending = false;
+    checkedVersion = requestedVersion;
+    checkedComplete = !requestedUnknown;
+  }
+  event publish when phase >= 2 { published = true; }
+  invariant checkedCurrentDesign = !published || (phase == 3 && checkedComplete && checkedVersion == version && !hasUnknown);
+}
+
+machine CheckedRulePublication {
+  state version: Nat in 0..2 = 0;
+  state phase: Nat in 0..3 = 0;
+  state hasUnknown: Bool = true;
+  state pending: Bool = false;
+  state requestedVersion: Nat in 0..2 = 0;
+  state requestedUnknown: Bool = true;
+  state checkedVersion: Nat in 0..2 = 0;
+  state checkedComplete: Bool = false;
+  state published: Bool = false;
+
+  event parseField when phase == 0 { phase = 1; }
+  event preview when phase == 1 { phase = 2; }
+  event apply when phase == 2 { phase = 3; }
+  event answerRule when hasUnknown && version < 2 {
+    version = version + 1;
+    hasUnknown = false;
+    phase = 0;
+    checkedComplete = false;
+    published = false;
+  }
+  event edit when version < 2 {
+    version = version + 1;
+    phase = 0;
+    checkedComplete = false;
+    published = false;
+  }
+  event startCheck when phase == 3 && !pending {
+    pending = true;
+    requestedVersion = version;
+    requestedUnknown = hasUnknown;
+  }
+  event finishCheck when pending {
+    pending = false;
+    checkedVersion = requestedVersion;
+    checkedComplete = !requestedUnknown;
+  }
+  event publish when phase == 3 && checkedComplete && checkedVersion == version && !hasUnknown { published = true; }
+  invariant checkedCurrentDesign = !published || (phase == 3 && checkedComplete && checkedVersion == version && !hasUnknown);
+}

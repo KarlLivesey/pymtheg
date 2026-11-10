@@ -1,0 +1,38 @@
+// Provider work and acknowledgement are separate from caller knowledge.
+machine Queue {
+  state pending: Bool = false;
+  state effected: Bool = false;
+  state response: Nat in 0..2 = 0;
+  state attempts: Nat in 0..2 = 0;
+  state deliveries: Nat in 0..2 = 0;
+  event submit when !pending && attempts < 2 {
+    pending = true; effected = false; response = 0; attempts = attempts + 1;
+  }
+  event perform when pending && !effected {
+    deliveries = deliveries + 1; effected = true;
+  }
+  event acknowledge when pending && effected { response = 1; pending = false; }
+  event loseAck when pending && effected { response = 2; pending = false; }
+  invariant noDuplicate = deliveries <= 1;
+}
+type Failure = OutcomeUnknown;
+op send() -> Result<Unit,Failure> effects(remote.Queue) cost calls exact 1
+protocol Queue {
+  submit submit;
+  outcome Ok(unit) when response == 1;
+  outcome OutcomeUnknown when response == 2;
+};
+flow retryJob() -> Result<Unit,Failure> effects(remote.Queue) {
+  retry 2 on OutcomeUnknown {
+    call send() as result;
+    match result {
+      Ok(value) => { return Ok(unit); }
+      OutcomeUnknown => { }
+    }
+  }
+  return OutcomeUnknown;
+}
+flow cautiousJob() -> Result<Unit,Failure> effects(remote.Queue) {
+  call send() as result;
+  propagate result;
+}

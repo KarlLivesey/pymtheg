@@ -1,0 +1,12 @@
+import "quote.pym";
+import "billing.pym";
+import "fulfilment.pym";
+// Explore this project in Studio. Quote is complete; pay still needs a decision.
+flow checkout(quantity: Nat, amount: Nat) -> Result<Receipt,PaymentError>
+effects(remote.Catalogue, remote.Stock, remote.Payments, state.Reservation)
+bound quantity <= 200 {
+  call quote(quantity);
+  call prepare();
+  call pay(amount) as result;
+  propagate result;
+}

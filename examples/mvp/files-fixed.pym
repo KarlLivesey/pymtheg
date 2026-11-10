@@ -1,0 +1,14 @@
+resource File {
+  states Open, Closed; initial Open; terminal Closed;
+  Open -> Closed; Closed -> Closed;
+}
+type ParseErrors = InvalidData;
+op parse(borrow f: File) -> Result<Unit, ParseErrors>
+effects(read.File) cost io_ops upper 1;
+flow process(take f: File) -> Result<Unit, ParseErrors> effects(read.File, state.File) {
+  call parse(borrow f) as result;
+  match result {
+    Ok(value) => { transition f -> Closed; return Ok(unit); }
+    InvalidData => { transition f -> Closed; return InvalidData; }
+  }
+} on cancel { transition f -> Closed; }

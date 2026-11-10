@@ -1,0 +1,14 @@
+node_modules/
+dist/
+*.tmp
+dist-web/
+
+.pymtheg-architecture/
+
+# Machine-local review archives, captures and private project trial material.
+# Keep these on disk; the selected reports/validation summaries are tracked.
+/evidence/review-candidates/
+/evidence/product-audit/
+/evidence/project-fit/
+__pycache__/
+*.pyc

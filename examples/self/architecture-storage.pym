@@ -1,0 +1,26 @@
+// Compare storage work for edits after the initial full import.
+// Payload counts are abstract writes, not elapsed time or measured bytes.
+op storeDocumentPayload() -> Unit cost document_payloads exact 1 cost revision_indexes exact 0;
+op storeRevisionIndex() -> Unit cost revision_indexes exact 1 cost document_payloads exact 0;
+
+// Copying all 111 documents for each of 1,000 edits can write 111,000 payloads.
+flow copyWholeRevision(documents: Nat, revisions: Nat) -> Unit
+bound documents <= 111 bound revisions <= 1000
+budget document_payloads <= 1000 {
+  for revision in revisions {
+    for document in documents { call storeDocumentPayload(); }
+    call storeRevisionIndex();
+  }
+}
+
+// Content-addressed storage writes only changed payloads after the baseline.
+// One changed document per edit is a declared workload assumption, not a proof
+// that every user edit changes exactly one document.
+flow reuseUnchangedContent(changedDocuments: Nat, revisions: Nat) -> Unit
+bound changedDocuments <= 1 bound revisions <= 1000
+budget document_payloads <= 1000 {
+  for revision in revisions {
+    for document in changedDocuments { call storeDocumentPayload(); }
+    call storeRevisionIndex();
+  }
+}

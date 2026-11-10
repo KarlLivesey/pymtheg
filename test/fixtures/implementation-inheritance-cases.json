@@ -1,0 +1,236 @@
+[
+  {
+    "name": "wave3-s-external-subclass/s01",
+    "files": {
+      "a.js": "function refund(){ return \"REFUND\" } function other(){ return \"OTHER\" }\nclass B { run(){ return refund() } }\nclass D extends B {}\nconst C = new D().constructor; Object.getPrototypeOf(C).prototype.run = other\nconsole.log(new B().run())\n"
+    }
+  },
+  {
+    "name": "wave3-s-external-subclass/s02",
+    "files": {
+      "a.js": "function refund(){ return \"REFUND\" } function other(){ return \"OTHER\" }\nclass B { run(){ return refund() } }\nclass D extends B {}\nObject.getPrototypeOf(new D()).__proto__.run = other\nconsole.log(new B().run())\n"
+    }
+  },
+  {
+    "name": "wave3-s-external-subclass/s03",
+    "files": {
+      "a.js": "function refund(){ return \"REFUND\" } function other(){ return \"OTHER\" }\nclass B { run(){ return refund() } }\nclass D extends B {}\nconst d = new D(); d.__proto__.__proto__.run = other\nconsole.log(new B().run())\n"
+    }
+  },
+  {
+    "name": "wave3-s-external-subclass/s04",
+    "files": {
+      "a.js": "function refund(){ return \"REFUND\" } function other(){ return \"OTHER\" }\nclass B { run(){ return refund() } }\nclass D extends B {}\nconst D2 = class extends B {}; Object.getPrototypeOf(D2.prototype).run = other\nconsole.log(new B().run())\n"
+    }
+  },
+  {
+    "name": "wave3-s-external-subclass/s05",
+    "files": {
+      "a.js": "function refund(){ return \"REFUND\" } function other(){ return \"OTHER\" }\nclass B { run(){ return refund() } }\nclass D extends B {}\nObject.getPrototypeOf(D.prototype).run = other\nconsole.log(new B().run())\n"
+    }
+  },
+  {
+    "name": "wave3-s-external-subclass/s06",
+    "files": {
+      "a.js": "function refund(){ return \"REFUND\" } function other(){ return \"OTHER\" }\nclass B { run(){ return refund() } }\nclass D extends B {}\nD.prototype.__proto__.run = other\nconsole.log(new B().run())\n"
+    }
+  },
+  {
+    "name": "wave3-s-external-subclass/s13",
+    "files": {
+      "a.js": "function refund(){ return \"REFUND\" } function other(){ return \"OTHER\" }\nclass B { run(){ return refund() } }\nclass D extends B {}\nconst d = new D(); d.constructor.__proto__.prototype.run = other\nconsole.log(new B().run())\n"
+    }
+  },
+  {
+    "name": "wave3-s-external-subclass/s14",
+    "files": {
+      "a.js": "function refund(){ return \"REFUND\" } function other(){ return \"OTHER\" }\nclass B { run(){ return refund() } }\nclass D extends B {}\nReflect.getPrototypeOf(D).prototype.run = other\nconsole.log(new B().run())\n"
+    }
+  },
+  {
+    "name": "wave3-s-external-subclass/s26",
+    "files": {
+      "a.js": "function refund(){ return \"REFUND\" } function other(){ return \"OTHER\" }\nclass B { run(){ return refund() } }\nclass D extends B {}\nconst d = new D(); Object.getPrototypeOf(Object.getPrototypeOf(d)).run = other\nconsole.log(new B().run())\n"
+    }
+  },
+  {
+    "name": "wave3-s-external-subclass/s27",
+    "files": {
+      "a.js": "function refund(){ return \"REFUND\" } function other(){ return \"OTHER\" }\nclass B { run(){ return refund() } }\nclass D extends B {}\nObject.getPrototypeOf(D).prototype.run = other\nconsole.log(new B().run())\n"
+    }
+  },
+  {
+    "name": "wave3-s-external-subclass/s28",
+    "files": {
+      "a.js": "function refund(){ return \"REFUND\" } function other(){ return \"OTHER\" }\nclass B { run(){ return refund() } }\nclass D extends B {}\nD.__proto__.prototype.run = other\nconsole.log(new B().run())\n"
+    }
+  },
+  {
+    "name": "wave3-s-external-subclass/s29",
+    "files": {
+      "a.js": "function refund(){ return \"REFUND\" } function other(){ return \"OTHER\" }\nclass B { run(){ return refund() } }\nclass D extends B {}\nconst P = D.prototype; Object.getPrototypeOf(P).run = other\nconsole.log(new B().run())\n"
+    }
+  },
+  {
+    "name": "wave3-s-external-subclass/s30",
+    "files": {
+      "a.js": "function refund(){ return \"REFUND\" } function other(){ return \"OTHER\" }\nclass B { run(){ return refund() } }\nclass D extends B {}\nconst o = new D(); const p = Object.getPrototypeOf(o); const q = Object.getPrototypeOf(p); q.run = other\nconsole.log(new B().run())\n"
+    }
+  },
+  {
+    "name": "wave3-s-external-subclass/s35",
+    "files": {
+      "a.js": "function refund(){ return \"REFUND\" } function other(){ return \"OTHER\" }\nclass B { run(){ return refund() } }\nclass D extends B {}\nconst f = (x) => x.constructor; f(new D()).__proto__.prototype.run = other\nconsole.log(new B().run())\n"
+    }
+  },
+  {
+    "name": "wave4-t-this-subclass/t01",
+    "files": {
+      "a.js": "function refund(){ return \"REFUND\" } function other(){ return \"OTHER\" }\nclass B { run(){ return refund() } }\nclass D extends B { constructor(){ super(); Object.getPrototypeOf(this.constructor.prototype).run = other } }\nnew D()\nconsole.log(new B().run(), new D().run())\n"
+    }
+  },
+  {
+    "name": "wave4-t-this-subclass/t02",
+    "files": {
+      "a.js": "function refund(){ return \"REFUND\" } function other(){ return \"OTHER\" }\nclass B { run(){ return refund() } }\nclass D extends B { constructor(){ super(); const C = this.constructor; C.__proto__.prototype.run = other } }\nnew D()\nconsole.log(new B().run(), new D().run())\n"
+    }
+  },
+  {
+    "name": "wave4-t-this-subclass/t03",
+    "files": {
+      "a.js": "function refund(){ return \"REFUND\" } function other(){ return \"OTHER\" }\nclass B { run(){ return refund() } }\nclass D extends B { constructor(){ super(); this.__proto__.__proto__.run = other } }\nnew D()\nconsole.log(new B().run(), new D().run())\n"
+    }
+  },
+  {
+    "name": "wave4-t-this-subclass/t05",
+    "files": {
+      "a.js": "function refund(){ return \"REFUND\" } function other(){ return \"OTHER\" }\nclass B { run(){ return refund() } }\nclass D extends B { constructor(){ super(); Object.getPrototypeOf(Object.getPrototypeOf(this)).run = other } }\nnew D()\nconsole.log(new B().run(), new D().run())\n"
+    }
+  },
+  {
+    "name": "wave4-t-this-subclass/t06",
+    "files": {
+      "a.js": "function refund(){ return \"REFUND\" } function other(){ return \"OTHER\" }\nclass B { run(){ return refund() } }\nclass D extends B { constructor(){ super(); const P = Object.getPrototypeOf(this); Object.getPrototypeOf(P).run = other } }\nnew D()\nconsole.log(new B().run(), new D().run())\n"
+    }
+  },
+  {
+    "name": "wave4-t-this-subclass/t07",
+    "files": {
+      "a.js": "function refund(){ return \"REFUND\" } function other(){ return \"OTHER\" }\nclass B { run(){ return refund() } }\nclass D extends B { constructor(){ super(); Object.getPrototypeOf(this.constructor).prototype.run = other } }\nnew D()\nconsole.log(new B().run(), new D().run())\n"
+    }
+  },
+  {
+    "name": "wave4-t-this-subclass/t08",
+    "files": {
+      "a.js": "function refund(){ return \"REFUND\" } function other(){ return \"OTHER\" }\nclass B { run(){ return refund() } }\nclass D extends B { constructor(){ super(); const { constructor: C } = this; Object.getPrototypeOf(C).prototype.run = other } }\nnew D()\nconsole.log(new B().run(), new D().run())\n"
+    }
+  },
+  {
+    "name": "wave4-t-this-subclass/t09",
+    "files": {
+      "a.js": "function refund(){ return \"REFUND\" } function other(){ return \"OTHER\" }\nclass B { run(){ return refund() } }\nclass D extends B { constructor(){ super(); this.constructor.__proto__.prototype.run = other } }\nnew D()\nconsole.log(new B().run(), new D().run())\n"
+    }
+  },
+  {
+    "name": "wave4-t-this-subclass/t10",
+    "files": {
+      "a.js": "function refund(){ return \"REFUND\" } function other(){ return \"OTHER\" }\nclass B { run(){ return refund() } }\nclass D extends B { constructor(){ super(); const s = this; s.__proto__.__proto__.run = other } }\nnew D()\nconsole.log(new B().run(), new D().run())\n"
+    }
+  },
+  {
+    "name": "wave7-z-assignment-cyclic/z05",
+    "files": {
+      "a.js": "function refund(){ return \"REFUND\" } function other(){ return \"OTHER\" }\nclass B { constructor(){ let C; C = this.constructor; (0, C).prototype.run = other } run(){ return refund() } }\nconsole.log(new B().run())\n"
+    }
+  },
+  {
+    "name": "wave7-z-assignment-cyclic/z07",
+    "files": {
+      "a.js": "function refund(){ return \"REFUND\" } function other(){ return \"OTHER\" }\nclass B { constructor(){ let C; C = this.constructor; [C][0].prototype.run = other } run(){ return refund() } }\nconsole.log(new B().run())\n"
+    }
+  },
+  {
+    "name": "wave7-z-assignment-cyclic/z08",
+    "files": {
+      "a.js": "function refund(){ return \"REFUND\" } function other(){ return \"OTHER\" }\nclass B { constructor(){ let C; C = this.constructor; ({ C }).C.prototype.run = other } run(){ return refund() } }\nconsole.log(new B().run())\n"
+    }
+  },
+  {
+    "name": "wave7-z-assignment-cyclic/z13",
+    "files": {
+      "a.js": "function refund(){ return \"REFUND\" } function other(){ return \"OTHER\" }\nclass B { constructor(){ let C = Object; C = this.constructor; (0, C).prototype.run = other } run(){ return refund() } }\nconsole.log(new B().run())\n"
+    }
+  },
+  {
+    "name": "wave7-z-assignment-cyclic/z18",
+    "files": {
+      "a.js": "function refund(){ return \"REFUND\" } function other(){ return \"OTHER\" }\nclass B { constructor(){ let C; C = this.constructor; const P = (0, C).prototype; P.run = other } run(){ return refund() } }\nconsole.log(new B().run())\n"
+    }
+  },
+  {
+    "name": "wave7-z-assignment-cyclic/z19",
+    "files": {
+      "a.js": "function refund(){ return \"REFUND\" } function other(){ return \"OTHER\" }\nclass B { constructor(){ let C; C = this.constructor; Object.assign((0, C).prototype, { run: other }) } run(){ return refund() } }\nconsole.log(new B().run())\n"
+    }
+  },
+  {
+    "name": "wave8-r-ts-strict-assignment-containers/r1",
+    "files": {
+      "a.ts": "function refund(): string { return \"REFUND\" } function other(): string { return \"OTHER\" } declare const flag: boolean; (globalThis as any).flag = true;\nclass B { constructor(){ let C: any; if (flag) C = this.constructor; (C || Object).prototype.run = other } run(): string { return refund() } }\nconsole.log(new B().run())\n"
+    }
+  },
+  {
+    "name": "wave8-r-ts-strict-assignment-containers/r2",
+    "files": {
+      "a.ts": "function refund(): string { return \"REFUND\" } function other(): string { return \"OTHER\" } declare const flag: boolean; (globalThis as any).flag = true;\nclass B { constructor(){ let C: any; C = this.constructor; const targets = [C]; for (const T of targets) T.prototype.run = other } run(): string { return refund() } }\nconsole.log(new B().run())\n"
+    }
+  },
+  {
+    "name": "wave8-r-ts-strict-assignment-containers/r3",
+    "files": {
+      "a.ts": "function refund(): string { return \"REFUND\" } function other(): string { return \"OTHER\" } declare const flag: boolean; (globalThis as any).flag = true;\nclass B { constructor(){ let C: any; C = this.constructor; [C].forEach((T: any) => { T.prototype.run = other }) } run(): string { return refund() } }\nconsole.log(new B().run())\n"
+    }
+  },
+  {
+    "name": "wave8-r-ts-strict-assignment-containers/r4",
+    "files": {
+      "a.ts": "function refund(): string { return \"REFUND\" } function other(): string { return \"OTHER\" } declare const flag: boolean; (globalThis as any).flag = true;\nclass B { constructor(){ let C: any; C = this.constructor; [C][0].prototype.run = other } run(): string { return refund() } }\nconsole.log(new B().run())\n"
+    }
+  },
+  {
+    "name": "wave8-r-ts-strict-assignment-containers/r5",
+    "files": {
+      "a.ts": "function refund(): string { return \"REFUND\" } function other(): string { return \"OTHER\" } declare const flag: boolean; (globalThis as any).flag = true;\nclass B { constructor(){ let C: any; C = this.constructor; ({ C }).C.prototype.run = other } run(): string { return refund() } }\nconsole.log(new B().run())\n"
+    }
+  },
+  {
+    "name": "wave8-r-ts-strict-assignment-containers/r6",
+    "files": {
+      "a.ts": "function refund(): string { return \"REFUND\" } function other(): string { return \"OTHER\" } declare const flag: boolean; (globalThis as any).flag = true;\nclass B { constructor(){ let C: any; C = this.constructor; Object.assign((C ?? Object).prototype, { run: other }) } run(): string { return refund() } }\nconsole.log(new B().run())\n"
+    }
+  },
+  {
+    "name": "wave6/y05",
+    "files": {
+      "c.ts": "import { B } from \"./a\"\nimport \"./b\"\nconsole.log(new B().run())\n",
+      "b.ts": "import { B, D } from \"./a\"\nfunction other(): string { return \"OTHER\" }\nexport class E extends B { constructor(){ super(); const C: any = this.constructor; Object.getPrototypeOf(C).prototype.run = other } }; new E()\n",
+      "a.ts": "function refund(): string { return \"REFUND\" }\nexport class B { run(): string { return refund() } }\nexport class D extends B {}\n"
+    }
+  },
+  {
+    "name": "wave6/y06",
+    "files": {
+      "c.ts": "import { B } from \"./a\"\nimport \"./b\"\nconsole.log(new B().run())\n",
+      "b.ts": "import { B, D } from \"./a\"\nfunction other(): string { return \"OTHER\" }\nObject.getPrototypeOf(D.prototype).run = other\n",
+      "a.ts": "function refund(): string { return \"REFUND\" }\nexport class B { run(): string { return refund() } }\nexport class D extends B {}\n"
+    }
+  },
+  {
+    "name": "wave6/y08",
+    "files": {
+      "c.ts": "import { B } from \"./a\"\nimport \"./b\"\nconsole.log(new B().run())\n",
+      "b.ts": "import { B, D } from \"./a\"\nfunction other(): string { return \"OTHER\" }\nexport class E extends B { constructor(){ super(); (this as any).__proto__.__proto__.run = other } }; new E()\n",
+      "a.ts": "function refund(): string { return \"REFUND\" }\nexport class B { run(): string { return refund() } }\nexport class D extends B {}\n"
+    }
+  }
+]

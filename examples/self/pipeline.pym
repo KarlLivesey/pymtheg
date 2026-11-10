@@ -1,0 +1,23 @@
+// Compare architectural choices without implementing parsers or checkers.
+op readSnapshot() -> Unit cost source_reads exact 1 cost parses exact 0;
+op parseSnapshot() -> Unit cost parses exact 1 cost source_reads exact 0;
+flow repeatedLoading(files: Nat, analyses: Nat) -> Unit bound files <= 20 bound analyses <= 5 {
+  for pass in analyses { for file in files { call readSnapshot(); call parseSnapshot(); } }
+}
+flow sharedSnapshot(files: Nat, analyses: Nat) -> Unit bound files <= 20 bound analyses <= 5 {
+  for file in files { call readSnapshot(); call parseSnapshot(); }
+  // Analyses borrow the shared immutable typed project: no source read/parse.
+  for pass in analyses { let shared = true; }
+}
+resource Worker {
+  states Running, Stopped; initial Running; terminal Stopped;
+  Running -> Stopped; Stopped -> Stopped;
+}
+type WorkerError = Crashed;
+op collect(take worker: Worker) -> Result<Unit, WorkerError>
+effects(state.Worker) cost source_reads exact 0 cost parses exact 0
+settles worker on (Ok, Crashed, Cancelled);
+flow ownSession(take worker: Worker) -> Result<Unit, WorkerError> effects(state.Worker) {
+  call collect(take worker) as result;
+  propagate result;
+} on cancel { transition worker -> Stopped; }

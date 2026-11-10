@@ -1,0 +1,14 @@
+import "domain.pym";
+op capture(amount: Nat) -> Result<Receipt,PaymentError>
+effects(remote.Payments) cost remote_calls exact 1 atomic;
+flow pay(amount: Nat) -> Result<Receipt,PaymentError> effects(remote.Payments) {
+  call capture(amount) as result;
+  match result {
+    Ok(receipt) => { return Ok(receipt); }
+    Declined => { return Declined; }
+    OutcomeUnknown => {
+      unknown "Who reconciles a possible capture before another attempt?";
+      return OutcomeUnknown;
+    }
+  }
+}

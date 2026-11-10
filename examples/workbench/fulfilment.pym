@@ -1,0 +1,14 @@
+resource Reservation {
+  states Active, Released, Consumed;
+  initial Active;
+  terminal Released, Consumed;
+  Active -> Released; Active -> Consumed;
+  Released -> Released;
+}
+op reserve() -> Reservation effects(state.Reservation) creates result cost remote_calls exact 1;
+op commit(take reservation: Reservation) -> Unit effects(state.Reservation)
+cost remote_calls exact 1 settles reservation on (Unit, Cancelled);
+flow prepare() -> Unit effects(state.Reservation) {
+  call reserve() as reservation;
+  call commit(take reservation);
+} on cancel { transition reservation -> Released; }

@@ -1,0 +1,341 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:pymtheg:report:v1",
+  "title": "Pymtheg scoped analysis report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "semanticVersion",
+    "snapshot",
+    "session",
+    "diagnostics",
+    "results",
+    "dependencies",
+    "measurements",
+    "artifacts"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "pymtheg.report/v1"
+    },
+    "semanticVersion": {
+      "type": "string"
+    },
+    "snapshot": {
+      "type": "object",
+      "required": ["id", "files"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["file", "hash", "text"],
+            "properties": {
+              "file": {
+                "type": "string"
+              },
+              "hash": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "session": {
+      "type": "object",
+      "required": ["state", "requested", "staleFiles"],
+      "properties": {
+        "state": {
+          "enum": ["Completed", "Cancelled", "Failed"]
+        },
+        "requested": {
+          "type": "string"
+        },
+        "staleFiles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/finding"
+      }
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/result"
+      }
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["from", "to", "kind"],
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": ["call", "type", "rule", "import", "assumption"]
+          }
+        }
+      }
+    },
+    "measurements": {
+      "$ref": "#/definitions/measurements"
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "consumers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["selectedFiles", "symbolIds", "diagnostics", "results"],
+      "properties": {
+        "selectedFiles": {
+          "$ref": "#/definitions/strings"
+        },
+        "symbolIds": {
+          "$ref": "#/definitions/strings"
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/finding"
+          }
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/result"
+          }
+        },
+        "incompleteFiles": {
+          "$ref": "#/definitions/strings"
+        }
+      }
+    }
+  },
+  "definitions": {
+    "span": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file", "start", "end"],
+      "properties": {
+        "file": {
+          "type": "string"
+        },
+        "start": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "required": ["code", "severity", "message", "span", "related", "path"],
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "severity": {
+          "enum": ["error", "warning", "info"]
+        },
+        "message": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/definitions/span"
+        },
+        "related": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/span"
+          }
+        },
+        "path": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "number",
+        "minimum": 0
+      }
+    },
+    "strings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "propertyId",
+        "propertyHash",
+        "analysisKind",
+        "outcome",
+        "method",
+        "completion",
+        "scope",
+        "assumptions",
+        "outstandingObligations",
+        "witnessOrDerivation",
+        "witnessValidation",
+        "diagnostics",
+        "toolVersions",
+        "measurements"
+      ],
+      "properties": {
+        "propertyId": {
+          "type": "string"
+        },
+        "propertyHash": {
+          "type": "string"
+        },
+        "analysisKind": {
+          "type": "string"
+        },
+        "outcome": {
+          "enum": [
+            "counterexample",
+            "no_counterexample",
+            "established",
+            "inconclusive",
+            "not_run"
+          ]
+        },
+        "method": {
+          "enum": [
+            "structural",
+            "abstract_interpretation",
+            "simulation",
+            "finite_model_check",
+            "heuristic"
+          ]
+        },
+        "completion": {
+          "enum": [
+            "complete",
+            "incomplete",
+            "unsupported",
+            "timed_out",
+            "cancelled",
+            "failed"
+          ]
+        },
+        "scope": {
+          "type": "object",
+          "required": ["snapshotHash", "configurationHash"],
+          "properties": {
+            "snapshotHash": {
+              "type": "string"
+            },
+            "configurationHash": {
+              "type": "string"
+            },
+            "modelHash": {
+              "type": "string"
+            },
+            "bounds": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "seed": {
+              "type": "string"
+            }
+          }
+        },
+        "assumptions": {
+          "$ref": "#/definitions/strings"
+        },
+        "outstandingObligations": {
+          "$ref": "#/definitions/strings"
+        },
+        "witnessOrDerivation": {},
+        "witnessValidation": {
+          "enum": [
+            "source_replayed",
+            "backend_only",
+            "unvalidated",
+            "not_applicable"
+          ]
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/finding"
+          }
+        },
+        "toolVersions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "measurements": {
+          "$ref": "#/definitions/measurements"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "established"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "completion": {
+                "const": "complete"
+              },
+              "method": {
+                "not": {
+                  "enum": ["simulation", "heuristic"]
+                }
+              },
+              "outstandingObligations": {
+                "maxItems": 0,
+                "type": "array"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

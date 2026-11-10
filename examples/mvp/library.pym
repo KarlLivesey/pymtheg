@@ -1,0 +1,12 @@
+// Decide eligibility before implementing a catalogue or lending database.
+type Reader = { suspended: Bool, remaining: Nat };
+type LoanError = Suspended | QuotaExceeded;
+rule eligible(reader: Reader, requested: Nat) -> Bool =
+!reader.suspended && requested <= reader.remaining;
+flow lend(reader: Reader, books: List<Nat>) -> Result<Unit,LoanError>
+bound books <= 3 {
+  if reader.suspended { return Suspended; }
+  if books.count > reader.remaining { return QuotaExceeded; }
+  assert eligible(reader, books.count);
+  return Ok(unit);
+}

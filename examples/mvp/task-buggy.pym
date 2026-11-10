@@ -1,0 +1,15 @@
+// An acknowledged background job: pending request, work, ack are distinct.
+machine TaskRunner {
+  state pending: Bool = false;
+  state effected: Bool = false;
+  state acknowledged: Bool = false;
+  state deliveries: Nat in 0..2 = 0;
+  state attempts: Nat in 0..2 = 0;
+  event enqueue when !pending && !acknowledged && attempts < 2 {
+    pending = true; effected = false; attempts = attempts + 1;
+  }
+  event runJob when pending && !effected { deliveries = deliveries + 1; effected = true; }
+  event loseAck when pending && effected { pending = false; }
+  event receiveAck when pending && effected { pending = false; acknowledged = true; }
+  invariant singleDelivery = deliveries <= 1;
+}
