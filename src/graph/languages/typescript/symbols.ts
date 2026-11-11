@@ -44,27 +44,139 @@ export function isRequireCall(node: ts.Node): node is ts.CallExpression {
     ts.isStringLiteralLike(node.arguments[0]!)
   );
 }
-const requireAlias = (declaration: ts.VariableDeclaration) => {
+
+// The checker of the program being extracted. Module-system names (`require`,
+// `module`, `exports`) are judged with it, so symbol extraction and link
+// extraction agree on whether a construct is CommonJS.
+let oracle: ts.TypeChecker | undefined;
+export function withChecker<T>(checker: ts.TypeChecker, run: () => T): T {
+  const previous = oracle;
+  oracle = checker;
+  try {
+    return run();
+  } finally {
+    oracle = previous;
+  }
+}
+/**
+ * Whether an identifier means the module system's global, following the
+ * compiler's own `isCommonJsRequire` rule: no binding, or only ambient
+ * declarations. A local function, parameter, variable or import of that name
+ * shadows it.
+ */
+export function isModuleGlobal(identifier: ts.Identifier): boolean {
+  if (!oracle) return true;
+  const symbol = oracle.getSymbolAtLocation(identifier);
+  if (!symbol) return true;
+  if (symbol.flags & ts.SymbolFlags.Alias) return false;
+  const declarations = symbol.declarations ?? [];
+  return (
+    !declarations.length ||
+    declarations.some((declaration) => {
+      if (declaration.getSourceFile().isDeclarationFile) return true;
+      for (
+        let node: ts.Node | undefined = declaration;
+        node;
+        node = node.parent
+      )
+        if (
+          ts.canHaveModifiers(node) &&
+          ts
+            .getModifiers(node)
+            ?.some((modifier) => modifier.kind === ts.SyntaxKind.DeclareKeyword)
+        )
+          return true;
+      return false;
+    })
+  );
+}
+/** A `require("literal")` call in a JavaScript file that means CommonJS. */
+export const isCommonJsRequire = (node: ts.Node): boolean =>
+  isRequireCall(node) &&
+  isJsFile(node.getSourceFile()) &&
+  isModuleGlobal(node.expression as ts.Identifier);
+/** The require call a variable is initialised from (`require(x)`, `require(x).y`), if any. */
+export function requireInitializer(
+  declaration: ts.VariableDeclaration,
+): ts.CallExpression | undefined {
   if (!declaration.initializer || !isJsFile(declaration.getSourceFile()))
-    return false;
+    return undefined;
   let value = unwrap(declaration.initializer);
   while (ts.isPropertyAccessExpression(value)) value = value.expression;
-  return isRequireCall(value);
+  return isRequireCall(value) ? value : undefined;
+}
+const requireAlias = (declaration: ts.VariableDeclaration) => {
+  const call = requireInitializer(declaration);
+  return !!call && isCommonJsRequire(call);
 };
+/**
+ * The compiler binds `const x = require("m")` as an alias even when `require`
+ * is a local function. Such a declaration is an ordinary variable here, so alias
+ * following must stop at it.
+ */
+export function isShadowedRequireAlias(declaration: ts.Node): boolean {
+  const root = ts.isBindingElement(declaration)
+    ? rootDeclaration(declaration)
+    : ts.isVariableDeclaration(declaration)
+      ? declaration
+      : undefined;
+  const call = root && requireInitializer(root);
+  return !!call && !isCommonJsRequire(call);
+}
 
+/**
+ * Whether a file binds `name` at its top level (which shadows the CommonJS
+ * `module`/`exports` objects for top-level assignments). The checker resolves
+ * these identifiers to export symbols, not to scope bindings, so this is a
+ * syntactic check of the file's own declarations.
+ */
+function declaresAtTop(file: ts.SourceFile, name: string): boolean {
+  const binds = (node: ts.BindingName): boolean =>
+    ts.isIdentifier(node)
+      ? node.text === name
+      : node.elements.some(
+          (element) => !ts.isOmittedExpression(element) && binds(element.name),
+        );
+  return file.statements.some((statement) => {
+    if (ts.isVariableStatement(statement))
+      return statement.declarationList.declarations.some((d) => binds(d.name));
+    if (
+      ts.isFunctionDeclaration(statement) ||
+      ts.isClassDeclaration(statement) ||
+      ts.isEnumDeclaration(statement)
+    )
+      return statement.name?.text === name;
+    if (ts.isImportDeclaration(statement)) {
+      const clause = statement.importClause;
+      const named = clause?.namedBindings;
+      return (
+        clause?.name?.text === name ||
+        (!!named &&
+          (ts.isNamespaceImport(named)
+            ? named.name.text === name
+            : named.elements.some((element) => element.name.text === name)))
+      );
+    }
+    if (ts.isImportEqualsDeclaration(statement))
+      return statement.name.text === name;
+    return false;
+  });
+}
 /** CommonJS export target text for `exports.x`, `module.exports.x` or `module.exports`. */
 export function commonJsTarget(expression: ts.Expression): string | undefined {
   const isModuleExports = (node: ts.Expression) =>
     ts.isPropertyAccessExpression(node) &&
     ts.isIdentifier(node.expression) &&
     node.expression.text === "module" &&
-    node.name.text === "exports";
+    node.name.text === "exports" &&
+    !declaresAtTop(node.getSourceFile(), "module");
   if (isModuleExports(expression)) return "module.exports";
   if (
     ts.isPropertyAccessExpression(expression) &&
     ts.isIdentifier(expression.name) &&
     ((ts.isIdentifier(expression.expression) &&
-      expression.expression.text === "exports") ||
+      expression.expression.text === "exports" &&
+      !declaresAtTop(expression.getSourceFile(), "exports")) ||
       isModuleExports(expression.expression))
   )
     return expression.name.text;
@@ -189,6 +301,23 @@ function overloadGroup(node: Member): { head: Member; tail: Member } {
 /** Canonical symbol node for a declaration, or undefined when it is not a graph symbol. */
 export function anchorOf(node: ts.Node): ts.Node | undefined {
   if (ts.isSourceFile(node)) return node;
+  if (ts.isParameter(node)) {
+    // Constructor parameter properties (`constructor(public cb: T)`) are class properties.
+    const owner = node.parent.parent;
+    if (
+      !ts.isParameterPropertyDeclaration(node, node.parent) ||
+      !ts.isIdentifier(node.name) ||
+      !owner
+    )
+      return undefined;
+    return (
+      ts.isClassDeclaration(owner)
+        ? anchorOf(owner) === owner
+        : ts.isClassExpression(owner) && !!holderOf(owner)
+    )
+      ? node
+      : undefined;
+  }
   const parent = node.parent;
   if (!parent) return undefined;
   if (
@@ -294,7 +423,11 @@ export function kindOf(anchor: ts.Node): string {
     return "method";
   if (ts.isPropertyAssignment(anchor))
     return isFunctionLike(anchor.initializer) ? "method" : "property";
-  if (ts.isPropertyDeclaration(anchor) || ts.isPropertySignature(anchor))
+  if (
+    ts.isPropertyDeclaration(anchor) ||
+    ts.isPropertySignature(anchor) ||
+    ts.isParameter(anchor)
+  )
     return "property";
   const value = ts.isVariableDeclaration(anchor)
     ? anchor.initializer
@@ -348,6 +481,10 @@ export function nameOf(anchor: ts.Node): string {
 /** The anchored container that qualifies this symbol's identity, or the source file. */
 export function containerOf(anchor: ts.Node): ts.Node | undefined {
   if (ts.isSourceFile(anchor)) return undefined;
+  if (ts.isParameter(anchor)) {
+    const owner = anchor.parent.parent;
+    return ts.isClassExpression(owner) ? holderOf(owner) : owner;
+  }
   let statement: ts.Node = anchor;
   if (ts.isBindingElement(anchor))
     statement = rootDeclaration(anchor)!.parent.parent;

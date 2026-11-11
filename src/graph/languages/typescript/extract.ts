@@ -1,3 +1,4 @@
+import { posix } from "node:path";
 import ts from "typescript";
 import type {
   Diagnostic,
@@ -12,8 +13,10 @@ import {
   containerOf,
   identityOf,
   isEntityName,
+  isCommonJsRequire,
   isJsFile,
-  isRequireCall,
+  isModuleGlobal,
+  isShadowedRequireAlias,
   keyOf,
   kindOf,
   nameOf,
@@ -26,10 +29,14 @@ export interface TargetFact {
   file: string;
   key: string;
 }
-type Meaning = "value" | "type" | "any";
+/** What a usage can mean: a call needs something callable, a type position a type. */
+type Meaning = "call" | "value" | "type" | "any";
 interface Targets {
   targets: TargetFact[];
-  /** Why there is no complete target set: external, local, no-symbol, missing-module, external-package. */
+  /**
+   * Why there is no complete target set: external, local, no-symbol,
+   * missing-module, external-package, unresolved-alias, computed-specifier.
+   */
   reason?: string;
 }
 
@@ -41,6 +48,15 @@ const TYPE_DECLARATIONS = new Set([
   ts.SyntaxKind.EnumDeclaration,
   ts.SyntaxKind.TypeParameter,
   ts.SyntaxKind.SourceFile,
+]);
+/** Declarations a call cannot invoke. */
+const NOT_CALLABLE = new Set([
+  ts.SyntaxKind.ModuleDeclaration,
+  ts.SyntaxKind.InterfaceDeclaration,
+  ts.SyntaxKind.TypeAliasDeclaration,
+  ts.SyntaxKind.EnumDeclaration,
+  ts.SyntaxKind.EnumMember,
+  ts.SyntaxKind.TypeParameter,
 ]);
 const TYPE_ONLY = new Set([
   ts.SyntaxKind.InterfaceDeclaration,
@@ -88,14 +104,19 @@ export function extractFile(
     let local = 0;
     const visit = (value: ts.Symbol, depth: number) => {
       let current = value;
-      if (current.flags & ts.SymbolFlags.Alias)
+      if (
+        current.flags & ts.SymbolFlags.Alias &&
+        !current.declarations?.some(isShadowedRequireAlias)
+      )
         current = checker.getAliasedSymbol(current);
       let declarations = current.declarations ?? [];
       if (meaning !== "any" && declarations.length > 1) {
         const filtered = declarations.filter((declaration) =>
           meaning === "type"
             ? TYPE_DECLARATIONS.has(declaration.kind)
-            : !TYPE_ONLY.has(declaration.kind),
+            : meaning === "call"
+              ? !NOT_CALLABLE.has(declaration.kind)
+              : !TYPE_ONLY.has(declaration.kind),
         );
         if (filtered.length) declarations = filtered;
       }
@@ -151,20 +172,35 @@ export function extractFile(
       data: facts,
     });
   }
+  const paths = Object.keys(program.getCompilerOptions().paths ?? {});
+  /** Why a module specifier does not resolve, or undefined when it does. */
+  function moduleReason(specifier: ts.Expression): string | undefined {
+    if (!ts.isStringLiteralLike(specifier)) return "computed-specifier";
+    if (checker.getSymbolAtLocation(specifier)) return undefined;
+    const text = specifier.text;
+    if (/^\.\.?(\/|$)/.test(text) || text.startsWith("/"))
+      return "missing-module";
+    const aliased =
+      text.startsWith("#") ||
+      paths.some((pattern) => {
+        const star = pattern.indexOf("*");
+        return star < 0
+          ? pattern === text
+          : text.length >= pattern.length - 1 &&
+              text.startsWith(pattern.slice(0, star)) &&
+              text.endsWith(pattern.slice(star + 1));
+      });
+    return aliased ? "unresolved-alias" : "external-package";
+  }
   function moduleLink(
     owner: string,
     specifier: ts.StringLiteralLike,
     extra: { [key: string]: Json },
   ) {
-    const symbol = checker.getSymbolAtLocation(specifier);
-    const relative =
-      /^\.\.?(\/|$)/.test(specifier.text) || specifier.text.startsWith("/");
-    const found = symbol
-      ? targetsOf(symbol, "any")
-      : {
-          targets: [],
-          reason: relative ? "missing-module" : "external-package",
-        };
+    const reason = moduleReason(specifier);
+    const found = reason
+      ? { targets: [], reason }
+      : targetsOf(checker.getSymbolAtLocation(specifier), "any");
     link(owner, "imports", specifier.text, specifier, found, {
       specifier: specifier.text,
       ...extra,
@@ -204,7 +240,7 @@ export function extractFile(
       : ts.isPropertyAccessExpression(expression)
         ? `(expression).${expression.name.text}`
         : "(expression)";
-    link(owner, "calls", name, at, targetsOf(symbol, "value"), extra);
+    link(owner, "calls", name, at, targetsOf(symbol, "call"), extra);
   }
   function binding(
     owner: string,
@@ -213,13 +249,18 @@ export function extractFile(
     name: ts.Node,
     kind: string,
     extra: { [key: string]: Json },
+    specifier?: ts.Expression,
   ) {
+    // Bindings from a module that does not resolve share its reason.
+    const reason = specifier && moduleReason(specifier);
     link(
       owner,
       kind,
       importedName,
       at,
-      targetsOf(symbolOf(name), "any"),
+      reason
+        ? { targets: [], reason }
+        : targetsOf(symbolOf(name), extra.typeOnly ? "type" : "any"),
       extra,
     );
   }
@@ -273,6 +314,7 @@ export function extractFile(
           clause.name,
           "imports",
           facts(typeOnly),
+          node.moduleSpecifier,
         );
       const bindings = clause?.namedBindings;
       if (bindings && ts.isNamespaceImport(bindings))
@@ -283,6 +325,7 @@ export function extractFile(
           bindings.name,
           "imports",
           facts(typeOnly),
+          node.moduleSpecifier,
         );
       else if (bindings)
         for (const element of bindings.elements)
@@ -293,6 +336,7 @@ export function extractFile(
             element.name,
             "imports",
             facts(typeOnly || element.isTypeOnly),
+            node.moduleSpecifier,
           );
       return;
     }
@@ -306,19 +350,23 @@ export function extractFile(
         });
       const clause = node.exportClause;
       if (clause && ts.isNamespaceExport(clause))
-        binding(moduleKey, "*", clause, clause.name, "exports", {});
+        binding(moduleKey, "*", clause, clause.name, "exports", {}, specifier);
       else if (clause)
         for (const element of clause.elements) {
           const local = specifier
             ? symbolOf(element.name)
             : checker.getExportSpecifierLocalTargetSymbol(element);
+          const only = typeOnly || element.isTypeOnly;
+          const reason = specifier && moduleReason(specifier);
           link(
             moduleKey,
             "exports",
             (element.propertyName ?? element.name).text,
             element,
-            targetsOf(local, "any"),
-            typeOnly || element.isTypeOnly ? { typeOnly: true } : {},
+            reason
+              ? { targets: [], reason }
+              : targetsOf(local, only ? "type" : "any"),
+            only ? { typeOnly: true } : {},
           );
         }
       return;
@@ -344,7 +392,15 @@ export function extractFile(
         ts.isStringLiteralLike(reference.expression)
       ) {
         moduleLink(moduleKey, reference.expression, {});
-        binding(moduleKey, "*", node.name, node.name, "imports", {});
+        binding(
+          moduleKey,
+          "*",
+          node.name,
+          node.name,
+          "imports",
+          {},
+          reference.expression,
+        );
       } else if (!ts.isExternalModuleReference(reference)) {
         const at = ts.isQualifiedName(reference) ? reference.right : reference;
         link(
@@ -371,7 +427,23 @@ export function extractFile(
             { targets: [], reason: "computed-specifier" },
             { dynamic: true },
           );
-      } else if (isRequireCall(node) && isJsFile(file)) {
+      } else if (
+        ts.isIdentifier(node.expression) &&
+        node.expression.text === "require" &&
+        node.arguments.length === 1 &&
+        !ts.isStringLiteralLike(node.arguments[0]!) &&
+        isJsFile(file) &&
+        isModuleGlobal(node.expression)
+      )
+        link(
+          owner,
+          "imports",
+          "(computed require)",
+          node,
+          { targets: [], reason: "computed-specifier" },
+          { require: true },
+        );
+      else if (isCommonJsRequire(node)) {
         moduleLink(owner, node.arguments[0] as ts.StringLiteralLike, {
           require: true,
         });
@@ -387,9 +459,15 @@ export function extractFile(
           declaration.initializer === holder
         ) {
           if (ts.isIdentifier(declaration.name))
-            binding(owner, "*", declaration.name, declaration.name, "imports", {
-              require: true,
-            });
+            binding(
+              owner,
+              "*",
+              declaration.name,
+              declaration.name,
+              "imports",
+              { require: true },
+              node.arguments[0],
+            );
           else if (ts.isObjectBindingPattern(declaration.name))
             for (const element of declaration.name.elements)
               if (ts.isIdentifier(element.name))
@@ -402,6 +480,7 @@ export function extractFile(
                   element.name,
                   "imports",
                   { require: true },
+                  node.arguments[0],
                 );
         }
       } else callLink(owner, node.expression);
@@ -422,7 +501,7 @@ export function extractFile(
           "calls",
           tag.getText(file),
           at,
-          targetsOf(symbolOf(at), "value"),
+          targetsOf(symbolOf(at), "call"),
           { jsx: true },
         );
       }
@@ -482,6 +561,52 @@ export function extractFile(
     ts.forEachChild(node, (child) => visit(child, owner));
   }
   visit(file, moduleKey);
+
+  // Triple-slash directives: path references link to the file; types and lib
+  // references name packages or the standard library, which are never captured.
+  const directives: [ts.FileReference, string][] = [
+    ...file.referencedFiles.map(
+      (item) => [item, "path"] as [ts.FileReference, string],
+    ),
+    ...file.typeReferenceDirectives.map(
+      (item) => [item, "types"] as [ts.FileReference, string],
+    ),
+    ...file.libReferenceDirectives.map(
+      (item) => [item, "lib"] as [ts.FileReference, string],
+    ),
+  ];
+  for (const [reference, kind] of directives.sort(
+    (a, b) => a[0].pos - b[0].pos,
+  )) {
+    let found: Targets = {
+      targets: [],
+      reason: kind === "lib" ? "external" : "external-package",
+    };
+    if (kind === "path") {
+      const base = posix.normalize(
+        posix.join(posix.dirname(file.fileName), reference.fileName),
+      );
+      const target = [base, `${base}.ts`, `${base}.d.ts`, `${base}.tsx`]
+        .map((name) => program.getSourceFile(name))
+        .find((source) => source && captured.has(source.fileName.slice(1)));
+      found = target
+        ? { targets: [{ file: target.fileName.slice(1), key: keyOf(target) }] }
+        : { targets: [], reason: "missing-module" };
+    }
+    links.push({
+      sourceKey: moduleKey,
+      kind: "imports",
+      targetName: reference.fileName || "(empty reference)",
+      range: { start: reference.pos, end: reference.end },
+      data: {
+        reference: kind,
+        ...(found.targets.length
+          ? { targets: found.targets.map((target) => ({ ...target })) }
+          : {}),
+        ...(found.reason ? { reason: found.reason } : {}),
+      },
+    });
+  }
 
   for (const diagnostic of program.getSyntacticDiagnostics(file)) {
     const start = diagnostic.start ?? 0;

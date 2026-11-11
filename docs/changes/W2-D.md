@@ -90,6 +90,7 @@ position. `key` (`kind@start`) is file-local and not persistent.
 | Class declaration; `const K = class {}` | `class` | `Job`, `Klass` |
 | Method, constructor, getter, setter, property | `method`, `constructor`, `getter`, `setter`, `property` | `Job.run`, `Job.constructor`, `Shape.size`, `Shape.#secret` |
 | Static member | same kinds | `Shape.static count` |
+| Constructor parameter property (`public`/`private`/`protected`/`readonly`/`override`) | `property` | `A.cb` |
 | Interface; its method/property/accessor signatures | `interface`, `method`, `property`, `getter`/`setter` | `Runner`, `Runner.run` |
 | Type alias | `type` | `Id` |
 | Enum and members | `enum`, `enum-member` | `Color`, `Color.Red` |
@@ -99,7 +100,7 @@ position. `key` (`kind@start`) is file-local and not persistent.
 | Callable members of a module-level object literal | `method` (`getter`/`setter`) | `api.run` |
 | `export default <expression>` / `export = <expression>` (not a plain name) | `constant`/`function`/`class` | `default`, `export=` |
 | Anonymous `export default function`/`class` | `function`/`class` | `default` |
-| CommonJS `exports.x = …`, `module.exports.x = …`, `module.exports = <non-name>` (JS files) | `function`/`class`/`constant` | `x`, `module.exports` |
+| CommonJS `exports.x = …`, `module.exports.x = …`, `module.exports = <non-name>` (JS files, top level, `module`/`exports` not bound by the file) | `function`/`class`/`constant` | `x`, `module.exports` |
 
 Overloads: **one symbol per overload set** (consecutive bodiless signatures
 plus the implementation, or all signatures in an ambient/interface set). Its range
@@ -112,7 +113,9 @@ candidates.
 Not extracted as symbols: declarations inside function bodies (local functions,
 local variables, parameters), object-literal data properties, members of type
 literals, call/construct/index signatures, class static blocks, and import
-bindings (imports are links, not symbols, including JS `const x = require(…)`).
+bindings (imports are links, not symbols, including JS `const x = require(…)`
+when `require` is the CommonJS global; with a locally bound `require` the
+variable is an ordinary `constant`/`variable`).
 
 Every non-module symbol has a `contains` link from its container (the module,
 class, interface, enum, namespace or holding variable), with the child's range.
@@ -134,11 +137,31 @@ module imports, the exported name for bindings: `default`, `*`, or the name).
 | `export * from "x"` | `imports` (`data.reexport`) | Module only (no per-name link) |
 | Dynamic `import("lit")` | `imports` (`data.dynamic`, source: enclosing symbol) | Definite to the module; computed specifier: unresolved `(dynamic import)` |
 | `require("lit")` in JS files; `const x = require()` / `const {a: b} = require()` bindings | `imports` (`data.require`) | Module definite; bindings through the checker's CommonJS aliasing to the original declaration (also into `.ts` modules) |
-| Calls, `new`, tagged templates, `super(…)` | `calls` | The checker's symbol for the callee: definite if every declaration is one graph symbol; **candidates** when several (union receivers, merged declarations, repeated JS functions); unresolved otherwise |
+| `require(expr)` with a non-literal argument in JS | `imports` (`data.require`) | Unresolved `(computed require)`, reason `computed-specifier`; not a call |
+| Triple-slash `/// <reference path>` | `imports` (`data.reference: "path"`) | Definite to the referenced captured file's module; `missing-module` otherwise |
+| Triple-slash `/// <reference types>` / `lib` | `imports` (`data.reference`) | Unresolved: `external-package` (type packages live in `node_modules`) / `external` (standard library) |
+| Calls, `new`, tagged templates, `super(…)` | `calls` | The checker's symbol for the callee, keeping only **callable** declarations (a merged function + namespace, or an `export =` function + namespace, is the function): definite if that is one graph symbol; **candidates** when several (union receivers, repeated JS functions); unresolved otherwise |
 | JSX `<Component>` / `<ns.Component>` | `calls` (`data.jsx`) | As calls; intrinsic lowercase elements are not links |
-| Type references, `typeof x` | `references` | Type positions prefer type declarations (a merged interface + namespace resolves to the interface) |
+| Type references, `typeof x` | `references` | Type positions keep type declarations (a merged interface + namespace resolves to the interface); `typeof x` keeps value declarations |
 | `extends` (classes, interfaces), `implements` | `extends`, `implements` | Checker symbol of the heritage expression |
 | Structure | `contains` | Definite |
+
+Usage meaning decides which of a merged symbol's declarations count, before
+mapping to graph symbols: calls keep callable declarations, type positions and
+`import type`/`export type` bindings keep type declarations (so `import type
+{ X }` where `X` is a constant and a type selects the type), value positions
+drop type-only declarations. A plain value import binding keeps every meaning
+and therefore gives candidates for a merged name.
+
+`require`, `module` and `exports` count as CommonJS only when they mean the
+module system's globals. For `require` the checker decides with the compiler's
+own `isCommonJsRequire` rule: no binding or only ambient declarations. A local
+function, a parameter, a variable or an imported name called `require` is
+an ordinary call to that declaration, with no import edge and no import
+bindings. The checker resolves `module`/`exports` identifiers to export symbols
+rather than scope bindings, so for those a top-level declaration of the name in
+the same file counts as shadowing. A `var module` declared in another global
+script is not seen (a known limitation).
 
 Paths aliases (`paths`/`baseUrl`), `package.json` `imports`/`exports`/`type`,
 `moduleResolution` modes and workspace packages all work through the compiler's
@@ -148,22 +171,27 @@ own resolver over the snapshot.
 
 | reason | Meaning |
 |---|---|
-| `external` | The checker found declarations, but outside the project: standard library, or an import from a package not in the snapshot (its alias has no declaration) |
-| `external-package` | Bare specifier that does not resolve: `node_modules` is never walked |
-| `missing-module` | Relative specifier with no captured file |
+| `external` | The checker found declarations, but outside the project: the standard library, or a call through a binding whose package is not in the snapshot |
+| `external-package` | A bare specifier that does not resolve (`node_modules` is never walked), and every binding imported from it |
+| `missing-module` | A relative specifier with no captured file, and every binding imported from it |
+| `unresolved-alias` | A specifier matching a `paths` pattern of the owning config, or a `#` subpath import, that resolves to no captured file, and its bindings |
 | `no-symbol` | The checker has no symbol: untyped JS, `any`/`unknown` receivers (often because the receiver's type came from an uncaptured package), computed callees |
 | `local` | The target is a parameter, local variable, local function or other non-symbol declaration |
-| `computed-specifier` | `import(expr)` with a non-literal specifier |
+| `computed-specifier` | `import(expr)` or JS `require(expr)` with a non-literal specifier |
 
 If the checker's declarations include both graph symbols and external/local
 ones (for example `x.toString()` on `Foo | number`), the link is never narrowed:
 two or more project targets are candidates; a single one stays unresolved with
-`data.targets` and `reason` recorded.
+`data.targets` and `reason` recorded. Likewise, when a recorded target's file
+failed (for example its package config is broken), the surviving targets are
+never promoted: one survivor is unresolved, two or more are candidates.
 
 Not extracted as links: plain value reads and writes (`x = y`, passing a
 function as a callback without calling it), decorators without a call, JSDoc
-type references in JavaScript, and `import type` expressions inside type
-positions other than `import("x").T` (that one gives a module `imports` link).
+type references in JavaScript (including JSDoc `import("x")` types), the
+`amd-module`/`amd-dependency` and `no-default-lib` triple-slash directives, and
+module augmentation (`declare module "./orig"` is a namespace symbol, but
+imports of `./orig` are not linked to it; backlog).
 
 ## Status and errors
 
@@ -172,14 +200,34 @@ positions other than `import("x").T` (that one gives a module `imports` link).
 - Unreadable or non-UTF-8 sources stay failed (detected by re-hashing the
   captured text against the original-byte hash) and are never returned by
   analysis.
-- **Analysis errors** (the whole module's analysis fails, every file failed,
-  reported in `analysisErrors`): a malformed `tsconfig*.json`/`jsconfig*.json`
-  or `package.json`; a relative `extends` or a project reference whose target is
-  not in the snapshot; an uncapturable config (core-reported).
-- A config that **extends an external package** (`"extends": "@tsconfig/node20"`)
-  cannot be captured because `node_modules` is never walked. This is an analysis
+- **A broken config fails only the files it governs.** A config is broken when
+  it is malformed JSON or not an object, when it has an invalid `extends` value,
+  when a relative `extends` target is missing from the snapshot, or when that
+  base is itself malformed. Each file the config could own is **failed**, with a
+  diagnostic naming the cause. Those files are its directory subtree, minus
+  files that a deeper valid config owns, plus anything its parsable
+  `files`/`include` names. Other projects analyse normally. Links from healthy
+  files into the failed files keep their names and stay unresolved; their
+  recorded targets are in `data.targets`.
+- **A broken `package.json`** (malformed or not an object) fails the files of
+  that package only: its directory subtree, minus subtrees with their own
+  `package.json`. A broken workspace root still leaves member packages
+  analysed. Its `workspaces` list is unknown, so imports between members stay
+  unresolved instead of being guessed.
+- **A missing or invalid project reference** fails nothing. References are not
+  passed to the compiler, so it becomes a note in the owner's files'
+  `data.configNotes`.
+- **Module-wide analysis errors** remain in exactly two cases. First, a context
+  file that could not be captured (for example non-UTF-8); the core reports it
+  before analysis runs. Second, a compiler build that no longer exposes
+  `matchFiles`; then no config's file list can be computed, so there is no
+  bounded scope to fail.
+- A config that **extends an external package** cannot be captured, because
+  `node_modules` is never walked. This covers a bare specifier
+  (`"@tsconfig/node20"`) and any relative path with a `node_modules` segment
+  (`"./node_modules/@tsconfig/node20/tsconfig.json"`). It is an analysis
   limitation, not an error: the config's own settings still apply, and every
-  file it owns is **partial** with a diagnostic naming the missing base.
+  file it owns is **partial**, with a diagnostic naming the missing base.
 - Other config diagnostics (unknown options and the like) are kept in each owned
   file's `data.configNotes`; "no inputs found" is normal for solution configs.
 
@@ -192,13 +240,14 @@ positions other than `import("x").T` (that one gives a module `imports` link).
    `[ 'typescript' ]`, so that test fails although fixture hiding still works.
    It is not an owned file, so it is unchanged here; the assertion should check
    that `toy` is absent rather than that the list is empty.
-2. **Analysis errors are module-wide.** One bad config in one package of a
-   monorepo fails every TypeScript/JavaScript file in the project, because the
-   interface reports project analysis failures per module, not per project or
-   file. Example: `packages/a/tsconfig.json` with `"extends": "./missing.json"`
-   fails `packages/b/**` too. Done instead: the strict, honest option (whole
-   module failed and reported); per-config isolation would need an interface way
-   to report an analysis error scoped to some files.
+2. **Scoped project failures are per-file facts, not `analysisErrors`.**
+   (Corrected. The first submission wrongly claimed the interface forced a
+   module-wide failure.) `analyze` can return `failed` results for some files,
+   and the core still resolves the rest. That is how a broken config is isolated
+   now. The only difference from a thrown error: the failure appears in the
+   report's `failed` list and in each file's diagnostics, not in
+   `analysisErrors`, because the interface has no way to name a failed
+   *project*. This is a reporting nuance, not a blocker.
 3. **Candidate sets cannot have one member.** When the checker returns one
    project declaration plus external ones, the honest answer is "this one, or
    something outside the project", which the interface cannot express (ambiguous
@@ -210,18 +259,24 @@ positions other than `import("x").T` (that one gives a module `imports` link).
 
 ## Observations
 
-Full numbers and the hand check are in `evidence/w2-d/README.md`.
+Full numbers, the round 1 to round 2 comparison and both hand checks are in
+`evidence/w2-d/README.md`.
 
 - **BullMQ indexes in full**: 261 claimed files, 261 clean, 0 partial, 0 failed,
-  no analysis or resolution errors; 3,234 symbols and 40,801 links (17,762
-  resolved, 4 candidate sets, 23,035 unresolved). A hand check of 24 random
-  resolved, 12 unresolved and all 4 candidate links found no wrong link.
+  no analysis or resolution errors. There are 3,279 symbols and 40,846 links
+  (17,812 resolved, 4 candidate sets, 23,030 unresolved). Compared with round 1:
+  +45 parameter-property symbols and their `contains` links, +5 calls resolved
+  to them, and 629 import bindings relabelled from `external` to the reason of
+  their unresolved module. Hand checks found no wrong link: round 1 checked 24
+  resolved, 12 unresolved and all 4 candidate sets; round 2, with a new seed,
+  checked 30 resolved, 15 unresolved and all 4 candidate sets.
   Unresolved links are dominated by uncaptured packages (`vitest`, `ioredis`,
   `node:*`) and the standard library. The existing deep analysis
   (`src/implementation/`) is unchanged and remains available on top.
-- Pymtheg `src/`: 208 files clean; 8,976 of 25,878 links resolved. The ratio is
+- Pymtheg `src/`: 208 files clean; 9,055 of 26,071 links resolved. The ratio is
   lower because most calls go into `typescript` and `zod`, which live in
   `node_modules`.
-- Time (observation): BullMQ analysis about 10 s of a 66 s first index; the rest
-  is core storage. An unchanged re-index reuses the stored facts (5 ms of
-  analysis); its remaining 33 s is core.
+- Time (observation, loaded machine): the BullMQ first index takes 60 to 66 s, of
+  which the module's analysis is about 10 s; the rest is core storage. An
+  unchanged re-index reuses the stored facts (about 5 ms of analysis); its
+  remaining 33 to 50 s is core.

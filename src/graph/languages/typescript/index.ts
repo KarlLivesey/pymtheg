@@ -11,6 +11,7 @@ import type {
 } from "../../types.js";
 import { extractFile, type TargetFact } from "./extract.js";
 import { projectModel, toVirtual } from "./project.js";
+import { withChecker } from "./symbols.js";
 
 /**
  * TypeScript and JavaScript through the TypeScript compiler. Analyze-only: one
@@ -61,6 +62,9 @@ const module: LanguageModule = {
     const model = projectModel(files, context.contextFiles);
     const captured = new Set(files.map((file) => file.path));
     const results: AnalyzedFile[] = [];
+    // A broken config or manifest fails only the files it governs, not the module.
+    for (const [path, message] of model.failures)
+      results.push({ path, result: failed(message) });
     for (const group of model.groups) {
       if (!group.roots.length) continue;
       const program = ts.createProgram({
@@ -84,13 +88,8 @@ const module: LanguageModule = {
         let result: ParseResult;
         try {
           if (!source) throw Error("The compiler did not load this source");
-          result = extractFile(
-            source,
-            checker,
-            program,
-            captured,
-            diagnostics,
-            data,
+          result = withChecker(checker, () =>
+            extractFile(source, checker, program, captured, diagnostics, data),
           );
           statistics.extracted++;
         } catch (error) {

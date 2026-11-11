@@ -386,12 +386,12 @@ test("CommonJS require binds in JS files; a computed require and a require in a 
         "cjs.js#helper",
       );
       graph.symbol("cjs.js", "other", "function");
-      // A computed require is not an import edge; calls through it stay unresolved.
-      assert.equal(graph.links("use.js", "name", "imports").length, 0);
-      assert.equal(
-        graph.link("use.js", "require", "calls").resolution,
-        "unresolved",
-      );
+      // A computed require is an unresolvable import, not a call to `require`.
+      const computed = graph.link("use.js", "require(name)", "imports");
+      assert.equal(computed.resolution, "unresolved");
+      assert.equal(computed.targetName, "(computed require)");
+      assert.equal(computed.data.reason, "computed-specifier");
+      assert.equal(graph.links("use.js", "require", "calls").length, 0);
       assert.equal(viaDynamic.resolution, "unresolved");
       // In TypeScript, `require` is an ordinary call: no import edge, no guess.
       assert.equal(graph.links("use.ts", '"./util"', "imports").length, 0);
@@ -634,7 +634,7 @@ test("an unchanged index reopens with links resolved and no file re-parsed or pr
   );
 });
 
-test("missing or unreadable configs are analysis errors, never silently ignored", async () => {
+test("a broken config fails only the files it governs and is never silently ignored", async () => {
   await project(
     {
       "tsconfig.json": JSON.stringify({
@@ -644,14 +644,13 @@ test("missing or unreadable configs are analysis errors, never silently ignored"
       "a.ts": "export const a = 1;\n",
     },
     async (graph, report) => {
-      assert.equal(report.analysisErrors.length, 1);
+      assert.deepEqual(report.analysisErrors, []);
+      assert.deepEqual(report.failed, ["a.ts"]);
       assert.match(
-        report.analysisErrors[0].message,
+        graph.store.getFile("a.ts").result.diagnostics[0].message,
         /extends "\.\/base\.json".*missing/,
       );
-      assert.deepEqual(report.failed, ["a.ts"]);
       // Adding the base repairs the analysis.
-      await graph.write("base.json", "{}");
       await graph.write("tsconfig.base.json", "{}");
       await graph.write(
         "tsconfig.json",
@@ -663,23 +662,147 @@ test("missing or unreadable configs are analysis errors, never silently ignored"
       // A malformed config.
       await graph.write("tsconfig.json", "{ broken");
       const malformed = await graph.reindex();
-      assert.equal(malformed.analysisErrors.length, 1);
+      assert.deepEqual(malformed.failed, ["a.ts"]);
       assert.match(
-        malformed.analysisErrors[0].message,
+        graph.store.getFile("a.ts").result.diagnostics[0].message,
         /Unreadable TypeScript config tsconfig\.json/,
       );
-      // A config that is not valid UTF-8 fails capture.
+      // A malformed base config fails the config that extends it.
+      await graph.write(
+        "tsconfig.json",
+        JSON.stringify({ extends: "./tsconfig.base.json" }),
+      );
+      await graph.write("tsconfig.base.json", "{ nope");
+      const badBase = await graph.reindex();
+      assert.deepEqual(badBase.failed, ["a.ts"]);
+      assert.match(
+        graph.store.getFile("a.ts").result.diagnostics[0].message,
+        /extends tsconfig\.base\.json, which is unreadable/,
+      );
+      // A config that is not valid UTF-8 fails capture (core-reported, module-wide).
       await graph.write("tsconfig.json", Buffer.from([0x7b, 0xff, 0x7d]));
       const unreadable = await graph.reindex();
       assert.equal(unreadable.analysisErrors.length, 1);
       assert.ok(unreadable.failed.includes("tsconfig.json"));
-      // A missing project reference.
+      // A missing project reference is only a note: references are not used for resolution.
       await graph.write(
         "tsconfig.json",
         JSON.stringify({ references: [{ path: "./pkg" }] }),
       );
       const reference = await graph.reindex();
-      assert.match(reference.analysisErrors[0].message, /references "\.\/pkg"/);
+      clean(reference);
+      assert.deepEqual(reference.failed, []);
+      assert.equal(graph.store.getFile("a.ts").result.status, "clean");
+      assert.match(
+        graph.store.getFile("a.ts").result.data.configNotes[0],
+        /references "\.\/pkg", which is missing/,
+      );
+    },
+  );
+});
+
+// Workspace with two packages; each case breaks only packages/a.
+const twoPackages = (overrides) => ({
+  "package.json": JSON.stringify({ private: true, workspaces: ["packages/*"] }),
+  "packages/a/package.json": JSON.stringify({
+    name: "@w/a",
+    main: "./src/index.ts",
+  }),
+  "packages/a/tsconfig.json": JSON.stringify({ include: ["src"] }),
+  "packages/a/src/index.ts": "export function fromA() {}\n",
+  "packages/b/package.json": JSON.stringify({
+    name: "@w/b",
+    main: "./src/index.ts",
+  }),
+  "packages/b/tsconfig.json": JSON.stringify({ include: ["src"] }),
+  "packages/b/src/index.ts": "export function local() {}\n",
+  "packages/b/src/use.ts":
+    'import { local } from "./index";\nimport { fromA } from "@w/a";\nlocal();\nfromA();\n',
+  ...overrides,
+});
+for (const [name, overrides, cause] of [
+  [
+    "a missing extends",
+    {
+      "packages/a/tsconfig.json": JSON.stringify({
+        extends: "./missing.json",
+        include: ["src"],
+      }),
+    },
+    /extends "\.\/missing\.json", which is missing/,
+  ],
+  [
+    "an unparsable package manifest",
+    { "packages/a/package.json": "{ not json" },
+    /Unreadable package manifest packages\/a\/package\.json/,
+  ],
+  [
+    "an invalid extends value",
+    {
+      "packages/a/tsconfig.json": JSON.stringify({
+        extends: 7,
+        include: ["src"],
+      }),
+    },
+    /invalid extends value/,
+  ],
+])
+  test(`${name} in one package fails only that package's files`, async () => {
+    await project(twoPackages(overrides), async (graph, report) => {
+      assert.deepEqual(report.analysisErrors, []);
+      assert.deepEqual(report.resolutionErrors, []);
+      assert.deepEqual(report.failed, ["packages/a/src/index.ts"]);
+      assert.match(
+        graph.store.getFile("packages/a/src/index.ts").result.diagnostics[0]
+          .message,
+        cause,
+      );
+      assert.equal(
+        graph.store.getFile("packages/b/src/use.ts").result.status,
+        "clean",
+      );
+      assert.equal(
+        graph.target(graph.link("packages/b/src/use.ts", "local", "calls")),
+        "packages/b/src/index.ts#local",
+      );
+      // A link into the failed package keeps its name and stays unresolved.
+      const into = graph.link("packages/b/src/use.ts", "fromA", "calls");
+      assert.equal(into.resolution, "unresolved");
+      assert.equal(into.targetName, "fromA");
+    });
+  });
+
+test("a missing project reference fails nothing", async () => {
+  await project(
+    twoPackages({
+      "packages/a/tsconfig.json": JSON.stringify({
+        include: ["src"],
+        references: [{ path: "../c" }],
+      }),
+    }),
+    async (graph, report) => {
+      clean(report);
+      assert.deepEqual(report.failed, []);
+      assert.equal(
+        graph.target(graph.link("packages/b/src/use.ts", "fromA", "calls")),
+        "packages/a/src/index.ts#fromA",
+      );
+    },
+  );
+});
+
+test("a broken config fails its subtree but not files owned by a deeper valid config", async () => {
+  await project(
+    {
+      "tsconfig.json": "{ broken",
+      "top.ts": "export const top = 1;\n",
+      "inner/tsconfig.json": "{}",
+      "inner/ok.ts": "export const ok = 1;\n",
+    },
+    async (graph, report) => {
+      assert.deepEqual(report.analysisErrors, []);
+      assert.deepEqual(report.failed, ["top.ts"]);
+      assert.equal(graph.store.getFile("inner/ok.ts").result.status, "clean");
     },
   );
 });
@@ -785,6 +908,350 @@ test("unreadable sources are reported failed and never cleaned by analysis", asy
       assert.deepEqual(report.analysisErrors, []);
       assert.deepEqual(report.failed, ["bad.ts"]);
       assert.equal(graph.store.getFile("ok.ts").result.status, "clean");
+    },
+  );
+});
+
+test("a relative extends into node_modules is a limitation like a package specifier", async () => {
+  await project(
+    {
+      "tsconfig.json": JSON.stringify({
+        extends: "./node_modules/@tsconfig/node20/tsconfig.json",
+        include: ["src"],
+      }),
+      "src/a.ts": "export const a = 1;\n",
+    },
+    async (graph, report) => {
+      assert.deepEqual(report.analysisErrors, []);
+      assert.deepEqual(report.failed, []);
+      assert.deepEqual(report.partial, ["src/a.ts"]);
+      assert.match(
+        graph.store.getFile("src/a.ts").result.diagnostics[0].message,
+        /inside node_modules; node_modules is never captured/,
+      );
+    },
+  );
+});
+
+test("a locally bound require, module or exports is not CommonJS", async () => {
+  await project(
+    {
+      "dep.ts": "export const real = 1;\n",
+      "fn.js": [
+        "export {};",
+        "function require(name) { return 42; }",
+        'require("./dep");',
+        'const x = require("./dep");',
+        "",
+      ].join("\n"),
+      "param.js": [
+        "export function load(require) {",
+        '  const { real } = require("./dep");',
+        "  return real;",
+        "}",
+        "",
+      ].join("\n"),
+      "imported.js": [
+        'import { require } from "./loader";',
+        'require("./dep");',
+        "",
+      ].join("\n"),
+      "loader.js": "export function require(name) { return name; }\n",
+      "shadow.js": [
+        "const exports = {};",
+        "exports.notExported = function () {};",
+        "",
+      ].join("\n"),
+      "real.js": 'const { real } = require("./dep");\nexports.ok = real;\n',
+    },
+    async (graph, report) => {
+      clean(report);
+      for (const file of ["fn.js", "param.js", "imported.js"])
+        assert.equal(
+          graph.links(file, '"./dep"', "imports").length,
+          0,
+          `no import edge in ${file}`,
+        );
+      const calls = graph
+        .links("fn.js", "require", "calls")
+        .sort((a, b) => a.range.start - b.range.start);
+      assert.equal(calls.length, 2);
+      for (const call of calls)
+        assert.equal(graph.target(call), "fn.js#require");
+      // The variable is an ordinary constant, not an import binding.
+      graph.symbol("fn.js", "x", "constant");
+      assert.equal(graph.links("fn.js", "x", "imports").length, 0);
+      assert.equal(
+        graph.link("param.js", "require", "calls").data.reason,
+        "local",
+      );
+      assert.equal(graph.links("param.js", "real", "imports").length, 0);
+      assert.equal(
+        graph.target(graph.link("imported.js", "require", "calls")),
+        "loader.js#require",
+      );
+      // A file-level `exports` binding shadows the CommonJS object.
+      assert.equal(
+        graph.store.findSymbols({ file: "shadow.js", name: "notExported" })
+          .length,
+        0,
+      );
+      // Control: the unshadowed forms are still CommonJS.
+      assert.equal(
+        graph.target(graph.link("real.js", '"./dep"')),
+        "dep.ts#dep.ts",
+      );
+      assert.equal(
+        graph.target(graph.link("real.js", "real", "imports")),
+        "dep.ts#real",
+      );
+      graph.symbol("real.js", "ok", "constant");
+    },
+  );
+});
+
+test("constructor parameter properties are class properties", async () => {
+  await project(
+    {
+      "a.ts": [
+        "class Base { constructor(public base: number) {} }",
+        "export class A extends Base {",
+        "  constructor(public cb: () => void, private readonly id: string, protected override base: number, plain: number) {",
+        "    super(base);",
+        "  }",
+        "}",
+        "export function f(a: A) { a.cb(); return a.base; }",
+        "",
+      ].join("\n"),
+    },
+    async (graph, report) => {
+      clean(report);
+      for (const identity of ["A.cb", "A.id", "A.base", "Base.base"])
+        graph.symbol("a.ts", identity, "property");
+      assert.equal(
+        graph.store.findSymbols({ file: "a.ts", name: "plain" }).length,
+        0,
+      );
+      assert.equal(
+        graph.target(graph.link("a.ts", "cb", "calls")),
+        "a.ts#A.cb",
+      );
+      const contains = graph
+        .links("a.ts", "public cb: () => void", "contains")
+        .map(
+          (link) =>
+            graph.store.findSymbols().find((s) => s.id === link.sourceId)
+              .identity,
+        );
+      assert.deepEqual(contains, ["A"]);
+    },
+  );
+});
+
+test("an incomplete target set is never narrowed to one definite target", async () => {
+  await project(
+    {
+      "foo.ts": [
+        "export class Foo { toString() { return 'foo'; } }",
+        "export function f(x: Foo | number) { return x.toString(); }",
+        "",
+      ].join("\n"),
+    },
+    async (graph) => {
+      const call = graph.link("foo.ts", "toString", "calls");
+      assert.equal(call.resolution, "unresolved");
+      assert.equal(call.data.reason, "external");
+      assert.deepEqual(
+        call.data.targets.map((target) => target.file),
+        ["foo.ts"],
+        "the project target is kept",
+      );
+    },
+  );
+  // A target whose file failed (its package config is broken) is lost: the
+  // surviving project candidate is not promoted to a definite target.
+  await project(twoPackagesUnion(), async (graph, report) => {
+    assert.deepEqual(report.failed, ["packages/a/src/shape.ts"]);
+    const call = graph.link("packages/b/src/use.ts", "go", "calls");
+    assert.equal(call.resolution, "unresolved");
+    assert.equal(call.data.targets.length, 2);
+  });
+});
+function twoPackagesUnion() {
+  return {
+    "packages/a/tsconfig.json": JSON.stringify({
+      extends: "./gone.json",
+      include: ["src"],
+    }),
+    "packages/a/src/shape.ts": "export class A { go() {} }\n",
+    "packages/b/tsconfig.json": JSON.stringify({ include: ["src"] }),
+    "packages/b/src/b.ts": "export class B { go() {} }\n",
+    "packages/b/src/use.ts": [
+      'import { A } from "../../a/src/shape";',
+      'import { B } from "./b";',
+      "export function run(x: A | B) { x.go(); }",
+      "",
+    ].join("\n"),
+  };
+}
+
+test("usage meaning selects declarations: calls, types and values", async () => {
+  await project(
+    {
+      "merged.ts": [
+        "export function fn() {}",
+        "export namespace fn { export const extra = 1; }",
+        "export const Thing = 1;",
+        "export type Thing = string;",
+        "export class Box {}",
+        "export interface Box { size: number }",
+        "",
+      ].join("\n"),
+      "eq.ts":
+        "function eq() {}\nnamespace eq { export const x = 1; }\nexport = eq;\n",
+      "use.ts": [
+        'import { fn, Thing, Box } from "./merged";',
+        'import type { Thing as T } from "./merged";',
+        'import eq = require("./eq");',
+        "fn();",
+        "eq();",
+        "new Box();",
+        "export const v = Thing;",
+        "export const t: T = '';",
+        "",
+      ].join("\n"),
+    },
+    async (graph, report) => {
+      clean(report);
+      assert.equal(
+        graph.target(graph.link("use.ts", "fn", "calls")),
+        "merged.ts#fn",
+      );
+      assert.equal(
+        graph.store
+          .findSymbols()
+          .find((s) => s.id === graph.link("use.ts", "fn", "calls").targetId)
+          .kind,
+        "function",
+      );
+      assert.equal(
+        graph.target(graph.link("use.ts", "eq", "calls")),
+        "eq.ts#eq",
+      );
+      assert.equal(
+        graph.store
+          .findSymbols()
+          .find((s) => s.id === graph.link("use.ts", "eq", "calls").targetId)
+          .kind,
+        "function",
+      );
+      const box = graph.link("use.ts", "Box", "calls");
+      assert.equal(
+        graph.store.findSymbols().find((s) => s.id === box.targetId).kind,
+        "class",
+      );
+      // `import type` selects the type alias, not the constant.
+      const typeImport = graph.link("use.ts", "Thing as T", "imports");
+      assert.equal(
+        graph.store.findSymbols().find((s) => s.id === typeImport.targetId)
+          .kind,
+        "type",
+      );
+      // A value import keeps both meanings as candidates.
+      assert.equal(
+        graph.link("use.ts", "Thing", "imports").resolution,
+        "ambiguous",
+      );
+      // A value read is not a link; a type position picks the type.
+      const typeRef = graph.link("use.ts", "T", "references");
+      assert.equal(
+        graph.store.findSymbols().find((s) => s.id === typeRef.targetId).kind,
+        "type",
+      );
+    },
+  );
+});
+
+test("unresolved reasons say why", async () => {
+  await project(
+    {
+      "tsconfig.json": JSON.stringify({
+        compilerOptions: { baseUrl: ".", paths: { "@app/*": ["src/*"] } },
+      }),
+      "src/use.ts": [
+        'import { gone } from "./missing";',
+        'import { nope } from "@app/absent";',
+        'import { pkg } from "left-pad";',
+        'import { sub } from "#internal";',
+        "gone(); nope(); pkg(); sub();",
+        "",
+      ].join("\n"),
+    },
+    async (graph) => {
+      const reason = (at, kind) =>
+        graph.link("src/use.ts", at, kind).data.reason;
+      assert.equal(reason('"./missing"'), "missing-module");
+      assert.equal(reason("gone", "imports"), "missing-module");
+      assert.equal(reason('"@app/absent"'), "unresolved-alias");
+      assert.equal(reason("nope", "imports"), "unresolved-alias");
+      assert.equal(reason('"left-pad"'), "external-package");
+      assert.equal(reason("pkg", "imports"), "external-package");
+      assert.equal(reason('"#internal"'), "unresolved-alias");
+      for (const name of ["gone", "nope", "pkg", "sub"]) {
+        const call = graph.link("src/use.ts", name, "calls");
+        assert.equal(call.resolution, "unresolved");
+        assert.equal(call.targetName, name);
+      }
+    },
+  );
+});
+
+test("triple-slash references are import links", async () => {
+  await project(
+    {
+      "globals.d.ts": "declare const shared: number;\n",
+      "main.ts": [
+        '/// <reference path="./globals.d.ts" />',
+        '/// <reference path="./absent.d.ts" />',
+        '/// <reference types="node" />',
+        '/// <reference lib="es2020" />',
+        "export const x = shared;",
+        "",
+      ].join("\n"),
+    },
+    async (graph) => {
+      const path = graph.link("main.ts", "./globals.d.ts", "imports");
+      assert.equal(graph.target(path), "globals.d.ts#globals.d.ts");
+      assert.equal(path.data.reference, "path");
+      assert.equal(
+        graph.link("main.ts", "./absent.d.ts").data.reason,
+        "missing-module",
+      );
+      const types = graph.link("main.ts", "node");
+      assert.equal(types.resolution, "unresolved");
+      assert.equal(types.data.reason, "external-package");
+      assert.equal(graph.link("main.ts", "es2020").data.reason, "external");
+    },
+  );
+});
+
+test("a broken workspace root fails only root-package files; members stay analysed without guessed links", async () => {
+  await project(
+    twoPackages({
+      "package.json": "{ broken",
+      "root.ts": "export const r = 1;\n",
+    }),
+    async (graph, report) => {
+      assert.deepEqual(report.analysisErrors, []);
+      assert.deepEqual(report.failed, ["root.ts"]);
+      assert.equal(
+        graph.target(graph.link("packages/b/src/use.ts", "local", "calls")),
+        "packages/b/src/index.ts#local",
+      );
+      // The workspace list is unknown, so @w/a is not linked rather than guessed.
+      const cross = graph.link("packages/b/src/use.ts", '"@w/a"');
+      assert.equal(cross.resolution, "unresolved");
+      assert.equal(cross.data.reason, "external-package");
     },
   );
 });
