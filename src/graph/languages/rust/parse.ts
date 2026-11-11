@@ -33,6 +33,7 @@ export async function parseRust({
     mapDefinition: () => undefined,
     secondPass({ tree, result }) {
       const opaqueCrateAliases: string[] = [];
+      const opaqueImplTypes: { name: string; scope: string }[] = [];
       result.symbols.push({
         key: "file",
         name: path,
@@ -163,14 +164,41 @@ export async function parseRust({
         type: Node | null;
         start: number;
         order: number;
+        macro?: boolean;
       };
       type BindingScopes = Map<number, Map<string, Binding[]>>;
       const bindingCache = new Map<number, BindingScopes>();
+      function patternNames(n: Node): Node[] {
+        if (
+          ["identifier", "shorthand_field_identifier", "self"].includes(n.type)
+        )
+          return n.text === "_" ? [] : [n];
+        if (
+          [
+            "scoped_identifier",
+            "scoped_type_identifier",
+            "type_identifier",
+            "field_identifier",
+          ].includes(n.type)
+        )
+          return [];
+        if (n.type === "field_pattern") {
+          const value = field(n, "pattern") ?? field(n, "name");
+          return value ? patternNames(value) : [];
+        }
+        return n.namedChildren
+          .filter((c) => field(n, "type")?.id !== c.id)
+          .flatMap(patternNames);
+      }
       function bindings(
         root: Node,
         at: Node,
         name: string,
-      ): { blocked: Set<string>; types: Map<string, ReceiverType> } {
+      ): {
+        blocked: Set<string>;
+        types: Map<string, ReceiverType>;
+        invalidated: boolean;
+      } {
         name = compact(name);
         let scopes = bindingCache.get(root.id);
         if (!scopes) {
@@ -181,12 +209,10 @@ export async function parseRust({
             type: Node | null,
             region: Node,
             start: number,
+            macro = false,
           ) => {
             if (!pattern) return;
-            const ids =
-              pattern.type === "identifier"
-                ? [pattern]
-                : pattern.descendantsOfType("identifier");
+            const ids = patternNames(pattern);
             const names =
               scopes!.get(region.id) ?? new Map<string, Binding[]>();
             for (const id of ids) {
@@ -202,6 +228,7 @@ export async function parseRust({
                 type: pattern.type === "identifier" ? type : null,
                 start,
                 order: order++,
+                macro,
               });
               names.set(compact(id.text), list);
             }
@@ -213,6 +240,17 @@ export async function parseRust({
               ["function_item", "impl_item", "mod_item"].includes(n.type)
             )
               return;
+            if (
+              n.type === "macro_invocation" &&
+              n.parent?.type === "expression_statement" &&
+              n.parent.parent?.type === "block"
+            ) {
+              for (const token of n.namedChildren
+                .filter((c) => c.type === "token_tree")
+                .flatMap((c) => c.descendantsOfType(["identifier", "self"])))
+                add(token, null, n.parent.parent, n.endIndex, true);
+              return;
+            }
             if (n.type === "closure_expression") parameterRegion = n;
             if (n.type === "parameter")
               add(field(n, "pattern"), field(n, "type"), parameterRegion, 0);
@@ -239,7 +277,12 @@ export async function parseRust({
                 "while_expression",
               ].includes(n.type)
             ) {
-              add(field(n, "pattern"), null, n, 0);
+              add(
+                field(n, "pattern"),
+                null,
+                n.type === "for_expression" ? (field(n, "body") ?? n) : n,
+                0,
+              );
               const ps = field(n, "parameters");
               if (ps)
                 for (const p of ps.namedChildren)
@@ -258,6 +301,7 @@ export async function parseRust({
               list.sort((a, b) => a.start - b.start || a.order - b.order);
           bindingCache.set(root.id, scopes);
         }
+        let invalidated = false;
         const blocked = new Set<string>();
         const types = new Map<string, ReceiverType>();
         let ancestor: Node | null = at;
@@ -274,6 +318,7 @@ export async function parseRust({
             const item = list[lo - 1];
             if (item) {
               blocked.add(name);
+              invalidated = item.macro === true;
               const { pattern, type } = item;
               const nominal =
                 type?.type === "reference_type" ? field(type, "type") : type;
@@ -310,7 +355,7 @@ export async function parseRust({
           if (ancestor.id === root.id) break;
           ancestor = ancestor.parent;
         }
-        return { blocked, types };
+        return { blocked, types, invalidated };
       }
       function arity(list: Node | null) {
         let minimum = 0,
@@ -426,7 +471,17 @@ export async function parseRust({
         fn: Node | null,
         implType: string,
         moduleScope = "",
+        unsafe = false,
       ) {
+        unsafe ||= n.type === "ERROR" || n.isMissing;
+        if (kinds[n.type]) {
+          const body = field(n, "body");
+          unsafe ||= n.namedChildren.some(
+            (c) => c.id !== body?.id && (c.hasError || c.isMissing),
+          );
+          if (["struct_item", "enum_item", "type_item"].includes(n.type))
+            unsafe ||= n.hasError;
+        }
         // Signature types are outside the function body item's scope. Preserve
         // the annotation's namespace so a later local type cannot retarget it.
         const body = fn && field(fn, "body");
@@ -484,6 +539,7 @@ export async function parseRust({
               data: {
                 scope,
                 moduleScope,
+                unsafe,
                 ...(["struct", "variant"].includes(actualKind)
                   ? {
                       constructorForm: n.namedChildren.some(
@@ -542,9 +598,61 @@ export async function parseRust({
                           .match(/#\[\s*path\s*=\s*"([^"]+)"\s*\]/)?.[1] ?? "",
                     }
                   : {}),
+                ...(n.type === "type_item"
+                  ? {
+                      aliasType:
+                        type?.type === "tuple_type" &&
+                        type.namedChildren.length === 1 &&
+                        !type.children.some((c) => c.type === ",")
+                          ? type.namedChildren[0]!.text
+                          : (type?.text ?? ""),
+                      aliasShape:
+                        type?.type === "tuple_type" &&
+                        type.namedChildren.length === 1 &&
+                        !type.children.some((c) => c.type === ",")
+                          ? "parenthesized_type"
+                          : (type?.type ?? ""),
+                      generics:
+                        field(n, "type_parameters")?.namedChildren.map((p) =>
+                          compact(field(p, "name")?.text ?? p.text),
+                        ) ?? [],
+                    }
+                  : {}),
                 ...(n.type === "impl_item"
                   ? {
                       implType: type?.text ?? "",
+                      universal:
+                        !!type &&
+                        type.type === "generic_type" &&
+                        (() => {
+                          const parameters =
+                            field(n, "type_parameters")
+                              ?.namedChildren.filter(
+                                (p) => p.type !== "lifetime_parameter",
+                              )
+                              .map((p) =>
+                                compact(field(p, "name")?.text ?? p.text),
+                              ) ?? [];
+                          const args =
+                            field(type, "type_arguments")
+                              ?.namedChildren.filter(
+                                (c) => c.type !== "lifetime",
+                              )
+                              .map((c) => compact(c.text)) ?? [];
+                          return (
+                            parameters.length > 0 &&
+                            new Set(args).size === args.length &&
+                            parameters.length === args.length &&
+                            parameters.every((p, i) => p === args[i])
+                          );
+                        })(),
+                      bounded:
+                        !!n.namedChildren.find(
+                          (c) => c.type === "where_clause",
+                        ) ||
+                        !!field(n, "type_parameters")?.descendantsOfType(
+                          "trait_bounds",
+                        ).length,
                       argumentSyntax: argumentSyntax(type),
                       trait: trait?.text ?? "",
                       generics:
@@ -582,6 +690,17 @@ export async function parseRust({
             opaqueCrateAliases.push(alias);
         }
         if (n.type === "use_declaration") {
+          if (n.hasError) {
+            link(
+              n,
+              owner,
+              scope,
+              "imports",
+              compact(field(n, "argument")?.text ?? n.text),
+              { unsafe: true, alias: "*", glob: true },
+            );
+            return;
+          }
           imports(
             field(n, "argument")!,
             "",
@@ -596,6 +715,13 @@ export async function parseRust({
         if (n.type === "macro_invocation") {
           const m = field(n, "macro");
           if (m) link(m, owner, scope, "macros", compact(m.text));
+          if (!fn || n.parent?.type === "expression_statement")
+            for (const t of n.namedChildren
+              .filter((c) => c.type === "token_tree")
+              .flatMap((c) =>
+                c.descendantsOfType(["identifier", "type_identifier"]),
+              ))
+              opaqueImplTypes.push({ name: compact(t.text), scope });
           return;
         }
         if (n.type === "call_expression") {
@@ -613,13 +739,16 @@ export async function parseRust({
               : {
                   blocked: new Set<string>(),
                   types: new Map<string, ReceiverType>(),
+                  invalidated: false,
                 };
             if (f.type === "field_expression") {
               const receiver = field(f, "value")!;
               const method = field(f, "field")!;
               const receiverType =
                 receiver.text === "self"
-                  ? implType
+                  ? b.invalidated
+                    ? ""
+                    : implType
                   : (b.types.get(compact(receiver.text))?.name ??
                     (receiver.type === "struct_expression"
                       ? (field(receiver, "name")?.text ?? "")
@@ -655,6 +784,7 @@ export async function parseRust({
                 implType,
                 implScope,
                 blocked:
+                  unsafe ||
                   !receiverType ||
                   genericShadow(n, receiverType.split("::")[0]!),
               });
@@ -669,6 +799,7 @@ export async function parseRust({
                 argumentCount: arity(field(n, "arguments")).maximum,
                 argumentMinimum: arity(field(n, "arguments")).minimum,
                 blocked:
+                  unsafe ||
                   b.blocked.has(compact(f.text.split("::")[0]!)) ||
                   genericShadow(n, f.text.split("::")[0]!),
                 implType,
@@ -676,6 +807,45 @@ export async function parseRust({
                 implKey: implNode ? `item:${implNode.startIndex}` : "",
               });
           }
+        }
+        if (
+          ["identifier", "scoped_identifier", "self"].includes(n.type) &&
+          n.text !== "_" &&
+          n.parent &&
+          [
+            "arguments",
+            "block",
+            "expression_statement",
+            "return_expression",
+            "array_expression",
+            "tuple_expression",
+            "binary_expression",
+            "reference_expression",
+            "assignment_expression",
+            "match_arm",
+            "field_initializer",
+            "struct_expression",
+            "let_declaration",
+            "if_expression",
+            "match_expression",
+          ].includes(n.parent.type) &&
+          field(n.parent, "pattern")?.id !== n.id &&
+          field(n.parent, "name")?.id !== n.id &&
+          !(
+            n.parent.type === "match_arm" &&
+            field(n.parent, "value")?.id !== n.id
+          )
+        ) {
+          const b = fn ? bindings(fn, n, n.text.split("::")[0]!) : null;
+          link(n, owner, scope, "values", compact(n.text), {
+            implType,
+            implScope,
+            blocked:
+              n.type === "self" ||
+              unsafe ||
+              !!b?.blocked.has(compact(n.text.split("::")[0]!)) ||
+              genericShadow(n, n.text.split("::")[0]!),
+          });
         }
         // Outermost type paths only; don't treat declaration names as references.
         if (
@@ -721,7 +891,7 @@ export async function parseRust({
             {
               implType: nextImpl,
               implScope,
-              blocked: genericShadow(n, n.text.split("::")[0]!),
+              blocked: unsafe || genericShadow(n, n.text.split("::")[0]!),
             },
           );
         }
@@ -733,11 +903,28 @@ export async function parseRust({
             n.type === "mod_item" ? null : nextFn,
             n.type === "mod_item" ? "" : nextImpl,
             n.type === "mod_item" ? nextScope : moduleScope,
+            unsafe,
           );
       }
       for (const n of tree.rootNode.namedChildren)
         visit(n, "file", "", null, "");
-      if (opaqueCrateAliases.length) result.data = { opaqueCrateAliases };
+      result.data = { opaqueCrateAliases, opaqueImplTypes };
+      // No fact recovered inside an error or an invalid declaration header may
+      // be used as proof. Containment remains structural, not semantic support.
+      const bad = result.symbols.filter(
+        (s) => (s.data as Record<string, unknown>)?.unsafe,
+      );
+      for (const l of result.links)
+        if (
+          l.kind !== "contains" &&
+          bad.some(
+            (s) => s.range.start <= l.range.start && s.range.end >= l.range.end,
+          )
+        )
+          l.data = {
+            ...(l.data as Record<string, import("../../types.js").Json>),
+            blocked: true,
+          };
     },
   });
   try {

@@ -3017,6 +3017,174 @@
         "start": 335,
         "end": 341
       }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "values",
+      "targetName": "value",
+      "source": {
+        "name": "new",
+        "kind": "method"
+      },
+      "target": null,
+      "candidates": [],
+      "range": {
+        "start": 614,
+        "end": 619
+      },
+      "at": "value"
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "values",
+      "targetName": "a",
+      "source": {
+        "name": "run",
+        "kind": "function"
+      },
+      "target": null,
+      "candidates": [],
+      "range": {
+        "start": 1025,
+        "end": 1026
+      },
+      "at": "a"
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "values",
+      "targetName": "super::B",
+      "source": {
+        "name": "check",
+        "kind": "function"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "B",
+        "kind": "struct"
+      },
+      "candidates": [],
+      "range": {
+        "start": 1152,
+        "end": 1160
+      },
+      "at": "super::B"
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "values",
+      "targetName": "B",
+      "source": {
+        "name": "new",
+        "kind": "method"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "B",
+        "kind": "struct"
+      },
+      "candidates": [],
+      "range": {
+        "start": 474,
+        "end": 475
+      },
+      "at": "B"
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "values",
+      "targetName": "super::A",
+      "source": {
+        "name": "check",
+        "kind": "function"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "A",
+        "kind": "struct"
+      },
+      "candidates": [],
+      "range": {
+        "start": 1141,
+        "end": 1149
+      },
+      "at": "super::A"
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "values",
+      "targetName": "value",
+      "source": {
+        "name": "generic",
+        "kind": "function"
+      },
+      "target": null,
+      "candidates": [],
+      "range": {
+        "start": 774,
+        "end": 779
+      },
+      "at": "value"
+    },
+    {
+      "file": "app/src/flat.rs",
+      "kind": "values",
+      "targetName": "Thing",
+      "source": {
+        "name": "new",
+        "kind": "method"
+      },
+      "target": {
+        "file": "app/src/flat.rs",
+        "name": "Thing",
+        "kind": "struct"
+      },
+      "candidates": [],
+      "range": {
+        "start": 68,
+        "end": 73
+      },
+      "at": "Thing"
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "values",
+      "targetName": "A",
+      "source": {
+        "name": "new",
+        "kind": "method"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "A",
+        "kind": "struct"
+      },
+      "candidates": [],
+      "range": {
+        "start": 415,
+        "end": 416
+      },
+      "at": "A"
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "values",
+      "targetName": "A",
+      "source": {
+        "name": "run",
+        "kind": "function"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "A",
+        "kind": "struct"
+      },
+      "candidates": [],
+      "range": {
+        "start": 1046,
+        "end": 1047
+      },
+      "at": "A"
     }
   ]
 }

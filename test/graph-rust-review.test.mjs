@@ -559,7 +559,7 @@ test("round 3.5: lifetimes never select between impls", async () => {
   const generic = await graph(
     lib(`struct A<T>(T);impl<T>A<T>{fn new(){}}fn run(){A::new();}`),
   );
-  generic.unknown("A::new");
+  generic.one("A::new", "impl<T> A<T>::new");
 });
 test("round 3.6: Self variants and members in the same generic impl", async () => {
   const g = await graph(
@@ -574,7 +574,7 @@ test("round 3.6: Self variants and members in the same generic impl", async () =
   const outside = await graph(
     lib(`struct A<T>(T);impl<T>A<T>{fn m(&self){}}fn run(x:A<u8>){x.m();}`),
   );
-  outside.unknown("x.m");
+  outside.one("x.m", "impl<T> A<T>::m");
 });
 test("round 3.7: glob reexports compose and cycles terminate", async () => {
   const g = await graph(
@@ -680,7 +680,7 @@ test("round 3 loss audit: wrapper blankets affect compatible nominal types only"
     ),
   );
   g.one("a.f", "impl A::f");
-  g.unknown("self.f");
+  g.one("self.f", "impl<T> W<T>::f");
 });
 
 test("round 3 unresolved audit: blanket impls in unrelated crates do not affect a caller", async () => {
@@ -720,7 +720,7 @@ test("round 3 unresolved audit: standard Drop Default Clone names do not hide un
       `use external::Clone;struct W<T>(T);impl<T> Clone for W<T>{}impl<T>W<T>{fn f(&self){}fn run(&self){self.f();}}`,
     ),
   );
-  custom.unknown("self.f");
+  custom.one("self.f", "impl<T> W<T>::f");
   const local = await graph(
     lib(
       `trait Clone{fn f(self){}}struct A;impl Clone for A{}impl A{fn f(&self){}}fn run(a:A){a.f();}`,
@@ -750,7 +750,7 @@ test("round 3 standard trait evidence respects a shadowed std module", async () 
       `mod std{pub mod clone{pub use external::Clone;}}struct W<T>(T);impl<T>std::clone::Clone for W<T>{}impl<T>W<T>{fn f(&self){}fn run(&self){self.f();}}`,
     ),
   );
-  g.unknown("self.f");
+  g.one("self.f", "impl<T> W<T>::f");
 });
 
 test("round 3 standard prelude evidence cannot override an opaque glob binding", async () => {
@@ -759,7 +759,7 @@ test("round 3 standard prelude evidence cannot override an opaque glob binding",
       `use external::*;struct W<T>(T);impl<T> Clone for W<T>{}impl<T>W<T>{fn f(&self){}fn run(&self){self.f();}}`,
     ),
   );
-  g.unknown("self.f");
+  g.one("self.f", "impl<T> W<T>::f");
 });
 
 test("round 3 unresolved audit: equal impl identity text does not merge their members", async () => {
@@ -778,7 +778,7 @@ test("round 3 unresolved audit: equal impl identity text does not merge their me
       `struct W<T>(T);impl<T>W<T>{fn f(&self){}}impl<T>W<T>where T:Copy{fn run(&self){self.f();}}`,
     ),
   );
-  separate.unknown("self.f");
+  separate.one("self.f", "impl<T> W<T>::f");
 });
 
 test("round 3 unresolved audit: static blanket functions cannot mask dot methods", async () => {
@@ -821,13 +821,13 @@ test("round 3 standard trait evidence respects Cargo and extern-crate aliases", 
       "dep/Cargo.toml": `[package]\nname="std"\n`,
     },
   );
-  g.unknown("self.f");
+  g.one("self.f", "impl<T> W<T>::f");
   const alias = await graph(
     lib(
       `extern crate foreign as std;struct W<T>(T);impl<T> std::clone::Clone for W<T>{}impl<T>W<T>{fn f(&self){}fn run(&self){self.f();}}`,
     ),
   );
-  alias.unknown("self.f");
+  alias.one("self.f", "impl<T> W<T>::f");
 });
 
 test("round 3 R3: equal type-argument spelling is not equal namespace binding", async () => {
@@ -856,8 +856,7 @@ test("round 3 R3: alias equivalence cannot be rejected out of a candidate set", 
       `struct F<T>(T);type X=u8;impl F<X>{fn f(&self){}}trait U{fn f(&self);}trait V{fn f(&self);}impl U for F<u8>{fn f(&self){}}impl V for F<u8>{fn f(&self){}}fn run(x:F<u8>){x.f();}`,
     ),
   );
-  assert.ok(g.targets("x.f")[0].some((s) => s.identity === "impl F<X>::f"));
-  assert.equal(g.targets("x.f")[0].length, 3);
+  g.unknown("x.f"); // Alias argument equivalence is unproven; never a closed set.
 });
 test("round 3 R5: lifetime erasure preserves char const arguments", async () => {
   const g = await graph(
@@ -922,7 +921,7 @@ test("round 3 binding identity: alias receivers do not omit the underlying type'
       `struct A;type Alias=A;impl Alias{fn f(&self){}}trait Tr{fn f(self);}impl Tr for A{fn f(self){}}fn run(x:Alias){x.f();}`,
     ),
   );
-  g.unknown("x.f");
+  assert.equal(g.targets("x.f")[0].length, 2);
 });
 test("round 3 alias guard preserves explicitly captured associated functions", async () => {
   const g = await graph(

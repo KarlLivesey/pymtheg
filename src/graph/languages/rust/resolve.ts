@@ -28,7 +28,14 @@ const withoutLifetimes = (s: string) =>
     )
     .replace(/,\s*>/g, ">")
     .replace(/<\s*>/g, "");
-type Namespace = "type" | "value" | "macro" | "pattern" | "any" | "import";
+type Namespace =
+  | "type"
+  | "value"
+  | "macro"
+  | "pattern"
+  | "any"
+  | "import"
+  | "importType";
 interface Place {
   crate: Crate;
   local: string;
@@ -41,6 +48,7 @@ interface Place {
 interface Found {
   symbols: GraphSymbol[];
   complete: boolean;
+  reason?: string;
 }
 const unique = (ss: GraphSymbol[]) => [
   ...new Map(ss.map((s) => [s.id, s])).values(),
@@ -48,16 +56,21 @@ const unique = (ss: GraphSymbol[]) => [
 const accepts = (s: GraphSymbol, ns: Namespace) => {
   if (ns === "any") return true;
   if (ns === "macro") return s.kind === "macro";
-  if (ns === "type")
+  if (ns === "importType" && s.kind === "variant") return true;
+  if (ns === "type" || ns === "importType")
     return ["module", "struct", "enum", "trait", "type"].includes(s.kind);
   if (ns === "pattern")
     return ["variant", "struct", "const", "static"].includes(s.kind);
   return (
-    ["function", "const", "static", "variant"].includes(s.kind) ||
+    ["function", "const", "static"].includes(s.kind) ||
+    (s.kind === "variant" && data(s).constructorForm !== "named") ||
     (s.kind === "struct" && data(s).constructorForm !== "named")
   );
 };
-export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
+export function resolveRust(
+  ctx: ResolutionContext,
+  uncertain?: (link: GraphLink, targets: GraphSymbol[], reason: string) => void,
+): LinkResolution[] {
   const symbols = ctx.symbols.filter(
     (s) => s.module === "rust" && s.status !== "failed",
   );
@@ -255,6 +268,7 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
   const merge = (xs: Found[]): Found => ({
     symbols: unique(xs.flatMap((x) => x.symbols)),
     complete: xs.every((x) => x.complete),
+    reason: [...new Set(xs.map((x) => x.reason).filter(Boolean))].join("; "),
   });
   const isDescendant = (scope: string, parent: string) =>
     !parent || scope === parent || scope.startsWith(parent + "::");
@@ -343,6 +357,8 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
     accessFrom?: Place,
   ): Found | null {
     const headNs: Namespace = rest.length ? "type" : ns;
+    const uses = importsByScope.get(`${loc.file}|${local}`);
+    if (uses?.globs.some((l) => data(l).unsafe)) return empty(false);
     const declared = (
       table.get(key(loc.crate.root, [q, name].filter(Boolean).join("::"))) ?? []
     ).filter(
@@ -356,7 +372,6 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
           children(s, rest, ns, seen, allowGlobs, accessFrom),
         ),
       );
-    const uses = importsByScope.get(`${loc.file}|${local}`);
     const explicit = (uses?.explicit.get(name) ?? []).filter(
       (l) => !accessFrom || visible(str(data(l).visibility), loc, accessFrom),
     );
@@ -435,7 +450,7 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
   ): Found {
     if (ns === "import")
       return merge(
-        (["type", "value", "macro"] as Namespace[]).map((n) =>
+        (["importType", "value", "macro"] as Namespace[]).map((n) =>
           find(raw, loc, scope, n, seen, allowGlobs, accessFrom),
         ),
       );
@@ -536,6 +551,7 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
           : empty();
       }
     }
+    result.complete &&= result.symbols.every((s) => !data(s).unsafe);
     if (result.complete) memo.set(guard, result);
     return result;
   }
@@ -631,6 +647,8 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
     argumentPlace: Place;
     argumentScope: string;
     argumentSyntax: string;
+    universal: boolean;
+    bounded: boolean;
   };
   const methodIndex = new Map<string, Method[]>();
   type Blankets = {
@@ -671,7 +689,169 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
     reachableCache.set(root, result);
     return result;
   }
+  // Alias expansion never treats an unexpanded alias as a disjoint nominal.
+  type Expansion = {
+    text: string;
+    loc: Place;
+    scope: string;
+    unknown: boolean;
+    externalShape?: string;
+  };
+  function expandType(
+    text: string,
+    loc: Place,
+    scope: string,
+    seen = new Set<string>(),
+    variables = new Set<string>(),
+  ): Expansion {
+    text = text.trim();
+    if (variables.has(compact(text)))
+      return { text, loc, scope, unknown: true };
+    const ref = text.match(
+      /^&\s*(?:'[_\p{ID_Start}][_\p{ID_Continue}]*\s*)?(mut\s+)?/u,
+    );
+    if (ref) {
+      const inner = expandType(
+        text.slice(ref[0].length),
+        loc,
+        scope,
+        seen,
+        variables,
+      );
+      return { ...inner, text: ref[0] + inner.text };
+    }
+    const target = find(text, loc, scope, "type");
+    const aliases = target.symbols.filter((s) => s.kind === "type");
+    // Unshadowed prelude Box is a known outer constructor. Expanding an alias
+    // to Box<...> does not make its impl applicable to unrelated nominal types.
+    if (
+      !target.symbols.length &&
+      target.complete &&
+      (/^Box\s*</.test(text) ||
+        (/^(?:::)?std::boxed::Box\s*</.test(text) &&
+          !find("std", loc, scope, "type").symbols.length &&
+          !opaqueStandardRoots.get(loc.crate.root)?.has("std")))
+    )
+      return { text, loc, scope, unknown: false, externalShape: "Box" };
+    if (!aliases.length)
+      return {
+        text,
+        loc,
+        scope,
+        unknown:
+          seen.size > 0 &&
+          (!target.complete ||
+            (!target.symbols.length &&
+              !variables.has(text) &&
+              !/^([ui](8|16|32|64|128|size)|f(32|64)|bool|char|str)$/.test(
+                text,
+              ))),
+      };
+    if (aliases.length !== 1 || !target.complete)
+      return { text, loc, scope, unknown: true };
+    const a = aliases[0]!,
+      rhs = str(data(a).aliasType),
+      key = a.id;
+    if (!rhs || data(a).unsafe || seen.has(key) || seen.size > 32)
+      return { text, loc, scope, unknown: true };
+    const owners = ownerPlace(a.file, str(data(a).scope));
+    if (owners.length !== 1) return { text, loc, scope, unknown: true };
+    const params = ((data(a).generics ?? []) as string[]).filter(
+      (g) => !g.startsWith("'"),
+    );
+    const noLife = withoutLifetimes(text),
+      raw = noLife.includes("<") ? noLife.slice(noLife.indexOf("<")) : "";
+    const args = raw ? splitArguments(raw) : [];
+    if (!args || args.length !== params.length)
+      return { text, loc, scope, unknown: true };
+    const substitutions = new Map(params.map((p, i) => [p, args[i]!]));
+    // Substituted nonprimitive names must not silently change namespace at the
+    // alias declaration. Keep uncertainty when those scopes differ.
+    const shifted =
+      (loc.file !== a.file || scope !== str(data(a).scope)) &&
+      args.some((x) =>
+        identifiers(x).some(
+          (t) =>
+            !/^([ui](8|16|32|64|128|size)|f(32|64)|bool|char|str)$/.test(t),
+        ),
+      );
+    const expanded = rhs.replace(
+      /[_\p{ID_Start}][_\p{ID_Continue}]*/gu,
+      (t) => substitutions.get(t) ?? t,
+    );
+    if (
+      data(a).aliasShape === "tuple_type" ||
+      data(a).aliasShape === "array_type"
+    )
+      return {
+        text: expanded,
+        loc: owners[0]!,
+        scope: str(data(a).scope),
+        unknown: false,
+        externalShape: str(data(a).aliasShape),
+      };
+    const next = expandType(
+      expanded,
+      owners[0]!,
+      str(data(a).scope),
+      new Set([...seen, key]),
+      variables,
+    );
+    return { ...next, unknown: next.unknown || shifted };
+  }
+  const stdBlanketNames = new Set([
+    "from",
+    "into",
+    "try_from",
+    "try_into",
+    "borrow",
+    "borrow_mut",
+    "to_owned",
+    "to_string",
+    "type_id",
+    "as_ref",
+    "as_mut",
+    "clone",
+    "clone_from",
+    "into_iter",
+    "default",
+  ]);
+  const macroTypesByCrate = new Map<string, Set<string>>();
+  const nominalNames = new Map<string, GraphSymbol[]>();
+  for (const symbol of symbols)
+    if (["struct", "enum", "type"].includes(symbol.kind)) {
+      const list = nominalNames.get(symbol.name) ?? [];
+      list.push(symbol);
+      nominalNames.set(symbol.name, list);
+    }
+  for (const f of ctx.files)
+    for (const token of (data(f.result).opaqueImplTypes ?? []) as {
+      name: string;
+      scope: string;
+    }[])
+      for (const loc of ownerPlace(f.path, token.scope)) {
+        const set = macroTypesByCrate.get(loc.crate.root) ?? new Set<string>();
+        macroTypesByCrate.set(loc.crate.root, set);
+        // Opaque token paths cannot be interpreted as unqualified names. Keep
+        // every reachable same-named nominal, including qualified/shadowed ones.
+        for (const candidate of nominalNames.get(token.name) ?? [])
+          if (
+            ownerPlace(candidate.file, str(data(candidate).scope)).some((p) =>
+              reachable(loc.crate.root).has(p.crate.root),
+            )
+          )
+            set.add(candidate.id);
+        const expanded = expandType(token.name, loc, token.scope);
+        for (const t of find(
+          expanded.text,
+          expanded.loc,
+          expanded.scope,
+          "type",
+        ).symbols)
+          set.add(t.id);
+      }
   const scopedMembers = (s: GraphSymbol) => membersByOwner.get(s.id) ?? [];
+  const shapeTargets = new Map<string, GraphSymbol[]>();
   for (const impl of symbols.filter((s) => s.kind === "impl")) {
     const implType = str(data(impl).implType);
     const generics = (data(impl).generics ?? []) as string[];
@@ -710,13 +890,51 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
         !!data(impl).trait &&
         !standard &&
         (!trait.complete || !trait.symbols.length);
+      const expanded = expandType(
+        implType,
+        loc,
+        str(data(impl).scope),
+        new Set(),
+        new Set(generics),
+      );
+      const expandedImplType = expanded.text;
+      if (data(impl).unsafe) {
+        blankets.opaque = true;
+        continue;
+      }
+      if (expanded.externalShape) {
+        const overrides = scopedMembers(impl);
+        for (const method of [
+          ...overrides,
+          ...traitMethods.filter(
+            (m) =>
+              data(m).defaultBody && !overrides.some((o) => o.name === m.name),
+          ),
+        ]) {
+          const key = `${loc.crate.root}|${expanded.externalShape}|${method.name}`;
+          const list = shapeTargets.get(key) ?? [];
+          list.push(method);
+          shapeTargets.set(key, list);
+        }
+        continue;
+      }
+      if (data(impl).unsafe || expanded.unknown) {
+        for (const name of instanceNames) blankets.names.add(name);
+        for (const name of suppliedNames) blankets.associatedNames.add(name);
+        if (data(impl).trait && unknownTrait) blankets.opaque = true;
+        if (data(impl).unsafe) blankets.opaque = true;
+        continue;
+      }
       const blanket =
         !!data(impl).trait &&
         generics
           .filter((g) => !g.startsWith("'"))
-          .some((g) => identifiers(implType).includes(g));
+          .some((g) => identifiers(expandedImplType).includes(g));
       if (blanket) {
-        const nominal = implType.replace(/^&(?:'\w+\s+)?(?:mut\s+)?/, "");
+        const nominal = expandedImplType.replace(
+          /^&(?:'\w+\s+)?(?:mut\s+)?/,
+          "",
+        );
         if (generics.includes(base(nominal))) {
           for (const name of instanceNames) blankets.names.add(name);
           for (const name of suppliedNames) blankets.associatedNames.add(name);
@@ -724,8 +942,19 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
         } else {
           // A nominal wrapper cannot be selected for an unrelated explicit
           // receiver type. Its generic arguments/bounds remain unsolved.
-          for (const t of find(nominal, loc, str(data(impl).scope), "type")
-            .symbols) {
+          const nominalTargets = find(
+            nominal,
+            expanded.loc,
+            expanded.scope,
+            "type",
+          );
+          if (!nominalTargets.complete || !nominalTargets.symbols.length) {
+            for (const name of instanceNames) blankets.names.add(name);
+            for (const name of suppliedNames)
+              blankets.associatedNames.add(name);
+            blankets.opaque ||= unknownTrait;
+          }
+          for (const t of nominalTargets.symbols) {
             const names = blankets.byType.get(t.id) ?? new Set<string>();
             for (const name of instanceNames) names.add(name);
             blankets.byType.set(t.id, names);
@@ -738,8 +967,11 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
         }
         continue;
       }
-      if (/^&/.test(implType.trim())) {
-        const nominal = implType.replace(/^&(?:'\w+\s+)?(?:mut\s+)?/, "");
+      if (/^&/.test(expandedImplType.trim())) {
+        const nominal = expandedImplType.replace(
+          /^&(?:'\w+\s+)?(?:mut\s+)?/,
+          "",
+        );
         for (const t of find(nominal, loc, str(data(impl).scope), "type")
           .symbols) {
           const names = blankets.refs.get(t.id) ?? new Set<string>();
@@ -749,7 +981,12 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
         }
         continue;
       }
-      const targets = find(implType, loc, str(data(impl).scope), "type");
+      const targets = find(
+        expandedImplType,
+        expanded.loc,
+        expanded.scope,
+        "type",
+      );
       if (standard)
         for (const target of targets.symbols) {
           const names = blankets.byType.get(target.id) ?? new Set<string>();
@@ -798,14 +1035,34 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
           list.push({
             symbol: m,
             inherent: !data(impl).trait,
-            implType,
+            implType: expandedImplType,
             generics,
-            uncertain: !targets.complete,
+            uncertain:
+              !targets.complete || !!data(impl).unsafe || !!data(m).unsafe,
+            universal:
+              data(impl).universal === true &&
+              (() => {
+                const type = withoutLifetimes(expandedImplType),
+                  ps = generics.filter((g) => !g.startsWith("'"));
+                const args = type.includes("<")
+                  ? splitArguments(type.slice(type.indexOf("<")))
+                  : null;
+                return (
+                  !!args &&
+                  args.length === ps.length &&
+                  new Set(args.map(compact)).size === ps.length &&
+                  args.every((a, i) => compact(a) === ps[i])
+                );
+              })(),
+            bounded: data(impl).bounded === true,
             implKey: `${impl.file}|${impl.key}`,
             ownerRoot: loc.crate.root,
-            argumentPlace: loc,
-            argumentScope: str(data(impl).scope),
-            argumentSyntax: str(data(impl).argumentSyntax),
+            argumentPlace: expanded.loc,
+            argumentScope: expanded.scope,
+            argumentSyntax:
+              expandedImplType === implType
+                ? str(data(impl).argumentSyntax)
+                : "",
           });
           methodIndex.set(k, list);
         }
@@ -1078,9 +1335,49 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
     receiverSyntax = "",
   ): Found {
     name = compact(name);
-    if (instance && !["owned", "shared", "mutable"].includes(borrow))
-      return empty(false);
-    const type = find(typeName, loc, scope, "type");
+
+    const expansion = expandType(
+      typeName,
+      loc,
+      scope,
+      new Set(),
+      new Set(callerGenerics.split(",")),
+    );
+    if (expansion.externalShape)
+      return {
+        symbols: unique(
+          [...reachable(loc.crate.root)]
+            .flatMap(
+              (root) =>
+                shapeTargets.get(
+                  `${root}|${expansion.externalShape}|${name}`,
+                ) ?? [],
+            )
+            .filter((s) => !instance || data(s).receiver === true),
+        ),
+        complete: false,
+        reason:
+          "external Box/tuple/array receiver dispatch is not proven; captured project impls retained",
+      };
+    const foundType = find(
+      expansion.text,
+      expansion.loc,
+      expansion.scope,
+      "type",
+    );
+    const type: Found = { ...foundType, symbols: [...foundType.symbols] };
+    type.complete &&= !expansion.unknown;
+    typeName = expansion.text;
+    if (/^&/.test(typeName)) {
+      borrow = /^&\s*(?:'\w+\s*)?mut\b/.test(typeName) ? "mutable" : "shared";
+      typeName = typeName.replace(/^&\s*(?:'\w+\s*)?(?:mut\s+)?/, "");
+      type.symbols = find(
+        typeName,
+        expansion.loc,
+        expansion.scope,
+        "type",
+      ).symbols;
+    }
     const blankets = visibleBlankets(loc.crate.root);
     if (instance && type.symbols.some((t) => t.kind === "type"))
       return empty(false);
@@ -1091,7 +1388,7 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
         ).length > 1,
     );
     const applicable = (m: Method) =>
-      m.implKey === sameImpl
+      m.implKey === sameImpl || (m.universal && (!instance || !m.bounded))
         ? "yes"
         : compatibility(
             typeName,
@@ -1109,6 +1406,8 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
       .flatMap((t) => methodIndex.get(`${t.id}|${name}`) ?? [])
       .filter((m) => {
         if (!reachable(loc.crate.root).has(m.ownerRoot)) return false;
+        // Recovered headers cannot prove arity, receiver form or applicability.
+        if (data(m.symbol).unsafe) return true;
         if (
           typeof data(m.symbol).arity === "number" &&
           (Number(data(m.symbol).arity) <
@@ -1121,6 +1420,7 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
         if (!instance) return true;
         const receiver = compact(str(data(m.symbol).receiverKind));
         if (!receiver || receiver === "none") return false;
+        if (borrow === "unknown" || receiver === "unknown") return true;
         if (
           receiver.includes("&mut") &&
           (borrow === "shared" || (borrow === "owned" && !mutable))
@@ -1129,8 +1429,26 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
         if (!receiver.includes("&") && borrow !== "owned") return false;
         return true;
       });
-    if (ambiguousTypeView && !matches.some((m) => m.implKey === sameImpl))
-      return empty(false);
+
+    const unknown = (reason: string): Found => ({
+      symbols: unique(matches.map((m) => m.symbol)),
+      complete: false,
+      reason,
+    });
+    if (
+      (instance && !["owned", "shared", "mutable"].includes(borrow)) ||
+      (ambiguousTypeView && !matches.some((m) => m.implKey === sameImpl))
+    )
+      return unknown("custom receiver adjustment or ambiguous module view");
+    if (
+      instance &&
+      type.symbols.some((t) =>
+        [...reachable(loc.crate.root)].some((root) =>
+          macroTypesByCrate.get(root)?.has(t.id),
+        ),
+      )
+    )
+      return unknown("opaque item macro may implement the receiver type");
     const inherent = matches.filter((m) => m.inherent);
     const proven = inherent.filter(
       (m) =>
@@ -1150,21 +1468,34 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
             ? "owned"
             : "unknown";
     };
+    if (stdBlanketNames.has(name) && (instance || !proven.length))
+      return unknown("uncaptured std/core blanket alternative: " + name);
+    // A proven inherent receiver exactly matches an existing &Type or owned Type
+    // before any dereference/autoref adjustment. Nominal-wrapper traits cannot
+    // beat it at that step. Universal and reference guards remain conservative.
+    const exactReceiver =
+      instance &&
+      ["shared", "owned"].includes(borrow) &&
+      proven.some((m) => form(m) === borrow);
     // Receiver candidates are searched before inherent/trait preference at that
     // candidate. Different autoref forms do NOT imply inherent dominance.
     if (
       instance &&
       (blankets.opaque ||
-        type.symbols.some((t) => blankets.opaqueTypes.has(t.id)) ||
+        (!exactReceiver &&
+          type.symbols.some((t) => blankets.opaqueTypes.has(t.id))) ||
         blankets.names.has(name) ||
-        type.symbols.some((t) => blankets.byType.get(t.id)?.has(name)) ||
+        (!exactReceiver &&
+          type.symbols.some((t) => blankets.byType.get(t.id)?.has(name))) ||
         type.symbols.some(
           (t) =>
             blankets.refs.get(t.id)?.has(name) ||
             blankets.refs.get(t.id)?.has("*"),
         ))
     )
-      return empty(false);
+      return unknown(
+        "project blanket/reference impl applicability or defaults unknown",
+      );
     if (
       !instance &&
       !proven.length &&
@@ -1176,7 +1507,9 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
             blankets.associatedByType.get(t.id)?.has(name),
         ))
     )
-      return empty(false);
+      return unknown(
+        "project blanket/reference impl applicability or defaults unknown",
+      );
     const opaque = type.symbols.some((t) => blankets.opaqueNormal.has(t.id));
     const dominates =
       proven.length > 0 &&
@@ -1197,8 +1530,22 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
       (!dominates ||
         selected.some((m) => m.uncertain || applicable(m) !== "yes"))
     )
-      return empty(false);
-    return { symbols: ss, complete };
+      return {
+        symbols: ss,
+        complete: false,
+        reason: "trait-only dispatch or generic substitution/bounds not proven",
+      };
+    return {
+      symbols: ss,
+      reason: expansion.unknown
+        ? "alias expansion unknown"
+        : opaque
+          ? "uncaptured trait defaults or trait-in-scope selection"
+          : "generic substitution or impl bounds not proven",
+      complete:
+        complete &&
+        !selected.some((m) => m.uncertain || applicable(m) !== "yes"),
+    };
   }
   const resolutions: LinkResolution[] = [];
   for (const l of ctx.links) {
@@ -1240,16 +1587,15 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
               str(d.genericBindings),
               str(d.receiverArgumentSyntax),
             );
-          const ns: Namespace =
-            l.kind === "calls"
-              ? "value"
-              : l.kind === "macros"
-                ? "macro"
-                : l.kind === "patterns"
-                  ? "pattern"
-                  : ["types", "implements"].includes(l.kind)
-                    ? "type"
-                    : "import";
+          const ns: Namespace = ["calls", "values"].includes(l.kind)
+            ? "value"
+            : l.kind === "macros"
+              ? "macro"
+              : l.kind === "patterns"
+                ? "pattern"
+                : ["types", "implements"].includes(l.kind)
+                  ? "type"
+                  : "import";
           let result = find(name, loc, scope, ns);
           if (
             l.kind === "calls" &&
@@ -1300,12 +1646,29 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
             str(d.scope) === str(data(s).scope) ||
             str(d.scope).startsWith(str(data(s).scope) + "::")),
       );
-    if (!found.complete) continue;
+    if (found.symbols.some((s) => data(s).unsafe)) {
+      found.complete = false;
+      found.reason = "syntax-error declaration or recovered region";
+    }
+    if (!found.complete) {
+      uncertain?.(
+        l,
+        unique(found.symbols),
+        found.reason || "namespace/import/alias structure is unknown",
+      );
+      continue;
+    }
     const targets = unique(found.symbols);
     // One import can bind several namespaces simultaneously. The interface's
     // one-of relation cannot assert such a multi-binding as one candidate set.
-    if (l.kind === "imports" && new Set(targets.map((s) => s.kind)).size > 1)
+    if (l.kind === "imports" && new Set(targets.map((s) => s.kind)).size > 1) {
+      uncertain?.(
+        l,
+        targets,
+        "Simultaneous namespace bindings cannot be represented as one-of",
+      );
       continue;
+    }
     if (targets.length > 1)
       resolutions.push({
         linkId: l.id,

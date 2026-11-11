@@ -1,10 +1,10 @@
 # W2-C: Rust language module for the code graph
 
-Round-three review revision, module version 3. Current main was merged normally,
+Round-four review revision, module version 4. Current main was merged normally,
 including the schema-3 graph core and blank-line identity conformance kit. W2-C
 changes only its Rust folder, Rust tests/fixtures, evidence and this note. No
-Cargo/rustc, Rust installation, project execution or project filesystem reads are
-required by the module or tests. The installed Rust WASM grammar and tags query
+Cargo/rustc, Rust installation or project execution is required by the module or
+tests. The module uses only supplied snapshots and never reads project files. The installed Rust WASM grammar and tags query
 load through the shared Tree-sitter helper; duplicate function/method tags are
 filtered. Parser trees never escape parsing.
 
@@ -22,7 +22,7 @@ filtered. Parser trees never escape parsing.
 | Glob member lookup, including chained glob reexports | Follow captured contents with cycle protection; check pub/pub(crate)/pub(super)/pub(in path)/private visibility for the importing module. Explicit imports and local items shadow globs |
 | Glob edge itself | Unresolved; assigning that edge a module target remains backlog |
 | Simultaneous type/value/macro imports | Import edge unresolved if one-of cannot express simultaneous bindings; each use selects its namespace |
-| Free calls and applicable inherent associated calls | Definite when facts determine one target; complete competing choices become candidates. Explicitly captured alias-associated functions remain usable; alias dot dispatch stays unresolved without expanding the underlying method set |
+| Free calls and applicable inherent associated calls | Definite when facts determine one target; complete competing choices become candidates. Explicitly captured alias-associated functions remain usable; simple alias receiver types expand; unsupported substitutions remain unresolved |
 | Receiver self, mut self, borrowed/lifetime-borrowed self and typed Self/&Self/&mut Self | Parsed structurally; preserve borrow and mutability, reject inapplicable methods |
 | Box/Rc/Pin and other custom typed self | Receiver syntax/type retained; dispatch unresolved when custom receiver adjustment is needed. No arbitrary Deref/Pin projection |
 | Lifetime-only impls | Lifetimes ignored for applicability; they never select between impls |
@@ -46,7 +46,7 @@ Both cfg branches remain captured; there is no feature/platform selection. Parti
 syntax remains partial with diagnostics (not a clean parse). A malformed grammar
 load remains a failure. Explicit non-glob paths are structural relationships, not
 a general Rust visibility/type-checking proof. General trait-in-scope selection,
-supertrait/bounds solving, associated-type projection, type-alias expansion,
+supertrait/bounds solving, associated-type projection, complex alias substitution,
 closure/result/chained-receiver inference and arbitrary macro scope/export lookup
 are not implemented. Custom typed receivers are recorded without guessing their
 adjustment. Files outside captured Cargo/module trees retain symbols and
@@ -68,14 +68,16 @@ also passes the stricter independent blank-line reindex with unchanged IDs and
 no exclusions.
 
 The interface cannot represent simultaneous import bindings as one-of targets,
-or a finite candidate list plus an unknown alternative. Such edges remain
-unresolved. No core/interface workaround was made.
+as a closed resolution, or a finite closed candidate list plus an unknown
+alternative. Such edges remain unresolved with known targets and the reason in
+link data. No core/interface change was made.
 
 ## Resolution work
 
 Imports, places, declarations and members are indexed once; binding evidence is
 cached per function and queried through lexical scopes. Completed lookups are
-memoized with module-view keys and recursion guards. Reachable Cargo roots and
+memoized with module-view keys and recursion guards. Receiver selection copies
+lookup results so one uncertain alias cannot mutate later cached lookups. Reachable Cargo roots and
 dispatch guards are cached. There is no project-wide import/place scan per name
 or repeated scan of a function body. Work still depends on path depth, candidate
 memberships and dependency/reexport relationships. Timing is not an assertion.
@@ -85,79 +87,123 @@ records are preserved as history. Round three intentionally changes semantics;
 those old equality hashes are not claimed to prove the new semantics unchanged.
 The final full-store report and new movement/audit records below are authoritative.
 
+## Round-four safety and restored relationships
+
+| Review item | Behavior |
+|---|---|
+| R1: structural pattern bindings | Shorthand fields, ref/mut/ref-mut, captured, nested tuple/slice/struct/tuple-struct/or patterns mask free calls. Function/closure parameters, let/let-else, if/while-let, match and for use their actual regions; the iterator expression does not inherit the for binding; parameter value bindings also mask calls in signature expressions (confirmed with rustc) |
+| R2: aliases | Expand captured identity/generic aliases, chains and references before impl/receiver decisions. Parenthesized types remain transparent. Known tuple/array and unshadowed prelude/std Box outer constructors cannot become a universal blanket for unrelated nominal types. Unknown, cyclic, external or unsupported expansion remains uncertainty. Substituted names that would change namespace are not guessed |
+| R3: std/core alternatives | The method-name guard table is exactly `from`, `into`, `try_from`, `try_into`, `borrow`, `borrow_mut`, `to_owned`, `to_string`, `type_id`, `as_ref`, `as_mut`, `clone`, `clone_from`, `into_iter`, `default`. It covers the requested From/Into/TryFrom/TryInto, Borrow/BorrowMut, ToOwned, ToString/Display, Any, reference AsRef/AsMut/Clone, Iterator/IntoIterator and Default alternatives. It conservatively withholds dot dispatch for these names without attempting trait/result inference. An independently proven inherent PATH call remains definite. Names outside this table are assumed not universally supplied by uncaptured standard-library blankets |
+| R4: statement macros | A local identifier token in an opaque statement macro invalidates its previous binding evidence until a new binding establishes it. The guard follows block activation order, including self; it does not expand or inspect macro definition bodies |
+| R4: item macros | Literal type-name tokens in opaque item/statement macro invocations make dot dispatch on that type uncertain. Qualified paths and local shadowing cannot evade the guard; every reachable same-named nominal is retained conservatively, plus expanded alias targets. Proven inherent path calls remain independent |
+| R5: fully generic inherent impls | Distinct own parameters in exactly `Type<P1,...,Pn>`, ignoring lifetimes, apply to every instantiation. Unbounded impls apply outright; bounds permit path name lookup but do not prove dot applicability. Same physical impl membership remains proof. Expanding an alias to a specialised type never makes that impl universal |
+| R5: receiver probing | Proven exact owned/shared inherent receivers precede nominal-wrapper trait adjustments. Universal/project reference guards and the std table remain conservative. Mutable/custom receiver adjustment is not broadened |
+| R6: loss audit | All original 152 links are reclassified individually, including restored entries. The previous assertion that all 63 remaining links were unprovable was inaccurate |
+| R7: expression values | Bare unit-struct and enum-variant expressions, including Self paths, emit value-namespace links. Named-field variant imports and patterns remain valid independently of bare-value lookup. Locals/self stay unresolved; a named-field variant is not a bare value constructor |
+| Syntax-error safety | Recovered declarations inside ERROR nodes, or declarations with broken headers, carry unsafe structure. Broken struct/enum field lists taint the declaration. Unsafe impls do not enter the method index; malformed use structure makes lookup uncertain. Such symbols cannot support a definite link or closed set from any file, including containment links. Recovered method headers remain possible before arity/receiver filtering. Clean headers elsewhere in a partial file remain usable |
+
+All candidate sets presented by the resolver are **closed**. If lookup or dispatch
+is not proven complete, the link remains unresolved. Analyze retains known project
+symbol IDs in `data.targets` and explains uncertainty in `data.uncertainty`; these
+are evidence, not a one-of resolution. A singleton possible trait implementation
+also remains unresolved. No OPEN sets are emitted. Analyze rebuilds this metadata
+from captured facts each run; it neither reparses nor reads project files. It uses
+one indexed resolver pass to annotate evidence, followed by the core's ordinary
+resolution pass. Both costs are reported separately.
+
+The macro guards are deliberately limited to literal invocation tokens and their
+statement/item positions. They cannot detect an expansion inventing a type/name
+absent from the invocation. Macro/proc-macro/derive bodies are not expanded.
+Cross-file macro exports/imports, the mixed external/project-glob case and all
+other manager-listed backlog remain outside this revision. General substitution,
+trait-in-scope precision, argument/result inference, supertraits, arbitrary Deref,
+Box/Pin/Rc receiver projection, and generated declarations are not implemented.
+Known Box/tuple outer shapes do not add a standard-library target to the graph.
+
 ## Vector and loss accounting
 
-All 1,563 `.rs` files at Vector
-`515e87d9861b564f521a8992d224892cd8cae120` were indexed through the real indexer
-and a fresh schema-3 SQLite store. Sources stayed in unique scratch. Both runs
-have 1,552 clean, 11 partial, zero failed files and zero analysis/resolution errors.
-The partial paths/grammar diagnostics remain recorded; no partial result was
-relabeled clean. No Vector code was executed.
+| Observation | Round-three head `3b19541f` | Round-four release |
+|---|---:|---:|
+| Claimed / clean / partial / failed | 1,563 / 1,552 / 11 / 0 | 1,563 / 1,552 / 11 / 0 |
+| Symbols | 35,907 | 35,907 |
+| Links | 310,195 | 365,699 |
+| Resolved | 109,632 | 115,794 |
+| Closed candidate sets | 1,230 | 1,102 |
+| Unresolved | 199,333 | 248,803 |
 
-| Whole repository | Symbols | Links | Resolved | Candidate sets | Unresolved |
-|---|---:|---:|---:|---:|---:|
-| Round two, b3a0147d | 35,907 | 311,132 | 106,602 | 1,090 | 203,440 |
-| Round three | 35,907 | 310,195 | 109,632 | 1,230 | 199,333 |
+The release real-store run observed 144.130 s total wall time, including 38.014 s
+module parsing, 7.603 s analysis/evidence annotation and 8.082 s resolution.
+The independent direct-module run observed 53.870 s total (36.348 s parsing,
+7.534 s analysis, 6.487 s resolution). These are loaded-machine observations,
+not thresholds. The previous submitted real-store observation was 189.492 s
+total, 60.790 s parsing and 8.999 s resolution; it had no evidence-annotation
+resolver pass. These different loaded-machine runs are not a speed claim.
+`round4-release-store.json` and `round4-release-summary.json`
+record kinds, top unresolved names, parse states and timings. Full per-link
+comparison proves the direct module and real store agree on all 365,699 links'
+file, span, kind, name, state, target IDs and data; counts alone were not used.
 
-937 placeholder edges disappeared: **72 wrong definite `_` links, one wrong
-candidate set and 864 already unresolved placeholders**. There are 3,790 old
-unresolved → resolved transitions (1,247 calls, 981 imports, 1,120 types, 427 patterns,
-15 implements) and 141 unresolved → candidate transitions. There are also 688
-old definite → unresolved transitions (394 calls, 230 imports, 60 types, four
-patterns), retained explicitly in the full movement ledger rather than hidden
-by the net gain. Visibility, receiver/blanket applicability and missing alternatives
-now constrain those decisions. No definite edge retargeted to a different symbol.
-The full transition ledger is `round3-submission-movement-{summary,links}.json`.
+All 1,563 Rust files at Vector
+`515e87d9861b564f521a8992d224892cd8cae120` are indexed through the real indexer
+and fresh schema-3 SQLite store, not a subset. The 11 partial files remain grammar
+partials; zero files fail, with no analysis/resolution errors. There are 92 Cargo
+target roots (36 lib, 11 bin, 3 example, 18 test, 14 bench, 10 build). Sources and
+stores stay in unique scratch and are deleted after use. No Vector program is run.
 
-The earlier write-up's blanket justification of 152 withheld links was inaccurate.
-On the same original 131-file/two-crate scope, **89 correct, provable links are
-restored; 63 remain**. Every remaining link is listed in
-`round3-loss-classification.{md,json}` with its old target and required evidence:
+`round4-release-movement-summary.json` compares every edge against the previous
+review head. There are 55,504 newly extracted value links: 6,867 resolved, 16
+candidates and 48,621 unresolved. Existing links gain 502 definite calls (498
+reach fully generic impls: 436 paths, 12 self dot calls and 50 other dot calls).
+Safety rules withhold 1,207 previous definite links and 144 previous candidate
+sets; no definite link retargets. All 141 sets added in round three are now
+unresolved: 136 from/try_from conversion sets have unknown std alternatives,
+and five validate/batcher sets lack generic applicability proof. Three other
+emit sets lose binding evidence after opaque statement macros. The remaining
+1,086 old candidate sets stay candidates; 16 new value sets give 1,102 total.
+The larger unresolved count also includes ordinary local expression values
+whose declarations/types are deliberately not inferred.
 
-| Category | Count |
-|---|---:|
-| (a) Was wrong before | 0 |
-| (b) Not provable under the stated supported rules | 63 |
-| (c) Correct and provable, still lost | 0 |
+`round4-loss-classification.{json,md}` enumerates **all original 152** against
+round-one `d60ac141` on the same 131 files: **101 restored, 51 remain**. Of the
+remaining links, (a) wrong before = **0**, (b) unprovable under an individually
+named current rule = **51**, (c) correct/provable still lost = **0**. The previous
+round's claim that all 63 were unprovable was inaccurate: this revision restores
+12 more, including with_increment and Generational::new examples. Remaining
+reasons cover substitution/inference, simultaneous/import namespace completeness,
+required macro guards, unknown earlier receiver steps, custom receivers and
+project blankets. Their old targets are not claimed wrong. Another 129 newly
+withheld links on those two crates are listed separately in
+`round4-additional-withheld.json`; they are not hidden in the original cohort.
 
-The 63 are: 11 cross-impl generic/inference cases, 14 simultaneous namespace
-imports, 17 uncaptured trait-default/scope cases, one uncaptured reference-trait
-case, 13 generic-trait applicability cases and seven custom self/Pin cases.
-These are not claimed to have been wrong Rust targets before. No new withheld
-round-one link lies outside the previous 152-link set. The two-crate totals are
-27,194 links: 10,877 resolved / 31 candidate sets / 16,286 unresolved.
-
-The new seed samples 30 resolved, all endpoints of 15 candidate sets, 15 general
-unresolved and 20 unresolved self calls with captured in-project inherent members.
-All final judgments are recorded in `round3-audit.md` and
-`round3-submission-audit.json`. The targeted audit found and fixed conditional-arity,
-physical impl ownership and static-versus-instance blanket mistakes; it did not
-merely list ordinary supported losses. Remaining targeted cases require custom
-receiver projection, cross-impl substitution, unknown trait defaults or generated
-nominal/module declarations. Sampling is not a universal accuracy proof.
-
-The final module run observed 40.921 s parse, 5.132 s resolve and 52.911 s
-module wall time. The separate fresh real-store run is recorded in
-`round3-submission-store.json`: 60.790 s module parse, 8.999 s resolve and
-189.492 s total through scratch copy/index/statistics, before cleanup. Timings
-are observations; the store counts exactly match the module output. There are 92 Cargo
-roots: 36 lib, 11 bin, three example, 18 test, 14 bench and ten build targets.
-Exact per-kind counts and top unresolved names are retained in that report.
-The final audit also exposed and fixed dependency-crate reexports and an overly
-broad alias guard; those fixes restore ordinary paths instead of merely listing
-lost patterns. Argument matching retains lifetime-free AST shapes, character
-const literals and scoped binding evidence; it does not expand type aliases.
+The new seed 0x20261114 selects 30 resolved, every endpoint in 15 candidate sets,
+15 general unresolved and 20 unresolved self calls with captured in-project
+members. The 20-entry pool is explicit and deduplicated by target ID, not mere
+coincidental names. Sources and all candidate endpoints are inspected; judgments
+are retained in `round4-audit.md` and the hand-check JSON. Findings fixed during
+this audit include aliases to known Box/tuple shapes poisoning unrelated receivers,
+parenthesized identity aliases, exact generic receiver applicability, self value
+expressions and qualified/shadowed macro type tokens. Sampling is not a universal
+accuracy claim.
 
 ## Validation and history
 
-Regressions cover each numbered review item with positive, negative and relevant
-ambiguous controls, plus the further ordinary patterns found in the targeted audit.
-The existing trait-dispatch negative and candidate checks remain intact.
-All four required commands passed sequentially: install, TLC-enabled full suite
-(1,324/1,324; zero skipped/cancelled), formatting, and focused Rust tests (78/78).
-Final required checks and source hashes are recorded in `round3-validation.json`.
-The final four-command sequence uses the manager-specified TLC jar, alone and in
-order. Earlier development validation overlapped subsequent edits/builds; it is
-explicitly not accepted as final evidence. Cancelled/aborted/superseded experiments
-remain in evidence, including the failed two-full-parse WASM comparison and the
-cancelled obsolete development store. None is counted as a passed property.
+The final isolated sequence passed: `npm ci --ignore-scripts`; `npm test`
+with the requested `PYM_TLC_JAR` (**1,343/1,343**, zero failed/cancelled/skipped);
+`npm run format:check`; and `node --test test/graph-rust*.test.mjs`
+(**97/97**, zero failed/cancelled/skipped). The frozen source hashes were unchanged
+through all four commands. `round4-validation.json` and `round4-check-*.log`
+record the commands and results. All **30** scratch rustc oracle cases pass.
+
+Four scratch-only compiled-module mutations disable R1 shorthand binding, R2 alias
+expansion, R3 std blanket guards and R5 universal generic applicability. The unchanged
+baseline passes and every mutation fails an assertion. The oracle harness invokes
+installed rustc only in disposable scratch, records actual compile/run outcomes,
+and is never imported by the language module or tests. Runtime and tests need no
+Rust toolchain. All numbered review items have regressions; exact fixture spans and
+independent blank-line identity conformance remain enforced without exclusions.
+
+Failed and superseded development attempts remain in `evidence/w2-c/`; the round-four
+README identifies the authoritative final records. No cancelled, failed, overlapping
+or obsolete run is counted as final validation. Earlier versions of this change note
+and prior evidence remain in git/history; old equality hashes do not prove this
+intentional semantic revision unchanged.
