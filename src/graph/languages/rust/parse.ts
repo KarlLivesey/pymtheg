@@ -33,7 +33,12 @@ export async function parseRust({
     mapDefinition: () => undefined,
     secondPass({ tree, result }) {
       const opaqueCrateAliases: string[] = [];
-      const opaqueImplTypes: { name: string; scope: string }[] = [];
+      const opaqueImplTypes: {
+        name: string;
+        scope: string;
+        semantic?: boolean;
+        variables?: string;
+      }[] = [];
       result.symbols.push({
         key: "file",
         name: path,
@@ -248,7 +253,8 @@ export async function parseRust({
               for (const token of n.namedChildren
                 .filter((c) => c.type === "token_tree")
                 .flatMap((c) => c.descendantsOfType(["identifier", "self"])))
-                add(token, null, n.parent.parent, n.endIndex, true);
+                if (!["self", "Self"].includes(compact(token.text)))
+                  add(token, null, n.parent.parent, n.endIndex, true);
               return;
             }
             if (n.type === "closure_expression") parameterRegion = n;
@@ -476,6 +482,8 @@ export async function parseRust({
         unsafe ||= n.type === "ERROR" || n.isMissing;
         if (kinds[n.type]) {
           const body = field(n, "body");
+          if (body?.children.some((c) => c.isMissing && c.type === "}"))
+            unsafe = true;
           unsafe ||= n.namedChildren.some(
             (c) => c.id !== body?.id && (c.hasError || c.isMissing),
           );
@@ -526,8 +534,16 @@ export async function parseRust({
                 : kind;
             const attrs: string[] = [];
             let previous = n.previousNamedSibling;
-            while (previous?.type === "attribute_item") {
-              attrs.unshift(previous.text);
+            while (
+              previous &&
+              ["attribute_item", "line_comment", "block_comment"].includes(
+                previous.type,
+              )
+            ) {
+              if (previous.type === "attribute_item") {
+                attrs.unshift(previous.text);
+                unsafe ||= previous.hasError;
+              }
               previous = previous.previousNamedSibling;
             }
             result.symbols.push({
@@ -719,9 +735,17 @@ export async function parseRust({
             for (const t of n.namedChildren
               .filter((c) => c.type === "token_tree")
               .flatMap((c) =>
-                c.descendantsOfType(["identifier", "type_identifier"]),
+                c.descendantsOfType(["identifier", "type_identifier", "self"]),
               ))
-              opaqueImplTypes.push({ name: compact(t.text), scope });
+              if (["self", "Self"].includes(compact(t.text))) {
+                if (implType)
+                  opaqueImplTypes.push({
+                    name: compact(implType),
+                    scope: implScope,
+                    semantic: true,
+                    variables: genericBindings(fn ?? n),
+                  });
+              } else opaqueImplTypes.push({ name: compact(t.text), scope });
           return;
         }
         if (n.type === "call_expression") {
@@ -908,7 +932,39 @@ export async function parseRust({
       }
       for (const n of tree.rootNode.namedChildren)
         visit(n, "file", "", null, "");
-      result.data = { opaqueCrateAliases, opaqueImplTypes };
+      // A closed function/closure body cannot swallow surrounding declarations.
+      // Everywhere else an error can hide an item; do not infer its text.
+      function declarationLossy(n: Node, closedBody = false): boolean {
+        if (n.isMissing && n.type === "}") return true;
+        if ((n.type === "ERROR" || n.isMissing) && !closedBody) return true;
+        const item =
+          !!kinds[n.type] ||
+          n.type.endsWith("_item") ||
+          ["use_declaration", "extern_crate_declaration"].includes(n.type) ||
+          (n.type === "macro_invocation" &&
+            [
+              "source_file",
+              "declaration_list",
+              "expression_statement",
+            ].includes(n.parent?.type ?? ""));
+        for (const c of n.children) {
+          let protectedBody = item ? false : closedBody;
+          if (
+            c.type === "block" &&
+            ["function_item", "closure_expression"].includes(n.type)
+          ) {
+            const close = c.children.at(-1);
+            protectedBody = close?.type === "}" && !close.isMissing;
+          }
+          if (declarationLossy(c, protectedBody)) return true;
+        }
+        return false;
+      }
+      result.data = {
+        opaqueCrateAliases,
+        opaqueImplTypes,
+        declarationLossy: declarationLossy(tree.rootNode),
+      };
       // No fact recovered inside an error or an invalid declaration header may
       // be used as proof. Containment remains structural, not semantic support.
       const bad = result.symbols.filter(

@@ -410,13 +410,13 @@ test("review borrow preference: different autoref forms never imply inherent dom
   );
   same.one("x.f", "impl A::f");
 });
-test("review reference impls are not silently omitted from receiver choices", async () => {
+test("review exact first probe beats reference trait impls", async () => {
   const g = await graph(
     lib(
       `struct A;impl A{fn f(&self){}}trait T{fn f(self);}impl T for &A{fn f(self){}}fn run(x:&A){x.f();}`,
     ),
   );
-  g.unknown("x.f");
+  g.one("x.f", "impl A::f"); // Exact first probe wins over the reference trait.
 });
 
 test("shared path file preserves both module views", async () => {

@@ -227,7 +227,7 @@ test("round 4 R4: opaque statement macros invalidate binding evidence in order",
   const self = await graph(
     lib(`struct A;impl A{fn f(&self){}fn run(&self){m!(self);self.f();}}`),
   );
-  self.unknown("self.f");
+  self.one("self.f", "impl A::f"); // self has an immutable signature type; first probe wins.
 });
 test("round 4 R4: item macro type tokens prevent complete dispatch", async () => {
   for (const invocation of ["imp!(A);", "external::imp!(A);"]) {
@@ -332,7 +332,7 @@ test("round 4 error regions and broken declaration headers cannot prove clean-fi
     lib(`fn f(){}use missing::{, f};fn run(){f();}`),
   );
   assert.equal(useError.files[0].result.status, "partial");
-  useError.unknown("f");
+  useError.one("f", "f"); // Intact local declaration remains authoritative.
 });
 test("round 4 alias expansion cannot turn a specialised impl into universal", async () => {
   const g = await graph(
@@ -341,7 +341,7 @@ test("round 4 alias expansion cannot turn a specialised impl into universal", as
     ),
   );
   g.unknown("x.f");
-  g.unknown("W::new");
+  g.one("W::new", "impl<T> Special<T>::new"); // Single inherent path name lookup.
 });
 test("round 4 structural bindings start at their actual scope", async () => {
   const g = await graph(

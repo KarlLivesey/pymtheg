@@ -102,6 +102,8 @@ export function resolveRust(
     const next = new Set([...ancestors, visitKey]);
     for (const s of moduleDeclarations.get(`${place.file}|${place.local}`) ??
       []) {
+      // Recovered module headers cannot establish another file's membership.
+      if (data(s).unsafe) continue;
       const local = s.identity;
       const relative = local.slice(place.local.length).replace(/^::/, "");
       const scope = [place.scope, relative].filter(Boolean).join("::");
@@ -200,6 +202,12 @@ export function resolveRust(
     ownerCache.set(k, result);
     return result;
   };
+  const lossyFiles = new Set(
+    ctx.files.filter((f) => data(f.result).declarationLossy).map((f) => f.path),
+  );
+  const lossyCrates = new Set(
+    places.filter((p) => lossyFiles.has(p.file)).map((p) => p.crate.root),
+  );
   const qualified = (loc: Place, local: string) =>
     [loc.scope, local.slice(loc.local.length).replace(/^::/, "")]
       .filter(Boolean)
@@ -304,6 +312,12 @@ export function resolveRust(
     allowGlobs: boolean,
     accessFrom?: Place,
   ): Found {
+    if (data(s).unsafe)
+      return {
+        symbols: [],
+        complete: false,
+        reason: "syntax-error declaration structure",
+      };
     if (!rest.length)
       return { symbols: accepts(s, ns) ? [s] : [], complete: true };
     if (s.kind === "module") {
@@ -358,7 +372,7 @@ export function resolveRust(
   ): Found | null {
     const headNs: Namespace = rest.length ? "type" : ns;
     const uses = importsByScope.get(`${loc.file}|${local}`);
-    if (uses?.globs.some((l) => data(l).unsafe)) return empty(false);
+
     const declared = (
       table.get(key(loc.crate.root, [q, name].filter(Boolean).join("::"))) ?? []
     ).filter(
@@ -393,6 +407,12 @@ export function resolveRust(
         ),
       );
       // A type-only import does not mask a value of the same name.
+      if (explicit.some((l) => data(l).unsafe))
+        return {
+          ...result,
+          complete: false,
+          reason: "syntax-error import structure",
+        };
       if (result.symbols.length || !result.complete) return result;
       // Fall through namespaces only when the import is KNOWN to bind a
       // different namespace. An uncaptured external import could bind this one.
@@ -403,6 +423,9 @@ export function resolveRust(
       );
       if (!all.complete || !all.symbols.length) return empty(false);
     }
+    // Intact local declarations and explicit imports win. A hidden declaration
+    // can shadow a glob or an enclosing name, including through a reexport.
+    const lossy = lossyFiles.has(loc.file) && local === loc.local;
     const globs = allowGlobs
       ? (uses?.globs ?? []).filter(
           (l) =>
@@ -428,16 +451,26 @@ export function resolveRust(
           );
           return {
             ...found,
-            complete:
-              imported.complete &&
-              found.complete &&
-              imported.symbols.every((s) => s.status === "clean"),
+            complete: !data(l).unsafe && imported.complete && found.complete,
           };
         }),
       );
-      if (result.symbols.length || !result.complete) return result;
+      if (result.symbols.length || !result.complete)
+        return lossy
+          ? {
+              ...result,
+              complete: false,
+              reason: "declaration-lossy module may shadow glob/enclosing name",
+            }
+          : result;
     }
-    return null;
+    return lossy
+      ? {
+          symbols: [],
+          complete: false,
+          reason: "declaration-lossy module may hide a binding",
+        }
+      : null;
   }
   function find(
     raw: string,
@@ -816,6 +849,126 @@ export function resolveRust(
     "into_iter",
     "default",
   ]);
+  const deriveMethods: Record<string, string[]> = {
+    PartialEq: ["eq", "ne"],
+    PartialOrd: ["partial_cmp", "lt", "le", "gt", "ge"],
+    Ord: ["cmp", "max", "min", "clamp"],
+    Hash: ["hash"],
+    Clone: ["clone", "clone_from"],
+    Debug: ["fmt"],
+    Default: ["default"],
+    Eq: [],
+    Copy: [],
+  };
+  const inertAttributes = new Set([
+    "allow",
+    "warn",
+    "deny",
+    "forbid",
+    "expect",
+    "cfg",
+    "cfg_attr",
+    "repr",
+    "doc",
+    "deprecated",
+    "must_use",
+    "non_exhaustive",
+    "inline",
+    "cold",
+    "track_caller",
+    "no_mangle",
+    "export_name",
+    "link_section",
+    "used",
+    "automatically_derived",
+    "test",
+    "ignore",
+    "should_panic",
+    "path",
+    "macro_export",
+    "macro_use",
+    "link",
+    "no_std",
+    "no_implicit_prelude",
+  ]);
+  const attributeUnknown = new Map<string, Set<string>>();
+  const attributeSources = new Map<string, GraphSymbol[]>();
+  for (const t of symbols.filter((s) =>
+    ["struct", "enum", "type"].includes(s.kind),
+  )) {
+    const names = new Set<string>();
+    const inspect = (raw: string): void => {
+      const a = raw.replace(/^#!?\[|\]$/g, "").trim();
+      const head = a.match(/^[\w:]+/)?.[0] ?? "";
+      if (head === "derive") {
+        for (const trait of a
+          .slice(a.indexOf("(") + 1, a.lastIndexOf(")"))
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)) {
+          const known = deriveMethods[trait];
+          if (known) for (const name of known) names.add(name);
+          else names.add("*");
+        }
+      } else if (head === "cfg_attr") {
+        // Conditional attributes may be enabled; recursively inspect payloads.
+        const contents = a.slice(a.indexOf("(") + 1, a.lastIndexOf(")"));
+        const args = splitArguments("<" + contents + ">");
+        if (!args) names.add("*");
+        else for (const nested of args.slice(1)) inspect(nested);
+      } else if (!inertAttributes.has(head)) names.add("*");
+    };
+    for (const a of (data(t).attributes ?? []) as string[]) inspect(a);
+    attributeUnknown.set(t.id, names);
+    if (names.size) attributeSources.set(t.id, [t]);
+  }
+  // Attribute effects belong to semantic types, including alias synonyms.
+  // An attributed identity/unknown alias may denote any receiver in its crate.
+  const attributedAliasesByCrate = new Map<string, Set<string>>();
+  for (const alias of symbols.filter((s) => s.kind === "type")) {
+    const names = attributeUnknown.get(alias.id);
+    if (!names?.size) continue;
+    if (["tuple_type", "array_type"].includes(str(data(alias).aliasShape)))
+      continue;
+    const scope = str(data(alias).scope),
+      variables = new Set((data(alias).generics ?? []) as string[]);
+    for (const loc of ownerPlace(alias.file, scope)) {
+      const expanded = expandType(
+        str(data(alias).aliasType),
+        loc,
+        scope,
+        new Set(),
+        variables,
+      );
+      if (expanded.externalShape) continue;
+      const nominal = expanded.text.replace(/^&\s*(?:'\w+\s*)?(?:mut\s+)?/, "");
+      const targets = variables.has(base(nominal))
+        ? []
+        : find(nominal, expanded.loc, expanded.scope, "type").symbols.filter(
+            (s) => ["struct", "enum"].includes(s.kind),
+          );
+      for (const target of targets) {
+        const combined = attributeUnknown.get(target.id) ?? new Set<string>();
+        for (const name of names) combined.add(name);
+        attributeUnknown.set(target.id, combined);
+        attributeSources.set(
+          target.id,
+          unique([...(attributeSources.get(target.id) ?? []), alias]),
+        );
+      }
+      if (
+        !targets.length &&
+        !/^(?:[ui](?:8|16|32|64|128|size)|f(?:32|64)|bool|char|str|\(\))$/.test(
+          nominal,
+        )
+      ) {
+        const global =
+          attributedAliasesByCrate.get(loc.crate.root) ?? new Set<string>();
+        for (const name of names) global.add(name);
+        attributedAliasesByCrate.set(loc.crate.root, global);
+      }
+    }
+  }
   const macroTypesByCrate = new Map<string, Set<string>>();
   const nominalNames = new Map<string, GraphSymbol[]>();
   for (const symbol of symbols)
@@ -828,26 +981,40 @@ export function resolveRust(
     for (const token of (data(f.result).opaqueImplTypes ?? []) as {
       name: string;
       scope: string;
+      semantic?: boolean;
+      variables?: string;
     }[])
       for (const loc of ownerPlace(f.path, token.scope)) {
         const set = macroTypesByCrate.get(loc.crate.root) ?? new Set<string>();
         macroTypesByCrate.set(loc.crate.root, set);
         // Opaque token paths cannot be interpreted as unqualified names. Keep
         // every reachable same-named nominal, including qualified/shadowed ones.
-        for (const candidate of nominalNames.get(token.name) ?? [])
+        for (const candidate of token.semantic
+          ? []
+          : (nominalNames.get(token.name) ?? []))
           if (
             ownerPlace(candidate.file, str(data(candidate).scope)).some((p) =>
               reachable(loc.crate.root).has(p.crate.root),
             )
           )
             set.add(candidate.id);
-        const expanded = expandType(token.name, loc, token.scope);
-        for (const t of find(
-          expanded.text,
-          expanded.loc,
-          expanded.scope,
-          "type",
-        ).symbols)
+        const variables = new Set(
+          (token.variables ?? "").split(",").filter(Boolean),
+        );
+        const expanded = expandType(
+          token.name,
+          loc,
+          token.scope,
+          new Set(),
+          variables,
+        );
+        const nominal = expanded.text.replace(
+          /^&\s*(?:'\w+\s*)?(?:mut\s+)?/,
+          "",
+        );
+        if (variables.has(base(nominal))) continue;
+        for (const t of find(nominal, expanded.loc, expanded.scope, "type")
+          .symbols)
           set.add(t.id);
       }
   const scopedMembers = (s: GraphSymbol) => membersByOwner.get(s.id) ?? [];
@@ -1388,7 +1555,9 @@ export function resolveRust(
         ).length > 1,
     );
     const applicable = (m: Method) =>
-      m.implKey === sameImpl || (m.universal && (!instance || !m.bounded))
+      m.implKey === sameImpl ||
+      (m.universal && !m.bounded) ||
+      (m.universal && !instance && !withoutLifetimes(typeName).includes("<"))
         ? "yes"
         : compatibility(
             typeName,
@@ -1440,15 +1609,6 @@ export function resolveRust(
       (ambiguousTypeView && !matches.some((m) => m.implKey === sameImpl))
     )
       return unknown("custom receiver adjustment or ambiguous module view");
-    if (
-      instance &&
-      type.symbols.some((t) =>
-        [...reachable(loc.crate.root)].some((root) =>
-          macroTypesByCrate.get(root)?.has(t.id),
-        ),
-      )
-    )
-      return unknown("opaque item macro may implement the receiver type");
     const inherent = matches.filter((m) => m.inherent);
     const proven = inherent.filter(
       (m) =>
@@ -1468,60 +1628,102 @@ export function resolveRust(
             ? "owned"
             : "unknown";
     };
-    if (stdBlanketNames.has(name) && (instance || !proven.length))
-      return unknown("uncaptured std/core blanket alternative: " + name);
-    // A proven inherent receiver exactly matches an existing &Type or owned Type
-    // before any dereference/autoref adjustment. Nominal-wrapper traits cannot
-    // beat it at that step. Universal and reference guards remain conservative.
-    const exactReceiver =
+    // The first receiver probe is its actual type: T, &T or &mut T.
+    // An intact inherent member at that step wins before ALL unseen traits.
+    const firstStep =
       instance &&
-      ["shared", "owned"].includes(borrow) &&
-      proven.some((m) => form(m) === borrow);
-    // Receiver candidates are searched before inherent/trait preference at that
-    // candidate. Different autoref forms do NOT imply inherent dominance.
-    if (
-      instance &&
-      (blankets.opaque ||
-        (!exactReceiver &&
-          type.symbols.some((t) => blankets.opaqueTypes.has(t.id))) ||
-        blankets.names.has(name) ||
-        (!exactReceiver &&
-          type.symbols.some((t) => blankets.byType.get(t.id)?.has(name))) ||
-        type.symbols.some(
-          (t) =>
-            blankets.refs.get(t.id)?.has(name) ||
-            blankets.refs.get(t.id)?.has("*"),
-        ))
-    )
-      return unknown(
-        "project blanket/reference impl applicability or defaults unknown",
-      );
-    if (
+      ["owned", "shared", "mutable"].includes(borrow) &&
+      proven.length > 0 &&
+      proven.every((m) => form(m) === borrow);
+    // Omitted arguments select an inherent family before inference. Explicit
+    // instantiations must establish applicability: a specialised or bounded
+    // impl can be unavailable while a trait member is callable instead.
+    const pathInherent =
       !instance &&
-      !proven.length &&
-      (blankets.opaque ||
-        blankets.associatedNames.has(name) ||
-        type.symbols.some(
-          (t) =>
-            blankets.opaqueTypes.has(t.id) ||
-            blankets.associatedByType.get(t.id)?.has(name),
-        ))
+      inherent.length > 0 &&
+      inherent.every((m) => !m.uncertain) &&
+      ((inherent.length === 1 && !withoutLifetimes(typeName).includes("<")) ||
+        inherent.every((m) => applicable(m) === "yes"));
+    if (type.complete && (firstStep || pathInherent))
+      return {
+        symbols: unique((firstStep ? proven : inherent).map((m) => m.symbol)),
+        complete: true,
+      };
+    // ONE completeness rule for dot dispatch. Each source can hide an earlier
+    // trait probe; none may bypass first-step inherent precedence above.
+    const reasons: string[] = [];
+    if (stdBlanketNames.has(name))
+      reasons.push("uncaptured std/core blanket alternative: " + name);
+    const blanketNames = instance ? blankets.names : blankets.associatedNames;
+    if (
+      blankets.opaque ||
+      blanketNames.has(name) ||
+      type.symbols.some(
+        (t) =>
+          blankets.opaqueTypes.has(t.id) ||
+          (instance
+            ? blankets.byType.get(t.id)?.has(name) ||
+              blankets.refs.get(t.id)?.has(name) ||
+              blankets.refs.get(t.id)?.has("*")
+            : blankets.associatedByType.get(t.id)?.has(name)),
+      )
     )
-      return unknown(
+      reasons.push(
         "project blanket/reference impl applicability or defaults unknown",
       );
-    const opaque = type.symbols.some((t) => blankets.opaqueNormal.has(t.id));
+    if (
+      type.symbols.some((t) =>
+        [...reachable(loc.crate.root)].some((root) =>
+          macroTypesByCrate.get(root)?.has(t.id),
+        ),
+      )
+    )
+      reasons.push("opaque item macro may implement the receiver type");
+    if (
+      [...reachable(loc.crate.root)].some(
+        (root) =>
+          attributedAliasesByCrate.get(root)?.has("*") ||
+          attributedAliasesByCrate.get(root)?.has(name),
+      )
+    )
+      reasons.push(
+        "opaque attributed alias may supply an impl; expansion not restricted to a captured nominal",
+      );
+    const attributed = type.symbols.filter(
+      (t) =>
+        attributeUnknown.get(t.id)?.has("*") ||
+        attributeUnknown.get(t.id)?.has(name),
+    );
+    if (attributed.length)
+      reasons.push(
+        "derive/attribute may supply earlier method: " +
+          name +
+          " on " +
+          unique(attributed.flatMap((t) => attributeSources.get(t.id) ?? [t]))
+            .map((t) => `${t.file}::${t.identity}`)
+            .join(", "),
+      );
+    if (
+      lossyCrates.has(loc.crate.root) ||
+      type.symbols.some((t) =>
+        ownerPlace(t.file, str(data(t).scope)).some((p) =>
+          lossyCrates.has(p.crate.root),
+        ),
+      )
+    )
+      reasons.push("declaration-lossy crate may hide impls");
+    if (type.symbols.some((t) => blankets.opaqueNormal.has(t.id)))
+      reasons.push("uncaptured trait defaults or trait-in-scope selection");
+    if (reasons.length) return unknown(reasons.join("; "));
     const dominates =
       proven.length > 0 &&
       (!instance ||
-        (matches
+        matches
           .filter((m) => !m.inherent)
-          .every((t) => proven.every((i) => form(t) === form(i))) &&
-          (!opaque || proven.every((m) => form(m) === borrow))));
+          .every((t) => proven.every((i) => form(t) === form(i))));
     const selected = dominates ? inherent : matches;
     const complete =
       type.complete &&
-      (dominates || !opaque) &&
       (!instance || !matches.some((m) => form(m) === "unknown"));
     const ss = unique(selected.map((m) => m.symbol));
     // One trait implementation or a generic substitution never implies dispatch.
@@ -1539,9 +1741,7 @@ export function resolveRust(
       symbols: ss,
       reason: expansion.unknown
         ? "alias expansion unknown"
-        : opaque
-          ? "uncaptured trait defaults or trait-in-scope selection"
-          : "generic substitution or impl bounds not proven",
+        : "generic substitution or impl bounds not proven",
       complete:
         complete &&
         !selected.some((m) => m.uncertain || applicable(m) !== "yes"),
