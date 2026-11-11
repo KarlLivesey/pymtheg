@@ -310,7 +310,8 @@ export function projectModel(
       esm ? { esm } : {},
     );
     if (renamed.error) renameErrors.set(file.path, renamed.error);
-    else if (renamed.renamed.length) renames.set(file.path, renamed);
+    else if (renamed.renamed.length || renamed.assumed.length)
+      renames.set(file.path, renamed);
     fs.add(file.path, renamed.error ? file.text : renamed.text);
   }
   for (const workspace of workspaces(manifests))
@@ -651,6 +652,8 @@ export function projectModel(
         const real = fs.real(name);
         const text = fs.files.get(real);
         if (text === undefined) return undefined;
+        // A file the parser or binder could not handle stays out of every program.
+        if (parseFailures.has(real.slice(1))) return undefined;
         let file = sources.get(real);
         if (!file) {
           // Each file parses in its own guard: a parser stack overflow (e.g.

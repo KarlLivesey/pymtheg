@@ -8,9 +8,16 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 const LOCAL = "function require(n) { return __fake(); }";
-/** A call site: reports what `require` reaches at this point. */
-const site = (id) =>
-  `__report(${JSON.stringify(id)}, () => require("./dep.cjs"))`;
+/** Callee text per site placeholder: S plain, P/Q/M the supported indirect forms. */
+export const CALLEES = {
+  S: "require",
+  P: "(require)",
+  Q: "(0, require)",
+  M: "module.require",
+};
+/** A call site: reports what the loader call reaches at this point. */
+const site = (id, form) =>
+  `__report(${JSON.stringify(id)}, () => ${CALLEES[form]}("./dep.cjs"))`;
 
 /**
  * Templates. `code` uses S0, S1, ... placeholders for call sites. `modes`
@@ -21,7 +28,13 @@ const site = (id) =>
  *    is allowed, "real" only where Node says real;
  *  - value-flow: a local binding that receives the real loader's value at run
  *    time; the analysis classifies the binding as local (an import is lost,
- *    never a wrong link).
+ *    never a wrong link);
+ *  - base: createRequire with a base other than this file: Node resolves
+ *    elsewhere; the analysis says "uncertain" and links nothing;
+ *  - bundler: a free `require` in an ES module: Node throws, the analysis
+ *    keeps the bundler reading ("real") and must flag every emitted link.
+ * Placeholders: S0.. plain `require(...)`; P0 `(require)(...)`; Q0
+ * `(0, require)(...)`; M0 `module.require(...)`.
  */
 const TEMPLATES = [
   {
@@ -278,6 +291,78 @@ const TEMPLATES = [
     name: "unrelated declarations",
     code: `const x = 1; function h(a) { return a; }\nS0`,
   },
+  // Round 7: Annex B with an if branch (B.3.4), sloppy only.
+  {
+    name: "function as an if branch in a function",
+    code: `function g() { if (true) ${LOCAL} return S0; }\ng();`,
+    modes: ["cjs"],
+  },
+  {
+    name: "function as an else branch in a function",
+    code: `function g() { if (false) ; else ${LOCAL} return S0; }\ng();`,
+    modes: ["cjs"],
+  },
+  {
+    name: "function as a nested if branch in a function",
+    code: `function g() { if (true) if (true) ${LOCAL} return S0; }\ng();`,
+    modes: ["cjs"],
+  },
+  {
+    name: "function as an if branch at top level",
+    code: `if (true) ${LOCAL}\nS0`,
+    modes: ["cjs"],
+  },
+  // Round 7: the wrapper's `arguments` (mapped to its parameters when sloppy).
+  {
+    name: "wrapper arguments written in an arrow",
+    code: `(() => { arguments[1] = () => __fake(); })();\nS0`,
+    modes: ["cjs", "cjs-strict"],
+    category: "dynamic",
+  },
+  {
+    name: "wrapper arguments written by a later-called arrow",
+    code: `const patch = () => { arguments[1] = (n) => __fake(); };\npatch();\nS0`,
+    modes: ["cjs", "cjs-strict"],
+    category: "dynamic",
+  },
+  {
+    name: "wrapper arguments returned and written",
+    code: `const f = () => arguments;\nf()[1] = () => __fake();\nS0`,
+    modes: ["cjs", "cjs-strict"],
+    category: "dynamic",
+  },
+  {
+    name: "wrapper arguments read only",
+    code: `const count = arguments.length;\nconst first = arguments[0];\nS0`,
+    modes: ["cjs", "cjs-strict"],
+  },
+  {
+    name: "a function's own arguments written",
+    code: `function h() { arguments[1] = () => __fake(); }\nh();\nS0`,
+    modes: ["cjs", "cjs-strict"],
+  },
+  // Round 7: supported indirect loader forms, and shadowed variants.
+  { name: "parenthesised require", code: `P0` },
+  { name: "comma require", code: `Q0` },
+  { name: "module.require", code: `M0`, modes: ["cjs", "cjs-strict"] },
+  {
+    name: "parenthesised local require",
+    code: `function g(require) { return P0; }\ng(__fake);`,
+  },
+  {
+    name: "comma local require",
+    code: `function g(require) { return Q0; }\ng(__fake);`,
+  },
+  {
+    name: "module.require on a local module",
+    code: `function g(module) { return M0; }\ng({ require: __fake });`,
+    modes: ["cjs", "cjs-strict"],
+  },
+  {
+    name: "createRequire renamed by destructuring",
+    code: `const { createRequire: cr } = require("node:module");\nfunction g() { const require = cr(__filename); return S0; }\ng();`,
+    modes: ["cjs", "cjs-strict"],
+  },
 ];
 const ESM_ONLY = [
   {
@@ -306,6 +391,36 @@ const ESM_ONLY = [
     code: `import m from "node:module";\nconst require = m.createRequire(import.meta.url);\nS0`,
   },
   {
+    name: "createRequire aliased import",
+    header: "",
+    code: `import { createRequire as cr } from "node:module";\nconst require = cr(import.meta.url);\nS0`,
+  },
+  {
+    name: "createRequire replaced on the default import",
+    header: "",
+    category: "dynamic",
+    // Restores Node's factory so later cases in the same process are unaffected.
+    code: `import m from "node:module";\nconst original = m.createRequire;\nm.createRequire = () => () => __fake();\nconst require = m.createRequire(import.meta.url);\nS0;\nm.createRequire = original;`,
+  },
+  {
+    name: "createRequire replaced by Object.assign",
+    header: "",
+    category: "dynamic",
+    code: `import m from "node:module";\nconst original = m.createRequire;\nObject.assign(m, { createRequire: () => () => __fake() });\nconst require = m.createRequire(import.meta.url);\nS0;\nObject.assign(m, { createRequire: original });`,
+  },
+  {
+    name: "createRequire with another base",
+    header: "",
+    category: "base",
+    code: `import { createRequire } from "node:module";\nconst require = createRequire(new URL("./sub/", import.meta.url));\nS0`,
+  },
+  {
+    name: "free require in an ES module (bundler assumption)",
+    header: "",
+    category: "bundler",
+    code: `export {};\nS0`,
+  },
+  {
     name: "createRequire renamed import",
     header: "",
     code: `import { createRequire as cr } from "node:module";\nconst createRequire = () => () => __fake();\nconst require = createRequire();\nS0`,
@@ -320,10 +435,12 @@ export function buildCorpus() {
   let index = 0;
   const add = (template, mode, code) => {
     const sites = [];
-    const text = code.replace(/S(\d)/g, (_, n) => {
+    const forms = {};
+    const text = code.replace(/\b([SPQM])(\d)\b/g, (_, form, n) => {
       const id = `c${index}s${n}`;
       sites.push(id);
-      return site(id);
+      forms[id] = form;
+      return site(id, form);
     });
     const extension = mode === "esm" ? "mjs" : "cjs";
     cases.push({
@@ -333,6 +450,7 @@ export function buildCorpus() {
       category: template.category ?? "static",
       code: text,
       sites,
+      forms,
     });
     index++;
   };
@@ -362,7 +480,12 @@ globalThis.__fake = () => ({ marker: "LOCAL" });
 globalThis.__report = (id, call) => {
   try {
     const value = call();
-    results[id] = value && value.marker === "REAL" ? "real" : "local";
+    results[id] =
+      value && value.marker === "REAL"
+        ? "real"
+        : value && value.marker === "SUB"
+          ? "elsewhere"
+          : "local";
   } catch {
     results[id] = "error";
   }
@@ -387,6 +510,11 @@ export async function runOracle(scratch, cases) {
     join(scratch, "dep.cjs"),
     'module.exports = { marker: "REAL" };\n',
   );
+  await mkdir(join(scratch, "sub"), { recursive: true });
+  await writeFile(
+    join(scratch, "sub", "dep.cjs"),
+    'module.exports = { marker: "SUB" };\n',
+  );
   await writeFile(
     join(scratch, "fake.mjs"),
     'export function require() { return { marker: "LOCAL" }; }\n',
@@ -401,10 +529,18 @@ export async function runOracle(scratch, cases) {
   await writeFile(
     join(scratch, "list.json"),
     JSON.stringify(
-      cases.map((item) => ({
-        path: join(scratch, item.file),
-        sites: item.sites,
-      })),
+      // Indirect-eval cases create a global `require` for the rest of the
+      // process; the free-`require` (bundler) cases must run before them.
+      [...cases]
+        .sort(
+          (a, b) =>
+            (a.category === "bundler" ? 0 : 1) -
+            (b.category === "bundler" ? 0 : 1),
+        )
+        .map((item) => ({
+          path: join(scratch, item.file),
+          sites: item.sites,
+        })),
     ),
   );
   const out = join(scratch, "results.json");
@@ -417,13 +553,30 @@ export async function runOracle(scratch, cases) {
   return JSON.parse(await readFile(out, "utf8"));
 }
 
-/** The analysis' classification of each site's `require`. */
+/** Offset of the site's callee identifier (`require`, or `module` for M). */
+const calleeStart = (item, id) => {
+  const marker = `__report(${JSON.stringify(id)}, () => `;
+  const start = item.code.indexOf(marker) + marker.length;
+  const form = item.forms[id];
+  return form === "P" ? start + 1 : form === "Q" ? start + 4 : start;
+};
+/** Offset of the site's specifier string `"./dep.cjs"`. */
+export const specifierStart = (item, id) => {
+  const marker = `__report(${JSON.stringify(id)}, () => `;
+  return (
+    item.code.indexOf(marker) +
+    marker.length +
+    CALLEES[item.forms[id]].length +
+    1
+  );
+};
+
+/** The analysis' classification of each site's callee. */
 export function analyse(classify, item) {
   const occurrences = classify(`/${item.file}`, item.code);
   const result = {};
   for (const id of item.sites) {
-    const marker = `__report(${JSON.stringify(id)}, () => `;
-    const start = item.code.indexOf(marker) + marker.length;
+    const start = calleeStart(item, id);
     const occurrence = occurrences.find((o) => o.start === start);
     result[id] = occurrence ? occurrence.classification : "missing";
   }
@@ -433,13 +586,50 @@ export function analyse(classify, item) {
 /** Whether an analysis answer agrees with Node for a case category. */
 export function agrees(category, node, ours) {
   if (ours === "missing") return false;
+  if (category === "bundler") return node === "error" && ours === "real";
   if (node === "real") {
     if (ours === "real") return true;
     if (category === "dynamic") return ours === "uncertain";
     if (category === "value-flow") return ours === "local";
     return false;
   }
-  // Node: something local, or an error. Never the real loader.
+  // Node: something local, an error, or resolved elsewhere. Never "real".
   if (ours === "local") return true;
-  return category === "dynamic" && ours === "uncertain";
+  return (
+    (category === "dynamic" || category === "base") && ours === "uncertain"
+  );
+}
+
+/**
+ * What the module EMITTED at a site must agree with Node: an import link
+ * resolved to dep.cjs exactly where Node used the real loader and the
+ * analysis says so; none where Node did not; a flagged one for the bundler
+ * reading. Returns a problem description or null.
+ */
+export function checkEmitted(item, id, node, ours, links, depModuleId) {
+  const start = specifierStart(item, id);
+  const found = links.filter(
+    (link) =>
+      link.file === item.file &&
+      link.kind === "imports" &&
+      link.range.start === start,
+  );
+  const intoDep = found.filter(
+    (link) =>
+      link.targetId === depModuleId ||
+      link.candidates.some((candidate) => candidate.id === depModuleId),
+  );
+  if (item.category === "bundler") {
+    if (intoDep.length !== 1) return "expected one import link into dep.cjs";
+    return intoDep[0].data?.assumes === "bundler-require"
+      ? null
+      : "bundler link without data.assumes";
+  }
+  if (node === "real" && ours === "real")
+    return intoDep.length === 1 && intoDep[0].resolution === "resolved"
+      ? null
+      : `expected a resolved import of dep.cjs, found ${found.length} link(s)`;
+  return intoDep.length
+    ? "an import link into dep.cjs where Node did not use the real loader"
+    : null;
 }

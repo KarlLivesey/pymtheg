@@ -31,6 +31,10 @@ export interface Occurrence {
   start: number;
   end: number;
   classification: Classification;
+  /** Why an `uncertain` occurrence is uncertain (default `dynamic-scope`). */
+  reason?: string;
+  /** A `real` free `require` in an ES module: a bundler assumption, not Node. */
+  assumed?: boolean;
 }
 /** Program-wide replacement names. */
 export interface FreshNames {
@@ -43,6 +47,10 @@ export interface Renamed {
   renamed: Name[];
   /** Start offsets of `uncertain` occurrences. */
   uncertain: number[];
+  /** Reason per uncertain offset (`dynamic-scope` or `createrequire-base`). */
+  reasons: Record<string, string>;
+  /** Start offsets of free `require` in ES modules (bundler assumption). */
+  assumed: number[];
   /** Set when the file must fail rather than be misread. */
   error?: string;
 }
@@ -289,7 +297,12 @@ export function classify(
             holder !== body &&
             (ts.isBlock(holder) ||
               ts.isCaseClause(holder) ||
-              ts.isDefaultClause(holder)) &&
+              ts.isDefaultClause(holder) ||
+              // B.3.4: a function declaration as an `if` branch (no braces)
+              // behaves as if it were in a block of its own.
+              (ts.isIfStatement(holder) &&
+                (holder.thenStatement === node ||
+                  holder.elseStatement === node))) &&
             !conflicts(node, holder, body, name)
           )
             hoisted = node;
@@ -382,6 +395,15 @@ export function classify(
             mutable:
               !isConstBinding(lexical) && !ts.isClassDeclaration(lexical),
           };
+      } else if (
+        ts.isIfStatement(node) &&
+        (child === node.thenStatement || child === node.elseStatement) &&
+        ts.isFunctionDeclaration(child) &&
+        child.name?.text === name &&
+        occurrence !== child.name
+      ) {
+        // B.3.4: the branch function's implicit block binds its name.
+        return { declaration: child, scope: child, mutable: true };
       } else if (ts.isCaseBlock(node)) {
         const lexical = lexicalIn(
           node.clauses.flatMap((clause) => [...clause.statements]),
@@ -536,6 +558,72 @@ export function classify(
     return current ?? file;
   };
 
+  // ----- `arguments` -----
+  /** Whether an `arguments` occurrence denotes the CommonJS wrapper's own. */
+  const wrapperArguments = (id: ts.Identifier): boolean => {
+    if (ts.isPropertyAccessExpression(id.parent) && id.parent.name === id)
+      return false;
+    if (resolve(id, "arguments").declaration) return false;
+    // Arrow functions inherit `arguments`; any other function has its own.
+    for (let node = id.parent; node; node = node.parent) {
+      if (ts.isFunctionLike(node) && !ts.isArrowFunction(node)) return false;
+      if (ts.isClassStaticBlockDeclaration(node)) return false;
+      if (ts.isSourceFile(node)) return true;
+    }
+    return false;
+  };
+  /** A target of assignment, update or deletion (including destructuring). */
+  const isWriteTarget = (node: ts.Node): boolean => {
+    let current = node;
+    for (
+      let parent = current.parent;
+      parent;
+      current = parent, parent = parent.parent
+    ) {
+      if (
+        ts.isBinaryExpression(parent) &&
+        parent.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
+        parent.operatorToken.kind <= ts.SyntaxKind.LastAssignment
+      )
+        return parent.left === current;
+      if (
+        (ts.isPrefixUnaryExpression(parent) ||
+          ts.isPostfixUnaryExpression(parent)) &&
+        (parent.operator === ts.SyntaxKind.PlusPlusToken ||
+          parent.operator === ts.SyntaxKind.MinusMinusToken)
+      )
+        return true;
+      if (ts.isDeleteExpression(parent)) return true;
+      if (
+        (ts.isForInStatement(parent) || ts.isForOfStatement(parent)) &&
+        parent.initializer === current
+      )
+        return true;
+      // Only literal/pattern containers can carry a target further up.
+      if (
+        !ts.isArrayLiteralExpression(parent) &&
+        !ts.isObjectLiteralExpression(parent) &&
+        !ts.isPropertyAssignment(parent) &&
+        !ts.isShorthandPropertyAssignment(parent) &&
+        !ts.isSpreadElement(parent) &&
+        !ts.isSpreadAssignment(parent) &&
+        !ts.isParenthesizedExpression(parent)
+      )
+        return false;
+    }
+    return false;
+  };
+  /** `x.length` or `x[i]` read: cannot change or leak the object. */
+  const harmlessRead = (id: ts.Identifier): boolean => {
+    const parent = id.parent;
+    const member =
+      (ts.isPropertyAccessExpression(parent) &&
+        parent.expression === id &&
+        parent.name.text === "length") ||
+      (ts.isElementAccessExpression(parent) && parent.expression === id);
+    return member && !isWriteTarget(parent);
+  };
+
   // ----- reassignment of the CommonJS wrapper's parameters -----
   const reassigned = new Set<Name>();
   if (!esm) {
@@ -591,12 +679,14 @@ export function classify(
             if (isName(id.text) && resolve(id, id.text).wrapper)
               reassigned.add(id.text);
       }
-      // Sloppy wrapper code: `arguments[i] = x` reassigns a parameter.
+      // Sloppy wrapper code: its `arguments` object is mapped to the
+      // parameters, so anything but a plain read can replace `require`.
       if (
         ts.isIdentifier(node) &&
         node.text === "arguments" &&
         !isStrict(file) &&
-        varScopeOf(node) === file
+        wrapperArguments(node) &&
+        !harmlessRead(node)
       )
         for (const name of NAMES) reassigned.add(name);
       ts.forEachChild(node, scan);
@@ -646,7 +736,8 @@ export function classify(
           ? isModuleObject(value.expression)
           : realRequireOf(value.expression))
       );
-    if (!ts.isIdentifier(value) || value.text !== "createRequire") return false;
+    if (!ts.isIdentifier(value)) return false;
+    // By origin, whatever the local name (`import { createRequire as cr }`).
     const declaration = resolve(value, value.text).declaration;
     if (!declaration) return false;
     if (ts.isImportSpecifier(declaration))
@@ -687,7 +778,116 @@ export function classify(
     return false;
   };
 
+  /** `import.meta.url`, `import.meta.filename`, `__filename`, `pathToFileURL(__filename)`. */
+  const baseIsThisFile = (base: ts.Expression | undefined): boolean => {
+    if (!base) return false;
+    let value = base;
+    while (ts.isParenthesizedExpression(value)) value = value.expression;
+    if (
+      ts.isPropertyAccessExpression(value) &&
+      ts.isMetaProperty(value.expression) &&
+      value.expression.keywordToken === ts.SyntaxKind.ImportKeyword &&
+      (value.name.text === "url" || value.name.text === "filename")
+    )
+      return true;
+    if (ts.isIdentifier(value) && value.text === "__filename")
+      return !resolve(value, "__filename").declaration;
+    if (ts.isCallExpression(value) && value.arguments.length === 1) {
+      const callee = value.expression;
+      const name = ts.isIdentifier(callee)
+        ? callee.text
+        : ts.isPropertyAccessExpression(callee)
+          ? callee.name.text
+          : "";
+      return name === "pathToFileURL" && baseIsThisFile(value.arguments[0]);
+    }
+    return false;
+  };
+  /**
+   * Whether this file could replace Node's `createRequire`: a write to any
+   * `createRequire` property, `Object.assign`/`defineProperty`-style calls
+   * mentioning it or given the module object, or the module object used as
+   * anything but a member read.
+   */
+  let tampered: boolean | undefined;
+  const createRequireTampered = (): boolean => {
+    if (tampered !== undefined) return tampered;
+    tampered = false;
+    const mutators = new Set([
+      "assign",
+      "defineProperty",
+      "defineProperties",
+      "set",
+      "setPrototypeOf",
+    ]);
+    const mentions = (node: ts.Node): boolean => {
+      let found = false;
+      const visit = (child: ts.Node): void => {
+        if (found) return;
+        if (
+          (ts.isStringLiteralLike(child) && child.text === "createRequire") ||
+          (ts.isIdentifier(child) && child.text === "createRequire")
+        )
+          found = true;
+        else ts.forEachChild(child, visit);
+      };
+      visit(node);
+      return found;
+    };
+    const scan = (node: ts.Node): void => {
+      if (tampered) return;
+      if (
+        (ts.isPropertyAccessExpression(node) &&
+          node.name.text === "createRequire") ||
+        (ts.isElementAccessExpression(node) &&
+          ts.isStringLiteralLike(node.argumentExpression) &&
+          node.argumentExpression.text === "createRequire")
+      )
+        if (isWriteTarget(node)) tampered = true;
+      if (ts.isCallExpression(node)) {
+        const callee = node.expression;
+        if (
+          ts.isPropertyAccessExpression(callee) &&
+          mutators.has(callee.name.text) &&
+          node.arguments.some(
+            (argument) =>
+              mentions(argument) ||
+              (ts.isIdentifier(argument) && isModuleObject(argument)),
+          )
+        )
+          tampered = true;
+      }
+      // The module object used other than as `object.member` (read).
+      if (
+        ts.isIdentifier(node) &&
+        !(
+          ts.isPropertyAccessExpression(node.parent) &&
+          node.parent.name === node
+        ) &&
+        !(
+          (ts.isImportClause(node.parent) ||
+            ts.isNamespaceImport(node.parent) ||
+            ts.isVariableDeclaration(node.parent)) &&
+          node.parent.name === node
+        ) &&
+        isModuleObject(node)
+      ) {
+        const parent = node.parent;
+        const memberRead =
+          ts.isPropertyAccessExpression(parent) &&
+          parent.expression === node &&
+          !isWriteTarget(parent);
+        if (!memberRead) tampered = true;
+      }
+      ts.forEachChild(node, scan);
+    };
+    scan(file);
+    return tampered;
+  };
+
   // ----- classification -----
+  const reasons = new Map<ts.Identifier, string>();
+  const assumed = new Set<ts.Identifier>();
   const memo = new Map<ts.Identifier, Classification>();
   const pending = new Set<ts.Identifier>();
   function classification(
@@ -728,7 +928,10 @@ export function classify(
       if (injects || reassigns) return "uncertain";
     }
     if (binding.wrapper) return reassigned.has(name) ? "uncertain" : "real";
-    if (binding.free) return "real";
+    if (binding.free) {
+      if (esm && name === "require") assumed.add(occurrence);
+      return "real";
+    }
     const declaration = binding.declaration!;
     if (
       name === "require" &&
@@ -738,8 +941,16 @@ export function classify(
       declaration.initializer &&
       ts.isCallExpression(declaration.initializer) &&
       isCreateRequire(declaration.initializer.expression)
-    )
+    ) {
+      // The factory could have been replaced in this file.
+      if (createRequireTampered()) return "uncertain";
+      // The base decides where it resolves: only this file's own location is modelled.
+      if (!baseIsThisFile(declaration.initializer.arguments[0])) {
+        reasons.set(occurrence, "createrequire-base");
+        return "uncertain";
+      }
       return "real";
+    }
     return "local";
   }
 
@@ -802,7 +1013,15 @@ export function classify(
         if (ts.isImportSpecifier(parent) || ts.isExportSpecifier(parent))
           if (kind === "uncertain") kind = "local";
       }
-      occurrences.push({ name, start, end: node.end, classification: kind });
+      const reason = kind === "uncertain" ? reasons.get(node) : undefined;
+      occurrences.push({
+        name,
+        start,
+        end: node.end,
+        classification: kind,
+        ...(reason ? { reason } : {}),
+        ...(kind === "real" && assumed.has(node) ? { assumed: true } : {}),
+      });
     }
     ts.forEachChild(node, visit);
   };
@@ -821,15 +1040,15 @@ export function renameShadowed(
   names: FreshNames,
   options: { esm?: boolean } = {},
 ): Renamed {
-  if (!mayMention(path, text)) return { text, renamed: [], uncertain: [] };
+  const empty = { renamed: [], uncertain: [], reasons: {}, assumed: [] };
+  if (!mayMention(path, text)) return { text, ...empty };
   let occurrences: Occurrence[];
   try {
     occurrences = classify(path, text, options);
   } catch (error) {
     return {
       text,
-      renamed: [],
-      uncertain: [],
+      ...empty,
       error: `Scope analysis of require/module/exports failed: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
@@ -839,13 +1058,16 @@ export function renameShadowed(
     if (occurrence.end - occurrence.start !== occurrence.name.length)
       return {
         text,
-        renamed: [],
-        uncertain: [],
+        ...empty,
         error: `"${occurrence.name}" at offset ${occurrence.start} is written with an escape sequence; it cannot be renamed in place, and the compiler would misread it as CommonJS`,
       };
   let output = text;
   const renamed = new Set<Name>();
   const uncertain: number[] = [];
+  const reasons: Record<string, string> = {};
+  const assumed = occurrences
+    .filter((o) => o.classification === "real" && o.assumed)
+    .map((o) => o.start);
   for (const occurrence of renaming) {
     const replacement =
       occurrence.classification === "local"
@@ -856,10 +1078,12 @@ export function renameShadowed(
       replacement +
       output.slice(occurrence.end);
     renamed.add(occurrence.name);
-    if (occurrence.classification === "uncertain")
+    if (occurrence.classification === "uncertain") {
       uncertain.push(occurrence.start);
+      if (occurrence.reason) reasons[occurrence.start] = occurrence.reason;
+    }
   }
-  return { text: output, renamed: [...renamed], uncertain };
+  return { text: output, renamed: [...renamed], uncertain, reasons, assumed };
 }
 
 /** Puts the original names back into a name or message derived from a renamed file. */

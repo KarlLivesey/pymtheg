@@ -24,6 +24,8 @@ export interface RenameContext {
   resolveModule: (specifier: string, from: string) => string | undefined;
   /** Nodes (and warm-up steps) whose checker lookups overflowed before. */
   skip: ReadonlySet<string>;
+  /** Whether a captured file is a module (ES or CommonJS exports). */
+  isModule: (path: string) => boolean;
 }
 import {
   anchorOf,
@@ -51,6 +53,8 @@ interface Targets {
   targets: TargetFact[];
   /** Whether the lookup passed through an import alias. */
   viaAlias?: boolean;
+  /** Reached through a free `require` in an ES module (bundler assumption). */
+  assumes?: boolean;
   /** The receiver of a member lookup, if any. */
   receiver?: ts.Expression | undefined;
   /**
@@ -85,7 +89,6 @@ const TYPE_ONLY = new Set([
 ]);
 const isLimit = (error: unknown) =>
   error instanceof RangeError && /call stack/i.test(error.message);
-const WARM_OFF = "warm-up";
 /** Thrown when the checker overflows: retry with `key` in RenameContext.skip. */
 export class CheckerLimit extends Error {
   constructor(readonly key: string) {
@@ -94,6 +97,8 @@ export class CheckerLimit extends Error {
 }
 /** Stands for a checker lookup that exhausted the stack. */
 const LIMIT = Object.freeze({ flags: 0 }) as unknown as ts.Symbol;
+/** moduleReason: the compiler did not type the specifier, but it names a captured file. */
+const CAPTURED = "\0captured";
 /** What a name lookup found: a symbol, or why there is none, and the member's receiver. */
 interface Lookup {
   symbol?: ts.Symbol | undefined;
@@ -127,6 +132,33 @@ export function extractFile(
   context: RenameContext,
 ): ParseResult {
   const uncertainAt = new Set(context.renamed?.uncertain ?? []);
+  const uncertainReason = (offset: number) =>
+    context.renamed?.reasons[offset] ?? "dynamic-scope";
+  const assumedAt = new Set(context.renamed?.assumed ?? []);
+  /** A variable (or destructured name) initialised from an assumed free `require`. */
+  const fromAssumed = (declaration: ts.Node): boolean => {
+    if (!assumedAt.size) return false;
+    let holder: ts.Node | undefined = declaration;
+    while (holder && !ts.isVariableDeclaration(holder)) {
+      if (
+        !ts.isBindingElement(holder) &&
+        !ts.isObjectBindingPattern(holder) &&
+        !ts.isArrayBindingPattern(holder)
+      )
+        return false;
+      holder = holder.parent;
+    }
+    const init = holder?.initializer;
+    const root = init && rootOf(init);
+    return !!root && assumedAt.has(root.getStart(file));
+  };
+  const receiverAssumed = (receiver: ts.Expression): boolean => {
+    if (!assumedAt.size) return false;
+    const root = rootOf(receiver);
+    if (!root) return false;
+    if (assumedAt.has(root.getStart(file))) return true;
+    return !!symbolOf(root)?.declarations?.some(fromAssumed);
+  };
   const freshExportNames = new Set(Object.values(context.fresh.local));
   const path = file.fileName.slice(1);
   const symbols: SymbolDraft[] = [];
@@ -221,7 +253,11 @@ export function extractFile(
     };
     visit(found.symbol, 0);
     const targets = [...facts.values()];
-    if (!external && !local) return { targets, viaAlias, receiver };
+    const assumes =
+      !!firstAlias?.declarations?.some(fromAssumed) ||
+      (receiver !== undefined && receiverAssumed(receiver));
+    if (!external && !local)
+      return { targets, viaAlias, receiver, ...(assumes ? { assumes } : {}) };
     // An alias whose module did not resolve keeps that module's reason.
     const moduleFailure =
       external &&
@@ -233,6 +269,7 @@ export function extractFile(
       reason: local ? "local" : moduleFailure || "external",
       viaAlias,
       receiver,
+      ...(assumes ? { assumes } : {}),
     };
   }
   /** The module reason of a member's receiver root, if that root is an unresolved binding. */
@@ -245,7 +282,17 @@ export function extractFile(
   }
   function bindingReason(symbol: ts.Symbol): string | undefined {
     const specifier = bindingSpecifier(symbol);
-    return specifier && moduleReason(specifier);
+    return specifier && bindingModuleReason(specifier);
+  }
+  /** A binding's reason from its module: a captured file the compiler did not type. */
+  function bindingModuleReason(specifier: ts.Expression): string | undefined {
+    const reason = moduleReason(specifier);
+    if (reason !== CAPTURED) return reason;
+    const file = context.resolveModule(
+      (specifier as ts.StringLiteralLike).text,
+      path,
+    )!;
+    return context.isModule(file) ? "untyped-require" : "not-a-module";
   }
   /**
    * Under a config whose `extends` chain could not be captured, module
@@ -315,6 +362,8 @@ export function extractFile(
     if (found.targets.length)
       facts.targets = found.targets.map((target) => ({ ...target }));
     if (reason) facts.reason = reason;
+    // Node itself has no `require` in an ES module; a bundler does.
+    if (found.assumes) facts.assumes = "bundler-require";
     links.push({
       sourceKey,
       kind,
@@ -330,9 +379,10 @@ export function extractFile(
     if (limited) return "compiler-limit";
     if (checker.getSymbolAtLocation(specifier)) return undefined;
     const text = specifier.text;
-    // A captured file that is not a module (no imports/exports, a script).
+    // A captured file the compiler did not type here (a script, or a require
+    // form the compiler does not recognise): the edge to that file is known.
     const resolved = context.resolveModule(text, path);
-    if (resolved !== undefined && captured.has(resolved)) return "not-a-module";
+    if (resolved !== undefined && captured.has(resolved)) return CAPTURED;
     if (/^\.\.?(\/|$)/.test(text) || text.startsWith("/"))
       return "missing-module";
     const aliased =
@@ -353,19 +403,20 @@ export function extractFile(
     extra: { [key: string]: Json },
   ) {
     const reason = moduleReason(specifier);
-    // Loading a script file is a real edge to that file, though it exports nothing.
-    const script =
-      reason === "not-a-module"
+    // The compiler did not type this edge, but the file is captured: link it.
+    const file =
+      reason === CAPTURED
         ? context.resolveModule(specifier.text, path)
         : undefined;
-    const found: Targets = script
-      ? { targets: [{ file: script, key: "module@0" }] }
+    const found: Targets = file
+      ? { targets: [{ file, key: "module@0" }] }
       : reason
         ? { targets: [], reason }
         : targetsOf(checker.getSymbolAtLocation(specifier), "any");
     link(owner, "imports", specifier.text, specifier, found, {
       specifier: specifier.text,
-      ...(script ? { notAModule: true } : {}),
+      // `notAModule` means one thing: the target file has no imports/exports.
+      ...(file && !context.isModule(file) ? { notAModule: true } : {}),
       ...extra,
     });
   }
@@ -409,6 +460,38 @@ export function extractFile(
       else return undefined;
     }
   };
+  /** `require` inside `(require)` or `(0, require)`. */
+  function requireIdentifier(callee: ts.Expression): ts.Identifier | undefined {
+    if (!ts.isParenthesizedExpression(callee)) return undefined;
+    let inner = callee.expression;
+    while (ts.isParenthesizedExpression(inner)) inner = inner.expression;
+    if (
+      ts.isBinaryExpression(inner) &&
+      inner.operatorToken.kind === ts.SyntaxKind.CommaToken
+    )
+      inner = inner.right;
+    return ts.isIdentifier(inner) && inner.text === "require"
+      ? inner
+      : undefined;
+  }
+  /** A supported indirect loader call form, by name; undefined otherwise. */
+  function requireForm(call: ts.CallExpression): string | undefined {
+    if (!isJsFile(file) || call.arguments.length !== 1) return undefined;
+    if (!ts.isStringLiteralLike(call.arguments[0]!)) return undefined;
+    const callee = call.expression;
+    if (
+      ts.isPropertyAccessExpression(callee) &&
+      callee.name.text === "require" &&
+      ts.isIdentifier(callee.expression) &&
+      callee.expression.text === "module"
+    )
+      return "module.require";
+    const id = requireIdentifier(callee);
+    if (!id) return undefined;
+    let inner = (callee as ts.ParenthesizedExpression).expression;
+    while (ts.isParenthesizedExpression(inner)) inner = inner.expression;
+    return ts.isBinaryExpression(inner) ? "(0, require)" : "(require)";
+  }
   /** The checker's symbol for a name, with the receiver of a member name. */
   function lookup(node: ts.Node): Lookup {
     const receiver = receiverOf(node);
@@ -417,7 +500,7 @@ export function extractFile(
       const root = rootOf(receiver);
       // A value from an uncertain `require(...)` call (dynamic scope).
       if (root && uncertainAt.has(root.getStart(file)))
-        return { reason: "dynamic-scope", receiver };
+        return { reason: uncertainReason(root.getStart(file)), receiver };
       const rootSymbol = root && symbolOf(root);
       const declaration = rootSymbol?.declarations?.[0];
       if (
@@ -430,7 +513,10 @@ export function extractFile(
         const init = (holder as ts.VariableDeclaration).initializer;
         const initRoot = init && rootOf(init);
         if (initRoot && uncertainAt.has(initRoot.getStart(file)))
-          return { reason: "dynamic-scope", receiver };
+          return {
+            reason: uncertainReason(initRoot.getStart(file)),
+            receiver,
+          };
       }
       // A member of a binding whose module did not resolve keeps that reason.
       const reason =
@@ -486,7 +572,7 @@ export function extractFile(
     specifier?: ts.Expression,
   ) {
     // Bindings from a module that does not resolve share its reason.
-    const reason = specifier && moduleReason(specifier);
+    const reason = specifier && bindingModuleReason(specifier);
     let found: Targets = reason
       ? { targets: [], reason }
       : targetsOf(symbolOf(name), extra.typeOnly ? "type" : "any");
@@ -596,7 +682,7 @@ export function extractFile(
               ? LIMIT
               : checker.getExportSpecifierLocalTargetSymbol(element);
           const only = typeOnly || element.isTypeOnly;
-          const reason = specifier && moduleReason(specifier);
+          const reason = specifier && bindingModuleReason(specifier);
           link(
             moduleKey,
             "exports",
@@ -685,18 +771,23 @@ export function extractFile(
             argument.text,
             argument,
             {
+              // A createRequire base decides where it resolves: the
+              // would-be target from this file is not kept then.
               targets:
-                target !== undefined && captured.has(target)
+                target !== undefined &&
+                captured.has(target) &&
+                uncertainReason(node.expression.getStart(file)) ===
+                  "dynamic-scope"
                   ? [{ file: target, key: "module@0" }]
                   : [],
-              reason: "dynamic-scope",
+              reason: uncertainReason(node.expression.getStart(file)),
             },
             { specifier: argument.text, require: true },
           );
         }
         link(owner, "calls", node.expression.text, node.expression, {
           targets: [],
-          reason: "dynamic-scope",
+          reason: uncertainReason(node.expression.getStart(file)),
         });
       } else if (
         ts.isIdentifier(node.expression) &&
@@ -714,9 +805,16 @@ export function extractFile(
           { require: true },
         );
       else if (isCommonJsRequire(node)) {
-        moduleLink(owner, node.arguments[0] as ts.StringLiteralLike, {
-          require: true,
-        });
+        const requireFacts: { [key: string]: Json } = assumedAt.has(
+          node.expression.getStart(file),
+        )
+          ? { require: true, assumes: "bundler-require" }
+          : { require: true };
+        moduleLink(
+          owner,
+          node.arguments[0] as ts.StringLiteralLike,
+          requireFacts,
+        );
         let holder: ts.Node = node;
         while (
           ts.isParenthesizedExpression(holder.parent) ||
@@ -735,7 +833,7 @@ export function extractFile(
               declaration.name,
               declaration.name,
               "imports",
-              { require: true },
+              requireFacts,
               node.arguments[0],
             );
           else if (ts.isObjectBindingPattern(declaration.name))
@@ -749,10 +847,24 @@ export function extractFile(
                   element,
                   element.name,
                   "imports",
-                  { require: true },
+                  requireFacts,
                   node.arguments[0],
                 );
         }
+      } else if (requireForm(node)) {
+        // `(require)("x")`, `(0, require)("x")`, `module.require("x")`: the
+        // loader, though the compiler does not type it; the edge is linked.
+        const callee = node.expression;
+        const id = ts.isPropertyAccessExpression(callee)
+          ? (callee.expression as ts.Identifier)
+          : requireIdentifier(callee)!;
+        moduleLink(owner, node.arguments[0] as ts.StringLiteralLike, {
+          require: true,
+          calleeForm: requireForm(node)!,
+          ...(assumedAt.has(id.getStart(file))
+            ? { assumes: "bundler-require" }
+            : {}),
+        });
       } else callLink(owner, node.expression);
     } else if (ts.isNewExpression(node))
       callLink(owner, node.expression, { construct: true });
@@ -847,29 +959,8 @@ export function extractFile(
   }
   // Ask for declaration types in source order first, so each inference step
   // builds on an already computed one instead of recursing through the chain.
-  // Variables and function return types are warmed in source order, so each
-  // inference step builds on a computed one. A warm-up step that overflows
-  // aborts too and is skipped on the retry.
-  const warm = (node: ts.Node): void => {
-    try {
-      if (ts.isVariableDeclaration(node) || ts.isBindingElement(node))
-        checker.getTypeAtLocation(node.name);
-      else if (
-        (ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node)) &&
-        node.body
-      ) {
-        const signature = checker.getSignatureFromDeclaration(node);
-        if (signature) checker.getReturnTypeOfSignature(signature);
-      }
-    } catch (error) {
-      // One overflow switches the warm-up off for this file on the retry.
-      if (isLimit(error)) throw new CheckerLimit(WARM_OFF);
-      throw error;
-    }
-    ts.forEachChild(node, warm);
-  };
-  if (context.skip.has(WARM_OFF)) limitHit = true;
-  else warm(file);
+  // The whole program is warmed in program order before extraction (index.ts).
+
   visit(file, moduleKey);
 
   // Triple-slash directives: path references link to the file; types and lib

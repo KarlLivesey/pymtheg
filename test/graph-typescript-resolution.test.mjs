@@ -2112,7 +2112,7 @@ test("direct eval and with make require uncertain; indirect eval does not", asyn
       assert.equal(result.status, "partial", file);
       assert.match(
         result.diagnostics.map((d) => d.message).join("\n"),
-        /run-time scope/,
+        /cannot be decided statically/,
       );
       const imported = graph.link(file, '"./dep"', "imports");
       assert.equal(imported.resolution, "unresolved");
@@ -2310,6 +2310,21 @@ test("checker stack limits: warm-up makes a deep chain clean; an overflow stays 
       const go = graph.link("deep.ts", "go", "calls");
       assert.equal(go.resolution, "unresolved");
       assert.equal(go.data.reason, "compiler-limit");
+      // Every compiler-limit link lies in the one deep expression `g0().go()`
+      // (the lookups of `g0` and of `.go` both recurse through the chain).
+      const text = graph.store.getFile("deep.ts").text;
+      const deepStart = text.indexOf("g0().go()");
+      const limited = graph.store
+        .links()
+        .filter(
+          (l) => l.file === "deep.ts" && l.data?.reason === "compiler-limit",
+        );
+      assert.ok(limited.length >= 1 && limited.length <= 2);
+      for (const l of limited)
+        assert.ok(
+          l.range.start >= deepStart &&
+            l.range.end <= deepStart + "g0().go()".length,
+        );
       assert.equal(
         graph.target(graph.link("deep.ts", "ok", "calls")),
         "deep.ts#ok",
@@ -2383,3 +2398,295 @@ for (const [key, value] of [
       },
     );
   });
+
+test("a binder stack overflow fails only that file", async () => {
+  // Stack thresholds shift as the JIT optimises a long-running process, so
+  // this runs in a fresh Node process: there 1,600 nested blocks parse but
+  // overflow the binder (measured window about 1,500-1,700 under the
+  // indexer). Without containment that overflow is a module-wide analysis
+  // error; the assertions below would then fail.
+  const scratch = await mkdtemp(join(tmpdir(), "pymtheg-binder-"));
+  try {
+    const root = join(scratch, "project");
+    await mkdir(root);
+    await writeFile(
+      join(root, "blocks.js"),
+      "{".repeat(1600) + "}".repeat(1600) + "\n",
+    );
+    await writeFile(join(root, "fine.ts"), "export function f() {}\nf();\n");
+    const script = join(scratch, "run.mjs");
+    const dist = new URL("../dist/graph/", import.meta.url).href;
+    await writeFile(
+      script,
+      [
+        `import { indexProject, LanguageRegistry, SqliteGraphStore } from ${JSON.stringify(dist + "index.js")};`,
+        `import ts from ${JSON.stringify(dist + "languages/typescript/index.js")};`,
+        `const store = new SqliteGraphStore(${JSON.stringify(join(scratch, "g.sqlite"))}, "binder");`,
+        `const report = await indexProject(${JSON.stringify(root)}, new LanguageRegistry([ts]), store);`,
+        `const fine = store.links().find((l) => l.file === "fine.ts" && l.kind === "calls");`,
+        "console.log(JSON.stringify({ analysisErrors: report.analysisErrors, failed: report.failed,",
+        '  message: store.getFile("blocks.js").result.diagnostics[0]?.message, fine: fine?.resolution }));',
+        "store.close();",
+      ].join("\n"),
+    );
+    const { execFileSync } = await import("node:child_process");
+    const out = JSON.parse(
+      execFileSync(process.execPath, [script], { encoding: "utf8" }),
+    );
+    assert.deepEqual(out.analysisErrors, []);
+    assert.deepEqual(out.failed, ["blocks.js"]);
+    assert.match(out.message, /(binder exhausted its stack|parser failed)/);
+    assert.equal(out.fine, "resolved");
+  } finally {
+    await rm(scratch, { recursive: true, force: true });
+  }
+});
+
+test("one file's checker overflow does not change another file's facts", async () => {
+  // b.ts depends on a 1,000-step return-type chain in a.ts (needs warm-up).
+  const a = [
+    "export class Box { go() { return 1; } }",
+    "export function f0() { return new Box(); }",
+    ...Array.from(
+      { length: 1000 },
+      (_, i) => `export function f${i + 1}() { return f${i}(); }`,
+    ),
+    "",
+  ].join("\n");
+  const b = 'import { f1000 } from "./a";\nf1000().go();\n';
+  const deep = [
+    "export class Crate { go() { return 1; } }",
+    "g0().go();",
+    ...Array.from(
+      { length: 10000 },
+      (_, i) => `function g${i}() { return g${i + 1}(); }`,
+    ),
+    "function g10000() { return new Crate(); }",
+    "",
+  ].join("\n");
+  const facts = (graph) => {
+    const link = graph.link("b.ts", "go", "calls");
+    return {
+      target: graph.target(link),
+      resolution: link.resolution,
+      reason: link.data.reason ?? null,
+    };
+  };
+  let alone;
+  await project({ "a.ts": a, "b.ts": b }, async (graph) => {
+    alone = facts(graph);
+  });
+  assert.deepEqual(alone, {
+    target: "a.ts#Box.go",
+    resolution: "resolved",
+    reason: null,
+  });
+  // The overflowing file sorts between a.ts and b.ts in extraction order.
+  await project({ "a.ts": a, "aa-deep.ts": deep, "b.ts": b }, async (graph) => {
+    assert.equal(graph.store.getFile("aa-deep.ts").result.status, "partial");
+    assert.deepEqual(facts(graph), alone);
+  });
+});
+
+test("a free require in an ES module is linked but flagged as a bundler assumption", async () => {
+  await project(
+    {
+      "dep.ts": dep6,
+      "esm.js":
+        'export {};\nconst d = require("./dep");\nd.real();\nconst { real } = require("./dep");\nreal();\n',
+      "cjs.js": 'const d = require("./dep");\nd.real();\n',
+    },
+    async (graph) => {
+      for (const link of graph.links("esm.js", '"./dep"', "imports"))
+        assert.equal(link.data.assumes, "bundler-require");
+      assert.equal(
+        graph.link("esm.js", "d", "imports").data.assumes,
+        "bundler-require",
+      );
+      const member = graph.store
+        .links()
+        .find((l) => l.file === "esm.js" && l.targetName === "d.real");
+      assert.equal(graph.target(member), "dep.ts#real");
+      assert.equal(member.data.assumes, "bundler-require");
+      const destructured = graph.store
+        .links()
+        .find(
+          (l) =>
+            l.file === "esm.js" &&
+            l.kind === "calls" &&
+            l.targetName === "real",
+        );
+      assert.equal(destructured.data.assumes, "bundler-require");
+      // An ordinary CommonJS file carries no assumption.
+      assert.equal(
+        graph.link("cjs.js", '"./dep"', "imports").data.assumes,
+        undefined,
+      );
+    },
+  );
+});
+
+test("createRequire with a base other than this file is unresolved with its own reason", async () => {
+  await project(
+    {
+      "dep.ts": dep6,
+      "sub/dep.ts": dep6,
+      "base.mjs": [
+        'import { createRequire } from "node:module";',
+        'const require = createRequire(new URL("./sub/", import.meta.url));',
+        'const m = require("./dep");',
+        "m.real();",
+        "",
+      ].join("\n"),
+      "own.mjs": [
+        'import { createRequire } from "node:module";',
+        "const require = createRequire(import.meta.url);",
+        'const m = require("./dep");',
+        "m.real();",
+        "",
+      ].join("\n"),
+    },
+    async (graph) => {
+      const edge = graph.link("base.mjs", '"./dep"', "imports");
+      assert.equal(edge.resolution, "unresolved");
+      assert.equal(edge.data.reason, "createrequire-base");
+      assert.equal(edge.data.targets, undefined);
+      assert.deepEqual(linksInto(graph, "base.mjs"), []);
+      assert.deepEqual(linksInto(graph, "base.mjs", "sub/dep.ts"), []);
+      assert.ok(linksInto(graph, "own.mjs").includes("imports ./dep"));
+    },
+  );
+});
+
+test("not-a-module means only that the target file has no exports", async () => {
+  await project(
+    {
+      "script.js": "var counter = 0;\ncounter++;\n",
+      "dep.ts": dep6,
+      "use.js": [
+        'const s = require("./script");',
+        'const d = (0, require)("./dep");',
+        'const e = \\u{0072}equire("./dep");',
+        "",
+      ].join("\n"),
+    },
+    async (graph) => {
+      const script = graph.link("use.js", '"./script"', "imports");
+      assert.equal(graph.target(script), "script.js#script.js");
+      assert.equal(script.data.notAModule, true);
+      for (const edge of graph.links("use.js", '"./dep"', "imports")) {
+        assert.equal(graph.target(edge), "dep.ts#dep.ts");
+        assert.equal(edge.data.notAModule, undefined);
+      }
+      for (const binding of graph.store
+        .links()
+        .filter(
+          (l) => l.file === "use.js" && l.kind === "imports" && l.data.reason,
+        ))
+        assert.notEqual(
+          binding.data.reason === "not-a-module" && binding.targetName !== "*",
+          true,
+        );
+      assert.equal(
+        graph.link("use.js", "s", "imports").data.reason,
+        "not-a-module",
+      );
+    },
+  );
+});
+
+test("parenthesised, comma and module.require forms keep the import", async () => {
+  await project(
+    {
+      "dep.ts": dep6,
+      "forms.js": [
+        'const a = (require)("./dep");',
+        'const b = (0, require)("./dep");',
+        'const c = module.require("./dep");',
+        "",
+      ].join("\n"),
+    },
+    async (graph) => {
+      const edges = graph.links("forms.js", '"./dep"', "imports");
+      assert.equal(edges.length, 3);
+      assert.deepEqual(edges.map((edge) => edge.data.calleeForm).sort(), [
+        "(0, require)",
+        "(require)",
+        "module.require",
+      ]);
+      for (const edge of edges)
+        assert.equal(graph.target(edge), "dep.ts#dep.ts");
+    },
+  );
+});
+
+test("reviewers' round 7 reproductions: no link into the module where Node uses a local", async () => {
+  const files = {
+    "dep.ts": dep6,
+    "ifbranch.js": [
+      "function g() {",
+      "  if (true) function require(n) { return { real() {} }; }",
+      '  const m = require("./dep");',
+      "  return m.real();",
+      "}",
+      "",
+    ].join("\n"),
+    "arrowargs.js": [
+      '(() => { arguments[1] = () => ({ marker: "LOCAL" }); })();',
+      'const a = require("./dep");',
+      "a.real();",
+      "",
+    ].join("\n"),
+    "patch.js": [
+      "const patch = () => { arguments[1] = (n) => ({ real() {} }); };",
+      "patch();",
+      'const b = require("./dep");',
+      "b.real();",
+      "",
+    ].join("\n"),
+    "returned.js": [
+      "const f = () => arguments;",
+      "f()[1] = () => ({});",
+      'const c = require("./dep");',
+      "c.real();",
+      "",
+    ].join("\n"),
+    "replaced.mjs": [
+      'import m from "node:module";',
+      'm.createRequire = () => () => ({ marker: "LOCAL" });',
+      "const require = m.createRequire(import.meta.url);",
+      'const d = require("./dep");',
+      "d.real();",
+      "",
+    ].join("\n"),
+    "aliased.mjs": [
+      'import { createRequire as cr } from "node:module";',
+      "const require = cr(import.meta.url);",
+      'const e = require("./dep");',
+      "e.real();",
+      "",
+    ].join("\n"),
+    "strictargs.js": [
+      '"use strict";',
+      "(() => { arguments[1] = () => ({}); })();",
+      'const s = require("./dep");',
+      "s.real();",
+      "",
+    ].join("\n"),
+  };
+  await project(files, async (graph) => {
+    for (const file of [
+      "ifbranch.js",
+      "arrowargs.js",
+      "patch.js",
+      "returned.js",
+      "replaced.mjs",
+    ])
+      assert.deepEqual(linksInto(graph, file), [], file);
+    // Aliased createRequire from node:module is the real loader.
+    assert.ok(linksInto(graph, "aliased.mjs").includes("calls e.real"));
+    // Strict code: `arguments` is not mapped to the parameters.
+    assert.ok(linksInto(graph, "strictargs.js").includes("calls s.real"));
+    await assertNoFreshNames(graph, files);
+  });
+});

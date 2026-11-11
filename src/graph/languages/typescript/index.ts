@@ -13,6 +13,10 @@ import { CheckerLimit, extractFile, type TargetFact } from "./extract.js";
 
 /** Program rebuilds per file after checker stack overflows before giving up. */
 const MAX_LIMIT_RETRIES = 25;
+/** Program rebuilds per project before the remaining files are not analysed. */
+const MAX_PROGRAM_REBUILDS = 200;
+const isStackLimit = (error: unknown) =>
+  error instanceof RangeError && /call stack/i.test(error.message);
 import {
   CONTEXT_PATTERNS,
   fromVirtual,
@@ -27,7 +31,7 @@ import {
  * facts; resolve maps those facts to symbol IDs. See docs/changes/W2-D.md.
  */
 // Bump the leading number whenever extraction or resolution semantics change.
-const MODULE_VERSION = `4+typescript-${ts.version}`;
+const MODULE_VERSION = `5+typescript-${ts.version}`;
 
 /** Observation counters for tests (programs built, files extracted). Not a correctness input. */
 export const statistics = { programs: 0, extracted: 0, reused: 0 };
@@ -163,15 +167,132 @@ const module: LanguageModule = {
       if (!group.roots.length) continue;
       // The host caches parsed files, so rebuilding a program after a
       // checker overflow (see CheckerLimit) re-binds but never re-parses.
-      const host = model.host(group);
-      const build = () => {
+      // The binder writes into cached SourceFiles: after a binder overflow
+      // that cache is corrupt, so the host (and its cache) is replaced.
+      let host = model.host(group);
+      let rebuilds = 0;
+      /** Captured files whose warm-up overflowed: never warmed again. */
+      const warmSkip = new Set<string>();
+      let lastProgram: ts.Program | undefined;
+      const compile = () => {
         statistics.programs++;
         const program = ts.createProgram({
-          rootNames: group.roots,
+          rootNames: group.roots.filter(
+            (root) => !model.parseFailures.has(root.slice(1)),
+          ),
           options: group.options,
           host,
         });
-        return { program, checker: program.getTypeChecker() };
+        try {
+          return { program, checker: program.getTypeChecker() };
+        } catch (error) {
+          lastProgram = program;
+          throw error;
+        }
+      };
+      /**
+       * A fresh program and checker, bound and warmed. The binder runs inside
+       * getTypeChecker(): a binder overflow is traced to the file(s) that
+       * cause it, which then fail alone (like parser failures). The warm-up
+       * asks for variable types and function return types of every captured
+       * file in program order, so a file's answers never depend on which
+       * other file happened to be extracted before a rebuild.
+       */
+      const build = (): { program: ts.Program; checker: ts.TypeChecker } => {
+        for (;;) {
+          let compiled: { program: ts.Program; checker: ts.TypeChecker };
+          try {
+            compiled = compile();
+          } catch (error) {
+            if (!isStackLimit(error)) throw error;
+            // The binder completes a file by setting classifiableNames; the
+            // file it was inside when the stack ran out has locals but not
+            // that. Otherwise, reproduce file by file.
+            const unfinished = (lastProgram?.getSourceFiles() ?? [])
+              .filter((source) => {
+                const state = source as ts.SourceFile & {
+                  locals?: unknown;
+                  classifiableNames?: unknown;
+                };
+                return !!state.locals && !state.classifiableNames;
+              })
+              .map((source) => fromVirtual(source.fileName))
+              .filter(
+                (path): path is string =>
+                  path !== undefined && captured.has(path),
+              );
+            const culprits = unfinished.length
+              ? unfinished
+              : group.roots
+                  .map((root) => root.slice(1))
+                  .filter((path) => !model.parseFailures.has(path))
+                  .filter((path) => {
+                    try {
+                      // A fresh host per candidate: a fresh parse, a fresh bind.
+                      ts.createProgram({
+                        rootNames: [toVirtual(path)],
+                        options: {
+                          ...group.options,
+                          noResolve: true,
+                          noLib: true,
+                        },
+                        host: model.host(group),
+                      }).getTypeChecker();
+                      return false;
+                    } catch (inner) {
+                      if (!isStackLimit(inner)) throw inner;
+                      return true;
+                    }
+                  });
+            // Not reproducible file by file: fail this config's files only.
+            if (!culprits.length)
+              culprits.push(
+                ...group.roots
+                  .map((root) => root.slice(1))
+                  .filter((path) => !model.parseFailures.has(path)),
+              );
+            for (const path of culprits)
+              model.parseFailures.set(
+                path,
+                "The TypeScript binder exhausted its stack on this file",
+              );
+            host = model.host(group);
+            continue;
+          }
+          const failedWarm = warmAll(compiled.program, compiled.checker);
+          if (failedWarm === undefined) return compiled;
+          warmSkip.add(failedWarm);
+        }
+      };
+      const warmAll = (
+        program: ts.Program,
+        checker: ts.TypeChecker,
+      ): string | undefined => {
+        for (const source of program.getSourceFiles()) {
+          const path = fromVirtual(source.fileName);
+          if (path === undefined || !captured.has(path) || warmSkip.has(path))
+            continue;
+          const warm = (node: ts.Node): void => {
+            if (ts.isVariableDeclaration(node) || ts.isBindingElement(node))
+              checker.getTypeAtLocation(node.name);
+            else if (
+              (ts.isFunctionDeclaration(node) ||
+                ts.isMethodDeclaration(node)) &&
+              node.body
+            ) {
+              const signature = checker.getSignatureFromDeclaration(node);
+              if (signature) checker.getReturnTypeOfSignature(signature);
+            }
+            ts.forEachChild(node, warm);
+          };
+          try {
+            warm(source);
+          } catch (error) {
+            if (!isStackLimit(error)) throw error;
+            return path;
+          }
+        }
+        return undefined;
       };
       let { program, checker } = build();
       const resolveModule = (specifier: string, from: string) => {
@@ -183,6 +304,22 @@ const module: LanguageModule = {
         ).resolvedModule?.resolvedFileName;
         return resolved === undefined ? undefined : fromVirtual(resolved);
       };
+      /** A captured file with ES or CommonJS exports (not a plain script). */
+      const isModule = (path: string): boolean => {
+        const source =
+          program.getSourceFile(toVirtual(path)) ??
+          host.getSourceFile(toVirtual(path), ts.ScriptTarget.Latest);
+        if (!source) return false;
+        const flags = source as ts.SourceFile & {
+          externalModuleIndicator?: unknown;
+          commonJsModuleIndicator?: unknown;
+        };
+        return (
+          !!flags.externalModuleIndicator ||
+          !!flags.commonJsModuleIndicator ||
+          /(^|[^.\w$])(module\.exports|exports\.[\w$]+)\s*=/.test(source.text)
+        );
+      };
       for (const root of group.roots) {
         const path = root.slice(1);
         const data: { [key: string]: Json } = {
@@ -193,7 +330,8 @@ const module: LanguageModule = {
         // Locally bound module-system names the compiler saw renamed (rename.ts).
         const renamed = model.renames.get(path);
         if (renamed) {
-          data.renamedForCompiler = [...renamed.renamed];
+          if (renamed.renamed.length)
+            data.renamedForCompiler = [...renamed.renamed];
           if (renamed.uncertain.length)
             data.dynamicScopeOccurrences = renamed.uncertain.length;
         }
@@ -202,8 +340,16 @@ const module: LanguageModule = {
         }));
         if (renamed?.uncertain.length)
           diagnostics.push({
-            message: `${renamed.uncertain.length} occurrence(s) of require/module/exports depend on run-time scope (with, direct eval or reassignment); their links are unresolved (dynamic-scope)`,
+            message: `${renamed.uncertain.length} occurrence(s) of require/module/exports cannot be decided statically (with, direct eval, reassignment, or a createRequire base other than this file); their links are unresolved`,
           });
+        if (rebuilds > MAX_PROGRAM_REBUILDS) {
+          const message = `The TypeScript checker overflowed so often in this project (${rebuilds} rebuilds) that the remaining files were not analysed`;
+          const result = failed(message);
+          if (model.ties.has(path))
+            tiedResults.set(path, [...(tiedResults.get(path) ?? []), result]);
+          else results.push({ path, result });
+          continue;
+        }
         let result: ParseResult | undefined;
         const skip = new Set<string>();
         for (let attempt = 0; !result; attempt++) {
@@ -228,16 +374,27 @@ const module: LanguageModule = {
                 ...(renamed ? { renamed } : {}),
                 resolveModule,
                 skip,
+                isModule,
               },
             );
             statistics.extracted++;
           } catch (error) {
-            if (error instanceof CheckerLimit && attempt < MAX_LIMIT_RETRIES) {
+            if (
+              error instanceof CheckerLimit &&
+              attempt < MAX_LIMIT_RETRIES &&
+              rebuilds <= MAX_PROGRAM_REBUILDS
+            ) {
               // The checker's state is untrustworthy after an overflow:
               // rebuild it, and answer that node without asking next time.
               skip.add(error.key);
+              rebuilds++;
               ({ program, checker } = build());
               continue;
+            }
+            // Never leave an overflowed checker in use for the next file.
+            if (error instanceof CheckerLimit) {
+              rebuilds++;
+              ({ program, checker } = build());
             }
             result = failed(
               error instanceof CheckerLimit
