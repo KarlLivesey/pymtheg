@@ -32,6 +32,28 @@ const isName = (node: Node) =>
   node.type === "true" ||
   node.type === "false" ||
   node.type === "iota";
+/** A syntax error (ERROR or missing node) in `node` but not inside `inner` (its body). */
+function errorOutside(node: Node, inner: Node | null): boolean {
+  if (!node.hasError) return false;
+  const visit = (current: Node): boolean => {
+    if (
+      inner &&
+      current.startIndex >= inner.startIndex &&
+      current.endIndex <= inner.endIndex &&
+      !(
+        current.startIndex === node.startIndex &&
+        current.endIndex === node.endIndex
+      )
+    )
+      return false;
+    if (current.type === "ERROR" || current.isMissing) return true;
+    if (!current.hasError) return false;
+    for (const child of current.children)
+      if (child && visit(child)) return true;
+    return false;
+  };
+  return visit(node);
+}
 const range = (node: Node): SourceRange => ({
   start: node.startIndex,
   end: node.endIndex,
@@ -310,8 +332,11 @@ export class GoExtractor {
   private declaration(node: Node): void {
     switch (node.type) {
       case "import_declaration":
+        // A broken import declaration: its recovered specs cannot be trusted, and
+        // unmatched qualifiers in this file may name a lost project import.
+        if (node.hasError) this.fact.importsBroken = true;
         for (const spec of node.descendantsOfType("import_spec"))
-          if (spec) this.importSpec(spec);
+          if (spec && !spec.hasError) this.importSpec(spec);
         return;
       case "function_declaration":
         return this.functionDeclaration(node);
@@ -381,8 +406,12 @@ export class GoExtractor {
     const result = node.childForFieldName("result");
     const typeParameters = node.childForFieldName("type_parameters");
     const scope = this.typeParams(typeParameters);
+    // A header with a syntax error: its recovered signature is not trusted.
+    const header = errorOutside(node, node.childForFieldName("body"));
     const key = this.symbol("function", name.text, name.text, range(node), {
-      ...this.signatureData(parameters, result, scope),
+      ...(header
+        ? { broken: true }
+        : this.signatureData(parameters, result, scope)),
       ...(scope.size ? { generic: true } : {}),
     });
     this.contains("file", key, range(node));
@@ -420,10 +449,15 @@ export class GoExtractor {
     const identity = `(${pointer ? "*" : ""}${receiverType}).${name.text}`;
     const parameters = node.childForFieldName("parameters");
     const result = node.childForFieldName("result");
+    // A header with a syntax error (receiver, parameters, results): not trusted;
+    // the receiver type's structure then counts as unknown in resolution.
+    const header = errorOutside(node, node.childForFieldName("body"));
     const key = this.symbol("method", name.text, identity, range(node), {
       receiver: receiverType,
       pointer,
-      ...this.signatureData(parameters, result, scope),
+      ...(header
+        ? { broken: true }
+        : this.signatureData(parameters, result, scope)),
     });
     this.contains("file", key, range(node));
     this.within(key, () =>
@@ -483,8 +517,12 @@ export class GoExtractor {
     const data: { [key: string]: Json } = {};
     if (scope.size) data.generic = true;
     if (local !== undefined) data.local = true;
+    // Inside a declaration with a syntax error: the recovered structure (fields,
+    // embeddings, interface elements, underlying type) is not trusted.
+    if (this.quiet) data.broken = true;
     const key = this.symbol(kind, symbolName, symbolName, range(spec), data);
     this.contains(local !== undefined ? this.owner : "file", key, range(spec));
+    if (this.quiet) return;
     this.within(key, () =>
       this.scoped(() => {
         this.walkTypeParams(typeParameters);
@@ -694,7 +732,10 @@ export class GoExtractor {
       .filter((item): item is Node => !!item);
     const type = spec.childForFieldName("type");
     const values = named(spec.childForFieldName("value"));
-    const descs = this.specDescs(names, type, values);
+    // A spec with a syntax error: its type and value are not trusted.
+    const descs = spec.hasError
+      ? names.map((): Desc => ({ k: "unknown" }))
+      : this.specDescs(names, type, values);
     const keys = names.map((name, index) =>
       name.text === "_"
         ? "file"
@@ -1343,7 +1384,9 @@ export class GoExtractor {
         field.type === "field_declaration" &&
         !field.childrenForFieldName("name").length,
     );
-    if (!embeds) return this.walkChildren(node);
+    // Inside a broken declaration recovery may have dropped embeddings: every
+    // anonymous struct there is a symbol of unknown structure.
+    if (!embeds && !this.quiet) return this.walkChildren(node);
     const enclosing = this.byKey.get(this.owner)?.identity ?? "file";
     let name: string;
     if (localName !== undefined)
@@ -1353,8 +1396,12 @@ export class GoExtractor {
       this.localStructs.set(enclosing, count);
       name = this.localIdentity(`${enclosing}.struct#${count}`);
     }
-    const key = this.symbol("struct", name, name, range(node), { local: true });
+    const key = this.symbol("struct", name, name, range(node), {
+      local: true,
+      ...(this.quiet ? { broken: true } : {}),
+    });
     this.contains(this.owner, key, range(node));
+    if (this.quiet) return;
     this.within(key, () => this.structFields(name, key, node));
   }
 

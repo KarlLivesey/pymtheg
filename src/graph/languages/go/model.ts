@@ -79,6 +79,8 @@ export interface FileFact {
    * scope shadows the name; that is decided by `analyze` on every index.
    */
   predeclared?: PredeclaredUse[];
+  /** An import declaration had a syntax error: unmatched qualifiers are unknown. */
+  importsBroken?: boolean;
 }
 export interface PredeclaredUse {
   n: string;

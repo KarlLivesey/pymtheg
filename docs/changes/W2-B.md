@@ -112,8 +112,29 @@ targets, never a guess. "Unresolved" keeps the target name.
 ### Not extracted (documented scope, not dropped evidence)
 
 - **Declarations containing a syntax error** (Tree-sitter ERROR or missing nodes
-  anywhere inside them) keep their symbol, `contains` and `receiver` links, but emit
-  no `calls` or `references` links: their identifiers cannot be bound reliably.
+  anywhere inside them) keep only their symbol, `contains` and `receiver` links. They
+  emit no `calls` or `references` links, because their identifiers cannot be bound
+  reliably, and nothing recovered from them is trusted:
+  - a **type** declaration (struct, interface, defined type, alias), and every local
+    or anonymous type inside an erroneous declaration, gets `data.broken`. No fields,
+    no `embeds` links, no interface methods and no underlying type are emitted.
+    `view()` treats its structure as **unknown**: it cannot be ruled out as an
+    implementer, no definite member lookup or `implements` is built on it, an
+    exported one may carry a hidden method (so sealed sets stay open), and any
+    dispatch set it could belong to is open. Such a set then lists every accessible
+    project method of that name, because the lost structure could promote any of
+    them;
+  - a **function or method** whose header (anything outside its body: receiver,
+    parameters, results, type parameters) contains an error gets `data.broken`
+    and no signature or result types. Its results type no values. A broken method
+    is not a member anyone resolves to, and its receiver type's structure becomes
+    unknown, keeping its other, intact methods. An error only inside the body keeps
+    the header trusted;
+  - a **`var`/`const`** spec with an error has an unknown type;
+  - an **import** spec with an error is dropped. If the import declaration has an
+    error, unmatched qualifiers in that file are unknown rather than external,
+    because they may name a lost project import.
+
   Top-level ERROR fragments emit nothing. The file stays `partial`.
 - Uses of the real predeclared identifiers: types (`int`, `string`, `error`,
   `any`, …), values (`nil`, `true`, `false`, `iota`) and builtin functions used as
@@ -531,6 +552,14 @@ has 25 mutations, and all fail tests.
    open.
 
 The module version is 10.
+
+## Module version 11 (eighth review)
+
+Structure recovered from a declaration containing a syntax error is no longer
+trusted (see "Not extracted"). Regressions are in `test/graph-go-review8.test.mjs`,
+covering both reproductions plus broken interfaces, sealed sets, method and
+function headers, `var` types, imports and local types. M26 is the mutation for
+this item (26/26 killed). The module version is 11.
 
 ## Core after PR 11 (W2-I)
 

@@ -240,6 +240,8 @@ class GoResolver {
   private symbolsById = new Map<string, GraphSymbol>();
   /** Function-local and anonymous types by file and identity. */
   private localTypes = new Map<string, GraphSymbol>();
+  /** Types with a method whose declaration header has a syntax error. */
+  private brokenReceivers = new Set<string>();
   private byFileKey = new Map<string, GraphSymbol>();
   private decls = new Map<string, Map<string, GraphSymbol[]>>();
   private members = new Map<string, GraphSymbol[]>();
@@ -359,6 +361,14 @@ class GoResolver {
         (symbol.kind === "function" && symbol.name !== "init")
       )
         push(this.decls, pkg.key, symbol.name, symbol);
+      else if (
+        symbol.kind === "method" &&
+        data.receiver !== undefined &&
+        (symbol.data as { broken?: boolean } | undefined)?.broken
+      )
+        // A method whose header has a syntax error: not a member anyone can resolve
+        // to; its receiver type's structure becomes unknown (see `view`).
+        this.brokenReceivers.add(`${pkg.key}\u0000${data.receiver}`);
       else if (symbol.kind === "method" && data.receiver !== undefined) {
         push2(
           this.members,
@@ -485,8 +495,11 @@ class GoResolver {
     if (depth < MAX_DEPTH) {
       if (ref.q !== undefined) {
         const base = this.lookupName(ref.q, from);
-        // A qualifier that is no project import can only be an external import.
-        if (base.e === "none" || base.e === "external")
+        // A qualifier that is no project import can only be an external import,
+        // unless the file's import declaration is broken (it may be a lost one).
+        if (base.e === "none" && this.files.get(from)?.fact.importsBroken)
+          value = UNKNOWN;
+        else if (base.e === "none" || base.e === "external")
           value = { kind: "external", name: `${ref.q}.${ref.n}` };
         else if (base.e === "pkg")
           value = base.pkgs.length
@@ -725,7 +738,7 @@ class GoResolver {
     // `q.X` with q neither local nor declared in the package: q can only be one of
     // this file's imports; not a project import, so it is external.
     if (base.e === "none")
-      return desc.x.k === "name"
+      return desc.x.k === "name" && !this.files.get(from)?.fact.importsBroken
         ? { e: "external", name: `${desc.x.n}.${desc.n}` }
         : NONE;
     if (base.e === "syms" && base.syms.every(isTypeSymbol)) {
@@ -816,6 +829,13 @@ class GoResolver {
     });
     let result: View;
     if (depth > MAX_DEPTH) result = unknown();
+    else if (
+      (type.data as { broken?: boolean } | undefined)?.broken ||
+      (pkg && this.brokenReceivers.has(`${pkg.key}\u0000${type.name}`))
+    )
+      // Declared inside a syntax error (or with a broken method): the recovered
+      // structure is not trusted; only its own intact declared methods are known.
+      result = unknown();
     else if (type.kind === "interface" || data.shape === "interface")
       result = { iface: [type], members: () => [], embedded: [] };
     else if (type.kind === "struct" || data.shape === "struct")
@@ -1645,6 +1665,16 @@ class GoResolver {
           certain = false;
           open = true;
           found = this.selectName([type], name, undefined, access, true);
+          // Still unknown without external types: a structure that cannot be
+          // determined (a syntax error, an unresolvable type) may promote any
+          // project method of this name. List them all; the set is open.
+          if (found.kind === "unknown")
+            out.push(
+              ...(this.methodsByName.get(name) ?? []).filter(
+                (method) =>
+                  exported(name) || this.pkgOf(method)?.key === access,
+              ),
+            );
         }
         if (found.kind !== "found") continue;
         if (!certain) open = true;
