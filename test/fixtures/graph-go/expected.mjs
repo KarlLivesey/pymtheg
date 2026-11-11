@@ -63,7 +63,6 @@ export const symbols = [
 export const links = [
   {"file":"broken/broken.go","kind":"contains","targetName":"broken.go","source":{"name":"broken","kind":"package"},"target":{"file":"broken/broken.go","name":"broken.go","kind":"file"},"at":"broken"},
   {"file":"broken/broken.go","kind":"contains","targetName":"Good","source":{"name":"broken.go","kind":"file"},"target":{"file":"broken/broken.go","name":"Good","kind":"function"},"at":"func Good() int { return 1 }"},
-  {"file":"broken/broken.go","kind":"references","targetName":"Bad","source":{"name":"broken.go","kind":"file"},"target":null,"at":"Bad"},
   {"file":"cmd/app/main.go","kind":"contains","targetName":"main.go","source":{"name":"main","kind":"package"},"target":{"file":"cmd/app/main.go","name":"main.go","kind":"file"},"at":"main","range":{"start":8,"end":12}},
   {"file":"cmd/app/main.go","kind":"imports","targetName":"fmt","source":{"name":"main.go","kind":"file"},"target":null,"at":"\"fmt\""},
   {"file":"cmd/app/main.go","kind":"imports","targetName":"example.com/shapes/geom","source":{"name":"main.go","kind":"file"},"target":{"file":"geom/area.go","name":"geom","kind":"package"},"at":"g \"example.com/shapes/geom\""},
@@ -178,7 +177,7 @@ export const links = [
   {"file":"geom/util.go","kind":"calls","targetName":"calc.Double","source":{"name":"scale","kind":"function"},"target":{"file":"geom/internal/calc/calc.go","name":"Double","kind":"function"},"at":"calc.Double"},
   {"file":"geom/util.go","kind":"contains","targetName":"Total","source":{"name":"util.go","kind":"file"},"target":{"file":"geom/util.go","name":"Total","kind":"function"},"at":"func Total(shapes ...Shape) float64 {\n\tsum := 0.0\n\tfor _, s := range shapes {\n\t\tsum += s.Area()\n\t}\n\tl := Labeled{Label: \"x\"}\n\treturn sum + l.Area()\n}"},
   {"file":"geom/util.go","kind":"references","targetName":"Shape","source":{"name":"Total","kind":"function"},"target":{"file":"geom/area.go","name":"Shape","kind":"interface"},"at":"Shape"},
-  {"file":"geom/util.go","kind":"calls","targetName":"s.Area","source":{"name":"Total","kind":"function"},"target":null,"candidates":[{"file":"geom/square.go","name":"Area","kind":"method"},{"file":"geom/area.go","name":"Area","kind":"method"}],"at":"s.Area"},
+  {"file":"geom/util.go","kind":"calls","targetName":"s.Area","source":{"name":"Total","kind":"function"},"target":null,"candidates":[{"file":"geom/area.go","name":"Area","kind":"method"},{"file":"geom/square.go","name":"Area","kind":"method"},{"file":"geom/area.go","name":"Area","kind":"method"}],"at":"s.Area"},
   {"file":"geom/util.go","kind":"references","targetName":"Labeled","source":{"name":"Total","kind":"function"},"target":{"file":"geom/square.go","name":"Labeled","kind":"struct"},"at":"Labeled"},
   {"file":"geom/util.go","kind":"calls","targetName":"l.Area","source":{"name":"Total","kind":"function"},"target":{"file":"geom/area.go","name":"Area","kind":"method"},"at":"l.Area"},
   {"file":"geom/util.go","kind":"contains","targetName":"Map","source":{"name":"util.go","kind":"file"},"target":{"file":"geom/util.go","name":"Map","kind":"function"},"at":"func Map[T any, U any](xs []T, f func(T) U) []U {\n\tout := make([]U, 0, len(xs))\n\tfor _, x := range xs {\n\t\tout = append(out, f(x))\n\t}\n\treturn out\n}"},

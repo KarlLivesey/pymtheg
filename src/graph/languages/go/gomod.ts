@@ -1,17 +1,25 @@
 import { posix } from "node:path";
 import type { ContextFile } from "../../types.js";
 
-/** A Go module rooted at a project directory ("" is the project root). */
+/** A module path mapped to a project directory ("" is the project root). */
 export interface GoModuleRoot {
   directory: string;
   path: string;
 }
-export interface GoProjectLayout {
-  modules: GoModuleRoot[];
-  /** Local `replace` targets, as extra module roots under the replaced path. */
+/** A go.mod in the snapshot, with the local `replace` directives it declares. */
+export interface GoModule extends GoModuleRoot {
   replacements: GoModuleRoot[];
-  /** Directories named by `use` in go.work files (recorded, not required). */
-  workspaceUses: string[];
+}
+/** A go.work in the snapshot: its `use` directories and its local replacements. */
+export interface GoWorkspace {
+  directory: string;
+  uses: string[];
+  replacements: GoModuleRoot[];
+}
+export interface GoProjectLayout {
+  /** Deepest directory first, so the first enclosing module is the nearest. */
+  modules: GoModule[];
+  workspaces: GoWorkspace[];
 }
 
 const strip = (line: string) => line.replace(/\/\/.*$/, "").trim();
@@ -51,57 +59,74 @@ export function joinDirectory(
     return undefined;
   return joined === "." ? "" : joined.replace(/\/$/, "");
 }
+/** `directory` is `root` or below it. */
+export const within = (directory: string, root: string): boolean =>
+  root === "" || directory === root || directory.startsWith(`${root}/`);
+
+function replacement(
+  directory: string,
+  args: string,
+): GoModuleRoot | undefined {
+  const [from, to] = args.split("=>").map((part) => part.trim());
+  const fromPath = unquote(from?.split(/\s+/)[0] ?? "");
+  const toPath = unquote(to?.split(/\s+/)[0] ?? "");
+  if (!fromPath || !(toPath.startsWith("./") || toPath.startsWith("../")))
+    return undefined;
+  const target = joinDirectory(directory, toPath);
+  return target === undefined
+    ? undefined
+    : { directory: target, path: fromPath };
+}
 
 export function readLayout(
   contextFiles: readonly ContextFile[],
 ): GoProjectLayout {
-  const layout: GoProjectLayout = {
-    modules: [],
-    replacements: [],
-    workspaceUses: [],
-  };
+  const layout: GoProjectLayout = { modules: [], workspaces: [] };
   for (const file of contextFiles) {
     if (file.status !== "clean") continue;
     const directory = directoryOf(file.path);
     const name = posix.basename(file.path);
+    const replacements: GoModuleRoot[] = [];
+    const uses: string[] = [];
+    let path: string | undefined;
     for (const { verb, args } of directives(file.text)) {
-      if (verb === "module" && name === "go.mod") {
-        const path = unquote(args.split(/\s+/)[0] ?? "");
-        if (path) layout.modules.push({ directory, path });
-      } else if (verb === "replace") {
-        const [from, to] = args.split("=>").map((part) => part.trim());
-        const fromPath = unquote(from?.split(/\s+/)[0] ?? "");
-        const toPath = unquote(to?.split(/\s+/)[0] ?? "");
-        if (fromPath && (toPath.startsWith("./") || toPath.startsWith("../"))) {
-          const target = joinDirectory(directory, toPath);
-          if (target !== undefined)
-            layout.replacements.push({ directory: target, path: fromPath });
-        }
+      if (verb === "module" && name === "go.mod")
+        path = unquote(args.split(/\s+/)[0] ?? "") || undefined;
+      else if (verb === "replace") {
+        const item = replacement(directory, args);
+        if (item) replacements.push(item);
       } else if (verb === "use" && name === "go.work") {
         const target = joinDirectory(directory, unquote(args));
-        if (target !== undefined) layout.workspaceUses.push(target);
+        if (target !== undefined) uses.push(target);
       }
     }
+    if (name === "go.mod" && path !== undefined)
+      layout.modules.push({ directory, path, replacements });
+    if (name === "go.work")
+      layout.workspaces.push({ directory, uses, replacements });
   }
-  const order = (a: GoModuleRoot, b: GoModuleRoot) =>
+  const order = (a: { directory: string }, b: { directory: string }) =>
     b.directory.length - a.directory.length ||
     (a.directory < b.directory ? -1 : a.directory > b.directory ? 1 : 0);
   layout.modules.sort(order);
-  layout.replacements.sort(order);
+  layout.workspaces.sort(order);
   return layout;
 }
 
-const within = (directory: string, root: string) =>
-  root === "" || directory === root || directory.startsWith(`${root}/`);
+/** The module owning a project directory: the nearest enclosing go.mod. */
+export function moduleOf(
+  layout: GoProjectLayout,
+  directory: string,
+): GoModule | undefined {
+  return layout.modules.find((item) => within(directory, item.directory));
+}
 
 /** The import path of a project directory: nearest enclosing go.mod module. */
 export function importPathOf(
   layout: GoProjectLayout,
   directory: string,
 ): string | undefined {
-  const module = layout.modules.find((item) =>
-    within(directory, item.directory),
-  );
+  const module = moduleOf(layout, directory);
   if (!module) return undefined;
   const rest =
     module.directory === ""
@@ -110,17 +135,63 @@ export function importPathOf(
   return rest ? `${module.path}/${rest}` : module.path;
 }
 
-/** Candidate project directories for an import path (module roots and local replacements). */
+/**
+ * The project directory an import path names, as seen from the importing
+ * directory's own module: its main module(s) (the importer's module, or every
+ * `use`d module of a go.work listing it) and the local `replace` directives of
+ * that go.mod (or of the go.work, which take precedence). A directory inside a
+ * different nested module than the one it was mapped through is not that package.
+ * Other project modules reached without a replace come from the module cache in Go,
+ * so they stay unresolved.
+ */
 export function directoryOfImport(
   layout: GoProjectLayout,
+  importerDirectory: string,
   importPath: string,
 ): string | undefined {
-  let best: { root: GoModuleRoot; length: number } | undefined;
-  for (const root of [...layout.replacements, ...layout.modules])
-    if (importPath === root.path || importPath.startsWith(`${root.path}/`))
-      if (!best || root.path.length > best.length)
-        best = { root, length: root.path.length };
+  const own = moduleOf(layout, importerDirectory);
+  if (!own) return undefined;
+  const workspace = layout.workspaces.find(
+    (item) =>
+      within(own.directory, item.directory) &&
+      item.uses.includes(own.directory),
+  );
+  const mains = workspace
+    ? layout.modules.filter((module) =>
+        workspace.uses.includes(module.directory),
+      )
+    : [own];
+  const replaced = new Map<string, GoModuleRoot>();
+  for (const main of mains)
+    for (const item of main.replacements)
+      if (!replaced.has(item.path)) replaced.set(item.path, item);
+  for (const item of workspace?.replacements ?? [])
+    replaced.set(item.path, item);
+  const matches = (path: string) =>
+    importPath === path || importPath.startsWith(`${path}/`);
+  let best: { root: GoModuleRoot; main?: GoModule } | undefined;
+  const consider = (root: GoModuleRoot, main?: GoModule) => {
+    if (
+      matches(root.path) &&
+      (!best || root.path.length > best.root.path.length)
+    )
+      best = main ? { root, main } : { root };
+  };
+  for (const main of mains) consider(main, main);
+  for (const item of replaced.values()) consider(item);
   if (!best) return undefined;
-  const rest = importPath.slice(best.root.path.length + 1);
-  return joinDirectory(best.root.directory, rest || ".");
+  const chosen: { root: GoModuleRoot; main?: GoModule } = best;
+  const rest = importPath.slice(chosen.root.path.length + 1);
+  const directory = joinDirectory(chosen.root.directory, rest || ".");
+  if (directory === undefined) return undefined;
+  const owner = moduleOf(layout, directory);
+  if (chosen.main) return owner === chosen.main ? directory : undefined;
+  // A replacement directory: the package must not sit inside a module nested below it.
+  if (
+    owner &&
+    owner.directory !== chosen.root.directory &&
+    within(owner.directory, chosen.root.directory)
+  )
+    return undefined;
+  return directory;
 }

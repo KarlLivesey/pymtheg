@@ -21,12 +21,31 @@ export type Desc =
   | { k: "sel"; x: Desc; n: string }
   /** A value whose named type is syntactically evident (declared type, literal, new, assertion). */
   | { k: "val"; t: TypeRef }
-  /** Result `i` of calling `f` (function, method or conversion). */
+  /** Result `i` of calling `f` (function, method, conversion or func value). */
   | { k: "call"; f: Desc; i: number }
+  /** An element (`elem`) or key (`key`) of a slice/map/channel/array value: range, index, receive. */
+  | { k: "elem"; x: Desc }
+  | { k: "key"; x: Desc }
+  /** A value of an unnamed container type: slice, array, map (`key`), channel (`ch`); `e` is the element. */
+  | { k: "cont"; e: Desc; key?: Desc; ch?: boolean }
+  /** A value of a function type whose result types are `r`. */
+  | { k: "func"; r: Desc[] }
+  /** A value whose type is a type parameter; `c` is its constraint when that is one named type. */
+  | { k: "tval"; c?: TypeRef }
+  /**
+   * A local variable that is written after its declaration. `d` gives its static
+   * type; `alts` lists every value it may hold, absent when a write is not knowable
+   * (address taken, op-assignment, range/receive assignment).
+   */
+  | { k: "var"; d: Desc; alts?: Desc[] }
   /** A local without a syntactically evident type. */
   | { k: "local" }
-  /** A local type declared inside a function body. */
-  | { k: "localtype" }
+  /** A value whose type is known to defeat member resolution (local named type). */
+  | { k: "opaque" }
+  /** A local type or type parameter declared inside a function or generic declaration. */
+  | { k: "localtype"; tp?: boolean; c?: TypeRef }
+  /** Parse-time only: a live local binding, replaced before facts are returned. */
+  | { k: "ref"; b: object }
   | { k: "unknown" };
 
 export interface ImportFact {

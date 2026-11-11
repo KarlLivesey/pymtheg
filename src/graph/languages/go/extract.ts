@@ -66,6 +66,14 @@ export function fileFacts(path: string): FileFact {
   return fact;
 }
 
+/** A local variable during extraction: its declared value and every later write. */
+interface Binding {
+  d: Desc;
+  writes: Desc[];
+  /** Some write is not knowable (address taken, op-assignment, range/receive `=`). */
+  opaque: boolean;
+}
+
 /**
  * Extracts Go declarations and references from one file's syntax tree.
  * Pure function of the source text: no project, disk or toolchain access.
@@ -77,6 +85,8 @@ export class GoExtractor {
   private scopes: Map<string, Desc>[] = [];
   private byKey = new Map<string, SymbolDraft>();
   private owner = "file";
+  /** Inside a declaration with a syntax error: no call/reference links (see W2-B.md). */
+  private quiet = false;
 
   constructor(
     private readonly path: string,
@@ -112,6 +122,14 @@ export class GoExtractor {
         beforePackage = false;
         this.topLevel(child);
       }
+    }
+    // Live local bindings become plain JSON only now that every write has been seen.
+    for (const link of this.links) {
+      const expr = (link.data as { expr?: Desc } | undefined)?.expr;
+      if (expr && link.data && typeof link.data === "object")
+        (link.data as { [key: string]: Json }).expr = this.finalize(
+          expr,
+        ) as unknown as Json;
     }
     fileData.test = this.fact.test;
     if (this.fact.package !== undefined) fileData.package = this.fact.package;
@@ -157,6 +175,7 @@ export class GoExtractor {
     data?: { [key: string]: Json },
     source = this.owner,
   ): void {
+    if (this.quiet && (kind === "calls" || kind === "references")) return;
     this.links.push({
       sourceKey: source,
       kind,
@@ -186,8 +205,75 @@ export class GoExtractor {
       this.scopes.pop();
     }
   }
+  /** Declares a local in the innermost scope; variables become live bindings. */
   private declare(name: string, desc: Desc): void {
-    if (name !== "_" && this.scopes.length) this.scopes.at(-1)!.set(name, desc);
+    if (name === "_" || !this.scopes.length) return;
+    const binding: Binding = { d: desc, writes: [], opaque: false };
+    this.scopes
+      .at(-1)!
+      .set(name, desc.k === "localtype" ? desc : { k: "ref", b: binding });
+  }
+  /** Records a write to a local variable; null means the written value is not knowable. */
+  private write(name: string, desc: Desc | null): void {
+    const found = this.local(name);
+    if (found?.k !== "ref") return;
+    const binding = found.b as Binding;
+    if (desc === null) binding.opaque = true;
+    else binding.writes.push(desc);
+  }
+  /** Replaces live bindings with plain descriptions. Cycles and deep chains become `local`. */
+  private finalize(desc: Desc, stack: Binding[] = []): Desc {
+    const next = (item: Desc) => this.finalize(item, stack);
+    switch (desc.k) {
+      case "ref": {
+        const binding = desc.b as Binding;
+        if (stack.includes(binding) || stack.length > 6) return { k: "local" };
+        const inner = [...stack, binding];
+        const d = this.finalize(binding.d, inner);
+        if (!binding.writes.length && !binding.opaque) return d;
+        if (binding.opaque) return { k: "var", d };
+        return {
+          k: "var",
+          d,
+          alts: [
+            d,
+            ...binding.writes.map((write) => this.finalize(write, inner)),
+          ],
+        };
+      }
+      case "sel":
+        return { k: "sel", x: next(desc.x), n: desc.n };
+      case "call":
+        return { k: "call", f: next(desc.f), i: desc.i };
+      case "elem":
+      case "key":
+        return { k: desc.k, x: next(desc.x) };
+      case "cont":
+        return {
+          k: "cont",
+          e: next(desc.e),
+          ...(desc.key ? { key: next(desc.key) } : {}),
+          ...(desc.ch ? { ch: true } : {}),
+        };
+      case "func":
+        return { k: "func", r: desc.r.map(next) };
+      case "var":
+        return desc.alts
+          ? { k: "var", d: next(desc.d), alts: desc.alts.map(next) }
+          : { k: "var", d: next(desc.d) };
+      default:
+        return desc;
+    }
+  }
+  /** The innermost operand of a selector/call chain, looking through bindings. */
+  private rootKind(desc: Desc, depth = 0): string {
+    if (depth > 12) return "unknown";
+    if (desc.k === "ref")
+      return this.rootKind((desc.b as Binding).d, depth + 1);
+    if (desc.k === "sel" || desc.k === "elem" || desc.k === "key")
+      return this.rootKind(desc.x, depth + 1);
+    if (desc.k === "call") return this.rootKind(desc.f, depth + 1);
+    return desc.k;
   }
   private local(name: string): Desc | undefined {
     for (let index = this.scopes.length - 1; index >= 0; index--) {
@@ -200,6 +286,17 @@ export class GoExtractor {
   // ---- declarations ------------------------------------------------------
 
   private topLevel(node: Node): void {
+    if (node.type === "ERROR") return;
+    const previous = this.quiet;
+    this.quiet = node.hasError;
+    try {
+      this.declaration(node);
+    } finally {
+      this.quiet = previous;
+    }
+  }
+
+  private declaration(node: Node): void {
     switch (node.type) {
       case "import_declaration":
         for (const spec of node.descendantsOfType("import_spec"))
@@ -220,7 +317,7 @@ export class GoExtractor {
           this.packageValue(spec, node.type === "var_declaration");
         return;
       default:
-        // Recovered fragments (ERROR nodes, stray statements) still yield references.
+        // Recovered stray fragments outside ERROR nodes still yield references.
         this.within("file", () => this.walk(node));
     }
   }
@@ -244,11 +341,19 @@ export class GoExtractor {
     );
   }
 
+  /** Type parameters with their constraint when it is a single named (non-predeclared) type. */
   private typeParams(list: Node | null): Map<string, Desc> {
     const scope = new Map<string, Desc>();
-    for (const declaration of named(list))
+    for (const declaration of named(list)) {
+      const constraint = named(declaration.childForFieldName("type"));
+      const ref = constraint.length === 1 ? this.typeRef(constraint[0]!) : null;
+      const desc: Desc =
+        ref && ref.q !== ""
+          ? { k: "localtype", tp: true, c: ref }
+          : { k: "localtype", tp: true };
       for (const name of declaration.childrenForFieldName("name"))
-        if (name) scope.set(name.text, { k: "localtype" });
+        if (name) scope.set(name.text, desc);
+    }
     return scope;
   }
   private walkTypeParams(list: Node | null): void {
@@ -296,7 +401,7 @@ export class GoExtractor {
     if (typeNode && typeNode.type === "generic_type") {
       for (const argument of typeNode.descendantsOfType("type_identifier"))
         if (argument && argument.parent?.type !== "generic_type")
-          scope.set(argument.text, { k: "localtype" });
+          scope.set(argument.text, { k: "localtype", tp: true });
       typeNode = typeNode.childForFieldName("type");
     }
     const receiverType =
@@ -381,7 +486,11 @@ export class GoExtractor {
               name.text,
               `${owner}.${name.text}`,
               { start: name.startIndex, end: field.endIndex },
-              ref ? { owner, t: { ...ref } } : { owner },
+              {
+                owner,
+                ...(ref ? { t: { ...ref } } : {}),
+                v: this.typedValue(type) as unknown as Json,
+              },
             );
             this.contains(ownerKey, key, {
               start: name.startIndex,
@@ -402,6 +511,12 @@ export class GoExtractor {
             this.within(ownerKey, () => this.walk(type));
             continue;
           }
+          // The grammar puts the `*` of an embedded `*T` beside the type, not in a pointer_type.
+          const embeddedPointer =
+            unparen(type).type === "pointer_type" ||
+            field.children.some(
+              (child) => !!child && !child.isNamed && child.type === "*",
+            );
           const key = this.symbol(
             "field",
             ref.n,
@@ -411,7 +526,7 @@ export class GoExtractor {
               owner,
               t: { ...ref },
               embedded: true,
-              pointer: unparen(type).type === "pointer_type",
+              pointer: embeddedPointer,
             },
           );
           this.contains(ownerKey, key, range(field));
@@ -419,7 +534,7 @@ export class GoExtractor {
             "embeds",
             compact(base),
             range(base),
-            { t: { ...ref } },
+            { t: { ...ref }, pointer: embeddedPointer },
             ownerKey,
           );
           if (inner.type === "generic_type") {
@@ -500,9 +615,9 @@ export class GoExtractor {
 
   /** Descriptions of each name's value: declared type, matching initializer or multi-value call. */
   private specDescs(names: Node[], type: Node | null, values: Node[]): Desc[] {
-    const declared = type ? this.typeRef(type) : null;
+    const declared = type ? this.typedValue(type) : null;
     return names.map((_, index): Desc => {
-      if (type) return declared ? { k: "val", t: declared } : { k: "local" };
+      if (declared) return declared;
       if (values.length === names.length) return this.desc(values[index]!);
       if (values.length === 1) {
         const value = values[0]!;
@@ -559,14 +674,11 @@ export class GoExtractor {
       const type = parameter.childForFieldName("type");
       if (type) this.walk(type);
       if (!declare) continue;
-      const ref = type ? this.typeRef(type) : null;
+      const value: Desc = type ? this.typedValue(type) : { k: "local" };
       const variadic = parameter.type === "variadic_parameter_declaration";
       for (const name of parameter.childrenForFieldName("name"))
         if (name)
-          this.declare(
-            name.text,
-            ref && !variadic ? { k: "val", t: ref } : { k: "local" },
-          );
+          this.declare(name.text, variadic ? { k: "cont", e: value } : value);
     }
   }
 
@@ -577,22 +689,7 @@ export class GoExtractor {
   ): { [key: string]: Json } {
     this.scopes.push(scope);
     try {
-      const results: Json[] = [];
-      if (result?.type === "parameter_list")
-        for (const parameter of named(result)) {
-          const type = parameter.childForFieldName("type");
-          const ref = type ? this.typeRef(type) : null;
-          const count = Math.max(
-            1,
-            parameter.childrenForFieldName("name").length,
-          );
-          for (let index = 0; index < count; index++)
-            results.push(ref ? { ...ref } : null);
-        }
-      else if (result) {
-        const ref = this.typeRef(result);
-        results.push(ref ? { ...ref } : null);
-      }
+      const results = this.resultDescs(result) as unknown as Json[];
       const list = (node: Node | null): string[] =>
         named(node).flatMap((parameter) => {
           const type = parameter.childForFieldName("type");
@@ -649,6 +746,62 @@ export class GoExtractor {
     return parts.join(" ");
   }
 
+  /** One value description per declared result. */
+  private resultDescs(result: Node | null): Desc[] {
+    if (!result) return [];
+    if (result.type !== "parameter_list") return [this.typedValue(result)];
+    return named(result).flatMap((parameter) => {
+      const type = parameter.childForFieldName("type");
+      const value: Desc = type ? this.typedValue(type) : { k: "local" };
+      return Array<Desc>(
+        Math.max(1, parameter.childrenForFieldName("name").length),
+      ).fill(value);
+    });
+  }
+
+  /** What is known about a value of the written type. */
+  private typedValue(node: Node): Desc {
+    const current = unparen(node);
+    const field = (name: string) => current.childForFieldName(name);
+    const of = (child: Node | null): Desc =>
+      child ? this.typedValue(child) : { k: "local" };
+    switch (current.type) {
+      case "pointer_type":
+        return of(named(current)[0] ?? null);
+      case "generic_type":
+        return of(field("type"));
+      case "type_identifier": {
+        const bound = this.local(current.text);
+        if (bound?.k === "localtype")
+          return bound.tp
+            ? bound.c
+              ? { k: "tval", c: { ...bound.c } }
+              : { k: "tval" }
+            : { k: "opaque" };
+        if (bound) return { k: "local" };
+        return PREDECLARED_TYPES.has(current.text)
+          ? { k: "val", t: { q: "", n: current.text } }
+          : { k: "val", t: { n: current.text } };
+      }
+      case "qualified_type": {
+        const ref = this.typeRef(current);
+        return ref ? { k: "val", t: ref } : { k: "local" };
+      }
+      case "slice_type":
+      case "array_type":
+      case "implicit_length_array_type":
+        return { k: "cont", e: of(field("element")) };
+      case "map_type":
+        return { k: "cont", e: of(field("value")), key: of(field("key")) };
+      case "channel_type":
+        return { k: "cont", e: of(field("value")), ch: true };
+      case "function_type":
+        return { k: "func", r: this.resultDescs(field("result")) };
+      default:
+        return { k: "local" };
+    }
+  }
+
   /** The named type of a type expression, or null for composite/unnamed types. Universe types use q "". */
   private typeRef(node: Node): TypeRef | null {
     let current = unparen(node);
@@ -678,6 +831,7 @@ export class GoExtractor {
     switch (current.type) {
       case "identifier": {
         const bound = this.local(current.text);
+        if (bound?.k === "localtype") return { k: "opaque" };
         if (bound) return bound;
         return { k: "name", n: current.text };
       }
@@ -690,47 +844,64 @@ export class GoExtractor {
       case "unary_expression": {
         const operator = current.child(0)?.text;
         const operand = current.childForFieldName("operand");
-        return operand && (operator === "&" || operator === "*")
-          ? this.desc(operand)
-          : { k: "unknown" };
+        if (!operand) return { k: "unknown" };
+        if (operator === "&" || operator === "*") return this.desc(operand);
+        if (operator === "<-") return { k: "elem", x: this.desc(operand) };
+        return { k: "unknown" };
       }
-      case "composite_literal": {
-        const type = current.childForFieldName("type");
-        const ref = type ? this.typeRef(type) : null;
-        return ref ? { k: "val", t: ref } : { k: "unknown" };
-      }
+      case "composite_literal":
       case "type_assertion_expression": {
         const type = current.childForFieldName("type");
-        const ref = type ? this.typeRef(type) : null;
-        return ref ? { k: "val", t: ref } : { k: "unknown" };
+        return type ? this.typedValue(type) : { k: "unknown" };
       }
+      case "index_expression": {
+        const operand = current.childForFieldName("operand");
+        return operand
+          ? { k: "elem", x: this.desc(operand) }
+          : { k: "unknown" };
+      }
+      case "slice_expression": {
+        const operand = current.childForFieldName("operand");
+        return operand ? this.desc(operand) : { k: "unknown" };
+      }
+      case "func_literal":
+        return {
+          k: "func",
+          r: this.resultDescs(current.childForFieldName("result")),
+        };
       case "call_expression": {
         const fn = current.childForFieldName("function");
         if (!fn) return { k: "unknown" };
         const callee = unparen(fn);
-        if (
-          callee.type === "identifier" &&
-          callee.text === "new" &&
-          !this.local("new")
-        ) {
-          const argument = named(current.childForFieldName("arguments"))[0];
-          const ref = argument ? this.typeRef(argument) : null;
-          return ref ? { k: "val", t: ref } : { k: "unknown" };
+        const args = named(current.childForFieldName("arguments"));
+        if (callee.type === "identifier" && !this.local(callee.text)) {
+          // new(T), make(T, …) and append(s, …) have syntactically evident results.
+          if ((callee.text === "new" || callee.text === "make") && args[0])
+            return callee.text === "new"
+              ? this.typedValue(args[0])
+              : this.typedValue(args[0]);
+          if (callee.text === "append" && args[0]) return this.desc(args[0]);
         }
         const f = this.calleeDesc(callee);
         return f ? { k: "call", f, i: 0 } : { k: "unknown" };
       }
       case "type_conversion_expression": {
         const type = current.childForFieldName("type");
-        const f = type ? this.typeNameDesc(type) : null;
-        return f ? { k: "call", f, i: 0 } : { k: "unknown" };
+        if (!type) return { k: "unknown" };
+        const f = this.typeNameDesc(type);
+        return f ? { k: "call", f, i: 0 } : this.typedValue(type);
       }
       default:
         return { k: "unknown" };
     }
   }
   private calleeDesc(callee: Node): Desc | null {
-    if (callee.type === "identifier" || callee.type === "selector_expression")
+    if (
+      callee.type === "identifier" ||
+      callee.type === "selector_expression" ||
+      callee.type === "func_literal" ||
+      callee.type === "call_expression"
+    )
       return this.desc(callee);
     if (callee.type === "index_expression") {
       const operand = callee.childForFieldName("operand");
@@ -769,6 +940,8 @@ export class GoExtractor {
     }
     switch (node.type) {
       case "comment":
+      case "ERROR":
+        // Misparsed regions yield no facts: their identifiers cannot be trusted.
         return;
       case "short_var_declaration": {
         const left = named(node.childForFieldName("left"));
@@ -776,9 +949,45 @@ export class GoExtractor {
         for (const value of right) this.walk(value);
         const descs = this.specDescs(left, null, right);
         left.forEach((name, index) => {
-          if (name.type === "identifier")
-            this.declare(name.text, descs[index]!);
+          if (name.type !== "identifier") return;
+          // `a, err := …` redeclares nothing already in this scope: it writes it.
+          if (this.scopes.at(-1)?.get(name.text)?.k === "ref")
+            this.write(name.text, descs[index]!);
+          else this.declare(name.text, descs[index]!);
         });
+        return;
+      }
+      case "assignment_statement": {
+        const left = named(node.childForFieldName("left"));
+        const right = named(node.childForFieldName("right"));
+        const operator = node.childForFieldName("operator")?.text ?? "=";
+        for (const value of right) this.walk(value);
+        const descs =
+          operator === "=" ? this.specDescs(left, null, right) : undefined;
+        left.forEach((target, index) => {
+          const name = unparen(target);
+          if (name.type === "identifier" && this.local(name.text)?.k === "ref")
+            this.write(name.text, descs ? descs[index]! : null);
+          else this.walk(target);
+        });
+        return;
+      }
+      case "inc_statement":
+      case "dec_statement": {
+        const operand = named(node)[0];
+        if (!operand) return;
+        const name = unparen(operand);
+        if (name.type === "identifier" && this.local(name.text)?.k === "ref")
+          this.write(name.text, null);
+        else this.walk(operand);
+        return;
+      }
+      case "unary_expression": {
+        const operand = node.childForFieldName("operand");
+        const name = operand ? unparen(operand) : undefined;
+        if (node.child(0)?.text === "&" && name?.type === "identifier")
+          this.write(name.text, null);
+        this.walkChildren(node);
         return;
       }
       case "range_clause":
@@ -787,11 +996,24 @@ export class GoExtractor {
         const right = node.childForFieldName("right");
         if (right) this.walk(right);
         const defines = node.children.some((child) => child?.text === ":=");
-        if (left && defines) {
-          for (const name of named(left))
-            if (name.type === "identifier")
-              this.declare(name.text, { k: "local" });
-        } else if (left) this.walk(left);
+        const source: Desc = right ? this.desc(right) : { k: "unknown" };
+        const items = named(left);
+        items.forEach((name, index) => {
+          if (name.type !== "identifier") return this.walk(name);
+          // range: key then element; receive: the element.
+          const value: Desc =
+            node.type === "range_clause" && index === 0 && items.length > 1
+              ? { k: "key", x: source }
+              : node.type === "range_clause"
+                ? items.length > 1
+                  ? { k: "elem", x: source }
+                  : { k: "key", x: source }
+                : source;
+          if (defines) this.declare(name.text, value);
+          else if (this.local(name.text)?.k === "ref")
+            this.write(name.text, null);
+          else this.walk(name);
+        });
         return;
       }
       case "type_switch_statement":
@@ -961,11 +1183,9 @@ export class GoExtractor {
     const operand = node.childForFieldName("operand");
     if (!operand) return this.walkChildren(node);
     const desc = this.desc(node);
-    let root: Desc = desc;
-    while (root.k === "sel" || root.k === "call")
-      root = root.k === "sel" ? root.x : root.f;
+    const root = this.rootKind(desc);
     // Field/method values on values of unknown type are not linked (see docs/changes/W2-B.md).
-    if (root.k !== "local" && root.k !== "unknown" && root.k !== "localtype")
+    if (!["local", "unknown", "localtype", "opaque"].includes(root))
       this.link("references", compact(node), range(node), {
         expr: desc as unknown as Json,
       });

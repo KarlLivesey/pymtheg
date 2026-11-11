@@ -11,9 +11,14 @@ import { directoryOfImport, importPathOf, readLayout } from "./gomod.js";
 import type { GoProjectLayout } from "./gomod.js";
 import { TYPE_KINDS, type Desc, type FileFact, type TypeRef } from "./model.js";
 
-/** Above this many possible targets an unknown-receiver call stays unresolved (recorded in data docs). */
+/** Above this many possible targets an unknown-receiver call stays unresolved. */
 export const CANDIDATE_LIMIT = 20;
+/** Interface dispatch lists a proven set (the method and its structural implementers): a higher cap. */
+export const DISPATCH_LIMIT = 50;
 const MAX_DEPTH = 12;
+/** Embedding depth and per-depth path limits for selector search; beyond them: not known. */
+const MAX_EMBED_DEPTH = 6;
+const MAX_EMBED_PATHS = 64;
 
 interface Pkg {
   key: string;
@@ -32,17 +37,46 @@ interface FileInfo {
   imports: Map<string, { path: string; pkgs: Pkg[] }>;
   dots: { path: string; pkgs: Pkg[] }[];
 }
+/**
+ * What is known about a value's type. `external`: declared outside the project (its
+ * members are not in the graph). `opaque`: known not to be resolvable (local named
+ * type, constraint-less type parameter). `unknown`: not syntactically evident.
+ */
 type TypeValue =
   | { kind: "project"; syms: GraphSymbol[] }
   | { kind: "external"; name: string }
+  | { kind: "cont"; e: Desc; key?: Desc; ch?: boolean; file: string }
+  | { kind: "func"; r: Desc[]; file: string }
+  | { kind: "tparam"; c?: TypeRef; file: string }
+  | { kind: "opaque" }
   | { kind: "unknown" };
 type Entity =
   | { e: "pkg"; pkgs: Pkg[]; path: string }
   | { e: "syms"; syms: GraphSymbol[] }
   | { e: "value"; type: TypeValue }
+  /** Something declared outside the project (function, type or variable). */
+  | { e: "external"; name: string }
   | { e: "none" };
 const NONE: Entity = { e: "none" };
 const UNKNOWN: TypeValue = { kind: "unknown" };
+const OPAQUE: TypeValue = { kind: "opaque" };
+/** Result of Go's selector rule for one name on a type. */
+type Selection =
+  /** Exactly one declaration path at the shallowest depth (syms > 1 only for build variants). */
+  | { kind: "found"; syms: GraphSymbol[]; pointer: boolean }
+  /** Several paths at the shallowest depth: illegal in Go. */
+  | { kind: "ambiguous"; syms: GraphSymbol[] }
+  | { kind: "none" }
+  /** An external or unresolvable embedded type could supply or shadow the name. */
+  | { kind: "unknown" };
+interface Decision {
+  ids: string[];
+  /** Only a definite decision may become a single target. */
+  definite: boolean;
+  /** Candidate cap for this kind of decision. */
+  limit?: number;
+}
+const UNRESOLVED: Decision = { ids: [], definite: false };
 
 const directoryOf = (path: string) => {
   const directory = posix.dirname(path);
@@ -82,13 +116,13 @@ class GoResolver {
   private symbolsById = new Map<string, GraphSymbol>();
   private byFileKey = new Map<string, GraphSymbol>();
   private decls = new Map<string, Map<string, GraphSymbol[]>>();
-  private methods = new Map<string, GraphSymbol[]>();
   private members = new Map<string, GraphSymbol[]>();
   private methodsByName = new Map<string, GraphSymbol[]>();
   private embedsBySource = new Map<string, GraphLink[]>();
-  private implementers = new Map<string, { type: GraphSymbol }[]>();
+  private implementers = new Map<string, GraphSymbol[]>();
   private reachable = new Map<string, Set<string>>();
   private memo = new Map<string, TypeValue>();
+  private selections = new Map<string, Selection>();
 
   constructor(
     private readonly moduleId: string,
@@ -118,11 +152,12 @@ class GoResolver {
         }
     const resolutions: LinkResolution[] = [];
     for (const link of this.context.links) {
-      const ids = this.resolveLink(link);
-      if (ids.length === 1)
-        resolutions.push({ linkId: link.id, targetId: ids[0]! });
-      else if (ids.length > 1)
-        resolutions.push({ linkId: link.id, candidateIds: ids });
+      const { ids, definite, limit = CANDIDATE_LIMIT } = this.resolveLink(link);
+      const distinct = unique(ids).sort();
+      if (distinct.length === 1 && definite)
+        resolutions.push({ linkId: link.id, targetId: distinct[0]! });
+      else if (distinct.length > 1 && distinct.length <= limit)
+        resolutions.push({ linkId: link.id, candidateIds: distinct });
     }
     return { resolutions, links: added };
   }
@@ -166,11 +201,7 @@ class GoResolver {
       this.byFileKey.set(`${symbol.file}\u0000${symbol.key}`, symbol);
       const pkg = this.files.get(symbol.file)!.pkg;
       if (!pkg) continue;
-      const data = (symbol.data ?? {}) as {
-        receiver?: string;
-        owner?: string;
-        interface?: boolean;
-      };
+      const data = (symbol.data ?? {}) as { receiver?: string; owner?: string };
       if (symbol.kind === "package") pkg.symbol = symbol;
       else if (
         TYPE_KINDS.has(symbol.kind) ||
@@ -180,7 +211,6 @@ class GoResolver {
       )
         push(this.decls, pkg.key, symbol.name, symbol);
       else if (symbol.kind === "method" && data.receiver !== undefined) {
-        push2(this.methods, `${pkg.key}\u0000${data.receiver}`, symbol);
         push2(
           this.members,
           `${pkg.key}\u0000${data.receiver}\u0000${symbol.name}`,
@@ -214,17 +244,15 @@ class GoResolver {
       }
   }
 
-  /** Go import rules over the snapshot: module path mapping, internal visibility, non-main packages. */
+  /** Go import rules over the snapshot, in the importing file's own module context. */
   private importTargets(from: FileInfo, path: string): Pkg[] {
-    const directory = directoryOfImport(this.layout, path);
+    const directory = directoryOfImport(this.layout, from.directory, path);
     if (directory === undefined || ignoredDirectory(directory)) return [];
     const parts = path.split("/");
     const internal = parts.lastIndexOf("internal");
     if (internal >= 0) {
       const parent = parts.slice(0, internal).join("/");
-      const importer = from.pkg
-        ? importPathOf(this.layout, from.directory)
-        : undefined;
+      const importer = importPathOf(this.layout, from.directory);
       if (
         importer === undefined ||
         !(
@@ -247,14 +275,19 @@ class GoResolver {
     return this.files.get(symbol.file)?.pkg;
   }
   /** Declarations in _test.go files are visible only to test files of the same directory. */
-  private visible(symbol: GraphSymbol, from: string): boolean {
+  private visible(symbol: GraphSymbol, from: string | undefined): boolean {
+    if (from === undefined) return true;
     const declared = this.files.get(symbol.file);
     if (!declared?.fact.test) return true;
     const reader = this.files.get(from);
     return !!reader?.fact.test && reader.directory === declared.directory;
   }
+  /** Unexported identifiers are distinct per package: only accessible from their own. */
+  private accessible(symbol: GraphSymbol, access: string | undefined): boolean {
+    return exported(symbol.name) || this.pkgOf(symbol)?.key === access;
+  }
 
-  // ---- names, types, members ---------------------------------------------
+  // ---- names and types ---------------------------------------------------
 
   private packageDecl(pkg: Pkg, name: string, from: string): GraphSymbol[] {
     return (this.decls.get(pkg.key)?.get(name) ?? []).filter((symbol) =>
@@ -272,10 +305,15 @@ class GoResolver {
     const imported = info.imports.get(name);
     if (imported) return { e: "pkg", pkgs: imported.pkgs, path: imported.path };
     const dotted: GraphSymbol[] = [];
-    for (const dot of info.dots)
+    let externalDot = false;
+    for (const dot of info.dots) {
+      if (!dot.pkgs.length) externalDot = true;
       for (const pkg of dot.pkgs)
         if (exported(name)) dotted.push(...this.packageDecl(pkg, name, from));
-    return dotted.length ? { e: "syms", syms: dotted } : NONE;
+    }
+    if (dotted.length) return { e: "syms", syms: dotted };
+    // A dot-imported external package may declare it.
+    return externalDot && exported(name) ? { e: "external", name } : NONE;
   }
 
   private typeFromRef(ref: TypeRef, from: string, depth: number): TypeValue {
@@ -299,6 +337,8 @@ class GoResolver {
       } else {
         const found = this.lookupName(ref.n, from);
         if (found.e === "syms") value = this.typeSyms(found.syms, depth);
+        else if (found.e === "external")
+          value = { kind: "external", name: ref.n };
       }
     }
     this.memo.set(key, value);
@@ -322,21 +362,35 @@ class GoResolver {
     return out.length ? { kind: "project", syms: unique(out) } : UNKNOWN;
   }
 
+  /** The type of a value description evaluated in `file`. */
+  private typeOf(desc: Desc, file: string, depth: number): TypeValue {
+    const entity = this.denote(staticDesc(desc), file, depth + 1);
+    if (entity.e === "value") return entity.type;
+    if (entity.e === "external") return { kind: "external", name: entity.name };
+    if (entity.e === "syms")
+      return this.sameType(
+        entity.syms.map((symbol) => this.valueType(symbol, depth + 1)),
+      );
+    return UNKNOWN;
+  }
+
   /** Type of a variable, constant or field symbol, evaluated in its own file. */
   private valueType(symbol: GraphSymbol, depth: number): TypeValue {
-    const data = (symbol.data ?? {}) as { d?: Desc; t?: TypeRef };
-    if (symbol.kind === "field" && data.t)
-      return this.typeFromRef(data.t, symbol.file, depth + 1);
-    if ((symbol.kind === "var" || symbol.kind === "const") && data.d) {
-      const entity = this.denote(data.d, symbol.file, depth + 1);
-      return entity.e === "value" ? entity.type : UNKNOWN;
+    if (depth > MAX_DEPTH) return UNKNOWN;
+    const data = (symbol.data ?? {}) as { d?: Desc; t?: TypeRef; v?: Desc };
+    if (symbol.kind === "field") {
+      if (data.v) return this.typeOf(data.v, symbol.file, depth + 1);
+      if (data.t) return this.typeFromRef(data.t, symbol.file, depth + 1);
     }
+    if ((symbol.kind === "var" || symbol.kind === "const") && data.d)
+      return this.typeOf(data.d, symbol.file, depth + 1);
+    if (TYPE_KINDS.has(symbol.kind)) return UNKNOWN;
     return UNKNOWN;
   }
 
   private sameType(values: TypeValue[]): TypeValue {
     if (!values.length) return UNKNOWN;
-    const [first] = values;
+    if (values.length === 1) return values[0]!;
     const keyOf = (value: TypeValue) =>
       value.kind === "project"
         ? value.syms
@@ -345,13 +399,14 @@ class GoResolver {
             .join(",")
         : value.kind === "external"
           ? `x:${value.name}`
-          : "?";
-    return values.every((value) => keyOf(value) === keyOf(first!))
-      ? first!
+          : `${value.kind}:${JSON.stringify(value)}`;
+    const first = keyOf(values[0]!);
+    return values.every((value) => keyOf(value) === first)
+      ? values[0]!
       : UNKNOWN;
   }
 
-  /** What an expression denotes: a package, declarations, or a value of some type. */
+  /** What an expression denotes: a package, declarations, an external thing, or a typed value. */
   private denote(desc: Desc, from: string, depth: number): Entity {
     if (depth > MAX_DEPTH) return NONE;
     switch (desc.k) {
@@ -359,120 +414,263 @@ class GoResolver {
         return this.lookupName(desc.n, from);
       case "val":
         return { e: "value", type: this.typeFromRef(desc.t, from, depth + 1) };
-      case "call": {
-        const callee = this.denote(desc.f, from, depth + 1);
-        if (callee.e !== "syms") return { e: "value", type: UNKNOWN };
-        if (callee.syms.every((symbol) => TYPE_KINDS.has(symbol.kind)))
-          return { e: "value", type: this.typeSyms(callee.syms, depth + 1) };
-        const results = callee.syms.map((symbol) => {
-          const data = (symbol.data ?? {}) as { results?: (TypeRef | null)[] };
-          const ref = data.results?.[desc.i];
-          return ref ? this.typeFromRef(ref, symbol.file, depth + 1) : UNKNOWN;
-        });
-        return { e: "value", type: this.sameType(results) };
-      }
-      case "sel": {
-        const base = this.denote(desc.x, from, depth + 1);
-        if (base.e === "pkg")
-          return {
-            e: "syms",
-            syms: exported(desc.n)
-              ? base.pkgs.flatMap((pkg) => this.packageDecl(pkg, desc.n, from))
-              : [],
-          };
-        if (base.e === "syms") {
-          if (base.syms.every((symbol) => TYPE_KINDS.has(symbol.kind))) {
-            // Method expression T.M / (*T).M.
-            const type = this.typeSyms(base.syms, depth + 1);
+      case "cont":
+        return {
+          e: "value",
+          type: {
+            kind: "cont",
+            e: desc.e,
+            ...(desc.key ? { key: desc.key } : {}),
+            ...(desc.ch ? { ch: true } : {}),
+            file: from,
+          },
+        };
+      case "func":
+        return { e: "value", type: { kind: "func", r: desc.r, file: from } };
+      case "tval":
+        return {
+          e: "value",
+          type: desc.c
+            ? { kind: "tparam", c: desc.c, file: from }
+            : { kind: "tparam", file: from },
+        };
+      case "opaque":
+        return { e: "value", type: OPAQUE };
+      case "elem":
+      case "key": {
+        const container = this.typeOf(desc.x, from, depth + 1);
+        if (container.kind === "external")
+          return { e: "value", type: container };
+        if (container.kind === "cont") {
+          // A single range variable over a channel is its element.
+          const item =
+            desc.k === "key" && !container.ch ? container.key : container.e;
+          if (item)
             return {
-              e: "syms",
-              syms:
-                type.kind === "project"
-                  ? (this.member(type.syms, desc.n, from, depth + 1) ?? [])
-                  : [],
+              e: "value",
+              type: this.typeOf(item, container.file, depth + 1),
             };
-          }
-          const type = this.sameType(
-            base.syms.map((symbol) => this.valueType(symbol, depth + 1)),
-          );
-          return this.memberEntity(type, desc.n, from, depth);
+          // The key of a slice, array or string is an int.
+          return { e: "value", type: { kind: "external", name: "int" } };
         }
-        if (base.e === "value")
-          return this.memberEntity(base.type, desc.n, from, depth);
-        return NONE;
+        return { e: "value", type: UNKNOWN };
       }
+      case "var": {
+        // The declaration fixes the static type; a func value's identity needs every write.
+        const declared = this.denote(desc.d, from, depth + 1);
+        if (declared.e !== "syms" || declared.syms.every(isTypeSymbol))
+          return declared;
+        if (!desc.alts) return NONE;
+        const syms: GraphSymbol[] = [];
+        for (const alt of desc.alts) {
+          const value = this.denote(alt, from, depth + 1);
+          if (value.e !== "syms") return NONE;
+          syms.push(...value.syms);
+        }
+        return { e: "syms", syms: unique(syms) };
+      }
+      case "call":
+        return { e: "value", type: this.callResult(desc, from, depth) };
+      case "sel":
+        return this.select(desc, from, depth);
       default:
         return { e: "value", type: UNKNOWN };
     }
   }
 
-  private memberEntity(
-    type: TypeValue,
-    name: string,
+  private callResult(
+    desc: Extract<Desc, { k: "call" }>,
+    from: string,
+    depth: number,
+  ): TypeValue {
+    const callee = this.denote(desc.f, from, depth + 1);
+    if (callee.e === "external")
+      return { kind: "external", name: `${callee.name}()` };
+    if (callee.e === "value") {
+      const type = callee.type;
+      if (type.kind === "func") {
+        const result = type.r[desc.i];
+        return result ? this.typeOf(result, type.file, depth + 1) : UNKNOWN;
+      }
+      return type.kind === "external" ? type : UNKNOWN;
+    }
+    if (callee.e !== "syms") return UNKNOWN;
+    if (callee.syms.every(isTypeSymbol))
+      return this.typeSyms(callee.syms, depth + 1);
+    const results = callee.syms.map((symbol) => {
+      if (symbol.kind === "function" || symbol.kind === "method") {
+        const data = (symbol.data ?? {}) as { results?: Desc[] };
+        const result = data.results?.[desc.i];
+        return result ? this.typeOf(result, symbol.file, depth + 1) : UNKNOWN;
+      }
+      // A func-typed variable or field.
+      const type = this.valueType(symbol, depth + 1);
+      if (type.kind === "func") {
+        const result = type.r[desc.i];
+        return result ? this.typeOf(result, type.file, depth + 1) : UNKNOWN;
+      }
+      return type.kind === "external" ? type : UNKNOWN;
+    });
+    return this.sameType(results);
+  }
+
+  private select(
+    desc: Extract<Desc, { k: "sel" }>,
     from: string,
     depth: number,
   ): Entity {
+    const base = this.denote(staticDesc(desc.x), from, depth + 1);
+    if (base.e === "pkg") {
+      if (!base.pkgs.length)
+        return { e: "external", name: `${base.path}.${desc.n}` };
+      return {
+        e: "syms",
+        syms: exported(desc.n)
+          ? base.pkgs.flatMap((pkg) => this.packageDecl(pkg, desc.n, from))
+          : [],
+      };
+    }
+    if (base.e === "external")
+      return { e: "external", name: `${base.name}.${desc.n}` };
+    if (base.e === "none") return NONE;
+    if (base.e === "syms" && base.syms.every(isTypeSymbol)) {
+      // Method expression T.M / (*T).M.
+      const type = this.typeSyms(base.syms, depth + 1);
+      if (type.kind === "external")
+        return { e: "external", name: `${type.name}.${desc.n}` };
+      if (type.kind !== "project") return NONE;
+      const found = this.selectName(type.syms, desc.n, from);
+      return found.kind === "found" ? { e: "syms", syms: found.syms } : NONE;
+    }
+    const type =
+      base.e === "value"
+        ? base.type
+        : this.sameType(
+            base.syms.map((symbol) => this.valueType(symbol, depth + 1)),
+          );
+    if (type.kind === "external")
+      return { e: "external", name: `${type.name}.${desc.n}` };
     if (type.kind !== "project") return NONE;
-    const found = this.member(type.syms, name, from, depth + 1);
-    if (!found?.length) return NONE;
-    if (found.every((symbol) => symbol.kind === "field"))
+    const found = this.selectName(type.syms, desc.n, from);
+    if (found.kind !== "found") return NONE;
+    if (found.syms.every((symbol) => symbol.kind === "field"))
       return {
         e: "value",
         type: this.sameType(
-          found.map((symbol) => this.valueType(symbol, depth + 1)),
+          found.syms.map((symbol) => this.valueType(symbol, depth + 1)),
         ),
       };
-    return { e: "syms", syms: found };
+    return { e: "syms", syms: found.syms };
+  }
+
+  // ---- Go's selector rule ------------------------------------------------
+
+  private embedded(
+    type: GraphSymbol,
+  ): { value: TypeValue; pointer: boolean; key: string }[] {
+    return (this.embedsBySource.get(type.id) ?? []).map((link) => {
+      const data = (link.data ?? {}) as { t?: TypeRef; pointer?: boolean };
+      const value = data.t ? this.typeFromRef(data.t, link.file, 1) : UNKNOWN;
+      const key =
+        value.kind === "project"
+          ? value.syms
+              .map((symbol) => symbol.id)
+              .sort()
+              .join(",")
+          : `${value.kind}:${link.file}:${link.range.start}`;
+      return { value, pointer: !!data.pointer, key };
+    });
   }
 
   /**
-   * Fields and methods selected by `name` on project types, at the shallowest
-   * embedding depth. Undefined when an embedded type outside the project could supply it.
+   * Fields and methods named `name` on project types, by the Go spec: the
+   * shallowest embedding depth wins; more than one path at that depth is ambiguous;
+   * an external/unknown embedded type at or above that depth makes the answer
+   * unknown. Unexported names count only when declared in the accessing package.
    */
-  private member(
+  private selectName(
     types: GraphSymbol[],
     name: string,
-    from: string,
-    depth: number,
-    seen = new Set<string>(),
-  ): GraphSymbol[] | undefined {
-    let level = types.filter((type) => !seen.has(type.id));
-    let incomplete = false;
-    for (
-      let step = 0;
-      level.length && step < 6 && depth + step < MAX_DEPTH;
-      step++
-    ) {
-      const found: GraphSymbol[] = [];
-      const next: GraphSymbol[] = [];
-      for (const type of level) {
-        seen.add(type.id);
-        const pkg = this.pkgOf(type);
-        if (!pkg) continue;
-        found.push(
-          ...(
-            this.members.get(`${pkg.key}\u0000${type.name}\u0000${name}`) ?? []
-          ).filter((symbol) => this.visible(symbol, from)),
-        );
-        for (const embedded of this.embeddedTypes(type)) {
-          if (embedded.kind === "project")
-            next.push(...embedded.syms.filter((item) => !seen.has(item.id)));
-          else incomplete = true;
-        }
+    from: string | undefined,
+    access = from === undefined ? undefined : this.files.get(from)?.pkg?.key,
+  ): Selection {
+    const memoKey = `${types
+      .map((type) => type.id)
+      .sort()
+      .join(
+        ",",
+      )}\u0000${name}\u0000${access ?? ""}\u0000${from === undefined ? "" : this.files.get(from)?.fact.test ? `t:${directoryOf(from)}` : "n"}`;
+    const cached = this.selections.get(memoKey);
+    if (cached) return cached;
+    let level: { types: GraphSymbol[]; pointer: boolean; path: string[] }[] = [
+      { types: unique(types), pointer: false, path: [] },
+    ];
+    let externalAt: number | undefined;
+    let result: Selection = { kind: "none" };
+    for (let depth = 0; level.length; depth++) {
+      if (
+        depth > MAX_EMBED_DEPTH ||
+        level.length > MAX_EMBED_PATHS ||
+        (externalAt !== undefined && externalAt <= depth)
+      ) {
+        result = { kind: "unknown" };
+        break;
       }
-      if (found.length) return unique(found);
-      level = unique(next);
+      const occurrences: { syms: GraphSymbol[]; pointer: boolean }[] = [];
+      const next: typeof level = [];
+      for (const node of level) {
+        const syms = unique(
+          node.types.flatMap((type) => {
+            const pkg = this.pkgOf(type);
+            return pkg
+              ? (
+                  this.members.get(
+                    `${pkg.key}\u0000${type.name}\u0000${name}`,
+                  ) ?? []
+                ).filter(
+                  (symbol) =>
+                    this.visible(symbol, from) &&
+                    this.accessible(symbol, access),
+                )
+              : [];
+          }),
+        );
+        if (syms.length) occurrences.push({ syms, pointer: node.pointer });
+        const seen = new Set<string>();
+        for (const type of node.types)
+          for (const item of this.embedded(type)) {
+            if (seen.has(item.key)) continue; // same embedding in build variants
+            seen.add(item.key);
+            if (item.value.kind !== "project") {
+              externalAt ??= depth + 1;
+              continue;
+            }
+            const ids = item.value.syms.map((symbol) => symbol.id);
+            if (ids.some((id) => node.path.includes(id))) continue; // embedding cycle
+            next.push({
+              types: item.value.syms,
+              pointer: node.pointer || item.pointer,
+              path: [...node.path, ...ids],
+            });
+          }
+      }
+      if (occurrences.length === 1) {
+        result = { kind: "found", ...occurrences[0]! };
+        break;
+      }
+      if (occurrences.length > 1) {
+        result = {
+          kind: "ambiguous",
+          syms: unique(occurrences.flatMap((item) => item.syms)),
+        };
+        break;
+      }
+      level = next;
     }
-    return incomplete ? undefined : [];
-  }
-
-  private embeddedTypes(type: GraphSymbol): TypeValue[] {
-    const out: TypeValue[] = [];
-    for (const link of this.embedsBySource.get(type.id) ?? []) {
-      const ref = (link.data as { t?: TypeRef } | undefined)?.t;
-      out.push(ref ? this.typeFromRef(ref, link.file, 1) : UNKNOWN);
-    }
-    return out;
+    if (result.kind === "none" && externalAt !== undefined)
+      result = { kind: "unknown" };
+    this.selections.set(memoKey, result);
+    return result;
   }
 
   // ---- interfaces --------------------------------------------------------
@@ -516,82 +714,78 @@ class GoResolver {
     const pkg = this.pkgOf(iface);
     if (!pkg) return undefined;
     const set = new Map<string, string>();
-    for (const [key, syms] of this.ownMembers(pkg, iface.name))
-      for (const symbol of syms)
-        if (symbol.kind === "method" && symbol.file === iface.file) {
-          const sig = (symbol.data as { sig?: string } | undefined)?.sig;
-          if (sig === undefined) return undefined;
-          set.set(key, this.canonical(sig, symbol.file));
-        }
-    for (const embedded of this.embeddedTypes(iface)) {
-      if (embedded.kind !== "project" || embedded.syms.length !== 1)
+    for (const symbol of this.ownMethods(iface)) {
+      const sig = (symbol.data as { sig?: string } | undefined)?.sig;
+      if (sig === undefined) return undefined;
+      set.set(symbol.name, this.canonical(sig, symbol.file));
+    }
+    for (const item of this.embedded(iface)) {
+      if (item.value.kind !== "project" || item.value.syms.length !== 1)
         return undefined;
-      const inner = embedded.syms[0]!;
+      const inner = item.value.syms[0]!;
       if (inner.kind !== "interface") return undefined;
       const methods = this.interfaceMethods(inner, seen);
       if (!methods) return undefined;
-      for (const [name, sig] of methods) set.set(name, sig);
+      for (const [name, sig] of methods) {
+        if (set.has(name) && set.get(name) !== sig) return undefined;
+        set.set(name, sig);
+      }
     }
     return set;
   }
-  private ownMembersIndex?: Map<string, Map<string, GraphSymbol[]>>;
-  private ownMembers(pkg: Pkg, owner: string): Map<string, GraphSymbol[]> {
-    if (!this.ownMembersIndex) {
-      this.ownMembersIndex = new Map();
-      for (const [key, syms] of this.members) {
-        const [pkgDir, pkgName, typeName, name] = key.split("\u0000");
-        const group = `${pkgDir}\u0000${pkgName}\u0000${typeName}`;
-        let map = this.ownMembersIndex.get(group);
-        if (!map) this.ownMembersIndex.set(group, (map = new Map()));
-        map.set(name!, syms);
+  private ownMethodsIndex?: Map<string, GraphSymbol[]>;
+  private ownMethods(iface: GraphSymbol): GraphSymbol[] {
+    if (!this.ownMethodsIndex) {
+      this.ownMethodsIndex = new Map();
+      for (const symbol of this.symbolsById.values()) {
+        const data = (symbol.data ?? {}) as {
+          owner?: string;
+          interface?: boolean;
+        };
+        if (symbol.kind === "method" && data.interface && data.owner)
+          push2(
+            this.ownMethodsIndex,
+            `${symbol.file}\u0000${data.owner}`,
+            symbol,
+          );
       }
     }
-    return this.ownMembersIndex.get(`${pkg.key}\u0000${owner}`) ?? new Map();
+    return this.ownMethodsIndex.get(`${iface.file}\u0000${iface.name}`) ?? [];
   }
 
-  /** Concrete method set of a named type: name -> {sig, method}, value or pointer receiver set. */
-  private methodSet(
+  /**
+   * Whether `type` (value and pointer method sets) has `name` with signature `sig`,
+   * per the selector rule: unique, a method, and for the value set either a value
+   * receiver or reached through an embedded pointer.
+   */
+  private hasMethod(
     type: GraphSymbol,
-    pointer: boolean,
-    depth = 0,
-  ): Map<string, { sig: string; method: GraphSymbol }> {
-    const set = new Map<string, { sig: string; method: GraphSymbol }>();
-    const pkg = this.pkgOf(type);
-    if (!pkg || depth > 4) return set;
-    for (const method of this.methods.get(`${pkg.key}\u0000${type.name}`) ??
-      []) {
-      const data = (method.data ?? {}) as { pointer?: boolean; sig?: string };
-      if (
-        (pointer || !data.pointer) &&
-        data.sig !== undefined &&
-        !set.has(method.name)
-      )
-        set.set(method.name, {
-          sig: this.canonical(data.sig, method.file),
-          method,
-        });
-    }
-    // Promoted methods from embedded project types (shallower declarations win).
-    for (const [, syms] of this.ownMembers(pkg, type.name))
-      for (const field of syms) {
-        const data = (field.data ?? {}) as {
-          embedded?: boolean;
-          pointer?: boolean;
-          t?: TypeRef;
-        };
-        if (field.kind !== "field" || !data.embedded || !data.t) continue;
-        const inner = this.typeFromRef(data.t, field.file, 1);
-        if (inner.kind !== "project" || inner.syms.length !== 1) continue;
-        const embedded = inner.syms[0]!;
-        if (embedded.kind === "interface") continue;
-        for (const [name, value] of this.methodSet(
-          embedded,
-          pointer || !!data.pointer,
-          depth + 1,
-        ))
-          if (!set.has(name)) set.set(name, value);
-      }
-    return set;
+    name: string,
+    sig: string,
+    access: string | undefined,
+  ): { value: boolean; pointer: boolean } {
+    const found = this.selectName([type], name, undefined, access);
+    if (found.kind !== "found") return { value: false, pointer: false };
+    const methods = found.syms;
+    if (
+      !methods.every((method) => {
+        const data = (method.data ?? {}) as { sig?: string };
+        return (
+          method.kind === "method" &&
+          data.sig !== undefined &&
+          this.canonical(data.sig, method.file) === sig
+        );
+      })
+    )
+      return { value: false, pointer: false };
+    const needsPointer = methods.some((method) => {
+      const data = (method.data ?? {}) as {
+        pointer?: boolean;
+        interface?: boolean;
+      };
+      return !data.interface && !!data.pointer;
+    });
+    return { value: !needsPointer || found.pointer, pointer: true };
   }
 
   private implementsLinks(added: AddedLink[]): void {
@@ -605,24 +799,19 @@ class GoResolver {
       } else if (symbol.kind === "struct" || symbol.kind === "type")
         types.push(symbol);
     }
-    for (const type of types) {
-      const value = this.methodSet(type, false);
-      const pointer = this.methodSet(type, true);
-      if (!pointer.size) continue;
+    for (const type of types)
       for (const { iface, methods } of interfaces) {
-        const matches = (set: Map<string, { sig: string }>) =>
-          [...methods].every(([name, sig]) => {
-            const method = set.get(name);
-            if (!method || method.sig !== sig) return false;
-            return (
-              exported(name) || this.pkgOf(type)?.key === this.pkgOf(iface)?.key
-            );
-          });
-        const byValue = matches(value);
-        if (!byValue && !matches(pointer)) continue;
-        const list = this.implementers.get(iface.id) ?? [];
-        list.push({ type });
-        this.implementers.set(iface.id, list);
+        const access = this.pkgOf(iface)?.key;
+        let byValue = true;
+        let byPointer = true;
+        for (const [name, sig] of methods) {
+          const has = this.hasMethod(type, name, sig, access);
+          byValue &&= has.value;
+          byPointer &&= has.pointer;
+          if (!byPointer) break;
+        }
+        if (!byPointer) continue;
+        push2(this.implementers, iface.id, type);
         added.push({
           key: `implements:${type.key}:${iface.id}`,
           file: type.file,
@@ -634,12 +823,15 @@ class GoResolver {
           targetId: iface.id,
         });
       }
-    }
   }
 
   // ---- link decisions ----------------------------------------------------
 
-  private resolveLink(link: GraphLink): string[] {
+  private definite(syms: GraphSymbol[]): Decision {
+    return { ids: syms.map((symbol) => symbol.id), definite: true };
+  }
+
+  private resolveLink(link: GraphLink): Decision {
     const data = (link.data ?? {}) as {
       expr?: Desc;
       t?: TypeRef;
@@ -649,36 +841,33 @@ class GoResolver {
     switch (link.kind) {
       case "contains": {
         const child = this.byFileKey.get(`${link.file}\u0000${data.child}`);
-        return child ? [child.id] : [];
+        return child ? this.definite([child]) : UNRESOLVED;
       }
       case "imports": {
         const info = this.files.get(link.file);
-        if (!info || !data.path) return [];
-        return this.importTargets(info, data.path)
-          .map((pkg) => pkg.symbol?.id)
-          .filter((id): id is string => !!id);
+        if (!info || !data.path) return UNRESOLVED;
+        return this.definite(
+          this.importTargets(info, data.path)
+            .map((pkg) => pkg.symbol)
+            .filter((symbol): symbol is GraphSymbol => !!symbol),
+        );
       }
       case "receiver": {
         const info = this.files.get(link.file);
-        if (!info?.pkg || !data.t) return [];
-        return this.packageDecl(info.pkg, data.t.n, link.file)
-          .filter((symbol) => TYPE_KINDS.has(symbol.kind))
-          .map((symbol) => symbol.id);
+        if (!info?.pkg || !data.t) return UNRESOLVED;
+        return this.definite(
+          this.packageDecl(info.pkg, data.t.n, link.file).filter(isTypeSymbol),
+        );
       }
       case "embeds":
       case "references":
       case "calls": {
-        if (data.t) {
-          const type = this.typeFromRef(data.t, link.file, 0);
-          return type.kind === "project"
-            ? this.ids(this.declaredTypes(data.t, link.file))
-            : [];
-        }
+        if (data.t) return this.definite(this.declaredTypes(data.t, link.file));
         if (data.expr) return this.resolveExpression(data.expr, link);
-        return [];
+        return UNRESOLVED;
       }
       default:
-        return [];
+        return UNRESOLVED;
     }
   }
 
@@ -690,51 +879,76 @@ class GoResolver {
       return base.e === "pkg" && exported(ref.n)
         ? base.pkgs
             .flatMap((pkg) => this.packageDecl(pkg, ref.n, from))
-            .filter((symbol) => TYPE_KINDS.has(symbol.kind))
+            .filter(isTypeSymbol)
         : [];
     }
     const found = this.lookupName(ref.n, from);
-    return found.e === "syms"
-      ? found.syms.filter((symbol) => TYPE_KINDS.has(symbol.kind))
-      : [];
+    return found.e === "syms" ? found.syms.filter(isTypeSymbol) : [];
   }
 
-  private ids(syms: GraphSymbol[]): string[] {
-    return unique(syms.map((symbol) => symbol.id)).sort();
-  }
-
-  private resolveExpression(desc: Desc, link: GraphLink): string[] {
+  private resolveExpression(desc: Desc, link: GraphLink): Decision {
     if (desc.k === "sel") {
-      const base = this.denote(desc.x, link.file, 0);
-      const type =
-        base.e === "value"
-          ? base.type
-          : base.e === "syms" &&
-              !base.syms.every((symbol) => TYPE_KINDS.has(symbol.kind))
-            ? this.sameType(
-                base.syms.map((symbol) => this.valueType(symbol, 1)),
-              )
-            : undefined;
-      if (type?.kind === "project") {
-        const found = this.member(type.syms, desc.n, link.file, 1);
-        if (!found?.length) return [];
-        const specs = found.filter(
+      const base = this.denote(staticDesc(desc.x), link.file, 0);
+      let type: TypeValue | undefined;
+      if (base.e === "value") type = base.type;
+      else if (base.e === "external")
+        type = { kind: "external", name: base.name };
+      else if (base.e === "syms" && !base.syms.every(isTypeSymbol))
+        type = this.sameType(
+          base.syms.map((symbol) => this.valueType(symbol, 1)),
+        );
+      if (type) return this.member(type, desc.n, link);
+    }
+    const entity = this.denote(desc, link.file, 0);
+    return entity.e === "syms" ? this.definite(entity.syms) : UNRESOLVED;
+  }
+
+  /** `x.name` where x has the given type. */
+  private member(type: TypeValue, name: string, link: GraphLink): Decision {
+    switch (type.kind) {
+      case "project": {
+        const found = this.selectName(type.syms, name, link.file);
+        if (found.kind === "ambiguous")
+          return {
+            ids: found.syms.map((symbol) => symbol.id),
+            definite: false,
+          };
+        if (found.kind !== "found") return UNRESOLVED;
+        const specs = found.syms.filter(
           (symbol) =>
             (symbol.data as { interface?: boolean } | undefined)?.interface,
         );
-        if (specs.length) return this.dispatch(specs, desc.n);
-        return this.ids(found);
+        return specs.length
+          ? this.dispatch(specs, name)
+          : this.definite(found.syms);
       }
-      if (type?.kind === "unknown" && link.kind === "calls")
-        return this.byName(desc.n, link.file);
-      if (type) return [];
+      case "tparam": {
+        // Only the constraint's methods are callable; it must be among the candidates.
+        if (!type.c) return UNRESOLVED;
+        const constraint = this.typeFromRef(type.c, type.file, 1);
+        if (constraint.kind !== "project") return UNRESOLVED;
+        const found = this.selectName(constraint.syms, name, link.file);
+        if (found.kind !== "found") return UNRESOLVED;
+        const specs = found.syms.filter(
+          (symbol) =>
+            (symbol.data as { interface?: boolean } | undefined)?.interface,
+        );
+        return specs.length === found.syms.length
+          ? this.dispatch(specs, name)
+          : UNRESOLVED;
+      }
+      case "unknown":
+        return link.kind === "calls"
+          ? this.byName(name, link.file)
+          : UNRESOLVED;
+      default:
+        // external, opaque, containers, func values: nothing in the project to offer.
+        return UNRESOLVED;
     }
-    const entity = this.denote(desc, link.file, 0);
-    return entity.e === "syms" ? this.ids(entity.syms) : [];
   }
 
   /** A call through an interface value: the interface method or any structural implementer. */
-  private dispatch(specs: GraphSymbol[], name: string): string[] {
+  private dispatch(specs: GraphSymbol[], name: string): Decision {
     const targets: GraphSymbol[] = [...specs];
     let implementations = 0;
     for (const spec of specs) {
@@ -746,25 +960,26 @@ class GoResolver {
               symbol.kind === "interface" && symbol.file === spec.file,
           )
         : undefined;
-      for (const { type } of iface
-        ? (this.implementers.get(iface.id) ?? [])
-        : []) {
-        const method = this.methodSet(type, true).get(name)?.method;
-        if (method) {
-          targets.push(method);
+      for (const type of iface ? (this.implementers.get(iface.id) ?? []) : []) {
+        const found = this.selectName([type], name, undefined, pkg?.key);
+        if (found.kind === "found") {
+          targets.push(...found.syms);
           implementations++;
         }
       }
     }
-    if (!implementations) return [];
-    const ids = this.ids(targets);
-    return ids.length > CANDIDATE_LIMIT ? [] : ids;
+    if (!implementations) return UNRESOLVED;
+    return {
+      ids: targets.map((symbol) => symbol.id),
+      definite: false,
+      limit: DISPATCH_LIMIT,
+    };
   }
 
   /** Unknown receiver: every concrete method of that name in packages reachable from the caller. */
-  private byName(name: string, from: string): string[] {
+  private byName(name: string, from: string): Decision {
     const info = this.files.get(from);
-    if (!info?.pkg) return [];
+    if (!info?.pkg) return UNRESOLVED;
     const reachable = this.reachableFrom(info.pkg.key);
     const found = (this.methodsByName.get(name) ?? []).filter((symbol) => {
       const pkg = this.pkgOf(symbol);
@@ -775,8 +990,10 @@ class GoResolver {
         (exported(name) || pkg.key === info.pkg!.key)
       );
     });
-    const ids = this.ids(found);
-    return ids.length >= 2 && ids.length <= CANDIDATE_LIMIT ? ids : [];
+    // Never definite: a single possibility stays unresolved (interface gap 3).
+    return found.length >= 2
+      ? { ids: found.map((symbol) => symbol.id), definite: false }
+      : UNRESOLVED;
   }
 
   private reachableFrom(start: string): Set<string> {
@@ -801,6 +1018,13 @@ class GoResolver {
   }
 }
 
+/** A reassigned local's static type comes from its declaration. */
+function staticDesc(desc: Desc): Desc {
+  return desc.k === "var" ? desc.d : desc;
+}
+function isTypeSymbol(symbol: GraphSymbol): boolean {
+  return TYPE_KINDS.has(symbol.kind);
+}
 function push(
   map: Map<string, Map<string, GraphSymbol[]>>,
   outer: string,

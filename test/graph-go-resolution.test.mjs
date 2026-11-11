@@ -1,84 +1,7 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
 import { test } from "node:test";
-import {
-  LanguageRegistry,
-  SqliteGraphStore,
-  indexProject,
-} from "../dist/graph/index.js";
-import go from "../dist/graph/languages/go/index.js";
+import { call, one, project } from "./fixtures/graph-go/harness.mjs";
 
-/** Indexes a small project and returns readable link facts. */
-async function project(files, steps = []) {
-  const scratch = await mkdtemp(join(tmpdir(), "pymtheg-graph-go-"));
-  const root = join(scratch, "project");
-  const store = new SqliteGraphStore(join(scratch, "graph.sqlite"), "go-test");
-  const write = async (path, text) => {
-    await mkdir(dirname(join(root, path)), { recursive: true });
-    await writeFile(join(root, path), text);
-  };
-  try {
-    await mkdir(root);
-    for (const [path, text] of Object.entries(files)) await write(path, text);
-    const snapshots = [];
-    for (const step of [null, ...steps]) {
-      if (step)
-        for (const [path, text] of Object.entries(step))
-          await write(path, text);
-      const report = await indexProject(
-        root,
-        new LanguageRegistry([go]),
-        store,
-      );
-      assert.deepEqual(report.errors, []);
-      assert.deepEqual(report.analysisErrors, []);
-      assert.deepEqual(report.resolutionErrors, []);
-      const symbols = store.findSymbols();
-      const name = (id) => {
-        const symbol = symbols.find((item) => item.id === id);
-        return symbol
-          ? `${symbol.file}:${symbol.kind}:${symbol.identity}`
-          : null;
-      };
-      const links = store
-        .links()
-        .sort(
-          (a, b) =>
-            (a.file < b.file ? -1 : a.file > b.file ? 1 : 0) ||
-            a.range.start - b.range.start,
-        )
-        .map((link) => ({
-          file: link.file,
-          kind: link.kind,
-          targetName: link.targetName,
-          at: store
-            .getFile(link.file)
-            .text.slice(link.range.start, link.range.end),
-          target: name(link.targetId),
-          candidates: link.candidates.map((item) => name(item.id)).sort(),
-          data: link.data,
-        }));
-      snapshots.push({ report, symbols, links });
-    }
-    return steps.length ? snapshots : snapshots[0];
-  } finally {
-    store.close();
-    await rm(scratch, { recursive: true, force: true });
-  }
-}
-const one = (links, predicate, label) => {
-  const found = links.filter(predicate);
-  assert.equal(found.length, 1, `${label}: ${JSON.stringify(found)}`);
-  return found[0];
-};
-const call = (links, file, at) =>
-  one(
-    links,
-    (link) => link.kind === "calls" && link.file === file && link.at === at,
-    `${file} ${at}`,
-  );
 const MOD = "module example.com/m\n\ngo 1.22\n";
 
 test("same-package functions resolve across files; other packages and test-only files do not", async () => {
@@ -243,12 +166,13 @@ test("method calls resolve only where the receiver type is syntactically evident
       "func (b *B) Run() {}",
       "func NewA() A { return A{} }",
       "func (a A) Field() { a.b.Run() }",
+      "type List []A",
       "",
     ].join("\n"),
     "p/use.go": [
       "package p",
       'import "bytes"',
-      "func Use(x interface{}, buf bytes.Buffer, fn func() A) {",
+      "func Use(x interface{}, buf bytes.Buffer, fn func() A, l List) {",
       "\tvar a A",
       "\ta.Run()",
       "\tb := &B{}",
@@ -263,6 +187,7 @@ test("method calls resolve only where the receiver type is syntactically evident
       "\tfor _, v := range []A{} { v.Run() }",
       "\tbuf.Write(nil)",
       "\tfn().Run()",
+      "\tfor _, w := range l { w.Run() }",
       "}",
       "",
     ].join("\n"),
@@ -282,17 +207,15 @@ test("method calls resolve only where the receiver type is syntactically evident
     call(links, "p/types.go", "a.b.Run").target,
     "p/types.go:method:(*B).Run",
   );
-  // Ambiguous: a range variable has no evident type; both Run methods are candidates.
-  assert.deepEqual(run("v.Run").candidates, [
+  // Element types of written container types and results of func-typed values are evident.
+  assert.equal(run("v.Run").target, "p/types.go:method:(A).Run");
+  assert.equal(run("fn().Run").target, "p/types.go:method:(A).Run");
+  // Ambiguous: ranging over a named project slice type (element type not tracked).
+  assert.deepEqual(run("w.Run").candidates, [
     "p/types.go:method:(*B).Run",
     "p/types.go:method:(A).Run",
   ]);
-  assert.equal(run("v.Run").target, null);
-  // Calling a func-typed parameter: its result type is not evident (no signature tracking of func values).
-  assert.deepEqual(run("fn().Run").candidates, [
-    "p/types.go:method:(*B).Run",
-    "p/types.go:method:(A).Run",
-  ]);
+  assert.equal(run("w.Run").target, null);
   // Negative: a known external receiver type never yields project candidates.
   assert.equal(run("buf.Write").target, null);
   assert.deepEqual(run("buf.Write").candidates, []);
