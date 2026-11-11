@@ -188,7 +188,15 @@ The manager keeps this table current. It is the single record of who holds which
 
 | Chunk | Status | Builder | Reviewer | Branch | Pull request | Owned paths held |
 |---|---|---|---|---|---|---|
-| — | Not started | — | — | — | — | — |
+| W0-2 Dependencies | building | Sol 6.1 | — | `w0-2-graph-dependencies` | — | `package.json`, `package-lock.json`, `scripts/grammar-check.mjs` |
+| W1-A Ownership disagreement | building | Opus 5.5 | — | `w1-a-ownership-agreement` | — | `src/analysis/ownership.ts`, `src/behaviour/flow.ts`, `test/ownership-agreement.test.mjs` |
+| W1-B Engine core | building | Sol 6.1 | — | `w1-b-engine-core` | — | `src/behaviour/explore*.ts`, `test/explore*.test.mjs` |
+| W1-E Machines and contracts | building | Opus 5.5 | — | `w1-e-mixed-file-contracts` | — | `src/contracts/document.ts`, `implementation-check.ts`, `manifest.ts`, `test/contracts-mixed-file.test.mjs` |
+| W1-C Graph store and interface | cut, waits for W0-2 | — | — | — | — | `src/graph/**` except `languages/*/` |
+| W1-D Document import | cut, next free slot | — | — | — | — | `src/shared/document-selection.ts`, `src/architecture/import-policy.ts`, `src/cli/import-summary.ts`, `src/architecture/store.ts` |
+| W1-F Two investigations | cut, next free slot | — | — | — | — | `evidence/w1-f/` |
+
+Each chunk also owns its own `evidence/<chunk-id>/` folder and `docs/changes/<chunk-id>.md`.
 
 Status values: cut, building, in review (round 1 or 2), changes needed, merged, escalated, dropped.
 
