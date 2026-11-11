@@ -3,7 +3,7 @@ import type { ContextFile } from "../../types.js";
 
 export interface Crate {
   root: string;
-  kind: "lib" | "bin";
+  kind: "lib" | "bin" | "example" | "test" | "bench" | "build";
   name: string;
   manifest: string;
   deps: Map<string, string>;
@@ -26,11 +26,18 @@ export function crates(
           .match(
             /\[\[?[^\n]+|[\w.-]+\s*=\s*(?:\[[\s\S]*?\]|\{[^}]*\}|[^\n]*)/g,
           ) ?? [];
-      let bin = 0;
+      const targetCounts = new Map<string, number>();
       for (const statement of statements) {
         if (statement.startsWith("[")) {
           section = statement.trim().replace(/^\[+|\]+$/g, "");
-          if (statement.startsWith("[[bin]]")) section = `bin.${bin++}`;
+          const target = /^\[\[(bin|example|test|bench)\]\]/.exec(
+            statement,
+          )?.[1];
+          if (target) {
+            const ordinal = targetCounts.get(target) ?? 0;
+            targetCounts.set(target, ordinal + 1);
+            section = `${target}.${ordinal}`;
+          }
           sections.set(section, sections.get(section) ?? {});
         } else {
           const m = /^([\w.-]+)\s*=\s*([\s\S]*)/.exec(statement);
@@ -79,6 +86,19 @@ export function crates(
         return matches(workspace.members) && !matches(workspace.exclude);
       })
       .sort((a, b) => b.dir.length - a.dir.length)[0];
+  const docsByPath = new Map(docs.map((d) => [d.path, d]));
+  const automaticPaths = new Map<string, string[]>();
+  for (const path of paths) {
+    const dirs = [
+      p.dirname(path),
+      ...(p.basename(path) === "main.rs" ? [p.dirname(p.dirname(path))] : []),
+    ];
+    for (const dir of dirs) {
+      const list = automaticPaths.get(dir) ?? [];
+      list.push(path);
+      automaticPaths.set(dir, list);
+    }
+  }
   const roots: Crate[] = [];
   for (const doc of docs) {
     const pkg = doc.sections.get("package");
@@ -87,10 +107,21 @@ export function crates(
     const workspace = workspaceFor(doc.dir);
     const workspacePath = workspace?.path ?? null;
     const deps = new Map<string, string>();
-    const dependency = (alias: string, path: string) => {
+    const buildDeps = new Map<string, string>();
+    let dependencyMap = deps;
+    const dependency = (alias: string, path: string, renamed: boolean) => {
+      const target = docsByPath.get(path);
+      if (target && !renamed)
+        alias =
+          literal(target.sections.get("lib")?.name) ??
+          literal(target.sections.get("package")?.name) ??
+          alias;
       alias = alias.replace(/-/g, "_");
-      const previous = deps.get(alias);
-      deps.set(alias, previous === undefined || previous === path ? path : "");
+      const previous = dependencyMap.get(alias);
+      dependencyMap.set(
+        alias,
+        previous === undefined || previous === path ? path : "",
+      );
     };
     for (const [section, values] of doc.sections) {
       if (
@@ -99,6 +130,7 @@ export function crates(
         )
       )
         continue;
+      dependencyMap = section.endsWith("build-dependencies") ? buildDeps : deps;
       const entries: [string, string][] = Object.entries(values).map(
         ([alias, raw]) =>
           alias.endsWith(".workspace") && raw === "true"
@@ -116,20 +148,22 @@ export function crates(
             workspace && depPath
               ? p.join(workspace.dir, depPath, "Cargo.toml")
               : "",
+            /package\s*=/.test(value),
           );
         } else {
           const depPath = /path\s*=\s*["']([^"']+)["']/.exec(value)?.[1];
           dependency(
             alias,
             depPath ? p.join(doc.dir, depPath, "Cargo.toml") : "",
+            /package\s*=/.test(value),
           );
         }
       }
     }
     const lib = doc.sections.get("lib");
     const libRoot = p.join(doc.dir, literal(lib?.path) ?? "src/lib.rs");
-    const libName = literal(lib?.name) ?? name.replace(/-/g, "_");
-    if (paths.has(libRoot))
+    const libName = (literal(lib?.name) ?? name).replace(/-/g, "_");
+    if (paths.has(libRoot) && (lib || pkg?.autolib !== "false"))
       roots.push({
         root: libRoot,
         kind: "lib",
@@ -157,6 +191,7 @@ export function crates(
         });
     }
     if (
+      pkg?.autobins !== "false" &&
       paths.has(p.join(doc.dir, "src/main.rs")) &&
       !roots.some((r) => r.root === p.join(doc.dir, "src/main.rs"))
     )
@@ -168,6 +203,59 @@ export function crates(
         workspace: workspacePath,
         deps: new Map([...deps, [libName, doc.path]]),
       });
+    const targetDeps = new Map([...deps, [libName, doc.path]]);
+    const addTarget = (
+      root: string,
+      targetName: string,
+      kind: Crate["kind"],
+    ) => {
+      if (paths.has(root) && !roots.some((c) => c.root === root))
+        roots.push({
+          root,
+          name: targetName.replace(/-/g, "_"),
+          kind,
+          manifest: doc.path,
+          workspace: workspacePath,
+          deps: kind === "build" ? buildDeps : targetDeps,
+        });
+    };
+    for (const kind of ["example", "test", "bench"] as const)
+      for (const [section, values] of doc.sections) {
+        if (!section.startsWith(kind + ".")) continue;
+        const targetName = literal(values.name);
+        const dir = { example: "examples", test: "tests", bench: "benches" }[
+          kind
+        ];
+        if (targetName)
+          addTarget(
+            p.join(doc.dir, literal(values.path) ?? `${dir}/${targetName}.rs`),
+            targetName,
+            kind,
+          );
+      }
+    for (const [dir, kind, flag] of [
+      ["src/bin", "bin", "autobins"],
+      ["examples", "example", "autoexamples"],
+      ["tests", "test", "autotests"],
+      ["benches", "bench", "autobenches"],
+    ] as const) {
+      if (pkg?.[flag] === "false") continue;
+      const prefix = p.join(doc.dir, dir) + "/";
+      for (const path of automaticPaths.get(p.join(doc.dir, dir)) ?? [])
+        if (path.startsWith(prefix)) {
+          const relative = path.slice(prefix.length);
+          if (/^[^/]+\.rs$/.test(relative))
+            addTarget(path, relative.slice(0, -3), kind);
+          else if (/^[^/]+\/main\.rs$/.test(relative))
+            addTarget(path, relative.split("/")[0]!, kind);
+        }
+    }
+    if (pkg?.build !== "false")
+      addTarget(
+        p.join(doc.dir, literal(pkg?.build) ?? "build.rs"),
+        "build_script_build",
+        "build",
+      );
   }
   return roots;
 }

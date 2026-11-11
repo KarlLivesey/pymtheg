@@ -1,153 +1,171 @@
 # W2-C: Rust language module for the code graph
 
-Implements mega-plan 4.4's structural Rust graph reader. Production discovery
-finds `src/graph/languages/rust/index.ts` without a core registration change.
-This is graph extraction, not the later Stage 7 contract/behaviour support claim.
-No CLI, MCP, Studio, compiler, package or shared graph interface changed.
+Review revision, module version 2. Implements mega-plan 4.4's structural Rust
+reader in one discoverable folder. Current origin/main was merged normally;
+PR 15's shared discovery-test fix is included. No graph interface, other
+language, CLI, MCP, Studio, dependency manifest or toolchain was changed by W2-C.
+Earlier implementation/test/audit records remain in `evidence/w2-c/` as history;
+the `review-*` records below supersede their completion claims.
 
-## Snapshot and parser boundary
+## Snapshot, identity and parser boundaries
 
-Claims case-sensitive `.rs` files; separately captures every `Cargo.toml`.
-Uses the installed `tree-sitter-rust` WASM and bundled tags query through the
-shared Tree-sitter helper. The definition mapping suppresses the bundled
-function/method duplicates; a live-tree pass emits scoped definitions exactly
-once. Nodes never escape parsing and parser/query/tree resources are freed.
-No Cargo, rustc, rust-analyzer, native compilation, project execution, or project
-filesystem reads occur in the module. Tests also run parsing/resolution with an
-empty executable PATH.
+Claims case-sensitive `.rs`; captures `Cargo.toml` as context. The installed
+`tree-sitter-rust` WASM and bundled tags query load through the shared helper.
+The definition mapping filters the bundled function/method duplicates; the live
+AST pass emits each scoped declaration once. Trees/nodes never escape parsing.
+No Cargo, rustc, rust-analyzer, native compilation, project execution or project
+filesystem reads occur inside the module. Analysis reuses parsed snapshot facts.
 
-Syntax errors retain extracted facts with `partial` status and diagnostics.
-Missing/failed grammar loading is a visible parse failure. Configuration attributes
-are retained as data; all syntactically present cfg branches, including test
-modules, are indexed. This does not select a Cargo feature configuration or
-prove that the captured program compiles. Privacy is recorded, never filtered:
-private declarations and private cross-module references are ordinary graph facts.
+Ranges are exact half-open UTF-16 offsets. Core IDs combine project/module/file,
+kind, position-independent scoped identity and duplicate ordinal. `$crate` is the
+file unit (graph kind `module`); `data.unitKind` distinguishes crate roots.
+Cargo-derived crate name, manifest, workspace and target kind are unit data.
+Impl identities retain self type, generics and trait: `impl A::new`,
+`impl B::new`, `impl Speak for A::f`, `impl<T> Wrap<T>::new`. Anonymous blocks use
+scope-local structural ordinals. Raw identifiers normalize `r#name` to `name` in
+names/identities/lookup; source spans still cover their original spelling.
+Visibility and attributes remain data; private items are never dropped. This is
+structural observation, not a Rust compilation or visibility-access check.
+
+Syntax errors remain partial with diagnostics; failed grammar loading remains a
+failure. Both sides of cfg alternatives, including cfg(test), remain captured.
+No feature/platform selection, macro expansion or generated-source execution
+occurs. Partial target provenance remains visible through the shared graph API.
 
 ## Construct matrix
 
-| Construct | Result |
+| Construct | Definite / candidates / unresolved / not extracted |
 |---|---|
-| File/crate units, inline/file modules, functions, structs, enums/variants, traits/default and required methods, impls, aliases, const/static, macro_rules | Symbols and definite `contains` links; full declaration UTF-16 spans |
-| `mod name;`, `name.rs`, `name/mod.rs`, literal `#[path = "..."]`, nested/inline module layout | Definite module-file links; conflicting captured layouts become candidates; absent files unresolved |
-| Literal Cargo package/lib/bin paths, default lib/main, named `[[bin]]` | Crate roots; a package binary can reference its library |
-| Workspace members (including segment globs/excludes), literal path dependencies, aliases, workspace-inherited path dependencies, dependency subtables | Snapshot context; cross-crate links when the referenced library is captured |
-| `use`, crate/self/super paths, nested groups, renames, module aliases | Definite where captured declarations/import facts determine a target; missing imports unresolved |
-| Glob members | Definite after enumerating known module contents; collisions are candidates; an opaque glob prevents a sole known member becoming definite. The glob import edge itself retains its `*` path unresolved |
-| Bare and path-qualified free calls, associated calls through resolved nominal types | Definite, or candidates for competing declarations; external/absent paths unresolved |
-| Receiver with a simple explicit parameter/local type, `self` in an impl, immediate struct literal | Inherent method resolves for that type; associated functions lacking a self parameter cannot be called as methods |
-| Unknown/inferred receiver, trait object, generic type parameter, trait-only method selection | Unresolved, or multiple structurally matching explicit trait implementations as candidates; no type inference or trait solver |
-| Syntactic type references and `impl Trait for Type` | Type/implements links where the path resolves; generic parameters and external types retain unresolved names |
-| Local macro_rules invocation after a visible definition | Definite project macro link; forward/absent/external macro names unresolved |
-| Local bindings shadowing callable names | Suppress imported/free-function resolution; block containment keeps local bindings/imports from leaking |
-| Reexports | Simple captured module reexports are followed; cyclic/complex/opaque chains can remain unresolved |
-| Standard library, registry dependencies, uncaptured path crates | Unresolved with original path kept |
-| Macro expansion and declarations/calls inside token trees | Not extracted; macro definition and invocation themselves are extracted |
+| Files/crates/modules; functions; structs/enums/variants; traits/methods/default bodies; impls; aliases; const/static; macro_rules | Symbols and `contains`; private declarations included |
+| Named-field vs tuple/unit constructors | Constructor-form metadata and separate type/value/macro lookup; a type-only item cannot capture a value call |
+| File and inline modules, including declarations inside functions | Module places and barriers; bare names never walk out of a module into an enclosing function/module |
+| `name.rs`, `name/mod.rs`, literal `#[path]` | Definite module-file links, or candidates for conflicting layouts; path-loaded files find children beside themselves, like mod.rs |
+| Cargo library/default main/explicit bin/example/test/bench targets | Crate roots from captured manifests |
+| Automatic `src/bin/*.rs`, `examples/*.rs`, `tests/*.rs`, `benches/*.rs`, and their `name/main.rs` forms | Proper crate roots, respecting auto-target flags; explicit targets still work with auto-discovery disabled |
+| Default/custom build.rs | Build crate root, using build dependencies; not executed |
+| Workspace members/globs/excludes, literal path dependencies, workspace dependencies, dependency subtables | Cross-crate lookup when libraries are captured; non-renamed dependencies use the target lib name, explicit `package` renames use the key; hyphens normalize to underscores |
+| `use`, nested groups, aliases, self/super/crate and absolute external paths | Namespace-aware lookup; explicit imports of unknown external bindings block fallback guesses |
+| Multi-hop reexports and parents' imports, including across path crates | Imports and use sites use the same recursive resolver in the destination's owning crate |
+| Glob member names | Resolve from known module contents; complete collisions become candidates; opaque alternatives remain unresolved. The glob import's own edge stays unresolved (backlog) |
+| Mixed-namespace imports | A binding can import type/value/macro names simultaneously; the single import edge stays unresolved when it would otherwise assert just one of different kinds. Use sites select their own namespace |
+| Free and associated calls | Definite when namespace/type/member facts determine one target; competing captured targets become candidates |
+| Explicit parameter/local receiver types and self | Preserve annotation scope, borrow/mutability and full generic syntax. Incompatible concrete generic arguments, inapplicable mutable/value receivers and mismatched argument counts are rejected |
+| Generic impl substitution, inferred/unknown receiver, trait object | Unresolved when applicability cannot be established; no inference, bounds solver or arbitrary autoderef |
+| Trait-only instance/associated calls | One matching implementation stays unresolved. Multiple complete known choices are candidates, including inherited default bodies; an unknown trait/default alternative prevents an incomplete candidate set |
+| Trait-in-scope selection | Not used to assert dispatch; captured applicable trait choices are conservatively retained. There is no general trait solver |
+| Type references and explicit trait implementations | Namespace-correct `types` / `implements` links |
+| Qualified match/if-let patterns | `patterns` links to variants, struct constructors and const/static values, rather than rejected type references |
+| Local callable-name shadowing | Binding evidence prevents imported/free-function guesses; lexical blocks preserve local scope |
+| Local macro_rules invocation after its definition | Project macro link; forward/absent/external names unresolved |
+| Standard library, registry packages, uncaptured path crates | Unresolved with the name/path retained |
+| Macro token-tree contents, proc-macro/derive expansion, generated declarations | Not extracted; definition/invocation syntax is captured without expansion |
 
-This is intentionally syntactic analysis. It does not implement Cargo feature
-selection, build scripts, generated modules, proc macros, Rust name/type checking,
-method autoderef, specialization, type-alias expansion for method lookup, generic substitution, closure inference or
-runtime dispatch. Trait default bodies are symbols, but inheritance of a default
-body into an impl is not synthesized. Macro export/import expansion and arbitrary
-macro textual-scope propagation across files are not implemented. A loose source
-file outside any captured Cargo/module tree still has symbols/containment, but
-its name links stay unresolved.
+The Cargo reader handles this literal context subset, not full TOML/Cargo
+semantics. Escaped/nonliteral paths, automatic workspace membership inference,
+platform activation, feature selection and generated targets are not evaluated.
+Conflicting platform-specific aliases stay unresolved. Files outside a captured
+Cargo root/module tree retain symbols/containment without invented membership.
+Nested fixture/support files are not automatically made targets merely because
+they live somewhere under tests/examples/benches; Cargo's target layouts apply.
 
-The Cargo reader accepts the context subset above, not the full TOML language.
-Auto-discovered `src/bin`/examples/tests/benches beyond default main and explicit
-`[[bin]]`, auto-added workspace members, nonliteral/escaped target paths and
-full Cargo target-specific dependency activation are not modeled. Conflicting
-platform-specific dependency aliases stay unresolved rather than selecting the
-last manifest branch. Captured files
-outside a declared crate tree remain extractable without invented membership.
+Method lookup does not expand type aliases, solve trait bounds/specialization,
+infer closure/results/chained receiver types or implement arbitrary Deref.
+Macro export/import expansion and arbitrary cross-file textual macro scope are
+not implemented. Private symbol availability does not prove legal access.
 
-## Identity scheme
+## Completeness and interface limits
 
-Core IDs combine project, module, file, kind and the module's scoped identity,
-plus the core's source-order ordinal for repeated identical declarations.
-The file unit is `$crate` with graph kind `module`; `data.unitKind` distinguishes
-Cargo crate roots from module files. A snapshot-only analysis pass adds the
-Cargo crate name, lib/bin target kind, manifest and workspace to root-unit data;
-it reuses parsed facts and never reparses source. Declarations use enclosing
-names joined with `::`.
-Impl containers include generic syntax, implemented trait (when present) and
-self type: `impl A::new`, `impl B::new`, `impl Speak for A::speak`, and
-`impl<T> Wrap<T>::new` are separate identities. Anonymous nested blocks use
-scope-local structural ordinals; comment/whitespace insertions do not enter IDs.
-Inserting/reordering anonymous blocks can change their ordinal, as with repeated
-same-identity declarations. File-local keys contain positions solely for wiring
-sources/containment and are not persistent identities. Visibility and attributes
-are JSON facts.
+An existing link decision can represent one target or a one-of set of at least
+two targets. One known target plus an unknown alternative remains unresolved;
+so do multiple known choices when an unknown trait/glob could supply the true
+missing target. Inherited project trait default bodies are included before
+forming candidate sets. A single trait impl is never converted to definite
+merely because no second captured method exists.
 
-## Interface gaps
+A Rust import can bind several namespaces at once. This module does not invent
+a one-of decision for simultaneous bindings; its import edge remains unresolved
+and its uses resolve by namespace. Additional namespace-specific import edges
+could be a later enhancement. No frozen-core workaround was required.
 
-The frozen interface requires at least two candidate IDs. A single known target
-with an opaque glob/trait-selection alternative cannot be represented as a
-one-element candidate set plus unknown alternatives. For example
-`use crate::known::*; use external::*; f();` retains `f` unresolved when only
-`known::f` is captured. No definite target is invented. Multiple known candidates
-remain explicit candidates; consumers must not infer an exhaustive Rust type
-analysis from the set.
+## Resolution scaling
 
-No other core change was needed. Source/context capture failures and parser
-partial provenance use the existing interface. The module does not change the
-support matrix/decision ledger directly because those paths belong to the wave
-integration chunk; this fragment is the proposed graph support record.
+Imports are indexed by file/scope/alias and glob group; module declarations and
+places by file/local scope; methods by nominal type/name; packages by manifest.
+Lookups memoize completed results, with recursion guards for cyclic/opaque
+imports. Binding facts are collected once per function, indexed by lexical scope
+and name, and queried through ancestor scopes with binary search on activation.
+There is no per-lookup scan of all project imports/places or rescan of a whole
+function body. Work still depends on path depth, local candidates and reexports;
+no elapsed-time bound is a correctness assertion.
 
-## Validation and evidence
+`performance-baseline/` preserves the corrected semantic implementation using
+project-wide import/place scans and function rescans. The comparison runner
+asserts every parsed fact and every resolved/unresolved/candidate decision is
+identical on the complete fixture and both Vector crates. It compares entire
+outputs, not just counts. In the final paired two-crate observation, baseline
+parse/resolve took 5.008/1.027 s; indexed/cached parse/resolve took 3.527/0.254 s.
+Hashes and reproducible commands are in the performance evidence.
 
-The fixture workspace includes both file module layouts, an inline and a path
-module, two crates with a path dependency, explicit lib/bin targets, private
-sibling calls, nested/renamed/glob imports, cfg(test), generics, distinct impls,
-trait defaults/implementors, macros, shadowing, unknown trait dispatch and a
-syntax-error file. The exact-position conformance manifest includes every
-symbol/link, Unicode-before-declaration, unresolved controls and candidate sets.
-Separate tests assert resolution rules and negative lookalikes, context-only
-edits, stable IDs after comment insertion, and resource-independent behavior.
+## Vector evidence and movement
 
-Real-project counts and sampled-link review are recorded under `evidence/w2-c/`.
-The initial two-crate experiment was interrupted after all 131 files parsed
-(4,382 symbols, 25,956 links) because method lookup repeatedly scanned all impl
-blocks. That experiment is not a successful index. The final module builds a
-per-snapshot method index instead; it does not change core performance code.
+Vector commit `515e87d9861b564f521a8992d224892cd8cae120`, shallow-cloned only in
+scratch. Every one of its 1,563 Rust files was analyzed directly through the
+module: 1,552 clean, 11 partial, **0 failed**. No source subset is described as a
+whole-store success. Exact per-kind counts and top unresolved names are in
+`review-whole-summary.json`; partial paths/diagnostics are retained separately.
+Grammar limitations include attributes in patterns, some qualified generic and
+higher-ranked syntax, and `raw` token contexts. They are not relabeled clean.
 
-The existing `test/graph-review.test.mjs` A10 test asserts that production
-`discoverLanguages()` prints an empty registry (`[]`). Rust correctly changes
-that output to `['rust']`, while the test-only toy remains hidden. A10 passes
-on an archived, unchanged `origin/main`; it fails with this module present.
-Updating that shared test is outside W2-C ownership. The PR therefore reports
-the full-suite failure explicitly and requires the integration owner to update
-that expectation. It is not described as a passing check or dismissed as a
-failure already present on main.
+| Scope / revision | Files | Symbols | Links | Resolved | Candidate sets | Unresolved |
+|---|---:|---:|---:|---:|---:|---:|
+| Reviewed d60ac141, two crates | 131 | 4,382 | 25,956 | 8,955 | 20 | 16,981 |
+| Current two crates | 131 | 4,382 | 27,261 | 10,611 | 20 | 16,630 |
+| Current nine crates | 247 | 7,157 | 46,944 | 17,652 | 40 | 29,252 |
+| Current whole repository, module only | 1,563 | 35,907 | 311,132 | 107,020 | 1,091 | 203,021 |
 
-The real-source audit also found a bare-call scope error in log_event.rs:
-`size_of::<Self>()` was initially linked to the enclosing impl method instead
-of remaining an external std::mem::size_of call. The corrected resolver keeps
-all impl/trait members (including associated types) outside bare lexical name
-lookup. Explicit method/associated-function calls use the separate member index.
-The incorrect earlier sample is preserved, investigated, and superseded by a
-new 20-resolved/10-unresolved sample. See `vector-audit-findings.md`.
+On the same two-crate snapshot, 1,042 old unresolved references now resolve:
+551 types, 270 calls, 149 converted patterns, 47 imports, 23 implements and two
+modules. At least 459 use-site gains point to a target whose import was already
+resolved before, directly exposing the import/use-site reexport mismatch.
+Another 1,305 pattern edges are newly extracted (730 resolved, 575 unresolved).
+Stricter namespace/applicability rules withhold 116 old definite links (66 calls,
+37 imports, 13 types). No old definite link retargeted to a different symbol.
+The complete positional movement list, including losses, is preserved.
 
-Receiver evidence preserves the annotation's lexical scope: a parameter `x: A`
-keeps the outer A even if the function body declares another A. Signature types
-are resolved outside the body item scope, and Self paths use the impl's defining
-scope. This is syntactic provenance, not inference of unannotated bindings.
+Observed module parse/resolve times were 3.527/0.254 s for two crates,
+7.641/0.395 s for nine, and 35.734/3.627 s for all files. The whole module run's
+wall time was 44.106 s. These are shared-machine observations, not speed-based
+properties; paired comparison wall time also includes the baseline execution.
 
-Final Vector scope: the complete `lib/vector-common/` and `lib/vector-core/`
-crate directories plus root Cargo.toml context, at commit
-`515e87d9861b564f521a8992d224892cd8cae120`. This is 131 of the checkout's 1,563
-Rust files; whole-repository indexing was not attempted or claimed. All 131
-claimed files parsed cleanly (0 partial, 0 failed), producing 4,382 symbols and
-25,956 links: 8,955 resolved, 20 candidate sets, 16,981 unresolved. No parser,
-analysis or resolution errors. The final run took approximately 74.9 seconds on
-this shared machine, an observation only. The 20-resolved/10-unresolved audit
-passes after the documented fix. Counts by kind, the ten most common unresolved
-names, exact sample locations, seed and review judgments are retained in evidence.
+A bounded 180-second whole-store experiment captured/parsed all 1,563 files but
+exhausted its budget during core analysis (exit 124). This is **unresolved whole
+store evidence**, not a successful index. PR 11 was still open. The final
+nine-crate store run completes independently; its report is
+`review-nine-final-store.json` (149.240 s observed, 247 clean files, zero
+analysis/resolution errors). No core performance code was modified. The
+manager can request the whole indexed run after the core optimization merges.
 
-Final checks on Node 24.21.0: `npm ci --ignore-scripts` passed;
-`node --test test/graph-rust*.test.mjs` passed 16/16; final `npm test`
-completed with 1,219/1,220 passing, zero skips/cancellations, and only the
-out-of-scope A10 empty-production-registry expectation failing. The unchanged
-main comparison passes A10. Raw logs, superseded experiments and the exact
-failure are preserved under `evidence/w2-c/`.
-`npm run format:check` also passed. See `validation.json` for final module source
-hashes and explicit command exit states. Review approval is not claimed.
+The final fresh seeded audit covers 30 resolved links, 15 complete candidate
+sets and 15 unresolved links; all judgments were checked against source and
+imports/declarations. Earlier audit findings and superseded samples are retained.
+See `review-audit.md`; sampling is not a universal graph-accuracy proof.
+
+## Validation
+
+The original exact-position conformance fixture remains unchanged and passes
+against the new module. Review regressions cover all numbered counterexamples,
+positive/negative controls, generic/borrow/default candidate completeness,
+namespace interactions, target flags, external-import fallback, cross-crate
+reexports, raw identifiers (including generic parameters and local bindings) and
+cycles. The final snapshot equivalence report proves that the last raw-name
+normalization controls leave every Vector parse fact, resolution decision and
+all 60 audited entries unchanged. Final required check outcomes are recorded
+in `review-validation.json`, in the required sequential order. A10 is now fixed
+by the merged main change; W2-C did not alter shared tests to obtain a pass.
+
+Final sequential checks on Node 24.21.0: install exit 0; `npm test` exit 0
+(1,259 passed, zero failed/cancelled, two inherited TLC prerequisite skips that
+remain unresolved); format check exit 0; focused Rust suite 42/42, zero skips.
+The final whole-snapshot parse/resolution hashes and all 60 audited entries are
+unchanged by the last raw generic/local binding controls. `review-validation.json`
+records source/baseline hashes and exact outcomes; review approval is not claimed.

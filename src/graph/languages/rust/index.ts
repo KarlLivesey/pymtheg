@@ -6,7 +6,7 @@ import { resolveRust } from "./resolve.js";
 
 const rust: LanguageModule = {
   id: "rust",
-  version: "1",
+  version: "2",
   extensions: [".rs"],
   contextFiles: ["Cargo.toml"],
   parse: parseRust,
