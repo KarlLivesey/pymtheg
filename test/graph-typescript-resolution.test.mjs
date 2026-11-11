@@ -638,7 +638,7 @@ test("a broken config fails only the files it governs and is never silently igno
   await project(
     {
       "tsconfig.json": JSON.stringify({
-        extends: "./base.json",
+        extends: "./tsconfig.base.json",
         compilerOptions: {},
       }),
       "a.ts": "export const a = 1;\n",
@@ -648,7 +648,7 @@ test("a broken config fails only the files it governs and is never silently igno
       assert.deepEqual(report.failed, ["a.ts"]);
       assert.match(
         graph.store.getFile("a.ts").result.diagnostics[0].message,
-        /extends "\.\/base\.json".*missing/,
+        /extends "\.\/tsconfig\.base\.json".*missing/,
       );
       // Adding the base repairs the analysis.
       await graph.write("tsconfig.base.json", "{}");
@@ -725,11 +725,11 @@ for (const [name, overrides, cause] of [
     "a missing extends",
     {
       "packages/a/tsconfig.json": JSON.stringify({
-        extends: "./missing.json",
+        extends: "./tsconfig.missing.json",
         include: ["src"],
       }),
     },
-    /extends "\.\/missing\.json", which is missing/,
+    /extends "\.\/tsconfig\.missing\.json", which is missing/,
   ],
   [
     "an unparsable package manifest",
@@ -1080,7 +1080,7 @@ test("an incomplete target set is never narrowed to one definite target", async 
 function twoPackagesUnion() {
   return {
     "packages/a/tsconfig.json": JSON.stringify({
-      extends: "./gone.json",
+      extends: "./tsconfig.gone.json",
       include: ["src"],
     }),
     "packages/a/src/shape.ts": "export class A { go() {} }\n",
@@ -1255,3 +1255,316 @@ test("a broken workspace root fails only root-package files; members stay analys
     },
   );
 });
+
+test("nothing reached through a shadowed-require value links into the required module", async () => {
+  const dep = "export function real() {}\nexport class K { run() {} }\n";
+  await project(
+    {
+      "dep.ts": dep,
+      "top.js": [
+        "export {};",
+        "function require(n) { return { real() { return 0; } }; }",
+        'const m = require("./dep");',
+        "m.real();",
+        "new m.K();",
+        "const read = m.real;",
+        "const n = m;",
+        "n.real();",
+        "let later;",
+        "later = n;",
+        "later.real();",
+        "const { real } = m;",
+        "real();",
+        'const { real: direct } = require("./dep");',
+        "direct();",
+        "function use(x) { x.real(); }",
+        "use(m);",
+        "const holder = { m };",
+        "holder.m.real();",
+        "function give() { return m; }",
+        "give().real();",
+        "",
+      ].join("\n"),
+      "param.js": [
+        "export function load(require) {",
+        '  const m = require("./dep");',
+        "  m.real();",
+        "  new m.K();",
+        "}",
+        "",
+      ].join("\n"),
+      "fake.js": [
+        "export {};",
+        "function fake() {}",
+        "function require(n) { return { real: fake }; }",
+        'const m = require("./dep");',
+        "m.real();",
+        "",
+      ].join("\n"),
+      // Control: the real CommonJS require still links.
+      "real.js": 'const m = require("./dep");\nm.real();\nnew m.K();\n',
+    },
+    async (graph, report) => {
+      clean(report);
+      const intoDep = (link) =>
+        [link.targetId, ...link.candidates.map((c) => c.id)].some(
+          (id) =>
+            graph.store.findSymbols().find((s) => s.id === id)?.file ===
+            "dep.ts",
+        ) || (link.data?.targets ?? []).some((t) => t.file === "dep.ts");
+      for (const file of ["top.js", "param.js", "fake.js"])
+        assert.deepEqual(
+          graph.store
+            .links()
+            .filter((link) => link.file === file && intoDep(link)),
+          [],
+          `no link into dep.ts from ${file}`,
+        );
+      const members = graph.store
+        .links()
+        .filter(
+          (link) =>
+            ["top.js", "param.js", "fake.js"].includes(link.file) &&
+            link.kind === "calls" &&
+            /^(m|n|later)\./.test(link.targetName),
+        );
+      assert.equal(members.length, 7);
+      // Carried through an object property or a return value.
+      for (const name of ["holder.m.real", "(expression).real"]) {
+        const carried = graph
+          .links("top.js", "real", "calls")
+          .filter((link) => link.targetName === name);
+        assert.equal(carried.length, 1, name);
+        assert.equal(carried[0].resolution, "unresolved");
+        assert.equal(carried[0].data.reason, "shadowed-require");
+      }
+      for (const link of members) {
+        assert.equal(link.resolution, "unresolved");
+        assert.equal(link.data.reason, "shadowed-require", link.targetName);
+      }
+      // Destructured names are local constants, not the module's exports.
+      const plain = (name) =>
+        graph
+          .links("top.js", name, "calls")
+          .filter((link) => link.targetName === name);
+      assert.equal(plain("real").length, 1);
+      assert.equal(graph.target(plain("real")[0]), "top.js#real");
+      assert.equal(graph.target(plain("direct")[0]), "top.js#direct");
+      // Passing it on: the parameter is untyped, so nothing resolves through it.
+      const passed = graph
+        .links("top.js", "real", "calls")
+        .filter((link) => link.targetName === "x.real");
+      assert.equal(passed.length, 1);
+      assert.equal(passed[0].resolution, "unresolved");
+      assert.equal(
+        graph.target(
+          graph
+            .links("real.js", "real", "calls")
+            .find((l) => l.targetName === "m.real"),
+        ),
+        "dep.ts#real",
+      );
+      assert.equal(
+        graph.target(graph.link("real.js", "K", "calls")),
+        "dep.ts#K",
+      );
+    },
+  );
+});
+
+test("the nearest containing config owns a file: root depth is zero", async () => {
+  await project(
+    {
+      "tsconfig.json": JSON.stringify({
+        compilerOptions: { baseUrl: ".", paths: { "@api": ["root.ts"] } },
+      }),
+      "root.ts": "export function api() {}\n",
+      "z/tsconfig.json": JSON.stringify({
+        compilerOptions: { baseUrl: ".", paths: { "@api": ["local.ts"] } },
+      }),
+      "z/local.ts": "export function api() {}\n",
+      "z/use.ts": 'import { api } from "@api";\napi();\n',
+    },
+    async (graph, report) => {
+      clean(report);
+      assert.equal(
+        graph.store.getFile("z/use.ts").result.data.project,
+        "z/tsconfig.json",
+      );
+      assert.equal(
+        graph.target(graph.link("z/use.ts", "api", "calls")),
+        "z/local.ts#api",
+      );
+    },
+  );
+});
+
+const sharedLayout = (app) => ({
+  [`packages/${app}/tsconfig.json`]: JSON.stringify({
+    include: ["src", "../shared/src"],
+    compilerOptions: { baseUrl: ".", paths: { "@lib/*": ["lib/*"] } },
+  }),
+  [`packages/${app}/lib/util.ts`]: "export function helper() {}\n",
+  [`packages/${app}/src/a.ts`]: "export const a = 1;\n",
+  "packages/shared/tsconfig.json": JSON.stringify({
+    include: ["src", "lib"],
+    compilerOptions: { baseUrl: ".", paths: { "@lib/*": ["lib/*"] } },
+  }),
+  "packages/shared/lib/util.ts": "export function helper() {}\n",
+  "packages/shared/src/s.ts":
+    "import { helper } from '@lib/util';\nhelper();\n",
+});
+for (const app of ["app", "zapp"])
+  test(`a config whose directory contains the file outranks one that includes it from elsewhere (${app})`, async () => {
+    await project(sharedLayout(app), async (graph, report) => {
+      clean(report);
+      assert.equal(
+        graph.store.getFile("packages/shared/src/s.ts").result.data.project,
+        "packages/shared/tsconfig.json",
+      );
+      assert.equal(
+        graph.target(graph.link("packages/shared/src/s.ts", "helper", "calls")),
+        "packages/shared/lib/util.ts#helper",
+      );
+    });
+  });
+
+test("equally ranked configs with different settings give candidates or unresolved, never a pick", async () => {
+  await project(
+    {
+      "pkg/tsconfig.a.json": JSON.stringify({
+        include: ["src"],
+        compilerOptions: {
+          baseUrl: ".",
+          paths: { "@x": ["one.ts"], "@y": ["one.ts"] },
+        },
+      }),
+      "pkg/tsconfig.b.json": JSON.stringify({
+        include: ["src"],
+        compilerOptions: { baseUrl: ".", paths: { "@x": ["two.ts"] } },
+      }),
+      "pkg/one.ts": "export function x() {}\nexport function y() {}\n",
+      "pkg/two.ts": "export function x() {}\n",
+      "pkg/src/use.ts": [
+        'import { x } from "@x";',
+        'import { y } from "@y";',
+        'import { same } from "./same";',
+        "x(); y(); same();",
+        "",
+      ].join("\n"),
+      "pkg/src/same.ts": "export function same() {}\n",
+    },
+    async (graph, report) => {
+      assert.deepEqual(report.analysisErrors, []);
+      const file = graph.store.getFile("pkg/src/use.ts").result;
+      assert.deepEqual(file.data.projects, [
+        "pkg/tsconfig.a.json",
+        "pkg/tsconfig.b.json",
+      ]);
+      // Differs between the configs and both are complete: candidates.
+      const x = graph.link("pkg/src/use.ts", "x", "calls");
+      assert.deepEqual(graph.candidates(x), ["pkg/one.ts#x", "pkg/two.ts#x"]);
+      // Resolves under one config only: unresolved, targets kept.
+      const y = graph.link("pkg/src/use.ts", "y", "calls");
+      assert.equal(y.resolution, "unresolved");
+      assert.equal(y.data.reason, "ambiguous-project");
+      assert.deepEqual(
+        y.data.targets.map((t) => t.file),
+        ["pkg/one.ts"],
+      );
+      // The same under both: definite.
+      assert.equal(
+        graph.target(graph.link("pkg/src/use.ts", "same", "calls")),
+        "pkg/src/same.ts#same",
+      );
+    },
+  );
+});
+
+test("the nearest package manifest governs a file", async () => {
+  await project(
+    {
+      "package.json": "{ broken",
+      "root.ts": "export const r = 1;\n",
+      "z/package.json": JSON.stringify({ name: "z" }),
+      "z/a.ts": "export const a = 1;\n",
+    },
+    async (graph, report) => {
+      assert.deepEqual(report.failed, ["root.ts"]);
+      assert.equal(graph.store.getFile("z/a.ts").result.status, "clean");
+    },
+  );
+});
+
+for (const [label, text] of [
+  ["an array", "[1, 2]"],
+  ["an empty array", "[]"],
+  ["null", "null"],
+  ["a number", "7"],
+  ["a string", '"x"'],
+])
+  test(`a config extending a base whose root is ${label} fails its files`, async () => {
+    await project(
+      {
+        "tsconfig.json": JSON.stringify({ extends: "./tsconfig.mid.json" }),
+        "tsconfig.mid.json": JSON.stringify({
+          extends: "./tsconfig.base.json",
+        }),
+        "tsconfig.base.json": text,
+        "a.ts": "export const a = 1;\n",
+      },
+      async (graph, report) => {
+        assert.deepEqual(report.failed, ["a.ts"]);
+        assert.match(
+          graph.store.getFile("a.ts").result.diagnostics[0].message,
+          /extends tsconfig\.base\.json, which is unreadable: not an object/,
+        );
+      },
+    );
+  });
+
+test("a candidate set never omits a possible target outside the project", async () => {
+  await project(
+    {
+      "u.ts": [
+        "export class Foo { toString() { return 'f'; } }",
+        "export class Bar { toString() { return 'b'; } }",
+        "export function f(x: Foo | Bar | Date) { return x.toString(); }",
+        "export function g(x: Foo | Bar) { return x.toString(); }",
+        "",
+      ].join("\n"),
+    },
+    async (graph) => {
+      const [withDate, inside] = graph
+        .links("u.ts", "toString", "calls")
+        .sort((a, b) => a.range.start - b.range.start);
+      assert.equal(withDate.resolution, "unresolved");
+      assert.equal(withDate.data.reason, "external");
+      assert.equal(withDate.data.targets.length, 2);
+      assert.deepEqual(graph.candidates(inside), [
+        "u.ts#Bar.toString",
+        "u.ts#Foo.toString",
+      ]);
+    },
+  );
+});
+
+for (const base of ["./base.json", "./config/ts.json"])
+  test(`a relative extends outside the context patterns (${base}) is a partial limitation`, async () => {
+    await project(
+      {
+        "tsconfig.json": JSON.stringify({ extends: base, include: ["src"] }),
+        [base.slice(2)]: JSON.stringify({ compilerOptions: { strict: true } }),
+        "src/a.ts": "export const a = 1;\n",
+      },
+      async (graph, report) => {
+        assert.deepEqual(report.analysisErrors, []);
+        assert.deepEqual(report.failed, []);
+        assert.deepEqual(report.partial, ["src/a.ts"]);
+        assert.match(
+          graph.store.getFile("src/a.ts").result.diagnostics[0].message,
+          /not captured as project context .*its settings are missing/,
+        );
+      },
+    );
+  });

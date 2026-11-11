@@ -14,9 +14,11 @@ Nothing is wired into a command.
 | `.js`, `.jsx`, `.mjs`, `.cjs` | JavaScript, analysed with `allowJs` |
 | `.d.ts`, `.d.mts`, `.d.cts` | Covered by the `.ts`/`.mts`/`.cts` claims (see below) |
 
-Context files: `tsconfig*.json` (so `tsconfig.json`, `tsconfig.build.json` and
-`tsconfig-cjs.json`), `jsconfig*.json`, `package.json`. They are context only,
-never graph sources.
+Context files: `*tsconfig*.json` (so `tsconfig.json`, `tsconfig.build.json`,
+`tsconfig-cjs.json` and `base.tsconfig.json`), `*jsconfig*.json`, and
+`package.json`. They are context only, never graph sources. Only files named
+`tsconfig*.json`/`jsconfig*.json` act as projects; the wider patterns exist so
+that common base-config names are captured for `extends`.
 
 **Declaration files** are ordinary graph sources: their declarations become
 symbols of the usual kinds, and the module symbol records
@@ -35,14 +37,32 @@ The module is **analyze-only** (no per-file `parse`). Each run:
    virtual file system that contains only captured sources and context files.
    File globbing uses the compiler's `matchFiles` (an internal export of the
    pinned compiler; a missing export is a visible analysis error).
-2. Assigns each source to one owning config: among configs whose file list
-   includes it, the one in the deepest directory; ties prefer `tsconfig.json`,
-   then `jsconfig.json`, then path order. A file no config includes goes to an
-   **inferred project** (like an editor: ESNext, Bundler resolution, `allowJs`,
-   JSX preserved, no `paths`); its file data has `project: null`.
+2. Assigns each source to an owning config. Candidates are the configs whose
+   file list includes it, plus any broken config whose directory contains it.
+   They are ranked in this order:
+   1. configs whose **directory contains the file** come before configs that
+      include it from elsewhere;
+   2. the **nearest** (deepest) directory wins; the project root has depth 0;
+   3. `tsconfig.json` comes before `jsconfig.json`, which comes before other
+      names (the editor's discovery rule).
+
+   If two or more configs are still equal after these three rules, that is a
+   **genuine tie**. The file is analysed under each tied config, and the results
+   are merged:
+   - a link whose targets are the same under every tied config keeps them;
+   - a link whose targets differ gets the union of targets: candidates if every
+     config's answer was complete, otherwise unresolved with reason
+     `ambiguous-project` and the targets kept;
+   - the file records `data.projects` listing the tied configs.
+
+   Path order is used only to order the tied configs in that list, never to
+   pick one. A file that no config includes goes to an **inferred project**
+   (like an editor: ESNext, Bundler resolution, `allowJs`, JSX preserved, no
+   `paths`); its file data has `project: null`.
 3. Builds one `ts.createProgram` per owning config with a snapshot-only host and
    extracts that config's files with its type checker. A file reached from
-   another project is parsed there too, but only its owner extracts it.
+   another project is parsed there too, but only its owner (or each tied owner)
+   extracts it.
 4. Records each link's checker targets as `{file, key}` facts in `link.data`,
    where `key` is the target symbol's file-local key (`kind@start`).
    `resolve` maps those facts to symbol IDs: one target is definite, two or more
@@ -163,6 +183,22 @@ rather than scope bindings, so for those a top-level declaration of the name in
 the same file counts as shadowing. A `var module` declared in another global
 script is not seen (a known limitation).
 
+The compiler's binder still treats `const m = require("./dep")` as an import
+alias when `require` is local, so its types point into `./dep`. Such a variable
+is an ordinary symbol here, and **nothing reached through it links into the
+module**. This covers member calls (`m.real()`), `new m.K()`, JSX
+`<m.C/>`, `typeof m.x`, heritage `extends m.K`, and the same forms on variables
+initialised or assigned from it (`const n = m`, `n = m`), transitively within
+the file. All of these are unresolved with reason `shadowed-require`. Names
+destructured from it (`const { real } = m`, `const { real } = require("./dep")`)
+are local constants, so calls to them resolve to those constants. Passing it to
+an untyped parameter gives no symbol. A value carried further, through an object
+property (`holder.m.real()`) or a return value (`give().real()`), is caught by
+its type: in a file with a shadowed `require`, a receiver whose type is the
+misbound module's namespace links nowhere. This is conservative: a genuine
+`import * as` of the same module in that same file is then also unresolved,
+never wrongly linked.
+
 Paths aliases (`paths`/`baseUrl`), `package.json` `imports`/`exports`/`type`,
 `moduleResolution` modes and workspace packages all work through the compiler's
 own resolver over the snapshot.
@@ -178,13 +214,17 @@ own resolver over the snapshot.
 | `no-symbol` | The checker has no symbol: untyped JS, `any`/`unknown` receivers (often because the receiver's type came from an uncaptured package), computed callees |
 | `local` | The target is a parameter, local variable, local function or other non-symbol declaration |
 | `computed-specifier` | `import(expr)` or JS `require(expr)` with a non-literal specifier |
+| `shadowed-require` | Reached through a value from a locally bound `require` (see above) |
+| `ambiguous-project` | Equally ranked configs disagree and at least one has no complete answer; their targets are kept |
 
-If the checker's declarations include both graph symbols and external/local
-ones (for example `x.toString()` on `Foo | number`), the link is never narrowed:
-two or more project targets are candidates; a single one stays unresolved with
-`data.targets` and `reason` recorded. Likewise, when a recorded target's file
+**A target set is never narrowed.** If any possible declaration lies outside the
+project (standard library, uncaptured package, a local), the link is
+**unresolved**, whatever the number of project targets. Examples: `x.toString()`
+on `Foo | number`, or on `Foo | Bar | Date`. The project targets are kept in
+`data.targets`, with the `reason`. Likewise, when a recorded target's file
 failed (for example its package config is broken), the surviving targets are
-never promoted: one survivor is unresolved, two or more are candidates.
+never promoted: the link is unresolved with all targets kept. Candidate sets
+therefore always list every possible target.
 
 Not extracted as links: plain value reads and writes (`x = y`, passing a
 function as a callback without calling it), decorators without a call, JSDoc
@@ -201,17 +241,21 @@ imports of `./orig` are not linked to it; backlog).
   captured text against the original-byte hash) and are never returned by
   analysis.
 - **A broken config fails only the files it governs.** A config is broken when
-  it is malformed JSON or not an object, when it has an invalid `extends` value,
-  when a relative `extends` target is missing from the snapshot, or when that
-  base is itself malformed. Each file the config could own is **failed**, with a
+  it is malformed JSON or not an object, or when it has an invalid `extends`
+  value. It is also broken when a relative `extends` target that the context
+  patterns would capture is missing, or when any base in the `extends` chain is
+  malformed or its root is not an object (an array, `null`, a number or a
+  string). Each file the config could own is **failed**, with a
   diagnostic naming the cause. Those files are its directory subtree, minus
   files that a deeper valid config owns, plus anything its parsable
-  `files`/`include` names. Other projects analyse normally. Links from healthy
+  `files`/`include` names. Ownership ranking still applies, so a nearer valid
+  config keeps its files. Other projects analyse normally. Links from healthy
   files into the failed files keep their names and stay unresolved; their
   recorded targets are in `data.targets`.
 - **A broken `package.json`** (malformed or not an object) fails the files of
-  that package only: its directory subtree, minus subtrees with their own
-  `package.json`. A broken workspace root still leaves member packages
+  that package only. The **nearest** manifest governs a file, with the project
+  root at depth 0, so a healthy `z/package.json` keeps `z/**` clean under a
+  broken root manifest. A broken workspace root still leaves member packages
   analysed. Its `workspaces` list is unknown, so imports between members stay
   unresolved instead of being guessed.
 - **A missing or invalid project reference** fails nothing. References are not
@@ -228,18 +272,20 @@ imports of `./orig` are not linked to it; backlog).
   (`"./node_modules/@tsconfig/node20/tsconfig.json"`). It is an analysis
   limitation, not an error: the config's own settings still apply, and every
   file it owns is **partial**, with a diagnostic naming the missing base.
+- A relative `extends` to a base **outside the context patterns** (for example
+  `./base.json` or `./config/ts.json`) cannot be captured (interface gap 5). The
+  module cannot tell whether the file exists, so this is also a limitation: the
+  config's own settings apply, and its files are **partial**, with a diagnostic
+  saying that the base is not captured as context and its settings are missing.
 - Other config diagnostics (unknown options and the like) are kept in each owned
   file's `data.configNotes`; "no inputs found" is normal for solution configs.
 
 ## Interface gaps
 
-1. **Core test assumes no production language exists.** `test/graph-review.test.mjs`
-   "A10: production discovery hides marked fixture languages…" asserts the
-   production module list prints exactly `[]`. Adding any production language
-   folder (this one, and the parallel Go and Rust modules) makes it print
-   `[ 'typescript' ]`, so that test fails although fixture hiding still works.
-   It is not an owned file, so it is unchanged here; the assertion should check
-   that `toy` is absent rather than that the list is empty.
+1. **(Resolved on `main`.)** `test/graph-review.test.mjs` A10 asserted that the
+   production module list was exactly `[]`, which any production language broke.
+   PR 15 changed it to check that the fixture language is hidden. With `main`
+   merged, the full suite passes with this module present.
 2. **Scoped project failures are per-file facts, not `analysisErrors`.**
    (Corrected. The first submission wrongly claimed the interface forced a
    module-wide failure.) `analyze` can return `failed` results for some files,
@@ -256,10 +302,24 @@ imports of `./orig` are not linked to it; backlog).
 4. **Unresolved reasons are module data.** The interface has one unresolved
    state; the distinction between standard library, uncaptured package, local
    and unknown lives only in `link.data.reason`.
+5. **Context files cannot depend on other context files' content.**
+   `contextFiles` is a static list of patterns. A module cannot ask for "the file
+   named by this config's `extends`". Example: `tsconfig.json` with
+   `"extends": "./base.json"` or `"./config/ts.json"`; the base is never
+   captured. The only alternative inside the interface is a blanket `*.json`
+   context pattern, and it is worse in two ways. Every JSON file in a project
+   (lock files, fixtures, data) would be read and stored as context, and every
+   JSON edit would force a full reanalysis. Also, the core fails the module's
+   whole analysis if any context file cannot be captured, so one non-UTF-8 JSON
+   fixture would fail every TypeScript file. Done instead: the patterns cover
+   the common base names (`*tsconfig*.json`, `*jsconfig*.json`). Any other
+   relative base is reported as partial (see above), never silently dropped.
+   Closing this needs an interface way to request specific context paths
+   discovered during analysis.
 
 ## Observations
 
-Full numbers, the round 1 to round 2 comparison and both hand checks are in
+Full numbers, the comparison across rounds and all three hand checks are in
 `evidence/w2-d/README.md`.
 
 - **BullMQ indexes in full**: 261 claimed files, 261 clean, 0 partial, 0 failed,
@@ -267,9 +327,14 @@ Full numbers, the round 1 to round 2 comparison and both hand checks are in
   (17,812 resolved, 4 candidate sets, 23,030 unresolved). Compared with round 1:
   +45 parameter-property symbols and their `contains` links, +5 calls resolved
   to them, and 629 import bindings relabelled from `external` to the reason of
-  their unresolved module. Hand checks found no wrong link: round 1 checked 24
-  resolved, 12 unresolved and all 4 candidate sets; round 2, with a new seed,
-  checked 30 resolved, 15 unresolved and all 4 candidate sets.
+  their unresolved module. Round 3 has exactly the same totals as round 2. No
+  BullMQ candidate set had an outside possibility, so the item-4 rule moved
+  none. Two files (`tests/types/*.ts`) are a genuine tie between
+  `tsconfig.tests-check.json` and `tsconfig.type-tests.json`; they are analysed
+  under both, and no link differs. Hand checks found no wrong link in any round:
+  round 1 checked 24 resolved, 12 unresolved and all 4 candidate sets; rounds 2
+  and 3, each with a new seed, checked 30 resolved, 15 unresolved and all 4
+  candidate sets.
   Unresolved links are dominated by uncaptured packages (`vitest`, `ioredis`,
   `node:*`) and the standard library. The existing deep analysis
   (`src/implementation/`) is unchanged and remains available on top.

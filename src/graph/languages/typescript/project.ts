@@ -57,6 +57,12 @@ export interface ProjectGroup {
 export interface ProjectModel {
   groups: ProjectGroup[];
   owner: Map<string, ProjectGroup>;
+  /**
+   * Files that two or more configs own equally (same containment, depth and
+   * name preference). Each is analysed under every tied config and the link
+   * results are merged without picking one.
+   */
+  ties: Map<string, ProjectGroup[]>;
   /** Files failed by a broken config or package manifest, with the cause. */
   failures: Map<string, string>;
   host: (group: ProjectGroup) => ts.CompilerHost;
@@ -203,6 +209,17 @@ function workspaces(
   return result;
 }
 
+/** Context patterns; also used to tell a missing base from an uncaptured one. */
+export const CONTEXT_PATTERNS = [
+  "*tsconfig*.json",
+  "*jsconfig*.json",
+  "package.json",
+] as const;
+const isContextPath = (path: string) =>
+  CONTEXT_PATTERNS.some((pattern) => matchesPattern(path, pattern));
+/** Directory depth: the project root is 0, `a` is 1, `a/b` is 2. */
+const depthOf = (directory: string) =>
+  directory === "." ? 0 : directory.split("/").length;
 const underDirectory = (path: string, directory: string) =>
   directory === "." || path.startsWith(directory + "/");
 const hasNodeModulesSegment = (path: string) =>
@@ -374,6 +391,14 @@ export function projectModel(
           target += ".json";
         const path = fromVirtual(target);
         const context = contexts.find((file) => file.path === path);
+        if (!context && path !== undefined && !isContextPath(path)) {
+          // Context patterns are static: a base outside them is never captured,
+          // so it may exist. Its settings are missing, which is a limitation.
+          group.limitations.push(
+            `${from} extends "${base}", which is not captured as project context (only ${CONTEXT_PATTERNS.join(", ")} are); its settings are missing`,
+          );
+          continue;
+        }
         if (!context) {
           fail(
             `TypeScript config ${from} extends "${base}", which is missing from the snapshot`,
@@ -394,11 +419,19 @@ export function projectModel(
           break;
         }
         const parsed = ts.convertToObject(baseSource, []) as unknown;
+        if (
+          parsed === null ||
+          typeof parsed !== "object" ||
+          Array.isArray(parsed)
+        ) {
+          fail(
+            `TypeScript config ${from} extends ${context.path}, which is unreadable: not an object`,
+          );
+          break;
+        }
         pending.push([
           context.path,
-          parsed && typeof parsed === "object"
-            ? (parsed as Record<string, unknown>).extends
-            : undefined,
+          (parsed as Record<string, unknown>).extends,
         ]);
       }
     }
@@ -473,18 +506,33 @@ export function projectModel(
           claim(file.path, group);
   }
   const owner = new Map<string, ProjectGroup>();
+  const ties = new Map<string, ProjectGroup[]>();
   const failures = new Map<string, string>();
   let inferred: ProjectGroup | undefined;
   for (const file of [...files].sort((a, b) => compare(a.path, b.path))) {
+    // Ownership: a config whose directory contains the file, then the nearest
+    // (deepest) directory, then tsconfig.json over jsconfig.json over other
+    // names. Path order only orders configs that are still equal; those are a
+    // genuine tie, analysed under each (see ties).
+    const rank = (group: ProjectGroup) => {
+      const directory = posix.dirname(group.config!);
+      return [
+        underDirectory(file.path, directory) ? 0 : 1,
+        -depthOf(directory),
+        configPreference(group.config!),
+      ];
+    };
     const candidates = (claimed.get(file.path) ?? []).sort((a, b) => {
-      const depth = (group: ProjectGroup) =>
-        posix.dirname(group.config!).split("/").length;
+      const [x, y] = [rank(a), rank(b)];
       return (
-        depth(b) - depth(a) ||
-        configPreference(a.config!) - configPreference(b.config!) ||
+        x[0]! - y[0]! ||
+        x[1]! - y[1]! ||
+        x[2]! - y[2]! ||
         compare(a.config!, b.config!)
       );
     });
+    const top = candidates[0] && rank(candidates[0]).join();
+    const tied = candidates.filter((group) => rank(group).join() === top);
     let group = candidates[0];
     if (!group) {
       inferred ??= {
@@ -500,12 +548,16 @@ export function projectModel(
     // The nearest package manifest governs a file; a broken one fails just its package.
     const manifest = packageDirectories
       .filter((directory) => underDirectory(file.path, directory))
-      .sort((a, b) => b.split("/").length - a.split("/").length)[0];
+      .sort((a, b) => depthOf(b) - depthOf(a))[0];
     const failure =
+      tied.find((candidate) => candidate.failure)?.failure ??
       group.failure ??
       (manifest === undefined ? undefined : brokenManifests.get(manifest));
     if (failure) failures.set(file.path, failure);
-    else group.roots.push(toVirtual(file.path));
+    else if (tied.length > 1) {
+      ties.set(file.path, tied);
+      for (const candidate of tied) candidate.roots.push(toVirtual(file.path));
+    } else group.roots.push(toVirtual(file.path));
   }
   if (inferred) groups.push(inferred);
   const host = (group: ProjectGroup): ts.CompilerHost => {
@@ -547,5 +599,5 @@ export function projectModel(
       realpath: (name) => fs.real(name),
     };
   };
-  return { groups, owner, failures, host };
+  return { groups, owner, ties, failures, host };
 }

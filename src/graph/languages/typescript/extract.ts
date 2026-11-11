@@ -63,6 +63,8 @@ const TYPE_ONLY = new Set([
   ts.SyntaxKind.TypeAliasDeclaration,
   ts.SyntaxKind.TypeParameter,
 ]);
+/** Marks a name reached through a value from a shadowed `require`. */
+const SHADOWED = Symbol("shadowed-require");
 const clip = (text: string) => {
   const flat = text
     .replace(/\s*(\??\.)\s*/g, "$1")
@@ -97,7 +99,11 @@ export function extractFile(
     end: node.end,
   });
 
-  function targetsOf(symbol: ts.Symbol | undefined, meaning: Meaning): Targets {
+  function targetsOf(
+    symbol: ts.Symbol | typeof SHADOWED | undefined,
+    meaning: Meaning,
+  ): Targets {
+    if (symbol === SHADOWED) return { targets: [], reason: "shadowed-require" };
     if (!symbol) return { targets: [], reason: "no-symbol" };
     const facts = new Map<string, TargetFact>();
     let external = 0;
@@ -207,18 +213,120 @@ export function extractFile(
     });
   }
   const symbolOf = (node: ts.Node) => checker.getSymbolAtLocation(node);
+
+  // Values from a shadowed `require`: the compiler binds `const m =
+  // require("./dep")` as an import alias even when `require` is local, so its
+  // types point into the module. Anything reached through such a variable, or
+  // through a variable initialised or assigned from one, links nowhere.
+  let shadowedValues: Set<ts.Symbol> | undefined;
+  /** Module symbols that a shadowed `require` variable was (mis)bound to. */
+  const shadowedModules = new Set<ts.Symbol>();
+  const rootOf = (node: ts.Node): ts.Identifier | undefined => {
+    let current: ts.Node = node;
+    for (;;) {
+      if (ts.isIdentifier(current)) return current;
+      if (
+        ts.isPropertyAccessExpression(current) ||
+        ts.isElementAccessExpression(current) ||
+        ts.isCallExpression(current) ||
+        ts.isParenthesizedExpression(current) ||
+        ts.isNonNullExpression(current) ||
+        ts.isAsExpression(current) ||
+        ts.isAwaitExpression(current)
+      )
+        current = current.expression;
+      else if (ts.isQualifiedName(current)) current = current.left;
+      else return undefined;
+    }
+  };
+  function shadowedSet(): Set<ts.Symbol> {
+    if (shadowedValues) return shadowedValues;
+    const set = new Set<ts.Symbol>();
+    shadowedValues = set;
+    if (!isJsFile(file)) return set;
+    const names = (name: ts.BindingName): ts.Identifier[] =>
+      ts.isIdentifier(name)
+        ? [name]
+        : name.elements.flatMap((element) =>
+            ts.isOmittedExpression(element) ? [] : names(element.name),
+          );
+    const edges: [ts.Identifier, ts.Expression][] = [];
+    const seeds: ts.Identifier[] = [];
+    const collect = (node: ts.Node): void => {
+      if (ts.isVariableDeclaration(node)) {
+        if (isShadowedRequireAlias(node)) seeds.push(...names(node.name));
+        else if (node.initializer)
+          for (const name of names(node.name))
+            edges.push([name, node.initializer]);
+      } else if (
+        ts.isBinaryExpression(node) &&
+        node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+        ts.isIdentifier(node.left)
+      )
+        edges.push([node.left, node.right]);
+      ts.forEachChild(node, collect);
+    };
+    collect(file);
+    if (!seeds.length) return set;
+    for (const seed of seeds) {
+      const symbol = symbolOf(seed);
+      if (!symbol) continue;
+      set.add(symbol);
+      if (symbol.flags & ts.SymbolFlags.Alias) {
+        const target = checker.getAliasedSymbol(symbol);
+        if (target.declarations?.some(ts.isSourceFile))
+          shadowedModules.add(target);
+      }
+    }
+    for (let changed = true; changed; ) {
+      changed = false;
+      for (const [name, value] of edges) {
+        const root = rootOf(value);
+        const from = root && symbolOf(root);
+        const to = symbolOf(name);
+        if (from && to && set.has(from) && !set.has(to)) {
+          set.add(to);
+          changed = true;
+        }
+      }
+    }
+    return set;
+  }
+  /** The checker's symbol for a name, unless it is reached through a shadowed-require value. */
+  function lookup(node: ts.Node): ts.Symbol | typeof SHADOWED | undefined {
+    const parent = node.parent;
+    const receiver =
+      ts.isPropertyAccessExpression(parent) && parent.name === node
+        ? parent.expression
+        : ts.isElementAccessExpression(parent) &&
+            parent.argumentExpression === node
+          ? parent.expression
+          : ts.isQualifiedName(parent) && parent.right === node
+            ? parent.left
+            : undefined;
+    const root = receiver && rootOf(receiver);
+    const rootSymbol = root && symbolOf(root);
+    if (rootSymbol && shadowedSet().has(rootSymbol)) return SHADOWED;
+    // Carried further (object property, return value): the receiver's type is
+    // still the misbound module namespace.
+    if (receiver && shadowedModules.size) {
+      const type = checker.getTypeAtLocation(receiver).getSymbol();
+      if (type && shadowedModules.has(type)) return SHADOWED;
+    }
+    return symbolOf(node);
+  }
   function calleeTarget(callee: ts.Expression): {
     at: ts.Node;
-    symbol: ts.Symbol | undefined;
+    symbol: ts.Symbol | typeof SHADOWED | undefined;
   } {
     const expression = unwrap(callee);
     if (ts.isPropertyAccessExpression(expression))
-      return { at: expression.name, symbol: symbolOf(expression.name) };
+      return { at: expression.name, symbol: lookup(expression.name) };
     if (ts.isElementAccessExpression(expression))
       return {
         at: expression,
         symbol: ts.isStringLiteralLike(expression.argumentExpression)
-          ? symbolOf(expression.argumentExpression)
+          ? lookup(expression.argumentExpression)
           : undefined,
       };
     if (
@@ -501,7 +609,7 @@ export function extractFile(
           "calls",
           tag.getText(file),
           at,
-          targetsOf(symbolOf(at), "call"),
+          targetsOf(lookup(at), "call"),
           { jsx: true },
         );
       }
@@ -523,7 +631,7 @@ export function extractFile(
         "references",
         name.getText(file),
         name,
-        targetsOf(symbolOf(at), "value"),
+        targetsOf(lookup(at), "value"),
         { typeof: true },
       );
     } else if (
@@ -544,7 +652,7 @@ export function extractFile(
         isEntityChain(expression) ? expression.getText(file) : "(expression)",
         node.expression,
         targetsOf(
-          symbolOf(at),
+          lookup(at),
           ts.isInterfaceDeclaration(node.parent.parent) || kind === "implements"
             ? "type"
             : "value",

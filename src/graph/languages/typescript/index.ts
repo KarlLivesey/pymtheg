@@ -10,7 +10,7 @@ import type {
   ParseResult,
 } from "../../types.js";
 import { extractFile, type TargetFact } from "./extract.js";
-import { projectModel, toVirtual } from "./project.js";
+import { CONTEXT_PATTERNS, projectModel, toVirtual } from "./project.js";
 import { withChecker } from "./symbols.js";
 
 /**
@@ -36,12 +36,92 @@ const failed = (message: string): ParseResult => ({
   links: [],
 });
 
+/**
+ * Merges one file's results from equally ranked configs. Symbols are syntactic
+ * and identical; a link whose targets differ between configs gets the union of
+ * targets (candidates when every variant was complete) and, if any variant was
+ * incomplete, the reason `ambiguous-project`, so no config is silently picked.
+ */
+function mergeTied(
+  variants: ParseResult[],
+  configs: (string | null)[],
+): ParseResult {
+  if (variants.some((variant) => variant.status === "failed"))
+    return variants.find((variant) => variant.status === "failed")!;
+  const [first] = variants;
+  const same = (a: unknown, b: unknown) =>
+    JSON.stringify(a) === JSON.stringify(b);
+  if (
+    variants.some(
+      (variant) =>
+        !same(variant.symbols, first!.symbols) ||
+        variant.links.length !== first!.links.length ||
+        variant.links.some(
+          (link, index) =>
+            link.kind !== first!.links[index]!.kind ||
+            !same(link.range, first!.links[index]!.range),
+        ),
+    )
+  )
+    return failed(
+      `Equally ranked configs ${configs.join(", ")} produced different structure for this file`,
+    );
+  const links = first!.links.map((link, index) => {
+    const datas = variants.map(
+      (variant) =>
+        (variant.links[index]!.data ?? {}) as {
+          targets?: TargetFact[];
+          reason?: string;
+        },
+    );
+    const outcome = (data: { targets?: TargetFact[]; reason?: string }) => [
+      data.targets ?? [],
+      data.reason ?? null,
+    ];
+    if (datas.every((data) => same(outcome(data), outcome(datas[0]!))))
+      return link;
+    const targets = new Map<string, TargetFact>();
+    for (const data of datas)
+      for (const target of data.targets ?? [])
+        targets.set(`${target.file}\0${target.key}`, { ...target });
+    const merged: { [key: string]: Json } = {
+      ...(link.data as { [key: string]: Json }),
+      projects: [...configs],
+    };
+    delete merged.targets;
+    delete merged.reason;
+    if (targets.size)
+      merged.targets = [...targets.values()].map((t) => ({ ...t }));
+    if (datas.some((data) => data.reason)) merged.reason = "ambiguous-project";
+    return { ...link, data: merged };
+  });
+  const diagnostics = [
+    ...new Map(
+      variants
+        .flatMap((variant) => variant.diagnostics)
+        .map((diagnostic) => [JSON.stringify(diagnostic), diagnostic]),
+    ).values(),
+  ];
+  return {
+    ...first!,
+    status: variants.some((variant) => variant.status === "partial")
+      ? "partial"
+      : first!.status,
+    diagnostics,
+    links,
+    data: {
+      ...(first!.data as { [key: string]: Json }),
+      projects: [...configs],
+    },
+  };
+}
+
 const module: LanguageModule = {
   id: "typescript",
   version: MODULE_VERSION,
   // `.d.ts`, `.d.mts` and `.d.cts` are covered by the `.ts`, `.mts` and `.cts` claims.
   extensions: [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"],
-  contextFiles: ["tsconfig*.json", "jsconfig*.json", "package.json"],
+  contextFiles: CONTEXT_PATTERNS,
   analyze(context) {
     const files = context.files.filter(readable);
     // Unchanged snapshot: stored facts came from a complete analysis of these exact
@@ -65,6 +145,7 @@ const module: LanguageModule = {
     // A broken config or manifest fails only the files it governs, not the module.
     for (const [path, message] of model.failures)
       results.push({ path, result: failed(message) });
+    const tiedResults = new Map<string, ParseResult[]>();
     for (const group of model.groups) {
       if (!group.roots.length) continue;
       const program = ts.createProgram({
@@ -97,9 +178,19 @@ const module: LanguageModule = {
             `TypeScript extraction failed: ${error instanceof Error ? error.message : String(error)}`,
           );
         }
-        results.push({ path, result });
+        if (model.ties.has(path))
+          tiedResults.set(path, [...(tiedResults.get(path) ?? []), result]);
+        else results.push({ path, result });
       }
     }
+    for (const [path, variants] of tiedResults)
+      results.push({
+        path,
+        result: mergeTied(
+          variants,
+          model.ties.get(path)!.map((group) => group.config),
+        ),
+      });
     return results;
   },
   resolve({ symbols, links }) {
@@ -120,9 +211,12 @@ const module: LanguageModule = {
             .filter((id): id is string => id !== undefined),
         ),
       ];
-      // Never a guess: a lost or incomplete target set is not narrowed to one definite target.
+      // Never a guess: a set with a lost target (failed file) or a possible
+      // declaration outside the project (`reason`) is not narrowed, neither to
+      // one definite target nor to a candidate set that omits a possibility.
       const complete = ids.length === facts.length && !data?.reason;
-      if (ids.length === 1 && complete)
+      if (!complete) continue;
+      if (ids.length === 1)
         resolutions.push({ linkId: link.id, targetId: ids[0]! });
       else if (ids.length >= 2)
         resolutions.push({ linkId: link.id, candidateIds: ids });
