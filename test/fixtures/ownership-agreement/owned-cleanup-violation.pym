@@ -1,0 +1,13 @@
+// Negative control: the handler transitions a resource the flow still owns
+// from a state with no such transition, so both analyses must object.
+resource Lease {
+  states Held, Returned;
+  initial Held;
+  terminal Returned;
+  Held -> Returned;
+}
+op acquire() -> Lease effects(state.Lease) creates result;
+flow main() -> Unit effects(state.Lease) {
+  call acquire() as lease;
+  transition lease -> Returned;
+} on cancel { transition lease -> Returned; }

@@ -1,0 +1,18 @@
+// One resource is transferred while another is still owned, so the static
+// analysis checks the cancel handler against both at the same boundary.
+resource Lease {
+  states Held, Returned;
+  initial Held;
+  terminal Returned;
+  Held -> Returned;
+  Returned -> Returned;
+}
+op acquire() -> Lease effects(state.Lease) creates result;
+op hand_back(take lease: Lease) -> Unit effects(state.Lease)
+  settles lease on (Unit, Cancelled);
+flow main() -> Unit effects(state.Lease) {
+  call acquire() as a;
+  call acquire() as b;
+  call hand_back(take a);
+  transition b -> Returned;
+} on cancel { transition a -> Returned; transition b -> Returned; }
