@@ -1136,16 +1136,60 @@ export function flowGraph(plan: FlowProgram): FlowGraph {
         );
   if (scopeIssues.length && !states.some((state) => !!state.error))
     throw new FlowUnsupported(scopeIssues.join("; "));
+  const assumptions = [...plan.assumptions];
+  if (!propertyKinds(plan, states).length && !assumptions.includes(NO_PROPERTY))
+    assumptions.push(NO_PROPERTY);
   return {
     states,
     initial,
     edges,
-    assumptions: [...plan.assumptions],
+    assumptions,
     ...(scopeIssues.length ? { scopeIssues } : {}),
     entryId: plan.entry.id,
   };
 }
 
+// The executionSafe fallback carries this assumption. flowGraph() records it
+// in the graph it builds, so graphMachine() never has to change its inputs.
+const NO_PROPERTY =
+  "No explicit assertion, concrete contract, acquired resource or linked invariant was exercised; executionSafe carries no business-safety claim";
+// Property kinds the explored states can violate. Reads its arguments only.
+function propertyKinds(plan: FlowProgram, states: FlowState[]): string[] {
+  const reached = new Set(states.flatMap((s) => s.frames.map((f) => f.flow)));
+  const queue = [...reached];
+  for (let i = 0; i < queue.length; i++)
+    for (const edge of plan.ir.edges)
+      if (
+        edge.from === queue[i] &&
+        ["call", "rule"].includes(edge.kind) &&
+        !reached.has(edge.to)
+      ) {
+        reached.add(edge.to);
+        queue.push(edge.to);
+      }
+  const declarations = plan.ir.declarations.filter(
+    (d) => reached.has(d.id) && callable(d),
+  ) as Callable[];
+  const hasAssertion = (body: Stmt[]): boolean =>
+    body.some((s) => s.kind === "assert" || blocks(s).some(hasAssertion));
+  const kinds: string[] = [
+    ...new Set(states.flatMap((s) => (s.error ? [s.error.code] : []))),
+  ];
+  if (
+    declarations.some(
+      (d) => hasAssertion(d.body ?? []) || hasAssertion(d.cancel ?? []),
+    )
+  )
+    kinds.push("assertion");
+  if (declarations.some((d) => d.meta.requires.length))
+    kinds.push("precondition");
+  if (declarations.some((d) => d.kind !== "op" && d.meta.ensures.length))
+    kinds.push("postcondition");
+  if (states.some((s) => Object.keys(s.resources).length))
+    kinds.push("resource");
+  if (plan.protocols.size) kinds.push("environment");
+  return kinds;
+}
 export function graphMachine(
   plan: FlowProgram,
   graph: FlowGraph,
@@ -1185,48 +1229,8 @@ export function graphMachine(
     })),
     ...graph.edges.map((e) => ({ ...e, from: e.from + 1, to: e.to + 1 })),
   ];
-  const reached = new Set(
-    graph.states.flatMap((s) => s.frames.map((f) => f.flow)),
-  );
-  const queue = [...reached];
-  for (let i = 0; i < queue.length; i++)
-    for (const edge of plan.ir.edges)
-      if (
-        edge.from === queue[i] &&
-        ["call", "rule"].includes(edge.kind) &&
-        !reached.has(edge.to)
-      ) {
-        reached.add(edge.to);
-        queue.push(edge.to);
-      }
-  const declarations = plan.ir.declarations.filter(
-    (d) => reached.has(d.id) && callable(d),
-  ) as Callable[];
-  const hasAssertion = (body: Stmt[]): boolean =>
-    body.some((s) => s.kind === "assert" || blocks(s).some(hasAssertion));
-  const kinds: string[] = [
-    ...new Set(graph.states.flatMap((s) => (s.error ? [s.error.code] : []))),
-  ];
-  if (
-    declarations.some(
-      (d) => hasAssertion(d.body ?? []) || hasAssertion(d.cancel ?? []),
-    )
-  )
-    kinds.push("assertion");
-  if (declarations.some((d) => d.meta.requires.length))
-    kinds.push("precondition");
-  if (declarations.some((d) => d.kind !== "op" && d.meta.ensures.length))
-    kinds.push("postcondition");
-  if (graph.states.some((s) => Object.keys(s.resources).length))
-    kinds.push("resource");
-  if (plan.protocols.size) kinds.push("environment");
-  if (!kinds.length) {
-    kinds.push("execution");
-    plan.assumptions.add(
-      "No explicit assertion, concrete contract, acquired resource or linked invariant was exercised; executionSafe carries no business-safety claim",
-    );
-    graph.assumptions = [...plan.assumptions];
-  }
+  const kinds = propertyKinds(plan, graph.states);
+  if (!kinds.length) kinds.push("execution");
   return {
     kind: "machine",
     id: plan.entry.id,
