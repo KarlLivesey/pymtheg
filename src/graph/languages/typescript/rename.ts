@@ -58,6 +58,8 @@ export interface Renamed {
 const isJs = (path: string) => /\.(c|m)?jsx?$/.test(path);
 const isName = (value: string): value is Name =>
   (NAMES as readonly string[]).includes(value);
+/** All parameters of Node's CommonJS wrapper function that matter here. */
+const WRAPPER_PARAMS = new Set<string>([...NAMES, "__filename", "__dirname"]);
 const LETTERS = "fghjkqvwxzbcdpuyamnorstlei";
 const LEXICAL = ts.NodeFlags.Let | ts.NodeFlags.Const | ts.NodeFlags.Using;
 
@@ -379,7 +381,7 @@ export function classify(
 
   // ----- resolution -----
   const resolve = (occurrence: ts.Identifier, name: string): Binding => {
-    const wrapperName = isName(name);
+    const wrapperName = WRAPPER_PARAMS.has(name);
     let child: ts.Node = occurrence;
     for (let node = occurrence.parent; node; child = node, node = node.parent) {
       if (ts.isBlock(node) || ts.isModuleBlock(node)) {
@@ -457,8 +459,13 @@ export function classify(
           if (declared)
             return { declaration: declared, scope: node, mutable: true };
         }
-        const parameter = parameterNamed(node, name);
-        if (parameter && child !== node.name)
+        // A computed name or decorator is evaluated in the enclosing scope:
+        // neither the parameters nor the body are visible to it.
+        const parameter =
+          inParameters || child === node.body
+            ? parameterNamed(node, name)
+            : undefined;
+        if (parameter)
           for (const id of bindingNames(parameter.name))
             if (id.text === name)
               return { declaration: id.parent, scope: node, mutable: true };
@@ -469,7 +476,12 @@ export function classify(
         )
           return { declaration: node, scope: node, mutable: false };
       } else if (ts.isClassLike(node)) {
-        if (node.name?.text === name && child !== node.name)
+        // Class decorators run outside the class scope; computed keys inside it.
+        if (
+          node.name?.text === name &&
+          child !== node.name &&
+          !ts.isDecorator(child)
+        )
           return { declaration: node, scope: node, mutable: false };
       } else if (ts.isSourceFile(node)) {
         if (esm) {
@@ -563,10 +575,29 @@ export function classify(
   const wrapperArguments = (id: ts.Identifier): boolean => {
     if (ts.isPropertyAccessExpression(id.parent) && id.parent.name === id)
       return false;
-    if (resolve(id, "arguments").declaration) return false;
+    // A `var arguments` in the wrapper's own var scope does not replace the
+    // mapped arguments object (sloppy code); any other binding of that name
+    // (let/const/class/function/parameter/catch/import, or a var of a nested
+    // function) is a different binding.
+    const declared = resolve(id, "arguments").declaration;
+    if (
+      declared &&
+      !(
+        (ts.isVariableDeclaration(declared) || ts.isBindingElement(declared)) &&
+        !((listOf(declared)?.flags ?? LEXICAL) & LEXICAL) &&
+        varScopeOf(declared) === file
+      )
+    )
+      return false;
     // Arrow functions inherit `arguments`; any other function has its own.
-    for (let node = id.parent; node; node = node.parent) {
-      if (ts.isFunctionLike(node) && !ts.isArrowFunction(node)) return false;
+    // A computed name or decorator of a method is evaluated outside it.
+    let child: ts.Node = id;
+    for (let node = id.parent; node; child = node, node = node.parent) {
+      if (ts.isFunctionLike(node) && !ts.isArrowFunction(node)) {
+        const outside =
+          ("name" in node && node.name === child) || ts.isDecorator(child);
+        if (!outside) return false;
+      }
       if (ts.isClassStaticBlockDeclaration(node)) return false;
       if (ts.isSourceFile(node)) return true;
     }
@@ -613,7 +644,11 @@ export function classify(
     }
     return false;
   };
-  /** `x.length` or `x[i]` read: cannot change or leak the object. */
+  /**
+   * `x.length`, `x[i]` read, or a copy into a new array (`...x`,
+   * `Array.from(x)`, `Array.prototype.slice.call(x)`, `[].slice.call(x)`):
+   * none can change the object or let it escape. Passing `x` itself does.
+   */
   const harmlessRead = (id: ts.Identifier): boolean => {
     const parent = id.parent;
     const member =
@@ -621,15 +656,29 @@ export function classify(
         parent.expression === id &&
         parent.name.text === "length") ||
       (ts.isElementAccessExpression(parent) && parent.expression === id);
-    return member && !isWriteTarget(parent);
+    if (member) return !isWriteTarget(parent);
+    if (ts.isSpreadElement(parent) && !isWriteTarget(parent)) return true;
+    if (ts.isCallExpression(parent) && parent.arguments[0] === id) {
+      const callee = parent.expression;
+      const text = callee.getText(file).replace(/\s+/g, "");
+      return (
+        text === "Array.from" ||
+        text === "Array.prototype.slice.call" ||
+        text === "[].slice.call"
+      );
+    }
+    return false;
   };
 
   // ----- reassignment of the CommonJS wrapper's parameters -----
-  const reassigned = new Set<Name>();
+  const reassigned = new Set<string>();
   if (!esm) {
     const mark = (target: ts.Node): void => {
       if (ts.isIdentifier(target)) {
-        if (isName(target.text) && resolve(target, target.text).wrapper)
+        if (
+          WRAPPER_PARAMS.has(target.text) &&
+          resolve(target, target.text).wrapper
+        )
           reassigned.add(target.text);
       } else if (ts.isParenthesizedExpression(target)) mark(target.expression);
       else if (ts.isArrayLiteralExpression(target))
@@ -676,7 +725,7 @@ export function classify(
           ts.isForInStatement(list.parent) || ts.isForOfStatement(list.parent);
         if (!(list.flags & LEXICAL) && (node.initializer || loop))
           for (const id of bindingNames(node.name))
-            if (isName(id.text) && resolve(id, id.text).wrapper)
+            if (WRAPPER_PARAMS.has(id.text) && resolve(id, id.text).wrapper)
               reassigned.add(id.text);
       }
       // Sloppy wrapper code: its `arguments` object is mapped to the
@@ -688,18 +737,27 @@ export function classify(
         wrapperArguments(node) &&
         !harmlessRead(node)
       )
-        for (const name of NAMES) reassigned.add(name);
+        for (const name of WRAPPER_PARAMS) reassigned.add(name);
       ts.forEachChild(node, scan);
     };
     scan(file);
   }
 
-  // ----- createRequire by origin -----
-  const fromNodeModule = (specifier: ts.Expression | undefined) =>
+  // ----- factories by origin (createRequire, pathToFileURL) -----
+  const MODULE = new Set(["module", "node:module"]);
+  const URL_MODULE = new Set(["url", "node:url"]);
+  const fromModule = (
+    specifier: ts.Expression | undefined,
+    modules: ReadonlySet<string>,
+  ) =>
     !!specifier &&
     ts.isStringLiteralLike(specifier) &&
-    (specifier.text === "module" || specifier.text === "node:module");
-  const realRequireOf = (expression: ts.Expression): boolean => {
+    modules.has(specifier.text);
+  /** `require("m")` with a real `require` and `m` in `modules`. */
+  const realRequireOf = (
+    expression: ts.Expression,
+    modules: ReadonlySet<string> = MODULE,
+  ): boolean => {
     let value = expression;
     while (ts.isParenthesizedExpression(value)) value = value.expression;
     return (
@@ -707,45 +765,57 @@ export function classify(
       ts.isIdentifier(value.expression) &&
       value.expression.text === "require" &&
       value.arguments.length === 1 &&
-      fromNodeModule(value.arguments[0]) &&
+      fromModule(value.arguments[0], modules) &&
       classification(value.expression, "require") === "real"
     );
   };
-  /** An identifier bound to Node's `module` object (namespace/default import or const require). */
-  const isModuleObject = (id: ts.Identifier): boolean => {
+  /** An identifier bound to a Node builtin's module object (namespace/default import or const require). */
+  const isModuleObject = (
+    id: ts.Identifier,
+    modules: ReadonlySet<string> = MODULE,
+  ): boolean => {
     const declaration = resolve(id, id.text).declaration;
     if (!declaration) return false;
     if (ts.isNamespaceImport(declaration) || ts.isImportClause(declaration))
-      return fromNodeModule(
+      return fromModule(
         ts.findAncestor(declaration, ts.isImportDeclaration)?.moduleSpecifier,
+        modules,
       );
     return (
       ts.isVariableDeclaration(declaration) &&
       isConstBinding(declaration) &&
       !!declaration.initializer &&
-      realRequireOf(declaration.initializer)
+      realRequireOf(declaration.initializer, modules)
     );
   };
-  const isCreateRequire = (callee: ts.Expression): boolean => {
+  /**
+   * Whether a callee provably is the builtin export `exported` of one of
+   * `modules`, by origin and whatever its local name: a named import, a
+   * destructured real `require`, or a member of the module object.
+   */
+  const isBuiltin = (
+    callee: ts.Expression,
+    exported: string,
+    modules: ReadonlySet<string>,
+  ): boolean => {
     let value = callee;
     while (ts.isParenthesizedExpression(value)) value = value.expression;
     if (ts.isPropertyAccessExpression(value))
       return (
-        value.name.text === "createRequire" &&
+        value.name.text === exported &&
         (ts.isIdentifier(value.expression)
-          ? isModuleObject(value.expression)
-          : realRequireOf(value.expression))
+          ? isModuleObject(value.expression, modules)
+          : realRequireOf(value.expression, modules))
       );
     if (!ts.isIdentifier(value)) return false;
-    // By origin, whatever the local name (`import { createRequire as cr }`).
     const declaration = resolve(value, value.text).declaration;
     if (!declaration) return false;
     if (ts.isImportSpecifier(declaration))
       return (
-        (declaration.propertyName ?? declaration.name).text ===
-          "createRequire" &&
-        fromNodeModule(
+        (declaration.propertyName ?? declaration.name).text === exported &&
+        fromModule(
           ts.findAncestor(declaration, ts.isImportDeclaration)?.moduleSpecifier,
+          modules,
         )
       );
     if (ts.isBindingElement(declaration) && isConstBinding(declaration)) {
@@ -754,11 +824,11 @@ export function classify(
       while (!ts.isVariableDeclaration(root)) root = root.parent;
       return (
         ts.isIdentifier(key) &&
-        key.text === "createRequire" &&
+        key.text === exported &&
         ts.isObjectBindingPattern(declaration.parent) &&
         declaration.parent.parent === root &&
         !!(root as ts.VariableDeclaration).initializer &&
-        realRequireOf((root as ts.VariableDeclaration).initializer!)
+        realRequireOf((root as ts.VariableDeclaration).initializer!, modules)
       );
     }
     if (
@@ -769,16 +839,21 @@ export function classify(
       const init = declaration.initializer;
       return (
         ts.isPropertyAccessExpression(init) &&
-        init.name.text === "createRequire" &&
+        init.name.text === exported &&
         (ts.isIdentifier(init.expression)
-          ? isModuleObject(init.expression)
-          : realRequireOf(init.expression))
+          ? isModuleObject(init.expression, modules)
+          : realRequireOf(init.expression, modules))
       );
     }
     return false;
   };
 
-  /** `import.meta.url`, `import.meta.filename`, `__filename`, `pathToFileURL(__filename)`. */
+  /**
+   * The base is provably this file's own location: `import.meta.url` or
+   * `import.meta.filename` in an ES module whose `import.meta` the file never
+   * writes; the wrapper's own, never written `__filename` in CommonJS; or
+   * `pathToFileURL(<one of those>)` with `pathToFileURL` from `node:url`.
+   */
   const baseIsThisFile = (base: ts.Expression | undefined): boolean => {
     if (!base) return false;
     let value = base;
@@ -789,30 +864,59 @@ export function classify(
       value.expression.keywordToken === ts.SyntaxKind.ImportKeyword &&
       (value.name.text === "url" || value.name.text === "filename")
     )
-      return true;
+      return esm && !importMetaWritten();
     if (ts.isIdentifier(value) && value.text === "__filename")
-      return !resolve(value, "__filename").declaration;
-    if (ts.isCallExpression(value) && value.arguments.length === 1) {
-      const callee = value.expression;
-      const name = ts.isIdentifier(callee)
-        ? callee.text
-        : ts.isPropertyAccessExpression(callee)
-          ? callee.name.text
-          : "";
-      return name === "pathToFileURL" && baseIsThisFile(value.arguments[0]);
-    }
+      return (
+        !esm &&
+        !!resolve(value, "__filename").wrapper &&
+        !reassigned.has("__filename")
+      );
+    if (ts.isCallExpression(value) && value.arguments.length === 1)
+      return (
+        isBuiltin(value.expression, "pathToFileURL", URL_MODULE) &&
+        !tamperedWith("pathToFileURL", URL_MODULE) &&
+        baseIsThisFile(value.arguments[0])
+      );
     return false;
   };
+  /** Any write to, mutator call on, or escape of `import.meta`. */
+  let metaWritten: boolean | undefined;
+  const importMetaWritten = (): boolean => {
+    if (metaWritten !== undefined) return metaWritten;
+    metaWritten = false;
+    const scan = (node: ts.Node): void => {
+      if (metaWritten) return;
+      if (
+        ts.isMetaProperty(node) &&
+        node.keywordToken === ts.SyntaxKind.ImportKeyword
+      ) {
+        const parent = node.parent;
+        const read =
+          ts.isPropertyAccessExpression(parent) &&
+          parent.expression === node &&
+          !isWriteTarget(parent);
+        if (!read) metaWritten = true;
+      }
+      ts.forEachChild(node, scan);
+    };
+    scan(file);
+    return metaWritten;
+  };
   /**
-   * Whether this file could replace Node's `createRequire`: a write to any
-   * `createRequire` property, `Object.assign`/`defineProperty`-style calls
+   * Whether this file could replace the builtin `exported`: a write to any
+   * property of that name, an `Object.assign`/`defineProperty`-style call
    * mentioning it or given the module object, or the module object used as
    * anything but a member read.
    */
-  let tampered: boolean | undefined;
-  const createRequireTampered = (): boolean => {
-    if (tampered !== undefined) return tampered;
-    tampered = false;
+  const tamperMemo = new Map<string, boolean>();
+  const tamperedWith = (
+    exported: string,
+    modules: ReadonlySet<string>,
+  ): boolean => {
+    const known = tamperMemo.get(exported);
+    if (known !== undefined) return known;
+    tamperMemo.set(exported, false);
+    let tampered = false;
     const mutators = new Set([
       "assign",
       "defineProperty",
@@ -825,8 +929,8 @@ export function classify(
       const visit = (child: ts.Node): void => {
         if (found) return;
         if (
-          (ts.isStringLiteralLike(child) && child.text === "createRequire") ||
-          (ts.isIdentifier(child) && child.text === "createRequire")
+          (ts.isStringLiteralLike(child) && child.text === exported) ||
+          (ts.isIdentifier(child) && child.text === exported)
         )
           found = true;
         else ts.forEachChild(child, visit);
@@ -837,11 +941,10 @@ export function classify(
     const scan = (node: ts.Node): void => {
       if (tampered) return;
       if (
-        (ts.isPropertyAccessExpression(node) &&
-          node.name.text === "createRequire") ||
+        (ts.isPropertyAccessExpression(node) && node.name.text === exported) ||
         (ts.isElementAccessExpression(node) &&
           ts.isStringLiteralLike(node.argumentExpression) &&
-          node.argumentExpression.text === "createRequire")
+          node.argumentExpression.text === exported)
       )
         if (isWriteTarget(node)) tampered = true;
       if (ts.isCallExpression(node)) {
@@ -852,7 +955,7 @@ export function classify(
           node.arguments.some(
             (argument) =>
               mentions(argument) ||
-              (ts.isIdentifier(argument) && isModuleObject(argument)),
+              (ts.isIdentifier(argument) && isModuleObject(argument, modules)),
           )
         )
           tampered = true;
@@ -870,7 +973,7 @@ export function classify(
             ts.isVariableDeclaration(node.parent)) &&
           node.parent.name === node
         ) &&
-        isModuleObject(node)
+        isModuleObject(node, modules)
       ) {
         const parent = node.parent;
         const memberRead =
@@ -882,6 +985,7 @@ export function classify(
       ts.forEachChild(node, scan);
     };
     scan(file);
+    tamperMemo.set(exported, tampered);
     return tampered;
   };
 
@@ -929,7 +1033,8 @@ export function classify(
     }
     if (binding.wrapper) return reassigned.has(name) ? "uncertain" : "real";
     if (binding.free) {
-      if (esm && name === "require") assumed.add(occurrence);
+      if (esm && (name === "require" || name === "module"))
+        assumed.add(occurrence);
       return "real";
     }
     const declaration = binding.declaration!;
@@ -940,10 +1045,10 @@ export function classify(
       ts.isIdentifier(declaration.name) &&
       declaration.initializer &&
       ts.isCallExpression(declaration.initializer) &&
-      isCreateRequire(declaration.initializer.expression)
+      isBuiltin(declaration.initializer.expression, "createRequire", MODULE)
     ) {
       // The factory could have been replaced in this file.
-      if (createRequireTampered()) return "uncertain";
+      if (tamperedWith("createRequire", MODULE)) return "uncertain";
       // The base decides where it resolves: only this file's own location is modelled.
       if (!baseIsThisFile(declaration.initializer.arguments[0])) {
         reasons.set(occurrence, "createrequire-base");

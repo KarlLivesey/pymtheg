@@ -36,10 +36,13 @@ test("the require scope analysis and the emitted links agree with Node on every 
     );
     assert.deepEqual(report.analysisErrors, []);
     const links = store.links();
-    const depModule = store
-      .findSymbols({ file: "dep.cjs" })
-      .find((symbol) => symbol.kind === "module");
-    assert.ok(depModule, "dep.cjs is indexed");
+    const depSymbols = store.findSymbols({ file: "dep.cjs" });
+    assert.ok(
+      depSymbols.some((symbol) => symbol.kind === "module"),
+      "dep.cjs is indexed",
+    );
+    // Every symbol of the dependency: its module and its members.
+    const dep = { all: new Set(depSymbols.map((symbol) => symbol.id)) };
     const disagreements = [];
     let sites = 0;
     for (const item of cases) {
@@ -50,14 +53,7 @@ test("the require scope analysis and the emitted links agree with Node on every 
           disagreements.push(
             `${item.file} [${item.mode}] ${item.template} ${id}: node=${node[id]} ours=${ours[id]}`,
           );
-        const emitted = checkEmitted(
-          item,
-          id,
-          node[id],
-          ours[id],
-          links,
-          depModule.id,
-        );
+        const emitted = checkEmitted(item, id, node[id], ours[id], links, dep);
         if (emitted)
           disagreements.push(
             `${item.file} [${item.mode}] ${item.template} ${id}: emitted: ${emitted} (node=${node[id]} ours=${ours[id]})`,

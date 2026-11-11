@@ -15,9 +15,15 @@ export const CALLEES = {
   Q: "(0, require)",
   M: "module.require",
 };
-/** A call site: reports what the loader call reaches at this point. */
-const site = (id, form) =>
-  `__report(${JSON.stringify(id)}, () => ${CALLEES[form]}("./dep.cjs"))`;
+/**
+ * A call site: reports what the loader call reaches at this point, and uses
+ * a member of the value (`v.real()`), so the emitted member link is checked
+ * too. X sites (cross-file consumers) report an expression instead.
+ */
+const SITE_PREFIX = "{ const v = ";
+const siteFor = (id, expression) =>
+  `__report(${JSON.stringify(id)}, () => ${SITE_PREFIX}${expression}; v.real(); return v; })`;
+const site = (id, form) => siteFor(id, `${CALLEES[form]}("./dep.cjs")`);
 
 /**
  * Templates. `code` uses S0, S1, ... placeholders for call sites. `modes`
@@ -363,8 +369,101 @@ const TEMPLATES = [
     code: `const { createRequire: cr } = require("node:module");\nfunction g() { const require = cr(__filename); return S0; }\ng();`,
     modes: ["cjs", "cjs-strict"],
   },
+  // Round 8: `var arguments` keeps the mapped object; other bindings do not.
+  {
+    name: "var arguments then a write",
+    code: `var arguments;\narguments[1] = () => __fake();\nS0`,
+    modes: ["cjs"],
+    category: "dynamic",
+  },
+  {
+    name: "var arguments = arguments then a write",
+    code: `var arguments = arguments;\narguments[1] = () => __fake();\nS0`,
+    modes: ["cjs"],
+    category: "dynamic",
+  },
+  {
+    name: "let arguments then a write",
+    code: `let arguments = [];\narguments[1] = () => __fake();\nS0`,
+    modes: ["cjs"],
+  },
+  {
+    name: "function arguments then a write",
+    code: `function arguments() {}\narguments[1] = () => __fake();\nS0`,
+    modes: ["cjs"],
+  },
+  {
+    name: "arrow parameter named arguments",
+    code: `const f = (arguments) => { arguments[1] = () => __fake(); };\nf([]);\nS0`,
+    modes: ["cjs"],
+  },
+  // Round 8: computed keys are evaluated in the enclosing scope.
+  {
+    name: "class computed key writes wrapper arguments",
+    code: `class C { [arguments[1] = () => __fake()]() {} }\nS0`,
+    modes: ["cjs"],
+    category: "dynamic",
+  },
+  {
+    name: "object computed key writes wrapper arguments",
+    code: `({ [(arguments[1] = () => __fake(), "k")]() {} });\nS0`,
+    modes: ["cjs"],
+    category: "dynamic",
+  },
+  // Round 8: harmless copies of the wrapper's arguments.
+  {
+    name: "spread of wrapper arguments",
+    code: `function f() {}\nf(...arguments);\nS0`,
+    modes: ["cjs", "cjs-strict"],
+  },
+  {
+    name: "Array.from of wrapper arguments",
+    code: `const copy = Array.from(arguments);\nS0`,
+    modes: ["cjs", "cjs-strict"],
+  },
+  {
+    name: "slice.call of wrapper arguments",
+    code: `const copy = Array.prototype.slice.call(arguments);\nS0`,
+    modes: ["cjs", "cjs-strict"],
+  },
+  {
+    name: "wrapper arguments passed on",
+    code: `function keep(a) { return a; }\nkeep(arguments);\nS0`,
+    modes: ["cjs", "cjs-strict"],
+    category: "dynamic",
+  },
+  // Round 8: createRequire's base must be proven.
+  {
+    name: "createRequire with a reassigned __filename",
+    code: `const { createRequire } = require("node:module");\n__filename = __dirname + "/sub/x.cjs";\nfunction g() { const require = createRequire(__filename); return S0; }\ng();`,
+    modes: ["cjs"],
+    category: "base",
+  },
+  {
+    name: "createRequire with a local pathToFileURL",
+    code: `const { createRequire } = require("node:module");\nfunction pathToFileURL(f) { return require("node:url").pathToFileURL(__dirname + "/sub/x.cjs"); }\nfunction g() { const require = createRequire(pathToFileURL(__filename)); return S0; }\ng();`,
+    modes: ["cjs", "cjs-strict"],
+    category: "base",
+  },
+  {
+    name: "createRequire with node:url pathToFileURL",
+    code: `const { createRequire } = require("node:module");\nconst { pathToFileURL } = require("node:url");\nfunction g() { const require = createRequire(pathToFileURL(__filename)); return S0; }\ng();`,
+    modes: ["cjs", "cjs-strict"],
+  },
 ];
 const ESM_ONLY = [
+  {
+    name: "module.require in an ES module (bundler assumption)",
+    header: "",
+    category: "bundler",
+    code: `export {};\nM0`,
+  },
+  {
+    name: "createRequire(__filename) in an ES module",
+    header: "",
+    category: "base",
+    code: `import { createRequire } from "node:module";\nfunction g() { const require = createRequire(__filename); return S0; }\ng();`,
+  },
   {
     name: "import binding",
     header: "",
@@ -429,6 +528,37 @@ const ESM_ONLY = [
 const ESM_HEADER =
   'import { createRequire } from "node:module";\nconst require = createRequire(import.meta.url);\n';
 
+/**
+ * Cross-file pairs: an exporter (no sites) and a Node-run consumer whose X
+ * sites use an imported value (`v.real()`), so the emitted links in an
+ * importing file are checked against Node too. EXP/BARREL name the files.
+ */
+const CROSS = [
+  {
+    name: "bundler: named, default and namespace imports of a free require",
+    category: "bundler",
+    exporter: `export const d = require("./dep.cjs");\nconst alias = d;\nexport default d;\nexport { alias };`,
+    consumer: `import { d, alias } from "./EXP";\nimport dflt from "./EXP";\nimport * as ns from "./EXP";\nX0(d)\nX1(dflt)\nX2(ns.d)\nX3(alias)`,
+  },
+  {
+    name: "bundler: through a barrel",
+    category: "bundler",
+    exporter: `export const d = require("./dep.cjs");`,
+    barrel: true,
+    consumer: `import { d } from "./BARREL";\nX0(d)`,
+  },
+  {
+    name: "createRequire exporter, consumed",
+    exporter: `import { createRequire } from "node:module";\nconst require = createRequire(import.meta.url);\nexport const d = require("./dep.cjs");`,
+    consumer: `import { d } from "./EXP";\nX0(d)`,
+  },
+  {
+    name: "local require exporter, consumed",
+    exporter: `function require(n) { return __fake(); }\nexport const d = require("./dep.cjs");`,
+    consumer: `import { d } from "./EXP";\nX0(d)`,
+  },
+];
+
 /** The corpus: [{file, mode, template, category, code, sites: [id]}]. */
 export function buildCorpus() {
   const cases = [];
@@ -436,12 +566,20 @@ export function buildCorpus() {
   const add = (template, mode, code) => {
     const sites = [];
     const forms = {};
-    const text = code.replace(/\b([SPQM])(\d)\b/g, (_, form, n) => {
-      const id = `c${index}s${n}`;
-      sites.push(id);
-      forms[id] = form;
-      return site(id, form);
-    });
+    const siteTexts = {};
+    const text = code
+      .replace(/\b([SPQM])(\d)\b/g, (_, form, n) => {
+        const id = `c${index}s${n}`;
+        sites.push(id);
+        forms[id] = form;
+        return (siteTexts[id] = site(id, form));
+      })
+      .replace(/\bX(\d)\(([^)\n]*)\)/g, (_, n, expression) => {
+        const id = `c${index}x${n}`;
+        sites.push(id);
+        forms[id] = "X";
+        return (siteTexts[id] = siteFor(id, expression));
+      });
     const extension = mode === "esm" ? "mjs" : "cjs";
     cases.push({
       file: `case${String(index).padStart(3, "0")}.${extension}`,
@@ -451,6 +589,7 @@ export function buildCorpus() {
       code: text,
       sites,
       forms,
+      siteTexts,
     });
     index++;
   };
@@ -466,6 +605,40 @@ export function buildCorpus() {
     }
   for (const template of ESM_ONLY)
     add(template, "esm", template.header + template.code);
+  CROSS.forEach((pair, n) => {
+    const exporter = `cross${n}-exporter.mjs`;
+    const barrel = `cross${n}-barrel.mjs`;
+    const category = pair.category ?? "static";
+    cases.push({
+      file: exporter,
+      mode: "esm",
+      template: `${pair.name} (exporter)`,
+      category,
+      code: pair.exporter + "\n",
+      sites: [],
+      forms: {},
+      siteTexts: {},
+    });
+    if (pair.barrel)
+      cases.push({
+        file: barrel,
+        mode: "esm",
+        template: `${pair.name} (barrel)`,
+        category,
+        code: `export * from "./${exporter}";\n`,
+        sites: [],
+        forms: {},
+        siteTexts: {},
+      });
+    add(
+      { name: `${pair.name} (consumer)`, category },
+      "esm",
+      pair.consumer
+        .replace("./EXP", `./${exporter}`)
+        .replace(/\.\/EXP/g, `./${exporter}`)
+        .replace("./BARREL", `./${barrel}`) + "\n",
+    );
+  });
   return cases;
 }
 
@@ -476,7 +649,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 const [list, out] = process.argv.slice(2);
 const results = {};
 let current = [];
-globalThis.__fake = () => ({ marker: "LOCAL" });
+globalThis.__fake = () => ({ marker: "LOCAL", real() {} });
 globalThis.__report = (id, call) => {
   try {
     const value = call();
@@ -508,20 +681,20 @@ export async function runOracle(scratch, cases) {
   await mkdir(scratch, { recursive: true });
   await writeFile(
     join(scratch, "dep.cjs"),
-    'module.exports = { marker: "REAL" };\n',
+    'module.exports = { marker: "REAL", real() {} };\n',
   );
   await mkdir(join(scratch, "sub"), { recursive: true });
   await writeFile(
     join(scratch, "sub", "dep.cjs"),
-    'module.exports = { marker: "SUB" };\n',
+    'module.exports = { marker: "SUB", real() {} };\n',
   );
   await writeFile(
     join(scratch, "fake.mjs"),
-    'export function require() { return { marker: "LOCAL" }; }\n',
+    'export function require() { return { marker: "LOCAL", real() {} }; }\n',
   );
   await writeFile(
     join(scratch, "fake-default.mjs"),
-    'export default function () { return { marker: "LOCAL" }; }\n',
+    'export default function () { return { marker: "LOCAL", real() {} }; }\n',
   );
   for (const item of cases)
     await writeFile(join(scratch, item.file), item.code);
@@ -546,7 +719,12 @@ export async function runOracle(scratch, cases) {
   const out = join(scratch, "results.json");
   execFileSync(
     process.execPath,
-    [join(scratch, "runner.mjs"), join(scratch, "list.json"), out],
+    [
+      ...process.execArgv.filter((flag) => flag.startsWith("--stack-size")),
+      join(scratch, "runner.mjs"),
+      join(scratch, "list.json"),
+      out,
+    ],
     // A hang guard, not a correctness criterion.
     { cwd: scratch, stdio: "ignore", timeout: 600_000 },
   );
@@ -555,14 +733,14 @@ export async function runOracle(scratch, cases) {
 
 /** Offset of the site's callee identifier (`require`, or `module` for M). */
 const calleeStart = (item, id) => {
-  const marker = `__report(${JSON.stringify(id)}, () => `;
+  const marker = `__report(${JSON.stringify(id)}, () => ${SITE_PREFIX}`;
   const start = item.code.indexOf(marker) + marker.length;
   const form = item.forms[id];
   return form === "P" ? start + 1 : form === "Q" ? start + 4 : start;
 };
 /** Offset of the site's specifier string `"./dep.cjs"`. */
 export const specifierStart = (item, id) => {
-  const marker = `__report(${JSON.stringify(id)}, () => `;
+  const marker = `__report(${JSON.stringify(id)}, () => ${SITE_PREFIX}`;
   return (
     item.code.indexOf(marker) +
     marker.length +
@@ -576,6 +754,10 @@ export function analyse(classify, item) {
   const occurrences = classify(`/${item.file}`, item.code);
   const result = {};
   for (const id of item.sites) {
+    if (item.forms[id] === "X") {
+      result[id] = "n/a";
+      continue;
+    }
     const start = calleeStart(item, id);
     const occurrence = occurrences.find((o) => o.start === start);
     result[id] = occurrence ? occurrence.classification : "missing";
@@ -585,6 +767,7 @@ export function analyse(classify, item) {
 
 /** Whether an analysis answer agrees with Node for a case category. */
 export function agrees(category, node, ours) {
+  if (ours === "n/a") return true; // cross-file X sites: emitted links only
   if (ours === "missing") return false;
   if (category === "bundler") return node === "error" && ours === "real";
   if (node === "real") {
@@ -601,35 +784,80 @@ export function agrees(category, node, ours) {
 }
 
 /**
- * What the module EMITTED at a site must agree with Node: an import link
- * resolved to dep.cjs exactly where Node used the real loader and the
- * analysis says so; none where Node did not; a flagged one for the bundler
- * reading. Returns a problem description or null.
+ * What the module EMITTED at a site must agree with Node. The import link at
+ * the specifier, and the member link `v.real` of the site's value (in the
+ * site's own file, which for X sites is an importing file):
+ *  - none into dep.cjs where Node used something local, threw, or resolved
+ *    elsewhere;
+ *  - where Node used the real loader and the analysis says so: a resolved
+ *    import, and a member resolved into dep.cjs (forms the compiler does not
+ *    type give an `untyped-require` member instead);
+ *  - for the bundler reading: links into dep.cjs flagged `data.assumes`.
+ * Returns a problem description or null.
  */
-export function checkEmitted(item, id, node, ours, links, depModuleId) {
-  const start = specifierStart(item, id);
-  const found = links.filter(
+export function checkEmitted(item, id, node, ours, links, dep) {
+  const into = (link) =>
+    dep.all.has(link.targetId) ||
+    link.candidates.some((candidate) => dep.all.has(candidate.id));
+  const form = item.forms[id];
+  const siteStart = item.code.indexOf(item.siteTexts[id]);
+  const siteEnd = siteStart + item.siteTexts[id].length;
+  const members = links.filter(
     (link) =>
       link.file === item.file &&
-      link.kind === "imports" &&
-      link.range.start === start,
+      link.kind === "calls" &&
+      link.targetName === "v.real" &&
+      link.range.start >= siteStart &&
+      link.range.end <= siteEnd,
   );
-  const intoDep = found.filter(
-    (link) =>
-      link.targetId === depModuleId ||
-      link.candidates.some((candidate) => candidate.id === depModuleId),
-  );
+  if (members.length !== 1)
+    return `expected one v.real link, found ${members.length}`;
+  const member = members[0];
+  const imports =
+    form === "X"
+      ? []
+      : links.filter(
+          (link) =>
+            link.file === item.file &&
+            link.kind === "imports" &&
+            link.range.start === specifierStart(item, id),
+        );
+  const importsIntoDep = imports.filter(into);
+  const untyped = form === "P" || form === "Q" || form === "M";
   if (item.category === "bundler") {
-    if (intoDep.length !== 1) return "expected one import link into dep.cjs";
-    return intoDep[0].data?.assumes === "bundler-require"
-      ? null
-      : "bundler link without data.assumes";
+    if (form !== "X") {
+      if (importsIntoDep.length !== 1)
+        return "expected one import link into dep.cjs";
+      if (importsIntoDep[0].data?.assumes !== "bundler-require")
+        return "bundler import without data.assumes";
+    }
+    if (member.data?.assumes !== "bundler-require")
+      return "bundler member link without data.assumes";
+    if (!untyped && !into(member))
+      return "bundler member link not into dep.cjs";
+    return null;
   }
-  if (node === "real" && ours === "real")
-    return intoDep.length === 1 && intoDep[0].resolution === "resolved"
-      ? null
-      : `expected a resolved import of dep.cjs, found ${found.length} link(s)`;
-  return intoDep.length
-    ? "an import link into dep.cjs where Node did not use the real loader"
-    : null;
+  if (node === "real" && (ours === "real" || form === "X")) {
+    if (
+      form !== "X" &&
+      !(
+        importsIntoDep.length === 1 &&
+        importsIntoDep[0].resolution === "resolved"
+      )
+    )
+      return `expected a resolved import of dep.cjs, found ${imports.length} link(s)`;
+    if (untyped)
+      return member.data?.reason === "untyped-require"
+        ? null
+        : `expected an untyped-require member, got ${member.resolution} ${member.data?.reason}`;
+    if (!(member.resolution === "resolved" && into(member)))
+      return `expected the member resolved into dep.cjs, got ${member.resolution} ${member.data?.reason}`;
+    if (member.data?.assumes) return "an assumes flag on a real link";
+    return null;
+  }
+  if (importsIntoDep.length)
+    return "an import link into dep.cjs where Node did not use the real loader";
+  if (into(member))
+    return "a member link into dep.cjs where Node did not use the real loader";
+  return null;
 }

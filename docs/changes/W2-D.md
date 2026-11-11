@@ -94,7 +94,7 @@ link across packages.
 **Unchanged snapshot reuse.** When `changedFiles` and `changedContextFiles`
 are both empty and every stored result was produced by this module version
 (which embeds the compiler version; the leading number is bumped whenever
-extraction or resolution semantics change, and is now 5), the stored facts are
+extraction or resolution semantics change, and is now 6), the stored facts are
 returned as they are:
 no program is built and nothing is parsed. They are the complete analysis of the
 identical snapshot, and `resolve` re-derives every target from them. Any source,
@@ -202,7 +202,7 @@ identity or diagnostic (a test asserts this over all stored facts). Files
 record `data.renamedForCompiler`.
 
 **Exact, and tested against Node.** `test/graph-typescript-scope-oracle.test.mjs`
-generates 205 small files (312 call sites; summary in
+generates 236 small files (341 call sites; summary in
 `evidence/w2-d/scope-oracle.txt`). They cover every declaration form:
 - function declarations at top level, in a function, in a block, in nested
   blocks, in labelled and `switch` blocks, and duplicated;
@@ -225,7 +225,16 @@ generates 205 small files (312 call sites; summary in
   (`new URL("./sub/", import.meta.url)`), and spoofed;
 - the call forms `require(…)`, `(require)(…)`, `(0, require)(…)` and
   `module.require(…)`, plain and shadowed;
-- a free `require` in an ES module.
+- a free `require` in an ES module, and `module.require` in an ES module;
+- `var arguments` (also `= arguments`), `let`/function/parameter named
+  `arguments`, and the wrapper's `arguments` written from a computed class or
+  object key, spread, `Array.from`/`slice.call` copies, and passed on;
+- `createRequire` with a reassigned `__filename`, with a local
+  `pathToFileURL`, with `node:url`'s `pathToFileURL`, and with `__filename`
+  in an ES module;
+- cross-file pairs (exporter and Node-run consumer): named, default,
+  namespace and barrel imports of a free-`require` value, of a
+  `createRequire` value, and of a local-`require` value.
 
 Each form appears in sloppy CommonJS, strict CommonJS and ES modules where it is
 valid. The test runs every file in Node (one child process, sequential) and
@@ -236,12 +245,17 @@ the analysis' classification of the callee, and the links the module actually
 - where Node used something local (or threw), there must be no link into the
   dependency;
 - where Node used the real loader and the analysis says so, there must be a
-  resolved import of it;
-- for the bundler reading of a free ES-module `require`, the link must carry
-  `data.assumes`.
+  resolved import of it, and the member call `v.real()` on the value must
+  resolve into it. For the forms the compiler does not type, it must instead
+  be `untyped-require`;
+- where Node used something local, threw or loaded another directory, neither
+  the import nor the member may link into it;
+- for the bundler reading, the import and the member must carry
+  `data.assumes`. Cross-file sites check the member link in the importing
+  file.
 
-Result: **0 classification and 0 emitted-link disagreements**. 278 static
-sites match exactly: 130 local, 130 real, and 18 where Node throws (TDZ, an
+Result: **0 classification and 0 emitted-link disagreements**. 289 static
+sites match exactly: 130 local, 141 real, and 18 where Node throws (TDZ, an
 undefined hoisted var, an early error), classified local. The model that this
 verifies:
 - **Block scope.** `let`/`const`/`class`/block functions are block-scoped. A
@@ -276,12 +290,22 @@ static answer:
 - the CommonJS wrapper binding when the file reassigns it anywhere: `var
   require = …` at top level, `require = …`, compound or destructuring
   assignment, or `for (require of …)`;
-- in sloppy CommonJS code, any use of the **wrapper's** `arguments`
-  (`arguments` is mapped to the parameters `exports, require, module`) other
-  than a plain read (`arguments.length`, `arguments[i]`). Writing, deleting,
-  passing on, returning or aliasing it counts. Which function's `arguments`
-  an occurrence denotes is resolved: arrows inherit it, and any other
-  function has its own;
+- in sloppy CommonJS code, any use of the **wrapper's** `arguments` other
+  than a plain read or a copy. `arguments` is mapped to the parameters
+  `exports, require, module, __filename, __dirname`. Plain reads are
+  `arguments.length` and `arguments[i]`; copies are `...arguments`,
+  `Array.from(arguments)`, `Array.prototype.slice.call(arguments)` and
+  `[].slice.call(arguments)`. Writing, deleting, passing `arguments` itself
+  on, returning it or aliasing it counts. Which function's `arguments` an
+  occurrence denotes is resolved:
+  - arrows inherit it;
+  - a computed member key or a decorator is evaluated in the enclosing scope,
+    not the method's;
+  - a `var arguments` (with or without `= arguments`) in the wrapper's own var
+    scope does not replace the mapped object;
+  - any other binding of that name is a different binding: `let`/`const`, a
+    function, a parameter, or a nested function's `var`;
+  - any other function has its own `arguments`.
 - a `createRequire` result when the file could have replaced the factory: a
   write to any `createRequire` property, an
   `Object.assign`/`defineProperty`/`defineProperties`/`Reflect.set`/
@@ -290,13 +314,22 @@ static answer:
 
 Such a `require("x")` gives an `imports` link that is unresolved with reason
 `dynamic-scope`, with `x` kept in `data.targets`. The call and members of its
-value are `dynamic-scope` too, and the file is partial with a diagnostic. 30
+value are `dynamic-scope` too, and the file is partial with a diagnostic. 36
 oracle sites are in this category; the analysis says `uncertain` (or the exact
 answer) and never "real" where Node did not use the real loader.
 
-A `createRequire` whose base is not this file's own location (`import.meta.url`,
-`import.meta.filename`, `__filename` or `pathToFileURL(__filename)`) resolves
-from somewhere else. One example is `createRequire(new URL("./sub/",
+A `createRequire` base counts as this file's own location only when that is
+**proven**:
+- `import.meta.url`/`import.meta.filename` in an ES module whose
+  `import.meta` the file never writes or lets escape;
+- the wrapper's own `__filename` in CommonJS, unshadowed and never written,
+  including through the wrapper's `arguments`;
+- `pathToFileURL(<one of those>)`, where `pathToFileURL` provably comes from
+  `node:url`/`url` (the same origin test as `createRequire`) and is never
+  replaced.
+
+`__filename` in an ES module and `import.meta` in CommonJS make Node throw,
+and are not this file. Any other base resolves from somewhere else. One example is `createRequire(new URL("./sub/",
 import.meta.url))`. Its requires are unresolved with reason
 `createrequire-base`, the specifier kept, and no would-be target, because the
 target from this file would be the wrong one. Indirect eval
@@ -321,20 +354,27 @@ an import edge; it is never a wrong link.
   occurrences are `uncertain`/`dynamic-scope`. In other files `require` keeps
   its CommonJS meaning, and their `require("x")` calls are emitted as import
   edges.
-- **Free `require` in an ES module.** In an ES-module-syntax file (or a `.js`
-  file under `"type": "module"`) this is treated as the loader (bundler
-  semantics); Node itself throws a ReferenceError there. Every link that rests
-  on that reading carries `data.assumes: "bundler-require"`: the import, its
-  bindings, and calls and members reached through them. An agent can
-  therefore tell the assumption from a fact.
+- **Free `require` (and `module.require`) in an ES module.** In an
+  ES-module-syntax file (or a `.js` file under `"type": "module"`) this is
+  treated as the loader (bundler semantics); Node itself throws a
+  ReferenceError there. Every link that rests on that reading carries
+  `data.assumes: "bundler-require"`, in this file and in others: the import,
+  its bindings, and the calls and members reached through them. The flag is
+  carried along alias chains step by step (imports, re-exports,
+  `export * from` barrels, `export default value`), and through variable and
+  destructuring initialisers (`const alias = d`) and the members of a receiver
+  chain (`ns.d.real()`). An agent can therefore tell the assumption from a
+  fact.
 - **Monkey-patching the loader.** Replacing `Module.prototype.require` or
   `Module._load` (as mocking libraries do), or mutating Node's `module` object
   from another file, is outside the binding model. Such code is read as
   ordinary CommonJS.
 - **Other callee forms.** These forms of the real loader are supported and
   linked (`data.calleeForm`): `require(…)`, `(require)(…)`, `(0, require)(…)`
-  and `module.require(…)`. The compiler types none of the last three, so their
-  bindings are not typed (reason `untyped-require`). These forms are not
+  and `module.require(…)`. The compiler types none of the last three. Their
+  bindings (`const p = (0, require)("x")`, `const { a } = …`) are emitted as
+  `imports` links unresolved with reason `untyped-require`, and so are calls
+  and members through them (`p.real()`). These forms are not
   linked: `require.call(…)`, `.apply`, `.bind`, an alias variable
   (`const r = require; r(…)`), a tagged template, `new require(…)`, a
   `{ require }` shorthand and `[require][0](…)`.
@@ -361,8 +401,11 @@ own resolver over the snapshot.
 | `computed-specifier` | `import(expr)` or JS `require(expr)` with a non-literal specifier |
 | `compiler-limit` | The TypeScript checker exhausted its stack on this lookup (deep inference chains); the file is partial |
 | `dynamic-scope` | A `require`/`module`/`exports` whose meaning is decided at run time (see above), anything reached through its value, and unresolved names inside a `with` body |
-| `not-a-module` | A binding from a captured file that has no imports or exports (a script). The import edge itself links to that file and carries `data.notAModule: true`; that flag means exactly this and nothing else |
-| `untyped-require` | A binding from a captured module required by a form the compiler does not type (`(0, require)(…)`, `module.require(…)`, an escaped `require`). The import edge links to the module |
+| `not-a-module` | A binding from a captured file that was analysed, has no syntax errors, and has no imports or exports (a script). The import edge itself links to that file and carries `data.notAModule: true`; that flag means exactly this and nothing else |
+| `partial-target` | A binding from a captured file with syntax errors and no exports found (its exports cannot be ruled out) |
+| `target-unavailable` | The target file failed analysis (parser, binder, scope analysis or a broken config); the import edge and its bindings are unresolved, the file kept in `data.targets` |
+| `untyped-require` | A binding, call or member reached through a captured module required by a form the compiler does not type (`(0, require)(…)`, `(require)(…)`, `module.require(…)`, an escaped `require`). The import edge links to the module |
+| `partial-declaration` | The target, or the structure a lookup went through, is at or after the first syntax error inside its declaration (see Status) |
 | `createrequire-base` | A require through `createRequire` with a base other than this file's location; no would-be target is kept |
 | `renamed-export` | An ES binding of an export named `require`/`module`/`exports` between a JS file and a TS file or a CommonJS property, whose spellings differ for the compiler |
 | `ambiguous-project` | Equally ranked configs disagree and at least one has no complete answer; their targets are kept |
@@ -387,7 +430,36 @@ imports of `./orig` are not linked to it; backlog).
 ## Status and errors
 
 - A syntax error makes the file **partial** with the compiler's syntactic
-  diagnostics (ranged); its recovered symbols stay linkable with partial status.
+  diagnostics (ranged). Heritage grammar the parser accepts but that has no
+  meaning also makes it partial, with a diagnostic: `class C extends A, B`,
+  two `extends` clauses, `extends` after `implements`, or `implements` on an
+  interface.
+- **What a partial declaration supports.** The exact rule, applied to the
+  target side of every link:
+  - **Existence and name.** A declaration may be linked when its name token
+    lies wholly before the first error inside its top-level declaration. So a
+    call to `function f(x: , y) {}` links to `f`, `new Base()` links to a
+    truncated `class Base`, and an import of the file links to its module.
+  - **Recovered structure.** A definite link may use a declaration's
+    structure (members, parameters, return type, heritage clauses, type
+    parameters, an aliased type) only where that part lies wholly before the
+    first error inside the declaration. For example: `x.b()` with
+    `interface I { a: ; b(): void }` is withheld because `b` follows the
+    error; `f(1, 2).go()` is withheld because f's return type follows its
+    error; `new Base().m()` with a truncated `class Base { m() {} ` links,
+    because `m` precedes the error.
+  - **Heritage clauses.** A heritage clause that is not wholly before the
+    first error of its declaration supports nothing. Members inherited
+    through it are withheld, and the `extends`/`implements` links written in
+    it are withheld too.
+  - **Other routes.** Receivers are judged the same way: every name, member
+    and callee in a receiver chain, plus an unannotated callback parameter
+    typed by the callee it is passed to.
+  - **Labelling.** Withheld links are unresolved with reason
+    `partial-declaration`, the would-be target kept in `data.targets`. Like
+    any incomplete set, they never make a candidate set complete.
+  - **Containment.** Only the declaration containing the error is affected.
+    Intact declarations elsewhere in the same file link normally.
 - **Compiler stack limits.** The checker's inference recurses once per step, so
   a long chain (`let v1 = v0; …` or `function f1() { return f0(); } …`) can
   exhaust the stack.
@@ -407,6 +479,22 @@ imports of `./orig` are not linked to it; backlog).
   - **Caps.** After 25 rebuilds for one file that file fails, and the checker
     is rebuilt before the next file. After 200 rebuilds in one project, the
     remaining files fail with a diagnostic saying so.
+- **Tests and stack size.** No stack-limit test depends on the machine's
+  stack size:
+  - The binder test runs in a fresh Node process that searches for a nesting
+    depth at which parsing succeeds and binding overflows, then requires the
+    binder outcome at that depth. If no such depth exists, it is reported as
+    an explicit skip.
+  - The reversed-chain, independence and nested-parentheses tests check that
+    their overflow actually happened, and otherwise skip that part with a
+    reason.
+  - The warm-up results hold at any stack size.
+
+  Checked with `node --stack-size=700 --test` and `node --stack-size=2048
+  --test`: 84 of 84 pass, with no skip needed at either size. Node rejects
+  `--stack-size` inside `NODE_OPTIONS`. The test runner passes it on to its
+  per-file processes, and the tests forward it to the child processes they
+  start.
 - **Parser and binder stack limits.** Each file parses in its own guard, so a
   file the parser cannot handle (10,000 nested parentheses) fails alone. The
   binder runs when the checker is created. On a binder overflow the offending
@@ -556,7 +644,7 @@ Full numbers, the comparison across rounds and all four hand checks are in
   from `external` to `external-package` (item 3). Hand checks found no wrong
   link in any round: round 1 checked 24 resolved, 12 unresolved and all 4
   candidate sets; rounds 2 to 6, each with a new seed, checked 30 resolved,
-  15 unresolved and all 4 candidate sets. Rounds 6 and 7 leave BullMQ's
+  15 unresolved and all 4 candidate sets. Rounds 6 to 8 leave BullMQ's
   totals identical to round 5.
 - **A project with a local `require`: `requirejs`** (`7faea649`, 406 files, 0
   failed). 133 files are renamed (`require` in 116, `exports` in 73, `module`

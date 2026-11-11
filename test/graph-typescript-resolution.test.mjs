@@ -2260,7 +2260,7 @@ test("renamed names agree across files and never bind to a look-alike export", a
   });
 });
 
-test("checker stack limits: warm-up makes a deep chain clean; an overflow stays contained", async () => {
+test("checker stack limits: warm-up makes a deep chain clean; an overflow stays contained", async (t) => {
   // Return-type chains: f(i+1) returns f(i)(). Declared in this order, the
   // source-order warm-up computes each return type on top of the previous one.
   const forward = [
@@ -2294,14 +2294,27 @@ test("checker stack limits: warm-up makes a deep chain clean; an overflow stays 
     },
     async (graph, report) => {
       assert.deepEqual(report.failed, []);
-      // Needs the source-order warm-up: without it this lookup overflows.
+      // Holds at any stack size: each warm-up step builds on a computed one.
       assert.equal(graph.store.getFile("forward.ts").result.status, "clean");
       assert.equal(
         graph.target(graph.link("forward.ts", "go", "calls")),
         "forward.ts#Box.go",
       );
-      // Still overflows: that one link is compiler-limit, the file partial, the rest intact.
+      assert.equal(
+        graph.target(graph.link("other.ts", "x", "calls")),
+        "other.ts#x",
+      );
+      // The containment part needs the 10,000-step chain to overflow, which
+      // depends on the stack size: if it does not, that part is unresolved.
       const deep = graph.store.getFile("deep.ts").result;
+      if (
+        graph.link("deep.ts", "go", "calls").data.reason !== "compiler-limit"
+      ) {
+        t.skip(
+          "the 10,000-step chain did not overflow at this stack size; containment not exercised",
+        );
+        return;
+      }
       assert.equal(deep.status, "partial");
       assert.match(
         deep.diagnostics.map((d) => d.message).join("\n"),
@@ -2337,12 +2350,23 @@ test("checker stack limits: warm-up makes a deep chain clean; an overflow stays 
   );
 });
 
-test("a parser stack overflow fails only that file", async () => {
+test("a parser stack overflow fails only that file", async (t) => {
   const nested = `export const x = ${"(".repeat(10000)}1${")".repeat(10000)};\n`;
   await project(
     { "nested.ts": nested, "fine.ts": "export function f() {}\nf();\n" },
     async (graph, report) => {
       assert.deepEqual(report.analysisErrors, []);
+      assert.equal(
+        graph.target(graph.link("fine.ts", "f", "calls")),
+        "fine.ts#f",
+      );
+      // Whether 10,000 parentheses overflow the parser depends on the stack.
+      if (graph.store.getFile("nested.ts").result.status !== "failed") {
+        t.skip(
+          "10,000 nested parentheses parsed at this stack size; containment not exercised",
+        );
+        return;
+      }
       assert.deepEqual(report.failed, ["nested.ts"]);
       assert.match(
         graph.store.getFile("nested.ts").result.diagnostics[0].message,
@@ -2399,50 +2423,73 @@ for (const [key, value] of [
     );
   });
 
-test("a binder stack overflow fails only that file", async () => {
-  // Stack thresholds shift as the JIT optimises a long-running process, so
-  // this runs in a fresh Node process: there 1,600 nested blocks parse but
-  // overflow the binder (measured window about 1,500-1,700 under the
-  // indexer). Without containment that overflow is a module-wide analysis
-  // error; the assertions below would then fail.
+test("a binder stack overflow fails only that file", async (t) => {
+  // The depth at which the binder (but not the parser) overflows depends on
+  // the stack size and on how warm the JIT is. So a fresh Node process
+  // searches for it: it grows the nesting until indexing gives anything
+  // other than a clean file. If that is a binder failure, the containment
+  // is asserted at that depth; if the parser fails first, there is no such
+  // depth on this machine and the test reports that as unresolved (a skip).
   const scratch = await mkdtemp(join(tmpdir(), "pymtheg-binder-"));
   try {
-    const root = join(scratch, "project");
-    await mkdir(root);
-    await writeFile(
-      join(root, "blocks.js"),
-      "{".repeat(1600) + "}".repeat(1600) + "\n",
-    );
-    await writeFile(join(root, "fine.ts"), "export function f() {}\nf();\n");
     const script = join(scratch, "run.mjs");
     const dist = new URL("../dist/graph/", import.meta.url).href;
     await writeFile(
       script,
       [
+        `import { mkdir, writeFile, rm } from "node:fs/promises";`,
+        `import { join } from "node:path";`,
         `import { indexProject, LanguageRegistry, SqliteGraphStore } from ${JSON.stringify(dist + "index.js")};`,
         `import ts from ${JSON.stringify(dist + "languages/typescript/index.js")};`,
-        `const store = new SqliteGraphStore(${JSON.stringify(join(scratch, "g.sqlite"))}, "binder");`,
-        `const report = await indexProject(${JSON.stringify(root)}, new LanguageRegistry([ts]), store);`,
-        `const fine = store.links().find((l) => l.file === "fine.ts" && l.kind === "calls");`,
-        "console.log(JSON.stringify({ analysisErrors: report.analysisErrors, failed: report.failed,",
-        '  message: store.getFile("blocks.js").result.diagnostics[0]?.message, fine: fine?.resolution }));',
-        "store.close();",
+        `const scratch = ${JSON.stringify(scratch)};`,
+        "let result = { found: false };",
+        "for (let depth = 200; depth <= 8000; depth += 50) {",
+        "  const root = join(scratch, `p${depth}`);",
+        "  await mkdir(root, { recursive: true });",
+        '  await writeFile(join(root, "blocks.js"), "{".repeat(depth) + "}".repeat(depth) + "\\n");',
+        '  await writeFile(join(root, "fine.ts"), "export function f() {}\\nf();\\n");',
+        '  const store = new SqliteGraphStore(join(scratch, `g${depth}.sqlite`), "binder");',
+        "  const report = await indexProject(root, new LanguageRegistry([ts]), store);",
+        '  const message = store.getFile("blocks.js").result.diagnostics[0]?.message ?? null;',
+        '  const fine = store.links().find((l) => l.file === "fine.ts" && l.kind === "calls")?.resolution ?? null;',
+        "  store.close();",
+        "  await rm(root, { recursive: true, force: true });",
+        "  if (!report.failed.length && !report.analysisErrors.length) continue;",
+        '  result = { found: /binder exhausted its stack/.test(message ?? ""), depth, analysisErrors: report.analysisErrors, failed: report.failed, message, fine };',
+        "  break;",
+        "}",
+        "console.log(JSON.stringify(result));",
       ].join("\n"),
     );
     const { execFileSync } = await import("node:child_process");
     const out = JSON.parse(
-      execFileSync(process.execPath, [script], { encoding: "utf8" }),
+      // Inherit a --stack-size given to this process, so the search runs
+      // under the same stack as the test.
+      execFileSync(
+        process.execPath,
+        [
+          ...process.execArgv.filter((flag) => flag.startsWith("--stack-size")),
+          script,
+        ],
+        { encoding: "utf8" },
+      ),
     );
+    if (!out.found) {
+      t.skip(
+        `no nesting depth at which parsing succeeds and the binder overflows on this machine (first failure: ${out.message ?? "none up to 8,000"}); binder containment not exercised`,
+      );
+      return;
+    }
     assert.deepEqual(out.analysisErrors, []);
     assert.deepEqual(out.failed, ["blocks.js"]);
-    assert.match(out.message, /(binder exhausted its stack|parser failed)/);
+    assert.match(out.message, /binder exhausted its stack/);
     assert.equal(out.fine, "resolved");
   } finally {
     await rm(scratch, { recursive: true, force: true });
   }
 });
 
-test("one file's checker overflow does not change another file's facts", async () => {
+test("one file's checker overflow does not change another file's facts", async (t) => {
   // b.ts depends on a 1,000-step return-type chain in a.ts (needs warm-up).
   const a = [
     "export class Box { go() { return 1; } }",
@@ -2483,8 +2530,12 @@ test("one file's checker overflow does not change another file's facts", async (
   });
   // The overflowing file sorts between a.ts and b.ts in extraction order.
   await project({ "a.ts": a, "aa-deep.ts": deep, "b.ts": b }, async (graph) => {
-    assert.equal(graph.store.getFile("aa-deep.ts").result.status, "partial");
+    // The other file's facts must match whether or not anything overflowed.
     assert.deepEqual(facts(graph), alone);
+    if (graph.store.getFile("aa-deep.ts").result.status !== "partial")
+      t.skip(
+        "the 10,000-step chain did not overflow at this stack size; independence after a rebuild not exercised",
+      );
   });
 });
 
@@ -2689,4 +2740,208 @@ test("reviewers' round 7 reproductions: no link into the module where Node uses 
     assert.ok(linksInto(graph, "strictargs.js").includes("calls s.real"));
     await assertNoFreshNames(graph, files);
   });
+});
+
+test("the bundler assumption travels through aliases, destructuring, re-exports and barrels", async () => {
+  const depCjs = "module.exports = { real() {} };\n";
+  await project(
+    {
+      "dep.cjs": depCjs,
+      "a.mjs": [
+        'export const d = require("./dep.cjs");',
+        "const alias = d;",
+        "alias.real();",
+        'const { real } = require("./dep.cjs");',
+        "export { real };",
+        "export default d;",
+        "",
+      ].join("\n"),
+      "barrel.mjs": 'export * from "./a.mjs";\n',
+      "consumer.ts": [
+        'import { d, real } from "./a.mjs";',
+        'import dflt from "./a.mjs";',
+        'import { d as viaBarrel } from "./barrel.mjs";',
+        "d.real();",
+        "real();",
+        "dflt.real();",
+        "viaBarrel.real();",
+        "",
+      ].join("\n"),
+      "c.js": 'import * as ns from "./a.mjs";\nns.d.real();\n',
+    },
+    async (graph) => {
+      const dep = new Set(
+        graph.store.findSymbols({ file: "dep.cjs" }).map((s) => s.id),
+      );
+      const intoDep = (l) =>
+        dep.has(l.targetId) || l.candidates.some((c) => dep.has(c.id));
+      for (const file of ["a.mjs", "consumer.ts", "c.js"]) {
+        const reached = graph.store
+          .links()
+          .filter(
+            (l) => l.file === file && intoDep(l) && l.kind !== "contains",
+          );
+        assert.ok(reached.length > 0, file);
+        for (const link of reached)
+          assert.equal(
+            link.data.assumes,
+            "bundler-require",
+            `${file} ${link.kind} ${link.targetName}`,
+          );
+      }
+      // The consumer's bindings and calls are among them.
+      for (const name of ["d.real", "real", "dflt.real", "viaBarrel.real"])
+        assert.ok(
+          graph.store
+            .links()
+            .some(
+              (l) =>
+                l.file === "consumer.ts" && l.targetName === name && intoDep(l),
+            ),
+          name,
+        );
+    },
+  );
+});
+
+test("partial declarations: name-only links stay, structure after the first error is withheld", async () => {
+  await project(
+    {
+      "broken.ts": [
+        "export interface I { a: ; b(): void }",
+        "export function f(x: , y): Box { return new Box(); }",
+        "export class Box { go() {} }",
+        "export class Base { m() {} ",
+        "",
+      ].join("\n"),
+      "heritage.ts": [
+        "export class Root { r() {} }",
+        "export class Other {}",
+        "export class C extends Root, Other {}",
+        "export class Good extends Root {}",
+        "",
+      ].join("\n"),
+      "use.ts": [
+        'import { I, f, Base, Box } from "./broken";',
+        'import { C, Good } from "./heritage";',
+        "export function run(x: I, c: C, g: Good) {",
+        "  x.b();",
+        "  f(1, 2);",
+        "  f(1, 2).go();",
+        "  new Box().go();",
+        "  new Base().m();",
+        "  c.r();",
+        "  g.r();",
+        "}",
+        "",
+      ].join("\n"),
+    },
+    async (graph, report) => {
+      const call = (name) =>
+        graph.store
+          .links()
+          .find(
+            (l) =>
+              l.file === "use.ts" &&
+              l.kind === "calls" &&
+              l.targetName === name,
+          );
+      // `b` follows the error inside I: withheld, target kept.
+      const b = call("x.b");
+      assert.equal(b.resolution, "unresolved");
+      assert.equal(b.data.reason, "partial-declaration");
+      assert.equal(b.data.targets.length, 1);
+      // The name of f is intact: the call links; nothing through its return type.
+      assert.equal(graph.target(call("f")), "broken.ts#f");
+      const text = graph.store.getFile("use.ts").text;
+      const goAt = (expression) => {
+        const start =
+          text.indexOf(expression) + expression.length - "go".length;
+        return graph.store
+          .links()
+          .find(
+            (l) =>
+              l.file === "use.ts" &&
+              l.kind === "calls" &&
+              l.range.start === start,
+          );
+      };
+      // Nothing resolves through f's return type, which follows the error.
+      const through = goAt("f(1, 2).go");
+      assert.equal(through.resolution, "unresolved");
+      assert.equal(through.data.reason, "partial-declaration");
+      // Intact declarations elsewhere in the file are unaffected (containment).
+      assert.equal(graph.target(goAt("new Box().go")), "broken.ts#Box.go");
+      // The module itself is linked: its existence does not depend on its contents.
+      assert.equal(
+        graph.target(graph.link("use.ts", '"./broken"', "imports")),
+        "broken.ts#broken.ts",
+      );
+      // `m` precedes the error in the truncated class.
+      assert.equal(graph.target(call("(expression).m")), "broken.ts#Base.m");
+      // A heritage clause with a grammar error supports nothing.
+      assert.equal(call("c.r").data.reason, "partial-declaration");
+      assert.equal(graph.target(call("g.r")), "heritage.ts#Root.r");
+      assert.ok(report.partial.includes("heritage.ts"));
+      const extendsLinks = graph.store
+        .links()
+        .filter((l) => l.file === "heritage.ts" && l.kind === "extends");
+      for (const link of extendsLinks.filter(
+        (l) =>
+          l.range.start <
+          graph.store.getFile("heritage.ts").text.indexOf("Good"),
+      ))
+        assert.equal(link.data.reason, "partial-declaration");
+    },
+  );
+});
+
+test("indirect loader forms emit untyped-require bindings and members", async () => {
+  await project(
+    {
+      "dep.ts": dep6,
+      "p.js":
+        'const p = (0, require)("./dep");\np.real();\nconst { real } = (require)("./dep");\n',
+    },
+    async (graph) => {
+      const whole = graph.link("p.js", "p", "imports");
+      assert.equal(whole.data.reason, "untyped-require");
+      assert.equal(
+        graph.link("p.js", "real", "imports").data.reason,
+        "untyped-require",
+      );
+      const member = graph.store
+        .links()
+        .find((l) => l.file === "p.js" && l.targetName === "p.real");
+      assert.equal(member.data.reason, "untyped-require");
+    },
+  );
+});
+
+test("failed and partial targets get their own reasons, never not-a-module", async () => {
+  await project(
+    {
+      "failed.js":
+        'export {};\nfunction require(n) { return {}; }\n\\u{0072}equire("x");\n',
+      "partial.js": "var x = ;\n",
+      "use.js":
+        'const f = require("./failed");\nconst q = require("./partial");\n',
+    },
+    async (graph, report) => {
+      assert.ok(report.failed.includes("failed.js"));
+      const failedEdge = graph.link("use.js", '"./failed"', "imports");
+      assert.equal(failedEdge.data.notAModule, undefined);
+      assert.equal(failedEdge.data.reason, "target-unavailable");
+      assert.equal(
+        graph.link("use.js", "f", "imports").data.reason,
+        "target-unavailable",
+      );
+      const partialEdge = graph.link("use.js", '"./partial"', "imports");
+      assert.equal(partialEdge.data.notAModule, undefined);
+      assert.equal(
+        graph.link("use.js", "q", "imports").data.reason,
+        "partial-target",
+      );
+    },
+  );
 });

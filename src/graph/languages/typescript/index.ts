@@ -31,7 +31,7 @@ import {
  * facts; resolve maps those facts to symbol IDs. See docs/changes/W2-D.md.
  */
 // Bump the leading number whenever extraction or resolution semantics change.
-const MODULE_VERSION = `5+typescript-${ts.version}`;
+const MODULE_VERSION = `6+typescript-${ts.version}`;
 
 /** Observation counters for tests (programs built, files extracted). Not a correctness input. */
 export const statistics = { programs: 0, extracted: 0, reused: 0 };
@@ -163,6 +163,14 @@ const module: LanguageModule = {
     for (const [path, message] of model.failures)
       results.push({ path, result: failed(message) });
     const tiedResults = new Map<string, ParseResult[]>();
+    // Bundler-assumption offsets per file, for links that cross files.
+    const assumedSets = new Map<string, ReadonlySet<number>>();
+    for (const [path, renamed] of model.renames)
+      if (renamed.assumed.length)
+        assumedSets.set(path, new Set(renamed.assumed));
+    const none: ReadonlySet<number> = new Set();
+    const assumedIn = (path: string) => assumedSets.get(path) ?? none;
+    const anyAssumed = assumedSets.size > 0;
     for (const group of model.groups) {
       if (!group.roots.length) continue;
       // The host caches parsed files, so rebuilding a program after a
@@ -304,21 +312,33 @@ const module: LanguageModule = {
         ).resolvedModule?.resolvedFileName;
         return resolved === undefined ? undefined : fromVirtual(resolved);
       };
-      /** A captured file with ES or CommonJS exports (not a plain script). */
-      const isModule = (path: string): boolean => {
+      /**
+       * What a captured target file is. `script` means only: analysed, no
+       * syntax errors, and no ES or CommonJS exports. A file that failed to
+       * parse or bind is `unavailable`; one with syntax errors and no exports
+       * found is `partial` (its exports cannot be ruled out).
+       */
+      const moduleKind = (
+        path: string,
+      ): "module" | "script" | "partial" | "unavailable" => {
+        if (model.parseFailures.has(path) || model.failures.has(path))
+          return "unavailable";
         const source =
           program.getSourceFile(toVirtual(path)) ??
           host.getSourceFile(toVirtual(path), ts.ScriptTarget.Latest);
-        if (!source) return false;
+        if (!source) return "unavailable";
         const flags = source as ts.SourceFile & {
           externalModuleIndicator?: unknown;
           commonJsModuleIndicator?: unknown;
+          parseDiagnostics?: readonly ts.Diagnostic[];
         };
-        return (
+        if (
           !!flags.externalModuleIndicator ||
           !!flags.commonJsModuleIndicator ||
           /(^|[^.\w$])(module\.exports|exports\.[\w$]+)\s*=/.test(source.text)
-        );
+        )
+          return "module";
+        return flags.parseDiagnostics?.length ? "partial" : "script";
       };
       for (const root of group.roots) {
         const path = root.slice(1);
@@ -374,7 +394,9 @@ const module: LanguageModule = {
                 ...(renamed ? { renamed } : {}),
                 resolveModule,
                 skip,
-                isModule,
+                moduleKind,
+                assumedIn,
+                anyAssumed,
               },
             );
             statistics.extracted++;
