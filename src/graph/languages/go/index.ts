@@ -126,10 +126,17 @@ function analyze({
     // Notes written by a previous analyze are recomputed from scratch.
     const links = file.result.links.map((link) => {
       const data = link.data as { [key: string]: Json } | undefined;
-      if (!data || !("overflow" in data || "builtin" in data)) return link;
-      const { overflow: _overflow, builtin: _builtin, ...rest } = data;
+      if (!data || !("overflow" in data || "builtin" in data || "open" in data))
+        return link;
+      const {
+        overflow: _overflow,
+        builtin: _builtin,
+        open: _open,
+        ...rest
+      } = data;
       void _overflow;
       void _builtin;
+      void _open;
       return { ...link, data: rest };
     });
     next.set(file.path, { ...file.result, symbols, links });
@@ -153,6 +160,7 @@ function analyze({
         data: {
           ...((link.data as { [key: string]: Json } | undefined) ?? {}),
           ...(note.builtin ? { builtin: true } : {}),
+          ...(note.open ? { open: { reason: note.open } } : {}),
           ...(note.overflow
             ? {
                 overflow: {
@@ -176,7 +184,7 @@ function analyze({
 
 const go: LanguageModule = {
   id: ID,
-  version: "5",
+  version: "6",
   extensions: [".go"],
   contextFiles: ["go.mod", "go.work"],
   parse,

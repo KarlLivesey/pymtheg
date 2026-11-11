@@ -246,7 +246,9 @@ export class GoExtractor {
       case "inst":
         return { k: "inst", x: next(desc.x) };
       case "call":
-        return { k: "call", f: next(desc.f), i: desc.i };
+        return desc.b
+          ? { k: "call", f: next(desc.f), i: desc.i, b: next(desc.b) }
+          : { k: "call", f: next(desc.f), i: desc.i };
       case "elem":
       case "key":
         return { k: desc.k, x: next(desc.x) };
@@ -461,6 +463,11 @@ export class GoExtractor {
         if (kind === "alias" || kind === "type") {
           const underlying = this.typeRef(type);
           if (underlying) data.underlying = { ...underlying };
+          // A named func type: its result types are written in its declaration.
+          if (unparen(type).type === "function_type")
+            data.fn = this.resultDescs(
+              unparen(type).childForFieldName("result"),
+            ) as unknown as Json[];
         }
         if (kind === "struct") this.structFields(name.text, key, type);
         else if (kind === "interface")
@@ -877,12 +884,23 @@ export class GoExtractor {
         const callee = unparen(fn);
         const args = named(current.childForFieldName("arguments"));
         if (callee.type === "identifier" && !this.local(callee.text)) {
-          // new(T), make(T, …) and append(s, …) have syntactically evident results.
-          if ((callee.text === "new" || callee.text === "make") && args[0])
-            return callee.text === "new"
+          // new(T), make(T, …) and append(s, …) have syntactically evident results
+          // only if the builtin is what is called. A package-level declaration in
+          // any file may shadow it, so resolution decides: `b` is used only when
+          // the name does not resolve to a declaration.
+          const hint =
+            (callee.text === "new" || callee.text === "make") && args[0]
               ? this.typedValue(args[0])
-              : this.typedValue(args[0]);
-          if (callee.text === "append" && args[0]) return this.desc(args[0]);
+              : callee.text === "append" && args[0]
+                ? this.desc(args[0])
+                : undefined;
+          if (hint)
+            return {
+              k: "call",
+              f: { k: "name", n: callee.text },
+              i: 0,
+              b: hint,
+            };
         }
         const f = this.calleeDesc(callee);
         return f ? { k: "call", f, i: 0 } : { k: "unknown" };
@@ -1247,7 +1265,12 @@ export class GoExtractor {
 
   private typeIdentifier(node: Node): void {
     const name = node.text;
-    if (this.local(name) || PREDECLARED_TYPES.has(name)) return;
+    if (
+      this.local(name) ||
+      PREDECLARED_TYPES.has(name) ||
+      PREDECLARED_VALUES.has(name)
+    )
+      return;
     this.link("references", name, range(node), { t: { n: name } });
   }
 }

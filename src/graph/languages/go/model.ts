@@ -21,8 +21,11 @@ export type Desc =
   | { k: "sel"; x: Desc; n: string }
   /** A value whose named type is syntactically evident (declared type, literal, new, assertion). */
   | { k: "val"; t: TypeRef }
-  /** Result `i` of calling `f` (function, method, conversion or func value). */
-  | { k: "call"; f: Desc; i: number }
+  /**
+   * Result `i` of calling `f` (function, method, conversion or func value). `b`: the
+   * result if `f` turns out to be the builtin itself (`new`, `make`, `append`).
+   */
+  | { k: "call"; f: Desc; i: number; b?: Desc }
   /** The callee `x[…]` of a call: a generic instantiation when x is a function, else an element. */
   | { k: "inst"; x: Desc }
   /** An element (`elem`) or key (`key`) of a slice/map/channel/array value: range, index, receive. */

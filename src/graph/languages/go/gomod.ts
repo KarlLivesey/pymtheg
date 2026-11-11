@@ -172,25 +172,31 @@ export function directoryOfImport(
         workspace.uses.includes(module.directory),
       )
     : [own];
-  // A versioned replace applies only when that exact version is the one required.
-  // The captured go.mod files are the only evidence of the selected version; when
-  // they do not establish it, the replacement is not applied (Go would fetch
-  // another version from the module cache, outside the project).
-  const selected = (item: GoModuleRoot, modules: GoModule[]) =>
-    item.version === undefined ||
-    (modules.some((main) => main.requires.get(item.path) === item.version) &&
-      modules.every(
-        (main) =>
-          !main.requires.has(item.path) ||
-          main.requires.get(item.path) === item.version,
-      ));
+  // A versioned replace applies only to the version Go selects. Selection is the
+  // maximum required version across the build's main modules (every `use`d module
+  // in a workspace), which is what the captured go.mod files establish. When they
+  // do not establish it (no requirement, or an unparsable version), the replacement
+  // is not applied: Go would fetch a version from the module cache instead.
+  const selectedVersion = (path: string): string | undefined => {
+    let best: string | undefined;
+    for (const main of mains) {
+      const version = main.requires.get(path);
+      if (version === undefined) continue;
+      if (!parseVersion(version)) return undefined;
+      if (best === undefined || compareVersions(version, best) > 0)
+        best = version;
+    }
+    return best;
+  };
+  const applies = (item: GoModuleRoot) =>
+    item.version === undefined || selectedVersion(item.path) === item.version;
   const replaced = new Map<string, GoModuleRoot>();
   for (const main of mains)
     for (const item of main.replacements)
-      if (!replaced.has(item.path) && selected(item, [main]))
+      if (!replaced.has(item.path) && applies(item))
         replaced.set(item.path, item);
   for (const item of workspace?.replacements ?? [])
-    if (selected(item, mains)) replaced.set(item.path, item);
+    if (applies(item)) replaced.set(item.path, item);
   const matches = (path: string) =>
     importPath === path || importPath.startsWith(`${path}/`);
   let best: { root: GoModuleRoot; main?: GoModule } | undefined;
@@ -218,4 +224,48 @@ export function directoryOfImport(
   )
     return undefined;
   return directory;
+}
+
+/** Semantic version parts, or undefined when not a `vMAJOR.MINOR.PATCH[-pre][+build]` version. */
+function parseVersion(
+  version: string,
+): { numbers: number[]; pre: string } | undefined {
+  const match =
+    /^v(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/.exec(
+      version,
+    );
+  if (!match) return undefined;
+  return {
+    numbers: [Number(match[1]), Number(match[2]), Number(match[3])],
+    pre: match[4] ?? "",
+  };
+}
+/** Semantic version order (pre-releases before their release; build metadata ignored). */
+export function compareVersions(a: string, b: string): number {
+  const left = parseVersion(a)!;
+  const right = parseVersion(b)!;
+  for (let index = 0; index < 3; index++)
+    if (left.numbers[index] !== right.numbers[index])
+      return left.numbers[index]! - right.numbers[index]!;
+  if (left.pre === right.pre) return 0;
+  if (!left.pre) return 1;
+  if (!right.pre) return -1;
+  const leftParts = left.pre.split(".");
+  const rightParts = right.pre.split(".");
+  for (
+    let index = 0;
+    index < Math.max(leftParts.length, rightParts.length);
+    index++
+  ) {
+    const x = leftParts[index];
+    const y = rightParts[index];
+    if (x === undefined) return -1;
+    if (y === undefined) return 1;
+    const xn = /^\d+$/.test(x);
+    const yn = /^\d+$/.test(y);
+    if (xn && yn && Number(x) !== Number(y)) return Number(x) - Number(y);
+    if (xn !== yn) return xn ? -1 : 1;
+    if (x !== y) return x < y ? -1 : 1;
+  }
+  return 0;
 }
