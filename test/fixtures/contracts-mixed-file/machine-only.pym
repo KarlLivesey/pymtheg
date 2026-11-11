@@ -1,0 +1,6 @@
+// Behaviour only: there is no interface contract to check.
+machine Kettle {
+  state boiled: Bool = false;
+  event reachBoil when !boiled { boiled = true; }
+  invariant settled = boiled || !boiled;
+}

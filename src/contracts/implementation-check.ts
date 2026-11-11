@@ -1,4 +1,5 @@
 import type { Scaffold } from "./scaffold.js";
+import { isNotContractMaterial } from "./document.js";
 import { z } from "zod";
 export const implementationCheckOptionsSchema = z
   .object({
@@ -29,14 +30,47 @@ export function emitImplementationCheck(
   scaffold: Scaffold,
   options: ImplementationCheckOptions,
 ) {
+  // Only an explicit not-contract-material marker is exempt; every other
+  // omission (unresolved, unsupported, plugin-declared) still refuses.
+  const unresolved = scaffold.omitted.filter((o) => !isNotContractMaterial(o)),
+    notChecked = scaffold.omitted
+      .filter(isNotContractMaterial)
+      .map(({ name, reason }) => ({ name, reason }));
   if (
     scaffold.mode !== "contracts" ||
-    scaffold.omitted.length ||
+    unresolved.length ||
     scaffold.format !== options.target
   )
     throw Error(
-      "Generate complete contracts before creating an implementation check.",
+      "Generate complete contracts before creating an implementation check." +
+        (unresolved.length
+          ? ` ${unresolved.length} contract declaration${unresolved.length === 1 ? " is" : "s are"} unresolved or unsupported: ` +
+            unresolved
+              .slice(0, 5)
+              .map((o) => `${o.name} (${o.reason})`)
+              .join("; ") +
+            (unresolved.length > 5 ? "; …" : "") +
+            ". Repair them; the check is not generated from partial contracts."
+          : ""),
     );
+  if (!scaffold.symbols.length && notChecked.length)
+    throw Error(
+      "This design has no interface contracts to check: " +
+        notChecked.map((o) => o.name).join(", ") +
+        " describe behaviour, which an implementation check does not cover.",
+    );
+  const notCheckedComment = notChecked.length
+    ? `// Not part of this contract check (behaviour, not interface contracts): ${notChecked
+        .map((o) => o.name.replace(/[\x00-\x1f\x7f]/g, " "))
+        .join(", ")}.\n`
+    : "";
+  const notCheckedNote = notChecked.length
+    ? ` Not part of this contract check: ${notChecked
+        .map((o) => o.name)
+        .join(
+          ", ",
+        )} (behavioural machines; check them with simulate or verify).`
+    : "";
   const type = options.implementationType;
   if (
     options.target !== "typescript" &&
@@ -92,9 +126,12 @@ export function emitImplementationCheck(
       "Declare this file as a module in the implementation crate and run cargo check. The trait bound checks signatures, not behaviour.";
   }
   return {
-    source,
+    source: notCheckedComment
+      ? source.replace(/^(\/\/[^\n]*\n)/, `$1${notCheckedComment}`)
+      : source,
     extension,
-    instructions,
+    instructions: instructions + notCheckedNote,
+    notChecked,
     snapshotId: scaffold.snapshotId,
     guarantee: "compiler-input-only" as const,
   };

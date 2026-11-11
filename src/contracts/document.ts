@@ -57,8 +57,38 @@ export interface ContractDocument {
   outputMode?: OutputMode;
   sourceRoot?: string;
   declarations: ContractDeclaration[];
-  omitted: { name: string; reason: string }[];
+  omitted: ContractOmission[];
 }
+/**
+ * Contract material the output should cover but cannot (unresolved source,
+ * dependency or type, or an unsupported construct). No `applicability` field:
+ * every omission without the explicit not-applicable marker below, including
+ * those added by plugins or read from older documents, blocks any claim of
+ * complete contracts.
+ */
+export interface UnresolvedContractOmission {
+  name: string;
+  reason: string;
+  applicability?: never;
+}
+/**
+ * A declaration that is not interface-contract material at all (a behavioural
+ * machine). It is still listed so no output claims to cover it, but it does not
+ * make the contracts incomplete for an implementation check.
+ */
+export interface NotApplicableContractOmission {
+  name: string;
+  reason: string;
+  applicability: "not-contract-material";
+}
+export type ContractOmission =
+  | UnresolvedContractOmission
+  | NotApplicableContractOmission;
+/** True only for the explicit marker; anything else is treated as unresolved. */
+export const isNotContractMaterial = (
+  omission: ContractOmission,
+): omission is NotApplicableContractOmission =>
+  omission.applicability === "not-contract-material";
 /** The sole typed-IR to output boundary. No emitter makes semantic decisions. */
 export function contractDocument(
   ir: ProjectIR,
@@ -106,11 +136,22 @@ export function contractDocument(
   };
   for (const d of ir.declarations) {
     if (d.kind === "machine") {
-      omitted.push({
-        name: d.name,
-        reason:
-          "Behavioural machines are specifications, not callable implementation contracts.",
-      });
+      // In a partially parsed file the machine says nothing about which
+      // contracts were lost, so coverage there stays unresolved.
+      omitted.push(
+        recoveredFiles.has(d.span.file)
+          ? {
+              name: d.name,
+              reason:
+                "Source could not be fully parsed; contract coverage of this file is unknown.",
+            }
+          : {
+              name: d.name,
+              reason:
+                "Behavioural machines are specifications, not callable implementation contracts.",
+              applicability: "not-contract-material",
+            },
+      );
       continue;
     }
     const headerEnd = callable(d)

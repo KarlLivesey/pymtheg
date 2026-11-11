@@ -1,0 +1,12 @@
+// A design that keeps behaviour and interface contracts in one file.
+machine Kettle {
+  state heating: Bool = false;
+  state boiled: Bool = false;
+  event switchOn when !heating && !boiled { heating = true; }
+  event reachBoil when heating { heating = false; boiled = true; }
+  invariant notBoth = !(heating && boiled);
+}
+type BoilError = NoWater | Overheated;
+type Reading = { celsius: Nat };
+op boil(litres: Nat) -> Result<Reading, BoilError>;
+op readTemperature() -> Reading;
