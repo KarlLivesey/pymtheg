@@ -276,6 +276,19 @@ Found during the restic re-run and fixed:
 
 The module version is 5.
 
+## Core after PR 11 (W2-I)
+
+The branch is merged with `main` after PR 11 (the linear-time core, on-disk schema
+3). No module change was needed:
+
+- The stricter conformance kit re-indexes every sample source with a blank line
+  inserted at the top and requires unchanged symbol IDs. It passes with no
+  `identityEditExclusions`, because Go identities hold no offsets: package and
+  file symbols use names, and methods use receiver-qualified names.
+- restic now indexes in 15.6 s, and an unchanged re-run takes 6.7 s (observations;
+  see `evidence/w2-b/restic.md`), with identical results.
+- Graph databases from before schema 3 must be rebuilt.
+
 ## Observations on a real project
 
 restic at `c734245f` (shallow clone in scratch; no source copied):
