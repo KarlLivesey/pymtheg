@@ -242,6 +242,8 @@ class GoResolver {
   private localTypes = new Map<string, GraphSymbol>();
   /** Types with a method whose declaration header has a syntax error. */
   private brokenReceivers = new Set<string>();
+  /** Packages with a method header in a syntax error whose receiver is unreadable. */
+  private brokenPackages = new Set<string>();
   private byFileKey = new Map<string, GraphSymbol>();
   private decls = new Map<string, Map<string, GraphSymbol[]>>();
   private members = new Map<string, GraphSymbol[]>();
@@ -337,6 +339,7 @@ class GoResolver {
         }
         pkg.files.push(file.path);
         info.pkg = pkg;
+        if (fact.unattributable) this.brokenPackages.add(key);
       }
       this.files.set(file.path, info);
     }
@@ -365,11 +368,13 @@ class GoResolver {
         symbol.kind === "method" &&
         data.receiver !== undefined &&
         (symbol.data as { broken?: boolean } | undefined)?.broken
-      )
+      ) {
         // A method whose header has a syntax error: not a member anyone can resolve
-        // to; its receiver type's structure becomes unknown (see `view`).
+        // to definitely; its receiver type's structure becomes unknown (see `view`).
+        // It is still a declared, possible target for candidate sets.
         this.brokenReceivers.add(`${pkg.key}\u0000${data.receiver}`);
-      else if (symbol.kind === "method" && data.receiver !== undefined) {
+        push2(this.methodsByName, symbol.name, symbol);
+      } else if (symbol.kind === "method" && data.receiver !== undefined) {
         push2(
           this.members,
           `${pkg.key}\u0000${data.receiver}\u0000${symbol.name}`,
@@ -831,7 +836,8 @@ class GoResolver {
     if (depth > MAX_DEPTH) result = unknown();
     else if (
       (type.data as { broken?: boolean } | undefined)?.broken ||
-      (pkg && this.brokenReceivers.has(`${pkg.key}\u0000${type.name}`))
+      (pkg && this.brokenReceivers.has(`${pkg.key}\u0000${type.name}`)) ||
+      (pkg && this.brokenPackages.has(pkg.key) && type.kind !== "interface")
     )
       // Declared inside a syntax error (or with a broken method): the recovered
       // structure is not trusted; only its own intact declared methods are known.
@@ -943,11 +949,16 @@ class GoResolver {
         // A structure that cannot be determined: its members at this depth are unknown.
         if (
           views.some(
-            (item) =>
+            (item, index) =>
               item.unknown &&
               !(item.externalOnly && skipExternal) &&
               // A method declared on the type itself is known at this depth.
-              !item.declared?.(name).length,
+              !item.declared?.(name).length &&
+              // Another package's unexported name can only come from a type whose
+              // package can reach that package.
+              (exported(name) ||
+                access === undefined ||
+                this.mayReach(this.pkgOf(node.types[index]!)?.key, access)),
           )
         )
           externalAt = Math.min(externalAt ?? depth, depth);
@@ -1540,6 +1551,40 @@ class GoResolver {
     return false;
   }
 
+  private reachMemo = new Map<string, boolean>();
+  /**
+   * Can a type of package `from` contain types of package `to`: the same package,
+   * reached through project imports, or a package with a broken import declaration
+   * on the way (the lost import may name anything).
+   */
+  private mayReach(from: string | undefined, to: string): boolean {
+    if (from === undefined) return true;
+    if (from === to) return true;
+    const key = `${from}\u0000${to}`;
+    const cached = this.reachMemo.get(key);
+    if (cached !== undefined) return cached;
+    const seen = new Set([from]);
+    const queue = [from];
+    let result = false;
+    while (queue.length && !result) {
+      const pkg = this.pkgs.get(queue.shift()!);
+      for (const path of pkg?.files ?? []) {
+        const info = this.files.get(path)!;
+        if (info.fact.importsBroken) result = true;
+        for (const entry of [...info.imports.values(), ...info.dots])
+          for (const target of entry.pkgs) {
+            if (target.key === to) result = true;
+            if (!seen.has(target.key)) {
+              seen.add(target.key);
+              queue.push(target.key);
+            }
+          }
+      }
+    }
+    this.reachMemo.set(key, result);
+    return result;
+  }
+
   private hiddenMemo = new Map<string, boolean>();
   /**
    * Can code outside the project obtain package `pkgKey`'s unexported method `name`
@@ -1572,7 +1617,13 @@ class GoResolver {
   /** The type's method set includes (or may include) package `pkgKey`'s unexported `name`. */
   private carries(type: GraphSymbol, name: string, pkgKey: string): boolean {
     const view = this.view(type);
-    if (view.unknown && !view.externalOnly) return true;
+    // An unknown structure might carry it, if its package can reach `pkgKey`.
+    if (
+      view.unknown &&
+      !view.externalOnly &&
+      this.mayReach(this.pkgOf(type)?.key, pkgKey)
+    )
+      return true;
     if (view.iface) {
       const flat = this.interfaceMember(
         view.iface,

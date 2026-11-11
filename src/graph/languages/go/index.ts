@@ -39,6 +39,7 @@ function parser(): Promise<Helper> {
         extractor.run(tree.rootNode);
         result.symbols = extractor.symbols;
         result.links = extractor.links;
+        result.diagnostics.push(...extractor.diagnostics);
         result.data = { go: extractor.fact as unknown as Json };
         if (extractor.fact.package === undefined) {
           result.status = "partial";
@@ -241,7 +242,7 @@ function analyze({
 
 const go: LanguageModule = {
   id: ID,
-  version: "11",
+  version: "12",
   extensions: [".go"],
   contextFiles: ["go.mod", "go.work"],
   parse,

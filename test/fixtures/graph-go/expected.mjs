@@ -3,6 +3,7 @@ export const symbols = [
   {"file":"broken/broken.go","name":"broken.go","kind":"file","identity":"broken.go","at":"package broken\n\nfunc Good() int { return 1 }\n\nfunc Bad( {\n"},
   {"file":"broken/broken.go","name":"broken","kind":"package","identity":"broken","at":"broken"},
   {"file":"broken/broken.go","name":"Good","kind":"function","identity":"Good","at":"func Good() int { return 1 }"},
+  {"file":"broken/broken.go","name":"Bad","kind":"function","identity":"Bad","at":"func Bad"},
   {"file":"cmd/app/main.go","name":"main.go","kind":"file","identity":"main.go","at":"package main\n\nimport (\n\t\"fmt\"\n\n\tg \"example.com/shapes/geom\"\n\t\"example.com/shapes/geom/internal/calc\"\n\t. \"example.com/shapes/internal/store\"\n)\n\ntype printer struct{}\n\nfunc (printer) Println(v string) {}\n\nfunc main() {\n\tsq := g.NewSquare(2)\n\tfmt.Println(sq.Area())\n\tvar c g.Circle\n\t_ = c.Name()\n\t_ = Save(\"x\")\n\tarea := (*g.Square).Area\n\t_ = area(sq)\n\tname := c.Name\n\t_ = name()\n\tvar s g.Shape = c\n\t_ = s.Name()\n\tints := g.Map[int, string]([]int{1}, show)\n\tst := &g.Stack[int]{}\n\tst.Push(len(ints))\n\t_ = calc.Double(1)\n\tdescribe(nil)\n\tmissing()\n}\n\nfunc show(v int) string { return fmt.Sprint(v) }\n\nfunc describe(items []interface{ Name() string }) {\n\tfmt := printer{}\n\tfor _, item := range items {\n\t\tfmt.Println(item.Name())\n\t}\n}\n"},
   {"file":"cmd/app/main.go","name":"main","kind":"package","identity":"main","at":"main","range":{"start":8,"end":12}},
   {"file":"cmd/app/main.go","name":"printer","kind":"struct","identity":"printer","at":"printer struct{}"},
@@ -63,6 +64,7 @@ export const symbols = [
 export const links = [
   {"file":"broken/broken.go","kind":"contains","targetName":"broken.go","source":{"name":"broken","kind":"package"},"target":{"file":"broken/broken.go","name":"broken.go","kind":"file"},"at":"broken"},
   {"file":"broken/broken.go","kind":"contains","targetName":"Good","source":{"name":"broken.go","kind":"file"},"target":{"file":"broken/broken.go","name":"Good","kind":"function"},"at":"func Good() int { return 1 }"},
+  {"file":"broken/broken.go","kind":"contains","targetName":"Bad","source":{"name":"broken.go","kind":"file"},"target":{"file":"broken/broken.go","name":"Bad","kind":"function"},"at":"func Bad"},
   {"file":"cmd/app/main.go","kind":"contains","targetName":"main.go","source":{"name":"main","kind":"package"},"target":{"file":"cmd/app/main.go","name":"main.go","kind":"file"},"at":"main","range":{"start":8,"end":12}},
   {"file":"cmd/app/main.go","kind":"imports","targetName":"fmt","source":{"name":"main.go","kind":"file"},"target":null,"at":"\"fmt\""},
   {"file":"cmd/app/main.go","kind":"imports","targetName":"example.com/shapes/geom","source":{"name":"main.go","kind":"file"},"target":{"file":"geom/area.go","name":"geom","kind":"package"},"at":"g \"example.com/shapes/geom\""},

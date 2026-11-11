@@ -1,6 +1,12 @@
 import { basename } from "node:path";
 import type { Node } from "web-tree-sitter";
-import type { Json, LinkDraft, SourceRange, SymbolDraft } from "../../types.js";
+import type {
+  Diagnostic,
+  Json,
+  LinkDraft,
+  SourceRange,
+  SymbolDraft,
+} from "../../types.js";
 import {
   BUILTIN_FUNCTIONS,
   KNOWN_GOARCH,
@@ -54,6 +60,16 @@ function errorOutside(node: Node, inner: Node | null): boolean {
   };
   return visit(node);
 }
+/** Top-level node kinds that are declarations (anything else is a recovery region). */
+const DECLARATIONS = new Set([
+  "import_declaration",
+  "function_declaration",
+  "method_declaration",
+  "type_declaration",
+  "var_declaration",
+  "const_declaration",
+  "comment",
+]);
 const range = (node: Node): SourceRange => ({
   start: node.startIndex,
   end: node.endIndex,
@@ -109,6 +125,7 @@ interface Binding {
  */
 export class GoExtractor {
   readonly symbols: SymbolDraft[] = [];
+  readonly diagnostics: Diagnostic[] = [];
   readonly links: LinkDraft[] = [];
   readonly fact: FileFact;
   private scopes: Map<string, Desc>[] = [];
@@ -135,6 +152,7 @@ export class GoExtractor {
       data: fileData,
     });
     let beforePackage = true;
+    let seenDeclaration = false;
     for (const child of root.namedChildren) {
       if (child.type === "comment") {
         if (beforePackage) this.buildLine(child.text);
@@ -149,6 +167,12 @@ export class GoExtractor {
         }
       } else {
         beforePackage = false;
+        if (!DECLARATIONS.has(child.type)) {
+          // A region error recovery could not keep as a declaration: recover the
+          // headers it swallowed. Before the first declaration it may hold imports.
+          this.recover(child.startIndex, child.endIndex, true);
+          if (!seenDeclaration) this.fact.importsBroken = true;
+        } else if (child.type !== "import_declaration") seenDeclaration = true;
         this.topLevel(child);
       }
     }
@@ -318,8 +342,100 @@ export class GoExtractor {
 
   // ---- declarations ------------------------------------------------------
 
+  /**
+   * Lexically recovers declaration headers from text tree-sitter could not keep as
+   * declarations (an ERROR region, or a function body that swallowed later code).
+   * Each becomes a `data.broken` symbol of unknown structure/signature, so nothing
+   * definite or closed is built on what was lost. `topLevel`: the region is at file
+   * level (every header counts); otherwise only headers at the start of a line in
+   * column 0 count (indented text is the function's own body).
+   */
+  private recover(start: number, end: number, topLevel: boolean): void {
+    const text = this.text.slice(start, end);
+    if (/\bimport\b/.test(text) || (topLevel && /^\s*["`]/.test(text)))
+      this.fact.importsBroken = true;
+    const pattern =
+      /\b(type|func|var|const)\b(\s*\(\s*(?:[A-Za-z_]\w*\s+)?(\*?)\s*([A-Za-z_]\w*)(?:\s*\[[^\]]*\])?\s*\)\s*([A-Za-z_]\w*)|\s*\(|\s+([A-Za-z_]\w*))?/g;
+    for (const match of text.matchAll(pattern)) {
+      const at = start + match.index;
+      if (!topLevel) {
+        const lineStart = this.text.lastIndexOf("\n", at - 1) + 1;
+        if (lineStart !== at) continue;
+      }
+      const [, keyword, rest, star, receiver, method, name] = match;
+      const span = { start: at, end: at + match[0].length };
+      const broken = { broken: true, recovered: true } as const;
+      if (keyword === "func" && receiver && method) {
+        // A method header: its receiver's method set is not fully known.
+        const key = this.symbol(
+          "method",
+          method,
+          star ? `(*${receiver}).${method}` : `(${receiver}).${method}`,
+          span,
+          {
+            receiver,
+            pointer: Boolean(star),
+            ...broken,
+          },
+        );
+        this.contains("file", key, span);
+      } else if (keyword === "func" && rest?.trim().startsWith("(")) {
+        // `func (` whose receiver cannot be read: some type of this package has an
+        // unknown method set; resolution treats every type of the package so.
+        this.fact.unattributable = true;
+        this.diagnostics.push({
+          message:
+            "Unreadable method header in a syntax error: method sets of this package are treated as unknown",
+          range: span,
+        });
+      } else if (name && keyword === "type") {
+        // The keyword after the name gives the kind, so the symbol keeps the ID
+        // the intact declaration has. Nothing of its structure is read.
+        const after = this.text.slice(at + match[0].length, end);
+        const kind = /^\s*(\[[^\]]*\]\s*)?struct\b/.test(after)
+          ? "struct"
+          : /^\s*(\[[^\]]*\]\s*)?interface\b/.test(after)
+            ? "interface"
+            : /^\s*=/.test(after)
+              ? "alias"
+              : "type";
+        const key = this.symbol(kind, name, name, span, { ...broken });
+        this.contains("file", key, span);
+      } else if (name && keyword === "func") {
+        const key = this.symbol("function", name, name, span, { ...broken });
+        this.contains("file", key, span);
+      } else if (name && (keyword === "var" || keyword === "const")) {
+        const key = this.symbol(keyword, name, name, span, {
+          d: { k: "unknown" },
+          ...broken,
+        });
+        this.contains("file", key, span);
+      }
+    }
+  }
+
   private topLevel(node: Node): void {
     if (node.type === "ERROR") return;
+    if (
+      (node.type === "function_declaration" ||
+        node.type === "method_declaration") &&
+      node.hasError
+    ) {
+      const body = node.childForFieldName("body");
+      if (body?.hasError) {
+        // Code swallowed into the body: ERROR regions inside it, or the whole rest
+        // of the body when it is never closed (it runs to the end of the file).
+        const unclosed =
+          body.lastChild?.isMissing || body.endIndex >= this.text.length;
+        if (unclosed) this.recover(body.startIndex, body.endIndex, false);
+        else
+          for (const region of body.descendantsOfType("ERROR"))
+            if (region) this.recover(region.startIndex, region.endIndex, false);
+      }
+    } else if (node.hasError)
+      // An import/type/var/const declaration that swallowed later code.
+      for (const region of node.descendantsOfType("ERROR"))
+        if (region) this.recover(region.startIndex, region.endIndex, false);
     const previous = this.quiet;
     this.quiet = node.hasError;
     try {

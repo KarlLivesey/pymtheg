@@ -120,10 +120,14 @@ targets, never a guess. "Unresolved" keeps the target name.
     no `embeds` links, no interface methods and no underlying type are emitted.
     `view()` treats its structure as **unknown**: it cannot be ruled out as an
     implementer, no definite member lookup or `implements` is built on it, an
-    exported one may carry a hidden method (so sealed sets stay open), and any
-    dispatch set it could belong to is open. Such a set then lists every accessible
-    project method of that name, because the lost structure could promote any of
-    them;
+    exported one may carry a hidden method (so sealed sets stay open), and a
+    dispatch set it could belong to is open, unless its membership is proven by
+    the methods declared on the type itself at depth 0. (`savePacker`, with every
+    method declared on itself, keeps its set closed.) An open set then lists every
+    accessible project method of that name, because the lost structure could
+    promote any of them. A broken spec in a `type ( … )` group makes its intact
+    siblings in that group unknown too. This is accepted: it is safe, and it is
+    limited to the group;
   - a **function or method** whose header (anything outside its body: receiver,
     parameters, results, type parameters) contains an error gets `data.broken`
     and no signature or result types. Its results type no values. A broken method
@@ -135,7 +139,29 @@ targets, never a guess. "Unresolved" keeps the target name.
     error, unmatched qualifiers in that file are unknown rather than external,
     because they may name a lost project import.
 
-  Top-level ERROR fragments emit nothing. The file stays `partial`.
+  Declarations swallowed by error recovery do not disappear. The headers inside
+  every top-level ERROR region are recovered lexically, and so are the headers in
+  ERROR regions inside a declaration and in a function body that never closes (or
+  whose braces cannot be matched):
+  - `type N` becomes a broken symbol of unknown structure. Its kind is taken from
+    the keyword after the name (`struct`, `interface`, `=` or otherwise `type`),
+    so it keeps the ID of the intact declaration. Its intact methods elsewhere
+    still resolve by receiver name;
+  - `func (r) M`, or `func (r *T) M`, becomes a broken method of its receiver,
+    with the same identity an intact header would have. It is a possible target
+    in candidate sets, never a definite one. Its receiver's structure becomes
+    unknown;
+  - `func N`, `var N` and `const N` become broken symbols with no type;
+  - an unreadable `func (` makes the method sets of every non-interface type in its
+    package unknown, with a diagnostic;
+  - a region before or among the imports, containing `import`, or starting with a
+    string literal sets `importsBroken`. Unmatched qualifiers in that file are then
+    unknown, not external.
+
+  Containment: a broken type affects another package only if that package's
+  types can reach it. An unknown structure can carry another package's hidden
+  method only if its own package reaches that package through project imports,
+  or through a file whose imports are broken. The file stays `partial`.
 - Uses of the real predeclared identifiers: types (`int`, `string`, `error`,
   `any`, …), values (`nil`, `true`, `false`, `iota`) and builtin functions used as
   values. Conversions to predeclared types (`string(b)`) are not calls. These names
@@ -560,6 +586,16 @@ trusted (see "Not extracted"). Regressions are in `test/graph-go-review8.test.mj
 covering both reproductions plus broken interfaces, sealed sets, method and
 function headers, `var` types, imports and local types. M26 is the mutation for
 this item (26/26 killed). The module version is 11.
+
+## Module version 12 (ninth review)
+
+Declarations swallowed by error recovery become unknown and no longer disappear
+(see "Not extracted"). This covers a type truncated at end of file, broken or
+swallowed method headers, unclosed bodies, and lost imports (`imprt`, or an
+unclosed `import (`). Regressions are in `test/graph-go-review9.test.mjs`, with
+controls for an intact declaration in the same file and for unrelated packages.
+The mutations for this round are M27–M31: 1a, 1b/c, 1d, 1e and containment. The
+module version is 12.
 
 ## Core after PR 11 (W2-I)
 

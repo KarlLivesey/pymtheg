@@ -81,6 +81,8 @@ export interface FileFact {
   predeclared?: PredeclaredUse[];
   /** An import declaration had a syntax error: unmatched qualifiers are unknown. */
   importsBroken?: boolean;
+  /** A method header in a syntax error whose receiver cannot be read. */
+  unattributable?: boolean;
 }
 export interface PredeclaredUse {
   n: string;
