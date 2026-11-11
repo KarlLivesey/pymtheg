@@ -8,7 +8,7 @@ import type {
   SymbolDraft,
 } from "../../types.js";
 import { fromVirtual } from "./project.js";
-import { heritageErrors } from "./untrusted.js";
+import { heritageErrors, openInfo } from "./untrusted.js";
 import {
   NAMES,
   restoreNames,
@@ -27,6 +27,8 @@ export interface RenameContext {
   skip: ReadonlySet<string>;
   /** What a captured target file is: a module, a script (no exports), partial (syntax errors), or unavailable (failed). */
   moduleKind: (path: string) => "module" | "script" | "partial" | "unavailable";
+  /** Apply the open-declaration rule (false in the neutral program). */
+  openRule?: boolean;
 }
 import {
   anchorOf,
@@ -127,6 +129,9 @@ const isEntityChain = (node: ts.Expression): boolean =>
     ts.isStringLiteralLike(node.argumentExpression) &&
     isEntityChain(node.expression));
 
+const programOpenMemo = new WeakMap<ts.Program, boolean>();
+const scriptOpenMemo = new WeakMap<ts.Program, boolean>();
+
 export function extractFile(
   file: ts.SourceFile,
   checker: ts.TypeChecker,
@@ -158,6 +163,8 @@ export function extractFile(
   // node in `skip`, whose links are then `compiler-limit` without asking.
   let limitHit = false;
   let limited = false;
+  /** The node being handled (where a name lookup happens). */
+  let current: ts.Node = file;
   function targetsOf(
     query: Lookup | ts.Symbol | undefined,
     meaning: Meaning,
@@ -187,6 +194,7 @@ export function extractFile(
     let local = 0;
     let viaAlias = false;
     let firstAlias: ts.Symbol | undefined;
+    const declared: ts.Node[] = [];
     const record = (declaration: ts.Declaration): boolean => {
       const target = fromVirtual(declaration.getSourceFile().fileName);
       if (target === undefined || !captured.has(target)) return false;
@@ -194,6 +202,7 @@ export function extractFile(
       if (!anchor) return false;
       const key = keyOf(anchor);
       facts.set(`${target}\0${key}`, { file: target, key });
+      declared.push(declaration);
       return true;
     };
     const visit = (value: ts.Symbol, depth: number) => {
@@ -234,7 +243,21 @@ export function extractFile(
     };
     visit(found.symbol, 0);
     const targets = [...facts.values()];
-    if (!external && !local) return { targets, viaAlias, receiver };
+    if (!external && !local) {
+      // Declarations nobody saw (parser recovery) could change the answer.
+      if (
+        targets.length &&
+        context.openRule !== false &&
+        openWithheld(found.symbol, declared, receiver)
+      )
+        return {
+          targets,
+          reason: "partial-declaration",
+          viaAlias,
+          receiver,
+        };
+      return { targets, viaAlias, receiver };
+    }
     // An alias whose module did not resolve keeps that module's reason.
     const moduleFailure =
       external &&
@@ -248,6 +271,274 @@ export function extractFile(
       receiver,
     };
   }
+  // ----- open declarations (untrusted.ts openInfo) -----
+  /**
+   * Whether a lookup could land elsewhere because of declarations that parser
+   * recovery may have dropped. One rule, three sources of open owners:
+   * (a) member lookups: every class, interface, enum, namespace, type or
+   *     object literal (and module object) in the receiver's type closure;
+   * (b) aliases: every module consulted for the imported name (the
+   *     specifier's module, and its `export *` closure when the name is not
+   *     declared there);
+   * (b) other names: every open scope (file, namespace body) between the
+   *     use and the declaration.
+   * An open owner withholds the link unless every target lies inside it,
+   * wholly before the offset it is open from (type owners), or inside it at
+   * all (scopes and modules, where seen declarations are seen), and is not a
+   * declaration an unseen one could replace (`var`, a JS function).
+   */
+  function openWithheld(
+    symbol: ts.Symbol,
+    declared: readonly ts.Node[],
+    receiver: ts.Expression | undefined,
+  ): boolean {
+    if (!programOpen()) return false;
+    const targets = declared.filter((d) => !ts.isSourceFile(d));
+    if (!targets.length) return false;
+    const owners = new Set<ts.Node>();
+    if (receiver) {
+      let type: ts.Type | undefined;
+      try {
+        type = checker.getTypeAtLocation(receiver);
+      } catch (error) {
+        if (isLimit(error)) return true;
+        throw error;
+      }
+      if (type) typeOwners(type, owners, new Set());
+      let root = checker.getSymbolAtLocation(receiver);
+      if (root && root.flags & ts.SymbolFlags.Alias)
+        root = checker.getAliasedSymbol(root);
+      for (const d of root?.declarations ?? []) owners.add(d);
+    } else if (symbol.flags & ts.SymbolFlags.Alias) consulted(symbol, owners);
+    else {
+      // Open scopes between the use and the declaration.
+      for (let node: ts.Node | undefined = current; node; node = node.parent)
+        if (
+          (ts.isSourceFile(node) || ts.isModuleDeclaration(node)) &&
+          openAt(node) !== undefined
+        )
+          for (const target of targets) {
+            if (!inside(node, target)) return true;
+            if (directlyIn(node, target) && replaceable(target)) return true;
+          }
+      // A global declared by another (script) file: any open script may
+      // declare it again.
+      if (
+        targets.some(
+          (target) =>
+            target.getSourceFile() !== file &&
+            !isModuleFile(target.getSourceFile()) &&
+            directlyIn(target.getSourceFile(), target),
+        ) &&
+        scriptOpen()
+      )
+        return true;
+    }
+    for (const owner of owners) {
+      const at = openAt(owner);
+      if (at === undefined) continue;
+      for (const target of targets) {
+        if (!inside(owner, target)) return true;
+        if (ts.isSourceFile(owner)) {
+          if (directlyIn(owner, target) && replaceable(target)) return true;
+        }
+        // A member must lie wholly before the offset: one whose name comes
+        // first but whose text runs past it (`isFailed(x: , y) {…}`) keeps
+        // its name in the neutral text, so only this check withholds it.
+        else if (target.end > at) return true;
+      }
+    }
+    return false;
+  }
+  const openAt = (node: ts.Node): number | undefined =>
+    openInfo(node.getSourceFile()).owners.get(node);
+  const inside = (owner: ts.Node, node: ts.Node): boolean =>
+    ts.isSourceFile(owner)
+      ? node.getSourceFile() === owner
+      : !!ts.findAncestor(node, (n) => n === owner);
+  /** The scope a declaration binds in (var hoists out of blocks). */
+  const bindingScope = (declaration: ts.Node): ts.Node | undefined => {
+    const hoists =
+      (ts.isVariableDeclaration(declaration) &&
+        ts.isVariableDeclarationList(declaration.parent) &&
+        !(
+          declaration.parent.flags &
+          (ts.NodeFlags.Let | ts.NodeFlags.Const)
+        )) ||
+      ts.isFunctionDeclaration(declaration);
+    for (let node = declaration.parent; node; node = node.parent) {
+      if (ts.isSourceFile(node) || ts.isModuleBlock(node)) return node;
+      if (ts.isFunctionLike(node) || ts.isClassStaticBlockDeclaration(node))
+        return node;
+      if (!hoists && ts.isBlock(node)) return node;
+      if (ts.isClassLike(node)) return node;
+    }
+    return undefined;
+  };
+  const directlyIn = (scope: ts.Node, declaration: ts.Node): boolean => {
+    const binding = bindingScope(declaration);
+    return ts.isModuleDeclaration(scope)
+      ? binding === scope.body
+      : binding === scope;
+  };
+  /** A declaration an unseen later one replaces: `var`, or a JS function. */
+  const replaceable = (declaration: ts.Node): boolean =>
+    (ts.isVariableDeclaration(declaration) &&
+      ts.isVariableDeclarationList(declaration.parent) &&
+      !(
+        declaration.parent.flags &
+        (ts.NodeFlags.Let | ts.NodeFlags.Const | ts.NodeFlags.Using)
+      )) ||
+    (ts.isFunctionDeclaration(declaration) &&
+      isJsFile(declaration.getSourceFile()));
+  const isModuleFile = (source: ts.SourceFile): boolean => {
+    const flags = source as ts.SourceFile & {
+      externalModuleIndicator?: unknown;
+      commonJsModuleIndicator?: unknown;
+    };
+    return !!flags.externalModuleIndicator || !!flags.commonJsModuleIndicator;
+  };
+  const capturedSources = () =>
+    program.getSourceFiles().filter((source) => {
+      const at = fromVirtual(source.fileName);
+      return at !== undefined && captured.has(at);
+    });
+  const programOpen = (): boolean => {
+    let known = programOpenMemo.get(program);
+    if (known === undefined) {
+      known = capturedSources().some(
+        (source) => openInfo(source).fileAt !== undefined,
+      );
+      programOpenMemo.set(program, known);
+    }
+    return known;
+  };
+  const scriptOpen = (): boolean => {
+    let known = scriptOpenMemo.get(program);
+    if (known === undefined) {
+      known = capturedSources().some(
+        (source) =>
+          !isModuleFile(source) && openInfo(source).fileAt !== undefined,
+      );
+      scriptOpenMemo.set(program, known);
+    }
+    return known;
+  };
+  /**
+   * Declarations a type's members can come from: its symbol's declarations
+   * and, through their heritage clauses, every base and implemented type;
+   * union and intersection parts; a reference's target; a mapped type's
+   * source; a type parameter's constraint; the open holders of its
+   * properties (spreads and other derived types keep their origins).
+   */
+  function typeOwners(type: ts.Type, out: Set<ts.Node>, seen: Set<ts.Type>) {
+    if (seen.has(type) || seen.size > 256) return;
+    seen.add(type);
+    const add = (symbol: ts.Symbol | undefined) => {
+      for (const declaration of symbol?.declarations ?? []) {
+        if (out.has(declaration)) continue;
+        out.add(declaration);
+        if (
+          (ts.isClassLike(declaration) ||
+            ts.isInterfaceDeclaration(declaration)) &&
+          declaration.heritageClauses
+        )
+          for (const clause of declaration.heritageClauses)
+            for (const base of clause.types) {
+              typeOwners(checker.getTypeAtLocation(base), out, seen);
+              typeOwners(checker.getTypeAtLocation(base.expression), out, seen);
+            }
+      }
+    };
+    if (type.isUnionOrIntersection()) {
+      for (const part of type.types) typeOwners(part, out, seen);
+      return;
+    }
+    add(type.getSymbol());
+    add(type.aliasSymbol);
+    if (type.flags & ts.TypeFlags.Object) {
+      const flags = (type as ts.ObjectType).objectFlags;
+      if (flags & ts.ObjectFlags.Reference) {
+        const target = (type as ts.TypeReference).target;
+        if (target && target !== type) typeOwners(target, out, seen);
+      }
+      if (flags & ts.ObjectFlags.Mapped) {
+        checker.getPropertiesOfType(type);
+        const modifiers = (type as { modifiersType?: ts.Type }).modifiersType;
+        if (modifiers) typeOwners(modifiers, out, seen);
+      }
+    }
+    if (type.flags & ts.TypeFlags.TypeParameter) {
+      const constraint = checker.getBaseConstraintOfType(type);
+      if (constraint && constraint !== type) typeOwners(constraint, out, seen);
+    }
+    // Members of a mapped or otherwise derived type keep their origins.
+    for (const property of checker.getPropertiesOfType(type).slice(0, 512))
+      for (const declaration of property.declarations ?? []) {
+        const holder = declaration.parent;
+        if (holder && !out.has(holder) && openAt(holder) !== undefined)
+          out.add(holder);
+      }
+  }
+  /** Modules consulted while resolving an alias chain (and their `export *`). */
+  function consulted(symbol: ts.Symbol, out: Set<ts.Node>) {
+    let currentSymbol: ts.Symbol | undefined = symbol;
+    for (
+      let steps = 0;
+      currentSymbol && currentSymbol.flags & ts.SymbolFlags.Alias && steps < 64;
+      steps++
+    ) {
+      const specifier = bindingSpecifier(currentSymbol);
+      const module = specifier
+        ? moduleFileOf(specifier)
+        : currentSymbol.declarations?.[0]?.getSourceFile();
+      if (module) out.add(module);
+      const next: ts.Symbol | undefined =
+        checker.getImmediateAliasedSymbol(currentSymbol);
+      if (
+        module &&
+        next &&
+        !next.declarations?.some(
+          (declaration) => declaration.getSourceFile() === module,
+        )
+      )
+        for (const star of starClosure(module)) out.add(star);
+      if (next === currentSymbol) break;
+      currentSymbol = next;
+    }
+  }
+  const moduleFileOf = (
+    specifier: ts.Expression,
+  ): ts.SourceFile | undefined => {
+    const declaration =
+      checker.getSymbolAtLocation(specifier)?.valueDeclaration;
+    return declaration && ts.isSourceFile(declaration)
+      ? declaration
+      : undefined;
+  };
+  function starClosure(module: ts.SourceFile): ts.SourceFile[] {
+    const found: ts.SourceFile[] = [];
+    const queue = [module];
+    const seen = new Set<ts.SourceFile>([module]);
+    while (queue.length) {
+      const next = queue.shift()!;
+      for (const statement of next.statements)
+        if (
+          ts.isExportDeclaration(statement) &&
+          !statement.exportClause &&
+          statement.moduleSpecifier
+        ) {
+          const target = moduleFileOf(statement.moduleSpecifier);
+          if (target && !seen.has(target)) {
+            seen.add(target);
+            found.push(target);
+            queue.push(target);
+          }
+        }
+    }
+    return found;
+  }
+
   /** The module reason of a member's receiver root, if that root is an unresolved binding. */
   function receiverReason(receiver: ts.Expression): string | undefined {
     const root = rootOf(receiver);
@@ -947,6 +1238,7 @@ export function extractFile(
   }
   /** Visits a node: its own links in a guard, then its children. */
   function visit(node: ts.Node, owner: string) {
+    current = node;
     const key = `${node.kind}@${node.getStart(file)}`;
     limited = context.skip.has(key);
     let next: string | null;

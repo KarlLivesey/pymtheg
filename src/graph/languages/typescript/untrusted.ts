@@ -82,10 +82,15 @@ export function untrustedSpans(
   errors: readonly number[],
 ): Span[] {
   if (!errors.length) return [];
+  // Trust ends where the construct holding the error starts (trustEnd).
+  const ends = [...new Set(errors.map((at) => trustEnd(source, at)))].sort(
+    (a, b) => a - b,
+  );
   const spans: Span[] = [];
+  const covered = new Set<number>();
   for (const statement of source.statements) {
     const start = statement.getStart(source);
-    const error = errors.find((at) => at >= start && at <= statement.end);
+    const error = ends.find((at) => at >= start && at < statement.end);
     if (error === undefined) continue;
     let from = error;
     // The innermost class or interface whose heritage clauses hold the error.
@@ -102,9 +107,23 @@ export function untrustedSpans(
       ts.forEachChild(node, visit);
     };
     visit(statement);
-    spans.push({ start: from, end: Math.max(from, statement.end) });
+    spans.push({ start: from, end: statement.end });
+    for (const at of ends)
+      if (at >= start && at < statement.end) covered.add(at);
   }
-  // Errors after the last statement (end of file) have nothing to neutralise.
+  // Trust that ends outside every statement (an unterminated comment after
+  // the last recovered statement, say): from there to the end of the file.
+  const text = source.text;
+  const rest = ends.find(
+    (at) =>
+      !covered.has(at) &&
+      at < text.length &&
+      !spans.some((span) => at >= span.start && at < span.end),
+  );
+  if (rest !== undefined) {
+    const kept = spans.filter((span) => span.end <= rest);
+    return [...kept, { start: rest, end: text.length }];
+  }
   return spans;
 }
 
@@ -250,13 +269,19 @@ export function neutralizeSpans(
     const from = statement ? statement.getStart(source) : span.start;
     const close = closers(text, from, span.start, source.languageVariant);
     const body = blank(text.slice(span.start, span.end));
-    // The closers go at the start of the span (offsets matter, lines not).
-    // A span too short for them (the parser closed the declaration early)
-    // keeps only its own closing-bracket tokens, as the parser used them.
-    const filled =
-      close.length <= body.length
-        ? close + body.slice(close.length)
-        : closingTokens(text, span, source.languageVariant);
+    // The closers go at the start of the span, over spaces only (line
+    // breaks keep their positions). A span too short for them (the parser
+    // closed the declaration early) keeps only its own closing-bracket
+    // tokens, as the parser used them.
+    const room = body.replace(/[\r\n]/g, "").length;
+    let filled: string;
+    if (close.length <= room) {
+      const out = body.split("");
+      let next = 0;
+      for (let i = 0; i < out.length && next < close.length; i++)
+        if (out[i] === " ") out[i] = close[next++]!;
+      filled = out.join("");
+    } else filled = closingTokens(text, span, source.languageVariant);
     out += text.slice(at, span.start) + filled;
     at = span.end;
   }
@@ -307,4 +332,178 @@ export function neutralizeAssumed(
     out = out.slice(0, at) + undeclared[name] + out.slice(at + name.length);
   }
   return out;
+}
+
+// ----- open declarations: what parser recovery may have thrown away -----
+
+/**
+ * Where trust ends for an error reported at `at`: the start of the construct
+ * the error belongs to. An error inside or at the end of a comment, a
+ * string, template, regular expression or JSX element belongs to it from its
+ * opening delimiter (an unterminated one runs to where the error is
+ * reported, often the end of the line or file).
+ */
+export function trustEnd(
+  source: ts.SourceFile,
+  at: number,
+  comments: readonly Span[] = commentsOf(source),
+): number {
+  let end = at;
+  for (const comment of comments)
+    if (comment.start < at && at <= comment.end)
+      end = Math.min(end, comment.start);
+  // The outermost literal or JSX construct whose text contains `at`.
+  const visit = (node: ts.Node): void => {
+    if (node.getStart(source) > at || node.end < at) return;
+    if (
+      ts.isStringLiteralLike(node) ||
+      ts.isTemplateExpression(node) ||
+      ts.isRegularExpressionLiteral(node) ||
+      ts.isJsxElement(node) ||
+      ts.isJsxSelfClosingElement(node) ||
+      ts.isJsxFragment(node) ||
+      ts.isJsxOpeningElement(node)
+    ) {
+      const start = node.getStart(source);
+      // A terminated construct ending exactly at `at` does not own the error.
+      const text = source.text;
+      const last = text[node.end - 1];
+      const terminated =
+        node.end - start >= 2 &&
+        (ts.isStringLiteralLike(node)
+          ? last === text[start]
+          : ts.isTemplateExpression(node)
+            ? last === "`"
+            : ts.isRegularExpressionLiteral(node)
+              ? true
+              : last === ">");
+      if (start <= at && (at < node.end || !terminated)) {
+        end = Math.min(end, start);
+        return;
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return end;
+}
+
+/** Every comment range in the file (leading and trailing trivia). */
+function commentsOf(source: ts.SourceFile): Span[] {
+  const text = source.text;
+  const seen = new Map<number, Span>();
+  const add = (ranges: readonly ts.CommentRange[] | undefined) => {
+    for (const range of ranges ?? [])
+      seen.set(range.pos, { start: range.pos, end: range.end });
+  };
+  const visit = (node: ts.Node): void => {
+    add(ts.getLeadingCommentRanges(text, node.pos));
+    add(ts.getTrailingCommentRanges(text, node.end));
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  add(ts.getLeadingCommentRanges(text, source.endOfFileToken.pos));
+  return [...seen.values()];
+}
+
+/** A declaration or scope whose set of members may hold unseen ones. */
+export interface OpenInfo {
+  /** The file scope is open from here (any parse error), or undefined. */
+  fileAt: number | undefined;
+  /**
+   * Declarations with a member list (class, interface, enum, namespace,
+   * type literal, object literal) open from the offset given: a parse error
+   * in the member list, or a missing closing brace. The source file itself
+   * is included (keyed by the SourceFile) when its scope is open.
+   */
+  owners: Map<ts.Node, number>;
+}
+
+const openMemo = new WeakMap<ts.SourceFile, OpenInfo>();
+
+/**
+ * The open declarations of a file, from the parser's own diagnostics only
+ * (grammar checks that drop no text, such as JS-only syntax or heritage
+ * defects, open nothing).
+ */
+export function openInfo(source: ts.SourceFile): OpenInfo {
+  const known = openMemo.get(source);
+  if (known) return known;
+  const diagnostics =
+    (source as ts.SourceFile & { parseDiagnostics?: readonly ts.Diagnostic[] })
+      .parseDiagnostics ?? [];
+  const owners = new Map<ts.Node, number>();
+  let fileAt: number | undefined;
+  if (diagnostics.length) {
+    const comments = commentsOf(source);
+    const ends = [
+      ...new Set(
+        diagnostics.map((d) => trustEnd(source, d.start ?? 0, comments)),
+      ),
+    ].sort((a, b) => a - b);
+    fileAt = ends[0];
+    owners.set(source, fileAt!);
+    const text = source.text;
+    const visit = (node: ts.Node): void => {
+      const list = memberListStart(node, source);
+      if (list !== undefined) {
+        const end = ts.isModuleDeclaration(node) ? node.body!.end : node.end;
+        const closed = text[end - 1] === "}";
+        let at = ends.find((e) => e >= list && e <= end);
+        // A missing closing brace: whatever the error, members end here.
+        if (!closed) at = Math.min(at ?? end, end);
+        if (at !== undefined) owners.set(node, at);
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(source);
+    // An unseen merge partner (a later `interface X`, `namespace X`) can add
+    // members to any mergeable declaration of an open scope: its own members
+    // stay seen, anything that falls through it is open. TS files only.
+    if (!/\.(c|m)?jsx?$/.test(source.fileName)) {
+      const mergeable = (statements: readonly ts.Statement[]) => {
+        for (const statement of statements) {
+          if (
+            ts.isClassDeclaration(statement) ||
+            ts.isInterfaceDeclaration(statement) ||
+            ts.isEnumDeclaration(statement) ||
+            ts.isModuleDeclaration(statement)
+          )
+            if (!owners.has(statement)) owners.set(statement, statement.end);
+          if (
+            ts.isModuleDeclaration(statement) &&
+            statement.body &&
+            ts.isModuleBlock(statement.body) &&
+            owners.has(statement)
+          )
+            mergeable(statement.body.statements);
+        }
+      };
+      mergeable(source.statements);
+    }
+  }
+  const info = { fileAt, owners };
+  openMemo.set(source, info);
+  return info;
+}
+
+/** Where a declaration's member list starts (its `{`), if it has one. */
+function memberListStart(
+  node: ts.Node,
+  source: ts.SourceFile,
+): number | undefined {
+  if (
+    ts.isClassLike(node) ||
+    ts.isInterfaceDeclaration(node) ||
+    ts.isEnumDeclaration(node) ||
+    ts.isTypeLiteralNode(node) ||
+    ts.isObjectLiteralExpression(node)
+  ) {
+    const members = (node as { members?: ts.NodeArray<ts.Node> }).members;
+    if (ts.isObjectLiteralExpression(node)) return node.getStart(source);
+    return members ? members.pos - 1 : undefined;
+  }
+  if (ts.isModuleDeclaration(node) && node.body && ts.isModuleBlock(node.body))
+    return node.body.getStart(source);
+  return undefined;
 }

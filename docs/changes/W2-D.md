@@ -49,10 +49,14 @@ The module is **analyze-only** (no per-file `parse`). Each run:
    If two or more configs are still equal after these three rules, that is a
    **genuine tie**. The file is analysed under each tied config, and the results
    are merged:
-   - a link whose targets are the same under every tied config keeps them;
-   - a link whose targets differ gets the union of targets: candidates if every
-     config's answer was complete, otherwise unresolved with reason
-     `ambiguous-project` and the targets kept;
+   - a link whose facts are the same under every tied config keeps them;
+   - otherwise the merged link is the weakest, most qualified of the
+     variants, whatever the configs' order: the union of targets (candidates
+     if every config's answer was complete); a reason that every variant
+     gives with the same targets is kept, any other reason makes it
+     `ambiguous-project` (the reasons listed in `tiedReasons`); `assumes`
+     is kept if any variant has it; any other field that differs is not
+     picked from one variant but listed per config in `byProject`;
    - the file records `data.projects` listing the tied configs and has no
      `data.project` (there is no single owner).
 
@@ -95,7 +99,7 @@ link across packages.
 **Unchanged snapshot reuse.** When `changedFiles` and `changedContextFiles`
 are both empty and every stored result was produced by this module version
 (which embeds the compiler version; the leading number is bumped whenever
-extraction or resolution semantics change, and is now 7), the stored facts are
+extraction or resolution semantics change, and is now 8), the stored facts are
 returned as they are:
 no program is built and nothing is parsed. They are the complete analysis of the
 identical snapshot, and `resolve` re-derives every target from them. Any source,
@@ -203,7 +207,7 @@ identity or diagnostic (a test asserts this over all stored facts). Files
 record `data.renamedForCompiler`.
 
 **Exact, and tested against Node.** `test/graph-typescript-scope-oracle.test.mjs`
-generates 256 small files (381 call sites; summary in
+generates 286 small files (411 call sites; summary in
 `evidence/w2-d/scope-oracle.txt`). They cover every declaration form:
 
 - function declarations at top level, in a function, in a block, in nested
@@ -230,11 +234,15 @@ generates 256 small files (381 call sites; summary in
 - a free `require` in an ES module, and `module.require` in an ES module;
 - `var arguments` (also `= arguments`), `let`/function/parameter named
   `arguments`, and the wrapper's `arguments` written from a computed class or
-  object key, spread, `Array.from`/`slice.call` copies, and passed on;
-- copies of the wrapper's `arguments` through a file's own `Array` (a local
-  `Array` with `from`, a local `Array.prototype.slice.call`), through a
-  replaced `Array.from` or `Array.prototype.slice`, and a spread beside a
-  local `Array`;
+  object key, and passed on;
+- every call that receives the wrapper's `arguments` (`Array.from`,
+  `slice.call`, `f(...arguments)`), including the bypasses of a callee
+  proof: a local `Array`, a patch from another file, a computed key on
+  `[].constructor` or the array prototype, `Function.prototype.call`,
+  `Object.assign`, `Reflect.set`, `defineProperty`, a renamed global, and
+  identity copies written afterwards; and array spreads under replaced
+  iterators (`Array.prototype[Symbol.iterator]`, `values`,
+  `Object.prototype[Symbol.iterator]`, the array iterator's `next`);
 - `createRequire` with a reassigned `__filename`, with a local
   `pathToFileURL`, with `node:url`'s `pathToFileURL`, and with `__filename`
   in an ES module;
@@ -266,8 +274,8 @@ the analysis' classification of the callee, and the links the module actually
   `data.assumes`. Cross-file sites check the member link in the importing
   file, so every dependent route above must carry the label.
 
-Result: **0 classification and 0 emitted-link disagreements**. 292 static
-sites match exactly: 130 local, 143 real, and 19 where Node throws or never
+Result: **0 classification and 0 emitted-link disagreements**. 296 static
+sites match exactly: 130 local, 147 real, and 19 where Node throws or never
 reaches the site (TDZ, an undefined hoisted var, an early error, an
 uncallable branch function), classified local. The model that this
 verifies:
@@ -306,20 +314,26 @@ static answer:
 require = …` at top level, `require = …`, compound or destructuring
   assignment, or `for (require of …)`;
 - in sloppy CommonJS code, any use of the **wrapper's** `arguments` other
-  than a plain read or a copy. `arguments` is mapped to the parameters
-  `exports, require, module, __filename, __dirname`. Plain reads are
-  `arguments.length` and `arguments[i]`; copies are `...arguments`,
-  `Array.from(arguments)`, `Array.prototype.slice.call(arguments)` and
-  `[].slice.call(arguments)`. The last three count as copies only when
-  `Array` is provably the untouched global: the file has no `with` or direct
-  `eval`, declares nothing named `Array`, has no string `"Array"`, and every
-  occurrence of the name `Array` (also as a property, `globalThis.Array`)
-  heads a member chain that is only called, `new`ed, or tested with
-  `instanceof`/`typeof`, never written, deleted, passed, stored or returned.
-  The file must also never write a member named `from` (or `slice`,
-  respectively) nor mention that name as a string. A spread needs no such
-  proof. Writing, deleting, passing `arguments` itself
-  on, returning it or aliasing it counts. Which function's `arguments` an
+  than a plain read or an array spread. `arguments` is mapped to the
+  parameters `exports, require, module, __filename, __dirname`. Plain reads
+  are `arguments.length` and `arguments[i]`. Every call that receives it
+  counts as passing it on, whatever the callee: `Array.from(arguments)`,
+  `Array.prototype.slice.call(arguments)`, `[].slice.call(arguments)` and
+  `f(...arguments)` included. Any of these callees can be replaced from
+  another file, through a computed key, through `Function.prototype.call`,
+  `Object.assign`, `Reflect.set` or `defineProperty`, or under another name of
+  the global object, so no proof is attempted. Only an array spread
+  (`[...arguments]`) stays harmless, because it iterates through the
+  arguments object's own `Symbol.iterator`. That is the built-in
+  `Array.prototype.values`, captured when the object is created; replacing
+  `Array.prototype[Symbol.iterator]`, `Array.prototype.values` or
+  `Object.prototype[Symbol.iterator]` does not change it. A replaced
+  `%ArrayIteratorPrototype%.next` receives only the iterator, never the
+  object, and `caller.arguments` is an unmapped copy in V8. The oracle checks
+  each of these in Node. `f(...arguments)` goes through the same iterator and
+  passes only values, so treating it as passing is deliberately over-cautious.
+  Writing, deleting, passing `arguments` itself on, returning it or aliasing
+  it counts. Which function's `arguments` an
   occurrence denotes is resolved:
   - arrows inherit it;
   - a computed member key or a decorator is evaluated in the enclosing scope,
@@ -480,6 +494,73 @@ imports of `./orig` are not linked to it; backlog).
   - **Containment.** A link that resolves the same without the untrusted
     text stays definite, even in the same file or through the same
     declaration (`new Box().go()` beside a broken function returning `Box`).
+- **Open declarations: what recovery may have dropped.** The differential
+  analysis below sees only the text the parser kept. Recovery can also throw
+  text away (`a = [1, ;` swallows the next member; an unterminated comment
+  or string swallows everything after it), and a lookup that then falls
+  through to an inherited or outer declaration agrees in both programs. One
+  notion covers this: a declaration or scope is **open from offset N**, and
+  one check consumes it, for every definite target or candidate set.
+  - **Where trust ends** (`trustEnd`): the start of the construct the error
+    belongs to. An error inside or at the end of a comment, string,
+    template, regular expression or JSX element belongs to it from its
+    opening delimiter, so an unterminated one reported at the end of the
+    line or file is untrusted from where it opens. Only the parser's own
+    diagnostics count; grammar checks that drop no text (JS-only syntax,
+    heritage defects) open nothing. A parser diagnostic that drops no text
+    either (an octal literal) is not told apart and opens its file.
+  - **(a) Member lists.** A class, interface, enum, namespace, type literal
+    or object literal is open from the first trust end inside its member
+    list, or from its own end if its closing brace is missing. A lookup
+    through a receiver whose type involves an open one is withheld unless
+    every target is a member of it lying wholly before N. The receiver's
+    type is followed through its symbol's declarations (merged ones
+    included), base classes and interfaces, `implements` clauses, union and
+    intersection parts, type arguments, constraints, mapped types' source,
+    and the declarations of its properties (`typeof`, indexed access and
+    `Partial<…>` included). So `new S1().m()` with `class S1 extends Base {
+a = [1, ; m() {} }` is withheld, though both programs land on `Base.m`.
+    Members wholly before the error stay definite; the member that holds the
+    error (`broken(x: , y) {…}`, its name before it) is not wholly before it
+    and is withheld, though the neutral text keeps its name.
+  - **(b) Scopes.** A file with any parse error has an open scope from the
+    first trust end, and so does an open namespace body. Decided for names:
+    - a name used in an open scope whose declaration lies outside that
+      scope (an outer scope, a global from another file) is withheld: an
+      unseen declaration could shadow it. One declared in the scope is
+      withheld if an unseen one could replace it (`var`, or a function in a
+      JS file); imports, `let`/`const`, classes, interfaces, types and TS
+      functions are kept;
+    - a global declared by another script file is withheld from every file
+      while any captured script file is open (its unseen top-level
+      declarations would be globals too);
+    - an import, re-export or namespace member resolves through the modules
+      it consults: the specifier's module and, when the name is not declared
+      there, its whole `export *` closure. If one of them is open, the link
+      is withheld unless the target is declared in that open module and is
+      not replaceable. An unseen export of the same name could shadow a star
+      export or make it ambiguous. Names declared in the open file, before
+      or after the error, stay definite: they are seen;
+    - in a TS file with an open scope, every class, interface, enum and
+      namespace declared directly in it is open from its own end: an unseen
+      merge partner (a later `interface X`) could add members. Their own
+      members stay definite; anything that falls through them (an inherited
+      member) is withheld.
+
+    Cost: nothing for files without parse errors (BullMQ). With one broken
+    file, every name imported through a barrel whose `export *` closure
+    includes it is withheld. That is most of BullMQ's tests, which import
+    from `src/classes/index.ts` (see Observations). In a project of scripts,
+    one broken script withholds every cross-file global.
+
+  - **Spans for the differential analysis** start at the trust end too,
+    never at the reported position. They are never empty. Trust that ends
+    outside every statement (an unterminated comment after a recovered
+    class) is a span to the end of the file.
+  - Like the differential labels, these are `partial-declaration` with the
+    would-be targets kept. The neutral program does not apply the rule (it
+    answers only what the kept text supports).
+
 - **Differential analysis.** Two kinds of input are untrusted: (a) the
   syntax-error tails above, and (b) each free `require`/`module` in an ES
   module that is read as the loader only under the bundler assumption. When
@@ -487,8 +568,8 @@ imports of `./orig` are not linked to it; backlog).
   nothing else happens. Otherwise, for each kind present, a second program is
   built over the same snapshot with that input neutralised **at the same
   offsets** (`untrusted.ts`):
-  - (a) each tail becomes spaces, starting with exactly the closing brackets
-    that were open where it starts (or, when the parser closed the
+  - (a) each tail becomes spaces (line breaks kept in place), starting with
+    exactly the closing brackets that were open where it starts (or, when the parser closed the
     declaration in less room, only the tail's own closing brackets), so every
     following statement parses at the same position as before. This is
     checked: if any top-level statement outside the tails would move or
@@ -703,15 +784,33 @@ Full numbers, the comparison across rounds and every hand check are in
   from `external` to `external-package` (item 3). Hand checks found no wrong
   link in any round: round 1 checked 24 resolved, 12 unresolved and all 4
   candidate sets; rounds 2 to 6, each with a new seed, checked 30 resolved,
-  15 unresolved and all 4 candidate sets. Rounds 6 to 9 leave BullMQ's
-  totals identical to round 5; round 9 builds no second program there (no
-  untrusted input).
-- **Differential analysis cost** (BullMQ copy with one syntax error added in
-  `class Job`): 6 programs instead of 4 (one extra for each of the two
-  projects that reach the file), 388 links become `partial-declaration`, and
-  nothing else moves except the missing annotation's own empty reference. On
-  `requirejs` (3 partial files) one neutral program is built and no link
-  differs.
+  15 unresolved and all 4 candidate sets. Rounds 6 to 10 leave BullMQ's
+  totals identical to round 5. Rounds 9 and 10 build no second program
+  there, and no BullMQ file uses the wrapper's `arguments` or has a parse
+  error.
+- **One syntax error in BullMQ's `class Job`** (`isFailed(x: , y)`): 6
+  programs instead of 4. 2,030 links become `partial-declaration` (round 9:
+  388), against 15,782 still resolved:
+  - the same 388 as in round 9 (the differential analysis);
+  - 6 lookups through `interface JobQueue extends Omit<MinimalQueue, …>`
+    declared in the open `job.ts`, falling through to `MinimalQueue`
+    (open-scope merge partner);
+  - 18 calls of `job.isFailed()`: the member holding the error. Its name
+    comes first, but it is not wholly before the error;
+  - 1,618 names (1,243 calls, 225 imports, 148 type references, one
+    `extends`, one `implements`) imported through barrels whose `export *`
+    closure includes `job.ts`, chiefly `src/classes/index.ts` (29 star
+    exports, imported by 48 files). An unseen `export` in `job.ts` could
+    shadow or make ambiguous any of those names.
+- **`requirejs` in round 10:** 410 links become `partial-declaration`
+  (resolved 471 → 63, candidate sets 2 → 0). `tests/packagesMultiLevel/build.js`
+  is a script (a bare object literal) with parse errors, so its scope is open
+  and any global could be redeclared unseen. 407 calls to globals declared
+  by script files are withheld: `define` 404, `finished` 2 and `D` 1. In
+  `dist/file.js` the parser reports an octal literal (`0777`), so its own JS
+  functions `mkDir`/`mkFullDir` (3 calls) are replaceable in an open scope.
+  The rename and
+  import-edge figures are unchanged.
 - **A project with a local `require`: `requirejs`** (`7faea649`, 406 files, 0
   failed). 133 files are renamed (`require` in 116, `exports` in 73, `module`
   in 61), almost all AMD `define(function (require, exports, module) {…})`

@@ -3240,60 +3240,532 @@ test("when a link rests on both kinds of untrusted input, partial-declaration wi
   );
 });
 
-test("the arguments copy exception needs the global Array: a local or replaced one makes require uncertain", async () => {
+test("any call that receives the wrapper's arguments makes require uncertain; only an array spread does not", async () => {
   const dep = "exports.real = function real() {};\n";
   const tail = 'const d = require("./dep.cjs");\nd.real();\n';
+  const fake = "function (a) { a[1] = () => ({ real() {} }); return []; }";
+  const uncertain = {
+    "from.cjs": "Array.from(arguments);\n",
+    "slice.cjs": "Array.prototype.slice.call(arguments);\n",
+    "empty-slice.cjs": "[].slice.call(arguments);\n",
+    "call-spread.cjs": "function f() {}\nf(...arguments);\n",
+    "local.cjs": `const Array = { from: ${fake} };\nArray.from(arguments);\n`,
+    "other-file.cjs": 'require("./patch.cjs");\nArray.from(arguments);\n',
+    "constructor-key.cjs": `const k = "fr" + "om";\n[].constructor[k] = ${fake};\nArray.from(arguments);\n`,
+    "function-call.cjs": `Function.prototype.call = ${fake};\nArray.prototype.slice.call(arguments);\n`,
+    "proto-key.cjs":
+      'const k = "sli" + "ce";\nObject.getPrototypeOf([])[k] = function () { this[1] = () => ({ real() {} }); return []; };\n[].slice.call(arguments);\n',
+    "assign.cjs": `Object.assign([].constructor, { ["fr" + "om"]: ${fake} });\nArray.from(arguments);\n`,
+    "global-name.cjs": `const w = globalThis, n = "Arr" + "ay";\nw[n] = { from: ${fake} };\nArray.from(arguments);\n`,
+  };
+  const files = { "dep.cjs": dep, "patch.cjs": `Array.from = ${fake};\n` };
+  for (const [name, head] of Object.entries(uncertain))
+    files[name] = head + tail;
+  files["array-spread.cjs"] = "const copy = [...arguments];\n" + tail;
+  files["array-spread-local.cjs"] =
+    "const Array = 1;\nconst copy = [...arguments];\n" + tail;
+  await project(files, async (graph) => {
+    for (const file of Object.keys(uncertain)) {
+      const edge = graph.link(file, '"./dep.cjs"', "imports");
+      assert.equal(edge.resolution, "unresolved", file);
+      assert.equal(edge.data.reason, "dynamic-scope", file);
+      assert.equal(
+        graph.link(file, "real", "calls").resolution,
+        "unresolved",
+        file,
+      );
+    }
+    for (const file of ["array-spread.cjs", "array-spread-local.cjs"]) {
+      assert.equal(
+        graph.target(graph.link(file, '"./dep.cjs"', "imports")),
+        "dep.cjs#dep.cjs",
+        file,
+      );
+      assert.equal(
+        graph.target(graph.link(file, "real", "calls")),
+        "dep.cjs#real",
+        file,
+      );
+    }
+  });
+});
+
+// ----- Round 10: declarations parser recovery may have dropped -----
+
+/** The single `calls` link whose text is `name` on the line containing `marker`. */
+function callOn(graph, file, marker, name) {
+  const text = graph.store.getFile(file).text;
+  const lineStart = text.lastIndexOf("\n", text.indexOf(marker)) + 1;
+  const lineEnd = text.indexOf("\n", lineStart);
+  const found = graph.store
+    .links()
+    .filter(
+      (l) =>
+        l.file === file &&
+        l.kind === "calls" &&
+        l.range.start >= lineStart &&
+        l.range.end <= lineEnd &&
+        text.slice(l.range.start, l.range.end) === name,
+    );
+  assert.equal(found.length, 1, `one ${name} call on the ${marker} line`);
+  return found[0];
+}
+const withheld = (link, what) => {
+  assert.equal(link.resolution, "unresolved", what);
+  assert.equal(link.data.reason, "partial-declaration", what);
+  assert.ok(link.data.targets?.length, `${what}: targets kept`);
+};
+const definite = (graph, link, target, what) => {
+  assert.equal(link.resolution, "resolved", what);
+  assert.equal(link.data.reason, undefined, what);
+  assert.equal(graph.target(link), target, what);
+};
+
+test("a member list that recovery may have cut is open: lookups that fall through it are withheld", async () => {
+  const base = "export class Base { m() { return 1; } }\n";
+  const sub = (name, line) =>
+    `import { Base } from "./base";\nexport class ${name} extends Base {\n${line}\n  m() { return 2; }\n}\n`;
   await project(
     {
-      "dep.cjs": dep,
-      "local.cjs":
-        "const Array = { from(a) { a[1] = () => ({ real() {} }); } };\nArray.from(arguments);\n" +
-        tail,
-      "slice.cjs":
-        "var Array = { prototype: { slice: { call(a) { a[1] = () => ({ real() {} }); } } } };\nArray.prototype.slice.call(arguments);\n" +
-        tail,
-      "replaced.cjs":
-        "Array.from = (a) => { a[1] = () => ({ real() {} }); };\nArray.from(arguments);\n" +
-        tail,
-      "proto.cjs":
-        "Array.prototype.slice = function () { this[1] = () => ({ real() {} }); };\n[].slice.call(arguments);\n" +
-        tail,
-      // No `Array` named: the prototype is reached another way.
-      "reached.cjs":
-        "Object.getPrototypeOf([]).slice = function () { this[1] = () => ({ real() {} }); };\n[].slice.call(arguments);\n" +
-        tail,
-      "global.cjs":
-        "Array.from(arguments);\nArray.prototype.slice.call(arguments);\n[].slice.call(arguments);\n" +
-        tail,
-      "spread.cjs":
-        "const Array = 1;\nfunction f() {}\nf(...arguments);\n" + tail,
+      "tsconfig.json": '{ "compilerOptions": { "strict": true } }\n',
+      "base.ts": base,
+      "s1.ts": sub("S1", "  a = [1, ;"),
+      "s2.ts": sub("S2", "  a = function( { }"),
+      "s3.ts": sub("S3", "  a: ;"),
+      "s4.ts":
+        'import { Base } from "./base";\nexport class S4 extends Base {\n  /* note\n  m() { return 2; }\n}\n',
+      "s5.ts":
+        'import { Base } from "./base";\nexport class S5 extends Base {\n  label = "it\'s; m() { return 2; }\n}\n',
+      // The member holding the error: its name comes first, its text runs on.
+      "s6.ts":
+        "export class S6 {\n  before() {}\n  broken(x: , y) { return 1; }\n}\n",
+      "use.ts": [
+        'import { S1 } from "./s1";',
+        'import { S2 } from "./s2";',
+        'import { S3 } from "./s3";',
+        'import { S4 } from "./s4";',
+        'import { S5 } from "./s5";',
+        'import { S6 } from "./s6";',
+        "new S1().m(); // s1",
+        "new S2().m(); // s2",
+        "new S3().m(); // s3",
+        "new S4().m(); // s4",
+        "new S5().m(); // s5",
+        "new S6().before(); // s6-before",
+        "new S6().broken(); // s6-broken",
+        "",
+      ].join("\n"),
     },
     async (graph) => {
-      for (const file of [
-        "local.cjs",
-        "slice.cjs",
-        "replaced.cjs",
-        "proto.cjs",
-        "reached.cjs",
-      ]) {
-        const edge = graph.link(file, '"./dep.cjs"', "imports");
-        assert.equal(edge.resolution, "unresolved", file);
-        assert.equal(edge.data.reason, "dynamic-scope", file);
-        const member = graph.link(file, "real", "calls");
-        assert.equal(member.resolution, "unresolved", file);
-      }
-      for (const file of ["global.cjs", "spread.cjs"]) {
-        assert.equal(
-          graph.target(graph.link(file, '"./dep.cjs"', "imports")),
-          "dep.cjs#dep.cjs",
-          file,
-        );
-        assert.equal(
-          graph.target(graph.link(file, "real", "calls")),
-          "dep.cjs#real",
-          file,
+      for (const marker of ["s1", "s2", "s4", "s5"]) {
+        const link = callOn(graph, "use.ts", `// ${marker}`, "m");
+        withheld(link, marker);
+        // Recovery dropped `m`: the would-be target is the inherited one.
+        assert.deepEqual(
+          link.data.targets.map((t) => t.file),
+          ["base.ts"],
+          marker,
         );
       }
+      withheld(callOn(graph, "use.ts", "// s6-broken", "broken"), "s6");
+      definite(
+        graph,
+        callOn(graph, "use.ts", "// s6-before", "before"),
+        "s6.ts#S6.before",
+        "s6 before",
+      );
+      // Control: recovery kept `m` (after the error): withheld too.
+      const kept = callOn(graph, "use.ts", "// s3", "m");
+      withheld(kept, "s3");
+      assert.deepEqual(
+        kept.data.targets.map((t) => t.file),
+        ["s3.ts"],
+      );
+    },
+  );
+});
+
+for (const [variant, line] of [
+  ["recovery-kept", "  a: ;"],
+  ["recovery-dropped", "  a = [1, ;"],
+])
+  test(`open member sets through every route (${variant})`, async () => {
+    await project(
+      {
+        "tsconfig.json": '{ "compilerOptions": { "strict": true } }\n',
+        "base.ts":
+          "export class Base { kp = () => 1; m() { return 1; } k() { return 1; } static sb() {} }\n",
+        // An open class with no seen member of its own (missing brace).
+        "empty.ts":
+          'import { Base } from "./base";\nexport class Empty extends Base {\n  /* note\n  k() {}\n}\n',
+        "open.ts": [
+          'import { Base } from "./base";',
+          "export class Before { b() {} }",
+          "export class Open extends Base {",
+          "  seen() {}",
+          "  seenP = () => 1;",
+          line,
+          "  m() { return 2; }",
+          "}",
+          "export interface OpenI {",
+          "  seenI(): void;",
+          line.replace("a = [1, ;", "x: [1, ;"),
+          "  later(): void;",
+          "}",
+          "export class After { z() {} }",
+          "",
+        ].join("\n"),
+        "g1.ts": "interface Merged { p(): void }\n",
+        "g2.ts": `interface Merged {\n  q(): void;\n${line.replace("a = [1, ;", "x: [1, ;")}\n}\n`,
+        "use.ts": [
+          'import { Open, OpenI, Before, After } from "./open";',
+          'import { Empty } from "./empty";',
+          "declare const pe: Partial<Empty>;",
+          "const spread = { ...new Open() };",
+          "class Sub extends Open {}",
+          "class Impl implements OpenI { seenI() {} later() {} own() {} }",
+          "interface Extra { extra(): void }",
+          "declare const both: Open & Extra;",
+          "const instance = new Open();",
+          "declare const t: typeof instance;",
+          "declare const C: typeof Open;",
+          "type Holder = { inner: Open };",
+          "declare const h: Holder['inner'];",
+          "declare const p: Partial<Open>;",
+          "declare const mg: Merged;",
+          "new Open().seen(); // direct-seen",
+          "new Open().k(); // direct-inherited",
+          "new Sub().seen(); // sub-seen",
+          "new Sub().k(); // sub-inherited",
+          "both.seen(); // intersection-seen",
+          "both.extra(); // intersection-other",
+          "new Impl().own(); // implements",
+          "t.seen(); // typeof-seen",
+          "t.k(); // typeof-inherited",
+          "C.sb(); // static-inherited",
+          "h.seen(); // indexed-seen",
+          "h.k(); // indexed-inherited",
+          "p.seen?.(); // mapped-seen",
+          "p.k?.(); // mapped-inherited",
+          "mg.p(); // merged",
+          "pe.k?.(); // mapped-source",
+          "spread.seenP(); // spread-seen",
+          "spread.kp(); // spread-inherited",
+          "new Before().b(); // before-own",
+          "new After().z(); // after-own",
+          "",
+        ].join("\n"),
+      },
+      async (graph) => {
+        const seen = "open.ts#Open.seen";
+        for (const marker of [
+          "direct-seen",
+          "sub-seen",
+          "intersection-seen",
+          "typeof-seen",
+          "indexed-seen",
+          "mapped-seen",
+        ])
+          definite(
+            graph,
+            callOn(graph, "use.ts", `// ${marker}`, "seen"),
+            seen,
+            marker,
+          );
+        for (const [marker, name] of [
+          ["direct-inherited", "k"],
+          ["sub-inherited", "k"],
+          ["intersection-other", "extra"],
+          ["implements", "own"],
+          ["typeof-inherited", "k"],
+          ["static-inherited", "sb"],
+          ["indexed-inherited", "k"],
+          ["mapped-inherited", "k"],
+          ["merged", "p"],
+          ["mapped-source", "k"],
+          ["spread-inherited", "kp"],
+        ])
+          withheld(callOn(graph, "use.ts", `// ${marker}`, name), marker);
+        definite(
+          graph,
+          callOn(graph, "use.ts", "// spread-seen", "seenP"),
+          "open.ts#Open.seenP",
+          "spread-seen",
+        );
+        // Intact classes of the open file, before and after the error: their
+        // own members stay definite.
+        definite(
+          graph,
+          callOn(graph, "use.ts", "// before-own", "b"),
+          "open.ts#Before.b",
+          "before",
+        );
+        definite(
+          graph,
+          callOn(graph, "use.ts", "// after-own", "z"),
+          "open.ts#After.z",
+          "after",
+        );
+        // Names exported by the open file stay definite (seen declarations).
+        assert.equal(
+          graph.target(graph.link("use.ts", "Open", "imports")),
+          "open.ts#Open",
+        );
+      },
+    );
+  });
+
+test("unterminated comments, strings, templates, regular expressions and JSX are untrusted from their opening delimiter", async () => {
+  const cls = (name, line) =>
+    `import { Base } from "./base";\nexport class ${name} extends Base {\n  seen() {}\n${line}\n  m() { return 2; }\n}\n`;
+  await project(
+    {
+      "tsconfig.json":
+        '{ "compilerOptions": { "strict": true, "jsx": "preserve" } }\n',
+      "base.ts": "export class Base { m() { return 1; } }\n",
+      "comment.ts": cls("Comment", "  /* note"),
+      "string.ts": cls("Str", "  label = \"it's;"),
+      "template.ts": cls("Tpl", "  a = `x${1}"),
+      "regex.ts": cls("Rx", "  a = /ab"),
+      "jsx.tsx": cls("Jsx", "  a = <div>"),
+      "use.ts": [
+        'import { Comment } from "./comment";',
+        'import { Str } from "./string";',
+        'import { Tpl } from "./template";',
+        'import { Rx } from "./regex";',
+        'import { Jsx } from "./jsx";',
+        ...["Comment", "Str", "Tpl", "Rx", "Jsx"].flatMap((name) => [
+          `new ${name}().seen(); // ${name}-seen`,
+          `new ${name}().m(); // ${name}-m`,
+        ]),
+        "",
+      ].join("\n"),
+    },
+    async (graph) => {
+      for (const name of ["Comment", "Str", "Tpl", "Rx", "Jsx"]) {
+        const file = {
+          Comment: "comment.ts",
+          Str: "string.ts",
+          Tpl: "template.ts",
+          Rx: "regex.ts",
+          Jsx: "jsx.tsx",
+        }[name];
+        assert.ok(graph.store.getFile(file), file);
+        definite(
+          graph,
+          callOn(graph, "use.ts", `// ${name}-seen`, "seen"),
+          `${file}#${name}.seen`,
+          `${name} seen`,
+        );
+        withheld(callOn(graph, "use.ts", `// ${name}-m`, "m"), `${name} m`);
+      }
+    },
+  );
+});
+
+test("an open file scope: shadowable names, replaceable declarations and star exports are withheld", async () => {
+  await project(
+    {
+      "tsconfig.json": '{ "compilerOptions": { "allowJs": true } }\n',
+      "globals.js": "function globalHelper() {}\n",
+      "helper.ts": "export function helper() { return 1; }\n",
+      "impl.ts": "export function tool() {}\n",
+      "openmod.ts": "export const ok = () => 1;\nconst broken = (;\n",
+      "barrel.ts": 'export * from "./openmod";\nexport * from "./impl";\n',
+      "clean-barrel.ts": 'export * from "./impl";\n',
+      "scope.ts": [
+        'import { helper } from "./helper";',
+        "export function bump() {}",
+        "helper(); // import",
+        "bump(); // ts-function",
+        "globalHelper(); // global",
+        "const broken = (;",
+        "export function later() {}",
+        "",
+      ].join("\n"),
+      "scripts.js": [
+        "var run = function () {};",
+        "function bumpJs() {}",
+        "run(); // var",
+        "bumpJs(); // js-function",
+        "const broken = (;",
+        "",
+      ].join("\n"),
+      "clean.ts": "globalHelper(); // clean-global\n",
+      "use.ts": [
+        'import { tool } from "./barrel";',
+        'import { tool as direct } from "./clean-barrel";',
+        'import { ok } from "./openmod";',
+        'import { later } from "./scope";',
+        "tool(); // star",
+        "direct(); // clean-star",
+        "ok(); // direct-export",
+        "later(); // seen-export",
+        "",
+      ].join("\n"),
+    },
+    async (graph) => {
+      definite(
+        graph,
+        callOn(graph, "scope.ts", "// import", "helper"),
+        "helper.ts#helper",
+        "import binding",
+      );
+      definite(
+        graph,
+        callOn(graph, "scope.ts", "// ts-function", "bump"),
+        "scope.ts#bump",
+        "TS function",
+      );
+      withheld(
+        callOn(graph, "scope.ts", "// global", "globalHelper"),
+        "global from an open file",
+      );
+      withheld(callOn(graph, "scripts.js", "// var", "run"), "var");
+      withheld(
+        callOn(graph, "scripts.js", "// js-function", "bumpJs"),
+        "JS function",
+      );
+      // scripts.js is an open script: any global may be declared there again.
+      withheld(
+        callOn(graph, "clean.ts", "// clean-global", "globalHelper"),
+        "global while a script is open",
+      );
+      withheld(callOn(graph, "use.ts", "// star", "tool"), "star via open");
+      definite(
+        graph,
+        callOn(graph, "use.ts", "// clean-star", "direct"),
+        "impl.ts#tool",
+        "clean star",
+      );
+      definite(
+        graph,
+        callOn(graph, "use.ts", "// direct-export", "ok"),
+        "openmod.ts#ok",
+        "direct export",
+      );
+      definite(
+        graph,
+        callOn(graph, "use.ts", "// seen-export", "later"),
+        "scope.ts#later",
+        "seen export after the error",
+      );
+    },
+  );
+});
+
+test("neutral text keeps the length and every line break, and blanks each span", async () => {
+  const ts = (await import("typescript")).default;
+  const { errorPositions, untrustedSpans, neutralizeSpans } = await import(
+    "../dist/graph/languages/typescript/untrusted.js"
+  );
+  const samples = [
+    "export interface I { a: ; b(): void }\nexport function f(x: , y): Box {\n  return new Box();\n}\nexport class Box { go() {} }\n",
+    "export class K { m() { return [1, (2 } }\nexport const z = 1;\n",
+    "export const t = `a${ (x: ) }b`;\nexport const z = 1;\n",
+    "export class S4 {\n  /* note\n  m() { return 2; }\n}\n",
+    "export class S5 {\n  label = \"it's; m() { return 2; }\n}\nexport const after = 1;\n",
+    "export class C extends A, B {\n  x() {}\n}\n",
+  ];
+  for (const text of samples) {
+    const source = ts.createSourceFile("/a.ts", text, 99, true);
+    const spans = untrustedSpans(
+      source,
+      errorPositions(source, source.parseDiagnostics),
+    );
+    assert.ok(spans.length, text);
+    for (const span of spans) assert.ok(span.end > span.start, text);
+    const neutral = neutralizeSpans(source, spans);
+    assert.equal(neutral.text.length, text.length, text);
+    const breaks = (value) =>
+      [...value].flatMap((c, i) => (c === "\n" || c === "\r" ? [i] : []));
+    assert.deepEqual(breaks(neutral.text), breaks(text), text);
+    for (let i = 0; i < text.length; i++) {
+      const inside = neutral.spans.some((s) => i >= s.start && i < s.end);
+      if (!inside) assert.equal(neutral.text[i], text[i], `${text} @${i}`);
+      else
+        assert.ok(
+          /[\s)\]}`]/.test(neutral.text[i]),
+          `${text} @${i}: ${JSON.stringify(neutral.text[i])}`,
+        );
+    }
+    // Only closing brackets survive inside a span.
+    const kept = neutral.spans
+      .map((s) => neutral.text.slice(s.start, s.end).replace(/\s/g, ""))
+      .join("");
+    assert.match(kept, /^[)\]}`]*$/, text);
+  }
+});
+
+test("tied configs merge the same way whichever config comes first", async () => {
+  const files = (first, second) => ({
+    "dep.cjs": 'exports.real = function real() { return "DEP"; };\n',
+    "real.js":
+      'import { createRequire } from "node:module";\nconst require = createRequire(import.meta.url);\nexport const value = require("./dep.cjs");\n',
+    "assumed.js": 'export const value = require("./dep.cjs");\n',
+    "other.ts": "export function other() {}\n",
+    "use.ts":
+      'import { value } from "@provider";\nimport { other } from "@second";\nvalue.real();\nother();\n',
+    "tsconfig.a.json": `{ "files": ["use.ts"], "compilerOptions": { "allowJs": true, "baseUrl": ".", "paths": { "@provider": ["./${first}"], "@second": ["./${first === "real.js" ? "other.ts" : "missing.ts"}"] }, "module": "ESNext", "moduleResolution": "Bundler" } }\n`,
+    "tsconfig.b.json": `{ "files": ["use.ts"], "compilerOptions": { "allowJs": true, "baseUrl": ".", "paths": { "@provider": ["./${second}"], "@second": ["./${second === "real.js" ? "other.ts" : "missing.ts"}"] }, "module": "ESNext", "moduleResolution": "Bundler" } }\n`,
+  });
+  const outcomes = [];
+  for (const order of [
+    ["real.js", "assumed.js"],
+    ["assumed.js", "real.js"],
+  ])
+    await project(files(...order), async (graph) => {
+      const member = graph.store
+        .links()
+        .find((l) => l.file === "use.ts" && l.targetName === "value.real");
+      assert.ok(member, "value.real");
+      assert.equal(member.data.assumes, "bundler-require", order.join());
+      // Every link of use.ts, independent of which config maps what.
+      outcomes.push(
+        graph.store
+          .links()
+          .filter((l) => l.file === "use.ts")
+          .map((l) => {
+            const { byProject, ...rest } = l.data ?? {};
+            return JSON.stringify({
+              kind: l.kind,
+              range: l.range,
+              resolution: l.resolution,
+              ...rest,
+              byProject: Object.values(byProject ?? {})
+                .map((v) => JSON.stringify(v))
+                .sort(),
+            });
+          })
+          .sort(),
+      );
+      const call = graph.store
+        .links()
+        .find((l) => l.file === "use.ts" && l.targetName === "other");
+      assert.equal(call.data.reason, "ambiguous-project", order.join());
+    });
+  assert.deepEqual(outcomes[0], outcomes[1]);
+});
+
+test("a global stays definite when no script file is open; a JS class with a missing brace is open", async () => {
+  await project(
+    {
+      "tsconfig.json": '{ "compilerOptions": { "allowJs": true } }\n',
+      "globals.js": "function globalHelper() {}\n",
+      "clean.ts": "globalHelper(); // clean-global\n",
+      "base.js": "export class Base { m() { return 1; } }\n",
+      "s4.js":
+        'import { Base } from "./base.js";\nexport class S4 extends Base {\n  /* note\n  m() { return 2; }\n}\n',
+      "use.js": 'import { S4 } from "./s4.js";\nnew S4().m(); // s4\n',
+    },
+    async (graph) => {
+      definite(
+        graph,
+        callOn(graph, "clean.ts", "// clean-global", "globalHelper"),
+        "globals.js#globalHelper",
+        "global, no open script",
+      );
+      withheld(callOn(graph, "use.js", "// s4", "m"), "JS missing brace");
     },
   );
 });

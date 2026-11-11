@@ -645,9 +645,17 @@ export function classify(
     return false;
   };
   /**
-   * `x.length`, `x[i]` read, or a copy into a new array (`...x`,
-   * `Array.from(x)`, `Array.prototype.slice.call(x)`, `[].slice.call(x)`):
-   * none can change the object or let it escape. Passing `x` itself does.
+   * `x.length`, a read `x[i]`, or a spread into an array literal
+   * (`[...x]`): none can change the object or let it escape. Every other use,
+   * including any call that receives it (`Array.from(x)`, `slice.call(x)`,
+   * `f(...x)`), counts as passing it on. An array spread is safe because it
+   * iterates through the arguments object's own `Symbol.iterator`, which is
+   * the built-in `Array.prototype.values` captured when the object is
+   * created (replacing `Array.prototype[Symbol.iterator]`, `values` or
+   * `Object.prototype[Symbol.iterator]` does not change it), and a replaced
+   * `%ArrayIteratorPrototype%.next` receives only the iterator, never the
+   * object (`caller.arguments` is an unmapped copy). Verified in Node; see
+   * docs/changes/W2-D.md. A call spread is treated as passing on purpose.
    */
   const harmlessRead = (id: ts.Identifier): boolean => {
     const parent = id.parent;
@@ -657,120 +665,11 @@ export function classify(
         parent.name.text === "length") ||
       (ts.isElementAccessExpression(parent) && parent.expression === id);
     if (member) return !isWriteTarget(parent);
-    if (ts.isSpreadElement(parent) && !isWriteTarget(parent)) return true;
-    if (ts.isCallExpression(parent) && parent.arguments[0] === id) {
-      const callee = parent.expression;
-      const text = callee.getText(file).replace(/\s+/g, "");
-      if (text === "Array.from") return arrayGlobal() && !touched("from");
-      if (text === "Array.prototype.slice.call" || text === "[].slice.call")
-        return arrayGlobal() && !touched("slice");
-    }
-    return false;
-  };
-  /**
-   * Whether `Array` in this file is provably the global built-in, untouched:
-   * no `with` or direct `eval`, no declaration named `Array` anywhere, no
-   * string "Array", and every occurrence of the name `Array` (also as a
-   * property, `globalThis.Array`) heads a member chain that is only called,
-   * tested with `instanceof` or `typeof`: never written, deleted, passed,
-   * stored or returned (so nothing can replace `Array.from` or the prototype).
-   */
-  let arrayMemo: boolean | undefined;
-  const arrayGlobal = (): boolean => {
-    if (arrayMemo !== undefined) return arrayMemo;
-    let clean = !directEvals.length && !withs.length;
-    const check = (node: ts.Node): void => {
-      if (!clean) return;
-      if (ts.isStringLiteralLike(node) && node.text === "Array") clean = false;
-      if (ts.isIdentifier(node) && node.text === "Array") {
-        const parent = node.parent;
-        const reference =
-          ts.isPropertyAccessExpression(parent) && parent.name === node
-            ? parent
-            : node;
-        if (reference === node && !isReference(node)) {
-          clean = false;
-          return;
-        }
-        let top: ts.Node = reference;
-        while (
-          (ts.isPropertyAccessExpression(top.parent) ||
-            ts.isElementAccessExpression(top.parent)) &&
-          top.parent.expression === top
-        )
-          top = top.parent;
-        const user = top.parent;
-        const allowed =
-          !isWriteTarget(top) &&
-          ((ts.isCallExpression(user) && user.expression === top) ||
-            (ts.isNewExpression(user) && user.expression === top) ||
-            ts.isTypeOfExpression(user) ||
-            (ts.isBinaryExpression(user) &&
-              user.operatorToken.kind === ts.SyntaxKind.InstanceOfKeyword &&
-              user.right === top));
-        if (!allowed) clean = false;
-      }
-      ts.forEachChild(node, check);
-    };
-    check(file);
-    return (arrayMemo = clean);
-  };
-  /** An identifier that names a binding's use, not a declaration or key. */
-  const isReference = (id: ts.Identifier): boolean => {
-    const parent = id.parent;
-    if (
-      (ts.isPropertyAssignment(parent) ||
-        ts.isMethodDeclaration(parent) ||
-        ts.isPropertyDeclaration(parent) ||
-        ts.isPropertySignature(parent) ||
-        ts.isGetAccessor(parent) ||
-        ts.isSetAccessor(parent)) &&
-      parent.name === id
-    )
-      return false;
-    if (ts.isShorthandPropertyAssignment(parent)) return false;
-    if (
-      (ts.isVariableDeclaration(parent) ||
-        ts.isFunctionLike(parent) ||
-        ts.isClassLike(parent) ||
-        ts.isParameter(parent) ||
-        ts.isEnumDeclaration(parent) ||
-        ts.isModuleDeclaration(parent) ||
-        ts.isInterfaceDeclaration(parent) ||
-        ts.isTypeAliasDeclaration(parent) ||
-        ts.isImportClause(parent) ||
-        ts.isImportSpecifier(parent) ||
-        ts.isNamespaceImport(parent) ||
-        ts.isImportEqualsDeclaration(parent) ||
-        ts.isExportSpecifier(parent) ||
-        ts.isLabeledStatement(parent)) &&
-      (parent as ts.NamedDeclaration).name === id
-    )
-      return false;
-    if (ts.isLabeledStatement(parent) && parent.label === id) return false;
-    if (ts.isBindingElement(parent)) return false;
-    return true;
-  };
-  /** A write anywhere to a member `name` (`x.name = …`), or the string `name`. */
-  const touchedMemo = new Map<string, boolean>();
-  const touched = (name: string): boolean => {
-    const known = touchedMemo.get(name);
-    if (known !== undefined) return known;
-    let found = false;
-    const check = (node: ts.Node): void => {
-      if (found) return;
-      if (ts.isStringLiteralLike(node) && node.text === name) found = true;
-      if (
-        ts.isPropertyAccessExpression(node) &&
-        node.name.text === name &&
-        isWriteTarget(node)
-      )
-        found = true;
-      ts.forEachChild(node, check);
-    };
-    check(file);
-    touchedMemo.set(name, found);
-    return found;
+    return (
+      ts.isSpreadElement(parent) &&
+      ts.isArrayLiteralExpression(parent.parent) &&
+      !isWriteTarget(parent)
+    );
   };
 
   // ----- reassignment of the CommonJS wrapper's parameters -----

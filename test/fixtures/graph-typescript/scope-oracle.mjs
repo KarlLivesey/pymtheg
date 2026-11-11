@@ -417,23 +417,27 @@ const TEMPLATES = [
     modes: ["cjs"],
     category: "dynamic",
   },
-  // Round 8: harmless copies of the wrapper's arguments.
-  {
-    name: "spread of wrapper arguments",
-    code: `function f() {}\nf(...arguments);\nS0`,
-    modes: ["cjs", "cjs-strict"],
-  },
+  // Round 10: every call that receives the wrapper's arguments is passing
+  // it on (uncertain), however the callee is reached: the copy exception
+  // and its proof are gone. Only an array spread stays harmless (static).
   {
     name: "Array.from of wrapper arguments",
     code: `const copy = Array.from(arguments);\nS0`,
     modes: ["cjs", "cjs-strict"],
+    category: "dynamic",
   },
   {
     name: "slice.call of wrapper arguments",
     code: `const copy = Array.prototype.slice.call(arguments);\nS0`,
     modes: ["cjs", "cjs-strict"],
+    category: "dynamic",
   },
-  // Round 9: the copy exception needs the global, untouched Array.
+  {
+    name: "spread of wrapper arguments into a call",
+    code: `function f() {}\nf(...arguments);\nS0`,
+    modes: ["cjs", "cjs-strict"],
+    category: "dynamic",
+  },
   {
     name: "a local Array whose from writes wrapper arguments",
     code: `const Array = { from(a) { a[1] = () => __fake(); } };\nArray.from(arguments);\nS0`,
@@ -447,27 +451,113 @@ const TEMPLATES = [
     category: "dynamic",
   },
   {
-    name: "a replaced Array.from writes wrapper arguments",
-    // Restores the built-in so later cases in the same process are unaffected.
-    code: `const saved = Array.from;\nArray.from = (a) => { a[1] = () => __fake(); return []; };\nArray.from(arguments);\nS0;\nArray.from = saved;`,
+    name: "Array.from replaced in another file",
+    code: `const patch = require("./patch-from.cjs");\npatch.install();\nArray.from(arguments);\npatch.restore();\nS0`,
     modes: ["cjs", "cjs-strict"],
     category: "dynamic",
   },
   {
-    name: "a replaced Array.prototype.slice under [].slice.call",
-    code: `const saved = Array.prototype.slice;\nArray.prototype.slice = function () { this[1] = () => __fake(); return []; };\n[].slice.call(arguments);\nS0;\nArray.prototype.slice = saved;`,
+    name: "Array.from replaced through [].constructor with a computed key",
+    code: `const k = "fr" + "om";\nconst saved = Array.from;\n[].constructor[k] = function (a) { a[1] = () => __fake(); return []; };\nArray.from(arguments);\nArray.from = saved;\nS0`,
     modes: ["cjs", "cjs-strict"],
     category: "dynamic",
   },
   {
-    name: "slice replaced through Object.getPrototypeOf([])",
-    code: `const proto = Object.getPrototypeOf([]);\nconst saved = proto.slice;\nproto.slice = function () { this[1] = () => __fake(); return []; };\n[].slice.call(arguments);\nS0;\nproto.slice = saved;`,
+    name: "Function.prototype.call replaced under slice.call",
+    code: `const saved = Function.prototype.call;\nFunction.prototype.call = function (a) { a[1] = () => __fake(); return []; };\nArray.prototype.slice.call(arguments);\nFunction.prototype.call = saved;\nS0`,
     modes: ["cjs", "cjs-strict"],
     category: "dynamic",
   },
   {
-    name: "spread of wrapper arguments beside a local Array",
-    code: `const Array = 1;\nfunction f() {}\nf(...arguments);\nS0`,
+    name: "slice replaced on Object.getPrototypeOf([]) with a computed key",
+    code: `const k = "sli" + "ce";\nconst proto = Object.getPrototypeOf([]);\nconst saved = proto.slice;\nproto[k] = function () { this[1] = () => __fake(); return []; };\n[].slice.call(arguments);\nproto.slice = saved;\nS0`,
+    modes: ["cjs", "cjs-strict"],
+    category: "dynamic",
+  },
+  {
+    name: "Array.from replaced by Object.assign with a computed key",
+    code: `const saved = Array.from;\nObject.assign([].constructor, { ["fr" + "om"]: function (a) { a[1] = () => __fake(); return []; } });\nArray.from(arguments);\nArray.from = saved;\nS0`,
+    modes: ["cjs", "cjs-strict"],
+    category: "dynamic",
+  },
+  {
+    name: "the global Array replaced through globalThis with a computed name",
+    code: `const w = globalThis, n = "Arr" + "ay";\nconst saved = w[n];\nw[n] = { from: function (a) { a[1] = () => __fake(); return []; } };\nArray.from(arguments);\nw[n] = saved;\nS0`,
+    modes: ["cjs", "cjs-strict"],
+    category: "dynamic",
+  },
+  {
+    name: "an identity Array.from from another file, then the copy written",
+    code: `const patch = require("./patch-identity.cjs");\npatch.install();\nconst copy = Array.from(arguments);\npatch.restore();\ncopy[1] = () => __fake();\nS0`,
+    modes: ["cjs", "cjs-strict"],
+    category: "dynamic",
+  },
+  {
+    name: "an identity slice through a concatenated key, then the copy written",
+    code: `const proto = Object.getPrototypeOf([]);\nconst saved = proto.slice;\nconst id = function () { return this; };\nproto["sl" + "ice"] = id;\nconst copy = [].slice.call(arguments);\nproto.slice = saved;\ncopy[1] = () => __fake();\nS0`,
+    modes: ["cjs", "cjs-strict"],
+    category: "dynamic",
+  },
+  {
+    name: "an identity slice through a template key, then the copy written",
+    code: `const proto = Object.getPrototypeOf([]);\nconst saved = proto.slice;\nconst id = function () { return this; };\nproto[\`sl\${"ice"}\`] = id;\nconst copy = [].slice.call(arguments);\nproto.slice = saved;\ncopy[1] = () => __fake();\nS0`,
+    modes: ["cjs", "cjs-strict"],
+    category: "dynamic",
+  },
+  {
+    name: "an identity slice through a key variable, then the copy written",
+    code: `const proto = Object.getPrototypeOf([]);\nconst saved = proto.slice;\nconst id = function () { return this; };\nconst key = "sl" + "ice";\nproto[key] = id;\nconst copy = [].slice.call(arguments);\nproto.slice = saved;\ncopy[1] = () => __fake();\nS0`,
+    modes: ["cjs", "cjs-strict"],
+    category: "dynamic",
+  },
+  {
+    name: "an identity slice through Reflect.set, then the copy written",
+    code: `const proto = Object.getPrototypeOf([]);\nconst saved = proto.slice;\nconst id = function () { return this; };\nReflect.set(proto, "slice", id);\nconst copy = [].slice.call(arguments);\nproto.slice = saved;\ncopy[1] = () => __fake();\nS0`,
+    modes: ["cjs", "cjs-strict"],
+    category: "dynamic",
+  },
+  {
+    name: "an identity slice through Object.defineProperty, then the copy written",
+    code: `const proto = Object.getPrototypeOf([]);\nconst saved = proto.slice;\nconst id = function () { return this; };\nObject.defineProperty(proto, "slice", { value: id, writable: true, configurable: true });\nconst copy = [].slice.call(arguments);\nproto.slice = saved;\ncopy[1] = () => __fake();\nS0`,
+    modes: ["cjs", "cjs-strict"],
+    category: "dynamic",
+  },
+  {
+    name: "an identity slice through Object.assign, then the copy written",
+    code: `const proto = Object.getPrototypeOf([]);\nconst saved = proto.slice;\nconst id = function () { return this; };\nObject.assign(proto, { slice: id });\nconst copy = [].slice.call(arguments);\nproto.slice = saved;\ncopy[1] = () => __fake();\nS0`,
+    modes: ["cjs", "cjs-strict"],
+    category: "dynamic",
+  },
+  // An array spread uses the arguments object's own Symbol.iterator (the
+  // built-in values, captured at creation); none of these reach the object.
+  {
+    name: "array spread of wrapper arguments",
+    code: `const copy = [...arguments];\nS0`,
+    modes: ["cjs", "cjs-strict"],
+  },
+  {
+    name: "array spread beside a local Array",
+    code: `const Array = 1;\nconst copy = [...arguments];\nS0`,
+    modes: ["cjs", "cjs-strict"],
+  },
+  {
+    name: "array spread after replacing Array.prototype[Symbol.iterator]",
+    code: `const saved = Array.prototype[Symbol.iterator];\nArray.prototype[Symbol.iterator] = function* () { yield () => __fake(); };\nconst copy = [...arguments];\nArray.prototype[Symbol.iterator] = saved;\nS0`,
+    modes: ["cjs", "cjs-strict"],
+  },
+  {
+    name: "array spread after replacing Array.prototype.values",
+    code: `const saved = Array.prototype.values;\nArray.prototype.values = function* () { yield () => __fake(); };\nconst copy = [...arguments];\nArray.prototype.values = saved;\nS0`,
+    modes: ["cjs", "cjs-strict"],
+  },
+  {
+    name: "array spread after adding Object.prototype[Symbol.iterator]",
+    code: `Object.prototype[Symbol.iterator] = function* () { yield () => __fake(); };\nconst copy = [...arguments];\ndelete Object.prototype[Symbol.iterator];\nS0`,
+    modes: ["cjs", "cjs-strict"],
+  },
+  {
+    name: "array spread through a replaced iterator next that reaches caller.arguments",
+    code: `const it = Object.getPrototypeOf([][Symbol.iterator]());\nconst next = it.next;\nit.next = function n() { try { const w = n.caller; if (w && w.arguments) w.arguments[1] = () => __fake(); } catch {} return next.call(this); };\nconst copy = [...arguments];\nit.next = next;\nS0`,
     modes: ["cjs", "cjs-strict"],
   },
   {
@@ -750,6 +840,15 @@ export async function runOracle(scratch, cases) {
   await writeFile(
     join(scratch, "sub", "dep.cjs"),
     'module.exports = { marker: "SUB", real() {} };\n',
+  );
+  // Patches installed from another file (restored by the case itself).
+  await writeFile(
+    join(scratch, "patch-from.cjs"),
+    "let saved;\nexports.install = () => { saved = Array.from; Array.from = function (a) { a[1] = () => __fake(); return []; }; };\nexports.restore = () => { Array.from = saved; };\n",
+  );
+  await writeFile(
+    join(scratch, "patch-identity.cjs"),
+    "let saved;\nexports.install = () => { saved = Array.from; Array.from = (x) => x; };\nexports.restore = () => { Array.from = saved; };\n",
   );
   await writeFile(
     join(scratch, "fake.mjs"),

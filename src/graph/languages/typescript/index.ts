@@ -39,7 +39,7 @@ import {
  * facts; resolve maps those facts to symbol IDs. See docs/changes/W2-D.md.
  */
 // Bump the leading number whenever extraction or resolution semantics change.
-const MODULE_VERSION = `7+typescript-${ts.version}`;
+const MODULE_VERSION = `8+typescript-${ts.version}`;
 
 /** Observation counters for tests (programs built, files extracted). Not a correctness input. */
 export const statistics = {
@@ -274,17 +274,29 @@ const failed = (message: string): ParseResult => ({
 });
 
 /**
- * Merges one file's results from equally ranked configs. Symbols are syntactic
- * and identical; a link whose targets differ between configs gets the union of
- * targets (candidates when every variant was complete) and, if any variant was
- * incomplete, the reason `ambiguous-project`, so no config is silently picked.
+ * Merges one file's results from equally ranked configs, independent of
+ * their order. Symbols are syntactic and must be identical. For each link the
+ * merged facts are the weakest, most qualified of the variants:
+ * - targets: the union (sorted);
+ * - reason: none if no variant has one and the targets agree or every
+ *   variant was complete (then two or more targets are candidates); the one
+ *   reason if every variant gives the same reason and the same targets;
+ *   otherwise `ambiguous-project`, with `tiedReasons` listing them;
+ * - `assumes`: kept if any variant has it;
+ * - any other field that differs between variants is not picked from one of
+ *   them: it moves to `byProject` (config → value), for every variant.
  */
 function mergeTied(
   variants: ParseResult[],
   configs: (string | null)[],
 ): ParseResult {
-  if (variants.some((variant) => variant.status === "failed"))
-    return variants.find((variant) => variant.status === "failed")!;
+  if (variants.some((variant) => variant.status === "failed")) {
+    // The weakest: a failure (the same message whatever the order).
+    const failures = variants
+      .filter((variant) => variant.status === "failed")
+      .map((variant) => variant.diagnostics.map((d) => d.message).join("; "));
+    return failed([...new Set(failures)].sort().join("; "));
+  }
   const [first] = variants;
   const same = (a: unknown, b: unknown) =>
     JSON.stringify(a) === JSON.stringify(b);
@@ -303,33 +315,63 @@ function mergeTied(
     return failed(
       `Equally ranked configs ${configs.join(", ")} produced different structure for this file`,
     );
+  const names = configs.map((config) => config ?? "(inferred)");
   const links = first!.links.map((link, index) => {
     const datas = variants.map(
       (variant) =>
-        (variant.links[index]!.data ?? {}) as {
-          targets?: TargetFact[];
-          reason?: string;
-        },
+        (variant.links[index]!.data ?? {}) as { [key: string]: Json },
     );
-    const outcome = (data: { targets?: TargetFact[]; reason?: string }) => [
-      data.targets ?? [],
-      data.reason ?? null,
-    ];
-    if (datas.every((data) => same(outcome(data), outcome(datas[0]!))))
-      return link;
+    if (datas.every((data) => same(data, datas[0]))) return link;
+    const keyed = (data: { [key: string]: Json }) =>
+      ((data.targets ?? []) as unknown as TargetFact[])
+        .map((t) => `${t.file}\0${t.key}`)
+        .sort();
     const targets = new Map<string, TargetFact>();
     for (const data of datas)
-      for (const target of data.targets ?? [])
+      for (const target of (data.targets ?? []) as unknown as TargetFact[])
         targets.set(`${target.file}\0${target.key}`, { ...target });
-    const merged: { [key: string]: Json } = {
-      ...(link.data as { [key: string]: Json }),
-      projects: [...configs],
-    };
-    delete merged.targets;
-    delete merged.reason;
+    const reasons = [
+      ...new Set(
+        datas
+          .map((data) => data.reason as string | undefined)
+          .filter((r): r is string => !!r),
+      ),
+    ].sort();
+    const sameTargets = datas.every((data) =>
+      same(keyed(data), keyed(datas[0]!)),
+    );
+    const merged: { [key: string]: Json } = {};
+    const keys = [...new Set(datas.flatMap((data) => Object.keys(data)))]
+      .filter((key) => !["targets", "reason", "assumes"].includes(key))
+      .sort();
+    const byProject: { [key: string]: Json } = {};
+    for (const key of keys) {
+      if (datas.every((data) => same(data[key], datas[0]![key]))) {
+        if (datas[0]![key] !== undefined) merged[key] = datas[0]![key]!;
+      } else
+        datas.forEach((data, at) => {
+          const entry = (byProject[names[at]!] ??= {}) as {
+            [key: string]: Json;
+          };
+          if (data[key] !== undefined) entry[key] = data[key]!;
+        });
+    }
+    if (Object.keys(byProject).length) merged.byProject = byProject;
     if (targets.size)
-      merged.targets = [...targets.values()].map((t) => ({ ...t }));
-    if (datas.some((data) => data.reason)) merged.reason = "ambiguous-project";
+      merged.targets = [...targets.entries()]
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+        .map(([, t]) => ({ ...t }));
+    const allComplete = reasons.length === 0;
+    if (!allComplete) {
+      const everyVariantSame =
+        sameTargets &&
+        reasons.length === 1 &&
+        datas.every((data) => data.reason === reasons[0]);
+      merged.reason = everyVariantSame ? reasons[0]! : "ambiguous-project";
+      if (!everyVariantSame) merged.tiedReasons = reasons;
+    }
+    if (!sameTargets || !allComplete) merged.projects = [...configs];
+    if (datas.some((data) => data.assumes)) merged.assumes = "bundler-require";
     return { ...link, data: merged };
   });
   const diagnostics = [
@@ -337,8 +379,10 @@ function mergeTied(
       variants
         .flatMap((variant) => variant.diagnostics)
         .map((diagnostic) => [JSON.stringify(diagnostic), diagnostic]),
-    ).values(),
-  ];
+    ).entries(),
+  ]
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([, diagnostic]) => diagnostic);
   return {
     ...first!,
     status: variants.some((variant) => variant.status === "partial")
@@ -450,6 +494,7 @@ const module: LanguageModule = {
         data: { [key: string]: Json },
         diagnostics: Diagnostic[],
         renamed: Renamed | undefined,
+        openRule = true,
       ): ParseResult => {
         if (session.rebuilds > MAX_PROGRAM_REBUILDS)
           return failed(
@@ -479,6 +524,7 @@ const module: LanguageModule = {
                 resolveModule,
                 skip,
                 moduleKind,
+                openRule,
               },
             );
             statistics.extracted++;
@@ -588,7 +634,8 @@ const module: LanguageModule = {
                   assumed: [],
                 }
               : renamed;
-          const other = extractWith(neutral, path, {}, [], context);
+          // The neutral program answers only what the kept text supports.
+          const other = extractWith(neutral, path, {}, [], context, false);
           statistics.neutralExtracted++;
           marks.set(path, differing(result, other));
         }
