@@ -1,0 +1,4 @@
+import lib.toy
+def main
+call helper
+call missing
