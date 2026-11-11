@@ -8,15 +8,15 @@ import type {
   SymbolDraft,
 } from "../../types.js";
 import { fromVirtual } from "./project.js";
-import { bindingSpecifier, type Provenance } from "./provenance.js";
+import { restoreNames, type Rename } from "./rename.js";
 import {
   anchorOf,
   containerOf,
   identityOf,
   isEntityName,
+  bindingSpecifier,
   isCommonJsRequire,
   isJsFile,
-  isModuleGlobal,
   keyOf,
   kindOf,
   nameOf,
@@ -67,6 +67,8 @@ const TYPE_ONLY = new Set([
   ts.SyntaxKind.TypeAliasDeclaration,
   ts.SyntaxKind.TypeParameter,
 ]);
+/** Stands for a checker lookup that exhausted the stack. */
+const LIMIT = Object.freeze({ flags: 0 }) as unknown as ts.Symbol;
 /** What a name lookup found: a symbol, or why there is none, and the member's receiver. */
 interface Lookup {
   symbol?: ts.Symbol | undefined;
@@ -96,8 +98,8 @@ export function extractFile(
   captured: ReadonlySet<string>,
   diagnostics: Diagnostic[],
   data: { [key: string]: Json },
-  provenance: Provenance,
   incompleteConfig: boolean,
+  renames: readonly Rename[] = [],
 ): ParseResult {
   const path = file.fileName.slice(1);
   const symbols: SymbolDraft[] = [];
@@ -109,10 +111,34 @@ export function extractFile(
     end: node.end,
   });
 
+  // The compiler's checker recurses per inference step and can exhaust the
+  // stack (e.g. a 1,000-step chain of `let a1 = a0`). Such a lookup becomes an
+  // unresolved `compiler-limit` link and the file is partial; it never fails
+  // the file and never yields a guess.
+  let limitHit = false;
+  const isLimit = (error: unknown) =>
+    error instanceof RangeError && /call stack/i.test(error.message);
   function targetsOf(
     query: Lookup | ts.Symbol | undefined,
     meaning: Meaning,
   ): Targets {
+    try {
+      return resolveTargets(query, meaning);
+    } catch (error) {
+      if (!isLimit(error)) throw error;
+      limitHit = true;
+      return { targets: [], reason: "compiler-limit" };
+    }
+  }
+  function resolveTargets(
+    query: Lookup | ts.Symbol | undefined,
+    meaning: Meaning,
+  ): Targets {
+    if (
+      query === LIMIT ||
+      (query && !("flags" in query) && query.symbol === LIMIT)
+    )
+      return { targets: [], reason: "compiler-limit" };
     const found: Lookup =
       query && "flags" in query ? { symbol: query } : (query ?? {});
     const receiver = found.receiver;
@@ -121,7 +147,6 @@ export function extractFile(
     const facts = new Map<string, TargetFact>();
     let external = 0;
     let local = 0;
-    let shadowed = 0;
     let viaAlias = false;
     let firstAlias: ts.Symbol | undefined;
     const record = (declaration: ts.Declaration): boolean => {
@@ -134,24 +159,12 @@ export function extractFile(
       return true;
     };
     const visit = (value: ts.Symbol, depth: number) => {
-      // Follow aliases one step at a time; a step whose declaration carries a
-      // shadowed-require value ends the walk there (at that declaration if it
-      // is a graph symbol), never in the module the compiler misbound it to.
       let current = value;
-      for (const step of provenance.aliasSteps(value)) {
-        current = step;
-        if (provenance.declares(step)) {
-          const anchored = (step.declarations ?? []).filter(record);
-          if (!anchored.length) shadowed++;
-          return;
-        }
-        if (step.flags & ts.SymbolFlags.Alias) {
-          viaAlias = true;
-          firstAlias ??= step;
-        }
-      }
-      if (current.flags & ts.SymbolFlags.Alias)
+      if (current.flags & ts.SymbolFlags.Alias) {
+        viaAlias = true;
+        firstAlias ??= current;
         current = checker.getAliasedSymbol(current);
+      }
       let declarations = current.declarations ?? [];
       if (meaning !== "any" && declarations.length > 1) {
         const filtered = declarations.filter((declaration) =>
@@ -183,21 +196,27 @@ export function extractFile(
     };
     visit(found.symbol, 0);
     const targets = [...facts.values()];
-    if (!external && !local && !shadowed)
-      return { targets, viaAlias, receiver };
+    if (!external && !local) return { targets, viaAlias, receiver };
     // An alias whose module did not resolve keeps that module's reason.
     const moduleFailure =
-      external && !targets.length && firstAlias && bindingReason(firstAlias);
+      external &&
+      !targets.length &&
+      ((firstAlias && bindingReason(firstAlias)) ||
+        (receiver && receiverReason(receiver)));
     return {
       targets,
-      reason: shadowed
-        ? "shadowed-require"
-        : local
-          ? "local"
-          : moduleFailure || "external",
+      reason: local ? "local" : moduleFailure || "external",
       viaAlias,
       receiver,
     };
+  }
+  /** The module reason of a member's receiver root, if that root is an unresolved binding. */
+  function receiverReason(receiver: ts.Expression): string | undefined {
+    const root = rootOf(receiver);
+    const symbol = root && symbolOf(root);
+    return symbol && symbol.flags & ts.SymbolFlags.Alias
+      ? bindingReason(symbol)
+      : undefined;
   }
   function bindingReason(symbol: ts.Symbol): string | undefined {
     const specifier = bindingSpecifier(symbol);
@@ -245,7 +264,6 @@ export function extractFile(
     let reason = found.reason;
     if (
       incompleteConfig &&
-      reason !== "shadowed-require" &&
       (kind === "imports" ||
         kind === "exports" ||
         found.viaAlias ||
@@ -301,7 +319,15 @@ export function extractFile(
       ...extra,
     });
   }
-  const symbolOf = (node: ts.Node) => checker.getSymbolAtLocation(node);
+  const symbolOf = (node: ts.Node): ts.Symbol | undefined => {
+    try {
+      return checker.getSymbolAtLocation(node);
+    } catch (error) {
+      if (!isLimit(error)) throw error;
+      limitHit = true;
+      return LIMIT;
+    }
+  };
 
   /** The receiver of a member name (`a.b` → `a`, `a["b"]` → `a`, `A.B` → `A`). */
   const receiverOf = (node: ts.Node): ts.Expression | undefined => {
@@ -335,21 +361,9 @@ export function extractFile(
       else return undefined;
     }
   };
-  /** The checker's symbol for a name, judged by the provenance of its receiver. */
+  /** The checker's symbol for a name, with the receiver of a member name. */
   function lookup(node: ts.Node): Lookup {
     const receiver = receiverOf(node);
-    if (receiver) {
-      if (
-        ts.isQualifiedName(receiver as ts.Node)
-          ? (() => {
-              const root = rootOf(receiver);
-              const symbol = root && symbolOf(root);
-              return !!symbol && provenance.symbol(symbol);
-            })()
-          : provenance.expression(receiver)
-      )
-        return { reason: "shadowed-require", receiver };
-    }
     const symbol = symbolOf(node);
     if (!symbol && receiver) {
       // A member of a binding whose module did not resolve keeps that reason.
@@ -588,8 +602,7 @@ export function extractFile(
         node.expression.text === "require" &&
         node.arguments.length === 1 &&
         !ts.isStringLiteralLike(node.arguments[0]!) &&
-        isJsFile(file) &&
-        isModuleGlobal(node.expression)
+        isJsFile(file)
       )
         link(
           owner,
@@ -716,6 +729,18 @@ export function extractFile(
     }
     ts.forEachChild(node, (child) => visit(child, owner));
   }
+  // Ask for declaration types in source order first, so each inference step
+  // builds on an already computed one instead of recursing through the chain.
+  const warm = (node: ts.Node): void => {
+    if (ts.isVariableDeclaration(node) || ts.isBindingElement(node))
+      try {
+        checker.getTypeAtLocation(node.name);
+      } catch (error) {
+        if (!isLimit(error)) throw error;
+      }
+    ts.forEachChild(node, warm);
+  };
+  warm(file);
   visit(file, moduleKey);
 
   // Triple-slash directives: path references link to the file; types and lib
@@ -773,6 +798,22 @@ export function extractFile(
         end: Math.min(file.text.length, start + (diagnostic.length ?? 0)),
       },
     });
+  }
+  if (limitHit)
+    diagnostics.push({
+      message:
+        "The TypeScript checker exhausted its stack on some lookups; those links are unresolved (compiler-limit)",
+    });
+  // Facts of a renamed file report the original names (see rename.ts).
+  if (renames.length) {
+    for (const symbol of symbols) {
+      symbol.name = restoreNames(symbol.name, renames);
+      symbol.identity = restoreNames(symbol.identity, renames);
+    }
+    for (const item of links)
+      item.targetName = restoreNames(item.targetName, renames);
+    for (const diagnostic of diagnostics)
+      diagnostic.message = restoreNames(diagnostic.message, renames);
   }
   return {
     status: diagnostics.length ? "partial" : "clean",

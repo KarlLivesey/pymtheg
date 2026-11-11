@@ -1256,122 +1256,6 @@ test("a broken workspace root fails only root-package files; members stay analys
   );
 });
 
-test("nothing reached through a shadowed-require value links into the required module", async () => {
-  const dep = "export function real() {}\nexport class K { run() {} }\n";
-  await project(
-    {
-      "dep.ts": dep,
-      "top.js": [
-        "export {};",
-        "function require(n) { return { real() { return 0; } }; }",
-        'const m = require("./dep");',
-        "m.real();",
-        "new m.K();",
-        "const read = m.real;",
-        "const n = m;",
-        "n.real();",
-        "let later;",
-        "later = n;",
-        "later.real();",
-        "const { real } = m;",
-        "real();",
-        'const { real: direct } = require("./dep");',
-        "direct();",
-        "function use(x) { x.real(); }",
-        "use(m);",
-        "const holder = { m };",
-        "holder.m.real();",
-        "function give() { return m; }",
-        "give().real();",
-        "",
-      ].join("\n"),
-      "param.js": [
-        "export function load(require) {",
-        '  const m = require("./dep");',
-        "  m.real();",
-        "  new m.K();",
-        "}",
-        "",
-      ].join("\n"),
-      "fake.js": [
-        "export {};",
-        "function fake() {}",
-        "function require(n) { return { real: fake }; }",
-        'const m = require("./dep");',
-        "m.real();",
-        "",
-      ].join("\n"),
-      // Control: the real CommonJS require still links.
-      "real.js": 'const m = require("./dep");\nm.real();\nnew m.K();\n',
-    },
-    async (graph, report) => {
-      clean(report);
-      const intoDep = (link) =>
-        [link.targetId, ...link.candidates.map((c) => c.id)].some(
-          (id) =>
-            graph.store.findSymbols().find((s) => s.id === id)?.file ===
-            "dep.ts",
-        ) || (link.data?.targets ?? []).some((t) => t.file === "dep.ts");
-      for (const file of ["top.js", "param.js", "fake.js"])
-        assert.deepEqual(
-          graph.store
-            .links()
-            .filter((link) => link.file === file && intoDep(link)),
-          [],
-          `no link into dep.ts from ${file}`,
-        );
-      const members = graph.store
-        .links()
-        .filter(
-          (link) =>
-            ["top.js", "param.js", "fake.js"].includes(link.file) &&
-            link.kind === "calls" &&
-            /^(m|n|later)\./.test(link.targetName),
-        );
-      assert.equal(members.length, 7);
-      // Carried through an object property or a return value.
-      for (const name of ["holder.m.real", "(expression).real"]) {
-        const carried = graph
-          .links("top.js", "real", "calls")
-          .filter((link) => link.targetName === name);
-        assert.equal(carried.length, 1, name);
-        assert.equal(carried[0].resolution, "unresolved");
-        assert.equal(carried[0].data.reason, "shadowed-require");
-      }
-      for (const link of members) {
-        assert.equal(link.resolution, "unresolved");
-        assert.equal(link.data.reason, "shadowed-require", link.targetName);
-      }
-      // Destructured names are local constants, not the module's exports.
-      const plain = (name) =>
-        graph
-          .links("top.js", name, "calls")
-          .filter((link) => link.targetName === name);
-      assert.equal(plain("real").length, 1);
-      assert.equal(graph.target(plain("real")[0]), "top.js#real");
-      assert.equal(graph.target(plain("direct")[0]), "top.js#direct");
-      // Passing it on: the parameter is untyped, so nothing resolves through it.
-      const passed = graph
-        .links("top.js", "real", "calls")
-        .filter((link) => link.targetName === "x.real");
-      assert.equal(passed.length, 1);
-      assert.equal(passed[0].resolution, "unresolved");
-      assert.equal(
-        graph.target(
-          graph
-            .links("real.js", "real", "calls")
-            .find((l) => l.targetName === "m.real"),
-        ),
-        "dep.ts#real",
-      );
-      assert.equal(
-        graph.target(graph.link("real.js", "K", "calls")),
-        "dep.ts#K",
-      );
-    },
-  );
-});
-
 test("the nearest containing config owns a file: root depth is zero", async () => {
   await project(
     {
@@ -1568,140 +1452,6 @@ for (const base of ["./base.json", "./config/ts.json"])
       },
     );
   });
-
-// Round 4: provenance of shadowed-require values across files.
-const shadowDep = "export function real() {}\nexport class K { run() {} }\n";
-const intoDep = (graph, link) =>
-  [link.targetId, ...link.candidates.map((c) => c.id)].some(
-    (id) =>
-      graph.store.findSymbols().find((s) => s.id === id)?.file === "dep.ts",
-  );
-const assertNoneIntoDep = (graph, files) => {
-  const wrong = graph.store
-    .links()
-    .filter((link) => files.includes(link.file) && intoDep(graph, link));
-  assert.deepEqual(
-    wrong.map((l) => `${l.file} ${l.kind} ${l.targetName}`),
-    [],
-  );
-};
-
-test("shadowed-require values do not escape through ES exports into other files", async () => {
-  await project(
-    {
-      "dep.ts": shadowDep,
-      "e.js": [
-        "export function require(n) { return {}; }",
-        'const m = require("./dep");',
-        "export { m };",
-        "export default m;",
-        "",
-      ].join("\n"),
-      "f.ts": [
-        'import { m } from "./e.js";',
-        'import d from "./e.js";',
-        "m.real();",
-        "new m.K();",
-        "d.real();",
-        "",
-      ].join("\n"),
-    },
-    async (graph) => {
-      assertNoneIntoDep(graph, ["e.js", "f.ts"]);
-      for (const name of ["m.real", "m.K", "d.real"]) {
-        const call = graph.store
-          .links()
-          .find((l) => l.file === "f.ts" && l.targetName === name);
-        assert.equal(call.resolution, "unresolved", name);
-        assert.equal(call.data.reason, "shadowed-require", name);
-      }
-      // The binding `m` is the local constant in e.js, not the dep module.
-      assert.equal(graph.target(graph.link("f.ts", "m", "imports")), "e.js#m");
-      assert.equal(
-        graph.link("f.ts", "d", "imports").data.reason,
-        "shadowed-require",
-      );
-    },
-  );
-});
-
-test("shadowed-require values do not escape through a default export of a member", async () => {
-  await project(
-    {
-      "dep.ts": shadowDep,
-      "a.js": [
-        "export {};",
-        "function require(n) { return { real() { return 17; } }; }",
-        'const m = require("./dep");',
-        "export default m.real;",
-        'import * as legit from "./dep";',
-        "legit.real();",
-        "",
-      ].join("\n"),
-      "b.js": 'import run from "./a";\nrun();\n',
-    },
-    async (graph) => {
-      // A genuine ES import of the same module in the same file still links.
-      assert.equal(
-        graph.target(
-          graph.store.links().find((l) => l.targetName === "legit.real"),
-        ),
-        "dep.ts#real",
-      );
-      assert.equal(
-        graph.link("a.js", "m.real", "exports").data.reason,
-        "shadowed-require",
-      );
-      assert.equal(
-        graph.link("b.js", "run", "imports").data.reason,
-        "shadowed-require",
-      );
-      const call = graph.store
-        .links()
-        .find((l) => l.file === "b.js" && l.kind === "calls");
-      assert.equal(call.resolution, "unresolved");
-      assert.equal(call.data.reason, "shadowed-require");
-      assertNoneIntoDep(graph, ["b.js"]);
-    },
-  );
-});
-
-test("shadowed-require values do not escape through CommonJS exports", async () => {
-  await project(
-    {
-      "dep.ts": shadowDep,
-      "x.js": [
-        "function require(n) { return { real() { return 0; } }; }",
-        'const m = require("./dep");',
-        "module.exports = m;",
-        "exports.mm = m;",
-        "",
-      ].join("\n"),
-      "y.js": [
-        'const x = require("./x");',
-        "x.real();",
-        "new x.K();",
-        'const { mm } = require("./x");',
-        "mm.real();",
-        "",
-      ].join("\n"),
-    },
-    async (graph) => {
-      assertNoneIntoDep(graph, ["x.js", "y.js"]);
-      for (const name of ["x.real", "x.K", "mm.real"]) {
-        const call = graph.store
-          .links()
-          .find((l) => l.file === "y.js" && l.targetName === name);
-        assert.equal(call.resolution, "unresolved", name);
-      }
-      // The real require of ./x still links to the module x.js.
-      const modules = graph.links("y.js", '"./x"', "imports");
-      assert.equal(modules.length, 2);
-      for (const module of modules)
-        assert.equal(graph.target(module), "x.js#x.js");
-    },
-  );
-});
 
 // Round 4: an uncaptured base config never yields a confident link.
 const incomplete = (graph, file, at, kind) => {
@@ -1920,3 +1670,319 @@ test("a tied file records its tied configs and no single project", async () => {
     },
   );
 });
+
+// Locally bound require: the compiler sees a same-length rename (rename.ts),
+// so every route a value can take is typed correctly with no tracking.
+const shadowDep = "export function real() {}\nexport class K { run() {} }\n";
+const shadowHeader = [
+  "export {};",
+  "function require(n) { return { real() { return 17; } }; }",
+  'const m = require("./dep");',
+];
+const routes = {
+  getter: ["const z = { get value() { return m; } };", "z.value.real();"],
+  arrayIndex: ["const z = [];", "z[0] = m;", "z[0].real();"],
+  destructuringAssignment: ["let z;", "({ x: z } = { x: m });", "z.real();"],
+  arrowReturn: ["const get = () => m;", "get().real();"],
+  functionExpressionReturn: [
+    "const get2 = function () { return m; };",
+    "get2().real();",
+  ],
+  cycle: [
+    "let x; let y;",
+    "function h() { x = y; }",
+    "x = m;",
+    "x.real();",
+    "y = x;",
+    "y.real();",
+  ],
+  logicalOr: ["let z;", "z ||= m;", "z.real();"],
+  nullish: ["let q = null;", "q ??= m;", "q.real();"],
+  arrayLiteral: ["const arr = [m];", "arr[0].real();"],
+  arrayPattern: ["const [first] = [m];", "first.real();"],
+  spread: ["const s = { ...m };", "s.real();"],
+  defaultParameter: ["function use(p = m) { p.real(); }"],
+  classFields: [
+    "class C { f = m; static s = m; }",
+    "new C().f.real();",
+    "C.s.real();",
+  ],
+  // Earlier rounds' routes.
+  direct: ["m.real();", "new m.K();", "const read = m.real;"],
+  reassigned: [
+    "const n = m;",
+    "n.real();",
+    "let later;",
+    "later = n;",
+    "later.real();",
+  ],
+  objectProperty: ["const holder = { m };", "holder.m.real();"],
+  functionReturn: ["function give() { return m; }", "give().real();"],
+  passedOn: ["function pass(x) { x.real(); }", "pass(m);"],
+  destructured: ["const { real } = m;", "real();"],
+  longChain: [
+    "let v0 = m;",
+    ...Array.from({ length: 1000 }, (_, i) => `let v${i + 1} = v${i};`),
+    "v1000.real();",
+  ],
+};
+test("a locally bound require never links into the module it names, by any route", async () => {
+  const files = { "dep.ts": shadowDep };
+  for (const [name, lines] of Object.entries(routes))
+    files[`${name}.js`] = [...shadowHeader, ...lines, ""].join("\n");
+  files["param.js"] = [
+    "export function load(require) {",
+    '  const m = require("./dep");',
+    "  m.real();",
+    "  new m.K();",
+    "}",
+    "",
+  ].join("\n");
+  files["fake.js"] = [
+    "export {};",
+    "function fake() {}",
+    "function require(n) { return { real: fake }; }",
+    'const m = require("./dep");',
+    "m.real();",
+    "",
+  ].join("\n");
+  // Across files: an exported getter, named/default re-exports, a default
+  // export of a member, module.exports and exports.x.
+  files["ex.js"] = [...shadowHeader, "export const get = () => m;", ""].join(
+    "\n",
+  );
+  files["useEx.ts"] = 'import { get } from "./ex.js";\nget().real();\n';
+  files["e.js"] = [
+    "export function require(n) { return {}; }",
+    'const m = require("./dep");',
+    "export { m };",
+    "export default m;",
+    "",
+  ].join("\n");
+  files["f.ts"] = [
+    'import { m } from "./e.js";',
+    'import d from "./e.js";',
+    "m.real();",
+    "new m.K();",
+    "d.real();",
+    "",
+  ].join("\n");
+  files["a.js"] = [
+    ...shadowHeader,
+    "export default m.real;",
+    'import * as legit from "./dep";',
+    "legit.real();",
+    "",
+  ].join("\n");
+  files["b.js"] = 'import run from "./a";\nrun();\n';
+  files["x.js"] = [
+    "function require(n) { return { real() { return 0; } }; }",
+    'const m = require("./dep");',
+    "module.exports = m;",
+    "exports.mm = m;",
+    "",
+  ].join("\n");
+  files["y.js"] = [
+    'const x = require("./x");',
+    "x.real();",
+    "new x.K();",
+    'const { mm } = require("./x");',
+    "mm.real();",
+    "",
+  ].join("\n");
+  // Controls: the real CommonJS require and createRequire still link.
+  files["real.js"] = 'const m = require("./dep");\nm.real();\nnew m.K();\n';
+  files["created.mjs"] = [
+    'import { createRequire } from "node:module";',
+    "const require = createRequire(import.meta.url);",
+    'const m = require("./dep");',
+    "m.real();",
+    "",
+  ].join("\n");
+  await project(files, async (graph, report) => {
+    assert.deepEqual(report.errors, []);
+    assert.deepEqual(report.analysisErrors, []);
+    assert.deepEqual(report.failed, []);
+    const intoDep = (link) =>
+      [link.targetId, ...link.candidates.map((c) => c.id)].some(
+        (id) =>
+          graph.store.findSymbols().find((s) => s.id === id)?.file === "dep.ts",
+      );
+    const shadowedFiles = Object.keys(files).filter(
+      (file) =>
+        !["dep.ts", "real.js", "created.mjs"].includes(file) && file !== "a.js",
+    );
+    const wrong = graph.store
+      .links()
+      .filter((link) => shadowedFiles.includes(link.file) && intoDep(link));
+    assert.deepEqual(
+      wrong.map((l) => `${l.file} ${l.kind} ${l.targetName}`),
+      [],
+    );
+    // In a.js only the genuine ES namespace import links into dep.ts.
+    assert.deepEqual(
+      graph.store
+        .links()
+        .filter((l) => l.file === "a.js" && intoDep(l))
+        .map((l) => `${l.kind} ${l.targetName}`)
+        .sort(),
+      ["calls legit.real", "imports *", "imports ./dep"],
+    );
+    // Every route's member call was actually extracted (not silently dropped).
+    for (const name of Object.keys(routes).filter((r) => r !== "passedOn"))
+      assert.ok(
+        graph.store
+          .links()
+          .some(
+            (l) =>
+              l.file === `${name}.js` &&
+              l.kind === "calls" &&
+              /real$/.test(l.targetName),
+          ),
+        name,
+      );
+    // Names are reported as written, not as the compiler's renamed text.
+    assert.equal(
+      graph.symbol("direct.js", "require", "function").name,
+      "require",
+    );
+    const call = graph.links("direct.js", "require", "calls")[0];
+    assert.equal(call.targetName, "require");
+    assert.equal(graph.target(call), "direct.js#require");
+    // A named re-export of the local value links to that local constant.
+    assert.equal(graph.target(graph.link("f.ts", "m", "imports")), "e.js#m");
+    // Controls.
+    assert.equal(
+      graph.target(
+        graph
+          .links("real.js", "real", "calls")
+          .find((l) => l.targetName === "m.real"),
+      ),
+      "dep.ts#real",
+    );
+    assert.equal(graph.target(graph.link("real.js", "K", "calls")), "dep.ts#K");
+    assert.equal(
+      graph.target(graph.link("created.mjs", '"./dep"', "imports")),
+      "dep.ts#dep.ts",
+    );
+    assert.equal(
+      graph.target(
+        graph
+          .links("created.mjs", "real", "calls")
+          .find((l) => l.targetName === "m.real"),
+      ),
+      "dep.ts#real",
+    );
+  });
+});
+
+test("a require shadowed only inside one function is renamed only there", async () => {
+  await project(
+    {
+      "dep.ts": shadowDep,
+      "mixed.js": [
+        'const outer = require("./dep");',
+        "outer.real();",
+        "function inner(require) {",
+        '  const m = require("./dep");',
+        "  m.real();",
+        "}",
+        "",
+      ].join("\n"),
+    },
+    async (graph) => {
+      const calls = graph.store
+        .links()
+        .filter(
+          (l) =>
+            l.file === "mixed.js" &&
+            l.kind === "calls" &&
+            /real$/.test(l.targetName),
+        );
+      const byName = Object.fromEntries(calls.map((l) => [l.targetName, l]));
+      assert.equal(graph.target(byName["outer.real"]), "dep.ts#real");
+      assert.equal(byName["m.real"].resolution, "unresolved");
+      assert.equal(graph.links("mixed.js", '"./dep"', "imports").length, 1);
+    },
+  );
+});
+
+test("a locally declared module or exports is not read as CommonJS exports", async () => {
+  await project(
+    {
+      "a.js":
+        "const module = { exports: {} };\nmodule.exports = { fake() {} };\n",
+      "b.js": "const exports = {};\nexports.fake2 = function () {};\n",
+      "c.js":
+        'const x = require("./a");\nx.fake();\nconst y = require("./b");\ny.fake2();\n',
+    },
+    async (graph) => {
+      assert.equal(
+        graph.store.findSymbols({ file: "b.js", name: "fake2" }).length,
+        0,
+      );
+      assert.equal(
+        graph.store.findSymbols({ file: "a.js", name: "module.exports" })
+          .length,
+        0,
+      );
+      graph.symbol("a.js", "module", "constant");
+      for (const name of ["x.fake", "y.fake2"])
+        assert.equal(
+          graph.store
+            .links()
+            .find((l) => l.file === "c.js" && l.targetName === name).resolution,
+          "unresolved",
+          name,
+        );
+    },
+  );
+});
+
+test("a type through a namespace import of a missing module says missing-module", async () => {
+  await project(
+    { "use.ts": 'import * as ns from "./missing";\nexport let b: ns.T;\n' },
+    async (graph) => {
+      assert.equal(
+        graph.link("use.ts", "ns.T", "references").data.reason,
+        "missing-module",
+      );
+    },
+  );
+});
+
+for (const [label, text] of [
+  ["an array", "[1, 2]"],
+  ["null", "null"],
+  ["unparsable", "{ broken"],
+])
+  test(`a sibling config whose root is ${label} never fails a healthy config's files`, async () => {
+    await project(
+      {
+        "tsconfig.json": JSON.stringify({
+          files: [],
+          references: [
+            { path: "./tsconfig.web.json" },
+            { path: "./tsconfig.tools.json" },
+          ],
+        }),
+        "tsconfig.web.json": JSON.stringify({ include: ["web/**/*.ts"] }),
+        "tsconfig.tools.json": text,
+        "web/a.ts": "export function a() {}\n",
+        "web/b.ts": 'import { a } from "./a";\na();\n',
+        "tools/build.ts": "export const build = 1;\n",
+      },
+      async (graph, report) => {
+        // Only files no healthy config selects fall back to the broken config.
+        assert.deepEqual(report.failed, ["tools/build.ts"]);
+        assert.equal(
+          graph.store.getFile("web/a.ts").result.data.project,
+          "tsconfig.web.json",
+        );
+        assert.equal(
+          graph.target(graph.link("web/b.ts", "a", "calls")),
+          "web/a.ts#a",
+        );
+      },
+    );
+  });

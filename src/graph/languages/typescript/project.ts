@@ -4,6 +4,7 @@ import { dirname, posix } from "node:path";
 import ts from "typescript";
 import { compare, matchesPattern } from "../../index.js";
 import type { ContextFile, GraphFile } from "../../types.js";
+import { renameShadowed, type Rename } from "./rename.js";
 
 /**
  * Project model for the snapshot: which config owns each source, with which
@@ -67,6 +68,8 @@ export interface ProjectModel {
   ties: Map<string, ProjectGroup[]>;
   /** Files failed by a broken config or package manifest, with the cause. */
   failures: Map<string, string>;
+  /** Same-length renames applied to each JS file's compiler text. */
+  renames: Map<string, Rename[]>;
   host: (group: ProjectGroup) => ts.CompilerHost;
 }
 
@@ -238,7 +241,16 @@ export function projectModel(
   contexts: readonly ContextFile[],
 ): ProjectModel {
   const fs = new VirtualFileSystem();
-  for (const file of files) fs.add(file.path, file.text);
+  // JS files reach the compiler with locally bound require/module/exports
+  // renamed (same length), so it never misreads them as CommonJS.
+  const renames = new Map<string, Rename[]>();
+  const renameErrors = new Map<string, string>();
+  for (const file of files) {
+    const renamed = renameShadowed(file.path, file.text);
+    if (renamed.error) renameErrors.set(file.path, renamed.error);
+    if (renamed.renames.length) renames.set(file.path, renamed.renames);
+    fs.add(file.path, renamed.text);
+  }
   for (const file of contexts) fs.add(file.path, file.text);
   const manifests: { path: string; json: Record<string, unknown> }[] = [];
   /** Package directory -> why its manifest is unreadable. */
@@ -499,11 +511,15 @@ export function projectModel(
         );
         group.options = forced(parsed.options);
       }
-      // A broken config still claims whatever its own file list names.
-      for (const name of parsed.fileNames) {
-        const path = fromVirtual(name);
-        if (path !== undefined) claim(path, group);
-      }
+      // A broken config still claims whatever its own file list names. A config
+      // whose selection cannot be read claims nothing here: the compiler would
+      // hand back its default input list (every file), so only the guarded
+      // directory fallback below applies.
+      if (!selectionUnreadable)
+        for (const name of parsed.fileNames) {
+          const path = fromVirtual(name);
+          if (path !== undefined) claim(path, group);
+        }
     }
     // Its own file selection cannot be read: it could own anything below its
     // directory (decided after every config, see below).
@@ -570,6 +586,7 @@ export function projectModel(
       .filter((directory) => underDirectory(file.path, directory))
       .sort((a, b) => depthOf(b) - depthOf(a))[0];
     const failure =
+      renameErrors.get(file.path) ??
       tied.find((candidate) => candidate.failure)?.failure ??
       group.failure ??
       (manifest === undefined ? undefined : brokenManifests.get(manifest));
@@ -619,5 +636,5 @@ export function projectModel(
       realpath: (name) => fs.real(name),
     };
   };
-  return { groups, owner, ties, failures, host };
+  return { groups, owner, ties, failures, renames, host };
 }

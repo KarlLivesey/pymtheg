@@ -94,7 +94,7 @@ link across packages.
 **Unchanged snapshot reuse.** When `changedFiles` and `changedContextFiles`
 are both empty and every stored result was produced by this module version
 (which embeds the compiler version; the leading number is bumped whenever
-extraction or resolution semantics change, and is now 2), the stored facts are
+extraction or resolution semantics change, and is now 3), the stored facts are
 returned as they are:
 no program is built and nothing is parsed. They are the complete analysis of the
 identical snapshot, and `resolve` re-derives every target from them. Any source,
@@ -176,59 +176,66 @@ mapping to graph symbols: calls keep callable declarations, type positions and
 drop type-only declarations. A plain value import binding keeps every meaning
 and therefore gives candidates for a merged name.
 
-`require`, `module` and `exports` count as CommonJS only when they mean the
-module system's globals. For `require` the checker decides with the compiler's
-own `isCommonJsRequire` rule: no binding or only ambient declarations. A local
-function, a parameter, a variable or an imported name called `require` is
-an ordinary call to that declaration, with no import edge and no import
-bindings. The checker resolves `module`/`exports` identifiers to export symbols
-rather than scope bindings, so for those a top-level declaration of the name in
-the same file counts as shadowing. A `var module` declared in another global
-script is not seen (a known limitation).
+**Locally bound `require`, `module` and `exports` (same-length rename).** The
+compiler treats a call to anything named `require` in a JavaScript file as a
+module import, and `module.exports = …`/`exports.x = …` as CommonJS exports, by
+name alone, even when the file declares its own `require`, `module` or
+`exports`. Its checker then types `const m = require("./dep")` as the module
+`./dep`, and every answer derived from `m` points there. Earlier rounds tried to
+chase such values afterwards; that cannot be made sound, because JavaScript has
+too many ways to move a value. The fix is at the source instead (`rename.ts`):
 
-**Provenance of shadowed-`require` values.** The compiler's binder treats
-`const m = require("./dep")` as an import alias of `./dep` even when `require`
-is local, so every alias and type it hands out for `m` points into `./dep`.
-That is wrong: at run time `m` is whatever the local function returns. The
-module therefore decides **once per declaration**, across every captured
-JavaScript file of the program (memoised in `provenance.ts`), whether a
-binding's value comes from such a call. A declaration carries that provenance
-when it is:
-- a variable or destructured name initialised from a shadowed `require` call;
-- a variable or destructured name initialised from an expression that carries
-  it, where an expression carries it if its root name, any member on its path,
-  or the callee of a call on its path does, and `a ? b : c` or `a || b`/`a && b`/
-  `a ?? b` carries it if either side does;
-- a variable that a plain assignment `x = value` gives such a value, in any
-  captured JavaScript file;
-- `export default value`/`export = value`, `module.exports = value`,
-  `exports.x = value`, or an object property `{ x: value }` / `{ m }` holding
-  such a value;
-- a function whose `return` (or arrow body) yields such a value.
+- Before a JavaScript file reaches the compiler's virtual host, a purely
+  syntactic scope analysis of that file finds every identifier occurrence
+  **bound to a local declaration** of `require`, `module` or `exports`. Bindings
+  come from `var`/`let`/`const` (including destructuring), function and class
+  declarations, parameters, import bindings, catch clauses and the names of
+  function/class expressions. Scopes follow JavaScript rules: `var` and
+  parameters per function, `let`/`const`/`class` per block.
+- Exactly those occurrences are replaced, in the text handed to the compiler,
+  by a fresh identifier of the **same length** that does not occur in the file
+  (`requirf`, `modulf`, `exportf`, …; another one if taken). Offsets, lines and
+  every other character are unchanged, so every position, symbol range and the
+  conformance kit's position checks stay valid. A `require` shadowed only inside
+  one function is renamed only there. Occurrences that mean the real CommonJS
+  loader are left alone.
+- The compiler then sees an ordinary function call. It types `m` as that
+  function's return value, so every downstream answer is correct with no
+  tracking: getters, arrays, destructuring and destructuring assignment, `||=`
+  and `??=`, spreads, default parameters, class fields, returns, cycles, chains
+  of any length, and exports and re-exports into other files.
+- Facts for a renamed file report the **original** names. Symbol names and
+  identities, link target names and diagnostics are mapped back, and the file
+  records `data.renamedForCompiler` (for example `["require"]`).
+- `const require = createRequire(import.meta.url)` (or `module.createRequire`)
+  is the **real** loader at run time, so it is not renamed, and `require("./x")`
+  through it is a normal CommonJS import.
+- TypeScript files are untouched: the compiler applies CommonJS semantics to
+  `require` only in JavaScript files. A TypeScript-only project pays nothing,
+  because the scan runs only on JS files that contain one of the three names.
 
-Every resolution path consults it. Alias chains are walked **one step at a
-time** (`getImmediateAliasedSymbol`; for a binding of a module whose value is
-`module.exports = …`, that assignment is an explicit step) and stop at the first
-step whose declaration carries the provenance. The link then targets that
-declaration if it is a graph symbol (`import { m } from "./e.js"` resolves to
-the constant `m` in `e.js`); otherwise it is unresolved with reason
-`shadowed-require`. Every member lookup (`m.real()`, `new m.K()`, `<m.C/>`,
-`typeof m.x`, `extends m.K`, `export default m.real`) checks its receiver
-expression the same way. So within these rules nothing reached through such a
-binding links into the module named by its string argument: not in the same
-file, and not through re-exports, default exports, `module.exports`/`exports.x`
-or imports in other files.
+With the rename in place, every `require("literal")` that reaches the compiler
+in a JavaScript file is the loader, so CommonJS detection is purely syntactic.
+The earlier provenance tracker (`provenance.ts`) and its `shadowed-require`
+reason are deleted.
 
-Genuine bindings are unaffected, because provenance belongs to declarations,
-not types: `import * as legit from "./dep"` beside a shadowed `require` of
-`./dep` in the same file still resolves `legit.real()` to `dep.ts#real`.
-
-Not tracked (each is an unresolved link at worst, never a link into the
-module): values passed as arguments to a parameter (an untyped JavaScript
-parameter gives no symbol anyway); values stored by mutation (`obj.x = m`,
-array elements, `Object.assign`); compound assignments; and the
-`var module`/`var exports` declared in another global script file, described
-above.
+**Remaining corners**, none of which can produce a link into the misread module:
+- **AMD.** `define(function (require, exports, module) { require("./b") })`
+  calls a local parameter. It is reported as an unresolved call to that
+  parameter (`local`), not as an import edge, even though at run time the AMD
+  loader does load `./b`. AMD is not modelled; this is conservative.
+- **Property keys.** A shorthand property `{ require }` or `export { require }`
+  of a renamed binding also renames that key or exported name in the compiler's
+  view. An importer's own `import { require }` is renamed the same way (the
+  replacement is deterministic), so the pair still resolves. If the two files
+  pick different replacements, or someone reads `obj.require` of such an
+  object, the link is unresolved, never wrong.
+- **Global scripts.** Scope is per file, which is Node's module semantics. A
+  top-level `var require` in one non-module script is not treated as shadowing
+  `require` in another script file, which keeps its CommonJS meaning.
+- If no fresh same-length identifier exists, which would take every one- and
+  two-letter variant appearing in the file, that file **fails** with a
+  diagnostic instead of being misread.
 
 Paths aliases (`paths`/`baseUrl`), `package.json` `imports`/`exports`/`type`,
 `moduleResolution` modes and workspace packages all work through the compiler's
@@ -239,13 +246,13 @@ own resolver over the snapshot.
 | reason | Meaning |
 |---|---|
 | `external` | The checker found declarations, but outside the project (standard library); or a name that resolved through a binding whose module did resolve but whose member has no declaration |
-| `external-package` | A bare specifier that does not resolve (`node_modules` is never walked), every binding imported from it, and every call, `new`, type reference, heritage clause and member lookup reached through such a binding |
+| `external-package` | A bare specifier that does not resolve (`node_modules` is never walked), every binding imported from it, and every call, `new`, type reference (including qualified names such as `ns.T`), heritage clause and member lookup reached through such a binding |
 | `missing-module` | The same for a relative specifier with no captured file (for example `new FlowProducer()` imported from an unbuilt `../../dist/...`) |
 | `unresolved-alias` | The same for a specifier matching a `paths` pattern of the owning config, or a `#` subpath import, that resolves to no captured file |
 | `no-symbol` | The checker has no symbol: untyped JS, `any`/`unknown` receivers (often because the receiver's type came from an uncaptured package), computed callees |
 | `local` | The target is a parameter, local variable, local function or other non-symbol declaration |
 | `computed-specifier` | `import(expr)` or JS `require(expr)` with a non-literal specifier |
-| `shadowed-require` | Reached through a value from a locally bound `require` (see above) |
+| `compiler-limit` | The TypeScript checker exhausted its stack on this lookup (deep inference chains); the file is partial |
 | `ambiguous-project` | Equally ranked configs disagree and at least one has no complete answer; their targets are kept |
 | `incomplete-config` | The file's config `extends` a base that was not captured, and the link's outcome depends on settings that base could supply (see Status); would-be targets are kept, the reason without that rule is in `data.reasonWithoutConfig` |
 
@@ -269,6 +276,13 @@ imports of `./orig` are not linked to it; backlog).
 
 - A syntax error makes the file **partial** with the compiler's syntactic
   diagnostics (ranged); its recovered symbols stay linkable with partial status.
+- **Compiler stack limits.** The checker's inference recurses once per step, so
+  a long chain such as `let v1 = v0; … let v1000 = v999;` can exhaust the stack.
+  Before extracting a file, the module asks for its declaration types in source
+  order, so each step builds on a computed one; a 1,000-step chain then indexes
+  clean. Any lookup that still overflows becomes an unresolved `compiler-limit`
+  link, and the file is partial with a diagnostic. The file never fails and the
+  link is never guessed.
 - Unreadable or non-UTF-8 sources stay failed (detected by re-hashing the
   captured text against the original-byte hash) and are never returned by
   analysis.
@@ -282,8 +296,11 @@ imports of `./orig` are not linked to it; backlog).
   its `files`/`include` select (in a Vite layout, a broken `tsconfig.node.json`
   fails `vite.config.ts` only). Only when its own selection cannot be read
   (malformed JSON or a non-object root) does it fall back to its directory
-  subtree; even then it skips files that a healthy config in the same directory
-  selects with its own `files`/`include`. Ownership ranking still applies, so a
+  subtree. In that case it claims nothing from the compiler's parse, which
+  would be the default input list of every file. Even then it skips files that
+  a healthy config in the same directory selects with its own `files`/`include`,
+  so a `tsconfig.tools.json` containing `[1,2]` never fails the files of a
+  sibling `tsconfig.web.json`. Ownership ranking still applies, so a
   nearer valid config keeps its files. Other projects analyse normally. Links from healthy
   files into the failed files keep their names and stay unresolved; their
   recorded targets are in `data.targets`.
@@ -325,9 +342,8 @@ imports of `./orig` are not linked to it; backlog).
   - every link with a target in another file;
   - every member lookup whose receiver is anything other than `this`/`super`
     or a class, enum, namespace or function declared in this file;
-  - every other link that had an unresolved reason other than `local` or
-    `shadowed-require` (its original reason is kept in
-    `data.reasonWithoutConfig`).
+  - every other link that had an unresolved reason other than `local` (its
+    original reason is kept in `data.reasonWithoutConfig`).
 
   What stays definite: `contains`, triple-slash `path` references (resolved
   from the file system, not by settings), and same-file targets reached by name
@@ -398,10 +414,26 @@ Full numbers, the comparison across rounds and all four hand checks are in
   `external-package` 11,210 (mostly `vitest`'s `expect`/`it` and their matcher
   chains) and `missing-module` 234 (`tests/types/*.ts` and fixtures that import
   the unbuilt `dist/`). Provenance, incomplete-config and the selection
-  fallback do not apply to BullMQ. Hand checks found no wrong link in any
-  round: round 1 checked 24 resolved, 12 unresolved and all 4 candidate sets;
-  rounds 2, 3 and 4, each with a new seed, checked 30 resolved, 15 unresolved
-  and all 4 candidate sets.
+  fallback do not apply to BullMQ. Round 5 (the rename) leaves resolution
+  unchanged: BullMQ has no locally bound `require`/`module`/`exports`, and 0
+  files are renamed. 14 qualified type names through namespace imports of
+  uncaptured packages (`sinon.SinonStub`, `vi.fn`, `DefaultTheme.NavItem`) move
+  from `external` to `external-package` (item 3). Hand checks found no wrong
+  link in any round: round 1 checked 24 resolved, 12 unresolved and all 4
+  candidate sets; rounds 2 to 5, each with a new seed, checked 30 resolved,
+  15 unresolved and all 4 candidate sets.
+- **A project with a local `require`: `requirejs`** (`7faea649`, 406 files, 0
+  failed). 133 files are renamed (`require` in 116, `exports` in 73, `module`
+  in 61), almost all AMD `define(function (require, exports, module) {…})`
+  modules. With the rename, 199 calls go to the local `require` parameters
+  (unresolved `local`), and 16 `require` import edges remain (2 resolved, the
+  genuine CommonJS ones in `dist/dist-site.js`). A run with the rename disabled
+  had 180 import edges (4 resolved). The two extra resolved edges were AMD
+  `require("./b")` calls inside `define` factories; the AMD loader would load
+  them, but they are not CommonJS, and they are now reported conservatively as
+  calls to the local parameter. `jiti` (a loader shim, 142 files) uses
+  `createRequire(import.meta.url)("…")` directly; it has no locally bound
+  `require` and nothing is renamed.
   Unresolved links are dominated by uncaptured packages (`vitest`, `ioredis`,
   `node:*`) and the standard library. The existing deep analysis
   (`src/implementation/`) is unchanged and remains available on top.
@@ -410,5 +442,5 @@ Full numbers, the comparison across rounds and all four hand checks are in
   `node_modules`.
 - Time (observation, loaded machine): before the W2-I core landed, the BullMQ
   first index took 38 to 66 s, of which the module's analysis was about 10 s,
-  the rest core storage. With W2-I merged (round 4) it takes 18 s, and an
-  unchanged re-index takes 6 s (about 5 ms of analysis; stored facts reused).
+  the rest core storage. With W2-I merged it takes 9 to 18 s, and an unchanged
+  re-index takes 3 to 6 s (about 5 ms of analysis; stored facts reused).

@@ -45,56 +45,13 @@ export function isRequireCall(node: ts.Node): node is ts.CallExpression {
   );
 }
 
-// The checker of the program being extracted. Module-system names (`require`,
-// `module`, `exports`) are judged with it, so symbol extraction and link
-// extraction agree on whether a construct is CommonJS.
-let oracle: ts.TypeChecker | undefined;
-export function withChecker<T>(checker: ts.TypeChecker, run: () => T): T {
-  const previous = oracle;
-  oracle = checker;
-  try {
-    return run();
-  } finally {
-    oracle = previous;
-  }
-}
 /**
- * Whether an identifier means the module system's global, following the
- * compiler's own `isCommonJsRequire` rule: no binding, or only ambient
- * declarations. A local function, parameter, variable or import of that name
- * shadows it.
+ * A `require("literal")` call in a JavaScript file. Locally bound `require`
+ * names never reach the compiler (rename.ts renames them), so every remaining
+ * one is the CommonJS loader or a `createRequire` result.
  */
-export function isModuleGlobal(identifier: ts.Identifier): boolean {
-  if (!oracle) return true;
-  const symbol = oracle.getSymbolAtLocation(identifier);
-  if (!symbol) return true;
-  if (symbol.flags & ts.SymbolFlags.Alias) return false;
-  const declarations = symbol.declarations ?? [];
-  return (
-    !declarations.length ||
-    declarations.some((declaration) => {
-      if (declaration.getSourceFile().isDeclarationFile) return true;
-      for (
-        let node: ts.Node | undefined = declaration;
-        node;
-        node = node.parent
-      )
-        if (
-          ts.canHaveModifiers(node) &&
-          ts
-            .getModifiers(node)
-            ?.some((modifier) => modifier.kind === ts.SyntaxKind.DeclareKeyword)
-        )
-          return true;
-      return false;
-    })
-  );
-}
-/** A `require("literal")` call in a JavaScript file that means CommonJS. */
 export const isCommonJsRequire = (node: ts.Node): boolean =>
-  isRequireCall(node) &&
-  isJsFile(node.getSourceFile()) &&
-  isModuleGlobal(node.expression as ts.Identifier);
+  isRequireCall(node) && isJsFile(node.getSourceFile());
 /** The require call a variable is initialised from (`require(x)`, `require(x).y`), if any. */
 export function requireInitializer(
   declaration: ts.VariableDeclaration,
@@ -109,74 +66,19 @@ const requireAlias = (declaration: ts.VariableDeclaration) => {
   const call = requireInitializer(declaration);
   return !!call && isCommonJsRequire(call);
 };
-/**
- * The compiler binds `const x = require("m")` as an alias even when `require`
- * is a local function. Such a declaration is an ordinary variable here, so alias
- * following must stop at it.
- */
-export function isShadowedRequireAlias(declaration: ts.Node): boolean {
-  const root = ts.isBindingElement(declaration)
-    ? rootDeclaration(declaration)
-    : ts.isVariableDeclaration(declaration)
-      ? declaration
-      : undefined;
-  const call = root && requireInitializer(root);
-  return !!call && !isCommonJsRequire(call);
-}
-
-/**
- * Whether a file binds `name` at its top level (which shadows the CommonJS
- * `module`/`exports` objects for top-level assignments). The checker resolves
- * these identifiers to export symbols, not to scope bindings, so this is a
- * syntactic check of the file's own declarations.
- */
-function declaresAtTop(file: ts.SourceFile, name: string): boolean {
-  const binds = (node: ts.BindingName): boolean =>
-    ts.isIdentifier(node)
-      ? node.text === name
-      : node.elements.some(
-          (element) => !ts.isOmittedExpression(element) && binds(element.name),
-        );
-  return file.statements.some((statement) => {
-    if (ts.isVariableStatement(statement))
-      return statement.declarationList.declarations.some((d) => binds(d.name));
-    if (
-      ts.isFunctionDeclaration(statement) ||
-      ts.isClassDeclaration(statement) ||
-      ts.isEnumDeclaration(statement)
-    )
-      return statement.name?.text === name;
-    if (ts.isImportDeclaration(statement)) {
-      const clause = statement.importClause;
-      const named = clause?.namedBindings;
-      return (
-        clause?.name?.text === name ||
-        (!!named &&
-          (ts.isNamespaceImport(named)
-            ? named.name.text === name
-            : named.elements.some((element) => element.name.text === name)))
-      );
-    }
-    if (ts.isImportEqualsDeclaration(statement))
-      return statement.name.text === name;
-    return false;
-  });
-}
 /** CommonJS export target text for `exports.x`, `module.exports.x` or `module.exports`. */
 export function commonJsTarget(expression: ts.Expression): string | undefined {
   const isModuleExports = (node: ts.Expression) =>
     ts.isPropertyAccessExpression(node) &&
     ts.isIdentifier(node.expression) &&
     node.expression.text === "module" &&
-    node.name.text === "exports" &&
-    !declaresAtTop(node.getSourceFile(), "module");
+    node.name.text === "exports";
   if (isModuleExports(expression)) return "module.exports";
   if (
     ts.isPropertyAccessExpression(expression) &&
     ts.isIdentifier(expression.name) &&
     ((ts.isIdentifier(expression.expression) &&
-      expression.expression.text === "exports" &&
-      !declaresAtTop(expression.getSourceFile(), "exports")) ||
+      expression.expression.text === "exports") ||
       isModuleExports(expression.expression))
   )
     return expression.name.text;
@@ -525,3 +427,31 @@ export function rangeOf(anchor: ts.Node): SourceRange {
 }
 export const keyOf = (anchor: ts.Node) =>
   `${kindOf(anchor)}@${rangeOf(anchor).start}`;
+
+/** The module specifier an import binding comes from, if the symbol is one. */
+export function bindingSpecifier(symbol: ts.Symbol): ts.Expression | undefined {
+  for (const declaration of symbol.declarations ?? []) {
+    const owner = ts.findAncestor(
+      declaration,
+      (node) =>
+        ts.isImportDeclaration(node) ||
+        ts.isExportDeclaration(node) ||
+        ts.isImportEqualsDeclaration(node) ||
+        ts.isVariableDeclaration(node),
+    );
+    if (!owner) continue;
+    if (ts.isImportDeclaration(owner)) return owner.moduleSpecifier;
+    if (ts.isExportDeclaration(owner) && owner.moduleSpecifier)
+      return owner.moduleSpecifier;
+    if (
+      ts.isImportEqualsDeclaration(owner) &&
+      ts.isExternalModuleReference(owner.moduleReference)
+    )
+      return owner.moduleReference.expression;
+    if (ts.isVariableDeclaration(owner)) {
+      const call = requireInitializer(owner);
+      if (call) return call.arguments[0];
+    }
+  }
+  return undefined;
+}

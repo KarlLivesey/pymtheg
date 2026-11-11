@@ -11,8 +11,6 @@ import type {
 } from "../../types.js";
 import { extractFile, type TargetFact } from "./extract.js";
 import { CONTEXT_PATTERNS, projectModel, toVirtual } from "./project.js";
-import { Provenance } from "./provenance.js";
-import { withChecker } from "./symbols.js";
 
 /**
  * TypeScript and JavaScript through the TypeScript compiler. Analyze-only: one
@@ -21,7 +19,7 @@ import { withChecker } from "./symbols.js";
  * facts; resolve maps those facts to symbol IDs. See docs/changes/W2-D.md.
  */
 // Bump the leading number whenever extraction or resolution semantics change.
-const MODULE_VERSION = `2+typescript-${ts.version}`;
+const MODULE_VERSION = `3+typescript-${ts.version}`;
 
 /** Observation counters for tests (programs built, files extracted). Not a correctness input. */
 export const statistics = { programs: 0, extracted: 0, reused: 0 };
@@ -162,10 +160,6 @@ const module: LanguageModule = {
       });
       statistics.programs++;
       const checker = program.getTypeChecker();
-      const provenance = withChecker(
-        checker,
-        () => new Provenance(program, checker, captured),
-      );
       for (const root of group.roots) {
         const path = root.slice(1);
         const source = program.getSourceFile(toVirtual(path));
@@ -174,24 +168,26 @@ const module: LanguageModule = {
           project: group.config,
         };
         if (group.notes.length) data.configNotes = [...group.notes];
+        // Locally bound module-system names the compiler saw renamed (rename.ts).
+        const renamed = model.renames.get(path);
+        if (renamed?.length)
+          data.renamedForCompiler = renamed.map((item) => item.original);
         const diagnostics: Diagnostic[] = group.limitations.map((message) => ({
           message,
         }));
         let result: ParseResult;
         try {
           if (!source) throw Error("The compiler did not load this source");
-          result = withChecker(checker, () =>
-            extractFile(
-              source,
-              checker,
-              program,
-              captured,
-              diagnostics,
-              data,
-              provenance,
-              // Settings from an uncaptured base are missing: see extract.ts.
-              group.limitations.length > 0,
-            ),
+          result = extractFile(
+            source,
+            checker,
+            program,
+            captured,
+            diagnostics,
+            data,
+            // Settings from an uncaptured base are missing: see extract.ts.
+            group.limitations.length > 0,
+            model.renames.get(path) ?? [],
           );
           statistics.extracted++;
         } catch (error) {
