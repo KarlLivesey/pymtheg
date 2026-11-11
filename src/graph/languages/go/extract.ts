@@ -446,10 +446,27 @@ export class GoExtractor {
     );
   }
 
-  private typeSpec(spec: Node): void {
+  private localIdentities = new Set<string>();
+  /** A file-unique identity for a function-local or anonymous type. */
+  private localIdentity(base: string): string {
+    let identity = base;
+    for (let index = 2; this.localIdentities.has(identity); index++)
+      identity = `${base}#${index}`;
+    this.localIdentities.add(identity);
+    return identity;
+  }
+
+  /**
+   * A type declaration. `local` is the identity of a function-local type (its
+   * symbol's name and identity, `data.local`); package-level types use their name.
+   * An alias of a struct or interface literal records the literal's fields or
+   * elements on the alias itself (`data.shape`), so its structure is known.
+   */
+  private typeSpec(spec: Node, local?: string): void {
     const name = spec.childForFieldName("name");
     const type = spec.childForFieldName("type");
     if (!name || !type) return this.within("file", () => this.walk(spec));
+    const symbolName = local ?? name.text;
     const typeParameters = spec.childForFieldName("type_parameters");
     const scope = this.typeParams(typeParameters);
     const kind =
@@ -462,24 +479,35 @@ export class GoExtractor {
             : "type";
     const data: { [key: string]: Json } = {};
     if (scope.size) data.generic = true;
-    const key = this.symbol(kind, name.text, name.text, range(spec), data);
-    this.contains("file", key, range(spec));
+    if (local !== undefined) data.local = true;
+    const key = this.symbol(kind, symbolName, symbolName, range(spec), data);
+    this.contains(local !== undefined ? this.owner : "file", key, range(spec));
     this.within(key, () =>
       this.scoped(() => {
         this.walkTypeParams(typeParameters);
+        const literal = unparen(type);
         if (kind === "alias" || kind === "type") {
           const underlying = this.typeRef(type);
           if (underlying) data.underlying = { ...underlying };
+          // `type P *T`: a defined pointer type has no methods of its own.
+          if (underlying && literal.type === "pointer_type")
+            data.underlyingPointer = true;
           // A named func type: its result types are written in its declaration.
-          if (unparen(type).type === "function_type")
+          if (literal.type === "function_type")
             data.fn = this.resultDescs(
-              unparen(type).childForFieldName("result"),
+              literal.childForFieldName("result"),
             ) as unknown as Json[];
         }
-        if (kind === "struct") this.structFields(name.text, key, type);
+        if (kind === "struct") this.structFields(symbolName, key, type);
         else if (kind === "interface")
-          this.interfaceElements(name.text, key, type, data);
-        else this.walk(type);
+          this.interfaceElements(symbolName, key, type, data);
+        else if (kind === "alias" && literal.type === "struct_type") {
+          data.shape = "struct";
+          this.structFields(symbolName, key, literal);
+        } else if (kind === "alias" && literal.type === "interface_type") {
+          data.shape = "interface";
+          this.interfaceElements(symbolName, key, literal, data);
+        } else this.walk(type);
       }, scope),
     );
   }
@@ -589,6 +617,18 @@ export class GoExtractor {
           this.parameters(parameters, false);
           this.parameters(result, false);
         });
+      } else if (
+        element.type === "type_elem" &&
+        named(element).length === 1 &&
+        unparen(named(element)[0]!).type === "interface_type"
+      ) {
+        // An embedded interface literal contributes its elements directly.
+        this.interfaceElements(
+          owner,
+          ownerKey,
+          unparen(named(element)[0]!),
+          data,
+        );
       } else if (element.type === "type_elem") {
         const parts = named(element);
         const only = parts.length === 1 ? parts[0]! : undefined;
@@ -827,7 +867,11 @@ export class GoExtractor {
     if (current.type === "generic_type")
       current = current.childForFieldName("type") ?? current;
     if (current.type === "type_identifier") {
-      if (this.local(current.text)) return null;
+      const bound = this.local(current.text);
+      // A function-local type: refer to its symbol (scope-aware).
+      if (bound?.k === "localtype" && bound.sym)
+        return { n: current.text, l: bound.sym };
+      if (bound) return null;
       return PREDECLARED_TYPES.has(current.text)
         ? { q: "", n: current.text }
         : { n: current.text };
@@ -1111,22 +1155,18 @@ export class GoExtractor {
         return;
       case "type_declaration":
         for (const spec of named(node)) {
+          if (spec.type !== "type_spec" && spec.type !== "type_alias") continue;
           const name = spec.childForFieldName("name");
-          if (name) this.declare(name.text, { k: "localtype" });
-          const typeParameters = spec.childForFieldName("type_parameters");
-          this.scoped(() => {
-            this.walkTypeParams(typeParameters);
-            const type = spec.childForFieldName("type");
-            // A local struct type embedding something can implement interfaces.
-            if (
-              type &&
-              name &&
-              spec.type === "type_spec" &&
-              unparen(type).type === "struct_type"
-            )
-              this.localStruct(unparen(type), name.text);
-            else if (type) this.walk(type);
-          }, this.typeParams(typeParameters));
+          if (!name) {
+            this.walk(spec);
+            continue;
+          }
+          // A local type is in scope from its declaration to the end of its block,
+          // shadows outer names, and is a distinct type per declaration.
+          const enclosing = this.byKey.get(this.owner)?.identity ?? "file";
+          const identity = this.localIdentity(`${enclosing}.${name.text}`);
+          this.declare(name.text, { k: "localtype", sym: identity });
+          this.typeSpec(spec, identity);
         }
         return;
       case "struct_type":
@@ -1299,11 +1339,12 @@ export class GoExtractor {
     if (!embeds) return this.walkChildren(node);
     const enclosing = this.byKey.get(this.owner)?.identity ?? "file";
     let name: string;
-    if (localName !== undefined) name = `${enclosing}.${localName}`;
+    if (localName !== undefined)
+      name = this.localIdentity(`${enclosing}.${localName}`);
     else {
       const count = (this.localStructs.get(enclosing) ?? 0) + 1;
       this.localStructs.set(enclosing, count);
-      name = `${enclosing}.struct#${count}`;
+      name = this.localIdentity(`${enclosing}.struct#${count}`);
     }
     const key = this.symbol("struct", name, name, range(node), { local: true });
     this.contains(this.owner, key, range(node));

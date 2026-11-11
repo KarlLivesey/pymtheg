@@ -76,6 +76,18 @@ type Selection =
   | { kind: "none" }
   /** An external or unresolvable embedded type could supply or shadow the name. */
   | { kind: "unknown" };
+/** The structure of a type, from `view`. */
+interface View {
+  /** An interface type: these interfaces' flat method set. */
+  iface?: GraphSymbol[];
+  /** Fields and methods declared at this level (for non-interfaces). */
+  members: (name: string) => GraphSymbol[];
+  embedded: { value: TypeValue; pointer: boolean; key: string }[];
+  /** The structure cannot be fully determined. */
+  unknown?: true;
+  /** Only because of a type outside the project (cannot hold project-unexported names). */
+  externalOnly?: true;
+}
 interface InterfaceMethod {
   /** Name, plus the declaring package for an unexported name. */
   key: string;
@@ -224,6 +236,8 @@ class GoResolver {
   private files = new Map<string, FileInfo>();
   private pkgs = new Map<string, Pkg>();
   private symbolsById = new Map<string, GraphSymbol>();
+  /** Function-local and anonymous types by file and identity. */
+  private localTypes = new Map<string, GraphSymbol>();
   private byFileKey = new Map<string, GraphSymbol>();
   private decls = new Map<string, Map<string, GraphSymbol[]>>();
   private members = new Map<string, GraphSymbol[]>();
@@ -326,6 +340,11 @@ class GoResolver {
       if (symbol.module !== this.moduleId || !this.files.has(symbol.file))
         continue;
       this.symbolsById.set(symbol.id, symbol);
+      if (
+        TYPE_KINDS.has(symbol.kind) &&
+        (symbol.data as { local?: boolean } | undefined)?.local
+      )
+        this.localTypes.set(`${symbol.file}\u0000${symbol.identity}`, symbol);
       this.byFileKey.set(`${symbol.file}\u0000${symbol.key}`, symbol);
       const pkg = this.files.get(symbol.file)!.pkg;
       if (!pkg) continue;
@@ -445,6 +464,11 @@ class GoResolver {
   }
 
   private typeFromRef(ref: TypeRef, from: string, depth: number): TypeValue {
+    if (ref.l !== undefined) {
+      // A function-local type: its symbol in the same file (scope resolved at parse).
+      const local = this.localTypes.get(`${from}\u0000${ref.l}`);
+      return local ? this.typeSyms([local], depth + 1) : UNKNOWN;
+    }
     if (ref.q === "") {
       // A predeclared type name, unless a package declaration shadows it.
       const declared = this.lookupName(ref.n, from);
@@ -487,6 +511,13 @@ class GoResolver {
     const out: GraphSymbol[] = [];
     for (const symbol of syms) {
       if (!TYPE_KINDS.has(symbol.kind)) return UNKNOWN;
+      if (
+        symbol.kind === "alias" &&
+        (symbol.data as { shape?: string } | undefined)?.shape
+      ) {
+        out.push(symbol); // an alias of a struct/interface literal
+        continue;
+      }
       if (symbol.kind === "alias") {
         const underlying = (symbol.data as { underlying?: TypeRef } | undefined)
           ?.underlying;
@@ -744,6 +775,106 @@ class GoResolver {
     });
   }
 
+  private views = new Map<string, View>();
+  /**
+   * The structure of any project type, used by every consumer (selection and
+   * promotion, method sets, `implements`, dispatch, carriers):
+   * - an interface (or an alias of an interface literal): its flat method set;
+   * - a struct (or an alias of a struct literal, or a function-local/anonymous
+   *   struct): its fields and declared methods, and its embedded elements;
+   * - a defined type over an interface: that interface's method set;
+   * - a defined type over a struct (or another defined type): its own declared
+   *   methods, the underlying type's fields and embedded elements (promoted
+   *   methods), but not the underlying named type's declared methods;
+   * - an alias of a named type: that type's structure.
+   * When the structure cannot be determined, `unknown` (`externalOnly` when only an
+   * external type is unknown: irrelevant for project packages' unexported names).
+   */
+  private view(type: GraphSymbol, depth = 0): View {
+    const cached = this.views.get(type.id);
+    if (cached) return cached;
+    const data = (type.data ?? {}) as {
+      shape?: string;
+      underlying?: TypeRef;
+      underlyingPointer?: boolean;
+    };
+    const pkg = this.pkgOf(type);
+    const own = (name: string) =>
+      pkg
+        ? (this.members.get(`${pkg.key}\u0000${type.name}\u0000${name}`) ?? [])
+        : [];
+    const declared = (name: string) =>
+      own(name).filter((symbol) => symbol.kind === "method");
+    const unknown = (externalOnly = false): View => ({
+      members: declared,
+      embedded: [],
+      unknown: true,
+      ...(externalOnly ? { externalOnly: true } : {}),
+    });
+    let result: View;
+    if (depth > MAX_DEPTH) result = unknown();
+    else if (type.kind === "interface" || data.shape === "interface")
+      result = { iface: [type], members: () => [], embedded: [] };
+    else if (type.kind === "struct" || data.shape === "struct")
+      result = { members: own, embedded: this.embedded(type) };
+    else if (type.kind === "alias" || type.kind === "type") {
+      if (!data.underlying) result = { members: declared, embedded: [] };
+      else if (data.underlyingPointer) result = unknown();
+      else {
+        const target = this.typeFromRef(data.underlying, type.file, depth + 1);
+        // A predeclared basic type (int, string, …) has no fields or promoted
+        // methods: only the defined type's own declared methods. `error`, `any` and
+        // `comparable` are interfaces, so they stay unknown (external).
+        if (
+          target.kind === "external" &&
+          data.underlying.q === "" &&
+          !["error", "any", "comparable"].includes(data.underlying.n)
+        )
+          result = { members: declared, embedded: [] };
+        else if (target.kind === "external") result = unknown(true);
+        else if (target.kind !== "project") result = unknown();
+        else {
+          const inner = target.syms.map((symbol) =>
+            symbol.id === type.id ? unknown() : this.view(symbol, depth + 1),
+          );
+          if (inner.some((item) => item.unknown && !item.externalOnly))
+            result = unknown();
+          else if (inner.every((item) => item.iface))
+            result = {
+              iface: unique(inner.flatMap((item) => item.iface!)),
+              members: () => [],
+              embedded: [],
+            };
+          else if (type.kind === "alias")
+            result = {
+              members: (name) => inner.flatMap((item) => item.members(name)),
+              embedded: inner.flatMap((item) => item.embedded),
+              ...(inner.some((item) => item.unknown)
+                ? { unknown: true as const, externalOnly: true as const }
+                : {}),
+            };
+          else
+            result = {
+              members: (name) => [
+                ...declared(name),
+                ...inner.flatMap((item) =>
+                  item
+                    .members(name)
+                    .filter((symbol) => symbol.kind === "field"),
+                ),
+              ],
+              embedded: inner.flatMap((item) => item.embedded),
+              ...(inner.some((item) => item.unknown)
+                ? { unknown: true as const, externalOnly: true as const }
+                : {}),
+            };
+        }
+      }
+    } else result = unknown();
+    this.views.set(type.id, result);
+    return result;
+  }
+
   /**
    * Fields and methods named `name` on project types, by the Go spec: the
    * shallowest embedding depth wins; more than one path at that depth is ambiguous;
@@ -785,54 +916,63 @@ class GoResolver {
       const occurrences: { syms: GraphSymbol[]; pointer: boolean }[] = [];
       const next: typeof level = [];
       for (const node of level) {
-        if (node.types.every((type) => type.kind === "interface")) {
-          // An interface's method set is flat: identical methods inherited along
-          // several paths merge, so it is one occurrence and is not expanded further.
-          const flat = this.interfaceMember(node.types, name, from, access);
+        const views = node.types.map((type) => this.view(type));
+        // A structure that cannot be determined: its members at this depth are unknown.
+        if (
+          views.some(
+            (item) => item.unknown && !(item.externalOnly && skipExternal),
+          )
+        )
+          externalAt = Math.min(externalAt ?? depth, depth);
+        const found: GraphSymbol[] = [];
+        // Interfaces: a flat method set; identical methods inherited along several
+        // paths merge, so it is one occurrence and is not expanded further.
+        const ifaces = unique(views.flatMap((item) => item.iface ?? []));
+        if (ifaces.length) {
+          const flat = this.interfaceMember(
+            ifaces,
+            name,
+            from,
+            access,
+            [],
+            skipExternal,
+          );
           // A project declaration of the name is the method even if an embedded
-          // external interface also has it (identical methods merge); only when the
-          // project declares none could an external embedded interface supply it.
-          if (flat.syms.length)
-            occurrences.push({ syms: flat.syms, pointer: node.pointer });
+          // external interface also has it (identical methods merge).
+          if (flat.syms.length) found.push(...flat.syms);
           else if (flat.unknown)
-            if (!skipExternal)
-              externalAt = Math.min(externalAt ?? depth, depth);
-          continue;
+            externalAt = Math.min(externalAt ?? depth, depth);
         }
-        const syms = unique(
-          node.types.flatMap((type) => {
-            const pkg = this.pkgOf(type);
-            return pkg
-              ? (
-                  this.members.get(
-                    `${pkg.key}\u0000${type.name}\u0000${name}`,
-                  ) ?? []
-                ).filter(
-                  (symbol) =>
-                    this.visible(symbol, from) &&
-                    this.accessible(symbol, access),
-                )
-              : [];
-          }),
+        const structural = views.filter((item) => !item.iface);
+        found.push(
+          ...structural
+            .flatMap((item) => item.members(name))
+            .filter(
+              (symbol) =>
+                this.visible(symbol, from) && this.accessible(symbol, access),
+            ),
         );
-        if (syms.length) occurrences.push({ syms, pointer: node.pointer });
+        if (found.length)
+          occurrences.push({ syms: unique(found), pointer: node.pointer });
         const seen = new Set<string>();
-        for (const type of node.types)
-          for (const item of this.embedded(type)) {
-            if (seen.has(item.key)) continue; // same embedding in build variants
-            seen.add(item.key);
-            if (item.value.kind !== "project") {
-              if (!skipExternal) externalAt ??= depth + 1;
-              continue;
-            }
-            const ids = item.value.syms.map((symbol) => symbol.id);
-            if (ids.some((id) => node.path.includes(id))) continue; // embedding cycle
-            next.push({
-              types: item.value.syms,
-              pointer: node.pointer || item.pointer,
-              path: [...node.path, ...ids],
-            });
+        for (const item of structural.flatMap((view) => view.embedded)) {
+          if (seen.has(item.key)) continue; // same embedding in build variants
+          seen.add(item.key);
+          if (item.value.kind !== "project") {
+            // An external type cannot declare a project package's unexported name;
+            // an unresolvable one could be anything.
+            if (!(item.value.kind === "external" && skipExternal))
+              externalAt ??= depth + 1;
+            continue;
           }
+          const ids = item.value.syms.map((symbol) => symbol.id);
+          if (ids.some((id) => node.path.includes(id))) continue; // embedding cycle
+          next.push({
+            types: item.value.syms,
+            pointer: node.pointer || item.pointer,
+            path: [...node.path, ...ids],
+          });
+        }
       }
       if (externalAt !== undefined && externalAt <= depth) {
         result = { kind: "unknown" };
@@ -864,6 +1004,7 @@ class GoResolver {
     from: string | undefined,
     access: string | undefined,
     path: string[] = [],
+    skipExternal = false,
   ): { syms: GraphSymbol[]; unknown: boolean } {
     const syms: GraphSymbol[] = [];
     let unknown = false;
@@ -880,19 +1021,22 @@ class GoResolver {
         ),
       );
       for (const item of this.embedded(iface)) {
-        if (
-          item.value.kind !== "project" ||
-          !item.value.syms.every((type) => type.kind === "interface")
-        ) {
+        if (item.value.kind !== "project") {
+          if (!(item.value.kind === "external" && skipExternal)) unknown = true;
+          continue;
+        }
+        const views = item.value.syms.map((symbol) => this.view(symbol));
+        if (!views.every((view) => view.iface)) {
           unknown = true;
           continue;
         }
         const inner = this.interfaceMember(
-          item.value.syms,
+          unique(views.flatMap((view) => view.iface!)),
           name,
           from,
           access,
           [...path, iface.id],
+          skipExternal,
         );
         syms.push(...inner.syms);
         unknown ||= inner.unknown;
@@ -979,8 +1123,9 @@ class GoResolver {
       for (const item of this.embedded(iface)) {
         if (item.value.kind !== "project" || item.value.syms.length !== 1)
           return undefined;
-        const inner = item.value.syms[0]!;
-        if (inner.kind !== "interface") return undefined;
+        const view = this.view(item.value.syms[0]!);
+        if (!view.iface || view.iface.length !== 1) return undefined;
+        const inner = view.iface[0]!;
         const methods = this.interfaceMethods(inner, path);
         if (!methods) return undefined;
         for (const method of methods.values())
@@ -1056,13 +1201,21 @@ class GoResolver {
     }[] = [];
     const types: GraphSymbol[] = [];
     for (const symbol of this.symbolsById.values()) {
-      if (symbol.kind === "interface") {
+      if (!TYPE_KINDS.has(symbol.kind)) continue;
+      const view = this.view(symbol);
+      if (view.iface) {
+        // Defined types/aliases over an interface share its method set; dispatch
+        // maps them to that interface.
+        if (view.iface.length !== 1 || view.iface[0] !== symbol) continue;
         const methods = this.interfaceMethods(symbol);
         if (methods?.size) {
           interfaces.push({ iface: symbol, methods });
           this.complete.add(symbol.id);
         }
-      } else if (symbol.kind === "struct" || symbol.kind === "type")
+      } else if (
+        symbol.kind !== "alias" ||
+        (symbol.data as { shape?: string } | undefined)?.shape
+      )
         types.push(symbol);
     }
     for (const type of types)
@@ -1160,6 +1313,10 @@ class GoResolver {
 
   /** Type references link to the declaration named, including aliases themselves. */
   private declaredTypes(ref: TypeRef, from: string): GraphSymbol[] {
+    if (ref.l !== undefined) {
+      const local = this.localTypes.get(`${from}\u0000${ref.l}`);
+      return local ? [local] : [];
+    }
     if (ref.q === "") return [];
     if (ref.q !== undefined) {
       const base = this.lookupName(ref.q, from);
@@ -1237,12 +1394,13 @@ class GoResolver {
           (symbol) =>
             (symbol.data as { interface?: boolean } | undefined)?.interface,
         );
+        const views = type.syms.map((symbol) => this.view(symbol));
         return specs.length
           ? this.dispatch(
               specs,
               name,
-              type.syms.every((symbol) => symbol.kind === "interface")
-                ? type.syms
+              views.every((view) => view.iface)
+                ? unique(views.flatMap((view) => view.iface!))
                 : undefined,
             )
           : this.definite(found.syms);
@@ -1352,27 +1510,47 @@ class GoResolver {
   /**
    * Can code outside the project obtain package `pkgKey`'s unexported method `name`
    * (and so implement interfaces that need it)? Only through an exported CARRIER
-   * declared in an OUTSIDE-REACHABLE package. Anything uncertain answers yes.
+   * declared in an OUTSIDE-REACHABLE package: an exported, package-level, non-test
+   * type whose method set includes it. Method sets come from `view` and the
+   * selector rule, so carriers through embedding (any depth, pointers, embedded
+   * interfaces), defined types, aliases, alias literals and generic declarations are
+   * all covered transitively. A type whose structure cannot be determined might
+   * carry it: yes.
    */
   private hiddenReachable(name: string, pkgKey: string): boolean {
     const key = `${pkgKey}\u0000${name}`;
     const cached = this.hiddenMemo.get(key);
     if (cached !== undefined) return cached;
-    const { carriers, uncertain } = this.carriersOf(name, pkgKey);
-    let reachable = uncertain;
-    for (const carrier of carriers) {
-      if (reachable) break;
-      const data = (carrier.data ?? {}) as { local?: boolean };
-      if (
-        exported(carrier.name) &&
-        !data.local &&
-        !this.files.get(carrier.file)?.fact.test &&
-        this.outsideReachable(this.pkgOf(carrier))
-      )
+    let reachable = false;
+    for (const type of this.symbolsById.values()) {
+      if (!TYPE_KINDS.has(type.kind) || !exported(type.name)) continue;
+      if ((type.data as { local?: boolean } | undefined)?.local) continue;
+      if (this.files.get(type.file)?.fact.test) continue;
+      if (!this.outsideReachable(this.pkgOf(type))) continue;
+      if (this.carries(type, name, pkgKey)) {
         reachable = true;
+        break;
+      }
     }
     this.hiddenMemo.set(key, reachable);
     return reachable;
+  }
+  /** The type's method set includes (or may include) package `pkgKey`'s unexported `name`. */
+  private carries(type: GraphSymbol, name: string, pkgKey: string): boolean {
+    const view = this.view(type);
+    if (view.unknown && !view.externalOnly) return true;
+    if (view.iface) {
+      const flat = this.interfaceMember(
+        view.iface,
+        name,
+        undefined,
+        pkgKey,
+        [],
+        true,
+      );
+      return flat.syms.length > 0 || flat.unknown;
+    }
+    return this.selectName([type], name, undefined, pkgKey).kind !== "none";
   }
 
   /**
@@ -1394,77 +1572,6 @@ class GoResolver {
     return !relative.split("/").includes("internal");
   }
 
-  /**
-   * Every project type whose method set includes package `pkgKey`'s unexported
-   * `name`, transitively: declaring interfaces and types, structs embedding a carrier
-   * at any depth (by value or pointer, including embedded interfaces), interfaces
-   * embedding a carrier, defined types and aliases whose underlying type is a
-   * carrier, generic types (by their declaration). `uncertain` when an embedded or
-   * underlying project type cannot be resolved.
-   */
-  private carriersOf(
-    name: string,
-    pkgKey: string,
-  ): { carriers: GraphSymbol[]; uncertain: boolean } {
-    const types = [...this.symbolsById.values()].filter((symbol) =>
-      TYPE_KINDS.has(symbol.kind),
-    );
-    const carrying = new Set<string>();
-    let uncertain = false;
-    const underlying = (type: GraphSymbol): TypeValue | undefined => {
-      const ref = (type.data as { underlying?: TypeRef } | undefined)
-        ?.underlying;
-      return ref ? this.typeFromRef(ref, type.file, 1) : undefined;
-    };
-    for (let changed = true, rounds = 0; changed && rounds < 50; rounds++) {
-      changed = false;
-      for (const type of types) {
-        if (carrying.has(type.id)) continue;
-        let carries = false;
-        if (type.kind === "interface") {
-          carries = this.ownMethods(type).some(
-            (method) =>
-              method.name === name && this.pkgOf(method)?.key === pkgKey,
-          );
-          for (const item of this.embedded(type)) {
-            if (item.value.kind === "project")
-              carries ||= item.value.syms.some((sym) => carrying.has(sym.id));
-            else if (item.value.kind === "unknown") uncertain = true;
-          }
-        } else if (type.kind === "struct") {
-          const found = this.selectName([type], name, undefined, pkgKey);
-          carries = found.kind === "found" || found.kind === "ambiguous";
-          // Embedded defined types/aliases that carry it are found via the fixpoint.
-          for (const item of this.embedded(type)) {
-            if (item.value.kind === "project")
-              carries ||= item.value.syms.some((sym) => carrying.has(sym.id));
-            else if (item.value.kind === "unknown") uncertain = true;
-          }
-        } else {
-          // Defined type or alias: keeps an interface's method set and a struct's
-          // promoted methods (conservatively: any carrying underlying type).
-          const value = underlying(type);
-          if (value?.kind === "project")
-            carries = value.syms.some((sym) => carrying.has(sym.id));
-          else if (value?.kind === "unknown") uncertain = true;
-          // Methods declared on a defined type itself.
-          if (!carries) {
-            const found = this.selectName([type], name, undefined, pkgKey);
-            carries = found.kind === "found";
-          }
-        }
-        if (carries) {
-          carrying.add(type.id);
-          changed = true;
-        }
-      }
-    }
-    return {
-      carriers: types.filter((type) => carrying.has(type.id)),
-      uncertain,
-    };
-  }
-
   private externalMemo = new Map<string, boolean>();
   /** The type embeds, at any depth, a type outside the project (or an unresolvable one). */
   private embedsExternal(type: GraphSymbol, seen = new Set<string>()): boolean {
@@ -1472,8 +1579,9 @@ class GoResolver {
     if (cached !== undefined) return cached;
     if (seen.has(type.id)) return false;
     seen.add(type.id);
-    let result = false;
-    for (const item of this.embedded(type)) {
+    const view = this.view(type);
+    let result = !!view.unknown;
+    for (const item of view.iface ? this.embedded(type) : view.embedded) {
       if (item.value.kind !== "project") result = true;
       else if (item.value.syms.some((sym) => this.embedsExternal(sym, seen)))
         result = true;

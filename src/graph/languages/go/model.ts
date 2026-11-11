@@ -8,6 +8,8 @@ export interface TypeRef {
   /** Package qualifier exactly as written in the source file, if any. */
   q?: string;
   n: string;
+  /** A function-local type: the identity of its symbol in the same file. */
+  l?: string;
 }
 
 /**
@@ -48,7 +50,7 @@ export type Desc =
   /** A value whose type is known to defeat member resolution (local named type). */
   | { k: "opaque" }
   /** A local type or type parameter declared inside a function or generic declaration. */
-  | { k: "localtype"; tp?: boolean; c?: TypeRef }
+  | { k: "localtype"; tp?: boolean; c?: TypeRef; sym?: string }
   /** Parse-time only: a live local binding, replaced before facts are returned. */
   | { k: "ref"; b: object }
   | { k: "unknown" };

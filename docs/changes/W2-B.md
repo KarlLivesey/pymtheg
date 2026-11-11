@@ -138,9 +138,13 @@ targets, never a guess. "Unresolved" keeps the target name.
 - tree-sitter-go reads `new(` as the builtin's syntax. A user-declared `new` called
   with a non-type argument (`new(1)`) therefore misparses, and its declaration
   yields no call/reference links (the file is `partial`).
-- Local declarations (variables, local types, labels) as symbols.
-- Struct fields of anonymous struct types, and fields of a defined type's
-  underlying struct (`type A B`); element types of named container types.
+- Local variables and labels as symbols. Function-local type declarations **are**
+  extracted (every kind, as `data.local` symbols), and so are anonymous struct types
+  that embed something, with their fields.
+- Fields of anonymous struct types that embed nothing (for example test tables), and
+  element types of named container types. Fields of a defined type's underlying
+  struct (`type A B`) are not separate symbols, but member lookup, promotion and
+  method sets follow them through `view`.
 - Generic type arguments are not tracked: `Stack[int]` methods resolve on `Stack`.
 - Type aliases are not expanded when comparing method signatures for
   `implements` (a missed link, never a wrong one; backlog).
@@ -207,8 +211,9 @@ reachability rule decides it; anything uncertain means open.
 - An interface with an unexported method `h` of package P is sealed only if code
   outside the project cannot obtain `h`. That holds when no **exported carrier** of
   `h` is declared in an **outside-reachable** package.
-- **Carriers of `h`** are every project type whose method set includes `h`,
-  computed transitively over the whole project (a fixpoint):
+- **Carriers of `h`** are every project type whose method set includes `h`. The
+  method set comes from the one shared structure function (`view`, below) and the
+  selector rule, so it is transitive over the whole project:
   - the declaring interface, and concrete types declaring `h`;
   - any struct embedding a carrier, by value or pointer, at any depth, including
     through embedded interfaces;
@@ -216,18 +221,25 @@ reachability rule decides it; anything uncertain means open.
   - any **defined** type whose underlying type is a carrier (`type Pub i`;
     `type Pub s2` with `type s2 struct{ a }`), because a defined type keeps an
     interface's method set and a struct's promoted methods;
-  - any alias of a carrier;
-  - generic types by their declaration, which covers every instantiation.
-- **Exported** means an exported name declared at package level in a non-test file.
-  Function-local and anonymous types can never be named from outside.
+  - any alias of a carrier, including an alias of a struct or interface **literal**
+    (`type Pub = struct{ a }`, `type Pub = interface{ i }`), and interfaces that
+    embed an interface literal (`type Pub interface{ interface{ i } }`);
+  - generic types by their declaration, which covers every instantiation;
+  - function-local and anonymous types, through their embedded elements.
+- **Exported** means an exported name declared at package level in a non-test
+  file. A function-local or anonymous type cannot itself be named from outside, but
+  an exported alias can name a type literal, and an exported type can embed one.
+  Both are carriers in their own right, because their method set includes the
+  literal's.
 - **Outside-reachable** packages are project packages that code outside the project
   can import, decided by import path within the package's own module:
   - not `package main`, and not a `_test` package;
   - no `internal` element in the import path *relative to its module*. A nested
     `go.mod` under `internal/sub/` starts its own module with a plain import path,
     so it is reachable. A package without a known module is assumed reachable.
-- **Uncertain** cases are open: an embedded or underlying project type that cannot
-  be resolved.
+- **Uncertain** cases are open. An exported type whose structure `view` cannot
+  determine (an unresolvable embedded or underlying type, or a defined pointer type)
+  might carry `h`, so the set is open.
 
 Reproductions that are open, each tested in `test/graph-go-review5.test.mjs`:
 
@@ -257,13 +269,38 @@ as unproven, and the set is open. When no carrier is reachable, an external type
 cannot have `h`, and such types are ruled out (for example `MuMock{ sync.Mutex }`
 for an internal interface). Definite `implements` links stay proof-based.
 
-**Local and anonymous struct types.** A function-local struct type, or an
-anonymous struct type (a literal, field or variable type) that embeds anything,
-can implement interfaces through promoted methods. Each becomes a `struct` symbol
-(`data.local`, identity `<enclosing>.<name>` or `<enclosing>.struct#<n>` in source
-order) with its fields and `embeds` links. It takes part in method sets, `implements`
-and dispatch like a package-level struct. A local or anonymous struct type that
-embeds nothing has no methods, so it is not a symbol.
+**Local and anonymous types.** Every function-local type declaration (struct,
+interface, defined type, alias) becomes a symbol (`data.local`, identity
+`<enclosing>.<name>`, with `#2`, `#3`, … for a repeated name in the same file).
+So does every anonymous struct type (a literal, field or variable type) that embeds
+something (`<enclosing>.struct#<n>` in source order). Each gets its fields,
+interface elements and `embeds` links.
+
+Local type names are resolved scope-aware at parse time: a local type is visible
+from its declaration to the end of its block and shadows outer names, and the same
+name in two functions or blocks is two types. An embedded field naming a local type
+refers to that symbol (`TypeRef.l`). These types take part in method sets,
+`implements` and dispatch exactly like package-level types. An anonymous struct
+type that embeds nothing has no methods, so it is not a symbol.
+
+**One structure function (`view`).** Every consumer asks the same function what a
+type's structure is:
+
+- an interface, or an alias of an interface literal: a flat method set;
+- a struct, an alias of a struct literal, or a local/anonymous struct: fields,
+  declared methods and embedded elements;
+- a defined type over an interface: that interface's method set;
+- a defined type over a struct or another defined type: its own declared methods,
+  plus the underlying type's fields and embedded elements (promoted methods), but
+  **not** the underlying named type's declared methods;
+- an alias of a named type: that type's structure.
+
+The consumers are selection and promotion, interface method sets, `implements`,
+dispatch member enumeration, static types of dispatch (a defined type over an
+interface dispatches on that interface) and carriers. When `view` cannot determine
+a structure, the answer is **unknown**: the type cannot be ruled out, and any set it
+touches is open. An unknown that comes only from an external type is irrelevant for
+a project package's unexported method names.
 
 **Invariant (tested):** a closed dispatch set lists only types with a proven
 `implements` link to the static interface. An open set may also list types that
@@ -442,6 +479,26 @@ has sixteen mutations; all fail tests.
    predeclared *type* (`string{…}`) parses and resolves.
 
 The module version is 8.
+
+## Module version 9 (sixth review): one structure function
+
+Regressions are in `test/graph-go-review6.test.mjs`. `evidence/w2-b/mutations.mjs`
+has 22 mutations, and all fail tests.
+
+1. Local types embedding local types: full local type symbols, with scope-aware
+   name resolution.
+2. Defined types and aliases are followed the same way in dispatch as in
+   reachability, in both directions (an underlying struct's promotions are kept;
+   its named type's declared methods are not).
+3. Type literals are carriers: aliases of struct/interface literals, and embedded
+   interface literals.
+4. An unknown structure opens the set, for every consumer: carriers, dispatch
+   membership, `implements`, member lookup. The two unknown paths (`view` and the
+   selector) are redundant by design, so M20 disables both. M21 and M22 disable
+   each one alone, with cases only that path can answer.
+
+`carriersOf` (the separate fixpoint) is removed: carriers are exported types for
+which `view` and the selector find `h`, or cannot decide. The module version is 9.
 
 ## Core after PR 11 (W2-I)
 
