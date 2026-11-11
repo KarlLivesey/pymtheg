@@ -191,10 +191,10 @@ The manager keeps this table current. It is the single record of who holds which
 | W0-2 Dependencies | merged | Sol 6.1 | Opus 5.5 | `w0-2-graph-dependencies` | [#1](https://github.com/KarlLivesey/pymtheg/pull/1) | `package.json`, `package-lock.json`, `scripts/grammar-check.mjs` |
 | W1-A Ownership disagreement | building | Opus 5.5 | — | `w1-a-ownership-agreement` | — | `src/analysis/ownership.ts`, `src/behaviour/flow.ts`, `test/ownership-agreement.test.mjs` |
 | W1-B Engine core | in review (round 1) | Sol 6.1 | Opus 5.5 | `w1-b-engine-core` | [#2](https://github.com/KarlLivesey/pymtheg/pull/2) | `src/behaviour/explore*.ts`, `test/explore*.test.mjs` |
-| W1-E Machines and contracts | building | Opus 5.5 | — | `w1-e-mixed-file-contracts` | — | `src/contracts/document.ts`, `implementation-check.ts`, `manifest.ts`, `test/contracts-mixed-file.test.mjs` |
+| W1-E Machines and contracts | in review (round 1) | Opus 5.5 | Sol 6.1 | `w1-e-mixed-file-contracts` | [#3](https://github.com/KarlLivesey/pymtheg/pull/3) | `src/contracts/document.ts`, `implementation-check.ts`, `manifest.ts`, `test/contracts-mixed-file.test.mjs` |
 | W1-C Graph store and interface | building | Sol 6.1 | — | `w1-c-graph-store-interface` | — | `src/graph/**` except `languages/*/` |
 | W1-D Document import | building | Sol 6.1 | — | `w1-d-document-import` | — | `src/shared/document-selection.ts`, `src/architecture/import-policy.ts`, `src/cli/import-summary.ts`, `src/architecture/store.ts`; extended on request to `src/architecture/model.ts`, `heading-identities.ts`, `headings.ts` (minimal RST section wiring; no other chunk holds them) |
-| W1-F Two investigations | cut, next free slot | — | — | — | — | `evidence/w1-f/` |
+| W1-F Two investigations | building | Opus 5.5 | — | `w1-f-investigations` | — | `evidence/w1-f/` |
 
 Each chunk also owns its own `evidence/<chunk-id>/` folder and `docs/changes/<chunk-id>.md`.
 
@@ -217,3 +217,7 @@ Reports to Karl are short:
 - a brief summary at the end of each wave: what merged, what is next, anything decided on his behalf that he might want to know.
 
 Backlog from reviews (not conditions): W0-2 — the grammar packages declare a `node-gyp-build` install hook; install stays compiler-free only while hooks are not run (`--ignore-scripts`, or npm 12 leaving them unapproved). Never add them to `allowScripts`. Stage 8 clean-machine install must cover this, including older npm that runs hooks by default.
+
+Backlog from W1-E (wiring, hot files, for a later CLI/MCP chunk): `src/cli/main.ts:653-657` plain `scaffold --mode contracts` on a mixed file still prints the machine as omitted and exits 2; saving a contract baseline (`src/cli/main.ts:589`, `src/mcp/server.ts:793`) still counts machines as missing coverage. Both can use the new `isNotContractMaterial` helper.
+
+Environment note: Go and Rust compilers are not installed on the build machine, so tests that compile emitted Go/Rust checks are skipped or fail the same way on `main`. Those results are unresolved, not passed.
