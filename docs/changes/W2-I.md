@@ -107,6 +107,15 @@ nested for...of membership scan must fail the growth assertions; removing failed
 target invalidation must fail the direct full-state comparison. Candidate-kind
 corruption is also checked against the thicker derived-link generator.
 
+
+Counter limits: numeric index-based `for`/`while` loop bodies are not counted
+unless they perform other instrumented operations. Element comparisons inside
+`Array.prototype.includes` and `Array.prototype.indexOf` are also not counted.
+A quadratic step written in those forms can therefore escape the growth check.
+SQL rows returned are not all SQLite VM steps, and sorting/native work is not
+fully measured. The counters are targeted regression evidence, not a general
+proof of asymptotic complexity; source inspection remains necessary.
+
 Before/after elapsed-time observations at 100/200/400/800/3200 files, the exact
 reproduction harness, operation counts and final check results are recorded in
 `evidence/w2-i/`. These are local observations with shared machine load, not
@@ -130,3 +139,20 @@ current complete-snapshot callbacks on every run. This is a description only;
 no incremental capability or contract change is implemented here. Inventory and
 content verification would still require work unless a separate trusted change
 inventory were supplied.
+
+## Review follow-up: snapshot test oracles
+
+Snapshot-isolation expectations are deep-copied before mutation. Tests mutate
+nested fields returned by getFile/files/contexts, symbol/link queries and
+neighbourhoods, on cold and warm stores. They also mutate retained parse inputs
+and outputs, analyze/resolve contexts, authoritative analyze outputs and resolver outputs, and prior reports,
+then verify unchanged stored facts and fresh subsequent invocations. An in-place
+analyze edit with no returned replacement cannot corrupt the decoded-file cache.
+This audits persistence/cross-invocation aliasing; it does not add new semantics
+for mutation of shared current-invocation snapshots. The exact cached-file
+clone-removal mutation must fail these tests. Evidence is in `review-r3/`.
+
+The shared synthetic module is now `test/fixtures/graph-core/synthetic.mjs`;
+operation-count tests and the observation script both import that fixture.
+Generated equivalence queries sample up to six symbols including the last ID,
+at depths 0/1/2/5, both unfiltered and filtered by calls.

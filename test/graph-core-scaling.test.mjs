@@ -8,7 +8,7 @@ import {
   LanguageRegistry,
   SqliteGraphStore,
 } from "../dist/graph/index.js";
-import { module as synthetic } from "../evidence/w2-i/scaling.mjs";
+import { module as synthetic } from "./fixtures/graph-core/synthetic.mjs";
 
 // Count executed JS lookup/array work and actual SQL rows returned, not elapsed time.
 // total_changes includes triggers and foreign-key effects, unlike a count of API calls.

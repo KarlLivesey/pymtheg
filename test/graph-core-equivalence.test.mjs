@@ -163,12 +163,18 @@ test("fixed-seed edit sequences match the frozen pre-W2-I indexer, resolution an
             );
           }
         }
-        for (const symbol of fast.findSymbols().slice(0, 3))
-          for (const depth of [0, 1, 2])
-            assert.deepEqual(
-              fast.neighbourhood(symbol.id, depth),
-              slow.neighbourhood(symbol.id, depth),
-            );
+        const symbols = fast.findSymbols();
+        const sample = [
+          ...new Set([...symbols.slice(0, 5), ...symbols.slice(-1)]),
+        ];
+        for (const symbol of sample)
+          for (const depth of [0, 1, 2, 5])
+            for (const kind of [undefined, "calls"])
+              assert.deepEqual(
+                fast.neighbourhood(symbol.id, depth, kind),
+                slow.neighbourhood(symbol.id, depth, kind),
+                `${project}: ${label}: neighbourhood ${symbol.id}/${depth}/${kind}`,
+              );
       };
       try {
         // Guaranteed ambiguity, missing names, repeated identities and partial files.
@@ -281,7 +287,7 @@ test("decoded snapshots are isolated, cold queries avoid source records, and ext
     const database = join(scratch, "graph.sqlite");
     store = new SqliteGraphStore(database, "cold");
     await indexProject(root, new LanguageRegistry([toy]), store);
-    const original = store.getFile("x.toy");
+    const original = structuredClone(store.getFile("x.toy"));
     store.files()[0].result.symbols[0].identity = "mutated";
     store.getFile("x.toy").text = "mutated";
     assert.deepEqual(store.getFile("x.toy"), original);
