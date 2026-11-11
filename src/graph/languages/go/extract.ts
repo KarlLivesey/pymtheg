@@ -25,6 +25,13 @@ const SCOPES = new Set([
   "default_case",
   "communication_case",
 ]);
+/** Identifiers, including `nil`/`true`/`false`/`iota`, which the grammar gives their own node kinds. */
+const isName = (node: Node) =>
+  node.type === "identifier" ||
+  node.type === "nil" ||
+  node.type === "true" ||
+  node.type === "false" ||
+  node.type === "iota";
 const range = (node: Node): SourceRange => ({
   start: node.startIndex,
   end: node.endIndex,
@@ -728,8 +735,9 @@ export class GoExtractor {
   private template(node: Node): string {
     if (node.type === "type_identifier") {
       if (this.local(node.text)) return `?${node.text}`;
+      // Predeclared names are marked so resolution can tell a shadowing declaration.
       return PREDECLARED_TYPES.has(node.text)
-        ? node.text
+        ? `\u0004${node.text}\u0003`
         : `\u0001${node.text}\u0003`;
     }
     if (node.type === "qualified_type") {
@@ -838,6 +846,10 @@ export class GoExtractor {
   private desc(node: Node): Desc {
     const current = unparen(node);
     switch (current.type) {
+      case "nil":
+      case "true":
+      case "false":
+      case "iota":
       case "identifier": {
         const bound = this.local(current.text);
         if (bound?.k === "localtype") return { k: "opaque" };
@@ -969,7 +981,7 @@ export class GoExtractor {
         for (const value of right) this.walk(value);
         const descs = this.specDescs(left, null, right);
         left.forEach((name, index) => {
-          if (name.type !== "identifier") return;
+          if (!isName(name)) return;
           // `a, err := …` redeclares nothing already in this scope: it writes it.
           if (this.scopes.at(-1)?.get(name.text)?.k === "ref")
             this.write(name.text, descs[index]!);
@@ -986,7 +998,7 @@ export class GoExtractor {
           operator === "=" ? this.specDescs(left, null, right) : undefined;
         left.forEach((target, index) => {
           const name = unparen(target);
-          if (name.type === "identifier" && this.local(name.text)?.k === "ref")
+          if (isName(name) && this.local(name.text)?.k === "ref")
             this.write(name.text, descs ? descs[index]! : null);
           else this.walk(target);
         });
@@ -997,7 +1009,7 @@ export class GoExtractor {
         const operand = named(node)[0];
         if (!operand) return;
         const name = unparen(operand);
-        if (name.type === "identifier" && this.local(name.text)?.k === "ref")
+        if (isName(name) && this.local(name.text)?.k === "ref")
           this.write(name.text, null);
         else this.walk(operand);
         return;
@@ -1019,7 +1031,7 @@ export class GoExtractor {
         const source: Desc = right ? this.desc(right) : { k: "unknown" };
         const items = named(left);
         items.forEach((name, index) => {
-          if (name.type !== "identifier") return this.walk(name);
+          if (!isName(name)) return this.walk(name);
           // range: key then element; receive: the element.
           const value: Desc =
             node.type === "range_clause" && index === 0 && items.length > 1
@@ -1044,8 +1056,8 @@ export class GoExtractor {
           if (value) this.walk(value);
           // The switch variable has its case's type: one type → that type;
           // several types or default → the switched operand's own description.
-          const alias = named(node.childForFieldName("alias")).filter(
-            (name) => name.type === "identifier",
+          const alias = named(node.childForFieldName("alias")).filter((name) =>
+            isName(name),
           );
           const operand: Desc = value
             ? this.desc(
@@ -1149,6 +1161,12 @@ export class GoExtractor {
         return this.selector(node);
       case "identifier":
         return this.identifier(node);
+      case "nil":
+      case "true":
+      case "false":
+      case "iota":
+        // Separate node kinds in the grammar; still shadowable names.
+        return this.predeclared(node, "value");
       case "type_identifier":
         return this.typeIdentifier(node);
       case "qualified_type": {
@@ -1186,7 +1204,9 @@ export class GoExtractor {
       else if (callee.type === "identifier") {
         const bound = this.local(callee.text);
         if (!bound && PREDECLARED_TYPES.has(callee.text)) {
-          // Conversion to a predeclared type such as string(b): not a call.
+          // Conversion to a predeclared type such as string(b): not a call, unless
+          // a package declaration named `string` shadows it.
+          this.predeclared(callee, "call");
         } else
           this.link("calls", callee.text, range(callee), {
             expr: (bound ?? { k: "name", n: callee.text }) as unknown as Json,
@@ -1248,16 +1268,28 @@ export class GoExtractor {
     if (unparen(operand).type !== "identifier") this.walk(operand);
   }
 
+  /** A use of a predeclared name: a link only if a package declaration shadows it. */
+  private predeclared(node: Node, kind: "value" | "type" | "call"): void {
+    // A local of that name is in scope: not the predeclared identifier, not linked.
+    if (this.quiet || this.local(node.text)) return;
+    (this.fact.predeclared ??= []).push({
+      n: node.text,
+      k: kind,
+      s: node.startIndex,
+      e: node.endIndex,
+      src: this.owner,
+    });
+  }
+
   private identifier(node: Node): void {
     const name = node.text;
+    if (name === "_" || this.local(name)) return;
     if (
-      name === "_" ||
-      this.local(name) ||
       PREDECLARED_VALUES.has(name) ||
       PREDECLARED_TYPES.has(name) ||
       BUILTIN_FUNCTIONS.has(name)
     )
-      return;
+      return this.predeclared(node, "value");
     this.link("references", name, range(node), {
       expr: { k: "name", n: name },
     });
@@ -1265,12 +1297,9 @@ export class GoExtractor {
 
   private typeIdentifier(node: Node): void {
     const name = node.text;
-    if (
-      this.local(name) ||
-      PREDECLARED_TYPES.has(name) ||
-      PREDECLARED_VALUES.has(name)
-    )
-      return;
+    if (this.local(name)) return;
+    if (PREDECLARED_TYPES.has(name) || PREDECLARED_VALUES.has(name))
+      return this.predeclared(node, "type");
     this.link("references", name, range(node), { t: { n: name } });
   }
 }

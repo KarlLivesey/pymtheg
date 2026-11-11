@@ -71,6 +71,21 @@ export interface FileFact {
   /** GOOS/GOARCH implied by a `_os`, `_arch` or `_os_arch` filename suffix. */
   goos?: string;
   goarch?: string;
+  /**
+   * Uses of predeclared identifiers (`nil`, `true`, `int`, `error`, `len`, …) that
+   * no local binds. They become links only when a package-level declaration in
+   * scope shadows the name; that is decided by `analyze` on every index.
+   */
+  predeclared?: PredeclaredUse[];
+}
+export interface PredeclaredUse {
+  n: string;
+  /** "value": an expression identifier; "type": a type position; "call": a conversion call. */
+  k: "value" | "type" | "call";
+  s: number;
+  e: number;
+  /** Key of the enclosing symbol (link source). */
+  src: string;
 }
 
 export const PREDECLARED_TYPES = new Set([

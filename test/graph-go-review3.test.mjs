@@ -36,13 +36,15 @@ test("1a: dispatch on an interface outside types could satisfy is marked open; u
   // Closer: all methods exported, *os.File satisfies it: open.
   assert.deepEqual(call(links, "p/p.go", "c.Close").candidates.length, 3);
   assert.deepEqual(open("c.Close"), OPEN_EXTERNAL);
-  // Sealed has an unexported method: only package p can implement it: closed.
+  // Sealed has an unexported method, but it is exported, so an outside type can embed
+  // it (or the exported Local/Other, which carry `sealed`) and override Close: open.
+  // The closed branches are tested in graph-go-review4.test.mjs.
   assert.deepEqual(call(links, "p/p.go", "s.Close").candidates, [
     "p/p.go:method:(Local).Close",
     "p/p.go:method:(Other).Close",
     "p/p.go:method:Sealed.Close",
   ]);
-  assert.equal(open("s.Close"), undefined);
+  assert.deepEqual(open("s.Close"), OPEN_EXTERNAL);
   // Embedded interfaces count: Both's methods are all exported.
   assert.deepEqual(open("b.Close"), OPEN_EXTERNAL);
   // Type-parameter constraint dispatch.
@@ -399,10 +401,9 @@ test("1a: an implementer that cannot be proven (external embedded type) is still
     "p/p.go:method:(text).ScannerError",
     "p/p.go:method:Progress.ScannerError",
   ]);
-  // Negative: a mismatched signature refutes Wrong. Progress has an unexported
-  // method, so only package p can implement it; every implementer's own
-  // ScannerError is listed: the set is closed.
-  assert.equal(link.data.open, undefined);
+  // Negative: a mismatched signature refutes Wrong. mockPrinter is not a proven
+  // implementer, so the set is open (and Progress is exported anyway).
+  assert.deepEqual(link.data.open, OPEN_EXTERNAL);
 });
 
 test("1a: when the called method itself may come from an external embedded type, the set is open", async () => {

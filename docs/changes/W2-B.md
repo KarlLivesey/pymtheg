@@ -114,10 +114,18 @@ targets, never a guess. "Unresolved" keeps the target name.
   anywhere inside them) keep their symbol, `contains` and `receiver` links, but emit
   no `calls` or `references` links: their identifiers cannot be bound reliably.
   Top-level ERROR fragments emit nothing. The file stays `partial`.
-- References to predeclared types (`int`, `string`, `error`, `any`, …) and
-  predeclared values (`nil`, `true`, `iota`). Conversions to predeclared types
-  (`string(b)`) are not calls. A package that redeclares one of those names is
-  not followed.
+- Uses of the real predeclared identifiers: types (`int`, `string`, `error`,
+  `any`, …), values (`nil`, `true`, `false`, `iota`) and builtin functions used as
+  values. Conversions to predeclared types (`string(b)`) are not calls. These names
+  can be redeclared, and one mechanism covers all of them. Extraction records each
+  use that no local binds as a stable parse fact (`data.go.predeclared`). On every
+  index, `analyze` turns a use into a `references`/`calls` link
+  (`data.predeclaredName`) only when a package-level declaration visible to that
+  file shadows the name; a `_test.go` declaration counts only for that package's
+  test files. Locals shadow as usual (not linked). Resolution likewise treats a
+  predeclared type as the builtin type only when no package declaration shadows it,
+  in variable types, method lookup and `implements` signature comparison. Calls of
+  builtin functions are always linked, with `builtin: true` only when unshadowed.
 - Keys of keyed composite literals (`T{Field: v}`): the composite type is often
   not known.
 - Field/method selections on locals without an evident type, except calls (calls
@@ -187,9 +195,29 @@ open sets (the same mechanism as `overflow` and `builtin`); closed sets have no
 | --- | --- | --- |
 | Build variants (a name declared in several build-constrained files) | Every declaration of the name visible to the caller | Closed |
 | Ambiguous selector (several embedding paths at the shallowest depth) | The distinct declarations reached | Closed (Go rejects the program) |
-| Interface dispatch (`x.M()`, `x` of a project interface type; also type-parameter constraints) | The interface method, plus `M` on every project type (any package, test files included) that implements the interface **or cannot be refuted** as an implementer. A type is not refuted when every interface method is either matched or possibly supplied by an external embedded type at the deciding depth (for example a test mock embedding `sync.Mutex` and a project interface). Only proven implementers get definite `implements` links. Expanded through implementers that hold an embedded interface | **Open, `external-implementers-possible`**, when a type outside the project could satisfy the interface: all of its methods, including embedded ones, are exported, or its method set is not fully known. Also open when an implementer's method comes from an embedded interface that is open, and when a possible implementer's `M` itself may come from an external embedded type. **Closed** when the interface has an unexported method, because only its own package can implement it, unless an expansion opens it |
-| Reassigned function/method values | Every value ever assigned, each interface method expanded to its dispatch set | Closed, unless an included dispatch set is open |
+| Interface dispatch (`x.M()`, `x` of a project interface type; also type-parameter constraints) | The interface method, plus `M` on every project type (any package, test files included) that implements the receiver's **static** interface **or cannot be ruled out** as an implementer of it. A type is not ruled out when every interface method is either matched or possibly supplied by an external embedded type at the deciding depth (for example a test mock embedding `sync.Mutex` and a project interface). An external type can never supply a project package's unexported method, so for those names external embedding is ignored. When a type's selection of `M` is uncertain only because of an external embedded type, the project declaration it would select otherwise is listed. Expanded through implementers that hold an embedded interface value. Only proven implementers get definite `implements` links | **Closed** only when all of these hold: (1) the static interface type is known, not merely an interface the method was inherited from; (2) the interface is **sealed** (below); (3) every member comes from a proven implementer, with no uncertain selection; (4) nothing was expanded through an embedded interface value. Otherwise **open, `external-implementers-possible`** |
+| Reassigned function/method values | Every value ever assigned, each interface method expanded to its dispatch set | Closed if it includes no dispatch set. An included dispatch set has no static receiver interface (the value only records which method), so it is open |
 | Name-only (receiver type not evident) | Every concrete project method of the name a value could carry: any package, test files included; unexported names only from the caller's package | **Always open, `receiver-type-unknown`**: the value may be of a type outside the project |
+
+**Sealed interface (no type outside the project can implement it).** The
+interface needs an unexported method `m` of some package P such that nothing outside
+the project can obtain `m`, in one of three ways:
+
+- P is `package main` (it cannot be imported);
+- P lies under an `internal/` directory (no outside module may import it); or
+- no exported, non-test project type **carries** `m`. A carrier is an interface whose
+  method set contains `m` (including the interface itself), a type whose method set
+  contains `m` (declared or promoted), or an alias to one. An exported carrier lets
+  outside code embed it, obtain `m`, override the exported methods and satisfy the
+  interface (the `testing.TB` pattern). So an exported interface with an
+  unexported method is **not** sealed unless P is `main` or internal.
+
+An interface whose methods are all exported is never sealed. Each branch has a
+positive and a negative test in `test/graph-go-review4.test.mjs`.
+
+**Invariant (tested):** a closed dispatch set lists only types with a proven
+`implements` link to the static interface. An open set may also list types that
+are possible but not proven.
 
 Precision trade-off: because external types' method sets are not in the graph, a
 project type that embeds an external type (for example `io.ReadCloser` or
@@ -323,6 +351,26 @@ Regressions are in `test/graph-go-review3.test.mjs`.
    positions either (`case nil:`).
 
 The module version is 6.
+
+## Module version 7 (fourth review: exact meaning of open and closed)
+
+Every candidate set lists every possible project target; "open" excuses only targets
+outside the project. A set is closed only when it is provably complete and every
+member is provably possible. Regressions are in `test/graph-go-review4.test.mjs`.
+`evidence/w2-b/mutations.mjs` applies eleven rule-weakening mutations to the compiled
+module and requires each to fail a test.
+
+1. An implementer whose selection of `M` is uncertain because of an external
+   embedded type keeps the project declaration it would otherwise select (`A.M`
+   promoted through `Wrap{ A; sync.Mutex }`), and the set is open.
+2. Sealing follows the exact rule above. Having an unexported method is not enough.
+3. Types that cannot supply another package's unexported method are ruled out
+   (`MuMock{ sync.Mutex }`, `RC{ io.ReadCloser }`, `q.QR{ io.Reader }`). Members
+   come from the static interface's implementers, not an embedded interface's.
+   Closed sets contain only proven implementers.
+4. Predeclared identifiers are decided at resolution (see "Not extracted").
+
+The module version is 7.
 
 ## Core after PR 11 (W2-I)
 

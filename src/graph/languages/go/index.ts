@@ -98,6 +98,36 @@ function analyze({
     )[0]!;
     hosts.set(host.path, directoryOf(host.path));
   }
+  // Package-level names, to decide whether a predeclared identifier is shadowed.
+  // A `_test.go` declaration shadows only for that package's test files.
+  const packageNames = new Map<
+    string,
+    { plain: Set<string>; test: Set<string> }
+  >();
+  for (const file of files) {
+    if (file.result.status === "failed") continue;
+    const fact = (file.result.data as unknown as { go?: FileFact } | undefined)
+      ?.go;
+    if (fact?.package === undefined) continue;
+    const key = `${directoryOf(file.path)}\u0000${fact.package}`;
+    let names = packageNames.get(key);
+    if (!names)
+      packageNames.set(key, (names = { plain: new Set(), test: new Set() }));
+    for (const symbol of file.result.symbols)
+      if (
+        [
+          "function",
+          "var",
+          "const",
+          "struct",
+          "interface",
+          "type",
+          "alias",
+        ].includes(symbol.kind) &&
+        !(symbol.kind === "function" && symbol.name === "init")
+      )
+        (fact.test ? names.test : names.plain).add(symbol.name);
+  }
   // Recompute every file's facts from its parse facts: drop the previous host symbol and overflow notes.
   const next = new Map<string, ParseResult>();
   for (const file of files) {
@@ -123,8 +153,35 @@ function analyze({
         },
       });
     }
-    // Notes written by a previous analyze are recomputed from scratch.
-    const links = file.result.links.map((link) => {
+    // Notes and shadowed-predeclared links from a previous analyze are recomputed.
+    const parsed = file.result.links.filter(
+      (link) =>
+        !(link.data as { predeclaredName?: boolean } | undefined)
+          ?.predeclaredName,
+    );
+    const fact = (file.result.data as unknown as { go?: FileFact } | undefined)
+      ?.go;
+    const scope =
+      fact?.package === undefined
+        ? undefined
+        : packageNames.get(`${directoryOf(file.path)}\u0000${fact.package}`);
+    for (const use of fact?.predeclared ?? []) {
+      const shadowed =
+        scope?.plain.has(use.n) ||
+        (file.path.endsWith("_test.go") && scope?.test.has(use.n));
+      if (!shadowed) continue;
+      parsed.push({
+        sourceKey: use.src,
+        kind: use.k === "call" ? "calls" : "references",
+        targetName: use.n,
+        range: { start: use.s, end: use.e },
+        data:
+          use.k === "type"
+            ? { t: { n: use.n }, predeclaredName: true }
+            : { expr: { k: "name", n: use.n }, predeclaredName: true },
+      });
+    }
+    const links = parsed.map((link) => {
       const data = link.data as { [key: string]: Json } | undefined;
       if (!data || !("overflow" in data || "builtin" in data || "open" in data))
         return link;
@@ -184,7 +241,7 @@ function analyze({
 
 const go: LanguageModule = {
   id: ID,
-  version: "6",
+  version: "7",
   extensions: [".go"],
   contextFiles: ["go.mod", "go.work"],
   parse,

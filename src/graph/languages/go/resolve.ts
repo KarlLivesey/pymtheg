@@ -440,7 +440,13 @@ class GoResolver {
   }
 
   private typeFromRef(ref: TypeRef, from: string, depth: number): TypeValue {
-    if (ref.q === "") return { kind: "external", name: ref.n };
+    if (ref.q === "") {
+      // A predeclared type name, unless a package declaration shadows it.
+      const declared = this.lookupName(ref.n, from);
+      return declared.e === "syms" && declared.syms.every(isTypeSymbol)
+        ? this.typeSyms(declared.syms, depth + 1)
+        : { kind: "external", name: ref.n };
+    }
     const key = `${from}\u0000${ref.q ?? ""}\u0000${ref.n}`;
     const cached = this.memo.get(key);
     if (cached) return cached;
@@ -744,8 +750,12 @@ class GoResolver {
     name: string,
     from: string | undefined,
     access = from === undefined ? undefined : this.files.get(from)?.pkg?.key,
+    ignoreExternal = false,
   ): Selection {
-    const memoKey = `${types
+    // An external type can never declare a project package's unexported name, so
+    // for unexported names embedded external types are irrelevant.
+    const skipExternal = ignoreExternal || !exported(name);
+    const memoKey = `${skipExternal ? "x" : ""}${types
       .map((type) => type.id)
       .sort()
       .join(
@@ -780,7 +790,8 @@ class GoResolver {
           if (flat.syms.length)
             occurrences.push({ syms: flat.syms, pointer: node.pointer });
           else if (flat.unknown)
-            externalAt = Math.min(externalAt ?? depth, depth);
+            if (!skipExternal)
+              externalAt = Math.min(externalAt ?? depth, depth);
           continue;
         }
         const syms = unique(
@@ -806,7 +817,7 @@ class GoResolver {
             if (seen.has(item.key)) continue; // same embedding in build variants
             seen.add(item.key);
             if (item.value.kind !== "project") {
-              externalAt ??= depth + 1;
+              if (!skipExternal) externalAt ??= depth + 1;
               continue;
             }
             const ids = item.value.syms.map((symbol) => symbol.id);
@@ -891,6 +902,11 @@ class GoResolver {
     const info = this.files.get(file);
     const own = info?.pkg ? this.pkgIdentity(info.pkg) : `?${file}`;
     return sig
+      .replace(/\u0004([^\u0003]+)\u0003/g, (_, name: string) =>
+        info?.pkg && this.packageDecl(info.pkg, name, file).some(isTypeSymbol)
+          ? `${own}.${name}`
+          : name,
+      )
       .replace(
         /\u0001([^\u0003]+)\u0003/g,
         (_, name: string) => `${own}.${name}`,
@@ -1243,17 +1259,31 @@ class GoResolver {
   }
 
   /**
-   * A call through an interface value: the interface method plus every
-   * implementation. `specs` are alternative declarations of the one method (merged
-   * from several embedded interfaces, or build variants). Unresolved when no
+   * A call through an interface value: the interface method plus `name` on every
+   * project type that implements the receiver's static interface or cannot be ruled
+   * out. `specs` are alternative declarations of the one method (merged from
+   * several embedded interfaces, or build variants). Unresolved when no
    * implementation is known, or when any part of the set cannot be established.
+   *
+   * Closed only if provably complete with only provable members: the static
+   * interface is known, sealed against outside implementers (see `sealed`), every
+   * member comes from a proven implementer, and nothing was expanded through an
+   * embedded interface value. Otherwise open (`external-implementers-possible`).
    */
   private dispatch(
     specs: GraphSymbol[],
     name: string,
     staticTypes?: GraphSymbol[],
   ): Decision {
-    const found = this.implementations(specs, name, new Set());
+    const exact =
+      !!staticTypes?.length &&
+      staticTypes.every(
+        (type) => type.kind === "interface" && this.complete.has(type.id),
+      );
+    // Members come from the static interface's (possible) implementers. Without it,
+    // the declaring interfaces' implementers are a superset, so the set is open.
+    const sources = exact ? staticTypes! : this.ownersOf(specs);
+    const found = this.implementations(specs, name, sources, new Set());
     if (
       !found ||
       !found.targets.some(
@@ -1262,17 +1292,13 @@ class GoResolver {
       )
     )
       return UNRESOLVED;
-    // Openness follows the static interface type when there is one (a type outside
-    // the project can satisfy it unless it has an unexported method); otherwise the
-    // interfaces the method comes from. Nested expansions can open it further.
-    const open =
-      found.open ||
-      this.externallyImplementable(staticTypes ?? this.ownersOf(specs));
+    const closed =
+      exact && !found.open && staticTypes!.every((type) => this.sealed(type));
     return {
       ids: [...specs, ...found.targets].map((symbol) => symbol.id),
       definite: false,
       limit: DISPATCH_LIMIT,
-      ...(open ? { open: "external-implementers-possible" as const } : {}),
+      ...(closed ? {} : { open: "external-implementers-possible" as const }),
     };
   }
 
@@ -1292,66 +1318,123 @@ class GoResolver {
     return out;
   }
 
+  private sealedMemo = new Map<string, boolean>();
   /**
-   * A type outside the project could satisfy one of these interfaces: all its
-   * methods (including embedded ones) are exported, or its method set is not fully
-   * known. An interface with an unexported method can only be implemented in its
-   * own package.
+   * No type outside the project can implement this interface. It needs an
+   * unexported method `m` of some package P such that nothing outside can obtain
+   * `m`: P is `package main`, or P lies under an `internal/` directory (no outside
+   * module may import it), or no exported, non-test project type carries `m` (an
+   * interface containing `m`, a type whose method set has `m`, or an alias to one).
+   * The interface itself counts as a carrier, so an exported sealed-looking
+   * interface is not sealed: outside code can embed it or an exported carrier and
+   * override the exported methods (the `testing.TB` pattern).
    */
-  private externallyImplementable(ifaces: GraphSymbol[]): boolean {
-    if (!ifaces.length) return true;
-    return ifaces.some((iface) => {
-      const methods = this.interfaceMethods(iface);
-      return (
-        !methods || [...methods.values()].every((method) => !method.access)
-      );
+  private sealed(iface: GraphSymbol): boolean {
+    const methods = this.interfaceMethods(iface);
+    if (!methods) return false;
+    for (const method of methods.values())
+      if (
+        method.access !== undefined &&
+        this.sealedName(method.name, method.access)
+      )
+        return true;
+    return false;
+  }
+  private sealedName(name: string, pkgKey: string): boolean {
+    const key = `${pkgKey}\u0000${name}`;
+    const cached = this.sealedMemo.get(key);
+    if (cached !== undefined) return cached;
+    const pkg = this.pkgs.get(pkgKey);
+    let sealed = false;
+    if (
+      pkg &&
+      (pkg.name === "main" || pkg.directory.split("/").includes("internal"))
+    )
+      sealed = true;
+    else if (pkg) {
+      sealed = true;
+      for (const symbol of this.symbolsById.values()) {
+        if (!TYPE_KINDS.has(symbol.kind) || !exported(symbol.name)) continue;
+        if (this.files.get(symbol.file)?.fact.test) continue;
+        if (this.carries(symbol, name, pkgKey)) {
+          sealed = false;
+          break;
+        }
+      }
+    }
+    this.sealedMemo.set(key, sealed);
+    return sealed;
+  }
+  /** The type's method set contains package `pkgKey`'s unexported method `name`. */
+  private carries(type: GraphSymbol, name: string, pkgKey: string): boolean {
+    const resolved = this.typeSyms([type], 1);
+    if (resolved.kind !== "project") return false;
+    return resolved.syms.some((symbol) => {
+      if (symbol.kind === "interface")
+        return !!this.interfaceMethods(symbol)?.has(`${name}\u0000${pkgKey}`);
+      const found = this.selectName([symbol], name, undefined, pkgKey);
+      return found.kind === "found" || found.kind === "ambiguous";
     });
   }
 
   /**
-   * Methods that may run for a call of `specs`. Implementations of an interface are
-   * known only when its whole method set is (see `complete`); any one known
-   * declaration's implementers are a superset of the merged interface's. An
-   * implementer whose method is itself an embedded interface's method expands that
-   * in turn; if it is already being expanded, the enclosing set covers it.
-   * `open`: some expanded interface could also be satisfied outside the project.
+   * Methods that may run for a call of `specs`, from the possible implementers of
+   * `sources`. Implementations of an interface are known only when its whole method
+   * set is (see `complete`). `open` is set when any member is not proven: its type
+   * is not a proven implementer, its selection is uncertain because of an external
+   * embedded type (the project declaration it would select otherwise is kept), or
+   * it is reached through an embedded interface value (whose dynamic type may be
+   * anything implementing that interface, inside or outside the project).
    */
   private implementations(
     specs: GraphSymbol[],
     name: string,
-    expanding: Set<string>,
+    sources: GraphSymbol[],
+    enumerated: Set<string>,
   ): { targets: GraphSymbol[]; open: boolean } | undefined {
-    if (specs.some((spec) => expanding.has(spec.id)))
+    // Covered only if an enclosing expansion already enumerates these interfaces'
+    // implementers (a wrapper of the same interface adds nothing new).
+    if (sources.length && sources.every((iface) => enumerated.has(iface.id)))
       return { targets: [], open: false };
-    if (expanding.size > MAX_DEPTH) return undefined;
-    const inner = new Set([...expanding, ...specs.map((spec) => spec.id)]);
+    if (enumerated.size > MAX_DEPTH) return undefined;
+    const inner = new Set([...enumerated, ...sources.map((iface) => iface.id)]);
     const out: GraphSymbol[] = [...specs];
     let known = false;
     let open = false;
-    for (const iface of this.ownersOf(specs)) {
+    for (const iface of sources) {
       if (!this.complete.has(iface.id)) continue;
       known = true;
       const access = this.pkgOf(iface)?.key;
+      const proven = new Set(
+        (this.implementers.get(iface.id) ?? []).map((type) => type.id),
+      );
       for (const type of this.possible.get(iface.id) ?? []) {
-        const found = this.selectName([type], name, undefined, access);
-        // The method may come from an external embedded type: not in the graph.
+        let found = this.selectName([type], name, undefined, access);
+        let certain = proven.has(type.id);
         if (found.kind === "unknown") {
+          // An external embedded type might supply or shadow it; if not, Go selects
+          // the project declaration found without that type. Keep it, unproven.
+          certain = false;
           open = true;
-          continue;
+          found = this.selectName([type], name, undefined, access, true);
         }
         if (found.kind !== "found") continue;
+        if (!certain) open = true;
         const nested = found.syms.filter(
           (method) =>
             (method.data as { interface?: boolean } | undefined)?.interface,
         );
         out.push(...found.syms.filter((method) => !nested.includes(method)));
         if (nested.length) {
-          const deeper = this.implementations(nested, name, inner);
+          const deeper = this.implementations(
+            nested,
+            name,
+            this.ownersOf(nested),
+            inner,
+          );
           if (!deeper) return undefined;
           out.push(...deeper.targets);
-          // The embedded interface value may hold a type from outside the project.
-          open ||=
-            deeper.open || this.externallyImplementable(this.ownersOf(nested));
+          open = true;
         }
       }
     }
