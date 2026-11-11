@@ -1,177 +1,163 @@
 # W2-C: Rust language module for the code graph
 
-Review revision, module version 2. Implements mega-plan 4.4's structural Rust
-reader in one discoverable folder. Current origin/main was merged normally;
-PR 15's shared discovery-test fix and PR 11's schema-3 core/conformance changes are included. No graph interface, other
-language, CLI, MCP, Studio, dependency manifest or toolchain was changed by W2-C.
-Earlier implementation/test/audit records remain in `evidence/w2-c/` as history;
-the `review-*` records below supersede their completion claims.
+Round-three review revision, module version 3. Current main was merged normally,
+including the schema-3 graph core and blank-line identity conformance kit. W2-C
+changes only its Rust folder, Rust tests/fixtures, evidence and this note. No
+Cargo/rustc, Rust installation, project execution or project filesystem reads are
+required by the module or tests. The installed Rust WASM grammar and tags query
+load through the shared Tree-sitter helper; duplicate function/method tags are
+filtered. Parser trees never escape parsing.
 
-## Snapshot, identity and parser boundaries
+## Constructs and limits
 
-Claims case-sensitive `.rs`; captures `Cargo.toml` as context. The installed
-`tree-sitter-rust` WASM and bundled tags query load through the shared helper.
-The definition mapping filters the bundled function/method duplicates; the live
-AST pass emits each scoped declaration once. Trees/nodes never escape parsing.
-No Cargo, rustc, rust-analyzer, native compilation, project execution or project
-filesystem reads occur inside the module. Analysis reuses parsed snapshot facts.
-
-Ranges are exact half-open UTF-16 offsets. Core IDs combine project/module/file,
-kind, position-independent scoped identity and duplicate ordinal. `$crate` is the
-file unit (graph kind `module`); `data.unitKind` distinguishes crate roots.
-Cargo-derived crate name, manifest, workspace and target kind are unit data.
-Impl identities retain self type, generics and trait: `impl A::new`,
-`impl B::new`, `impl Speak for A::f`, `impl<T> Wrap<T>::new`. Anonymous blocks use
-scope-local structural ordinals. Raw identifiers normalize `r#name` to `name` in
-names/identities/lookup; source spans still cover their original spelling.
-Visibility and attributes remain data; private items are never dropped. This is
-structural observation, not a Rust compilation or visibility-access check.
-
-Syntax errors remain partial with diagnostics; failed grammar loading remains a
-failure. Both sides of cfg alternatives, including cfg(test), remain captured.
-No feature/platform selection, macro expansion or generated-source execution
-occurs. Partial target provenance remains visible through the shared graph API.
-
-## Construct matrix
-
-| Construct | Definite / candidates / unresolved / not extracted |
+| Construct | Result |
 |---|---|
-| Files/crates/modules; functions; structs/enums/variants; traits/methods/default bodies; impls; aliases; const/static; macro_rules | Symbols and `contains`; private declarations included |
-| Named-field vs tuple/unit constructors | Constructor-form metadata and separate type/value/macro lookup; a type-only item cannot capture a value call |
-| File and inline modules, including declarations inside functions | Module places and barriers; bare names never walk out of a module into an enclosing function/module |
-| `name.rs`, `name/mod.rs`, literal `#[path]` | Definite module-file links, or candidates for conflicting layouts; path-loaded files find children beside themselves, like mod.rs |
-| Cargo library/default main/explicit bin/example/test/bench targets | Crate roots from captured manifests |
-| Automatic `src/bin/*.rs`, `examples/*.rs`, `tests/*.rs`, `benches/*.rs`, and their `name/main.rs` forms | Proper crate roots, respecting auto-target flags; explicit targets still work with auto-discovery disabled |
-| Default/custom build.rs | Build crate root, using build dependencies; not executed |
-| Workspace members/globs/excludes, literal path dependencies, workspace dependencies, dependency subtables | Cross-crate lookup when libraries are captured; non-renamed dependencies use the target lib name, explicit `package` renames use the key; hyphens normalize to underscores |
-| `use`, nested groups, aliases, self/super/crate and absolute external paths | Namespace-aware lookup; explicit imports of unknown external bindings block fallback guesses |
-| Multi-hop reexports and parents' imports, including across path crates | Imports and use sites use the same recursive resolver in the destination's owning crate |
-| Glob member names | Resolve from known module contents; complete collisions become candidates; opaque alternatives remain unresolved. The glob import's own edge stays unresolved (backlog) |
-| Mixed-namespace imports | A binding can import type/value/macro names simultaneously; the single import edge stays unresolved when it would otherwise assert just one of different kinds. Use sites select their own namespace |
-| Free and associated calls | Definite when namespace/type/member facts determine one target; competing captured targets become candidates |
-| Explicit parameter/local receiver types and self | Preserve annotation scope, borrow/mutability and full generic syntax. Incompatible concrete generic arguments, inapplicable mutable/value receivers and mismatched argument counts are rejected |
-| Generic impl substitution, inferred/unknown receiver, trait object | Unresolved when applicability cannot be established; no inference, bounds solver or arbitrary autoderef |
-| Trait-only instance/associated calls | One matching implementation stays unresolved. Multiple complete known choices are candidates, including inherited default bodies; an unknown trait/default alternative prevents an incomplete candidate set |
-| Differing autoref receiver forms and reference impls | Different applicable inherent/trait receiver forms remain candidates; captured reference impls or unknown applicability remain unresolved rather than being omitted |
-| Trait-in-scope selection | Not used to assert dispatch; captured applicable trait choices are conservatively retained. There is no general trait solver |
-| Type references and explicit trait implementations | Namespace-correct `types` / `implements` links |
-| Qualified match/if-let patterns | `patterns` links to variants, struct constructors and const/static values, rather than rejected type references |
-| Local callable-name shadowing | Binding evidence prevents imported/free-function guesses; lexical blocks preserve local scope |
-| Local macro_rules invocation after its definition | Project macro link; forward/absent/external names unresolved |
-| Standard library, registry packages, uncaptured path crates | Unresolved with the name/path retained |
-| Macro token-tree contents, proc-macro/derive expansion, generated declarations | Not extracted; definition/invocation syntax is captured without expansion |
+| Crate/file/module units, functions, structs, enums/variants, traits/methods/default bodies, impls, aliases, const/static and macro_rules | Symbols with exact UTF-16 spans and contains links; private declarations are ordinary symbols |
+| Type, value and macro namespaces | Separate lookup; named-field structs cannot capture value calls; constructor form is data |
+| `_` inference/pattern placeholders | Not emitted as named references; `use … as _` keeps the import relationship but binds no lookup name |
+| File/inline/function-local modules, name.rs, name/mod.rs and literal path attributes | Module places and scope barriers; children of path-loaded files are beside that file |
+| Cargo libraries, explicit targets, automatic src/bin, examples, tests, benches and build.rs | Proper crate roots respecting auto-target flags; build dependencies are separate; no target is executed |
+| Workspace paths, dependency aliases and library names | Captured path crates resolve across files; target library name wins unless Cargo explicitly renames the dependency; hyphens/raw identifiers normalize |
+| Nested/renamed imports, self/super/crate/absolute paths, multi-hop and cross-crate reexports | Import and use sites use the same recursive lookup in the owning crate; direct dependency-crate reexports (`pub use dep;`) reach the Cargo dependency instead of recursing into their own binding |
+| Glob member lookup, including chained glob reexports | Follow captured contents with cycle protection; check pub/pub(crate)/pub(super)/pub(in path)/private visibility for the importing module. Explicit imports and local items shadow globs |
+| Glob edge itself | Unresolved; assigning that edge a module target remains backlog |
+| Simultaneous type/value/macro imports | Import edge unresolved if one-of cannot express simultaneous bindings; each use selects its namespace |
+| Free calls and applicable inherent associated calls | Definite when facts determine one target; complete competing choices become candidates. Explicitly captured alias-associated functions remain usable; alias dot dispatch stays unresolved without expanding the underlying method set |
+| Receiver self, mut self, borrowed/lifetime-borrowed self and typed Self/&Self/&mut Self | Parsed structurally; preserve borrow and mutability, reject inapplicable methods |
+| Box/Rc/Pin and other custom typed self | Receiver syntax/type retained; dispatch unresolved when custom receiver adjustment is needed. No arbitrary Deref/Pin projection |
+| Lifetime-only impls | Lifetimes ignored for applicability; they never select between impls |
+| Self variants and members of the same inherent generic impl | Nominal Self lookup ignores arguments; same physical impl membership proves generic applicability. Methods are indexed by contains source IDs, so equal impl identity text cannot merge ownership |
+| Other generic/const substitution, inference and bounds | Unresolved when not established; concrete arguments are compared using syntax shapes and their declaration/annotation namespace bindings. Equal spelling in different scopes is not proof; aliases remain unknown rather than excluding a true candidate |
+| Blanket trait impls for T/&T/&mut T | Their applicable method names make receiver choices uncertain; include project default methods. Unknown traits/defaults prevent incomplete candidate sets |
+| Generic wrapper impls | Affect compatible nominal receiver types; a distinct explicit nominal type proves incompatibility. Unsatisfied/unknown bounds are not guessed |
+| Instance versus associated functions | A static trait function cannot mask a dot call. Associated lookup also checks missing blanket alternatives, unless an applicable inherent function wins |
+| Reference impls | Only supplied names are uncertain for known traits. An uncaptured trait's unknown names make all dot calls on that type uncertain; inherent Type::method paths remain independent |
+| Dispatch evidence across crates | Restricted to the caller's crate and reachable captured path dependencies; unrelated workspace crates do not suppress calls |
+| Trait-only calls | One captured impl alone does not prove dispatch. Multiple complete known targets become candidates, including default bodies; unknown alternatives remain unresolved |
+| Standard trait applicability | A small method-name catalogue constrains Drop, Default, Clone, From/TryFrom/Into/TryInto, FromIterator/IntoIterator, Add/AddAssign and Debug/Display. It creates no external targets. Captured local traits, nonstandard imports, opaque glob shadowing, and captured Cargo/extern-crate aliases prevent standard-namespace assumptions |
+| Conditional arguments and parameters | Attributes/comments are not arguments; minimum/maximum arity accounts for cfg-conditional syntax |
+| if let, while let, let-else and match patterns | Bind only in the consequent/body, after the completed let-else declaration, or within the corresponding match arm. Else/value expressions do not inherit those bindings |
+| Type and pattern references | Namespace-correct types/implements/patterns links; qualified patterns resolve variants, constructors and consts |
+| macro_rules and macro_export | Definitions and local active invocations captured; macro_export visibility is pub (crate-root public), while containment records the definition site |
+| Macro token trees, generated types/declarations, proc macros/derives | Not expanded or extracted; module declarations inside cfg_if!/include! are not used to invent module membership |
+| Standard/registry/uncaptured dependencies | Unresolved with their names kept |
 
-The Cargo reader handles this literal context subset, not full TOML/Cargo
-semantics. Escaped/nonliteral paths, automatic workspace membership inference,
-platform activation, feature selection and generated targets are not evaluated.
-Conflicting platform-specific aliases stay unresolved. Files outside a captured
-Cargo root/module tree retain symbols/containment without invented membership.
-Nested fixture/support files are not automatically made targets merely because
-they live somewhere under tests/examples/benches; Cargo's target layouts apply.
+Both cfg branches remain captured; there is no feature/platform selection. Partial
+syntax remains partial with diagnostics (not a clean parse). A malformed grammar
+load remains a failure. Explicit non-glob paths are structural relationships, not
+a general Rust visibility/type-checking proof. General trait-in-scope selection,
+supertrait/bounds solving, associated-type projection, type-alias expansion,
+closure/result/chained-receiver inference and arbitrary macro scope/export lookup
+are not implemented. Custom typed receivers are recorded without guessing their
+adjustment. Files outside captured Cargo/module trees retain symbols and
+containment; nested support files are not invented as automatic Cargo targets.
 
-Method lookup does not expand type aliases, solve trait bounds/specialization,
-infer closure/results/chained receiver types or implement arbitrary Deref.
-Macro export/import expansion and arbitrary cross-file textual macro scope are
-not implemented. Private symbol availability does not prove legal access.
+The TOML reader handles literal captured package/workspace/target/path-dependency
+context, not Cargo evaluation, generated targets or automatic workspace inference.
+No compiler or filesystem fallback fills missing evidence.
 
-## Completeness and interface limits
+## Identity and interface
 
-An existing link decision can represent one target or a one-of set of at least
-two targets. One known target plus an unknown alternative remains unresolved;
-so do multiple known choices when an unknown trait/glob could supply the true
-missing target. Inherited project trait default bodies are included before
-forming candidate sets. A single trait impl is never converted to definite
-merely because no second captured method exists.
+IDs combine project/module/file, kind, scoped identity and duplicate ordinal;
+positions are not part of identity. Impl identities retain trait/self/generic
+syntax. Where clauses remain omitted from the identity text (backlog); duplicate
+ordinals distinguish blocks. Ownership uses contains source IDs, independent of
+that text. Raw identifiers normalize names while spans cover original spelling.
+Anonymous blocks use structural ordinals. The unchanged exact-position fixture
+also passes the stricter independent blank-line reindex with unchanged IDs and
+no exclusions.
 
-A Rust import can bind several namespaces at once. This module does not invent
-a one-of decision for simultaneous bindings; its import edge remains unresolved
-and its uses resolve by namespace. Additional namespace-specific import edges
-could be a later enhancement. No frozen-core workaround was required.
+The interface cannot represent simultaneous import bindings as one-of targets,
+or a finite candidate list plus an unknown alternative. Such edges remain
+unresolved. No core/interface workaround was made.
 
-## Resolution scaling
+## Resolution work
 
-Imports are indexed by file/scope/alias and glob group; module declarations and
-places by file/local scope; methods by nominal type/name; packages by manifest.
-Lookups memoize completed results, with recursion guards for cyclic/opaque
-imports. Binding facts are collected once per function, indexed by lexical scope
-and name, and queried through ancestor scopes with binary search on activation.
-There is no per-lookup scan of all project imports/places or rescan of a whole
-function body. Work still depends on path depth, local candidates and reexports;
-no elapsed-time bound is a correctness assertion.
+Imports, places, declarations and members are indexed once; binding evidence is
+cached per function and queried through lexical scopes. Completed lookups are
+memoized with module-view keys and recursion guards. Reachable Cargo roots and
+dispatch guards are cached. There is no project-wide import/place scan per name
+or repeated scan of a function body. Work still depends on path depth, candidate
+memberships and dependency/reexport relationships. Timing is not an assertion.
 
-`performance-baseline/` preserves the corrected semantic implementation using
-project-wide import/place scans and function rescans. The comparison runner
-asserts every parsed fact and every resolved/unresolved/candidate decision is
-identical on the complete fixture and both Vector crates. It compares entire
-outputs, not just counts. In the final paired two-crate observation, baseline
-parse/resolve took 6.512/1.940 s; indexed/cached parse/resolve took 5.615/0.370 s.
-Hashes and reproducible commands are in the performance evidence.
+The round-two corrected scan-based performance baseline and full-output equality
+records are preserved as history. Round three intentionally changes semantics;
+those old equality hashes are not claimed to prove the new semantics unchanged.
+The final full-store report and new movement/audit records below are authoritative.
 
-## Vector evidence and movement
+## Vector and loss accounting
 
-Vector commit `515e87d9861b564f521a8992d224892cd8cae120`, shallow-cloned only in
-scratch. Every one of its 1,563 Rust files was analyzed directly through the
-module: 1,552 clean, 11 partial, **0 failed**. No source subset is described as a
-whole-store success. Exact per-kind counts and top unresolved names are in
-`review-schema3-whole-module-summary.json`; partial paths/diagnostics are retained separately.
-Grammar limitations include attributes in patterns, some qualified generic and
-higher-ranked syntax, and `raw` token contexts. They are not relabeled clean.
+All 1,563 `.rs` files at Vector
+`515e87d9861b564f521a8992d224892cd8cae120` were indexed through the real indexer
+and a fresh schema-3 SQLite store. Sources stayed in unique scratch. Both runs
+have 1,552 clean, 11 partial, zero failed files and zero analysis/resolution errors.
+The partial paths/grammar diagnostics remain recorded; no partial result was
+relabeled clean. No Vector code was executed.
 
-| Scope / revision | Files | Symbols | Links | Resolved | Candidate sets | Unresolved |
-|---|---:|---:|---:|---:|---:|---:|
-| Reviewed d60ac141, two crates | 131 | 4,382 | 25,956 | 8,955 | 20 | 16,981 |
-| Current two crates | 131 | 4,382 | 27,261 | 10,557 | 20 | 16,684 |
-| Current nine crates | 247 | 7,157 | 46,944 | 17,584 | 40 | 29,320 |
-| Current whole repository, module and real store | 1,563 | 35,907 | 311,132 | 106,602 | 1,090 | 203,440 |
+| Whole repository | Symbols | Links | Resolved | Candidate sets | Unresolved |
+|---|---:|---:|---:|---:|---:|
+| Round two, b3a0147d | 35,907 | 311,132 | 106,602 | 1,090 | 203,440 |
+| Round three | 35,907 | 310,195 | 109,632 | 1,230 | 199,333 |
 
-On the same two-crate snapshot, 1,024 old unresolved references now resolve:
-551 types, 252 calls, 149 converted patterns, 47 imports, 23 implements and two
-modules. At least 459 use-site gains point to a target whose import was already
-resolved before, directly exposing the import/use-site reexport mismatch.
-Another 1,305 pattern edges are newly extracted (730 resolved, 575 unresolved).
-Stricter namespace/applicability rules withhold 152 old definite links (102 calls,
-37 imports, 13 types). No old definite link retargeted to a different symbol.
-The complete positional movement list, including losses, is preserved.
+937 placeholder edges disappeared: **72 wrong definite `_` links, one wrong
+candidate set and 864 already unresolved placeholders**. There are 3,790 old
+unresolved → resolved transitions (1,247 calls, 981 imports, 1,120 types, 427 patterns,
+15 implements) and 141 unresolved → candidate transitions. There are also 688
+old definite → unresolved transitions (394 calls, 230 imports, 60 types, four
+patterns), retained explicitly in the full movement ledger rather than hidden
+by the net gain. Visibility, receiver/blanket applicability and missing alternatives
+now constrain those decisions. No definite edge retargeted to a different symbol.
+The full transition ledger is `round3-submission-movement-{summary,links}.json`.
 
-Observed module parse/resolve times were 5.615/0.370 s for two crates,
-12.440/0.885 s for nine, and 74.606/7.134 s for all files. The whole module run's
-wall time was 88.957 s. These are shared-machine observations, not speed-based
-properties; paired comparison wall time also includes the baseline execution.
+The earlier write-up's blanket justification of 152 withheld links was inaccurate.
+On the same original 131-file/two-crate scope, **89 correct, provable links are
+restored; 63 remain**. Every remaining link is listed in
+`round3-loss-classification.{md,json}` with its old target and required evidence:
 
-The earlier bounded 180-second whole-store experiment timed out during the old
-core's analysis phase (exit 124); its logs remain historical unresolved evidence.
-After PR 11 merged, the whole repository was indexed through the real indexer
-and a fresh schema-3 SQLite store; the final report is
-`review-schema3-whole-store.json`: 124.672 s observed through indexing, including scratch copy; module parse/resolve 56.974/4.259 s within that run. All 1,563 files were indexed, with 11 partial and zero failed; analysis/resolution error lists are empty. No existing database was reused and no core
-performance code was modified. The old nine-crate store records are historical;
-the current whole-store report supersedes the earlier core limitation.
+| Category | Count |
+|---|---:|
+| (a) Was wrong before | 0 |
+| (b) Not provable under the stated supported rules | 63 |
+| (c) Correct and provable, still lost | 0 |
 
-The final whole-snapshot equivalence record (`review-schema3-snapshot-equivalence.json`) confirms that the shared-path cache fix leaves every Vector parse fact, resolution decision and all 60 audited entries unchanged.
+The 63 are: 11 cross-impl generic/inference cases, 14 simultaneous namespace
+imports, 17 uncaptured trait-default/scope cases, one uncaptured reference-trait
+case, 13 generic-trait applicability cases and seven custom self/Pin cases.
+These are not claimed to have been wrong Rust targets before. No new withheld
+round-one link lies outside the previous 152-link set. The two-crate totals are
+27,194 links: 10,877 resolved / 31 candidate sets / 16,286 unresolved.
 
-The final fresh seeded audit covers 30 resolved links, 15 complete candidate
-sets and 15 unresolved links; all judgments were checked against source and
-imports/declarations. Earlier audit findings and superseded samples are retained.
-See `review-audit.md`; sampling is not a universal graph-accuracy proof.
+The new seed samples 30 resolved, all endpoints of 15 candidate sets, 15 general
+unresolved and 20 unresolved self calls with captured in-project inherent members.
+All final judgments are recorded in `round3-audit.md` and
+`round3-submission-audit.json`. The targeted audit found and fixed conditional-arity,
+physical impl ownership and static-versus-instance blanket mistakes; it did not
+merely list ordinary supported losses. Remaining targeted cases require custom
+receiver projection, cross-impl substitution, unknown trait defaults or generated
+nominal/module declarations. Sampling is not a universal accuracy proof.
 
-## Validation
+The final module run observed 40.921 s parse, 5.132 s resolve and 52.911 s
+module wall time. The separate fresh real-store run is recorded in
+`round3-submission-store.json`: 60.790 s module parse, 8.999 s resolve and
+189.492 s total through scratch copy/index/statistics, before cleanup. Timings
+are observations; the store counts exactly match the module output. There are 92 Cargo
+roots: 36 lib, 11 bin, three example, 18 test, 14 bench and ten build targets.
+Exact per-kind counts and top unresolved names are retained in that report.
+The final audit also exposed and fixed dependency-crate reexports and an overly
+broad alias guard; those fixes restore ordinary paths instead of merely listing
+lost patterns. Argument matching retains lifetime-free AST shapes, character
+const literals and scoped binding evidence; it does not expand type aliases.
 
-The original exact-position conformance fixture remains unchanged and passes
-against the new module. Review regressions cover all numbered counterexamples,
-positive/negative controls, generic/borrow/default candidate completeness,
-namespace interactions, target flags, external-import fallback, cross-crate
-reexports, raw identifiers (including generic parameters and local bindings) and
-cycles. The older snapshot equivalence report is historical evidence for the raw-name
-normalization revision, before the final conservative receiver refinement.
-The final paired performance runs compare every fact and decision against the
-corrected scan-based baseline. Exact-position conformance now also reindexes
-the fixture after inserting a blank line and requires unchanged symbol IDs;
-no fixture exclusion or core modification is used. A shared-path regression
-preserves both module views and prevents memoization from collapsing candidates.
-Final required checks and source hashes are recorded in `review-validation.json`.
-Review approval is not claimed.
+## Validation and history
 
-Final sequential checks: `npm ci --ignore-scripts`, `npm test` with the specified
-`PYM_TLC_JAR` (1,291/1,291, zero failures/cancellations/skips),
-`npm run format:check`, then focused Rust tests (45/45, zero skips): all exit 0.
-The last main merge after checks contains only manager ledger updates; executable
-source/tests are unchanged.
+Regressions cover each numbered review item with positive, negative and relevant
+ambiguous controls, plus the further ordinary patterns found in the targeted audit.
+The existing trait-dispatch negative and candidate checks remain intact.
+All four required commands passed sequentially: install, TLC-enabled full suite
+(1,324/1,324; zero skipped/cancelled), formatting, and focused Rust tests (78/78).
+Final required checks and source hashes are recorded in `round3-validation.json`.
+The final four-command sequence uses the manager-specified TLC jar, alone and in
+order. Earlier development validation overlapped subsequent edits/builds; it is
+explicitly not accepted as final evidence. Cancelled/aborted/superseded experiments
+remain in evidence, including the failed two-full-parse WASM comparison and the
+cancelled obsolete development store. None is counted as a passed property.

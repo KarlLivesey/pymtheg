@@ -432,3 +432,521 @@ test("shared path file preserves both module views", async () => {
     ["left::g", "right::g"],
   );
 });
+
+test("round 3.1: inferred placeholders and anonymous imports never bind names", async () => {
+  const g = await graph(
+    lib(
+      `mod m {pub trait Ext{}} use m::Ext as _; fn run(x:Vec<u8>){let v:Vec<_>=x;} fn typed(x:m::Ext){}`,
+    ),
+  );
+  assert.equal(
+    g.links.filter(
+      (l) => ["types", "patterns"].includes(l.kind) && l.targetName === "_",
+    ).length,
+    0,
+  );
+  g.one("m::Ext", "m::Ext", "types");
+  const mixed = await graph(
+    lib(
+      `mod a{pub trait T{}}mod b{pub trait U{}}use a::T as _;use b::U as _;fn f(x:Vec<_>) {}`,
+    ),
+  );
+  assert.equal(mixed.links.filter((l) => l.targetName === "_").length, 0);
+});
+test("round 3.2: blanket impls cannot disappear from method choices", async () => {
+  for (const target of ["T", "&T", "&mut T"]) {
+    const g = await graph(
+      lib(
+        `struct A;impl A{fn f(&self){}}trait Tr{fn f(self){}}impl<T> Tr for ${target} {}fn run(a:A){a.f();}`,
+      ),
+    );
+    g.unknown("a.f");
+  }
+  const defaults = await graph(
+    lib(
+      `struct A;mod tr{pub trait T{fn f(self){}}pub trait U{fn f(&self){}}pub trait V{fn f(&self){}}}impl<X> tr::T for X{}impl tr::U for A{}impl tr::V for A{}use tr::T;fn run(a:A){a.f();}`,
+    ),
+  );
+  defaults.unknown("a.f");
+  const other = await graph(
+    lib(
+      `struct A;impl A{fn f(&self){}}trait Tr{fn other(self){}}impl<T> Tr for T{}fn run(a:A){a.f();}`,
+    ),
+  );
+  other.one("a.f", "impl A::f");
+  const bounded = await graph(
+    lib(
+      `struct A;impl A{fn f(&self){}}trait Tr{fn f(self){}}impl<T:Copy> Tr for T{}fn run(a:A){a.f();}`,
+    ),
+  );
+  bounded.unknown("a.f");
+});
+test("round 3.3: all self receiver forms are parsed structurally", async () => {
+  const forms = [
+    ["self", "self"],
+    ["mut self", "self"],
+    ["&self", "&self"],
+    ["&mut self", "&mut self"],
+    ["&'a self", "&self"],
+    ["&'a mut self", "&mut self"],
+    ["self: Self", "self"],
+    ["self: &Self", "&self"],
+    ["self: &mut Self", "&mut self"],
+    ["self: Box<Self>", "unknown"],
+    ["self: Rc<Self>", "unknown"],
+    ["self: Pin<&mut Self>", "unknown"],
+    ["mut self: Box<Self>", "unknown"],
+  ];
+  for (const [form, kind] of forms) {
+    const g = await graph(
+      lib(`struct A;impl A{fn f(&mut self){}fn run<'a>(${form}){self.f();}}`),
+    );
+    const method = g.symbols.find((s) => s.identity === "impl A::run");
+    assert.equal(method.data.receiverKind, kind, form);
+    assert.equal(method.data.receiverSyntax, form);
+    if (form === "mut self" || kind === "&mut self")
+      g.one("self.f", "impl A::f");
+    else g.unknown("self.f");
+  }
+  const g = await graph(
+    lib(
+      `struct A;impl A{fn f(&mut self){}fn run<'a>(&'a mut self){self.f();}}mod tr{pub trait U{fn f(&self){}}pub trait V{fn f(&self){}}}impl tr::U for A{}impl tr::V for A{}`,
+    ),
+  );
+  assert.ok(g.targets("self.f")[0].some((s) => s.identity === "impl A::f"));
+});
+test("round 3.4: glob visibility is evaluated for the importing module", async () => {
+  const g = await graph(
+    lib(
+      `mod a{fn drop(x:u8){}struct String;pub fn g(){}pub(crate) fn c(){}pub(super) fn s(){}pub(in crate::a) fn restricted(){}mod child{use super::*;fn run(){drop(1);restricted();}}}mod b{use crate::a::*;fn run(x:String){drop(x);g();c();s();restricted();}}`,
+    ),
+  );
+  const drops = g.targets("drop");
+  assert.equal(drops[0][0].identity, "a::drop");
+  assert.equal(drops[1].length, 0);
+  g.unknown("String", "types");
+  g.one("g", "a::g");
+  g.one("c", "a::c");
+  g.one("s", "a::s");
+  assert.deepEqual(
+    g.targets("restricted").map((ts) => ts.map((s) => s.identity)),
+    [["a::restricted"], []],
+  );
+  const shadow = await graph(
+    lib(
+      `mod a{pub fn f(){}}mod b{pub fn f(){}}mod c{use crate::a::*;use crate::b::f;fn run(){f();}}mod d{use crate::a::*;fn f(){}fn run(){f();}}`,
+    ),
+  );
+  assert.deepEqual(
+    shadow.targets("f").map((ts) => ts[0].identity),
+    ["b::f", "d::f"],
+  );
+  const hidden = await graph(
+    lib(
+      `mod a{pub fn f(){}}mod b{use crate::a::f;}mod c{use crate::b::*;fn run(){f();}}`,
+    ),
+  );
+  hidden.unknown("f");
+});
+test("round 3.5: lifetimes never select between impls", async () => {
+  const g = await graph(
+    lib(
+      `struct A<'a>(&'a u8);impl<'a>A<'a>{fn new(){}fn f(&self){}}fn run(x:A<'_>){A::new();x.f();}`,
+    ),
+  );
+  g.one("A::new", "impl<'a> A<'a>::new");
+  g.one("x.f", "impl<'a> A<'a>::f");
+  const generic = await graph(
+    lib(`struct A<T>(T);impl<T>A<T>{fn new(){}}fn run(){A::new();}`),
+  );
+  generic.unknown("A::new");
+});
+test("round 3.6: Self variants and members in the same generic impl", async () => {
+  const g = await graph(
+    lib(
+      `enum E<T>{A(T),B}impl<T>E<T>{fn new(){}fn m(&self){}fn run(&self){Self::new();self.m();match self{Self::A(x)=>{},Self::B=>{}}}}`,
+    ),
+  );
+  g.one("Self::new", "impl<T> E<T>::new");
+  g.one("self.m", "impl<T> E<T>::m");
+  g.one("Self::A", "E::A", "patterns");
+  g.one("Self::B", "E::B", "patterns");
+  const outside = await graph(
+    lib(`struct A<T>(T);impl<T>A<T>{fn m(&self){}}fn run(x:A<u8>){x.m();}`),
+  );
+  outside.unknown("x.m");
+});
+test("round 3.7: glob reexports compose and cycles terminate", async () => {
+  const g = await graph(
+    lib(
+      `mod a{pub struct X;pub fn f(){}}mod facade{pub use crate::a::*;}mod facade2{pub use crate::facade::*;}mod user{use crate::facade2::*;use super::facade2::X;fn run(x:X){f();}}`,
+    ),
+  );
+  g.one("X", "a::X", "types");
+  g.one("f", "a::f");
+  const cycle = await graph(
+    lib(
+      `mod a{pub use crate::b::*;pub fn f(){}}mod b{pub use crate::a::*;}mod user{use crate::b::*;fn run(){f();unknown();}}`,
+    ),
+  );
+  cycle.one("f", "a::f");
+  cycle.unknown("unknown");
+  const ambiguous = await graph(
+    lib(
+      `mod a{pub fn f(){}}mod b{pub fn f(){}}mod facade{pub use crate::a::*;pub use crate::b::*;}use facade::*;fn run(){f();}`,
+    ),
+  );
+  assert.equal(ambiguous.targets("f")[0].length, 2);
+});
+test("round 3.8: reference impl uncertainty is limited to supplied names", async () => {
+  const g = await graph(
+    lib(
+      `struct A;impl A{fn f(&self){}}trait Tr{fn g(self){}}impl Tr for &A{}fn run(a:A){a.f();a.g();A::f(&a);}`,
+    ),
+  );
+  g.one("a.f", "impl A::f");
+  g.unknown("a.g");
+  g.one("A::f", "impl A::f");
+  const opaque = await graph(
+    lib(
+      `struct A;impl A{fn f(&self){}}impl External for &A{}fn run(a:A){a.f();A::f(&a);}`,
+    ),
+  );
+  opaque.unknown("a.f");
+  opaque.one("A::f", "impl A::f");
+});
+test("round 3.9: conditional patterns bind only within their actual regions", async () => {
+  const g = await graph(
+    lib(
+      `fn f(){}fn run(x:Option<fn()>){if let Some(f)=x{f();}else{f();}f();while let Some(f)=x{f();}f();let Some(f)=x else{f();return;};f();}fn arms(x:Option<fn()>){match x{Some(f)=>f(),None=>f()};f();}`,
+    ),
+  );
+  assert.deepEqual(
+    g.targets("f").map((ts) => ts.map((s) => s.identity)),
+    [[], ["f"], ["f"], [], ["f"], ["f"], [], [], ["f"], ["f"]],
+  );
+});
+test("round 3.10: macro_export has public visibility", async () => {
+  const g = await graph(
+    lib(
+      `#[macro_export]macro_rules! public_macro{()=>{}}macro_rules! private_macro{()=>{}}fn f(){public_macro!();private_macro!();}`,
+    ),
+  );
+  assert.equal(
+    g.symbols.find((s) => s.name === "public_macro").data.visibility,
+    "pub",
+  );
+  assert.equal(
+    g.symbols.find((s) => s.name === "private_macro").data.visibility,
+    "private",
+  );
+  g.one("public_macro", "public_macro", "macros");
+  g.one("private_macro", "private_macro", "macros");
+});
+
+test("round 3: multiline self calls retain same-impl generic evidence", async () => {
+  const g = await graph(
+    lib(`struct A<T>(T);impl<T>A<T>{fn f(&self){}fn run(&self){self\n .f();}}`),
+  );
+  g.one("self\n .f", "impl<T> A<T>::f");
+});
+test("round 3: opaque wrapper impls cannot poison unrelated nominal receivers", async () => {
+  const g = await graph(
+    lib(
+      `struct W<T>(T);impl<T> External for W<T>{}struct A;impl A{fn f(&self){}}fn run(a:A,w:W<u8>){a.f();w.f();}`,
+    ),
+  );
+  g.one("a.f", "impl A::f");
+  g.unknown("w.f");
+});
+
+test("round 3 loss audit: cfg attributes are not call arguments", async () => {
+  const g = await graph(
+    lib(
+      `struct A;impl A{fn new(x:u8,#[cfg(test)] y:u8){} }fn run(){A::new(1,#[cfg(test)] 2);}`,
+    ),
+  );
+  g.one("A::new", "impl A::new");
+  const no = await graph(
+    lib(`struct A;impl A{fn f(x:u8,y:u8){}}fn run(){A::f(1);}`),
+  );
+  no.unknown("A::f");
+});
+
+test("round 3 loss audit: wrapper blankets affect compatible nominal types only", async () => {
+  const g = await graph(
+    lib(
+      `struct A;impl A{fn f(&self){}}struct W<T>(T);trait Tr{fn f(self){}}impl<T>Tr for W<T>{}impl<T>W<T>{fn f(&self){}fn run(&self){self.f();}}fn run(a:A){a.f();}`,
+    ),
+  );
+  g.one("a.f", "impl A::f");
+  g.unknown("self.f");
+});
+
+test("round 3 unresolved audit: blanket impls in unrelated crates do not affect a caller", async () => {
+  const sources = {
+    "src/lib.rs": `struct A;impl A{fn f(&self){}}fn run(a:A){a.f();}`,
+    "other/src/lib.rs": `pub trait Tr{fn f(self){}}impl<T>Tr for T{}`,
+  };
+  const manifests = {
+    "Cargo.toml": `[package]\nname="app"\n[workspace]\nmembers=["other"]\n`,
+    "other/Cargo.toml": `[package]\nname="other"\n`,
+  };
+  const isolated = await graph(sources, manifests);
+  isolated.one("a.f", "impl A::f");
+  const connected = await graph(
+    { ...sources, "src/lib.rs": `use other::Tr;${sources["src/lib.rs"]}` },
+    {
+      ...manifests,
+      "Cargo.toml":
+        manifests["Cargo.toml"] + `[dependencies]\nother={path="other"}\n`,
+    },
+  );
+  connected.unknown("a.f");
+});
+
+test("round 3 unresolved audit: standard Drop Default Clone names do not hide unrelated members", async () => {
+  const g = await graph(
+    lib(
+      `struct A;impl Default for A{fn default()->Self{A}}impl A{fn f(&self){}fn run(&mut self){self.f();}}struct W<T>(T);use core::clone::Clone as C;impl<T:C>C for W<T>{fn clone(&self)->Self{todo!()}}impl<T>W<T>{fn f(&self){}fn run(&self){self.f();}}`,
+    ),
+  );
+  assert.deepEqual(
+    g.targets("self.f").map((ts) => ts.map((s) => s.identity)),
+    [["impl A::f"], ["impl<T> W<T>::f"]],
+  );
+  const custom = await graph(
+    lib(
+      `use external::Clone;struct W<T>(T);impl<T> Clone for W<T>{}impl<T>W<T>{fn f(&self){}fn run(&self){self.f();}}`,
+    ),
+  );
+  custom.unknown("self.f");
+  const local = await graph(
+    lib(
+      `trait Clone{fn f(self){}}struct A;impl Clone for A{}impl A{fn f(&self){}}fn run(a:A){a.f();}`,
+    ),
+  );
+  assert.equal(local.targets("a.f")[0].length, 2);
+});
+
+test("round 3 unresolved audit: known standard trait names also constrain reference impls", async () => {
+  const g = await graph(
+    lib(
+      `struct A;impl A{fn len(&self){}fn run(&mut self){self.len();}}impl<'a> IntoIterator for &'a A{type Item=u8;type IntoIter=();fn into_iter(self)->Self::IntoIter{()}}impl From<u8> for A{fn from(x:u8)->Self{A}}`,
+    ),
+  );
+  g.one("self.len", "impl A::len");
+  const custom = await graph(
+    lib(
+      `use external::IntoIterator;struct A;impl A{fn len(&self){}}impl IntoIterator for &A{}fn run(a:A){a.len();}`,
+    ),
+  );
+  custom.unknown("a.len");
+});
+
+test("round 3 standard trait evidence respects a shadowed std module", async () => {
+  const g = await graph(
+    lib(
+      `mod std{pub mod clone{pub use external::Clone;}}struct W<T>(T);impl<T>std::clone::Clone for W<T>{}impl<T>W<T>{fn f(&self){}fn run(&self){self.f();}}`,
+    ),
+  );
+  g.unknown("self.f");
+});
+
+test("round 3 standard prelude evidence cannot override an opaque glob binding", async () => {
+  const g = await graph(
+    lib(
+      `use external::*;struct W<T>(T);impl<T> Clone for W<T>{}impl<T>W<T>{fn f(&self){}fn run(&self){self.f();}}`,
+    ),
+  );
+  g.unknown("self.f");
+});
+
+test("round 3 unresolved audit: equal impl identity text does not merge their members", async () => {
+  const g = await graph(
+    lib(
+      `struct W<T>(T);impl<T>W<T>{fn f(&self){}fn run(&self){self.f();}}impl<T>W<T>where T:Copy{fn other(&self){}}`,
+    ),
+  );
+  g.one("self.f", "impl<T> W<T>::f");
+  const impls = g.symbols.filter((s) => s.kind === "impl");
+  assert.equal(impls.length, 2);
+  assert.equal(impls[0].identity, impls[1].identity);
+  assert.notEqual(impls[0].id, impls[1].id);
+  const separate = await graph(
+    lib(
+      `struct W<T>(T);impl<T>W<T>{fn f(&self){}}impl<T>W<T>where T:Copy{fn run(&self){self.f();}}`,
+    ),
+  );
+  separate.unknown("self.f");
+});
+
+test("round 3 unresolved audit: static blanket functions cannot mask dot methods", async () => {
+  const g = await graph(
+    lib(
+      `struct A;impl A{fn f(&mut self){}fn run(&mut self){self.f();}}trait Tr{fn f(){}}impl<T>Tr for T{}`,
+    ),
+  );
+  g.one("self.f", "impl A::f");
+  const receiver = await graph(
+    lib(
+      `struct A;impl A{fn f(&self){}}trait Tr{fn f(self){}}impl<T>Tr for T{}fn run(a:A){a.f();}`,
+    ),
+  );
+  receiver.unknown("a.f");
+});
+test("round 3: associated trait candidate sets cannot omit a blanket default", async () => {
+  const g = await graph(
+    lib(
+      `struct A;trait T{fn f(){}}impl<X>T for X{}trait U{fn f();}trait V{fn f();}impl U for A{fn f(){}}impl V for A{fn f(){}}fn run(){A::f();}`,
+    ),
+  );
+  g.unknown("A::f");
+  const inherent = await graph(
+    lib(
+      `struct A;trait T{fn f(){}}impl<X>T for X{}impl A{fn f(){}}fn run(){A::f();}`,
+    ),
+  );
+  inherent.one("A::f", "impl A::f");
+});
+
+test("round 3 standard trait evidence respects Cargo and extern-crate aliases", async () => {
+  const g = await graph(
+    {
+      "src/lib.rs": `struct W<T>(T);impl<T> ::std::clone::Clone for W<T>{}impl<T>W<T>{fn f(&self){}fn run(&self){self.f();}}`,
+      "dep/src/lib.rs": `pub mod clone{pub use external::Clone;}`,
+    },
+    {
+      "Cargo.toml": `[package]\nname="app"\n[dependencies]\nstd={path="dep"}\n`,
+      "dep/Cargo.toml": `[package]\nname="std"\n`,
+    },
+  );
+  g.unknown("self.f");
+  const alias = await graph(
+    lib(
+      `extern crate foreign as std;struct W<T>(T);impl<T> std::clone::Clone for W<T>{}impl<T>W<T>{fn f(&self){}fn run(&self){self.f();}}`,
+    ),
+  );
+  alias.unknown("self.f");
+});
+
+test("round 3 R3: equal type-argument spelling is not equal namespace binding", async () => {
+  const g = await graph(
+    lib(
+      `struct F<T>(T);mod a{use super::F;pub type X=u8;impl F<X>{fn f(&self){}}}mod b{use super::F;type X=String;fn run(x:F<X>){x.f();}}`,
+    ),
+  );
+  g.unknown("x.f");
+  const same = await graph(
+    lib(
+      `struct F<T>(T);mod a{use super::F;pub type X=u8;impl F<X>{fn f(&self){}}}use a::X as Y;fn run(x:F<Y>){x.f();}`,
+    ),
+  );
+  same.one("x.f", "a::impl F<X>::f");
+  const generic = await graph(
+    lib(
+      `struct F<T>(T);type X=u8;impl F<X>{fn f(&self){}}fn run<X>(x:F<X>){x.f();}`,
+    ),
+  );
+  generic.unknown("x.f");
+});
+test("round 3 R3: alias equivalence cannot be rejected out of a candidate set", async () => {
+  const g = await graph(
+    lib(
+      `struct F<T>(T);type X=u8;impl F<X>{fn f(&self){}}trait U{fn f(&self);}trait V{fn f(&self);}impl U for F<u8>{fn f(&self){}}impl V for F<u8>{fn f(&self){}}fn run(x:F<u8>){x.f();}`,
+    ),
+  );
+  assert.ok(g.targets("x.f")[0].some((s) => s.identity === "impl F<X>::f"));
+  assert.equal(g.targets("x.f")[0].length, 3);
+});
+test("round 3 R5: lifetime erasure preserves char const arguments", async () => {
+  const g = await graph(
+    lib(
+      `struct F<const C:char>;impl F<'a'>{fn f(&self){}}trait Tr{fn f(&self);}impl Tr for F<'b'>{fn f(&self){}}fn wrong(x:F<'b'>){x.f();}fn right(x:F<'a'>){x.f();}`,
+    ),
+  );
+  assert.equal(g.targets("x.f")[0].length, 0);
+  assert.equal(g.targets("x.f")[1][0].identity, "impl F<'a'>::f");
+});
+
+test("round 3 generic bindings include Unicode parameter names", async () => {
+  const blanket = await graph(
+    lib(
+      `struct A;impl A{fn f(&self){}}trait Tr{fn f(self){}}impl<Π>Tr for Π{}fn run(a:A){a.f();}`,
+    ),
+  );
+  blanket.unknown("a.f");
+  const scoped = await graph(
+    lib(
+      `struct Π;struct F<T>(T);trait Bound{}impl<Π:Bound>F<Π>{fn f(&self){}}trait Tr{fn f(&self);}impl Tr for F<Π>{fn f(&self){}}fn run(x:F<Π>){x.f();}`,
+    ),
+  );
+  const choices = scoped.targets("x.f")[0];
+  assert.notEqual(choices.length, 1);
+  assert.ok(
+    !choices.length ||
+      choices.some((s) => s.identity === "impl Tr for F<Π>::f"),
+  );
+});
+
+test("round 3 argument binding proof includes explicit standard imports", async () => {
+  const g = await graph(
+    lib(
+      `use std::string::String as S;struct F<T>(T);impl F<u8>{fn f(&self){}}trait Tr{fn f(&self);}impl Tr for F<S>{fn f(&self){}}fn run(x:F<S>){x.f();}`,
+    ),
+  );
+  g.unknown("x.f");
+  const same = await graph(
+    lib(
+      `struct F<T>(T);impl F<::std::string::String>{fn f(&self){}}fn run(x:F<String>){x.f();}`,
+    ),
+  );
+  same.one("x.f", "impl F<::std::string::String>::f");
+});
+
+test("round 3 binding identity: shared module type views cannot collapse dispatch", async () => {
+  const g = await graph({
+    "src/lib.rs": `#[path="shared.rs"]mod a;#[path="shared.rs"]mod b;impl a::S{fn f(&self){}}trait Tr{fn f(&self);}impl Tr for b::S{fn f(&self){}}`,
+    "src/shared.rs": `use crate::Tr;pub struct S;impl S{pub fn run(&self){self.f();}}`,
+  });
+  g.unknown("self.f");
+  const own = await graph({
+    "src/lib.rs": `#[path="shared.rs"]mod a;#[path="shared.rs"]mod b;`,
+    "src/shared.rs": `pub struct S;impl S{fn f(&self){}pub fn run(&self){self.f();}}`,
+  });
+  own.one("self.f", "impl S::f");
+});
+test("round 3 binding identity: alias receivers do not omit the underlying type's trait methods", async () => {
+  const g = await graph(
+    lib(
+      `struct A;type Alias=A;impl Alias{fn f(&self){}}trait Tr{fn f(self);}impl Tr for A{fn f(self){}}fn run(x:Alias){x.f();}`,
+    ),
+  );
+  g.unknown("x.f");
+});
+test("round 3 alias guard preserves explicitly captured associated functions", async () => {
+  const g = await graph(
+    lib(`struct A; type Alias=A;impl Alias{fn new(){}}fn run(){Alias::new();}`),
+  );
+  g.one("Alias::new", "impl Alias::new");
+});
+test("round 3 reference binding borrow is structural across lifetime spacing", async () => {
+  const g = await graph(
+    lib(`struct A;impl A{fn f(&mut self){}}fn run<'a>(x:& 'a mut A){x.f();}`),
+  );
+  g.one("x.f", "impl A::f");
+});
+test("round 3 unresolved audit: a dependency crate can be reexported by its own name", async () => {
+  const g = await graph(
+    {
+      "src/lib.rs": `pub use dep;fn run(){dep::f();missing::f();}`,
+      "dep/src/lib.rs": `pub fn f(){}`,
+    },
+    {
+      "Cargo.toml": `[package]\nname="app"\n[dependencies]\ndep={path="dep"}`,
+      "dep/Cargo.toml": `[package]\nname="dep"`,
+    },
+  );
+  g.one("dep::f", "f");
+  g.unknown("missing::f");
+});

@@ -32,6 +32,7 @@ export async function parseRust({
     // pass below maps all definitions once, including definitions absent from tags.
     mapDefinition: () => undefined,
     secondPass({ tree, result }) {
+      const opaqueCrateAliases: string[] = [];
       result.symbols.push({
         key: "file",
         name: path,
@@ -48,7 +49,10 @@ export async function parseRust({
         targetName: string,
         extra: Record<string, string | boolean | number> = {},
       ) => {
-        if (targetName)
+        if (
+          targetName &&
+          !(["types", "patterns"].includes(kind) && targetName === "_")
+        )
           result.links.push({
             sourceKey: owner,
             kind,
@@ -57,7 +61,13 @@ export async function parseRust({
             data: { scope, ...extra },
           });
       };
-      function imports(n: Node, prefix: string, owner: string, scope: string) {
+      function imports(
+        n: Node,
+        prefix: string,
+        owner: string,
+        scope: string,
+        visibility: string,
+      ) {
         if (n.type === "scoped_use_list") {
           const p = field(n, "path")?.text;
           imports(
@@ -65,9 +75,11 @@ export async function parseRust({
             prefix + (p ? compact(p) + "::" : ""),
             owner,
             scope,
+            visibility,
           );
         } else if (n.type === "use_list") {
-          for (const c of n.namedChildren) imports(c, prefix, owner, scope);
+          for (const c of n.namedChildren)
+            imports(c, prefix, owner, scope, visibility);
         } else {
           const rename = n.type === "use_as_clause";
           let name = prefix + compact(rename ? field(n, "path")!.text : n.text);
@@ -77,9 +89,64 @@ export async function parseRust({
             : name.split("::").at(-1)!;
           link(n, owner, scope, "imports", name, {
             alias,
+            visibility,
             glob: n.type === "use_wildcard",
           });
         }
+      }
+      const argumentSyntaxCache = new Map<number, string>();
+      function argumentSyntax(type: Node | null): string {
+        if (!type) return "[]";
+        const cached = argumentSyntaxCache.get(type.id);
+        if (cached !== undefined) return cached;
+        function syntax(n: Node): unknown | null {
+          if (
+            n.hasError ||
+            n.isMissing ||
+            [
+              "ERROR",
+              "function_type",
+              "for_lifetimes",
+              "higher_ranked_trait_bound",
+              "macro_invocation",
+              "block",
+              "binary_expression",
+              "call_expression",
+              "string_literal",
+              "raw_string_literal",
+            ].includes(n.type)
+          )
+            return null;
+          if (
+            n.type === "char_literal" ||
+            n.type === "integer_literal" ||
+            n.type === "boolean_literal"
+          )
+            return [n.type, n.text];
+          const children = (
+            n.type === "type_arguments" ? n.namedChildren : n.children
+          ).filter((c) => c.type !== "lifetime" && !c.type.endsWith("comment"));
+          if (n.type === "type_arguments" && !children.length)
+            return [n.type, []];
+          if (!children.length)
+            return [
+              n.type,
+              ["identifier", "type_identifier"].includes(n.type)
+                ? compact(n.text)
+                : n.text,
+            ];
+          const values = children.map(syntax);
+          return values.some((v) => v === null) ? null : [n.type, values];
+        }
+        const args = field(type, "type_arguments");
+        const nodes =
+          args?.namedChildren.filter(
+            (c) => c.type !== "lifetime" && !c.type.endsWith("comment"),
+          ) ?? [];
+        const shapes = nodes.map(syntax),
+          value = shapes.some((v) => v === null) ? "" : JSON.stringify(shapes);
+        argumentSyntaxCache.set(type.id, value);
+        return value;
       }
       const lexicalScopes = new Map<number, string>();
       type ReceiverType = {
@@ -87,6 +154,7 @@ export async function parseRust({
         scope: string;
         borrow: string;
         mutable: boolean;
+        argumentSyntax: string;
       };
       // Build lexical binding evidence once per function. Each query visits only
       // its ancestor scopes and binary-searches the requested name's activations.
@@ -122,6 +190,12 @@ export async function parseRust({
             const names =
               scopes!.get(region.id) ?? new Map<string, Binding[]>();
             for (const id of ids) {
+              if (
+                id.text === "_" ||
+                id.parent?.type === "scoped_identifier" ||
+                field(id.parent ?? id, "type")?.id === id.id
+              )
+                continue;
               const list = names.get(compact(id.text)) ?? [];
               list.push({
                 pattern,
@@ -144,8 +218,18 @@ export async function parseRust({
               add(field(n, "pattern"), field(n, "type"), parameterRegion, 0);
             if (n.type === "let_declaration" && n.parent)
               add(field(n, "pattern"), field(n, "type"), n.parent, n.endIndex);
-            if (n.type === "let_condition" && n.parent)
-              add(field(n, "pattern"), null, n.parent, 0);
+            if (n.type === "let_condition") {
+              let control = n.parent;
+              while (
+                control &&
+                !["if_expression", "while_expression"].includes(control.type)
+              )
+                control = control.parent;
+              const region =
+                control &&
+                (field(control, "consequence") ?? field(control, "body"));
+              if (region) add(field(n, "pattern"), null, region, 0);
+            }
             if (
               [
                 "closure_expression",
@@ -191,23 +275,29 @@ export async function parseRust({
             if (item) {
               blocked.add(name);
               const { pattern, type } = item;
+              const nominal =
+                type?.type === "reference_type" ? field(type, "type") : type;
               if (
                 type &&
-                /^(?:&(?:'\w+\s+)?(?:mut\s+)?)?[\w:]+(?:<[^>]*>)?$/.test(
-                  type.text.replace(/\br#/g, ""),
-                )
+                nominal &&
+                [
+                  "type_identifier",
+                  "scoped_type_identifier",
+                  "generic_type",
+                  "primitive_type",
+                ].includes(nominal.type)
               )
                 types.set(name, {
-                  name: compact(
-                    type.text.replace(/^&(?:'\w+\s+)?(?:mut\s+)?/, ""),
-                  ),
+                  name: nominal.text.replace(/\br#/g, "").trim(),
+                  argumentSyntax: argumentSyntax(nominal),
                   scope: lexicalScopes.get(type.id) ?? "",
-                  borrow: /^&(?:'\w+\s+)?mut\s/.test(
-                    type.text.replace(/\br#/g, ""),
-                  )
-                    ? "mutable"
-                    : type.text.startsWith("&")
-                      ? "shared"
+                  borrow:
+                    type.type === "reference_type"
+                      ? type.namedChildren.some(
+                          (c) => c.type === "mutable_specifier",
+                        )
+                        ? "mutable"
+                        : "shared"
                       : "owned",
                   mutable:
                     pattern.parent?.namedChildren.some(
@@ -221,6 +311,97 @@ export async function parseRust({
           ancestor = ancestor.parent;
         }
         return { blocked, types };
+      }
+      function arity(list: Node | null) {
+        let minimum = 0,
+          maximum = 0,
+          optional = false;
+        for (const child of list?.namedChildren ?? []) {
+          if (child.type.endsWith("comment")) continue;
+          if (child.type === "attribute_item") {
+            optional ||= /\bcfg(?:_attr)?\b/.test(child.text);
+            continue;
+          }
+          maximum++;
+          if (!optional) minimum++;
+          optional = false;
+        }
+        return { minimum, maximum };
+      }
+      // Receiver grammar, including typed self, is inspected structurally. Raw
+      // source is retained separately; lifetimes never hide a mutable_specifier.
+      function receiverInfo(fn: Node | null) {
+        const parameter =
+          fn &&
+          field(fn, "parameters")?.namedChildren.find(
+            (c) =>
+              c.type === "self_parameter" ||
+              field(c, "pattern")?.type === "self",
+          );
+        if (!parameter)
+          return {
+            kind: "none",
+            borrow: "unknown",
+            mutable: false,
+            syntax: "",
+            type: "",
+          };
+        const type = field(parameter, "type");
+        const mutable = parameter.namedChildren.some(
+          (c) => c.type === "mutable_specifier",
+        );
+        const reference =
+          (type?.type === "reference_type" &&
+            field(type, "type")?.text === "Self") ||
+          (!type && parameter.children.some((c) => c.type === "&"));
+        const referenceMutable =
+          reference &&
+          (type ?? parameter).namedChildren.some(
+            (c) => c.type === "mutable_specifier",
+          );
+        const owned =
+          !type || (type.type === "type_identifier" && type.text === "Self");
+        const borrow = reference
+          ? referenceMutable
+            ? "mutable"
+            : "shared"
+          : owned
+            ? "owned"
+            : "unknown";
+        return {
+          kind:
+            borrow === "mutable"
+              ? "&mut self"
+              : borrow === "shared"
+                ? "&self"
+                : borrow === "owned"
+                  ? "self"
+                  : "unknown",
+          borrow,
+          mutable,
+          syntax: parameter.text,
+          type: type?.text ?? "Self",
+        };
+      }
+      const genericBindingsCache = new Map<number, string>();
+      function genericBindings(n: Node): string {
+        const cached = genericBindingsCache.get(n.id);
+        if (cached !== undefined) return cached;
+        const names = new Set<string>();
+        let parent: Node | null = n;
+        while (parent && parent.type !== "mod_item") {
+          for (const parameter of field(parent, "type_parameters")
+            ?.namedChildren ?? []) {
+            const name = compact(
+              field(parameter, "name")?.text ?? parameter.text,
+            );
+            if (!name.startsWith("'")) names.add(name);
+          }
+          parent = parent.parent;
+        }
+        const value = [...names].join(",");
+        genericBindingsCache.set(n.id, value);
+        return value;
       }
       const blockNumbers = new Map<string, number>();
       function genericShadow(n: Node, name: string): boolean {
@@ -319,31 +500,28 @@ export async function parseRust({
                   : {}),
                 ...(actualKind === "method"
                   ? {
-                      arity:
-                        field(n, "parameters")?.namedChildren.filter(
-                          (c) =>
-                            c.type === "parameter" ||
-                            c.type === "self_parameter",
-                        ).length ?? 0,
-                      receiverKind:
-                        field(n, "parameters")?.namedChildren.find(
-                          (c) => c.type === "self_parameter",
-                        )?.text ??
-                        (field(n, "parameters")?.namedChildren.some(
-                          (c) => field(c, "pattern")?.type === "self",
-                        )
-                          ? "unknown"
-                          : "none"),
+                      arity: arity(field(n, "parameters")).maximum,
+                      arityMinimum: arity(field(n, "parameters")).minimum,
+                      receiverKind: receiverInfo(n).kind,
+                      receiverSyntax: receiverInfo(n).syntax,
+                      receiverType: receiverInfo(n).type,
+                      receiverMutable: receiverInfo(n).mutable,
                       defaultBody: !!field(n, "body"),
                     }
                   : {}),
                 visibility:
-                  n.namedChildren.find((c) => c.type === "visibility_modifier")
-                    ?.text ??
-                  (n.type === "enum_variant" ||
-                  n.parent?.parent?.type === "trait_item"
-                    ? "inherited"
-                    : "private"),
+                  actualKind === "macro" &&
+                  attrs.some((a) =>
+                    /^#\[\s*macro_export(?:\s*\]|\s*\()/.test(a),
+                  )
+                    ? "pub"
+                    : (n.namedChildren.find(
+                        (c) => c.type === "visibility_modifier",
+                      )?.text ??
+                      (n.type === "enum_variant" ||
+                      n.parent?.parent?.type === "trait_item"
+                        ? "inherited"
+                        : "private")),
                 attributes: attrs,
                 ...(actualKind === "method"
                   ? {
@@ -367,6 +545,7 @@ export async function parseRust({
                 ...(n.type === "impl_item"
                   ? {
                       implType: type?.text ?? "",
+                      argumentSyntax: argumentSyntax(type),
                       trait: trait?.text ?? "",
                       generics:
                         field(n, "type_parameters")?.namedChildren.map((p) =>
@@ -393,8 +572,24 @@ export async function parseRust({
               link(n, key, scope, "modules", name, { key });
           }
         }
+        if (n.type === "extern_crate_declaration") {
+          const alias = field(n, "alias")?.text;
+          if (
+            alias &&
+            ["std", "core"].includes(alias) &&
+            field(n, "name")?.text !== alias
+          )
+            opaqueCrateAliases.push(alias);
+        }
         if (n.type === "use_declaration") {
-          imports(field(n, "argument")!, "", owner, scope);
+          imports(
+            field(n, "argument")!,
+            "",
+            owner,
+            scope,
+            n.namedChildren.find((c) => c.type === "visibility_modifier")
+              ?.text ?? "private",
+          );
           return;
         }
         if (n.type === "macro_definition") return;
@@ -429,30 +624,30 @@ export async function parseRust({
                     (receiver.type === "struct_expression"
                       ? (field(receiver, "name")?.text ?? "")
                       : ""));
-              const selfParameter =
-                fn &&
-                field(fn, "parameters")?.namedChildren.find(
-                  (c) => c.type === "self_parameter",
-                );
               link(f, owner, scope, "calls", f.text.replace(/\br#/g, ""), {
-                argumentCount:
-                  field(n, "arguments")?.namedChildren.filter(
-                    (c) => !c.type.endsWith("comment"),
-                  ).length ?? 0,
+                genericBindings: genericBindings(fn ?? n),
+                argumentCount: arity(field(n, "arguments")).maximum,
+                argumentMinimum: arity(field(n, "arguments")).minimum,
                 method: method.text,
                 receiverType,
+                receiverArgumentSyntax:
+                  receiver.text === "self"
+                    ? argumentSyntax(implNode && field(implNode, "type"))
+                    : (b.types.get(compact(receiver.text))?.argumentSyntax ??
+                      argumentSyntax(
+                        receiver.type === "struct_expression"
+                          ? field(receiver, "name")
+                          : null,
+                      )),
                 receiverBorrow:
                   receiver.text === "self"
-                    ? !selfParameter
-                      ? "unknown"
-                      : selfParameter.text.includes("&mut")
-                        ? "mutable"
-                        : selfParameter.text.includes("&")
-                          ? "shared"
-                          : "owned"
+                    ? receiverInfo(fn).borrow
                     : (b.types.get(compact(receiver.text))?.borrow ?? "owned"),
                 receiverMutable:
-                  b.types.get(compact(receiver.text))?.mutable ?? false,
+                  receiver.text === "self"
+                    ? receiverInfo(fn).mutable
+                    : (b.types.get(compact(receiver.text))?.mutable ?? false),
+                implKey: implNode ? `item:${implNode.startIndex}` : "",
                 typeScope:
                   receiver.text === "self"
                     ? implScope
@@ -465,15 +660,20 @@ export async function parseRust({
               });
             } else
               link(f, owner, scope, "calls", compact(f.text), {
-                argumentCount:
-                  field(n, "arguments")?.namedChildren.filter(
-                    (c) => !c.type.endsWith("comment"),
-                  ).length ?? 0,
+                pathSyntax: f.text,
+                pathArgumentSyntax: argumentSyntax(field(f, "path")),
+                implArgumentSyntax: argumentSyntax(
+                  implNode && field(implNode, "type"),
+                ),
+                genericBindings: genericBindings(fn ?? n),
+                argumentCount: arity(field(n, "arguments")).maximum,
+                argumentMinimum: arity(field(n, "arguments")).minimum,
                 blocked:
                   b.blocked.has(compact(f.text.split("::")[0]!)) ||
                   genericShadow(n, f.text.split("::")[0]!),
                 implType,
                 implScope,
+                implKey: implNode ? `item:${implNode.startIndex}` : "",
               });
           }
         }
@@ -537,6 +737,7 @@ export async function parseRust({
       }
       for (const n of tree.rootNode.namedChildren)
         visit(n, "file", "", null, "");
+      if (opaqueCrateAliases.length) result.data = { opaqueCrateAliases };
     },
   });
   try {

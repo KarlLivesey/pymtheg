@@ -11,11 +11,23 @@ type Data = Record<string, Json>;
 const data = (x: { data?: Json }) => (x.data ?? {}) as Data;
 const str = (x: unknown) => (typeof x === "string" ? x : "");
 const compact = (s: string) => s.replace(/\s+/g, "").replace(/\br#/g, "");
+const identifiers = (s: string): string[] =>
+  s.match(/[_\p{ID_Start}][_\p{ID_Continue}]*/gu) ?? [];
 // Erasure is ONLY for namespace lookup. Method applicability uses the full type.
 const base = (s: string) =>
   compact(s)
     .replace(/::<[\s\S]*>$/, "")
     .replace(/<[\s\S]*>$/, "");
+const withoutLifetimes = (s: string) =>
+  s
+    .replace(/\br#/g, "")
+    .trim()
+    .replace(
+      /'[_\p{ID_Start}][_\p{ID_Continue}]*(?![_\p{ID_Continue}'])\s*,?/gu,
+      "",
+    )
+    .replace(/,\s*>/g, ">")
+    .replace(/<\s*>/g, "");
 type Namespace = "type" | "value" | "macro" | "pattern" | "any" | "import";
 interface Place {
   crate: Crate;
@@ -215,6 +227,7 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
       if (data(l).glob) entry.globs.push(l);
       else {
         const alias = compact(str(data(l).alias));
+        if (alias === "_") continue;
         const list = entry.explicit.get(alias) ?? [];
         list.push(l);
         entry.explicit.set(alias, list);
@@ -228,26 +241,54 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
       list.push(c);
       packagesByManifest.set(c.manifest, list);
     }
-  const membersByScope = new Map<string, GraphSymbol[]>();
-  for (const s of symbols)
-    if (s.kind === "method") {
-      const k = `${s.file}|${str(data(s).scope)}`;
-      const list = membersByScope.get(k) ?? [];
-      list.push(s);
-      membersByScope.set(k, list);
-    }
+  const membersByOwner = new Map<string, GraphSymbol[]>();
+  for (const l of ctx.links) {
+    if (l.kind !== "contains" || !l.sourceId) continue;
+    const member = byLocalKey.get(`${l.file}|${str(data(l).key)}`);
+    if (member?.kind !== "method") continue;
+    const list = membersByOwner.get(l.sourceId) ?? [];
+    list.push(member);
+    membersByOwner.set(l.sourceId, list);
+  }
   const memo = new Map<string, Found>();
   const empty = (complete = true): Found => ({ symbols: [], complete });
   const merge = (xs: Found[]): Found => ({
     symbols: unique(xs.flatMap((x) => x.symbols)),
     complete: xs.every((x) => x.complete),
   });
+  const isDescendant = (scope: string, parent: string) =>
+    !parent || scope === parent || scope.startsWith(parent + "::");
+  function visible(visibility: string, owner: Place, importer: Place): boolean {
+    visibility = compact(visibility);
+    if (visibility === "pub") return true;
+    if (owner.crate.root !== importer.crate.root) return false;
+    if (visibility === "pub(crate)") return true;
+    let boundary = owner.scope;
+    if (visibility === "pub(super)") boundary = owner.parent?.scope ?? "";
+    else if (visibility.startsWith("pub(in")) {
+      const path = visibility.slice(6, -1).split("::");
+      if (path[0] === "crate") {
+        path.shift();
+        boundary = path.join("::");
+      } else {
+        let dest = owner;
+        while (path[0] === "super") {
+          dest = dest.parent ?? dest;
+          path.shift();
+        }
+        if (path[0] === "self") path.shift();
+        boundary = [dest.scope, ...path].filter(Boolean).join("::");
+      }
+    }
+    return isDescendant(importer.scope, boundary);
+  }
   function children(
     s: GraphSymbol,
     rest: string[],
     ns: Namespace,
     seen: Set<string>,
     allowGlobs: boolean,
+    accessFrom?: Place,
   ): Found {
     if (!rest.length)
       return { symbols: accepts(s, ns) ? [s] : [], complete: true };
@@ -258,7 +299,15 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
       return destinations.length
         ? merge(
             destinations.map((dest) =>
-              find(rest.join("::"), dest, dest.local, ns, seen, allowGlobs),
+              find(
+                rest.join("::"),
+                dest,
+                dest.local,
+                ns,
+                seen,
+                allowGlobs,
+                accessFrom,
+              ),
             ),
           )
         : empty(false);
@@ -291,22 +340,35 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
     ns: Namespace,
     seen: Set<string>,
     allowGlobs: boolean,
+    accessFrom?: Place,
   ): Found | null {
     const headNs: Namespace = rest.length ? "type" : ns;
     const declared = (
       table.get(key(loc.crate.root, [q, name].filter(Boolean).join("::"))) ?? []
-    ).filter((s) => accepts(s, headNs));
+    ).filter(
+      (s) =>
+        accepts(s, headNs) &&
+        (!accessFrom || visible(str(data(s).visibility), loc, accessFrom)),
+    );
     if (declared.length)
       return merge(
-        declared.map((s) => children(s, rest, ns, seen, allowGlobs)),
+        declared.map((s) =>
+          children(s, rest, ns, seen, allowGlobs, accessFrom),
+        ),
       );
     const uses = importsByScope.get(`${loc.file}|${local}`);
-    const explicit = uses?.explicit.get(name) ?? [];
+    const explicit = (uses?.explicit.get(name) ?? []).filter(
+      (l) => !accessFrom || visible(str(data(l).visibility), loc, accessFrom),
+    );
+    const importPath = (l: GraphLink) =>
+      !l.targetName.includes("::") && loc.crate.deps.has(compact(l.targetName))
+        ? "::" + l.targetName
+        : l.targetName;
     if (explicit.length) {
       const result = merge(
         explicit.map((l) =>
           find(
-            [l.targetName, ...rest].join("::"),
+            [importPath(l), ...rest].join("::"),
             loc,
             str(data(l).scope),
             ns,
@@ -321,12 +383,17 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
       // different namespace. An uncaptured external import could bind this one.
       const all = merge(
         explicit.map((l) =>
-          find(l.targetName, loc, str(data(l).scope), "any", seen, allowGlobs),
+          find(importPath(l), loc, str(data(l).scope), "any", seen, allowGlobs),
         ),
       );
       if (!all.complete || !all.symbols.length) return empty(false);
     }
-    const globs = allowGlobs ? (uses?.globs ?? []) : [];
+    const globs = allowGlobs
+      ? (uses?.globs ?? []).filter(
+          (l) =>
+            !accessFrom || visible(str(data(l).visibility), loc, accessFrom),
+        )
+      : [];
     if (globs.length) {
       const result = merge(
         globs.map((l) => {
@@ -336,12 +403,12 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
             str(data(l).scope),
             "type",
             seen,
-            false,
+            true,
           );
           if (!imported.symbols.length) return empty(false);
           const found = merge(
             imported.symbols.map((s) =>
-              children(s, [name, ...rest], ns, seen, false),
+              children(s, [name, ...rest], ns, seen, true, accessFrom ?? loc),
             ),
           );
           return {
@@ -364,14 +431,16 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
     ns: Namespace = "any",
     seen = new Set<string>(),
     allowGlobs = true,
+    accessFrom?: Place,
   ): Found {
     if (ns === "import")
       return merge(
         (["type", "value", "macro"] as Namespace[]).map((n) =>
-          find(raw, loc, scope, n, seen, allowGlobs),
+          find(raw, loc, scope, n, seen, allowGlobs, accessFrom),
         ),
       );
     const name = base(raw);
+    if (name === "_") return empty();
     const guard = JSON.stringify([
       loc.crate.root,
       loc.file,
@@ -380,10 +449,13 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
       name,
       ns,
       allowGlobs,
+      accessFrom?.crate.root,
+      accessFrom?.scope,
     ]);
     const cached = memo.get(guard);
     if (cached) return cached;
-    if (seen.has(guard) || seen.size > 64) return empty(false);
+    if (seen.has(guard)) return empty(!accessFrom ? false : true);
+    if (seen.size > 128) return empty(false);
     seen = new Set([...seen, guard]);
     const absolute = name.startsWith("::");
     const parts = name.replace(/^::/, "").split("::");
@@ -402,7 +474,15 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
       }
       if (parts[0] === "self") parts.shift();
       result = parts.length
-        ? find(parts.join("::"), dest, dest.local, ns, seen, allowGlobs)
+        ? find(
+            parts.join("::"),
+            dest,
+            dest.local,
+            ns,
+            seen,
+            allowGlobs,
+            accessFrom,
+          )
         : { symbols: [dest.symbol], complete: true };
     } else {
       let found: Found | null = null;
@@ -418,6 +498,7 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
             ns,
             seen,
             allowGlobs,
+            accessFrom,
           );
           if (found || local === loc.local) break;
           if (!local.startsWith(loc.local) || !local) break;
@@ -458,31 +539,232 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
     if (result.complete) memo.set(guard, result);
     return result;
   }
+  const opaqueStandardRoots = new Map<string, Set<string>>();
+  for (const file of ctx.files) {
+    const aliases = (data(file.result).opaqueCrateAliases ?? []) as string[];
+    if (!aliases.length) continue;
+    for (const loc of ownerPlace(file.path, "")) {
+      const names =
+        opaqueStandardRoots.get(loc.crate.root) ?? new Set<string>();
+      for (const name of aliases) names.add(name);
+      opaqueStandardRoots.set(loc.crate.root, names);
+    }
+  }
+  // These standard traits have small, fixed method-name contracts. This is
+  // applicability evidence only: no external declaration or target is invented.
+  const standardTraits = new Map<string, string[]>([
+    ["ops::Drop", ["drop"]],
+    ["default::Default", ["default"]],
+    ["clone::Clone", ["clone", "clone_from"]],
+    ["convert::From", ["from"]],
+    ["convert::TryFrom", ["try_from"]],
+    ["convert::Into", ["into"]],
+    ["convert::TryInto", ["try_into"]],
+    ["iter::FromIterator", ["from_iter"]],
+    ["iter::IntoIterator", ["into_iter"]],
+    ["ops::Add", ["add"]],
+    ["ops::AddAssign", ["add_assign"]],
+    ["fmt::Debug", ["fmt"]],
+    ["fmt::Display", ["fmt"]],
+  ]);
+  const standardPrelude = new Map([
+    ["Drop", "ops::Drop"],
+    ["Default", "default::Default"],
+    ["Clone", "clone::Clone"],
+    ["From", "convert::From"],
+    ["TryFrom", "convert::TryFrom"],
+    ["Into", "convert::Into"],
+    ["TryInto", "convert::TryInto"],
+    ["FromIterator", "iter::FromIterator"],
+    ["IntoIterator", "iter::IntoIterator"],
+  ]);
+  function standardMethods(
+    raw: string,
+    loc: Place,
+    scope: string,
+    allowPrelude: boolean,
+  ): string[] | null {
+    let path = base(raw);
+    for (let depth = 0; depth < 16; depth++) {
+      const absolute = path.startsWith("::");
+      path = path.replace(/^::/, "");
+      if (/^(std|core)::/.test(path)) {
+        const crateName = path.split("::")[0]!;
+        if (
+          loc.crate.deps.has(crateName) ||
+          opaqueStandardRoots.get(loc.crate.root)?.has(crateName)
+        )
+          return null;
+        const shadow =
+          !absolute && find(path.split("::")[0]!, loc, scope, "type");
+        if (shadow && (shadow.symbols.length || !shadow.complete)) return null;
+        return standardTraits.get(path.replace(/^(std|core)::/, "")) ?? null;
+      }
+      const [first, ...rest] = path.split("::");
+      let local = scope,
+        bindings: GraphLink[] = [];
+      while (true) {
+        bindings =
+          importsByScope.get(`${loc.file}|${local}`)?.explicit.get(first!) ??
+          [];
+        if (bindings.length || local === loc.local || !local) break;
+        local = local.includes("::")
+          ? local.slice(0, local.lastIndexOf("::"))
+          : "";
+      }
+      if (bindings.length !== 1)
+        return allowPrelude && !bindings.length && !rest.length
+          ? (standardTraits.get(standardPrelude.get(first!) ?? "") ?? null)
+          : null;
+      path = [bindings[0]!.targetName, ...rest].join("::");
+    }
+    return null;
+  }
   type Method = {
     symbol: GraphSymbol;
     inherent: boolean;
     implType: string;
     generics: string[];
     uncertain: boolean;
+    implKey: string;
+    ownerRoot: string;
+    argumentPlace: Place;
+    argumentScope: string;
+    argumentSyntax: string;
   };
   const methodIndex = new Map<string, Method[]>();
-  const opaqueTraits = new Set<string>();
-  const referenceImpls = new Set<string>();
-  const scopedMembers = (s: GraphSymbol) =>
-    membersByScope.get(`${s.file}|${s.identity}`) ?? [];
+  type Blankets = {
+    names: Set<string>;
+    associatedNames: Set<string>;
+    opaque: boolean;
+    byType: Map<string, Set<string>>;
+    associatedByType: Map<string, Set<string>>;
+    opaqueTypes: Set<string>;
+    refs: Map<string, Set<string>>;
+    opaqueNormal: Set<string>;
+  };
+  const emptyBlankets = (): Blankets => ({
+    names: new Set(),
+    associatedNames: new Set(),
+    opaque: false,
+    byType: new Map(),
+    associatedByType: new Map(),
+    opaqueTypes: new Set(),
+    refs: new Map(),
+    opaqueNormal: new Set(),
+  });
+  const blanketsByCrate = new Map<string, Blankets>();
+  const reachableCache = new Map<string, Set<string>>();
+  function reachable(root: string): Set<string> {
+    const cached = reachableCache.get(root);
+    if (cached) return cached;
+    const result = new Set<string>(),
+      pending = [root];
+    while (pending.length) {
+      const next = pending.pop()!;
+      if (result.has(next)) continue;
+      result.add(next);
+      for (const manifest of roots.get(next)?.crate.deps.values() ?? [])
+        for (const dep of packagesByManifest.get(manifest) ?? [])
+          pending.push(dep.root);
+    }
+    reachableCache.set(root, result);
+    return result;
+  }
+  const scopedMembers = (s: GraphSymbol) => membersByOwner.get(s.id) ?? [];
   for (const impl of symbols.filter((s) => s.kind === "impl")) {
     const implType = str(data(impl).implType);
     const generics = (data(impl).generics ?? []) as string[];
-    if (generics.includes(base(implType))) continue;
     for (const loc of ownerPlace(impl.file, str(data(impl).scope))) {
+      const blankets = blanketsByCrate.get(loc.crate.root) ?? emptyBlankets();
+      blanketsByCrate.set(loc.crate.root, blankets);
+      const trait = data(impl).trait
+        ? find(str(data(impl).trait), loc, str(data(impl).scope), "type")
+        : empty();
+      const traitMethods = trait.symbols
+        .filter((t) => t.kind === "trait")
+        .flatMap(scopedMembers);
+      const standard =
+        data(impl).trait && !trait.symbols.length
+          ? standardMethods(
+              str(data(impl).trait),
+              loc,
+              str(data(impl).scope),
+              trait.complete,
+            )
+          : null;
+      const suppliedNames = new Set([
+        ...[...scopedMembers(impl), ...traitMethods].map((m) => m.name),
+        ...(standard ?? []),
+      ]);
+      const instanceNames = new Set([
+        ...[...scopedMembers(impl), ...traitMethods]
+          .filter((m) => data(m).receiver === true)
+          .map((m) => m.name),
+        ...(standard ?? []).filter(
+          (name) =>
+            !["default", "from", "try_from", "from_iter"].includes(name),
+        ),
+      ]);
+      const unknownTrait =
+        !!data(impl).trait &&
+        !standard &&
+        (!trait.complete || !trait.symbols.length);
+      const blanket =
+        !!data(impl).trait &&
+        generics
+          .filter((g) => !g.startsWith("'"))
+          .some((g) => identifiers(implType).includes(g));
+      if (blanket) {
+        const nominal = implType.replace(/^&(?:'\w+\s+)?(?:mut\s+)?/, "");
+        if (generics.includes(base(nominal))) {
+          for (const name of instanceNames) blankets.names.add(name);
+          for (const name of suppliedNames) blankets.associatedNames.add(name);
+          blankets.opaque ||= unknownTrait;
+        } else {
+          // A nominal wrapper cannot be selected for an unrelated explicit
+          // receiver type. Its generic arguments/bounds remain unsolved.
+          for (const t of find(nominal, loc, str(data(impl).scope), "type")
+            .symbols) {
+            const names = blankets.byType.get(t.id) ?? new Set<string>();
+            for (const name of instanceNames) names.add(name);
+            blankets.byType.set(t.id, names);
+            const associated =
+              blankets.associatedByType.get(t.id) ?? new Set<string>();
+            for (const name of suppliedNames) associated.add(name);
+            blankets.associatedByType.set(t.id, associated);
+            if (unknownTrait) blankets.opaqueTypes.add(t.id);
+          }
+        }
+        continue;
+      }
       if (/^&/.test(implType.trim())) {
         const nominal = implType.replace(/^&(?:'\w+\s+)?(?:mut\s+)?/, "");
         for (const t of find(nominal, loc, str(data(impl).scope), "type")
-          .symbols)
-          referenceImpls.add(t.id);
+          .symbols) {
+          const names = blankets.refs.get(t.id) ?? new Set<string>();
+          for (const name of instanceNames) names.add(name);
+          if (unknownTrait) names.add("*");
+          blankets.refs.set(t.id, names);
+        }
         continue;
       }
       const targets = find(implType, loc, str(data(impl).scope), "type");
+      if (standard)
+        for (const target of targets.symbols) {
+          const names = blankets.byType.get(target.id) ?? new Set<string>();
+          for (const name of instanceNames) names.add(name);
+          blankets.byType.set(target.id, names);
+          // Clone::clone_from has an external default body; retain that unknown
+          // alternative for qualified calls too. Other catalogued methods are
+          // required overrides and are captured in the impl itself.
+          if (standard.includes("clone_from")) {
+            const associated =
+              blankets.associatedByType.get(target.id) ?? new Set<string>();
+            associated.add("clone_from");
+            blankets.associatedByType.set(target.id, associated);
+          }
+        }
       const overrides = scopedMembers(impl);
       let methods = overrides;
       if (data(impl).trait) {
@@ -492,8 +774,8 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
           str(data(impl).scope),
           "type",
         );
-        if (!traits.complete || !traits.symbols.length)
-          for (const t of targets.symbols) opaqueTraits.add(t.id);
+        if (!standard && (!traits.complete || !traits.symbols.length))
+          for (const t of targets.symbols) blankets.opaqueNormal.add(t.id);
         methods = [
           ...overrides,
           ...traits.symbols
@@ -519,26 +801,267 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
             implType,
             generics,
             uncertain: !targets.complete,
+            implKey: `${impl.file}|${impl.key}`,
+            ownerRoot: loc.crate.root,
+            argumentPlace: loc,
+            argumentScope: str(data(impl).scope),
+            argumentSyntax: str(data(impl).argumentSyntax),
           });
           methodIndex.set(k, list);
         }
     }
   }
+  const activeBlankets = new Map<string, Blankets>();
+  function visibleBlankets(root: string): Blankets {
+    const cached = activeBlankets.get(root);
+    if (cached) return cached;
+    const result = emptyBlankets();
+    for (const owner of reachable(root)) {
+      const source = blanketsByCrate.get(owner);
+      if (!source) continue;
+      result.opaque ||= source.opaque;
+      for (const name of source.names) result.names.add(name);
+      for (const name of source.associatedNames)
+        result.associatedNames.add(name);
+      for (const [id, names] of source.associatedByType) {
+        const combined = result.associatedByType.get(id) ?? new Set<string>();
+        for (const name of names) combined.add(name);
+        result.associatedByType.set(id, combined);
+      }
+      for (const id of source.opaqueTypes) result.opaqueTypes.add(id);
+      for (const id of source.opaqueNormal) result.opaqueNormal.add(id);
+      for (const [id, names] of source.refs) {
+        const combined = result.refs.get(id) ?? new Set<string>();
+        for (const name of names) combined.add(name);
+        result.refs.set(id, combined);
+      }
+      for (const [id, names] of source.byType) {
+        const combined = result.byType.get(id) ?? new Set<string>();
+        for (const name of names) combined.add(name);
+        result.byType.set(id, combined);
+      }
+    }
+    activeBlankets.set(root, result);
+    return result;
+  }
+  type ArgumentKey = { key: string; alias: boolean };
+  function standardArgumentKey(
+    raw: string,
+    loc: Place,
+    scope: string,
+  ): ArgumentKey | null {
+    const absolute = raw.startsWith("::"),
+      path = raw.replace(/^::/, "");
+    if (!/^(std|core)::/.test(path)) return null;
+    const head = path.split("::")[0]!;
+    if (
+      loc.crate.deps.has(head) ||
+      opaqueStandardRoots.get(loc.crate.root)?.has(head)
+    )
+      return null;
+    const shadow = !absolute && find(head, loc, scope, "type");
+    if (shadow && (!shadow.complete || shadow.symbols.length)) return null;
+    if (path === "std::string::String")
+      return { key: "standard:String", alias: false };
+    const primitive = path.match(
+      /^(?:std|core)::primitive::([ui](?:8|16|32|64|128|size)|f(?:32|64)|bool|char|str)$/,
+    )?.[1];
+    if (primitive) return { key: `primitive:${primitive}`, alias: false };
+    // An identical qualified standard binding is the same type argument even
+    // when its declaration is uncaptured. Different paths may be reexports.
+    return { key: `standard-path:${path}`, alias: true };
+  }
+  function importedArgumentKey(
+    raw: string,
+    loc: Place,
+    scope: string,
+    callerBindings: Set<string>,
+  ): ArgumentKey | null {
+    const [head, ...tail] = raw.split("::");
+    let local = scope;
+    while (true) {
+      const imports =
+        importsByScope.get(`${loc.file}|${local}`)?.explicit.get(head!) ?? [];
+      if (imports.length) {
+        if (imports.length !== 1) return null;
+        const item = imports[0]!,
+          path = [item.targetName, ...tail].join("::");
+        if (callerBindings.has(path.replace(/^::/, "").split("::")[0]!))
+          return null;
+        return (
+          standardArgumentKey(path, loc, str(data(item).scope)) ?? {
+            key: `import:${loc.crate.root}|${loc.scope}|${loc.local}|${item.id}|${tail.join("::")}`,
+            alias: true,
+          }
+        );
+      }
+      if (local === loc.local || !local) break;
+      local = local.includes("::")
+        ? local.slice(0, local.lastIndexOf("::"))
+        : "";
+    }
+    return null;
+  }
+  function argumentKey(
+    raw: string,
+    loc: Place,
+    scope: string,
+    callerBindings: Set<string>,
+  ): ArgumentKey | null {
+    raw = raw.trim().replace(/\s*::\s*/g, "::");
+    if (/^(true|false)$/.test(raw))
+      return { key: `literal:${raw}`, alias: false };
+    if (/^-?\d[\d_]*$/.test(raw))
+      return { key: `integer:${BigInt(raw.replace(/_/g, ""))}`, alias: false };
+    if (/^'[^'\\]'$/u.test(raw)) return { key: `char:${raw}`, alias: false };
+    if (raw === "()") return { key: "primitive:unit", alias: false };
+    if (
+      !/^(?:::)?[_\p{ID_Start}][_\p{ID_Continue}]*(?:::[_\p{ID_Start}][_\p{ID_Continue}]*)*$/u.test(
+        raw,
+      )
+    )
+      return null;
+    if (!raw.startsWith("::") && callerBindings.has(raw.split("::")[0]!))
+      return null;
+    const type = find(raw, loc, scope, "type");
+    if (type.symbols.length > 1) return null;
+    if (!type.symbols.length) {
+      const binding =
+        standardArgumentKey(raw, loc, scope) ??
+        importedArgumentKey(raw, loc, scope, callerBindings);
+      if (binding) return binding;
+    }
+    if (!type.complete) return null;
+    const symbol = type.symbols[0];
+    if (symbol) {
+      if (ownerPlace(symbol.file, str(data(symbol).scope)).length !== 1)
+        return null;
+      if (!["struct", "enum", "type"].includes(symbol.kind)) return null;
+      // Distinct aliases can denote the same underlying type. Equal bindings
+      // prove equality without expanding an alias; different aliases do not.
+      return { key: `symbol:${symbol.id}`, alias: symbol.kind === "type" };
+    }
+    const value = find(raw, loc, scope, "value");
+    if (!value.complete) return null;
+    if (value.symbols.length)
+      return value.symbols.length === 1 &&
+        value.symbols[0]!.kind === "const" &&
+        ownerPlace(value.symbols[0]!.file, str(data(value.symbols[0]!).scope))
+          .length === 1
+        ? { key: `const:${value.symbols[0]!.id}`, alias: true }
+        : null;
+    if (/^(?:[ui](?:8|16|32|64|128|size)|f(?:32|64)|bool|char|str)$/.test(raw))
+      return { key: `primitive:${raw}`, alias: false };
+    if (
+      raw === "String" &&
+      !loc.crate.deps.has("std") &&
+      !opaqueStandardRoots.get(loc.crate.root)?.has("std")
+    )
+      return { key: "standard:String", alias: false };
+    return null;
+  }
+  function splitArguments(args: string): string[] | null {
+    const result: string[] = [];
+    const stack: string[] = [];
+    let start = 1,
+      quote = "",
+      escaped = false;
+    for (let i = 1; i < args.length - 1; i++) {
+      const c = args[i]!;
+      if (quote) {
+        if (escaped) escaped = false;
+        else if (c === "\\") escaped = true;
+        else if (c === quote) quote = "";
+        continue;
+      }
+      if (c === "'" || c === '"') {
+        quote = c;
+        continue;
+      }
+      if ("<([{".includes(c)) stack.push(c);
+      else if (">)]}".includes(c)) {
+        const expected: Record<string, string> = {
+          ">": "<",
+          ")": "(",
+          "]": "[",
+          "}": "{",
+        };
+        if (stack.pop() !== expected[c]) return null;
+      } else if (c === "," && !stack.length) {
+        result.push(args.slice(start, i));
+        start = i + 1;
+      }
+    }
+    if (quote || stack.length) return null;
+    result.push(args.slice(start, -1));
+    return result;
+  }
   function compatibility(
     receiver: string,
     impl: string,
     generics: string[],
+    receiverPlace: Place,
+    receiverScope: string,
+    declarationPlace: Place,
+    declarationScope: string,
+    callerGenerics: string,
+    receiverSyntax: string,
+    declarationSyntax: string,
   ): "yes" | "no" | "unknown" {
-    receiver = compact(receiver);
-    impl = compact(impl);
+    const rawImpl = impl;
+    receiver = withoutLifetimes(receiver);
+    impl = withoutLifetimes(impl);
+    generics = generics.filter((g) => !g.startsWith("'"));
     const receiverArgs = receiver.includes("<")
       ? receiver.slice(receiver.indexOf("<"))
       : "";
     const implArgs = impl.includes("<") ? impl.slice(impl.indexOf("<")) : "";
-    if (generics.some((g) => new RegExp(`\\b${g}\\b`).test(implArgs)))
+    if (generics.some((g) => identifiers(rawImpl).includes(g)))
       return "unknown";
-    if (receiverArgs === implArgs) return "yes";
-    return receiverArgs && implArgs ? "no" : "unknown";
+    if (!receiverArgs && !implArgs) return "yes";
+    if (!receiverArgs || !implArgs) return "unknown";
+    const callerBindings = new Set(callerGenerics.split(",").filter(Boolean));
+    const tokens =
+      receiverArgs.match(/[_\p{ID_Start}][_\p{ID_Continue}]*/gu) ?? [];
+    if (
+      receiverSyntax &&
+      declarationSyntax &&
+      receiverSyntax === declarationSyntax &&
+      receiverPlace.crate.root === declarationPlace.crate.root &&
+      receiverPlace.file === declarationPlace.file &&
+      receiverPlace.scope === declarationPlace.scope &&
+      receiverScope === declarationScope &&
+      !tokens.some((t) => callerBindings.has(t)) &&
+      !receiverArgs.includes("!")
+    )
+      return "yes";
+    const left = splitArguments(receiverArgs),
+      right = splitArguments(implArgs);
+    if (!left || !right || left.length !== right.length) return "unknown";
+    let equal = true;
+    for (let i = 0; i < left.length; i++) {
+      const l = argumentKey(
+          left[i]!,
+          receiverPlace,
+          receiverScope,
+          callerBindings,
+        ),
+        r = argumentKey(
+          right[i]!,
+          declarationPlace,
+          declarationScope,
+          new Set(),
+        );
+      if (!l || !r) {
+        equal = false;
+        continue;
+      }
+      if (l.key !== r.key) {
+        if (!l.alias && !r.alias) return "no";
+        equal = false;
+      }
+    }
+    return equal ? "yes" : "unknown";
   }
   function methods(
     typeName: string,
@@ -549,21 +1072,52 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
     borrow: string,
     mutable: boolean,
     argumentCount: number,
+    sameImpl = "",
+    argumentMinimum = argumentCount,
+    callerGenerics = "",
+    receiverSyntax = "",
   ): Found {
     name = compact(name);
     if (instance && !["owned", "shared", "mutable"].includes(borrow))
       return empty(false);
     const type = find(typeName, loc, scope, "type");
+    const blankets = visibleBlankets(loc.crate.root);
+    if (instance && type.symbols.some((t) => t.kind === "type"))
+      return empty(false);
+    const ambiguousTypeView = type.symbols.some(
+      (t) =>
+        ownerPlace(t.file, str(data(t).scope)).filter((p) =>
+          reachable(loc.crate.root).has(p.crate.root),
+        ).length > 1,
+    );
+    const applicable = (m: Method) =>
+      m.implKey === sameImpl
+        ? "yes"
+        : compatibility(
+            typeName,
+            m.implType,
+            m.generics,
+            loc,
+            scope,
+            m.argumentPlace,
+            m.argumentScope,
+            callerGenerics,
+            receiverSyntax,
+            m.argumentSyntax,
+          );
     const matches = type.symbols
       .flatMap((t) => methodIndex.get(`${t.id}|${name}`) ?? [])
       .filter((m) => {
+        if (!reachable(loc.crate.root).has(m.ownerRoot)) return false;
         if (
           typeof data(m.symbol).arity === "number" &&
-          data(m.symbol).arity !== argumentCount + (instance ? 1 : 0)
+          (Number(data(m.symbol).arity) <
+            argumentMinimum + (instance ? 1 : 0) ||
+            Number(data(m.symbol).arityMinimum ?? data(m.symbol).arity) >
+              argumentCount + (instance ? 1 : 0))
         )
           return false;
-        if (compatibility(typeName, m.implType, m.generics) === "no")
-          return false;
+        if (applicable(m) === "no") return false;
         if (!instance) return true;
         const receiver = compact(str(data(m.symbol).receiverKind));
         if (!receiver || receiver === "none") return false;
@@ -575,11 +1129,13 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
         if (!receiver.includes("&") && borrow !== "owned") return false;
         return true;
       });
+    if (ambiguousTypeView && !matches.some((m) => m.implKey === sameImpl))
+      return empty(false);
     const inherent = matches.filter((m) => m.inherent);
     const proven = inherent.filter(
       (m) =>
         !m.uncertain &&
-        compatibility(typeName, m.implType, m.generics) === "yes" &&
+        applicable(m) === "yes" &&
         (!instance || str(data(m.symbol).receiverKind) !== "unknown"),
     );
     const form = (m: Method): string => {
@@ -596,9 +1152,32 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
     };
     // Receiver candidates are searched before inherent/trait preference at that
     // candidate. Different autoref forms do NOT imply inherent dominance.
-    if (instance && type.symbols.some((t) => referenceImpls.has(t.id)))
+    if (
+      instance &&
+      (blankets.opaque ||
+        type.symbols.some((t) => blankets.opaqueTypes.has(t.id)) ||
+        blankets.names.has(name) ||
+        type.symbols.some((t) => blankets.byType.get(t.id)?.has(name)) ||
+        type.symbols.some(
+          (t) =>
+            blankets.refs.get(t.id)?.has(name) ||
+            blankets.refs.get(t.id)?.has("*"),
+        ))
+    )
       return empty(false);
-    const opaque = type.symbols.some((t) => opaqueTraits.has(t.id));
+    if (
+      !instance &&
+      !proven.length &&
+      (blankets.opaque ||
+        blankets.associatedNames.has(name) ||
+        type.symbols.some(
+          (t) =>
+            blankets.opaqueTypes.has(t.id) ||
+            blankets.associatedByType.get(t.id)?.has(name),
+        ))
+    )
+      return empty(false);
+    const opaque = type.symbols.some((t) => blankets.opaqueNormal.has(t.id));
     const dominates =
       proven.length > 0 &&
       (!instance ||
@@ -616,11 +1195,7 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
     if (
       ss.length === 1 &&
       (!dominates ||
-        selected.some(
-          (m) =>
-            m.uncertain ||
-            compatibility(typeName, m.implType, m.generics) !== "yes",
-        ))
+        selected.some((m) => m.uncertain || applicable(m) !== "yes"))
     )
       return empty(false);
     return { symbols: ss, complete };
@@ -646,7 +1221,8 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
           let name = compact(l.targetName);
           const selfPath = name === "Self" || name.startsWith("Self::");
           const scope = selfPath ? str(d.implScope) : str(d.scope);
-          if (selfPath && d.implType) name = str(d.implType) + name.slice(4);
+          if (selfPath && d.implType)
+            name = base(str(d.implType)) + name.slice(4);
           if (d.method)
             return methods(
               str(d.receiverType),
@@ -657,6 +1233,12 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
               str(d.receiverBorrow),
               d.receiverMutable === true,
               Number(d.argumentCount),
+              compact(l.targetName).startsWith("self.")
+                ? `${l.file}|${str(d.implKey)}`
+                : "",
+              Number(d.argumentMinimum ?? d.argumentCount),
+              str(d.genericBindings),
+              str(d.receiverArgumentSyntax),
             );
           const ns: Namespace =
             l.kind === "calls"
@@ -674,16 +1256,23 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
             !result.symbols.length &&
             name.includes("::")
           ) {
-            const split = name.lastIndexOf("::");
+            const pathSyntax = selfPath
+              ? name
+              : (str(d.pathSyntax) || l.targetName).replace(/\br#/g, "");
+            const split = pathSyntax.lastIndexOf("::");
             result = methods(
-              name.slice(0, split),
-              name.slice(split + 2),
+              selfPath ? str(d.implType) : pathSyntax.slice(0, split).trim(),
+              pathSyntax.slice(split + 2).trim(),
               loc,
               scope,
               false,
               "owned",
               true,
               Number(d.argumentCount),
+              selfPath ? `${l.file}|${str(d.implKey)}` : "",
+              Number(d.argumentMinimum ?? d.argumentCount),
+              str(d.genericBindings),
+              str(selfPath ? d.implArgumentSyntax : d.pathArgumentSyntax),
             );
           }
           if (l.kind === "calls")
