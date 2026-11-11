@@ -1392,6 +1392,7 @@ export class StudioService {
             ...(e.planning?.linkReviewRevision || e.planning?.originRevision
               ? [e.planning.linkReviewRevision || e.planning.originRevision!]
               : []),
+            ...Object.values(e.planning?.linkBaselines ?? {}),
           ]),
         ],
       ]),
@@ -1829,14 +1830,6 @@ export class StudioService {
     },
   ) {
     const item = planItemSchema.parse(raw);
-    if (
-      !target &&
-      item.links.length &&
-      !item.linkReviewRevision &&
-      !item.originRevision &&
-      revision
-    )
-      item.linkReviewRevision = revision;
     return this.architectureWrite(signal, async (owned) => {
       const store = (await this.architecture(true))!,
         head = await store.readAsync();
@@ -2088,6 +2081,50 @@ export class StudioService {
           400,
           "The evidence revision is not retained in this architecture. Choose an existing revision or leave it open.",
         );
+      // Baselines are server-owned change markers, never reviews. Only the
+      // explicit acknowledgement (a new linkReviewRevision) reviews links.
+      const newlyReviewed =
+        !!item.linkReviewRevision &&
+        item.linkReviewRevision !== now?.linkReviewRevision;
+      if (newlyReviewed && !(await store.readAsync(item.linkReviewRevision!)))
+        throw new StudioError(
+          409,
+          "This link review names a revision this architecture does not have. Refresh the record and review the displayed linked targets again; the draft was preserved.",
+        );
+      // Links stay covered by an earlier review only while the record keeps one.
+      const coveredBefore = new Set(
+        (item.linkReviewRevision || item.originRevision) &&
+        (now?.linkReviewRevision || now?.originRevision)
+          ? now.links.map((link) => link.target)
+          : [],
+      );
+      const previousTargets = new Set(now?.links.map((link) => link.target));
+      const linkBaselines: Record<string, string> = {};
+      if (!newlyReviewed)
+        for (const { target: linked } of item.links) {
+          if (
+            linked.startsWith("source:") ||
+            linked === logicalId ||
+            linkBaselines[linked]
+          )
+            continue;
+          const kept = now?.linkBaselines?.[linked];
+          if (kept) linkBaselines[linked] = kept;
+          else if (coveredBefore.has(linked)) continue;
+          // The base revision is used only when it contains the target, so a
+          // later change can always be compared; never a silent gap.
+          else if (base?.entities.some((e) => e.id === linked))
+            linkBaselines[linked] = revision;
+          else if (!revision && head) linkBaselines[linked] = head.id;
+          else if (!previousTargets.has(linked))
+            throw new StudioError(
+              409,
+              `The linked record ${linked} is not in the revision this edit started from. Refresh the record to see the current target, then save again; the draft was preserved.`,
+            );
+          else if (head) linkBaselines[linked] = head.id;
+        }
+      if (Object.keys(linkBaselines).length) item.linkBaselines = linkBaselines;
+      else delete item.linkBaselines;
       if (position < 0) current.items.push(item);
       else current.items[position] = item;
       const documents = (head?.documents ?? [])

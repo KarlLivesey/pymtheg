@@ -12,12 +12,15 @@ export function LinkedTargetComparison({
   beforeTarget,
   before,
   after,
+  label,
   initiallyOpen = false,
 }: {
   target: string;
   beforeTarget?: string | undefined;
   before?: string | undefined;
   after: string;
+  /** What the earlier revision is, e.g. "reviewed version" or "version when this link was added". */
+  label: string;
   initiallyOpen?: boolean;
 }) {
   const [open, setOpen] = useState(initiallyOpen);
@@ -64,7 +67,9 @@ export function LinkedTargetComparison({
       return (
         <p>
           {previous
-            ? "No retained target at the earlier revision."
+            ? before
+              ? `No retained target at the ${label}.`
+              : "No earlier revision is recorded for this link."
             : "Target is missing from this revision. Repair the link before accepting it."}
         </p>
       );
@@ -101,7 +106,7 @@ export function LinkedTargetComparison({
       onToggle={(event) => setOpen(event.currentTarget.open)}
       className="linked-target-comparison"
     >
-      <summary>Compare linked target with reviewed version</summary>
+      <summary>Compare linked target with {label}</summary>
       {error ? (
         <p role="alert">Could not load the comparison: {error}</p>
       ) : !records ? (
