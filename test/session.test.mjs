@@ -31,6 +31,8 @@ async function invoke(file, fake, extra = [], onStderr = () => {}) {
         file,
         "--entry",
         "Sample",
+        "--backend",
+        "quint",
         "--quint",
         fake,
         "--timeout",

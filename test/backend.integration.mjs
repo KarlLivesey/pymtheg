@@ -37,7 +37,7 @@ function cli(file, entry, backend = "quint", extra = [], context) {
             process.env.PYM_TLC_JAR ??
               "/tmp/spec-language-research/tla2tools.jar",
           ]
-        : []),
+        : ["--backend", "quint"]),
       ...extra,
     ],
     { encoding: "utf8" },

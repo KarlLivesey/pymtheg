@@ -19,11 +19,11 @@ const commands = [
   ],
   [
     `simulate FILE${identity.extension} --entry NAME [--seed 42 --max-steps 6 --max-samples 1000]`,
-    "Explore bounded event sequences with Quint.",
+    "Explore bounded event sequences with the built-in seeded sampler (default); --backend quint selects Quint.",
   ],
   [
-    `verify FILE${identity.extension} --entry NAME --backend tlc --tlc-jar PATH`,
-    "Check all states of the selected finite model.",
+    `verify FILE${identity.extension} --entry NAME [--backend builtin|tlc] [--state-budget 1000000]`,
+    "Check all states with built-in breadth-first search (default); TLC requires --tlc-jar PATH.",
   ],
   [
     `emit FILE${identity.extension} --entry NAME --target quint --out MODEL.qnt`,
@@ -57,6 +57,6 @@ export function help() {
     commands
       .map(([syntax, purpose]) => `${identity.cli} ${syntax}\n  ${purpose}`)
       .join("\n\n") +
-    `\n\nUse --scenario NAME for a saved ${identity.projectConfig} scenario. --scope FILE.json and --timeout 45s bound requested behavioural checks.\nLocal checking works offline. Simulation requires pinned Quint; verification requires the pinned TLC JAR.\n`
+    `\n\nUse --scenario NAME for a saved ${identity.projectConfig} scenario. --scope FILE.json and --timeout 45s bound requested behavioural checks.\nLocal checking works offline. Simulation and verification use built-in workers by default. Explicit Quint/TLC backends require their pinned tools.\n`
   );
 }

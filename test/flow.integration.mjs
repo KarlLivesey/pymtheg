@@ -123,6 +123,7 @@ for (const [name, source, bad, entry = "main", scope] of cases)
               process.env.PYM_TLC_JAR ??
                 "/tmp/spec-language-research/tla2tools.jar",
             );
+          else args.push("--backend", "quint");
           const p = spawnSync(process.execPath, args, { encoding: "utf8" });
           assert.ifError(p.error);
           const report = JSON.parse(p.stdout);

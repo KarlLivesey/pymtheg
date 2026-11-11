@@ -39,6 +39,7 @@ for (const engine of ["quint", "tlc"])
             "45s",
           ];
           if (engine === "tlc") args.push("--backend", "tlc", "--tlc-jar", jar);
+          else args.push("--backend", "quint");
           const command = spawnSync(process.execPath, args, {
             encoding: "utf8",
           });
