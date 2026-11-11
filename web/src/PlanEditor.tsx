@@ -380,6 +380,7 @@ export function PlanEditor({
                 beforeTarget={previousTargets[i]}
                 target={link.target}
                 before={linkComparisonBase(item, link.target).revision}
+                label={linkComparisonBase(item, link.target).label}
                 after={entitiesRevision}
                 initiallyOpen={item.links.length === 1}
               />

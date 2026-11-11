@@ -82,6 +82,14 @@ review field. New links now use the supplied revision as a *baseline*.
 - `linkBaselines` is administrative metadata for the implementation plan hash,
   like `linkReviewRevision`. Index version 19 → 20 (v19 stored indexes are
   re-derived; v19 bundles are still accepted).
+- The plan editor's comparison panel (`web/src/LinkedTargetComparison.tsx`,
+  whose only caller is `web/src/PlanEditor.tsx`) takes a required `label` from
+  `linkComparisonBase`. Its heading reads "Compare linked target with version when
+  this link was added", "… with reviewed version", or "… with earlier version"
+  when the link has no recorded revision. When the earlier revision does not hold
+  the target, it says "No retained target at the {label}."; when the link has no
+  earlier revision at all, it says "No earlier revision is recorded for this
+  link." Layout is unchanged.
 
 ## Review bookkeeping is not a content change
 
@@ -116,8 +124,3 @@ real one. They are treated deterministically:
 - Source-link baselines and review (`sourceRoots`, `sourceReviewSelection`,
   `sourceReviewSnapshot`; forged snapshots are still refused with 409).
 - What counts as a target change (apart from ignoring review bookkeeping, above).
-- The comparison panel's heading text, "Compare linked target with reviewed
-  version", lives in `web/src/LinkedTargetComparison.tsx`, which is outside this
-  chunk. `linkComparisonBase` already returns the truthful label ("version when
-  this link was added" or "reviewed version"); passing it to the panel is a
-  one-prop change in that file (see the hand-back).
