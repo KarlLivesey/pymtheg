@@ -203,7 +203,14 @@ export function analyseOwnership(ir: ProjectIR): AnalysisResult[] {
             break;
           }
           case "transition": {
-            const r = use(s.name, state, s.span);
+            // Cancellation handler transitions are conditional on acquisition
+            // and caller ownership (docs/support.md): a borrowed or already
+            // transferred resource is skipped, as in flow exploration.
+            if (inCancel) {
+              const held = state.get(s.name);
+              if (!held || held.borrow || held.moved === "yes") break;
+            }
+            const r = inCancel ? state.get(s.name) : use(s.name, state, s.span);
             if (!r) {
               if (!inCancel)
                 emit("O003", `No owned resource ${s.name}`, s.span);
