@@ -1,0 +1,11 @@
+// W2-G fixture: flows with no assertion, contract, resource or protocol, so
+// lowering takes the executionSafe fallback, and each calls an operation.
+op stamp() -> Unit;
+op stampChecked() -> Unit ensures true;
+flow stampOnce() -> Unit { call stamp(); }
+flow stampTwice(flag: Bool) -> Unit {
+  call stamp();
+  if flag { call stampChecked(); }
+}
+// Control: no call, already pure before the fix.
+flow idle() -> Unit { return unit; }
