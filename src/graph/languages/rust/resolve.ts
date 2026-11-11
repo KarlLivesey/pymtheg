@@ -164,11 +164,9 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
     const found = new Set<string>();
     let local = scope;
     while (true) {
-      for (const loc of placesByScope.get(`${file}|${local}`) ?? [])
-        if (!found.has(loc.crate.root)) {
-          found.add(loc.crate.root);
-          result.push(loc);
-        }
+      const level = placesByScope.get(`${file}|${local}`) ?? [];
+      for (const loc of level) if (!found.has(loc.crate.root)) result.push(loc);
+      for (const loc of level) found.add(loc.crate.root);
       if (!local) break;
       local = local.includes("::")
         ? local.slice(0, local.lastIndexOf("::"))
@@ -377,6 +375,7 @@ export function resolveRust(ctx: ResolutionContext): LinkResolution[] {
     const guard = JSON.stringify([
       loc.crate.root,
       loc.file,
+      loc.scope,
       scope,
       name,
       ns,

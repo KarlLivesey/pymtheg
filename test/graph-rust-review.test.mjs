@@ -418,3 +418,17 @@ test("review reference impls are not silently omitted from receiver choices", as
   );
   g.unknown("x.f");
 });
+
+test("shared path file preserves both module views", async () => {
+  const g = await graph({
+    "src/lib.rs": `mod left { fn g(){} #[path="../shared.rs"] mod m; } mod right { fn g(){} #[path="../shared.rs"] mod m; }`,
+    "src/shared.rs": `pub fn f(){super::g();}`,
+  });
+  assert.deepEqual(
+    g
+      .targets("super::g")[0]
+      .map((s) => s.identity)
+      .sort(),
+    ["left::g", "right::g"],
+  );
+});

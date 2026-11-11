@@ -2,7 +2,7 @@
 
 Review revision, module version 2. Implements mega-plan 4.4's structural Rust
 reader in one discoverable folder. Current origin/main was merged normally;
-PR 15's shared discovery-test fix is included. No graph interface, other
+PR 15's shared discovery-test fix and PR 11's schema-3 core/conformance changes are included. No graph interface, other
 language, CLI, MCP, Studio, dependency manifest or toolchain was changed by W2-C.
 Earlier implementation/test/audit records remain in `evidence/w2-c/` as history;
 the `review-*` records below supersede their completion claims.
@@ -52,6 +52,7 @@ occurs. Partial target provenance remains visible through the shared graph API.
 | Explicit parameter/local receiver types and self | Preserve annotation scope, borrow/mutability and full generic syntax. Incompatible concrete generic arguments, inapplicable mutable/value receivers and mismatched argument counts are rejected |
 | Generic impl substitution, inferred/unknown receiver, trait object | Unresolved when applicability cannot be established; no inference, bounds solver or arbitrary autoderef |
 | Trait-only instance/associated calls | One matching implementation stays unresolved. Multiple complete known choices are candidates, including inherited default bodies; an unknown trait/default alternative prevents an incomplete candidate set |
+| Differing autoref receiver forms and reference impls | Different applicable inherent/trait receiver forms remain candidates; captured reference impls or unknown applicability remain unresolved rather than being omitted |
 | Trait-in-scope selection | Not used to assert dispatch; captured applicable trait choices are conservatively retained. There is no general trait solver |
 | Type references and explicit trait implementations | Namespace-correct `types` / `implements` links |
 | Qualified match/if-let patterns | `patterns` links to variants, struct constructors and const/static values, rather than rejected type references |
@@ -103,7 +104,7 @@ project-wide import/place scans and function rescans. The comparison runner
 asserts every parsed fact and every resolved/unresolved/candidate decision is
 identical on the complete fixture and both Vector crates. It compares entire
 outputs, not just counts. In the final paired two-crate observation, baseline
-parse/resolve took 5.008/1.027 s; indexed/cached parse/resolve took 3.527/0.254 s.
+parse/resolve took 6.512/1.940 s; indexed/cached parse/resolve took 5.615/0.370 s.
 Hashes and reproducible commands are in the performance evidence.
 
 ## Vector evidence and movement
@@ -112,38 +113,40 @@ Vector commit `515e87d9861b564f521a8992d224892cd8cae120`, shallow-cloned only in
 scratch. Every one of its 1,563 Rust files was analyzed directly through the
 module: 1,552 clean, 11 partial, **0 failed**. No source subset is described as a
 whole-store success. Exact per-kind counts and top unresolved names are in
-`review-whole-summary.json`; partial paths/diagnostics are retained separately.
+`review-schema3-whole-module-summary.json`; partial paths/diagnostics are retained separately.
 Grammar limitations include attributes in patterns, some qualified generic and
 higher-ranked syntax, and `raw` token contexts. They are not relabeled clean.
 
 | Scope / revision | Files | Symbols | Links | Resolved | Candidate sets | Unresolved |
 |---|---:|---:|---:|---:|---:|---:|
 | Reviewed d60ac141, two crates | 131 | 4,382 | 25,956 | 8,955 | 20 | 16,981 |
-| Current two crates | 131 | 4,382 | 27,261 | 10,611 | 20 | 16,630 |
-| Current nine crates | 247 | 7,157 | 46,944 | 17,652 | 40 | 29,252 |
-| Current whole repository, module only | 1,563 | 35,907 | 311,132 | 107,020 | 1,091 | 203,021 |
+| Current two crates | 131 | 4,382 | 27,261 | 10,557 | 20 | 16,684 |
+| Current nine crates | 247 | 7,157 | 46,944 | 17,584 | 40 | 29,320 |
+| Current whole repository, module and real store | 1,563 | 35,907 | 311,132 | 106,602 | 1,090 | 203,440 |
 
-On the same two-crate snapshot, 1,042 old unresolved references now resolve:
-551 types, 270 calls, 149 converted patterns, 47 imports, 23 implements and two
+On the same two-crate snapshot, 1,024 old unresolved references now resolve:
+551 types, 252 calls, 149 converted patterns, 47 imports, 23 implements and two
 modules. At least 459 use-site gains point to a target whose import was already
 resolved before, directly exposing the import/use-site reexport mismatch.
 Another 1,305 pattern edges are newly extracted (730 resolved, 575 unresolved).
-Stricter namespace/applicability rules withhold 116 old definite links (66 calls,
+Stricter namespace/applicability rules withhold 152 old definite links (102 calls,
 37 imports, 13 types). No old definite link retargeted to a different symbol.
 The complete positional movement list, including losses, is preserved.
 
-Observed module parse/resolve times were 3.527/0.254 s for two crates,
-7.641/0.395 s for nine, and 35.734/3.627 s for all files. The whole module run's
-wall time was 44.106 s. These are shared-machine observations, not speed-based
+Observed module parse/resolve times were 5.615/0.370 s for two crates,
+12.440/0.885 s for nine, and 74.606/7.134 s for all files. The whole module run's
+wall time was 88.957 s. These are shared-machine observations, not speed-based
 properties; paired comparison wall time also includes the baseline execution.
 
-A bounded 180-second whole-store experiment captured/parsed all 1,563 files but
-exhausted its budget during core analysis (exit 124). This is **unresolved whole
-store evidence**, not a successful index. PR 11 was still open. The final
-nine-crate store run completes independently; its report is
-`review-nine-final-store.json` (149.240 s observed, 247 clean files, zero
-analysis/resolution errors). No core performance code was modified. The
-manager can request the whole indexed run after the core optimization merges.
+The earlier bounded 180-second whole-store experiment timed out during the old
+core's analysis phase (exit 124); its logs remain historical unresolved evidence.
+After PR 11 merged, the whole repository was indexed through the real indexer
+and a fresh schema-3 SQLite store; the final report is
+`review-schema3-whole-store.json`: 124.672 s observed through indexing, including scratch copy; module parse/resolve 56.974/4.259 s within that run. All 1,563 files were indexed, with 11 partial and zero failed; analysis/resolution error lists are empty. No existing database was reused and no core
+performance code was modified. The old nine-crate store records are historical;
+the current whole-store report supersedes the earlier core limitation.
+
+The final whole-snapshot equivalence record (`review-schema3-snapshot-equivalence.json`) confirms that the shared-path cache fix leaves every Vector parse fact, resolution decision and all 60 audited entries unchanged.
 
 The final fresh seeded audit covers 30 resolved links, 15 complete candidate
 sets and 15 unresolved links; all judgments were checked against source and
@@ -157,15 +160,18 @@ against the new module. Review regressions cover all numbered counterexamples,
 positive/negative controls, generic/borrow/default candidate completeness,
 namespace interactions, target flags, external-import fallback, cross-crate
 reexports, raw identifiers (including generic parameters and local bindings) and
-cycles. The final snapshot equivalence report proves that the last raw-name
-normalization controls leave every Vector parse fact, resolution decision and
-all 60 audited entries unchanged. Final required check outcomes are recorded
-in `review-validation.json`, in the required sequential order. A10 is now fixed
-by the merged main change; W2-C did not alter shared tests to obtain a pass.
+cycles. The older snapshot equivalence report is historical evidence for the raw-name
+normalization revision, before the final conservative receiver refinement.
+The final paired performance runs compare every fact and decision against the
+corrected scan-based baseline. Exact-position conformance now also reindexes
+the fixture after inserting a blank line and requires unchanged symbol IDs;
+no fixture exclusion or core modification is used. A shared-path regression
+preserves both module views and prevents memoization from collapsing candidates.
+Final required checks and source hashes are recorded in `review-validation.json`.
+Review approval is not claimed.
 
-Final sequential checks on Node 24.21.0: install exit 0; `npm test` exit 0
-(1,259 passed, zero failed/cancelled, two inherited TLC prerequisite skips that
-remain unresolved); format check exit 0; focused Rust suite 42/42, zero skips.
-The final whole-snapshot parse/resolution hashes and all 60 audited entries are
-unchanged by the last raw generic/local binding controls. `review-validation.json`
-records source/baseline hashes and exact outcomes; review approval is not claimed.
+Final sequential checks: `npm ci --ignore-scripts`, `npm test` with the specified
+`PYM_TLC_JAR` (1,291/1,291, zero failures/cancellations/skips),
+`npm run format:check`, then focused Rust tests (45/45, zero skips): all exit 0.
+The last main merge after checks contains only manager ledger updates; executable
+source/tests are unchanged.
