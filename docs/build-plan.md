@@ -220,4 +220,4 @@ Backlog from reviews (not conditions): W0-2 — the grammar packages declare a `
 
 Backlog from W1-E (wiring, hot files, for a later CLI/MCP chunk): `src/cli/main.ts:653-657` plain `scaffold --mode contracts` on a mixed file still prints the machine as omitted and exits 2; saving a contract baseline (`src/cli/main.ts:589`, `src/mcp/server.ts:793`) still counts machines as missing coverage. Both can use the new `isNotContractMaterial` helper.
 
-Environment note: Go and Rust compilers are not installed on the build machine, so tests that compile emitted Go/Rust checks are skipped or fail the same way on `main`. Those results are unresolved, not passed.
+Environment note: Go is not installed on the build machine (Rust and Java are), so tests that compile emitted Go checks are skipped or fail the same way on `main`. Those results are unresolved, not passed.
