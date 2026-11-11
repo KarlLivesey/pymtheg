@@ -192,7 +192,7 @@ The manager keeps this table current. It is the single record of who holds which
 | W1-A Ownership disagreement | merged | Opus 5.5 | Sol 6.1 | `w1-a-ownership-agreement` | [#5](https://github.com/KarlLivesey/pymtheg/pull/5) | `src/analysis/ownership.ts`, `src/behaviour/flow.ts`, `test/ownership-agreement.test.mjs` |
 | W1-B Engine core | merged | Sol 6.1 | Opus 5.5 | `w1-b-engine-core` | [#2](https://github.com/KarlLivesey/pymtheg/pull/2) | `src/behaviour/explore*.ts`, `test/explore*.test.mjs` |
 | W1-E Machines and contracts | merged | Opus 5.5 | Sol 6.1 | `w1-e-mixed-file-contracts` | [#3](https://github.com/KarlLivesey/pymtheg/pull/3) | `src/contracts/document.ts`, `implementation-check.ts`, `manifest.ts`, `test/contracts-mixed-file.test.mjs` |
-| W2-A Built-in backend wiring | building (started early: W1-B merged, files free) | Sol 6.1 | — | `w2-a-builtin-backend` | — | `src/backends/adapter.ts`, `src/behaviour/model.ts`, `src/behaviour/explore*.ts`, minimal lines in `src/cli/main.ts` and `src/cli/help.ts`, `evidence/builtin-checker/differential.mjs` |
+| W2-A Built-in backend wiring | in review (round 1) | Sol 6.1 | Opus 5.5 | `w2-a-builtin-backend` | [#8](https://github.com/KarlLivesey/pymtheg/pull/8) | `src/backends/adapter.ts`, `src/behaviour/model.ts`, `src/behaviour/explore*.ts`, minimal lines in `src/cli/main.ts` and `src/cli/help.ts`, `evidence/builtin-checker/differential.mjs` |
 | W2-G Flow lowering must not change its input (B106) | building | Opus 5.5 | — | `w2-g-flow-lowering-pure` | — | `src/behaviour/flow.ts` only (`model.ts` stays with W2-A) |
 | W2-H Link baseline versus real review (1.2) | cut; waits for W1-D to merge | — | — | — | — | `src/studio/service.ts`, architecture record type as needed |
 | W1-C Graph store and interface | in review (round 1) | Sol 6.1 | Opus 5.5 | `w1-c-graph-store-interface` | [#7](https://github.com/KarlLivesey/pymtheg/pull/7) | `src/graph/**` except `languages/*/` |
@@ -230,3 +230,5 @@ Backlog from W1-B review: a worker that never posts `ready` makes the cancellati
 Backlog from W1-A: a cancel handler that *calls* an operation with an already handed-off resource (while another is still owned) is flagged by the static check but not the behavioural check. Strict-side mismatch, predates W1-A; follow-up with the state-dependent cancel cleanup chunk (7.3).
 
 Backlog from W1-A review: runtime ownership validation at invocation boundaries (the declared residual mismatch); keep ownership/lifecycle correlation across static branch joins (conservative `O004` on an idempotent branch model); behavioural preflight should preserve unresolved cancellation settlement summaries. All for the 7.3 chunk.
+
+Wiring backlog from W2-A (hot files): MCP and Studio still select the external engines explicitly at `src/mcp/workspace.ts:185` and `src/studio/service.ts:3392` (legacy tool availability at `service.ts:3207-3208`); switch to the built-in backend in the Wave 3 removal chunk.
