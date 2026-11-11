@@ -131,37 +131,17 @@ targets, never a guess. "Unresolved" keeps the target name.
   - a **function or method** whose header (anything outside its body: receiver,
     parameters, results, type parameters) contains an error gets `data.broken`
     and no signature or result types. Its results type no values. A broken method
-    is not a member anyone resolves to, and its receiver type's structure becomes
-    unknown, keeping its other, intact methods. An error only inside the body keeps
-    the header trusted;
+    is not a member anyone resolves to; it is a possible candidate. Its file is
+    declaration-lossy, so its receiver's method set is unknown (layer 1, below).
+    An error only inside the body keeps the header trusted;
   - a **`var`/`const`** spec with an error has an unknown type;
   - an **import** spec with an error is dropped. If the import declaration has an
     error, unmatched qualifiers in that file are unknown rather than external,
     because they may name a lost project import.
 
-  Declarations swallowed by error recovery do not disappear. The headers inside
-  every top-level ERROR region are recovered lexically, and so are the headers in
-  ERROR regions inside a declaration and in a function body that never closes (or
-  whose braces cannot be matched):
-  - `type N` becomes a broken symbol of unknown structure. Its kind is taken from
-    the keyword after the name (`struct`, `interface`, `=` or otherwise `type`),
-    so it keeps the ID of the intact declaration. Its intact methods elsewhere
-    still resolve by receiver name;
-  - `func (r) M`, or `func (r *T) M`, becomes a broken method of its receiver,
-    with the same identity an intact header would have. It is a possible target
-    in candidate sets, never a definite one. Its receiver's structure becomes
-    unknown;
-  - `func N`, `var N` and `const N` become broken symbols with no type;
-  - an unreadable `func (` makes the method sets of every non-interface type in its
-    package unknown, with a diagnostic;
-  - a region before or among the imports, containing `import`, or starting with a
-    string literal sets `importsBroken`. Unmatched qualifiers in that file are then
-    unknown, not external.
-
-  Containment: a broken type affects another package only if that package's
-  types can reach it. An unknown structure can carry another package's hidden
-  method only if its own package reaches that package through project imports,
-  or through a file whose imports are broken. The file stays `partial`.
+  What a broken file costs its package, and what is read back from the text of
+  what tree-sitter could not keep, is in "Declaration-lossy files" below. The file
+  stays `partial`.
 - Uses of the real predeclared identifiers: types (`int`, `string`, `error`,
   `any`, …), values (`nil`, `true`, `false`, `iota`) and builtin functions used as
   values. Conversions to predeclared types (`string(b)`) are not calls. These names
@@ -235,6 +215,123 @@ and it returns only files whose facts changed.
    replace a file's facts and runs on every index. The other reasons
    (internal-package violation, external type, nothing found) are not recorded.
 
+## Declaration-lossy files: two layers
+
+When tree-sitter cannot keep a file's declarations, soundness rests on layer 1
+alone. Layer 1 reads only the tree, never the text. Layer 2 reads the text back,
+but only adds precision.
+
+### Layer 1: a package with a lossy file may hold unseen declarations
+
+A file is **declaration-lossy** (`data.go.lossy`) when tree-sitter gives it:
+
+- any top-level ERROR node; or
+- any top-level declaration with an error, unless the error is provably
+  confined to a function or method body.
+
+A body error is confined only when all of these hold:
+
+- the header (receiver, name, type parameters, parameters, results) has no
+  error;
+- the body ends with a real, not missing, `}`;
+- no ERROR or missing node in the body holds a `{`, `}`, `func`, `type`, `var`,
+  `const`, `import` or `package` token;
+- no function literal or function type in the body has an error.
+
+Anything that cannot be proven confined is lossy: an unclosed body, a body
+closed by a later function's brace, a broken `type`, `var`, `const` or `import`
+declaration, or a broken header. A confined error, such as restic's
+`status_test.go`, costs nothing beyond its own declaration's links (see "Not
+extracted").
+
+While a package has at least one lossy file, for **that package**:
+
+- **Method sets.** An unseen method may be declared on any of the package's
+  named non-interface types (`view`).
+  - A field or method declared intact on the type itself (depth 0) stays known
+    and definite, because a second declaration would not compile.
+  - Everything else about the type's method set is unknown. No promoted member
+    lookup through it is definite, because an unseen depth-0 method could shadow
+    it.
+  - No `implements` link may need a method that is not declared intact on the
+    type.
+  - The type cannot be ruled out as an implementer, and no dispatch or name-only
+    set it could join is closed.
+  - Interfaces, aliases and function-local types cannot gain methods, so they
+    are unchanged.
+- **Names.** An unqualified name used in the package resolves definitely when
+  it names an intact package-level declaration of the package, or one of the
+  file's imports (neither could be declared twice). Any other name is
+  uncertain: a dot-imported name, a builtin, a predeclared identifier, or a name
+  with no declaration at all. It stays unresolved, with its name kept as
+  `targetName`, and the `builtin` flag is not asserted.
+  - A predeclared type named in the package (`error`, `string`, …) may be
+    shadowed. A method signature that names one proves nothing, so no
+    `implements` link is built on it. As a value's type it is external but
+    *shadowable*: it never hides a project package's unexported name.
+- **Unseen types.** An unseen type could implement anything it can reach.
+  - A dispatch set on an interface whose package a lossy package can reach
+    (`mayReach`, transitive through project imports) is open.
+  - A set of build variants with a member in a lossy package is open
+    (`declarations-may-be-unseen`).
+- **Imports.** The lossy file's own imports are unknown (`importsBroken`), as
+  before: when an ERROR region comes before the first non-import declaration,
+  or when the import declaration itself is broken.
+- **Other packages** are affected only through these rules: through the types
+  and interfaces they actually use, and through reach. Never wholesale.
+
+### Layer 2: lexical recovery, for precision only
+
+Recovery runs only for lossy files (and can be switched off for tests:
+`recoveryOptions.enabled` in `recover.ts`). It reads declaration headers back
+from the lossy regions:
+
+- every top-level ERROR node, and every top-level declaration with an
+  unconfined error, whole;
+- comments, string, raw-string and rune literals are masked first, lexing from
+  the start of the file so literal state is always known;
+- headers are recognised by Go's token rules at any indentation, using Unicode
+  identifiers. The forms are:
+  - `func (r T) M`, `func (r *T[P]) M`;
+  - `func F`;
+  - `type N …` and `type ( … )` groups, with the kind taken from the next token;
+  - `var`/`const` names, alone or grouped;
+  - `import`.
+
+Each header becomes a `data.broken`, `data.recovered` symbol.
+
+What a recovered symbol **may** be used for:
+
+- a stable ID: its kind and identity are those an intact declaration would have;
+- a possible member: a recovered method joins name-only sets and the
+  unknown-structure fallback of dispatch sets;
+- a possible implementer: a recovered type may be listed in an (open) dispatch
+  set;
+- a diagnostic: a `func (` whose receiver cannot be read reports one, and
+  nothing else (layer 1 already covers it).
+
+What it **may not** be used for:
+
+- It is never a definite target of any link. Recovered functions, vars, consts
+  and types are not names anything resolves to. A recovered type is not the
+  target of its methods' `receiver` links, and it never gets `implements`
+  links. Recovered symbols get no `contains` links.
+- It never takes, replaces or shifts an intact declaration's ID. A header whose
+  identity an intact declaration of the same file already has is not emitted. A
+  recovered method that repeats an intact method of the same receiver in the
+  package is ignored.
+- It never makes a link definite or a set closed. With recovery off, every
+  safety test still passes (mutation M32).
+
+**Backlog (not in this version):**
+
+- `func(x int) error {` inside a top-level ERROR region is read as a method
+  `(int).error`. This adds uncertainty only.
+- An unclosed `/*` that tree-sitter splits so that later declarations parse as
+  intact.
+- One broken spec in a `type ( … )` group makes the intact specs of that group
+  unknown.
+
 ## Candidate sets: closed or open
 
 Every candidate set is one of two kinds. A **closed** set contains every possible
@@ -245,9 +342,9 @@ open sets (the same mechanism as `overflow` and `builtin`); closed sets have no
 
 | Kind of set | Contains | Closed or open |
 | --- | --- | --- |
-| Build variants (a name declared in several build-constrained files) | Every declaration of the name visible to the caller | Closed |
+| Build variants (a name declared in several build-constrained files) | Every declaration of the name visible to the caller | Closed, unless a member's package is declaration-lossy: then **open, `declarations-may-be-unseen`** (a variant may be among the unseen declarations) |
 | Ambiguous selector (several embedding paths at the shallowest depth) | The distinct declarations reached | Closed (Go rejects the program) |
-| Interface dispatch (`x.M()`, `x` of a project interface type; also type-parameter constraints) | The interface method, plus `M` on every project type (any package, test files included) that implements the receiver's **static** interface **or cannot be ruled out** as an implementer of it. A type is not ruled out when every interface method is either matched or possibly supplied by an external embedded type at the deciding depth (for example a test mock embedding `sync.Mutex` and a project interface). An external type can never supply a project package's unexported method, so for those names external embedding is ignored. When a type's selection of `M` is uncertain only because of an external embedded type, the project declaration it would select otherwise is listed. Expanded through implementers that hold an embedded interface value. Only proven implementers get definite `implements` links | **Closed** only when all of these hold: (1) the static interface type is known, not merely an interface the method was inherited from; (2) the interface is **sealed** (below); (3) every member comes from a proven implementer, with no uncertain selection; (4) nothing was expanded through an embedded interface value. Otherwise **open, `external-implementers-possible`** |
+| Interface dispatch (`x.M()`, `x` of a project interface type; also type-parameter constraints) | The interface method, plus `M` on every project type (any package, test files included) that implements the receiver's **static** interface **or cannot be ruled out** as an implementer of it. A type is not ruled out when every interface method is either matched or possibly supplied by an external embedded type at the deciding depth (for example a test mock embedding `sync.Mutex` and a project interface). An external type can never supply a project package's unexported method, so for those names external embedding is ignored. When a type's selection of `M` is uncertain only because of an external embedded type, the project declaration it would select otherwise is listed. Expanded through implementers that hold an embedded interface value. Only proven implementers get definite `implements` links | **Closed** only when all of these hold: (1) the static interface type is known, not merely an interface the method was inherited from; (2) the interface is **sealed** (below); (3) every member comes from a proven implementer, with no uncertain selection; (4) nothing was expanded through an embedded interface value; (5) no declaration-lossy package can reach the interface's package (an unseen type there could implement it). Otherwise **open, `external-implementers-possible`** |
 | Reassigned function/method values | Every value ever assigned, each interface method expanded to its dispatch set | Closed if it includes no dispatch set. An included dispatch set has no static receiver interface (the value only records which method), so it is open |
 | Name-only (receiver type not evident) | Every concrete project method of the name a value could carry: any package, test files included; unexported names only from the caller's package | **Always open, `receiver-type-unknown`**: the value may be of a type outside the project |
 
@@ -596,6 +693,27 @@ unclosed `import (`). Regressions are in `test/graph-go-review9.test.mjs`, with
 controls for an intact declaration in the same file and for unrelated packages.
 The mutations for this round are M27–M31: 1a, 1b/c, 1d, 1e and containment. The
 module version is 12.
+
+## Module version 13 (tenth review): two layers
+
+Soundness no longer depends on the lexical scanner (see "Declaration-lossy
+files"). Layer 1 decides from the tree alone which files may have lost
+declarations, and treats their packages as possibly holding unseen
+declarations. Layer 2 keeps the recovery for IDs, candidates and diagnostics
+only. It now masks literals and comments, reads indented headers, `type ( … )`
+groups and Unicode names, and never emits over an intact identity.
+
+- **Removed:** the per-receiver (`brokenReceivers`) and per-package
+  (`unattributable`) rules from the ninth review. Layer 1 covers both.
+- **Tests:** `test/graph-go-review10.test.mjs` runs every reviewer reproduction
+  (items 1–4) with recovery on and off. It adds controls for intact names and
+  depth-0 members, confined body errors, build variants, signatures naming
+  predeclared types, and recovered types.
+- **Mutations:** 40/40 killed; with recovery fully off, every `safety:` test
+  passes.
+- **Cost on restic:** see `evidence/w2-b/restic.md`.
+
+The module version is 13.
 
 ## Core after PR 11 (W2-I)
 

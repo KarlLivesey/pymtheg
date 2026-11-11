@@ -18,6 +18,12 @@ import {
   type ImportFact,
   type TypeRef,
 } from "./model.js";
+import {
+  confined,
+  maskLiterals,
+  readHeaders,
+  recoveryOptions,
+} from "./recover.js";
 
 /** Scope nodes: each opens a lexical block whose declarations end with it. */
 const SCOPES = new Set([
@@ -133,6 +139,8 @@ export class GoExtractor {
   private owner = "file";
   /** Inside a declaration with a syntax error: no call/reference links (see W2-B.md). */
   private quiet = false;
+  /** Top-level nodes that may have swallowed declarations (layer 1). */
+  private lossyRegions: SourceRange[] = [];
 
   constructor(
     private readonly path: string,
@@ -168,14 +176,18 @@ export class GoExtractor {
       } else {
         beforePackage = false;
         if (!DECLARATIONS.has(child.type)) {
-          // A region error recovery could not keep as a declaration: recover the
-          // headers it swallowed. Before the first declaration it may hold imports.
-          this.recover(child.startIndex, child.endIndex, true);
+          // A region error recovery could not keep as a declaration. Before the
+          // first declaration it may hold imports.
+          this.lossy(child);
           if (!seenDeclaration) this.fact.importsBroken = true;
-        } else if (child.type !== "import_declaration") seenDeclaration = true;
+        } else {
+          if (child.hasError && !confined(child)) this.lossy(child);
+          if (child.type !== "import_declaration") seenDeclaration = true;
+        }
         this.topLevel(child);
       }
     }
+    if (this.fact.lossy && recoveryOptions.enabled) this.recoverAll();
     // Live local bindings become plain JSON only now that every write has been seen.
     for (const link of this.links) {
       const expr = (link.data as { expr?: Desc } | undefined)?.expr;
@@ -343,99 +355,72 @@ export class GoExtractor {
   // ---- declarations ------------------------------------------------------
 
   /**
-   * Lexically recovers declaration headers from text tree-sitter could not keep as
-   * declarations (an ERROR region, or a function body that swallowed later code).
-   * Each becomes a `data.broken` symbol of unknown structure/signature, so nothing
-   * definite or closed is built on what was lost. `topLevel`: the region is at file
-   * level (every header counts); otherwise only headers at the start of a line in
-   * column 0 count (indented text is the function's own body).
+   * Layer 2, precision only: declaration headers read from the text of the lossy
+   * regions, with comments and string, raw-string and rune literals masked first
+   * (the mask runs over the whole file, so literal state is always known). Each
+   * header becomes a `data.broken`, `data.recovered` symbol: a stable ID, and a
+   * possible (never definite) member or candidate; it gets no links. A header
+   * whose identity an intact declaration of this file already has is skipped, so
+   * no intact symbol's ID changes. Anything unreadable stays with layer 1.
    */
-  private recover(start: number, end: number, topLevel: boolean): void {
-    const text = this.text.slice(start, end);
-    if (/\bimport\b/.test(text) || (topLevel && /^\s*["`]/.test(text)))
-      this.fact.importsBroken = true;
-    const pattern =
-      /\b(type|func|var|const)\b(\s*\(\s*(?:[A-Za-z_]\w*\s+)?(\*?)\s*([A-Za-z_]\w*)(?:\s*\[[^\]]*\])?\s*\)\s*([A-Za-z_]\w*)|\s*\(|\s+([A-Za-z_]\w*))?/g;
-    for (const match of text.matchAll(pattern)) {
-      const at = start + match.index;
-      if (!topLevel) {
-        const lineStart = this.text.lastIndexOf("\n", at - 1) + 1;
-        if (lineStart !== at) continue;
+  private recoverAll(): void {
+    const masked = maskLiterals(this.text);
+    const taken = new Set(this.symbols.map((symbol) => symbol.identity));
+    const broken = { broken: true, recovered: true } as const;
+    const emit = (
+      kind: string,
+      name: string,
+      identity: string,
+      span: SourceRange,
+      data: { [key: string]: Json },
+    ) => {
+      if (taken.has(identity)) return;
+      taken.add(identity);
+      this.symbol(kind, name, identity, span, { ...data, ...broken });
+    };
+    for (const region of this.lossyRegions)
+      for (const header of readHeaders(masked, region.start, region.end)) {
+        if (header.kind === "import") {
+          this.fact.importsBroken = true;
+          continue;
+        }
+        if (header.kind === "unreadable") {
+          this.diagnostics.push({
+            message:
+              "Unreadable method header in a syntax error: its receiver is unknown",
+            range: header.span,
+          });
+          continue;
+        }
+        if (header.kind === "method")
+          emit(
+            "method",
+            header.name,
+            `(${header.pointer ? "*" : ""}${header.receiver}).${header.name}`,
+            header.span,
+            { receiver: header.receiver!, pointer: !!header.pointer },
+          );
+        else if (header.kind === "var" || header.kind === "const")
+          emit(header.kind, header.name, header.name, header.span, {
+            d: { k: "unknown" },
+          });
+        else emit(header.kind, header.name, header.name, header.span, {});
       }
-      const [, keyword, rest, star, receiver, method, name] = match;
-      const span = { start: at, end: at + match[0].length };
-      const broken = { broken: true, recovered: true } as const;
-      if (keyword === "func" && receiver && method) {
-        // A method header: its receiver's method set is not fully known.
-        const key = this.symbol(
-          "method",
-          method,
-          star ? `(*${receiver}).${method}` : `(${receiver}).${method}`,
-          span,
-          {
-            receiver,
-            pointer: Boolean(star),
-            ...broken,
-          },
-        );
-        this.contains("file", key, span);
-      } else if (keyword === "func" && rest?.trim().startsWith("(")) {
-        // `func (` whose receiver cannot be read: some type of this package has an
-        // unknown method set; resolution treats every type of the package so.
-        this.fact.unattributable = true;
-        this.diagnostics.push({
-          message:
-            "Unreadable method header in a syntax error: method sets of this package are treated as unknown",
-          range: span,
-        });
-      } else if (name && keyword === "type") {
-        // The keyword after the name gives the kind, so the symbol keeps the ID
-        // the intact declaration has. Nothing of its structure is read.
-        const after = this.text.slice(at + match[0].length, end);
-        const kind = /^\s*(\[[^\]]*\]\s*)?struct\b/.test(after)
-          ? "struct"
-          : /^\s*(\[[^\]]*\]\s*)?interface\b/.test(after)
-            ? "interface"
-            : /^\s*=/.test(after)
-              ? "alias"
-              : "type";
-        const key = this.symbol(kind, name, name, span, { ...broken });
-        this.contains("file", key, span);
-      } else if (name && keyword === "func") {
-        const key = this.symbol("function", name, name, span, { ...broken });
-        this.contains("file", key, span);
-      } else if (name && (keyword === "var" || keyword === "const")) {
-        const key = this.symbol(keyword, name, name, span, {
-          d: { k: "unknown" },
-          ...broken,
-        });
-        this.contains("file", key, span);
-      }
-    }
+  }
+
+  /**
+   * Layer 1 (see W2-B.md, "Declaration-lossy files"): this top-level node may have
+   * swallowed declarations. Decided from the tree alone; the file's package is then
+   * treated as possibly holding unseen declarations. The node's span is kept for
+   * the precision-only recovery (layer 2).
+   */
+  private lossy(node: Node): void {
+    this.fact.lossy = true;
+    this.lossyRegions.push({ start: node.startIndex, end: node.endIndex });
   }
 
   private topLevel(node: Node): void {
     if (node.type === "ERROR") return;
-    if (
-      (node.type === "function_declaration" ||
-        node.type === "method_declaration") &&
-      node.hasError
-    ) {
-      const body = node.childForFieldName("body");
-      if (body?.hasError) {
-        // Code swallowed into the body: ERROR regions inside it, or the whole rest
-        // of the body when it is never closed (it runs to the end of the file).
-        const unclosed =
-          body.lastChild?.isMissing || body.endIndex >= this.text.length;
-        if (unclosed) this.recover(body.startIndex, body.endIndex, false);
-        else
-          for (const region of body.descendantsOfType("ERROR"))
-            if (region) this.recover(region.startIndex, region.endIndex, false);
-      }
-    } else if (node.hasError)
-      // An import/type/var/const declaration that swallowed later code.
-      for (const region of node.descendantsOfType("ERROR"))
-        if (region) this.recover(region.startIndex, region.endIndex, false);
     const previous = this.quiet;
     this.quiet = node.hasError;
     try {

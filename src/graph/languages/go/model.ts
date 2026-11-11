@@ -81,8 +81,12 @@ export interface FileFact {
   predeclared?: PredeclaredUse[];
   /** An import declaration had a syntax error: unmatched qualifiers are unknown. */
   importsBroken?: boolean;
-  /** A method header in a syntax error whose receiver cannot be read. */
-  unattributable?: boolean;
+  /**
+   * Declaration-lossy (layer 1, see W2-B.md): a top-level ERROR, or a declaration
+   * whose error could have swallowed following declarations. Decided from the
+   * tree alone.
+   */
+  lossy?: boolean;
 }
 export interface PredeclaredUse {
   n: string;

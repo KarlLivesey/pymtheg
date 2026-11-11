@@ -51,7 +51,8 @@ interface FileInfo {
  */
 type TypeValue =
   | { kind: "project"; syms: GraphSymbol[] }
-  | { kind: "external"; name: string }
+  /** `shadowable`: a predeclared name in a lossy package (an unseen declaration may shadow it). */
+  | { kind: "external"; name: string; shadowable?: true }
   | { kind: "cont"; e: Desc; key?: Desc; ch?: boolean; file: string }
   | { kind: "func"; r: Desc[]; file: string }
   | { kind: "tparam"; c?: TypeRef; file: string }
@@ -63,8 +64,13 @@ type Entity =
   | { e: "value"; type: TypeValue }
   /** Something declared outside the project (function, type or variable). */
   | { e: "external"; name: string }
+  /** Not knowable: in a lossy package an unseen declaration may own the name. */
+  | { e: "unknown" }
   | { e: "none" };
 const NONE: Entity = { e: "none" };
+const UNSEEN: Entity = { e: "unknown" };
+const isRecovered = (symbol: GraphSymbol) =>
+  !!(symbol.data as { recovered?: boolean } | undefined)?.recovered;
 const UNKNOWN: TypeValue = { kind: "unknown" };
 const OPAQUE: TypeValue = { kind: "opaque" };
 /** Result of Go's selector rule for one name on a type. */
@@ -112,7 +118,9 @@ export type OpenReason =
   /** Dispatch on an interface that a type outside the project could satisfy. */
   | "external-implementers-possible"
   /** A name-only set: the receiver's type, and so its package, is unknown. */
-  | "receiver-type-unknown";
+  | "receiver-type-unknown"
+  /** Declarations of a declaration-lossy package (see W2-B.md) may be unseen. */
+  | "declarations-may-be-unseen";
 const UNRESOLVED: Decision = { ids: [], definite: false };
 
 const directoryOf = (path: string) => {
@@ -240,10 +248,11 @@ class GoResolver {
   private symbolsById = new Map<string, GraphSymbol>();
   /** Function-local and anonymous types by file and identity. */
   private localTypes = new Map<string, GraphSymbol>();
-  /** Types with a method whose declaration header has a syntax error. */
-  private brokenReceivers = new Set<string>();
-  /** Packages with a method header in a syntax error whose receiver is unreadable. */
-  private brokenPackages = new Set<string>();
+  /**
+   * Packages with a declaration-lossy file (layer 1, see W2-B.md): unseen
+   * declarations may exist in them.
+   */
+  private lossyPackages = new Set<string>();
   private byFileKey = new Map<string, GraphSymbol>();
   private decls = new Map<string, Map<string, GraphSymbol[]>>();
   private members = new Map<string, GraphSymbol[]>();
@@ -288,7 +297,7 @@ class GoResolver {
       const name = link.data as { builtinName?: boolean } | undefined;
       if (
         name?.builtinName &&
-        this.lookupName(link.targetName, link.file).e !== "syms"
+        this.lookupName(link.targetName, link.file).e === "none"
       )
         this.builtins.add(link.id);
       const {
@@ -302,7 +311,17 @@ class GoResolver {
         resolutions.push({ linkId: link.id, targetId: distinct[0]! });
       else if (distinct.length > 1 && distinct.length <= limit) {
         resolutions.push({ linkId: link.id, candidateIds: distinct });
-        if (open) this.open.set(link.id, open);
+        // Layer 1: a set of declarations (build variants) in a lossy package may
+        // miss one in an unseen declaration.
+        const reason =
+          open ??
+          (distinct.some((id) => {
+            const symbol = this.symbolsById.get(id);
+            return !!symbol && this.lossy(this.pkgOf(symbol));
+          })
+            ? ("declarations-may-be-unseen" as const)
+            : undefined);
+        if (reason) this.open.set(link.id, reason);
       } else if (distinct.length > limit)
         // Too many to list: unresolved with the name kept; a cut list could omit the target.
         this.overflow.set(link.id, { candidates: distinct.length, cap: limit });
@@ -339,9 +358,20 @@ class GoResolver {
         }
         pkg.files.push(file.path);
         info.pkg = pkg;
-        if (fact.unattributable) this.brokenPackages.add(key);
+        if (fact.lossy) this.lossyPackages.add(key);
       }
       this.files.set(file.path, info);
+    }
+    // Intact methods by package, receiver and name: a recovered header that
+    // repeats one adds nothing (layer 2 never shadows an intact declaration).
+    const intactMethods = new Set<string>();
+    for (const symbol of this.context.symbols) {
+      const data = symbol.data as { receiver?: string } | undefined;
+      const pkg = this.files.get(symbol.file)?.pkg;
+      if (symbol.kind === "method" && pkg && !isRecovered(symbol))
+        intactMethods.add(
+          `${pkg.key}\u0000${data?.receiver}\u0000${symbol.name}`,
+        );
     }
     for (const symbol of this.context.symbols) {
       if (symbol.module !== this.moduleId || !this.files.has(symbol.file))
@@ -357,7 +387,14 @@ class GoResolver {
       if (!pkg) continue;
       const data = (symbol.data ?? {}) as { receiver?: string; owner?: string };
       if (symbol.kind === "package") pkg.symbol = symbol;
-      else if (
+      else if (isRecovered(symbol)) {
+        // Layer 2: a recovered header is never a declaration names resolve to.
+        // A recovered method may only join candidate sets (its file is lossy, so
+        // layer 1 already makes its receiver's method set unknown).
+        const key = `${pkg.key}\u0000${data.receiver}\u0000${symbol.name}`;
+        if (symbol.kind === "method" && !intactMethods.has(key))
+          push2(this.methodsByName, symbol.name, symbol);
+      } else if (
         TYPE_KINDS.has(symbol.kind) ||
         symbol.kind === "var" ||
         symbol.kind === "const" ||
@@ -370,9 +407,8 @@ class GoResolver {
         (symbol.data as { broken?: boolean } | undefined)?.broken
       ) {
         // A method whose header has a syntax error: not a member anyone can resolve
-        // to definitely; its receiver type's structure becomes unknown (see `view`).
-        // It is still a declared, possible target for candidate sets.
-        this.brokenReceivers.add(`${pkg.key}\u0000${data.receiver}`);
+        // to definitely (its file is lossy, so layer 1 makes its receiver's method
+        // set unknown). It is still a possible target for candidate sets.
         push2(this.methodsByName, symbol.name, symbol);
       } else if (symbol.kind === "method" && data.receiver !== undefined) {
         push2(
@@ -459,15 +495,25 @@ class GoResolver {
     );
   }
 
+  /** Layer 1: the package may hold declarations no parse tree shows. */
+  private lossy(pkg: Pkg | undefined): boolean {
+    return !!pkg && this.lossyPackages.has(pkg.key);
+  }
+
   private lookupName(name: string, from: string): Entity {
     const info = this.files.get(from);
     if (!info) return NONE;
     if (info.pkg) {
+      // An intact package-level declaration: a second one would not compile.
       const own = this.packageDecl(info.pkg, name, from);
       if (own.length) return { e: "syms", syms: own };
     }
+    // A file-block import cannot share a name with a package-level declaration.
     const imported = info.imports.get(name);
     if (imported) return { e: "pkg", pkgs: imported.pkgs, path: imported.path };
+    // Anything else (dot-import, builtin, predeclared, or nothing) an unseen
+    // declaration of a lossy package could shadow.
+    if (this.lossy(info.pkg)) return UNSEEN;
     const dotted: GraphSymbol[] = [];
     let externalDot = false;
     for (const dot of info.dots) {
@@ -489,8 +535,10 @@ class GoResolver {
     if (ref.q === "") {
       // A predeclared type name, unless a package declaration shadows it.
       const declared = this.lookupName(ref.n, from);
-      return declared.e === "syms" && declared.syms.every(isTypeSymbol)
-        ? this.typeSyms(declared.syms, depth + 1)
+      if (declared.e === "syms" && declared.syms.every(isTypeSymbol))
+        return this.typeSyms(declared.syms, depth + 1);
+      return declared.e === "unknown"
+        ? { kind: "external", name: ref.n, shadowable: true }
         : { kind: "external", name: ref.n };
     }
     const key = `${from}\u0000${ref.q ?? ""}\u0000${ref.n}`;
@@ -740,6 +788,7 @@ class GoResolver {
     }
     if (base.e === "external")
       return { e: "external", name: `${base.name}.${desc.n}` };
+    if (base.e === "unknown") return NONE;
     // `q.X` with q neither local nor declared in the package: q can only be one of
     // this file's imports; not a project import, so it is external.
     if (base.e === "none")
@@ -834,13 +883,9 @@ class GoResolver {
     });
     let result: View;
     if (depth > MAX_DEPTH) result = unknown();
-    else if (
-      (type.data as { broken?: boolean } | undefined)?.broken ||
-      (pkg && this.brokenReceivers.has(`${pkg.key}\u0000${type.name}`)) ||
-      (pkg && this.brokenPackages.has(pkg.key) && type.kind !== "interface")
-    )
-      // Declared inside a syntax error (or with a broken method): the recovered
-      // structure is not trusted; only its own intact declared methods are known.
+    else if ((type.data as { broken?: boolean } | undefined)?.broken)
+      // Declared inside a syntax error: the recovered structure is not trusted;
+      // only its own intact declared methods are known.
       result = unknown();
     else if (type.kind === "interface" || data.shape === "interface")
       result = { iface: [type], members: () => [], embedded: [] };
@@ -900,6 +945,20 @@ class GoResolver {
         }
       }
     } else result = unknown();
+    // Layer 1: in a declaration-lossy package an unseen method may be declared on
+    // any named type. Members declared intact on the type itself (depth 0) stay
+    // known (a second declaration would not compile); anything else, promoted
+    // members included (an unseen depth-0 method could shadow them), is unknown.
+    // Interfaces, aliases and function-local types cannot gain methods.
+    if (
+      this.lossy(pkg) &&
+      !result.iface &&
+      type.kind !== "alias" &&
+      !(type.data as { local?: boolean } | undefined)?.local
+    ) {
+      const known = result.members;
+      result = { members: known, declared: known, embedded: [], unknown: true };
+    }
     this.views.set(type.id, result);
     return result;
   }
@@ -999,7 +1058,13 @@ class GoResolver {
           if (item.value.kind !== "project") {
             // An external type cannot declare a project package's unexported name;
             // an unresolvable one could be anything.
-            if (!(item.value.kind === "external" && skipExternal))
+            if (
+              !(
+                item.value.kind === "external" &&
+                !item.value.shadowable &&
+                skipExternal
+              )
+            )
               externalAt ??= depth + 1;
             continue;
           }
@@ -1060,7 +1125,14 @@ class GoResolver {
       );
       for (const item of this.embedded(iface)) {
         if (item.value.kind !== "project") {
-          if (!(item.value.kind === "external" && skipExternal)) unknown = true;
+          if (
+            !(
+              item.value.kind === "external" &&
+              !item.value.shadowable &&
+              skipExternal
+            )
+          )
+            unknown = true;
           continue;
         }
         const views = item.value.syms.map((symbol) => this.view(symbol));
@@ -1098,7 +1170,10 @@ class GoResolver {
         .replace(/\u0004([^\u0003]+)\u0003/g, (_, name: string) =>
           info?.pkg && this.packageDecl(info.pkg, name, file).some(isTypeSymbol)
             ? `${own}.${name}`
-            : name,
+            : // In a lossy package an unseen declaration may shadow it.
+              this.lossy(info?.pkg)
+              ? `\u0006${name}`
+              : name,
         )
         .replace(
           /\u0001([^\u0003]+)\u0003/g,
@@ -1214,7 +1289,7 @@ class GoResolver {
   ): { value: boolean; pointer: boolean; unknown?: true } {
     const found = this.selectName([type], name, undefined, access);
     // An external embedded type could supply (or shadow) it: not provable, not refuted.
-    if (found.kind === "unknown")
+    if (found.kind === "unknown" || sig.includes("\u0006"))
       return { value: false, pointer: false, unknown: true };
     if (found.kind !== "found") return { value: false, pointer: false };
     const methods = found.syms;
@@ -1227,8 +1302,18 @@ class GoResolver {
           this.canonical(data.sig, method.file) === sig
         );
       })
-    )
-      return { value: false, pointer: false };
+    ) {
+      // A signature naming a predeclared type a lossy package may shadow: unknown.
+      const uncertain = methods.some((method) =>
+        this.canonical(
+          (method.data as { sig?: string } | undefined)?.sig ?? "",
+          method.file,
+        ).includes("\u0006"),
+      );
+      return uncertain
+        ? { value: false, pointer: false, unknown: true }
+        : { value: false, pointer: false };
+    }
     const needsPointer = methods.some((method) => {
       const data = (method.data ?? {}) as {
         pointer?: boolean;
@@ -1294,8 +1379,9 @@ class GoResolver {
         if (refuted) continue;
         // Not refuted: a possible implementer, so dispatch must list its method.
         push2(this.possible, iface.id, type);
-        // Only a fully proven method set is a definite `implements` link.
-        if (unknown) continue;
+        // Only a fully proven method set is a definite `implements` link; a
+        // recovered header (layer 2) never is the subject of one.
+        if (unknown || isRecovered(type)) continue;
         push2(this.implementers, iface.id, type);
         added.push({
           key: `implements:${type.key}:${iface.id}`,
@@ -1509,8 +1595,15 @@ class GoResolver {
       )
     )
       return UNRESOLVED;
+    // Layer 1: an unseen type of a lossy package may implement any interface that
+    // package can reach.
     const closed =
-      exact && !found.open && staticTypes!.every((type) => this.sealed(type));
+      exact &&
+      !found.open &&
+      staticTypes!.every(
+        (type) =>
+          this.sealed(type) && !this.lossyReaches(this.pkgOf(type)?.key),
+      );
     return {
       ids: [...specs, ...found.targets].map((symbol) => symbol.id),
       definite: false,
@@ -1548,6 +1641,14 @@ class GoResolver {
         !this.hiddenReachable(method.name, method.access)
       )
         return true;
+    return false;
+  }
+
+  /** Some declaration-lossy package can reach package `to` (or is it). */
+  private lossyReaches(to: string | undefined): boolean {
+    if (to === undefined) return this.lossyPackages.size > 0;
+    for (const from of this.lossyPackages)
+      if (this.mayReach(from, to)) return true;
     return false;
   }
 

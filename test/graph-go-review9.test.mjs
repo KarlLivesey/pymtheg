@@ -34,11 +34,12 @@ test("a: a type truncated at end of file becomes a broken symbol of unknown stru
     link.candidates.join(),
   );
   assert.deepEqual(link.data.open, OPEN);
-  // Pub's intact method elsewhere still has its receiver.
+  // Layer 2: the recovered Pub is never a definite target, not even of the
+  // receiver link of its intact method elsewhere.
   assert.ok(
-    links.some(
+    !links.some(
       (item) =>
-        item.kind === "receiver" && item.target === "p/broken.go:struct:Pub",
+        item.target === "p/broken.go:struct:Pub" && item.kind !== "contains",
     ),
   );
 });
@@ -215,7 +216,7 @@ test("an unreadable method header makes every method set of its package unknown,
   });
   assert.equal(parsed.status, "partial");
   assert.ok(
-    parsed.diagnostics.some((item) => /method sets/.test(item.message)),
+    parsed.diagnostics.some((item) => /receiver is unknown/.test(item.message)),
     JSON.stringify(parsed.diagnostics),
   );
 });
