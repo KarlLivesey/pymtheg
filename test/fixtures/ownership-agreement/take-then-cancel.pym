@@ -1,0 +1,15 @@
+// Minimal reproduction: the cancel handler names a resource that an earlier
+// statement has already transferred to a settling operation.
+resource Lease {
+  states Held, Returned;
+  initial Held;
+  terminal Returned;
+  Held -> Returned;
+}
+op acquire() -> Lease effects(state.Lease) creates result;
+op hand_back(take lease: Lease) -> Unit effects(state.Lease)
+  settles lease on (Unit, Cancelled);
+flow main() -> Unit effects(state.Lease) {
+  call acquire() as lease;
+  call hand_back(take lease);
+} on cancel { transition lease -> Returned; }

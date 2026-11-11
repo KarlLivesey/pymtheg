@@ -1,0 +1,31 @@
+// Original model shaped like the restic trial's lock handling: the lock is
+// handed to a settling unlock on every exit, and cancellation releases it.
+resource WorkLock {
+  states Held, Released;
+  initial Held;
+  terminal Released;
+  Held -> Released;
+}
+type StepError = Interrupted | WriteFailed;
+type JobResult = Done | Fatal;
+op lock() -> WorkLock effects(state.WorkLock) creates result;
+op work() -> Result<Unit, StepError> effects(remote.Store) atomic;
+op publish() -> Result<Unit, StepError> effects(remote.Store) atomic;
+op unlock(take held: WorkLock) -> Unit effects(state.WorkLock)
+  settles held on (Unit, Cancelled);
+flow job() -> JobResult effects(state.WorkLock, remote.Store) {
+  call lock() as held;
+  call work() as worked;
+  match worked {
+    Interrupted => { call unlock(take held); return Fatal; }
+    WriteFailed => { call unlock(take held); return Fatal; }
+    Ok(w) => {
+      call publish() as published;
+      match published {
+        Interrupted => { call unlock(take held); return Fatal; }
+        WriteFailed => { call unlock(take held); return Fatal; }
+        Ok(p) => { call unlock(take held); return Done; }
+      }
+    }
+  }
+} on cancel { transition held -> Released; }
