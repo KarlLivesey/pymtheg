@@ -193,9 +193,11 @@ The manager keeps this table current. It is the single record of who holds which
 | W1-B Engine core | merged | Sol 6.1 | Opus 5.5 | `w1-b-engine-core` | [#2](https://github.com/KarlLivesey/pymtheg/pull/2) | `src/behaviour/explore*.ts`, `test/explore*.test.mjs` |
 | W1-E Machines and contracts | merged | Opus 5.5 | Sol 6.1 | `w1-e-mixed-file-contracts` | [#3](https://github.com/KarlLivesey/pymtheg/pull/3) | `src/contracts/document.ts`, `implementation-check.ts`, `manifest.ts`, `test/contracts-mixed-file.test.mjs` |
 | W2-A Built-in backend wiring | building (started early: W1-B merged, files free) | Sol 6.1 | — | `w2-a-builtin-backend` | — | `src/backends/adapter.ts`, `src/behaviour/model.ts`, `src/behaviour/explore*.ts`, minimal lines in `src/cli/main.ts` and `src/cli/help.ts`, `evidence/builtin-checker/differential.mjs` |
+| W2-G Flow lowering must not change its input (B106) | cut; waits for W1-A and W2-A to merge | — | — | — | — | `src/behaviour/flow.ts` (`graphMachine`), `src/behaviour/model.ts` (`lower`) |
+| W2-H Link baseline versus real review (1.2) | cut; waits for W1-D to merge | — | — | — | — | `src/studio/service.ts`, architecture record type as needed |
 | W1-C Graph store and interface | building | Sol 6.1 | — | `w1-c-graph-store-interface` | — | `src/graph/**` except `languages/*/` |
 | W1-D Document import | changes needed (after round 1) | Sol 6.1 | Opus 5.5 | `w1-d-document-import` | [#4](https://github.com/KarlLivesey/pymtheg/pull/4) | `src/shared/document-selection.ts`, `src/architecture/import-policy.ts`, `src/cli/import-summary.ts`, `src/architecture/store.ts`; extended on request to `src/architecture/model.ts`, `heading-identities.ts`, `headings.ts` (minimal RST section wiring; no other chunk holds them) |
-| W1-F Two investigations | building | Opus 5.5 | — | `w1-f-investigations` | — | `evidence/w1-f/` |
+| W1-F Two investigations | merged (evidence only, merged by the manager without a separate review; the fix chunks get reviewed) | Opus 5.5 | — | `w1-f-investigations` | [#6](https://github.com/KarlLivesey/pymtheg/pull/6) | `evidence/w1-f/` |
 
 Each chunk also owns its own `evidence/<chunk-id>/` folder and `docs/changes/<chunk-id>.md`.
 
