@@ -20,6 +20,8 @@ export type PositionExpectation =
   | { range: SourceRange; at?: string };
 type Selector = { file: string; name: string; kind: string };
 export interface ConformanceExpectations {
+  /** Explicit exceptions for source fixtures with other position-sensitive preambles. */
+  identityEditExclusions?: readonly { file: string; reason: string }[];
   symbols: (Selector & { identity: string } & PositionExpectation)[];
   links: ({
     file: string;
@@ -205,6 +207,47 @@ export async function checkLanguageConformance(
     await indexProject(root, registry, store);
     assert.deepEqual(store.findSymbols(), symbols, "IDs survive replacement");
     assert.deepEqual(store.links(), links, "Resolution is deterministic");
+    const exclusions = new Set<string>();
+    for (const exclusion of expected.identityEditExclusions ?? []) {
+      assert.ok(
+        exclusion.reason.trim(),
+        "Identity edit exclusion needs a reason",
+      );
+      assert.ok(
+        fixtures.some(
+          (fixture) => fixture.path === exclusion.file && !fixture.context,
+        ) && !exclusions.has(exclusion.file),
+        "Identity edit exclusion must name a unique source fixture",
+      );
+      exclusions.add(exclusion.file);
+    }
+    for (const fixture of fixtures) {
+      if (fixture.context || exclusions.has(fixture.path)) continue;
+      const text = fixture.text;
+      let offset = text.startsWith("\uFEFF") ? 1 : 0;
+      let blankLine = "\n";
+      if (text.startsWith("#!", offset)) {
+        const newline = /\r\n|[\r\n\u2028\u2029]/.exec(text.slice(offset));
+        if (!newline) {
+          await writeFile(join(root, fixture.path), `${text}\n\n`);
+          continue;
+        }
+        offset += newline.index + newline[0].length;
+        blankLine = newline[0];
+      }
+      await writeFile(
+        join(root, fixture.path),
+        `${text.slice(0, offset)}${blankLine}${text.slice(offset)}`,
+      );
+    }
+    const edited = await indexProject(root, registry, store);
+    assert.deepEqual(edited.analysisErrors, []);
+    assert.deepEqual(edited.resolutionErrors, []);
+    assert.deepEqual(
+      store.findSymbols().map((symbol) => symbol.id),
+      symbols.map((symbol) => symbol.id),
+      "IDs survive an edit above every symbol",
+    );
   } finally {
     store?.close();
     await rm(scratch, { recursive: true, force: true });
