@@ -189,9 +189,9 @@ The manager keeps this table current. It is the single record of who holds which
 | Chunk | Status | Builder | Reviewer | Branch | Pull request | Owned paths held |
 |---|---|---|---|---|---|---|
 | W0-2 Dependencies | merged | Sol 6.1 | Opus 5.5 | `w0-2-graph-dependencies` | [#1](https://github.com/KarlLivesey/pymtheg/pull/1) | `package.json`, `package-lock.json`, `scripts/grammar-check.mjs` |
-| W1-A Ownership disagreement | building | Opus 5.5 | — | `w1-a-ownership-agreement` | — | `src/analysis/ownership.ts`, `src/behaviour/flow.ts`, `test/ownership-agreement.test.mjs` |
+| W1-A Ownership disagreement | in review (round 1) | Opus 5.5 | Sol 6.1 | `w1-a-ownership-agreement` | [#5](https://github.com/KarlLivesey/pymtheg/pull/5) | `src/analysis/ownership.ts`, `src/behaviour/flow.ts`, `test/ownership-agreement.test.mjs` |
 | W1-B Engine core | merged | Sol 6.1 | Opus 5.5 | `w1-b-engine-core` | [#2](https://github.com/KarlLivesey/pymtheg/pull/2) | `src/behaviour/explore*.ts`, `test/explore*.test.mjs` |
-| W1-E Machines and contracts | in review (round 1) | Opus 5.5 | Sol 6.1 | `w1-e-mixed-file-contracts` | [#3](https://github.com/KarlLivesey/pymtheg/pull/3) | `src/contracts/document.ts`, `implementation-check.ts`, `manifest.ts`, `test/contracts-mixed-file.test.mjs` |
+| W1-E Machines and contracts | merged | Opus 5.5 | Sol 6.1 | `w1-e-mixed-file-contracts` | [#3](https://github.com/KarlLivesey/pymtheg/pull/3) | `src/contracts/document.ts`, `implementation-check.ts`, `manifest.ts`, `test/contracts-mixed-file.test.mjs` |
 | W2-A Built-in backend wiring | building (started early: W1-B merged, files free) | Sol 6.1 | — | `w2-a-builtin-backend` | — | `src/backends/adapter.ts`, `src/behaviour/model.ts`, `src/behaviour/explore*.ts`, minimal lines in `src/cli/main.ts` and `src/cli/help.ts`, `evidence/builtin-checker/differential.mjs` |
 | W1-C Graph store and interface | building | Sol 6.1 | — | `w1-c-graph-store-interface` | — | `src/graph/**` except `languages/*/` |
 | W1-D Document import | in review (round 1) | Sol 6.1 | Opus 5.5 | `w1-d-document-import` | [#4](https://github.com/KarlLivesey/pymtheg/pull/4) | `src/shared/document-selection.ts`, `src/architecture/import-policy.ts`, `src/cli/import-summary.ts`, `src/architecture/store.ts`; extended on request to `src/architecture/model.ts`, `heading-identities.ts`, `headings.ts` (minimal RST section wiring; no other chunk holds them) |
@@ -224,3 +224,5 @@ Backlog from W1-E (wiring, hot files, for a later CLI/MCP chunk): `src/cli/main.
 Environment note: Go is not installed on the build machine (Rust and Java are), so tests that compile emitted Go checks are skipped or fail the same way on `main`. Those results are unresolved, not passed.
 
 Backlog from W1-B review: a worker that never posts `ready` makes the cancellation test hang rather than fail (add a test-level timeout); `explore()` could cross-check indexed misses against an unindexed step as a second guard. For W2-A.
+
+Backlog from W1-A: a cancel handler that *calls* an operation with an already handed-off resource (while another is still owned) is flagged by the static check but not the behavioural check. Strict-side mismatch, predates W1-A; follow-up with the state-dependent cancel cleanup chunk (7.3).
