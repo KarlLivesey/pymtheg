@@ -768,6 +768,7 @@ try {
           "--max-samples",
           "--timeout",
           "--backend",
+          "--state-budget",
           "--scope",
           "--check-scope",
           "--quint",
@@ -824,8 +825,9 @@ try {
       (!options.get("--out") || options.get("--target") !== "quint")
     )
       throw Error("emit requires --target quint --out PATH");
-    if (command === "verify" && options.get("--backend") !== "tlc")
-      throw Error("verify requires --backend tlc");
+    const backend = options.get("--backend") ?? "builtin";
+    if (!["builtin", "tlc", "quint"].includes(backend))
+      throw Error("--backend must be builtin, tlc or quint");
     const intOption = (key: string, fallback: number, max: number): number => {
       const s = options.get(key) ?? String(fallback);
       if (!/^\d+$/.test(s)) throw Error(`${key} must be an integer`);
@@ -845,7 +847,13 @@ try {
       throw Error("Seed must be a nonnegative signed 64-bit integer");
     const backendOptions: BackendOptions = {
       entry: options.get("--entry") ?? "",
-      backend: command === "verify" ? "tlc" : "quint",
+      backend: backend as NonNullable<BackendOptions["backend"]>,
+      method: command === "simulate" ? "sample" : "exhaustive",
+      stateBudget: intOption(
+        "--state-budget",
+        1_000_000,
+        Number.MAX_SAFE_INTEGER,
+      ),
       seed,
       maxSteps: intOption("--max-steps", 6, 10000),
       maxSamples: intOption("--max-samples", 1000, 100000),
