@@ -55,7 +55,16 @@ for (const engine of ["quint", "tlc"])
               "45s",
               ...(engine === "tlc"
                 ? ["--backend", "tlc", "--tlc-jar", jar]
-                : ["--seed", "42", "--max-steps", "6", "--max-samples", "20"]),
+                : [
+                    "--backend",
+                    "quint",
+                    "--seed",
+                    "42",
+                    "--max-steps",
+                    "6",
+                    "--max-samples",
+                    "20",
+                  ]),
             ],
             { encoding: "utf8" },
           );
