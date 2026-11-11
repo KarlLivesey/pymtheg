@@ -1,7 +1,10 @@
 import { compareText } from "../shared/order.js";
 import { architectureLimits } from "./limits.js";
 import type { ArchitectureDocument } from "./schema.js";
-import { projectDocumentationPath } from "../shared/document-selection.js";
+import {
+  projectDocumentationPath,
+  documentationDirectory,
+} from "../shared/document-selection.js";
 const generated = new Set(["node_modules", "target", "dist"]);
 export function excludedDirectory(name: string) {
   return name.startsWith(".") || generated.has(name);
@@ -143,13 +146,21 @@ export function folderInventory(
     );
     if (reason) {
       recordSkipped(skipped, entry.path, reason);
+      // The saved ledger predates detailed reasons: preserve its scope-first
+      // directory collapse and format label independently of the new report.
+      const outsideFolder =
+        options.include === undefined &&
+        selection === "project-documents" &&
+        parts.length > 1 &&
+        !documentationDirectory(entry.path);
       excluded.push(
-        entry.path +
-          (reason === "unsupported-type"
-            ? " (outside text-document import formats)"
-            : reason === "excluded"
-              ? " (excluded)"
-              : " (outside selected documentation scope)"),
+        reason === "excluded"
+          ? entry.path + " (excluded)"
+          : outsideFolder
+            ? parts[0] + " (outside selected documentation scope)"
+            : reason === "outside-selection" && options.include !== undefined
+              ? entry.path + " (outside selected documentation scope)"
+              : entry.path + " (outside text-document import formats)",
       );
       continue;
     }

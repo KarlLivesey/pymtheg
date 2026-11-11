@@ -1427,6 +1427,7 @@ export async function readArchitectureFolder(
     name: string,
     reason: Parameters<typeof recordSkipped>[2],
     kind: "file" | "directory" | "entry" = "file",
+    legacyLabel?: string,
   ) {
     recordSkipped(skipped, name, reason, kind);
     const label = {
@@ -1438,19 +1439,28 @@ export async function readArchitectureFolder(
       "too-large": "exceeds the 16 MiB document limit",
       excluded: "excluded",
     }[reason];
-    excluded.push(name + " (" + label + ")");
+    excluded.push(name + " (" + (legacyLabel ?? label) + ")");
   }
   let bytes = 0;
   async function readDocument(path: string, name: string) {
     const reason = documentSkipReason(name, selection);
     if (reason) {
-      skip(name, reason);
+      skip(
+        name,
+        reason,
+        "file",
+        reason === "outside-selection" && selection.include === undefined
+          ? "outside text-document import formats"
+          : undefined,
+      );
       return;
     }
     const before = await stat(path);
     if (before.size > architectureLimits.documentBytes) {
-      skip(name, "too-large");
-      return;
+      recordSkipped(skipped, name, "too-large");
+      throw Object.assign(Error(name + " exceeds the 16 MiB document limit"), {
+        skipped,
+      });
     }
     bytes += before.size;
     if (

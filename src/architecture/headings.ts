@@ -139,27 +139,39 @@ export function architectureHeadings(
   if (!/\.rst$/i.test(path)) return architectureMarkdown(text).headings;
   const lines = text.split("\n"),
     projected = lines.map(() => ""),
-    styles = new Map<string, number>();
+    styles = new Map<string, number>(),
+    starts = new Map<number, number>();
   const adornment = (line: string) =>
     /^([=\-`:'"~^_*+#<>.])\1{1,}\s*$/.exec(line)?.[1];
+  let previousUnderline = -1;
   for (let i = 0; i + 1 < lines.length; i++) {
-    const title = lines[i]!.replace(/\r$/, ""),
+    const rawTitle = lines[i]!.replace(/\r$/, ""),
+      title = rawTitle.trim(),
       underline = lines[i + 1]!.replace(/\r$/, ""),
       character = adornment(underline);
-    if (
-      !title.trim() ||
-      /^\s/.test(title) ||
-      adornment(title) ||
-      !character ||
-      underline.trimEnd().length < title.trimEnd().length
-    )
-      continue;
+    if (!title || adornment(rawTitle) || !character) continue;
     const overline =
       i > 0 &&
+      i - 1 !== previousUnderline &&
       adornment(lines[i - 1]!) === character &&
-      lines[i - 1]!.trimEnd().length >= title.trimEnd().length;
-    if (i > (overline ? 1 : 0) && lines[i - (overline ? 2 : 1)]!.trim())
+      lines[i - 1]!.trimEnd().length === underline.trimEnd().length;
+    if (
+      (/^\s/.test(rawTitle) && !overline) ||
+      (underline.trimEnd().length < title.length &&
+        underline.trimEnd().length < 4)
+    )
       continue;
+    const start = overline ? i - 1 : i;
+    // A section may immediately follow a heading's underline. Other prose
+    // still needs a block boundary; indented literal/directive content is ignored.
+    if (
+      start > 0 &&
+      lines[start - 1]!.trim() &&
+      start - 1 !== previousUnderline
+    )
+      continue;
+    starts.set(i, start);
+    previousUnderline = i + 1;
     const style = character + (overline ? "overline" : "underline");
     if (!styles.has(style)) styles.set(style, styles.size + 1);
     // The existing Markdown navigation supports six levels.
@@ -167,12 +179,8 @@ export function architectureHeadings(
     i++;
   }
   return architectureMarkdown(projected.join("\n")).headings.map((heading) => {
-    const start =
-      heading.line > 0 && adornment(lines[heading.line - 1]!)
-        ? heading.line - 1
-        : heading.line;
-    let end = heading.end;
-    if (end > 0 && end < lines.length && adornment(lines[end - 1]!)) end--;
+    const start = starts.get(heading.line)!;
+    const end = starts.get(heading.end) ?? heading.end;
     const body = lines.slice(heading.line + 2, end).join("\n");
     return {
       ...heading,

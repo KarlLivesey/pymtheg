@@ -39,9 +39,10 @@ skips; paths retain the first 100 in sorted discovery order, with omitted count
 stated. Pruned filesystem directories count once; descendants are uninspected,
 not claimed counted. Upload inventories count supplied file entries and cannot
 report entries the picker did not supply. The legacy `excluded` strings remain
-available. Filesystem reading skips documents over 16 MiB. Upload preflight keeps
-its existing fail-closed per-file size check and attaches `skipped` to that error;
-aggregate size/count limits and IO/decoding failures still reject the import.
+available with their original wording and directory collapsing. Filesystem reading
+and upload preflight both reject documents over 16 MiB and attach `skipped` to
+that error.
+Aggregate size/count limits and IO/decoding failures still reject the import.
 `renderImportSummary({ ..., skipped })` renders counts, bounded paths and the bound,
 including a zero-skip summary. Runtime/private exclusions remain absent from
 retained import ledgers to preserve existing cross-transport drift semantics.
@@ -68,11 +69,12 @@ retained import ledgers to preserve existing cross-transport drift semantics.
   `/api/architecture/import-preview` and `/api/architecture/import-commit` handlers: validate and carry
   that summary through preview/commit if transport-wide reporting is desired.
   Already-uploaded document arrays alone cannot reconstruct omitted files.
-- `src/architecture/schema.ts`, `architectureIndexVersion`: integration should
-  advance the shared index version so older stored indexes containing RST are
-  rebuilt with section navigation. New imports already index RST sections.
 
 No dedicated MCP folder-import endpoint exists in the current server; future
 wiring should call the same reader/policy and return `skipped`, rather than
 implementing another selector. CLI/MCP/Studio option controls and end-to-end
 summary propagation remain incomplete and are not claimed delivered here.
+
+Indexes are rebuilt on read; no index-version bump is needed. Relaxing the
+per-document size rejection to a reported skip belongs to the chunk that wires
+`skipped` into CLI output, so a successful import cannot hide oversized input.

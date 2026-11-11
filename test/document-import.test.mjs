@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile, truncate } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, writeFile, truncate } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { readArchitectureFolder } from "../dist/architecture/store.js";
@@ -9,7 +9,10 @@ import {
   architectureDetail,
 } from "../dist/architecture/model.js";
 import { architectureHeadings } from "../dist/architecture/headings.js";
-import { folderInventory } from "../dist/architecture/import-policy.js";
+import {
+  folderInventory,
+  withImportInventory,
+} from "../dist/architecture/import-policy.js";
 import {
   documentationDirectory,
   projectDocumentationPath,
@@ -110,15 +113,12 @@ test("skip reports group reasons, bound paths, and state directory counts", asyn
         join(scratch, `${i}.pdf`),
         "original unsupported fixture",
       );
-    await writeFile(join(scratch, "large.md"), "");
-    await truncate(join(scratch, "large.md"), 16 * 1024 * 1024 + 1);
     const loaded = await readArchitectureFolder(scratch);
     assert.equal(loaded.documents.length, 0);
     assert.equal(loaded.skipped.counts["unsupported-type"], 105);
-    assert.equal(loaded.skipped.counts["too-large"], 1);
-    assert.equal(loaded.skipped.total, 106);
+    assert.equal(loaded.skipped.total, 105);
     assert.equal(loaded.skipped.paths.length, 100);
-    assert.equal(loaded.skipped.truncated, 6);
+    assert.equal(loaded.skipped.truncated, 5);
     const rendered = renderImportSummary({
       committed: false,
       changes: { added: [], changed: [], removed: [] },
@@ -126,7 +126,7 @@ test("skip reports group reasons, bound paths, and state directory counts", asyn
     });
     assert.match(rendered, /unsupported-type: 105/);
     assert.match(rendered, /path limit 100/);
-    assert.match(rendered, /6 paths omitted/);
+    assert.match(rendered, /5 paths omitted/);
     assert.match(rendered, /directory counts exclude uninspected descendants/);
   } finally {
     await rm(scratch, { recursive: true, force: true });
@@ -209,5 +209,176 @@ test("upload preflight rejects oversized files with the too-large discovery reas
       assert.equal(error.skipped.paths[0].path, "large.rst");
       return true;
     },
+  );
+});
+
+test("CLI and upload project inventories retain main's exact legacy exclusion strings", async () => {
+  const scratch = await mkdtemp(
+    join(tmpdir(), "pymtheg-document-import-ledger-"),
+  );
+  const files = [
+    { path: "docs/a.md", text: "# A\n" },
+    { path: "README.md", text: "# Readme\n" },
+    { path: "package.json", text: "{}\n" },
+    { path: "src/x.ts", text: "export {};\n" },
+    { path: "notes/n.md", text: "# Notes\n" },
+  ];
+  try {
+    for (const directory of ["docs", "src", "notes"])
+      await mkdir(join(scratch, directory));
+    for (const file of files)
+      await writeFile(join(scratch, file.path), file.text);
+    const cli = await readArchitectureFolder(scratch, defaults);
+    const upload = folderInventory(
+      files.map((file) => ({
+        path: file.path,
+        bytes: Buffer.byteLength(file.text),
+      })),
+      "project-documents",
+    );
+    const expected = [
+      "notes (outside selected documentation scope)",
+      "package.json (outside text-document import formats)",
+      "src (outside selected documentation scope)",
+    ];
+    assert.deepEqual(cli.excluded, expected);
+    assert.deepEqual(upload.excluded, expected);
+    // Detailed reasons stay separate from the saved ledger's historical labels.
+    assert.ok(
+      cli.skipped.paths.some(
+        (p) => p.path === "package.json" && p.reason === "outside-selection",
+      ),
+    );
+    const cliSnapshot = withImportInventory(
+      cli.documents,
+      "project",
+      cli.excluded,
+      "project-docs",
+    );
+    const uploadDocuments = upload.included.map((path) =>
+      files.find((file) => file.path === path),
+    );
+    const uploadSnapshot = withImportInventory(
+      uploadDocuments,
+      "project",
+      upload.excluded,
+      "project-docs",
+    );
+    assert.deepEqual(uploadSnapshot, cliSnapshot);
+    assert.equal(
+      cliSnapshot.at(-1).text,
+      JSON.stringify(
+        {
+          schema: "pymtheg.import/v1",
+          source: "project",
+          included: ["README.md", "docs/a.md"],
+          excluded: expected,
+        },
+        null,
+        2,
+      ),
+    );
+  } finally {
+    await rm(scratch, { recursive: true, force: true });
+  }
+});
+
+test("filesystem import rejects oversized documents and attaches a discovery summary", async () => {
+  const scratch = await mkdtemp(
+    join(tmpdir(), "pymtheg-document-import-size-"),
+  );
+  try {
+    const file = join(scratch, "large.rst");
+    await writeFile(file, "");
+    await truncate(file, 16 * 1024 * 1024 + 1);
+    for (const input of [scratch, file]) {
+      await assert.rejects(readArchitectureFolder(input), (error) => {
+        assert.equal(
+          error.message,
+          "large.rst exceeds the 16 MiB document limit",
+        );
+        assert.equal(error.skipped.counts["too-large"], 1);
+        assert.deepEqual(error.skipped.paths, [
+          { path: "large.rst", reason: "too-large", kind: "file" },
+        ]);
+        return true;
+      });
+    }
+  } finally {
+    await rm(scratch, { recursive: true, force: true });
+  }
+});
+
+for (const [name, text, titles] of [
+  [
+    "indented title under an overline",
+    "=========\n  Title  \n=========\n\nBody\n",
+    ["Title"],
+  ],
+  [
+    "short underline with at least four characters",
+    "Long title here\n=====\n\nBody\n",
+    ["Long title here"],
+  ],
+  [
+    "adjacent section titles without a blank line",
+    "Title\n=====\nSub\n---\n\nbody\n",
+    ["Title", "Sub"],
+  ],
+  [
+    "literal block content",
+    "Literal::\n\n    Title\n    =====\n\n    Body\n",
+    [],
+  ],
+  [
+    "code-block directive content",
+    ".. code-block:: text\n\n    =========\n      Title\n    =========\n\n    Body\n",
+    [],
+  ],
+  ["transitions", "Paragraph.\n\n---------\n\nMore prose.\n", []],
+  [
+    "simple tables",
+    "=====  =====\nName   Value\n=====  =====\nOne    Two\n=====  =====\n",
+    [],
+  ],
+]) {
+  test(`RST recognises ${name} correctly`, () => {
+    const headings = architectureHeadings(text, "document.rst");
+    assert.deepEqual(
+      headings.map((heading) => heading.title),
+      titles,
+    );
+    for (const heading of headings)
+      assert.equal(
+        heading.text,
+        text.split("\n").slice(heading.line, heading.end).join("\n"),
+      );
+  });
+}
+
+test("a legacy Markdown-only heading registry does not falsely warn about retained RST", async () => {
+  const { prepareHeadingIdentities, identifiedHeadings } = await import(
+    "../dist/architecture/heading-identities.js"
+  );
+  const markdown = { path: "old.md", text: "# Existing\n\nBody\n" };
+  const current = prepareHeadingIdentities([], [markdown]);
+  const before = identifiedHeadings(current).headings.get("old.md");
+  const documents = [
+    ...current,
+    { path: "retained.rst", text: "Title\n=====\n\nBody\n" },
+  ];
+  const result = identifiedHeadings(documents);
+  assert.deepEqual(result.warnings, []);
+  assert.deepEqual(result.headings.get("old.md"), before);
+  assert.equal(result.headings.get("retained.rst").length, 1);
+  const registered = prepareHeadingIdentities(current, documents);
+  const changed = registered.map((document) =>
+    document.path === "retained.rst"
+      ? { ...document, text: document.text + "Changed\n" }
+      : document,
+  );
+  assert.match(
+    identifiedHeadings(changed).warnings.join("\n"),
+    /retained\.rst: heading identity metadata does not match these bytes/,
   );
 });
