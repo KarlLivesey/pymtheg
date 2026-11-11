@@ -207,3 +207,12 @@ README identifies the authoritative final records. No cancelled, failed, overlap
 or obsolete run is counted as final validation. Earlier versions of this change note
 and prior evidence remain in git/history; old equality hashes do not prove this
 intentional semantic revision unchanged.
+
+Post-reboot verification: fetching and normally merging `origin/main` reported
+already up to date at `326fdfe3`. The Rust implementation and test hashes match
+`2507ca5f` and the completed round-four Vector/audit/mutation evidence. No further
+semantic change was needed, and no new post-reboot Vector run is claimed. All four
+required commands were rerun sequentially: install and format pass, 1,343 full-suite
+tests and 97 focused Rust tests pass, zero failed/cancelled/skipped.
+`round4-reboot-validation.json` records the recovered artifact hashes, source-hash
+equality and new check logs without overwriting the original evidence.
