@@ -23,13 +23,13 @@ remote (`KarlLivesey/pymtheg`) and `gh` is signed in, so pull requests work.
 2. **Assign.** A builder is started in a fresh worktree branched from the current `origin/main`.
 3. **Build.** The builder works in small loops under `AGENTS.md`, runs the checks in section 6, and opens a pull request when it is satisfied the "done when" is met.
 4. **Review.** The manager assigns two independent reviewers, one Sol 6.1 and one Opus 5.5 at high effort (Karl, 11 November 2026). Each builds and tests a disposable checkout of the branch and returns **pass** or **changes needed** with specific findings. Both must pass.
-5. **Fix.** Findings go back to the same builder. A re-check is a new review assignment.
+5. **Fix.** Blocking findings go back to the same builder. Each re-check is a new pair of review assignments, repeated until both pass.
 6. **Merge.** When both reviewers pass with checks green, the manager merges the pull request on GitHub with a normal merge, deletes the branch, updates the ledger, and tells builders with open chunks to rebase.
 
 Limits that prevent the old review loop returning:
 
 - A review checks four things only: the "done when" is met, the result is correct, the change stayed inside its owned paths, and the tests are meaningful. No ratings, no cosmetic requests.
-- At most **two** review rounds per pull request. If it still has not passed, the manager decides: narrow the chunk, reassign it, or escalate to Karl.
+- No cap on rounds (Karl, 11 November 2026): if either reviewer says changes are needed, or the two disagree, the blocking findings go back to the builder, the fix is pushed, and both reviewers review again. This repeats until both pass. Only blocking findings (wrong result, unmet "done when", out-of-scope edit, meaningless test) send it back; the manager settles whether a disputed finding is blocking.
 - A reviewer's optional suggestions are recorded as backlog, not as conditions.
 
 ## 3. Keeping chunks apart
