@@ -46,7 +46,7 @@ reference to it becomes a candidate set of all of them, never a pick.
 | `method` (interface) | `I.M`, `data.interface: true` | method element |
 | `struct`, `interface`, `type` (defined), `alias` | name | type spec |
 | `field` | `T.f`; an embedded field is `T.Embedded` with `data.embedded` | name to end of field |
-| `struct` (local/anonymous, `data.local`) | `<enclosing>.<name>` for a function-local type, `<enclosing>.struct#<n>` for an anonymous struct type that embeds something | the struct type |
+| local/anonymous type (`data.local`; any type kind) | `<file>:<enclosing>.<name>` for a function-local type, `<file>:<enclosing>.struct#<n>` for an anonymous struct type that embeds something; `#2`, `#3`, … for a repeat in the same file. Unique per package | the type spec / struct type |
 | `var`, `const` (package level) | name (blank `_` is not a symbol) | name to end of spec |
 
 Generic functions and types have `data.generic`. Interfaces that contain type-set
@@ -270,17 +270,31 @@ cannot have `h`, and such types are ruled out (for example `MuMock{ sync.Mutex }
 for an internal interface). Definite `implements` links stay proof-based.
 
 **Local and anonymous types.** Every function-local type declaration (struct,
-interface, defined type, alias) becomes a symbol (`data.local`, identity
-`<enclosing>.<name>`, with `#2`, `#3`, … for a repeated name in the same file).
-So does every anonymous struct type (a literal, field or variable type) that embeds
-something (`<enclosing>.struct#<n>` in source order). Each gets its fields,
-interface elements and `embeds` links.
+interface, defined type, alias) becomes a symbol (`data.local`), and so does every
+anonymous struct type (a literal, field or variable type) that embeds something.
+Each gets its fields, interface elements and `embeds` links.
+
+**Identity scheme, unique per package:**
+
+- `<file>:<enclosing>.<name>` for a local type, for example
+  `p.go:init.l` or `p.go:(*T).M.l`;
+- `<file>:<enclosing>.struct#<n>` for the n-th anonymous struct in the enclosing
+  declaration, in source order;
+- `#2`, `#3`, … appended for a repeated identity in the same file.
+
+The file name makes two files' `init` functions, or two build-variant copies of one
+function, distinct types. This full identity is the symbol's name and identity, the
+key of its members (fields, interface methods), and its spelling in method
+signatures (`implements` comparison). It is used wherever a local type is a key or
+is compared, so two local `t` types in different scopes never compare equal.
 
 Local type names are resolved scope-aware at parse time: a local type is visible
 from its declaration to the end of its block and shadows outer names, and the same
 name in two functions or blocks is two types. An embedded field naming a local type
-refers to that symbol (`TypeRef.l`). These types take part in method sets,
-`implements` and dispatch exactly like package-level types. An anonymous struct
+refers to that symbol (`TypeRef.l`). With the package-unique identity, these types
+take part in method sets, `implements`, dispatch and carriers exactly like
+package-level types. Values *of* a local type are still opaque to member lookup
+(`var v lt; v.M()` stays unresolved; backlog). An anonymous struct
 type that embeds nothing has no methods, so it is not a symbol.
 
 **One structure function (`view`).** Every consumer asks the same function what a
@@ -499,6 +513,24 @@ has 22 mutations, and all fail tests.
 
 `carriersOf` (the separate fixpoint) is removed: carriers are exported types for
 which `view` and the selector find `h`, or cannot decide. The module version is 9.
+
+## Module version 10 (seventh review)
+
+Regressions are in `test/graph-go-review7.test.mjs`. `evidence/w2-b/mutations.mjs`
+has 25 mutations, and all fail tests.
+
+1. Local type identities are unique per package (identity scheme above). They are
+   used in members, signatures, method sets, `implements`, dispatch and carriers.
+   1. The two `t` in `F` and `G` no longer make `F.w implements G.j`.
+   2. Same-shaped anonymous structs in several files' `init` functions, and local
+      types in build-variant copies of one function, no longer share members.
+2. A type's own declared methods are known at depth 0 whatever its underlying type
+   is. An unknown or external underlying type makes only the inherited part
+   unknown. So `type w Base; func (w) M()` keeps `(w).M`, and `w implements I` is
+   definite when every method of `I` is declared on `w`. If some are not, the set is
+   open.
+
+The module version is 10.
 
 ## Core after PR 11 (W2-I)
 

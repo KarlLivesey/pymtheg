@@ -449,9 +449,12 @@ export class GoExtractor {
   private localIdentities = new Set<string>();
   /** A file-unique identity for a function-local or anonymous type. */
   private localIdentity(base: string): string {
-    let identity = base;
+    // Unique per package: the file name, then the enclosing declaration, the local
+    // name (or struct#n), and #2, #3, … for a repeated name in the same file.
+    const scoped = `${basename(this.path)}:${base}`;
+    let identity = scoped;
     for (let index = 2; this.localIdentities.has(identity); index++)
-      identity = `${base}#${index}`;
+      identity = `${scoped}#${index}`;
     this.localIdentities.add(identity);
     return identity;
   }
@@ -774,7 +777,11 @@ export class GoExtractor {
   /** Type text with named types marked for package-qualified comparison during resolution. */
   private template(node: Node): string {
     if (node.type === "type_identifier") {
-      if (this.local(node.text)) return `?${node.text}`;
+      const bound = this.local(node.text);
+      // A local type: its package-unique identity (not its spelling).
+      if (bound?.k === "localtype" && bound.sym)
+        return `\u0005${bound.sym}\u0003`;
+      if (bound) return `?${node.text}`;
       // Predeclared names are marked so resolution can tell a shadowing declaration.
       return PREDECLARED_TYPES.has(node.text)
         ? `\u0004${node.text}\u0003`

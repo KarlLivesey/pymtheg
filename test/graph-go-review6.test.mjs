@@ -291,6 +291,6 @@ test("embeds links to function-local types resolve to the local symbol", async (
   const embeds = links.filter((link) => link.kind === "embeds");
   assert.deepEqual(
     embeds.map((link) => link.target),
-    ["p/p.go:type:Print.findNode"],
+    ["p/p.go:type:p.go:Print.findNode"],
   );
 });

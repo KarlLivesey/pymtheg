@@ -85,6 +85,8 @@ interface View {
   embedded: { value: TypeValue; pointer: boolean; key: string }[];
   /** The structure cannot be fully determined. */
   unknown?: true;
+  /** Methods declared on the type itself: known even when the rest is unknown. */
+  declared?: (name: string) => GraphSymbol[];
   /** Only because of a type outside the project (cannot hold project-unexported names). */
   externalOnly?: true;
 }
@@ -807,6 +809,7 @@ class GoResolver {
       own(name).filter((symbol) => symbol.kind === "method");
     const unknown = (externalOnly = false): View => ({
       members: declared,
+      declared,
       embedded: [],
       unknown: true,
       ...(externalOnly ? { externalOnly: true } : {}),
@@ -920,7 +923,11 @@ class GoResolver {
         // A structure that cannot be determined: its members at this depth are unknown.
         if (
           views.some(
-            (item) => item.unknown && !(item.externalOnly && skipExternal),
+            (item) =>
+              item.unknown &&
+              !(item.externalOnly && skipExternal) &&
+              // A method declared on the type itself is known at this depth.
+              !item.declared?.(name).length,
           )
         )
           externalAt = Math.min(externalAt ?? depth, depth);
@@ -1050,28 +1057,35 @@ class GoResolver {
   private canonical(sig: string, file: string): string {
     const info = this.files.get(file);
     const own = info?.pkg ? this.pkgIdentity(info.pkg) : `?${file}`;
-    return sig
-      .replace(/\u0004([^\u0003]+)\u0003/g, (_, name: string) =>
-        info?.pkg && this.packageDecl(info.pkg, name, file).some(isTypeSymbol)
-          ? `${own}.${name}`
-          : name,
-      )
-      .replace(
-        /\u0001([^\u0003]+)\u0003/g,
-        (_, name: string) => `${own}.${name}`,
-      )
-      .replace(
-        /\u0002([^.]+)\.([^\u0003]+)\u0003/g,
-        (_, q: string, name: string) => {
-          const entry = info?.imports.get(q);
-          const target = entry
-            ? entry.pkgs.length
-              ? this.pkgIdentity(entry.pkgs[0]!)
-              : entry.path
-            : `?${q}`;
-          return `${target}.${name}`;
-        },
-      );
+    return (
+      sig
+        // A function-local type: its package-unique identity.
+        .replace(
+          /\u0005([^\u0003]+)\u0003/g,
+          (_, local: string) => `${own}.local:${local}`,
+        )
+        .replace(/\u0004([^\u0003]+)\u0003/g, (_, name: string) =>
+          info?.pkg && this.packageDecl(info.pkg, name, file).some(isTypeSymbol)
+            ? `${own}.${name}`
+            : name,
+        )
+        .replace(
+          /\u0001([^\u0003]+)\u0003/g,
+          (_, name: string) => `${own}.${name}`,
+        )
+        .replace(
+          /\u0002([^.]+)\.([^\u0003]+)\u0003/g,
+          (_, q: string, name: string) => {
+            const entry = info?.imports.get(q);
+            const target = entry
+              ? entry.pkgs.length
+                ? this.pkgIdentity(entry.pkgs[0]!)
+                : entry.path
+              : `?${q}`;
+            return `${target}.${name}`;
+          },
+        )
+    );
   }
   private pkgIdentity(pkg: Pkg): string {
     return pkg.importPath ?? `dir:${pkg.directory}:${pkg.name}`;
