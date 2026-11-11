@@ -1,7 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
 import { compare, fileFacts, validateResult } from "./identity.js";
-import { decideLink, resolutionFacts } from "./analysis.js";
+import { LinkDecider, resolutionFacts } from "./analysis.js";
 import type {
   ContextFile,
   GraphStorage,
@@ -17,27 +17,67 @@ import type {
 export class SqliteGraphStore implements GraphStorage {
   private readonly db: DatabaseSync;
   readonly projectId: string;
+  private readonly decodedFiles = new Map<
+    string,
+    { body: string; file: GraphFile }
+  >();
+  private readonly fileBodies = new Map<string, string>();
+  private readonly decodedContexts = new Map<string, ContextFile>();
+  private decodeFile(body: string): GraphFile {
+    const parsed = this.decodedFiles.get(body);
+    if (parsed) return structuredClone(parsed.file);
+    const file = JSON.parse(body) as GraphFile;
+    // Only the current captured record for a path is retained.
+    const previous = this.fileBodies.get(file.path);
+    if (previous !== undefined) this.decodedFiles.delete(previous);
+    this.fileBodies.set(file.path, body);
+    this.decodedFiles.set(body, { body, file });
+    return structuredClone(file);
+  }
   constructor(path: string, projectId?: string) {
     this.db = new DatabaseSync(path);
     try {
       this.db.exec(`PRAGMA foreign_keys=ON;
         CREATE TABLE IF NOT EXISTS graph_meta(key TEXT PRIMARY KEY,value TEXT NOT NULL);`);
       this.db
-        .prepare("INSERT OR IGNORE INTO graph_meta VALUES ('schema','2')")
+        .prepare("INSERT OR IGNORE INTO graph_meta VALUES ('schema','3')")
         .run();
       if (
         this.db.prepare("SELECT value FROM graph_meta WHERE key='schema'").get()
-          ?.value !== "2"
+          ?.value !== "3"
       )
         throw Error("Unsupported graph schema; rebuild the index");
       this.db
-        .exec(`CREATE TABLE IF NOT EXISTS graph_files(path TEXT PRIMARY KEY,body TEXT NOT NULL);
+        .exec(`CREATE TABLE IF NOT EXISTS graph_files(path TEXT PRIMARY KEY,body TEXT NOT NULL,status TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS graph_contexts(path TEXT PRIMARY KEY,body TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS graph_symbols(id TEXT PRIMARY KEY,file TEXT NOT NULL REFERENCES graph_files(path) ON DELETE CASCADE,name TEXT NOT NULL,kind TEXT NOT NULL,body TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS graph_links(id TEXT PRIMARY KEY,file TEXT NOT NULL REFERENCES graph_files(path) ON DELETE CASCADE,source TEXT REFERENCES graph_symbols(id) ON DELETE CASCADE,target TEXT REFERENCES graph_symbols(id) ON DELETE SET NULL,kind TEXT NOT NULL,body TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS graph_candidates(link TEXT NOT NULL REFERENCES graph_links(id) ON DELETE CASCADE,symbol TEXT NOT NULL REFERENCES graph_symbols(id) ON DELETE CASCADE,PRIMARY KEY(link,symbol));
-        CREATE INDEX IF NOT EXISTS graph_symbol_name ON graph_symbols(name);
-        CREATE INDEX IF NOT EXISTS graph_symbol_file ON graph_symbols(file);
+        CREATE TABLE IF NOT EXISTS graph_links(id TEXT PRIMARY KEY,file TEXT NOT NULL REFERENCES graph_files(path) ON DELETE CASCADE,source TEXT REFERENCES graph_symbols(id) ON DELETE CASCADE,target TEXT REFERENCES graph_symbols(id) ON DELETE SET NULL,kind TEXT NOT NULL,body TEXT NOT NULL,module TEXT NOT NULL,origin TEXT NOT NULL,resolution TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS graph_candidates(link TEXT NOT NULL REFERENCES graph_links(id) ON DELETE CASCADE,symbol TEXT NOT NULL REFERENCES graph_symbols(id) ON DELETE CASCADE,kind TEXT NOT NULL,PRIMARY KEY(link,symbol));
+        CREATE INDEX IF NOT EXISTS graph_symbol_name ON graph_symbols(name,id);
+        CREATE INDEX IF NOT EXISTS graph_symbol_name_kind ON graph_symbols(name,kind,id);
+        CREATE INDEX IF NOT EXISTS graph_symbol_name_file ON graph_symbols(name,file,id);
+        CREATE INDEX IF NOT EXISTS graph_symbol_name_kind_file ON graph_symbols(name,kind,file,id);
+        CREATE INDEX IF NOT EXISTS graph_symbol_kind_file ON graph_symbols(kind,file,id);
+        CREATE INDEX IF NOT EXISTS graph_symbol_file ON graph_symbols(file,id);
+        CREATE INDEX IF NOT EXISTS graph_symbol_kind ON graph_symbols(kind,id);
+        CREATE INDEX IF NOT EXISTS graph_link_file ON graph_links(file);
+        CREATE INDEX IF NOT EXISTS graph_link_module ON graph_links(module);
+        CREATE INDEX IF NOT EXISTS graph_link_resolution ON graph_links(resolution);
+        CREATE INDEX IF NOT EXISTS graph_candidate_symbol ON graph_candidates(symbol,kind,link);
+        CREATE TRIGGER IF NOT EXISTS graph_target_changed AFTER UPDATE OF target ON graph_links
+        WHEN OLD.target IS NOT NEW.target BEGIN
+          UPDATE graph_links SET resolution=CASE WHEN NEW.target IS NOT NULL THEN 'resolved'
+            WHEN EXISTS(SELECT 1 FROM graph_candidates WHERE link=NEW.id) THEN 'ambiguous' ELSE 'unresolved' END WHERE id=NEW.id;
+        END;
+        CREATE TRIGGER IF NOT EXISTS graph_candidate_added AFTER INSERT ON graph_candidates BEGIN
+          UPDATE graph_links SET resolution='ambiguous' WHERE id=NEW.link AND target IS NULL AND resolution!='ambiguous';
+        END;
+        CREATE TRIGGER IF NOT EXISTS graph_candidate_removed AFTER DELETE ON graph_candidates BEGIN
+          UPDATE graph_links SET resolution=CASE WHEN target IS NOT NULL THEN 'resolved'
+            WHEN EXISTS(SELECT 1 FROM graph_candidates WHERE link=OLD.link) THEN 'ambiguous' ELSE 'unresolved' END
+            WHERE id=OLD.link AND resolution IS NOT CASE WHEN target IS NOT NULL THEN 'resolved'
+            WHEN EXISTS(SELECT 1 FROM graph_candidates WHERE link=OLD.link) THEN 'ambiguous' ELSE 'unresolved' END;
+        END;
         CREATE INDEX IF NOT EXISTS graph_link_source ON graph_links(source,kind);
         CREATE INDEX IF NOT EXISTS graph_link_target ON graph_links(target,kind);`);
       this.db
@@ -67,29 +107,54 @@ export class SqliteGraphStore implements GraphStorage {
     return this.db
       .prepare("SELECT body FROM graph_files ORDER BY path")
       .all()
-      .map((row) => JSON.parse(row.body as string) as GraphFile)
+      .map((row) => this.decodeFile(row.body as string))
       .sort((a, b) => compare(a.path, b.path));
   }
   getFile(path: string): GraphFile | undefined {
     const row = this.db
       .prepare("SELECT body FROM graph_files WHERE path=?")
       .get(path);
-    return row ? (JSON.parse(row.body as string) as GraphFile) : undefined;
+    return row ? this.decodeFile(row.body as string) : undefined;
   }
   contexts(): ContextFile[] {
-    return this.db
+    const bodies = this.db
       .prepare("SELECT body FROM graph_contexts ORDER BY path")
       .all()
-      .map((row) => JSON.parse(row.body as string) as ContextFile)
+      .map((row) => row.body as string);
+    const retained = new Set(bodies);
+    for (const body of this.decodedContexts.keys())
+      if (!retained.has(body)) this.decodedContexts.delete(body);
+    return bodies
+      .map((body) => {
+        let file = this.decodedContexts.get(body);
+        if (!file) {
+          file = JSON.parse(body) as ContextFile;
+          this.decodedContexts.set(body, file);
+        }
+        return structuredClone(file);
+      })
       .sort((a, b) => compare(a.path, b.path));
   }
   replaceContexts(files: readonly ContextFile[]): void {
-    const sorted = [...files].sort((a, b) => compare(a.path, b.path));
-    if (JSON.stringify(this.contexts()) === JSON.stringify(sorted)) return;
+    const previous = new Map(
+      this.contexts().map((file) => [file.path, JSON.stringify(file)]),
+    );
+    const desired = new Map(
+      files.map((file) => [file.path, JSON.stringify(file)]),
+    );
+    if (desired.size !== files.length) throw Error("Duplicate context file");
+    const changed = [...desired].filter(
+      ([path, body]) => previous.get(path) !== body,
+    );
+    const removed = [...previous.keys()].filter((path) => !desired.has(path));
+    if (!changed.length && !removed.length) return;
     this.transaction(() => {
-      this.db.exec("DELETE FROM graph_contexts");
-      const insert = this.db.prepare("INSERT INTO graph_contexts VALUES (?,?)");
-      for (const file of sorted) insert.run(file.path, JSON.stringify(file));
+      const remove = this.db.prepare("DELETE FROM graph_contexts WHERE path=?");
+      const insert = this.db.prepare(
+        "INSERT INTO graph_contexts VALUES (?,?) ON CONFLICT(path) DO UPDATE SET body=excluded.body",
+      );
+      for (const path of removed) remove.run(path);
+      for (const [path, body] of changed) insert.run(path, body);
     });
   }
   replaceFile(file: GraphFile): void {
@@ -108,9 +173,9 @@ export class SqliteGraphStore implements GraphStorage {
       this.db.prepare("DELETE FROM graph_links WHERE file=?").run(file.path);
       this.db
         .prepare(
-          "INSERT INTO graph_files VALUES (?,?) ON CONFLICT(path) DO UPDATE SET body=excluded.body",
+          "INSERT INTO graph_files VALUES (?,?,?) ON CONFLICT(path) DO UPDATE SET body=excluded.body,status=excluded.status",
         )
-        .run(file.path, JSON.stringify(file));
+        .run(file.path, JSON.stringify(file), file.result.status);
       const insert = this.db.prepare(
         "INSERT INTO graph_symbols VALUES (?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,kind=excluded.kind,body=excluded.body",
       );
@@ -142,7 +207,7 @@ export class SqliteGraphStore implements GraphStorage {
   }
   private insertLink(link: GraphLink): void {
     this.db
-      .prepare("INSERT INTO graph_links VALUES (?,?,?,?,?,?)")
+      .prepare("INSERT INTO graph_links VALUES (?,?,?,?,?,?,?,?,?)")
       .run(
         link.id,
         link.file,
@@ -150,14 +215,20 @@ export class SqliteGraphStore implements GraphStorage {
         link.targetId,
         link.kind,
         JSON.stringify(link),
+        link.module,
+        link.origin,
+        link.resolution,
       );
     for (const candidate of link.candidates)
       this.db
-        .prepare("INSERT INTO graph_candidates VALUES (?,?)")
-        .run(link.id, candidate.id);
+        .prepare("INSERT INTO graph_candidates VALUES (?,?,?)")
+        .run(link.id, candidate.id, link.kind);
   }
   removeFile(path: string): void {
     this.db.prepare("DELETE FROM graph_files WHERE path=?").run(path);
+    const body = this.fileBodies.get(path);
+    if (body !== undefined) this.decodedFiles.delete(body);
+    this.fileBodies.delete(path);
   }
   findSymbols(query: SymbolQuery = {}): GraphSymbol[] {
     const conditions: string[] = [];
@@ -167,77 +238,67 @@ export class SqliteGraphStore implements GraphStorage {
         conditions.push(`${key}=?`);
         values.push(query[key]);
       }
-    const statuses = new Map(
-      this.files().map((file) => [file.path, file.result.status]),
-    );
     return this.db
       .prepare(
         `SELECT body FROM graph_symbols ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""} ORDER BY id`,
       )
       .all(...values)
-      .map((row) => {
-        const symbol = JSON.parse(row.body as string) as GraphSymbol;
-        return { ...symbol, status: statuses.get(symbol.file)! };
-      });
+      .map((row) => JSON.parse(row.body as string) as GraphSymbol);
   }
-  links(): GraphLink[] {
-    const symbols = new Map(
-      this.findSymbols().map((symbol) => [symbol.id, symbol]),
-    );
-    const statuses = new Map(
-      this.files().map((file) => [file.path, file.result.status]),
-    );
-    const candidates = new Map<string, string[]>();
-    for (const row of this.db
-      .prepare("SELECT link,symbol FROM graph_candidates ORDER BY link,symbol")
-      .all()) {
-      const values = candidates.get(row.link as string) ?? [];
-      values.push(row.symbol as string);
-      candidates.set(row.link as string, values);
-    }
+  private selectLinks(where = "", values: string[] = []): GraphLink[] {
     return this.db
-      .prepare("SELECT body,target FROM graph_links ORDER BY id")
-      .all()
+      .prepare(
+        `SELECT l.body,l.target,f.status AS sourceStatus,tf.status AS targetStatus,
+      (SELECT json_group_array(json_object('id',id,'status',status)) FROM
+        (SELECT c.symbol AS id,cf.status AS status FROM graph_candidates c
+         JOIN graph_symbols cs ON cs.id=c.symbol JOIN graph_files cf ON cf.path=cs.file
+         WHERE c.link=l.id ORDER BY c.symbol)) AS candidates
+      FROM graph_links l JOIN graph_files f ON f.path=l.file
+      LEFT JOIN graph_symbols ts ON ts.id=l.target LEFT JOIN graph_files tf ON tf.path=ts.file
+      ${where ? `WHERE ${where}` : ""} ORDER BY l.id`,
+      )
+      .all(...values)
       .map((row) => {
         const link = JSON.parse(row.body as string) as GraphLink;
-        const options = (candidates.get(link.id) ?? []).map((id) => ({
-          id,
-          status: symbols.get(id)!.status,
-        }));
+        const candidates = JSON.parse(
+          row.candidates as string,
+        ) as GraphLink["candidates"];
         const targetId = row.target as string | null;
         return {
           ...link,
           targetId,
-          targetStatus: targetId ? symbols.get(targetId)!.status : null,
-          sourceStatus: statuses.get(link.file)!,
-          candidates: options,
+          targetStatus: (row.targetStatus ?? null) as GraphLink["targetStatus"],
+          sourceStatus: row.sourceStatus as GraphLink["sourceStatus"],
+          candidates,
           resolution: targetId
             ? "resolved"
-            : options.length
+            : candidates.length
               ? "ambiguous"
               : "unresolved",
         };
       });
   }
+  links(): GraphLink[] {
+    return this.selectLinks();
+  }
   outgoing(id: string, kind?: string): GraphLink[] {
-    return this.links().filter(
-      (link) =>
-        link.sourceId === id && (kind === undefined || link.kind === kind),
+    return this.selectLinks(
+      `l.source=?${kind === undefined ? "" : " AND l.kind=?"}`,
+      kind === undefined ? [id] : [id, kind],
     );
   }
   incoming(id: string, kind?: string): GraphLink[] {
-    return this.links().filter(
-      (link) =>
-        (link.targetId === id ||
-          link.candidates.some((candidate) => candidate.id === id)) &&
-        (kind === undefined || link.kind === kind),
+    const filter = kind === undefined ? "" : " AND kind=?";
+    return this.selectLinks(
+      `l.id IN (SELECT id FROM graph_links WHERE target=?${filter} UNION SELECT link FROM graph_candidates WHERE symbol=?${filter})`,
+      kind === undefined ? [id, id] : [id, kind, id, kind],
     );
   }
   unresolved(): GraphLink[] {
-    return this.links().filter((link) => link.resolution === "unresolved");
+    return this.selectLinks("l.resolution='unresolved'");
   }
   ambiguous(): GraphLink[] {
-    return this.links().filter((link) => link.resolution === "ambiguous");
+    return this.selectLinks("l.resolution='ambiguous'");
   }
   private writeTargets(
     current: readonly GraphLink[],
@@ -258,30 +319,28 @@ export class SqliteGraphStore implements GraphStorage {
       this.db.prepare("DELETE FROM graph_candidates WHERE link=?").run(link.id);
       for (const candidate of link.candidates)
         this.db
-          .prepare("INSERT INTO graph_candidates VALUES (?,?)")
-          .run(link.id, candidate.id);
+          .prepare("INSERT INTO graph_candidates VALUES (?,?,?)")
+          .run(link.id, candidate.id, link.kind);
     }
   }
   resolveLinks(resolutions: readonly LinkResolution[]): void {
     const current = this.links();
-    const symbols = this.findSymbols();
+    const decider = new LinkDecider(this.findSymbols());
+    const linkIds = new Set(current.map((link) => link.id));
     const decisions = new Map<string, LinkResolution>();
     for (const item of resolutions) {
-      if (
-        decisions.has(item.linkId) ||
-        !current.some((link) => link.id === item.linkId)
-      )
+      if (decisions.has(item.linkId) || !linkIds.has(item.linkId))
         throw Error("Invalid or duplicate link resolution");
       decisions.set(item.linkId, item);
     }
     const desired = current.map((link) =>
-      decideLink(link, decisions.get(link.id), symbols),
+      decider.decide(link, decisions.get(link.id)),
     );
     if (JSON.stringify(current) !== JSON.stringify(desired))
       this.transaction(() => this.writeTargets(current, desired));
   }
   replaceAnalysis(module: string, result: ResolutionResult): void {
-    const current = this.links().filter((link) => link.module === module);
+    const current = this.selectLinks("l.module=?", [module]);
     const desired = resolutionFacts(
       this.projectId,
       module,
@@ -293,6 +352,7 @@ export class SqliteGraphStore implements GraphStorage {
     if (JSON.stringify(current) === JSON.stringify(desired)) return;
     this.transaction(() => {
       const wanted = new Map(desired.map((link) => [link.id, link]));
+      const previous = new Map(current.map((link) => [link.id, link]));
       for (const link of current)
         if (
           link.origin === "analysis" &&
@@ -303,33 +363,41 @@ export class SqliteGraphStore implements GraphStorage {
       for (const link of desired)
         if (
           link.origin === "analysis" &&
-          !current.some(
-            (old) =>
-              old.id === link.id &&
-              JSON.stringify(old) === JSON.stringify(link),
-          )
+          JSON.stringify(previous.get(link.id)) !== JSON.stringify(link)
         )
           this.insertLink(link);
-      this.writeTargets(current, desired);
+      this.writeTargets(
+        current,
+        desired.filter((link) => link.origin === "parse"),
+      );
     });
   }
   neighbourhood(id: string, depth: number, kind?: string): Neighbourhood {
     if (!Number.isInteger(depth) || depth < 0 || depth > 100)
       throw Error("Depth must be an integer from 0 to 100");
-    const symbols = new Map(
-      this.findSymbols().map((symbol) => [symbol.id, symbol]),
+    const symbolById = this.db.prepare(
+      "SELECT body FROM graph_symbols WHERE id=?",
     );
-    if (!symbols.has(id)) return { symbols: [], links: [] };
+    if (!symbolById.get(id)) return { symbols: [], links: [] };
+    const filter = kind === undefined ? "" : " AND kind=?";
+    const incident = this.db
+      .prepare(`SELECT id FROM graph_links WHERE source=?${filter}
+      UNION SELECT id FROM graph_links WHERE target=?${filter}
+      UNION SELECT link AS id FROM graph_candidates WHERE symbol=?${filter}`);
     const visited = new Set([id]);
     const links = new Map<string, GraphLink>();
     let frontier = [id];
     for (let level = 0; level < depth && frontier.length; level++) {
       const next: string[] = [];
       for (const current of frontier)
-        for (const link of [
-          ...this.outgoing(current, kind),
-          ...this.incoming(current, kind),
-        ]) {
+        for (const row of incident.all(
+          ...(kind === undefined
+            ? [current, current, current]
+            : [current, kind, current, kind, current, kind]),
+        )) {
+          const linkId = row.id as string;
+          if (links.has(linkId)) continue;
+          const link = this.selectLinks("l.id=?", [linkId])[0]!;
           links.set(link.id, link);
           for (const endpoint of [
             link.sourceId,
@@ -344,7 +412,12 @@ export class SqliteGraphStore implements GraphStorage {
       frontier = next;
     }
     return {
-      symbols: [...visited].sort(compare).map((key) => symbols.get(key)!),
+      symbols: [...visited]
+        .sort(compare)
+        .map(
+          (key) =>
+            JSON.parse(symbolById.get(key)!.body as string) as GraphSymbol,
+        ),
       links: [...links.values()].sort((a, b) => compare(a.id, b.id)),
     };
   }

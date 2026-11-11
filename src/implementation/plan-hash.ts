@@ -10,6 +10,7 @@ const administrative = new Set([
   "evidenceRevision",
   "originRevision",
   "linkReviewRevision",
+  "linkBaselines",
   "sourceHashes",
   "sourceRoots",
   "sourceExpectations",
