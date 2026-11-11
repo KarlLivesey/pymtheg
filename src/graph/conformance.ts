@@ -205,6 +205,16 @@ export async function checkLanguageConformance(
     await indexProject(root, registry, store);
     assert.deepEqual(store.findSymbols(), symbols, "IDs survive replacement");
     assert.deepEqual(store.links(), links, "Resolution is deterministic");
+    for (const fixture of fixtures)
+      await writeFile(join(root, fixture.path), `\n${fixture.text}`);
+    const edited = await indexProject(root, registry, store);
+    assert.deepEqual(edited.analysisErrors, []);
+    assert.deepEqual(edited.resolutionErrors, []);
+    assert.deepEqual(
+      store.findSymbols().map((symbol) => symbol.id),
+      symbols.map((symbol) => symbol.id),
+      "IDs survive an edit above every symbol",
+    );
   } finally {
     store?.close();
     await rm(scratch, { recursive: true, force: true });
