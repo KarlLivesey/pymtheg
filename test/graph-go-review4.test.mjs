@@ -154,7 +154,9 @@ test("3: types that cannot supply another package's unexported method are ruled 
     "type QR struct{ io.Reader }",
     "func (QR) Do() {}",
   );
-  // Exported Sealed: open, but MuMock, RC and q.QR are still excluded.
+  // Exported Sealed in a public package (fifth review, item 2): outside code can
+  // reach a carrier of `hidden` (Sealed itself, T, U), so an external type may have
+  // inherited it; MuMock, RC and q.QR embed external types and cannot be ruled out.
   let { links } = await project({
     "go.mod": MOD,
     "p/p.go": sealed("p"),
@@ -162,9 +164,12 @@ test("3: types that cannot supply another package's unexported method are ruled 
   });
   let link = call(links, "p/p.go", "s.Do");
   assert.deepEqual(link.candidates, [
+    "p/p.go:method:(MuMock).Do",
+    "p/p.go:method:(RC).Do",
     "p/p.go:method:(T).Do",
     "p/p.go:method:(U).Do",
     "p/p.go:method:Sealed.Do",
+    "q/q.go:method:(QR).Do",
   ]);
   assert.deepEqual(link.data.open, OPEN);
   // In an internal package it is closed, with the same members.

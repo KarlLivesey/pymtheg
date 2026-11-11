@@ -1117,10 +1117,21 @@ export class GoExtractor {
           this.scoped(() => {
             this.walkTypeParams(typeParameters);
             const type = spec.childForFieldName("type");
-            if (type) this.walk(type);
+            // A local struct type embedding something can implement interfaces.
+            if (
+              type &&
+              name &&
+              spec.type === "type_spec" &&
+              unparen(type).type === "struct_type"
+            )
+              this.localStruct(unparen(type), name.text);
+            else if (type) this.walk(type);
           }, this.typeParams(typeParameters));
         }
         return;
+      case "struct_type":
+        // An anonymous struct type (literal, field or variable type).
+        return this.localStruct(node);
       case "func_literal":
         this.scoped(() => {
           this.parameters(node.childForFieldName("parameters"));
@@ -1201,9 +1212,13 @@ export class GoExtractor {
         // The container (or generic function) itself is referenced.
         this.walk(callee);
       } else if (callee.type === "func_literal") this.walk(callee);
-      else if (callee.type === "identifier") {
+      else if (isName(callee)) {
         const bound = this.local(callee.text);
-        if (!bound && PREDECLARED_TYPES.has(callee.text)) {
+        if (
+          !bound &&
+          (PREDECLARED_TYPES.has(callee.text) ||
+            PREDECLARED_VALUES.has(callee.text))
+        ) {
           // Conversion to a predeclared type such as string(b): not a call, unless
           // a package declaration named `string` shadows it.
           this.predeclared(callee, "call");
@@ -1266,6 +1281,33 @@ export class GoExtractor {
         expr: desc as unknown as Json,
       });
     if (unparen(operand).type !== "identifier") this.walk(operand);
+  }
+
+  private localStructs = new Map<string, number>();
+  /**
+   * A function-local or anonymous struct type. If it embeds anything, its promoted
+   * method set can implement interfaces, so it becomes a struct symbol (identity
+   * `<enclosing>.<name>` or `<enclosing>.struct#<n>` in source order, `data.local`)
+   * with its fields and `embeds` links, like a package-level struct.
+   */
+  private localStruct(node: Node, localName?: string): void {
+    const embeds = named(named(node)[0]).some(
+      (field) =>
+        field.type === "field_declaration" &&
+        !field.childrenForFieldName("name").length,
+    );
+    if (!embeds) return this.walkChildren(node);
+    const enclosing = this.byKey.get(this.owner)?.identity ?? "file";
+    let name: string;
+    if (localName !== undefined) name = `${enclosing}.${localName}`;
+    else {
+      const count = (this.localStructs.get(enclosing) ?? 0) + 1;
+      this.localStructs.set(enclosing, count);
+      name = `${enclosing}.struct#${count}`;
+    }
+    const key = this.symbol("struct", name, name, range(node), { local: true });
+    this.contains(this.owner, key, range(node));
+    this.within(key, () => this.structFields(name, key, node));
   }
 
   /** A use of a predeclared name: a link only if a package declaration shadows it. */

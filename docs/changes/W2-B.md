@@ -46,6 +46,7 @@ reference to it becomes a candidate set of all of them, never a pick.
 | `method` (interface) | `I.M`, `data.interface: true` | method element |
 | `struct`, `interface`, `type` (defined), `alias` | name | type spec |
 | `field` | `T.f`; an embedded field is `T.Embedded` with `data.embedded` | name to end of field |
+| `struct` (local/anonymous, `data.local`) | `<enclosing>.<name>` for a function-local type, `<enclosing>.struct#<n>` for an anonymous struct type that embeds something | the struct type |
 | `var`, `const` (package level) | name (blank `_` is not a symbol) | name to end of spec |
 
 Generic functions and types have `data.generic`. Interfaces that contain type-set
@@ -199,21 +200,70 @@ open sets (the same mechanism as `overflow` and `builtin`); closed sets have no
 | Reassigned function/method values | Every value ever assigned, each interface method expanded to its dispatch set | Closed if it includes no dispatch set. An included dispatch set has no static receiver interface (the value only records which method), so it is open |
 | Name-only (receiver type not evident) | Every concrete project method of the name a value could carry: any package, test files included; unexported names only from the caller's package | **Always open, `receiver-type-unknown`**: the value may be of a type outside the project |
 
-**Sealed interface (no type outside the project can implement it).** The
-interface needs an unexported method `m` of some package P such that nothing outside
-the project can obtain `m`, in one of three ways:
+**Sealed interface (no type outside the project can implement it).** One
+reachability rule decides it; anything uncertain means open.
 
-- P is `package main` (it cannot be imported);
-- P lies under an `internal/` directory (no outside module may import it); or
-- no exported, non-test project type **carries** `m`. A carrier is an interface whose
-  method set contains `m` (including the interface itself), a type whose method set
-  contains `m` (declared or promoted), or an alias to one. An exported carrier lets
-  outside code embed it, obtain `m`, override the exported methods and satisfy the
-  interface (the `testing.TB` pattern). So an exported interface with an
-  unexported method is **not** sealed unless P is `main` or internal.
+- An interface whose methods are all exported is never sealed.
+- An interface with an unexported method `h` of package P is sealed only if code
+  outside the project cannot obtain `h`. That holds when no **exported carrier** of
+  `h` is declared in an **outside-reachable** package.
+- **Carriers of `h`** are every project type whose method set includes `h`,
+  computed transitively over the whole project (a fixpoint):
+  - the declaring interface, and concrete types declaring `h`;
+  - any struct embedding a carrier, by value or pointer, at any depth, including
+    through embedded interfaces;
+  - any interface embedding a carrier interface;
+  - any **defined** type whose underlying type is a carrier (`type Pub i`;
+    `type Pub s2` with `type s2 struct{ a }`), because a defined type keeps an
+    interface's method set and a struct's promoted methods;
+  - any alias of a carrier;
+  - generic types by their declaration, which covers every instantiation.
+- **Exported** means an exported name declared at package level in a non-test file.
+  Function-local and anonymous types can never be named from outside.
+- **Outside-reachable** packages are project packages that code outside the project
+  can import, decided by import path within the package's own module:
+  - not `package main`, and not a `_test` package;
+  - no `internal` element in the import path *relative to its module*. A nested
+    `go.mod` under `internal/sub/` starts its own module with a plain import path,
+    so it is reachable. A package without a known module is assumed reachable.
+- **Uncertain** cases are open: an embedded or underlying project type that cannot
+  be resolved.
 
-An interface whose methods are all exported is never sealed. Each branch has a
-positive and a negative test in `test/graph-go-review4.test.mjs`.
+Reproductions that are open, each tested in `test/graph-go-review5.test.mjs`:
+
+- an internal interface whose implementer is re-exposed by an exported struct
+  (`api.Carrier{ p.A }`, also by pointer);
+- an exported interface embedding an internal interface;
+- a facade alias (`type Thing = p.I`);
+- a nested module under `internal/`;
+- defined types and generic aliases;
+- the same cases inside a `go.work` workspace.
+
+Controls that stay closed: everything unexported with no exported carrier;
+`package main`; a genuinely internal package with nothing re-exposed (including
+`internal/` inside a nested module).
+
+**The rule's one assumption:** a separate module whose import path shares the prefix
+above an `internal/` directory may import that directory (the `x/tools/gopls`
+pattern). Such modules are assumed to be part of the captured project. If one is
+not, an internal package's sealed interface could be implemented by it, and a set
+the graph calls closed would be missing that module's types.
+
+**Inherited hidden methods.** An external type cannot declare another package's
+unexported method, but it can inherit one by embedding an outside-reachable carrier.
+So when `h`'s carriers are reachable, a project type that embeds any external type
+(at any depth) cannot be ruled out as an implementer. Its matching method is listed
+as unproven, and the set is open. When no carrier is reachable, an external type
+cannot have `h`, and such types are ruled out (for example `MuMock{ sync.Mutex }`
+for an internal interface). Definite `implements` links stay proof-based.
+
+**Local and anonymous struct types.** A function-local struct type, or an
+anonymous struct type (a literal, field or variable type) that embeds anything,
+can implement interfaces through promoted methods. Each becomes a `struct` symbol
+(`data.local`, identity `<enclosing>.<name>` or `<enclosing>.struct#<n>` in source
+order) with its fields and `embeds` links. It takes part in method sets, `implements`
+and dispatch like a package-level struct. A local or anonymous struct type that
+embeds nothing has no methods, so it is not a symbol.
 
 **Invariant (tested):** a closed dispatch set lists only types with a proven
 `implements` link to the static interface. An open set may also list types that
@@ -371,6 +421,27 @@ module and requires each to fail a test.
 4. Predeclared identifiers are decided at resolution (see "Not extracted").
 
 The module version is 7.
+
+## Module version 8 (fifth review)
+
+Regressions are in `test/graph-go-review5.test.mjs`. `evidence/w2-b/mutations.mjs`
+has sixteen mutations; all fail tests.
+
+1. One reachability rule for sealed interfaces (above) replaces the three special
+   branches (`main`, `internal/`, exported carrier in the same package).
+2. Inherited hidden methods: a type embedding an external type cannot be ruled out
+   when the hidden method is outside-reachable.
+3. Function-local and anonymous struct types are implementers.
+4. Shadowed `nil`, `true`, `false`, `iota` in call position use the shared
+   predeclared-name mechanism; selector bases, composite-literal types and type
+   arguments are covered too.
+
+   Grammar limit: tree-sitter-go parses these four names as keywords, so a
+   composite literal of a type named `false` (`false{…}`) is a syntax error. The
+   file is partial and that declaration emits no links. A user type named like a
+   predeclared *type* (`string{…}`) parses and resolves.
+
+The module version is 8.
 
 ## Core after PR 11 (W2-I)
 

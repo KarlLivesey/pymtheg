@@ -9,7 +9,12 @@ import type {
   ResolutionContext,
   ResolutionResult,
 } from "../../types.js";
-import { directoryOfImport, importPathOf, readLayout } from "./gomod.js";
+import {
+  directoryOfImport,
+  importPathOf,
+  moduleOf,
+  readLayout,
+} from "./gomod.js";
 import type { GoProjectLayout } from "./gomod.js";
 import { TYPE_KINDS, type Desc, type FileFact, type TypeRef } from "./model.js";
 
@@ -1068,7 +1073,16 @@ class GoResolver {
         let unknown = false;
         for (const { name, sig, access } of methods.values()) {
           const has = this.hasMethod(type, name, sig, access);
-          if (has.unknown) {
+          // An external type cannot declare another package's unexported method but
+          // can inherit it from a carrier that outside code can reach: a project type
+          // embedding any external type then cannot be ruled out.
+          const inherited =
+            !has.pointer &&
+            !has.unknown &&
+            access !== undefined &&
+            this.embedsExternal(type) &&
+            this.hiddenReachable(name, access);
+          if (has.unknown || inherited) {
             unknown = true;
             continue;
           }
@@ -1318,16 +1332,9 @@ class GoResolver {
     return out;
   }
 
-  private sealedMemo = new Map<string, boolean>();
   /**
-   * No type outside the project can implement this interface. It needs an
-   * unexported method `m` of some package P such that nothing outside can obtain
-   * `m`: P is `package main`, or P lies under an `internal/` directory (no outside
-   * module may import it), or no exported, non-test project type carries `m` (an
-   * interface containing `m`, a type whose method set has `m`, or an alias to one).
-   * The interface itself counts as a carrier, so an exported sealed-looking
-   * interface is not sealed: outside code can embed it or an exported carrier and
-   * override the exported methods (the `testing.TB` pattern).
+   * No type outside the project can implement this interface: it has an unexported
+   * method that code outside the project cannot obtain (`hiddenReachable` false).
    */
   private sealed(iface: GraphSymbol): boolean {
     const methods = this.interfaceMethods(iface);
@@ -1335,46 +1342,145 @@ class GoResolver {
     for (const method of methods.values())
       if (
         method.access !== undefined &&
-        this.sealedName(method.name, method.access)
+        !this.hiddenReachable(method.name, method.access)
       )
         return true;
     return false;
   }
-  private sealedName(name: string, pkgKey: string): boolean {
+
+  private hiddenMemo = new Map<string, boolean>();
+  /**
+   * Can code outside the project obtain package `pkgKey`'s unexported method `name`
+   * (and so implement interfaces that need it)? Only through an exported CARRIER
+   * declared in an OUTSIDE-REACHABLE package. Anything uncertain answers yes.
+   */
+  private hiddenReachable(name: string, pkgKey: string): boolean {
     const key = `${pkgKey}\u0000${name}`;
-    const cached = this.sealedMemo.get(key);
+    const cached = this.hiddenMemo.get(key);
     if (cached !== undefined) return cached;
-    const pkg = this.pkgs.get(pkgKey);
-    let sealed = false;
-    if (
-      pkg &&
-      (pkg.name === "main" || pkg.directory.split("/").includes("internal"))
-    )
-      sealed = true;
-    else if (pkg) {
-      sealed = true;
-      for (const symbol of this.symbolsById.values()) {
-        if (!TYPE_KINDS.has(symbol.kind) || !exported(symbol.name)) continue;
-        if (this.files.get(symbol.file)?.fact.test) continue;
-        if (this.carries(symbol, name, pkgKey)) {
-          sealed = false;
-          break;
+    const { carriers, uncertain } = this.carriersOf(name, pkgKey);
+    let reachable = uncertain;
+    for (const carrier of carriers) {
+      if (reachable) break;
+      const data = (carrier.data ?? {}) as { local?: boolean };
+      if (
+        exported(carrier.name) &&
+        !data.local &&
+        !this.files.get(carrier.file)?.fact.test &&
+        this.outsideReachable(this.pkgOf(carrier))
+      )
+        reachable = true;
+    }
+    this.hiddenMemo.set(key, reachable);
+    return reachable;
+  }
+
+  /**
+   * A package that code outside the project can import: not `package main`, not a
+   * `_test` package, and no `internal` element in its import path relative to its
+   * own module (a nested go.mod starts a new module with a plain path). Assumes
+   * modules sharing the path prefix above an `internal/` directory are in the
+   * captured project (see the change note).
+   */
+  private outsideReachable(pkg: Pkg | undefined): boolean {
+    if (!pkg) return true;
+    if (pkg.name === "main" || pkg.name.endsWith("_test")) return false;
+    const module = moduleOf(this.layout, pkg.directory);
+    if (!module) return true;
+    const relative =
+      module.directory === ""
+        ? pkg.directory
+        : pkg.directory.slice(module.directory.length + 1);
+    return !relative.split("/").includes("internal");
+  }
+
+  /**
+   * Every project type whose method set includes package `pkgKey`'s unexported
+   * `name`, transitively: declaring interfaces and types, structs embedding a carrier
+   * at any depth (by value or pointer, including embedded interfaces), interfaces
+   * embedding a carrier, defined types and aliases whose underlying type is a
+   * carrier, generic types (by their declaration). `uncertain` when an embedded or
+   * underlying project type cannot be resolved.
+   */
+  private carriersOf(
+    name: string,
+    pkgKey: string,
+  ): { carriers: GraphSymbol[]; uncertain: boolean } {
+    const types = [...this.symbolsById.values()].filter((symbol) =>
+      TYPE_KINDS.has(symbol.kind),
+    );
+    const carrying = new Set<string>();
+    let uncertain = false;
+    const underlying = (type: GraphSymbol): TypeValue | undefined => {
+      const ref = (type.data as { underlying?: TypeRef } | undefined)
+        ?.underlying;
+      return ref ? this.typeFromRef(ref, type.file, 1) : undefined;
+    };
+    for (let changed = true, rounds = 0; changed && rounds < 50; rounds++) {
+      changed = false;
+      for (const type of types) {
+        if (carrying.has(type.id)) continue;
+        let carries = false;
+        if (type.kind === "interface") {
+          carries = this.ownMethods(type).some(
+            (method) =>
+              method.name === name && this.pkgOf(method)?.key === pkgKey,
+          );
+          for (const item of this.embedded(type)) {
+            if (item.value.kind === "project")
+              carries ||= item.value.syms.some((sym) => carrying.has(sym.id));
+            else if (item.value.kind === "unknown") uncertain = true;
+          }
+        } else if (type.kind === "struct") {
+          const found = this.selectName([type], name, undefined, pkgKey);
+          carries = found.kind === "found" || found.kind === "ambiguous";
+          // Embedded defined types/aliases that carry it are found via the fixpoint.
+          for (const item of this.embedded(type)) {
+            if (item.value.kind === "project")
+              carries ||= item.value.syms.some((sym) => carrying.has(sym.id));
+            else if (item.value.kind === "unknown") uncertain = true;
+          }
+        } else {
+          // Defined type or alias: keeps an interface's method set and a struct's
+          // promoted methods (conservatively: any carrying underlying type).
+          const value = underlying(type);
+          if (value?.kind === "project")
+            carries = value.syms.some((sym) => carrying.has(sym.id));
+          else if (value?.kind === "unknown") uncertain = true;
+          // Methods declared on a defined type itself.
+          if (!carries) {
+            const found = this.selectName([type], name, undefined, pkgKey);
+            carries = found.kind === "found";
+          }
+        }
+        if (carries) {
+          carrying.add(type.id);
+          changed = true;
         }
       }
     }
-    this.sealedMemo.set(key, sealed);
-    return sealed;
+    return {
+      carriers: types.filter((type) => carrying.has(type.id)),
+      uncertain,
+    };
   }
-  /** The type's method set contains package `pkgKey`'s unexported method `name`. */
-  private carries(type: GraphSymbol, name: string, pkgKey: string): boolean {
-    const resolved = this.typeSyms([type], 1);
-    if (resolved.kind !== "project") return false;
-    return resolved.syms.some((symbol) => {
-      if (symbol.kind === "interface")
-        return !!this.interfaceMethods(symbol)?.has(`${name}\u0000${pkgKey}`);
-      const found = this.selectName([symbol], name, undefined, pkgKey);
-      return found.kind === "found" || found.kind === "ambiguous";
-    });
+
+  private externalMemo = new Map<string, boolean>();
+  /** The type embeds, at any depth, a type outside the project (or an unresolvable one). */
+  private embedsExternal(type: GraphSymbol, seen = new Set<string>()): boolean {
+    const cached = this.externalMemo.get(type.id);
+    if (cached !== undefined) return cached;
+    if (seen.has(type.id)) return false;
+    seen.add(type.id);
+    let result = false;
+    for (const item of this.embedded(type)) {
+      if (item.value.kind !== "project") result = true;
+      else if (item.value.syms.some((sym) => this.embedsExternal(sym, seen)))
+        result = true;
+      if (result) break;
+    }
+    this.externalMemo.set(type.id, result);
+    return result;
   }
 
   /**
