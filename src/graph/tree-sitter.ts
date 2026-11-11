@@ -1,14 +1,48 @@
 import { createRequire } from "node:module";
 import { readFile } from "node:fs/promises";
-import { Language, Parser, Query, type QueryMatch } from "web-tree-sitter";
-import type { ParseResult, SymbolDraft } from "./types.js";
+import {
+  Language,
+  Parser,
+  Query,
+  type QueryMatch,
+  type Tree,
+  type Node,
+} from "web-tree-sitter";
+import type {
+  ParseResult,
+  SymbolDraft,
+  SourceRange,
+  LinkDraft,
+} from "./types.js";
 const require = createRequire(import.meta.url);
 let initialized: Promise<void> | undefined;
+export interface TagReference {
+  kind: string;
+  name: string;
+  range: SourceRange;
+  node: Node;
+  match: QueryMatch;
+}
+export interface TagsPass {
+  /** Borrowed until the callback returns. Never retain native nodes/trees. */
+  tree: Tree;
+  matches: readonly QueryMatch[];
+  references: readonly TagReference[];
+  result: ParseResult;
+}
 export interface TagsOptions {
   /** Absolute grammar WASM path; resolve from the language module's package. */
   wasmPath: string;
   /** Full tags.scm contents; paired @name / @definition.kind captures are mapped. */
   query: string;
+  /** Runs synchronously while the whole tree and all reference captures are alive.
+   * Add language-specific links/scopes or replace/deduplicate symbols on result. */
+  secondPass?: (pass: TagsPass) => void;
+  /** Optional reference-to-link mapper; undefined retains exposure through secondPass. */
+  mapReference?: (
+    reference: TagReference,
+    symbols: readonly SymbolDraft[],
+  ) => LinkDraft | undefined;
   /** Override symbol mapping for scope, custom kinds or metadata. No tree may escape parse(). */
   mapDefinition?: (
     match: QueryMatch,
@@ -48,10 +82,26 @@ export async function createTagsParser(
       try {
         const symbols: SymbolDraft[] = [];
         const seen = new Set<string>();
-        for (const match of query.matches(tree.rootNode)) {
+        const matches = query.matches(tree.rootNode);
+        const references: TagReference[] = [];
+        for (const match of matches) {
           const name = match.captures.find(
             (capture) => capture.name === "name",
           )?.node;
+          for (const capture of match.captures.filter((item) =>
+            item.name.startsWith("reference."),
+          )) {
+            references.push({
+              kind: capture.name.slice("reference.".length),
+              name: name?.text ?? capture.node.text,
+              range: {
+                start: capture.node.startIndex,
+                end: capture.node.endIndex,
+              },
+              node: capture.node,
+              match,
+            });
+          }
           for (const capture of match.captures.filter((item) =>
             item.name.startsWith("definition."),
           )) {
@@ -61,6 +111,7 @@ export async function createTagsParser(
             const symbol: SymbolDraft = {
               key,
               name: name.text,
+              identity: name.text,
               kind,
               range: {
                 start: capture.node.startIndex,
@@ -76,7 +127,7 @@ export async function createTagsParser(
             }
           }
         }
-        return {
+        const result: ParseResult = {
           status: tree.rootNode.hasError ? "partial" : "clean",
           diagnostics: tree.rootNode.hasError
             ? [{ message: "Tree-sitter syntax error or missing node" }]
@@ -84,6 +135,18 @@ export async function createTagsParser(
           symbols,
           links: [],
         };
+        for (const reference of references) {
+          const link = options.mapReference?.(reference, symbols);
+          if (link) result.links.push(link);
+        }
+        options.secondPass?.({ tree, matches, references, result });
+        if (tree.rootNode.hasError && result.status === "clean") {
+          result.status = "partial";
+          result.diagnostics.push({
+            message: "Tree-sitter syntax error or missing node",
+          });
+        }
+        return result;
       } finally {
         tree.delete();
       }

@@ -40,7 +40,13 @@ const fixtureRoot = new URL("./fixtures/graph/toy/", import.meta.url);
 const byName = (store, name) => store.findSymbols({ name })[0];
 
 test("convention discovery needs no language list or core edits", async () => {
-  const registry = await discoverLanguages();
+  assert.equal(
+    (await discoverLanguages()).claim("nested/example.toy"),
+    undefined,
+  );
+  const registry = await discoverLanguages(undefined, {
+    includeTestOnly: true,
+  });
   assert.equal(registry.claim("nested/example.toy").id, "toy");
   const core = await readFile(
     new URL("../src/graph/registry.ts", import.meta.url),
@@ -265,7 +271,7 @@ test("module revision invalidates cache, malformed facts fail explicitly, store 
     assert.deepEqual(store.findSymbols(), symbols);
     const broken = {
       ...toy,
-      version: "2",
+      version: "3",
       parse() {
         return {
           status: "clean",
@@ -292,7 +298,7 @@ test("module revision invalidates cache, malformed facts fail explicitly, store 
     assert.equal(store.findSymbols().length, 0);
     const recovered = await indexProject(
       root,
-      new LanguageRegistry([{ ...toy, version: "2" }]),
+      new LanguageRegistry([{ ...toy, version: "3" }]),
       store,
     );
     assert.equal(recovered.indexed, 1);
@@ -368,15 +374,40 @@ test("toy passes the reusable language conformance kit", async () => {
     ],
     {
       symbols: [
-        { file: "main.toy", name: "main.toy", kind: "file" },
-        { file: "lib.toy", name: "lib.toy", kind: "file" },
-        { file: "main.toy", name: "main", kind: "function" },
-        { file: "lib.toy", name: "helper", kind: "function" },
+        {
+          file: "main.toy",
+          name: "main.toy",
+          kind: "file",
+          identity: "main.toy",
+          at: "import lib.toy\ndef main\ncall helper\ncall missing\n",
+        },
+        {
+          file: "lib.toy",
+          name: "lib.toy",
+          kind: "file",
+          identity: "lib.toy",
+          at: "def helper\ncall helper\n",
+        },
+        {
+          file: "main.toy",
+          name: "main",
+          kind: "function",
+          identity: "main",
+          at: "def main",
+        },
+        {
+          file: "lib.toy",
+          name: "helper",
+          kind: "function",
+          identity: "helper",
+          at: "def helper",
+        },
       ],
       links: [
         {
           file: "main.toy",
           kind: "imports",
+          at: "import lib.toy",
           source: null,
           targetName: "lib.toy",
           target: { file: "lib.toy", name: "lib.toy", kind: "file" },
@@ -384,6 +415,7 @@ test("toy passes the reusable language conformance kit", async () => {
         {
           file: "main.toy",
           kind: "calls",
+          at: "call helper",
           source: { name: "main", kind: "function" },
           targetName: "helper",
           target: { file: "lib.toy", name: "helper", kind: "function" },
@@ -393,11 +425,13 @@ test("toy passes the reusable language conformance kit", async () => {
           kind: "calls",
           source: { name: "main", kind: "function" },
           targetName: "missing",
+          at: "call missing",
           target: null,
         },
         {
           file: "lib.toy",
           kind: "calls",
+          at: "call helper",
           source: { name: "helper", kind: "function" },
           targetName: "helper",
           target: { file: "lib.toy", name: "helper", kind: "function" },
@@ -407,7 +441,7 @@ test("toy passes the reusable language conformance kit", async () => {
   );
 });
 
-test("stable IDs exclude local keys and end offsets, include project, path, kind, name and start", async () => {
+test("stable IDs exclude position and local keys; include project, path, kind and scoped identity", async () => {
   await sandbox(async ({ store }) => {
     const text = "def x\n";
     const file = {
@@ -423,6 +457,7 @@ test("stable IDs exclude local keys and end offsets, include project, path, kind
     const revised = structuredClone(file);
     revised.result.symbols[1].key = "new-local-key";
     revised.result.symbols[1].range.end--;
+    revised.result.symbols[1].range.start++;
     store.replaceFile(revised);
     assert.equal(byName(store, "x").id, id);
     const replica = new SqliteGraphStore(":memory:", store.projectId);
@@ -436,7 +471,7 @@ test("stable IDs exclude local keys and end offsets, include project, path, kind
       replica.close();
       other.close();
     }
-    for (const attribute of ["name", "kind", "start", "path"]) {
+    for (const attribute of ["identity", "kind", "path"]) {
       const changed = structuredClone(file);
       if (attribute === "path") changed.path = "renamed.toy";
       else if (attribute === "start") changed.result.symbols[1].range.start++;
@@ -450,7 +485,7 @@ test("stable IDs exclude local keys and end offsets, include project, path, kind
   });
 });
 
-test("a target becoming partial withholds incoming targets while retaining source facts", async () => {
+test("a partial target remains linkable and its status is visible", async () => {
   await sandbox(async ({ root, store }) => {
     await cp(fixtureRoot, root, { recursive: true });
     const registry = new LanguageRegistry([toy]);
@@ -464,13 +499,15 @@ test("a target becoming partial withholds incoming targets while retaining sourc
     assert.deepEqual(report.partial, ["lib.toy"]);
     assert.equal(byName(store, "main").id, main.id);
     assert.equal(byName(store, "helper").id, helper.id);
-    assert.equal(store.incoming(helper.id).length, 0);
+    assert.equal(store.incoming(helper.id).length, 1);
+    assert.equal(byName(store, "helper").status, "partial");
     assert.equal(
       store
         .outgoing(main.id, "calls")
         .find((link) => link.targetName === "helper").resolution,
-      "unresolved",
+      "resolved",
     );
+    assert.equal(store.incoming(helper.id)[0].targetStatus, "partial");
   });
 });
 

@@ -3,7 +3,8 @@ import type { LanguageModule, LinkDraft, ParseResult } from "../../types.js";
 /** A deliberately tiny fixture language. It is not a production language support claim. */
 const module: LanguageModule = {
   id: "toy",
-  version: "1",
+  version: "2",
+  testOnly: true,
   extensions: [".toy"],
   parse({ path, text }) {
     const result: ParseResult = {
@@ -13,6 +14,7 @@ const module: LanguageModule = {
         {
           key: "file",
           name: path,
+          identity: path,
           kind: "file",
           range: { start: 0, end: text.length },
         },
@@ -29,6 +31,7 @@ const module: LanguageModule = {
         result.symbols.push({
           key: sourceKey,
           name: match[2]!,
+          identity: match[2]!,
           kind: "function",
           range,
         });
@@ -68,7 +71,7 @@ const module: LanguageModule = {
           symbol.module === "toy" &&
           files.some(
             (file) =>
-              file.path === symbol.file && file.result.status === "clean",
+              file.path === symbol.file && file.result.status !== "failed",
           ) &&
           (link.kind === "imports"
             ? symbol.file === link.targetName && symbol.kind === "file"

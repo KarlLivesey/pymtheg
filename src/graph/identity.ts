@@ -1,17 +1,33 @@
 import { createHash } from "node:crypto";
 import type { GraphFile, GraphLink, GraphSymbol } from "./types.js";
-export const contentHash = (text: string): string =>
+export const contentHash = (text: string | Uint8Array): string =>
   createHash("sha256").update(text).digest("hex");
 const digest = (parts: unknown[]): string => contentHash(JSON.stringify(parts));
 export function fileFacts(
   projectId: string,
   file: GraphFile,
 ): { symbols: GraphSymbol[]; links: GraphLink[] } {
+  const ordinals = new Map<string, number>();
+  const ordered = [...file.result.symbols].sort(
+    (a, b) =>
+      a.range.start - b.range.start ||
+      a.range.end - b.range.end ||
+      compare(a.key, b.key),
+  );
+  const assigned = new Map<string, number>();
+  for (const symbol of ordered) {
+    const group = JSON.stringify([symbol.kind, symbol.identity]);
+    const ordinal = ordinals.get(group) ?? 0;
+    assigned.set(symbol.key, ordinal);
+    ordinals.set(group, ordinal + 1);
+  }
   const symbols = file.result.symbols.map((symbol) => ({
     ...symbol,
-    id: `symbol:${digest(["v1", projectId, file.module, file.path, symbol.kind, symbol.name, symbol.range.start])}`,
+    id: `symbol:${digest(["v2", projectId, file.module, file.path, symbol.kind, symbol.identity, assigned.get(symbol.key)])}`,
+    ordinal: assigned.get(symbol.key)!,
     file: file.path,
     module: file.module,
+    status: file.result.status,
   }));
   const keys = new Map(symbols.map((symbol) => [symbol.key, symbol.id]));
   const links: GraphLink[] = file.result.links.map((link, index) => ({
@@ -19,6 +35,10 @@ export function fileFacts(
     id: `link:${digest(["v1", projectId, file.module, file.path, index])}`,
     file: file.path,
     module: file.module,
+    origin: "parse" as const,
+    sourceStatus: file.result.status,
+    targetStatus: null,
+    candidates: [],
     sourceId: link.sourceKey === null ? null : keys.get(link.sourceKey)!,
     targetId: null,
     resolution: "unresolved",
@@ -44,24 +64,18 @@ export function validateResult(
       throw Error("Invalid UTF-16 range");
   };
   const keys = new Set<string>();
-  const identities = new Set<string>();
+
   for (const symbol of result.symbols) {
     range(symbol.range);
-    const identity = JSON.stringify([
-      symbol.kind,
-      symbol.name,
-      symbol.range.start,
-    ]);
     if (
       !symbol.key ||
       !symbol.name ||
       !symbol.kind ||
-      keys.has(symbol.key) ||
-      identities.has(identity)
+      !symbol.identity ||
+      keys.has(symbol.key)
     )
       throw Error("Duplicate or empty symbol identity/key");
     keys.add(symbol.key);
-    identities.add(identity);
   }
   for (const link of result.links) {
     range(link.range);
@@ -99,3 +113,13 @@ export function validateResult(
   };
   json(result);
 }
+
+/** Locale-independent UTF-16 lexicographic order. */
+export const compare = (a: string, b: string): number =>
+  a < b ? -1 : a > b ? 1 : 0;
+export const addedLinkId = (
+  project: string,
+  module: string,
+  file: string,
+  key: string,
+): string => `link:${digest(["v2", project, module, file, "analysis", key])}`;
