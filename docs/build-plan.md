@@ -193,7 +193,7 @@ The manager keeps this table current. It is the single record of who holds which
 | W1-B Engine core | in review (round 1) | Sol 6.1 | Opus 5.5 | `w1-b-engine-core` | [#2](https://github.com/KarlLivesey/pymtheg/pull/2) | `src/behaviour/explore*.ts`, `test/explore*.test.mjs` |
 | W1-E Machines and contracts | in review (round 1) | Opus 5.5 | Sol 6.1 | `w1-e-mixed-file-contracts` | [#3](https://github.com/KarlLivesey/pymtheg/pull/3) | `src/contracts/document.ts`, `implementation-check.ts`, `manifest.ts`, `test/contracts-mixed-file.test.mjs` |
 | W1-C Graph store and interface | building | Sol 6.1 | — | `w1-c-graph-store-interface` | — | `src/graph/**` except `languages/*/` |
-| W1-D Document import | building | Sol 6.1 | — | `w1-d-document-import` | — | `src/shared/document-selection.ts`, `src/architecture/import-policy.ts`, `src/cli/import-summary.ts`, `src/architecture/store.ts`; extended on request to `src/architecture/model.ts`, `heading-identities.ts`, `headings.ts` (minimal RST section wiring; no other chunk holds them) |
+| W1-D Document import | in review (round 1) | Sol 6.1 | Opus 5.5 | `w1-d-document-import` | [#4](https://github.com/KarlLivesey/pymtheg/pull/4) | `src/shared/document-selection.ts`, `src/architecture/import-policy.ts`, `src/cli/import-summary.ts`, `src/architecture/store.ts`; extended on request to `src/architecture/model.ts`, `heading-identities.ts`, `headings.ts` (minimal RST section wiring; no other chunk holds them) |
 | W1-F Two investigations | building | Opus 5.5 | — | `w1-f-investigations` | — | `evidence/w1-f/` |
 
 Each chunk also owns its own `evidence/<chunk-id>/` folder and `docs/changes/<chunk-id>.md`.
