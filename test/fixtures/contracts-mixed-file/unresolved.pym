@@ -1,0 +1,8 @@
+// Behaviour plus a contract whose input type is never declared.
+machine Kettle {
+  state boiled: Bool = false;
+  event reachBoil when !boiled { boiled = true; }
+  invariant settled = boiled || !boiled;
+}
+type Reading = { celsius: Nat };
+op boil(litres: Nat, vessel: Vessel) -> Reading;
