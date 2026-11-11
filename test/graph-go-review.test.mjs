@@ -512,11 +512,69 @@ test("interface dispatch keeps sets up to its own cap; unknown receivers keep th
       "func Use(i I, j J) { i.M(); j.N(); for _, x := range []interface{ M() }{} { x.M() } }",
     ),
   });
-  assert.equal(call(links, "p/p.go", "i.M").candidates.length, 31);
-  assert.deepEqual(call(links, "p/p.go", "j.N").candidates, []);
-  assert.equal(call(links, "p/p.go", "j.N").target, null);
+  // Under the cap: the complete set, with no overflow note.
+  const listed = call(links, "p/p.go", "i.M");
+  assert.equal(listed.candidates.length, 31);
+  assert.equal(listed.data.overflow, undefined);
+  // Over the cap: unresolved, name kept, never a truncated list; the reason is on the link.
+  const dispatch = call(links, "p/p.go", "j.N");
+  assert.equal(dispatch.target, null);
+  assert.deepEqual(dispatch.candidates, []);
+  assert.equal(dispatch.targetName, "j.N");
+  assert.deepEqual(dispatch.data.overflow, { candidates: 61, cap: 50 });
   // 30 possible methods by name exceed the unknown-receiver cap of 20.
-  assert.deepEqual(call(links, "p/p.go", "x.M").candidates, []);
+  const byName = call(links, "p/p.go", "x.M");
+  assert.deepEqual(byName.candidates, []);
+  assert.equal(byName.targetName, "x.M");
+  assert.deepEqual(byName.data.overflow, { candidates: 30, cap: 20 });
+});
+
+test("the overflow reason distinguishes 'too many' from 'nothing found' and follows other files' changes", async () => {
+  const method = (prefix, count) =>
+    Array.from(
+      { length: count },
+      (_, index) =>
+        `type ${prefix}${index} struct{}\nfunc (${prefix}${index}) Close() error { return nil }`,
+    ).join("\n");
+  const use = lines(
+    "package p",
+    'import "os"',
+    "func Use(f *os.File) {",
+    "\tfor _, c := range []interface{ Close() error }{} { c.Close() }",
+    "\tf.Close()",
+    "\tfor _, n := range []interface{ Nothing() }{} { n.Nothing() }",
+    "}",
+  );
+  const [before, after, back] = await project(
+    {
+      "go.mod": MOD,
+      "p/use.go": use,
+      "p/a.go": lines("package p", method("A", 19)),
+    },
+    [
+      { "p/b.go": lines("package p", method("B", 2)) },
+      { "p/b.go": "package p\n" },
+    ],
+  );
+  const close = (state) => call(state.links, "p/use.go", "c.Close");
+  // 19 candidates: listed in full.
+  assert.equal(close(before).candidates.length, 19);
+  assert.equal(close(before).data.overflow, undefined);
+  // Another file adds two more: use.go is unchanged, yet its link is now over the cap.
+  assert.equal(after.report.indexed, 1);
+  assert.deepEqual(close(after).candidates, []);
+  assert.deepEqual(close(after).data.overflow, { candidates: 21, cap: 20 });
+  // And back under the cap: the note disappears and the full list returns.
+  assert.equal(close(back).candidates.length, 19);
+  assert.equal(close(back).data.overflow, undefined);
+  // "Nothing found" and "external receiver" are unresolved without an overflow note.
+  for (const state of [before, after, back])
+    for (const at of ["f.Close", "n.Nothing"]) {
+      const link = call(state.links, "p/use.go", at);
+      assert.equal(link.target, null, at);
+      assert.deepEqual(link.candidates, [], at);
+      assert.equal(link.data.overflow, undefined, at);
+    }
 });
 
 test("range: one variable over a channel is its element; over a slice it is the index", async () => {

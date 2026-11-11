@@ -94,9 +94,9 @@ targets, never a guess. "Unresolved" keeps the target name.
 | Unexported field/method selected from another package (including an external `_test` package), directly or promoted | Not visible: unresolved (Go treats it as a different identifier) |
 | Method expression `(*T).M` / `T.M`, method value `x.M` | Definite (`references`); `calls` on a local that holds it see "reassigned locals" |
 | A local holding a function or method value | **Definite** when never written after its declaration. When written again (`=`, multi-assign, `:=` redeclaration, inside a closure): **candidates** of all values ever assigned if each is a known function/method; unresolved if any is unknown, if its address is taken, after `op=`/`++`, after a `range`/receive `=` assignment, for parameters (incoming value unknown) and for assignment cycles (`f, g = g, f`) |
-| `x.M()` where x's static type is an interface declared in the project | Candidates: the interface method plus `M` (by the selector rule) on every structural implementer. Unresolved when no implementer exists or there are more than 50 |
+| `x.M()` where x's static type is an interface declared in the project | Candidates: the interface method plus `M` (by the selector rule) on every structural implementer. Unresolved when no implementer exists; over 50: unresolved with `data.overflow` (never truncated) |
 | `x.M()` where x's type is a type parameter with a single named project interface constraint | The same interface dispatch on the constraint (the constraint method is always among the candidates). Unresolved for `any`, unions, inline constraints and constraint-less receiver type parameters |
-| `x.M()` where x has no evident type: ranging over or indexing a **named** project container type (`type List []T`), anonymous interface types (`[]interface{ Close() error }`), results of builtins other than `new`/`make`/`append`, values from dynamic code (`reflect`) | Candidates: concrete `M` methods in the caller's package and every project package it transitively imports (exported names only across packages). Unresolved with fewer than 2 or more than 20. **These are the only candidate sets that may omit the true target**: the value can be of an external type whose method is not in the graph |
+| `x.M()` where x has no evident type: ranging over or indexing a **named** project container type (`type List []T`), anonymous interface types (`[]interface{ Close() error }`), results of builtins other than `new`/`make`/`append`, values from dynamic code (`reflect`) | Candidates: concrete `M` methods in the caller's package and every project package it transitively imports (exported names only across packages). Unresolved with fewer than 2; over 20: unresolved with `data.overflow` (never truncated). **These are the only candidate sets that may omit the true target**: the value can be of an external type whose method is not in the graph |
 | `x.M()` / `x.f` where x's type is known to be external: parameter, field, variable, result or composite literal of an external type; result of calling an external function or method (`os.Open`, `context.Background`, `errgroup.WithContext`); element of an external container; a predeclared type (`error`) | Unresolved, name kept; never project candidates |
 | A local shadowing an import or function (`fmt := printer{}`, `helper := func(){}`) | The local wins. Methods on its evident type resolve |
 | Builtins (`len`, `append`, …) | Unresolved, `data.builtin: true` |
@@ -164,10 +164,38 @@ and it returns only files whose facts changed.
    evident at all (the "no evident type" row above) may still be an external value.
    Its candidate set lists project methods only, and the interface has no flag for
    "possibly none of these". That row is the only place this applies.
-5. **Resolution cannot annotate parsed links.** The reason a link is unresolved
-   (internal-package violation, builtin, external type, over the candidate limit)
-   is only in the module's logic. `resolve` cannot add `data` to parsed links. Only
-   builtins are flagged, because that is known at parse time.
+5. **Resolution cannot annotate parsed links.** `resolve` cannot add `data` to
+   parsed links, so the reason a link is unresolved is mostly only in the module's
+   logic. Two reasons are recorded. Builtins are flagged at parse time. Over-cap
+   candidate sets are recorded by `analyze` (see "Candidate caps"), which may
+   replace a file's facts and runs on every index. The other reasons
+   (internal-package violation, external type, nothing found) are not recorded.
+
+## Candidate caps
+
+| Decision | Cap | Over the cap |
+| --- | ---: | --- |
+| Interface dispatch (interface method plus every structural implementer's method; also type-parameter constraints) | 50 | Unresolved, `data.overflow = {candidates: N, cap: 50}` |
+| Name-only guess for an unknown receiver (methods of that name in reachable packages) | 20 | Unresolved, `data.overflow = {candidates: N, cap: 20}` |
+| Build variants, ambiguous selectors, reassigned function values | 20 | Unresolved, `data.overflow = {candidates: N, cap: 20}` |
+
+Two conditions hold and are tested in `test/graph-go-review.test.mjs`:
+
+1. **Never truncated.** A set over its cap becomes a wholly unresolved link with its
+   `targetName` kept and no candidates. The module never returns a partial list,
+   because a partial list could omit the true target. Under the cap the complete set
+   is listed.
+2. **The reason is visible.** `data.overflow` on the link records how many possible
+   targets there were and the cap. An agent can therefore tell "too many candidates"
+   (`overflow` present) from "nothing found" or "external" (no `overflow`).
+
+How the reason is recorded: `resolve` cannot write link data (gap 5), so `analyze`
+runs the same resolver over the snapshot with provisional IDs, finds the
+over-cap links and writes `overflow` into those files' facts. `analyze` runs on
+every index and first strips any previous `overflow`, so the note follows changes
+in other files. The test adds methods in another file, takes an unchanged file's
+link over the cap, and then removes them again. The note never affects which target
+is chosen: `resolve` computes the same decision independently.
 
 ## Module version 2 (first review)
 
@@ -198,7 +226,8 @@ Two design consequences:
 - Interface dispatch therefore has its own candidate cap of 50. Unknown receivers
   keep 20.
 
-The module version is 2, so cached version-1 facts are re-parsed.
+The module version is 2, so cached version-1 facts are re-parsed. Version 3 adds
+the overflow note (re-review conditions on the candidate caps).
 
 ## Observations on a real project
 

@@ -10,7 +10,7 @@ import type {
 import { GoExtractor } from "./extract.js";
 import { importPathOf, readLayout } from "./gomod.js";
 import type { FileFact } from "./model.js";
-import { resolveGo } from "./resolve.js";
+import { overflowingLinks, resolveGo } from "./resolve.js";
 
 const ID = "go";
 /** Key of the one package symbol hosted per directory package (added by analyze). */
@@ -98,7 +98,8 @@ function analyze({
     )[0]!;
     hosts.set(host.path, directoryOf(host.path));
   }
-  const output: AnalyzedFile[] = [];
+  // Recompute every file's facts from its parse facts: drop the previous host symbol and overflow notes.
+  const next = new Map<string, ParseResult>();
   for (const file of files) {
     if (file.result.status === "failed") continue;
     const symbols = file.result.symbols.filter(
@@ -122,8 +123,42 @@ function analyze({
         },
       });
     }
-    const result = { ...file.result, symbols };
-    if (JSON.stringify(result) !== JSON.stringify(file.result))
+    const links = file.result.links.map((link) => {
+      const data = link.data as { [key: string]: Json } | undefined;
+      if (!data || !("overflow" in data)) return link;
+      const { overflow: _previous, ...rest } = data;
+      void _previous;
+      return { ...link, data: rest };
+    });
+    next.set(file.path, { ...file.result, symbols, links });
+  }
+  // Candidate sets over their cap are left unresolved; record why on the link itself.
+  const overflow = overflowingLinks(
+    ID,
+    files.map((file) =>
+      next.has(file.path) ? { ...file, result: next.get(file.path)! } : file,
+    ),
+    contextFiles,
+  );
+  for (const [path, group] of overflow) {
+    const result = next.get(path)!;
+    result.links = result.links.map((link, index) => {
+      const note = group.get(index);
+      return note
+        ? {
+            ...link,
+            data: {
+              ...((link.data as { [key: string]: Json } | undefined) ?? {}),
+              overflow: { candidates: note.candidates, cap: note.cap },
+            },
+          }
+        : link;
+    });
+  }
+  const output: AnalyzedFile[] = [];
+  for (const file of files) {
+    const result = next.get(file.path);
+    if (result && JSON.stringify(result) !== JSON.stringify(file.result))
       output.push({ path: file.path, result });
   }
   return output;
@@ -131,7 +166,7 @@ function analyze({
 
 const go: LanguageModule = {
   id: ID,
-  version: "2",
+  version: "3",
   extensions: [".go"],
   contextFiles: ["go.mod", "go.work"],
   parse,

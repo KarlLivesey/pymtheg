@@ -1,6 +1,8 @@
 import { posix } from "node:path";
 import type {
   AddedLink,
+  ContextFile,
+  GraphFile,
   GraphLink,
   GraphSymbol,
   LinkResolution,
@@ -109,7 +111,75 @@ export function resolveGo(
   return new GoResolver(moduleId, context).run();
 }
 
+/** A link whose possible targets exceed the cap for its kind of decision. */
+export interface Overflow {
+  candidates: number;
+  cap: number;
+}
+
+/**
+ * Runs the same resolution over provisional IDs (`draft:<file>\0<key>`) to find
+ * links whose candidate sets exceed their cap. Used by `analyze`, the only phase
+ * that may write link data, so the reason is recorded on the link itself.
+ */
+export function overflowingLinks(
+  moduleId: string,
+  files: readonly GraphFile[],
+  contextFiles: readonly ContextFile[],
+): Map<string, Map<number, Overflow>> {
+  const symbols: GraphSymbol[] = [];
+  const links: GraphLink[] = [];
+  const id = (path: string, key: string) => `draft:${path}\u0000${key}`;
+  for (const file of files) {
+    if (file.module !== moduleId || file.result.status === "failed") continue;
+    for (const symbol of file.result.symbols)
+      symbols.push({
+        ...symbol,
+        id: id(file.path, symbol.key),
+        ordinal: 0,
+        file: file.path,
+        module: moduleId,
+        status: file.result.status,
+      });
+    file.result.links.forEach((link, index) =>
+      links.push({
+        ...link,
+        id: `${file.path}\u0000${index}`,
+        file: file.path,
+        module: moduleId,
+        origin: "parse",
+        sourceId:
+          link.sourceKey === null ? null : id(file.path, link.sourceKey),
+        targetId: null,
+        resolution: "unresolved",
+        candidates: [],
+        sourceStatus: file.result.status,
+        targetStatus: null,
+      }),
+    );
+  }
+  const resolver = new GoResolver(moduleId, {
+    projectId: "go-overflow",
+    files,
+    contextFiles,
+    symbols,
+    links,
+  });
+  resolver.run();
+  const output = new Map<string, Map<number, Overflow>>();
+  for (const [linkId, overflow] of resolver.overflow) {
+    const split = linkId.lastIndexOf("\u0000");
+    const path = linkId.slice(0, split);
+    let group = output.get(path);
+    if (!group) output.set(path, (group = new Map()));
+    group.set(Number(linkId.slice(split + 1)), overflow);
+  }
+  return output;
+}
+
 class GoResolver {
+  /** Links whose candidate sets exceeded their cap: unresolved, never truncated. */
+  readonly overflow = new Map<string, Overflow>();
   private layout: GoProjectLayout;
   private files = new Map<string, FileInfo>();
   private pkgs = new Map<string, Pkg>();
@@ -158,6 +228,9 @@ class GoResolver {
         resolutions.push({ linkId: link.id, targetId: distinct[0]! });
       else if (distinct.length > 1 && distinct.length <= limit)
         resolutions.push({ linkId: link.id, candidateIds: distinct });
+      else if (distinct.length > limit)
+        // Too many to list: unresolved with the name kept; a cut list could omit the target.
+        this.overflow.set(link.id, { candidates: distinct.length, cap: limit });
     }
     return { resolutions, links: added };
   }
