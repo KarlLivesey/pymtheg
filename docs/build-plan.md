@@ -10,7 +10,7 @@ Building has not started and does not start until Karl says so.
 |---|---|---|---|
 | Manager and coach | The lead session (Claude Fable 5.2) | Cuts chunks, writes briefs, assigns builders and reviewers, guards file ownership, keeps the ledger in section 9, merges passing pull requests, unblocks and coaches builders, reports to Karl | Write feature code |
 | Builder | Claude Opus 5.5 at medium effort, or Sol (GPT-6.1 Sol) at medium effort | Builds one chunk in its own worktree, proves it, opens a pull request | Touch files outside the chunk's owned paths; merge; start other agents |
-| Reviewer | Opus 5.5 medium or Sol 6.1 medium, always the other model from the builder | Reviews one pull request against its brief and returns pass or changes needed | Change the branch; widen the scope; score or polish |
+| Reviewers | Two per pull request: one Sol 6.1 (medium) and one Opus 5.5 at high effort, working independently | Each reviews the pull request against its brief and returns pass or changes needed; it is merged only when both pass | Change the branch; widen the scope; score or polish |
 | Owner | Karl | Decides scope, answers escalations, can stop anything | — |
 
 Confirmed available on this machine: `claude-opus-5-5` (effort `medium`) and
@@ -22,9 +22,9 @@ remote (`KarlLivesey/pymtheg`) and `gh` is signed in, so pull requests work.
 1. **Cut.** The manager writes the chunk brief (section 4) and records it in the ledger with its owned paths.
 2. **Assign.** A builder is started in a fresh worktree branched from the current `origin/main`.
 3. **Build.** The builder works in small loops under `AGENTS.md`, runs the checks in section 6, and opens a pull request when it is satisfied the "done when" is met.
-4. **Review.** The manager assigns a reviewer of the other model. The reviewer builds and tests a disposable checkout of the branch and returns **pass** or **changes needed** with specific findings.
+4. **Review.** The manager assigns two independent reviewers, one Sol 6.1 and one Opus 5.5 at high effort (Karl, 11 November 2026). Each builds and tests a disposable checkout of the branch and returns **pass** or **changes needed** with specific findings. Both must pass.
 5. **Fix.** Findings go back to the same builder. A re-check is a new review assignment.
-6. **Merge.** On a pass with checks green, the manager merges the pull request on GitHub with a normal merge, deletes the branch, updates the ledger, and tells builders with open chunks to rebase.
+6. **Merge.** When both reviewers pass with checks green, the manager merges the pull request on GitHub with a normal merge, deletes the branch, updates the ledger, and tells builders with open chunks to rebase.
 
 Limits that prevent the old review loop returning:
 
@@ -102,7 +102,7 @@ aims for under about 400 changed lines outside tests. Anything larger is cut aga
 ## 5. Model assignment
 
 - Builders alternate between Opus 5.5 medium and Sol 6.1 medium so both are exercised.
-- The reviewer is always the other model from the builder.
+- Every pull request gets two reviews, one Sol 6.1 and one Opus 5.5 high, whichever model built it.
 - Chunks that continue the same area go to the same model where practical, since it already knows that code's shape.
 - At most **four** builders run at once. That is a ceiling, not a target: a wave uses only as many as it has genuinely disjoint chunks for.
 
@@ -192,11 +192,11 @@ The manager keeps this table current. It is the single record of who holds which
 | W1-A Ownership disagreement | merged | Opus 5.5 | Sol 6.1 | `w1-a-ownership-agreement` | [#5](https://github.com/KarlLivesey/pymtheg/pull/5) | `src/analysis/ownership.ts`, `src/behaviour/flow.ts`, `test/ownership-agreement.test.mjs` |
 | W1-B Engine core | merged | Sol 6.1 | Opus 5.5 | `w1-b-engine-core` | [#2](https://github.com/KarlLivesey/pymtheg/pull/2) | `src/behaviour/explore*.ts`, `test/explore*.test.mjs` |
 | W1-E Machines and contracts | merged | Opus 5.5 | Sol 6.1 | `w1-e-mixed-file-contracts` | [#3](https://github.com/KarlLivesey/pymtheg/pull/3) | `src/contracts/document.ts`, `implementation-check.ts`, `manifest.ts`, `test/contracts-mixed-file.test.mjs` |
-| W2-A Built-in backend wiring | in review (round 1) | Sol 6.1 | Opus 5.5 | `w2-a-builtin-backend` | [#8](https://github.com/KarlLivesey/pymtheg/pull/8) | `src/backends/adapter.ts`, `src/behaviour/model.ts`, `src/behaviour/explore*.ts`, minimal lines in `src/cli/main.ts` and `src/cli/help.ts`, `evidence/builtin-checker/differential.mjs` |
+| W2-A Built-in backend wiring | in review (round 1) | Sol 6.1 | Sol 6.1 + Opus 5.5 high | `w2-a-builtin-backend` | [#8](https://github.com/KarlLivesey/pymtheg/pull/8) | `src/backends/adapter.ts`, `src/behaviour/model.ts`, `src/behaviour/explore*.ts`, minimal lines in `src/cli/main.ts` and `src/cli/help.ts`, `evidence/builtin-checker/differential.mjs` |
 | W2-G Flow lowering must not change its input (B106) | building | Opus 5.5 | — | `w2-g-flow-lowering-pure` | — | `src/behaviour/flow.ts` only (`model.ts` stays with W2-A) |
 | W2-H Link baseline versus real review (1.2) | cut; waits for W1-D to merge | — | — | — | — | `src/studio/service.ts`, architecture record type as needed |
-| W1-C Graph store and interface | in review (round 1) | Sol 6.1 | Opus 5.5 | `w1-c-graph-store-interface` | [#7](https://github.com/KarlLivesey/pymtheg/pull/7) | `src/graph/**` except `languages/*/` |
-| W1-D Document import | in review (round 2) | Sol 6.1 | Opus 5.5 | `w1-d-document-import` | [#4](https://github.com/KarlLivesey/pymtheg/pull/4) | `src/shared/document-selection.ts`, `src/architecture/import-policy.ts`, `src/cli/import-summary.ts`, `src/architecture/store.ts`; extended on request to `src/architecture/model.ts`, `heading-identities.ts`, `headings.ts` (minimal RST section wiring; no other chunk holds them) |
+| W1-C Graph store and interface | in review (round 1) | Sol 6.1 | Sol 6.1 + Opus 5.5 high | `w1-c-graph-store-interface` | [#7](https://github.com/KarlLivesey/pymtheg/pull/7) | `src/graph/**` except `languages/*/` |
+| W1-D Document import | in review (round 2) | Sol 6.1 | Sol 6.1 + Opus 5.5 high | `w1-d-document-import` | [#4](https://github.com/KarlLivesey/pymtheg/pull/4) | `src/shared/document-selection.ts`, `src/architecture/import-policy.ts`, `src/cli/import-summary.ts`, `src/architecture/store.ts`; extended on request to `src/architecture/model.ts`, `heading-identities.ts`, `headings.ts` (minimal RST section wiring; no other chunk holds them) |
 | W1-F Two investigations | merged (evidence only, merged by the manager without a separate review; the fix chunks get reviewed) | Opus 5.5 | — | `w1-f-investigations` | [#6](https://github.com/KarlLivesey/pymtheg/pull/6) | `evidence/w1-f/` |
 
 Each chunk also owns its own `evidence/<chunk-id>/` folder and `docs/changes/<chunk-id>.md`.
@@ -232,3 +232,5 @@ Backlog from W1-A: a cancel handler that *calls* an operation with an already ha
 Backlog from W1-A review: runtime ownership validation at invocation boundaries (the declared residual mismatch); keep ownership/lifecycle correlation across static branch joins (conservative `O004` on an idempotent branch model); behavioural preflight should preserve unresolved cancellation settlement summaries. All for the 7.3 chunk.
 
 Wiring backlog from W2-A (hot files): MCP and Studio still select the external engines explicitly at `src/mcp/workspace.ts:185` and `src/studio/service.ts:3392` (legacy tool availability at `service.ts:3207-3208`); switch to the built-in backend in the Wave 3 removal chunk.
+
+Review rule change (Karl, 11 November 2026): every pull request needs one Sol 6.1 review and one Opus 5.5 high review, both passing. PRs 1, 2, 3, 5 and 6 were merged earlier on a single medium review; each gets the missing reviews after the fact, and any finding becomes a fix chunk. Review briefs are kept locally in the git-ignored `evidence/project-fit/review-briefs/`.
