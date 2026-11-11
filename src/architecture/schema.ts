@@ -386,6 +386,39 @@ export const planItemSchema = z
   })
   .passthrough();
 export type PlanItem = z.infer<typeof planItemSchema>;
+/** Which earlier revision a document link is compared with, and what it truthfully is. */
+export function linkComparisonBase(
+  item: Pick<
+    PlanItem,
+    "linkBaselines" | "linkReviewRevision" | "originRevision"
+  >,
+  target: string,
+): {
+  revision: string | undefined;
+  state: "never-reviewed" | "reviewed" | "none";
+  label: string;
+} {
+  const baseline = item.linkBaselines?.[target];
+  if (baseline)
+    return {
+      revision: baseline,
+      state: "never-reviewed",
+      label: "version when this link was added",
+    };
+  if (item.linkReviewRevision)
+    return {
+      revision: item.linkReviewRevision,
+      state: "reviewed",
+      label: "reviewed version",
+    };
+  if (item.originRevision)
+    return {
+      revision: item.originRevision,
+      state: "never-reviewed",
+      label: "version when this link was added",
+    };
+  return { revision: undefined, state: "none", label: "earlier version" };
+}
 export const planSchema = z
   .object({
     schema: z.literal("pymtheg.plan/v1"),

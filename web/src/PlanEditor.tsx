@@ -8,6 +8,7 @@ import { SourcePlanLinks } from "./SourcePlanLinks";
 import { ArchitectureConflictReview } from "./ArchitectureConflictReview";
 import { api, ApiError } from "./api";
 import {
+  linkComparisonBase,
   planItemSchema,
   indexSchema,
   type PlanItem,
@@ -378,7 +379,7 @@ export function PlanEditor({
               <LinkedTargetComparison
                 beforeTarget={previousTargets[i]}
                 target={link.target}
-                before={item.linkReviewRevision || item.originRevision}
+                before={linkComparisonBase(item, link.target).revision}
                 after={entitiesRevision}
                 initiallyOpen={item.links.length === 1}
               />

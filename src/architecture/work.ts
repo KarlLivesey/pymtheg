@@ -4,6 +4,7 @@ import {
   nativePlanPath,
 } from "./import-merge.js";
 import type { ArchitectureDocument } from "./schema.js";
+import { linkComparisonBase } from "./schema.js";
 import type {
   ArchitectureIndex,
   ArchitectureEntity,
@@ -120,17 +121,16 @@ export function openArchitectureWork(
     )
       add("open-decision", "This decision or risk is still open.");
     const links = outgoing.get(entity.id) ?? [];
-    const reviewedAt = plan.linkReviewRevision || plan.originRevision;
     // A baseline records when a never-reviewed link was added; only an explicit review is a review.
     const referenceFor = (to: string) => {
-      const baseline = plan.linkBaselines?.[to];
-      const at = baseline || reviewedAt;
-      return at
+      const { revision, state } = linkComparisonBase(plan, to);
+      return revision
         ? {
-            reviewed: previousEntities.get(at),
-            linkReview: baseline
-              ? ("never-reviewed" as const)
-              : ("reviewed" as const),
+            reviewed: previousEntities.get(revision),
+            linkReview:
+              state === "reviewed"
+                ? ("reviewed" as const)
+                : ("never-reviewed" as const),
           }
         : undefined;
     };
@@ -174,8 +174,9 @@ export function openArchitectureWork(
             linkReview,
           );
       }
+    // A record is never stale with respect to itself.
     const documentLinks = links.filter(
-      (link) => !link.to.startsWith("source:"),
+      (link) => !link.to.startsWith("source:") && link.to !== entity.id,
     );
     const unknownReported = new Set<string>();
     for (const link of documentLinks) {
@@ -200,6 +201,16 @@ export function openArchitectureWork(
       }
       const before = reviewed.get(link.to),
         after = current.get(link.to);
+      if (!before && after) {
+        // Never skip silently: the reference revision cannot show this target.
+        addLink(
+          "unknown-link-review",
+          `Comparison unavailable: linked target “${after.name.slice(0, 240)}” is not in the revision ${linkReview === "reviewed" ? "this plan reviewed" : "recorded when this link was added (never reviewed)"}. Review the current target.`,
+          link.to,
+          linkReview,
+        );
+        continue;
+      }
       if (before?.document && after && before.document !== after.document)
         addLink(
           "moved-target",

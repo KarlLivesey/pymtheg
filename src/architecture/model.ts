@@ -20,6 +20,18 @@ import {
   type ArchitectureEdge,
   type ArchitectureIndex,
 } from "./schema.js";
+/** Plan fields that record reviews or baselines, not what the record says. */
+const reviewBookkeeping = new Set([
+  "linkReviewRevision",
+  "linkBaselines",
+  "sourceRoots",
+  "sourceExpectations",
+  "sourceHashes",
+  "sourceReviewSnapshot",
+  "sourceSelectionSnapshot",
+  "sourceSelections",
+  "sourceReviewSelection",
+]);
 export * from "./schema.js";
 const record = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === "object" && !Array.isArray(v);
@@ -310,6 +322,16 @@ export function indexArchitecture(
               : {}),
           },
           contentHash: hash(JSON.stringify(item)),
+          // Link change detection ignores review and baseline bookkeeping.
+          relationshipHash: hash(
+            JSON.stringify(
+              Object.fromEntries(
+                Object.entries(item).filter(
+                  ([key]) => !reviewBookkeeping.has(key),
+                ),
+              ),
+            ),
+          ),
           searchText: recordText(item, visit),
           document: d.path,
           pointer: ["items", i],
