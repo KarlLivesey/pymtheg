@@ -65,6 +65,7 @@ export const entitySchema = z
         evidenceRevision: z.string(),
         originRevision: z.string().optional(),
         linkReviewRevision: z.string().optional(),
+        linkBaselines: z.record(z.string(), z.string()).optional(),
       })
       .optional(),
     document: z.string(),
@@ -93,7 +94,7 @@ export const edgeSchema = z
   })
   .strict();
 export type ArchitectureEdge = z.infer<typeof edgeSchema>;
-export const architectureIndexVersion = 19 as const;
+export const architectureIndexVersion = 20 as const;
 export const indexSchema = z
   .object({
     schema: z.literal("pymtheg.architecture/v1"),
@@ -242,6 +243,7 @@ export const bundleSchema = z
           z.literal(16),
           z.literal(17),
           z.literal(18),
+          z.literal(19),
           z.literal(architectureIndexVersion),
         ])
         .optional(),
@@ -342,6 +344,10 @@ export const planItemSchema = z
     evidenceRevision: z.string().max(120),
     originRevision: z.string().max(120).optional(),
     linkReviewRevision: z.string().max(120).optional(),
+    /** Server-recorded revision at which each not-yet-reviewed document link was added. Never a review. */
+    linkBaselines: z
+      .record(z.string().max(8192), z.string().max(120))
+      .optional(),
     sourceExpectations: z.record(z.string(), z.string().length(64)).optional(),
     sourceRoots: z
       .record(
@@ -416,6 +422,8 @@ export const workIssueSchema = z
     message: z.string(),
     origin: z.enum(["authored", "imported"]),
     target: z.string().optional(),
+    /** For link findings: compared with an explicit review, or with the baseline recorded when the never-reviewed link was added. */
+    linkReview: z.enum(["reviewed", "never-reviewed"]).optional(),
   })
   .strict();
 export const workIssuesSchema = z.array(workIssueSchema);

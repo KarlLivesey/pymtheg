@@ -121,64 +121,113 @@ export function openArchitectureWork(
       add("open-decision", "This decision or risk is still open.");
     const links = outgoing.get(entity.id) ?? [];
     const reviewedAt = plan.linkReviewRevision || plan.originRevision;
-    const reviewed = reviewedAt ? previousEntities.get(reviewedAt) : undefined;
+    // A baseline records when a never-reviewed link was added; only an explicit review is a review.
+    const referenceFor = (to: string) => {
+      const baseline = plan.linkBaselines?.[to];
+      const at = baseline || reviewedAt;
+      return at
+        ? {
+            reviewed: previousEntities.get(at),
+            linkReview: baseline
+              ? ("never-reviewed" as const)
+              : ("reviewed" as const),
+          }
+        : undefined;
+    };
+    const since = (linkReview: "reviewed" | "never-reviewed") =>
+      linkReview === "reviewed"
+        ? "since this plan reviewed it"
+        : "since this link was added (never reviewed)";
+    const addLink = (
+      kind: z.infer<typeof workIssueSchema>["kind"],
+      message: string,
+      target: string,
+      linkReview: "reviewed" | "never-reviewed",
+    ) =>
+      issues.push({
+        id: entity.id,
+        kind,
+        origin: authored.has(entity.document) ? "authored" : "imported",
+        message,
+        target,
+        linkReview,
+      });
     const seenForks = new Set<string>();
     for (const link of links)
       for (const fork of forkTargets.get(link.to) ?? []) {
         const key = JSON.stringify(fork);
         if (seenForks.has(key)) continue;
         seenForks.add(key);
+        const reference = referenceFor(link.to);
+        const reviewed = reference?.reviewed;
+        const linkReview = reference?.linkReview ?? "never-reviewed";
         const before = fork.target ? reviewed?.get(fork.target) : undefined;
         const after = fork.target ? current.get(fork.target) : undefined;
         if (!reviewed || before?.contentHash !== after?.contentHash)
-          add(
+          addLink(
             "diverged-target",
             `This plan links to the local copy ${current.get(link.to)?.document ?? link.to}. ` +
               (after
-                ? `The separately tracked copy from ${fork.source} at ${after.document} is new or changed since this relationship was reviewed. Compare it before reviewing the link or choosing a different target.`
+                ? `The separately tracked copy from ${fork.source} at ${after.document} is new or changed ${linkReview === "reviewed" ? "since this relationship was reviewed" : reference ? "since this link was added (never reviewed)" : "and this link was never reviewed"}. Compare it before reviewing the link or choosing a different target.`
                 : `The separately tracked copy from ${fork.source} was removed. Review whether the local copy still represents the intended design.`),
             fork.target ?? link.to,
+            linkReview,
           );
       }
     const documentLinks = links.filter(
       (link) => !link.to.startsWith("source:"),
     );
-    if (reviewedAt && documentLinks.length) {
-      if (!reviewed)
-        add(
-          "unknown-link-review",
-          "The revision used to review these links is unavailable; review their current targets.",
-        );
-      else
-        for (const link of documentLinks) {
-          const before = reviewed.get(link.to),
-            after = current.get(link.to);
-          if (before?.document && after && before.document !== after.document)
-            add(
-              "moved-target",
-              `Linked target “${after.name.slice(0, 240)}” moved from ${before.document} to ${after.document}. Review the retained target at its new location.`,
-              link.to,
-            );
-          if (before?.name && after && before.name !== after.name)
-            add(
-              "retitled-target",
-              `Linked target was renamed from “${before.name.slice(0, 240)}” to “${after.name.slice(0, 240)}”. Review whether this decision still points to the intended design.`,
-              link.to,
-            );
-          else if (
-            !plan.hasEvidence &&
-            before &&
-            after &&
-            (before.relationshipHash && after.relationshipHash
-              ? before.relationshipHash !== after.relationshipHash
-              : before.contentHash !== after.contentHash)
-          )
-            add(
-              "changed-target",
-              `Linked target “${after.name.slice(0, 240)}” has changed since this plan reviewed it. Review whether the relationship still represents the intended design.`,
-              link.to,
-            );
+    const unknownReported = new Set<string>();
+    for (const link of documentLinks) {
+      const reference = referenceFor(link.to);
+      if (!reference) continue;
+      const { reviewed, linkReview } = reference;
+      if (!reviewed) {
+        if (!unknownReported.has(linkReview)) {
+          unknownReported.add(linkReview);
+          issues.push({
+            id: entity.id,
+            kind: "unknown-link-review",
+            origin: authored.has(entity.document) ? "authored" : "imported",
+            message:
+              linkReview === "reviewed"
+                ? "The revision used to review these links is unavailable; review their current targets."
+                : "The revision recorded when these links were added is unavailable, and they were never reviewed; review their current targets.",
+            linkReview,
+          });
         }
+        continue;
+      }
+      const before = reviewed.get(link.to),
+        after = current.get(link.to);
+      if (before?.document && after && before.document !== after.document)
+        addLink(
+          "moved-target",
+          `Linked target “${after.name.slice(0, 240)}” moved from ${before.document} to ${after.document} ${since(linkReview)}. Review the retained target at its new location.`,
+          link.to,
+          linkReview,
+        );
+      if (before?.name && after && before.name !== after.name)
+        addLink(
+          "retitled-target",
+          `Linked target was renamed from “${before.name.slice(0, 240)}” to “${after.name.slice(0, 240)}” ${since(linkReview)}. Review whether this decision still points to the intended design.`,
+          link.to,
+          linkReview,
+        );
+      else if (
+        !plan.hasEvidence &&
+        before &&
+        after &&
+        (before.relationshipHash && after.relationshipHash
+          ? before.relationshipHash !== after.relationshipHash
+          : before.contentHash !== after.contentHash)
+      )
+        addLink(
+          "changed-target",
+          `Linked target “${after.name.slice(0, 240)}” has changed ${since(linkReview)}. Review whether the relationship still represents the intended design.`,
+          link.to,
+          linkReview,
+        );
     }
     if (!plan.hasEvidence) continue;
     const previous = history.get(plan.evidenceRevision);

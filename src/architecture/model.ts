@@ -305,6 +305,9 @@ export function indexArchitecture(
             ...(item.linkReviewRevision
               ? { linkReviewRevision: item.linkReviewRevision }
               : {}),
+            ...(item.linkBaselines && Object.keys(item.linkBaselines).length
+              ? { linkBaselines: { ...item.linkBaselines } }
+              : {}),
           },
           contentHash: hash(JSON.stringify(item)),
           searchText: recordText(item, visit),

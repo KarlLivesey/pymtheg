@@ -1392,6 +1392,7 @@ export class StudioService {
             ...(e.planning?.linkReviewRevision || e.planning?.originRevision
               ? [e.planning.linkReviewRevision || e.planning.originRevision!]
               : []),
+            ...Object.values(e.planning?.linkBaselines ?? {}),
           ]),
         ],
       ]),
@@ -1829,14 +1830,6 @@ export class StudioService {
     },
   ) {
     const item = planItemSchema.parse(raw);
-    if (
-      !target &&
-      item.links.length &&
-      !item.linkReviewRevision &&
-      !item.originRevision &&
-      revision
-    )
-      item.linkReviewRevision = revision;
     return this.architectureWrite(signal, async (owned) => {
       const store = (await this.architecture(true))!,
         head = await store.readAsync();
@@ -2065,6 +2058,28 @@ export class StudioService {
       delete item.sourceSelectionSnapshot;
       delete item.sourceSelections;
       delete item.sourceReviewSelection;
+      // Baselines are server-owned change markers, never reviews. Only the
+      // explicit acknowledgement (a new linkReviewRevision) reviews links.
+      const newlyReviewed =
+        !!item.linkReviewRevision &&
+        item.linkReviewRevision !== now?.linkReviewRevision;
+      const coveredBefore = new Set(
+        now?.linkReviewRevision || now?.originRevision
+          ? now.links.map((link) => link.target)
+          : [],
+      );
+      const linkBaselines: Record<string, string> = {};
+      const addedAt = revision || head?.id;
+      if (!newlyReviewed)
+        for (const { target: linked } of item.links) {
+          if (linked.startsWith("source:") || linkBaselines[linked]) continue;
+          const kept = now?.linkBaselines?.[linked];
+          if (kept) linkBaselines[linked] = kept;
+          else if (!coveredBefore.has(linked) && addedAt)
+            linkBaselines[linked] = addedAt;
+        }
+      if (Object.keys(linkBaselines).length) item.linkBaselines = linkBaselines;
+      else delete item.linkBaselines;
       for (const link of item.links) {
         const unchanged = now?.links.some(
           (old) => old.kind === link.kind && old.target === link.target,
