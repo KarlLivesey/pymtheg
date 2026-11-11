@@ -51,6 +51,8 @@ export interface ProjectGroup {
   limitations: string[];
   /** Non-fatal config diagnostics, recorded on owned files. */
   notes: string[];
+  /** Whether the config names its own `files`/`include` (not inherited or default). */
+  explicitSelection?: boolean;
   /** Why this config is unusable; every file it owns is failed with this message. */
   failure?: string;
 }
@@ -322,6 +324,7 @@ export function projectModel(
     if (!list.includes(group)) list.push(group);
     claimed.set(path, list);
   };
+  const unreadable: ProjectGroup[] = [];
   const configs = contexts
     .filter((file) => isConfig(file.path))
     .sort((a, b) => compare(a.path, b.path));
@@ -358,6 +361,9 @@ export function projectModel(
     const object = (
       raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {}
     ) as Record<string, unknown>;
+    /** Malformed JSON or a non-object root: its files/include cannot be read. */
+    const selectionUnreadable = !!syntax || object !== raw;
+    group.explicitSelection = "files" in object || "include" in object;
     // Follow the extends chain ourselves first so missing bases are classified, not ignored.
     const pending: [string, unknown][] = [[config.path, object.extends]];
     const seen = new Set<string>();
@@ -499,11 +505,25 @@ export function projectModel(
         if (path !== undefined) claim(path, group);
       }
     }
-    // A broken config could own anything below its directory.
-    if (group.failure)
-      for (const file of files)
-        if (underDirectory(file.path, posix.dirname(config.path)))
-          claim(file.path, group);
+    // Its own file selection cannot be read: it could own anything below its
+    // directory (decided after every config, see below).
+    if (group.failure && selectionUnreadable) unreadable.push(group);
+  }
+  // Never fall back onto files that a healthy config in the same directory
+  // explicitly selects with its own `files`/`include`.
+  for (const group of unreadable) {
+    const directory = posix.dirname(group.config!);
+    for (const file of files)
+      if (
+        underDirectory(file.path, directory) &&
+        !(claimed.get(file.path) ?? []).some(
+          (other) =>
+            !other.failure &&
+            other.explicitSelection &&
+            posix.dirname(other.config!) === directory,
+        )
+      )
+        claim(file.path, group);
   }
   const owner = new Map<string, ProjectGroup>();
   const ties = new Map<string, ProjectGroup[]>();

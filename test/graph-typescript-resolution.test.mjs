@@ -1568,3 +1568,355 @@ for (const base of ["./base.json", "./config/ts.json"])
       },
     );
   });
+
+// Round 4: provenance of shadowed-require values across files.
+const shadowDep = "export function real() {}\nexport class K { run() {} }\n";
+const intoDep = (graph, link) =>
+  [link.targetId, ...link.candidates.map((c) => c.id)].some(
+    (id) =>
+      graph.store.findSymbols().find((s) => s.id === id)?.file === "dep.ts",
+  );
+const assertNoneIntoDep = (graph, files) => {
+  const wrong = graph.store
+    .links()
+    .filter((link) => files.includes(link.file) && intoDep(graph, link));
+  assert.deepEqual(
+    wrong.map((l) => `${l.file} ${l.kind} ${l.targetName}`),
+    [],
+  );
+};
+
+test("shadowed-require values do not escape through ES exports into other files", async () => {
+  await project(
+    {
+      "dep.ts": shadowDep,
+      "e.js": [
+        "export function require(n) { return {}; }",
+        'const m = require("./dep");',
+        "export { m };",
+        "export default m;",
+        "",
+      ].join("\n"),
+      "f.ts": [
+        'import { m } from "./e.js";',
+        'import d from "./e.js";',
+        "m.real();",
+        "new m.K();",
+        "d.real();",
+        "",
+      ].join("\n"),
+    },
+    async (graph) => {
+      assertNoneIntoDep(graph, ["e.js", "f.ts"]);
+      for (const name of ["m.real", "m.K", "d.real"]) {
+        const call = graph.store
+          .links()
+          .find((l) => l.file === "f.ts" && l.targetName === name);
+        assert.equal(call.resolution, "unresolved", name);
+        assert.equal(call.data.reason, "shadowed-require", name);
+      }
+      // The binding `m` is the local constant in e.js, not the dep module.
+      assert.equal(graph.target(graph.link("f.ts", "m", "imports")), "e.js#m");
+      assert.equal(
+        graph.link("f.ts", "d", "imports").data.reason,
+        "shadowed-require",
+      );
+    },
+  );
+});
+
+test("shadowed-require values do not escape through a default export of a member", async () => {
+  await project(
+    {
+      "dep.ts": shadowDep,
+      "a.js": [
+        "export {};",
+        "function require(n) { return { real() { return 17; } }; }",
+        'const m = require("./dep");',
+        "export default m.real;",
+        'import * as legit from "./dep";',
+        "legit.real();",
+        "",
+      ].join("\n"),
+      "b.js": 'import run from "./a";\nrun();\n',
+    },
+    async (graph) => {
+      // A genuine ES import of the same module in the same file still links.
+      assert.equal(
+        graph.target(
+          graph.store.links().find((l) => l.targetName === "legit.real"),
+        ),
+        "dep.ts#real",
+      );
+      assert.equal(
+        graph.link("a.js", "m.real", "exports").data.reason,
+        "shadowed-require",
+      );
+      assert.equal(
+        graph.link("b.js", "run", "imports").data.reason,
+        "shadowed-require",
+      );
+      const call = graph.store
+        .links()
+        .find((l) => l.file === "b.js" && l.kind === "calls");
+      assert.equal(call.resolution, "unresolved");
+      assert.equal(call.data.reason, "shadowed-require");
+      assertNoneIntoDep(graph, ["b.js"]);
+    },
+  );
+});
+
+test("shadowed-require values do not escape through CommonJS exports", async () => {
+  await project(
+    {
+      "dep.ts": shadowDep,
+      "x.js": [
+        "function require(n) { return { real() { return 0; } }; }",
+        'const m = require("./dep");',
+        "module.exports = m;",
+        "exports.mm = m;",
+        "",
+      ].join("\n"),
+      "y.js": [
+        'const x = require("./x");',
+        "x.real();",
+        "new x.K();",
+        'const { mm } = require("./x");',
+        "mm.real();",
+        "",
+      ].join("\n"),
+    },
+    async (graph) => {
+      assertNoneIntoDep(graph, ["x.js", "y.js"]);
+      for (const name of ["x.real", "x.K", "mm.real"]) {
+        const call = graph.store
+          .links()
+          .find((l) => l.file === "y.js" && l.targetName === name);
+        assert.equal(call.resolution, "unresolved", name);
+      }
+      // The real require of ./x still links to the module x.js.
+      const modules = graph.links("y.js", '"./x"', "imports");
+      assert.equal(modules.length, 2);
+      for (const module of modules)
+        assert.equal(graph.target(module), "x.js#x.js");
+    },
+  );
+});
+
+// Round 4: an uncaptured base config never yields a confident link.
+const incomplete = (graph, file, at, kind) => {
+  const found = graph.link(file, at, kind);
+  assert.equal(found.resolution, "unresolved", `${at} ${kind}`);
+  assert.equal(found.data.reason, "incomplete-config", `${at} ${kind}`);
+  return found;
+};
+test("settings from an uncaptured base config: paths alias", async () => {
+  await project(
+    {
+      "tsconfig.json": JSON.stringify({
+        extends: "./base.json",
+        compilerOptions: { baseUrl: "." },
+      }),
+      "base.json": JSON.stringify({
+        compilerOptions: { paths: { service: ["right.ts"] } },
+      }),
+      "service.ts": "export function run() {}\n",
+      "right.ts": "export function run() {}\n",
+      "use.ts":
+        'import { run } from "service";\nrun();\nfunction own() {}\nown();\n',
+    },
+    async (graph, report) => {
+      assert.ok(report.partial.includes("use.ts"));
+      const call = incomplete(graph, "use.ts", "run", "calls");
+      assert.deepEqual(
+        call.data.targets.map((t) => t.file),
+        ["service.ts"],
+      );
+      incomplete(graph, "use.ts", "run", "imports");
+      incomplete(graph, "use.ts", '"service"', "imports");
+      // A same-file call reached without any import stays definite.
+      assert.equal(
+        graph.target(graph.link("use.ts", "own", "calls")),
+        "use.ts#own",
+      );
+    },
+  );
+});
+
+test("settings from an uncaptured base config: workspace packages shadowed by paths", async () => {
+  await project(
+    {
+      "package.json": JSON.stringify({
+        private: true,
+        workspaces: ["packages/*"],
+      }),
+      "base.json": JSON.stringify({
+        compilerOptions: {
+          baseUrl: ".",
+          paths: { "@core/*": ["./app/src/core/*"] },
+        },
+      }),
+      "app/tsconfig.json": JSON.stringify({
+        extends: "../base.json",
+        include: ["src"],
+      }),
+      "app/src/config.ts": "export function load() {}\n",
+      "app/src/core/util.ts": "export function util() {}\n",
+      "app/src/use.ts":
+        'import { load } from "config";\nload();\nimport { util } from "@core/util";\nutil();\n',
+      "packages/config/package.json": JSON.stringify({
+        name: "config",
+        main: "./index.ts",
+      }),
+      "packages/config/index.ts": "export function load() {}\n",
+      "packages/util/package.json": JSON.stringify({
+        name: "@core/util",
+        main: "./index.ts",
+      }),
+      "packages/util/index.ts": "export function util() {}\n",
+    },
+    async (graph) => {
+      for (const at of ["load", "util"]) {
+        incomplete(graph, "app/src/use.ts", at, "calls");
+        incomplete(graph, "app/src/use.ts", at, "imports");
+      }
+      incomplete(graph, "app/src/use.ts", '"config"', "imports");
+      incomplete(graph, "app/src/use.ts", '"@core/util"', "imports");
+    },
+  );
+});
+
+test("settings from an uncaptured base config: a package base", async () => {
+  await project(
+    {
+      "tsconfig.json": JSON.stringify({
+        extends: "@company/tsconfig/base.json",
+        compilerOptions: { baseUrl: "." },
+      }),
+      "service.ts": "export function run() {}\n",
+      "use.ts": 'import { run } from "service";\nrun();\n',
+    },
+    async (graph) => {
+      incomplete(graph, "use.ts", "run", "calls");
+      incomplete(graph, "use.ts", '"service"', "imports");
+    },
+  );
+});
+
+test("settings from an uncaptured base config: moduleResolution", async () => {
+  await project(
+    {
+      "package.json": JSON.stringify({
+        private: true,
+        workspaces: ["packages/*"],
+      }),
+      "packages/pkg/package.json": JSON.stringify({
+        name: "pkg",
+        main: "./legacy.ts",
+        exports: { ".": "./modern.ts" },
+      }),
+      "packages/pkg/legacy.ts": "export function go() {}\n",
+      "packages/pkg/modern.ts": "export function go() {}\n",
+      "app/tsconfig.json": JSON.stringify({
+        extends: "./base.json",
+        include: ["*.ts"],
+      }),
+      "app/base.json": JSON.stringify({
+        compilerOptions: { moduleResolution: "bundler", module: "esnext" },
+      }),
+      "app/use.ts": 'import { go } from "pkg";\ngo();\n',
+    },
+    async (graph) => {
+      const call = incomplete(graph, "app/use.ts", "go", "calls");
+      assert.equal(call.data.targets.length, 1);
+      incomplete(graph, "app/use.ts", '"pkg"', "imports");
+    },
+  );
+});
+
+test("a broken config with a readable selection fails only what it selects (Vite layout)", async () => {
+  const layout = {
+    "tsconfig.json": JSON.stringify({
+      files: [],
+      references: [
+        { path: "./tsconfig.app.json" },
+        { path: "./tsconfig.node.json" },
+      ],
+    }),
+    "tsconfig.app.json": JSON.stringify({ include: ["src"] }),
+    "tsconfig.node.json": JSON.stringify({
+      extends: "./tsconfig.missing.json",
+      include: ["vite.config.ts"],
+    }),
+    "vite.config.ts": "export default {};\n",
+    "src/App.tsx": "export function App() { return <div />; }\n",
+    "src/main.tsx": 'import { App } from "./App";\nApp();\n',
+    "src/helper.ts": "export const helper = 1;\n",
+  };
+  await project(layout, async (graph, report) => {
+    assert.deepEqual(report.failed, ["vite.config.ts"]);
+    assert.equal(
+      graph.target(graph.link("src/main.tsx", "App", "calls")),
+      "src/App.tsx#App",
+    );
+  });
+  // An unreadable selection falls back to the subtree, but not onto files a
+  // healthy config in the same directory explicitly selects.
+  await project(
+    { ...layout, "tsconfig.node.json": "{ broken" },
+    async (graph, report) => {
+      assert.deepEqual(report.failed, ["vite.config.ts"]);
+      assert.equal(graph.store.getFile("src/helper.ts").result.status, "clean");
+    },
+  );
+});
+
+test("calls, new, types and heritage through a binding from a missing module say missing-module", async () => {
+  await project(
+    {
+      "use.ts": [
+        'import { Foo } from "./missing";',
+        'import * as ns from "./missing";',
+        "new Foo();",
+        "Foo.make();",
+        "ns.go();",
+        "export let x: Foo;",
+        "export class C extends Foo {}",
+        "",
+      ].join("\n"),
+    },
+    async (graph) => {
+      const reasons = graph.store
+        .links()
+        .filter((l) => l.file === "use.ts" && l.kind !== "contains")
+        .map((l) => `${l.kind} ${l.targetName} ${l.data.reason}`)
+        .sort();
+      assert.deepEqual(reasons, [
+        "calls Foo missing-module",
+        "calls Foo.make missing-module",
+        "calls ns.go missing-module",
+        "extends Foo missing-module",
+        "imports * missing-module",
+        "imports ./missing missing-module",
+        "imports ./missing missing-module",
+        "imports Foo missing-module",
+        "references Foo missing-module",
+      ]);
+    },
+  );
+});
+
+test("a tied file records its tied configs and no single project", async () => {
+  await project(
+    {
+      "tsconfig.a.json": JSON.stringify({ include: ["src"] }),
+      "tsconfig.b.json": JSON.stringify({ include: ["src"] }),
+      "src/a.ts": "export const a = 1;\n",
+    },
+    async (graph) => {
+      const data = graph.store.getFile("src/a.ts").result.data;
+      assert.deepEqual(data.projects, ["tsconfig.a.json", "tsconfig.b.json"]);
+      assert.equal("project" in data, false);
+    },
+  );
+});

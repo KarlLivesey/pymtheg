@@ -53,7 +53,8 @@ The module is **analyze-only** (no per-file `parse`). Each run:
    - a link whose targets differ gets the union of targets: candidates if every
      config's answer was complete, otherwise unresolved with reason
      `ambiguous-project` and the targets kept;
-   - the file records `data.projects` listing the tied configs.
+   - the file records `data.projects` listing the tied configs and has no
+     `data.project` (there is no single owner).
 
    Path order is used only to order the tied configs in that list, never to
    pick one. A file that no config includes goes to an **inferred project**
@@ -92,7 +93,9 @@ link across packages.
 
 **Unchanged snapshot reuse.** When `changedFiles` and `changedContextFiles`
 are both empty and every stored result was produced by this module version
-(which embeds the compiler version), the stored facts are returned as they are:
+(which embeds the compiler version; the leading number is bumped whenever
+extraction or resolution semantics change, and is now 2), the stored facts are
+returned as they are:
 no program is built and nothing is parsed. They are the complete analysis of the
 identical snapshot, and `resolve` re-derives every target from them. Any source,
 config or package-manifest change, or a version change, reanalyses everything.
@@ -183,21 +186,49 @@ rather than scope bindings, so for those a top-level declaration of the name in
 the same file counts as shadowing. A `var module` declared in another global
 script is not seen (a known limitation).
 
-The compiler's binder still treats `const m = require("./dep")` as an import
-alias when `require` is local, so its types point into `./dep`. Such a variable
-is an ordinary symbol here, and **nothing reached through it links into the
-module**. This covers member calls (`m.real()`), `new m.K()`, JSX
-`<m.C/>`, `typeof m.x`, heritage `extends m.K`, and the same forms on variables
-initialised or assigned from it (`const n = m`, `n = m`), transitively within
-the file. All of these are unresolved with reason `shadowed-require`. Names
-destructured from it (`const { real } = m`, `const { real } = require("./dep")`)
-are local constants, so calls to them resolve to those constants. Passing it to
-an untyped parameter gives no symbol. A value carried further, through an object
-property (`holder.m.real()`) or a return value (`give().real()`), is caught by
-its type: in a file with a shadowed `require`, a receiver whose type is the
-misbound module's namespace links nowhere. This is conservative: a genuine
-`import * as` of the same module in that same file is then also unresolved,
-never wrongly linked.
+**Provenance of shadowed-`require` values.** The compiler's binder treats
+`const m = require("./dep")` as an import alias of `./dep` even when `require`
+is local, so every alias and type it hands out for `m` points into `./dep`.
+That is wrong: at run time `m` is whatever the local function returns. The
+module therefore decides **once per declaration**, across every captured
+JavaScript file of the program (memoised in `provenance.ts`), whether a
+binding's value comes from such a call. A declaration carries that provenance
+when it is:
+- a variable or destructured name initialised from a shadowed `require` call;
+- a variable or destructured name initialised from an expression that carries
+  it, where an expression carries it if its root name, any member on its path,
+  or the callee of a call on its path does, and `a ? b : c` or `a || b`/`a && b`/
+  `a ?? b` carries it if either side does;
+- a variable that a plain assignment `x = value` gives such a value, in any
+  captured JavaScript file;
+- `export default value`/`export = value`, `module.exports = value`,
+  `exports.x = value`, or an object property `{ x: value }` / `{ m }` holding
+  such a value;
+- a function whose `return` (or arrow body) yields such a value.
+
+Every resolution path consults it. Alias chains are walked **one step at a
+time** (`getImmediateAliasedSymbol`; for a binding of a module whose value is
+`module.exports = …`, that assignment is an explicit step) and stop at the first
+step whose declaration carries the provenance. The link then targets that
+declaration if it is a graph symbol (`import { m } from "./e.js"` resolves to
+the constant `m` in `e.js`); otherwise it is unresolved with reason
+`shadowed-require`. Every member lookup (`m.real()`, `new m.K()`, `<m.C/>`,
+`typeof m.x`, `extends m.K`, `export default m.real`) checks its receiver
+expression the same way. So within these rules nothing reached through such a
+binding links into the module named by its string argument: not in the same
+file, and not through re-exports, default exports, `module.exports`/`exports.x`
+or imports in other files.
+
+Genuine bindings are unaffected, because provenance belongs to declarations,
+not types: `import * as legit from "./dep"` beside a shadowed `require` of
+`./dep` in the same file still resolves `legit.real()` to `dep.ts#real`.
+
+Not tracked (each is an unresolved link at worst, never a link into the
+module): values passed as arguments to a parameter (an untyped JavaScript
+parameter gives no symbol anyway); values stored by mutation (`obj.x = m`,
+array elements, `Object.assign`); compound assignments; and the
+`var module`/`var exports` declared in another global script file, described
+above.
 
 Paths aliases (`paths`/`baseUrl`), `package.json` `imports`/`exports`/`type`,
 `moduleResolution` modes and workspace packages all work through the compiler's
@@ -207,15 +238,16 @@ own resolver over the snapshot.
 
 | reason | Meaning |
 |---|---|
-| `external` | The checker found declarations, but outside the project: the standard library, or a call through a binding whose package is not in the snapshot |
-| `external-package` | A bare specifier that does not resolve (`node_modules` is never walked), and every binding imported from it |
-| `missing-module` | A relative specifier with no captured file, and every binding imported from it |
-| `unresolved-alias` | A specifier matching a `paths` pattern of the owning config, or a `#` subpath import, that resolves to no captured file, and its bindings |
+| `external` | The checker found declarations, but outside the project (standard library); or a name that resolved through a binding whose module did resolve but whose member has no declaration |
+| `external-package` | A bare specifier that does not resolve (`node_modules` is never walked), every binding imported from it, and every call, `new`, type reference, heritage clause and member lookup reached through such a binding |
+| `missing-module` | The same for a relative specifier with no captured file (for example `new FlowProducer()` imported from an unbuilt `../../dist/...`) |
+| `unresolved-alias` | The same for a specifier matching a `paths` pattern of the owning config, or a `#` subpath import, that resolves to no captured file |
 | `no-symbol` | The checker has no symbol: untyped JS, `any`/`unknown` receivers (often because the receiver's type came from an uncaptured package), computed callees |
 | `local` | The target is a parameter, local variable, local function or other non-symbol declaration |
 | `computed-specifier` | `import(expr)` or JS `require(expr)` with a non-literal specifier |
 | `shadowed-require` | Reached through a value from a locally bound `require` (see above) |
 | `ambiguous-project` | Equally ranked configs disagree and at least one has no complete answer; their targets are kept |
+| `incomplete-config` | The file's config `extends` a base that was not captured, and the link's outcome depends on settings that base could supply (see Status); would-be targets are kept, the reason without that rule is in `data.reasonWithoutConfig` |
 
 **A target set is never narrowed.** If any possible declaration lies outside the
 project (standard library, uncaptured package, a local), the link is
@@ -245,11 +277,14 @@ imports of `./orig` are not linked to it; backlog).
   value. It is also broken when a relative `extends` target that the context
   patterns would capture is missing, or when any base in the `extends` chain is
   malformed or its root is not an object (an array, `null`, a number or a
-  string). Each file the config could own is **failed**, with a
-  diagnostic naming the cause. Those files are its directory subtree, minus
-  files that a deeper valid config owns, plus anything its parsable
-  `files`/`include` names. Ownership ranking still applies, so a nearer valid
-  config keeps its files. Other projects analyse normally. Links from healthy
+  string). Each file the config could own is **failed**, with a diagnostic
+  naming the cause. When its own JSON is readable, those are exactly the files
+  its `files`/`include` select (in a Vite layout, a broken `tsconfig.node.json`
+  fails `vite.config.ts` only). Only when its own selection cannot be read
+  (malformed JSON or a non-object root) does it fall back to its directory
+  subtree; even then it skips files that a healthy config in the same directory
+  selects with its own `files`/`include`. Ownership ranking still applies, so a
+  nearer valid config keeps its files. Other projects analyse normally. Links from healthy
   files into the failed files keep their names and stay unresolved; their
   recorded targets are in `data.targets`.
 - **A broken `package.json`** (malformed or not an object) fails the files of
@@ -277,6 +312,30 @@ imports of `./orig` are not linked to it; backlog).
   module cannot tell whether the file exists, so this is also a limitation: the
   config's own settings apply, and its files are **partial**, with a diagnostic
   saying that the base is not captured as context and its settings are missing.
+- **No confident link under missing settings.** When any config in a file's
+  `extends` chain could not be captured (external package, `node_modules` path,
+  or a base outside the context patterns), the base could have set `baseUrl`,
+  `paths`, `moduleResolution`, `customConditions`, `rootDirs`,
+  `moduleSuffixes`, `lib`, `types`, `jsx` or `strict*`. Then the following are
+  unresolved with reason `incomplete-config`, with the would-be targets kept in
+  `data.targets`:
+  - **every** `imports`/`exports` link, relative or not, because `rootDirs`
+    and `moduleSuffixes` can redirect relative specifiers too;
+  - every link whose lookup passed through an import binding;
+  - every link with a target in another file;
+  - every member lookup whose receiver is anything other than `this`/`super`
+    or a class, enum, namespace or function declared in this file;
+  - every other link that had an unresolved reason other than `local` or
+    `shadowed-require` (its original reason is kept in
+    `data.reasonWithoutConfig`).
+
+  What stays definite: `contains`, triple-slash `path` references (resolved
+  from the file system, not by settings), and same-file targets reached by name
+  or through a stable receiver (`own()`, `this.method()`, `Local.method()`,
+  `extends LocalBase`, `x: LocalType`). Those are lexical, so no compiler
+  setting can change them. The rule is deliberately coarse: under a base that
+  could not be captured, most cross-file links are unresolved, which is the
+  honest outcome.
 - Other config diagnostics (unknown options and the like) are kept in each owned
   file's `data.configNotes`; "no inputs found" is normal for solution configs.
 
@@ -313,13 +372,15 @@ imports of `./orig` are not linked to it; backlog).
    whole analysis if any context file cannot be captured, so one non-UTF-8 JSON
    fixture would fail every TypeScript file. Done instead: the patterns cover
    the common base names (`*tsconfig*.json`, `*jsconfig*.json`). Any other
-   relative base is reported as partial (see above), never silently dropped.
+   relative base makes its files partial, and every link that could depend on
+   that base's settings is unresolved with reason `incomplete-config` and its
+   would-be targets kept (see Status), never a silent guess.
    Closing this needs an interface way to request specific context paths
    discovered during analysis.
 
 ## Observations
 
-Full numbers, the comparison across rounds and all three hand checks are in
+Full numbers, the comparison across rounds and all four hand checks are in
 `evidence/w2-d/README.md`.
 
 - **BullMQ indexes in full**: 261 claimed files, 261 clean, 0 partial, 0 failed,
@@ -331,17 +392,23 @@ Full numbers, the comparison across rounds and all three hand checks are in
   BullMQ candidate set had an outside possibility, so the item-4 rule moved
   none. Two files (`tests/types/*.ts`) are a genuine tie between
   `tsconfig.tests-check.json` and `tsconfig.type-tests.json`; they are analysed
-  under both, and no link differs. Hand checks found no wrong link in any round:
-  round 1 checked 24 resolved, 12 unresolved and all 4 candidate sets; rounds 2
-  and 3, each with a new seed, checked 30 resolved, 15 unresolved and all 4
-  candidate sets.
+  under both, and no link differs. Round 4 changes no resolution state; only
+  unresolved reasons move. 11,444 links are relabelled to the reason of the
+  binding they go through: from `external` 6,635 and from `no-symbol` 4,809, to
+  `external-package` 11,210 (mostly `vitest`'s `expect`/`it` and their matcher
+  chains) and `missing-module` 234 (`tests/types/*.ts` and fixtures that import
+  the unbuilt `dist/`). Provenance, incomplete-config and the selection
+  fallback do not apply to BullMQ. Hand checks found no wrong link in any
+  round: round 1 checked 24 resolved, 12 unresolved and all 4 candidate sets;
+  rounds 2, 3 and 4, each with a new seed, checked 30 resolved, 15 unresolved
+  and all 4 candidate sets.
   Unresolved links are dominated by uncaptured packages (`vitest`, `ioredis`,
   `node:*`) and the standard library. The existing deep analysis
   (`src/implementation/`) is unchanged and remains available on top.
 - Pymtheg `src/`: 208 files clean; 9,055 of 26,071 links resolved. The ratio is
   lower because most calls go into `typescript` and `zod`, which live in
   `node_modules`.
-- Time (observation, loaded machine): the BullMQ first index takes 60 to 66 s, of
-  which the module's analysis is about 10 s; the rest is core storage. An
-  unchanged re-index reuses the stored facts (about 5 ms of analysis); its
-  remaining 33 to 50 s is core.
+- Time (observation, loaded machine): before the W2-I core landed, the BullMQ
+  first index took 38 to 66 s, of which the module's analysis was about 10 s,
+  the rest core storage. With W2-I merged (round 4) it takes 18 s, and an
+  unchanged re-index takes 6 s (about 5 ms of analysis; stored facts reused).

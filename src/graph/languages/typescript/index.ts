@@ -11,6 +11,7 @@ import type {
 } from "../../types.js";
 import { extractFile, type TargetFact } from "./extract.js";
 import { CONTEXT_PATTERNS, projectModel, toVirtual } from "./project.js";
+import { Provenance } from "./provenance.js";
 import { withChecker } from "./symbols.js";
 
 /**
@@ -19,7 +20,8 @@ import { withChecker } from "./symbols.js";
  * host. Analysis records each link's checker targets as (file, symbol key)
  * facts; resolve maps those facts to symbol IDs. See docs/changes/W2-D.md.
  */
-const MODULE_VERSION = `1+typescript-${ts.version}`;
+// Bump the leading number whenever extraction or resolution semantics change.
+const MODULE_VERSION = `2+typescript-${ts.version}`;
 
 /** Observation counters for tests (programs built, files extracted). Not a correctness input. */
 export const statistics = { programs: 0, extracted: 0, reused: 0 };
@@ -109,10 +111,15 @@ function mergeTied(
       : first!.status,
     diagnostics,
     links,
-    data: {
-      ...(first!.data as { [key: string]: Json }),
-      projects: [...configs],
-    },
+    data: (() => {
+      // A tie has no single owner: `projects` lists them; `project` is absent.
+      const merged: { [key: string]: Json } = {
+        ...(first!.data as { [key: string]: Json }),
+        projects: [...configs],
+      };
+      delete merged.project;
+      return merged;
+    })(),
   };
 }
 
@@ -155,6 +162,10 @@ const module: LanguageModule = {
       });
       statistics.programs++;
       const checker = program.getTypeChecker();
+      const provenance = withChecker(
+        checker,
+        () => new Provenance(program, checker, captured),
+      );
       for (const root of group.roots) {
         const path = root.slice(1);
         const source = program.getSourceFile(toVirtual(path));
@@ -170,7 +181,17 @@ const module: LanguageModule = {
         try {
           if (!source) throw Error("The compiler did not load this source");
           result = withChecker(checker, () =>
-            extractFile(source, checker, program, captured, diagnostics, data),
+            extractFile(
+              source,
+              checker,
+              program,
+              captured,
+              diagnostics,
+              data,
+              provenance,
+              // Settings from an uncaptured base are missing: see extract.ts.
+              group.limitations.length > 0,
+            ),
           );
           statistics.extracted++;
         } catch (error) {
