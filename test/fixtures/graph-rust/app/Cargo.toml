@@ -1,0 +1,10 @@
+[package]
+name = "sample-app"
+version = "0.1.0"
+[lib]
+path = "src/lib.rs"
+[[bin]]
+name = "demo"
+path = "src/driver.rs"
+[dependencies]
+helper = { path = "../helper" }
