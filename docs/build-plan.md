@@ -29,7 +29,7 @@ remote (`KarlLivesey/pymtheg`) and `gh` is signed in, so pull requests work.
 Limits that prevent the old review loop returning:
 
 - A review checks four things only: the "done when" is met, the result is correct, the change stayed inside its owned paths, and the tests are meaningful. No ratings, no cosmetic requests.
-- No cap on rounds (Karl, 11 November 2026): if either reviewer says changes are needed, or the two disagree, the blocking findings go back to the builder, the fix is pushed, and both reviewers review again. This repeats until both pass. Only blocking findings (wrong result, unmet "done when", out-of-scope edit, meaningless test) send it back; the manager settles whether a disputed finding is blocking.
+- No cap on rounds (Karl, 11 November 2026): a pull request merges only when both reviewers say it is fine. If either one says something needs fixing, it goes back to the builder, the fix is pushed, and both reviewers review again. This repeats until both pass. One reviewer passing does not outweigh the other's finding, and the manager does not overrule a reviewer's "needs fixing". Reviewers still raise only blocking findings (wrong result, unmet "done when", out-of-scope edit, meaningless test); optional suggestions stay in the backlog.
 - A reviewer's optional suggestions are recorded as backlog, not as conditions.
 
 ## 3. Keeping chunks apart
