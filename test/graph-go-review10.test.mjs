@@ -9,7 +9,9 @@ import { call, project } from "./fixtures/graph-go/harness.mjs";
 
 const MOD = "module example.com/m\n\ngo 1.22\n";
 const lines = (...items) => [...items, ""].join("\n");
-const OPEN = { reason: "external-implementers-possible" };
+/** Open, for whichever reason applies (a lossy package is one). */
+const assertOpen = (open, message) =>
+  assert.ok(open?.reason, message ?? JSON.stringify(open));
 
 /** Runs `check(on)` with recovery on, then off; restores it either way. */
 async function both(check) {
@@ -157,7 +159,7 @@ test("safety: 2 an indented header swallowed by an unclosed body", async () => {
       ),
     }));
     const link = call(links, "p/clean.go", "x.M");
-    assert.deepEqual(link.data.open, OPEN, `recovery ${on}`);
+    assertOpen(link.data.open, `recovery ${on}`);
     if (on)
       assert.ok(
         link.candidates.includes("p/broken.go:method:(b).M"),
@@ -190,7 +192,7 @@ test("safety: 3 grouped and Unicode types truncated at end of file", async () =>
         "p/broken.go": broken,
       });
       const link = call(links, "p/clean.go", "v.M");
-      assert.deepEqual(link.data.open, OPEN, `${name}, recovery ${on}`);
+      assertOpen(link.data.open, `${name}, recovery ${on}`);
       if (on) {
         assert.deepEqual(
           recovered(symbols, name).map((symbol) => symbol.kind),
@@ -237,7 +239,7 @@ test("safety: 4 an unknown structure reaches a hidden method through a chain of 
       link.candidates.includes("internal/w/w.go:method:(W).M"),
       `recovery ${on}: ${link.candidates.join()}`,
     );
-    assert.deepEqual(link.data.open, OPEN);
+    assertOpen(link.data.open);
   });
   // Control: intact, W carries h through y.Mid and x.Carrier: proven, closed.
   const { links } = await project(
@@ -271,7 +273,7 @@ test("safety: layer 1 keeps intact same-package names and depth-0 members defini
       ),
       "p/flags_windows.go": lines("package p", "func variant() {}"),
       "p/broken.go": lines("package p", "func B() {", "if true {"),
-      "r/r.go": lines(
+      "q/internal/r/r.go": lines(
         "package r",
         "type i interface{ M(); h() }",
         "type a struct{}",
@@ -293,8 +295,8 @@ test("safety: layer 1 keeps intact same-package names and depth-0 members defini
     );
     // Promoted: an unseen method on T could shadow it.
     assert.equal(call(links, "p/p.go", "t.P").target, null);
-    // A package that p cannot reach keeps its closed set.
-    assert.equal(call(links, "r/r.go", "x.M").data.open, undefined);
+    // A package p may not import (another tree's internal/) keeps its closed set.
+    assert.equal(call(links, "q/internal/r/r.go", "x.M").data.open, undefined);
   });
 });
 
@@ -385,7 +387,7 @@ test("safety: an unseen type of a lossy package may implement a sealed interface
       "p/p.go": base,
       "p/broken.go": lines("package p", "func B() {", "if true {"),
     }));
-    assert.deepEqual(call(links, "p/p.go", "x.M").data.open, OPEN, `${on}`);
+    assertOpen(call(links, "p/p.go", "x.M").data.open, `${on}`);
   });
 });
 
@@ -410,7 +412,7 @@ test("safety: a recovered type never gets an implements link", async () => {
     );
     // Never a closed set: open (recovery on lists (Q).M), or unresolved.
     const link = call(links, "p/clean.go", "x.M");
-    if (link.candidates.length) assert.deepEqual(link.data.open, OPEN);
+    if (link.candidates.length) assertOpen(link.data.open);
     else assert.equal(link.target, null);
     if (on) assert.ok(link.candidates.includes("p/clean.go:method:(Q).M"));
   });
@@ -438,7 +440,7 @@ test("safety: e an unclosed import block: the set stays open with recovery off",
       ),
     });
     const link = call(links, "internal/q/q.go", "x.M");
-    assert.deepEqual(link.data.open, OPEN, `${on}`);
+    assertOpen(link.data.open, `${on}`);
     if (on) assert.ok(link.candidates.includes("cmd/main.go:method:(W).M"));
   });
 });

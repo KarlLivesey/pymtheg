@@ -220,7 +220,15 @@ function analyze({
         data: {
           ...((link.data as { [key: string]: Json } | undefined) ?? {}),
           ...(note.builtin ? { builtin: true } : {}),
-          ...(note.open ? { open: { reason: note.open } } : {}),
+          ...(note.open
+            ? {
+                open: {
+                  reason: note.open[0]!,
+                  // Every reason that applies, when there is more than one.
+                  ...(note.open.length > 1 ? { reasons: note.open } : {}),
+                },
+              }
+            : {}),
           ...(note.overflow
             ? {
                 overflow: {
@@ -244,7 +252,7 @@ function analyze({
 
 const go: LanguageModule = {
   id: ID,
-  version: "13",
+  version: "14",
   extensions: [".go"],
   contextFiles: ["go.mod", "go.work"],
   parse,

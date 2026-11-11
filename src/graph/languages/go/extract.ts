@@ -169,7 +169,7 @@ export class GoExtractor {
         const name = named(child).find(
           (item) => item.type === "package_identifier",
         );
-        if (name) {
+        if (name && !name.isMissing && name.text && !child.hasError) {
           this.fact.package = name.text;
           this.fact.packageRange = range(name);
         }
@@ -187,6 +187,10 @@ export class GoExtractor {
         this.topLevel(child);
       }
     }
+    // Layer 1: without a readable package clause the file joins no package, so
+    // nothing it declares is trusted; every package of its directory may be
+    // missing its declarations (see the resolver).
+    if (this.fact.package === undefined) this.lossy(root);
     if (this.fact.lossy && recoveryOptions.enabled) this.recoverAll();
     // Live local bindings become plain JSON only now that every write has been seen.
     for (const link of this.links) {

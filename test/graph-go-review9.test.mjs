@@ -7,7 +7,9 @@ import { call, project } from "./fixtures/graph-go/harness.mjs";
 
 const MOD = "module example.com/m\n\ngo 1.22\n";
 const lines = (...items) => [...items, ""].join("\n");
-const OPEN = { reason: "external-implementers-possible" };
+/** Open, for whichever reason applies (a lossy package is one). */
+const assertOpen = (open, message) =>
+  assert.ok(open?.reason, message ?? JSON.stringify(open));
 
 test("a: a type truncated at end of file becomes a broken symbol of unknown structure", async () => {
   const { links, symbols } = await project({
@@ -33,7 +35,7 @@ test("a: a type truncated at end of file becomes a broken symbol of unknown stru
     link.candidates.includes("p/clean.go:method:(c).M"),
     link.candidates.join(),
   );
-  assert.deepEqual(link.data.open, OPEN);
+  assertOpen(link.data.open);
   // Layer 2: the recovered Pub is never a definite target, not even of the
   // receiver link of its intact method elsewhere.
   assert.ok(
@@ -116,7 +118,7 @@ test("d: a method whose following code was swallowed is still a possible target;
       link.candidates.includes("p/b.go:method:(b).M"),
       `${broken}: ${link.candidates.join()}`,
     );
-    assert.deepEqual(link.data.open, OPEN, broken);
+    assertOpen(link.data.open, broken);
   }
   // Control: without b.go the set is closed.
   const { links } = await project({ "go.mod": MOD, "p/p.go": p });
@@ -152,7 +154,7 @@ test("e: a lost import makes unmatched qualifiers unknown, not external", async 
       link.candidates.includes("cmd/main.go:method:(W).M"),
       `${head}: ${link.candidates.join()}`,
     );
-    assert.deepEqual(link.data.open, OPEN, head);
+    assertOpen(link.data.open, head);
   }
 });
 
@@ -166,7 +168,7 @@ test("containment: intact declarations in the same file, and unrelated packages,
       "func G() { var g Good; g.M() }",
       "type Pub struct { c",
     ),
-    "r/r.go": lines(
+    "q/internal/r/r.go": lines(
       "package r",
       "type i interface{ M(); h() }",
       "type a struct{}",
@@ -177,8 +179,11 @@ test("containment: intact declarations in the same file, and unrelated packages,
     ),
   });
   assert.equal(call(links, "p/b.go", "g.M").target, "p/b.go:method:(Good).M");
-  assert.equal(call(links, "r/r.go", "v.M").target, "r/r.go:method:(a).M");
-  assert.equal(call(links, "r/r.go", "x.M").data.open, undefined);
+  assert.equal(
+    call(links, "q/internal/r/r.go", "v.M").target,
+    "q/internal/r/r.go:method:(a).M",
+  );
+  assert.equal(call(links, "q/internal/r/r.go", "x.M").data.open, undefined);
 });
 
 test("an unreadable method header makes every method set of its package unknown, with a diagnostic", async () => {
@@ -197,7 +202,7 @@ test("an unreadable method header makes every method set of its package unknown,
     "go.mod": MOD,
     "p/p.go": p,
     "p/z.go": lines("package p", "type z struct{ a }", "func ( {"),
-    "r/r.go": lines(
+    "q/internal/r/r.go": lines(
       "package r",
       "type j interface{ M(); h() }",
       "type a struct{}",
@@ -206,10 +211,10 @@ test("an unreadable method header makes every method set of its package unknown,
       "func Use(x j) { x.M() }",
     ),
   });
-  assert.deepEqual(call(links, "p/p.go", "x.M").data.open, OPEN);
+  assertOpen(call(links, "p/p.go", "x.M").data.open);
   assert.equal(call(links, "p/p.go", "v.M").target, "p/p.go:method:(b).M");
   // Another package is not affected.
-  assert.equal(call(links, "r/r.go", "x.M").data.open, undefined);
+  assert.equal(call(links, "q/internal/r/r.go", "x.M").data.open, undefined);
   const parsed = await go.parse({
     path: "p/z.go",
     text: lines("package p", "type z struct{ a }", "func ( {"),

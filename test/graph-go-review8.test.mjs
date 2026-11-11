@@ -7,7 +7,9 @@ import { call, project } from "./fixtures/graph-go/harness.mjs";
 
 const MOD = "module example.com/m\n\ngo 1.22\n";
 const lines = (...items) => [...items, ""].join("\n");
-const OPEN = { reason: "external-implementers-possible" };
+/** Open, for whichever reason applies (a lossy package is one). */
+const assertOpen = (open, message) =>
+  assert.ok(open?.reason, message ?? JSON.stringify(open));
 const implementsOf = (links) =>
   links
     .filter((link) => link.kind === "implements")
@@ -54,7 +56,7 @@ test("repro 1: a broken struct's recovered embedding gives no definite link in a
     dispatch.candidates.includes("p/b.go:method:(c).M"),
     dispatch.candidates.join(),
   );
-  assert.deepEqual(dispatch.data.open, OPEN);
+  assertOpen(dispatch.data.open);
 });
 
 test("repro 2: an embedding recovery dropped still makes its method a possible target", async () => {
@@ -83,7 +85,7 @@ test("repro 2: an embedding recovery dropped still makes its method a possible t
     link.candidates.join(),
   );
   assert.ok(link.candidates.includes("p/p.go:method:(a).M"));
-  assert.deepEqual(link.data.open, OPEN);
+  assertOpen(link.data.open);
 });
 
 test("a broken interface has no trusted method set", async () => {
@@ -122,7 +124,7 @@ test("a broken exported type might carry a hidden method: the sealed set is open
     "p/p.go": base,
     "p/pub.go": lines("package p", "type Pub struct{ a; z map[ }"),
   }));
-  assert.deepEqual(call(links, "p/p.go", "x.M").data.open, OPEN);
+  assertOpen(call(links, "p/p.go", "x.M").data.open);
 });
 
 test("broken method and function headers support no definite link", async () => {
@@ -157,7 +159,7 @@ test("broken method and function headers support no definite link", async () => 
     dispatch.candidates.includes("p/p.go:method:(A).M"),
     dispatch.candidates.join(),
   );
-  assert.deepEqual(dispatch.data.open, OPEN);
+  assertOpen(dispatch.data.open);
   // A clean function's result types its value; a broken one's does not.
   assert.equal(call(links, "p/p.go", "v.M").target, "p/p.go:method:(B).M");
   assert.equal(call(links, "p/p.go", "w.M").target, null);
@@ -217,6 +219,6 @@ test("local types inside a broken declaration have unknown structure", async () 
     link.candidates.includes("p/p.go:method:(b).M"),
     link.candidates.join(),
   );
-  assert.deepEqual(link.data.open, OPEN);
+  assertOpen(link.data.open);
   assert.ok(!implementsOf(links).some((item) => item.startsWith("make.go:")));
 });

@@ -162,8 +162,8 @@ export interface Overflow {
 /** Facts about a parsed link that only whole-project resolution can establish. */
 export interface LinkNote {
   overflow?: Overflow;
-  /** The candidate set is open: it may omit the true target, for this reason. */
-  open?: OpenReason;
+  /** The candidate set is open: it may omit the true target, for these reasons. */
+  open?: OpenReason[];
   /** The call really is to a builtin (no package-level declaration shadows it). */
   builtin?: true;
 }
@@ -231,7 +231,7 @@ export function linkNotes(
   for (const [linkId, overflow] of resolver.overflow)
     note(linkId).overflow = overflow;
   for (const linkId of resolver.builtins) note(linkId).builtin = true;
-  for (const [linkId, reason] of resolver.open) note(linkId).open = reason;
+  for (const [linkId, reasons] of resolver.open) note(linkId).open = reasons;
   return output;
 }
 
@@ -241,7 +241,7 @@ class GoResolver {
   /** Calls whose builtin name is not shadowed by a package-level declaration. */
   readonly builtins = new Set<string>();
   /** Candidate links whose set may omit a target outside the project. */
-  readonly open = new Map<string, OpenReason>();
+  readonly open = new Map<string, OpenReason[]>();
   private layout: GoProjectLayout;
   private files = new Map<string, FileInfo>();
   private pkgs = new Map<string, Pkg>();
@@ -269,6 +269,11 @@ class GoResolver {
   constructor(
     private readonly moduleId: string,
     private readonly context: ResolutionContext,
+    /**
+     * Only to name an open set's reasons: resolve as if no file were lossy and no
+     * declaration broken (intact declarations of lossy files are kept).
+     */
+    private readonly ignoreLossy = false,
   ) {
     this.layout = readLayout(context.contextFiles);
   }
@@ -311,22 +316,50 @@ class GoResolver {
         resolutions.push({ linkId: link.id, targetId: distinct[0]! });
       else if (distinct.length > 1 && distinct.length <= limit) {
         resolutions.push({ linkId: link.id, candidateIds: distinct });
-        // Layer 1: a set of declarations (build variants) in a lossy package may
-        // miss one in an unseen declaration.
-        const reason =
-          open ??
-          (distinct.some((id) => {
-            const symbol = this.symbolsById.get(id);
-            return !!symbol && this.lossy(this.pkgOf(symbol));
-          })
-            ? ("declarations-may-be-unseen" as const)
-            : undefined);
-        if (reason) this.open.set(link.id, reason);
+        const reasons = this.reasons(link, distinct, open);
+        if (reasons.length) this.open.set(link.id, reasons);
       } else if (distinct.length > limit)
         // Too many to list: unresolved with the name kept; a cut list could omit the target.
         this.overflow.set(link.id, { candidates: distinct.length, cap: limit });
     }
     return { resolutions, links: added };
+  }
+
+  /**
+   * Why a set is open, truthfully. `declarations-may-be-unseen` (layer 1) when a
+   * member is in a lossy package, or when the set would not be open with no file
+   * lossy and no declaration broken; `external-implementers-possible` only when
+   * it is open even then.
+   */
+  private reasons(
+    link: GraphLink,
+    ids: string[],
+    open: OpenReason | undefined,
+  ): OpenReason[] {
+    const unseen = "declarations-may-be-unseen" as const;
+    if (!this.lossyPackages.size) return open ? [open] : [];
+    const lossyMember = ids.some((id) => {
+      const symbol = this.symbolsById.get(id);
+      return !!symbol && this.lossy(this.pkgOf(symbol));
+    });
+    if (open === "external-implementers-possible") {
+      const shadow = this.shadow().resolveLink(link);
+      if (!shadow.open) return [unseen];
+      return lossyMember ? [open, unseen] : [open];
+    }
+    if (open) return [open];
+    return lossyMember ? [unseen] : [];
+  }
+
+  private shadowResolver?: GoResolver;
+  /** The project without lossy packages or broken symbols (only to name reasons). */
+  private shadow(): GoResolver {
+    if (!this.shadowResolver) {
+      this.shadowResolver = new GoResolver(this.moduleId, this.context, true);
+      this.shadowResolver.index();
+      this.shadowResolver.implementsLinks([]);
+    }
+    return this.shadowResolver;
   }
 
   // ---- indexing ----------------------------------------------------------
@@ -358,10 +391,22 @@ class GoResolver {
         }
         pkg.files.push(file.path);
         info.pkg = pkg;
-        if (fact.lossy) this.lossyPackages.add(key);
+        if (fact.lossy && !this.ignoreLossy) this.lossyPackages.add(key);
       }
       this.files.set(file.path, info);
     }
+    // A lossy file whose package clause is missing or unreadable may belong to
+    // any package of its directory (an external `_test` package only from a
+    // `_test.go` file); nothing it declares is trusted.
+    if (!this.ignoreLossy)
+      for (const info of this.files.values())
+        if (info.fact.lossy && !info.pkg)
+          for (const pkg of this.pkgs.values())
+            if (
+              pkg.directory === info.directory &&
+              (info.fact.test || !pkg.name.endsWith("_test"))
+            )
+              this.lossyPackages.add(pkg.key);
     // Intact methods by package, receiver and name: a recovered header that
     // repeats one adds nothing (layer 2 never shadows an intact declaration).
     const intactMethods = new Set<string>();
@@ -375,6 +420,12 @@ class GoResolver {
     }
     for (const symbol of this.context.symbols) {
       if (symbol.module !== this.moduleId || !this.files.has(symbol.file))
+        continue;
+      // Reasons only: without the damage, so no broken or recovered symbol.
+      if (
+        this.ignoreLossy &&
+        (symbol.data as { broken?: boolean } | undefined)?.broken
+      )
         continue;
       this.symbolsById.set(symbol.id, symbol);
       if (
@@ -550,8 +601,7 @@ class GoResolver {
         const base = this.lookupName(ref.q, from);
         // A qualifier that is no project import can only be an external import,
         // unless the file's import declaration is broken (it may be a lost one).
-        if (base.e === "none" && this.files.get(from)?.fact.importsBroken)
-          value = UNKNOWN;
+        if (base.e === "none" && this.importsUnknown(from)) value = UNKNOWN;
         else if (base.e === "none" || base.e === "external")
           value = { kind: "external", name: `${ref.q}.${ref.n}` };
         else if (base.e === "pkg")
@@ -792,7 +842,7 @@ class GoResolver {
     // `q.X` with q neither local nor declared in the package: q can only be one of
     // this file's imports; not a project import, so it is external.
     if (base.e === "none")
-      return desc.x.k === "name" && !this.files.get(from)?.fact.importsBroken
+      return desc.x.k === "name" && !this.importsUnknown(from)
         ? { e: "external", name: `${desc.x.n}.${desc.n}` }
         : NONE;
     if (base.e === "syms" && base.syms.every(isTypeSymbol)) {
@@ -1652,38 +1702,77 @@ class GoResolver {
     return false;
   }
 
-  private reachMemo = new Map<string, boolean>();
   /**
    * Can a type of package `from` contain types of package `to`: the same package,
    * reached through project imports, or a package with a broken import declaration
    * on the way (the lost import may name anything).
    */
+  /**
+   * The file's imports may be incomplete: its import declaration is broken, or
+   * (layer 1) the file is lossy, so an import may sit in what tree-sitter lost.
+   */
+  private importsUnknown(path: string): boolean {
+    const fact = this.files.get(path)?.fact;
+    return !!fact?.importsBroken || (!!fact?.lossy && !this.ignoreLossy);
+  }
+
   private mayReach(from: string | undefined, to: string): boolean {
     if (from === undefined) return true;
-    if (from === to) return true;
-    const key = `${from}\u0000${to}`;
-    const cached = this.reachMemo.get(key);
-    if (cached !== undefined) return cached;
+    return from === to || this.reachSet(from).has(to);
+  }
+
+  private reachSets = new Map<string, Set<string>>();
+  /**
+   * Packages whose types a type of package `from` may contain: its project
+   * imports, transitively. A package whose imports are not all known (a lossy
+   * package, or a file with a broken import declaration) may import any
+   * package Go lets it import (not `main`, not a `_test` package, `internal/`
+   * only from within its parent), and onward from those.
+   */
+  private reachSet(from: string): Set<string> {
+    const cached = this.reachSets.get(from);
+    if (cached) return cached;
     const seen = new Set([from]);
     const queue = [from];
-    let result = false;
-    while (queue.length && !result) {
+    const visit = (key: string) => {
+      if (!seen.has(key)) {
+        seen.add(key);
+        queue.push(key);
+      }
+    };
+    while (queue.length) {
       const pkg = this.pkgs.get(queue.shift()!);
-      for (const path of pkg?.files ?? []) {
+      if (!pkg) continue;
+      const unknown =
+        this.lossyPackages.has(pkg.key) ||
+        pkg.files.some((path) => this.importsUnknown(path));
+      if (unknown)
+        for (const target of this.pkgs.values()) {
+          if (this.canImport(pkg, target)) visit(target.key);
+        }
+      for (const path of pkg.files) {
         const info = this.files.get(path)!;
-        if (info.fact.importsBroken) result = true;
         for (const entry of [...info.imports.values(), ...info.dots])
-          for (const target of entry.pkgs) {
-            if (target.key === to) result = true;
-            if (!seen.has(target.key)) {
-              seen.add(target.key);
-              queue.push(target.key);
-            }
-          }
+          for (const target of entry.pkgs) visit(target.key);
       }
     }
-    this.reachMemo.set(key, result);
-    return result;
+    this.reachSets.set(from, seen);
+    return seen;
+  }
+
+  /** Go's import rules: could package `from` import package `target`? */
+  private canImport(from: Pkg, target: Pkg): boolean {
+    if (target.importPath === undefined || target.name === "main") return false;
+    const parts = target.importPath.split("/");
+    const internal = parts.lastIndexOf("internal");
+    if (internal < 0) return true;
+    const parent = parts.slice(0, internal).join("/");
+    const importer = importPathOf(this.layout, from.directory);
+    return (
+      parent === "" ||
+      (importer !== undefined &&
+        (importer === parent || importer.startsWith(`${parent}/`)))
+    );
   }
 
   private hiddenMemo = new Map<string, boolean>();

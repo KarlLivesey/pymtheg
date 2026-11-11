@@ -225,6 +225,10 @@ but only adds precision.
 
 A file is **declaration-lossy** (`data.go.lossy`) when tree-sitter gives it:
 
+- no readable package clause (missing, misspelled, or with no name). Such a file
+  joins no package, so nothing it declares is trusted. It makes **every package
+  of its directory** lossy: from a `_test.go` file the external `_test` package
+  too, otherwise only the non-`_test` ones;
 - any top-level ERROR node; or
 - any top-level declaration with an error, unless the error is provably
   confined to a function or method body.
@@ -270,15 +274,31 @@ While a package has at least one lossy file, for **that package**:
     `implements` link is built on it. As a value's type it is external but
     *shadowable*: it never hides a project package's unexported name.
 - **Unseen types.** An unseen type could implement anything it can reach.
-  - A dispatch set on an interface whose package a lossy package can reach
-    (`mayReach`, transitive through project imports) is open.
+  - A dispatch set on an interface whose package a lossy package can reach is
+    open. Reach is transitive through project imports. A lossy package's
+    imports are not all known, so it may reach **any package Go lets it
+    import**: not `main`, not a `_test` package, and `internal/` only from
+    within its parent. It may then reach onward from those.
   - A set of build variants with a member in a lossy package is open
     (`declarations-may-be-unseen`).
-- **Imports.** The lossy file's own imports are unknown (`importsBroken`), as
-  before: when an ERROR region comes before the first non-import declaration,
-  or when the import declaration itself is broken.
+- **Imports.** Every lossy file's own imports are unknown, decided from the tree
+  alone. An import lost after a declaration (for example inside the ERROR that
+  `var a = [` opens) is covered with recovery off. Unmatched qualifiers in a
+  lossy file are unknown, not external.
+  - On restic this broad rule cost one closed set in one of the four mid-edit
+    variants (see `evidence/w2-b/restic.md`). The narrower `import`-token test
+    was therefore not needed.
 - **Other packages** are affected only through these rules: through the types
   and interfaces they actually use, and through reach. Never wholesale.
+- **Reasons.** A set open because of layer 1 says so.
+  - `data.open.reason` is `declarations-may-be-unseen` when the set would not
+    be open with no file lossy and no declaration broken. This is decided by
+    resolving the same link a second time that way (intact declarations of
+    lossy files are kept), only to name the reason.
+  - When the set is open anyway and also has a member in a lossy package, both
+    reasons apply: `reason` is `external-implementers-possible` and `reasons`
+    lists both.
+  - Build-variant sets with a lossy member have `declarations-may-be-unseen`.
 
 ### Layer 2: lexical recovery, for precision only
 
@@ -714,6 +734,24 @@ groups and Unicode names, and never emits over an intact identity.
 - **Cost on restic:** see `evidence/w2-b/restic.md`.
 
 The module version is 13.
+
+## Module version 14 (eleventh review)
+
+Which packages a lossy file makes uncertain, decided from the tree alone:
+
+1. **No readable package clause.** The file makes every package of its
+   directory lossy (and the external `_test` package, from a `_test.go` file).
+   Before this version such a file joined no package and made none uncertain.
+2. **Lost imports.** Every lossy file's imports are unknown. A lossy package
+   may reach any package Go lets it import, transitively. Before, only an ERROR
+   before the first declaration counted, and the lexical scanner saw the rest,
+   so turning recovery off could close a set.
+3. **Truthful reasons:** `declarations-may-be-unseen`, or both reasons.
+
+`test/graph-go-review11.test.mjs` covers the three items with recovery on and
+off, and adds a transitive-reach test without any lossy file (the repro-4 test
+no longer needs transitivity, since a lossy package now reaches any importable
+package). Mutations M44–M47 cover items 1–3. The module version is 14.
 
 ## Core after PR 11 (W2-I)
 
