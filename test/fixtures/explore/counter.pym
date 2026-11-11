@@ -1,0 +1,5 @@
+machine Counter {
+  state n: Nat in 0..4 = 0;
+  event advance when n < 4 { n = n + 1; }
+  invariant bounded = n <= 4;
+}
