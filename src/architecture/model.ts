@@ -149,7 +149,7 @@ export function indexArchitecture(
         pointer: [],
         identity: "name-derived",
       });
-      if (/\.md$/i.test(d.path)) {
+      if (/\.(md|rst)$/i.test(d.path)) {
         const headings = headingIndex.headings.get(d.path) ?? [];
         headings.forEach((heading, i) => {
           visit();

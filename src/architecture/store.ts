@@ -16,7 +16,13 @@ import {
 } from "./history.js";
 import { indexInWorker } from "./runner.js";
 import { ArchitectureConflict } from "./import-merge.js";
-import { excludedDirectory, textDocument } from "./import-policy.js";
+import {
+  excludedDirectory,
+  documentSkipReason,
+  recordSkipped,
+  skippedDocuments,
+  type DocumentSelection,
+} from "./import-policy.js";
 import { decodeUtf8 } from "../shared/text.js";
 import {
   architectureDraftSchema,
@@ -1401,26 +1407,66 @@ export class ArchitectureStore {
 }
 export async function readArchitectureFolder(
   input: string,
-  selection: {
-    file?: (path: string) => boolean;
-    directory?: (path: string) => boolean;
-    signal?: AbortSignal;
-  } = {},
+  selection: DocumentSelection = {},
 ) {
+  selection.signal?.throwIfAborted();
+  // Validate patterns before discovery, including an empty source.
+  documentSkipReason("", selection);
   const root = await realpath(input).catch((error: NodeJS.ErrnoException) => {
       if (error.code === "ENOENT")
         throw Error(
-          "The documentation source folder was not found. Check its current location; use --source-id when refreshing a moved source.",
+          "The documentation source folder or file was not found. Check its current location; use --source-id when refreshing a moved source.",
         );
       throw error;
     }),
     documents: ArchitectureDocument[] = [],
-    excluded: string[] = [];
-  if (!(await stat(root)).isDirectory())
-    throw Error(
-      "Choose a documentation folder for import-architecture. To import one document, use Studio’s individual-file import.",
-    );
+    excluded: string[] = [],
+    skipped = skippedDocuments(),
+    singleFile = (await stat(root)).isFile();
+  function skip(
+    name: string,
+    reason: Parameters<typeof recordSkipped>[2],
+    kind: "file" | "directory" | "entry" = "file",
+  ) {
+    recordSkipped(skipped, name, reason, kind);
+    const label = {
+      "unsupported-type": "outside text-document import formats",
+      "outside-selection": "outside selected documentation scope",
+      "generated-private": "generated/private directory",
+      "symbolic-link": "symbolic link",
+      "special-file": "special file",
+      "too-large": "exceeds the 16 MiB document limit",
+      excluded: "excluded",
+    }[reason];
+    excluded.push(name + " (" + label + ")");
+  }
   let bytes = 0;
+  async function readDocument(path: string, name: string) {
+    const reason = documentSkipReason(name, selection);
+    if (reason) {
+      skip(name, reason);
+      return;
+    }
+    const before = await stat(path);
+    if (before.size > architectureLimits.documentBytes) {
+      skip(name, "too-large");
+      return;
+    }
+    bytes += before.size;
+    if (
+      bytes > architectureLimits.snapshotBytes ||
+      documents.length >= architectureLimits.maxDocuments - 1
+    )
+      throw Error("Architecture document import limit exceeded");
+    const text = decodeUtf8(await readFile(path), name),
+      after = await stat(path);
+    if (before.size !== after.size || before.mtimeMs !== after.mtimeMs)
+      throw Error(
+        name + " changed during import; retry to capture a consistent file",
+      );
+    selection.signal?.throwIfAborted();
+    documents.push({ path: name, text });
+  }
   async function visit(dir: string) {
     selection.signal?.throwIfAborted();
     for (const entry of (await readdir(dir, { withFileTypes: true })).sort(
@@ -1430,44 +1476,29 @@ export async function readArchitectureFolder(
       const path = join(dir, entry.name),
         name = relative(root, path);
       if (entry.isSymbolicLink()) {
-        excluded.push(name + " (symbolic link)");
-        continue;
-      }
-      if (entry.isDirectory()) {
+        skip(name, "symbolic-link", "entry");
+      } else if (entry.isDirectory()) {
         if (excludedDirectory(entry.name)) {
-          excluded.push(name + " (generated/private directory)");
+          skip(name, "generated-private", "directory");
           continue;
         }
-        if (selection.directory?.(name) === false) {
-          excluded.push(name + " (outside selected documentation scope)");
+        // Explicit includes can reach beyond the default directory predicate.
+        // User excludes apply to files; walking preserves exact per-file counts.
+        if (
+          selection.include === undefined &&
+          selection.directory?.(name) === false
+        ) {
+          skip(name, "outside-selection", "directory");
           continue;
         }
         await visit(path);
       } else if (entry.isFile()) {
-        if (!textDocument(entry.name) || selection.file?.(name) === false) {
-          excluded.push(name + " (outside text-document import formats)");
-          continue;
-        }
-        const before = await stat(path);
-        if (before.size > architectureLimits.documentBytes)
-          throw Error(name + " exceeds the 16 MiB document limit");
-        bytes += before.size;
-        if (
-          bytes > architectureLimits.snapshotBytes ||
-          documents.length >= architectureLimits.maxDocuments
-        )
-          throw Error("Architecture document import limit exceeded");
-        const text = decodeUtf8(await readFile(path), name),
-          after = await stat(path);
-        if (before.size !== after.size || before.mtimeMs !== after.mtimeMs)
-          throw Error(
-            name + " changed during import; retry to capture a consistent file",
-          );
-        selection.signal?.throwIfAborted();
-        documents.push({ path: name, text });
-      }
+        await readDocument(path, name);
+      } else skip(name, "special-file", "entry");
     }
   }
-  await visit(root);
-  return { root, documents, excluded };
+  if (singleFile) await readDocument(root, root.split("/").at(-1)!);
+  else if ((await stat(root)).isDirectory()) await visit(root);
+  else skip(root, "special-file", "entry");
+  return { root, documents, excluded, skipped };
 }

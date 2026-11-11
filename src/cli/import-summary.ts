@@ -1,3 +1,4 @@
+import type { SkippedDocuments } from "../architecture/import-policy.js";
 interface ImportSummary {
   committed: boolean;
   unchanged?: boolean;
@@ -6,6 +7,7 @@ interface ImportSummary {
   changes: { added: string[]; changed: string[]; removed: string[] };
   conflicts?: { path: string; reason: string }[];
   warnings?: string[];
+  skipped?: SkippedDocuments;
   newlyBrokenAuthoredLinks?: { name: string; target: string }[];
   [key: string]: unknown;
 }
@@ -31,6 +33,18 @@ export function renderImportSummary(value: ImportSummary): string {
       lines.push(
         `  … ${rows.length - 20} more; use --format json for all paths.`,
       );
+  }
+  if (value.skipped) {
+    const skipped = value.skipped;
+    lines.push(
+      `Skipped: ${skipped.total} entries (directory counts exclude uninspected descendants; path limit ${skipped.pathLimit}).`,
+    );
+    for (const [reason, count] of Object.entries(skipped.counts))
+      lines.push(`  ${reason}: ${count}`);
+    for (const row of skipped.paths)
+      lines.push(`  ${row.path} — ${row.reason} (${row.kind})`);
+    if (skipped.truncated)
+      lines.push(`  … ${skipped.truncated} paths omitted.`);
   }
   for (const row of value.conflicts ?? [])
     lines.push(`Conflict: ${row.path} — ${row.reason}`);

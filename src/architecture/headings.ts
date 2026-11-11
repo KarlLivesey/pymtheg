@@ -131,8 +131,58 @@ export function architectureMarkdown(text: string): {
     })),
   };
 }
-export function architectureHeadings(text: string): ArchitectureHeading[] {
-  return architectureMarkdown(text).headings;
+/** RST adornment styles define levels in first-seen order; originals stay lossless. */
+export function architectureHeadings(
+  text: string,
+  path = "document.md",
+): ArchitectureHeading[] {
+  if (!/\.rst$/i.test(path)) return architectureMarkdown(text).headings;
+  const lines = text.split("\n"),
+    projected = lines.map(() => ""),
+    styles = new Map<string, number>();
+  const adornment = (line: string) =>
+    /^([=\-`:'"~^_*+#<>.])\1{1,}\s*$/.exec(line)?.[1];
+  for (let i = 0; i + 1 < lines.length; i++) {
+    const title = lines[i]!.replace(/\r$/, ""),
+      underline = lines[i + 1]!.replace(/\r$/, ""),
+      character = adornment(underline);
+    if (
+      !title.trim() ||
+      /^\s/.test(title) ||
+      adornment(title) ||
+      !character ||
+      underline.trimEnd().length < title.trimEnd().length
+    )
+      continue;
+    const overline =
+      i > 0 &&
+      adornment(lines[i - 1]!) === character &&
+      lines[i - 1]!.trimEnd().length >= title.trimEnd().length;
+    if (i > (overline ? 1 : 0) && lines[i - (overline ? 2 : 1)]!.trim())
+      continue;
+    const style = character + (overline ? "overline" : "underline");
+    if (!styles.has(style)) styles.set(style, styles.size + 1);
+    // The existing Markdown navigation supports six levels.
+    projected[i] = "#".repeat(Math.min(styles.get(style)!, 6)) + " " + title;
+    i++;
+  }
+  return architectureMarkdown(projected.join("\n")).headings.map((heading) => {
+    const start =
+      heading.line > 0 && adornment(lines[heading.line - 1]!)
+        ? heading.line - 1
+        : heading.line;
+    let end = heading.end;
+    if (end > 0 && end < lines.length && adornment(lines[end - 1]!)) end--;
+    const body = lines.slice(heading.line + 2, end).join("\n");
+    return {
+      ...heading,
+      line: start,
+      end,
+      text: lines.slice(start, end).join("\n"),
+      bodyHash: hash(body),
+      hasBody: !!body.trim(),
+    };
+  });
 }
 
 export const headingRegistryPath = ".pymtheg-heading-identities.json";
