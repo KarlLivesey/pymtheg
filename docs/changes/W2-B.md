@@ -79,7 +79,7 @@ targets, never a guess. "Unresolved" keeps the target name.
 | Same, from a non-test file to a declaration in a `_test.go` file | Unresolved (Go hides it) |
 | `_test.go` (same package or external `_test`) reading test-file declarations in the same directory | Definite |
 | Import of a path in the importing file's own module (nearest `go.mod`), or in any module `use`d by a `go.work` that lists it | **Definite** to the package symbol |
-| Import of a path covered by a local `replace … => ./dir` in the importing file's own `go.mod` (or its `go.work`, which wins) | **Definite** to the package in the replacement directory. A version-specific `replace path vX => ./dir` applies only when the captured `go.mod` (every `go.work` main module that requires it) requires exactly `vX`. Otherwise, including when no requirement is captured, it is not applied, because the selected version is not established. An unversioned `replace` applies to all versions |
+| Import of a path covered by a local `replace … => ./dir` in the importing file's own `go.mod` (or its `go.work`, which overrides the modules' replaces of that path) | **Definite** to the package in the replacement directory when the directory is proven. The selected version is the maximum the main modules require. A version-specific `replace path vX => ./dir` of the selected version wins over an unversioned one, whatever their order. A version-specific replace of another version does not apply. The selected version is **not proven** when no main module requires the path, when a version cannot be parsed, or when another captured `go.mod` requires a higher version (the main requirement may then be stale). In that case every replacement that could apply is a **candidate**: both directories are kept and none is definite. Without an unversioned replace, the package may come from the module cache, so the import stays unresolved |
 | A directory mapped through one module that actually belongs to a nested `go.mod` (`example.com/m/sub` when `sub/go.mod` exists) | Unresolved (it is another module's package) |
 | Another project module reached without `replace`/`go.work` | Unresolved (Go would take it from the module cache, possibly another version) |
 | Directory with two importable package names | Candidates (package symbols) |
@@ -105,7 +105,7 @@ targets, never a guess. "Unresolved" keeps the target name.
 | `x.M()` / `x.f` where x's type is known to be external: parameter, field, variable, result or composite literal of an external type; result of calling an external function or method (`os.Open`, `context.Background`, `errgroup.WithContext`); element of an external container; a predeclared type (`error`) | Unresolved, name kept; never project candidates |
 | A local shadowing an import or function (`fmt := printer{}`, `helper := func(){}`) | The local wins. Methods on its evident type resolve |
 | Builtins (`len`, `append`, `new`, …) | Unresolved, `data.builtin: true`, set only when no package-level declaration visible to the caller shadows the name. A user-declared `new` or `len` is resolved to that declaration without the flag, and a test-file declaration shadows only for that package's test files. The flag is recomputed by `analyze` on every index, so it follows shadowing declarations added or removed in other files |
-| Implicit interface satisfaction | **Definite** `implements` link when every interface method is selected uniquely (selector rule) as a method with an identical canonical signature. An unexported interface method keeps its declaring package through embedding (`type J interface{ p.I }` with `p.I{ hidden() }` needs `p`'s `hidden`, never `q.hidden`). An interface's method set merges identical methods inherited along several paths (`L{J; K}` with `J`, `K` both embedding `I`); the same method with different signatures makes the interface unsatisfiable, so it gets no links. Cycles are detected per embedding path. `data.pointerReceiver` is set when only `*T` satisfies it: a pointer-receiver method counts for the value `T` only when reached through an embedded `*E`. Named types are compared by package import path |
+| Implicit interface satisfaction | **Definite** `implements` link when every interface method is selected uniquely (selector rule) as a method whose signature is proven identical by Go's type identity (see "Type identity"). An unexported interface method keeps its declaring package through embedding (`type J interface{ p.I }` with `p.I{ hidden() }` needs `p`'s `hidden`, never `q.hidden`). An interface's method set merges identical methods inherited along several paths (`L{J; K}` with `J`, `K` both embedding `I`); the same method with different signatures makes the interface unsatisfiable, so it gets no links. Cycles are detected per embedding path. `data.pointerReceiver` is set when only `*T` satisfies it: a pointer-receiver method counts for the value `T` only when reached through an embedded `*E`. Named types are compared by package import path |
 | Interfaces that embed an external interface, are generic or are constraints | No `implements` links (their method set is unknown or not a method set) |
 | Struct embedding, type references, receiver types | **Definite** for project types. External types unresolved |
 
@@ -173,8 +173,9 @@ targets, never a guess. "Unresolved" keeps the target name.
   struct (`type A B`) are not separate symbols, but member lookup, promotion and
   method sets follow them through `view`.
 - Generic type arguments are not tracked: `Stack[int]` methods resolve on `Stack`.
-- Type aliases are not expanded when comparing method signatures for
-  `implements` (a missed link, never a wrong one; backlog).
+- Type aliases of literal or generic types are not expanded when comparing
+  signatures. The comparison is unknown, so this can miss a link but never
+  makes a wrong one (see "Type identity").
 - cgo (`import "C"`) is an ordinary unresolved import. Vendored directories are
   indexed as source files, but imports are not resolved into `vendor/`.
 
@@ -215,6 +216,40 @@ and it returns only files whose facts changed.
    replace a file's facts and runs on every index. The other reasons
    (internal-package violation, external type, nothing found) are not recorded.
 
+## Type identity
+
+Signatures are compared by Go type identity (spec, "Type identity"), in one
+canonical form used everywhere types or signatures are compared: `implements`,
+method-set matching (`hasMethod`), and merging interface methods inherited along
+several paths.
+
+- **Extraction** writes each signature as a structural term (`TypeTerm`):
+  parameter and result types expanded to their arity at every depth, names
+  dropped, the final `...T` marked variadic.
+- **Resolution** binds the term to declarations (`identity`).
+- **Comparison** (`identical`) answers *identical*, *different* or *unknown*. A
+  difference anywhere is proven difference. Otherwise anything unknown leaves
+  the answer unknown.
+- **Unknown** never gives a definite `implements`. It never refutes a member
+  either: the type stays a possible implementer, listed in dispatch sets.
+
+| Identity rule | This form |
+| --- | --- |
+| Grouped parameters and results expanded to arity, at every depth | Exact |
+| Variadic `...T` is not `[]T` | Exact |
+| Parameter and result names ignored | Exact |
+| Channel direction | Exact |
+| Array length | Exact for integer literals (by value: `4` = `0x4`). Any other constant expression is **unknown** (not evaluated, never compared by spelling) |
+| Struct field names, order, embedded-ness, tags | Exact. A tag compares by its string value: raw literals exactly, interpreted literals decoded for `\"`, `\\`, `\n` and `\t`; any other escape makes the tag unknown |
+| Unexported field and interface-method names | Exact: qualified by the package of the file that writes the literal |
+| Interface type sets | Exact for method sets: order ignored, embedded interfaces (literal or named project interfaces) expanded. Unions, `~T` and other type-set elements are **unknown** |
+| Type parameters | Deliberately **unknown** (not compared by position). A method naming its type's parameter never proves or refutes `implements` |
+| Generic instantiation arguments | Exact (argument by argument) |
+| Aliases resolved to their target | Exact for `any` = `interface{}`, `byte` = `uint8`, `rune` = `int32`, and project aliases of named types (`type A = B`). An alias of a literal or generic type is **unknown** |
+| Named types by declaring package and name | Exact for project types, through Go's scope rules. These include one package under two import names, the same local name for two packages, dot imports, and a package-level (or function-local) type shadowing a predeclared name. Build variants of a type (several declarations) are **unknown** |
+| Types declared outside the project | By import path and name. The same path and name are identical. A different external name is **unknown**, never different, because it may be an alias (`os.FileMode` is `fs.FileMode`) |
+| Names in a lossy package, or not resolvable | **Unknown** |
+
 ## Declaration-lossy files: two layers
 
 When tree-sitter cannot keep a file's declarations, soundness rests on layer 1
@@ -225,10 +260,26 @@ but only adds precision.
 
 A file is **declaration-lossy** (`data.go.lossy`) when tree-sitter gives it:
 
-- no readable package clause (missing, misspelled, or with no name). Such a file
-  joins no package, so nothing it declares is trusted. It makes **every package
-  of its directory** lossy: from a `_test.go` file the external `_test` package
-  too, otherwise only the non-`_test` ones;
+- no readable package clause (missing, misspelled, with no name, or a second
+  clause), or a clause whose **membership cannot be proven**. Such a file joins
+  no package, so nothing it declares is trusted. It makes **every package of its
+  directory** lossy: from a `_test.go` file the external `_test` package too,
+  otherwise only the non-`_test` ones. Membership cannot be proven (Go rejects
+  the directory, but mid-edit, renaming a package file by file, it is routine)
+  for:
+  - a `_test` package declared by a file that is not a `_test.go` file;
+  - every file of a group with more than one non-`_test` package name. A group
+    is either all the directory's files with no build constraint (no
+    `//go:build`, no GOOS/GOARCH suffix), or all its files with one identical
+    constraint (they are built together whenever it holds). Which name is the
+    real one cannot be proven, so every file of the group is untrusted.
+
+  Files of different constraints are not compared. So a `//go:build ignore`
+  generator `package main` beside a library changes nothing (restic's root is
+  such a directory). A constrained file whose name conflicts with the
+  unconstrained files under another constraint is not detected. Telling
+  `ignore` from a satisfiable tag would need constraint evaluation, which is
+  backlog;
 - any top-level ERROR node; or
 - any top-level declaration with an error, unless the error is provably
   confined to a function or method body.
@@ -299,6 +350,11 @@ While a package has at least one lossy file, for **that package**:
     reasons apply: `reason` is `external-implementers-possible` and `reasons`
     lists both.
   - Build-variant sets with a lossy member have `declarations-may-be-unseen`.
+  - Name-only sets (`receiver-type-unknown`) keep only that reason, even with
+    a member in a lossy package (backlog).
+  - Recovery never changes a reason. Its headers never mark imports, because a
+    lossy file's imports are already unknown, and the second resolution ignores
+    lossy state and broken or recovered symbols alike.
 
 ### Layer 2: lexical recovery, for precision only
 
@@ -752,6 +808,31 @@ Which packages a lossy file makes uncertain, decided from the tree alone:
 off, and adds a transitive-reach test without any lossy file (the repro-4 test
 no longer needs transitivity, since a lossy package now reaches any importable
 package). Mutations M44–M47 cover items 1–3. The module version is 14.
+
+## Module version 15 (twelfth review)
+
+- **Conflicting package clauses.** A readable but conflicting package clause
+  (`package pp` beside `package p`, an untagged `package main`, `package p_test`
+  in a non-test file, two clauses in one file) now takes the missing-clause
+  path: the file is untrusted and the directory's packages are lossy (see
+  layer 1).
+  - One older test asserted package candidates for a directory with two
+    unconstrained names. It now asserts the import is unresolved.
+- **Reasons.** Recovery no longer sets `importsBroken`, so reasons are identical
+  with recovery on and off.
+- **Type identity** (see "Type identity"). One canonical form, applied at every
+  nesting level, replaces the text template. Nested grouped parameters keep
+  their arity, and unexported fields of anonymous structs belong to their
+  package. On restic this moves two links, both correct (see
+  `evidence/w2-b/restic.md`).
+- **`replace` selection.** A version-specific replace of the selected version
+  wins regardless of order. An unprovable selection gives candidates.
+- **Removed:** a stale doc comment above `importsUnknown`.
+- **Tests:** `test/graph-go-review12.test.mjs` and
+  `test/graph-go-identity.test.mjs` (one or more tests per exact identity rule).
+- **Mutations:** M48–M64, plus M23 and M43 re-pointed.
+
+The module version is 15.
 
 ## Core after PR 11 (W2-I)
 

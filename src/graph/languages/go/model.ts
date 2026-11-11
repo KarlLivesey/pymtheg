@@ -183,3 +183,40 @@ export const KNOWN_GOARCH = new Set([
 ]);
 
 export const TYPE_KINDS = new Set(["struct", "interface", "type", "alias"]);
+
+/**
+ * A written type, structurally, for Go type identity (spec, "Type identity").
+ * Names are as written (`q` the import name used, `p` a predeclared spelling);
+ * the resolver binds them. `u`: not representable exactly, never compared equal.
+ */
+export type TypeTerm =
+  | { k: "u" }
+  /** A named type or generic instantiation. */
+  | { k: "n"; n: string; q?: string; p?: true; a?: TypeTerm[] }
+  /** A function-local type, by its package-unique identity. */
+  | { k: "l"; s: string }
+  | { k: "ptr"; e: TypeTerm }
+  | { k: "sl"; e: TypeTerm }
+  /** `len`: decimal value, or null when not a literal (unknown). */
+  | { k: "ar"; len: string | null; e: TypeTerm }
+  | { k: "map"; key: TypeTerm; e: TypeTerm }
+  /** Direction: both, send-only, receive-only. */
+  | { k: "ch"; d: "b" | "s" | "r"; e: TypeTerm }
+  /** Parameters and results expanded to arity; `v`: the last is `...T`. */
+  | { k: "fn"; p: TypeTerm[]; r: TypeTerm[]; v?: true }
+  | { k: "st"; f: StructFieldTerm[] }
+  /** Methods and embedded interfaces, as written. */
+  | { k: "if"; m: InterfaceMethodTerm[]; e: TypeTerm[] };
+export interface StructFieldTerm {
+  n: string;
+  /** Embedded field. */
+  x?: true;
+  t: TypeTerm;
+  /** Tag value; null when it could not be decoded. */
+  g: string | null;
+}
+export interface InterfaceMethodTerm {
+  n: string;
+  s: TypeTerm;
+}
+export const UNKNOWN_TERM: TypeTerm = { k: "u" };

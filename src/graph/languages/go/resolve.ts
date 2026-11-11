@@ -16,7 +16,13 @@ import {
   readLayout,
 } from "./gomod.js";
 import type { GoProjectLayout } from "./gomod.js";
-import { TYPE_KINDS, type Desc, type FileFact, type TypeRef } from "./model.js";
+import {
+  TYPE_KINDS,
+  type Desc,
+  type FileFact,
+  type TypeRef,
+  type TypeTerm,
+} from "./model.js";
 
 /** Above this many possible targets an unknown-receiver call stays unresolved. */
 export const CANDIDATE_LIMIT = 20;
@@ -100,7 +106,7 @@ interface InterfaceMethod {
   /** Name, plus the declaring package for an unexported name. */
   key: string;
   name: string;
-  sig: string;
+  sig: Identity;
   /** Declaring package of an unexported method (it is a different identifier elsewhere). */
   access?: string | undefined;
 }
@@ -364,13 +370,62 @@ class GoResolver {
 
   // ---- indexing ----------------------------------------------------------
 
+  /**
+   * Layer 1: files whose package membership cannot be proven, treated exactly
+   * like a file without a package clause. Go rejects a directory that mixes
+   * package names, but mid-edit (renaming a package file by file) it is routine:
+   * - a `_test` package declared by a file that is not a `_test.go` file;
+   * - more than one non-`_test` package name among the files with no build
+   *   constraint (no `//go:build`, no GOOS/GOARCH suffix), or among files with
+   *   the same constraint (they are built together whenever it holds). Which
+   *   name is the real one cannot be proven, so every such file is untrusted.
+   * A constrained file is not compared with files of another constraint: a
+   * `//go:build ignore` generator `package main` beside a library is valid.
+   */
+  private untrustedMembership(): Set<string> {
+    const out = new Set<string>();
+    if (this.ignoreLossy) return out;
+    const groups = new Map<string, { path: string; name: string }[]>();
+    for (const file of this.context.files) {
+      if (file.module !== this.moduleId || file.result.status === "failed")
+        continue;
+      const fact = (
+        file.result.data as unknown as { go?: FileFact } | undefined
+      )?.go;
+      if (fact?.package === undefined) continue;
+      if (fact.package.endsWith("_test")) {
+        if (!fact.test) out.add(file.path);
+        continue;
+      }
+      const constraint = JSON.stringify([
+        fact.build ?? null,
+        fact.goos ?? null,
+        fact.goarch ?? null,
+      ]);
+      const key = `${directoryOf(file.path)}\u0000${constraint}`;
+      push2(groups, key, { path: file.path, name: fact.package });
+    }
+    for (const members of groups.values())
+      if (new Set(members.map((member) => member.name)).size > 1)
+        for (const member of members) out.add(member.path);
+    return out;
+  }
+
   private index(): void {
+    const untrusted = this.untrustedMembership();
     for (const file of this.context.files) {
       if (file.module !== this.moduleId || file.result.status === "failed")
         continue;
       const data = file.result.data as unknown as { go?: FileFact } | undefined;
-      const fact = data?.go;
-      if (!fact) continue;
+      const parsed = data?.go;
+      if (!parsed) continue;
+      // An untrusted clause counts as no clause (the missing-clause path below).
+      const fact: FileFact = untrusted.has(file.path)
+        ? (({ package: _package, ...rest }) => {
+            void _package;
+            return { ...rest, lossy: true };
+          })(parsed)
+        : parsed;
       const directory = directoryOf(file.path);
       const info: FileInfo = {
         path: file.path,
@@ -497,8 +552,12 @@ class GoResolver {
 
   /** Go import rules over the snapshot, in the importing file's own module context. */
   private importTargets(from: FileInfo, path: string): Pkg[] {
-    const directory = directoryOfImport(this.layout, from.directory, path);
-    if (directory === undefined || ignoredDirectory(directory)) return [];
+    const directories = directoryOfImport(
+      this.layout,
+      from.directory,
+      path,
+    ).filter((directory) => !ignoredDirectory(directory));
+    if (!directories.length) return [];
     const parts = path.split("/");
     const internal = parts.lastIndexOf("internal");
     if (internal >= 0) {
@@ -516,7 +575,7 @@ class GoResolver {
     }
     return [...this.pkgs.values()].filter(
       (pkg) =>
-        pkg.directory === directory &&
+        directories.includes(pkg.directory) &&
         !pkg.name.endsWith("_test") &&
         pkg.name !== "main",
     );
@@ -1207,42 +1266,226 @@ class GoResolver {
 
   // ---- interfaces --------------------------------------------------------
 
-  private canonical(sig: string, file: string): string {
+  /**
+   * Go type identity (spec, "Type identity"), in one canonical form used by every
+   * comparison of types or signatures. A written `TypeTerm` is bound to
+   * declarations: a named type becomes its declaring package and name (an alias
+   * becomes its target), an unexported field or method name is qualified by its
+   * package, an embedded interface becomes its methods. Whatever cannot be bound
+   * exactly is `u`, which `identical` never treats as equal or as different.
+   */
+  private identity(
+    term: TypeTerm | undefined,
+    file: string,
+    depth = 0,
+  ): Identity {
+    if (!term || depth > MAX_DEPTH) return UNKNOWN_IDENTITY;
+    const next = (item: TypeTerm) => this.identity(item, file, depth + 1);
     const info = this.files.get(file);
-    const own = info?.pkg ? this.pkgIdentity(info.pkg) : `?${file}`;
-    return (
-      sig
-        // A function-local type: its package-unique identity.
-        .replace(
-          /\u0005([^\u0003]+)\u0003/g,
-          (_, local: string) => `${own}.local:${local}`,
-        )
-        .replace(/\u0004([^\u0003]+)\u0003/g, (_, name: string) =>
-          info?.pkg && this.packageDecl(info.pkg, name, file).some(isTypeSymbol)
-            ? `${own}.${name}`
-            : // In a lossy package an unseen declaration may shadow it.
-              this.lossy(info?.pkg)
-              ? `\u0006${name}`
-              : name,
-        )
-        .replace(
-          /\u0001([^\u0003]+)\u0003/g,
-          (_, name: string) => `${own}.${name}`,
-        )
-        .replace(
-          /\u0002([^.]+)\.([^\u0003]+)\u0003/g,
-          (_, q: string, name: string) => {
-            const entry = info?.imports.get(q);
-            const target = entry
-              ? entry.pkgs.length
-                ? this.pkgIdentity(entry.pkgs[0]!)
-                : entry.path
-              : `?${q}`;
-            return `${target}.${name}`;
-          },
-        )
-    );
+    const own = info?.pkg ? this.pkgIdentity(info.pkg) : undefined;
+    // Unexported names are distinct per package.
+    const qualify = (name: string) =>
+      exported(name) ? name : own === undefined ? undefined : `${own}.${name}`;
+    switch (term.k) {
+      case "n":
+        return this.namedIdentity(term, file, depth);
+      case "l":
+        return own === undefined
+          ? UNKNOWN_IDENTITY
+          : { k: "n", id: `${own}.local:${term.s}`, a: [] };
+      case "ptr":
+      case "sl":
+        return { k: term.k, e: next(term.e) };
+      case "ar":
+        return { k: "ar", len: term.len, e: next(term.e) };
+      case "map":
+        return { k: "map", key: next(term.key), e: next(term.e) };
+      case "ch":
+        return { k: "ch", d: term.d, e: next(term.e) };
+      case "fn":
+        return {
+          k: "fn",
+          p: term.p.map(next),
+          r: term.r.map(next),
+          v: !!term.v,
+        };
+      case "st": {
+        const fields: Extract<Identity, { k: "st" }>["f"] = [];
+        for (const field of term.f) {
+          const name = qualify(field.n);
+          if (name === undefined) return UNKNOWN_IDENTITY;
+          fields.push({ n: name, x: !!field.x, t: next(field.t), g: field.g });
+        }
+        return { k: "st", f: fields };
+      }
+      case "if": {
+        const methods = new Map<string, Identity>();
+        const add = (key: string, sig: Identity): boolean => {
+          const existing = methods.get(key);
+          if (existing && identical(existing, sig) !== true) return false;
+          methods.set(key, sig);
+          return true;
+        };
+        for (const method of term.m) {
+          const name = qualify(method.n);
+          if (name === undefined || !add(name, next(method.s)))
+            return UNKNOWN_IDENTITY;
+        }
+        for (const embed of term.e) {
+          const inner = this.embeddedMethods(embed, file, depth + 1);
+          if (!inner) return UNKNOWN_IDENTITY;
+          for (const [key, sig] of inner)
+            if (!add(key, sig)) return UNKNOWN_IDENTITY;
+        }
+        return {
+          k: "if",
+          m: [...methods].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+        };
+      }
+      default:
+        return UNKNOWN_IDENTITY;
+    }
   }
+
+  /**
+   * The methods an embedded interface element contributes: an interface literal,
+   * or a named project interface (its method set), keyed like `identity`.
+   */
+  private embeddedMethods(
+    term: TypeTerm,
+    file: string,
+    depth: number,
+  ): [string, Identity][] | undefined {
+    if (term.k === "if") {
+      const inner = this.identity(term, file, depth);
+      return inner.k === "if" ? inner.m : undefined;
+    }
+    if (term.k !== "n") return undefined;
+    const symbol = this.namedDeclaration(term, file);
+    if (!symbol) return undefined;
+    const view = this.view(symbol);
+    if (!view.iface || view.iface.length !== 1) return undefined;
+    const methods = this.interfaceMethods(view.iface[0]!);
+    if (!methods) return undefined;
+    const out: [string, Identity][] = [];
+    for (const method of methods.values()) {
+      const pkg =
+        method.access === undefined ? undefined : this.pkgs.get(method.access);
+      if (method.access !== undefined && !pkg) return undefined;
+      out.push([
+        pkg ? `${this.pkgIdentity(pkg)}.${method.name}` : method.name,
+        method.sig,
+      ]);
+    }
+    return out;
+  }
+
+  /**
+   * The one project declaration a written type name denotes in `file`, by Go's
+   * scope rules (package block, then imports and dot-imports); undefined when it
+   * is not exactly one intact project type, or a lossy package may hide another.
+   */
+  private namedDeclaration(
+    term: Extract<TypeTerm, { k: "n" }>,
+    file: string,
+  ): GraphSymbol | undefined {
+    const info = this.files.get(file);
+    if (!info) return undefined;
+    const one = (syms: GraphSymbol[]) => {
+      const types = unique(syms.filter(isTypeSymbol));
+      return types.length === 1 &&
+        !(types[0]!.data as { broken?: boolean } | undefined)?.broken
+        ? types[0]
+        : undefined;
+    };
+    if (term.q !== undefined) {
+      const entry = info.imports.get(term.q);
+      if (!entry || this.importsUnknown(file) || !exported(term.n))
+        return undefined;
+      return one(
+        entry.pkgs.flatMap((pkg) => this.packageDecl(pkg, term.n, file)),
+      );
+    }
+    if (info.pkg) {
+      const own = this.packageDecl(info.pkg, term.n, file);
+      if (own.length) return one(own);
+    }
+    if (this.lossy(info.pkg) || term.p) return undefined;
+    const dotted: GraphSymbol[] = [];
+    for (const dot of info.dots) {
+      if (!dot.pkgs.length) return undefined;
+      for (const pkg of dot.pkgs)
+        if (exported(term.n))
+          dotted.push(...this.packageDecl(pkg, term.n, file));
+    }
+    return one(dotted);
+  }
+
+  /** A named type's identity: its declaration, never its spelling. */
+  private namedIdentity(
+    term: Extract<TypeTerm, { k: "n" }>,
+    file: string,
+    depth: number,
+  ): Identity {
+    const info = this.files.get(file);
+    if (!info) return UNKNOWN_IDENTITY;
+    const args = (term.a ?? []).map((item) =>
+      this.identity(item, file, depth + 1),
+    );
+    if (term.q !== undefined) {
+      const entry = info.imports.get(term.q);
+      if (
+        entry &&
+        !entry.pkgs.length &&
+        !this.importsUnknown(file) &&
+        exported(term.n)
+      )
+        // Outside the project: its path and name. It may be an alias of
+        // anything, so a different external name is never proven different.
+        return { k: "n", id: `${entry.path}.${term.n}`, a: args, ext: true };
+    }
+    const symbol = this.namedDeclaration(term, file);
+    if (symbol) {
+      const pkg = this.pkgOf(symbol)!;
+      if (symbol.kind !== "alias")
+        return {
+          k: "n",
+          id: `${this.pkgIdentity(pkg)}.${symbol.name}`,
+          a: args,
+        };
+      // An alias is its target. A literal or generic target is not kept.
+      const data = (symbol.data ?? {}) as {
+        underlying?: TypeRef;
+        shape?: string;
+      };
+      const ref = data.underlying;
+      if (!ref || data.shape || term.a?.length || ref.l !== undefined)
+        return UNKNOWN_IDENTITY;
+      return this.identity(
+        ref.q === ""
+          ? { k: "n", n: ref.n, p: true }
+          : ref.q === undefined
+            ? { k: "n", n: ref.n }
+            : { k: "n", n: ref.n, q: ref.q },
+        symbol.file,
+        depth + 1,
+      );
+    }
+    // A predeclared type: unless declared in the package (then `symbol` above,
+    // or not exactly one) or a lossy package may hide such a declaration.
+    if (
+      term.q === undefined &&
+      term.p &&
+      !args.length &&
+      !this.lossy(info.pkg) &&
+      !(info.pkg && this.packageDecl(info.pkg, term.n, file).length)
+    ) {
+      if (term.n === "any") return { k: "if", m: [] };
+      return { k: "n", id: PREDECLARED_ALIASES[term.n] ?? term.n, a: [] };
+    }
+    return UNKNOWN_IDENTITY;
+  }
+
   private pkgIdentity(pkg: Pkg): string {
     return pkg.importPath ?? `dir:${pkg.directory}:${pkg.name}`;
   }
@@ -1269,12 +1512,14 @@ class GoResolver {
       const set = new Map<string, InterfaceMethod>();
       const add = (method: InterfaceMethod): boolean => {
         const existing = set.get(method.key);
-        if (existing && existing.sig !== method.sig) return false;
+        // Merging needs proven-identical signatures.
+        if (existing && identical(existing.sig, method.sig) !== true)
+          return false;
         set.set(method.key, method);
         return true;
       };
       for (const symbol of this.ownMethods(iface)) {
-        const sig = (symbol.data as { sig?: string } | undefined)?.sig;
+        const sig = (symbol.data as { sig?: TypeTerm } | undefined)?.sig;
         if (sig === undefined) return undefined;
         const access = exported(symbol.name) ? undefined : pkg.key;
         if (
@@ -1284,7 +1529,7 @@ class GoResolver {
                 ? symbol.name
                 : `${symbol.name}\u0000${access}`,
             name: symbol.name,
-            sig: this.canonical(sig, symbol.file),
+            sig: this.identity(sig, symbol.file),
             access,
           })
         )
@@ -1334,36 +1579,26 @@ class GoResolver {
   private hasMethod(
     type: GraphSymbol,
     name: string,
-    sig: string,
+    sig: Identity,
     access: string | undefined,
   ): { value: boolean; pointer: boolean; unknown?: true } {
     const found = this.selectName([type], name, undefined, access);
     // An external embedded type could supply (or shadow) it: not provable, not refuted.
-    if (found.kind === "unknown" || sig.includes("\u0006"))
+    if (found.kind === "unknown")
       return { value: false, pointer: false, unknown: true };
     if (found.kind !== "found") return { value: false, pointer: false };
     const methods = found.syms;
-    if (
-      !methods.every((method) => {
-        const data = (method.data ?? {}) as { sig?: string };
-        return (
-          method.kind === "method" &&
-          data.sig !== undefined &&
-          this.canonical(data.sig, method.file) === sig
-        );
-      })
-    ) {
-      // A signature naming a predeclared type a lossy package may shadow: unknown.
-      const uncertain = methods.some((method) =>
-        this.canonical(
-          (method.data as { sig?: string } | undefined)?.sig ?? "",
-          method.file,
-        ).includes("\u0006"),
-      );
-      return uncertain
-        ? { value: false, pointer: false, unknown: true }
-        : { value: false, pointer: false };
+    // A field of that name (or a method of another signature) refutes it; a
+    // signature whose identity cannot be proven leaves it unknown.
+    let uncertain = false;
+    for (const method of methods) {
+      const data = (method.data ?? {}) as { sig?: TypeTerm };
+      if (method.kind !== "method") return { value: false, pointer: false };
+      const same = identical(this.identity(data.sig, method.file), sig);
+      if (same === false) return { value: false, pointer: false };
+      if (same === undefined) uncertain = true;
     }
+    if (uncertain) return { value: false, pointer: false, unknown: true };
     const needsPointer = methods.some((method) => {
       const data = (method.data ?? {}) as {
         pointer?: boolean;
@@ -1703,11 +1938,6 @@ class GoResolver {
   }
 
   /**
-   * Can a type of package `from` contain types of package `to`: the same package,
-   * reached through project imports, or a package with a broken import declaration
-   * on the way (the lost import may name anything).
-   */
-  /**
    * The file's imports may be incomplete: its import declaration is broken, or
    * (layer 1) the file is lossy, so an import may sit in what tree-sitter lost.
    */
@@ -1960,6 +2190,123 @@ class GoResolver {
           open: "receiver-type-unknown",
         }
       : UNRESOLVED;
+  }
+}
+
+/** A type's identity (see `GoResolver.identity`). */
+type Identity =
+  | { k: "u" }
+  /** `ext`: declared outside the project (it may be an alias of anything). */
+  | { k: "n"; id: string; a: Identity[]; ext?: true }
+  | { k: "ptr" | "sl"; e: Identity }
+  | { k: "ar"; len: string | null; e: Identity }
+  | { k: "map"; key: Identity; e: Identity }
+  | { k: "ch"; d: "b" | "s" | "r"; e: Identity }
+  | { k: "fn"; p: Identity[]; r: Identity[]; v: boolean }
+  | {
+      k: "st";
+      f: { n: string; x: boolean; t: Identity; g: string | null }[];
+    }
+  /** Methods by (qualified) name, sorted: a type set ignores order. */
+  | { k: "if"; m: [string, Identity][] };
+const UNKNOWN_IDENTITY: Identity = { k: "u" };
+/** Predeclared aliases: `byte` is `uint8`, `rune` is `int32` (`any` is `interface{}`). */
+const PREDECLARED_ALIASES: { [name: string]: string } = {
+  byte: "uint8",
+  rune: "int32",
+};
+
+/**
+ * Go type identity over two identities: true only when proven identical, false
+ * only when proven different, undefined otherwise. A difference anywhere proves
+ * difference; otherwise anything unknown leaves the answer unknown.
+ */
+function identical(a: Identity, b: Identity): boolean | undefined {
+  if (a.k === "u" || b.k === "u") return undefined;
+  if (a.k !== b.k)
+    // An external named type may be an alias of a literal.
+    return (a.k === "n" && a.ext) || (b.k === "n" && b.ext) ? undefined : false;
+  /** Every pair identical; `start`: what is already known (undefined: unknown). */
+  const all = (
+    pairs: [Identity, Identity][],
+    start: boolean | undefined,
+  ): boolean | undefined => {
+    let result = start;
+    for (const [x, y] of pairs) {
+      const same = identical(x, y);
+      if (same === false) return false;
+      if (same === undefined) result = undefined;
+    }
+    return result;
+  };
+  const zip = (x: Identity[], y: Identity[]) =>
+    x.map((item, index) => [item, y[index]!] as [Identity, Identity]);
+  switch (a.k) {
+    case "n": {
+      const other = b as typeof a;
+      if (a.id !== other.id) return a.ext || other.ext ? undefined : false;
+      if (a.a.length !== other.a.length) return false;
+      return all(zip(a.a, other.a), true);
+    }
+    case "ptr":
+    case "sl":
+      return identical(a.e, (b as typeof a).e);
+    case "ar": {
+      const other = b as typeof a;
+      const length =
+        a.len === null || other.len === null ? undefined : a.len === other.len;
+      if (length === false) return false;
+      return all([[a.e, other.e]], length);
+    }
+    case "map": {
+      const other = b as typeof a;
+      return all(
+        [
+          [a.key, other.key],
+          [a.e, other.e],
+        ],
+        true,
+      );
+    }
+    case "ch": {
+      const other = b as typeof a;
+      if (a.d !== other.d) return false;
+      return identical(a.e, other.e);
+    }
+    case "fn": {
+      const other = b as typeof a;
+      if (
+        a.p.length !== other.p.length ||
+        a.r.length !== other.r.length ||
+        a.v !== other.v
+      )
+        return false;
+      return all([...zip(a.p, other.p), ...zip(a.r, other.r)], true);
+    }
+    case "st": {
+      const other = b as typeof a;
+      if (a.f.length !== other.f.length) return false;
+      let tags: boolean | undefined = true;
+      for (const [index, field] of a.f.entries()) {
+        const peer = other.f[index]!;
+        if (field.n !== peer.n || field.x !== peer.x) return false;
+        if (field.g === null || peer.g === null) tags = undefined;
+        else if (field.g !== peer.g) return false;
+      }
+      return all(
+        a.f.map((field, index) => [field.t, other.f[index]!.t]),
+        tags,
+      );
+    }
+    case "if": {
+      const other = b as typeof a;
+      if (a.m.length !== other.m.length) return false;
+      if (a.m.some(([key], index) => key !== other.m[index]![0])) return false;
+      return all(
+        a.m.map(([, sig], index) => [sig, other.m[index]![1]]),
+        true,
+      );
+    }
   }
 }
 

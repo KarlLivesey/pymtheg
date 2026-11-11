@@ -15,6 +15,10 @@ import {
   PREDECLARED_VALUES,
   type Desc,
   type FileFact,
+  type InterfaceMethodTerm,
+  type StructFieldTerm,
+  type TypeTerm,
+  UNKNOWN_TERM,
   type ImportFact,
   type TypeRef,
 } from "./model.js";
@@ -86,6 +90,40 @@ const compact = (node: Node): string => {
 };
 const named = (node: Node | null | undefined): Node[] =>
   node ? node.namedChildren.filter((child) => child.type !== "comment") : [];
+/**
+ * An array length written as an integer literal, as a decimal string; null for
+ * any other constant expression (not evaluated, so never compared equal).
+ */
+function arrayLength(node: Node | null): string | null {
+  if (node?.type !== "int_literal") return null;
+  const text = node.text.replace(/_/g, "");
+  try {
+    return /^0[0-7]+$/.test(text)
+      ? BigInt(`0o${text.slice(1)}`).toString()
+      : BigInt(text).toString();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A struct tag's string value: "" when there is none; null when an interpreted
+ * literal uses escapes this does not decode (never compared equal by spelling).
+ */
+function tagValue(node: Node | null): string | null {
+  if (!node) return "";
+  if (node.type === "raw_string_literal")
+    return node.text.slice(1, -1).replace(/\r/g, "");
+  if (node.type !== "interpreted_string_literal") return null;
+  const body = node.text.slice(1, -1);
+  if (/\\[^"\\nt]/.test(body)) return null;
+  try {
+    return JSON.parse(`"${body}"`) as string;
+  } catch {
+    return null;
+  }
+}
+
 const unparen = (node: Node): Node => {
   let current = node;
   while (
@@ -161,11 +199,13 @@ export class GoExtractor {
     });
     let beforePackage = true;
     let seenDeclaration = false;
+    let clauses = 0;
     for (const child of root.namedChildren) {
       if (child.type === "comment") {
         if (beforePackage) this.buildLine(child.text);
       } else if (child.type === "package_clause") {
         beforePackage = false;
+        clauses++;
         const name = named(child).find(
           (item) => item.type === "package_identifier",
         );
@@ -187,9 +227,13 @@ export class GoExtractor {
         this.topLevel(child);
       }
     }
-    // Layer 1: without a readable package clause the file joins no package, so
-    // nothing it declares is trusted; every package of its directory may be
-    // missing its declarations (see the resolver).
+    // Layer 1: without one readable package clause (none, an unreadable one, or
+    // two) the file joins no package, so nothing it declares is trusted; every
+    // package of its directory may be missing its declarations (see the resolver).
+    if (clauses > 1) {
+      delete this.fact.package;
+      delete this.fact.packageRange;
+    }
     if (this.fact.package === undefined) this.lossy(root);
     if (this.fact.lossy && recoveryOptions.enabled) this.recoverAll();
     // Live local bindings become plain JSON only now that every write has been seen.
@@ -384,10 +428,9 @@ export class GoExtractor {
     };
     for (const region of this.lossyRegions)
       for (const header of readHeaders(masked, region.start, region.end)) {
-        if (header.kind === "import") {
-          this.fact.importsBroken = true;
-          continue;
-        }
+        // A lossy file's imports are already unknown (layer 1); recovery never
+        // changes what the resolver knows about imports.
+        if (header.kind === "import") continue;
         if (header.kind === "unreadable") {
           this.diagnostics.push({
             message:
@@ -895,65 +938,170 @@ export class GoExtractor {
     this.scopes.push(scope);
     try {
       const results = this.resultDescs(result) as unknown as Json[];
-      const list = (node: Node | null): string[] =>
-        named(node).flatMap((parameter) => {
-          const type = parameter.childForFieldName("type");
-          const text =
-            (parameter.type === "variadic_parameter_declaration" ? "..." : "") +
-            (type ? this.template(type) : "?");
-          return Array(
-            Math.max(1, parameter.childrenForFieldName("name").length),
-          ).fill(text);
-        });
-      const resultText =
-        result?.type === "parameter_list"
-          ? list(result).join(",")
-          : result
-            ? this.template(result)
-            : "";
       return {
         results,
-        sig: `(${list(parameters).join(",")})(${resultText})`,
+        sig: this.functionTerm(parameters, result) as unknown as Json,
       };
     } finally {
       this.scopes.pop();
     }
   }
 
-  /** Type text with named types marked for package-qualified comparison during resolution. */
-  private template(node: Node): string {
-    if (node.type === "type_identifier") {
-      const bound = this.local(node.text);
-      // A local type: its package-unique identity (not its spelling).
-      if (bound?.k === "localtype" && bound.sym)
-        return `\u0005${bound.sym}\u0003`;
-      if (bound) return `?${node.text}`;
-      // Predeclared names are marked so resolution can tell a shadowing declaration.
-      return PREDECLARED_TYPES.has(node.text)
-        ? `\u0004${node.text}\u0003`
-        : `\u0001${node.text}\u0003`;
+  /**
+   * A function signature as a type term (see `TypeTerm`): parameter and result
+   * types expanded to their arity (grouped names count one each), names
+   * dropped, the final `...T` parameter marked variadic.
+   */
+  private functionTerm(parameters: Node | null, result: Node | null): TypeTerm {
+    const list = (node: Node | null): TypeTerm[] =>
+      named(node).flatMap((parameter) => {
+        const type = parameter.childForFieldName("type");
+        const item = type ? this.typeTerm(type) : UNKNOWN_TERM;
+        const term: TypeTerm =
+          parameter.type === "variadic_parameter_declaration"
+            ? { k: "sl", e: item }
+            : item;
+        return Array<TypeTerm>(
+          Math.max(1, parameter.childrenForFieldName("name").length),
+        ).fill(term);
+      });
+    const variadic = named(parameters).some(
+      (parameter) => parameter.type === "variadic_parameter_declaration",
+    );
+    return {
+      k: "fn",
+      p: list(parameters),
+      r:
+        result?.type === "parameter_list"
+          ? list(result)
+          : result
+            ? [this.typeTerm(result)]
+            : [],
+      ...(variadic ? { v: true } : {}),
+    };
+  }
+
+  /**
+   * The written type as a structural term, for type identity at resolution
+   * (`identical` in resolve.ts). Names are kept as written, with their
+   * qualifier; the resolver binds them to declarations. Anything this cannot
+   * represent exactly is `UNKNOWN_TERM`, never a guess.
+   */
+  private typeTerm(node: Node): TypeTerm {
+    const current = unparen(node);
+    const field = (name: string) => current.childForFieldName(name);
+    const of = (child: Node | null): TypeTerm =>
+      child ? this.typeTerm(child) : UNKNOWN_TERM;
+    switch (current.type) {
+      case "type_identifier": {
+        const bound = this.local(current.text);
+        // A function-local type: its package-unique identity.
+        if (bound?.k === "localtype" && bound.sym && !bound.tp)
+          return { k: "l", s: bound.sym };
+        // A type parameter (or any other local binding): not compared.
+        if (bound) return UNKNOWN_TERM;
+        return PREDECLARED_TYPES.has(current.text)
+          ? { k: "n", n: current.text, p: true }
+          : { k: "n", n: current.text };
+      }
+      case "qualified_type":
+        return {
+          k: "n",
+          q: field("package")?.text ?? "",
+          n: field("name")?.text ?? "",
+        };
+      case "generic_type": {
+        const base = of(field("type"));
+        const args = named(field("type_arguments")).map((item) =>
+          this.typeTerm(
+            item.type === "type_elem" ? (named(item)[0] ?? item) : item,
+          ),
+        );
+        return base.k === "n" ? { ...base, a: args } : UNKNOWN_TERM;
+      }
+      case "pointer_type":
+        return { k: "ptr", e: of(named(current)[0] ?? null) };
+      case "slice_type":
+        return { k: "sl", e: of(field("element")) };
+      case "array_type":
+        return {
+          k: "ar",
+          len: arrayLength(field("length")),
+          e: of(field("element")),
+        };
+      case "map_type":
+        return { k: "map", key: of(field("key")), e: of(field("value")) };
+      case "channel_type": {
+        const tokens = current.children.map((child) => child?.type);
+        const dir =
+          tokens[0] === "<-" ? "r" : tokens.includes("<-") ? "s" : "b";
+        return { k: "ch", d: dir, e: of(field("value")) };
+      }
+      case "function_type":
+        return this.functionTerm(field("parameters"), field("result"));
+      case "struct_type": {
+        const fields: StructFieldTerm[] = [];
+        const list = named(current).find(
+          (child) => child.type === "field_declaration_list",
+        );
+        for (const declaration of named(list ?? null)) {
+          if (declaration.type !== "field_declaration") return UNKNOWN_TERM;
+          const type = declaration.childForFieldName("type");
+          const tag = tagValue(declaration.childForFieldName("tag"));
+          const names = declaration.childrenForFieldName("name");
+          const term = of(type);
+          if (names.length)
+            for (const name of names)
+              fields.push({ n: name!.text, t: term, g: tag });
+          else {
+            // Embedded: the field name is the type name (without qualifier).
+            const pointer = declaration.children.some(
+              (child) => child?.type === "*",
+            );
+            const base = type ? unparen(type) : null;
+            const name =
+              base?.type === "qualified_type"
+                ? (base.childForFieldName("name")?.text ?? "")
+                : base?.type === "generic_type"
+                  ? (base.childForFieldName("type")?.text ?? "")
+                  : (base?.text ?? "");
+            fields.push({
+              n: name.replace(/^.*\./, ""),
+              x: true,
+              t: pointer ? { k: "ptr", e: term } : term,
+              g: tag,
+            });
+          }
+        }
+        return { k: "st", f: fields };
+      }
+      case "interface_type": {
+        const methods: InterfaceMethodTerm[] = [];
+        const embeds: TypeTerm[] = [];
+        for (const element of named(current)) {
+          if (element.type === "method_elem") {
+            const name = element.childForFieldName("name");
+            if (!name) return UNKNOWN_TERM;
+            methods.push({
+              n: name.text,
+              s: this.functionTerm(
+                element.childForFieldName("parameters"),
+                element.childForFieldName("result"),
+              ),
+            });
+          } else if (element.type === "type_elem") {
+            const parts = named(element);
+            // A union or `~T` makes a type set: not compared.
+            if (parts.length !== 1 || parts[0]!.type === "negated_type")
+              return UNKNOWN_TERM;
+            embeds.push(this.typeTerm(parts[0]!));
+          } else if (element.type !== "comment") return UNKNOWN_TERM;
+        }
+        return { k: "if", m: methods, e: embeds };
+      }
+      default:
+        return UNKNOWN_TERM;
     }
-    if (node.type === "qualified_type") {
-      const pkg = node.childForFieldName("package")?.text ?? "";
-      const name = node.childForFieldName("name")?.text ?? "";
-      return `\u0002${pkg}.${name}\u0003`;
-    }
-    if (
-      node.type === "parameter_declaration" ||
-      node.type === "variadic_parameter_declaration"
-    ) {
-      const type = node.childForFieldName("type");
-      return (
-        (node.type === "variadic_parameter_declaration" ? "..." : "") +
-        (type ? this.template(type) : "?")
-      );
-    }
-    if (node.childCount === 0) return node.text;
-    const parts: string[] = [];
-    for (const child of node.children)
-      if (child && child.type !== "comment")
-        parts.push(child.isNamed ? this.template(child) : child.text);
-    return parts.join(" ");
   }
 
   /** One value description per declared result. */

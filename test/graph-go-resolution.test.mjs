@@ -107,7 +107,9 @@ test("imports resolve by go.mod module path; stdlib, foreign prefixes, internal 
   });
 });
 
-test("a directory with two importable package names gives package candidates", async () => {
+test("a directory with two unconstrained package names proves neither: the import is unresolved", async () => {
+  // Go rejects the directory; which name is real cannot be proven (round 12),
+  // so neither file's membership is trusted (see W2-B.md, layer 1).
   const { links } = await project({
     "go.mod": MOD,
     "two/a.go": "package one\n",
@@ -115,10 +117,8 @@ test("a directory with two importable package names gives package candidates", a
     "use/u.go": 'package use\nimport "example.com/m/two"\n',
   });
   const link = one(links, (item) => item.kind === "imports", "import");
-  assert.deepEqual(link.candidates, [
-    "two/a.go:package:one",
-    "two/b.go:package:other",
-  ]);
+  assert.equal(link.target, null);
+  assert.deepEqual(link.candidates, []);
 });
 
 test("nested modules and local replace directives map import paths to project directories", async () => {

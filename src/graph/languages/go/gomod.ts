@@ -147,21 +147,22 @@ export function importPathOf(
 }
 
 /**
- * The project directory an import path names, as seen from the importing
+ * The project directories an import path may name, as seen from the importing
  * directory's own module: its main module(s) (the importer's module, or every
  * `use`d module of a go.work listing it) and the local `replace` directives of
- * that go.mod (or of the go.work, which take precedence). A directory inside a
- * different nested module than the one it was mapped through is not that package.
- * Other project modules reached without a replace come from the module cache in Go,
- * so they stay unresolved.
+ * that go.mod (or of the go.work, which take precedence). One directory when it
+ * is proven; several when the captured files cannot prove which replacement Go
+ * uses (every candidate is kept, none is definite); none when the package comes
+ * from the module cache. A directory inside a different nested module than the
+ * one it was mapped through is not that package.
  */
 export function directoryOfImport(
   layout: GoProjectLayout,
   importerDirectory: string,
   importPath: string,
-): string | undefined {
+): string[] {
   const own = moduleOf(layout, importerDirectory);
-  if (!own) return undefined;
+  if (!own) return [];
   const workspace = layout.workspaces.find(
     (item) =>
       within(own.directory, item.directory) &&
@@ -172,11 +173,12 @@ export function directoryOfImport(
         workspace.uses.includes(module.directory),
       )
     : [own];
-  // A versioned replace applies only to the version Go selects. Selection is the
-  // maximum required version across the build's main modules (every `use`d module
-  // in a workspace), which is what the captured go.mod files establish. When they
-  // do not establish it (no requirement, or an unparsable version), the replacement
-  // is not applied: Go would fetch a version from the module cache instead.
+  // The version Go selects: the maximum required version across the build's main
+  // modules (since Go 1.17 the main go.mod lists every dependency at its selected
+  // version, and a build whose requirements were raised fails until it does).
+  // Not proven (undefined) when no main module requires the path, when a version
+  // cannot be parsed, or when another captured go.mod requires a higher version
+  // (the main requirement is then stale and selection may be higher).
   const selectedVersion = (path: string): string | undefined => {
     let best: string | undefined;
     for (const main of mains) {
@@ -186,44 +188,80 @@ export function directoryOfImport(
       if (best === undefined || compareVersions(version, best) > 0)
         best = version;
     }
+    if (best === undefined) return undefined;
+    for (const module of layout.modules) {
+      if (mains.includes(module)) continue;
+      const version = module.requires.get(path);
+      if (
+        version !== undefined &&
+        (!parseVersion(version) || compareVersions(version, best) > 0)
+      )
+        return undefined;
+    }
     return best;
   };
-  const applies = (item: GoModuleRoot) =>
-    item.version === undefined || selectedVersion(item.path) === item.version;
-  const replaced = new Map<string, GoModuleRoot>();
-  for (const main of mains)
-    for (const item of main.replacements)
-      if (!replaced.has(item.path) && applies(item))
-        replaced.set(item.path, item);
-  for (const item of workspace?.replacements ?? [])
-    if (applies(item)) replaced.set(item.path, item);
+  // The replacements of one path from one source (a go.work, or the main modules):
+  // a version-specific replacement of the selected version wins over an
+  // unversioned one, whatever their order; with the version unproven, every
+  // replacement that could apply is a candidate.
+  const pick = (items: GoModuleRoot[]): GoModuleRoot[] => {
+    if (!items.length) return [];
+    const plain = items.filter((item) => item.version === undefined);
+    const versioned = items.filter((item) => item.version !== undefined);
+    if (!versioned.length) return plain;
+    const selected = selectedVersion(items[0]!.path);
+    if (selected === undefined)
+      // Without a plain replacement the package may come from the module cache.
+      return plain.length ? [...plain, ...versioned] : [];
+    const hit = versioned.filter((item) => item.version === selected);
+    return hit.length ? hit : plain;
+  };
+  const byPath = (items: GoModuleRoot[]) => {
+    const out = new Map<string, GoModuleRoot[]>();
+    for (const item of items)
+      out.set(item.path, [...(out.get(item.path) ?? []), item]);
+    return out;
+  };
+  const fromMains = byPath(mains.flatMap((main) => main.replacements));
+  const fromWork = byPath(workspace?.replacements ?? []);
+  const replaced = new Map<string, GoModuleRoot[]>();
+  for (const path of new Set([...fromMains.keys(), ...fromWork.keys()])) {
+    // A go.work replacement of a path overrides the modules' replacements.
+    const roots = pick(fromWork.get(path) ?? fromMains.get(path)!);
+    if (roots.length) replaced.set(path, roots);
+  }
   const matches = (path: string) =>
     importPath === path || importPath.startsWith(`${path}/`);
-  let best: { root: GoModuleRoot; main?: GoModule } | undefined;
-  const consider = (root: GoModuleRoot, main?: GoModule) => {
-    if (
-      matches(root.path) &&
-      (!best || root.path.length > best.root.path.length)
-    )
-      best = main ? { root, main } : { root };
+  let best: { roots: GoModuleRoot[]; main?: GoModule } | undefined;
+  const consider = (roots: GoModuleRoot[], main?: GoModule) => {
+    const path = roots[0]!.path;
+    if (matches(path) && (!best || path.length > best.roots[0]!.path.length))
+      best = main ? { roots, main } : { roots };
   };
-  for (const main of mains) consider(main, main);
-  for (const item of replaced.values()) consider(item);
-  if (!best) return undefined;
-  const chosen: { root: GoModuleRoot; main?: GoModule } = best;
-  const rest = importPath.slice(chosen.root.path.length + 1);
-  const directory = joinDirectory(chosen.root.directory, rest || ".");
-  if (directory === undefined) return undefined;
-  const owner = moduleOf(layout, directory);
-  if (chosen.main) return owner === chosen.main ? directory : undefined;
-  // A replacement directory: the package must not sit inside a module nested below it.
-  if (
-    owner &&
-    owner.directory !== chosen.root.directory &&
-    within(owner.directory, chosen.root.directory)
-  )
-    return undefined;
-  return directory;
+  for (const main of mains) consider([main], main);
+  for (const roots of replaced.values()) consider(roots);
+  if (!best) return [];
+  const chosen: { roots: GoModuleRoot[]; main?: GoModule } = best;
+  const out: string[] = [];
+  for (const root of chosen.roots) {
+    const rest = importPath.slice(root.path.length + 1);
+    const directory = joinDirectory(root.directory, rest || ".");
+    if (directory === undefined) continue;
+    const owner = moduleOf(layout, directory);
+    if (chosen.main) {
+      if (owner === chosen.main) out.push(directory);
+      continue;
+    }
+    // A replacement directory: the package must not sit inside a module nested below it.
+    if (
+      owner &&
+      owner.directory !== root.directory &&
+      within(owner.directory, root.directory)
+    )
+      continue;
+    out.push(directory);
+  }
+  return [...new Set(out)];
 }
 
 /** Semantic version parts, or undefined when not a `vMAJOR.MINOR.PATCH[-pre][+build]` version. */
