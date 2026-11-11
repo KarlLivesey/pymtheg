@@ -188,11 +188,11 @@ The manager keeps this table current. It is the single record of who holds which
 
 | Chunk | Status | Builder | Reviewer | Branch | Pull request | Owned paths held |
 |---|---|---|---|---|---|---|
-| W0-2 Dependencies | in review (round 1) | Sol 6.1 | Opus 5.5 | `w0-2-graph-dependencies` | [#1](https://github.com/KarlLivesey/pymtheg/pull/1) | `package.json`, `package-lock.json`, `scripts/grammar-check.mjs` |
+| W0-2 Dependencies | merged | Sol 6.1 | Opus 5.5 | `w0-2-graph-dependencies` | [#1](https://github.com/KarlLivesey/pymtheg/pull/1) | `package.json`, `package-lock.json`, `scripts/grammar-check.mjs` |
 | W1-A Ownership disagreement | building | Opus 5.5 | — | `w1-a-ownership-agreement` | — | `src/analysis/ownership.ts`, `src/behaviour/flow.ts`, `test/ownership-agreement.test.mjs` |
 | W1-B Engine core | building | Sol 6.1 | — | `w1-b-engine-core` | — | `src/behaviour/explore*.ts`, `test/explore*.test.mjs` |
 | W1-E Machines and contracts | building | Opus 5.5 | — | `w1-e-mixed-file-contracts` | — | `src/contracts/document.ts`, `implementation-check.ts`, `manifest.ts`, `test/contracts-mixed-file.test.mjs` |
-| W1-C Graph store and interface | cut, waits for W0-2 | — | — | — | — | `src/graph/**` except `languages/*/` |
+| W1-C Graph store and interface | cut, next free slot (W0-2 merged) | — | — | — | — | `src/graph/**` except `languages/*/` |
 | W1-D Document import | building | Sol 6.1 | — | `w1-d-document-import` | — | `src/shared/document-selection.ts`, `src/architecture/import-policy.ts`, `src/cli/import-summary.ts`, `src/architecture/store.ts`; extended on request to `src/architecture/model.ts`, `heading-identities.ts`, `headings.ts` (minimal RST section wiring; no other chunk holds them) |
 | W1-F Two investigations | cut, next free slot | — | — | — | — | `evidence/w1-f/` |
 
@@ -215,3 +215,5 @@ Reports to Karl are short:
 
 - a few lines of progress when something lands or changes state;
 - a brief summary at the end of each wave: what merged, what is next, anything decided on his behalf that he might want to know.
+
+Backlog from reviews (not conditions): W0-2 — the grammar packages declare a `node-gyp-build` install hook; install stays compiler-free only while hooks are not run (`--ignore-scripts`, or npm 12 leaving them unapproved). Never add them to `allowScripts`. Stage 8 clean-machine install must cover this, including older npm that runs hooks by default.
