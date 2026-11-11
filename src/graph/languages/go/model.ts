@@ -23,6 +23,8 @@ export type Desc =
   | { k: "val"; t: TypeRef }
   /** Result `i` of calling `f` (function, method, conversion or func value). */
   | { k: "call"; f: Desc; i: number }
+  /** The callee `x[…]` of a call: a generic instantiation when x is a function, else an element. */
+  | { k: "inst"; x: Desc }
   /** An element (`elem`) or key (`key`) of a slice/map/channel/array value: range, index, receive. */
   | { k: "elem"; x: Desc }
   | { k: "key"; x: Desc }

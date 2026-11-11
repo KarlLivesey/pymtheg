@@ -78,7 +78,7 @@ targets, never a guess. "Unresolved" keeps the target name.
 | Same, from a non-test file to a declaration in a `_test.go` file | Unresolved (Go hides it) |
 | `_test.go` (same package or external `_test`) reading test-file declarations in the same directory | Definite |
 | Import of a path in the importing file's own module (nearest `go.mod`), or in any module `use`d by a `go.work` that lists it | **Definite** to the package symbol |
-| Import of a path covered by a local `replace … => ./dir` in the importing file's own `go.mod` (or its `go.work`, which wins) | **Definite** to the package in the replacement directory |
+| Import of a path covered by a local `replace … => ./dir` in the importing file's own `go.mod` (or its `go.work`, which wins) | **Definite** to the package in the replacement directory. A version-specific `replace path vX => ./dir` applies only when the captured `go.mod` (every `go.work` main module that requires it) requires exactly `vX`. Otherwise, including when no requirement is captured, it is not applied, because the selected version is not established. An unversioned `replace` applies to all versions |
 | A directory mapped through one module that actually belongs to a nested `go.mod` (`example.com/m/sub` when `sub/go.mod` exists) | Unresolved (it is another module's package) |
 | Another project module reached without `replace`/`go.work` | Unresolved (Go would take it from the module cache, possibly another version) |
 | Directory with two importable package names | Candidates (package symbols) |
@@ -88,19 +88,23 @@ targets, never a guess. "Unresolved" keeps the target name.
 | `pkg.F`, `pkg.T`, `pkg.V` through a project import, including an alias | **Definite** (exported names only) |
 | Same, by the original package name while aliased, or an unexported name | Unresolved |
 | Dot-import names | **Definite** (exported only). With an external dot-import, an otherwise unknown exported name is treated as external |
-| Method/field selection `x.M` where x's type is syntactically evident: declared `var x T`, typed parameter, receiver, `T{}`/`&T{}`, `new(T)`, `make(T)`, `x.(T)`, `x := pkgVar`, a field of known type, the result of a project function, method or func-typed value with a declared result type, a conversion `T(v)`, an element/key of a written slice/array/map/channel type (`range`, `x[i]`, `<-ch`) | Go's selector rule (below) |
+| A qualifier `q` in `q.T`/`q.F` that is neither local, nor package-level, nor a project import | External: unresolved with the name kept, never project candidates. In Go such a qualifier can only be one of the file's imports. Project imports are matched by their real `package` clause name, so no package name is ever guessed from an import path to decide project versus external (`github.com/minio/minio-go/v7` is `minio`, `gopkg.in/yaml.v3` is `yaml`) |
+| Method/field selection `x.M` where x's type is syntactically evident: declared `var x T`, typed parameter, receiver, `T{}`/`&T{}`, `new(T)`, `make(T)`, `x.(T)`, `x := pkgVar`, a field of known type, the result of a project function, method or func-typed value with a declared result type, a conversion `T(v)`, an element/key of a written slice/array/map/channel type (`range`, `x[i]`, `<-ch`), a type-switch variable in a case with exactly one type | Go's selector rule (below) |
+| Type-switch variable `switch v := x.(type)` | Per case clause: one type → that type (external → unresolved, project → resolved by the selector rule); several types, `nil` or `default` → the switched operand's own description |
+| Calling an element of a function container: `handlers["a"]()`, `fns[0]()` | A `references` link to the container plus an **unresolved** `calls` link (`targetName` `handlers["a"]`). The functions stored in a literal initialiser are not tracked as candidates. `F[int](x)` (explicit instantiation, same syntax) calls `F` definitely |
 | **Selector rule** (members, `implements`, dispatch): own fields/methods at depth 0, then promoted members breadth-first by embedding depth, counting every embedding path | Exactly one path at the shallowest depth: **definite** (candidates if that declaration has build variants). Several paths (including the same method reached via two embedded types): **candidates** of the distinct declarations, unresolved if they are one declaration. A field at a shallower or equal depth shadows or ambiguates a method of that name |
 | An embedded type outside the project (or not resolvable) at a depth at or above the first project match | Unresolved: the external type may declare or shadow the name |
 | Unexported field/method selected from another package (including an external `_test` package), directly or promoted | Not visible: unresolved (Go treats it as a different identifier) |
 | Method expression `(*T).M` / `T.M`, method value `x.M` | Definite (`references`); `calls` on a local that holds it see "reassigned locals" |
 | A local holding a function or method value | **Definite** when never written after its declaration. When written again (`=`, multi-assign, `:=` redeclaration, inside a closure): **candidates** of all values ever assigned if each is a known function/method; unresolved if any is unknown, if its address is taken, after `op=`/`++`, after a `range`/receive `=` assignment, for parameters (incoming value unknown) and for assignment cycles (`f, g = g, f`) |
-| `x.M()` where x's static type is an interface declared in the project | Candidates: the interface method plus `M` (by the selector rule) on every structural implementer. Unresolved when no implementer exists; over 50: unresolved with `data.overflow` (never truncated) |
+| `x.M()` where x's static type is an interface declared in the project | Candidates: the interface method plus `M` (by the selector rule) on every structural implementer. When an implementer's `M` is itself an embedded interface's method, that is expanded in turn (it is already covered when it is the method being dispatched). Unresolved when no implementation is known, when a needed interface's implementations cannot be established (it is generic or embeds an external interface), or over 50 (`data.overflow`, never truncated) |
+| Interface method value assigned to a local and later reassigned (`f := i.M; f = a.M; f()`) | Each interface method among the values expands to its dispatch set before combining, so no implementation is omitted. Unresolved if any part is unknown |
 | `x.M()` where x's type is a type parameter with a single named project interface constraint | The same interface dispatch on the constraint (the constraint method is always among the candidates). Unresolved for `any`, unions, inline constraints and constraint-less receiver type parameters |
-| `x.M()` where x has no evident type: ranging over or indexing a **named** project container type (`type List []T`), anonymous interface types (`[]interface{ Close() error }`), results of builtins other than `new`/`make`/`append`, values from dynamic code (`reflect`) | Candidates: concrete `M` methods in the caller's package and every project package it transitively imports (exported names only across packages). Unresolved with fewer than 2; over 20: unresolved with `data.overflow` (never truncated). **These are the only candidate sets that may omit the true target**: the value can be of an external type whose method is not in the graph |
+| `x.M()` where x has no evident type: ranging over or indexing a **named** project container type (`type List []T`), anonymous interface types (`[]interface{ Close() error }`), results of builtins other than `new`/`make`/`append`, values from dynamic code (`reflect`) | Candidates: concrete `M` methods in the caller's package and every project package it transitively imports (exported names only across packages). Unresolved with fewer than 2; over 20: unresolved with `data.overflow` (never truncated). These sets may omit the true target when the value is of an external type, whose method is not in the graph |
 | `x.M()` / `x.f` where x's type is known to be external: parameter, field, variable, result or composite literal of an external type; result of calling an external function or method (`os.Open`, `context.Background`, `errgroup.WithContext`); element of an external container; a predeclared type (`error`) | Unresolved, name kept; never project candidates |
 | A local shadowing an import or function (`fmt := printer{}`, `helper := func(){}`) | The local wins. Methods on its evident type resolve |
-| Builtins (`len`, `append`, …) | Unresolved, `data.builtin: true` |
-| Implicit interface satisfaction | **Definite** `implements` link when every interface method is selected uniquely (selector rule, as seen from the interface's package) as a method with an identical canonical signature. `data.pointerReceiver` is set when only `*T` satisfies it: a pointer-receiver method counts for the value `T` only when reached through an embedded `*E`. Named types are compared by package import path |
+| Builtins (`len`, `append`, `new`, …) | Unresolved, `data.builtin: true`, set only when no package-level declaration visible to the caller shadows the name. A user-declared `new` or `len` is resolved to that declaration without the flag, and a test-file declaration shadows only for that package's test files. The flag is recomputed by `analyze` on every index, so it follows shadowing declarations added or removed in other files |
+| Implicit interface satisfaction | **Definite** `implements` link when every interface method is selected uniquely (selector rule) as a method with an identical canonical signature. An unexported interface method keeps its declaring package through embedding (`type J interface{ p.I }` with `p.I{ hidden() }` needs `p`'s `hidden`, never `q.hidden`). An interface's method set merges identical methods inherited along several paths (`L{J; K}` with `J`, `K` both embedding `I`); the same method with different signatures makes the interface unsatisfiable, so it gets no links. Cycles are detected per embedding path. `data.pointerReceiver` is set when only `*T` satisfies it: a pointer-receiver method counts for the value `T` only when reached through an embedded `*E`. Named types are compared by package import path |
 | Interfaces that embed an external interface, are generic or are constraints | No `implements` links (their method set is unknown or not a method set) |
 | Struct embedding, type references, receiver types | **Definite** for project types. External types unresolved |
 
@@ -120,6 +124,11 @@ targets, never a guess. "Unresolved" keeps the target name.
   always get a link). For a selector, only the full expression is linked. The base
   identifier `pkg` in `pkg.F` is not linked separately.
 - Calls of function literals (`func(){}()`).
+- Functions stored in map/slice/array containers are not tracked: calling an element
+  is an unresolved call (see the table).
+- tree-sitter-go reads `new(` as the builtin's syntax. A user-declared `new` called
+  with a non-type argument (`new(1)`) therefore misparses, and its declaration
+  yields no call/reference links (the file is `partial`).
 - Local declarations (variables, local types, labels) as symbols.
 - Struct fields of anonymous struct types, and fields of a defined type's
   underlying struct (`type A B`); element types of named container types.
@@ -142,14 +151,9 @@ and it returns only files whose facts changed.
 
 ## Interface gaps
 
-1. **Core test A10 forbids any production language.**
-   `test/graph-review.test.mjs` A10 runs `discoverLanguages()` from a scratch
-   directory and asserts its output matches `/\[\]\ntoy/`. That means the
-   production module list must be empty. With this chunk the output is
-   `[ 'go' ]\ntoy`, so A10 fails. The test file is core, not owned by this chunk,
-   and was not edited. The Rust and TypeScript chunks will hit the same failure.
-   Suggested fix (manager): assert that `toy` is absent from the production list
-   instead of asserting an empty list. The manager is fixing it separately (PR 15).
+1. **Core test A10 forbade any production language. Resolved on `main` (PR 15).**
+   A10 now checks that production discovery omits test-only modules instead of
+   requiring an empty list. With this branch merged, the whole suite passes.
 2. **No multi-file symbol.** A Go package spans several files, but a symbol lives
    in one file with one range. Instead, the package symbol is hosted in a
    deterministic file. Consequence: adding a file that sorts before the host (or
@@ -160,10 +164,19 @@ and it returns only files whose facts changed.
    unknown-receiver call, the link stays unresolved: the module will not promote
    it to definite.
 4. **Candidates cannot say "or something outside the project".** Receivers known
-   to be external are unresolved, never candidates. But a receiver whose type is not
-   evident at all (the "no evident type" row above) may still be an external value.
-   Its candidate set lists project methods only, and the interface has no flag for
-   "possibly none of these". That row is the only place this applies.
+   to be external are unresolved, never candidates. Two kinds of candidate set can
+   still omit a target outside the graph, and the interface has no flag for
+   "possibly none of these":
+   - name-only guesses for a receiver whose type is not evident (the "no evident
+     type" row), and
+   - interface dispatch, because a value of a project interface with only exported
+     methods may hold an external type that satisfies it (for example an `*os.File`
+     in a project `Closer`). An interface with an unexported method can only be
+     implemented inside its own package, so its dispatch set is complete within the
+     project.
+
+   Every other candidate set (build variants, ambiguous selectors, reassigned
+   values, apart from any dispatch sets they include) lists all possible targets.
 5. **Resolution cannot annotate parsed links.** `resolve` cannot add `data` to
    parsed links, so the reason a link is unresolved is mostly only in the module's
    logic. Two reasons are recorded. Builtins are flagged at parse time. Over-cap
@@ -228,6 +241,40 @@ Two design consequences:
 
 The module version is 2, so cached version-1 facts are re-parsed. Version 3 adds
 the overflow note (re-review conditions on the candidate caps).
+
+## Module version 4 (second review)
+
+Each fix has positive, negative and, where relevant, ambiguous regressions in
+`test/graph-go-review2.test.mjs`:
+
+1. Unexported interface methods keep their declaring package when method sets are
+   flattened and compared.
+2. Interface method values in reassigned locals expand to their dispatch sets.
+   Dispatch also expands implementers whose method comes from an embedded interface
+   (the same bypass one level down), and implementations are taken only from
+   interfaces whose method set, and therefore implementer list, is complete.
+3. Version-specific `replace` directives.
+4. Interface method sets merge identical inherited methods, with cycle detection per
+   path. The selector rule treats an interface's method set as flat. A project
+   declaration of a name is selected even when an embedded external interface
+   might also declare it (identical methods merge). Only a name the project does not
+   declare is unknown.
+5. Type-switch variables typed per case clause.
+6. Unmatched qualifiers are external.
+7. Element calls are not calls of their container.
+8. `builtin` is set only when the builtin is called. `analyze` derives it from the
+   stable parse fact `builtinName`.
+
+Found during the restic re-run and fixed:
+
+- My first version of the per-case type switch linked each case type twice (it
+  compared Tree-sitter node wrappers by identity). Regression: "each type in a
+  type-switch case is linked exactly once". A restic-wide check now finds no
+  duplicate links.
+- My first version of the flat interface lookup also treated a project interface's
+  own methods as unknown when it embedded an external interface.
+
+The module version is 5.
 
 ## Observations on a real project
 

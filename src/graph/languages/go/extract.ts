@@ -243,6 +243,8 @@ export class GoExtractor {
       }
       case "sel":
         return { k: "sel", x: next(desc.x), n: desc.n };
+      case "inst":
+        return { k: "inst", x: next(desc.x) };
       case "call":
         return { k: "call", f: next(desc.f), i: desc.i };
       case "elem":
@@ -1022,13 +1024,43 @@ export class GoExtractor {
           const initializer = node.childForFieldName("initializer");
           if (initializer) this.walk(initializer);
           if (value) this.walk(value);
-          const alias = node.childForFieldName("alias");
-          for (const name of named(alias))
-            if (name.type === "identifier")
-              this.declare(name.text, { k: "local" });
-          for (const child of named(node))
-            if (child.type === "type_case" || child.type === "default_case")
-              this.walk(child);
+          // The switch variable has its case's type: one type → that type;
+          // several types or default → the switched operand's own description.
+          const alias = named(node.childForFieldName("alias")).filter(
+            (name) => name.type === "identifier",
+          );
+          const operand: Desc = value
+            ? this.desc(
+                value.type === "type_assertion_expression"
+                  ? (value.childForFieldName("operand") ?? value)
+                  : value,
+              )
+            : { k: "unknown" };
+          for (const child of named(node)) {
+            if (child.type !== "type_case" && child.type !== "default_case")
+              continue;
+            const types = child
+              .childrenForFieldName("type")
+              .filter((item): item is Node => !!item && item.isNamed);
+            this.scoped(() => {
+              for (const type of types) this.walk(type);
+              const single =
+                types.length === 1 && types[0]!.text !== "nil"
+                  ? this.typedValue(types[0]!)
+                  : operand;
+              for (const name of alias) this.declare(name.text, single);
+              // Tree-sitter returns a new wrapper per access: compare positions.
+              for (const item of named(child))
+                if (
+                  !types.some(
+                    (type) =>
+                      type.startIndex === item.startIndex &&
+                      type.endIndex === item.endIndex,
+                  )
+                )
+                  this.walk(item);
+            });
+          }
         });
         return;
       case "var_declaration":
@@ -1120,15 +1152,19 @@ export class GoExtractor {
     const typeArguments = node.childForFieldName("type_arguments");
     const args = node.childForFieldName("arguments");
     if (fn) {
-      let callee = unparen(fn);
+      const callee = unparen(fn);
       if (callee.type === "index_expression") {
-        // Explicit instantiation such as F[int, string](x).
+        // F[int](x) instantiates a generic function; handlers["a"]() calls an element.
+        // The grammar cannot tell; resolution can: only function operands are called.
         const operand = callee.childForFieldName("operand");
-        const index = callee.childForFieldName("index");
-        if (index) this.walk(index);
-        if (operand) callee = unparen(operand);
-      }
-      if (callee.type === "func_literal") this.walk(callee);
+        this.link("calls", compact(callee), range(callee), {
+          expr: (operand
+            ? { k: "inst", x: this.desc(operand) }
+            : { k: "unknown" }) as unknown as Json,
+        });
+        // The container (or generic function) itself is referenced.
+        this.walk(callee);
+      } else if (callee.type === "func_literal") this.walk(callee);
       else if (callee.type === "identifier") {
         const bound = this.local(callee.text);
         if (!bound && PREDECLARED_TYPES.has(callee.text)) {
@@ -1136,8 +1172,10 @@ export class GoExtractor {
         } else
           this.link("calls", callee.text, range(callee), {
             expr: (bound ?? { k: "name", n: callee.text }) as unknown as Json,
+            // Stable parse fact; `analyze` sets `builtin` only when no package
+            // declaration of this name shadows the builtin.
             ...(!bound && BUILTIN_FUNCTIONS.has(callee.text)
-              ? { builtin: true }
+              ? { builtinName: true }
               : {}),
           });
       } else if (callee.type === "selector_expression") {

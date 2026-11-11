@@ -71,6 +71,14 @@ type Selection =
   | { kind: "none" }
   /** An external or unresolvable embedded type could supply or shadow the name. */
   | { kind: "unknown" };
+interface InterfaceMethod {
+  /** Name, plus the declaring package for an unexported name. */
+  key: string;
+  name: string;
+  sig: string;
+  /** Declaring package of an unexported method (it is a different identifier elsewhere). */
+  access?: string | undefined;
+}
 interface Decision {
   ids: string[];
   /** Only a definite decision may become a single target. */
@@ -116,17 +124,23 @@ export interface Overflow {
   candidates: number;
   cap: number;
 }
+/** Facts about a parsed link that only whole-project resolution can establish. */
+export interface LinkNote {
+  overflow?: Overflow;
+  /** The call really is to a builtin (no package-level declaration shadows it). */
+  builtin?: true;
+}
 
 /**
  * Runs the same resolution over provisional IDs (`draft:<file>\0<key>`) to find
  * links whose candidate sets exceed their cap. Used by `analyze`, the only phase
  * that may write link data, so the reason is recorded on the link itself.
  */
-export function overflowingLinks(
+export function linkNotes(
   moduleId: string,
   files: readonly GraphFile[],
   contextFiles: readonly ContextFile[],
-): Map<string, Map<number, Overflow>> {
+): Map<string, Map<number, LinkNote>> {
   const symbols: GraphSymbol[] = [];
   const links: GraphLink[] = [];
   const id = (path: string, key: string) => `draft:${path}\u0000${key}`;
@@ -166,20 +180,28 @@ export function overflowingLinks(
     links,
   });
   resolver.run();
-  const output = new Map<string, Map<number, Overflow>>();
-  for (const [linkId, overflow] of resolver.overflow) {
+  const output = new Map<string, Map<number, LinkNote>>();
+  const note = (linkId: string): LinkNote => {
     const split = linkId.lastIndexOf("\u0000");
     const path = linkId.slice(0, split);
     let group = output.get(path);
     if (!group) output.set(path, (group = new Map()));
-    group.set(Number(linkId.slice(split + 1)), overflow);
-  }
+    const index = Number(linkId.slice(split + 1));
+    let item = group.get(index);
+    if (!item) group.set(index, (item = {}));
+    return item;
+  };
+  for (const [linkId, overflow] of resolver.overflow)
+    note(linkId).overflow = overflow;
+  for (const linkId of resolver.builtins) note(linkId).builtin = true;
   return output;
 }
 
 class GoResolver {
   /** Links whose candidate sets exceeded their cap: unresolved, never truncated. */
   readonly overflow = new Map<string, Overflow>();
+  /** Calls whose builtin name is not shadowed by a package-level declaration. */
+  readonly builtins = new Set<string>();
   private layout: GoProjectLayout;
   private files = new Map<string, FileInfo>();
   private pkgs = new Map<string, Pkg>();
@@ -190,6 +212,8 @@ class GoResolver {
   private methodsByName = new Map<string, GraphSymbol[]>();
   private embedsBySource = new Map<string, GraphLink[]>();
   private implementers = new Map<string, GraphSymbol[]>();
+  /** Interfaces whose method set is fully known, so their implementer list is complete. */
+  private complete = new Set<string>();
   private reachable = new Map<string, Set<string>>();
   private memo = new Map<string, TypeValue>();
   private selections = new Map<string, Selection>();
@@ -222,6 +246,12 @@ class GoResolver {
         }
     const resolutions: LinkResolution[] = [];
     for (const link of this.context.links) {
+      const name = link.data as { builtinName?: boolean } | undefined;
+      if (
+        name?.builtinName &&
+        this.lookupName(link.targetName, link.file).e !== "syms"
+      )
+        this.builtins.add(link.id);
       const { ids, definite, limit = CANDIDATE_LIMIT } = this.resolveLink(link);
       const distinct = unique(ids).sort();
       if (distinct.length === 1 && definite)
@@ -398,7 +428,10 @@ class GoResolver {
     if (depth < MAX_DEPTH) {
       if (ref.q !== undefined) {
         const base = this.lookupName(ref.q, from);
-        if (base.e === "pkg")
+        // A qualifier that is no project import can only be an external import.
+        if (base.e === "none" || base.e === "external")
+          value = { kind: "external", name: `${ref.q}.${ref.n}` };
+        else if (base.e === "pkg")
           value = base.pkgs.length
             ? this.typeSyms(
                 base.pkgs.flatMap((pkg) =>
@@ -544,6 +577,17 @@ class GoResolver {
       }
       case "call":
         return { e: "value", type: this.callResult(desc, from, depth) };
+      case "inst": {
+        // Only a generic function is called through `x[…]`; an element of a
+        // map/slice/array of funcs is a value whose identity is not tracked.
+        const base = this.denote(desc.x, from, depth + 1);
+        return base.e === "syms" &&
+          base.syms.every(
+            (symbol) => symbol.kind === "function" || symbol.kind === "method",
+          )
+          ? base
+          : NONE;
+      }
       case "sel":
         return this.select(desc, from, depth);
       default:
@@ -605,7 +649,12 @@ class GoResolver {
     }
     if (base.e === "external")
       return { e: "external", name: `${base.name}.${desc.n}` };
-    if (base.e === "none") return NONE;
+    // `q.X` with q neither local nor declared in the package: q can only be one of
+    // this file's imports; not a project import, so it is external.
+    if (base.e === "none")
+      return desc.x.k === "name"
+        ? { e: "external", name: `${desc.x.n}.${desc.n}` }
+        : NONE;
     if (base.e === "syms" && base.syms.every(isTypeSymbol)) {
       // Method expression T.M / (*T).M.
       const type = this.typeSyms(base.syms, depth + 1);
@@ -692,6 +741,19 @@ class GoResolver {
       const occurrences: { syms: GraphSymbol[]; pointer: boolean }[] = [];
       const next: typeof level = [];
       for (const node of level) {
+        if (node.types.every((type) => type.kind === "interface")) {
+          // An interface's method set is flat: identical methods inherited along
+          // several paths merge, so it is one occurrence and is not expanded further.
+          const flat = this.interfaceMember(node.types, name, from, access);
+          // A project declaration of the name is the method even if an embedded
+          // external interface also has it (identical methods merge); only when the
+          // project declares none could an external embedded interface supply it.
+          if (flat.syms.length)
+            occurrences.push({ syms: flat.syms, pointer: node.pointer });
+          else if (flat.unknown)
+            externalAt = Math.min(externalAt ?? depth, depth);
+          continue;
+        }
         const syms = unique(
           node.types.flatMap((type) => {
             const pkg = this.pkgOf(type);
@@ -727,6 +789,10 @@ class GoResolver {
             });
           }
       }
+      if (externalAt !== undefined && externalAt <= depth) {
+        result = { kind: "unknown" };
+        break;
+      }
       if (occurrences.length === 1) {
         result = { kind: "found", ...occurrences[0]! };
         break;
@@ -744,6 +810,50 @@ class GoResolver {
       result = { kind: "unknown" };
     this.selections.set(memoKey, result);
     return result;
+  }
+
+  /** Interface methods named `name` through interface embedding (cycle-safe by path). */
+  private interfaceMember(
+    ifaces: GraphSymbol[],
+    name: string,
+    from: string | undefined,
+    access: string | undefined,
+    path: string[] = [],
+  ): { syms: GraphSymbol[]; unknown: boolean } {
+    const syms: GraphSymbol[] = [];
+    let unknown = false;
+    for (const iface of ifaces) {
+      if (path.includes(iface.id)) continue;
+      const pkg = this.pkgOf(iface);
+      if (!pkg) continue;
+      syms.push(
+        ...(
+          this.members.get(`${pkg.key}\u0000${iface.name}\u0000${name}`) ?? []
+        ).filter(
+          (symbol) =>
+            this.visible(symbol, from) && this.accessible(symbol, access),
+        ),
+      );
+      for (const item of this.embedded(iface)) {
+        if (
+          item.value.kind !== "project" ||
+          !item.value.syms.every((type) => type.kind === "interface")
+        ) {
+          unknown = true;
+          continue;
+        }
+        const inner = this.interfaceMember(
+          item.value.syms,
+          name,
+          from,
+          access,
+          [...path, iface.id],
+        );
+        syms.push(...inner.syms);
+        unknown ||= inner.unknown;
+      }
+    }
+    return { syms: unique(syms), unknown };
   }
 
   // ---- interfaces --------------------------------------------------------
@@ -773,38 +883,63 @@ class GoResolver {
     return pkg.importPath ?? `dir:${pkg.directory}:${pkg.name}`;
   }
 
-  /** Method set of an interface (name -> canonical signature), or undefined when not fully known. */
+  /**
+   * Method set of an interface, keyed by method identity (an unexported name is
+   * qualified by its declaring package), or undefined when not fully known.
+   * Identical methods inherited along several embedding paths merge (Go's rule
+   * for interfaces); the same identity with different signatures is an error.
+   */
   private interfaceMethods(
     iface: GraphSymbol,
-    seen = new Set<string>(),
-  ): Map<string, string> | undefined {
+    path = new Set<string>(),
+  ): Map<string, InterfaceMethod> | undefined {
     const data = (iface.data ?? {}) as {
       constraint?: boolean;
       generic?: boolean;
     };
-    if (data.constraint || data.generic || seen.has(iface.id)) return undefined;
-    seen.add(iface.id);
+    if (data.constraint || data.generic || path.has(iface.id)) return undefined;
     const pkg = this.pkgOf(iface);
     if (!pkg) return undefined;
-    const set = new Map<string, string>();
-    for (const symbol of this.ownMethods(iface)) {
-      const sig = (symbol.data as { sig?: string } | undefined)?.sig;
-      if (sig === undefined) return undefined;
-      set.set(symbol.name, this.canonical(sig, symbol.file));
-    }
-    for (const item of this.embedded(iface)) {
-      if (item.value.kind !== "project" || item.value.syms.length !== 1)
-        return undefined;
-      const inner = item.value.syms[0]!;
-      if (inner.kind !== "interface") return undefined;
-      const methods = this.interfaceMethods(inner, seen);
-      if (!methods) return undefined;
-      for (const [name, sig] of methods) {
-        if (set.has(name) && set.get(name) !== sig) return undefined;
-        set.set(name, sig);
+    path.add(iface.id);
+    try {
+      const set = new Map<string, InterfaceMethod>();
+      const add = (method: InterfaceMethod): boolean => {
+        const existing = set.get(method.key);
+        if (existing && existing.sig !== method.sig) return false;
+        set.set(method.key, method);
+        return true;
+      };
+      for (const symbol of this.ownMethods(iface)) {
+        const sig = (symbol.data as { sig?: string } | undefined)?.sig;
+        if (sig === undefined) return undefined;
+        const access = exported(symbol.name) ? undefined : pkg.key;
+        if (
+          !add({
+            key:
+              access === undefined
+                ? symbol.name
+                : `${symbol.name}\u0000${access}`,
+            name: symbol.name,
+            sig: this.canonical(sig, symbol.file),
+            access,
+          })
+        )
+          return undefined;
       }
+      for (const item of this.embedded(iface)) {
+        if (item.value.kind !== "project" || item.value.syms.length !== 1)
+          return undefined;
+        const inner = item.value.syms[0]!;
+        if (inner.kind !== "interface") return undefined;
+        const methods = this.interfaceMethods(inner, path);
+        if (!methods) return undefined;
+        for (const method of methods.values())
+          if (!add(method)) return undefined;
+      }
+      return set;
+    } finally {
+      path.delete(iface.id);
     }
-    return set;
   }
   private ownMethodsIndex?: Map<string, GraphSymbol[]>;
   private ownMethods(iface: GraphSymbol): GraphSymbol[] {
@@ -862,22 +997,26 @@ class GoResolver {
   }
 
   private implementsLinks(added: AddedLink[]): void {
-    const interfaces: { iface: GraphSymbol; methods: Map<string, string> }[] =
-      [];
+    const interfaces: {
+      iface: GraphSymbol;
+      methods: Map<string, InterfaceMethod>;
+    }[] = [];
     const types: GraphSymbol[] = [];
     for (const symbol of this.symbolsById.values()) {
       if (symbol.kind === "interface") {
         const methods = this.interfaceMethods(symbol);
-        if (methods?.size) interfaces.push({ iface: symbol, methods });
+        if (methods?.size) {
+          interfaces.push({ iface: symbol, methods });
+          this.complete.add(symbol.id);
+        }
       } else if (symbol.kind === "struct" || symbol.kind === "type")
         types.push(symbol);
     }
     for (const type of types)
       for (const { iface, methods } of interfaces) {
-        const access = this.pkgOf(iface)?.key;
         let byValue = true;
         let byPointer = true;
-        for (const [name, sig] of methods) {
+        for (const { name, sig, access } of methods.values()) {
           const has = this.hasMethod(type, name, sig, access);
           byValue &&= has.value;
           byPointer &&= has.pointer;
@@ -973,7 +1112,32 @@ class GoResolver {
       if (type) return this.member(type, desc.n, link);
     }
     const entity = this.denote(desc, link.file, 0);
-    return entity.e === "syms" ? this.definite(entity.syms) : UNRESOLVED;
+    if (entity.e !== "syms") return UNRESOLVED;
+    return link.kind === "calls"
+      ? this.expand(entity.syms)
+      : this.definite(entity.syms);
+  }
+
+  /**
+   * Possible targets of calling these values: an interface method value calls one
+   * of the interface's implementations, so it expands to its dispatch set; if any
+   * value's set is not known, the whole call is unresolved.
+   */
+  private expand(syms: GraphSymbol[]): Decision {
+    const specs = syms.filter(
+      (symbol) =>
+        (symbol.data as { interface?: boolean } | undefined)?.interface,
+    );
+    if (!specs.length) return this.definite(syms);
+    const ids = syms
+      .filter((symbol) => !specs.includes(symbol))
+      .map((symbol) => symbol.id);
+    for (const spec of specs) {
+      const dispatched = this.dispatch([spec], spec.name);
+      if (!dispatched.ids.length) return UNRESOLVED;
+      ids.push(...dispatched.ids);
+    }
+    return { ids, definite: false, limit: DISPATCH_LIMIT };
   }
 
   /** `x.name` where x has the given type. */
@@ -1020,10 +1184,46 @@ class GoResolver {
     }
   }
 
-  /** A call through an interface value: the interface method or any structural implementer. */
+  /**
+   * A call through an interface value: the interface method plus every
+   * implementation. `specs` are alternative declarations of the one method (merged
+   * from several embedded interfaces, or build variants). Unresolved when no
+   * implementation is known, or when any part of the set cannot be established.
+   */
   private dispatch(specs: GraphSymbol[], name: string): Decision {
-    const targets: GraphSymbol[] = [...specs];
-    let implementations = 0;
+    const targets = this.implementations(specs, name, new Set());
+    if (
+      !targets ||
+      !targets.some(
+        (symbol) =>
+          !(symbol.data as { interface?: boolean } | undefined)?.interface,
+      )
+    )
+      return UNRESOLVED;
+    return {
+      ids: [...specs, ...targets].map((symbol) => symbol.id),
+      definite: false,
+      limit: DISPATCH_LIMIT,
+    };
+  }
+
+  /**
+   * Methods that may run for a call of `specs`. Implementations of an interface are
+   * known only when its whole method set is (see `complete`); any one known
+   * declaration's implementers are a superset of the merged interface's. An
+   * implementer whose method is itself an embedded interface's method expands that
+   * in turn; if it is already being expanded, the enclosing set covers it.
+   */
+  private implementations(
+    specs: GraphSymbol[],
+    name: string,
+    expanding: Set<string>,
+  ): GraphSymbol[] | undefined {
+    if (specs.some((spec) => expanding.has(spec.id))) return [];
+    if (expanding.size > MAX_DEPTH) return undefined;
+    const inner = new Set([...expanding, ...specs.map((spec) => spec.id)]);
+    const out: GraphSymbol[] = [...specs];
+    let known = false;
     for (const spec of specs) {
       const owner = (spec.data as { owner?: string } | undefined)?.owner;
       const pkg = this.pkgOf(spec);
@@ -1033,20 +1233,24 @@ class GoResolver {
               symbol.kind === "interface" && symbol.file === spec.file,
           )
         : undefined;
-      for (const type of iface ? (this.implementers.get(iface.id) ?? []) : []) {
+      if (!iface || !this.complete.has(iface.id)) continue;
+      known = true;
+      for (const type of this.implementers.get(iface.id) ?? []) {
         const found = this.selectName([type], name, undefined, pkg?.key);
-        if (found.kind === "found") {
-          targets.push(...found.syms);
-          implementations++;
+        if (found.kind !== "found") return undefined;
+        const nested = found.syms.filter(
+          (method) =>
+            (method.data as { interface?: boolean } | undefined)?.interface,
+        );
+        out.push(...found.syms.filter((method) => !nested.includes(method)));
+        if (nested.length) {
+          const deeper = this.implementations(nested, name, inner);
+          if (!deeper) return undefined;
+          out.push(...deeper);
         }
       }
     }
-    if (!implementations) return UNRESOLVED;
-    return {
-      ids: targets.map((symbol) => symbol.id),
-      definite: false,
-      limit: DISPATCH_LIMIT,
-    };
+    return known ? unique(out) : undefined;
   }
 
   /** Unknown receiver: every concrete method of that name in packages reachable from the caller. */

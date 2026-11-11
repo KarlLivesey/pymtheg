@@ -5,10 +5,14 @@ import type { ContextFile } from "../../types.js";
 export interface GoModuleRoot {
   directory: string;
   path: string;
+  /** A version-specific `replace` applies only to that version. */
+  version?: string;
 }
-/** A go.mod in the snapshot, with the local `replace` directives it declares. */
+/** A go.mod in the snapshot, with its requirements and local `replace` directives. */
 export interface GoModule extends GoModuleRoot {
   replacements: GoModuleRoot[];
+  /** `require` path -> version, as written. */
+  requires: Map<string, string>;
 }
 /** A go.work in the snapshot: its `use` directories and its local replacements. */
 export interface GoWorkspace {
@@ -68,13 +72,16 @@ function replacement(
   args: string,
 ): GoModuleRoot | undefined {
   const [from, to] = args.split("=>").map((part) => part.trim());
-  const fromPath = unquote(from?.split(/\s+/)[0] ?? "");
+  const fromParts = from?.split(/\s+/) ?? [];
+  const fromPath = unquote(fromParts[0] ?? "");
+  const version = fromParts[1];
   const toPath = unquote(to?.split(/\s+/)[0] ?? "");
   if (!fromPath || !(toPath.startsWith("./") || toPath.startsWith("../")))
     return undefined;
   const target = joinDirectory(directory, toPath);
-  return target === undefined
-    ? undefined
+  if (target === undefined) return undefined;
+  return version
+    ? { directory: target, path: fromPath, version }
     : { directory: target, path: fromPath };
 }
 
@@ -87,12 +94,16 @@ export function readLayout(
     const directory = directoryOf(file.path);
     const name = posix.basename(file.path);
     const replacements: GoModuleRoot[] = [];
+    const requires = new Map<string, string>();
     const uses: string[] = [];
     let path: string | undefined;
     for (const { verb, args } of directives(file.text)) {
       if (verb === "module" && name === "go.mod")
         path = unquote(args.split(/\s+/)[0] ?? "") || undefined;
-      else if (verb === "replace") {
+      else if (verb === "require") {
+        const [path, version] = args.split(/\s+/);
+        if (path && version) requires.set(unquote(path), version);
+      } else if (verb === "replace") {
         const item = replacement(directory, args);
         if (item) replacements.push(item);
       } else if (verb === "use" && name === "go.work") {
@@ -101,7 +112,7 @@ export function readLayout(
       }
     }
     if (name === "go.mod" && path !== undefined)
-      layout.modules.push({ directory, path, replacements });
+      layout.modules.push({ directory, path, replacements, requires });
     if (name === "go.work")
       layout.workspaces.push({ directory, uses, replacements });
   }
@@ -161,12 +172,25 @@ export function directoryOfImport(
         workspace.uses.includes(module.directory),
       )
     : [own];
+  // A versioned replace applies only when that exact version is the one required.
+  // The captured go.mod files are the only evidence of the selected version; when
+  // they do not establish it, the replacement is not applied (Go would fetch
+  // another version from the module cache, outside the project).
+  const selected = (item: GoModuleRoot, modules: GoModule[]) =>
+    item.version === undefined ||
+    (modules.some((main) => main.requires.get(item.path) === item.version) &&
+      modules.every(
+        (main) =>
+          !main.requires.has(item.path) ||
+          main.requires.get(item.path) === item.version,
+      ));
   const replaced = new Map<string, GoModuleRoot>();
   for (const main of mains)
     for (const item of main.replacements)
-      if (!replaced.has(item.path)) replaced.set(item.path, item);
+      if (!replaced.has(item.path) && selected(item, [main]))
+        replaced.set(item.path, item);
   for (const item of workspace?.replacements ?? [])
-    replaced.set(item.path, item);
+    if (selected(item, mains)) replaced.set(item.path, item);
   const matches = (path: string) =>
     importPath === path || importPath.startsWith(`${path}/`);
   let best: { root: GoModuleRoot; main?: GoModule } | undefined;

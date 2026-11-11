@@ -10,7 +10,7 @@ import type {
 import { GoExtractor } from "./extract.js";
 import { importPathOf, readLayout } from "./gomod.js";
 import type { FileFact } from "./model.js";
-import { overflowingLinks, resolveGo } from "./resolve.js";
+import { linkNotes, resolveGo } from "./resolve.js";
 
 const ID = "go";
 /** Key of the one package symbol hosted per directory package (added by analyze). */
@@ -123,36 +123,46 @@ function analyze({
         },
       });
     }
+    // Notes written by a previous analyze are recomputed from scratch.
     const links = file.result.links.map((link) => {
       const data = link.data as { [key: string]: Json } | undefined;
-      if (!data || !("overflow" in data)) return link;
-      const { overflow: _previous, ...rest } = data;
-      void _previous;
+      if (!data || !("overflow" in data || "builtin" in data)) return link;
+      const { overflow: _overflow, builtin: _builtin, ...rest } = data;
+      void _overflow;
+      void _builtin;
       return { ...link, data: rest };
     });
     next.set(file.path, { ...file.result, symbols, links });
   }
-  // Candidate sets over their cap are left unresolved; record why on the link itself.
-  const overflow = overflowingLinks(
+  // Over-cap candidate sets (left unresolved) and real builtin calls are only known
+  // project-wide; record them on the links themselves.
+  const notes = linkNotes(
     ID,
     files.map((file) =>
       next.has(file.path) ? { ...file, result: next.get(file.path)! } : file,
     ),
     contextFiles,
   );
-  for (const [path, group] of overflow) {
+  for (const [path, group] of notes) {
     const result = next.get(path)!;
     result.links = result.links.map((link, index) => {
       const note = group.get(index);
-      return note
-        ? {
-            ...link,
-            data: {
-              ...((link.data as { [key: string]: Json } | undefined) ?? {}),
-              overflow: { candidates: note.candidates, cap: note.cap },
-            },
-          }
-        : link;
+      if (!note) return link;
+      return {
+        ...link,
+        data: {
+          ...((link.data as { [key: string]: Json } | undefined) ?? {}),
+          ...(note.builtin ? { builtin: true } : {}),
+          ...(note.overflow
+            ? {
+                overflow: {
+                  candidates: note.overflow.candidates,
+                  cap: note.overflow.cap,
+                },
+              }
+            : {}),
+        },
+      };
     });
   }
   const output: AnalyzedFile[] = [];
@@ -166,7 +176,7 @@ function analyze({
 
 const go: LanguageModule = {
   id: ID,
-  version: "3",
+  version: "5",
   extensions: [".go"],
   contextFiles: ["go.mod", "go.work"],
   parse,
