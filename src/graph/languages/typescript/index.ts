@@ -9,8 +9,16 @@ import type {
   LinkResolution,
   ParseResult,
 } from "../../types.js";
-import { extractFile, type TargetFact } from "./extract.js";
-import { CONTEXT_PATTERNS, projectModel, toVirtual } from "./project.js";
+import { CheckerLimit, extractFile, type TargetFact } from "./extract.js";
+
+/** Program rebuilds per file after checker stack overflows before giving up. */
+const MAX_LIMIT_RETRIES = 25;
+import {
+  CONTEXT_PATTERNS,
+  fromVirtual,
+  projectModel,
+  toVirtual,
+} from "./project.js";
 
 /**
  * TypeScript and JavaScript through the TypeScript compiler. Analyze-only: one
@@ -19,7 +27,7 @@ import { CONTEXT_PATTERNS, projectModel, toVirtual } from "./project.js";
  * facts; resolve maps those facts to symbol IDs. See docs/changes/W2-D.md.
  */
 // Bump the leading number whenever extraction or resolution semantics change.
-const MODULE_VERSION = `3+typescript-${ts.version}`;
+const MODULE_VERSION = `4+typescript-${ts.version}`;
 
 /** Observation counters for tests (programs built, files extracted). Not a correctness input. */
 export const statistics = { programs: 0, extracted: 0, reused: 0 };
@@ -153,16 +161,30 @@ const module: LanguageModule = {
     const tiedResults = new Map<string, ParseResult[]>();
     for (const group of model.groups) {
       if (!group.roots.length) continue;
-      const program = ts.createProgram({
-        rootNames: group.roots,
-        options: group.options,
-        host: model.host(group),
-      });
-      statistics.programs++;
-      const checker = program.getTypeChecker();
+      // The host caches parsed files, so rebuilding a program after a
+      // checker overflow (see CheckerLimit) re-binds but never re-parses.
+      const host = model.host(group);
+      const build = () => {
+        statistics.programs++;
+        const program = ts.createProgram({
+          rootNames: group.roots,
+          options: group.options,
+          host,
+        });
+        return { program, checker: program.getTypeChecker() };
+      };
+      let { program, checker } = build();
+      const resolveModule = (specifier: string, from: string) => {
+        const resolved = ts.resolveModuleName(
+          specifier,
+          toVirtual(from),
+          group.options,
+          host,
+        ).resolvedModule?.resolvedFileName;
+        return resolved === undefined ? undefined : fromVirtual(resolved);
+      };
       for (const root of group.roots) {
         const path = root.slice(1);
-        const source = program.getSourceFile(toVirtual(path));
         const data: { [key: string]: Json } = {
           analyzer: MODULE_VERSION,
           project: group.config,
@@ -170,30 +192,59 @@ const module: LanguageModule = {
         if (group.notes.length) data.configNotes = [...group.notes];
         // Locally bound module-system names the compiler saw renamed (rename.ts).
         const renamed = model.renames.get(path);
-        if (renamed?.length)
-          data.renamedForCompiler = renamed.map((item) => item.original);
+        if (renamed) {
+          data.renamedForCompiler = [...renamed.renamed];
+          if (renamed.uncertain.length)
+            data.dynamicScopeOccurrences = renamed.uncertain.length;
+        }
         const diagnostics: Diagnostic[] = group.limitations.map((message) => ({
           message,
         }));
-        let result: ParseResult;
-        try {
-          if (!source) throw Error("The compiler did not load this source");
-          result = extractFile(
-            source,
-            checker,
-            program,
-            captured,
-            diagnostics,
-            data,
-            // Settings from an uncaptured base are missing: see extract.ts.
-            group.limitations.length > 0,
-            model.renames.get(path) ?? [],
-          );
-          statistics.extracted++;
-        } catch (error) {
-          result = failed(
-            `TypeScript extraction failed: ${error instanceof Error ? error.message : String(error)}`,
-          );
+        if (renamed?.uncertain.length)
+          diagnostics.push({
+            message: `${renamed.uncertain.length} occurrence(s) of require/module/exports depend on run-time scope (with, direct eval or reassignment); their links are unresolved (dynamic-scope)`,
+          });
+        let result: ParseResult | undefined;
+        const skip = new Set<string>();
+        for (let attempt = 0; !result; attempt++) {
+          try {
+            const source = program.getSourceFile(toVirtual(path));
+            if (!source)
+              throw Error(
+                model.parseFailures.get(path) ??
+                  "The compiler did not load this source",
+              );
+            result = extractFile(
+              source,
+              checker,
+              program,
+              captured,
+              diagnostics.map((item) => ({ ...item })),
+              { ...data },
+              // Settings from an uncaptured base are missing: see extract.ts.
+              group.limitations.length > 0,
+              {
+                fresh: model.fresh,
+                ...(renamed ? { renamed } : {}),
+                resolveModule,
+                skip,
+              },
+            );
+            statistics.extracted++;
+          } catch (error) {
+            if (error instanceof CheckerLimit && attempt < MAX_LIMIT_RETRIES) {
+              // The checker's state is untrustworthy after an overflow:
+              // rebuild it, and answer that node without asking next time.
+              skip.add(error.key);
+              ({ program, checker } = build());
+              continue;
+            }
+            result = failed(
+              error instanceof CheckerLimit
+                ? `The TypeScript checker exhausted its stack more than ${MAX_LIMIT_RETRIES} times in this file`
+                : `TypeScript extraction failed: ${error instanceof Error ? error.message : String(error)}`,
+            );
+          }
         }
         if (model.ties.has(path))
           tiedResults.set(path, [...(tiedResults.get(path) ?? []), result]);

@@ -1986,3 +1986,400 @@ for (const [label, text] of [
       },
     );
   });
+
+// Round 6: exact scope, dynamic scope, createRequire origin, spelling,
+// cross-file names, containment and labels.
+const freshFor = async (files) => {
+  const { freshNames } = await import(
+    "../dist/graph/languages/typescript/rename.js"
+  );
+  return freshNames(Object.values(files).map(String));
+};
+/** No compiler-only name may appear in any stored fact, identity or diagnostic. */
+async function assertNoFreshNames(graph, files) {
+  const fresh = await freshFor(files);
+  const names = [
+    ...Object.values(fresh.local),
+    ...Object.values(fresh.uncertain),
+  ];
+  const stored =
+    JSON.stringify(graph.store.files().map((file) => file.result)) +
+    JSON.stringify(graph.store.findSymbols()) +
+    JSON.stringify(graph.store.links());
+  for (const name of names)
+    assert.ok(!stored.includes(name), `fresh name ${name} leaked`);
+}
+const dep6 = "export function real() {}\nexport class K { run() {} }\n";
+const linksInto = (graph, file, target = "dep.ts") =>
+  graph.store
+    .links()
+    .filter(
+      (l) =>
+        l.file === file &&
+        [l.targetId, ...l.candidates.map((c) => c.id)].some(
+          (id) =>
+            graph.store.findSymbols().find((s) => s.id === id)?.file === target,
+        ),
+    )
+    .map((l) => `${l.kind} ${l.targetName}`)
+    .sort();
+
+test("exact scope: Annex B, catch clauses, static blocks and the CommonJS wrapper", async () => {
+  const files = {
+    "dep.ts": dep6,
+    // Sloppy function code: the block function is hoisted into g (Annex B).
+    "annexb.js": [
+      "function g(c) {",
+      "  if (c) { function require(n) { return { real() {} }; } }",
+      '  const m = require("./dep");',
+      "  return m.real();",
+      "}",
+      "",
+    ].join("\n"),
+    // CommonJS top level: Annex B never hoists a wrapper parameter name, so
+    // after the block `require` is Node's loader (checked against Node).
+    "cjstop.js": [
+      "if (true) { function require(n) { return {}; } }",
+      'const m = require("./dep");',
+      "m.real();",
+      "",
+    ].join("\n"),
+    // A catch binding is scoped to its block only.
+    "catch.js": [
+      "export {};",
+      "try {} catch (require) {}",
+      'const d = require("./dep");',
+      "d.real();",
+      "",
+    ].join("\n"),
+    "other.js": "function require(n) { return 1; }\n",
+    // A class static block is its own var scope.
+    "static.js": [
+      "class S { static { var require = 1; } }",
+      'const m = require("./dep");',
+      "m.real();",
+      "",
+    ].join("\n"),
+  };
+  await project(files, async (graph, report) => {
+    clean(report);
+    assert.deepEqual(linksInto(graph, "annexb.js"), []);
+    for (const file of ["cjstop.js", "catch.js", "static.js"]) {
+      const out = linksInto(graph, file);
+      assert.ok(out.includes("imports ./dep"), `${file}: ${out}`);
+      assert.ok(
+        out.some((l) => /real$/.test(l)),
+        `${file}: ${out}`,
+      );
+    }
+    assert.deepEqual(linksInto(graph, "catch.js", "other.js"), []);
+    await assertNoFreshNames(graph, files);
+  });
+});
+
+test("direct eval and with make require uncertain; indirect eval does not", async () => {
+  const files = {
+    "dep.ts": dep6,
+    "direct.js": [
+      "function run() {",
+      '  eval("var require = () => ({})");',
+      '  const m = require("./dep");',
+      "  m.real();",
+      "}",
+      "",
+    ].join("\n"),
+    "within.js": [
+      "with ({ require: () => ({}) }) {",
+      '  const w = require("./dep");',
+      "  w.real();",
+      "}",
+      "",
+    ].join("\n"),
+    "indirect.js": [
+      '(0, eval)("var require = () => ({})");',
+      'globalThis.eval("var require = 1");',
+      'new Function("var require = 1")();',
+      'const m = require("./dep");',
+      "m.real();",
+      "",
+    ].join("\n"),
+  };
+  await project(files, async (graph, report) => {
+    assert.deepEqual(report.failed, []);
+    for (const file of ["direct.js", "within.js"]) {
+      assert.deepEqual(linksInto(graph, file), [], file);
+      const result = graph.store.getFile(file).result;
+      assert.equal(result.status, "partial", file);
+      assert.match(
+        result.diagnostics.map((d) => d.message).join("\n"),
+        /run-time scope/,
+      );
+      const imported = graph.link(file, '"./dep"', "imports");
+      assert.equal(imported.resolution, "unresolved");
+      assert.equal(imported.data.reason, "dynamic-scope");
+      assert.deepEqual(imported.data.targets, [
+        { file: "dep.ts", key: "module@0" },
+      ]);
+      const member = graph.store
+        .links()
+        .find(
+          (l) =>
+            l.file === file && l.kind === "calls" && /real$/.test(l.targetName),
+        );
+      assert.equal(member.data.reason, "dynamic-scope", file);
+      assert.equal(
+        graph.link(file, "require", "calls").data.reason,
+        "dynamic-scope",
+      );
+    }
+    assert.equal(graph.store.getFile("indirect.js").result.status, "clean");
+    assert.ok(linksInto(graph, "indirect.js").includes("imports ./dep"));
+    await assertNoFreshNames(graph, files);
+  });
+});
+
+test("createRequire is recognised by origin, not spelling", async () => {
+  const files = {
+    "dep.ts": dep6,
+    "spoof.js": [
+      "export {};",
+      "function createRequire() { return (n) => ({ real() {} }); }",
+      "const require = createRequire();",
+      'const m = require("./dep");',
+      "m.real();",
+      "",
+    ].join("\n"),
+    "renamed.mjs": [
+      'import { createRequire as cr } from "node:module";',
+      "const createRequire = () => () => ({});",
+      "const require = createRequire();",
+      'require("./dep").real();',
+      "",
+    ].join("\n"),
+    "namespace.mjs": [
+      'import * as nodeModule from "node:module";',
+      "const require = nodeModule.createRequire(import.meta.url);",
+      'const m = require("./dep");',
+      "m.real();",
+      "",
+    ].join("\n"),
+    "commonjs.js": [
+      'const { createRequire } = require("module");',
+      "function load() {",
+      "  const require = createRequire(__filename);",
+      '  const m = require("./dep");',
+      "  return m.real();",
+      "}",
+      "",
+    ].join("\n"),
+  };
+  await project(files, async (graph) => {
+    assert.deepEqual(linksInto(graph, "spoof.js"), []);
+    assert.deepEqual(linksInto(graph, "renamed.mjs"), []);
+    for (const file of ["namespace.mjs", "commonjs.js"]) {
+      const out = linksInto(graph, file);
+      assert.ok(
+        out.includes("imports ./dep") && out.includes("calls m.real"),
+        `${file}: ${out}`,
+      );
+    }
+    await assertNoFreshNames(graph, files);
+  });
+});
+
+test("identifier spelling: decoded names, escapes fail the file, existing look-alikes do not collide", async () => {
+  const files = {
+    "plain.js":
+      'export {};\nfunction require(n) { return {}; }\nrequire("x");\n',
+    "escaped.js":
+      'export {};\nfunction require(n) { return {}; }\n\\u{0072}equire("x");\n',
+    "realEscape.js": '\\u{0072}equire("./plain");\n',
+    "lookalike.js":
+      'export {};\nconst requirf = 1;\nconst requirg = 2;\nfunction require(n) { return requirf + requirg; }\nrequire("x");\n',
+  };
+  await project(files, async (graph, report) => {
+    assert.equal(
+      graph.symbol("plain.js", "require", "function").name,
+      "require",
+    );
+    assert.equal(
+      graph.target(graph.link("plain.js", "require", "calls")),
+      "plain.js#require",
+    );
+    assert.deepEqual(report.failed, ["escaped.js"]);
+    assert.match(
+      graph.store.getFile("escaped.js").result.diagnostics[0].message,
+      /escape sequence/,
+    );
+    // An escaped *real* require needs no renaming: the file is fine.
+    assert.equal(graph.store.getFile("realEscape.js").result.status, "clean");
+    // The existing requirf/requirg are ordinary constants; the call still binds locally.
+    graph.symbol("lookalike.js", "requirf", "constant");
+    graph.symbol("lookalike.js", "requirg", "constant");
+    assert.equal(
+      graph.target(graph.link("lookalike.js", "require", "calls")),
+      "lookalike.js#require",
+    );
+    await assertNoFreshNames(graph, files);
+  });
+});
+
+test("renamed names agree across files and never bind to a look-alike export", async () => {
+  const files = {
+    "e.js":
+      "export function require(n) { return 1; }\nexport const requirf = 2;\n",
+    "imp.js": 'import { require } from "./e.js";\nrequire("x");\n',
+    "alias.js": 'import { require as r } from "./e.js";\nr("x");\n',
+    "loader.js":
+      "function require(n) { return 1; }\nexport { require as loader };\n",
+    "useLoader.js": 'import { loader } from "./loader.js";\nloader("x");\n',
+  };
+  await project(files, async (graph, report) => {
+    clean(report);
+    assert.equal(
+      graph.target(graph.link("imp.js", "require", "imports")),
+      "e.js#require",
+    );
+    assert.equal(
+      graph.target(graph.link("imp.js", "require", "calls")),
+      "e.js#require",
+    );
+    assert.equal(
+      graph.target(graph.link("alias.js", "require as r", "imports")),
+      "e.js#require",
+    );
+    assert.equal(
+      graph.target(graph.link("alias.js", "r", "calls")),
+      "e.js#require",
+    );
+    assert.equal(
+      graph.target(graph.link("useLoader.js", "loader", "calls")),
+      "loader.js#require",
+    );
+    await assertNoFreshNames(graph, files);
+  });
+});
+
+test("checker stack limits: warm-up makes a deep chain clean; an overflow stays contained", async () => {
+  // Return-type chains: f(i+1) returns f(i)(). Declared in this order, the
+  // source-order warm-up computes each return type on top of the previous one.
+  const forward = [
+    "export class Box { go() { return 1; } }",
+    "export function f0() { return new Box(); }",
+    ...Array.from(
+      { length: 1000 },
+      (_, i) => `export function f${i + 1}() { return f${i}(); }`,
+    ),
+    "f1000().go();",
+    "",
+  ].join("\n");
+  // Reversed, the first warm-up step already recurses through the whole chain.
+  const reversed = [
+    "export class Crate { go() { return 1; } }",
+    "export function ok() {}",
+    "ok();",
+    "g0().go();",
+    ...Array.from(
+      { length: 10000 },
+      (_, i) => `function g${i}() { return g${i + 1}(); }`,
+    ),
+    "function g10000() { return new Crate(); }",
+    "",
+  ].join("\n");
+  await project(
+    {
+      "forward.ts": forward,
+      "deep.ts": reversed,
+      "other.ts": "export function x() {}\nx();\n",
+    },
+    async (graph, report) => {
+      assert.deepEqual(report.failed, []);
+      // Needs the source-order warm-up: without it this lookup overflows.
+      assert.equal(graph.store.getFile("forward.ts").result.status, "clean");
+      assert.equal(
+        graph.target(graph.link("forward.ts", "go", "calls")),
+        "forward.ts#Box.go",
+      );
+      // Still overflows: that one link is compiler-limit, the file partial, the rest intact.
+      const deep = graph.store.getFile("deep.ts").result;
+      assert.equal(deep.status, "partial");
+      assert.match(
+        deep.diagnostics.map((d) => d.message).join("\n"),
+        /exhausted its stack/,
+      );
+      const go = graph.link("deep.ts", "go", "calls");
+      assert.equal(go.resolution, "unresolved");
+      assert.equal(go.data.reason, "compiler-limit");
+      assert.equal(
+        graph.target(graph.link("deep.ts", "ok", "calls")),
+        "deep.ts#ok",
+      );
+      assert.equal(
+        graph.target(graph.link("other.ts", "x", "calls")),
+        "other.ts#x",
+      );
+    },
+  );
+});
+
+test("a parser stack overflow fails only that file", async () => {
+  const nested = `export const x = ${"(".repeat(10000)}1${")".repeat(10000)};\n`;
+  await project(
+    { "nested.ts": nested, "fine.ts": "export function f() {}\nf();\n" },
+    async (graph, report) => {
+      assert.deepEqual(report.analysisErrors, []);
+      assert.deepEqual(report.failed, ["nested.ts"]);
+      assert.match(
+        graph.store.getFile("nested.ts").result.diagnostics[0].message,
+        /parser failed/,
+      );
+      assert.equal(
+        graph.target(graph.link("fine.ts", "f", "calls")),
+        "fine.ts#f",
+      );
+    },
+  );
+});
+
+test("requiring an existing script file links to it and labels its bindings not-a-module", async () => {
+  await project(
+    {
+      "script.js": "var counter = 0;\ncounter++;\n",
+      "use.js": 'const s = require("./script");\nrequire("./missing");\n',
+    },
+    async (graph) => {
+      const edge = graph.link("use.js", '"./script"', "imports");
+      assert.equal(graph.target(edge), "script.js#script.js");
+      assert.equal(edge.data.notAModule, true);
+      assert.equal(
+        graph.link("use.js", "s", "imports").data.reason,
+        "not-a-module",
+      );
+      assert.equal(
+        graph.link("use.js", '"./missing"', "imports").data.reason,
+        "missing-module",
+      );
+    },
+  );
+});
+
+for (const [key, value] of [
+  ["include", 42],
+  ["files", "a.ts"],
+  ["exclude", { x: 1 }],
+])
+  test(`a config with a non-array "${key}" is an unreadable selection`, async () => {
+    await project(
+      {
+        "tsconfig.json": JSON.stringify({ [key]: value }),
+        "a.ts": "export const a = 1;\n",
+      },
+      async (graph, report) => {
+        assert.deepEqual(report.failed, ["a.ts"]);
+        assert.match(
+          graph.store.getFile("a.ts").result.diagnostics[0].message,
+          new RegExp(`invalid "${key}"`),
+        );
+      },
+    );
+  });

@@ -4,7 +4,12 @@ import { dirname, posix } from "node:path";
 import ts from "typescript";
 import { compare, matchesPattern } from "../../index.js";
 import type { ContextFile, GraphFile } from "../../types.js";
-import { renameShadowed, type Rename } from "./rename.js";
+import {
+  freshNames,
+  renameShadowed,
+  type FreshNames,
+  type Renamed,
+} from "./rename.js";
 
 /**
  * Project model for the snapshot: which config owns each source, with which
@@ -69,7 +74,11 @@ export interface ProjectModel {
   /** Files failed by a broken config or package manifest, with the cause. */
   failures: Map<string, string>;
   /** Same-length renames applied to each JS file's compiler text. */
-  renames: Map<string, Rename[]>;
+  renames: Map<string, Renamed>;
+  /** The program-wide fresh names used by every rename. */
+  fresh: FreshNames;
+  /** Files the compiler's parser could not parse, with the cause. */
+  parseFailures: Map<string, string>;
   host: (group: ProjectGroup) => ts.CompilerHost;
 }
 
@@ -241,16 +250,6 @@ export function projectModel(
   contexts: readonly ContextFile[],
 ): ProjectModel {
   const fs = new VirtualFileSystem();
-  // JS files reach the compiler with locally bound require/module/exports
-  // renamed (same length), so it never misreads them as CommonJS.
-  const renames = new Map<string, Rename[]>();
-  const renameErrors = new Map<string, string>();
-  for (const file of files) {
-    const renamed = renameShadowed(file.path, file.text);
-    if (renamed.error) renameErrors.set(file.path, renamed.error);
-    if (renamed.renames.length) renames.set(file.path, renamed.renames);
-    fs.add(file.path, renamed.text);
-  }
   for (const file of contexts) fs.add(file.path, file.text);
   const manifests: { path: string; json: Record<string, unknown> }[] = [];
   /** Package directory -> why its manifest is unreadable. */
@@ -282,6 +281,38 @@ export function projectModel(
         json: json as Record<string, unknown>,
       });
     }
+  // JS files reach the compiler with locally bound require/module/exports
+  // renamed (same length), so it never misreads them as CommonJS. Fresh names
+  // are chosen once for the whole program, from every captured text.
+  const fresh = freshNames(files.map((file) => file.text));
+  const renames = new Map<string, Renamed>();
+  const renameErrors = new Map<string, string>();
+  const typeOf = (path: string) => {
+    const manifest = manifests
+      .filter((m) => underDirectory(path, posix.dirname(m.path)))
+      .sort(
+        (a, b) =>
+          depthOf(posix.dirname(b.path)) - depthOf(posix.dirname(a.path)),
+      )[0];
+    return manifest?.json.type;
+  };
+  for (const file of files) {
+    const esm =
+      file.path.endsWith(".mjs") ||
+      ((file.path.endsWith(".js") || file.path.endsWith(".jsx")) &&
+        typeOf(file.path) === "module")
+        ? true
+        : undefined;
+    const renamed = renameShadowed(
+      file.path,
+      file.text,
+      fresh,
+      esm ? { esm } : {},
+    );
+    if (renamed.error) renameErrors.set(file.path, renamed.error);
+    else if (renamed.renamed.length) renames.set(file.path, renamed);
+    fs.add(file.path, renamed.error ? file.text : renamed.text);
+  }
   for (const workspace of workspaces(manifests))
     for (const [name, directory] of workspace.packages)
       fs.links.set(
@@ -373,8 +404,22 @@ export function projectModel(
     const object = (
       raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {}
     ) as Record<string, unknown>;
-    /** Malformed JSON or a non-object root: its files/include cannot be read. */
-    const selectionUnreadable = !!syntax || object !== raw;
+    // `files`, `include` and `exclude` must be arrays of strings.
+    const badSelection = (["files", "include", "exclude"] as const).find(
+      (key) =>
+        key in object &&
+        !(
+          Array.isArray(object[key]) &&
+          (object[key] as unknown[]).every((item) => typeof item === "string")
+        ),
+    );
+    if (badSelection)
+      fail(
+        `TypeScript config ${config.path} has an invalid "${badSelection}" (expected an array of strings)`,
+      );
+    /** Malformed JSON, a non-object root or an invalid selection: its own file selection cannot be read. */
+    const selectionUnreadable =
+      !!syntax || object !== raw || badSelection !== undefined;
     group.explicitSelection = "files" in object || "include" in object;
     // Follow the extends chain ourselves first so missing bases are classified, not ignored.
     const pending: [string, unknown][] = [[config.path, object.extends]];
@@ -597,6 +642,7 @@ export function projectModel(
     } else group.roots.push(toVirtual(file.path));
   }
   if (inferred) groups.push(inferred);
+  const parseFailures = new Map<string, string>();
   const host = (group: ProjectGroup): ts.CompilerHost => {
     const sources = new Map<string, ts.SourceFile>();
     return {
@@ -607,7 +653,17 @@ export function projectModel(
         if (text === undefined) return undefined;
         let file = sources.get(real);
         if (!file) {
-          file = ts.createSourceFile(real, text, languageVersion, true);
+          // Each file parses in its own guard: a parser stack overflow (e.g.
+          // thousands of nested parentheses) fails that file only.
+          try {
+            file = ts.createSourceFile(real, text, languageVersion, true);
+          } catch (error) {
+            parseFailures.set(
+              real.slice(1),
+              `The TypeScript parser failed on this file: ${error instanceof Error ? error.message : String(error)}`,
+            );
+            return undefined;
+          }
           sources.set(real, file);
         }
         return file;
@@ -636,5 +692,5 @@ export function projectModel(
       realpath: (name) => fs.real(name),
     };
   };
-  return { groups, owner, ties, failures, renames, host };
+  return { groups, owner, ties, failures, renames, fresh, parseFailures, host };
 }

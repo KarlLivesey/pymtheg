@@ -94,7 +94,7 @@ link across packages.
 **Unchanged snapshot reuse.** When `changedFiles` and `changedContextFiles`
 are both empty and every stored result was produced by this module version
 (which embeds the compiler version; the leading number is bumped whenever
-extraction or resolution semantics change, and is now 3), the stored facts are
+extraction or resolution semantics change, and is now 4), the stored facts are
 returned as they are:
 no program is built and nothing is parsed. They are the complete analysis of the
 identical snapshot, and `resolve` re-derives every target from them. Any source,
@@ -178,64 +178,114 @@ and therefore gives candidates for a merged name.
 
 **Locally bound `require`, `module` and `exports` (same-length rename).** The
 compiler treats a call to anything named `require` in a JavaScript file as a
-module import, and `module.exports = …`/`exports.x = …` as CommonJS exports, by
-name alone, even when the file declares its own `require`, `module` or
-`exports`. Its checker then types `const m = require("./dep")` as the module
-`./dep`, and every answer derived from `m` points there. Earlier rounds tried to
-chase such values afterwards; that cannot be made sound, because JavaScript has
-too many ways to move a value. The fix is at the source instead (`rename.ts`):
+module import, and `module.exports = …`/`exports.x = …` as CommonJS exports,
+by name alone, even where the file declares its own `require`, `module` or
+`exports`. The fix is at the source (`rename.ts`): before a JavaScript file
+reaches the compiler, a syntactic scope analysis of that file classifies every
+occurrence of the three names, working on the decoded identifier and its full
+token span:
 
-- Before a JavaScript file reaches the compiler's virtual host, a purely
-  syntactic scope analysis of that file finds every identifier occurrence
-  **bound to a local declaration** of `require`, `module` or `exports`. Bindings
-  come from `var`/`let`/`const` (including destructuring), function and class
-  declarations, parameters, import bindings, catch clauses and the names of
-  function/class expressions. Scopes follow JavaScript rules: `var` and
-  parameters per function, `let`/`const`/`class` per block.
-- Exactly those occurrences are replaced, in the text handed to the compiler,
-  by a fresh identifier of the **same length** that does not occur in the file
-  (`requirf`, `modulf`, `exportf`, …; another one if taken). Offsets, lines and
-  every other character are unchanged, so every position, symbol range and the
-  conformance kit's position checks stay valid. A `require` shadowed only inside
-  one function is renamed only there. Occurrences that mean the real CommonJS
-  loader are left alone.
-- The compiler then sees an ordinary function call. It types `m` as that
-  function's return value, so every downstream answer is correct with no
-  tracking: getters, arrays, destructuring and destructuring assignment, `||=`
-  and `??=`, spreads, default parameters, class fields, returns, cycles, chains
-  of any length, and exports and re-exports into other files.
-- Facts for a renamed file report the **original** names. Symbol names and
-  identities, link target names and diagnostics are mapped back, and the file
-  records `data.renamedForCompiler` (for example `["require"]`).
-- `const require = createRequire(import.meta.url)` (or `module.createRequire`)
-  is the **real** loader at run time, so it is not renamed, and `require("./x")`
-  through it is a normal CommonJS import.
-- TypeScript files are untouched: the compiler applies CommonJS semantics to
-  `require` only in JavaScript files. A TypeScript-only project pays nothing,
-  because the scan runs only on JS files that contain one of the three names.
+| Classification | Meaning | Compiler text |
+|---|---|---|
+| `real` | The module system's binding: Node's CommonJS wrapper parameter; a free name in an ES-module-syntax file (bundler semantics); or `const require = createRequire(…)` whose `createRequire` **provably comes from Node's `module`/`node:module`** (an ES named, namespace or default import of that specifier, or a real unshadowed `require("module")`), itself unshadowed | unchanged |
+| `local` | Bound to a declaration of the file's own | renamed to a program-wide fresh name of the same length |
+| `uncertain` | Decided only at run time | renamed to a second fresh name that is never declared, so the compiler infers nothing through it |
 
-With the rename in place, every `require("literal")` that reaches the compiler
-in a JavaScript file is the loader, so CommonJS detection is purely syntactic.
-The earlier provenance tracker (`provenance.ts`) and its `shadowed-require`
-reason are deleted.
+Fresh names are chosen once per program and occur in **no** captured file, so a
+renamed `import { require }` and the exporter's renamed `export function
+require` always agree, and nothing can collide with an existing `requirf`. ES
+import/export specifier *names* `require`/`module`/`exports` are spelled with
+the fresh name in every JS file for the same reason (`export { require as
+loader }` renames only the local side). Offsets are unchanged, and facts
+restore the original names: no fresh name appears in any stored fact,
+identity or diagnostic (a test asserts this over all stored facts). Files
+record `data.renamedForCompiler`.
 
-**Remaining corners**, none of which can produce a link into the misread module:
-- **AMD.** `define(function (require, exports, module) { require("./b") })`
-  calls a local parameter. It is reported as an unresolved call to that
-  parameter (`local`), not as an import edge, even though at run time the AMD
-  loader does load `./b`. AMD is not modelled; this is conservative.
-- **Property keys.** A shorthand property `{ require }` or `export { require }`
-  of a renamed binding also renames that key or exported name in the compiler's
-  view. An importer's own `import { require }` is renamed the same way (the
-  replacement is deterministic), so the pair still resolves. If the two files
-  pick different replacements, or someone reads `obj.require` of such an
-  object, the link is unresolved, never wrong.
-- **Global scripts.** Scope is per file, which is Node's module semantics. A
-  top-level `var require` in one non-module script is not treated as shadowing
-  `require` in another script file, which keeps its CommonJS meaning.
-- If no fresh same-length identifier exists, which would take every one- and
-  two-letter variant appearing in the file, that file **fails** with a
-  diagnostic instead of being misread.
+**Exact, and tested against Node.** `test/graph-typescript-scope-oracle.test.mjs`
+generates 168 small files (275 call sites; summary in
+`evidence/w2-d/scope-oracle.txt`). They cover every declaration form:
+- function declarations at top level, in a function, in a block, in nested
+  blocks, in labelled and `switch` blocks, and duplicated;
+- `var`/`let`/`const` before and after use;
+- parameters, default and destructured parameters, and a body `var`
+  re-declaring a parameter (with and without parameter expressions);
+- catch clauses, plain and destructured;
+- class static blocks, class and function expression names, class declaration
+  names;
+- import bindings;
+- `for`/`for-in`/`for-of` heads with `let`/`const`/`var`;
+- arrows, getters, setters, methods, generators and async functions.
+
+Each form appears in sloppy CommonJS, strict CommonJS and ES modules. The test
+runs every file in Node (one child process, sequential) and records whether
+each `require("./dep.cjs")` reaches the real loader, then asserts that the
+analysis classifies that occurrence the same way. Result: **0 disagreements**.
+251 static sites match exactly: 119 local, 114 real, and 18 where Node throws
+(TDZ, an undefined hoisted var, an early error), classified local. The model
+that this verifies:
+- **Block scope.** `let`/`const`/`class`/block functions are block-scoped. A
+  catch binding is scoped to its block only. A class static block is its own
+  `var` scope.
+- **Parameters.** Default-parameter expressions see the parameters, not the
+  body's `var`s. A body `var` of a parameter's name is the same binding.
+- **Names of expressions.** Function and class expression names bind only
+  inside the expression.
+- **Annex B.3.2.1.** In sloppy function code, a block-level function also binds
+  a `var` in the function, except when the name is a parameter or replacing it
+  with `var` would conflict with an enclosing lexical declaration. Duplicates
+  in one block are allowed.
+- **CommonJS top level.** This is the body of Node's wrapper function, whose
+  parameters are `exports`, `require` and `module`. So Annex B never hoists
+  these names there. Node confirms that after `if (true) { function require
+  () {} }` a top-level `require` is the real loader. A top-level `function
+  require` replaces the parameter, and a top-level `let require` is an early
+  error.
+- **Strict mode.** ES modules, `"use strict"` prologues and class bodies have
+  no Annex B.
+
+**Conservative (`uncertain`, never treated as the loader).** These have no
+static answer:
+- an occurrence inside a `with` body;
+- any occurrence whose binding scope contains a direct `eval(…)` that could
+  add a nearer `var` (sloppy) or assign the binding (any mode);
+- the CommonJS wrapper binding when the file reassigns it anywhere (`var
+  require = …` at top level, `require = …`, compound or destructuring
+  assignment, `for (require of …)`, or sloppy top-level `arguments`).
+
+Such a `require("x")` gives an `imports` link that is unresolved with reason
+`dynamic-scope`, with `x` kept in `data.targets`. The call and members of its
+value are `dynamic-scope` too, and the file is partial with a diagnostic. 22
+oracle sites are in this category; the analysis says `uncertain` (or the exact
+answer) and never "real" where Node did not use the real loader. Indirect eval
+(`(0, eval)(…)`, `globalThis.eval(…)`, `new Function(…)`) runs in global
+scope and cannot change a module's bindings, so it is ignored, and the oracle
+confirms the real loader there.
+
+**Value flow is not modelled.** A local binding that holds the real loader at
+run time is classified local. Examples are `function load(require) {…}
+load(require)` (2 oracle sites) and `const r = require; r("x")`. That loses
+an import edge; it is never a wrong link.
+
+**Not modelled, with exactly what is emitted:**
+- **AMD.** `define(function (require, exports, module) { require("./b") })`:
+  the call is to a local parameter. It is emitted as an unresolved `calls`
+  link (`local`) and no `imports` link, although the AMD loader would load
+  `./b` at run time.
+- **Globals across script files.** A top-level `var require` in a non-module
+  browser script is, in a browser, a global that other scripts see. The
+  analysis uses Node's per-file scope. In the declaring file it is the wrapper
+  binding, and when reassigned (as in `requirejs`'s `require.js`) its
+  occurrences are `uncertain`/`dynamic-scope`. In other files `require` keeps
+  its CommonJS meaning, and their `require("x")` calls are emitted as import
+  edges.
+- **Free `require` in an ES module.** In an ES-module-syntax file this is
+  treated as the loader (bundler semantics). Node itself would throw a
+  ReferenceError there.
+
+**Spelling.** If any occurrence that must be renamed is written with an escape
+(`\u{0072}equire`), it cannot be replaced at the same length, so that file
+**fails** with a diagnostic. An escaped *real* `require` needs no rename and is
+fine. A parse failure inside the analysis also fails just that file.
 
 Paths aliases (`paths`/`baseUrl`), `package.json` `imports`/`exports`/`type`,
 `moduleResolution` modes and workspace packages all work through the compiler's
@@ -253,6 +303,9 @@ own resolver over the snapshot.
 | `local` | The target is a parameter, local variable, local function or other non-symbol declaration |
 | `computed-specifier` | `import(expr)` or JS `require(expr)` with a non-literal specifier |
 | `compiler-limit` | The TypeScript checker exhausted its stack on this lookup (deep inference chains); the file is partial |
+| `dynamic-scope` | A `require`/`module`/`exports` whose meaning is decided at run time (see above), anything reached through its value, and unresolved names inside a `with` body |
+| `not-a-module` | A binding from a captured file that is a script (no imports/exports); the import edge itself links to that file |
+| `renamed-export` | An ES binding of an export named `require`/`module`/`exports` between a JS file and a TS file or a CommonJS property, whose spellings differ for the compiler |
 | `ambiguous-project` | Equally ranked configs disagree and at least one has no complete answer; their targets are kept |
 | `incomplete-config` | The file's config `extends` a base that was not captured, and the link's outcome depends on settings that base could supply (see Status); would-be targets are kept, the reason without that rule is in `data.reasonWithoutConfig` |
 
@@ -277,12 +330,20 @@ imports of `./orig` are not linked to it; backlog).
 - A syntax error makes the file **partial** with the compiler's syntactic
   diagnostics (ranged); its recovered symbols stay linkable with partial status.
 - **Compiler stack limits.** The checker's inference recurses once per step, so
-  a long chain such as `let v1 = v0; … let v1000 = v999;` can exhaust the stack.
-  Before extracting a file, the module asks for its declaration types in source
-  order, so each step builds on a computed one; a 1,000-step chain then indexes
-  clean. Any lookup that still overflows becomes an unresolved `compiler-limit`
-  link, and the file is partial with a diagnostic. The file never fails and the
-  link is never guessed.
+  a long chain (`let v1 = v0; …` or `function f1() { return f0(); } …`) can
+  exhaust the stack. Before extracting a file, the module asks for variable
+  types and function return types in source order, so each step builds on a
+  computed one; a 1,000-step chain then indexes clean. After an overflow the
+  checker's internal state is **not trustworthy**: a retried lookup can
+  silently answer "no symbol". So any overflow aborts that file's extraction,
+  the program is rebuilt (parsed files are cached), and the file is retried
+  with the overflowing node answered as `compiler-limit` without asking the
+  checker, or with the warm-up off if the warm-up overflowed. The file is
+  partial with a diagnostic, and every other link in it comes from a fresh
+  checker. After 25 rebuilds for one file, that file fails.
+- **Parser stack limits.** Each file parses in its own guard. A file the parser
+  cannot handle (for example 10,000 nested parentheses) fails alone, with a
+  diagnostic.
 - Unreadable or non-UTF-8 sources stay failed (detected by re-hashing the
   captured text against the original-byte hash) and are never returned by
   analysis.
@@ -324,6 +385,9 @@ imports of `./orig` are not linked to it; backlog).
   (`"./node_modules/@tsconfig/node20/tsconfig.json"`). It is an analysis
   limitation, not an error: the config's own settings still apply, and every
   file it owns is **partial**, with a diagnostic naming the missing base.
+- `files`, `include` and `exclude` must be arrays of strings. Any other value
+  (for example `"include": 42`) makes the selection unreadable: the config is
+  broken, and only the guarded directory fallback applies.
 - A relative `extends` to a base **outside the context patterns** (for example
   `./base.json` or `./config/ts.json`) cannot be captured (interface gap 5). The
   module cannot tell whether the file exists, so this is also a limitation: the
@@ -420,8 +484,9 @@ Full numbers, the comparison across rounds and all four hand checks are in
   uncaptured packages (`sinon.SinonStub`, `vi.fn`, `DefaultTheme.NavItem`) move
   from `external` to `external-package` (item 3). Hand checks found no wrong
   link in any round: round 1 checked 24 resolved, 12 unresolved and all 4
-  candidate sets; rounds 2 to 5, each with a new seed, checked 30 resolved,
-  15 unresolved and all 4 candidate sets.
+  candidate sets; rounds 2 to 6, each with a new seed, checked 30 resolved,
+  15 unresolved and all 4 candidate sets. Round 6 (the exact scope model)
+  leaves BullMQ's totals identical to round 5.
 - **A project with a local `require`: `requirejs`** (`7faea649`, 406 files, 0
   failed). 133 files are renamed (`require` in 116, `exports` in 73, `module`
   in 61), almost all AMD `define(function (require, exports, module) {…})`

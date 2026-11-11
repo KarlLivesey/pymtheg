@@ -8,7 +8,23 @@ import type {
   SymbolDraft,
 } from "../../types.js";
 import { fromVirtual } from "./project.js";
-import { restoreNames, type Rename } from "./rename.js";
+import {
+  NAMES,
+  restoreNames,
+  type FreshNames,
+  type Renamed,
+} from "./rename.js";
+
+/** Per-file context for module-system names (see rename.ts). */
+export interface RenameContext {
+  fresh: FreshNames;
+  /** Present when this file's compiler text was renamed. */
+  renamed?: Renamed | undefined;
+  /** Resolves a module specifier from a file to a captured path, if any. */
+  resolveModule: (specifier: string, from: string) => string | undefined;
+  /** Nodes (and warm-up steps) whose checker lookups overflowed before. */
+  skip: ReadonlySet<string>;
+}
 import {
   anchorOf,
   containerOf,
@@ -67,6 +83,15 @@ const TYPE_ONLY = new Set([
   ts.SyntaxKind.TypeAliasDeclaration,
   ts.SyntaxKind.TypeParameter,
 ]);
+const isLimit = (error: unknown) =>
+  error instanceof RangeError && /call stack/i.test(error.message);
+const WARM_OFF = "warm-up";
+/** Thrown when the checker overflows: retry with `key` in RenameContext.skip. */
+export class CheckerLimit extends Error {
+  constructor(readonly key: string) {
+    super(`The TypeScript checker exhausted its stack at ${key}`);
+  }
+}
 /** Stands for a checker lookup that exhausted the stack. */
 const LIMIT = Object.freeze({ flags: 0 }) as unknown as ts.Symbol;
 /** What a name lookup found: a symbol, or why there is none, and the member's receiver. */
@@ -99,8 +124,10 @@ export function extractFile(
   diagnostics: Diagnostic[],
   data: { [key: string]: Json },
   incompleteConfig: boolean,
-  renames: readonly Rename[] = [],
+  context: RenameContext,
 ): ParseResult {
+  const uncertainAt = new Set(context.renamed?.uncertain ?? []);
+  const freshExportNames = new Set(Object.values(context.fresh.local));
   const path = file.fileName.slice(1);
   const symbols: SymbolDraft[] = [];
   const links: LinkDraft[] = [];
@@ -111,24 +138,22 @@ export function extractFile(
     end: node.end,
   });
 
-  // The compiler's checker recurses per inference step and can exhaust the
-  // stack (e.g. a 1,000-step chain of `let a1 = a0`). Such a lookup becomes an
-  // unresolved `compiler-limit` link and the file is partial; it never fails
-  // the file and never yields a guess.
+  // The checker recurses once per inference step and can exhaust the stack.
+  // After an overflow its internal state is not trustworthy (a retried lookup
+  // may silently answer "no symbol"), so an overflow aborts this extraction
+  // with CheckerLimit; the caller rebuilds the program and retries with that
+  // node in `skip`, whose links are then `compiler-limit` without asking.
   let limitHit = false;
-  const isLimit = (error: unknown) =>
-    error instanceof RangeError && /call stack/i.test(error.message);
+  let limited = false;
   function targetsOf(
     query: Lookup | ts.Symbol | undefined,
     meaning: Meaning,
   ): Targets {
-    try {
-      return resolveTargets(query, meaning);
-    } catch (error) {
-      if (!isLimit(error)) throw error;
+    if (limited) {
       limitHit = true;
       return { targets: [], reason: "compiler-limit" };
     }
+    return resolveTargets(query, meaning);
   }
   function resolveTargets(
     query: Lookup | ts.Symbol | undefined,
@@ -262,6 +287,19 @@ export function extractFile(
   ) {
     const facts: { [key: string]: Json } = { ...extra };
     let reason = found.reason;
+    // Inside a `with` body every name may be a property of the object.
+    if (
+      !found.targets.length &&
+      (reason === "no-symbol" || reason === "external") &&
+      ts.findAncestor(
+        at,
+        (node) =>
+          !!node.parent &&
+          ts.isWithStatement(node.parent) &&
+          node.parent.statement === node,
+      )
+    )
+      reason = "dynamic-scope";
     if (
       incompleteConfig &&
       (kind === "imports" ||
@@ -289,8 +327,12 @@ export function extractFile(
   /** Why a module specifier does not resolve, or undefined when it does. */
   function moduleReason(specifier: ts.Expression): string | undefined {
     if (!ts.isStringLiteralLike(specifier)) return "computed-specifier";
+    if (limited) return "compiler-limit";
     if (checker.getSymbolAtLocation(specifier)) return undefined;
     const text = specifier.text;
+    // A captured file that is not a module (no imports/exports, a script).
+    const resolved = context.resolveModule(text, path);
+    if (resolved !== undefined && captured.has(resolved)) return "not-a-module";
     if (/^\.\.?(\/|$)/.test(text) || text.startsWith("/"))
       return "missing-module";
     const aliased =
@@ -311,22 +353,28 @@ export function extractFile(
     extra: { [key: string]: Json },
   ) {
     const reason = moduleReason(specifier);
-    const found = reason
-      ? { targets: [], reason }
-      : targetsOf(checker.getSymbolAtLocation(specifier), "any");
+    // Loading a script file is a real edge to that file, though it exports nothing.
+    const script =
+      reason === "not-a-module"
+        ? context.resolveModule(specifier.text, path)
+        : undefined;
+    const found: Targets = script
+      ? { targets: [{ file: script, key: "module@0" }] }
+      : reason
+        ? { targets: [], reason }
+        : targetsOf(checker.getSymbolAtLocation(specifier), "any");
     link(owner, "imports", specifier.text, specifier, found, {
       specifier: specifier.text,
+      ...(script ? { notAModule: true } : {}),
       ...extra,
     });
   }
   const symbolOf = (node: ts.Node): ts.Symbol | undefined => {
-    try {
-      return checker.getSymbolAtLocation(node);
-    } catch (error) {
-      if (!isLimit(error)) throw error;
+    if (limited) {
       limitHit = true;
       return LIMIT;
     }
+    return checker.getSymbolAtLocation(node);
   };
 
   /** The receiver of a member name (`a.b` → `a`, `a["b"]` → `a`, `A.B` → `A`). */
@@ -366,9 +414,25 @@ export function extractFile(
     const receiver = receiverOf(node);
     const symbol = symbolOf(node);
     if (!symbol && receiver) {
-      // A member of a binding whose module did not resolve keeps that reason.
       const root = rootOf(receiver);
+      // A value from an uncertain `require(...)` call (dynamic scope).
+      if (root && uncertainAt.has(root.getStart(file)))
+        return { reason: "dynamic-scope", receiver };
       const rootSymbol = root && symbolOf(root);
+      const declaration = rootSymbol?.declarations?.[0];
+      if (
+        declaration &&
+        (ts.isVariableDeclaration(declaration) ||
+          ts.isBindingElement(declaration))
+      ) {
+        let holder: ts.Node = declaration;
+        while (!ts.isVariableDeclaration(holder)) holder = holder.parent;
+        const init = (holder as ts.VariableDeclaration).initializer;
+        const initRoot = init && rootOf(init);
+        if (initRoot && uncertainAt.has(initRoot.getStart(file)))
+          return { reason: "dynamic-scope", receiver };
+      }
+      // A member of a binding whose module did not resolve keeps that reason.
       const reason =
         rootSymbol &&
         rootSymbol.flags & ts.SymbolFlags.Alias &&
@@ -423,19 +487,22 @@ export function extractFile(
   ) {
     // Bindings from a module that does not resolve share its reason.
     const reason = specifier && moduleReason(specifier);
-    link(
-      owner,
-      kind,
-      importedName,
-      at,
-      reason
-        ? { targets: [], reason }
-        : targetsOf(symbolOf(name), extra.typeOnly ? "type" : "any"),
-      extra,
-    );
+    let found: Targets = reason
+      ? { targets: [], reason }
+      : targetsOf(symbolOf(name), extra.typeOnly ? "type" : "any");
+    // An export NAME `require`/`module`/`exports` is renamed in JS files only;
+    // between a JS and a TS file (or a CommonJS property) the names differ.
+    if (
+      !reason &&
+      !found.targets.length &&
+      (freshExportNames.has(importedName) ||
+        (NAMES as readonly string[]).includes(importedName))
+    )
+      found = { ...found, reason: "renamed-export" };
+    link(owner, kind, importedName, at, found, extra);
   }
 
-  function visit(node: ts.Node, owner: string) {
+  function handle(node: ts.Node, owner: string): string | null {
     const anchor = anchorOf(node);
     if (anchor === node) {
       const key = keyOf(node);
@@ -508,7 +575,7 @@ export function extractFile(
             facts(typeOnly || element.isTypeOnly),
             node.moduleSpecifier,
           );
-      return;
+      return null;
     }
     if (ts.isExportDeclaration(node)) {
       const specifier = node.moduleSpecifier;
@@ -525,7 +592,9 @@ export function extractFile(
         for (const element of clause.elements) {
           const local = specifier
             ? symbolOf(element.name)
-            : checker.getExportSpecifierLocalTargetSymbol(element);
+            : limited
+              ? LIMIT
+              : checker.getExportSpecifierLocalTargetSymbol(element);
           const only = typeOnly || element.isTypeOnly;
           const reason = specifier && moduleReason(specifier);
           link(
@@ -539,7 +608,7 @@ export function extractFile(
             only ? { typeOnly: true } : {},
           );
         }
-      return;
+      return null;
     }
     if (ts.isExportAssignment(node) && isEntityName(unwrap(node.expression))) {
       const expression = unwrap(node.expression);
@@ -553,7 +622,7 @@ export function extractFile(
         node.expression,
         targetsOf(lookup(at), "any"),
       );
-      return;
+      return null;
     }
     if (ts.isImportEqualsDeclaration(node)) {
       const reference = node.moduleReference;
@@ -581,7 +650,7 @@ export function extractFile(
           targetsOf(symbolOf(at), "any"),
         );
       }
-      return;
+      return null;
     }
     if (ts.isCallExpression(node)) {
       const argument = node.arguments[0];
@@ -597,6 +666,38 @@ export function extractFile(
             { targets: [], reason: "computed-specifier" },
             { dynamic: true },
           );
+      } else if (
+        ts.isIdentifier(node.expression) &&
+        uncertainAt.has(node.expression.getStart(file))
+      ) {
+        // `require`/`module`/`exports` whose meaning is decided at run time
+        // (with, direct eval, reassignment): neither the loader nor local.
+        const argument = node.arguments[0];
+        if (
+          context.fresh.uncertain.require === node.expression.text &&
+          argument &&
+          ts.isStringLiteralLike(argument)
+        ) {
+          const target = context.resolveModule(argument.text, path);
+          link(
+            owner,
+            "imports",
+            argument.text,
+            argument,
+            {
+              targets:
+                target !== undefined && captured.has(target)
+                  ? [{ file: target, key: "module@0" }]
+                  : [],
+              reason: "dynamic-scope",
+            },
+            { specifier: argument.text, require: true },
+          );
+        }
+        link(owner, "calls", node.expression.text, node.expression, {
+          targets: [],
+          reason: "dynamic-scope",
+        });
       } else if (
         ts.isIdentifier(node.expression) &&
         node.expression.text === "require" &&
@@ -727,20 +828,48 @@ export function extractFile(
       )
         moduleLink(owner, argument.literal, { typeOnly: true });
     }
-    ts.forEachChild(node, (child) => visit(child, owner));
+    return owner;
+  }
+  /** Visits a node: its own links in a guard, then its children. */
+  function visit(node: ts.Node, owner: string) {
+    const key = `${node.kind}@${node.getStart(file)}`;
+    limited = context.skip.has(key);
+    let next: string | null;
+    try {
+      next = handle(node, owner);
+    } catch (error) {
+      if (isLimit(error)) throw new CheckerLimit(key);
+      throw error;
+    } finally {
+      limited = false;
+    }
+    if (next !== null) ts.forEachChild(node, (child) => visit(child, next));
   }
   // Ask for declaration types in source order first, so each inference step
   // builds on an already computed one instead of recursing through the chain.
+  // Variables and function return types are warmed in source order, so each
+  // inference step builds on a computed one. A warm-up step that overflows
+  // aborts too and is skipped on the retry.
   const warm = (node: ts.Node): void => {
-    if (ts.isVariableDeclaration(node) || ts.isBindingElement(node))
-      try {
+    try {
+      if (ts.isVariableDeclaration(node) || ts.isBindingElement(node))
         checker.getTypeAtLocation(node.name);
-      } catch (error) {
-        if (!isLimit(error)) throw error;
+      else if (
+        (ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node)) &&
+        node.body
+      ) {
+        const signature = checker.getSignatureFromDeclaration(node);
+        if (signature) checker.getReturnTypeOfSignature(signature);
       }
+    } catch (error) {
+      // One overflow switches the warm-up off for this file on the retry.
+      if (isLimit(error)) throw new CheckerLimit(WARM_OFF);
+      throw error;
+    }
     ts.forEachChild(node, warm);
   };
-  warm(file);
+  if (context.skip.has(WARM_OFF)) limitHit = true;
+  else warm(file);
   visit(file, moduleKey);
 
   // Triple-slash directives: path references link to the file; types and lib
@@ -805,16 +934,18 @@ export function extractFile(
         "The TypeScript checker exhausted its stack on some lookups; those links are unresolved (compiler-limit)",
     });
   // Facts of a renamed file report the original names (see rename.ts).
-  if (renames.length) {
+  if (context.renamed) {
+    const fresh = context.fresh;
     for (const symbol of symbols) {
-      symbol.name = restoreNames(symbol.name, renames);
-      symbol.identity = restoreNames(symbol.identity, renames);
+      symbol.name = restoreNames(symbol.name, fresh);
+      symbol.identity = restoreNames(symbol.identity, fresh);
     }
     for (const item of links)
-      item.targetName = restoreNames(item.targetName, renames);
+      item.targetName = restoreNames(item.targetName, fresh);
     for (const diagnostic of diagnostics)
-      diagnostic.message = restoreNames(diagnostic.message, renames);
+      diagnostic.message = restoreNames(diagnostic.message, fresh);
   }
+
   return {
     status: diagnostics.length ? "partial" : "clean",
     diagnostics,

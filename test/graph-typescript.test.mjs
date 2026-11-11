@@ -97,6 +97,7 @@ for (const file of [
   "src/broken.ts",
   "src/lazy.ts",
   "src/legacy.js",
+  "src/loader.js",
   API,
   "src/lib/index.ts",
   "src/lib/inner.ts",
@@ -121,6 +122,19 @@ sym(
   "constant",
   "module.exports",
   "module.exports = { legacy }",
+);
+// A locally declared require: renamed for the compiler, reported as written.
+sym(
+  "src/loader.js",
+  "function",
+  "require",
+  span("src/loader.js", "function require", "\n}"),
+);
+sym(
+  "src/loader.js",
+  "constant",
+  "loaded",
+  'export const loaded = require("./lib/api");',
 );
 sym(API, "interface", "Runner", span(API, "export interface Runner", "\n}"));
 const runner = { name: "Runner", kind: "interface" };
@@ -219,7 +233,17 @@ const apiModule = target(API, API, "module");
 const format = target(API, "format", "function");
 const job = target(API, "Job", "class");
 const mainFn = { name: "main", kind: "function" };
+const LOADER = "src/loader.js";
 const links = [
+  // The call goes to the file's own function, not to an import of ./lib/api.
+  link(
+    LOADER,
+    "calls",
+    "require",
+    { name: "loaded", kind: "constant" },
+    target(LOADER, "require", "function"),
+    nth(LOADER, "require", 2),
+  ),
   ...contains,
   // CommonJS require in a .js file importing a .ts module.
   link(
