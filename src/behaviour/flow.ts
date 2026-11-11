@@ -766,6 +766,9 @@ function ordinarySuccessors(plan: FlowProgram, state: FlowState): FlowEdge[] {
         type = resource ? plan.ir.symbols.get(resource.type) : undefined;
       if (!resource || type?.kind !== "resource")
         throw new FlowUnsupported("Unknown resource state");
+      // Cancellation handler transitions are conditional on acquisition and
+      // caller ownership (docs/support.md), matching the ownership analysis.
+      if (frame.cancelling && resource.owner !== frame.owner) break;
       if (
         resource.owner !== frame.owner ||
         !type.transitions.some(

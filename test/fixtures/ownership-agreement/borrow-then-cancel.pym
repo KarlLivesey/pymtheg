@@ -1,0 +1,10 @@
+// The cancel handler names a borrowed resource, which the flow does not own.
+resource Lease {
+  states Held, Returned;
+  initial Held;
+  terminal Returned;
+  Held -> Returned;
+}
+flow main(borrow lease: Lease) -> Unit effects(state.Lease) {
+  assert true;
+} on cancel { transition lease -> Returned; }

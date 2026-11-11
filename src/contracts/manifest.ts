@@ -37,7 +37,17 @@ export const contractManifestSchema = z
     snapshotId: z.string(),
     entries: z.array(entrySchema).max(100000),
     omitted: z
-      .array(z.object({ name: z.string(), reason: z.string() }).strict())
+      .array(
+        z
+          .object({
+            name: z.string(),
+            reason: z.string(),
+            // Plugin manifests copy document omissions verbatim. Drift still
+            // counts every omission as incomplete coverage.
+            applicability: z.literal("not-contract-material").optional(),
+          })
+          .strict(),
+      )
       .max(100000),
   })
   .strict()
@@ -101,7 +111,9 @@ export function contractManifest(doc: ContractDocument): ContractManifest {
         };
       })
       .sort((a, b) => compareText(a.id, b.id)),
-    omitted: doc.omitted,
+    // Baseline format unchanged: every omission stays incomplete coverage for
+    // drift and baseline saving, including machines.
+    omitted: doc.omitted.map(({ name, reason }) => ({ name, reason })),
   };
 }
 function contractDelta(before: unknown, after: unknown): string[] {
