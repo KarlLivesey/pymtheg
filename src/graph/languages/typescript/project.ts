@@ -79,7 +79,8 @@ export interface ProjectModel {
   fresh: FreshNames;
   /** Files the compiler's parser could not parse, with the cause. */
   parseFailures: Map<string, string>;
-  host: (group: ProjectGroup) => ts.CompilerHost;
+  /** A compiler host over the snapshot; a variant replaces some files' text. */
+  host: (group: ProjectGroup, variant?: HostVariant) => ts.CompilerHost;
 }
 
 const INFERRED: ts.CompilerOptions = {
@@ -92,6 +93,16 @@ const INFERRED: ts.CompilerOptions = {
   resolveJsonModule: false,
 };
 /** Options the snapshot analysis always overrides; recorded in the change note. */
+/** A host serving other compiler text for some files (differential analysis). */
+export interface HostVariant {
+  /** Replacement compiler text by captured path. */
+  texts: ReadonlyMap<string, string>;
+  /** Reuses this host's parsed files for files whose text is not replaced. */
+  base?: ts.CompilerHost;
+  /** Where parser failures of this variant are recorded (not the model's). */
+  failures: Map<string, string>;
+}
+
 function forced(options: ts.CompilerOptions): ts.CompilerOptions {
   const result: ts.CompilerOptions = {
     ...options,
@@ -644,31 +655,41 @@ export function projectModel(
   }
   if (inferred) groups.push(inferred);
   const parseFailures = new Map<string, string>();
-  const host = (group: ProjectGroup): ts.CompilerHost => {
+  const caches = new WeakMap<ts.CompilerHost, Map<string, ts.SourceFile>>();
+  const host = (
+    group: ProjectGroup,
+    variant?: HostVariant,
+  ): ts.CompilerHost => {
     const sources = new Map<string, ts.SourceFile>();
-    return {
+    const failures = variant?.failures ?? parseFailures;
+    const shared = variant?.base && caches.get(variant.base);
+    const created: ts.CompilerHost = {
       getSourceFile(name, languageVersion) {
         if (name.startsWith(LIB_ROOT + "/")) return libFile(name);
         const real = fs.real(name);
-        const text = fs.files.get(real);
+        const override = variant?.texts.get(real.slice(1));
+        const text = override ?? fs.files.get(real);
         if (text === undefined) return undefined;
         // A file the parser or binder could not handle stays out of every program.
-        if (parseFailures.has(real.slice(1))) return undefined;
-        let file = sources.get(real);
+        if (failures.has(real.slice(1))) return undefined;
+        // An unchanged file reuses the base host's parse (and binding).
+        let file =
+          sources.get(real) ??
+          (override === undefined ? shared?.get(real) : undefined);
         if (!file) {
           // Each file parses in its own guard: a parser stack overflow (e.g.
           // thousands of nested parentheses) fails that file only.
           try {
             file = ts.createSourceFile(real, text, languageVersion, true);
           } catch (error) {
-            parseFailures.set(
+            failures.set(
               real.slice(1),
               `The TypeScript parser failed on this file: ${error instanceof Error ? error.message : String(error)}`,
             );
             return undefined;
           }
-          sources.set(real, file);
         }
+        sources.set(real, file);
         return file;
       },
       getDefaultLibLocation: () => LIB_ROOT,
@@ -694,6 +715,8 @@ export function projectModel(
       getDirectories: (name) => fs.entries(fs.real(name)).directories,
       realpath: (name) => fs.real(name),
     };
+    caches.set(created, sources);
+    return created;
   };
   return { groups, owner, ties, failures, renames, fresh, parseFailures, host };
 }

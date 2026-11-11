@@ -8,11 +8,11 @@ Nothing is wired into a command.
 
 ## Claims and context
 
-| Claimed source | Notes |
-|---|---|
-| `.ts`, `.tsx`, `.mts`, `.cts` | TypeScript, including declaration files |
-| `.js`, `.jsx`, `.mjs`, `.cjs` | JavaScript, analysed with `allowJs` |
-| `.d.ts`, `.d.mts`, `.d.cts` | Covered by the `.ts`/`.mts`/`.cts` claims (see below) |
+| Claimed source                | Notes                                                 |
+| ----------------------------- | ----------------------------------------------------- |
+| `.ts`, `.tsx`, `.mts`, `.cts` | TypeScript, including declaration files               |
+| `.js`, `.jsx`, `.mjs`, `.cjs` | JavaScript, analysed with `allowJs`                   |
+| `.d.ts`, `.d.mts`, `.d.cts`   | Covered by the `.ts`/`.mts`/`.cts` claims (see below) |
 
 Context files: `*tsconfig*.json` (so `tsconfig.json`, `tsconfig.build.json`,
 `tsconfig-cjs.json` and `base.tsconfig.json`), `*jsconfig*.json`, and
@@ -60,6 +60,7 @@ The module is **analyze-only** (no per-file `parse`). Each run:
    pick one. A file that no config includes goes to an **inferred project**
    (like an editor: ESNext, Bundler resolution, `allowJs`, JSX preserved, no
    `paths`); its file data has `project: null`.
+
 3. Builds one `ts.createProgram` per owning config with a snapshot-only host and
    extracts that config's files with its type checker. A file reached from
    another project is parsed there too, but only its owner (or each tied owner)
@@ -94,7 +95,7 @@ link across packages.
 **Unchanged snapshot reuse.** When `changedFiles` and `changedContextFiles`
 are both empty and every stored result was produced by this module version
 (which embeds the compiler version; the leading number is bumped whenever
-extraction or resolution semantics change, and is now 6), the stored facts are
+extraction or resolution semantics change, and is now 7), the stored facts are
 returned as they are:
 no program is built and nothing is parsed. They are the complete analysis of the
 identical snapshot, and `resolve` re-derives every target from them. Any source,
@@ -105,25 +106,25 @@ config or package-manifest change, or a version change, reanalyses everything.
 Symbol `identity` is the container-qualified declared name; it never contains a
 position. `key` (`kind@start`) is file-local and not persistent.
 
-| Construct | kind | identity example |
-|---|---|---|
-| File | `module` | its path, `src/lib/api.ts` (name too) |
-| Function declaration (incl. `declare function`) | `function` | `format`, `Outer.Inner.deep` |
-| `const`/`let`/`var` holding an arrow function or function expression | `function` | `handler` |
-| Class declaration; `const K = class {}` | `class` | `Job`, `Klass` |
-| Method, constructor, getter, setter, property | `method`, `constructor`, `getter`, `setter`, `property` | `Job.run`, `Job.constructor`, `Shape.size`, `Shape.#secret` |
-| Static member | same kinds | `Shape.static count` |
-| Constructor parameter property (`public`/`private`/`protected`/`readonly`/`override`) | `property` | `A.cb` |
-| Interface; its method/property/accessor signatures | `interface`, `method`, `property`, `getter`/`setter` | `Runner`, `Runner.run` |
-| Type alias | `type` | `Id` |
-| Enum and members | `enum`, `enum-member` | `Color`, `Color.Red` |
-| Namespace (`namespace A.B` gives `A` and `A.B`), ambient module, `declare global` | `namespace` | `Outer.Inner`, `"ambient"`, `global` |
-| Module-level `const`/`using` (incl. destructured names) | `constant` | `lazy`, `renamed` |
-| Module-level `let`/`var` | `variable` | `counter` |
-| Callable members of a module-level object literal | `method` (`getter`/`setter`) | `api.run` |
-| `export default <expression>` / `export = <expression>` (not a plain name) | `constant`/`function`/`class` | `default`, `export=` |
-| Anonymous `export default function`/`class` | `function`/`class` | `default` |
-| CommonJS `exports.x = …`, `module.exports.x = …`, `module.exports = <non-name>` (JS files, top level, `module`/`exports` not bound by the file) | `function`/`class`/`constant` | `x`, `module.exports` |
+| Construct                                                                                                                                       | kind                                                    | identity example                                            |
+| ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- | ----------------------------------------------------------- |
+| File                                                                                                                                            | `module`                                                | its path, `src/lib/api.ts` (name too)                       |
+| Function declaration (incl. `declare function`)                                                                                                 | `function`                                              | `format`, `Outer.Inner.deep`                                |
+| `const`/`let`/`var` holding an arrow function or function expression                                                                            | `function`                                              | `handler`                                                   |
+| Class declaration; `const K = class {}`                                                                                                         | `class`                                                 | `Job`, `Klass`                                              |
+| Method, constructor, getter, setter, property                                                                                                   | `method`, `constructor`, `getter`, `setter`, `property` | `Job.run`, `Job.constructor`, `Shape.size`, `Shape.#secret` |
+| Static member                                                                                                                                   | same kinds                                              | `Shape.static count`                                        |
+| Constructor parameter property (`public`/`private`/`protected`/`readonly`/`override`)                                                           | `property`                                              | `A.cb`                                                      |
+| Interface; its method/property/accessor signatures                                                                                              | `interface`, `method`, `property`, `getter`/`setter`    | `Runner`, `Runner.run`                                      |
+| Type alias                                                                                                                                      | `type`                                                  | `Id`                                                        |
+| Enum and members                                                                                                                                | `enum`, `enum-member`                                   | `Color`, `Color.Red`                                        |
+| Namespace (`namespace A.B` gives `A` and `A.B`), ambient module, `declare global`                                                               | `namespace`                                             | `Outer.Inner`, `"ambient"`, `global`                        |
+| Module-level `const`/`using` (incl. destructured names)                                                                                         | `constant`                                              | `lazy`, `renamed`                                           |
+| Module-level `let`/`var`                                                                                                                        | `variable`                                              | `counter`                                                   |
+| Callable members of a module-level object literal                                                                                               | `method` (`getter`/`setter`)                            | `api.run`                                                   |
+| `export default <expression>` / `export = <expression>` (not a plain name)                                                                      | `constant`/`function`/`class`                           | `default`, `export=`                                        |
+| Anonymous `export default function`/`class`                                                                                                     | `function`/`class`                                      | `default`                                                   |
+| CommonJS `exports.x = …`, `module.exports.x = …`, `module.exports = <non-name>` (JS files, top level, `module`/`exports` not bound by the file) | `function`/`class`/`constant`                           | `x`, `module.exports`                                       |
 
 Overloads: **one symbol per overload set** (consecutive bodiless signatures
 plus the implementation, or all signatures in an ambient/interface set). Its range
@@ -152,22 +153,22 @@ binding links at the import/export specifier; calls at the callee's name (the
 `(expression).run` when the receiver is not a name chain, the specifier for
 module imports, the exported name for bindings: `default`, `*`, or the name).
 
-| Construct | kind | Resolution |
-|---|---|---|
-| `import … from "x"`, `export … from "x"`, `import x = require("x")`, side-effect import | `imports` (source: the module) | Definite to the target **module** symbol |
-| Named / default / namespace import bindings, `import type` (`data.typeOnly`) | `imports` | Definite to the **original declaration**, through barrels, `export *`, renames and default exports (checker alias chain); namespace imports to the module |
-| `export { a as b } from`, local `export { a }`, `export * as ns from`, `export default name` | `exports` | Same as bindings |
-| `export * from "x"` | `imports` (`data.reexport`) | Module only (no per-name link) |
-| Dynamic `import("lit")` | `imports` (`data.dynamic`, source: enclosing symbol) | Definite to the module; computed specifier: unresolved `(dynamic import)` |
-| `require("lit")` in JS files; `const x = require()` / `const {a: b} = require()` bindings | `imports` (`data.require`) | Module definite; bindings through the checker's CommonJS aliasing to the original declaration (also into `.ts` modules) |
-| `require(expr)` with a non-literal argument in JS | `imports` (`data.require`) | Unresolved `(computed require)`, reason `computed-specifier`; not a call |
-| Triple-slash `/// <reference path>` | `imports` (`data.reference: "path"`) | Definite to the referenced captured file's module; `missing-module` otherwise |
-| Triple-slash `/// <reference types>` / `lib` | `imports` (`data.reference`) | Unresolved: `external-package` (type packages live in `node_modules`) / `external` (standard library) |
-| Calls, `new`, tagged templates, `super(…)` | `calls` | The checker's symbol for the callee, keeping only **callable** declarations (a merged function + namespace, or an `export =` function + namespace, is the function): definite if that is one graph symbol; **candidates** when several (union receivers, repeated JS functions); unresolved otherwise |
-| JSX `<Component>` / `<ns.Component>` | `calls` (`data.jsx`) | As calls; intrinsic lowercase elements are not links |
-| Type references, `typeof x` | `references` | Type positions keep type declarations (a merged interface + namespace resolves to the interface); `typeof x` keeps value declarations |
-| `extends` (classes, interfaces), `implements` | `extends`, `implements` | Checker symbol of the heritage expression |
-| Structure | `contains` | Definite |
+| Construct                                                                                    | kind                                                 | Resolution                                                                                                                                                                                                                                                                                            |
+| -------------------------------------------------------------------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `import … from "x"`, `export … from "x"`, `import x = require("x")`, side-effect import      | `imports` (source: the module)                       | Definite to the target **module** symbol                                                                                                                                                                                                                                                              |
+| Named / default / namespace import bindings, `import type` (`data.typeOnly`)                 | `imports`                                            | Definite to the **original declaration**, through barrels, `export *`, renames and default exports (checker alias chain); namespace imports to the module                                                                                                                                             |
+| `export { a as b } from`, local `export { a }`, `export * as ns from`, `export default name` | `exports`                                            | Same as bindings                                                                                                                                                                                                                                                                                      |
+| `export * from "x"`                                                                          | `imports` (`data.reexport`)                          | Module only (no per-name link)                                                                                                                                                                                                                                                                        |
+| Dynamic `import("lit")`                                                                      | `imports` (`data.dynamic`, source: enclosing symbol) | Definite to the module; computed specifier: unresolved `(dynamic import)`                                                                                                                                                                                                                             |
+| `require("lit")` in JS files; `const x = require()` / `const {a: b} = require()` bindings    | `imports` (`data.require`)                           | Module definite; bindings through the checker's CommonJS aliasing to the original declaration (also into `.ts` modules)                                                                                                                                                                               |
+| `require(expr)` with a non-literal argument in JS                                            | `imports` (`data.require`)                           | Unresolved `(computed require)`, reason `computed-specifier`; not a call                                                                                                                                                                                                                              |
+| Triple-slash `/// <reference path>`                                                          | `imports` (`data.reference: "path"`)                 | Definite to the referenced captured file's module; `missing-module` otherwise                                                                                                                                                                                                                         |
+| Triple-slash `/// <reference types>` / `lib`                                                 | `imports` (`data.reference`)                         | Unresolved: `external-package` (type packages live in `node_modules`) / `external` (standard library)                                                                                                                                                                                                 |
+| Calls, `new`, tagged templates, `super(…)`                                                   | `calls`                                              | The checker's symbol for the callee, keeping only **callable** declarations (a merged function + namespace, or an `export =` function + namespace, is the function): definite if that is one graph symbol; **candidates** when several (union receivers, repeated JS functions); unresolved otherwise |
+| JSX `<Component>` / `<ns.Component>`                                                         | `calls` (`data.jsx`)                                 | As calls; intrinsic lowercase elements are not links                                                                                                                                                                                                                                                  |
+| Type references, `typeof x`                                                                  | `references`                                         | Type positions keep type declarations (a merged interface + namespace resolves to the interface); `typeof x` keeps value declarations                                                                                                                                                                 |
+| `extends` (classes, interfaces), `implements`                                                | `extends`, `implements`                              | Checker symbol of the heritage expression                                                                                                                                                                                                                                                             |
+| Structure                                                                                    | `contains`                                           | Definite                                                                                                                                                                                                                                                                                              |
 
 Usage meaning decides which of a merged symbol's declarations count, before
 mapping to graph symbols: calls keep callable declarations, type positions and
@@ -185,16 +186,16 @@ reaches the compiler, a syntactic scope analysis of that file classifies every
 occurrence of the three names, working on the decoded identifier and its full
 token span:
 
-| Classification | Meaning | Compiler text |
-|---|---|---|
-| `real` | The module system's binding: Node's CommonJS wrapper parameter; a free name in an ES-module-syntax file (bundler semantics); or `const require = X(base)` where `X` **provably is Node's `createRequire`** by origin, whatever its local name (an ES named import `createRequire [as cr]`, a namespace or default import's `.createRequire`, or `const { createRequire: cr } = require("module")` with a real `require`), the file never replaces that factory, and `base` is this file's own location | unchanged |
-| `local` | Bound to a declaration of the file's own | renamed to a program-wide fresh name of the same length |
-| `uncertain` | Decided only at run time | renamed to a second fresh name that is never declared, so the compiler infers nothing through it |
+| Classification | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Compiler text                                                                                    |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| `real`         | The module system's binding: Node's CommonJS wrapper parameter; a free name in an ES-module-syntax file (bundler semantics); or `const require = X(base)` where `X` **provably is Node's `createRequire`** by origin, whatever its local name (an ES named import `createRequire [as cr]`, a namespace or default import's `.createRequire`, or `const { createRequire: cr } = require("module")` with a real `require`), the file never replaces that factory, and `base` is this file's own location | unchanged                                                                                        |
+| `local`        | Bound to a declaration of the file's own                                                                                                                                                                                                                                                                                                                                                                                                                                                               | renamed to a program-wide fresh name of the same length                                          |
+| `uncertain`    | Decided only at run time                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | renamed to a second fresh name that is never declared, so the compiler infers nothing through it |
 
 Fresh names are chosen once per program and occur in **no** captured file, so a
 renamed `import { require }` and the exporter's renamed `export function
 require` always agree, and nothing can collide with an existing `requirf`. ES
-import/export specifier *names* `require`/`module`/`exports` are spelled with
+import/export specifier _names_ `require`/`module`/`exports` are spelled with
 the fresh name in every JS file for the same reason (`export { require as
 loader }` renames only the local side). Offsets are unchanged, and facts
 restore the original names: no fresh name appears in any stored fact,
@@ -202,8 +203,9 @@ identity or diagnostic (a test asserts this over all stored facts). Files
 record `data.renamedForCompiler`.
 
 **Exact, and tested against Node.** `test/graph-typescript-scope-oracle.test.mjs`
-generates 236 small files (341 call sites; summary in
+generates 256 small files (381 call sites; summary in
 `evidence/w2-d/scope-oracle.txt`). They cover every declaration form:
+
 - function declarations at top level, in a function, in a block, in nested
   blocks, in labelled and `switch` blocks, and duplicated;
 - `var`/`let`/`const` before and after use;
@@ -229,12 +231,21 @@ generates 236 small files (341 call sites; summary in
 - `var arguments` (also `= arguments`), `let`/function/parameter named
   `arguments`, and the wrapper's `arguments` written from a computed class or
   object key, spread, `Array.from`/`slice.call` copies, and passed on;
+- copies of the wrapper's `arguments` through a file's own `Array` (a local
+  `Array` with `from`, a local `Array.prototype.slice.call`), through a
+  replaced `Array.from` or `Array.prototype.slice`, and a spread beside a
+  local `Array`;
 - `createRequire` with a reassigned `__filename`, with a local
   `pathToFileURL`, with `node:url`'s `pathToFileURL`, and with `__filename`
   in an ES module;
 - cross-file pairs (exporter and Node-run consumer): named, default,
   namespace and barrel imports of a free-`require` value, of a
-  `createRequire` value, and of a local-`require` value.
+  `createRequire` value, and of a local-`require` value; and a free-`require`
+  value reached through an object member (`{ d }`, `{ value: d }`), a
+  function return, an array element, destructuring, an object spread, a class
+  field, a JSDoc generic and a 30-step alias chain, directly and through a
+  barrel, with the same routes over a real `createRequire` loader as the
+  control (no label allowed there).
 
 Each form appears in sloppy CommonJS, strict CommonJS and ES modules where it is
 valid. The test runs every file in Node (one child process, sequential) and
@@ -242,6 +253,7 @@ records whether each call reaches the real loader, a local function, another
 directory (`sub/dep.cjs`), or throws. It then checks two things against Node:
 the analysis' classification of the callee, and the links the module actually
 **emits** for that site, after indexing the whole corpus:
+
 - where Node used something local (or threw), there must be no link into the
   dependency;
 - where Node used the real loader and the analysis says so, there must be a
@@ -252,12 +264,14 @@ the analysis' classification of the callee, and the links the module actually
   the import nor the member may link into it;
 - for the bundler reading, the import and the member must carry
   `data.assumes`. Cross-file sites check the member link in the importing
-  file.
+  file, so every dependent route above must carry the label.
 
-Result: **0 classification and 0 emitted-link disagreements**. 289 static
-sites match exactly: 130 local, 141 real, and 18 where Node throws (TDZ, an
-undefined hoisted var, an early error), classified local. The model that this
+Result: **0 classification and 0 emitted-link disagreements**. 292 static
+sites match exactly: 130 local, 143 real, and 19 where Node throws or never
+reaches the site (TDZ, an undefined hoisted var, an early error, an
+uncallable branch function), classified local. The model that this
 verifies:
+
 - **Block scope.** `let`/`const`/`class`/block functions are block-scoped. A
   catch binding is scoped to its block only. A class static block is its own
   `var` scope.
@@ -272,8 +286,8 @@ verifies:
 - **CommonJS top level.** This is the body of Node's wrapper function, whose
   parameters are `exports`, `require` and `module`. So Annex B never hoists
   these names there. Node confirms that after `if (true) { function require
-  () {} }` a top-level `require` is the real loader. A top-level `function
-  require` replaces the parameter, and a top-level `let require` is an early
+() {} }` a top-level `require` is the real loader. A top-level `function
+require` replaces the parameter, and a top-level `let require` is an early
   error.
 - **Annex B.3.4.** A function declaration that is directly an `if` or `else`
   branch (no braces), in sloppy code, behaves as if it were in a block of its
@@ -284,18 +298,27 @@ verifies:
 
 **Conservative (`uncertain`, never treated as the loader).** These have no
 static answer:
+
 - an occurrence inside a `with` body;
 - any occurrence whose binding scope contains a direct `eval(…)` that could
   add a nearer `var` (sloppy) or assign the binding (any mode);
 - the CommonJS wrapper binding when the file reassigns it anywhere: `var
-  require = …` at top level, `require = …`, compound or destructuring
+require = …` at top level, `require = …`, compound or destructuring
   assignment, or `for (require of …)`;
 - in sloppy CommonJS code, any use of the **wrapper's** `arguments` other
   than a plain read or a copy. `arguments` is mapped to the parameters
   `exports, require, module, __filename, __dirname`. Plain reads are
   `arguments.length` and `arguments[i]`; copies are `...arguments`,
   `Array.from(arguments)`, `Array.prototype.slice.call(arguments)` and
-  `[].slice.call(arguments)`. Writing, deleting, passing `arguments` itself
+  `[].slice.call(arguments)`. The last three count as copies only when
+  `Array` is provably the untouched global: the file has no `with` or direct
+  `eval`, declares nothing named `Array`, has no string `"Array"`, and every
+  occurrence of the name `Array` (also as a property, `globalThis.Array`)
+  heads a member chain that is only called, `new`ed, or tested with
+  `instanceof`/`typeof`, never written, deleted, passed, stored or returned.
+  The file must also never write a member named `from` (or `slice`,
+  respectively) nor mention that name as a string. A spread needs no such
+  proof. Writing, deleting, passing `arguments` itself
   on, returning it or aliasing it counts. Which function's `arguments` an
   occurrence denotes is resolved:
   - arrows inherit it;
@@ -320,6 +343,7 @@ answer) and never "real" where Node did not use the real loader.
 
 A `createRequire` base counts as this file's own location only when that is
 **proven**:
+
 - `import.meta.url`/`import.meta.filename` in an ES module whose
   `import.meta` the file never writes or lets escape;
 - the wrapper's own `__filename` in CommonJS, unshadowed and never written,
@@ -343,6 +367,7 @@ load(require)` (2 oracle sites) and `const r = require; r("x")`. That loses
 an import edge; it is never a wrong link.
 
 **Not modelled, with exactly what is emitted:**
+
 - **AMD.** `define(function (require, exports, module) { require("./b") })`:
   the call is to a local parameter. It is emitted as an unresolved `calls`
   link (`local`) and no `imports` link, although the AMD loader would load
@@ -359,12 +384,10 @@ an import edge; it is never a wrong link.
   treated as the loader (bundler semantics); Node itself throws a
   ReferenceError there. Every link that rests on that reading carries
   `data.assumes: "bundler-require"`, in this file and in others: the import,
-  its bindings, and the calls and members reached through them. The flag is
-  carried along alias chains step by step (imports, re-exports,
-  `export * from` barrels, `export default value`), and through variable and
-  destructuring initialisers (`const alias = d`) and the members of a receiver
-  chain (`ns.d.real()`). An agent can therefore tell the assumption from a
-  fact.
+  its bindings, and the calls and members reached through them by any route
+  the checker follows. This is decided by the differential analysis below,
+  not by following routes by hand. An agent can therefore tell the assumption
+  from a fact.
 - **Monkey-patching the loader.** Replacing `Module.prototype.require` or
   `Module._load` (as mocking libraries do), or mutating Node's `module` object
   from another file, is outside the binding model. Such code is read as
@@ -381,7 +404,7 @@ an import edge; it is never a wrong link.
 
 **Spelling.** If any occurrence that must be renamed is written with an escape
 (`\u{0072}equire`), it cannot be replaced at the same length, so that file
-**fails** with a diagnostic. An escaped *real* `require` needs no rename and is
+**fails** with a diagnostic. An escaped _real_ `require` needs no rename and is
 fine. A parse failure inside the analysis also fails just that file.
 
 Paths aliases (`paths`/`baseUrl`), `package.json` `imports`/`exports`/`type`,
@@ -390,26 +413,26 @@ own resolver over the snapshot.
 
 **Unresolved, with the name kept and `data.reason`:**
 
-| reason | Meaning |
-|---|---|
-| `external` | The checker found declarations, but outside the project (standard library); or a name that resolved through a binding whose module did resolve but whose member has no declaration |
-| `external-package` | A bare specifier that does not resolve (`node_modules` is never walked), every binding imported from it, and every call, `new`, type reference (including qualified names such as `ns.T`), heritage clause and member lookup reached through such a binding |
-| `missing-module` | The same for a relative specifier with no captured file (for example `new FlowProducer()` imported from an unbuilt `../../dist/...`) |
-| `unresolved-alias` | The same for a specifier matching a `paths` pattern of the owning config, or a `#` subpath import, that resolves to no captured file |
-| `no-symbol` | The checker has no symbol: untyped JS, `any`/`unknown` receivers (often because the receiver's type came from an uncaptured package), computed callees |
-| `local` | The target is a parameter, local variable, local function or other non-symbol declaration |
-| `computed-specifier` | `import(expr)` or JS `require(expr)` with a non-literal specifier |
-| `compiler-limit` | The TypeScript checker exhausted its stack on this lookup (deep inference chains); the file is partial |
-| `dynamic-scope` | A `require`/`module`/`exports` whose meaning is decided at run time (see above), anything reached through its value, and unresolved names inside a `with` body |
-| `not-a-module` | A binding from a captured file that was analysed, has no syntax errors, and has no imports or exports (a script). The import edge itself links to that file and carries `data.notAModule: true`; that flag means exactly this and nothing else |
-| `partial-target` | A binding from a captured file with syntax errors and no exports found (its exports cannot be ruled out) |
-| `target-unavailable` | The target file failed analysis (parser, binder, scope analysis or a broken config); the import edge and its bindings are unresolved, the file kept in `data.targets` |
-| `untyped-require` | A binding, call or member reached through a captured module required by a form the compiler does not type (`(0, require)(…)`, `(require)(…)`, `module.require(…)`, an escaped `require`). The import edge links to the module |
-| `partial-declaration` | The target, or the structure a lookup went through, is at or after the first syntax error inside its declaration (see Status) |
-| `createrequire-base` | A require through `createRequire` with a base other than this file's location; no would-be target is kept |
-| `renamed-export` | An ES binding of an export named `require`/`module`/`exports` between a JS file and a TS file or a CommonJS property, whose spellings differ for the compiler |
-| `ambiguous-project` | Equally ranked configs disagree and at least one has no complete answer; their targets are kept |
-| `incomplete-config` | The file's config `extends` a base that was not captured, and the link's outcome depends on settings that base could supply (see Status); would-be targets are kept, the reason without that rule is in `data.reasonWithoutConfig` |
+| reason                | Meaning                                                                                                                                                                                                                                                     |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `external`            | The checker found declarations, but outside the project (standard library); or a name that resolved through a binding whose module did resolve but whose member has no declaration                                                                          |
+| `external-package`    | A bare specifier that does not resolve (`node_modules` is never walked), every binding imported from it, and every call, `new`, type reference (including qualified names such as `ns.T`), heritage clause and member lookup reached through such a binding |
+| `missing-module`      | The same for a relative specifier with no captured file (for example `new FlowProducer()` imported from an unbuilt `../../dist/...`)                                                                                                                        |
+| `unresolved-alias`    | The same for a specifier matching a `paths` pattern of the owning config, or a `#` subpath import, that resolves to no captured file                                                                                                                        |
+| `no-symbol`           | The checker has no symbol: untyped JS, `any`/`unknown` receivers (often because the receiver's type came from an uncaptured package), computed callees                                                                                                      |
+| `local`               | The target is a parameter, local variable, local function or other non-symbol declaration                                                                                                                                                                   |
+| `computed-specifier`  | `import(expr)` or JS `require(expr)` with a non-literal specifier                                                                                                                                                                                           |
+| `compiler-limit`      | The TypeScript checker exhausted its stack on this lookup (deep inference chains); the file is partial                                                                                                                                                      |
+| `dynamic-scope`       | A `require`/`module`/`exports` whose meaning is decided at run time (see above), anything reached through its value, and unresolved names inside a `with` body                                                                                              |
+| `not-a-module`        | A binding from a captured file that was analysed, has no syntax errors, and has no imports or exports (a script). The import edge itself links to that file and carries `data.notAModule: true`; that flag means exactly this and nothing else              |
+| `partial-target`      | A binding from a captured file with syntax errors and no exports found (its exports cannot be ruled out)                                                                                                                                                    |
+| `target-unavailable`  | The target file failed analysis (parser, binder, scope analysis or a broken config); the import edge and its bindings are unresolved, the file kept in `data.targets`                                                                                       |
+| `untyped-require`     | A binding, call or member reached through a captured module required by a form the compiler does not type (`(0, require)(…)`, `(require)(…)`, `module.require(…)`, an escaped `require`). The import edge links to the module                               |
+| `partial-declaration` | The link's outcome depends on recovered text after a syntax error (see Status and "Differential analysis"); the normal program's targets are kept                                                                                                           |
+| `createrequire-base`  | A require through `createRequire` with a base other than this file's location; no would-be target is kept                                                                                                                                                   |
+| `renamed-export`      | An ES binding of an export named `require`/`module`/`exports` between a JS file and a TS file or a CommonJS property, whose spellings differ for the compiler                                                                                               |
+| `ambiguous-project`   | Equally ranked configs disagree and at least one has no complete answer; their targets are kept                                                                                                                                                             |
+| `incomplete-config`   | The file's config `extends` a base that was not captured, and the link's outcome depends on settings that base could supply (see Status); would-be targets are kept, the reason without that rule is in `data.reasonWithoutConfig`                          |
 
 **A target set is never narrowed.** If any possible declaration lies outside the
 project (standard library, uncaptured package, a local), the link is
@@ -434,32 +457,66 @@ imports of `./orig` are not linked to it; backlog).
   meaning also makes it partial, with a diagnostic: `class C extends A, B`,
   two `extends` clauses, `extends` after `implements`, or `implements` on an
   interface.
-- **What a partial declaration supports.** The exact rule, applied to the
-  target side of every link:
-  - **Existence and name.** A declaration may be linked when its name token
-    lies wholly before the first error inside its top-level declaration. So a
+- **What a partial declaration supports.** The text of a declaration from
+  its first syntax error to its end is recovered structure that the source
+  does not actually state. So is a whole heritage clause list when the error
+  is inside it (including the grammar defects above). Links that depend on
+  that text are decided by the differential analysis below:
+  - **Existence and name.** A name before the error is not untrusted, so a
     call to `function f(x: , y) {}` links to `f`, `new Base()` links to a
     truncated `class Base`, and an import of the file links to its module.
-  - **Recovered structure.** A definite link may use a declaration's
-    structure (members, parameters, return type, heritage clauses, type
-    parameters, an aliased type) only where that part lies wholly before the
-    first error inside the declaration. For example: `x.b()` with
-    `interface I { a: ; b(): void }` is withheld because `b` follows the
-    error; `f(1, 2).go()` is withheld because f's return type follows its
-    error; `new Base().m()` with a truncated `class Base { m() {} ` links,
-    because `m` precedes the error.
-  - **Heritage clauses.** A heritage clause that is not wholly before the
-    first error of its declaration supports nothing. Members inherited
-    through it are withheld, and the `extends`/`implements` links written in
-    it are withheld too.
-  - **Other routes.** Receivers are judged the same way: every name, member
-    and callee in a receiver chain, plus an unannotated callback parameter
-    typed by the callee it is passed to.
-  - **Labelling.** Withheld links are unresolved with reason
-    `partial-declaration`, the would-be target kept in `data.targets`. Like
-    any incomplete set, they never make a candidate set complete.
-  - **Containment.** Only the declaration containing the error is affected.
-    Intact declarations elsewhere in the same file link normally.
+  - **Anything that depends on the text after the error** is unresolved with
+    reason `partial-declaration`: a member declared after it (`x.b()` with
+    `interface I { a: ; b(): void }`), a return type after it
+    (`f(1, 2).go()`), and every value that carries such a type onward
+    (a variable, a callback parameter typed by the callee, a returned value,
+    an array element, a destructured or spread value, a class field, a
+    generic instantiation, another file, a barrel). Members inherited
+    through a heritage clause holding the error, and the `extends`/
+    `implements` links written in it, are withheld too.
+  - **Labelling.** The normal program's would-be targets are kept in
+    `data.targets`. Like any incomplete set, they never make a candidate set
+    complete.
+  - **Containment.** A link that resolves the same without the untrusted
+    text stays definite, even in the same file or through the same
+    declaration (`new Box().go()` beside a broken function returning `Box`).
+- **Differential analysis.** Two kinds of input are untrusted: (a) the
+  syntax-error tails above, and (b) each free `require`/`module` in an ES
+  module that is read as the loader only under the bundler assumption. When
+  a project's program contains neither (the normal case, as in BullMQ),
+  nothing else happens. Otherwise, for each kind present, a second program is
+  built over the same snapshot with that input neutralised **at the same
+  offsets** (`untrusted.ts`):
+  - (a) each tail becomes spaces, starting with exactly the closing brackets
+    that were open where it starts (or, when the parser closed the
+    declaration in less room, only the tail's own closing brackets), so every
+    following statement parses at the same position as before. This is
+    checked: if any top-level statement outside the tails would move or
+    change kind, everything from the first tail to the end of the file is
+    neutralised instead;
+  - (b) the assumed `require`/`module` is renamed, at the same length, to an
+    undeclared name, as the dynamic-scope rule does.
+
+  Every file of the project is extracted again against that program, and
+  each link is compared with the link at the same site (kind and range). If
+  the target set and reason are the same, the link does not depend on the
+  untrusted input and is unchanged. If they differ, or the site has no link
+  there, the link depends on it. For (a), a link with targets and no other
+  reason becomes unresolved `partial-declaration` with the normal program's
+  targets kept. For (b), it keeps its outcome and gains
+  `data.assumes: "bundler-require"`. If both kinds apply to one link,
+  `partial-declaration` wins. The type checker does all the propagation;
+  there are no hand-written routes. Structural `contains` links come from the
+  parse alone and are not compared. A neutral extraction that fails or is cut
+  off marks every link of that file as dependent.
+
+  Cost: nothing for a project without untrusted input. Otherwise one extra
+  program and one extra extraction of the project's files per kind present
+  (two when a project has both). Unchanged files reuse the normal program's
+  parsed and bound source files. A project whose program does not reach an
+  untrusted file builds nothing extra. Measured on BullMQ with one broken
+  file: see `evidence/w2-d/README.md`.
+
 - **Compiler stack limits.** The checker's inference recurses once per step, so
   a long chain (`let v1 = v0; …` or `function f1() { return f0(); } …`) can
   exhaust the stack.
@@ -491,10 +548,11 @@ imports of `./orig` are not linked to it; backlog).
   - The warm-up results hold at any stack size.
 
   Checked with `node --stack-size=700 --test` and `node --stack-size=2048
-  --test`: 84 of 84 pass, with no skip needed at either size. Node rejects
+--test`: 84 of 84 pass, with no skip needed at either size. Node rejects
   `--stack-size` inside `NODE_OPTIONS`. The test runner passes it on to its
   per-file processes, and the tests forward it to the child processes they
   start.
+
 - **Parser and binder stack limits.** Each file parses in its own guard, so a
   file the parser cannot handle (10,000 nested parentheses) fails alone. The
   binder runs when the checker is created. On a binder overflow the offending
@@ -575,6 +633,7 @@ imports of `./orig` are not linked to it; backlog).
   setting can change them. The rule is deliberately coarse: under a base that
   could not be captured, most cross-file links are unresolved, which is the
   honest outcome.
+
 - Other config diagnostics (unknown options and the like) are kept in each owned
   file's `data.configNotes`; "no inputs found" is normal for solution configs.
 
@@ -591,7 +650,7 @@ imports of `./orig` are not linked to it; backlog).
    now. The only difference from a thrown error: the failure appears in the
    report's `failed` list and in each file's diagnostics, not in
    `analysisErrors`, because the interface has no way to name a failed
-   *project*. This is a reporting nuance, not a blocker.
+   _project_. This is a reporting nuance, not a blocker.
 3. **Candidate sets cannot have one member.** When the checker returns one
    project declaration plus external ones, the honest answer is "this one, or
    something outside the project", which the interface cannot express (ambiguous
@@ -619,7 +678,7 @@ imports of `./orig` are not linked to it; backlog).
 
 ## Observations
 
-Full numbers, the comparison across rounds and all four hand checks are in
+Full numbers, the comparison across rounds and every hand check are in
 `evidence/w2-d/README.md`.
 
 - **BullMQ indexes in full**: 261 claimed files, 261 clean, 0 partial, 0 failed,
@@ -644,8 +703,15 @@ Full numbers, the comparison across rounds and all four hand checks are in
   from `external` to `external-package` (item 3). Hand checks found no wrong
   link in any round: round 1 checked 24 resolved, 12 unresolved and all 4
   candidate sets; rounds 2 to 6, each with a new seed, checked 30 resolved,
-  15 unresolved and all 4 candidate sets. Rounds 6 to 8 leave BullMQ's
-  totals identical to round 5.
+  15 unresolved and all 4 candidate sets. Rounds 6 to 9 leave BullMQ's
+  totals identical to round 5; round 9 builds no second program there (no
+  untrusted input).
+- **Differential analysis cost** (BullMQ copy with one syntax error added in
+  `class Job`): 6 programs instead of 4 (one extra for each of the two
+  projects that reach the file), 388 links become `partial-declaration`, and
+  nothing else moves except the missing annotation's own empty reference. On
+  `requirejs` (3 partial files) one neutral program is built and no link
+  differs.
 - **A project with a local `require`: `requirejs`** (`7faea649`, 406 files, 0
   failed). 133 files are renamed (`require` in 116, `exports` in 73, `module`
   in 61), almost all AMD `define(function (require, exports, module) {…})`

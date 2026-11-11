@@ -1,1 +1,7 @@
-{ "name": "@sample/util", "type": "module", "exports": { ".": "./src/index.ts" } }
+{
+  "name": "@sample/util",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

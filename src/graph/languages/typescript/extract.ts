@@ -8,6 +8,7 @@ import type {
   SymbolDraft,
 } from "../../types.js";
 import { fromVirtual } from "./project.js";
+import { heritageErrors } from "./untrusted.js";
 import {
   NAMES,
   restoreNames,
@@ -26,10 +27,6 @@ export interface RenameContext {
   skip: ReadonlySet<string>;
   /** What a captured target file is: a module, a script (no exports), partial (syntax errors), or unavailable (failed). */
   moduleKind: (path: string) => "module" | "script" | "partial" | "unavailable";
-  /** Offsets of assumed free `require`/`module` in each file (bundler reading). */
-  assumedIn: (path: string) => ReadonlySet<number>;
-  /** Whether any file of the program has such an assumption. */
-  anyAssumed: boolean;
 }
 import {
   anchorOf,
@@ -57,8 +54,6 @@ interface Targets {
   targets: TargetFact[];
   /** Whether the lookup passed through an import alias. */
   viaAlias?: boolean;
-  /** Reached through a free `require` in an ES module (bundler assumption). */
-  assumes?: boolean;
   /** The receiver of a member lookup, if any. */
   receiver?: ts.Expression | undefined;
   /**
@@ -145,264 +140,6 @@ export function extractFile(
   const uncertainAt = new Set(context.renamed?.uncertain ?? []);
   const uncertainReason = (offset: number) =>
     context.renamed?.reasons[offset] ?? "dynamic-scope";
-  const assumedAt = new Set(context.renamed?.assumed ?? []);
-  /**
-   * Whether a value rests on the bundler reading of a free `require`/`module`
-   * in an ES module, in this file or another one: followed through alias
-   * chains (imports, re-exports, barrels), variable and destructuring
-   * initialisers, default exports and the members of a receiver chain.
-   */
-  const assumedMemo = new Map<ts.Symbol, boolean>();
-  const symbolAssumed = (symbol: ts.Symbol | undefined, depth = 0): boolean => {
-    if (!context.anyAssumed || !symbol || symbol === LIMIT || depth > 24)
-      return false;
-    const known = assumedMemo.get(symbol);
-    if (known !== undefined) return known;
-    assumedMemo.set(symbol, false);
-    let result = false;
-    let current: ts.Symbol | undefined = symbol;
-    for (let steps = 0; current && steps < 64 && !result; steps++) {
-      if (current.declarations?.some((d) => declarationAssumed(d, depth)))
-        result = true;
-      if (!(current.flags & ts.SymbolFlags.Alias)) break;
-      const next: ts.Symbol | undefined =
-        checker.getImmediateAliasedSymbol(current);
-      if (!next || next === current) break;
-      current = next;
-    }
-    assumedMemo.set(symbol, result);
-    return result;
-  };
-  const declarationAssumed = (declaration: ts.Node, depth: number): boolean => {
-    let holder: ts.Node | undefined = declaration;
-    while (
-      holder &&
-      (ts.isBindingElement(holder) ||
-        ts.isObjectBindingPattern(holder) ||
-        ts.isArrayBindingPattern(holder))
-    )
-      holder = holder.parent;
-    const value =
-      holder && ts.isVariableDeclaration(holder)
-        ? holder.initializer
-        : holder && ts.isExportAssignment(holder)
-          ? holder.expression
-          : undefined;
-    return !!value && expressionAssumed(value, depth + 1);
-  };
-  const expressionAssumed = (expression: ts.Expression, depth = 0): boolean => {
-    if (!context.anyAssumed) return false;
-    let current: ts.Node = expression;
-    for (;;) {
-      if (
-        ts.isParenthesizedExpression(current) ||
-        ts.isNonNullExpression(current) ||
-        ts.isAsExpression(current) ||
-        ts.isAwaitExpression(current)
-      ) {
-        current = current.expression;
-        continue;
-      }
-      if (ts.isPropertyAccessExpression(current)) {
-        if (symbolAssumed(symbolOf(current.name), depth)) return true;
-        current = current.expression;
-        continue;
-      }
-      if (
-        ts.isElementAccessExpression(current) ||
-        ts.isCallExpression(current)
-      ) {
-        current = current.expression;
-        continue;
-      }
-      break;
-    }
-    if (!ts.isIdentifier(current)) return false;
-    const source = current.getSourceFile();
-    const at = fromVirtual(source.fileName);
-    if (at !== undefined && context.assumedIn(at).has(current.getStart(source)))
-      return true;
-    return symbolAssumed(symbolOf(current), depth);
-  };
-
-  // ----- syntax errors: what a partial declaration may support -----
-  /**
-   * Error positions per file: the parser's diagnostics plus heritage grammar
-   * the parser accepts but that has no meaning (`extends A, B`, two
-   * `extends` clauses, `extends` after `implements`, `implements` on an
-   * interface).
-   */
-  const errorMemo = new Map<ts.SourceFile, number[]>();
-  const errorsOf = (source: ts.SourceFile): number[] => {
-    const known = errorMemo.get(source);
-    if (known) return known;
-    const errors = program
-      .getSyntacticDiagnostics(source)
-      .map((diagnostic) => diagnostic.start ?? 0);
-    const visit = (node: ts.Node): void => {
-      if (
-        (ts.isClassLike(node) || ts.isInterfaceDeclaration(node)) &&
-        node.heritageClauses?.length
-      ) {
-        const clauses = node.heritageClauses;
-        const extendsClauses = clauses.filter(
-          (c) => c.token === ts.SyntaxKind.ExtendsKeyword,
-        );
-        const bad =
-          (ts.isClassLike(node) &&
-            (extendsClauses.length > 1 ||
-              extendsClauses.some((c) => c.types.length > 1) ||
-              (clauses.findIndex(
-                (c) => c.token === ts.SyntaxKind.ImplementsKeyword,
-              ) <
-                clauses.findIndex(
-                  (c) => c.token === ts.SyntaxKind.ExtendsKeyword,
-                ) &&
-                clauses.some(
-                  (c) => c.token === ts.SyntaxKind.ImplementsKeyword,
-                ) &&
-                extendsClauses.length > 0))) ||
-          (ts.isInterfaceDeclaration(node) &&
-            clauses.some((c) => c.token === ts.SyntaxKind.ImplementsKeyword));
-        if (bad) errors.push(clauses[0]!.getStart(source));
-      }
-      ts.forEachChild(node, visit);
-    };
-    visit(source);
-    errors.sort((a, b) => a - b);
-    errorMemo.set(source, errors);
-    return errors;
-  };
-  /** The top-level statement (or the file) that contains a node. */
-  const topOf = (node: ts.Node): ts.Node => {
-    let current = node;
-    while (current.parent && !ts.isSourceFile(current.parent))
-      current = current.parent;
-    return current;
-  };
-  /** The first error inside the top-level declaration containing `node`. */
-  const firstError = (node: ts.Node): number | undefined => {
-    const source = node.getSourceFile();
-    const errors = errorsOf(source);
-    if (!errors.length) return undefined;
-    const top = topOf(node);
-    const start = ts.isSourceFile(top) ? 0 : top.getStart(source);
-    return errors.find((e) => e >= start && e <= top.end);
-  };
-  /** A target whose name token is not wholly before the first error. */
-  const targetWithheld = (declaration: ts.Node): boolean => {
-    // A module's existence never depends on its contents.
-    if (ts.isSourceFile(declaration)) return false;
-    const error = firstError(declaration);
-    if (error === undefined) return false;
-    const name = (declaration as ts.NamedDeclaration).name;
-    return (name ?? declaration).end > error;
-  };
-  /** The part of a declaration that determines the type a lookup goes through. */
-  const typePart = (declaration: ts.Node): ts.Node => {
-    let holder: ts.Node = declaration;
-    while (
-      ts.isBindingElement(holder) ||
-      ts.isObjectBindingPattern(holder) ||
-      ts.isArrayBindingPattern(holder)
-    )
-      holder = holder.parent;
-    if (ts.isFunctionLike(holder))
-      return (holder as ts.SignatureDeclaration).type ?? holder;
-    if (
-      ts.isVariableDeclaration(holder) ||
-      ts.isParameter(holder) ||
-      ts.isPropertyDeclaration(holder) ||
-      ts.isPropertySignature(holder) ||
-      ts.isPropertyAssignment(holder)
-    ) {
-      const typed = holder as ts.VariableDeclaration;
-      return typed.type ?? typed.initializer ?? typed.name;
-    }
-    if (
-      ts.isClassLike(holder) ||
-      ts.isInterfaceDeclaration(holder) ||
-      ts.isEnumDeclaration(holder) ||
-      ts.isModuleDeclaration(holder)
-    )
-      return (holder as ts.NamedDeclaration).name ?? holder;
-    return holder;
-  };
-  /** A symbol whose type-determining part is not wholly before the first error. */
-  const throughWithheld = (symbol: ts.Symbol | undefined): boolean => {
-    if (!symbol || symbol === LIMIT) return false;
-    let current = symbol;
-    if (current.flags & ts.SymbolFlags.Alias)
-      current = checker.getAliasedSymbol(current);
-    return !!current.declarations?.some((declaration) => {
-      const at = fromVirtual(declaration.getSourceFile().fileName);
-      if (at === undefined || !captured.has(at)) return false;
-      const error = firstError(declaration);
-      if (error === undefined) return false;
-      if (targetWithheld(declaration)) return true;
-      // An unannotated parameter takes its type from the callee it is passed to.
-      if (
-        ts.isParameter(declaration) &&
-        !declaration.type &&
-        (ts.isArrowFunction(declaration.parent) ||
-          ts.isFunctionExpression(declaration.parent)) &&
-        ts.isCallExpression(declaration.parent.parent)
-      )
-        return throughWithheld(
-          symbolOf(calleeName(declaration.parent.parent.expression)),
-        );
-      return typePart(declaration).end > error;
-    });
-  };
-  const calleeName = (callee: ts.Expression): ts.Node => {
-    const value = unwrap(callee);
-    return ts.isPropertyAccessExpression(value) ? value.name : value;
-  };
-  /** A member reached through a receiver whose type rests on partial structure. */
-  const receiverWithheld = (
-    receiver: ts.Expression,
-    targets: readonly ts.Node[],
-  ): boolean => {
-    let current: ts.Node = receiver;
-    for (;;) {
-      if (
-        ts.isParenthesizedExpression(current) ||
-        ts.isNonNullExpression(current) ||
-        ts.isAsExpression(current) ||
-        ts.isAwaitExpression(current)
-      )
-        current = current.expression;
-      else if (ts.isPropertyAccessExpression(current)) {
-        if (throughWithheld(symbolOf(current.name))) return true;
-        current = current.expression;
-      } else if (ts.isCallExpression(current) || ts.isNewExpression(current)) {
-        if (throughWithheld(symbolOf(calleeName(current.expression))))
-          return true;
-        current = current.expression;
-      } else if (ts.isElementAccessExpression(current))
-        current = current.expression;
-      else break;
-    }
-    if (ts.isIdentifier(current) && throughWithheld(symbolOf(current)))
-      return true;
-    // Inherited members through a heritage clause that is not wholly before
-    // the first error of the receiver type's declaration.
-    const type = checker.getTypeAtLocation(receiver);
-    for (const declaration of type.getSymbol()?.declarations ?? []) {
-      if (
-        !(
-          ts.isClassLike(declaration) || ts.isInterfaceDeclaration(declaration)
-        ) ||
-        !declaration.heritageClauses?.length
-      )
-        continue;
-      const error = firstError(declaration);
-      const heritageEnd = declaration.heritageClauses.at(-1)!.end;
-      if (error === undefined || error >= heritageEnd) continue;
-      if (targets.some((target) => target.parent !== declaration)) return true;
-    }
-    return false;
-  };
   const freshExportNames = new Set(Object.values(context.fresh.local));
   const path = file.fileName.slice(1);
   const symbols: SymbolDraft[] = [];
@@ -443,23 +180,13 @@ export function extractFile(
     const found: Lookup =
       query && "flags" in query ? { symbol: query } : (query ?? {});
     const receiver = found.receiver;
-    if (found.reason || !found.symbol) {
-      // Unresolved, but still resting on the bundler reading if its receiver does.
-      const assumes = receiver !== undefined && expressionAssumed(receiver);
-      return {
-        targets: [],
-        reason: found.reason ?? "no-symbol",
-        receiver,
-        ...(assumes ? { assumes } : {}),
-      };
-    }
+    if (found.reason || !found.symbol)
+      return { targets: [], reason: found.reason ?? "no-symbol", receiver };
     const facts = new Map<string, TargetFact>();
     let external = 0;
     let local = 0;
     let viaAlias = false;
     let firstAlias: ts.Symbol | undefined;
-    let partial = false;
-    const declared: ts.Node[] = [];
     const record = (declaration: ts.Declaration): boolean => {
       const target = fromVirtual(declaration.getSourceFile().fileName);
       if (target === undefined || !captured.has(target)) return false;
@@ -467,9 +194,6 @@ export function extractFile(
       if (!anchor) return false;
       const key = keyOf(anchor);
       facts.set(`${target}\0${key}`, { file: target, key });
-      declared.push(declaration);
-      // Recovered structure at or after a syntax error supports no link.
-      if (targetWithheld(declaration)) partial = true;
       return true;
     };
     const visit = (value: ts.Symbol, depth: number) => {
@@ -510,26 +234,7 @@ export function extractFile(
     };
     visit(found.symbol, 0);
     const targets = [...facts.values()];
-    const assumes =
-      symbolAssumed(found.symbol) ||
-      (receiver !== undefined && expressionAssumed(receiver));
-    if (
-      !partial &&
-      targets.length &&
-      receiver !== undefined &&
-      receiverWithheld(receiver, declared)
-    )
-      partial = true;
-    if (partial)
-      return {
-        targets,
-        reason: "partial-declaration",
-        viaAlias,
-        receiver,
-        ...(assumes ? { assumes } : {}),
-      };
-    if (!external && !local)
-      return { targets, viaAlias, receiver, ...(assumes ? { assumes } : {}) };
+    if (!external && !local) return { targets, viaAlias, receiver };
     // An alias whose module did not resolve keeps that module's reason.
     const moduleFailure =
       external &&
@@ -541,7 +246,6 @@ export function extractFile(
       reason: local ? "local" : moduleFailure || "external",
       viaAlias,
       receiver,
-      ...(assumes ? { assumes } : {}),
     };
   }
   /** The module reason of a member's receiver root, if that root is an unresolved binding. */
@@ -634,8 +338,6 @@ export function extractFile(
     if (found.targets.length)
       facts.targets = found.targets.map((target) => ({ ...target }));
     if (reason) facts.reason = reason;
-    // Node itself has no `require` in an ES module; a bundler does.
-    if (found.assumes) facts.assumes = "bundler-require";
     links.push({
       sourceKey,
       kind,
@@ -1148,11 +850,7 @@ export function extractFile(
           { require: true },
         );
       else if (isCommonJsRequire(node)) {
-        const requireFacts: { [key: string]: Json } = assumedAt.has(
-          node.expression.getStart(file),
-        )
-          ? { require: true, assumes: "bundler-require" }
-          : { require: true };
+        const requireFacts: { [key: string]: Json } = { require: true };
         moduleLink(
           owner,
           node.arguments[0] as ts.StringLiteralLike,
@@ -1162,16 +860,9 @@ export function extractFile(
       } else if (requireForm(node)) {
         // `(require)("x")`, `(0, require)("x")`, `module.require("x")`: the
         // loader, though the compiler does not type it; the edge is linked.
-        const callee = node.expression;
-        const id = ts.isPropertyAccessExpression(callee)
-          ? (callee.expression as ts.Identifier)
-          : requireIdentifier(callee)!;
         const formFacts: { [key: string]: Json } = {
           require: true,
           calleeForm: requireForm(node)!,
-          ...(assumedAt.has(id.getStart(file))
-            ? { assumes: "bundler-require" }
-            : {}),
         };
         moduleLink(owner, node.arguments[0] as ts.StringLiteralLike, formFacts);
         // Its bindings are real but the compiler does not type them.
@@ -1237,18 +928,12 @@ export function extractFile(
           ? "type"
           : "value",
       );
-      // A heritage clause that is not wholly before the first syntax error of
-      // its declaration supports nothing.
-      const error = firstError(node.parent.parent);
       link(
         owner,
         kind,
         isEntityChain(expression) ? expression.getText(file) : "(expression)",
         node.expression,
-        error !== undefined &&
-          error <= node.parent.parent.heritageClauses!.at(-1)!.end
-          ? { ...found, reason: "partial-declaration" }
-          : found,
+        found,
       );
     } else if (ts.isImportTypeNode(node)) {
       const argument = node.argument;
@@ -1338,8 +1023,8 @@ export function extractFile(
     });
   }
   // Heritage grammar the parser accepts but that has no meaning makes this
-  // file partial too (see errorsOf).
-  for (const at of errorsOf(file))
+  // file partial too (see untrusted.ts).
+  for (const at of heritageErrors(file))
     if (
       !program
         .getSyntacticDiagnostics(file)

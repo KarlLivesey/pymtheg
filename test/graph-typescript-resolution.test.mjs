@@ -2945,3 +2945,355 @@ test("failed and partial targets get their own reasons, never not-a-module", asy
     },
   );
 });
+
+// ----- Round 9: the differential analysis (untrusted.ts) -----
+
+/**
+ * The last `calls` link to `method` on each line marked `// D` (depends on
+ * untrusted input) or `// C` (control), as [mark, line, link].
+ */
+function markedCalls(graph, file, method) {
+  const text = graph.store.getFile(file).text;
+  const links = graph.store
+    .links()
+    .filter((l) => l.file === file && l.kind === "calls");
+  const found = [];
+  let offset = 0;
+  for (const line of text.split("\n")) {
+    const mark = / \/\/ ([DC])$/.exec(line)?.[1];
+    const end = offset + line.length;
+    if (mark) {
+      const onLine = links
+        .filter(
+          (l) =>
+            l.range.start >= offset &&
+            l.range.end <= end &&
+            text.slice(l.range.start, l.range.end) === method,
+        )
+        .sort((a, b) => b.range.start - a.range.start);
+      assert.ok(onLine.length, `a ${method} call on: ${line}`);
+      found.push([mark, line, onLine[0]]);
+    }
+    offset = end + 1;
+  }
+  return found;
+}
+
+const BROKEN = [
+  "export class Box { go() {} }",
+  "export class Crate<T> { item!: T; open(): T { return this.item; } }",
+  "export function make(x: , y): Box { return new Box(); }",
+  "export function visit(x: , cb: (p: Box) => void) {}",
+  "export function list(x: , y): Box[] { return []; }",
+  "export function pair(x: , y): { box: Box } { return { box: new Box() }; }",
+  "export function crate(x: , y): Crate<Box> { return new Crate(); }",
+  "export class Later { run() { new Box().go(); } } // C",
+  "",
+].join("\n");
+
+test("partial declarations: every route the checker follows is withheld; independent links stay definite", async () => {
+  await project(
+    {
+      "broken.ts": BROKEN,
+      "mid.ts": [
+        'import { make, Box } from "./broken";',
+        "export const made = make(1, 2);",
+        "export const fine = new Box();",
+        "",
+      ].join("\n"),
+      "barrel.ts": 'export * from "./mid";\n',
+      "use.ts": [
+        'import { make, visit, list, pair, crate, Box, Crate } from "./broken";',
+        'import { made, fine } from "./mid";',
+        'import { made as viaBarrel, fine as fineViaBarrel } from "./barrel";',
+        "const result = make(1, 2);",
+        "result.go(); // D",
+        "visit(1, (p) => p.go()); // D",
+        "function wrap() { return make(1, 2); }",
+        "wrap().go(); // D",
+        "list(1, 2)[0].go(); // D",
+        "const arr = [make(1, 2)];",
+        "arr[0].go(); // D",
+        "const { box } = pair(1, 2);",
+        "box.go(); // D",
+        "const [first] = list(1, 2);",
+        "first.go(); // D",
+        "const copy = { ...pair(1, 2) };",
+        "copy.box.go(); // D",
+        "const items = [...list(1, 2)];",
+        "items[0].go(); // D",
+        "class Holder { field = make(1, 2); }",
+        "new Holder().field.go(); // D",
+        "crate(1, 2).open().go(); // D",
+        "function id<T>(v: T): T { return v; }",
+        "id(make(1, 2)).go(); // D",
+        "made.go(); // D",
+        "viaBarrel.go(); // D",
+        "new Box().go(); // C",
+        "new Crate<Box>().open().go(); // C",
+        "const typed: Box = make(1, 2);",
+        "typed.go(); // C",
+        "fine.go(); // C",
+        "fineViaBarrel.go(); // C",
+        "id(new Box()).go(); // C",
+        "",
+      ].join("\n"),
+    },
+    async (graph) => {
+      for (const [file, method] of [
+        ["use.ts", "go"],
+        ["broken.ts", "go"],
+      ])
+        for (const [mark, line, link] of markedCalls(graph, file, method)) {
+          if (mark === "D") {
+            assert.equal(link.resolution, "unresolved", line);
+            assert.equal(link.data.reason, "partial-declaration", line);
+            // The normal program's target is kept.
+            assert.deepEqual(
+              link.data.targets.map((t) => t.file),
+              ["broken.ts"],
+              line,
+            );
+          } else {
+            assert.equal(link.resolution, "resolved", line);
+            assert.equal(graph.target(link), "broken.ts#Box.go", line);
+            assert.equal(link.data.reason, undefined, line);
+          }
+        }
+      // Name-only links into the broken file stay definite.
+      for (const name of ["make", "visit", "list", "pair", "crate", "Box"])
+        assert.equal(
+          graph.link("use.ts", name, "imports").resolution,
+          "resolved",
+          name,
+        );
+      assert.equal(
+        graph.target(graph.link("mid.ts", "make", "calls")),
+        "broken.ts#make",
+      );
+    },
+  );
+});
+
+const DEP_CJS = "module.exports = { real() {} };\n";
+const ROUTES = [
+  "export const holder = { d };",
+  "export const boxed = { value: d };",
+  "export function ret() { return d; }",
+  "export const arr = [d];",
+  "export const spread = { ...holder };",
+  "export class K { field = d; }",
+  "/** @template T @param {T} v @returns {T} */",
+  "export function id(v) { return v; }",
+  "const a0 = d;",
+  ...Array.from({ length: 29 }, (_, i) => `const a${i + 1} = a${i};`),
+  "export const a30 = a29;",
+  "export const own = { real() {} };",
+];
+
+test("the bundler label follows every route the checker follows; independent links stay unflagged", async () => {
+  await project(
+    {
+      "dep.cjs": DEP_CJS,
+      "a.mjs": [
+        'export const d = require("./dep.cjs");',
+        ...ROUTES,
+        "holder.d.real(); // D",
+        "boxed.value.real(); // D",
+        "ret().real(); // D",
+        "arr[0].real(); // D",
+        "const { d: destructured } = holder;",
+        "destructured.real(); // D",
+        "spread.d.real(); // D",
+        "new K().field.real(); // D",
+        "id(d).real(); // D",
+        "a30.real(); // D",
+        "own.real(); // C",
+        "id(own).real(); // C",
+        "",
+      ].join("\n"),
+      "barrel.mjs": 'export * from "./a.mjs";\n',
+      "use.ts": [
+        'import { holder, boxed, ret, arr, spread, K, id, a30, own } from "./a.mjs";',
+        'import { holder as viaBarrel, own as ownViaBarrel } from "./barrel.mjs";',
+        "holder.d.real(); // D",
+        "boxed.value.real(); // D",
+        "ret().real(); // D",
+        "arr[0].real(); // D",
+        "const [first] = arr;",
+        "first.real(); // D",
+        "spread.d.real(); // D",
+        "new K().field.real(); // D",
+        "id(holder.d).real(); // D",
+        "a30.real(); // D",
+        "viaBarrel.d.real(); // D",
+        "own.real(); // C",
+        "ownViaBarrel.real(); // C",
+        "id(own).real(); // C",
+        "",
+      ].join("\n"),
+    },
+    async (graph) => {
+      for (const file of ["a.mjs", "use.ts"])
+        for (const [mark, line, link] of markedCalls(graph, file, "real")) {
+          if (mark === "D") {
+            assert.equal(link.resolution, "resolved", `${file}: ${line}`);
+            assert.equal(
+              graph.target(link),
+              "dep.cjs#module.exports.real",
+              `${file}: ${line}`,
+            );
+            assert.equal(
+              link.data.assumes,
+              "bundler-require",
+              `${file}: ${line}`,
+            );
+          } else {
+            assert.equal(link.resolution, "resolved", `${file}: ${line}`);
+            assert.equal(
+              graph.target(link),
+              "a.mjs#own.real",
+              `${file}: ${line}`,
+            );
+            assert.equal(link.data.assumes, undefined, `${file}: ${line}`);
+          }
+        }
+      // An import of a name declared in a.mjs targets that declaration in
+      // both programs: it does not rest on the loader, whatever its value.
+      for (const name of ["own", "holder"]) {
+        const binding = graph.link("use.ts", name, "imports");
+        assert.equal(graph.target(binding), `a.mjs#${name}`);
+        assert.equal(binding.data.assumes, undefined, name);
+      }
+    },
+  );
+});
+
+test("differential analysis: no untrusted input builds no second program; one broken file one per affected project", async () => {
+  const before = statistics.neutralPrograms;
+  await project(
+    {
+      "a.ts": "export class Box { go() {} }\n",
+      "b.ts": 'import { Box } from "./a";\nnew Box().go();\n',
+    },
+    async (graph, report) => {
+      clean(report);
+      assert.equal(statistics.neutralPrograms, before);
+    },
+  );
+  const start = statistics.neutralPrograms;
+  await project(
+    {
+      "one/tsconfig.json": '{ "include": ["*.ts"] }\n',
+      "one/a.ts": "export function f(x: ): number { return 1; }\n",
+      "one/b.ts": 'import { f } from "./a";\nf(1);\n',
+      "two/tsconfig.json": '{ "include": ["*.ts"] }\n',
+      "two/c.ts": "export function g() {}\ng();\n",
+    },
+    async (graph) => {
+      // Only the project holding the broken file gets a neutral program.
+      assert.equal(statistics.neutralPrograms - start, 1);
+      assert.equal(
+        graph.target(graph.link("one/b.ts", "f", "calls")),
+        "one/a.ts#f",
+      );
+      assert.equal(
+        graph.target(graph.link("two/c.ts", "g", "calls")),
+        "two/c.ts#g",
+      );
+    },
+  );
+});
+
+test("when a link rests on both kinds of untrusted input, partial-declaration wins", async () => {
+  await project(
+    {
+      "package.json": '{ "type": "module" }\n',
+      "dep.cjs": DEP_CJS,
+      "a.js": [
+        'export const d = require("./dep.cjs");',
+        "export function broken(x: , y) { return d; }",
+        "",
+      ].join("\n"),
+      "use.js": [
+        'import { d, broken } from "./a.js";',
+        "d.real(); // D",
+        "broken().real(); // D",
+        "",
+      ].join("\n"),
+    },
+    async (graph) => {
+      const [[, , viaD], [, , viaBroken]] = markedCalls(
+        graph,
+        "use.js",
+        "real",
+      );
+      // Only the loader assumption: resolved and flagged.
+      assert.equal(viaD.resolution, "resolved");
+      assert.equal(viaD.data.assumes, "bundler-require");
+      assert.equal(viaD.data.reason, undefined);
+      // Also through the recovered body of `broken`: partial-declaration.
+      assert.equal(viaBroken.resolution, "unresolved");
+      assert.equal(viaBroken.data.reason, "partial-declaration");
+      assert.equal(viaBroken.data.assumes, undefined);
+    },
+  );
+});
+
+test("the arguments copy exception needs the global Array: a local or replaced one makes require uncertain", async () => {
+  const dep = "exports.real = function real() {};\n";
+  const tail = 'const d = require("./dep.cjs");\nd.real();\n';
+  await project(
+    {
+      "dep.cjs": dep,
+      "local.cjs":
+        "const Array = { from(a) { a[1] = () => ({ real() {} }); } };\nArray.from(arguments);\n" +
+        tail,
+      "slice.cjs":
+        "var Array = { prototype: { slice: { call(a) { a[1] = () => ({ real() {} }); } } } };\nArray.prototype.slice.call(arguments);\n" +
+        tail,
+      "replaced.cjs":
+        "Array.from = (a) => { a[1] = () => ({ real() {} }); };\nArray.from(arguments);\n" +
+        tail,
+      "proto.cjs":
+        "Array.prototype.slice = function () { this[1] = () => ({ real() {} }); };\n[].slice.call(arguments);\n" +
+        tail,
+      // No `Array` named: the prototype is reached another way.
+      "reached.cjs":
+        "Object.getPrototypeOf([]).slice = function () { this[1] = () => ({ real() {} }); };\n[].slice.call(arguments);\n" +
+        tail,
+      "global.cjs":
+        "Array.from(arguments);\nArray.prototype.slice.call(arguments);\n[].slice.call(arguments);\n" +
+        tail,
+      "spread.cjs":
+        "const Array = 1;\nfunction f() {}\nf(...arguments);\n" + tail,
+    },
+    async (graph) => {
+      for (const file of [
+        "local.cjs",
+        "slice.cjs",
+        "replaced.cjs",
+        "proto.cjs",
+        "reached.cjs",
+      ]) {
+        const edge = graph.link(file, '"./dep.cjs"', "imports");
+        assert.equal(edge.resolution, "unresolved", file);
+        assert.equal(edge.data.reason, "dynamic-scope", file);
+        const member = graph.link(file, "real", "calls");
+        assert.equal(member.resolution, "unresolved", file);
+      }
+      for (const file of ["global.cjs", "spread.cjs"]) {
+        assert.equal(
+          graph.target(graph.link(file, '"./dep.cjs"', "imports")),
+          "dep.cjs#dep.cjs",
+          file,
+        );
+        assert.equal(
+          graph.target(graph.link(file, "real", "calls")),
+          "dep.cjs#real",
+          file,
+        );
+      }
+    },
+  );
+});

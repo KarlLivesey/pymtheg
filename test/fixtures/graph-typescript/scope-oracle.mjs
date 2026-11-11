@@ -318,6 +318,13 @@ const TEMPLATES = [
     code: `if (true) ${LOCAL}\nS0`,
     modes: ["cjs"],
   },
+  {
+    // Not hoisted over the wrapper parameter, so nothing can call it: Node
+    // reports the site as never reached (error); it can only be local.
+    name: "an if-branch function's own name inside its body at top level",
+    code: `if (true) function require(n) { if (n !== "./dep.cjs") return S0; return __fake(); }\nrequire(0);`,
+    modes: ["cjs"],
+  },
   // Round 7: the wrapper's `arguments` (mapped to its parameters when sloppy).
   {
     name: "wrapper arguments written in an arrow",
@@ -424,6 +431,43 @@ const TEMPLATES = [
   {
     name: "slice.call of wrapper arguments",
     code: `const copy = Array.prototype.slice.call(arguments);\nS0`,
+    modes: ["cjs", "cjs-strict"],
+  },
+  // Round 9: the copy exception needs the global, untouched Array.
+  {
+    name: "a local Array whose from writes wrapper arguments",
+    code: `const Array = { from(a) { a[1] = () => __fake(); } };\nArray.from(arguments);\nS0`,
+    modes: ["cjs", "cjs-strict"],
+    category: "dynamic",
+  },
+  {
+    name: "a local Array.prototype.slice.call writes wrapper arguments",
+    code: `var Array = { prototype: { slice: { call(a) { a[1] = () => __fake(); } } } };\nArray.prototype.slice.call(arguments);\nS0`,
+    modes: ["cjs", "cjs-strict"],
+    category: "dynamic",
+  },
+  {
+    name: "a replaced Array.from writes wrapper arguments",
+    // Restores the built-in so later cases in the same process are unaffected.
+    code: `const saved = Array.from;\nArray.from = (a) => { a[1] = () => __fake(); return []; };\nArray.from(arguments);\nS0;\nArray.from = saved;`,
+    modes: ["cjs", "cjs-strict"],
+    category: "dynamic",
+  },
+  {
+    name: "a replaced Array.prototype.slice under [].slice.call",
+    code: `const saved = Array.prototype.slice;\nArray.prototype.slice = function () { this[1] = () => __fake(); return []; };\n[].slice.call(arguments);\nS0;\nArray.prototype.slice = saved;`,
+    modes: ["cjs", "cjs-strict"],
+    category: "dynamic",
+  },
+  {
+    name: "slice replaced through Object.getPrototypeOf([])",
+    code: `const proto = Object.getPrototypeOf([]);\nconst saved = proto.slice;\nproto.slice = function () { this[1] = () => __fake(); return []; };\n[].slice.call(arguments);\nS0;\nproto.slice = saved;`,
+    modes: ["cjs", "cjs-strict"],
+    category: "dynamic",
+  },
+  {
+    name: "spread of wrapper arguments beside a local Array",
+    code: `const Array = 1;\nfunction f() {}\nf(...arguments);\nS0`,
     modes: ["cjs", "cjs-strict"],
   },
   {
@@ -546,6 +590,25 @@ const CROSS = [
     exporter: `export const d = require("./dep.cjs");`,
     barrel: true,
     consumer: `import { d } from "./BARREL";\nX0(d)`,
+  },
+  // Round 9: every route the checker follows carries the label (differential).
+  {
+    name: "bundler: object members, return, array, destructuring, spread, class field, generic, 30-step chain",
+    category: "bundler",
+    exporter: `export const d = require("./dep.cjs");\nexport const holder = { d };\nexport const boxed = { value: d };\nexport function ret() { return d; }\nexport const arr = [d];\nexport const spread = { ...holder };\nexport class K { field = d; }\n/** @template T @param {T} v @returns {T} */\nexport function id(v) { return v; }\nconst a0 = d;\nconst a1 = a0;\nconst a2 = a1;\nconst a3 = a2;\nconst a4 = a3;\nconst a5 = a4;\nconst a6 = a5;\nconst a7 = a6;\nconst a8 = a7;\nconst a9 = a8;\nconst a10 = a9;\nconst a11 = a10;\nconst a12 = a11;\nconst a13 = a12;\nconst a14 = a13;\nconst a15 = a14;\nconst a16 = a15;\nconst a17 = a16;\nconst a18 = a17;\nconst a19 = a18;\nconst a20 = a19;\nconst a21 = a20;\nconst a22 = a21;\nconst a23 = a22;\nconst a24 = a23;\nconst a25 = a24;\nconst a26 = a25;\nconst a27 = a26;\nconst a28 = a27;\nconst a29 = a28;\nexport const a30 = a29;`,
+    consumer: `import { holder, boxed, ret, arr, spread, K, id, a30 } from \"./EXP\";\nconst r = ret();\nconst [first] = arr;\nconst { d: destructured } = holder;\nconst k = new K();\nconst g = id(holder.d);\nX0(holder.d)\nX1(boxed.value)\nX2(r)\nX3(first)\nX4(destructured)\nX5(spread.d)\nX6(k.field)\nX7(a30)\nX8(g)`,
+  },
+  {
+    name: "bundler routes through a barrel",
+    category: "bundler",
+    exporter: `export const d = require("./dep.cjs");\nexport const holder = { d };\nexport const boxed = { value: d };\nexport function ret() { return d; }\nexport const arr = [d];\nexport const spread = { ...holder };\nexport class K { field = d; }\n/** @template T @param {T} v @returns {T} */\nexport function id(v) { return v; }\nconst a0 = d;\nconst a1 = a0;\nconst a2 = a1;\nconst a3 = a2;\nconst a4 = a3;\nconst a5 = a4;\nconst a6 = a5;\nconst a7 = a6;\nconst a8 = a7;\nconst a9 = a8;\nconst a10 = a9;\nconst a11 = a10;\nconst a12 = a11;\nconst a13 = a12;\nconst a14 = a13;\nconst a15 = a14;\nconst a16 = a15;\nconst a17 = a16;\nconst a18 = a17;\nconst a19 = a18;\nconst a20 = a19;\nconst a21 = a20;\nconst a22 = a21;\nconst a23 = a22;\nconst a24 = a23;\nconst a25 = a24;\nconst a26 = a25;\nconst a27 = a26;\nconst a28 = a27;\nconst a29 = a28;\nexport const a30 = a29;`,
+    barrel: true,
+    consumer: `import { holder, boxed, ret, arr, spread, K, id, a30 } from \"./BARREL\";\nconst r = ret();\nconst [first] = arr;\nconst { d: destructured } = holder;\nconst k = new K();\nconst g = id(holder.d);\nX0(holder.d)\nX1(boxed.value)\nX2(r)\nX3(first)\nX4(destructured)\nX5(spread.d)\nX6(k.field)\nX7(a30)\nX8(g)`,
+  },
+  {
+    name: "real loader on the same routes (control: no label)",
+    exporter: `import { createRequire } from "node:module";\nconst require = createRequire(import.meta.url);\nexport const d = require("./dep.cjs");\nexport const holder = { d };\nexport const boxed = { value: d };\nexport function ret() { return d; }\nexport const arr = [d];\nexport const spread = { ...holder };\nexport class K { field = d; }\n/** @template T @param {T} v @returns {T} */\nexport function id(v) { return v; }\nconst a0 = d;\nconst a1 = a0;\nconst a2 = a1;\nconst a3 = a2;\nconst a4 = a3;\nconst a5 = a4;\nconst a6 = a5;\nconst a7 = a6;\nconst a8 = a7;\nconst a9 = a8;\nconst a10 = a9;\nconst a11 = a10;\nconst a12 = a11;\nconst a13 = a12;\nconst a14 = a13;\nconst a15 = a14;\nconst a16 = a15;\nconst a17 = a16;\nconst a18 = a17;\nconst a19 = a18;\nconst a20 = a19;\nconst a21 = a20;\nconst a22 = a21;\nconst a23 = a22;\nconst a24 = a23;\nconst a25 = a24;\nconst a26 = a25;\nconst a27 = a26;\nconst a28 = a27;\nconst a29 = a28;\nexport const a30 = a29;`,
+    consumer: `import { holder, boxed, ret, arr, spread, K, id, a30 } from \"./EXP\";\nconst r = ret();\nconst [first] = arr;\nconst { d: destructured } = holder;\nconst k = new K();\nconst g = id(holder.d);\nX0(holder.d)\nX1(boxed.value)\nX2(r)\nX3(first)\nX4(destructured)\nX5(spread.d)\nX6(k.field)\nX7(a30)\nX8(g)`,
   },
   {
     name: "createRequire exporter, consumed",

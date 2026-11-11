@@ -661,13 +661,116 @@ export function classify(
     if (ts.isCallExpression(parent) && parent.arguments[0] === id) {
       const callee = parent.expression;
       const text = callee.getText(file).replace(/\s+/g, "");
-      return (
-        text === "Array.from" ||
-        text === "Array.prototype.slice.call" ||
-        text === "[].slice.call"
-      );
+      if (text === "Array.from") return arrayGlobal() && !touched("from");
+      if (text === "Array.prototype.slice.call" || text === "[].slice.call")
+        return arrayGlobal() && !touched("slice");
     }
     return false;
+  };
+  /**
+   * Whether `Array` in this file is provably the global built-in, untouched:
+   * no `with` or direct `eval`, no declaration named `Array` anywhere, no
+   * string "Array", and every occurrence of the name `Array` (also as a
+   * property, `globalThis.Array`) heads a member chain that is only called,
+   * tested with `instanceof` or `typeof`: never written, deleted, passed,
+   * stored or returned (so nothing can replace `Array.from` or the prototype).
+   */
+  let arrayMemo: boolean | undefined;
+  const arrayGlobal = (): boolean => {
+    if (arrayMemo !== undefined) return arrayMemo;
+    let clean = !directEvals.length && !withs.length;
+    const check = (node: ts.Node): void => {
+      if (!clean) return;
+      if (ts.isStringLiteralLike(node) && node.text === "Array") clean = false;
+      if (ts.isIdentifier(node) && node.text === "Array") {
+        const parent = node.parent;
+        const reference =
+          ts.isPropertyAccessExpression(parent) && parent.name === node
+            ? parent
+            : node;
+        if (reference === node && !isReference(node)) {
+          clean = false;
+          return;
+        }
+        let top: ts.Node = reference;
+        while (
+          (ts.isPropertyAccessExpression(top.parent) ||
+            ts.isElementAccessExpression(top.parent)) &&
+          top.parent.expression === top
+        )
+          top = top.parent;
+        const user = top.parent;
+        const allowed =
+          !isWriteTarget(top) &&
+          ((ts.isCallExpression(user) && user.expression === top) ||
+            (ts.isNewExpression(user) && user.expression === top) ||
+            ts.isTypeOfExpression(user) ||
+            (ts.isBinaryExpression(user) &&
+              user.operatorToken.kind === ts.SyntaxKind.InstanceOfKeyword &&
+              user.right === top));
+        if (!allowed) clean = false;
+      }
+      ts.forEachChild(node, check);
+    };
+    check(file);
+    return (arrayMemo = clean);
+  };
+  /** An identifier that names a binding's use, not a declaration or key. */
+  const isReference = (id: ts.Identifier): boolean => {
+    const parent = id.parent;
+    if (
+      (ts.isPropertyAssignment(parent) ||
+        ts.isMethodDeclaration(parent) ||
+        ts.isPropertyDeclaration(parent) ||
+        ts.isPropertySignature(parent) ||
+        ts.isGetAccessor(parent) ||
+        ts.isSetAccessor(parent)) &&
+      parent.name === id
+    )
+      return false;
+    if (ts.isShorthandPropertyAssignment(parent)) return false;
+    if (
+      (ts.isVariableDeclaration(parent) ||
+        ts.isFunctionLike(parent) ||
+        ts.isClassLike(parent) ||
+        ts.isParameter(parent) ||
+        ts.isEnumDeclaration(parent) ||
+        ts.isModuleDeclaration(parent) ||
+        ts.isInterfaceDeclaration(parent) ||
+        ts.isTypeAliasDeclaration(parent) ||
+        ts.isImportClause(parent) ||
+        ts.isImportSpecifier(parent) ||
+        ts.isNamespaceImport(parent) ||
+        ts.isImportEqualsDeclaration(parent) ||
+        ts.isExportSpecifier(parent) ||
+        ts.isLabeledStatement(parent)) &&
+      (parent as ts.NamedDeclaration).name === id
+    )
+      return false;
+    if (ts.isLabeledStatement(parent) && parent.label === id) return false;
+    if (ts.isBindingElement(parent)) return false;
+    return true;
+  };
+  /** A write anywhere to a member `name` (`x.name = …`), or the string `name`. */
+  const touchedMemo = new Map<string, boolean>();
+  const touched = (name: string): boolean => {
+    const known = touchedMemo.get(name);
+    if (known !== undefined) return known;
+    let found = false;
+    const check = (node: ts.Node): void => {
+      if (found) return;
+      if (ts.isStringLiteralLike(node) && node.text === name) found = true;
+      if (
+        ts.isPropertyAccessExpression(node) &&
+        node.name.text === name &&
+        isWriteTarget(node)
+      )
+        found = true;
+      ts.forEachChild(node, check);
+    };
+    check(file);
+    touchedMemo.set(name, found);
+    return found;
   };
 
   // ----- reassignment of the CommonJS wrapper's parameters -----
