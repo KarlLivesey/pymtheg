@@ -12,41 +12,50 @@ export function decideLink(
   decision: LinkResolution | undefined,
   symbols: readonly GraphSymbol[],
 ): GraphLink {
-  const byId = new Map(symbols.map((symbol) => [symbol.id, symbol]));
-  const target = (id: string) => {
-    const value = byId.get(id);
-    if (!value || value.status === "failed")
-      throw Error("Invalid or failed link target");
-    return value;
-  };
-  const next: GraphLink = {
-    ...link,
-    targetId: null,
-    targetStatus: null,
-    candidates: [],
-    resolution: "unresolved",
-  };
-  if (!decision) return next;
-  if (decision.candidateIds !== undefined) {
-    if (
-      decision.targetId !== undefined ||
-      decision.candidateIds.length < 2 ||
-      new Set(decision.candidateIds).size !== decision.candidateIds.length
-    )
-      throw Error(
-        "Candidates must contain at least two distinct targets, without a definite target",
-      );
-    next.candidates = [...decision.candidateIds]
-      .sort(compare)
-      .map((id) => ({ id, status: target(id).status }));
-    next.resolution = "ambiguous";
-  } else if (decision.targetId !== null && decision.targetId !== undefined) {
-    const symbol = target(decision.targetId);
-    next.targetId = symbol.id;
-    next.targetStatus = symbol.status;
-    next.resolution = "resolved";
+  return new LinkDecider(symbols).decide(link, decision);
+}
+/** Internal per-pass lookup; callers of decideLink retain its original signature. */
+export class LinkDecider {
+  private readonly byId: Map<string, GraphSymbol>;
+  constructor(symbols: readonly GraphSymbol[]) {
+    this.byId = new Map(symbols.map((symbol) => [symbol.id, symbol]));
   }
-  return next;
+  decide(link: GraphLink, decision: LinkResolution | undefined): GraphLink {
+    const target = (id: string) => {
+      const value = this.byId.get(id);
+      if (!value || value.status === "failed")
+        throw Error("Invalid or failed link target");
+      return value;
+    };
+    const next: GraphLink = {
+      ...link,
+      targetId: null,
+      targetStatus: null,
+      candidates: [],
+      resolution: "unresolved",
+    };
+    if (!decision) return next;
+    if (decision.candidateIds !== undefined) {
+      if (
+        decision.targetId !== undefined ||
+        decision.candidateIds.length < 2 ||
+        new Set(decision.candidateIds).size !== decision.candidateIds.length
+      )
+        throw Error(
+          "Candidates must contain at least two distinct targets, without a definite target",
+        );
+      next.candidates = [...decision.candidateIds]
+        .sort(compare)
+        .map((id) => ({ id, status: target(id).status }));
+      next.resolution = "ambiguous";
+    } else if (decision.targetId !== null && decision.targetId !== undefined) {
+      const symbol = target(decision.targetId);
+      next.targetId = symbol.id;
+      next.targetStatus = symbol.status;
+      next.resolution = "resolved";
+    }
+    return next;
+  }
 }
 /** Pure validation before storage writes; module mistakes cannot be confused with backend errors. */
 export function resolutionFacts(
@@ -60,24 +69,32 @@ export function resolutionFacts(
   const links = existing.filter(
     (link) => link.module === module && link.origin === "parse",
   );
+  const linkIds = new Set(links.map((link) => link.id));
+  const decider = new LinkDecider(symbols);
+  const filesByPath = new Map(
+    files
+      .filter((file) => file.module === module)
+      .map((file) => [file.path, file]),
+  );
+  const symbolsById = new Map(symbols.map((symbol) => [symbol.id, symbol]));
+  const validated = new Map<
+    string,
+    Map<string, GraphFile["result"]["symbols"][number]>
+  >();
   const decisions = new Map<string, LinkResolution>();
   for (const decision of result.resolutions) {
-    if (
-      decisions.has(decision.linkId) ||
-      !links.some((link) => link.id === decision.linkId)
-    )
+    if (decisions.has(decision.linkId) || !linkIds.has(decision.linkId))
       throw Error("Invalid, duplicate or foreign link resolution");
     decisions.set(decision.linkId, decision);
   }
   const output = links.map((link) =>
-    decideLink(link, decisions.get(link.id), symbols),
+    decider.decide(link, decisions.get(link.id)),
   );
   const keys = new Set<string>();
   for (const added of result.links) {
-    const file = files.find(
-      (file) => file.path === added.file && file.module === module,
-    );
-    const source = symbols.find((symbol) => symbol.id === added.sourceId);
+    const file = filesByPath.get(added.file);
+    const source =
+      added.sourceId === null ? undefined : symbolsById.get(added.sourceId);
     const identity = JSON.stringify([added.file, added.key]);
     if (
       !file ||
@@ -95,7 +112,21 @@ export function resolutionFacts(
       range: added.range,
       ...(added.data === undefined ? {} : { data: added.data }),
     };
-    validateResult(file.text, { ...file.result, links: [draft] });
+    let localSymbols = validated.get(file.path);
+    if (!localSymbols) {
+      validateResult(file.text, { ...file.result, links: [] });
+      localSymbols = new Map(
+        file.result.symbols.map((symbol) => [symbol.key, symbol]),
+      );
+      validated.set(file.path, localSymbols);
+    }
+    const localSource = source ? localSymbols.get(source.key) : undefined;
+    validateResult(file.text, {
+      status: "clean",
+      diagnostics: [],
+      symbols: localSource ? [localSource] : [],
+      links: [draft],
+    });
     const link: GraphLink = {
       ...draft,
       id: addedLinkId(projectId, module, file.path, added.key),
@@ -115,7 +146,7 @@ export function resolutionFacts(
         : { linkId: link.id, targetId: added.targetId ?? null };
     if (added.candidateIds !== undefined && added.targetId !== undefined)
       throw Error("Added link cannot have definite and candidate targets");
-    output.push(decideLink(link, decision, symbols));
+    output.push(decider.decide(link, decision));
   }
   return output.sort((a, b) => compare(a.id, b.id));
 }

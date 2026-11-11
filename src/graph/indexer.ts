@@ -160,6 +160,10 @@ export async function indexProject(
   const contexts = [...captures.values()].filter((file) =>
     registry.modules.some((module) => needsContext(module, file.path)),
   );
+  const oldContextByPath = new Map(
+    oldContexts.map((file) => [file.path, file]),
+  );
+  const contextByPath = new Map(contexts.map((file) => [file.path, file]));
   const changedContexts = [
     ...new Set([
       ...oldContexts.map((file) => file.path),
@@ -168,8 +172,8 @@ export async function indexProject(
   ]
     .filter(
       (path) =>
-        JSON.stringify(oldContexts.find((file) => file.path === path)) !==
-        JSON.stringify(contexts.find((file) => file.path === path)),
+        JSON.stringify(oldContextByPath.get(path)) !==
+        JSON.stringify(contextByPath.get(path)),
     )
     .sort(compare);
   const updates: GraphFile[] = [];
@@ -227,6 +231,12 @@ export async function indexProject(
       const files = (await store.files()).filter(
         (file) => file.module === module.id,
       );
+      const filesByPath = new Map(files.map((file) => [file.path, file]));
+      const oldPaths = new Set(
+        oldFiles
+          .filter((file) => file.module === module.id)
+          .map((file) => file.path),
+      );
       const ownContexts = contexts.filter((file) =>
         needsContext(module, file.path),
       );
@@ -239,13 +249,7 @@ export async function indexProject(
           files,
           contextFiles: ownContexts,
           changedFiles: [...changed]
-            .filter(
-              (path) =>
-                files.some((file) => file.path === path) ||
-                oldFiles.some(
-                  (file) => file.path === path && file.module === module.id,
-                ),
-            )
+            .filter((path) => filesByPath.has(path) || oldPaths.has(path))
             .sort(compare),
           changedContextFiles: changedContexts.filter((path) =>
             needsContext(module, path),
@@ -253,7 +257,7 @@ export async function indexProject(
         });
         const seen = new Set<string>();
         for (const item of results) {
-          const file = files.find((file) => file.path === item.path);
+          const file = filesByPath.get(item.path);
           if (!file || seen.has(item.path))
             throw Error(
               "Project analysis returned a duplicate or foreign file",
@@ -283,7 +287,7 @@ export async function indexProject(
         }));
       }
       for (const item of results) {
-        const file = files.find((file) => file.path === item.path)!;
+        const file = filesByPath.get(item.path)!;
         if (JSON.stringify(file.result) !== JSON.stringify(item.result))
           await store.replaceFile({ ...file, result: item.result });
         report.analyzed++;

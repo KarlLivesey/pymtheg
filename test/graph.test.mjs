@@ -5,6 +5,7 @@ import {
   mkdtemp,
   mkdir,
   readFile,
+  readdir,
   rm,
   symlink,
   writeFile,
@@ -48,11 +49,12 @@ test("convention discovery needs no language list or core edits", async () => {
     includeTestOnly: true,
   });
   assert.equal(registry.claim("nested/example.toy").id, "toy");
-  const core = await readFile(
-    new URL("../src/graph/registry.ts", import.meta.url),
-    "utf8",
-  );
-  assert.doesNotMatch(core, /toy/);
+  const coreDirectory = new URL("../src/graph/", import.meta.url);
+  for (const entry of await readdir(coreDirectory, { withFileTypes: true }))
+    if (entry.isFile() && entry.name.endsWith(".ts")) {
+      const core = await readFile(new URL(entry.name, coreDirectory), "utf8");
+      assert.doesNotMatch(core, /toy/, entry.name);
+    }
   await sandbox(async ({ scratch }) => {
     const folder = join(scratch, "languages", "invented");
     await mkdir(folder, { recursive: true });
