@@ -131,8 +131,100 @@ export function architectureMarkdown(text: string): {
     })),
   };
 }
-export function architectureHeadings(text: string): ArchitectureHeading[] {
-  return architectureMarkdown(text).headings;
+/** RST adornment styles define levels in first-seen order; originals stay lossless. */
+export function architectureHeadings(
+  text: string,
+  path = "document.md",
+): ArchitectureHeading[] {
+  if (!/\.rst$/i.test(path)) return architectureMarkdown(text).headings;
+  const lines = text.split("\n"),
+    styles = new Map<string, number>(),
+    counts = new Map<string, number>(),
+    headers: {
+      line: number;
+      titleLine: number;
+      level: number;
+      title: string;
+      slug: string;
+      key: string;
+    }[] = [];
+  const adornment = (line: string) =>
+    /^([\x21-\x2f\x3a-\x40\x5b-\x60\x7b-\x7e])\1{1,}\s*$/.exec(line)?.[1];
+  let previousUnderline = -1;
+  for (let i = 0; i + 1 < lines.length; i++) {
+    const rawTitle = lines[i]!.replace(/\r$/, ""),
+      title = rawTitle.trim(),
+      underline = lines[i + 1]!.replace(/\r$/, ""),
+      character = adornment(underline);
+    if (
+      !title ||
+      adornment(rawTitle) ||
+      !character ||
+      /^[*+-]\s/.test(title) ||
+      underline.trimEnd() === "::"
+    )
+      continue;
+    const overline =
+      i > 0 &&
+      i - 1 !== previousUnderline &&
+      adornment(lines[i - 1]!) === character &&
+      lines[i - 1]!.trimEnd().length === underline.trimEnd().length;
+    if (
+      (/^\s/.test(rawTitle) && !overline) ||
+      (underline.trimEnd().length < title.length &&
+        underline.trimEnd().length < 4)
+    )
+      continue;
+    const start = overline ? i - 1 : i;
+    // A section may immediately follow a heading's underline. Other prose
+    // still needs a block boundary; indented literal/directive content is ignored.
+    if (
+      start > 0 &&
+      lines[start - 1]!.trim() &&
+      start - 1 !== previousUnderline
+    )
+      continue;
+    previousUnderline = i + 1;
+    const style = character + (overline ? "overline" : "underline");
+    if (!styles.has(style)) styles.set(style, styles.size + 1);
+    const base =
+      title
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}]+/gu, "-")
+        .replace(/^-|-$/g, "") || "section";
+    const count = counts.get(base) ?? 0;
+    counts.set(base, count + 1);
+    headers.push({
+      line: start,
+      titleLine: i,
+      level: Math.min(styles.get(style)!, 6),
+      title,
+      slug: base + (count ? "-" + count : ""),
+      key: headingIdentifier(title) ?? title,
+    });
+    i++;
+  }
+  const ends = headers.map(() => lines.length),
+    open: number[] = [];
+  headers.forEach((heading, i) => {
+    while (
+      open.length &&
+      headers[open[open.length - 1]!]!.level >= heading.level
+    )
+      ends[open.pop()!] = heading.line;
+    open.push(i);
+  });
+  return headers.map(({ titleLine, ...heading }, i) => {
+    const end = ends[i]!;
+    const body = lines.slice(titleLine + 2, end).join("\n");
+    return {
+      ...heading,
+      end,
+      text: lines.slice(heading.line, end).join("\n"),
+      bodyHash: hash(body),
+      hasBody: !!body.trim(),
+    };
+  });
 }
 
 export const headingRegistryPath = ".pymtheg-heading-identities.json";

@@ -68,12 +68,16 @@ export function identifiedHeadings(documents: readonly ArchitectureDocument[]) {
     );
   }
   const byPath = new Map(registry?.documents.map((d) => [d.path, d]) ?? []);
-  for (const document of documents.filter((d) => /\.md$/i.test(d.path))) {
-    const headings = architectureHeadings(document.text),
+  for (const document of documents.filter((d) => /\.(md|rst)$/i.test(d.path))) {
+    const headings = architectureHeadings(document.text, document.path),
       stored = byPath.get(document.path),
       contentHash = hash(document.text),
       valid = stored?.hash === contentHash;
-    if (headings.length && ((registry && !valid) || invalid))
+    const missingRstEntry = /\.rst$/i.test(document.path) && !stored;
+    if (
+      headings.length &&
+      ((registry && !valid && !missingRstEntry) || invalid)
+    )
       warnings.push(
         `${document.path}: heading identity metadata does not match these bytes; review affected links.`,
       );
@@ -115,7 +119,7 @@ export function prepareHeadingIdentities(
     [next, afterByHash],
   ] as const)
     for (const d of documents)
-      if (/\.md$/i.test(d.path)) {
+      if (/\.(md|rst)$/i.test(d.path)) {
         const key = hash(d.text),
           paths = groups.get(key) ?? [];
         paths.push(d.path);
@@ -134,8 +138,8 @@ export function prepareHeadingIdentities(
   const movedAway = new Set(movedFrom.values());
   const nextHeadings = new Map(
     next
-      .filter((d) => /\.md$/i.test(d.path))
-      .map((d) => [d.path, architectureHeadings(d.text)]),
+      .filter((d) => /\.(md|rst)$/i.test(d.path))
+      .map((d) => [d.path, architectureHeadings(d.text, d.path)]),
   );
   const candidates = new Map<string, Set<string>>();
   const namedCandidates = new Map<string, Set<string>>();
@@ -223,9 +227,9 @@ export function prepareHeadingIdentities(
       ? { moveCandidates: [...moveCandidates.values()] }
       : {}),
   };
-  for (const document of next.filter((d) => /\.md$/i.test(d.path))) {
+  for (const document of next.filter((d) => /\.(md|rst)$/i.test(d.path))) {
     const oldPath = movedFrom.get(document.path) ?? document.path;
-    const headings = architectureHeadings(document.text),
+    const headings = architectureHeadings(document.text, document.path),
       old =
         !movedFrom.has(document.path) && movedAway.has(document.path)
           ? []

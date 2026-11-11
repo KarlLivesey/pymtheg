@@ -1,5 +1,6 @@
 const folders = new Set([
   "docs",
+  "doc",
   "documentation",
   "design",
   "architecture",
@@ -12,7 +13,7 @@ export function documentationDirectory(path: string): boolean {
 export function projectDocumentationPath(path: string): boolean {
   return path.includes("/")
     ? documentationDirectory(path)
-    : /\.(md|txt)$/i.test(path) ||
+    : /\.(md|txt|rst)$/i.test(path) ||
         /^(architecture|design|requirements|decisions|contracts)[^/]*\.json$/i.test(
           path,
         );
