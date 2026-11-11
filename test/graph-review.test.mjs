@@ -630,25 +630,56 @@ test("A8: ordering never invokes localeCompare and is stable across locale envir
   });
 });
 
-test("A10: production discovery hides marked fixture languages even from an unrelated working directory", async () => {
-  assert.equal((await discoverLanguages()).claim("x.toy"), undefined);
-  assert.equal(
-    (await discoverLanguages(undefined, { includeTestOnly: true })).claim(
-      "x.toy",
-    ).id,
-    "toy",
-  );
+test("A10: production discovery hides test-only languages, including the toy, even from an unrelated working directory", async () => {
+  // Real language modules may or may not be present; the property is that
+  // production discovery omits exactly the test-only modules, never which
+  // real languages exist.
+  const describe = (registry) =>
+    registry.modules.map((module) => ({
+      id: module.id,
+      testOnly: module.testOnly === true,
+    }));
+  const check = (production, testMode) => {
+    const productionIds = production.map((module) => module.id);
+    const testModeIds = testMode.map((module) => module.id);
+    assert.deepEqual(
+      production.filter((module) => module.testOnly),
+      [],
+      "production discovery returned a test-only module",
+    );
+    assert.ok(!productionIds.includes("toy"), "production offers toy");
+    const toyEntry = testMode.find((module) => module.id === "toy");
+    assert.ok(toyEntry, "test-mode discovery is missing toy");
+    assert.equal(toyEntry.testOnly, true, "toy is not marked test-only");
+    for (const id of productionIds)
+      assert.ok(testModeIds.includes(id), `test mode dropped ${id}`);
+    assert.deepEqual(
+      testModeIds.filter((id) => !productionIds.includes(id)),
+      testMode.filter((module) => module.testOnly).map((module) => module.id),
+      "test mode minus production must be exactly the test-only modules",
+    );
+  };
+  const production = await discoverLanguages();
+  const testMode = await discoverLanguages(undefined, {
+    includeTestOnly: true,
+  });
+  check(describe(production), describe(testMode));
+  assert.equal(production.claim("x.toy"), undefined);
+  assert.equal(testMode.claim("x.toy").id, "toy");
   await sandbox(async ({ scratch }) => {
     const url = pathToFileURL(
       join(process.cwd(), "dist/graph/registry.js"),
     ).href;
-    const code = `import {discoverLanguages} from ${JSON.stringify(url)}; console.log((await discoverLanguages()).modules.map(m=>m.id)); console.log((await discoverLanguages(undefined,{includeTestOnly:true})).claim('x.toy').id);`;
-    const output = execFileSync(
-      process.execPath,
-      ["--input-type=module", "-e", code],
-      { cwd: scratch, encoding: "utf8" },
+    const code = `import {discoverLanguages} from ${JSON.stringify(url)}; const d = (r) => r.modules.map((m) => ({ id: m.id, testOnly: m.testOnly === true })); const p = await discoverLanguages(); const t = await discoverLanguages(undefined, { includeTestOnly: true }); console.log(JSON.stringify({ production: d(p), testMode: d(t), productionToy: p.claim('x.toy')?.id ?? null, testToy: t.claim('x.toy')?.id ?? null }));`;
+    const output = JSON.parse(
+      execFileSync(process.execPath, ["--input-type=module", "-e", code], {
+        cwd: scratch,
+        encoding: "utf8",
+      }),
     );
-    assert.match(output, /\[\]\ntoy/);
+    check(output.production, output.testMode);
+    assert.equal(output.productionToy, null);
+    assert.equal(output.testToy, "toy");
   });
 });
 
