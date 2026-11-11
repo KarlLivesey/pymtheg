@@ -1430,6 +1430,8 @@ export async function readArchitectureFolder(
     legacyLabel?: string,
   ) {
     recordSkipped(skipped, name, reason, kind);
+    // Special entries were never part of the saved legacy inventory.
+    if (reason === "special-file") return;
     const label = {
       "unsupported-type": "outside text-document import formats",
       "outside-selection": "outside selected documentation scope",
@@ -1449,7 +1451,7 @@ export async function readArchitectureFolder(
         name,
         reason,
         "file",
-        reason === "outside-selection" && selection.include === undefined
+        reason === "outside-selection" || reason === "excluded"
           ? "outside text-document import formats"
           : undefined,
       );
@@ -1509,6 +1511,6 @@ export async function readArchitectureFolder(
   }
   if (singleFile) await readDocument(root, root.split("/").at(-1)!);
   else if ((await stat(root)).isDirectory()) await visit(root);
-  else skip(root, "special-file", "entry");
+  else skip(input.split("/").at(-1)!, "special-file", "entry");
   return { root, documents, excluded, skipped };
 }

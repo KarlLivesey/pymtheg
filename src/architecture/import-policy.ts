@@ -154,13 +154,9 @@ export function folderInventory(
         parts.length > 1 &&
         !documentationDirectory(entry.path);
       excluded.push(
-        reason === "excluded"
-          ? entry.path + " (excluded)"
-          : outsideFolder
-            ? parts[0] + " (outside selected documentation scope)"
-            : reason === "outside-selection" && options.include !== undefined
-              ? entry.path + " (outside selected documentation scope)"
-              : entry.path + " (outside text-document import formats)",
+        outsideFolder
+          ? parts[0] + " (outside selected documentation scope)"
+          : entry.path + " (outside text-document import formats)",
       );
       continue;
     }

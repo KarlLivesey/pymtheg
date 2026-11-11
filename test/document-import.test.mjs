@@ -1,8 +1,9 @@
 import test from "node:test";
+import { execFileSync } from "node:child_process";
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, rm, writeFile, truncate } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, resolve, relative } from "node:path";
 import { readArchitectureFolder } from "../dist/architecture/store.js";
 import {
   indexArchitecture,
@@ -99,6 +100,14 @@ test("explicit include overrides default scope; exclude wins and is reported", a
     loaded.documents.map((d) => d.path),
   );
   assert.equal(inventory.skipped.counts.excluded, 1);
+  assert.deepEqual(inventory.excluded, [
+    "doc/guide.rst (outside text-document import formats)",
+  ]);
+  assert.ok(
+    loaded.excluded.every((path) =>
+      path.endsWith(" (outside text-document import formats)"),
+    ),
+  );
   assert.deepEqual(
     (await readArchitectureFolder(fixtures, { include: [] })).documents,
     [],
@@ -381,4 +390,154 @@ test("a legacy Markdown-only heading registry does not falsely warn about retain
     identifiedHeadings(changed).warnings.join("\n"),
     /retained\.rst: heading identity metadata does not match these bytes/,
   );
+});
+
+test("FIFOs are reported without changing the legacy ledger or a saved import", async () => {
+  const scratch = await mkdtemp(
+    join(tmpdir(), "pymtheg-document-import-fifo-"),
+  );
+  try {
+    const source = join(scratch, "source"),
+      project = join(scratch, "project");
+    await mkdir(join(source, "docs"), { recursive: true });
+    await mkdir(project);
+    await writeFile(join(source, "docs/a.md"), "# a");
+    const runImport = () =>
+      JSON.parse(
+        execFileSync(
+          process.execPath,
+          [
+            "dist/cli/main.js",
+            "import-architecture",
+            source,
+            "--into",
+            project,
+            "--format",
+            "json",
+          ],
+          { encoding: "utf8" },
+        ),
+      );
+    // With ordinary documents this is the same snapshot main saved: no exclusions.
+    const baseline = await readArchitectureFolder(source);
+    assert.deepEqual(baseline.excluded, []);
+    const first = runImport();
+    assert.equal(first.committed, true);
+    execFileSync("mkfifo", [
+      join(source, "docs/pipe.md"),
+      join(source, "fifo"),
+    ]);
+    const loaded = await readArchitectureFolder(source);
+    assert.deepEqual(loaded.skipped.paths, [
+      { path: "docs/pipe.md", reason: "special-file", kind: "entry" },
+      { path: "fifo", reason: "special-file", kind: "entry" },
+    ]);
+    assert.deepEqual(loaded.excluded, []);
+    const upload = folderInventory([{ path: "docs/a.md", bytes: 3 }]);
+    assert.deepEqual(upload.excluded, loaded.excluded);
+    assert.deepEqual(
+      withImportInventory(loaded.documents, source, loaded.excluded),
+      withImportInventory(baseline.documents, source, baseline.excluded),
+    );
+    const refreshed = runImport();
+    assert.equal(refreshed.committed, false);
+    assert.equal(refreshed.unchanged, true);
+    assert.equal(refreshed.revision, first.revision);
+    for (const input of [
+      join(source, "fifo"),
+      relative(process.cwd(), join(source, "fifo")),
+    ]) {
+      const single = await readArchitectureFolder(input);
+      assert.deepEqual(single.excluded, []);
+      assert.deepEqual(single.skipped.paths, [
+        { path: "fifo", reason: "special-file", kind: "entry" },
+      ]);
+    }
+  } finally {
+    await rm(scratch, { recursive: true, force: true });
+  }
+});
+
+for (const title of ["Title #", "Phase {#one}"]) {
+  test(`RST title remains literal: ${title}`, () => {
+    const text = `${title}\n${"=".repeat(title.length)}\n\nBody\n`;
+    const [heading] = architectureHeadings(text, "literal.rst");
+    assert.equal(heading.title, title);
+    assert.equal(heading.key, title);
+    assert.equal(Object.hasOwn(heading, "anchor"), false);
+    assert.equal(heading.text, text);
+    const indexed = indexArchitecture([
+      { path: "literal.rst", text },
+    ]).entities.filter((entity) => entity.kind === "heading");
+    assert.deepEqual(
+      indexed.map((entity) => entity.name),
+      [title],
+    );
+  });
+}
+
+for (const punctuation of [
+  "?",
+  "!",
+  "$",
+  "%",
+  "&",
+  "(",
+  ")",
+  ",",
+  "/",
+  ";",
+  "@",
+  "[",
+  "\\",
+  "]",
+  "{",
+  "|",
+  "}",
+]) {
+  test(`RST accepts printable ASCII punctuation adornment ${punctuation}`, () => {
+    const title = "What now?";
+    const headings = architectureHeadings(
+      `${title}\n${punctuation.repeat(title.length)}\n\nBody\n`,
+      "punctuation.rst",
+    );
+    assert.deepEqual(
+      headings.map((heading) => heading.title),
+      [title],
+    );
+  });
+}
+
+for (const title of ["* item one", "- item", "+ item"]) {
+  test(`RST bullet item is not a heading: ${title}`, () => {
+    assert.deepEqual(architectureHeadings(`${title}\n----\n`, "list.rst"), []);
+  });
+}
+
+test("RST literal-block marker is not an adornment, and numbered titles remain valid", () => {
+  assert.deepEqual(architectureHeadings("Ex\n::\n", "literal.rst"), []);
+  assert.deepEqual(
+    architectureHeadings("1. Intro\n========\n", "numbered.rst").map(
+      (heading) => heading.title,
+    ),
+    ["1. Intro"],
+  );
+});
+
+test("Markdown with no registry entry retains main's mismatch warning", async () => {
+  const { prepareHeadingIdentities, identifiedHeadings } = await import(
+    "../dist/architecture/heading-identities.js"
+  );
+  const current = prepareHeadingIdentities(
+    [],
+    [{ path: "old.md", text: "# Existing\n\nBody\n" }],
+  );
+  const result = identifiedHeadings([
+    ...current,
+    { path: "missing.md", text: "# Missing\n\nBody\n" },
+    { path: "missing.rst", text: "Missing\n=======\n\nBody\n" },
+  ]);
+  assert.deepEqual(result.warnings, [
+    "missing.md: heading identity metadata does not match these bytes; review affected links.",
+  ]);
 });

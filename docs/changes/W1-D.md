@@ -7,6 +7,8 @@ underline headings (and matching overline/underline pairs) become ordinary
 linkable sections with original line spans and refresh identities. Styles define
 levels in encounter order, capped at the existing six Markdown levels. This is
 section recognition, not an RST renderer; indented literal blocks are ignored.
+RST titles stay literal (including trailing `#` and `{#...}`), and adornments
+accept printable ASCII punctuation. Bullet items and `::` are not headings.
 Karl explicitly approved minimal RST wiring in `headings.ts`,
 `heading-identities.ts`, and `model.ts` beyond the original owned paths.
 
@@ -39,7 +41,10 @@ skips; paths retain the first 100 in sorted discovery order, with omitted count
 stated. Pruned filesystem directories count once; descendants are uninspected,
 not claimed counted. Upload inventories count supplied file entries and cannot
 report entries the picker did not supply. The legacy `excluded` strings remain
-available with their original wording and directory collapsing. Filesystem reading
+available with their original wording and directory collapsing. Special files
+appear only in `skipped`, never in the saved legacy exclusion ledger; single
+special-file sources use the supplied basename. Markdown registry warnings stay
+unchanged; only unregistered RST documents avoid a false mismatch warning. Filesystem reading
 and upload preflight both reject documents over 16 MiB and attach `skipped` to
 that error.
 Aggregate size/count limits and IO/decoding failures still reject the import.

@@ -73,7 +73,11 @@ export function identifiedHeadings(documents: readonly ArchitectureDocument[]) {
       stored = byPath.get(document.path),
       contentHash = hash(document.text),
       valid = stored?.hash === contentHash;
-    if (headings.length && ((stored && !valid) || invalid))
+    const missingRstEntry = /\.rst$/i.test(document.path) && !stored;
+    if (
+      headings.length &&
+      ((registry && !valid && !missingRstEntry) || invalid)
+    )
       warnings.push(
         `${document.path}: heading identity metadata does not match these bytes; review affected links.`,
       );
