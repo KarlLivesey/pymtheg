@@ -16,6 +16,7 @@ async function measure(store, run) {
   const counts = {
     visits: 0,
     lookups: 0,
+    iterations: 0,
     rows: 0,
     decodedFiles: 0,
     writes: 0,
@@ -59,6 +60,36 @@ async function measure(store, run) {
               return original.apply(this, args);
             },
         );
+  // Count for...of, spread and destructuring, including Map/Set entries/keys/values.
+  for (const [prototype, names] of [
+    [Array.prototype, [Symbol.iterator, "values", "entries", "keys"]],
+    [Map.prototype, [Symbol.iterator, "values", "entries", "keys"]],
+    [Set.prototype, [Symbol.iterator, "values", "entries", "keys"]],
+  ])
+    for (const name of names)
+      replace(
+        prototype,
+        name,
+        (original) =>
+          function (...args) {
+            const iterator = original.apply(this, args);
+            const next = iterator.next.bind(iterator);
+            const wrapped = {
+              next(...values) {
+                const result = next.apply(undefined, values);
+                if (!result.done) counts.iterations++;
+                return result;
+              },
+              [Symbol.iterator]() {
+                return this;
+              },
+            };
+            if (iterator.return)
+              wrapped.return = iterator.return.bind(iterator);
+            if (iterator.throw) wrapped.throw = iterator.throw.bind(iterator);
+            return wrapped;
+          },
+      );
   replace(
     JSON,
     "parse",
@@ -158,20 +189,27 @@ test("first/repeat work is linear; unchanged has zero parses, writes and stored-
         else assert.fail(`Unexpected write: ${sql}`);
       }
       assert.ok(
-        changed.writes > 0 && changed.writes <= 81,
+        changed.writes > 0 && changed.writes <= 201,
         JSON.stringify(changed),
       );
       const symbol = store.findSymbols({ file: "0.syn" })[0];
       const queries = await measure(store, () => {
         assert.equal(store.findSymbols({ name: symbol.name }).length, 1);
-        assert.equal(store.outgoing(symbol.id).length, 1);
-        assert.equal(store.incoming(symbol.id).length, 1);
+        assert.equal(store.outgoing(symbol.id, "calls").length, 1);
+        assert.equal(store.incoming(symbol.id, "calls").length, 1);
         assert.equal(store.unresolved().length, 0);
-        assert.equal(store.ambiguous().length, 0);
-        assert.equal(store.neighbourhood(symbol.id, 2).symbols.length, 1);
+        assert.equal(
+          store.neighbourhood(symbol.id, 2, "calls").symbols.length,
+          1,
+        );
       });
       assert.equal(queries.decodedFiles, 0);
       assert.ok(queries.rows <= 12, JSON.stringify(queries));
+      const ambiguous = await measure(store, () =>
+        assert.equal(store.ambiguous().length, count * 10),
+      );
+      assert.equal(ambiguous.rows, count * 10);
+      assert.equal(ambiguous.decodedFiles, 0);
       observations.push({
         files: count,
         first,
@@ -179,21 +217,27 @@ test("first/repeat work is linear; unchanged has zero parses, writes and stored-
         changedWrites: changed.writes,
         queryRows: queries.rows,
       });
+      for (let i = 1; i < observations.length; i++)
+        for (const phase of ["first", "repeat"])
+          for (const metric of ["visits", "lookups", "iterations", "rows"]) {
+            const previous = observations[i - 1][phase][metric];
+            const current = observations[i][phase][metric];
+            assert.ok(
+              current <= 2 * previous + 50,
+              `${phase} ${metric} grows linearly: ${previous} -> ${current}`,
+            );
+          }
     } finally {
       store?.close();
       await rm(scratch, { recursive: true, force: true });
     }
   }
-  for (let i = 1; i < observations.length; i++)
-    for (const phase of ["first", "repeat"])
-      for (const metric of ["visits", "lookups", "rows"]) {
-        const previous = observations[i - 1][phase][metric];
-        const current = observations[i][phase][metric];
-        assert.ok(
-          current <= 2 * previous + 50,
-          `${phase} ${metric} grows linearly: ${previous} -> ${current}`,
-        );
-      }
+  for (const observation of observations)
+    assert.equal(
+      observation.changedWrites,
+      observations[0].changedWrites,
+      "One-file writes do not grow with project size",
+    );
   for (const { files, first, repeat, changedWrites, queryRows } of observations)
     t.diagnostic(
       JSON.stringify({
@@ -201,12 +245,14 @@ test("first/repeat work is linear; unchanged has zero parses, writes and stored-
         first: {
           visits: first.visits,
           lookups: first.lookups,
+          iterations: first.iterations,
           rows: first.rows,
           writes: first.writes,
         },
         repeat: {
           visits: repeat.visits,
           lookups: repeat.lookups,
+          iterations: repeat.iterations,
           rows: repeat.rows,
           writes: repeat.writes,
           decodedFiles: repeat.decodedFiles,

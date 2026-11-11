@@ -72,19 +72,31 @@ function generatedModule() {
         resolutions,
         links: symbols
           .filter((s) => s.kind === "function" && s.status !== "failed")
-          .map((s) => ({
-            key: s.key,
-            file: s.file,
-            sourceId: s.id,
-            kind: "implements",
-            targetName: "implicit",
-            range: s.range,
-            ...((named.get("a")?.length ?? 0) > 1
-              ? { candidateIds: named.get("a") }
-              : named.has("a")
-                ? { targetId: named.get("a")[0] }
-                : {}),
-          })),
+          .flatMap((s) => {
+            const pool = [...named.values()].flat();
+            return [
+              {
+                key: `${s.key}:definite`,
+                file: s.file,
+                sourceId: s.id,
+                kind: "references",
+                targetName: "implicit-definite",
+                range: s.range,
+                targetId: s.id,
+              },
+              {
+                key: `${s.key}:possible`,
+                file: s.file,
+                sourceId: s.id,
+                kind: "implements",
+                targetName: "implicit-possible",
+                range: s.range,
+                ...(pool.length >= 2
+                  ? { candidateIds: pool }
+                  : { targetId: s.id }),
+              },
+            ];
+          }),
       };
     },
   };
@@ -291,6 +303,93 @@ test("decoded snapshots are isolated, cold queries avoid source records, and ext
   } finally {
     second?.close();
     store?.close();
+    await rm(scratch, { recursive: true, force: true });
+  }
+});
+
+test("direct partial and failed replacements invalidate incoming definite and derived-candidate links", async () => {
+  const scratch = await mkdtemp(join(tmpdir(), "pymtheg-core-status-"));
+  let fast, slow;
+  try {
+    const root = join(scratch, "project");
+    await mkdir(root);
+    for (const [path, text] of Object.entries({
+      "target.toy": "def target\ndef second\n",
+      "caller.toy": "def caller\ncall target\n",
+      "survivor.toy": "def survivor\n",
+    }))
+      await writeFile(join(root, path), text);
+    fast = new SqliteGraphStore(join(scratch, "fast.sqlite"), "status");
+    slow = new ReferenceStore(join(scratch, "slow.sqlite"), "status");
+    const registry = new LanguageRegistry([generatedModule()]);
+    await indexProject(root, registry, fast);
+    await referenceIndex(root, registry, slow);
+    const original = fast.getFile("target.toy");
+    const target = fast.findSymbols({ name: "target" })[0];
+    const assertEqual = () => {
+      assert.deepEqual(snapshot(fast), snapshot(slow));
+      for (const symbol of fast.findSymbols())
+        for (const kind of [undefined, "calls", "implements", "references"]) {
+          assert.deepEqual(
+            fast.incoming(symbol.id, kind),
+            slow.incoming(symbol.id, kind),
+          );
+          assert.deepEqual(
+            fast.neighbourhood(symbol.id, 2, kind),
+            slow.neighbourhood(symbol.id, 2, kind),
+          );
+        }
+    };
+    assert.equal(fast.incoming(target.id, "calls").length, 1);
+    assert.ok(
+      fast
+        .incoming(target.id, "implements")
+        .some(
+          (link) => link.file === "caller.toy" && link.candidates.length >= 3,
+        ),
+    );
+    for (const status of ["partial", "failed"]) {
+      const file = {
+        ...original,
+        result: {
+          ...original.result,
+          status,
+          diagnostics: [{ message: `direct ${status} qualification` }],
+        },
+      };
+      fast.replaceFile(file);
+      slow.replaceFile(file);
+      // Do not re-index here: resolution must not repair and hide failed-target invalidation.
+      assertEqual();
+      if (status === "partial") {
+        assert.equal(
+          fast.incoming(target.id, "calls")[0].targetStatus,
+          "partial",
+        );
+        assert.ok(
+          fast
+            .incoming(target.id, "implements")
+            .every(
+              (link) =>
+                link.candidates.find((candidate) => candidate.id === target.id)
+                  .status === "partial",
+            ),
+        );
+      } else {
+        assert.equal(fast.incoming(target.id).length, 0);
+        assert.ok(
+          fast
+            .unresolved()
+            .some(
+              (link) =>
+                link.file === "caller.toy" && link.targetName === "target",
+            ),
+        );
+      }
+    }
+  } finally {
+    fast?.close();
+    slow?.close();
     await rm(scratch, { recursive: true, force: true });
   }
 });

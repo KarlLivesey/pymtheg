@@ -1,12 +1,34 @@
 # W2-I: graph core speed and conformance hardening
 
-The language-module and query interface is unchanged: no existing exported type
-or function signature, ID calculation, stored-fact meaning, result ordering or
-module lifecycle contract changed. Language-module authors need no implementation
+The language-module and query interface is unchanged: no language-module/query
+type or function signature, ID calculation, stored-fact meaning, result ordering
+or module lifecycle contract changed. The conformance expectations gain an
+optional, explicit exclusion list for other position-sensitive preambles. Language-module authors need no implementation
 changes. The conformance kit now independently verifies the existing requirement
 that symbol IDs survive a blank line inserted above declarations, even if an
 author's initial expected identities contain source offsets. Discovery's test
 now checks every immediate `src/graph/*.ts` core file for fixture-language names.
+
+## Exact conformance edit
+
+Context-only fixtures (`context: true`) are never edited. For every source fixture,
+the kit inserts one LF blank line before the source, except that a leading BOM
+stays at offset zero and a leading `#!` line stays first: insertion is after the
+BOM and, if present there, the entire shebang line including its original line
+terminator (LF, CRLF, CR or Unicode line separator). After a shebang the blank
+line repeats that terminator, so inserting LF cannot accidentally coalesce with
+a CR-only terminator. A shebang without a terminator
+gets an LF terminator followed by the blank line. Other source bytes are unchanged.
+
+Other constructs can also be sensitive to line placement, such as an encoding
+cookie required on the first two lines. Such a fixture may explicitly opt out
+with `identityEditExclusions: [{file: "script.ext", reason: "..."}]` in its
+**expectations**. Reasons must be nonempty; filenames must name unique source
+fixtures. Excluded fixtures retain their original text and are visibly exempt
+from this edit-stability check; all other positional/fact checks still apply.
+No exclusion is inferred silently. Existing correct callers need no new fields.
+Compiler-backed self-tests cover shebangs, BOMs and unchanged context text; the
+broken offset-based identity variant remains rejected.
 
 ## Internal changes
 
@@ -47,7 +69,10 @@ invalidation triggers. There is no migration or backwards compatibility claim.
 test-only pre-W2-I implementations from commit `397c5e7`. Twenty-four projects
 use a fixed PRNG seed and exercise unchanged runs, edits, symbol renames, file
 moves, deletions, partial files, parser errors, context changes/removal, analysis
-errors, resolver errors, invalid/duplicate decisions, derived links and ambiguity.
+errors, resolver errors, invalid/duplicate decisions, and common definite and
+multi-candidate derived links. Direct partial/failed replacement with retained
+symbols verifies incoming-target/candidate invalidation before any re-indexing
+can repair a mistake.
 Comparisons include full source/canonical file records, contexts, symbols and IDs,
 all link fields/candidate statuses, complete reports, filtered queries and
 neighbourhoods. Existing graph assertions remain intact; the discovery assertion
@@ -55,8 +80,9 @@ is expanded to all core files. A deliberately offset-based module now fails the
 kit despite initially correct expectations. Additional checks cover cold query
 paths, snapshot isolation, and changes from another store connection.
 
-`test/graph-core-scaling.test.mjs` counts array visits, map/set operations and SQL
-rows returned, plus SQLite `total_changes()` (including triggers and foreign-key
+`test/graph-core-scaling.test.mjs` counts array callback visits, map/set operations,
+Array/Map/Set iteration steps (including for...of, spread and destructuring), and
+SQL rows returned, plus SQLite `total_changes()` (including triggers and foreign-key
 actions). It asserts linear growth over 40/80/160/320 files, zero parses/writes/
 stored-file decoding on unchanged runs, and one parse plus writes restricted to
 the edited file's facts for a one-file edit. It also checks an affected caller
@@ -69,6 +95,17 @@ error recovery remain mandatory and can replace facts. Timings are never
 acceptance criteria; deterministic ordering and SQLite B-tree operations retain
 their usual sorting/index costs. Work also necessarily scales with snapshot
 bytes and candidate memberships, not just counts of files and links.
+
+The synthetic workload now contains ten parsed, ten definite derived and ten
+three-candidate derived links per file. The one-file edit writes 151 rows at every
+counted size (including that file's derived candidate memberships); unchanged
+runs write zero. The older parsed-only observations remain preserved and can be
+reproduced with `evidence/w2-i/parsed-only-scaling.mjs`. New derived-workload counts,
+observations, requested mutation checks and final validation logs are under
+`evidence/w2-i/review-r2/`. The exact per-added-link symbol-map regression and a
+nested for...of membership scan must fail the growth assertions; removing failed
+target invalidation must fail the direct full-state comparison. Candidate-kind
+corruption is also checked against the thicker derived-link generator.
 
 Before/after elapsed-time observations at 100/200/400/800/3200 files, the exact
 reproduction harness, operation counts and final check results are recorded in
