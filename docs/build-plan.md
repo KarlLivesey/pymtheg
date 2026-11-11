@@ -196,7 +196,7 @@ The manager keeps this table current. It is the single record of who holds which
 | W2-G Flow lowering must not change its input (B106) | in review (round 1) | Opus 5.5 | Sol 6.1 + Opus 5.5 high | `w2-g-flow-lowering-pure` | [#9](https://github.com/KarlLivesey/pymtheg/pull/9) | `src/behaviour/flow.ts` only (`model.ts` stays with W2-A) |
 | W2-H Link baseline versus real review (1.2) | cut; waits for W1-D to merge | — | — | — | — | `src/studio/service.ts`, architecture record type as needed |
 | W1-C Graph store and interface | changes needed (after round 1; both reviewers) | Sol 6.1 | Sol 6.1 + Opus 5.5 high | `w1-c-graph-store-interface` | [#7](https://github.com/KarlLivesey/pymtheg/pull/7) | `src/graph/**` except `languages/*/` |
-| W1-D Document import | in review (round 2) | Sol 6.1 | Sol 6.1 + Opus 5.5 high | `w1-d-document-import` | [#4](https://github.com/KarlLivesey/pymtheg/pull/4) | `src/shared/document-selection.ts`, `src/architecture/import-policy.ts`, `src/cli/import-summary.ts`, `src/architecture/store.ts`; extended on request to `src/architecture/model.ts`, `heading-identities.ts`, `headings.ts` (minimal RST section wiring; no other chunk holds them) |
+| W1-D Document import | changes needed (after round 2; both reviewers) | Sol 6.1 | Sol 6.1 + Opus 5.5 high | `w1-d-document-import` | [#4](https://github.com/KarlLivesey/pymtheg/pull/4) | `src/shared/document-selection.ts`, `src/architecture/import-policy.ts`, `src/cli/import-summary.ts`, `src/architecture/store.ts`; extended on request to `src/architecture/model.ts`, `heading-identities.ts`, `headings.ts` (minimal RST section wiring; no other chunk holds them) |
 | W1-F Two investigations | merged (evidence only, merged by the manager without a separate review; the fix chunks get reviewed) | Opus 5.5 | — | `w1-f-investigations` | [#6](https://github.com/KarlLivesey/pymtheg/pull/6) | `evidence/w1-f/` |
 
 Each chunk also owns its own `evidence/<chunk-id>/` folder and `docs/changes/<chunk-id>.md`.
@@ -238,3 +238,5 @@ Review rule change (Karl, 11 November 2026): every pull request needs one Sol 6.
 Backlog from W2-G: B106 covers two different failures (the pre-run identity check and a real failed replay); give the check its own code in `adapter.ts` in the Wave 3 removal chunk. Observation: two Quint tests stopped on "Explicit checker budget exhausted" on `main` while the machine was busy with other builds, so some existing backend tests depend on machine load; they go when Quint is removed.
 
 Backlog from W1-C review: a grammar `.wasm` kept inside a language folder is not copied to `dist/` by the build, so a language bringing its own grammar file needs a build change; for now grammars come from npm packages (dependency chunk).
+
+Backlog from W1-D review: include patterns such as `.`, `docs/./sub`, `docs//sub` silently match nothing (normalise or reject); error wording at exactly 4096 documents changed. For the import wiring chunk.
