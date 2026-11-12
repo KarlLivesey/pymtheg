@@ -4064,3 +4064,309 @@ test("each route the failure travels, and each that keeps a correct answer", asy
     assert.equal(link.cause, undefined, marker);
   }
 });
+
+// ----- Round 14: the structural rule -----
+
+const keeps = (link, what) => {
+  assert.notEqual(link.reason, "invalid-code", `${what}: kept`);
+  assert.equal(link.cause, undefined, `${what}: no cause`);
+};
+
+test("the structural rule: the receiver's type decides, in both directions", async () => {
+  const bad = [
+    "export class Failed { m() {} kind!: string; }",
+    'export interface FailedI { m(): void; kind: "failed" }',
+    "export function failedFn(): Failed { return new Failed(); }",
+    "",
+  ].join("\n");
+  const files = {
+    "bad.ts": bad,
+    "use.ts": [
+      'import { Failed, FailedI, failedFn } from "./bad";',
+      "class A { m() {} }",
+      "class B { m() {} }",
+      "class LocalBase { lm() {} }",
+      // Sol 1: a type-level computation over a tainted argument.
+      'class Box<T> { value!: keyof T extends "kind" ? A : B; plain!: T; many!: T[]; count!: number; }',
+      "declare let bx: Box<FailedI>;",
+      "bx.value.m(); // computed",
+      "bx.plain.m(); // member-T",
+      "bx.many.map((x) => x); // member-array",
+      "bx.many[0].m(); // member-array-element",
+      "bx.count.toFixed(); // member-number",
+      "declare const map: Map<string, Failed>;",
+      'map.get("k")!.m(); // map-get',
+      'map.has("k"); // map-has',
+      "declare const promise: Promise<Failed>;",
+      "promise.then((v) => v.m()); // promise-then",
+      "function make(): (j: Failed) => void { return () => {}; }",
+      "make().call(null, null as any); // returned-function",
+      'declare const pk: Pick<FailedI, "m">;',
+      "pk.m(); // pick",
+      "declare const rt: ReturnType<typeof failedFn>;",
+      "rt.m(); // return-type-of",
+      "declare const un: A | Failed;",
+      "un.m(); // union",
+      // Sol 4: library members keep their answers.
+      "function factory<T>(x: T): T[] { return [x]; }",
+      "declare let fb: Failed;",
+      "factory(fb).map((x) => x); // factory-map",
+      "function sandbox() { return function process(job: Failed): void {}; }",
+      "sandbox().bind(null); // sandbox-bind",
+      "export async function all() {",
+      "  (await Promise.all([new Failed()])).map((x) => x); // promise-all",
+      "}",
+      // Opus 6: a returned closure's body is not its type.
+      "export const make2 = () => () => { new Failed(); return 1; };",
+      "make2().call(null); // closure-body",
+      // Opus 1: overloads and computing generics with a weakly tainted argument.
+      "interface PA { method(): number }",
+      "interface PB { method(): string }",
+      "declare const cb: (j: Failed) => void;",
+      "declare function pick2(x: (j: number) => void): PB;",
+      "declare function pick2(x: (j: Failed) => void): PA;",
+      "pick2(cb).method(); // overload",
+      "type Sel<T> = T extends (j: number) => void ? PB : PA;",
+      "declare function sel<T>(x: T): Sel<T>;",
+      "sel(cb).method(); // generic-computation",
+      // Overloads that all give one untainted class: its member set decides,
+      // until the result is awaited or read from (its type arguments then
+      // depend on the overload chosen).
+      "class Wk {",
+      "  constructor(n: string, p: (j: Failed) => void);",
+      "  constructor(n: string);",
+      "  constructor(n: string, p?: (j: Failed) => void) {}",
+      "  on() {}",
+      "}",
+      'const wk = new Wk("q", (j) => {});',
+      "wk.on(); // ctor-overload",
+      "declare function boxed(x: (j: number) => void): Promise<A>;",
+      "declare function boxed(x: (j: Failed) => void): Promise<B>;",
+      "boxed(cb).then(() => {}); // same-class-overload",
+      "export async function awaited() {",
+      "  (await boxed(cb)).m(); // awaited-overload",
+      "}",
+      // A computation's inputs decide, not the receiver's route.
+      "declare const itc: InstanceType<typeof Wk>;",
+      "itc.on(); // instance-type-clean",
+      "declare const itf: InstanceType<typeof Failed>;",
+      "itf.m(); // instance-type-failed",
+      "declare const cw: Required<{ k(): void }> & { p: Promise<Failed> };",
+      "cw.k(); // computation-clean-input",
+      "declare const mw: Map<Partial<A>, Failed>;",
+      "mw.forEach(() => {}); // computation-beside-taint",
+      // An own member stands even when the failed file has that name.
+      "class D2 extends Failed { m() {} }",
+      "new D2().m(); // own-member-named-in-failed",
+      // A function type is not FAILED for its parameters.
+      "type Proc = (j: Failed) => string;",
+      "declare const pr: ReturnType<Proc>;",
+      "pr.trim(); // return-of-function-type",
+      "declare const pp: Parameters<Proc>;",
+      "pp[0].m(); // parameter-of-function-type",
+      // A closure's body is not its type: it returns `any`, untainted.
+      'const mk = () => { new Failed(); return JSON.parse("1"); };',
+      "mk().foo(); // closure-any",
+      // Sol 3: a long chain reaches its fixpoint.
+      ...Array.from(
+        { length: 90 },
+        (_, i) => `const x${89 - i} = ${i === 89 ? "Failed" : `x${88 - i}`};`,
+      ),
+      "new x89().m(); // long-chain",
+      "",
+    ].join("\n"),
+  };
+  const { problems, bad: broken } = await differential(files, {
+    "bad.ts": bad + "const x = (;\n",
+  });
+  assert.deepEqual(problems, []);
+  const failedOn = [
+    ["computed", "m"],
+    ["member-T", "m"],
+    ["member-array-element", "m"],
+    ["map-get", "m"],
+    ["promise-then", "m"],
+    ["pick", "m"],
+    ["return-type-of", "m"],
+    ["union", "m"],
+    ["promise-all", "map"],
+    ["overload", "method"],
+    ["generic-computation", "method"],
+    ["awaited-overload", "m"],
+    ["instance-type-failed", "m"],
+    ["parameter-of-function-type", "m"],
+    ["long-chain", "m"],
+  ];
+  for (const [marker, at] of failedOn)
+    isFailed(
+      linkAt(broken, "use.ts", `// ${marker}`, at),
+      { file: "bad.ts" },
+      marker,
+    );
+  for (const [marker, at] of [
+    ["member-array", "map"],
+    ["member-number", "toFixed"],
+    ["map-has", "has"],
+    ["promise-then", "then"],
+    ["returned-function", "call"],
+    ["factory-map", "map"],
+    ["sandbox-bind", "bind"],
+    ["closure-body", "call"],
+    ["ctor-overload", "on"],
+    ["same-class-overload", "then"],
+    ["instance-type-clean", "on"],
+    ["computation-clean-input", "k"],
+    ["computation-beside-taint", "forEach"],
+    ["own-member-named-in-failed", "m"],
+    ["return-of-function-type", "trim"],
+    ["closure-any", "foo"],
+  ])
+    keeps(linkAt(broken, "use.ts", `// ${marker}`, at), marker);
+});
+
+test("failed scripts, declare global, import types and reference paths carry the failure", async () => {
+  const script =
+    "namespace N { export class C { m() {} } export function a() {} }\n";
+  const global =
+    "export {};\ndeclare global { interface Thing { m(): void } interface Window { fromBad(): void } }\n";
+  const helper = "export function helper() {}\nexport function helperX() {}\n";
+  const files = {
+    "tsconfig.json": '{ "compilerOptions": { "lib": ["es2020", "dom"] } }\n',
+    "ns.ts": script,
+    "dg.ts": global,
+    "mod.ts": helper,
+    "ref.ts": "declare function refd(): void;\n",
+    "use.ts": [
+      "declare let n: N.C;",
+      "n.m(); // ns-member",
+      "N.a(); // ns-function",
+      "declare const th: Thing;",
+      "th.m(); // global-interface",
+      'import "./dg";',
+      "window.fromBad(); // global-merge",
+      'type TI = typeof import("./mod");',
+      "declare const ti: TI;",
+      "ti.helper(); // import-type",
+      "",
+    ].join("\n"),
+    "use-module.ts":
+      "export {};\ndeclare let n3: N.C;\nn3.m(); // module-consumer\n",
+    "use-bare.ts": 'import "./mod";\nhelperX(); // module-name\n',
+    "use-ref.ts": '/// <reference path="./ref.ts" />\nrefd(); // ref-call\n',
+  };
+  const broken = {
+    "ns.ts": script + "const x = (;\n",
+    "dg.ts": global + "const x = (;\n",
+    "mod.ts": helper + "const x = (;\n",
+    "ref.ts": "declare function refd(): void;\nconst x = (;\n",
+  };
+  const { problems, bad } = await differential(files, broken);
+  assert.deepEqual(problems, []);
+  isFailed(
+    linkAt(bad, "use.ts", "// ns-member", "m"),
+    { file: "ns.ts" },
+    "ns member",
+  );
+  isFailed(
+    linkAt(bad, "use.ts", "// ns-function", "a"),
+    { file: "ns.ts" },
+    "ns function",
+  );
+  isFailed(
+    linkAt(bad, "use-module.ts", "// module-consumer", "m"),
+    { file: "ns.ts" },
+    "module consumer",
+  );
+  isFailed(
+    linkAt(bad, "use.ts", "// global-interface", "m"),
+    { file: "dg.ts" },
+    "declare global",
+  );
+  isFailed(
+    linkAt(bad, "use.ts", "// global-merge", "fromBad"),
+    { file: "dg.ts" },
+    "global merge",
+  );
+  isFailed(
+    linkAt(bad, "use.ts", "// import-type", "helper"),
+    { file: "mod.ts" },
+    "import type",
+  );
+  // A failed module's own top-level names are not globals: no cause.
+  keeps(linkAt(bad, "use-bare.ts", "// module-name", "helperX"), "module name");
+  // A reference path to a failed file is broken, not missing.
+  const reference = [...bad.links.values()].find(
+    (l) => l.file === "use-ref.ts" && l.kind === "imports",
+  );
+  assert.equal(reference.reason, "invalid-code");
+  assert.equal(reference.cause.file, "ref.ts");
+});
+
+test("an inherited or merged member the compiler found stands unless the failed file could declare its name", async () => {
+  const bad =
+    "export class Base { m() {} }\nexport interface BaseI { m(): void }\n";
+  const files = {
+    "bad.ts": bad,
+    "use.ts": [
+      'import { Base, BaseI } from "./bad";',
+      "class Other { own() {} m() {} }",
+      "interface Derived extends Other {}",
+      "class Derived extends Base {}",
+      "new Derived().own(); // derived-own",
+      "new Derived().m(); // derived-m",
+      "interface I extends BaseI, Other {}",
+      "declare const i: I;",
+      "i.own(); // interface-own",
+      "i.m(); // interface-m",
+      "",
+    ].join("\n"),
+  };
+  const { problems, bad: broken } = await differential(files, {
+    "bad.ts": bad + "const x = (;\n",
+  });
+  assert.deepEqual(problems, []);
+  for (const marker of ["derived-own", "interface-own"])
+    isResolved(
+      linkAt(broken, "use.ts", `// ${marker}`, "own"),
+      "use.ts#Other.own",
+      marker,
+    );
+  for (const marker of ["derived-m", "interface-m"])
+    isFailed(
+      linkAt(broken, "use.ts", `// ${marker}`, "m"),
+      { file: "bad.ts" },
+      marker,
+    );
+});
+
+test("JSDoc import types in JS files carry the failure", async () => {
+  const bad = "export class Failed { m() {} }\n";
+  const files = {
+    "tsconfig.json":
+      '{ "compilerOptions": { "allowJs": true, "checkJs": false } }\n',
+    "bad.ts": bad,
+    "use.js": [
+      '/** @type {import("./bad").Failed} */',
+      "let jf;",
+      "jf.m(); // jsdoc-at-type",
+      '/** @typedef {import("./bad").Failed} F */',
+      "/** @type {F} */",
+      "let jt;",
+      "jt.m(); // jsdoc-typedef",
+      '/** @returns {import("./bad").Failed} */',
+      "function mk() { return undefined; }",
+      "mk().m(); // jsdoc-returns",
+      "",
+    ].join("\n"),
+  };
+  const { problems, bad: broken } = await differential(files, {
+    "bad.ts": bad + "const x = (;\n",
+  });
+  assert.deepEqual(problems, []);
+  for (const marker of ["jsdoc-at-type", "jsdoc-typedef", "jsdoc-returns"])
+    isFailed(
+      linkAt(broken, "use.js", `// ${marker}`, "m"),
+      { file: "bad.ts" },
+      marker,
+    );
+});

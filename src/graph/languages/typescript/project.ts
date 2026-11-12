@@ -110,8 +110,12 @@ const INFERRED: ts.CompilerOptions = {
 /** What a failed (syntax-error) file reports and contributes. */
 export interface SyntaxFailure {
   diagnostics: Diagnostic[];
-  /** Names it declares (functions, classes, variables, namespaces, ...). */
+  /** Global names it declares: a script's top level and namespaces, `declare global`. */
   names: string[];
+  /** Its original text (for the member-name test only, never a target). */
+  text: string;
+  /** Identifier escapes or a computed member name: it could declare any member. */
+  anything: boolean;
 }
 
 /**
@@ -182,9 +186,18 @@ export function syntaxFailure(
   diagnostics.sort(
     (a, b) => a.range!.start - b.range!.start || a.range!.end - b.range!.end,
   );
-  // The names it declares at top level, in namespaces and in `declare
-  // global` (as far as the parser read it): all an unseen declaration of
-  // this file could answer elsewhere. Locals of its functions cannot.
+  // The global names it declares (as far as the parser read it): a
+  // script's top-level and namespace declarations, and a module's
+  // `declare global` blocks. A module's own top-level names are
+  // module-scoped: no other file can reach them without importing it.
+  const parsed = source as ts.SourceFile & {
+    externalModuleIndicator?: unknown;
+  };
+  const script =
+    !parsed.externalModuleIndicator &&
+    !/(^|[^.\w$])(module\.exports|exports\.[\w$]+)\s*=|(^|[^.\w$])require\s*\(/.test(
+      text,
+    );
   const names = new Set<string>();
   const bindingNames = (name: ts.BindingName): void => {
     if (ts.isIdentifier(name)) names.add(name.text);
@@ -192,12 +205,13 @@ export function syntaxFailure(
       for (const element of name.elements)
         if (!ts.isOmittedExpression(element)) bindingNames(element.name);
   };
-  const collect = (statements: readonly ts.Statement[]): void => {
+  const collect = (statements: readonly ts.Statement[], global: boolean) => {
     for (const statement of statements) {
-      if (ts.isVariableStatement(statement))
+      if (global && ts.isVariableStatement(statement))
         for (const declaration of statement.declarationList.declarations)
           bindingNames(declaration.name);
       else if (
+        global &&
         (ts.isFunctionDeclaration(statement) ||
           ts.isClassDeclaration(statement) ||
           ts.isInterfaceDeclaration(statement) ||
@@ -209,17 +223,42 @@ export function syntaxFailure(
       )
         names.add(statement.name.text);
       if (ts.isModuleDeclaration(statement)) {
+        const augmentsGlobal =
+          (statement.flags & ts.NodeFlags.GlobalAugmentation) !== 0;
         let body = statement.body;
         while (body && ts.isModuleDeclaration(body)) body = body.body;
-        if (body && ts.isModuleBlock(body)) collect(body.statements);
+        if (body && ts.isModuleBlock(body) && (global || augmentsGlobal))
+          collect(body.statements, true);
       }
     }
   };
-  collect(source.statements);
+  collect(source.statements, script);
+  // Whether it could declare a member of a given name, by a deliberately
+  // over-inclusive test of its whole text (readable or not): identifier
+  // escapes or a computed member name could declare anything.
+  let anything = /\\u/.test(text);
+  const computed = (node: ts.Node): void => {
+    if (anything) return;
+    if (ts.isComputedPropertyName(node)) anything = true;
+    else ts.forEachChild(node, computed);
+  };
+  computed(source);
   return {
     diagnostics,
     names: [...names].sort(),
+    text,
+    anything,
   };
+}
+
+/** Whether a failed file could declare a member of this name (see syntaxFailure). */
+export function couldDeclare(failure: SyntaxFailure, name: string): boolean {
+  if (failure.anything) return true;
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return (
+    new RegExp(`(^|[^\\w$])${escaped}($|[^\\w$])`).test(failure.text) ||
+    ['"', "'", "`"].some((quote) => failure.text.includes(quote + name + quote))
+  );
 }
 
 /**

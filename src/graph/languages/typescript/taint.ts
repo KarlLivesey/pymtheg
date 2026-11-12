@@ -37,6 +37,12 @@ export interface TaintInput {
   resolveModule: (specifier: string, from: string) => string | undefined;
   /** Whether a captured file failed (syntax error). */
   invalid: (path: string) => boolean;
+  /**
+   * Names the program's failed files declare (top level, namespaces,
+   * `declare global`), with those files: an unresolved reference to one is
+   * a dependence on them, like an import binding.
+   */
+  failedNames: ReadonlyMap<string, readonly string[]>;
 }
 
 const memo = new WeakMap<ts.TypeChecker, Taint>();
@@ -50,6 +56,12 @@ const CALL_ARGUMENTS = true;
 const WEAK_THROUGH_VALUE_ONLY = true;
 /** The parameters of a signature in a type taint weakly. */
 const WEAK_SIGNATURE_PARAMETERS = true;
+/** An unresolved name a failed file declares taints like a binding. */
+const UNREAD_NAMES = true;
+/** A function literal counts by its signature only, not its body. */
+const SIGNATURE_ONLY = true;
+/** An import type of a failed module is a seed. */
+const IMPORT_TYPES = true;
 
 /**
  * A symbol and the aliases it resolves through, as the compiler resolves
@@ -213,6 +225,20 @@ export const DEPENDENCIES: Record<
             parts.push(declaration);
     return parts;
   },
+  /** In a JS file, a JSDoc `@type` or `@returns` type, and a `@typedef`. */
+  jsdoc: (node) => {
+    if (ts.isJSDocTypedefTag(node) || ts.isJSDocCallbackTag(node))
+      return node.typeExpression ? [node.typeExpression] : [];
+    if (!/\.(c|m)?jsx?$/.test(node.getSourceFile().fileName)) return [];
+    const parts: ts.Node[] = [];
+    const type = ts.getJSDocType(node);
+    if (type) parts.push(type);
+    if (ts.isFunctionLike(node)) {
+      const returned = ts.getJSDocReturnType(node);
+      if (returned) parts.push(returned);
+    }
+    return parts;
+  },
   /** A generic constraint or default. */
   typeParameter: (node) =>
     ts.isTypeParameterDeclaration(node)
@@ -313,7 +339,8 @@ export function taintOf(input: TaintInput, failed: boolean): Taint {
   if (!failed) return EMPTY;
   const known = memo.get(input.checker);
   if (known) return known;
-  const { program, checker, captured, resolveModule, invalid } = input;
+  const { program, checker, captured, resolveModule, invalid, failedNames } =
+    input;
   const seeds = new Map<ts.Symbol, Set<string>>();
   const all = new Map<ts.Symbol, Set<string>>();
   const weak = new Map<ts.Symbol, Set<string>>();
@@ -422,14 +449,19 @@ export function taintOf(input: TaintInput, failed: boolean): Taint {
         )
       )
         declarations.push(node);
+      // JSDoc `@typedef`/`@callback` tags are declarations too.
+      for (const doc of (node as { jsDoc?: ts.JSDoc[] }).jsDoc ?? [])
+        for (const tag of doc.tags ?? [])
+          if (
+            (ts.isJSDocTypedefTag(tag) || ts.isJSDocCallbackTag(tag)) &&
+            tag.typeExpression
+          )
+            declarations.push(tag);
       ts.forEachChild(node, visit);
     };
     visit(source);
   }
-  if (!all.size) {
-    memo.set(checker, EMPTY);
-    return EMPTY;
-  }
+
   // ----- closure -----
   /**
    * Whether a node is a type argument (or array element type) that decides
@@ -472,30 +504,48 @@ export function taintOf(input: TaintInput, failed: boolean): Taint {
       (ts.isArrayTypeNode(parent) && parent.elementType === node)
     );
   };
+  /** A dependence of one declaration's symbol on another symbol's taint. */
+  interface Edge {
+    target: ts.Symbol;
+    /** How the other symbol's strong taint reaches the target. */
+    fromAll: "strong" | "weak";
+    /** Whether its weak taint reaches the target. */
+    fromWeak: boolean;
+  }
+  const dependents = new Map<ts.Symbol, Edge[]>();
+  const depend = (on: ts.Symbol, edge: Edge) => {
+    // A member of an instantiated generic type depends through its
+    // declaration's own symbol.
+    const keys = new Set<ts.Symbol>([on]);
+    for (const declaration of on.declarations ?? []) {
+      const declared = (declaration as { symbol?: ts.Symbol }).symbol;
+      if (declared) keys.add(declared);
+    }
+    for (const key of keys)
+      dependents.set(key, [...(dependents.get(key) ?? []), edge]);
+  };
+  /** Only a generic or overloaded callee's result depends on its arguments. */
+  const argumentsMatter = (call: ts.CallExpression | ts.NewExpression) => {
+    try {
+      const type = checker.getTypeAtLocation(call.expression);
+      const signatures = ts.isNewExpression(call)
+        ? type.getConstructSignatures()
+        : type.getCallSignatures();
+      return (
+        signatures.length > 1 ||
+        signatures.some((signature) => !!signature.typeParameters?.length)
+      );
+    } catch {
+      return true;
+    }
+  };
   /**
-   * Causes of whatever a subtree refers to (aliases followed): strong when a
-   * reference decides what the declaration is, weak when it sits in a type
-   * argument (or refers to a weakly tainted symbol).
+   * Records what a part of a declaration refers to (aliases followed):
+   * strong when a reference decides what the declaration is, weak when it
+   * sits in a type argument; a name no declaration answers that a failed
+   * file declares taints the target directly.
    */
-  const referenced = (
-    part: ts.Node,
-  ): { strong: Set<string>; weak: Set<string> } => {
-    const found = { strong: new Set<string>(), weak: new Set<string>() };
-    /** Only a generic or overloaded callee's result depends on its arguments. */
-    const argumentsMatter = (call: ts.CallExpression | ts.NewExpression) => {
-      try {
-        const type = checker.getTypeAtLocation(call.expression);
-        const signatures = ts.isNewExpression(call)
-          ? type.getConstructSignatures()
-          : type.getCallSignatures();
-        return (
-          signatures.length > 1 ||
-          signatures.some((signature) => !!signature.typeParameters?.length)
-        );
-      } catch {
-        return true;
-      }
-    };
+  const reference = (target: ts.Symbol, part: ts.Node) => {
     const visit = (node: ts.Node, inArgument: boolean): void => {
       if (ts.isIdentifier(node) || ts.isPrivateIdentifier(node)) {
         let symbol: ts.Symbol | undefined;
@@ -517,19 +567,57 @@ export function taintOf(input: TaintInput, failed: boolean): Taint {
             checker,
             checker.getSymbolAtLocation(parent.name),
           );
-        if (symbol)
-          for (const step of aliasChain(checker, symbol)) {
-            for (const cause of causesOfSymbol(all, step))
-              (inArgument ? found.weak : found.strong).add(cause);
-            if (!object)
-              for (const cause of causesOfSymbol(weak, step))
-                found.weak.add(cause);
-          }
+        // An unresolved name (in a type, the compiler's "unknown" symbol).
+        const resolved =
+          symbol &&
+          (symbol.declarations?.length || symbol.flags & ts.SymbolFlags.Alias);
+        if (symbol && resolved)
+          for (const step of aliasChain(checker, symbol))
+            depend(step, {
+              target,
+              fromAll: inArgument ? "weak" : "strong",
+              fromWeak: !object,
+            });
+        else if (UNREAD_NAMES && ts.isIdentifier(node)) {
+          const files = failedNames.get(node.text);
+          if (files?.length) add(inArgument ? weak : all, target, files);
+        }
       }
       // `x as T`, `<T>x`: the asserted type replaces the expression's.
       if (ts.isAsExpression(node) || ts.isTypeAssertionExpression(node)) {
         visit(node.type, inArgument);
         return;
+      }
+      // A function literal's type is its signature: its parameters'
+      // annotations (or defaults) and its return type (or what it returns),
+      // never what its body mentions.
+      if (
+        SIGNATURE_ONLY &&
+        (ts.isArrowFunction(node) || ts.isFunctionExpression(node))
+      ) {
+        for (const parameter of node.parameters) {
+          if (parameter.type) visit(parameter.type, true);
+          else if (parameter.initializer) visit(parameter.initializer, true);
+        }
+        if (node.type) visit(node.type, inArgument);
+        else
+          for (const returned of DEPENDENCIES.inferredReturn!(node, checker))
+            visit(returned, inArgument);
+        return;
+      }
+      // `import("./bad")`, `typeof import("./bad")`, `import("./bad").X`.
+      if (
+        IMPORT_TYPES &&
+        ts.isImportTypeNode(node) &&
+        ts.isLiteralTypeNode(node.argument) &&
+        ts.isStringLiteralLike(node.argument.literal)
+      ) {
+        const from = fromVirtual(node.getSourceFile().fileName);
+        const causes =
+          from === undefined
+            ? []
+            : moduleCauses(node.argument.literal, from, false);
+        if (causes.length) add(inArgument ? weak : all, target, causes);
       }
       if (
         CALL_ARGUMENTS &&
@@ -564,44 +652,52 @@ export function taintOf(input: TaintInput, failed: boolean): Taint {
       );
     };
     visit(part, false);
-    return found;
   };
-  for (let changed = true, rounds = 0; changed && rounds < 64; rounds++) {
-    changed = false;
-    for (const node of declarations) {
-      const symbol = symbolOfDeclaration(node, checker);
-      if (!symbol) continue;
-      for (const parts of Object.values(DEPENDENCIES))
-        for (const part of parts(node, checker)) {
-          const causes = referenced(part);
-          if (causes.strong.size && add(all, symbol, causes.strong))
-            changed = true;
-          if (causes.weak.size && add(weak, symbol, causes.weak))
-            changed = true;
-        }
-      // `const { job } = tree`: the destructured property's own taint.
-      if (
-        DESTRUCTURED &&
-        ts.isBindingElement(node) &&
-        ts.isObjectBindingPattern(node.parent)
-      ) {
-        const key = node.propertyName ?? node.name;
-        let property: ts.Symbol | undefined;
-        try {
-          property = ts.isIdentifier(key)
-            ? checker.getTypeAtLocation(node.parent).getProperty(key.text)
-            : undefined;
-        } catch {
-          property = undefined;
-        }
-        if (property) {
-          const strong = causesOfSymbol(all, property);
-          if (strong.length && add(all, symbol, strong)) changed = true;
-          const weakCauses = causesOfSymbol(weak, property);
-          if (weakCauses.length && add(weak, symbol, weakCauses))
-            changed = true;
-        }
+  for (const node of declarations) {
+    const symbol = symbolOfDeclaration(node, checker);
+    if (!symbol) continue;
+    for (const parts of Object.values(DEPENDENCIES))
+      for (const part of parts(node, checker)) reference(symbol, part);
+    // `const { job } = tree`: the destructured property's own taint.
+    if (
+      DESTRUCTURED &&
+      ts.isBindingElement(node) &&
+      ts.isObjectBindingPattern(node.parent)
+    ) {
+      const key = node.propertyName ?? node.name;
+      let property: ts.Symbol | undefined;
+      try {
+        property = ts.isIdentifier(key)
+          ? checker.getTypeAtLocation(node.parent).getProperty(key.text)
+          : undefined;
+      } catch {
+        property = undefined;
       }
+      if (property)
+        depend(property, { target: symbol, fromAll: "strong", fromWeak: true });
+    }
+  }
+  // Nothing reaches a failed file (no binding, import type or global name).
+  if (!all.size && !weak.size) {
+    memo.set(checker, EMPTY);
+    return EMPTY;
+  }
+  // A worklist to the true fixpoint: taint only grows, over finitely many
+  // symbols and causes, so it ends; there is no pass limit.
+  const queue = [...new Set([...all.keys(), ...weak.keys()])];
+  while (queue.length) {
+    const changed = queue.pop()!;
+    for (const edge of dependents.get(changed) ?? []) {
+      let grew = false;
+      const strong = all.get(changed);
+      if (strong?.size)
+        grew =
+          add(edge.fromAll === "strong" ? all : weak, edge.target, strong) ||
+          grew;
+      const weakCauses = weak.get(changed);
+      if (edge.fromWeak && weakCauses?.size)
+        grew = add(weak, edge.target, weakCauses) || grew;
+      if (grew) queue.push(edge.target);
     }
   }
   const taint = { seeds, all, weak };
