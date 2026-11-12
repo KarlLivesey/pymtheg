@@ -110,7 +110,7 @@ const INFERRED: ts.CompilerOptions = {
 /** What a failed (syntax-error) file reports and contributes. */
 export interface SyntaxFailure {
   diagnostics: Diagnostic[];
-  /** Identifier names occurring in its text: all an unseen declaration could introduce. */
+  /** Names it declares (functions, classes, variables, namespaces, ...). */
   names: string[];
 }
 
@@ -182,18 +182,40 @@ export function syntaxFailure(
   diagnostics.sort(
     (a, b) => a.range!.start - b.range!.start || a.range!.end - b.range!.end,
   );
-  // Every identifier the parser met (its own record, and the tree's).
-  const names = new Set<string>(
-    (
-      source as { identifiers?: ReadonlyMap<string, string> }
-    ).identifiers?.keys() ?? [],
-  );
-  const collect = (node: ts.Node): void => {
-    if (ts.isIdentifier(node) || ts.isPrivateIdentifier(node))
-      names.add(node.text);
-    ts.forEachChild(node, collect);
+  // The names it declares at top level, in namespaces and in `declare
+  // global` (as far as the parser read it): all an unseen declaration of
+  // this file could answer elsewhere. Locals of its functions cannot.
+  const names = new Set<string>();
+  const bindingNames = (name: ts.BindingName): void => {
+    if (ts.isIdentifier(name)) names.add(name.text);
+    else
+      for (const element of name.elements)
+        if (!ts.isOmittedExpression(element)) bindingNames(element.name);
   };
-  collect(source);
+  const collect = (statements: readonly ts.Statement[]): void => {
+    for (const statement of statements) {
+      if (ts.isVariableStatement(statement))
+        for (const declaration of statement.declarationList.declarations)
+          bindingNames(declaration.name);
+      else if (
+        (ts.isFunctionDeclaration(statement) ||
+          ts.isClassDeclaration(statement) ||
+          ts.isInterfaceDeclaration(statement) ||
+          ts.isTypeAliasDeclaration(statement) ||
+          ts.isEnumDeclaration(statement) ||
+          ts.isModuleDeclaration(statement)) &&
+        statement.name &&
+        ts.isIdentifier(statement.name)
+      )
+        names.add(statement.name.text);
+      if (ts.isModuleDeclaration(statement)) {
+        let body = statement.body;
+        while (body && ts.isModuleDeclaration(body)) body = body.body;
+        if (body && ts.isModuleBlock(body)) collect(body.statements);
+      }
+    }
+  };
+  collect(source.statements);
   return {
     diagnostics,
     names: [...names].sort(),

@@ -107,7 +107,7 @@ link across packages.
 **Unchanged snapshot reuse.** When `changedFiles` and `changedContextFiles`
 are both empty and every stored result was produced by this module version
 (which embeds the compiler version; the leading number is bumped whenever
-extraction or resolution semantics change, and is now 11), the stored facts are
+extraction or resolution semantics change, and is now 12), the stored facts are
 returned as they are:
 no program is built and nothing is parsed. They are the complete analysis of the
 identical snapshot, and `resolve` re-derives every target from them. Any source,
@@ -522,35 +522,64 @@ imports of `./orig` are not linked to it; backlog).
   failed file is named. A failure with its cause is a value that passes
   through every lookup depending on it, in two steps (`taint.ts`, then one
   consumer in `extract.ts`):
+  - **The rule: a wrong cause is worse than a missing one.** A link is
+    failed only when its dependence on a failed file is real; a correct
+    resolved link is never thrown away (it keeps its target, flagged).
   - **Taint (T1),** computed once per program, only when the program would
     include a failed file, with the compiler's own symbol and alias
     resolution. Seeds are the bindings of a failed module: an import,
     re-export (named, type-only, `export *`), `import =`, `require`, dynamic
     `import()`, `module.exports = require(…)`, and a name that only an
     `export *` from a failed module could supply. Then, to a fixpoint, a
-    declaration of a valid file is tainted when a name in any part its
-    meaning depends on refers to a tainted symbol: its type annotation, a
-    type alias body, its heritage clauses (every merged declaration of the
-    symbol), its initialiser (for an inferred type), its return type or the
-    expressions it returns, an `export =`/`module.exports =`/`exports.x =`
-    right-hand side, a default export, a generic constraint or default.
-    Aliases are followed as the compiler resolves them, including each
-    module's `export =` symbol.
-  - **One consumer (T2),** before any checker answer is accepted (resolved,
-    candidates, `no-symbol`, `external` alike): a name whose binding resolves
-    into a failed file fails; a member access, call, `new`, JSX element or
-    qualified type name whose receiver depends on taint (the names along its
-    chain, the arguments of a call in it, the receiver's type and its alias)
-    fails, unless the answer is an own member declared directly in the
-    receiver type's own declarations (one object type, not a union or
-    intersection). An inherited or merged member found elsewhere through a
-    tainted type fails even though the checker found a target. If in doubt,
-    `invalid-code`.
-  - **Unread names.** An unresolved link (`no-symbol`, or `external` with no
-    declaration anywhere) whose name occurs as an identifier in a failed file
-    of its program fails with that file as the cause: an unseen declaration
-    (a global, a `declare global`, a namespace merge) can only introduce a
-    name the unread text contains.
+    declaration of a valid file is tainted by the names in the parts its
+    meaning depends on: its type annotation, a type alias body, its
+    heritage clauses (every merged declaration), its initialiser, its return
+    type or returned expressions, an `export =`/`module.exports =`/
+    `exports.x =` right-hand side, a default export, a generic constraint or
+    default, the iterated expression of a `for … of`, the property a
+    destructuring takes, and, for an unannotated callback parameter, the call
+    it is passed to (its callee, and the declaration of its contextual type). Aliases are followed as the compiler resolves
+    them, including each module's `export =` symbol; a member of an
+    instantiated generic type is matched to its declaration.
+  - **Strong and weak.** A reference taints **strongly** when it decides
+    what the declaration is or which members it has. It taints **weakly**
+    when it can only change member types: a type argument of a class or
+    interface (`Promise<Job>`, `QueueGetters<Job>`), an array element type,
+    the parameters of a function or constructor type, or the arguments of a
+    generic or overloaded call (through inference). A type argument of a type
+    alias (`Pick<BaseI, "m">`, a mapped type) decides the members: strong.
+    A call's arguments do not taint its result at all when the callee is
+    neither generic nor overloaded. Weak taint passes on only through a value
+    itself: not through the object of a member access, unless the member's
+    declared type refers to its owner's type parameters (`Array<T>.slice`,
+    `Box<T>.value`), and always through element access. An `x as T` (or
+    `<T>x`) depends on `T` only.
+  - **One consumer (T2),** before any checker answer is accepted:
+    - a name whose binding resolves into a failed file fails;
+    - a call fails because of its arguments only when its callee has two or
+      more distinct targets (overloads the arguments choose between); with
+      one declaration it keeps its target, flagged;
+    - a member access, call, `new`, JSX element or qualified type name whose
+      receiver is **strongly** tainted (a name along its chain, the callee
+      producing it, the result of a generic or overloaded call with a
+      tainted argument, an asserted type, or its own type) fails, unless the
+      answer is an own member declared directly in the receiver type's own
+      declarations (one object type, not a union or intersection);
+    - one whose receiver is only **weakly** tainted keeps any answer the
+      compiler found; with no answer it fails only when the receiver's type
+      could not be computed (the error type, or `any`), because of what it
+      depends on.
+  - **Unread names.** An unresolved bare name (`no-symbol`, or `external`
+    with no declaration anywhere) that a failed file of its program declares
+    at top level, in a namespace or in `declare global` fails with that file
+    as the cause; so does a member through such a name (`N.a()`). A member
+    name through an untainted receiver never acquires a cause.
+  - **Why (`data.cause.via`).** Every failed link says what in valid code
+    depends on the failed file: `import of the failed file`, `binding Job`,
+    `receiver job`, `type Derived`, `callee make`, `asserted type Job`,
+    `argument b of overloaded o.f`, `argument arr of generic or overloaded
+Promise.all`, `name N declared in the failed file`, with `; its type
+could not be computed` for a weak receiver without an answer.
   - **One constructor (T3)** builds every failed link and cannot do so
     without a cause; a link marked `invalid-code` without one is a
     programming error that stops the analysis.
@@ -807,16 +836,20 @@ Full numbers, the comparison across rounds and every hand check are in
   there, and no BullMQ file uses the wrapper's `arguments` or has a parse
   error.
 - **One syntax error in BullMQ's `class Job`** (`isFailed(x: , y)`): the
-  whole of `src/classes/job.ts` fails. 4 programs, as unbroken. Links: 3,862
-  failed (all with cause `src/classes/job.ts`), 15,289 resolved and
-  flagged, 634 resolved without the flag (programs without `job.ts`), 3
-  candidate sets (flagged), 20,619 otherwise unresolved. Compared link by
-  link with the clean index (`evidence/w2-d/clean-broken-diff.mjs`): **0
-  changed targets, 0 changed non-failed reasons**, and all 920 links whose
-  clean target is in `job.ts` fail, naming it. Of the failed links, 698
-  resolved elsewhere when clean (lookups through tainted values, failed
-  because in doubt), 1 was a candidate set, and 2,243 were already
-  unresolved (mostly `expect(job)…` matcher chains on tainted values).
+  whole of `src/classes/job.ts` fails. 4 programs, as unbroken. Compared link
+  by link with the clean index (`evidence/w2-d/clean-broken-diff.mjs`, the
+  clean index as the oracle):
+  - **A.** Clean target in `job.ts`: 920, all `invalid-code` naming it.
+  - **B.** Resolved elsewhere when clean, the same target when broken:
+    15,987 flagged, 634 unflagged (programs without `job.ts`).
+  - **C.** Resolved elsewhere when clean, failed when broken: 0.
+  - **D.** Unresolved when clean, failed when broken: 13, each with its
+    justification (`receiver jobs (type argument); its type could not be
+computed` for array methods on `Job[]`, `argument arr of generic or
+overloaded Promise.all`, `receiver originalGetDependencies` for
+    `Job.prototype.…`, `callee sandbox`).
+  - **E.** Changed target or changed non-failed reason: 0.
+  - 22,853 links unresolved in both, unchanged; 439 belonged to `job.ts`.
 - **`requirejs`:** 2 files fail (`tests/packagesMultiLevel/build.js`, a bare
   object literal; `dist/file.js`, the octal literal `0777`). 257 links fail,
   all with cause `dist/file.js`: its import and binding in

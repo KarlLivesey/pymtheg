@@ -35,7 +35,7 @@ import {
  * facts; resolve maps those facts to symbol IDs. See docs/changes/W2-D.md.
  */
 // Bump the leading number whenever extraction or resolution semantics change.
-const MODULE_VERSION = `11+typescript-${ts.version}`;
+const MODULE_VERSION = `12+typescript-${ts.version}`;
 
 /** Observation counters for tests (programs built, files extracted). Not a correctness input. */
 export const statistics = {
@@ -381,10 +381,16 @@ export function mergeTied(
     // link has failed, with the union of causes and no target from others.
     if (datas.some((data) => data.reason === "invalid-code")) {
       const causes = new Set<string>();
+      const vias = new Set<string>();
       for (const data of datas) {
-        const cause = (data.cause ?? {}) as { file?: string; files?: string[] };
+        const cause = (data.cause ?? {}) as {
+          file?: string;
+          files?: string[];
+          via?: string;
+        };
         if (cause.file) causes.add(cause.file);
         for (const file of cause.files ?? []) causes.add(file);
+        if (cause.via) vias.add(cause.via);
       }
       const merged = mergeFields(datas, [
         "targets",
@@ -394,7 +400,10 @@ export function mergeTied(
       ]);
       merged.reason = "invalid-code";
       const list = [...causes].sort();
-      merged.cause = list.length === 1 ? { file: list[0]! } : { files: list };
+      merged.cause = {
+        ...(list.length === 1 ? { file: list[0]! } : { files: list }),
+        ...(vias.size ? { via: [...vias].sort().join("; ") } : {}),
+      };
       merged.projects = [...projects];
       return { ...link, data: merged };
     }

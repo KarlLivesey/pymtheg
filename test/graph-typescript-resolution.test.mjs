@@ -2830,7 +2830,7 @@ test("failed and invalid targets get their own reasons, never not-a-module", asy
       const invalidEdge = graph.link("use.js", '"./partial"', "imports");
       assert.equal(invalidEdge.data.notAModule, undefined);
       assert.equal(invalidEdge.data.reason, "invalid-code");
-      assert.deepEqual(invalidEdge.data.cause, { file: "partial.js" });
+      assert.equal(invalidEdge.data.cause.file, "partial.js");
       assert.equal(
         graph.link("use.js", "q", "imports").data.reason,
         "invalid-code",
@@ -3043,7 +3043,9 @@ const failedLink = (link, cause, what) => {
   assert.equal(link.data.targets, undefined, `${what}: no targets`);
   assert.equal(link.targetId ?? null, null, `${what}: no target`);
   assert.deepEqual(link.candidates ?? [], [], `${what}: no candidates`);
-  assert.deepEqual(link.data.cause, cause, `${what}: cause`);
+  const { via, ...files } = link.data.cause ?? {};
+  assert.deepEqual(files, cause, `${what}: cause`);
+  assert.ok(typeof via === "string" && via.length, `${what}: via`);
 };
 const FLAG = "no-unseen-declarations";
 const flagged = (graph, link, target, what) => {
@@ -3480,6 +3482,8 @@ async function differential(files, broken) {
       if (!causes.length || causes.some((f) => !brokenPaths.has(f)))
         problems.push(`${key}: failed with cause ${JSON.stringify(b.cause)}`);
       if (b.targets.length) problems.push(`${key}: failed but names targets`);
+      if (!b.cause?.via)
+        problems.push(`${key}: failed without a justification`);
       for (const f of intoBroken)
         if (!causes.includes(f)) problems.push(`${key}: cause lacks ${f}`);
       continue;
@@ -3519,7 +3523,9 @@ const isFailed = (link, cause, what) => {
     `${what}: ${link.resolution} ${link.reason}`,
   );
   assert.deepEqual(link.targets, [], `${what}: no targets`);
-  assert.deepEqual(link.cause, cause, `${what}: cause`);
+  const { via, ...files } = link.cause ?? {};
+  assert.deepEqual(files, cause, `${what}: cause`);
+  assert.ok(typeof via === "string" && via.length, `${what}: via`);
 };
 const isResolved = (link, target, what) => {
   assert.equal(link.resolution, "resolved", `${what}: ${link.reason}`);
@@ -3683,6 +3689,13 @@ test("a failure passes through every lookup that depends on it (clean vs broken)
     linkAt(bad, "use.ts", "// impl-own", "own2"),
     "use.ts#Impl.own2",
     "impl-own",
+  );
+  // A binding of a valid declaration whose value depends on a failed file
+  // names that declaration correctly: resolved, flagged.
+  isResolved(
+    linkAt(bad, "use.ts", 'import dflt from "./d"', "dflt", "imports"),
+    "d.ts#default",
+    "default-export binding",
   );
   const control = linkAt(bad, "use.ts", "// control", "c");
   isResolved(control, "use.ts#Clean.c", "control");
@@ -3857,4 +3870,197 @@ test("a call's result carries the failure of its arguments' types", async () => 
     { file: "gen.ts" },
     "splice",
   );
+});
+
+test("arguments decide only overloads and generic results: a correct link is not thrown away", async () => {
+  const bad = "export class Base { m() {} }\n";
+  const files = {
+    "bad.ts": bad,
+    "use.ts": [
+      'import { Base } from "./bad";',
+      "class Local { lm() {} }",
+      "class Q { add(x: Base): number { return 1; } }",
+      "declare const q: Q;",
+      "declare const b: Base;",
+      "q.add(b); // single-signature",
+      "interface O { f(x: Base): void; }",
+      "interface O { f(x: string): void; }",
+      "declare const o: O;",
+      "o.f(b); // overloaded",
+      "function gen<T>(v: T): T { return v; }",
+      "gen(b).toString(); // generic-result",
+      "function plain(x: Base): Local { return new Local(); }",
+      "plain(b).lm(); // plain-result",
+      "",
+    ].join("\n"),
+  };
+  const { problems, bad: broken } = await differential(files, {
+    "bad.ts": bad + "const x = (;\n",
+  });
+  assert.deepEqual(problems, []);
+  // Rule 1: one declaration decides the call whatever its arguments.
+  const single = linkAt(broken, "use.ts", "// single-signature", "add");
+  isResolved(single, "use.ts#Q.add", "single signature");
+  assert.ok(single.assumes.includes("no-unseen-declarations"));
+  // Rule 1: distinct overload targets are picked by the arguments.
+  const overloaded = linkAt(broken, "use.ts", "// overloaded", "f");
+  isFailed(overloaded, { file: "bad.ts" }, "overloaded");
+  assert.match(overloaded.cause.via, /^argument b of overloaded o\.f$/);
+  // Rule 2: a generic callee's result carries its argument's failure.
+  isFailed(
+    linkAt(broken, "use.ts", "// generic-result", "toString"),
+    { file: "bad.ts" },
+    "generic result",
+  );
+  // Rule 2: a non-generic single signature's result does not.
+  isResolved(
+    linkAt(broken, "use.ts", "// plain-result", "lm"),
+    "use.ts#Local.lm",
+    "plain result",
+  );
+});
+
+test("type arguments of a class or interface keep its members; a type alias's arguments decide them", async () => {
+  const bad =
+    "export class Base { m() {} }\nexport interface BaseI { m(): void }\n";
+  const files = {
+    "bad.ts": bad,
+    "use.ts": [
+      'import { Base, BaseI } from "./bad";',
+      "class Holder<T> { x() {} item!: T; }",
+      "declare const h: Holder<Base>;",
+      "h.x(); // class-argument",
+      "h.item.m(); // member-typed-by-argument",
+      "declare const list: Base[];",
+      "list[0].m(); // element",
+      'declare const p: Pick<BaseI, "m">;',
+      "p.m(); // alias-argument",
+      "declare const v: unknown;",
+      "(v as Base).m(); // assertion",
+      "class Local { lm() {} }",
+      "declare const q: Holder<Base>;",
+      "(q as any as Local).lm(); // assertion-any",
+      "",
+    ].join("\n"),
+  };
+  const { problems, bad: broken } = await differential(files, {
+    "bad.ts": bad + "const x = (;\n",
+  });
+  assert.deepEqual(problems, []);
+  // Members of a class do not depend on its type arguments.
+  isResolved(
+    linkAt(broken, "use.ts", "// class-argument", "x"),
+    "use.ts#Holder.x",
+    "class argument",
+  );
+  // A member typed by the argument, an element, a type alias's argument
+  // and an asserted type do.
+  for (const [marker, at] of [
+    ["// member-typed-by-argument", "m"],
+    ["// element", "m"],
+    ["// alias-argument", "m"],
+    ["// assertion", "m"],
+  ])
+    isFailed(linkAt(broken, "use.ts", marker, at), { file: "bad.ts" }, marker);
+  // An assertion replaces the expression's type: no dependence remains.
+  isResolved(
+    linkAt(broken, "use.ts", "// assertion-any", "lm"),
+    "use.ts#Local.lm",
+    "asserted type",
+  );
+});
+
+test("each route the failure travels, and each that keeps a correct answer", async () => {
+  const job = [
+    "export class Job { getState() {} }",
+    "export function makeJob(): Job { return new Job(); }",
+    "",
+  ].join("\n");
+  const files = {
+    "job.ts": job,
+    "use.ts": [
+      'import { Job } from "./job";',
+      'import type { Missing } from "uncaptured-package";',
+      "class LocalBase { lm() {} }",
+      "class Sub extends LocalBase {}",
+      // Routes that carry the failure.
+      "declare const jobs: Job[];",
+      "jobs.map((j) => j.getState()); // contextual-receiver",
+      "interface Events { done: (job: Job) => void }",
+      "declare function on<K extends keyof Events>(k: K, l: Events[K]): void;",
+      'on("done", (job) => job.getState()); // contextual-type',
+      "for (const j of jobs) j.getState(); // for-of",
+      "interface Tree { job: Job }",
+      "declare const tree: Tree;",
+      "const { job } = tree;",
+      "job.getState(); // destructured",
+      "class Maker<T> { make(): Job { return null as any; } t!: T; }",
+      "declare const maker: Maker<number>;",
+      "const made = maker.make();",
+      "made.getState(); // instantiated",
+      // Routes that keep a correct answer (inherited members: strong taint
+      // would fail them).
+      "class Holder<T> extends LocalBase { item!: T; }",
+      "declare const holder: Holder<Job>;",
+      "holder.lm(); // class-type-argument",
+      "declare const factory: { new (p: (j: Job) => void): Sub };",
+      "const built = new factory(() => {});",
+      "built.lm(); // signature-parameter",
+      "function plain(x: Job): Sub { return new Sub(); }",
+      "declare const aJob: Job;",
+      "plain(aJob).lm(); // plain-result",
+      "const stored = plain(aJob);",
+      "stored.lm(); // stored-plain",
+      "const asserted = aJob as unknown as Sub;",
+      "asserted.lm(); // assertion-stored",
+      "class Q2<T> { client!: Missing; t!: T; }",
+      "declare const q2: Q2<Job>;",
+      "const client = q2.client;",
+      "client.scard(); // member-object",
+      "q2.client.scard(); // direct-member-object",
+      "function plainMissing(x: Job): Missing { return null as any; }",
+      "const fromPlain = plainMissing(aJob);",
+      "fromPlain.scard(); // plain-missing",
+      "",
+    ].join("\n"),
+  };
+  const { problems, bad } = await differential(files, {
+    "job.ts": job + "const x = (;\n",
+  });
+  assert.deepEqual(problems, []);
+  for (const marker of [
+    "contextual-receiver",
+    "contextual-type",
+    "for-of",
+    "destructured",
+    "instantiated",
+  ])
+    isFailed(
+      linkAt(bad, "use.ts", `// ${marker}`, "getState"),
+      { file: "job.ts" },
+      marker,
+    );
+  for (const marker of [
+    "class-type-argument",
+    "signature-parameter",
+    "plain-result",
+    "stored-plain",
+    "assertion-stored",
+  ])
+    isResolved(
+      linkAt(bad, "use.ts", `// ${marker}`, "lm"),
+      "use.ts#LocalBase.lm",
+      marker,
+    );
+  // Unresolved for a reason that has nothing to do with job.ts (an
+  // uncaptured package): no cause.
+  for (const marker of [
+    "member-object",
+    "direct-member-object",
+    "plain-missing",
+  ]) {
+    const link = linkAt(bad, "use.ts", `// ${marker}`, "scard");
+    assert.notEqual(link.reason, "invalid-code", marker);
+    assert.equal(link.cause, undefined, marker);
+  }
 });

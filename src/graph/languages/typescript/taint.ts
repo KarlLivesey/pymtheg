@@ -17,8 +17,17 @@ import { bindingSpecifier } from "./symbols.js";
 export interface Taint {
   /** Seeds: bindings that resolve into a failed file. */
   seeds: Map<ts.Symbol, Set<string>>;
-  /** Every tainted symbol (seeds included), with its causes. */
+  /**
+   * Strongly tainted symbols (seeds included), with their causes: what the
+   * symbol is, or which members it has, depends on a failed file.
+   */
   all: Map<ts.Symbol, Set<string>>;
+  /**
+   * Weakly tainted symbols: the failed file appears only in a type argument
+   * or array element type (`Promise<Job>[]`, `extends Base<Job>`), so member
+   * lookups find the same declarations but their result types may differ.
+   */
+  weak: Map<ts.Symbol, Set<string>>;
 }
 
 export interface TaintInput {
@@ -31,6 +40,16 @@ export interface TaintInput {
 }
 
 const memo = new WeakMap<ts.TypeChecker, Taint>();
+/** A destructured binding depends on the property it takes. */
+const DESTRUCTURED = true;
+/** A reference inside a type argument taints weakly. */
+const WEAK_ARGUMENTS = true;
+/** A call's arguments taint its result weakly, and only for a generic or overloaded callee. */
+const CALL_ARGUMENTS = true;
+/** Weak taint passes on only through a value itself, not through the object of a member access. */
+const WEAK_THROUGH_VALUE_ONLY = true;
+/** The parameters of a signature in a type taint weakly. */
+const WEAK_SIGNATURE_PARAMETERS = true;
 
 /**
  * A symbol and the aliases it resolves through, as the compiler resolves
@@ -70,10 +89,13 @@ export function aliasChain(
   }
   return chain;
 }
-const EMPTY: Taint = { seeds: new Map(), all: new Map() };
+const EMPTY: Taint = { seeds: new Map(), all: new Map(), weak: new Map() };
 
 /** The parts of a declaration its meaning depends on, by kind (one entry per kind). */
-export const DEPENDENCIES: Record<string, (node: ts.Node) => ts.Node[]> = {
+export const DEPENDENCIES: Record<
+  string,
+  (node: ts.Node, checker: ts.TypeChecker) => ts.Node[]
+> = {
   /** `x: T`, `p: T`, `prop: T`. */
   annotation: (node) =>
     (ts.isVariableDeclaration(node) ||
@@ -93,6 +115,15 @@ export const DEPENDENCIES: Record<string, (node: ts.Node) => ts.Node[]> = {
       : [],
   /** Initialisers, for inferred types (also of a destructured binding). */
   initializer: (node) => {
+    // `for (const job of jobs)`: the iterated expression.
+    if (
+      ts.isVariableDeclaration(node) &&
+      !node.initializer &&
+      ts.isVariableDeclarationList(node.parent) &&
+      (ts.isForOfStatement(node.parent.parent) ||
+        ts.isForInStatement(node.parent.parent))
+    )
+      return [node.parent.parent.expression];
     if (
       (ts.isVariableDeclaration(node) ||
         ts.isParameter(node) ||
@@ -144,6 +175,44 @@ export const DEPENDENCIES: Record<string, (node: ts.Node) => ts.Node[]> = {
     ts.isExportAssignment(node) && !node.isExportEquals
       ? [node.expression]
       : [],
+  /**
+   * An unannotated parameter of a callback takes its type from the call it
+   * is passed to (`list.map((job) => …)`): the callee and its receiver.
+   */
+  contextual: (node, checker) => {
+    if (!ts.isParameter(node) || node.type) return [];
+    const fn = node.parent;
+    if (!ts.isArrowFunction(fn) && !ts.isFunctionExpression(fn)) return [];
+    const parts: ts.Node[] = [];
+    let holder: ts.Node = fn;
+    while (ts.isParenthesizedExpression(holder.parent)) holder = holder.parent;
+    const call = holder.parent;
+    if (
+      (ts.isCallExpression(call) || ts.isNewExpression(call)) &&
+      call.expression !== holder
+    )
+      // The callee (its receiver's type arguments reach it when the
+      // callee's declared type uses them, as `Array<T>.map` does).
+      parts.push(call.expression);
+    // The declaration of the contextual type itself (a listener's function
+    // type in an interface, say), which names the parameter's type.
+    let contextual: ts.Type | undefined;
+    try {
+      contextual = checker.getContextualType(fn);
+    } catch {
+      contextual = undefined;
+    }
+    for (const type of contextual?.isUnion()
+      ? contextual.types
+      : contextual
+        ? [contextual]
+        : [])
+      for (const symbol of [type.getSymbol(), type.aliasSymbol])
+        for (const declaration of symbol?.declarations ?? [])
+          if (!declaration.getSourceFile().isDeclarationFile)
+            parts.push(declaration);
+    return parts;
+  },
   /** A generic constraint or default. */
   typeParameter: (node) =>
     ts.isTypeParameterDeclaration(node)
@@ -175,6 +244,71 @@ function symbolOfDeclaration(
   return name ? checker.getSymbolAtLocation(name) : undefined;
 }
 
+/**
+ * The causes recorded for a symbol, also through its declarations: a member
+ * of an instantiated generic type is a new symbol whose declarations are the
+ * original ones.
+ */
+/**
+ * Whether a member's declared type refers to its owner's type parameters
+ * (`Array<T>.slice(): T[]`, `Box<T>.value: T`): then the member's value
+ * depends on the receiver's type arguments. So does a member the compiler
+ * could not resolve.
+ */
+export function usesOwnerTypeParameters(
+  checker: ts.TypeChecker,
+  member: ts.Symbol | undefined,
+): boolean {
+  // A member with no symbol cannot be shown independent of the receiver.
+  if (!member) return true;
+  const declaration = member.valueDeclaration ?? member.declarations?.[0];
+  const owner = declaration?.parent;
+  if (
+    !declaration ||
+    !owner ||
+    !(ts.isClassLike(owner) || ts.isInterfaceDeclaration(owner)) ||
+    !owner.typeParameters?.length
+  )
+    return false;
+  const parameters = new Set<ts.Symbol>();
+  for (const parameter of owner.typeParameters) {
+    const symbol = checker.getSymbolAtLocation(parameter.name);
+    if (symbol) parameters.add(symbol);
+  }
+  let uses = false;
+  const visit = (node: ts.Node): void => {
+    if (uses) return;
+    if (ts.isTypeReferenceNode(node) && ts.isIdentifier(node.typeName)) {
+      const symbol = checker.getSymbolAtLocation(node.typeName);
+      if (symbol && parameters.has(symbol)) uses = true;
+    }
+    // Not a body or an initialiser: the declared type only.
+    if (ts.isBlock(node) || (ts.isExpression(node) && !ts.isTypeNode(node)))
+      return;
+    ts.forEachChild(node, visit);
+  };
+  const typed = declaration as ts.SignatureDeclaration & {
+    type?: ts.TypeNode;
+  };
+  if (typed.type) visit(typed.type);
+  for (const parameter of typed.parameters ?? [])
+    if (parameter.type) visit(parameter.type);
+  return uses;
+}
+
+export function causesOfSymbol(
+  map: ReadonlyMap<ts.Symbol, ReadonlySet<string>>,
+  symbol: ts.Symbol,
+): string[] {
+  const causes = [...(map.get(symbol) ?? [])];
+  for (const declaration of symbol.declarations ?? []) {
+    const declared = (declaration as { symbol?: ts.Symbol }).symbol;
+    if (declared && declared !== symbol)
+      causes.push(...(map.get(declared) ?? []));
+  }
+  return causes;
+}
+
 export function taintOf(input: TaintInput, failed: boolean): Taint {
   if (!failed) return EMPTY;
   const known = memo.get(input.checker);
@@ -182,6 +316,7 @@ export function taintOf(input: TaintInput, failed: boolean): Taint {
   const { program, checker, captured, resolveModule, invalid } = input;
   const seeds = new Map<ts.Symbol, Set<string>>();
   const all = new Map<ts.Symbol, Set<string>>();
+  const weak = new Map<ts.Symbol, Set<string>>();
   const add = (
     map: Map<ts.Symbol, Set<string>>,
     symbol: ts.Symbol,
@@ -281,7 +416,11 @@ export function taintOf(input: TaintInput, failed: boolean): Taint {
           add(all, target, causes);
         }
       }
-      if (Object.values(DEPENDENCIES).some((parts) => parts(node).length > 0))
+      if (
+        Object.values(DEPENDENCIES).some(
+          (parts) => parts(node, checker).length > 0,
+        )
+      )
         declarations.push(node);
       ts.forEachChild(node, visit);
     };
@@ -292,10 +431,72 @@ export function taintOf(input: TaintInput, failed: boolean): Taint {
     return EMPTY;
   }
   // ----- closure -----
-  /** Causes of whatever a subtree refers to (aliases followed). */
-  const referenced = (part: ts.Node): Set<string> => {
-    const causes = new Set<string>();
-    const visit = (node: ts.Node): void => {
+  /**
+   * Whether a node is a type argument (or array element type) that decides
+   * only member types, not which members exist: an argument of a class or
+   * interface (`Promise<Job>`, `QueueGetters<Job>`). An argument of a type
+   * alias (`Pick<BaseI, "m">`, a mapped type) can decide the members.
+   */
+  const isTypeArgument = (node: ts.Node): boolean => {
+    const parent = node.parent;
+    if (
+      ts.isTypeReferenceNode(parent) ||
+      ts.isExpressionWithTypeArguments(parent)
+    ) {
+      const name = ts.isTypeReferenceNode(parent)
+        ? parent.typeName
+        : parent.expression;
+      let referenced: ts.Symbol | undefined;
+      try {
+        referenced = checker.getSymbolAtLocation(
+          ts.isQualifiedName(name) ? name.right : name,
+        );
+        if (referenced && referenced.flags & ts.SymbolFlags.Alias)
+          referenced = checker.getAliasedSymbol(referenced);
+      } catch {
+        referenced = undefined;
+      }
+      if (
+        !referenced ||
+        !(referenced.flags & (ts.SymbolFlags.Class | ts.SymbolFlags.Interface))
+      )
+        return false;
+    }
+    return (
+      ((ts.isTypeReferenceNode(parent) ||
+        ts.isExpressionWithTypeArguments(parent) ||
+        ts.isCallExpression(parent) ||
+        ts.isNewExpression(parent) ||
+        ts.isImportTypeNode(parent)) &&
+        !!parent.typeArguments?.includes(node as ts.TypeNode)) ||
+      (ts.isArrayTypeNode(parent) && parent.elementType === node)
+    );
+  };
+  /**
+   * Causes of whatever a subtree refers to (aliases followed): strong when a
+   * reference decides what the declaration is, weak when it sits in a type
+   * argument (or refers to a weakly tainted symbol).
+   */
+  const referenced = (
+    part: ts.Node,
+  ): { strong: Set<string>; weak: Set<string> } => {
+    const found = { strong: new Set<string>(), weak: new Set<string>() };
+    /** Only a generic or overloaded callee's result depends on its arguments. */
+    const argumentsMatter = (call: ts.CallExpression | ts.NewExpression) => {
+      try {
+        const type = checker.getTypeAtLocation(call.expression);
+        const signatures = ts.isNewExpression(call)
+          ? type.getConstructSignatures()
+          : type.getCallSignatures();
+        return (
+          signatures.length > 1 ||
+          signatures.some((signature) => !!signature.typeParameters?.length)
+        );
+      } catch {
+        return true;
+      }
+    };
+    const visit = (node: ts.Node, inArgument: boolean): void => {
       if (ts.isIdentifier(node) || ts.isPrivateIdentifier(node)) {
         let symbol: ts.Symbol | undefined;
         try {
@@ -303,14 +504,67 @@ export function taintOf(input: TaintInput, failed: boolean): Taint {
         } catch {
           symbol = undefined;
         }
+        // The object of a member access gives the member's value only its
+        // strong taint (which members exist); its type arguments do not
+        // reach a member whose own type does not depend on them.
+        const parent = node.parent;
+        const object =
+          WEAK_THROUGH_VALUE_ONLY &&
+          node !== part &&
+          ts.isPropertyAccessExpression(parent) &&
+          parent.expression === node &&
+          !usesOwnerTypeParameters(
+            checker,
+            checker.getSymbolAtLocation(parent.name),
+          );
         if (symbol)
-          for (const step of aliasChain(checker, symbol))
-            for (const cause of all.get(step) ?? []) causes.add(cause);
+          for (const step of aliasChain(checker, symbol)) {
+            for (const cause of causesOfSymbol(all, step))
+              (inArgument ? found.weak : found.strong).add(cause);
+            if (!object)
+              for (const cause of causesOfSymbol(weak, step))
+                found.weak.add(cause);
+          }
       }
-      ts.forEachChild(node, visit);
+      // `x as T`, `<T>x`: the asserted type replaces the expression's.
+      if (ts.isAsExpression(node) || ts.isTypeAssertionExpression(node)) {
+        visit(node.type, inArgument);
+        return;
+      }
+      if (
+        CALL_ARGUMENTS &&
+        (ts.isCallExpression(node) || ts.isNewExpression(node))
+      ) {
+        // The callee decides the result; its arguments only through
+        // inferred type arguments (weak), and only when they can.
+        visit(node.expression, inArgument);
+        for (const typeArgument of node.typeArguments ?? [])
+          visit(typeArgument, true);
+        if (argumentsMatter(node))
+          for (const argument of node.arguments ?? []) visit(argument, true);
+        return;
+      }
+      // The parameters of a signature in a type (a function, constructor or
+      // method type) decide only what it accepts: weak, through inference.
+      const signatureParameter =
+        WEAK_SIGNATURE_PARAMETERS &&
+        ts.isParameter(node) &&
+        (ts.isFunctionTypeNode(node.parent) ||
+          ts.isConstructorTypeNode(node.parent) ||
+          ts.isCallSignatureDeclaration(node.parent) ||
+          ts.isConstructSignatureDeclaration(node.parent) ||
+          ts.isMethodSignature(node.parent));
+      ts.forEachChild(node, (child) =>
+        visit(
+          child,
+          inArgument ||
+            signatureParameter ||
+            (WEAK_ARGUMENTS && isTypeArgument(child)),
+        ),
+      );
     };
-    visit(part);
-    return causes;
+    visit(part, false);
+    return found;
   };
   for (let changed = true, rounds = 0; changed && rounds < 64; rounds++) {
     changed = false;
@@ -318,13 +572,39 @@ export function taintOf(input: TaintInput, failed: boolean): Taint {
       const symbol = symbolOfDeclaration(node, checker);
       if (!symbol) continue;
       for (const parts of Object.values(DEPENDENCIES))
-        for (const part of parts(node)) {
+        for (const part of parts(node, checker)) {
           const causes = referenced(part);
-          if (causes.size && add(all, symbol, causes)) changed = true;
+          if (causes.strong.size && add(all, symbol, causes.strong))
+            changed = true;
+          if (causes.weak.size && add(weak, symbol, causes.weak))
+            changed = true;
         }
+      // `const { job } = tree`: the destructured property's own taint.
+      if (
+        DESTRUCTURED &&
+        ts.isBindingElement(node) &&
+        ts.isObjectBindingPattern(node.parent)
+      ) {
+        const key = node.propertyName ?? node.name;
+        let property: ts.Symbol | undefined;
+        try {
+          property = ts.isIdentifier(key)
+            ? checker.getTypeAtLocation(node.parent).getProperty(key.text)
+            : undefined;
+        } catch {
+          property = undefined;
+        }
+        if (property) {
+          const strong = causesOfSymbol(all, property);
+          if (strong.length && add(all, symbol, strong)) changed = true;
+          const weakCauses = causesOfSymbol(weak, property);
+          if (weakCauses.length && add(weak, symbol, weakCauses))
+            changed = true;
+        }
+      }
     }
   }
-  const taint = { seeds, all };
+  const taint = { seeds, all, weak };
   memo.set(checker, taint);
   return taint;
 }

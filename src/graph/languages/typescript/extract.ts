@@ -8,7 +8,13 @@ import type {
   SymbolDraft,
 } from "../../types.js";
 import { fromVirtual, toVirtual } from "./project.js";
-import { aliasChain, taintOf, type Taint } from "./taint.js";
+import {
+  aliasChain,
+  causesOfSymbol,
+  usesOwnerTypeParameters,
+  taintOf,
+  type Taint,
+} from "./taint.js";
 import {
   NAMES,
   restoreNames,
@@ -69,6 +75,8 @@ interface Targets {
   receiver?: ts.Expression | undefined;
   /** For `invalid-code`: the failed file(s) that caused it (never a target). */
   cause?: readonly string[];
+  /** For `invalid-code`: what in valid code depends on the failed file. */
+  via?: string;
   /** The declarations recorded as targets (for the own-member test). */
   declarations?: readonly ts.Node[];
   /** Unresolved with no declaration found anywhere (not even outside the project). */
@@ -129,15 +137,29 @@ const causesOf = (files: Iterable<string>): Causes | undefined => {
   return list.length ? (list as unknown as Causes) : undefined;
 };
 /** The one constructor of a failed link: no targets, the cause required. */
-const invalid = (cause: Causes, receiver?: ts.Expression): Targets => ({
+const invalid = (
+  cause: Causes,
+  via: string,
+  receiver?: ts.Expression,
+): Targets => ({
   targets: [],
   reason: "invalid-code",
   cause: [...cause],
+  via,
   ...(receiver ? { receiver } : {}),
 });
+/** Causes and the dependence that justifies them. */
+interface Dependence {
+  causes: Causes;
+  via: string;
+  /** Only through type arguments: members are found the same way. */
+  weak?: boolean;
+}
 /** What a name lookup found: a symbol, or why there is none, and the member's receiver. */
 interface Lookup {
   symbol?: ts.Symbol | undefined;
+  /** The member name looked up, when there is a receiver. */
+  name?: string | undefined;
   reason?: string;
   receiver?: ts.Expression | undefined;
 }
@@ -218,17 +240,36 @@ export function extractFile(
       query && "flags" in query ? { symbol: query } : (query ?? {});
     const taint = currentTaint();
     const named = found.symbol && namedCauses(taint, found.symbol);
-    if (named) return invalid(named, found.receiver);
+    if (named) return invalid(named.causes, named.via, found.receiver);
     const through = found.receiver && receiverCauses(taint, found.receiver);
     const result = resolveChecked(found, meaning);
     if (!through) return result;
+    // Weak (type arguments only): any answer the compiler found stands. No
+    // answer fails only when a failed file declares a member of that name
+    // (an unseen declaration can only supply names its text declares).
+    if (through.weak) {
+      const answered =
+        result.targets.length > 0 ||
+        (result.reason !== "no-symbol" &&
+          !(result.reason === "external" && result.noAnswer));
+      if (answered) return result;
+      // The receiver's type could not be computed (the error type, or the
+      // `any` it degrades to), because of what the receiver depends on.
+      return errorType(found.receiver!)
+        ? invalid(
+            through.causes,
+            `${through.via}; its type could not be computed`,
+            found.receiver,
+          )
+        : result;
+    }
     if (
       result.targets.length &&
       !result.reason &&
       ownMembers(result.declarations ?? [], found.receiver!)
     )
       return result;
-    return invalid(through, found.receiver);
+    return invalid(through.causes, through.via, found.receiver);
   }
   function resolveChecked(found: Lookup, meaning: Meaning): Targets {
     const receiver = found.receiver;
@@ -320,44 +361,135 @@ export function extractFile(
       context.anyFailed,
     );
   /** Causes when a name's binding (its alias chain) resolves into a failed file. */
-  function namedCauses(taint: Taint, symbol: ts.Symbol): Causes | undefined {
+  function namedCauses(
+    taint: Taint,
+    symbol: ts.Symbol,
+  ): Dependence | undefined {
     if (!taint.all.size) return undefined;
     const causes: string[] = [];
-    for (const step of aliasChain(checker, symbol)) {
+    // Only bindings that resolve into a failed file (seeds, reached
+    // through re-exports and `export =` by the alias chain): a binding of a
+    // valid declaration whose type depends on a failed file names that
+    // declaration correctly.
+    for (const step of aliasChain(checker, symbol))
       causes.push(...(taint.seeds.get(step) ?? []));
-      // An alias tainted by what it re-exports (`export = b`) is a binding
-      // that resolves into failed code as well.
-      if (step.flags & ts.SymbolFlags.Alias || step.escapedName === "export=")
-        causes.push(...(taint.all.get(step) ?? []));
-    }
-    return causesOf(causes);
+    const found = causesOf(causes);
+    return found && { causes: found, via: `binding ${symbol.name}` };
   }
-  /** Causes of whatever a receiver depends on: the names along its chain and its type. */
+  /**
+   * Whether a call's result type can depend on its arguments: the callee is
+   * generic or overloaded. A non-generic single signature gives the same
+   * result whatever the arguments.
+   */
+  function resultDependsOnArguments(
+    call: ts.CallExpression | ts.NewExpression,
+  ): boolean {
+    const type = checker.getTypeAtLocation(call.expression);
+    const signatures = ts.isNewExpression(call)
+      ? type.getConstructSignatures()
+      : type.getCallSignatures();
+    return (
+      signatures.length > 1 ||
+      signatures.some((signature) => !!signature.typeParameters?.length)
+    );
+  }
+  /** Causes from the names in a call's arguments, with the first one as the justification. */
+  function argumentCauses(
+    taint: Taint,
+    call: ts.CallExpression | ts.NewExpression,
+    why: string,
+  ): Dependence | undefined {
+    const causes: string[] = [];
+    let via: string | undefined;
+    let strong = false;
+    const names = (node: ts.Node): void => {
+      if (ts.isIdentifier(node)) {
+        const symbol = checker.getSymbolAtLocation(node);
+        if (symbol)
+          for (const step of aliasChain(checker, symbol)) {
+            const strongCauses = causesOfSymbol(taint.all, step);
+            const weakCauses = causesOfSymbol(taint.weak, step);
+            if (strongCauses.length) strong = true;
+            if (strongCauses.length || weakCauses.length) {
+              causes.push(...strongCauses, ...weakCauses);
+              via ??= `argument ${node.text} of ${why} ${call.expression.getText(file)}`;
+            }
+          }
+      }
+      ts.forEachChild(node, names);
+    };
+    for (const argument of call.arguments ?? []) names(argument);
+    const found = causesOf(causes);
+    return found && { causes: found, via: via!, weak: !strong };
+  }
+  /**
+   * Causes of whatever a receiver depends on: the names along its chain, the
+   * arguments of a call in it whose result can depend on them (a generic or
+   * overloaded callee), and its type.
+   */
   function receiverCauses(
     taint: Taint,
     receiver: ts.Expression,
-  ): Causes | undefined {
-    if (!taint.all.size) return undefined;
+  ): Dependence | undefined {
+    if (!taint.all.size && !taint.weak.size) return undefined;
     const causes: string[] = [];
-    const symbolCauses = (symbol: ts.Symbol | undefined) => {
+    const weakCauses: string[] = [];
+    let via: string | undefined;
+    let weakVia: string | undefined;
+    // Weak taint counts only for the receiver's own value (its name, or the
+    // callee producing it), not for receivers further in.
+    let outer = true;
+    const symbolCauses = (symbol: ts.Symbol | undefined, label: string) => {
       if (symbol)
-        for (const step of aliasChain(checker, symbol))
-          causes.push(...(taint.all.get(step) ?? []));
+        for (const step of aliasChain(checker, symbol)) {
+          const found = causesOfSymbol(taint.all, step);
+          if (found.length) {
+            causes.push(...found);
+            via ??= `${label} ${symbol.name}`;
+          }
+          const weakFound = outer ? causesOfSymbol(taint.weak, step) : [];
+          if (weakFound.length) {
+            weakCauses.push(...weakFound);
+            weakVia ??= `${label} ${symbol.name} (type argument)`;
+          }
+        }
     };
     try {
       for (let node: ts.Node | undefined = receiver; node; ) {
         if (ts.isIdentifier(node) || ts.isPrivateIdentifier(node)) {
           const symbol = checker.getSymbolAtLocation(node);
-          symbolCauses(symbol);
-          // A name no declaration answers: one a failed file mentions.
-          if (!symbol && ts.isIdentifier(node))
-            causes.push(...(context.failedNames.get(node.text) ?? []));
+          symbolCauses(symbol, "receiver");
+          // A name no declaration answers that a failed file declares.
+          if (!symbol && ts.isIdentifier(node)) {
+            const declared = context.failedNames.get(node.text) ?? [];
+            if (declared.length) {
+              causes.push(...declared);
+              via ??= `name ${node.text} declared in the failed file`;
+            }
+          }
+          node = undefined;
+        } else if (
+          ts.isAsExpression(node) ||
+          ts.isTypeAssertionExpression(node)
+        ) {
+          // The asserted type replaces the expression's: its names decide.
+          const names = (part: ts.Node): void => {
+            if (ts.isIdentifier(part))
+              symbolCauses(checker.getSymbolAtLocation(part), "asserted type");
+            ts.forEachChild(part, names);
+          };
+          names(node.type);
           node = undefined;
         } else if (ts.isPropertyAccessExpression(node)) {
-          symbolCauses(checker.getSymbolAtLocation(node.name));
+          const member = checker.getSymbolAtLocation(node.name);
+          symbolCauses(member, "receiver");
+          // The object's type arguments reach the member's value only when
+          // its declared type refers to its owner's type parameters.
+          if (!usesOwnerTypeParameters(checker, member)) outer = false;
           node = node.expression;
         } else if (ts.isQualifiedName(node)) {
-          symbolCauses(checker.getSymbolAtLocation(node.right));
+          symbolCauses(checker.getSymbolAtLocation(node.right), "receiver");
+          outer = false;
           node = node.left;
         } else if (
           ts.isElementAccessExpression(node) ||
@@ -365,33 +497,56 @@ export function extractFile(
           ts.isNewExpression(node) ||
           ts.isParenthesizedExpression(node) ||
           ts.isNonNullExpression(node) ||
-          ts.isAsExpression(node) ||
-          ts.isTypeAssertionExpression(node) ||
           ts.isSatisfiesExpression(node) ||
           ts.isAwaitExpression(node)
         ) {
           if (ts.isCallExpression(node) || ts.isNewExpression(node)) {
-            symbolCauses(checker.getSymbolAtLocation(node.expression));
-            // A call's result type can depend on its arguments (generics).
-            const names = (argument: ts.Node): void => {
-              if (ts.isIdentifier(argument))
-                symbolCauses(checker.getSymbolAtLocation(argument));
-              ts.forEachChild(argument, names);
-            };
-            for (const argument of node.arguments ?? []) names(argument);
+            symbolCauses(
+              checker.getSymbolAtLocation(node.expression),
+              "callee",
+            );
+            // Only a generic or overloaded callee's result can depend on
+            // the arguments (and only the outermost call's result is the
+            // receiver's value).
+            if (outer && resultDependsOnArguments(node)) {
+              const argument = argumentCauses(
+                taint,
+                node,
+                "generic or overloaded",
+              );
+              if (argument?.weak) {
+                weakCauses.push(...argument.causes);
+                weakVia ??= argument.via;
+              } else if (argument) {
+                causes.push(...argument.causes);
+                via ??= argument.via;
+              }
+            }
           }
           node = node.expression;
         } else node = undefined;
       }
       const type = checker.getTypeAtLocation(receiver);
       for (const part of type.isUnionOrIntersection() ? type.types : [type]) {
-        symbolCauses(part.getSymbol());
-        symbolCauses(part.aliasSymbol);
+        symbolCauses(part.getSymbol(), "type");
+        symbolCauses(part.aliasSymbol, "type");
       }
     } catch (error) {
       if (!isLimit(error)) throw error;
     }
-    return causesOf(causes);
+    const found = causesOf(causes);
+    if (found) return { causes: found, via: via! };
+    const weakFound = causesOf(weakCauses);
+    return weakFound && { causes: weakFound, via: weakVia!, weak: true };
+  }
+  /** A type the compiler could not compute: its error type, or `any`. */
+  function errorType(expression: ts.Expression): boolean {
+    try {
+      const type = checker.getTypeAtLocation(expression);
+      return !!(type.flags & ts.TypeFlags.Any);
+    } catch {
+      return false;
+    }
   }
   /**
    * Whether every target is declared directly in the receiver type's own
@@ -471,21 +626,20 @@ export function extractFile(
     found: Targets,
     extra: { [key: string]: Json } = {},
   ) {
-    // An unresolved name that occurs in a failed file of this program: that
-    // file is why there is no answer (it may declare it), so the link fails.
+    // An unresolved bare name that a failed file of this program declares:
+    // that file is why there is no answer (a global, a `declare global`,
+    // a namespace). A member name through an untainted receiver never is.
     if (
       !found.targets.length &&
+      !found.receiver &&
       (found.reason === "no-symbol" ||
-        (found.reason === "external" && found.noAnswer))
+        (found.reason === "external" && found.noAnswer)) &&
+      ts.isIdentifier(at) &&
+      !receiverOf(at)
     ) {
-      const name =
-        ts.isIdentifier(at) || ts.isPrivateIdentifier(at) ? at : undefined;
-      // A script's unseen declarations would be globals, a module's could
-      // augment the global scope: either way only names its text mentions.
-      const unread = causesOf(
-        name ? (context.failedNames.get(name.text) ?? []) : [],
-      );
-      if (unread) found = invalid(unread, found.receiver);
+      const unread = causesOf(context.failedNames.get(at.text) ?? []);
+      if (unread)
+        found = invalid(unread, `name ${at.text} declared in the failed file`);
     }
     const facts: { [key: string]: Json } = { ...extra };
     let reason = found.reason;
@@ -520,8 +674,10 @@ export function extractFile(
       const cause = found.cause ?? [];
       if (!cause.length)
         throw Error("An invalid-code link must name its cause");
-      if (cause.length === 1) facts.cause = { file: cause[0]! };
-      else facts.cause = { files: [...cause] };
+      facts.cause = {
+        ...(cause.length === 1 ? { file: cause[0]! } : { files: [...cause] }),
+        ...(found.via ? { via: found.via } : {}),
+      };
     } else if (found.targets.length)
       facts.targets = found.targets.map((target) => ({ ...target }));
     if (reason) facts.reason = reason;
@@ -573,7 +729,7 @@ export function extractFile(
     const found: Targets = file
       ? kind === "invalid"
         ? // A file that cannot be read has failed: no target, its file the cause.
-          invalid([file])
+          invalid([file], "import of the failed file")
         : {
             targets: [{ file, key: "module@0" }],
             // A target whose analysis failed has no facts to link to.
@@ -717,6 +873,12 @@ export function extractFile(
   /** The checker's symbol for a name, with the receiver of a member name. */
   function lookup(node: ts.Node): Lookup {
     const receiver = receiverOf(node);
+    const name =
+      receiver && (ts.isIdentifier(node) || ts.isPrivateIdentifier(node))
+        ? node.text
+        : receiver && ts.isStringLiteralLike(node)
+          ? node.text
+          : undefined;
     const symbol = symbolOf(node);
     if (!symbol && receiver) {
       const root = rootOf(receiver);
@@ -753,9 +915,9 @@ export function extractFile(
         rootSymbol &&
         rootSymbol.flags & ts.SymbolFlags.Alias &&
         bindingReason(rootSymbol);
-      if (reason) return { reason, receiver };
+      if (reason) return { reason, receiver, name };
     }
-    return symbol ? { symbol, receiver } : { receiver };
+    return symbol ? { symbol, receiver, name } : { receiver, name };
   }
   function calleeTarget(callee: ts.Expression): {
     at: ts.Node;
@@ -782,6 +944,7 @@ export function extractFile(
     owner: string,
     callee: ts.Expression,
     extra: { [key: string]: Json } = {},
+    call?: ts.CallExpression | ts.NewExpression,
   ) {
     const { at, symbol } = calleeTarget(callee);
     const expression = unwrap(callee);
@@ -790,7 +953,14 @@ export function extractFile(
       : ts.isPropertyAccessExpression(expression)
         ? `(expression).${expression.name.text}`
         : "(expression)";
-    link(owner, "calls", name, at, targetsOf(symbol, "call"), extra);
+    let found = targetsOf(symbol, "call");
+    // The callee decides a call; its arguments only pick between distinct
+    // overload targets. With two or more, a tainted argument fails the link.
+    if (call && found.targets.length > 1 && !found.reason) {
+      const argument = argumentCauses(currentTaint(), call, "overloaded");
+      if (argument) found = invalid(argument.causes, argument.via);
+    }
+    link(owner, "calls", name, at, found, extra);
   }
   function binding(
     owner: string,
@@ -814,7 +984,7 @@ export function extractFile(
         : undefined;
     let found: Targets =
       reason === "invalid-code" && module !== undefined
-        ? invalid([module])
+        ? invalid([module], "import of the failed file")
         : reason
           ? { targets: [], reason }
           : targetsOf(symbolOf(name), extra.typeOnly ? "type" : "any");
@@ -1065,9 +1235,9 @@ export function extractFile(
         moduleLink(owner, node.arguments[0] as ts.StringLiteralLike, formFacts);
         // Its bindings are real but the compiler does not type them.
         requireBindings(owner, node, formFacts);
-      } else callLink(owner, node.expression);
+      } else callLink(owner, node.expression, {}, node);
     } else if (ts.isNewExpression(node))
-      callLink(owner, node.expression, { construct: true });
+      callLink(owner, node.expression, { construct: true }, node);
     else if (ts.isTaggedTemplateExpression(node))
       callLink(owner, node.tag, { tagged: true });
     else if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
