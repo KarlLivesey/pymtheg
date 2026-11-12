@@ -1,5 +1,5 @@
 import { implies as cfgImplies, possible as cfgPossible } from "./cfg.js";
-import { inertAttributeName } from "./parse.js";
+import { knownAttributeName, attributeRules } from "./parse.js";
 import { posix as p } from "node:path";
 import type {
   GraphSymbol,
@@ -31,6 +31,8 @@ const withoutLifetimes = (s: string) =>
     .replace(/,\s*>/g, ">")
     .replace(/<\s*>/g, "");
 type Namespace = "type" | "value" | "macro" | "any" | "import" | "importType";
+type AttributeOrigin = { name: string; scope: string; file: string };
+type AttributeGate = AttributeOrigin & { condition: string; explicit: boolean };
 interface Place {
   crate: Crate;
   local: string;
@@ -42,6 +44,8 @@ interface Place {
   uncertain?: boolean;
   conditions?: string[];
   opaqueAttributes?: string[];
+  shadowableAttributes?: AttributeOrigin[];
+  attributeGates?: AttributeGate[];
 }
 interface Found {
   symbols: GraphSymbol[];
@@ -56,6 +60,9 @@ const unique = (ss: GraphSymbol[]) => [
 ];
 const accepts = (s: GraphSymbol, ns: Namespace) => {
   if (ns === "any") return true;
+  if (data(s).semanticKind === "macro") return ns === "macro" || ns === "value";
+  if (data(s).namespaceUnverified && (ns === "macro" || ns === "value"))
+    return true;
   if (ns === "macro") return s.kind === "macro";
   if (ns === "importType" && s.kind === "variant") return true;
   if (ns === "type" || ns === "importType")
@@ -66,6 +73,27 @@ const accepts = (s: GraphSymbol, ns: Namespace) => {
     (s.kind === "struct" && data(s).constructorForm !== "named")
   );
 };
+// A proc-macro declaration has one captured function identity, an exported
+// macro name, and a function-value facet available only inside its own crate.
+const acceptsAt = (
+  s: GraphSymbol,
+  ns: Namespace,
+  name: string,
+  root: string,
+  from: string,
+) => {
+  if (!accepts(s, ns)) return false;
+  if (data(s).semanticKind !== "macro") return true;
+  const macro = name === str(data(s).exportedMacroName),
+    value = root === from && name === s.name;
+  return ns === "macro"
+    ? macro
+    : ns === "value"
+      ? value
+      : ns === "any"
+        ? macro || value
+        : false;
+};
 export function resolveRust(
   ctx: ResolutionContext,
   uncertain?: (
@@ -75,7 +103,12 @@ export function resolveRust(
     files?: string[],
     attributes?: string[],
   ) => void,
-  markPresence?: (symbol: GraphSymbol, attributes: string[]) => void,
+  markPresence?: (
+    symbol: GraphSymbol,
+    attributes: string[],
+    conditions: string[],
+  ) => void,
+  markConditions?: (link: GraphLink, conditions: string[]) => void,
 ): LinkResolution[] {
   // Cache only unproved import namespaces, never targets or positive proofs.
   // Facts are immutable for this run; caller conditions and placement are in
@@ -95,6 +128,83 @@ export function resolveRust(
     }
     return result;
   };
+  const attributeBindings = new Map<
+    string,
+    { names: string[]; unknown: boolean; macroUse?: boolean }
+  >();
+  for (const file of ctx.files)
+    for (const b of (data(file.result).attributeBindings ?? []) as {
+      scope: string;
+      names: string[];
+      unknown: boolean;
+      macroUse?: boolean;
+    }[]) {
+      const key = file.path + "|" + b.scope,
+        old = attributeBindings.get(key);
+      attributeBindings.set(key, {
+        names: [...new Set([...(old?.names ?? []), ...b.names])],
+        unknown: !!old?.unknown || b.unknown,
+        macroUse: !!old?.macroUse || !!b.macroUse,
+      });
+    }
+  type AttributeContext = {
+    shadowable: { name: string; scope: string }[];
+    implicit: {
+      name: string;
+      scope: string;
+      condition: string;
+      explicit: boolean;
+    }[];
+  };
+  const contextsByFile = new Map(
+    ctx.files.map((f) => [
+      f.path,
+      (data(f.result).attributeContexts ?? []) as AttributeContext[],
+    ]),
+  );
+  const contextOf = (item: GraphSymbol | GraphLink) =>
+    contextsByFile.get(item.file)?.[Number(data(item).attributeContext)];
+  const gates = (item: GraphSymbol | GraphLink): AttributeGate[] =>
+    (contextOf(item)?.implicit ?? []).map((g) => ({ ...g, file: item.file }));
+  const origins = (item: GraphSymbol | GraphLink): AttributeOrigin[] =>
+    (contextOf(item)?.shadowable ?? []).map((x) => ({ ...x, file: item.file }));
+  const attributeShadowCache = new Map<string, boolean>();
+  function shadowFromParents(origin: AttributeOrigin): boolean {
+    const key = JSON.stringify(origin),
+      cached = attributeShadowCache.get(key);
+    if (cached !== undefined) return cached;
+    const head = origin.name.split("::")[0]!,
+      rule = attributeRules.get(head);
+    let result = false;
+    if (rule && rule.category !== "builtin")
+      for (const own of ownerPlace(origin.file, origin.scope)) {
+        if (rule.category === "tool" && own.crate.deps.has(head)) result = true;
+        let parent = own.parent;
+        while (parent) {
+          if (parent.file !== origin.file) {
+            let scope = parent.local;
+            while (true) {
+              const b = attributeBindings.get(parent.file + "|" + scope);
+              if (
+                b &&
+                (b.unknown ||
+                  b.names.includes(head) ||
+                  (rule.category === "prelude" && b.macroUse))
+              )
+                result = true;
+              if (!scope) break;
+              scope = scope.includes("::")
+                ? scope.slice(0, scope.lastIndexOf("::"))
+                : "";
+            }
+          }
+          parent = parent.parent;
+        }
+      }
+    attributeShadowCache.set(key, result);
+    return result;
+  }
+  let attributeContextReady = false;
   const itemPresenceCache = new Map<string, string[]>();
   function itemPresence(item: GraphSymbol | GraphLink): string[] {
     const cached = itemPresenceCache.get(item.id);
@@ -102,6 +212,14 @@ export function resolveRust(
     const attributes = [
       ...new Set([
         ...((data(item).opaqueItemAttributes ?? []) as string[]),
+        ...[
+          ...origins(item),
+          ...ownerPlace(item.file, str(data(item).scope)).flatMap(
+            (p) => p.shadowableAttributes ?? [],
+          ),
+        ]
+          .filter(shadowFromParents)
+          .map((x) => x.name),
         ...ownerPlace(item.file, str(data(item).scope)).flatMap(
           (p) => p.opaqueAttributes ?? [],
         ),
@@ -148,8 +266,26 @@ export function resolveRust(
   const modulePlaces = new Map<string, Place[]>();
   const moduleIncomplete = new Set<string>();
   const moduleConditions = new Map<string, string[]>();
-  const conditionsFor = (s: GraphSymbol | GraphLink): string[] =>
-    moduleConditions.get(s.id) ?? ((data(s).conditions ?? []) as string[]);
+  const conditionsFor = (s: GraphSymbol | GraphLink): string[] => {
+    let conditions =
+      moduleConditions.get(s.id) ?? ((data(s).conditions ?? []) as string[]);
+    if (attributeContextReady)
+      for (const gate of contextOf(s)?.implicit ?? [])
+        if (
+          !gate.explicit &&
+          shadowFromParents({
+            name: gate.name,
+            scope: gate.scope,
+            file: s.file,
+          })
+        )
+          conditions = conditions.filter((c) => c !== gate.condition);
+        else if (!conditions.includes(gate.condition))
+          conditions = [...conditions, gate.condition];
+    return contextOf(s)?.implicit.length
+      ? [...new Set(conditions)].sort()
+      : conditions;
+  };
   function walk(place: Place, ancestors: Set<string>) {
     const visitKey = `${place.crate.root}|${place.file}|${place.local}`;
     if (ancestors.has(visitKey)) return;
@@ -177,6 +313,11 @@ export function resolveRust(
             ...(place.opaqueAttributes ?? []),
             ...((data(s).opaqueItemAttributes ?? []) as string[]),
           ],
+          shadowableAttributes: [
+            ...(place.shadowableAttributes ?? []),
+            ...origins(s),
+          ],
+          attributeGates: [...(place.attributeGates ?? []), ...gates(s)],
           uncertain: place.uncertain || moduleIncomplete.has(s.id),
         });
       else {
@@ -258,6 +399,16 @@ export function resolveRust(
                 ...((data(units.get(file) ?? {}).opaqueItemAttributes ??
                   []) as string[]),
               ],
+              shadowableAttributes: [
+                ...(place.shadowableAttributes ?? []),
+                ...origins(s),
+                ...(units.get(file) ? origins(units.get(file)!) : []),
+              ],
+              attributeGates: [
+                ...(place.attributeGates ?? []),
+                ...gates(s),
+                ...(units.get(file) ? gates(units.get(file)!) : []),
+              ],
               uncertain: place.uncertain || moduleIncomplete.has(s.id),
               directory,
             });
@@ -284,6 +435,12 @@ export function resolveRust(
         []) as string[],
       opaqueAttributes: (data(units.get(crate.root) ?? {})
         .opaqueItemAttributes ?? []) as string[],
+      shadowableAttributes: units.get(crate.root)
+        ? origins(units.get(crate.root)!)
+        : [],
+      attributeGates: units.get(crate.root)
+        ? gates(units.get(crate.root)!)
+        : [],
     };
     roots.set(crate.root, place);
     walk(place, new Set());
@@ -315,11 +472,33 @@ export function resolveRust(
     ownerCache.set(k, result);
     return result;
   };
+  attributeContextReady = true;
+  // Do not carry an assumed standard test gate through a file module when its
+  // attribute head may instead be a macro binding in the enclosing context.
+  for (const place of places) {
+    const gs = place.attributeGates ?? [];
+    if (!gs.length) continue;
+    const removable = new Set(
+      gs.filter((g) => !g.explicit).map((g) => g.condition),
+    );
+    place.conditions = [
+      ...new Set([
+        ...(place.conditions ?? []).filter((c) => !removable.has(c)),
+        ...gs
+          .filter((g) => g.explicit || !shadowFromParents(g))
+          .map((g) => g.condition),
+      ]),
+    ];
+  }
   if (markPresence)
     for (const symbol of symbols) {
       const attributes = itemPresence(symbol);
-      if (attributes.length) markPresence(symbol, attributes);
+      markPresence(symbol, attributes, conditionsFor(symbol));
     }
+  if (markConditions)
+    for (const link of ctx.links)
+      if (contextOf(link)?.implicit.length)
+        markConditions(link, conditionsFor(link));
   const failedByScope = new Map<string, string[]>(),
     failedByCrate = new Map<string, string[]>();
   for (const loc of places)
@@ -387,13 +566,29 @@ export function resolveRust(
       if (data(s).unit && loc.scope) continue;
       const q = data(s).unit
         ? loc.scope
-        : [qualified(loc, str(data(s).scope)), s.name]
+        : [
+            qualified(loc, str(data(s).scope)),
+            str(data(s).exportedMacroName) || s.name,
+          ]
             .filter(Boolean)
             .join("::");
       const k = key(loc.crate.root, q);
       const list = table.get(k) ?? [];
       list.push(s);
       table.set(k, unique(list));
+      const aliases = [
+        ...((data(s).exportedMacroNames ?? []) as string[]),
+        ...(data(s).semanticKind === "macro" ? [s.name] : []),
+      ];
+      for (const alias of aliases) {
+        const aliasKey = key(
+          loc.crate.root,
+          [qualified(loc, str(data(s).scope)), alias]
+            .filter(Boolean)
+            .join("::"),
+        );
+        table.set(aliasKey, unique([...(table.get(aliasKey) ?? []), s]));
+      }
     }
   }
   const importsByScope = new Map<
@@ -675,7 +870,13 @@ export function resolveRust(
           ) ?? []
         ).filter(
           (s) =>
-            accepts(s, headNs) &&
+            acceptsAt(
+              s,
+              headNs,
+              name,
+              loc.crate.root,
+              (accessFrom ?? loc).crate.root,
+            ) &&
             possible([...(loc.conditions ?? []), ...conditionsFor(s)]) &&
             (!accessFrom || visible(str(data(s).visibility), loc, accessFrom)),
         );
@@ -1490,22 +1691,61 @@ export function resolveRust(
     )
       for (const loc of ownerPlace(f.path, ""))
         macroUseCrates.add(loc.crate.root);
-  function opaqueAttribute(raw: string, loc: Place, scope: string): boolean {
+  function opaqueAttribute(
+    raw: string,
+    loc: Place,
+    scope: string,
+    conditions: string[] = [],
+  ): boolean {
+    if (!possible(conditions)) return false;
     const a = raw.replace(/^#!?\[|\]$/g, "").trim(),
       name = a.match(/^[\w:]+/)?.[0] ?? "";
     if (name === "cfg_attr") {
       const ps = splitArguments(
         "<" + a.slice(a.indexOf("(") + 1, a.lastIndexOf(")")) + ">",
       );
-      return !ps || ps.slice(1).some((p) => opaqueAttribute(p, loc, scope));
+      if (!ps?.[0]) return true;
+      const predicate = ps[0].replace(
+        /\s+(?=(?:[^"\n]*"[^"\n]*")*[^"\n]*$)/g,
+        "",
+      );
+      return (
+        possible([...conditions, predicate]) &&
+        ps
+          .slice(1)
+          .some((p) =>
+            opaqueAttribute(p, loc, scope, [...conditions, predicate]),
+          )
+      );
     }
     if (name === "unsafe") {
       const ps = splitArguments(
         "<" + a.slice(a.indexOf("(") + 1, a.lastIndexOf(")")) + ">",
       );
-      return !ps || ps.some((p) => opaqueAttribute(p, loc, scope));
+      return !ps || ps.some((p) => opaqueAttribute(p, loc, scope, conditions));
     }
-    if (name !== "derive") return !inertAttributeName(name);
+    let shadow = false;
+    const rule = attributeRules.get(name.split("::")[0]!);
+    if (rule && rule.category !== "builtin") {
+      let local = scope;
+      while (true) {
+        const b = attributeBindings.get(loc.file + "|" + local);
+        if (
+          b &&
+          (b.unknown ||
+            b.names.includes(name.split("::")[0]!) ||
+            (rule.category === "prelude" && b.macroUse))
+        )
+          shadow = true;
+        if (!local || local === loc.local) break;
+        local = local.includes("::")
+          ? local.slice(0, local.lastIndexOf("::"))
+          : "";
+      }
+      shadow ||= shadowFromParents({ file: loc.file, scope, name });
+    }
+    if (!knownAttributeName(name, shadow)) return true;
+    if (name !== "derive") return false;
     const names = a
       .slice(a.indexOf("(") + 1, a.lastIndexOf(")"))
       .split(",")
@@ -1536,8 +1776,9 @@ export function resolveRust(
         scope: string;
         raw: string;
         module: string;
+        conditions?: string[];
       }[])
-        if (opaqueAttribute(e.raw, loc, e.scope)) {
+        if (opaqueAttribute(e.raw, loc, e.scope, e.conditions ?? [])) {
           const q = qualified(loc, e.scope);
           opaqueScopes.add(`${loc.crate.root}|${q}`);
           if (e.module)

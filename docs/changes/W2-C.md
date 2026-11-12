@@ -1,7 +1,7 @@
 # W2-C: Rust language module for the code graph
 
 This is the **no-toolchain fallback** under D16. Precise compiler-backed Rust
-resolution belongs to a later chunk. Version 10 uses the installed Rust WASM
+resolution belongs to a later chunk. Version 11 uses the installed Rust WASM
 grammar through the shared Tree-sitter helper and supplied source/manifest
 snapshots only. Runtime, installation and tests never invoke Cargo/rustc, read
 project files, expand macros or add dependencies. Private items are ordinary
@@ -80,9 +80,28 @@ purpose was removed. Retired experimental table evidence is historical only.
 
 For **semantic** links (calls, imports, implements, module/path/type/struct/variant/const/macro references), one shared presence predicate requires the item and every enclosing item to be free of non-builtin attributes. Unknown attributes may replace or remove their input. Such input stays a would-be target, never a definite target or closed set; `item-under-opaque-attribute` explains the uncertainty and `data.opaqueAttributes` identifies the relevant paths. A first-probe match does not bypass this rule. Derive preserves its input item; its expansion remains unseen.
 
-The explicit builtin list is exported by `parse.ts`: cfg/cfg_attr; derive; allow/warn/deny/forbid/expect; doc; inline/cold/must_use/deprecated/repr/non_exhaustive/track_caller; no_mangle/export_name/link/link_name/link_section/link_ordinal/used; test/ignore/should_panic/bench/automatically_derived; path/macro_use/macro_export; global_allocator/panic_handler/target_feature/instruction_set; proc_macro/proc_macro_attribute/proc_macro_derive; no_std/no_core/no_main/no_implicit_prelude; crate_name/crate_type/recursion_limit/type_length_limit/windows_subsystem/debugger_visualizer/collapse_debuginfo/naked/coverage/optimize/feature. Unsafe wrappers recurse into the same list. The reserved tool prefixes rustfmt::, clippy:: and diagnostic:: are inert. cfg_attr payloads recurse; any opaque payload makes presence unproved. All other paths, including tokio::main, tracing::instrument, async_trait, tonic::async_trait, typetag::serde and project/helper attributes, are opaque. References: [Rust attributes](https://doc.rust-lang.org/reference/attributes.html), [procedural attributes](https://doc.rust-lang.org/reference/procedural-macros.html#attribute-macros), [derive macros](https://doc.rust-lang.org/reference/procedural-macros.html#derive-macros).
+Attribute classification is centralized in `parse.ts:attributeRules`; the same classification drives presence, implicit gates and semantic namespace. The native explicit-import shadow probes in `round11-attribute-oracles.json` pin every true-builtin entry against rustc (49 reject replacement with E0659; cfg/cfg_attr reject it as a reserved attribute name).
+
+| Class | Paths | Presence/meaning |
+|---|---|---|
+| True builtin, inert | allow, automatically_derived, cold, collapse_debuginfo, coverage, crate_name, crate_type, debugger_visualizer, deny, deprecated, doc, expect, export_name, feature, forbid, ignore, inline, instruction_set, link, link_name, link_ordinal, link_section, macro_export, macro_use, must_use, naked, no_builtins, no_core, no_implicit_prelude, no_link, no_main, no_mangle, no_std, non_exhaustive, optimize, panic_handler, path, recursion_limit, repr, should_panic, target_feature, track_caller, type_length_limit, used, warn, windows_subsystem | Cannot be replaced by a same-named attribute import; input exists as written, subject to enclosing gates/opacity |
+| True builtin, conditional | cfg, cfg_attr | Existing predicate implication and conditional payload rules |
+| True builtin, macro declaration | proc_macro, proc_macro_attribute, proc_macro_derive | Retain AST function identity for stable structural IDs; export in macro namespace (derive's exported name), not an ordinary external value function. Source function remains callable within its own crate. Conditional macro kind is unverified |
+| Prelude attribute macro, conditional | test, bench | When unshadowed, function presence implies cfg(test); other syntactic targets stay unverified |
+| Prelude attribute macro, inert | derive, global_allocator | When unshadowed, preserve input; derive adds unseen code |
+| Prelude attribute macro, unmodeled | test_case, cfg_eval, cfg_accessible | Opaque even without a shadow; no unsupported compiler transformation is proved |
+| Registered tool prefix | rustfmt, clippy, diagnostic, miri, rust_analyzer | Qualified paths only; inert only when unshadowed |
+| Other | All other paths, including bare imported names | Opaque |
+
+Prelude/tool classification requires no potentially binding explicit import/local macro (and type/module/extern alias for tool prefixes) in enclosing attribute scopes, including captured file-module parents. A binding that cannot be ruled out makes the attribute opaque. Captured dependency names can also shadow a registered tool prefix through the modern extern prelude. Glob `use` does **not** count as a shadow: supplying a prelude attribute that way is ambiguous, E0659. `#[macro_use] extern crate` is different: rustc accepts its replacement prelude attributes; unknown exports therefore make prelude names opaque, with named `macro_use(...)` lists limiting that uncertainty. Item-position code generation also prevents proof of absence of a binding. Scope provenance is captured: an import inside a function body does not shadow the function's own attribute, nor does a module body's item shadow its containing module attribute.
+
+Unsafe wrappers recurse. `cfg_attr` payloads apply only when their predicate can hold alongside the item's gates; impossible payloads add no opacity. Nested payload paths retain their full spelling, e.g. `pm::keep`. Attribute contexts are interned per file, rather than duplicated on every semantic link. Re-analysis recomputes contextual gates and opacity even for cached child parse facts.
+
+References: [Rust attributes](https://doc.rust-lang.org/reference/attributes.html), [testing attributes](https://doc.rust-lang.org/reference/attributes/testing.html), [tool attributes](https://doc.rust-lang.org/reference/attributes.html#tool-attributes), [procedural macros](https://doc.rust-lang.org/reference/procedural-macros.html), and [macro-use prelude](https://doc.rust-lang.org/reference/names/preludes.html#macro_use-prelude).
 
 ## Cargo editions and conditioned bindings
+
+Captured manifests are read by a structural, snapshot-only TOML parser: bare/quoted/escaped/dotted keys; inline/standard tables and arrays of tables; comments, basic/literal/multiline strings and escapes. No Cargo-specific key regexes remain. Unsupported/invalid TOML rejects the **whole document**, never recovers a partial edition or defaults unread text to 2015. Datetime values are deliberately unsupported: even in unused metadata, they make the document unknown. Missing edition defaults to 2015 only in an understood document. A document with no readable package/name supplies no crate ownership, so semantic paths depending on it cannot be definite. Ill-typed editions remain unknown; ill-typed target identities do not trigger guessed automatic targets. Unsupported membership glob syntax makes workspace inheritance unknown. Target discovery, dependency renames/kinds/optional activation, workspace members/exclude and inherited package/dependency facts consume the same normalized keys. Patch/replace paths are retained as possible alternatives, with `?manifest-override`: Cargo's version/registry selection is not proved. Unreadable manifest/override reach never invents an invalid-code cause. Direct `dep:` activation suppresses Cargo's implicit alias feature; arbitrary feature closure remains unmodeled.
 
 Literal editions 2015/2018/2021/2024, missing-edition default 2015, package workspace inheritance, and per-target overrides are captured. The same edition-aware import lookup serves import links and forwarded names/reexports. In 2015, unqualified use and absolute paths start at the crate root; ordinary expression paths remain lexical. In modern editions, uniform imports and the extern prelude apply. Explicit extern-crate aliases are captured. Unknown edition compares both interpretations and withholds certainty when they differ.
 
@@ -478,3 +497,64 @@ Fresh seeded manual source inspection: **30 definite, 15 gains, 30 withdrawals, 
 Final required checks ran strictly sequentially with frozen source/tests: `npm ci --ignore-scripts`; supplied `PYM_TLC_JAR` full `npm test` (**1,755 pass, 0 skipped**); `npm run format:check`; separate Rust tests (**357 pass, 0 skipped**). All exit 0, with no process-test hang. **68 native controls** (41 rustc, 27 offline Cargo), plus all three supplied production reproductions, pass. **54 mutations killed**, baseline passes. Mutated modules and native controls are scratch-only; runtime/tests never invoke Rust/Cargo.
 
 Development attempts are explicitly separated from acceptance in `round10-development-notes.md`: the initial duplicate dependency-route defect, rejected draft controls, stopped expanding-import probes and incomplete attribution attempts are not passes. Experimental lookup caches were removed; the shipped fix is the small self-expanding-import guard, with a native shrinking-reexport control. Source hashes, final completion assertions, full equality, cause/reach/hint integrity and ablation evidence are under `evidence/w2-c/round10-*`.
+
+## Round 11: structural TOML and contextual attribute identity
+
+The three round-10 blockers are fixed together:
+
+1. **Cargo facts come from parsed TOML.** Quoted/escaped/dotted keys, inline/standard tables, arrays of tables and string spellings share one normalized tree. Package/workspace/per-target editions use that tree; unreadable documents and unread edition values never default to 2015. Other dependent facts and their unknown behavior are described above. The 48 full-fact spelling fixtures independently normalize with Python `tomllib`; 36 offline Cargo programs cover the actual compiler-facing controls, including table/inline inheritance, quoted editions, both bin-edition directions, collisions and explicit `dep:` activation. All 41 Vector manifests are understood; all 92 target roots and their editions agree with the baseline. Captured workspace patch selection remains unverified, rather than assuming registry/version selection; this changes metadata for an external route, not Vector's definite project targets.
+2. **Unshadowed test/bench functions imply `cfg(test)`.** These conditions use the existing implication/alternative logic, including cfg_attr and a caller already under test. An attributed function called from a cfg(test) module can still be definite. Compiler controls accept the normal and test-harness programs. Unsupported test_case/cfg_eval/cfg_accessible transformations stay opaque. Proc-macro declaration attributes preserve the source function's structural identity, but export the macro name in the macro namespace; the ordinary function facet is local to its defining crate. This avoids changing structural target IDs.
+3. **Attribute spelling is not identity.** The three-class table above replaces the old flat inert-name list. Explicit/local bindings, unknown item generation, macro-use extern imports and registered-tool dependency names can defeat proof of a prelude/tool meaning. A glob use does not shadow the standard attribute. Impossible cfg_attr payloads do not add opacity, and qualified payload names retain their full path. Native controls include the reviewers' replacement impl/tool program, every shadowable head, the bare imported replacement, and macro-use/tool-dependency routes. Contains stays structural; semantic links require presence-as-written. Re-indexing recomputes contextual gates and opacity, including cached child files.
+
+### Vector cost — semantic links only
+
+**The strict shadowing rule withdraws 11,730 definite semantic links (34.7% of the baseline's 33,768 definite semantic links).** This is larger than the expected small change: uncaptured `#[macro_use] extern crate` exports can replace prelude attribute macros, including `derive` and `test`; item-generation/explicit binding routes also prevent proving an unshadowed meaning. The native macro-use control is accepted and demonstrates replacement. The module does not assume the external crate's exports from its familiar name.
+
+Fresh full counterfactual runs disable only shadow classification or only implicit test/bench gates. **Every one of the 11,730 withdrawals restores its exact baseline target when shadow classification is disabled; none restores when only test/bench gates are disabled.** Thus no Vector withdrawal is charged to the TOML reader or test/bench gate itself. All per-link classifications are retained in `round11-attribution.json`; these ablations never edit production facts.
+
+| Withdrawn semantic kind | Count |
+|---|---:|
+| types | 8,112 |
+| calls | 1,474 |
+| patterns | 1,126 |
+| imports | 508 |
+| values | 501 |
+| implements | 9 |
+
+Only two attribute paths occur as direct reported blockers in these withdrawals, so there are no additional top-15 paths to list:
+
+| Reported path | Withdrawals carrying this blocker (non-exclusive) |
+|---|---:|
+| derive | 11,141 |
+| test | 217 |
+
+Eight carry both paths. Another 380 have indirect scope/receiver/impl-applicability effects without a direct attribute-path field. They are included in the counterfactual proof, not guessed from their message. Broad uncertainty propagation can keep an intact type's first-step method unverified when another impl's nominal self type becomes unknown. This is the retained “unproven is not absent” rule.
+
+**11,293 withdrawals keep exactly one would-be target.** All 11,730 former target IDs occur in the full new hint inventory, checked before the cap; six use count-only overflow. The four gains are explicit import/reexport links to the exported derive name `NamedInternalEvent`, whose written function is `derive_internal_event_name`. Native export/import controls pin that namespace distinction. There are **0 retargets, 0 added/removed links, and all 90 old closed sets keep exactly the same IDs**. No dot call acquires a closed set. All **33,870 contains** links remain definite. Opaque-marked symbols: **5,549 → 10,503**.
+
+Fresh pinned Vector (`515e87d9861b564f521a8992d224892cd8cae120`) at the default heap:
+
+| Result | 81aba89e → current |
+|---|---:|
+| files | 1,563 → 1,563 |
+| clean / partial / failed | 1,552 / 0 / 11 → unchanged |
+| symbols / links | 35,422 / 365,530 → unchanged |
+| definite | 67,638 → 55,912 |
+| closed sets | 90 → 90 |
+| unresolved | 297,802 → 309,528 |
+| invalid-code | 170 → 168 |
+| failed-file reach annotations | 175,683 → 176,535 |
+| analysis return bytes | 170,130,391 → 177,326,471 |
+| graph-fact bytes | 299,076,732 → 304,931,139 |
+
+The two removed causes are the ConfigBuilder import inside an opaque test input and the `tracing_limit::RateLimitedLayer::new` path whose binding is no longer provable under opaque scope generation. Both remain unresolved, with reach uncertainty and no guessed cause. All 168 remaining causes reproduce with named traversal witnesses: 18 module/crate paths/declarations and 150 explicit non-glob import/reexport chains. Every one of the 176,535 reach annotations has a captured ownership/dependency path. The reach changes are 940 additions (939 calls, one import) and 88 cleared import annotations, as lookup proof changes under opacity/macro export classification; no new failed file is introduced.
+
+Hints remain bounded and unverified: **31,605 count-only overflows; 99,795 nonempty lists; 74,226 singleton lists; 222,378 retained IDs**. Full production indexing/store completes with execArgv=[], NODE_OPTIONS empty and Node heap limit 4,496,293,888 bytes. Every link state/target/metadata and every symbol position/metadata equals the direct run. Observed store elapsed 292.1s and peak RSS 5,315,400 KiB are loaded-machine observations, not acceptance timing bounds. No core edit or increased heap is used.
+
+The same **11 real, syntax-valid grammar-gap files** still fail completely. They contribute no symbols/links; `src/config/builder.rs` and the other rejected constructs remain listed in `round8-grammar.json` with native syntax evidence. The grammar is unchanged. This is still failure of valid Rust due to grammar limitations, not evidence that the user's Rust is invalid or that all of Vector was cargo-typechecked.
+
+### Checks and source inspection
+
+After normally merging the newly landed TypeScript module (9a1b7c2f), final frozen checks ran sequentially, all exit 0: npm ci --ignore-scripts; supplied PYM_TLC_JAR npm test (**2,049 pass, 0 skipped**); format:check; Rust tests (**523 pass, 0 skipped**). No process-test hang occurred. **67 mutations killed**, with an unmodified passing baseline and syntax checks on every mutated JS module; missing-package errors cannot count as kills. The 13 new mutations cover unread edition/TOML recovery, test/bench gates, shadowing/glob distinction, dead cfg_attr payloads/full paths, bare opacity, collisions, bin edition, optional dep activation and macro-use shadowing. Native evidence includes 48 rustc controls (one unmodeled test_case observation), 36 offline Cargo controls, 63 attribute classification probes, and the tool-dependency replacement control. Runtime/install/module tests never need the compiler.
+
+Fresh seeded source inspection: **30 definite, all 4 gains, 30 withdrawals, 15 closed sets, 15 unresolved, 20 project-hint links, 20 failed-file causes**. Individual judgments distinguish broad std/external/generic name hints from actual captured callees; none is silently upgraded to a compiler answer. All prior withdrawn IDs remain in the uncapped inventory. Original 152 re-derived: **5 restored / 147 unverified under named fallback rules / 0 newly identified wrong-before / 0 further provable under that policy identified still lost**. Seven of the preceding 12 restored links now pay the shadowing/presence cost; this is not a claim that rustc cannot resolve them. Intermediate/rejected attempts are identified in `round11-development-notes.md`. Full equality, source hashes, movement, attribution, samples and audits are under `evidence/w2-c/round11-*`.

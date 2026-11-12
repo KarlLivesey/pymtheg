@@ -119,63 +119,108 @@ function referencePosition(n: Node):
   }
   return undefined;
 }
-export const inertAttributes = new Set([
-  "allow",
-  "warn",
-  "deny",
-  "forbid",
-  "expect",
-  "cfg",
-  "cfg_attr",
-  "repr",
-  "doc",
-  "deprecated",
-  "must_use",
-  "non_exhaustive",
-  "inline",
-  "cold",
-  "track_caller",
-  "no_mangle",
-  "export_name",
-  "link_section",
-  "used",
-  "automatically_derived",
-  "test",
-  "ignore",
-  "should_panic",
-  "path",
-  "macro_export",
-  "macro_use",
-  "link",
-  "no_std",
-  "no_implicit_prelude",
-  "derive",
-  "bench",
-  "global_allocator",
-  "panic_handler",
-  "target_feature",
-  "instruction_set",
-  "link_name",
-  "link_ordinal",
-  "proc_macro",
-  "proc_macro_attribute",
-  "proc_macro_derive",
-  "no_main",
-  "no_core",
-  "crate_name",
-  "crate_type",
-  "recursion_limit",
-  "type_length_limit",
-  "windows_subsystem",
-  "debugger_visualizer",
-  "collapse_debuginfo",
-  "naked",
-  "coverage",
-  "optimize",
-  "feature",
+export type AttributeEffect = "inert" | "conditional" | "macro" | "opaque";
+export type AttributeRule = {
+  category: "builtin" | "prelude" | "tool";
+  effect: AttributeEffect;
+  condition?: string;
+};
+/** One classification table. Native shadow controls pin every builtin entry. */
+export const attributeRules = new Map<string, AttributeRule>([
+  ["allow", { category: "builtin", effect: "inert" }],
+  ["automatically_derived", { category: "builtin", effect: "inert" }],
+  ["cfg", { category: "builtin", effect: "conditional" }],
+  ["cfg_attr", { category: "builtin", effect: "conditional" }],
+  ["cold", { category: "builtin", effect: "inert" }],
+  ["collapse_debuginfo", { category: "builtin", effect: "inert" }],
+  ["coverage", { category: "builtin", effect: "inert" }],
+  ["crate_name", { category: "builtin", effect: "inert" }],
+  ["crate_type", { category: "builtin", effect: "inert" }],
+  ["debugger_visualizer", { category: "builtin", effect: "inert" }],
+  ["deny", { category: "builtin", effect: "inert" }],
+  ["deprecated", { category: "builtin", effect: "inert" }],
+  ["doc", { category: "builtin", effect: "inert" }],
+  ["expect", { category: "builtin", effect: "inert" }],
+  ["export_name", { category: "builtin", effect: "inert" }],
+  ["feature", { category: "builtin", effect: "inert" }],
+  ["forbid", { category: "builtin", effect: "inert" }],
+  ["ignore", { category: "builtin", effect: "inert" }],
+  ["inline", { category: "builtin", effect: "inert" }],
+  ["instruction_set", { category: "builtin", effect: "inert" }],
+  ["link", { category: "builtin", effect: "inert" }],
+  ["link_name", { category: "builtin", effect: "inert" }],
+  ["link_ordinal", { category: "builtin", effect: "inert" }],
+  ["link_section", { category: "builtin", effect: "inert" }],
+  ["macro_export", { category: "builtin", effect: "inert" }],
+  ["macro_use", { category: "builtin", effect: "inert" }],
+  ["must_use", { category: "builtin", effect: "inert" }],
+  ["naked", { category: "builtin", effect: "inert" }],
+  ["no_builtins", { category: "builtin", effect: "inert" }],
+  ["no_core", { category: "builtin", effect: "inert" }],
+  ["no_implicit_prelude", { category: "builtin", effect: "inert" }],
+  ["no_link", { category: "builtin", effect: "inert" }],
+  ["no_main", { category: "builtin", effect: "inert" }],
+  ["no_mangle", { category: "builtin", effect: "inert" }],
+  ["no_std", { category: "builtin", effect: "inert" }],
+  ["non_exhaustive", { category: "builtin", effect: "inert" }],
+  ["optimize", { category: "builtin", effect: "inert" }],
+  ["panic_handler", { category: "builtin", effect: "inert" }],
+  ["path", { category: "builtin", effect: "inert" }],
+  ["proc_macro", { category: "builtin", effect: "macro" }],
+  ["proc_macro_attribute", { category: "builtin", effect: "macro" }],
+  ["proc_macro_derive", { category: "builtin", effect: "macro" }],
+  ["recursion_limit", { category: "builtin", effect: "inert" }],
+  ["repr", { category: "builtin", effect: "inert" }],
+  ["should_panic", { category: "builtin", effect: "inert" }],
+  ["target_feature", { category: "builtin", effect: "inert" }],
+  ["track_caller", { category: "builtin", effect: "inert" }],
+  ["type_length_limit", { category: "builtin", effect: "inert" }],
+  ["used", { category: "builtin", effect: "inert" }],
+  ["warn", { category: "builtin", effect: "inert" }],
+  ["windows_subsystem", { category: "builtin", effect: "inert" }],
+  ["test", { category: "prelude", effect: "conditional", condition: "test" }],
+  ["bench", { category: "prelude", effect: "conditional", condition: "test" }],
+  ["derive", { category: "prelude", effect: "inert" }],
+  ["global_allocator", { category: "prelude", effect: "inert" }],
+  ["test_case", { category: "prelude", effect: "opaque" }],
+  ["cfg_eval", { category: "prelude", effect: "opaque" }],
+  ["cfg_accessible", { category: "prelude", effect: "opaque" }],
+  ["rustfmt", { category: "tool", effect: "inert" }],
+  ["clippy", { category: "tool", effect: "inert" }],
+  ["diagnostic", { category: "tool", effect: "inert" }],
+  ["miri", { category: "tool", effect: "inert" }],
+  ["rust_analyzer", { category: "tool", effect: "inert" }],
 ]);
-export const inertAttributeName = (name: string) =>
-  inertAttributes.has(name) || /^(rustfmt|clippy|diagnostic)::/.test(name);
+export function attributeEffect(
+  name: string,
+  shadowed = false,
+): AttributeEffect {
+  const head = name.split("::")[0]!,
+    rule = attributeRules.get(name.includes("::") ? head : name);
+  if (
+    !rule ||
+    (name.includes("::") && rule.category !== "tool") ||
+    (rule.category === "tool" && !name.includes("::")) ||
+    (rule.category !== "builtin" && shadowed)
+  )
+    return "opaque";
+  return rule.effect;
+}
+export const inertAttributes = new Set(
+  [...attributeRules]
+    .filter(([, r]) => r.effect === "inert" && r.category !== "tool")
+    .map(([n]) => n),
+);
+export const conditionalAttributes = new Map(
+  [...attributeRules]
+    .filter(([, r]) => r.condition)
+    .map(([n, r]) => [n, r.condition!]),
+);
+export const macroDefinitionAttributes = new Set(
+  [...attributeRules].filter(([, r]) => r.effect === "macro").map(([n]) => n),
+);
+export const knownAttributeName = (name: string, shadowed = false) =>
+  attributeEffect(name, shadowed) !== "opaque";
 const kinds: Record<string, string> = {
   mod_item: "module",
   function_item: "function",
@@ -260,6 +305,7 @@ async function createHelper(): Promise<Helper> {
         range: { start: 0, end: text.length },
         data: { scope: "", unit: true, visibility: "private" },
       });
+      const lexicalScopes = new Map<number, string>();
       let activeConditions: string[] = [];
       const link = (
         n: Node,
@@ -301,6 +347,7 @@ async function createHelper(): Promise<Helper> {
             data: {
               scope,
               conditions: activeConditions,
+              ...attributeContext(n),
               ...(presenceAttributes(n).length
                 ? { opaqueItemAttributes: presenceAttributes(n) }
                 : {}),
@@ -356,10 +403,19 @@ async function createHelper(): Promise<Helper> {
       };
       const parts = (nodes: Node[]): Meta => {
         const ns = nodes.filter((c) => !c.type.endsWith("comment"));
+        const end = ns.findIndex(
+            (c) => c.type === "=" || c.type === "token_tree",
+          ),
+          i = end < 0 ? ns.length : end;
         return {
-          name: compact(ns[0]?.text ?? ""),
-          value: ns[1]?.type === "=" ? ns[2] : undefined,
-          args: ns[1]?.type === "token_tree" ? ns[1] : undefined,
+          name: compact(
+            ns
+              .slice(0, i)
+              .map((n) => n.text)
+              .join(""),
+          ),
+          value: ns[i]?.type === "=" ? ns[i + 1] : undefined,
+          args: ns[i]?.type === "token_tree" ? ns[i] : undefined,
         };
       };
       const meta = (n: Node): Meta =>
@@ -403,7 +459,19 @@ async function createHelper(): Promise<Helper> {
           return undefined;
         return m.name + (m.value ? "=" + m.value.text : "");
       }
-      function cfg(meta: Meta): string[] {
+      function cfg(meta: Meta, at?: Node, includeImplicit = true): string[] {
+        const implicit = conditionalAttributes.get(meta.name);
+        if (
+          implicit &&
+          includeImplicit &&
+          at &&
+          attributeEffect(meta.name, shadowed(meta.name, at)) === "conditional"
+        )
+          return [
+            at.type === "function_item"
+              ? implicit
+              : "?conditional-attribute-target",
+          ];
         if (meta.name === "cfg") {
           const args = meta.args ? payloads(meta.args) : [];
           return [args.length === 1 ? (predicate(args[0]!) ?? "?") : "?"];
@@ -415,9 +483,49 @@ async function createHelper(): Promise<Helper> {
           const condition = predicate(ps[0]!) ?? "?";
           return ps
             .slice(1)
-            .flatMap((m) => cfg(m).map((c) => `any(not(${condition}),${c})`));
+            .flatMap((m) =>
+              cfg(m, at, includeImplicit).map(
+                (c) => `any(not(${condition}),${c})`,
+              ),
+            );
         }
         return [];
+      }
+      function applications(
+        m: Meta,
+        n: Node,
+        guards = explicitConditionsOn(n),
+      ): { meta: Meta; guards: string[] }[] {
+        if (!possible(guards)) return [];
+        if (m.name === "cfg_attr") {
+          if (!m.args) return [{ meta: m, guards }];
+          const ps = payloads(m.args);
+          if (!ps[0]) return [{ meta: m, guards }];
+          return ps
+            .slice(1)
+            .flatMap((p) =>
+              applications(p, n, [...guards, predicate(ps[0]!) ?? "?"]),
+            );
+        }
+        if (m.name === "unsafe" && m.args)
+          return payloads(m.args).flatMap((p) => applications(p, n, guards));
+        return [{ meta: m, guards }];
+      }
+      function procMacro(
+        meta: Meta,
+        n: Node,
+      ): { kind: string; name?: string | undefined; conditional: boolean }[] {
+        return applications(meta, n)
+          .filter((a) => macroDefinitionAttributes.has(a.meta.name))
+          .map((a) => ({
+            kind: a.meta.name,
+            conditional: a.guards.some(
+              (c) => !implies(explicitConditionsOn(n), c),
+            ),
+            ...(a.meta.name === "proc_macro_derive" && a.meta.args
+              ? { name: payloads(a.meta.args)[0]?.name }
+              : {}),
+          }));
       }
       const attributeCache = new Map<number, Node[]>();
       const conditionCache = new Map<number, string[]>();
@@ -474,31 +582,241 @@ async function createHelper(): Promise<Helper> {
         const cached = conditionCache.get(n.id);
         if (cached) return cached;
         const inherited = n.parent ? conditionsOn(n.parent) : [];
-        const own = attributesOn(n).flatMap((a) => cfg(meta(a)));
+        const own = attributesOn(n).flatMap((a) => cfg(meta(a), n));
+        if (
+          attributesOn(n)
+            .flatMap((a) => procMacro(meta(a), n))
+            .some((p) => p.conditional)
+        )
+          own.push("?proc-macro-kind");
         const result = own.length
           ? [...new Set([...inherited, ...own])]
           : inherited;
         conditionCache.set(n.id, result);
         return result;
       }
+      const attributeBindings = new Map<
+        number,
+        { node: Node; names: Set<string>; unknown: boolean; macroUse: boolean }
+      >();
+      const explicitCache = new Map<number, string[]>();
+      function explicitConditionsOn(n: Node): string[] {
+        const cached = explicitCache.get(n.id);
+        if (cached) return cached;
+        const inherited = n.parent ? explicitConditionsOn(n.parent) : [];
+        const own = attributesOn(n).flatMap((a) => cfg(meta(a), n, false));
+        const result = [...new Set([...inherited, ...own])];
+        explicitCache.set(n.id, result);
+        return result;
+      }
+      function bindingContainer(n: Node): Node {
+        let p = n.parent;
+        while (p && !lexicalItemContainer(p)) p = p.parent;
+        return p ?? tree.rootNode;
+      }
+      function collectAttributeBindings(n: Node): void {
+        if (!possible(explicitConditionsOn(n))) return;
+        const names: string[] = [];
+        if (n.type === "use_declaration") {
+          const argument = field(n, "argument");
+          if (argument) imports(argument, "", "", "", "", [], names);
+        } else if (
+          [
+            "mod_item",
+            "struct_item",
+            "enum_item",
+            "trait_item",
+            "type_item",
+            "macro_definition",
+          ].includes(n.type)
+        ) {
+          const name = field(n, "name");
+          if (name) names.push(compact(name.text));
+        } else if (n.type === "extern_crate_declaration") {
+          const name = field(n, "alias") ?? field(n, "name");
+          if (name) names.push(compact(name.text));
+        }
+        let macroUse = false;
+        if (n.type === "extern_crate_declaration")
+          for (const a of attributesOn(n))
+            for (const app of applications(meta(a), n))
+              if (app.meta.name === "macro_use") {
+                if (!app.meta.args) macroUse = true;
+                else
+                  for (const entry of payloads(app.meta.args))
+                    names.push(entry.name);
+              }
+        const scope = bindingContainer(n),
+          unknown =
+            n.type === "macro_invocation" &&
+            [
+              "source_file",
+              "declaration_list",
+              "block",
+              "expression_statement",
+            ].includes(n.parent?.type ?? "");
+        if (names.some((n) => n !== "*" && n !== "_") || unknown || macroUse) {
+          const v = attributeBindings.get(scope.id) ?? {
+            node: scope,
+            names: new Set<string>(),
+            unknown: false,
+            macroUse: false,
+          };
+          for (const name of names)
+            if (
+              attributeRules.get(name)?.category === "tool" ||
+              (attributeRules.get(name)?.category === "prelude" &&
+                (["use_declaration", "macro_definition"].includes(n.type) ||
+                  (n.type === "extern_crate_declaration" &&
+                    names.includes(name) &&
+                    attributesOn(n).some((a) => meta(a).name === "macro_use"))))
+            )
+              v.names.add(name);
+          v.unknown ||= unknown;
+          v.macroUse ||= macroUse;
+          attributeBindings.set(scope.id, v);
+        }
+        for (const c of n.namedChildren) collectAttributeBindings(c);
+      }
+      function shadowed(name: string, n: Node): boolean {
+        const rule = attributeRules.get(name.split("::")[0]!);
+        if (!rule || rule.category === "builtin") return false;
+        const head = name.split("::")[0]!;
+        let node: Node | null = n.type === "source_file" ? n : n.parent;
+        while (node) {
+          const b = attributeBindings.get(node.id);
+          if (
+            b &&
+            (b.unknown ||
+              b.names.has(head) ||
+              (rule.category === "prelude" && b.macroUse))
+          )
+            return true;
+          node = node.parent;
+        }
+        return false;
+      }
+      collectAttributeBindings(tree.rootNode);
+      const implicitCache = new Map<
+        number,
+        { name: string; scope: string; condition: string; explicit: boolean }[]
+      >();
+      function implicitConditionsOn(n: Node): {
+        name: string;
+        scope: string;
+        condition: string;
+        explicit: boolean;
+      }[] {
+        const cached = implicitCache.get(n.id);
+        if (cached) return cached;
+        const inherited = n.parent ? implicitConditionsOn(n.parent) : [];
+        function from(m: Meta): {
+          name: string;
+          scope: string;
+          condition: string;
+          explicit: boolean;
+        }[] {
+          if (m.name === "cfg_attr" && m.args) {
+            const ps = payloads(m.args),
+              p = predicate(ps[0]!) ?? "?";
+            return ps
+              .slice(1)
+              .flatMap(from)
+              .map((x) => ({
+                ...x,
+                condition: `any(not(${p}),${x.condition})`,
+              }));
+          }
+          const condition = conditionalAttributes.get(m.name);
+          return condition && !shadowed(m.name, n) && n.type === "function_item"
+            ? [
+                {
+                  name: m.name,
+                  scope: lexicalScopes.get(n.id) ?? "",
+                  condition,
+                  explicit: false,
+                },
+              ]
+            : [];
+        }
+        const result = [
+          ...inherited,
+          ...attributesOn(n).flatMap((a) => from(meta(a))),
+        ].map((x) => ({
+          ...x,
+          explicit: explicitConditionsOn(n).includes(x.condition),
+        }));
+        implicitCache.set(n.id, result);
+        return result;
+      }
+      const shadowableCache = new Map<
+        number,
+        { name: string; scope: string }[]
+      >();
+      function shadowableOn(n: Node): { name: string; scope: string }[] {
+        const cached = shadowableCache.get(n.id);
+        if (cached) return cached;
+        function from(m: Meta): { name: string; scope: string }[] {
+          return applications(m, n).flatMap(({ meta: m }) => {
+            const rule = attributeRules.get(m.name.split("::")[0]!);
+            return rule && rule.category !== "builtin" && !shadowed(m.name, n)
+              ? [{ name: m.name, scope: lexicalScopes.get(n.id) ?? "" }]
+              : [];
+          });
+        }
+        const result = [
+          ...new Map(
+            [
+              ...(n.parent ? shadowableOn(n.parent) : []),
+              ...attributesOn(n).flatMap((a) => from(meta(a))),
+            ].map((x) => [JSON.stringify(x), x]),
+          ).values(),
+        ].sort(
+          (a, b) =>
+            a.name.localeCompare(b.name) || a.scope.localeCompare(b.scope),
+        );
+        shadowableCache.set(n.id, result);
+        return result;
+      }
+      const attributeContexts: {
+        shadowable: { name: string; scope: string }[];
+        implicit: {
+          name: string;
+          scope: string;
+          condition: string;
+          explicit: boolean;
+        }[];
+      }[] = [];
+      const contextIds = new Map<string, number>();
+      function attributeContext(n: Node) {
+        const context = {
+          shadowable: shadowableOn(n),
+          implicit: implicitConditionsOn(n),
+        };
+        if (!context.shadowable.length && !context.implicit.length) return {};
+        const key = JSON.stringify(context);
+        let id = contextIds.get(key);
+        if (id === undefined) {
+          id = attributeContexts.length;
+          attributeContexts.push(context);
+          contextIds.set(key, id);
+        }
+        return { attributeContext: id };
+      }
       const presenceCache = new Map<number, string[]>();
-      function opaquePresence(meta: Meta): string[] {
-        if (meta.name === "cfg_attr")
-          return meta.args
-            ? payloads(meta.args).slice(1).flatMap(opaquePresence)
-            : ["cfg_attr"];
-        if (meta.name === "unsafe")
-          return meta.args
-            ? payloads(meta.args).flatMap(opaquePresence)
-            : ["unsafe"];
-        return inertAttributeName(meta.name) ? [] : [meta.name || "?attribute"];
+      function opaquePresence(meta: Meta, n: Node): string[] {
+        return applications(meta, n)
+          .filter(
+            (a) => !knownAttributeName(a.meta.name, shadowed(a.meta.name, n)),
+          )
+          .map((a) => a.meta.name || "?attribute");
       }
       /** One presence predicate, inherited through every enclosing AST item. */
       function presenceAttributes(n: Node): string[] {
         const cached = presenceCache.get(n.id);
         if (cached) return cached;
         const inherited = n.parent ? presenceAttributes(n.parent) : [];
-        const own = attributesOn(n).flatMap((a) => opaquePresence(meta(a)));
+        const own = attributesOn(n).flatMap((a) => opaquePresence(meta(a), n));
         const result = own.length
           ? [...new Set([...inherited, ...own])].sort()
           : inherited;
@@ -510,6 +828,7 @@ async function createHelper(): Promise<Helper> {
         unit: true,
         visibility: "private",
         conditions: conditionsOn(tree.rootNode),
+        ...attributeContext(tree.rootNode),
         opaqueItemAttributes: presenceAttributes(tree.rootNode),
       };
       function modulePath(nodes: Node[]): {
@@ -603,16 +922,17 @@ async function createHelper(): Promise<Helper> {
         argumentSyntaxCache.set(type.id, value);
         return value;
       }
-      const bindingAttributeOpaque = (m: Meta): boolean =>
-        m.name === "cfg_attr" && m.args
-          ? payloads(m.args).slice(1).some(bindingAttributeOpaque)
-          : m.name === "derive" || !inertAttributeName(m.name);
+      const bindingAttributeOpaque = (m: Meta, n: Node): boolean =>
+        applications(m, n).some(
+          (a) =>
+            a.meta.name === "derive" ||
+            !knownAttributeName(a.meta.name, shadowed(a.meta.name, n)),
+        );
       function bindingType(n: Node): Node | null {
-        return attributesOn(n).some((a) => bindingAttributeOpaque(meta(a)))
+        return attributesOn(n).some((a) => bindingAttributeOpaque(meta(a), n))
           ? null
           : field(n, "type");
       }
-      const lexicalScopes = new Map<number, string>();
       type ReceiverType = {
         name: string;
         scope: string;
@@ -724,7 +1044,7 @@ async function createHelper(): Promise<Helper> {
                 (n.type === "expression_statement" &&
                   n.namedChildren.some((c) => c.type === "macro_invocation")) ||
                 (n.type === "attribute_item" &&
-                  bindingAttributeOpaque(meta(n)));
+                  bindingAttributeOpaque(meta(n), n));
               for (const alias of imported.filter(
                 (x) => x !== "*" && x !== "_",
               )) {
@@ -1070,6 +1390,14 @@ async function createHelper(): Promise<Helper> {
           const nameNode = field(n, "name");
           const type = field(n, "type");
           const trait = field(n, "trait");
+          const transformations =
+            n.type === "function_item"
+              ? attributesOn(n).flatMap((a) => procMacro(meta(a), n))
+              : [];
+          const transformed =
+            transformations.length === 1 && !transformations[0]!.conditional
+              ? transformations[0]
+              : undefined;
           const name =
             n.type === "impl_item"
               ? `impl${field(n, "type_parameters") ? compact(field(n, "type_parameters")!.text) : ""} ${trait ? compact(trait.text) + " for " : ""}${type ? compact(type.text) : "?"}`
@@ -1098,6 +1426,25 @@ async function createHelper(): Promise<Helper> {
                 scope,
                 moduleScope,
                 conditions,
+                ...attributeContext(n),
+                ...(transformations.length
+                  ? {
+                      procMacroKinds: transformations.map((p) => p.kind),
+                      ...(transformed
+                        ? {
+                            sourceFunctionName: nameNode?.text ?? "",
+                            semanticKind: "macro",
+                            exportedMacroName:
+                              transformed.name ?? nameNode?.text ?? "",
+                          }
+                        : {
+                            namespaceUnverified: true,
+                            exportedMacroNames: transformations.flatMap((p) =>
+                              p.name ? [p.name] : [],
+                            ),
+                          }),
+                    }
+                  : {}),
                 ...(presenceAttributes(n).length
                   ? { opaqueItemAttributes: presenceAttributes(n) }
                   : {}),
@@ -1464,6 +1811,7 @@ async function createHelper(): Promise<Helper> {
         scope: string;
         raw: string;
         module: string;
+        conditions: string[];
       }[] = [];
       function attributes(n: Node): void {
         if (["attribute_item", "inner_attribute_item"].includes(n.type)) {
@@ -1485,6 +1833,7 @@ async function createHelper(): Promise<Helper> {
             opaqueAttributes.push({
               scope: lexicalScopes.get(item.id) ?? "",
               raw: n.text,
+              conditions: explicitConditionsOn(item),
               module:
                 item.type === "mod_item"
                   ? compact(field(item, "name")?.text ?? "")
@@ -1495,6 +1844,13 @@ async function createHelper(): Promise<Helper> {
       }
       attributes(tree.rootNode);
       result.data = {
+        attributeContexts,
+        attributeBindings: [...attributeBindings.values()].map((b) => ({
+          scope: lexicalScopes.get(b.node.id) ?? "",
+          names: [...b.names].sort(),
+          unknown: b.unknown,
+          macroUse: b.macroUse,
+        })),
         opaqueCrateAliases,
         opaqueItemScopes: [...opaqueItemScopes],
         opaqueAttributes,

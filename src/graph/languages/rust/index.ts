@@ -9,7 +9,7 @@ const TARGET_HINT_LIMIT = 16;
 
 const rust: LanguageModule = {
   id: "rust",
-  version: "10",
+  version: "11",
   extensions: [".rs"],
   contextFiles: ["Cargo.toml"],
   parse: parseRust,
@@ -79,6 +79,7 @@ const rust: LanguageModule = {
       }
     >();
     const presence = new Map<string, string[]>();
+    const conditions = new Map<string, string[]>();
     resolveRust(
       {
         projectId,
@@ -103,14 +104,29 @@ const rust: LanguageModule = {
             ? [...new Set(attributes)].sort()
             : undefined,
         }),
-      (symbol, attributes) => presence.set(symbol.id, attributes),
+      (symbol, attributes, gates) => {
+        presence.set(symbol.id, attributes);
+        conditions.set(symbol.id, gates);
+      },
+      (link, gates) => conditions.set(link.id, gates),
     );
     for (let i = 0; i < updated.length; i++) {
       const f = updated[i]!,
         a = byPath.get(f.path);
       if (a)
         a.result.symbols = a.result.symbols.map((symbol, j) => {
-          const attributes = presence.get(facts[i]!.symbols[j]!.id);
+          const id = facts[i]!.symbols[j]!.id,
+            attributes = presence.get(id);
+          symbol = {
+            ...symbol,
+            data: {
+              ...(symbol.data as Record<string, Json>),
+              conditions:
+                conditions.get(id) ??
+                (symbol.data as Record<string, Json>).conditions ??
+                [],
+            },
+          };
           return attributes?.length
             ? {
                 ...symbol,
@@ -124,7 +140,14 @@ const rust: LanguageModule = {
         });
       if (a)
         a.result.links = a.result.links.map((l, j) => {
-          const u = unknown.get(facts[i]!.links[j]!.id);
+          const id = facts[i]!.links[j]!.id,
+            u = unknown.get(id),
+            gates = conditions.get(id);
+          if (gates)
+            l = {
+              ...l,
+              data: { ...(l.data as Record<string, Json>), conditions: gates },
+            };
           return u
             ? {
                 ...l,
