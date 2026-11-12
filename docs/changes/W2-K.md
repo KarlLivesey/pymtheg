@@ -1,14 +1,18 @@
 # W2-K: can the Rust build chain provide exact code-graph links?
 
-Investigation only (round 6, after five reviews). Evidence, scripts and raw
-outputs: `evidence/w2-k/`. No product code, contract or support level changes.
+Investigation only (round 6, after five reviews, with the W2-K2 corrections
+after the post-merge review). Evidence, scripts and raw outputs:
+`evidence/w2-k/`. No product code, contract or support level changes.
 
 ## The answer
 
-**Yes for most method calls in a crate that compiles; no for any other kind of
-link.**
+**Yes for most method calls in a crate that compiles, through the stable LLVM-IR
+route, which gives no other kind of link. Yes for `implements` links and item
+declaration locations, through stable rustdoc HTML, which gives no call links
+and is not a stable machine interface.** Both are part of the default
+toolchain; both run project code.
 
-Stable `cargo`/`rustc` (LLVM IR, or the same data in `asm`, with the dev
+The IR route: stable `cargo`/`rustc` (LLVM IR, or the same data in `asm`, with the dev
 profile's debug info) give an exact call → callee record for every call rustc
 generates code for, including calls inlined at opt-level 0. A callee the crate
 only declares gets its file:line from the dependencies' own IR, by building
@@ -54,9 +58,42 @@ where it is the same but located in only one build. In `vector-common` and
 `file-source-common` they give identical figures in every mode
 (`raw/route-a/ir-devtest-located.txt` lists every differing site).
 
-All 68 distinct recovered locations were checked against source and are
-correct. The stable route gives no imports, type references or `implements`
-links.
+Every definition location recovered by the lookup was checked against source,
+and every one was valid: 68 per-crate checks (19 + 29 + 20), which are 65
+unique file:line:instantiated-name entries and 57 unique file:line locations
+across the three crates (`raw/route-a/check-defs-denominators.txt`). The IR
+route gives no imports, type references or `implements` links.
+
+**Stable rustdoc HTML** (`cargo doc --no-deps --document-private-items`;
+measured in W2-K2 on the hard-case crate, a two-crate probe and
+`vector-common`; `raw/rustdoc/`):
+
+- **Gives** item declaration locations (197 of 212 `vector-common` item pages,
+  92.9%; the rest are re-exports and macro redirect pages) and `implements`:
+  per type its inherent, trait, auto-trait and applicable blanket impls, per
+  trait its same-crate implementors, with impl locations. Derive, attribute-macro
+  and `macro_rules` output is placed at the derive, attribute or invocation
+  line.
+- **Agrees with rustc** on every pair a compile probe could test: 126 of 225
+  (type, trait) pairs in the hard-case crate and 1,995 of 5,896 in
+  `vector-common`, 0 disagreements. Of `vector-common`'s 104 written
+  `impl Trait for Type` blocks it lists 82 at their location; the other 22 are
+  all cfg'd out of the documented configuration.
+- **Does not give** call links (0 links other than line anchors in 37 source
+  pages; stable rejects `--generate-link-to-definition`). In the probe (one case
+  each) it also listed no impl inside a function body, of a `#[doc(hidden)]`
+  type, or under `#[cfg(not(doc))]`. An impl in another
+  workspace crate reaches a trait's page only through a JavaScript file, and a
+  cross-crate trait in an impl header was a path in 1 and plain text in 11 of 12
+  cold probe runs: trait identity across crates is not repeatable this way.
+- **Broken code:** `cargo doc` exits 0 with unchanged impl lists on 3 of 3
+  body-only errors (including the reviewer's `from_other() -> u32`, which
+  `cargo check` rejects with E0308), so its success does not mean the crate
+  compiles. It fails on 8 of 8 syntax, signature, impl and dependency errors.
+- **Runs** build scripts and proc macros. **Cost**, `vector-common`: cold
+  51 s, 0.9 GiB, 1.0 GB target; re-run after a touch 2 s.
+- **Stability:** HTML is rustdoc's output for people; its JSON output is
+  nightly. The reader matches the 1.96.1 and 1.98.1 markup only.
 
 **Like for like with rust-analyzer** (an optional rustup component). It
 analyses one cfg set of its own: default features, plus `cfg(test)`,
@@ -164,15 +201,16 @@ also runs build scripts and proc macros, as any `cargo build` does.
 ## The options
 
 Coverage is "method calls with a callee definition location", in the order
-`vector-common` / `file-source-common` / `tracing-limit`.
+`vector-common` / `file-source-common` / `tracing-limit`, except row (2r).
 
-| Option                                                                 | Needs installed                                                                                                        | Runs project code       | Coverage                                                 | Crate that does not compile               | Cost                                                                                                               |
-| ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ----------------------- | -------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| (1) Hand-written W2-C only                                             | Nothing                                                                                                                | No                      | Structure-level (not measured here)                      | Partial                                   | Parsing only                                                                                                       |
-| (2) Stable IR tier (dev + test, dependency IR lookup), W2-C underneath | `cargo`/`rustc` only (D16)                                                                                             | Yes, like `cargo build` | 73.2% / 92.3% / 99.3% (98.7% with every record located)  | That crate falls back to W2-C             | Cold dev 3–61 s + test 6–24 s per crate, 0.3–1.9 GB of IR, target 0.7–4.1 GB; cargo reuses dependencies afterwards |
-| (2+) As (2), plus std located from rlib DWARF                          | (2) plus a DWARF reader, which is not part of the Rust toolchain (`llvm-dwarfdump` here), and `rust-src` for std files | Yes                     | 74.3% / 93.8% / 100%                                     | As (2)                                    | As (2), plus building the std index (2.3 s)                                                                        |
-| (3) rust-analyzer when present, W2-C fallback                          | rustup component                                                                                                       | Yes (off = wrong links) | LSIF 98.7% / 96.5% / 100% (SCIP: workspace targets only) | Partial, exit 0, sometimes silently wrong | Whole workspace per change: 4–8 min, 9–13 GiB; index 78 MB (SCIP) or 322 MB (LSIF)                                 |
-| (4) Layered: W2-C base, then (2), then (3) on top when present         | (2); (3) optional                                                                                                      | Yes                     | (2) everywhere, (3) where installed                      | W2-C (plus partial (3))                   | (2) plus optional (3)                                                                                              |
+| Option                                                                              | Needs installed                                                                                                        | Runs project code       | Coverage                                                                                                                               | Crate that does not compile                                                                 | Cost                                                                                                               |
+| ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| (1) Hand-written W2-C only                                                          | Nothing                                                                                                                | No                      | Structure-level (not measured here)                                                                                                    | Partial                                                                                     | Parsing only                                                                                                       |
+| (2) Stable IR tier (dev + test, dependency IR lookup), W2-C underneath              | `cargo`/`rustc` only (D16)                                                                                             | Yes, like `cargo build` | 73.2% / 92.3% / 99.3% (98.7% with every record located)                                                                                | That crate falls back to W2-C                                                               | Cold dev 3–61 s + test 6–24 s per crate, 0.3–1.9 GB of IR, target 0.7–4.1 GB; cargo reuses dependencies afterwards |
+| (2+) As (2), plus std located from rlib DWARF                                       | (2) plus a DWARF reader, which is not part of the Rust toolchain (`llvm-dwarfdump` here), and `rust-src` for std files | Yes                     | 74.3% / 93.8% / 100%                                                                                                                   | As (2)                                                                                      | As (2), plus building the std index (2.3 s)                                                                        |
+| (2r) Stable rustdoc HTML for `implements`, beside (2)                               | `cargo`/`rustdoc` only (D16)                                                                                           | Yes, like `cargo build` | No call links. `implements`: agreed with rustc on every probed pair (126 of 225 hard-case pairs, 1,995 of 5,896 `vector-common` pairs) | Exit 0 with unchanged impl lists on body-only errors; fails on syntax and item-level errors | `vector-common` cold 51 s, 0.9 GiB, 1.0 GB target; a parser pinned to rustdoc's HTML                               |
+| (3) rust-analyzer when present, W2-C fallback                                       | rustup component                                                                                                       | Yes (off = wrong links) | LSIF 98.7% / 96.5% / 100% (SCIP: workspace targets only)                                                                               | Partial, exit 0, sometimes silently wrong                                                   | Whole workspace per change: 4–8 min, 9–13 GiB; index 78 MB (SCIP) or 322 MB (LSIF)                                 |
+| (4) Layered: W2-C base, then (2) (and (2r) if chosen), then (3) on top when present | (2); (2r) a choice; (3) optional                                                                                       | Yes                     | (2) everywhere, (3) where installed                                                                                                    | W2-C (plus partial (3), and (2r) for body-only errors)                                      | (2) plus (2r) and optional (3)                                                                                     |
 
 ## Recommendation: option 4, layered
 
@@ -183,10 +221,14 @@ The numbers argue for it, for these reasons:
    99.3% of method calls in these three crates, and all in-workspace targets in
    two of them. The std DWARF step (2+) adds about 1 point but needs a tool
    outside the Rust toolchain, so it is optional. Option 3's extra reach comes from a component D16 makes optional,
-   so it cannot be the base.
-2. **Neither toolchain route is safe on its own for code mid-edit.** IR gives
-   nothing for a crate that does not compile, and rust-analyzer can be silently
-   wrong. W2-C must stay underneath, and every link must record which route
+   so it cannot be the base. The default toolchain also gives `implements`
+   links through rustdoc HTML (2r), which agreed with rustc on every probed
+   pair. Whether to read it is a choice, because its HTML is not a stable
+   interface (condition 6).
+2. **No toolchain route is safe on its own for code mid-edit.** IR gives
+   nothing for a crate that does not compile; rustdoc HTML gives nothing on
+   syntax and item-level errors, and on body-only errors exits 0 as if the crate
+   compiled; and rust-analyzer can be silently wrong. W2-C must stay underneath, and every link must record which route
    produced it.
 3. **rust-analyzer adds what IR cannot reach,** though its links too hold only
    for its own cfg set (default features plus `cfg(test)`, `cfg(miri)` and `debug_assertions`, which matches no real build). At
@@ -233,6 +275,11 @@ Conditions, each a decision or a chunk:
    position. Results are cached on snapshot hashes, context files, `rustc -vV`,
    the tool version, the feature set and rust-analyzer's `cargo.cfgs`. The build set (dev + test, and
    whether std DWARF is read) is a stated choice.
+6. **rustdoc HTML, if used.** Pin the rustdoc versions the reader understands and
+   treat unrecognised markup as a failure; take "the crate compiles" from
+   `cargo check`, not from `cargo doc`; record that its configuration includes
+   `cfg(doc)`; and identify a trait from another crate by path only where the
+   HTML links it, not by its displayed name.
 
 Unanswered:
 
@@ -241,11 +288,13 @@ Unanswered:
 - `-O` beyond the `dyn` probe;
 - full-Vector byte repeatability;
 - LSIF under broken code;
+- rustdoc HTML on other Vector crates, a whole workspace, with dependencies
+  documented, and across rustdoc versions; type references in its signatures;
 - network needs on other toolchains.
 
 Go is installed on this machine now (go1.27.4) but was not measured in this
 chunk; a separate Go investigation will measure it.
 
-Checks: `npm ci`; `npm test` without `PYM_TLC_JAR` gave 1,244 pass, 0 fail, 2
-skipped (TLC backend tests: unresolved, not passed); `npm run format:check`
-clean.
+Checks (W2-K2, on this branch): `npm ci`; `npm test` without
+`PYM_TLC_JAR` gave 1,396 pass, 0 fail, 2 skipped (TLC backend tests:
+unresolved, not passed); `npm run format:check` clean.
