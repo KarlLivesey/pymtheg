@@ -178,7 +178,7 @@ not expand macros or establish a dispatch result.
 `cfg_attr` payloads are inspected; conditional module paths retain every captured
 layout and mark missing alternatives unknown. Standard derive *spellings* only
 help this namespace annotation when unshadowed by named/glob imports or
-macro_use routes (including cfg_attr); no per-method derive knowledge
+effective macro_use routes (including nested cfg_attr payloads whose predicates are not provably false); no per-method derive knowledge
 remains. The current shared classification is `parse.ts:attributeRules`, with
 conditional test/bench behavior and E4 visible-binding exceptions as stated
 above; unknown attributes remain opaque. This namespace annotation does not
@@ -629,3 +629,37 @@ Against pushed **9aa746c4**, Vector has **0 gains / 0 withdrawals / 0 retargets*
 Required sequential checks pass: `npm ci --ignore-scripts`; full `npm test` with PYM_TLC_JAR (**2,081/2,081**); `format:check`; Rust tests (**555/555**). **75/75 mutations are killed**, with a passing final module-v13 baseline. The named-test mutation fails its new cfg(test) test; accepting the unsupported datetime fails its new edition-unverified test. Native controls record the exact named-list empty-output replacement as accepted for all three heads; the existing bare E4 counterexamples remain labelled known limits. Evidence: `evidence/w2-c/round13-*`; prior evidence remains intact.
 
 The full production indexer/store run also completes at the **default Node heap**, with module version 13: no analysis errors or resolution errors, the same eleven grammar-gap failures, and every stored link fact and symbol equal to the direct run (`round13-store.json`, `round13-equality.json`). No core edits or heap overrides.
+
+
+## Round 14 — one effective attribute reading
+
+Review round 12 B1 and the namespace extra are fixed. `applications()` is the shared cfg_attr/unsafe expander; `effectiveAttributes(item)` applies it to the item's outer/inner attributes. A payload participates unless its predicate, conjoined with the enclosing explicit conditions, is provably false. Named macro-use payloads populate a separate macro-name set. Crate names/aliases can shadow tool prefixes, but do not bind prelude attribute macros. Bare unknown exports retain E4; test/bench remain strict. Module version 14 refreshes cached parses.
+
+The parser now supplies effective, guarded namespace-attribute records to the resolver. The resolver no longer independently expands cfg_attr or unsafe wrappers. Macro-export visibility and module-path selection use the same effective reading; impossible path/export payloads are ignored and provably active paths are explicit. Captured source attribute strings on symbols remain unchanged for display.
+
+Literal attribute-name audit (all Rust module sources):
+
+| Read / consumer | Effective reading status |
+| --- | --- |
+| `macro_use`, extern-crate named and bare binding collection | **Now fixed:** effective applications; named names kept separately from crate aliases |
+| `macro_use`, resolver macro-import namespace annotation | **Now fixed:** parser's effective named records; deleted independent raw cfg_attr recursion |
+| `macro_export`, macro visibility | **Now fixed:** effective applications replace literal source regex |
+| `path`, module layout | **Now fixed:** effective applications replace independent cfg_attr recursion; guard implication distinguishes definite/possible paths |
+| `proc_macro`, `proc_macro_attribute`, `proc_macro_derive` | **Yes:** procMacro() consumes applications, preserving conditional macro-kind uncertainty and derive export names |
+| `derive`, local binding-type opacity | **Yes:** bindingAttributeOpaque() consumes applications |
+| `derive` and builtin/prelude/tool classification, item presence and shadowable contexts | **Yes:** opaquePresence()/shadowableOn() consume applications |
+| `derive`, resolver standard-derive namespace annotation and general attribute classification | **Yes:** consumes parser's effective guarded records; no raw wrapper expansion remains |
+| `test` / `bench`, implicit conditions | **Not a literal presence check:** the conditionalAttributes table feeds cfg()/implicitConditionsOn(); their recursive cfg_attr implication preserves the predicate rather than treating a conditional attribute as unconditional |
+| `cfg` / `cfg_attr`, explicit and inherited conditions | **Interpreter, not a binding check:** cfg() recursively encodes `predicate implies payload condition`; applications() uses those conditions to discard impossible payloads |
+| `cfg_attr` / `unsafe`, applications() | **The one effective reader:** unwraps nested payloads and carries guards |
+| `cfg_attr`, implicitConditionsOn() | **Condition interpreter:** records guarded implicit test/bench conditions, not a second binding-presence decision |
+| `not` / `all` / `any`, predicate parser | **Not attributes:** cfg predicate grammar only |
+| attributeRules name table / original `attributes` symbol strings | **Not presence tests:** classification data and captured source display; never literal wrapper-based binding proof |
+
+New regressions cover derive/global_allocator through true, unknown, nested and multi-name payloads; a false predicate with a definite control; child modules; bare and named test payloads; the extern-crate alias namespace control; effective macro_export/path/proc_macro_derive. Mutations restore literal-only macro-use/export tests and wrongly bind the crate alias as an attribute name.
+
+Required checks pass: `npm ci --ignore-scripts`; full `npm test` with PYM_TLC_JAR **2,101/2,101**; formatting; Rust tests **575/575**. The passing mutation baseline and **78/78 killed mutations** include the literal-only macro-use/export readers and wrong-namespace alias. Native controls: **38 accepted / 9 expected rejections**, covering the reported cfg_attr replacement route, nested/multi-name/unknown/bare/named/child cases, false and alias controls, and path/export behavior.
+
+Against pushed **7cff9c0b**, pinned whole Vector has **0 gains / 0 withdrawals / 0 retargets**: every one of **365,530 link facts** is unchanged (byte-identical snapshots), as are all **35,422 symbol facts**. Totals remain **67,191 resolved / 90 candidate sets / 298,249 unresolved**; **1,563 files: 1,552 clean / 11 failed**. The existing valid-Rust grammar gaps are unchanged. Namespace annotation metadata is normalized to effective guarded applications; no semantic graph fact changes. Evidence is retained under `evidence/w2-c/round14-*`; prior records are preserved.
+
+The full production store run completes at the **default Node heap**, with no analysis/resolution errors. Every stored link and symbol equals the direct run. Graph facts remain **300,720,139 serialized bytes**; effective attribute metadata raises the analysis-return size by **218,503 bytes** to **173,550,905** (no target-list growth). Old round12 size evidence is preserved, with this run recorded separately in round14-size-capped.json.

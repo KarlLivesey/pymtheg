@@ -1937,21 +1937,11 @@ export function resolveRust(
     "PartialOrd",
     "Hash",
   ]);
-  function importsMacroNames(raw: string): boolean {
-    const a = raw.replace(/^#!?\[|\]$/g, "").trim();
-    const name = a.match(/^[\w:]+/)?.[0] ?? "";
-    if (name === "macro_use") return true;
-    if (name !== "cfg_attr") return false;
-    const ps = splitArguments(
-      "<" + a.slice(a.indexOf("(") + 1, a.lastIndexOf(")")) + ">",
-    );
-    return !ps || ps.slice(1).some(importsMacroNames);
-  }
   const macroUseCrates = new Set<string>();
   for (const f of ctx.files)
     if (
-      ((data(f.result).opaqueAttributes ?? []) as { raw: string }[]).some((e) =>
-        importsMacroNames(e.raw),
+      ((data(f.result).opaqueAttributes ?? []) as { name: string }[]).some(
+        (e) => e.name === "macro_use",
       )
     )
       for (const loc of ownerPlace(f.path, ""))
@@ -1965,30 +1955,6 @@ export function resolveRust(
     if (!possible(conditions)) return false;
     const a = raw.replace(/^#!?\[|\]$/g, "").trim(),
       name = a.match(/^[\w:]+/)?.[0] ?? "";
-    if (name === "cfg_attr") {
-      const ps = splitArguments(
-        "<" + a.slice(a.indexOf("(") + 1, a.lastIndexOf(")")) + ">",
-      );
-      if (!ps?.[0]) return true;
-      const predicate = ps[0].replace(
-        /\s+(?=(?:[^"\n]*"[^"\n]*")*[^"\n]*$)/g,
-        "",
-      );
-      return (
-        possible([...conditions, predicate]) &&
-        ps
-          .slice(1)
-          .some((p) =>
-            opaqueAttribute(p, loc, scope, [...conditions, predicate]),
-          )
-      );
-    }
-    if (name === "unsafe") {
-      const ps = splitArguments(
-        "<" + a.slice(a.indexOf("(") + 1, a.lastIndexOf(")")) + ">",
-      );
-      return !ps || ps.some((p) => opaqueAttribute(p, loc, scope, conditions));
-    }
     let shadow = false;
     const rule = attributeRules.get(name.split("::")[0]!);
     if (rule && rule.category !== "builtin") {

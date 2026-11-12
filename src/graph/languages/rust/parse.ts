@@ -594,6 +594,10 @@ async function createHelper(): Promise<Helper> {
         attributeCache.set(n.id, result);
         return result;
       }
+      /** All attribute consumers share cfg_attr/unsafe expansion and viability. */
+      function effectiveAttributes(n: Node) {
+        return attributesOn(n).flatMap((a) => applications(meta(a), n));
+      }
       /** The one cfg collector for every item/site, including inherited gates. */
       function conditionsOn(n: Node): string[] {
         const cached = conditionCache.get(n.id);
@@ -660,22 +664,24 @@ async function createHelper(): Promise<Helper> {
           if (name) names.push(compact(name.text));
         }
         let macroUse = false;
+        const macroNames = new Set<string>();
         const macroUseImports: MacroUseImport[] = [];
         if (n.type === "extern_crate_declaration")
-          for (const a of attributesOn(n))
-            for (const app of applications(meta(a), n))
-              if (app.meta.name === "macro_use") {
-                macroUseImports.push({
-                  crate: compact(field(n, "name")?.text ?? ""),
-                  names: app.meta.args
-                    ? payloads(app.meta.args).map((x) => x.name)
-                    : null,
-                });
-                if (!app.meta.args) macroUse = true;
-                else
-                  for (const entry of payloads(app.meta.args))
-                    names.push(entry.name);
-              }
+          for (const app of effectiveAttributes(n))
+            if (app.meta.name === "macro_use") {
+              macroUseImports.push({
+                crate: compact(field(n, "name")?.text ?? ""),
+                names: app.meta.args
+                  ? payloads(app.meta.args).map((x) => x.name)
+                  : null,
+              });
+              if (!app.meta.args) macroUse = true;
+              else
+                for (const entry of payloads(app.meta.args)) {
+                  names.push(entry.name);
+                  macroNames.add(entry.name);
+                }
+            }
         const scope = bindingContainer(n),
           unknown =
             n.type === "macro_invocation" &&
@@ -699,8 +705,7 @@ async function createHelper(): Promise<Helper> {
               (attributeRules.get(name)?.category === "prelude" &&
                 (["use_declaration", "macro_definition"].includes(n.type) ||
                   (n.type === "extern_crate_declaration" &&
-                    names.includes(name) &&
-                    attributesOn(n).some((a) => meta(a).name === "macro_use"))))
+                    macroNames.has(name))))
             )
               v.names.add(name);
           v.unknown ||= unknown;
@@ -873,7 +878,7 @@ async function createHelper(): Promise<Helper> {
         ...attributeContext(tree.rootNode),
         opaqueItemAttributes: presenceAttributes(tree.rootNode),
       };
-      function modulePath(nodes: Node[]): {
+      function modulePath(n: Node): {
         path: string;
         paths: string[];
         pathExplicit: boolean;
@@ -883,11 +888,7 @@ async function createHelper(): Promise<Helper> {
         let path = "",
           pathExplicit = false,
           pathOpaque = false;
-        const read = (m: Meta, conditional = false): void => {
-          if (m.name === "cfg_attr" && m.args) {
-            for (const p of payloads(m.args).slice(1)) read(p, true);
-            return;
-          }
+        const read = (m: Meta, conditional: boolean): void => {
           if (m.name !== "path") return;
           if (!conditional) pathExplicit = true;
           let value: string | undefined;
@@ -910,7 +911,11 @@ async function createHelper(): Promise<Helper> {
           paths.push(value);
           if (!conditional) path = value;
         };
-        for (const n of nodes) read(meta(n));
+        for (const app of effectiveAttributes(n))
+          read(
+            app.meta,
+            app.guards.some((c) => !implies(explicitConditionsOn(n), c)),
+          );
         return { path, paths: [...new Set(paths)], pathExplicit, pathOpaque };
       }
       const argumentSyntaxCache = new Map<number, string>();
@@ -1532,8 +1537,8 @@ async function createHelper(): Promise<Helper> {
                   : {}),
                 visibility:
                   actualKind === "macro" &&
-                  attrs.some((a) =>
-                    /^#\[\s*macro_export(?:\s*\]|\s*\()/.test(a),
+                  effectiveAttributes(n).some(
+                    (a) => a.meta.name === "macro_export",
                   )
                     ? "pub"
                     : (n.namedChildren.find(
@@ -1557,7 +1562,7 @@ async function createHelper(): Promise<Helper> {
                 ...(n.type === "mod_item"
                   ? {
                       inline: !!field(n, "body"),
-                      ...modulePath(attributeNodes),
+                      ...modulePath(n),
                     }
                   : {}),
                 ...(n.type === "type_item"
@@ -1852,6 +1857,7 @@ async function createHelper(): Promise<Helper> {
       const opaqueAttributes: {
         scope: string;
         raw: string;
+        name: string;
         module: string;
         conditions: string[];
       }[] = [];
@@ -1872,15 +1878,17 @@ async function createHelper(): Promise<Helper> {
               n.type === "inner_attribute_item" ? item : item.parent,
             )
           )
-            opaqueAttributes.push({
-              scope: lexicalScopes.get(item.id) ?? "",
-              raw: n.text,
-              conditions: explicitConditionsOn(item),
-              module:
-                item.type === "mod_item"
-                  ? compact(field(item, "name")?.text ?? "")
-                  : "",
-            });
+            for (const app of applications(meta(n), item))
+              opaqueAttributes.push({
+                scope: lexicalScopes.get(item.id) ?? "",
+                name: app.meta.name,
+                raw: `#[${app.meta.name}${app.meta.args?.text ?? (app.meta.value ? "=" + app.meta.value.text : "")}]`,
+                conditions: app.guards,
+                module:
+                  item.type === "mod_item"
+                    ? compact(field(item, "name")?.text ?? "")
+                    : "",
+              });
         }
         for (const c of n.namedChildren) attributes(c);
       }
