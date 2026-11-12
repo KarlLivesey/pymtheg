@@ -328,3 +328,5 @@ From W2-B round 14. For the interface additions chunk: the core re-parses a fail
 Backlog from W2-D round 11: JavaScript early errors that the TypeScript compiler suppresses for JS files without `checkJs` (`let let = 1`, top-level `return`) leave the file clean although Node rejects it.
 
 Ruling for the no-toolchain modules (manager, W2-B round 15): links are required to be right for code that compiles. A definite link on an expression the language's type checker rejects is outside the contract; the modules are not type checkers. A wrong definite link in a program the compiler accepts is always blocking.
+
+Backlog from W2-B round 15 (for the sharpening chunk or the Go toolchain chunk): methods declared in valid files on a type from a failed file are over-failed (18 links on the broken restic variant; in any compiling program they can only be those methods); cross-package pointer-alias embedding and methods declared on a pointer-alias receiver stay unresolved though Go accepts them; three internal lookups still bypass the single scope lookup (no wrong output found); the grammar accepts `for i := 0; i < 3; i++` followed by a newline before `{`.
