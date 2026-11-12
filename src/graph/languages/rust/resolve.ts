@@ -897,7 +897,9 @@ export function resolveRust(
   }
   const activeMacroImports: GraphLink[] = [];
   type TextMacro = {
-    symbol: GraphSymbol;
+    symbol?: GraphSymbol;
+    conditions?: string[];
+    unseenReason?: string;
     file: string;
     scope: string;
     start: number;
@@ -938,40 +940,68 @@ export function resolveRust(
         )
         .flatMap((child) => importedText(child, seen)),
     ];
-    return entries.map((entry) => ({
-      symbol: {
-        ...entry.symbol,
-        data: {
-          ...data(entry.symbol),
-          macroPathCondition: `all(${[...conditionsFor(m), str(data(entry.symbol).macroPathCondition) || "all()", `any(${guards.map((cs) => `all(${cs.join(",")})`).join(",")})`].join(",")})`,
-        },
-      },
-      file: m.file,
-      scope: str(data(m).scope),
-      start: m.range.end,
-      order: [m.range.end, ...entry.order],
-    }));
+    const failedBodies = (modulePlaces.get(m.id) ?? []).filter((p) =>
+      failedFiles.has(p.file),
+    );
+    if (failedBodies.length)
+      entries.push({
+        file: m.file,
+        scope: str(data(m).scope),
+        start: m.range.end,
+        order: [Number.MAX_SAFE_INTEGER],
+        conditions: [],
+        unseenReason: failedBodies.some((p) => !internalFailures.has(p.file))
+          ? "failed-file-unseen-declarations"
+          : "parser-internal-error",
+      });
+    return entries.map((entry) => {
+      const condition = `all(${[...conditionsFor(m), ...(entry.conditions ?? []), entry.symbol ? str(data(entry.symbol).macroPathCondition) || "all()" : "all()", `any(${guards.map((cs) => `all(${cs.join(",")})`).join(",")})`].join(",")})`;
+      return {
+        ...(entry.symbol
+          ? {
+              symbol: {
+                ...entry.symbol,
+                data: { ...data(entry.symbol), macroPathCondition: condition },
+              },
+            }
+          : {
+              conditions: [condition],
+              unseenReason:
+                entry.unseenReason ?? "failed-file-unseen-declarations",
+            }),
+        file: m.file,
+        scope: str(data(m).scope),
+        start: m.range.end,
+        order: [m.range.end, ...entry.order],
+      };
+    });
   }
   for (const m of modules) textMacros.push(...importedText(m));
   const textMacrosByName = new Map<string, TextMacro[]>();
-  for (const entry of textMacros)
+  const unseenTextMacros = textMacros.filter((entry) => !entry.symbol);
+  for (const entry of textMacros) {
+    if (!entry.symbol) continue;
     textMacrosByName.set(entry.symbol.name, [
       ...(textMacrosByName.get(entry.symbol.name) ?? []),
       entry,
     ]);
+  }
   function textualMacro(
     name: string,
     site: GraphLink,
     loc: Place,
     scope: string,
   ): Found | null {
-    const entries = (textMacrosByName.get(name) ?? [])
+    const entries = [...(textMacrosByName.get(name) ?? []), ...unseenTextMacros]
       .filter(
         (e) =>
           e.file === site.file &&
           e.start <= site.range.start &&
           (!e.scope || e.scope === scope || scope.startsWith(e.scope + "::")) &&
-          possible([...(loc.conditions ?? []), ...conditionsFor(e.symbol)]),
+          possible([
+            ...(loc.conditions ?? []),
+            ...(e.symbol ? conditionsFor(e.symbol) : (e.conditions ?? [])),
+          ]),
       )
       .sort(
         (a, b) =>
@@ -980,13 +1010,30 @@ export function resolveRust(
           a.order.reduce((diff, v, i) => diff || (b.order[i] ?? 0) - v, 0),
       );
     const targets: GraphSymbol[] = [];
+    const unseen = new Set<string>();
     for (const entry of entries) {
+      if (!entry.symbol) {
+        unseen.add(entry.unseenReason ?? "failed-file-unseen-declarations");
+        continue;
+      }
       targets.push(entry.symbol);
       if (present(targets, loc)) break;
     }
-    return targets.length
-      ? conditional({ symbols: unique(targets), complete: true }, targets, loc)
-      : null;
+    if (!targets.length && !unseen.size) return null;
+    const found = conditional(
+      { symbols: unique(targets), complete: true },
+      targets,
+      loc,
+    );
+    return unseen.size
+      ? {
+          ...found,
+          complete: false,
+          reason: [
+            ...new Set([...(found.reason ? [found.reason] : []), ...unseen]),
+          ].join("; "),
+        }
+      : found;
   }
   function macroLookup(
     name: string,
