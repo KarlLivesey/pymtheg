@@ -1,3 +1,4 @@
+import { storagePath, storageDirectory } from "../storage/local.js";
 import { randomUUID } from "node:crypto";
 import {
   lstat,
@@ -18,7 +19,7 @@ import { loadConfig } from "./config.js";
 const missing = (error: unknown) =>
   (error as NodeJS.ErrnoException).code === "ENOENT";
 async function markerFile(root: string): Promise<string> {
-  const marker = resolve(root, identity.projectMarker),
+  const marker = storagePath(root, "marker"),
     folder = dirname(marker);
   try {
     const metadata = await lstat(folder);
@@ -105,7 +106,7 @@ async function createOnce(path: string, text: string): Promise<boolean> {
 }
 async function protectLocalStorage(root: string): Promise<string[]> {
   const filesCreated: string[] = [];
-  const storage = resolve(root, ".pymtheg-architecture");
+  const storage = storageDirectory(root, "marker", true);
   await mkdir(storage, { mode: 0o700 }).catch((error) => {
     if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
   });
@@ -117,10 +118,10 @@ async function protectLocalStorage(root: string): Promise<string[]> {
   if (
     await createOnce(
       resolve(storage, ".gitignore"),
-      "# Local database and recovery state. Share exported architecture history instead.\n*\n!.gitignore\n",
+      "# Local databases and rebuildable state. Share exported history.\nshared/\nrebuildable/\n",
     )
   )
-    filesCreated.push(".pymtheg-architecture/.gitignore");
+    filesCreated.push(".pymtheg/.gitignore");
   return filesCreated;
 }
 export async function initializeWorkspace(input: string, name?: string) {
@@ -158,7 +159,7 @@ export async function initializeWorkspace(input: string, name?: string) {
   filesCreated.push(...(await protectLocalStorage(root)));
   if (
     await createOnce(
-      resolve(root, identity.projectConfig),
+      storagePath(root, "settings", true),
       json({ version: 1, scenarios: {} }),
     )
   )

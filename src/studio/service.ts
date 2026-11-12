@@ -1,3 +1,4 @@
+import { storagePath } from "../storage/local.js";
 import { errorMessage } from "../shared/error-message.js";
 import { decodeObservation } from "../implementation/storage.js";
 import { implementationDesignPlans } from "../implementation/design-attention.js";
@@ -926,12 +927,7 @@ export class StudioService {
     if (create)
       return (this.architectureStore ??= ArchitectureStore.open(this.root));
     if (this.architectureStore) return this.architectureStore;
-    if (
-      !existsSync(
-        resolve(this.root, ".pymtheg-architecture", "architecture.sqlite"),
-      )
-    )
-      return null;
+    if (!existsSync(storagePath(this.root, "planning"))) return null;
     if (this.architectureReader) {
       const reader = await this.architectureReader;
       if (await reader.snapshotChanged()) {
@@ -3225,9 +3221,7 @@ export class StudioService {
       workspace: await readWorkspace(this.root),
       root: this.root,
       outputTargets: this.outputRegistry.targets(),
-      architectureAvailable: existsSync(
-        resolve(this.root, ".pymtheg-architecture", "architecture.sqlite"),
-      ),
+      architectureAvailable: existsSync(storagePath(this.root, "planning")),
       agentConnection: {
         command: process.execPath,
         args: [
@@ -3330,7 +3324,7 @@ export class StudioService {
         scenarios: { ...current.config.scenarios, [name.trim()]: selected },
       };
       const text = json(config);
-      await atomicWrite(resolve(this.root, identity.projectConfig), text);
+      await atomicWrite(storagePath(this.root, "settings", true), text);
       output = { config, hash: hash(text) };
     });
     this.saveQueue = task.catch(() => {});

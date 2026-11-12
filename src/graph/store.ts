@@ -1,4 +1,5 @@
-import { DatabaseSync } from "node:sqlite";
+import type { DatabaseSync } from "node:sqlite";
+import { openDatabase } from "../storage/local.js";
 import { randomUUID } from "node:crypto";
 import { compare, fileFacts, validateResult } from "./identity.js";
 import { LinkDecider, resolutionFacts } from "./analysis.js";
@@ -35,7 +36,7 @@ export class SqliteGraphStore implements GraphStorage {
     return structuredClone(file);
   }
   constructor(path: string, projectId?: string) {
-    this.db = new DatabaseSync(path);
+    this.db = openDatabase(path);
     try {
       this.db.exec(`PRAGMA foreign_keys=ON;
         CREATE TABLE IF NOT EXISTS graph_meta(key TEXT PRIMARY KEY,value TEXT NOT NULL);`);

@@ -1,3 +1,8 @@
+import {
+  storageDirectory,
+  storagePath,
+  openDatabase,
+} from "../storage/local.js";
 import { readRecipeFormDraft, type RecipeFormDraft } from "./recipes.js";
 import {
   mkdir,
@@ -106,10 +111,11 @@ export class RecoveryConflict extends Error {
 export class RecoveryStore {
   private constructor(
     private db: Database,
+    private runsDb: Database,
     private validateReport: (value: unknown) => boolean,
   ) {}
   static async openOrCreate(root: string): Promise<RecoveryStore> {
-    const directory = resolve(root, ".pymtheg-studio");
+    const directory = storageDirectory(root, "drafts", true);
     try {
       await mkdir(directory, { mode: 0o700 });
     } catch (e) {
@@ -129,7 +135,7 @@ export class RecoveryStore {
     if (!(await stat(directory)).isDirectory())
       throw Error("Recovery path is not a directory");
     await chmod(directory, 0o700);
-    const file = resolve(directory, "workspace.sqlite");
+    const file = storagePath(root, "drafts");
     try {
       const info = await lstat(file);
       if (!info.isFile() || info.isSymbolicLink())
@@ -148,8 +154,8 @@ export class RecoveryStore {
       }
     }
     await atomicWrite(resolve(directory, ".gitignore"), "*\n");
-    const { DatabaseSync } = await import("node:sqlite");
-    const db = new DatabaseSync(file);
+    const db = openDatabase(file);
+    let runsDb: Database | undefined;
     try {
       const version = db.prepare("PRAGMA user_version").get()?.user_version;
       if (version !== 0 && version !== 1)
@@ -158,9 +164,14 @@ export class RecoveryStore {
         "PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=0;",
       );
       db.exec(
-        "CREATE TABLE IF NOT EXISTS workspace (id INTEGER PRIMARY KEY CHECK(id=1), revision INTEGER NOT NULL, payload TEXT NOT NULL); CREATE TABLE IF NOT EXISTS history (sequence INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL UNIQUE, payload TEXT NOT NULL); PRAGMA user_version=1;",
+        "CREATE TABLE IF NOT EXISTS workspace (id INTEGER PRIMARY KEY CHECK(id=1), revision INTEGER NOT NULL, payload TEXT NOT NULL); PRAGMA user_version=1;",
       );
       await chmod(file, 0o600);
+      runsDb = openDatabase(storagePath(root, "runs", true));
+      runsDb.exec(
+        "CREATE TABLE IF NOT EXISTS history (sequence INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL UNIQUE, payload TEXT NOT NULL)",
+      );
+      await chmod(storagePath(root, "runs"), 0o600);
       const schema = JSON.parse(
         await readFile(
           fileURLToPath(
@@ -170,8 +181,9 @@ export class RecoveryStore {
         ),
       ) as object;
       const validate = new Ajv({ strict: true }).compile(schema);
-      return new RecoveryStore(db, validate);
+      return new RecoveryStore(db, runsDb, validate);
     } catch (e) {
+      runsDb?.close();
       db.close();
       throw e;
     }
@@ -230,24 +242,24 @@ export class RecoveryStore {
       throw Error(
         "Run is too large for automatic history. Export its report to keep it.",
       );
-    this.db.exec("BEGIN IMMEDIATE");
+    this.runsDb.exec("BEGIN IMMEDIATE");
     try {
-      this.db
+      this.runsDb
         .prepare(
           "INSERT INTO history(id,payload) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload",
         )
         .run(run.id, payload);
-      this.db.exec(
+      this.runsDb.exec(
         "DELETE FROM history WHERE sequence NOT IN (SELECT sequence FROM history ORDER BY sequence DESC LIMIT 3)",
       );
-      this.db.exec("COMMIT");
+      this.runsDb.exec("COMMIT");
     } catch (e) {
-      this.db.exec("ROLLBACK");
+      this.runsDb.exec("ROLLBACK");
       throw e;
     }
   }
   runs(): StudioRun[] {
-    return this.db
+    return this.runsDb
       .prepare("SELECT payload FROM history ORDER BY sequence DESC LIMIT 3")
       .all()
       .map((row) => {
@@ -324,6 +336,7 @@ export class RecoveryStore {
       });
   }
   close() {
+    this.runsDb.close();
     this.db.close();
   }
 }

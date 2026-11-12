@@ -1,3 +1,4 @@
+import { storagePath } from "../storage/local.js";
 import { readFile, realpath, stat } from "node:fs/promises";
 import { resolve, dirname, relative, sep } from "node:path";
 import { projectConfig, type ProjectConfig } from "../shared/config.js";
@@ -6,7 +7,7 @@ export async function loadConfig(
   root: string,
 ): Promise<{ config: ProjectConfig; hash: string | null }> {
   try {
-    const file = await realpath(resolve(root, identity.projectConfig));
+    const file = await realpath(storagePath(root, "settings"));
     const child = relative(await realpath(root), file);
     if (child === ".." || child.startsWith(".." + sep))
       throw Error("Project configuration is outside the project root");
