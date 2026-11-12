@@ -52,6 +52,7 @@ interface Place {
   shadowableAttributes?: AttributeOrigin[];
   attributeGates?: AttributeGate[];
   noImplicitPrelude?: boolean;
+  directoryUnverified?: boolean;
 }
 interface Found {
   symbols: GraphSymbol[];
@@ -555,10 +556,39 @@ export function resolveRust(
           conditions = [...conditions, gate.condition];
     if (data(s).macroPathCondition)
       conditions = [...conditions, str(data(s).macroPathCondition)];
+    // One presence condition covers every semantic route, including textual
+    // macro transfer and crate-root macro exports from guessed module files.
+    if (
+      attributeContextReady &&
+      !conditions.includes("?module-layout") &&
+      ownerPlace(s.file, str(data(s).scope)).some(
+        (loc) => loc.directoryUnverified,
+      )
+    )
+      conditions = [...conditions, "?module-layout"];
     return contextOf(s)?.implicit.length
       ? [...new Set(conditions)].sort()
       : conditions;
   };
+  // Captured paths are lexical hints, never evidence about symlinks or
+  // rustc's special directory tracking for inner/inline path attributes.
+  function plainModulePath(value: string): boolean {
+    return (
+      !!value &&
+      !value.includes("\\") &&
+      !/^(?:\/|[A-Za-z]:)/.test(value) &&
+      value.split("/").every((part) => !!part && part !== "." && part !== "..")
+    );
+  }
+  function hintedFiles(names: string[]): string[] {
+    const wanted = new Set(names);
+    return [...files.keys()].filter(
+      (file) =>
+        wanted.has(p.basename(file)) ||
+        (p.basename(file) === "mod.rs" &&
+          wanted.has(p.basename(p.dirname(file)) + ".rs")),
+    );
+  }
   function moduleDirectories(
     layout: Data,
     defaults: string[],
@@ -568,10 +598,12 @@ export function resolveRust(
     const paths = (layout.paths ?? []) as string[];
     if (!paths.length && !layout.pathOpaque)
       return { directories: defaults, uncertain: false };
+    // These newly supported shapes lack a complete rustc directory model.
+    // Keep locations only as hints; descendants also search captured filenames.
     return {
       directories: [
         ...new Set([
-          ...(layout.pathExplicit && !layout.pathOpaque ? [] : defaults),
+          ...defaults,
           ...paths.map((value) =>
             inline
               ? p.normalize(p.join(base, value))
@@ -579,8 +611,7 @@ export function resolveRust(
           ),
         ]),
       ],
-      uncertain:
-        !!layout.pathOpaque || (!layout.pathExplicit && paths.length > 0),
+      uncertain: true,
     };
   }
   function walk(place: Place, ancestors: Set<string>) {
@@ -609,6 +640,8 @@ export function resolveRust(
             scope,
             local,
             directory,
+            directoryUnverified:
+              !!place.directoryUnverified || layout.uncertain,
             noImplicitPrelude:
               !!place.noImplicitPrelude || !!data(s).noImplicitPrelude,
             parent: place,
@@ -631,6 +664,12 @@ export function resolveRust(
           });
       } else {
         const path = str(data(s).path);
+        const pathValues = (data(s).paths ?? []) as string[];
+        const pathUnverified =
+          !!data(s).pathOpaque ||
+          pathValues.some((value) => !plainModulePath(value));
+        const locationUnverified =
+          !!place.directoryUnverified || pathUnverified;
         const pathTargets = new Set(
           ((data(s).paths ?? []) as string[]).map((path) =>
             p.normalize(
@@ -649,9 +688,18 @@ export function resolveRust(
           ...new Set([
             ...(data(s).pathExplicit || path ? [] : ordinary),
             ...pathTargets,
+            ...(locationUnverified
+              ? hintedFiles(
+                  pathValues.length
+                    ? pathValues.map((value) =>
+                        p.basename(value.replaceAll("\\", "/")),
+                      )
+                    : [s.name + ".rs"],
+                )
+              : []),
           ]),
         ];
-        if (data(s).pathOpaque) moduleIncomplete.add(s.id);
+        if (locationUnverified) moduleIncomplete.add(s.id);
         if (
           pathTargets.size &&
           ([...pathTargets].some((f) => !files.has(f)) ||
@@ -682,6 +730,7 @@ export function resolveRust(
         );
         for (const file of targets) {
           const directories = new Set<string>();
+          if (locationUnverified) directories.add(p.dirname(file));
           if (pathTargets.has(file)) directories.add(p.dirname(file));
           if (!data(s).pathExplicit && !path && ordinary.includes(file))
             directories.add(
@@ -689,8 +738,12 @@ export function resolveRust(
                 ? p.dirname(file)
                 : p.join(p.dirname(file), p.basename(file, ".rs")),
             );
-          const innerLayout = (data(units.get(file) ?? {}).innerModulePath ??
-            {}) as Data;
+          // An unconditional outer path is first and makes the inner path unused.
+          const innerLayout = (
+            data(s).pathExplicit && path
+              ? {}
+              : (data(units.get(file) ?? {}).innerModulePath ?? {})
+          ) as Data;
           const layout = moduleDirectories(
             innerLayout,
             [...directories],
@@ -736,6 +789,7 @@ export function resolveRust(
                 moduleIncomplete.has(s.id) ||
                 layout.uncertain,
               directory,
+              directoryUnverified: locationUnverified || layout.uncertain,
             });
         }
       }
@@ -828,7 +882,7 @@ export function resolveRust(
   const failedByScope = new Map<string, string[]>(),
     failedByCrate = new Map<string, string[]>();
   for (const loc of places)
-    if (failedFiles.has(loc.file)) {
+    if (failedFiles.has(loc.file) && !loc.directoryUnverified) {
       const key = `${loc.crate.root}|${loc.scope}`;
       failedByScope.set(
         key,
@@ -989,7 +1043,7 @@ export function resolveRust(
           ? []
           : ((data(units.get(body.file) ?? {}).macroUseConditions ??
               []) as string[][])),
-        ...(failed ? [[]] : []),
+        ...(failed || body.directoryUnverified ? [[]] : []),
       ];
       // A failed file's leading inner attributes cannot prove absence of macro_use.
       if (!guards.length) continue;
@@ -1005,19 +1059,21 @@ export function resolveRust(
           )
           .flatMap((child) => importedText(child, seen)),
       ];
-      if (failed)
+      if (failed || body.directoryUnverified)
         entries.push({
           file: m.file,
           scope: str(data(m).scope),
           start: m.range.end,
           order: [Number.MAX_SAFE_INTEGER],
           conditions: [],
-          unseenReason: internalFailures.has(body.file)
-            ? "parser-internal-error"
-            : "failed-file-unseen-declarations",
+          unseenReason: body.directoryUnverified
+            ? "module-layout-unverified"
+            : internalFailures.has(body.file)
+              ? "parser-internal-error"
+              : "failed-file-unseen-declarations",
         });
       for (const entry of entries) {
-        const condition = `all(${[...conditionsFor(m), ...(body.conditions ?? []), ...(entry.conditions ?? []), entry.symbol ? str(data(entry.symbol).macroPathCondition) || "all()" : "all()", `any(${guards.map((cs) => `all(${cs.join(",")})`).join(",")})`].join(",")})`;
+        const condition = `all(${[...conditionsFor(m), ...(entry.conditions ?? []), entry.symbol ? str(data(entry.symbol).macroPathCondition) || "all()" : "all()", `any(${guards.map((cs) => `all(${cs.join(",")})`).join(",")})`].join(",")})`;
         result.push({
           ...(entry.symbol
             ? {
@@ -1235,7 +1291,7 @@ export function resolveRust(
         ? [roots.get(s.file)!].filter(Boolean)
         : (modulePlaces.get(s.id) ?? []);
       const failed = destinations
-        .filter((p) => failedFiles.has(p.file))
+        .filter((p) => failedFiles.has(p.file) && !p.directoryUnverified)
         .map((p) => p.file);
       if (failed.length) return broken(failed);
       if (!rest.length)
@@ -1246,23 +1302,29 @@ export function resolveRust(
       const found = destinations.length
         ? merge(
             destinations.map((dest) =>
-              find(
-                rest.join("::"),
-                {
-                  ...dest,
-                  conditions: [
-                    ...(dest.conditions ?? []),
-                    ...(accessFrom?.crate.root === dest.crate.root
-                      ? (accessFrom.conditions ?? [])
-                      : []),
-                  ],
-                },
-                dest.local,
-                ns,
-                seen,
-                allowGlobs,
-                accessFrom,
-              ),
+              dest.directoryUnverified && failedFiles.has(dest.file)
+                ? {
+                    symbols: [],
+                    complete: false,
+                    reason: "module-layout-unverified",
+                  }
+                : find(
+                    rest.join("::"),
+                    {
+                      ...dest,
+                      conditions: [
+                        ...(dest.conditions ?? []),
+                        ...(accessFrom?.crate.root === dest.crate.root
+                          ? (accessFrom.conditions ?? [])
+                          : []),
+                      ],
+                    },
+                    dest.local,
+                    ns,
+                    seen,
+                    allowGlobs,
+                    accessFrom,
+                  ),
             ),
           )
         : empty(false);
@@ -3021,7 +3083,7 @@ export function resolveRust(
     else if (l.kind === "modules") {
       const s = byLocalKey.get(`${l.file}|${str(d.key)}`);
       const failed = (s ? (modulePlaces.get(s.id) ?? []) : [])
-        .filter((p) => failedFiles.has(p.file))
+        .filter((p) => failedFiles.has(p.file) && !p.directoryUnverified)
         .map((p) => p.file);
       found = failed.length
         ? broken(failed)

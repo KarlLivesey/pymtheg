@@ -203,13 +203,16 @@ for (const path of ["alternate.rs", "custom/alternate.rs"])
       "src/child/nested.rs": "pub fn picked()->u8{1}",
       [target]: "pub fn picked()->u8{2}",
     });
-    g.one("child::value", "value");
-    g.one("child::nested::picked", "picked");
+    g.unverified("child::value", "value");
+    g.unverified("child::nested::picked", "picked");
     const l = g.links.find(
       (l) => l.kind === "calls" && l.targetName === "child::nested::picked",
     );
-    const d = g.decisions.find((d) => d.linkId === l.id);
-    assert.equal(g.symbols.find((s) => s.id === d.targetId).file, target);
+    assert.ok(
+      l.data.targets.some(
+        (id) => g.symbols.find((s) => s.id === id).file === target,
+      ),
+    );
   });
 test("inline inner path uses a directory prefix", async () => {
   const g = await graph({
@@ -218,14 +221,15 @@ test("inline inner path uses a directory prefix", async () => {
     "src/custom/nested.rs": "pub fn picked()->u8{2}",
     "src/child/nested.rs": "pub fn picked()->u8{1}",
   });
-  g.one("child::nested::picked", "picked");
+  g.unverified("child::nested::picked", "picked");
   const l = g.links.find(
     (l) => l.kind === "calls" && l.targetName === "child::nested::picked",
   );
-  const d = g.decisions.find((d) => d.linkId === l.id);
-  assert.equal(
-    g.symbols.find((s) => s.id === d.targetId).file,
-    "src/custom/nested.rs",
+  assert.ok(
+    l.data.targets.some(
+      (id) =>
+        g.symbols.find((s) => s.id === id).file === "src/custom/nested.rs",
+    ),
   );
 });
 test("inner opaque attribute marks module and contents unverified", async () => {

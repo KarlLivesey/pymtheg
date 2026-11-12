@@ -154,7 +154,7 @@ test("review 4: modules inside functions form module scope barriers", async () =
   g.one("crate::drop", "drop");
   g.one("super::drop", "drop");
 });
-test("review 5: path-loaded files have sibling child modules", async () => {
+test("review 5: parent-component path retains sibling child hints without proof", async () => {
   for (const wrong of [false, true]) {
     const g = await graph({
       "src/lib.rs": '#[path="../extra/p.rs"] mod p; fn run(){p::child::f();}',
@@ -162,8 +162,10 @@ test("review 5: path-loaded files have sibling child modules", async () => {
       "extra/child.rs": "pub fn f(){}",
       ...(wrong ? { "extra/p/child.rs": "pub fn wrong(){}" } : {}),
     });
-    g.one("p::child::f", "f");
-    assert.equal(g.targets("p::child::f")[0][0].file, "extra/child.rs");
+    g.unverified("p::child::f", "f");
+    assert.ok(
+      g.would("p::child::f")[0].some((s) => s.file === "extra/child.rs"),
+    );
   }
 });
 test("review 6: library target names and explicit Cargo renames", async () => {

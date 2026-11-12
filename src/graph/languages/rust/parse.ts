@@ -906,10 +906,11 @@ async function createHelper(): Promise<Helper> {
         const paths: string[] = [];
         let path = "",
           pathExplicit = false,
-          pathOpaque = false;
+          pathOpaque = false,
+          firstCertainPath = false;
         const read = (m: Meta, conditional: boolean): void => {
-          if (m.name !== "path") return;
-          if (!conditional) pathExplicit = true;
+          if (m.name !== "path" || firstCertainPath) return;
+          if (!conditional) firstCertainPath = true;
           let value: string | undefined;
           if (m.value?.type === "raw_string_literal")
             value =
@@ -920,15 +921,17 @@ async function createHelper(): Promise<Helper> {
               value = JSON.parse(m.value.text) as string;
             } catch {}
           }
-          if (
-            value === undefined ||
-            /^(?:\/|[A-Za-z]:[\\\/]|\\\\)/.test(value)
-          ) {
+          if (value === undefined) {
             pathOpaque = true;
             return;
           }
           paths.push(value);
-          if (!conditional) path = value;
+          if (!conditional) {
+            if (paths.length === 1 && !pathOpaque) {
+              path = value;
+              pathExplicit = true;
+            } else pathOpaque = true;
+          }
         };
         for (const app of effectiveAttributes(n))
           read(

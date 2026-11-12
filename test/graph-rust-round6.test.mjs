@@ -619,14 +619,14 @@ test("macro_use can shadow standard derive spellings and generate lexical items"
   }
 });
 
-test("absolute module paths cannot be guessed from similarly named relative files", async () => {
+test("absolute module paths retain only unverified similarly named file hints", async () => {
   const g = await graph({
     "src/lib.rs": '#[path="/else.rs"]mod m;fn r(){m::f();}',
     "src/else.rs": "pub fn f(){}",
   });
   g.unknown("m", "modules");
   g.unknown("m::f");
-  assert.equal(g.would("m::f")[0].length, 0);
+  assert.equal(g.would("m::f")[0][0].file, "src/else.rs");
 });
 
 test("cfg_attr loading the same filename retains ordinary and path child directories", async () => {

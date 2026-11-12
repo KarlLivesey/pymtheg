@@ -1,0 +1,36 @@
+[
+  {
+    "name": "unknown-path-textual-macro",
+    "files": {
+      "src/main.rs": "macro_rules! m{()=>{1u8}}#[macro_use]#[path=\"a/../b.rs\"]mod child;fn proof()->u16{m!()}fn main(){print!(\"{}\",proof());}",
+      "src/a/keep.rs": "",
+      "src/b.rs": "macro_rules! m{()=>{73u16}}",
+      "b.rs": "macro_rules! m{()=>{19u8}}"
+    },
+    "macro": "m",
+    "target": "src/b.rs"
+  },
+  {
+    "name": "unknown-path-exported-macro",
+    "files": {
+      "src/main.rs": "#[path=\"a/../b.rs\"]mod child;fn proof()->u16{crate::m!()}fn main(){print!(\"{}\",proof());}",
+      "src/a/keep.rs": "",
+      "src/b.rs": "#[macro_export]macro_rules! m{()=>{73u16}}",
+      "b.rs": "#[macro_export]macro_rules! m{()=>{19u8}}"
+    },
+    "macro": "crate::m",
+    "target": "src/b.rs"
+  },
+  {
+    "name": "unknown-path-empty-textual-macro",
+    "files": {
+      "src/main.rs": "macro_rules! m{()=>{1u8}}#[macro_use]#[path=\"a/../b.rs\"]mod child;fn proof()->u16{m!() as u16}fn main(){print!(\"{}\",proof());}",
+      "src/a/keep.rs": "",
+      "src/b.rs": "",
+      "b.rs": ""
+    },
+    "macro": "m",
+    "target": "src/main.rs",
+    "answer": "1"
+  }
+]
