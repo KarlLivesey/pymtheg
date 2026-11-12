@@ -3365,7 +3365,7 @@ test("meaningless heritage grammar is a syntax error: the file fails", async () 
       const diagnostics = graph.store.getFile("c.ts").result.diagnostics;
       assert.match(
         diagnostics[0].message,
-        /^Syntax error at line 2, column 16: Invalid heritage clauses/,
+        /^Syntax error at line 2, column 27: Classes can only extend a single class\. Found: "B"\.$/,
       );
       failedLink(callOn(graph, "use.ts", "// c", "C"), { file: "c.ts" }, "C");
     },
@@ -3382,12 +3382,479 @@ test("a failed file edited but still failing is analysed again when it changes w
     },
     async (graph) => {
       failedLink(callOn(graph, "use.js", "// g", "g"), { file: "a.js" }, "g");
-      // Still broken, but now a module: it declares no globals.
-      await graph.write("a.js", "export function g() {}\nvar x = (;\n");
+      // Still broken, but now a module that does not mention `g`: it can
+      // declare no global, and no unseen declaration could be named `g`.
+      await graph.write("a.js", "export function h() {}\nvar x = (;\n");
       await graph.reindex();
       const call = callOn(graph, "use.js", "// g", "g");
       assert.equal(call.data.reason, "no-symbol");
       assert.equal(call.data.cause, undefined);
     },
+  );
+});
+
+// ----- Round 12: a failure passes through every lookup that depends on it -----
+
+/** Indexes files in a scratch project: links keyed by site, targets by identity. */
+async function indexFiles(files) {
+  const scratch = await mkdtemp(join(tmpdir(), "pymtheg-graph-ts-diff-"));
+  const root = join(scratch, "project");
+  const store = new SqliteGraphStore(join(scratch, "graph.sqlite"), "diff");
+  try {
+    for (const [path, text] of Object.entries(files)) {
+      await mkdir(dirname(join(root, path)), { recursive: true });
+      await writeFile(join(root, path), text);
+    }
+    const report = await indexProject(root, registry(), store);
+    const symbols = new Map(
+      store.findSymbols().map((s) => [s.id, `${s.file}#${s.identity}`]),
+    );
+    const texts = new Map(store.files().map((f) => [f.path, f.text]));
+    const links = new Map();
+    for (const l of store.links()) {
+      let key = `${l.file}\0${l.kind}\0${l.range.start}\0${l.range.end}`;
+      while (links.has(key)) key += "+";
+      const text = texts.get(l.file);
+      const lineStart = text.lastIndexOf("\n", l.range.start - 1) + 1;
+      const lineEnd = text.indexOf("\n", l.range.start);
+      links.set(key, {
+        file: l.file,
+        kind: l.kind,
+        line: text.slice(lineStart, lineEnd < 0 ? undefined : lineEnd),
+        text: text.slice(l.range.start, l.range.end),
+        resolution: l.resolution,
+        reason: l.data?.reason,
+        cause: l.data?.cause,
+        assumes: l.data?.assumes,
+        targets:
+          l.resolution === "resolved"
+            ? [symbols.get(l.targetId)]
+            : l.resolution === "ambiguous"
+              ? l.candidates.map((c) => symbols.get(c.id)).sort()
+              : (l.data?.targets ?? []).map((t) => `${t.file}#${t.key}`),
+        targetFiles:
+          l.resolution === "resolved"
+            ? [symbols.get(l.targetId).split("#")[0]]
+            : l.resolution === "ambiguous"
+              ? l.candidates.map((c) => symbols.get(c.id).split("#")[0])
+              : (l.data?.targets ?? []).map((t) => t.file),
+      });
+    }
+    return { report, links };
+  } finally {
+    store.close();
+    await rm(scratch, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Indexes `files` clean and with `broken` replacing some of them. Every link
+ * of a valid file is then identical (maybe plus the flag) or `invalid-code`
+ * naming a broken file; never another target or another non-failed reason;
+ * and a link whose clean target is in a broken file fails, naming it.
+ */
+async function differential(files, broken) {
+  const clean = await indexFiles(files);
+  const bad = await indexFiles({ ...files, ...broken });
+  const brokenPaths = new Set(Object.keys(broken));
+  for (const path of brokenPaths)
+    assert.ok(bad.report.failed.includes(path), `${path} fails`);
+  const counts = {
+    failed: 0,
+    flagged: 0,
+    unflagged: 0,
+    changedTarget: 0,
+    changedReason: 0,
+  };
+  const problems = [];
+  const causeFiles = (cause) =>
+    cause?.file ? [cause.file] : (cause?.files ?? []);
+  for (const [key, c] of clean.links) {
+    if (brokenPaths.has(c.file)) continue;
+    const b = bad.links.get(key);
+    assert.ok(b, `link ${key} exists in both`);
+    const intoBroken = c.targetFiles.filter((f) => brokenPaths.has(f));
+    if (b.reason === "invalid-code") {
+      counts.failed++;
+      const causes = causeFiles(b.cause);
+      if (!causes.length || causes.some((f) => !brokenPaths.has(f)))
+        problems.push(`${key}: failed with cause ${JSON.stringify(b.cause)}`);
+      if (b.targets.length) problems.push(`${key}: failed but names targets`);
+      for (const f of intoBroken)
+        if (!causes.includes(f)) problems.push(`${key}: cause lacks ${f}`);
+      continue;
+    }
+    if (intoBroken.length)
+      problems.push(
+        `${key} (${c.text}): clean target in ${intoBroken} but broken is ${b.resolution} ${b.reason}`,
+      );
+    if (JSON.stringify(c.targets) !== JSON.stringify(b.targets)) {
+      counts.changedTarget++;
+      problems.push(`${key} (${c.text}): target ${c.targets} -> ${b.targets}`);
+    } else if (c.reason !== b.reason) {
+      counts.changedReason++;
+      problems.push(`${key} (${c.text}): reason ${c.reason} -> ${b.reason}`);
+    } else if (b.assumes?.includes("no-unseen-declarations")) counts.flagged++;
+    else counts.unflagged++;
+  }
+  return { counts, problems, clean, bad };
+}
+
+/** The single link with text `at` on the line containing `marker` in `file`. */
+function linkAt(result, file, marker, at, kind = "calls") {
+  const found = [...result.links.values()].filter(
+    (l) =>
+      l.file === file &&
+      l.kind === kind &&
+      l.text === at &&
+      l.line.includes(marker),
+  );
+  assert.equal(found.length, 1, `one ${kind} ${at} on ${marker} in ${file}`);
+  return found[0];
+}
+const isFailed = (link, cause, what) => {
+  assert.equal(
+    link.reason,
+    "invalid-code",
+    `${what}: ${link.resolution} ${link.reason}`,
+  );
+  assert.deepEqual(link.targets, [], `${what}: no targets`);
+  assert.deepEqual(link.cause, cause, `${what}: cause`);
+};
+const isResolved = (link, target, what) => {
+  assert.equal(link.resolution, "resolved", `${what}: ${link.reason}`);
+  assert.deepEqual(link.targets, [target], what);
+};
+
+const TAINT_FILES = {
+  "tsconfig.json":
+    '{ "compilerOptions": { "allowJs": true, "jsx": "preserve", "strict": true } }\n',
+  "bad.ts": [
+    "export class Base { m() {} static s() {} }",
+    "export interface BaseI { m(): void }",
+    "export const holder = { inner() {} };",
+    "export function Widget() { return null; }",
+    "",
+  ].join("\n"),
+  "oo.ts":
+    "export interface OtherI { m(): void; n(): void }\nexport class OtherC { m() {} }\n",
+  "bad2.ts": "export interface X { m(): void; }\n",
+  "bad.cts": "function x() {}\nexport = x;\n",
+  "barrel.cts": 'import x = require("./bad.cjs");\nexport = x;\n',
+  "use.cts": 'import x = require("./barrel.cjs");\nx(); // 2b\n',
+  "badc.cjs": "exports.x = function () {};\n",
+  "barrelc.cjs": 'module.exports = require("./badc.cjs");\n',
+  "usec.cjs": 'const b = require("./barrelc.cjs");\nb.x(); // 2c\n',
+  "bad3.ts": "export function x3() {}\nexport type T3 = number;\n",
+  "barrel3.ts":
+    'export { x3 } from "./bad3"; // 3\nexport type { T3 } from "./bad3"; // 3t\n',
+  "job.ts":
+    "export class Job { getState() {} other() {} }\nexport function helper() {}\n",
+  "queue.ts":
+    'import { Job } from "./job";\nexport class Queue { add(): Job { return null as any; } }\n',
+  "broken.js": "exports.x = function () {};\n",
+  "eqmid.ts": 'import b = require("./broken.js");\nexport = b;\n',
+  "useeq.ts": 'import m = require("./eqmid.js");\nm.x(); // eq\n',
+  "gns.ts": "namespace N { export function a() {} }\n",
+  "dg.ts": "export {};\ndeclare global { function globalThing(): void; }\n",
+  "a2.ts": 'import { Base } from "./bad";\nexport class A2 extends Base {}\n',
+  "b2.ts": 'import { A2 } from "./a2";\nexport class B2 extends A2 {}\n',
+  "d.ts": 'import { Base } from "./bad";\nexport default new Base();\n',
+  "comp.tsx":
+    'import { Widget } from "./bad";\nexport const el = <Widget />; // jsx\n',
+  "use2.ts": [
+    'import type { X } from "./bad2";',
+    "type Y = X;",
+    "declare let x: Y;",
+    "x.m(); // 2a",
+    "",
+  ].join("\n"),
+  "usej.ts": [
+    'import { Queue } from "./queue";',
+    "export async function run() {",
+    "  const j = new Queue().add();",
+    "  j.getState(); // job-state",
+    '  const m = await import("./job");',
+    "  m.helper(); // dynamic",
+    "}",
+    "",
+  ].join("\n"),
+  "use.ts": [
+    'import { Base, BaseI } from "./bad";',
+    'import * as ns from "./bad";',
+    'import { OtherI, OtherC } from "./oo";',
+    'import { B2 } from "./b2";',
+    'import dflt from "./d";',
+    "class Other { m() {} }",
+    "interface Derived extends Other {}",
+    "class Derived extends Base {}",
+    "new Derived().m(); // derived",
+    "interface I extends BaseI, OtherI {}",
+    "declare const i: I;",
+    "i.m(); // merged-interface",
+    "class K extends Base {}",
+    "interface K extends OtherC {}",
+    "new K().m(); // k-merge",
+    "declare const t: BaseI & OtherI;",
+    "t.m(); // intersection",
+    'interface J extends Pick<BaseI, "m">, OtherI {}',
+    "declare const jj: J;",
+    "jj.m(); // pick",
+    "const b = new Base();",
+    "b.m(); // variable",
+    "function make(): Base { return null as any; }",
+    "make().m(); // return-type",
+    "function make2() { return new Base(); }",
+    "make2().m(); // inferred-return",
+    "class Box<T> { value!: T; }",
+    "declare const box: Box<Base>;",
+    "box.value.m(); // generic",
+    "class Impl implements BaseI { m() {} own2() {} }",
+    "new Impl().own2(); // impl-own",
+    "declare const viaI: BaseI;",
+    "viaI.m(); // via-interface",
+    "new B2().m(); // chain",
+    "dflt.m(); // default",
+    "ns.holder.inner(); // namespace",
+    "class Own extends Base { own() {} }",
+    "new Own().own(); // own",
+    "N.a(); // global-namespace",
+    "globalThing(); // declare-global",
+    "class Clean { c() {} }",
+    "new Clean().c(); // control",
+    "",
+  ].join("\n"),
+};
+const TAINT_BROKEN = {
+  "bad.ts": TAINT_FILES["bad.ts"] + "const bad = (;\n",
+  "bad2.ts": TAINT_FILES["bad2.ts"] + "const bad = (;\n",
+  "bad.cts": TAINT_FILES["bad.cts"] + "const bad = (;\n",
+  "badc.cjs": TAINT_FILES["badc.cjs"] + "var bad = (;\n",
+  "bad3.ts": TAINT_FILES["bad3.ts"] + "const bad = (;\n",
+  "job.ts":
+    "export class Job { getState() {} bad(x: , y) {} }\nexport function helper() {}\n",
+  "broken.js": TAINT_FILES["broken.js"] + "var bad = (;\n",
+  "gns.ts": TAINT_FILES["gns.ts"] + "const bad = (;\n",
+  "dg.ts": TAINT_FILES["dg.ts"] + "const bad = (;\n",
+};
+
+test("a failure passes through every lookup that depends on it (clean vs broken)", async () => {
+  const { counts, problems, bad } = await differential(
+    TAINT_FILES,
+    TAINT_BROKEN,
+  );
+  assert.deepEqual(problems, []);
+  assert.equal(counts.changedTarget, 0);
+  assert.equal(counts.changedReason, 0);
+  const one = (file) => ({ file });
+  const failedAt = (file, marker, at, cause, kind) =>
+    isFailed(linkAt(bad, file, marker, at, kind), one(cause), marker);
+  // Reviewer 1 and the Opus heritage/merge cases.
+  for (const [marker, at] of [
+    ["// derived", "m"],
+    ["// merged-interface", "m"],
+    ["// k-merge", "m"],
+    ["// intersection", "m"],
+    ["// pick", "m"],
+    ["// variable", "m"],
+    ["// return-type", "m"],
+    ["// inferred-return", "m"],
+    ["// generic", "m"],
+    ["// via-interface", "m"],
+    ["// chain", "m"],
+    ["// default", "m"],
+    ["// namespace", "inner"],
+  ])
+    failedAt("use.ts", marker, at, "bad.ts");
+  failedAt("use2.ts", "// 2a", "m", "bad2.ts");
+  failedAt("use.cts", "// 2b", "x", "bad.cts");
+  failedAt("usec.cjs", "// 2c", "x", "badc.cjs");
+  failedAt("barrel3.ts", "// 3", "x3", "bad3.ts", "exports");
+  failedAt("barrel3.ts", "// 3t", "T3", "bad3.ts", "exports");
+  failedAt("usej.ts", "// job-state", "getState", "job.ts");
+  failedAt("usej.ts", "// dynamic", "helper", "job.ts");
+  failedAt("useeq.ts", "// eq", "x", "broken.js");
+  failedAt("use.ts", "// global-namespace", "a", "gns.ts");
+  failedAt("use.ts", "// declare-global", "globalThing", "dg.ts");
+  failedAt("comp.tsx", "// jsx", "Widget", "bad.ts");
+  // Own members of a tainted class stay resolved, flagged; so does a control.
+  isResolved(linkAt(bad, "use.ts", "// own", "own"), "use.ts#Own.own", "own");
+  isResolved(
+    linkAt(bad, "use.ts", "// impl-own", "own2"),
+    "use.ts#Impl.own2",
+    "impl-own",
+  );
+  const control = linkAt(bad, "use.ts", "// control", "c");
+  isResolved(control, "use.ts#Clean.c", "control");
+  assert.ok(control.assumes.includes("no-unseen-declarations"));
+});
+
+test("TypeScript-only syntax in a JS file is a syntax error: the file fails", async () => {
+  await project(
+    {
+      "tsonly.js":
+        "export enum E { A = 1 }\nexport interface I { m(): void }\nexport function f(x: number) { return x as number; }\n",
+      "use.js": 'import { f } from "./tsonly.js";\nf(1); // f\n',
+    },
+    async (graph, report) => {
+      assert.ok(report.failed.includes("tsonly.js"));
+      assert.deepEqual(graph.store.findSymbols({ file: "tsonly.js" }), []);
+      failedLink(
+        callOn(graph, "use.js", "// f", "f"),
+        { file: "tsonly.js" },
+        "f",
+      );
+    },
+  );
+});
+
+test("the first syntax error's position is tsc's: a byte-order mark is not a column", async () => {
+  await project({ "bom.ts": "﻿let a = ;\n" }, async (graph, report) => {
+    assert.ok(report.failed.includes("bom.ts"));
+    assert.match(
+      graph.store.getFile("bom.ts").result.diagnostics[0].message,
+      /^Syntax error at line 1, column 9: Expression expected\./,
+    );
+  });
+});
+
+test("tied configs: a variant that failed makes the merged link failed with the union of causes", async () => {
+  const config = (target) =>
+    `{ "files": ["use.ts"], "compilerOptions": { "baseUrl": ".", "paths": { "@provider": ["./${target}"] } } }\n`;
+  for (const [a, b] of [
+    ["ok.ts", "broken.ts"],
+    ["broken.ts", "ok.ts"],
+  ])
+    await project(
+      {
+        "ok.ts": "export function value() {}\n",
+        "broken.ts": "export function value() {}\nconst x = (;\n",
+        "use.ts": 'import { value } from "@provider";\nvalue(); // v\n',
+        "tsconfig.a.json": config(a),
+        "tsconfig.b.json": config(b),
+      },
+      async (graph) => {
+        failedLink(
+          callOn(graph, "use.ts", "// v", "value"),
+          { file: "broken.ts" },
+          `${a}, ${b}`,
+        );
+      },
+    );
+});
+
+test("a failed file is served to programs as absent, not as empty text", async () => {
+  const ts = (await import("typescript")).default;
+  const { projectModel } = await import(
+    "../dist/graph/languages/typescript/project.js"
+  );
+  const files = [
+    { path: "bad.ts", text: "export const a = (;\n" },
+    { path: "use.ts", text: 'import { a } from "./bad";\n' },
+  ];
+  const model = projectModel(files, []);
+  const group = model.groups.find((g) => g.roots.length);
+  const host = model.host(group);
+  const program = ts.createProgram({
+    rootNames: group.roots,
+    options: group.options,
+    host,
+  });
+  assert.ok(model.syntaxFailures.has("bad.ts"));
+  assert.equal(
+    host.getSourceFile("/bad.ts", ts.ScriptTarget.Latest),
+    undefined,
+  );
+  assert.equal(program.getSourceFile("/bad.ts"), undefined);
+  assert.ok(model.requested(host).has("bad.ts"));
+  // The file still exists for module resolution: an import of it is an
+  // import of a broken file, not of a missing one.
+  assert.ok(host.fileExists("/bad.ts"));
+});
+
+test("each dependency kind carries the failure (the member's name is not in the failed file)", async () => {
+  const files = {
+    "local.ts":
+      "export interface Local { q(): void }\nexport class LocalC { q() {} }\n",
+    "fx.ts": [
+      'import { Local, LocalC } from "./local";',
+      "export interface X extends Local {}",
+      "export class C extends LocalC {}",
+      "",
+    ].join("\n"),
+    "dflt.ts": 'import { C } from "./fx";\nexport default new C();\n',
+    "eqv.ts": 'import { C } from "./fx";\nconst v = new C();\nexport = v;\n',
+    "eqx.ts": 'import { C } from "./fx";\nexport = new C();\n',
+    "usek.ts": [
+      'import { X, C } from "./fx";',
+      'import d from "./dflt";',
+      'import eqv = require("./eqv");',
+      'import eqx = require("./eqx");',
+      "declare const a: X;",
+      "a.q(); // annotation",
+      "type AY = X;",
+      "declare const ay: AY;",
+      "ay.q(); // alias-body",
+      "interface H extends X {}",
+      "declare const h: H;",
+      "h.q(); // heritage",
+      "const ini = new C();",
+      "ini.q(); // initializer",
+      "function rt(): C { return null as any; }",
+      "rt().q(); // return-type",
+      "function ir() { return new C(); }",
+      "ir().q(); // inferred-return",
+      "eqv.q(); // export-equals",
+      "eqx.q(); // expression-export",
+      "d.q(); // default-export",
+      "function first<T extends C>(v: T): T { return v; }",
+      "first(null as any).q(); // constraint",
+      "",
+    ].join("\n"),
+  };
+  const { problems, bad } = await differential(files, {
+    "fx.ts": files["fx.ts"] + "const bad = (;\n",
+  });
+  assert.deepEqual(problems, []);
+  for (const marker of [
+    "annotation",
+    "alias-body",
+    "heritage",
+    "initializer",
+    "return-type",
+    "inferred-return",
+    "export-equals",
+    "expression-export",
+    "default-export",
+    "constraint",
+  ])
+    isFailed(
+      linkAt(bad, "usek.ts", `// ${marker}`, "q"),
+      { file: "fx.ts" },
+      marker,
+    );
+});
+
+test("a call's result carries the failure of its arguments' types", async () => {
+  const gen = "export class Job<A, B, C> { a!: A; }\n";
+  const files = {
+    "gen.ts": gen,
+    "use.ts": [
+      'import { Job } from "./gen";',
+      "declare const arr: Promise<Job<any, any, string>>[];",
+      "export async function all() {",
+      "  const [last] = (await Promise.all(arr)).splice(-1); // args",
+      "}",
+      "",
+    ].join("\n"),
+  };
+  const { problems, bad } = await differential(files, {
+    "gen.ts": gen + "const bad = (;\n",
+  });
+  assert.deepEqual(problems, []);
+  isFailed(
+    linkAt(bad, "use.ts", "// args", "splice"),
+    { file: "gen.ts" },
+    "splice",
   );
 });

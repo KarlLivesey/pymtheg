@@ -85,7 +85,13 @@ export interface ProjectModel {
    * every program as absent. Their diagnostics, and whether the file was a
    * script (its top-level declarations would be globals).
    */
-  syntaxFailures: Map<string, { diagnostics: Diagnostic[]; script: boolean }>;
+  syntaxFailures: Map<string, SyntaxFailure>;
+  /**
+   * Fails a file whose program reported syntactic diagnostics beyond the
+   * parser's (TypeScript-only syntax in a JS file); every later program
+   * serves it as absent.
+   */
+  failSyntax: (path: string, extra: readonly ts.Diagnostic[]) => boolean;
   /** Failed files a host was asked for (roots or imports): unseen declarations. */
   requested: (host: ts.CompilerHost) => ReadonlySet<string>;
   /** A compiler host over the snapshot; a variant replaces some files' text. */
@@ -101,98 +107,147 @@ const INFERRED: ts.CompilerOptions = {
   allowImportingTsExtensions: true,
   resolveJsonModule: false,
 };
+/** What a failed (syntax-error) file reports and contributes. */
+export interface SyntaxFailure {
+  diagnostics: Diagnostic[];
+  /** Identifier names occurring in its text: all an unseen declaration could introduce. */
+  names: string[];
+}
+
 /**
- * A syntax error makes a file invalid: a TypeScript parser diagnostic, or
- * heritage grammar the parser accepts but that has no meaning. Returns its
- * errors sorted by position, each "Syntax error at line L, column C:" with
- * the parser's own message and the offending text when there is a span
- * (one line, at most 40 characters), and whether the file was a script.
- * `parsed` may be the compiler's parse of a same-length renamed text.
+ * A syntax error makes a file invalid: any syntactic diagnostic (the
+ * parser's, the compiler's syntax-phase checks such as TypeScript-only
+ * syntax in a JS file, passed as `extra`), or heritage grammar the compiler
+ * rejects. Diagnostics are sorted by position and read like tsc's: line and
+ * column by the compiler's own conversion on the text tsc parses (without a
+ * byte-order mark), the compiler's message, and the offending text when the
+ * diagnostic has a span (one line, at most 40 characters).
  */
 export function syntaxFailure(
   path: string,
   text: string,
-  parsed?: ts.SourceFile,
-): { diagnostics: Diagnostic[]; script: boolean } | undefined {
-  const source = (parsed ??
-    ts.createSourceFile(
-      toVirtual(path),
-      text,
-      ts.ScriptTarget.Latest,
-      true,
-    )) as ts.SourceFile & {
+  extra: readonly ts.Diagnostic[] = [],
+): SyntaxFailure | undefined {
+  const bom = text.startsWith("\uFEFF") ? 1 : 0;
+  const plain = text.slice(bom);
+  const source = ts.createSourceFile(
+    toVirtual(path),
+    plain,
+    ts.ScriptTarget.Latest,
+    true,
+  ) as ts.SourceFile & {
     parseDiagnostics?: readonly ts.Diagnostic[];
     externalModuleIndicator?: unknown;
     commonJsModuleIndicator?: unknown;
   };
   const at = (start: number, length: number, message: string) => {
     const { line, character } = source.getLineAndCharacterOfPosition(start);
-    const found = text
+    const found = plain
       .slice(start, start + length)
       .replace(/\s+/g, " ")
       .trim();
     const shown = found.length > 40 ? found.slice(0, 37) + "..." : found;
     return {
       message: `Syntax error at line ${line + 1}, column ${character + 1}: ${message}${shown ? ` Found: "${shown}".` : ""}`,
-      range: { start, end: Math.min(text.length, start + length) },
+      range: {
+        start: start + bom,
+        end: Math.min(text.length, start + length + bom),
+      },
     };
   };
-  const diagnostics: Diagnostic[] = [
-    ...(source.parseDiagnostics ?? []).map((diagnostic) =>
-      at(
-        diagnostic.start ?? 0,
-        diagnostic.length ?? 0,
-        ts.flattenDiagnosticMessageText(diagnostic.messageText, " "),
-      ),
-    ),
-    ...heritageErrors(source).map((start) =>
-      at(
-        start,
-        0,
-        "Invalid heritage clauses (more than one base class, extends after implements, or implements on an interface).",
-      ),
-    ),
-  ].sort(
+  const seen = new Set<string>();
+  const diagnostics: Diagnostic[] = [];
+  const push = (start: number, length: number, message: string) => {
+    const key = `${start}\0${length}\0${message}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    diagnostics.push(at(start, length, message));
+  };
+  for (const diagnostic of source.parseDiagnostics ?? [])
+    push(
+      diagnostic.start ?? 0,
+      diagnostic.length ?? 0,
+      ts.flattenDiagnosticMessageText(diagnostic.messageText, " "),
+    );
+  // Positions of `extra` are on the compiler's text (with the mark).
+  for (const diagnostic of extra)
+    push(
+      Math.max(0, (diagnostic.start ?? 0) - bom),
+      diagnostic.length ?? 0,
+      ts.flattenDiagnosticMessageText(diagnostic.messageText, " "),
+    );
+  for (const error of heritageErrors(source))
+    push(error.start, error.length, error.message);
+  if (!diagnostics.length) return undefined;
+  diagnostics.sort(
     (a, b) => a.range!.start - b.range!.start || a.range!.end - b.range!.end,
   );
-  if (!diagnostics.length) return undefined;
+  // Every identifier the parser met (its own record, and the tree's).
+  const names = new Set<string>(
+    (
+      source as { identifiers?: ReadonlyMap<string, string> }
+    ).identifiers?.keys() ?? [],
+  );
+  const collect = (node: ts.Node): void => {
+    if (ts.isIdentifier(node) || ts.isPrivateIdentifier(node))
+      names.add(node.text);
+    ts.forEachChild(node, collect);
+  };
+  collect(source);
   return {
     diagnostics,
-    script: !source.externalModuleIndicator && !source.commonJsModuleIndicator,
+    names: [...names].sort(),
   };
 }
 
 /**
- * Positions of heritage grammar the parser accepts but that has no meaning
- * (`extends A, B`, two `extends` clauses, `extends` after `implements`,
- * `implements` on an interface): a syntax error like any other.
+ * Heritage grammar the compiler rejects, where and as tsc reports it:
+ * a second base class (at that type), a second `extends` or `implements`
+ * clause, `extends` after `implements` (at the clause), and `implements`
+ * on an interface (at the clause).
  */
-function heritageErrors(source: ts.SourceFile): number[] {
-  const errors: number[] = [];
+function heritageErrors(
+  source: ts.SourceFile,
+): { start: number; length: number; message: string }[] {
+  const errors: { start: number; length: number; message: string }[] = [];
+  const at = (node: ts.Node, message: string) =>
+    errors.push({
+      start: node.getStart(source),
+      length: ts.isHeritageClause(node)
+        ? node.token === ts.SyntaxKind.ExtendsKeyword
+          ? "extends".length
+          : "implements".length
+        : node.end - node.getStart(source),
+      message,
+    });
   const visit = (node: ts.Node): void => {
     if (
       (ts.isClassLike(node) || ts.isInterfaceDeclaration(node)) &&
       node.heritageClauses?.length
     ) {
-      const clauses = node.heritageClauses;
-      const extendsClauses = clauses.filter(
-        (c) => c.token === ts.SyntaxKind.ExtendsKeyword,
-      );
-      const implementsAt = clauses.findIndex(
-        (c) => c.token === ts.SyntaxKind.ImplementsKeyword,
-      );
-      const extendsAt = clauses.findIndex(
-        (c) => c.token === ts.SyntaxKind.ExtendsKeyword,
-      );
-      const bad =
-        (ts.isClassLike(node) &&
-          (extendsClauses.length > 1 ||
-            extendsClauses.some((c) => c.types.length > 1) ||
-            (implementsAt >= 0 &&
-              extendsAt >= 0 &&
-              implementsAt < extendsAt))) ||
-        (ts.isInterfaceDeclaration(node) && implementsAt >= 0);
-      if (bad) errors.push(clauses[0]!.getStart(source));
+      let seenExtends = false;
+      let seenImplements = false;
+      for (const clause of node.heritageClauses) {
+        if (clause.token === ts.SyntaxKind.ExtendsKeyword) {
+          if (ts.isClassLike(node)) {
+            if (seenExtends) at(clause, "'extends' clause already seen.");
+            else if (seenImplements)
+              at(clause, "'extends' clause must precede 'implements' clause.");
+            else if (clause.types.length > 1)
+              at(clause.types[1]!, "Classes can only extend a single class.");
+          }
+          seenExtends = true;
+        } else {
+          if (ts.isInterfaceDeclaration(node))
+            at(
+              clause,
+              "Interface declaration cannot have 'implements' clause.",
+            );
+          else if (seenImplements)
+            at(clause, "'implements' clause already seen.");
+          seenImplements = true;
+        }
+      }
     }
     ts.forEachChild(node, visit);
   };
@@ -763,10 +818,7 @@ export function projectModel(
   }
   if (inferred) groups.push(inferred);
   const parseFailures = new Map<string, string>();
-  const syntaxFailures = new Map<
-    string,
-    { diagnostics: Diagnostic[]; script: boolean }
-  >();
+  const syntaxFailures = new Map<string, SyntaxFailure>();
   const caches = new WeakMap<ts.CompilerHost, Map<string, ts.SourceFile>>();
   const asked = new WeakMap<ts.CompilerHost, Set<string>>();
   const originals = new Map(files.map((file) => [file.path, file.text]));
@@ -810,11 +862,13 @@ export function projectModel(
           }
           // A file that cannot be read is not valid code: it has failed.
           const path = real.slice(1);
-          const failure = syntaxFailure(
-            path,
-            originals.get(path) ?? text,
-            file,
-          );
+          const errors =
+            ((file as ts.SourceFile & { parseDiagnostics?: unknown[] })
+              .parseDiagnostics?.length ?? 0) > 0 ||
+            heritageErrors(file).length > 0;
+          const failure = errors
+            ? syntaxFailure(path, originals.get(path) ?? text)
+            : undefined;
           if (failure) {
             syntaxFailures.set(path, failure);
             failures.set(
@@ -865,6 +919,17 @@ export function projectModel(
     parseFailures,
     syntaxFailures,
     requested: (host) => asked.get(host) ?? new Set(),
+    failSyntax: (path, extra) => {
+      if (syntaxFailures.has(path)) return false;
+      const failure = syntaxFailure(path, originals.get(path) ?? "", extra);
+      if (!failure) return false;
+      syntaxFailures.set(path, failure);
+      parseFailures.set(
+        path,
+        "This file has a syntax error: it is not valid code",
+      );
+      return true;
+    },
     host,
   };
 }

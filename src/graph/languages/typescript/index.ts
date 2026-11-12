@@ -35,7 +35,7 @@ import {
  * facts; resolve maps those facts to symbol IDs. See docs/changes/W2-D.md.
  */
 // Bump the leading number whenever extraction or resolution semantics change.
-const MODULE_VERSION = `10+typescript-${ts.version}`;
+const MODULE_VERSION = `11+typescript-${ts.version}`;
 
 /** Observation counters for tests (programs built, files extracted). Not a correctness input. */
 export const statistics = {
@@ -81,6 +81,8 @@ function openSession(
   makeHost: () => ts.CompilerHost,
   failures: Map<string, string>,
   captured: ReadonlySet<string>,
+  /** Fails files with syntactic diagnostics the parser alone does not report; true to rebuild. */
+  validate?: (program: ts.Program) => boolean,
 ): Session {
   let host = makeHost();
   /** Captured files whose warm-up overflowed: never warmed again. */
@@ -176,6 +178,8 @@ function openSession(
         host = makeHost();
         continue;
       }
+      // A file failed by the syntax phase is absent from the next build.
+      if (validate?.(compiled.program)) continue;
       const failedWarm = warmAll(compiled.program, compiled.checker);
       if (failedWarm === undefined) return compiled;
       warmSkip.add(failedWarm);
@@ -298,6 +302,8 @@ const failed = (message: string): ParseResult => ({
  *   with the same targets, otherwise `ambiguous-project` with `tiedReasons`;
  *   `assumes`: the union;
  * - any other link or file field that differs: per config in `byProject`;
+ * - a variant that failed (`invalid-code`) makes the link failed, with the
+ *   union of causes and no target from the other variants;
  * - diagnostics: the sorted union; status: the weakest.
  */
 export function mergeTied(
@@ -371,6 +377,27 @@ export function mergeTied(
         (variant.links[index]!.data ?? {}) as { [key: string]: Json },
     );
     if (datas.every((data) => same(data, datas[0]))) return link;
+    // A failed dependency is the weakest: if any variant failed, the merged
+    // link has failed, with the union of causes and no target from others.
+    if (datas.some((data) => data.reason === "invalid-code")) {
+      const causes = new Set<string>();
+      for (const data of datas) {
+        const cause = (data.cause ?? {}) as { file?: string; files?: string[] };
+        if (cause.file) causes.add(cause.file);
+        for (const file of cause.files ?? []) causes.add(file);
+      }
+      const merged = mergeFields(datas, [
+        "targets",
+        "reason",
+        "assumes",
+        "cause",
+      ]);
+      merged.reason = "invalid-code";
+      const list = [...causes].sort();
+      merged.cause = list.length === 1 ? { file: list[0]! } : { files: list };
+      merged.projects = [...projects];
+      return { ...link, data: merged };
+    }
     const keyed = (data: { [key: string]: Json }) =>
       ((data.targets ?? []) as unknown as TargetFact[])
         .map((t) => `${t.file}\0${t.key}`)
@@ -508,6 +535,19 @@ const module: LanguageModule = {
         () => model.host(group),
         model.parseFailures,
         captured,
+        // Any syntactic diagnostic fails a file: also the compiler's
+        // syntax-phase checks the parser does not make (TypeScript-only
+        // syntax in a JS file, TS8xxx).
+        (program) => {
+          let failedAny = false;
+          for (const source of program.getSourceFiles()) {
+            const path = fromVirtual(source.fileName);
+            if (path === undefined || !captured.has(path)) continue;
+            const extra = program.getSyntacticDiagnostics(source);
+            if (extra.length && model.failSyntax(path, extra)) failedAny = true;
+          }
+          return failedAny;
+        },
       );
       const resolveModule = (specifier: string, from: string) => {
         const resolved = ts.resolveModuleName(
@@ -584,7 +624,8 @@ const module: LanguageModule = {
                 resolveModule,
                 skip,
                 moduleKind,
-                failedScripts,
+                anyFailed: unseen.size > 0,
+                failedNames,
               },
             );
             statistics.extracted++;
@@ -619,9 +660,10 @@ const module: LanguageModule = {
           .map((root) => root.slice(1))
           .filter((path) => model.parseFailures.has(path)),
       ]);
-      const failedScripts = [...unseen]
-        .filter((path) => model.syntaxFailures.get(path)?.script)
-        .sort();
+      const failedNames = new Map<string, string[]>();
+      for (const path of [...unseen].sort())
+        for (const name of model.syntaxFailures.get(path)?.names ?? [])
+          failedNames.set(name, [...(failedNames.get(name) ?? []), path]);
       const analysed: [string, ParseResult][] = [];
       for (const root of group.roots) {
         const path = root.slice(1);

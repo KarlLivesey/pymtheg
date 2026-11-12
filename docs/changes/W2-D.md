@@ -62,6 +62,9 @@ The module is **analyze-only** (no per-file `parse`). Each run:
      (diagnostics, `projects`), or listed per config in `byProject` (for
      example one config's `configNotes`); the output is identical for every
      order of the variants;
+   - a variant that failed (`invalid-code`) makes the merged link failed,
+     with the union of causes and no target from the other variants: a
+     failed dependency is the weakest outcome;
    - the file records `data.projects` listing the tied configs and has no
      `data.project` (there is no single owner).
 
@@ -104,7 +107,7 @@ link across packages.
 **Unchanged snapshot reuse.** When `changedFiles` and `changedContextFiles`
 are both empty and every stored result was produced by this module version
 (which embeds the compiler version; the leading number is bumped whenever
-extraction or resolution semantics change, and is now 10), the stored facts are
+extraction or resolution semantics change, and is now 11), the stored facts are
 returned as they are:
 no program is built and nothing is parsed. They are the complete analysis of the
 identical snapshot, and `resolve` re-derives every target from them. Any source,
@@ -445,25 +448,25 @@ own resolver over the snapshot.
 
 **Unresolved, with the name kept and `data.reason`:**
 
-| reason               | Meaning                                                                                                                                                                                                                                                     |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `external`           | The checker found declarations, but outside the project (standard library); or a name that resolved through a binding whose module did resolve but whose member has no declaration                                                                          |
-| `external-package`   | A bare specifier that does not resolve (`node_modules` is never walked), every binding imported from it, and every call, `new`, type reference (including qualified names such as `ns.T`), heritage clause and member lookup reached through such a binding |
-| `missing-module`     | The same for a relative specifier with no captured file (for example `new FlowProducer()` imported from an unbuilt `../../dist/...`)                                                                                                                        |
-| `unresolved-alias`   | The same for a specifier matching a `paths` pattern of the owning config, or a `#` subpath import, that resolves to no captured file                                                                                                                        |
-| `no-symbol`          | The checker has no symbol: untyped JS, `any`/`unknown` receivers (often because the receiver's type came from an uncaptured package), computed callees                                                                                                      |
-| `local`              | The target is a parameter, local variable, local function or other non-symbol declaration                                                                                                                                                                   |
-| `computed-specifier` | `import(expr)` or JS `require(expr)` with a non-literal specifier                                                                                                                                                                                           |
-| `compiler-limit`     | The TypeScript checker exhausted its stack on this lookup (deep inference chains); the file is partial                                                                                                                                                      |
-| `dynamic-scope`      | A `require`/`module`/`exports` whose meaning is decided at run time (see above), anything reached through its value, and unresolved names inside a `with` body                                                                                              |
-| `not-a-module`       | A binding from a captured file that was analysed, has no syntax errors, and has no imports or exports (a script). The import edge itself links to that file and carries `data.notAModule: true`; that flag means exactly this and nothing else              |
-| `invalid-code`       | Failed: the link goes into a file that cannot be read (see Status), or is answered only through one. No target, candidate or would-be target; `data.cause` names the failed file (`{ file }`, or `{ files: [...] }` sorted when several could be the cause) |
-| `target-unavailable` | The target file failed for another reason (a parser or binder stack overflow, scope analysis, a broken config); the import edge and its bindings are unresolved, the file kept in `data.targets`                                                            |
-| `untyped-require`    | A binding, call or member reached through a captured module required by a form the compiler does not type (`(0, require)(…)`, `(require)(…)`, `module.require(…)`, an escaped `require`). The import edge links to the module                               |
-| `createrequire-base` | A require through `createRequire` with a base other than this file's location; no would-be target is kept                                                                                                                                                   |
-| `renamed-export`     | An ES binding of an export named `require`/`module`/`exports` between a JS file and a TS file or a CommonJS property, whose spellings differ for the compiler                                                                                               |
-| `ambiguous-project`  | Equally ranked configs disagree and at least one has no complete answer; their targets are kept                                                                                                                                                             |
-| `incomplete-config`  | The file's config `extends` a base that was not captured, and the link's outcome depends on settings that base could supply (see Status); would-be targets are kept, the reason without that rule is in `data.reasonWithoutConfig`                          |
+| reason               | Meaning                                                                                                                                                                                                                                                                    |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `external`           | The checker found declarations, but outside the project (standard library); or a name that resolved through a binding whose module did resolve but whose member has no declaration                                                                                         |
+| `external-package`   | A bare specifier that does not resolve (`node_modules` is never walked), every binding imported from it, and every call, `new`, type reference (including qualified names such as `ns.T`), heritage clause and member lookup reached through such a binding                |
+| `missing-module`     | The same for a relative specifier with no captured file (for example `new FlowProducer()` imported from an unbuilt `../../dist/...`)                                                                                                                                       |
+| `unresolved-alias`   | The same for a specifier matching a `paths` pattern of the owning config, or a `#` subpath import, that resolves to no captured file                                                                                                                                       |
+| `no-symbol`          | The checker has no symbol: untyped JS, `any`/`unknown` receivers (often because the receiver's type came from an uncaptured package), computed callees                                                                                                                     |
+| `local`              | The target is a parameter, local variable, local function or other non-symbol declaration                                                                                                                                                                                  |
+| `computed-specifier` | `import(expr)` or JS `require(expr)` with a non-literal specifier                                                                                                                                                                                                          |
+| `compiler-limit`     | The TypeScript checker exhausted its stack on this lookup (deep inference chains); the file is partial                                                                                                                                                                     |
+| `dynamic-scope`      | A `require`/`module`/`exports` whose meaning is decided at run time (see above), anything reached through its value, and unresolved names inside a `with` body                                                                                                             |
+| `not-a-module`       | A binding from a captured file that was analysed, has no syntax errors, and has no imports or exports (a script). The import edge itself links to that file and carries `data.notAModule: true`; that flag means exactly this and nothing else                             |
+| `invalid-code`       | Failed: the link goes into a file that cannot be read (see Status), or depends on one (see "a failure propagates"). No target, candidate or would-be target; `data.cause` names the failed file (`{ file }`, or `{ files: [...] }` sorted when several could be the cause) |
+| `target-unavailable` | The target file failed for another reason (a parser or binder stack overflow, scope analysis, a broken config); the import edge and its bindings are unresolved, the file kept in `data.targets`                                                                           |
+| `untyped-require`    | A binding, call or member reached through a captured module required by a form the compiler does not type (`(0, require)(…)`, `(require)(…)`, `module.require(…)`, an escaped `require`). The import edge links to the module                                              |
+| `createrequire-base` | A require through `createRequire` with a base other than this file's location; no would-be target is kept                                                                                                                                                                  |
+| `renamed-export`     | An ES binding of an export named `require`/`module`/`exports` between a JS file and a TS file or a CommonJS property, whose spellings differ for the compiler                                                                                                              |
+| `ambiguous-project`  | Equally ranked configs disagree and at least one has no complete answer; their targets are kept                                                                                                                                                                            |
+| `incomplete-config`  | The file's config `extends` a base that was not captured, and the link's outcome depends on settings that base could supply (see Status); would-be targets are kept, the reason without that rule is in `data.reasonWithoutConfig`                                         |
 
 **A target set is never narrowed.** If any possible declaration lies outside the
 project (standard library, uncaptured package, a local), the link is
@@ -484,35 +487,95 @@ imports of `./orig` are not linked to it; backlog).
 ## Status and errors
 
 - **A file that cannot be read is not valid code: it has failed.** A file
-  with any syntax error (a diagnostic from the TypeScript parser, or heritage
-  grammar the parser accepts but that has no meaning: `class C extends A, B`,
-  two `extends` clauses, `extends` after `implements`, `implements` on an
-  interface) is `failed`. It contributes no symbols and no links, and its
-  diagnostics give each syntax error, sorted by position, the way a compiler
-  does: `Syntax error at line 2, column 19: Expression expected. Found: ";".`
-  (1-based line and column, the parser's own message, and the offending text
-  when the parser gives a span, on one line and cut to 40 characters). Type
-  errors do not fail a file. An error that loses no text (a legacy octal
-  literal `0777`) fails it too; there is no special case.
-- **Nothing in a failed file is a target.** The compiler host serves a
-  failed file to every program as **absent** (not as empty text): the module
-  specifier still names an existing captured file, so an import of it is
-  recognised as an import of a broken file, and nothing in it can be found. A
-  link that would go into it, or that only it could answer, is **failed**:
-  `unresolved`, reason `invalid-code`, its name kept, and no target, no
-  candidates and no would-be targets. `data.cause` names the broken file
-  (`{ "file": "maths.js" }`; `{ "files": [...] }`, sorted, when several could
-  be the cause), so a reader can see "this import is broken because the file
-  it imports is broken". No symbol inside the failed file is named. That
-  covers: the import itself and each name imported from it (`import { pi,
-phi, absolute } from "./maths.js"` fails all four, and `absolute(phi)`
-  fails too); members of a namespace import of it; a name reached through
-  an `export *` from it (in any barrel along the way); a member inherited
-  from a base class or interface declared in it; and a bare name that no
-  declaration answers while a failed script file is part of the program (its
-  top-level declarations would have been globals). An import whose specifier
-  resolves to no file at all stays an ordinary unresolved import
-  (`missing-module`, no cause): missing is not broken.
+  with any syntactic diagnostic is `failed`: the parser's own, the
+  compiler's syntax-phase checks (TypeScript-only syntax in a JS file:
+  annotations, `enum`, `interface`, `as`, `!`, TS8xxx), or heritage grammar
+  the compiler rejects (`class C extends A, B`, two `extends` or
+  `implements` clauses, `extends` after `implements`, `implements` on an
+  interface). It contributes no symbols and no links. Its diagnostics give
+  each syntax error sorted by position, the way tsc reports it:
+  `Syntax error at line 2, column 19: Expression expected. Found: ";".`
+  The line and column are the compiler's own conversion of the
+  diagnostic's position on the text tsc parses (a byte-order mark is not a
+  column), with the compiler's message, and the offending text when the
+  diagnostic has a span (one line, cut to 40 characters). Type errors do not
+  fail a file. An error that loses no text (a legacy octal literal `0777`)
+  fails it too; there is no special case. Not handled (backlog): JS early
+  errors the compiler does not report for JS without `checkJs`
+  (`let let = 1`, a top-level `return`), which leave such a file clean.
+- **What is still `partial`.** Never a syntax error. A file is `partial`
+  only when its facts are complete but qualified, with a diagnostic: its
+  config `extends` a base that was not captured (`incomplete-config`), the
+  checker exhausted its stack on some lookups (`compiler-limit`), or some
+  `require`/`module`/`exports` occurrences cannot be decided statically
+  (`dynamic-scope`).
+- **Nothing in a failed file is a target, and a failure propagates.** The
+  compiler host serves a failed file to every program as **absent** (not as
+  empty text, which a test pins): the module specifier still names an
+  existing captured file, so an import of it is recognised as an import of a
+  broken file, and nothing in it can be found. A link that depends on a
+  failed file is **failed**: `unresolved`, reason `invalid-code`, its name
+  kept, and no target, no candidates and no would-be targets. `data.cause`
+  names the broken file (`{ "file": "maths.js" }`; `{ "files": [...] }`,
+  sorted, when several could be the cause), so a reader can see "this import
+  is broken because the file it imports is broken". No symbol inside the
+  failed file is named. A failure with its cause is a value that passes
+  through every lookup depending on it, in two steps (`taint.ts`, then one
+  consumer in `extract.ts`):
+  - **Taint (T1),** computed once per program, only when the program would
+    include a failed file, with the compiler's own symbol and alias
+    resolution. Seeds are the bindings of a failed module: an import,
+    re-export (named, type-only, `export *`), `import =`, `require`, dynamic
+    `import()`, `module.exports = require(…)`, and a name that only an
+    `export *` from a failed module could supply. Then, to a fixpoint, a
+    declaration of a valid file is tainted when a name in any part its
+    meaning depends on refers to a tainted symbol: its type annotation, a
+    type alias body, its heritage clauses (every merged declaration of the
+    symbol), its initialiser (for an inferred type), its return type or the
+    expressions it returns, an `export =`/`module.exports =`/`exports.x =`
+    right-hand side, a default export, a generic constraint or default.
+    Aliases are followed as the compiler resolves them, including each
+    module's `export =` symbol.
+  - **One consumer (T2),** before any checker answer is accepted (resolved,
+    candidates, `no-symbol`, `external` alike): a name whose binding resolves
+    into a failed file fails; a member access, call, `new`, JSX element or
+    qualified type name whose receiver depends on taint (the names along its
+    chain, the arguments of a call in it, the receiver's type and its alias)
+    fails, unless the answer is an own member declared directly in the
+    receiver type's own declarations (one object type, not a union or
+    intersection). An inherited or merged member found elsewhere through a
+    tainted type fails even though the checker found a target. If in doubt,
+    `invalid-code`.
+  - **Unread names.** An unresolved link (`no-symbol`, or `external` with no
+    declaration anywhere) whose name occurs as an identifier in a failed file
+    of its program fails with that file as the cause: an unseen declaration
+    (a global, a `declare global`, a namespace merge) can only introduce a
+    name the unread text contains.
+  - **One constructor (T3)** builds every failed link and cannot do so
+    without a cause; a link marked `invalid-code` without one is a
+    programming error that stops the analysis.
+  - Examples, each tested clean against broken: an import and its bindings
+    (`import { pi, phi, absolute } from "./maths.js"` fails all four, and
+    `absolute(phi)`); a type alias of a failed interface (`type Y = X; x.m()`);
+    `export =` one file away; CommonJS forwarding (`module.exports =
+require(…)`); named and type-only re-exports; a variable, a declared and
+    an inferred return type, a generic argument (`Box<Base>`), a class that
+    `implements` a failed interface (its own members stay resolved), a
+    two-level `extends` chain, a default export, a namespace import, a JSX
+    component, a class merged with an interface whose other base is valid,
+    an interface extending a failed one and a valid one, an intersection,
+    `Pick<…>`, a dynamic `import()`, a global namespace in a failed script,
+    and `declare global` in a failed module.
+  - An import whose specifier resolves to no file at all stays an ordinary
+    unresolved import (`missing-module`, no cause): missing is not broken.
+- **Every other link (K3) keeps the compiler's answer.** A link with no
+  dependency on a tainted symbol, in a program with a failed file, keeps its
+  status and target and is flagged (below). A general test helper indexes a
+  fixture clean and with files broken, and checks every link of a valid file:
+  identical (perhaps plus the flag), or `invalid-code` naming a broken file;
+  never another target or another non-failed reason; and every link whose
+  clean target is in a broken file fails, naming it. The same check runs on
+  BullMQ (see Observations).
 - **Every other link in a program with a failed file is flagged.** If a
   program had at least one failed file among the files it would otherwise
   include (a root, or a file it imports), every link computed from that
@@ -744,20 +807,22 @@ Full numbers, the comparison across rounds and every hand check are in
   there, and no BullMQ file uses the wrapper's `arguments` or has a parse
   error.
 - **One syntax error in BullMQ's `class Job`** (`isFailed(x: , y)`): the
-  whole of `src/classes/job.ts` fails (no symbols, no links). 434 links fail
-  (`invalid-code`, cause `src/classes/job.ts`): the imports of `job.ts`
-  and names reached through it, chiefly through `src/classes/index.ts`'s
-  `export * from './job'`. 15,987 links are resolved and flagged, 634 are
-  resolved without the flag (programs that do not include `job.ts`), the 4
-  candidate sets are flagged, and 23,348 links are otherwise unresolved. 4
-  programs, as unbroken.
-- **`requirejs`:** 2 files fail. `tests/packagesMultiLevel/build.js` is a
-  bare object literal (`';' expected`), and `dist/file.js` has the octal
-  literal `0777`. 106 links fail: 12 into `dist/file.js` (its imports and
-  bindings, cause that file), and 94 bare names that no declaration answers,
-  caused by both failed scripts, whose globals are unseen. All 462 resolved
-  links and the 2 candidate sets are flagged, because the project's single
-  program includes both files; 4,029 are otherwise unresolved.
+  whole of `src/classes/job.ts` fails. 4 programs, as unbroken. Links: 3,862
+  failed (all with cause `src/classes/job.ts`), 15,289 resolved and
+  flagged, 634 resolved without the flag (programs without `job.ts`), 3
+  candidate sets (flagged), 20,619 otherwise unresolved. Compared link by
+  link with the clean index (`evidence/w2-d/clean-broken-diff.mjs`): **0
+  changed targets, 0 changed non-failed reasons**, and all 920 links whose
+  clean target is in `job.ts` fail, naming it. Of the failed links, 698
+  resolved elsewhere when clean (lookups through tainted values, failed
+  because in doubt), 1 was a candidate set, and 2,243 were already
+  unresolved (mostly `expect(job)…` matcher chains on tainted values).
+- **`requirejs`:** 2 files fail (`tests/packagesMultiLevel/build.js`, a bare
+  object literal; `dist/file.js`, the octal literal `0777`). 257 links fail,
+  all with cause `dist/file.js`: its import and binding in
+  `dist/dist-site.js` and members through it, and unresolved names that
+  `dist/file.js` mentions. All 462 resolved links and both candidate sets are
+  flagged (one program); 3,878 are otherwise unresolved.
 - **A project with a local `require`: `requirejs`** (`7faea649`, 406 files, 0
   failed). 133 files are renamed (`require` in 116, `exports` in 73, `module`
   in 61), almost all AMD `define(function (require, exports, module) {…})`
