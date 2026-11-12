@@ -1,6 +1,6 @@
 # W2-L: can the Go build chain supply exact code-graph links, and at what cost?
 
-Investigation only (round 1). Evidence, helper, scripts and raw outputs:
+Investigation only (round 2). Evidence, helper, scripts and raw outputs:
 `evidence/w2-l/`. No product code, contract or support level changes.
 
 ## The answer
@@ -9,7 +9,9 @@ Investigation only (round 1). Evidence, helper, scripts and raw outputs:
 only the `go` command and the standard library, without running any project
 code.** A standard-library helper (`go list` + `go/parser` + `go/types`) gives
 exact callee locations for static calls, the interface method for dynamic
-calls plus the exact set of implementers in the loaded program, identifier →
+calls plus the implementers of the call's receiver interface among the types
+of the packages loaded for that configuration (a type in an unloaded package,
+another configuration or a dependent module is not seen), identifier →
 declaration, import → directory and verified `implements` pairs.
 
 On restic (one project; 26,535 call expressions counted by syntax in all 559
@@ -26,17 +28,25 @@ tracked files):
   - function values: 4.7%;
   - calls in files excluded by a configuration: 7.5% in one configuration,
     0.4% (`build.go`) in six.
-- **Against the hand-written module (PR 12):** every definite module link that
-  both sides cover agrees by definition position. That is 11,771 resolved
-  calls, 18,041 resolved references and 1,296 resolved imports; 0 differ.
+- **Against the hand-written module** (as merged on `main`, module version
+  20): every definite module link that both sides cover agrees by definition
+  position. That is 11,771 resolved calls, 18,041 resolved references and
+  1,296 resolved imports; 0 differ. No closed candidate set misses the
+  toolchain's target. **No contract violation was found.**
 - **What the toolchain adds:**
-  - definite std and dependency callees: 29.1% of call sites, which the
-    module leaves unresolved by design;
+  - definite std and dependency callees, which the module leaves unresolved by
+    design: 7,624 static function/method calls (28.7% of call sites), or
+    7,712 (29.1%) with conversions to std/dependency named types;
   - verified `implements`: of the module's 276 unverified candidates, it
     refutes 59 and confirms 211, and it adds 24 pairs.
-- **What the comparison also exposed:** the module fails a valid file
-  (`status_test.go`). As a result, 30 builtin calls get a wrong
-  `invalid-code` cause.
+- **What the comparison also exposed** (none of it a contract violation):
+  - by-design imprecision in the module's unverified and open sets: 348
+    open interface-call sets carry candidates the toolchain refutes; 20 open
+    sets miss one reachable method; 8 open by-name sets name only wrong
+    targets;
+  - one grammar gap: the module fails a valid file (`status_test.go`), so 30
+    builtin calls in its package get an `invalid-code` cause that names a
+    valid file.
 
 Every toolchain link is true for one build configuration. One configuration
 saw 507 of 559 files; six were needed for 558. 172 call sites have a
@@ -116,7 +126,12 @@ What (3) costs Pymtheg:
    set labelled by configuration, never several definite links.
 4. **Snapshot rule (W1-C).** `go list -overlay` can supply the snapshot's
    project files, but dependencies and std are read from the module cache and
-   `GOROOT`. Is reading outside the project acceptable?
+   `GOROOT`, and local `replace` targets and `go.work` modules may lie outside
+   the indexed directory. Is reading outside the project acceptable? If so,
+   the re-index cache key must cover the content of every such non-immutable
+   file the loader read (taken from `go list -json`), not only the project's
+   files: a measured repro shows a link change with every project file
+   unchanged (`evidence/w2-l/README.md`, part G).
 
 Not measured: other projects, gopls, `x/tools/go/packages`, implementer sets
 for calls in test packages, private module proxies and `direct` VCS fetches.
