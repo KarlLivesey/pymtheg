@@ -146,16 +146,16 @@ for (const variant of ["local", "explicit", "child"]) {
     noCause(fixed, "A::default");
   });
 }
-test("round 8 B1 failed glob supplies only otherwise unbound names", async () => {
+test("round 9 B2 failed glob gives reach uncertainty for otherwise unbound names", async () => {
   const g = await graph({
     "src/lib.rs": "mod broken;use broken::*;fn f(){g();}",
     "src/broken.rs": broken,
   });
   g.unknown("g");
   const l = g.links.find((l) => l.targetName === "g");
-  assert.equal(l.data.uncertainty, "invalid-code");
-  assert.deepEqual(l.data.cause, { files: ["src/broken.rs"] });
-  assert.equal(l.data.targets, undefined);
+  assert.match(l.data.uncertainty, /failed-file-unseen-declarations/);
+  assert.equal(l.data.cause, undefined);
+  assert.deepEqual(l.data.targets, []);
 });
 test("round 8 B1 conditional binding still retains valid glob alternatives", async () => {
   const g = await graph({
@@ -183,6 +183,8 @@ test("round 8 B1 namespace precedence covers types literals variants imports and
   g.one("local", "local", "macros");
   for (const [name, kind] of [
     ["S", "types"],
+    ["Option", "types"],
+    ["None", "values"],
     ["E::V", "values"],
     ["local::External", "imports"],
     ["local::External", "types"],

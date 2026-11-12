@@ -1,7 +1,7 @@
 # W2-C: Rust language module for the code graph
 
 This is the **no-toolchain fallback** under D16. Precise compiler-backed Rust
-resolution belongs to a later chunk. Version 8 uses the installed Rust WASM
+resolution belongs to a later chunk. Version 9 uses the installed Rust WASM
 grammar through the shared Tree-sitter helper and supplied source/manifest
 snapshots only. Runtime, installation and tests never invoke Cargo/rustc, read
 project files, expand macros or add dependencies. Private items are ordinary
@@ -26,7 +26,7 @@ syntax-only oracle is not a claim to have typechecked all of Vector.
 | Modules | Inline and function-local barriers; name.rs/name/mod.rs; literal path attributes including raw strings. Path-loaded files' children are beside the file. Doc strings never become path attributes; absolute paths have no captured root proof and stay unverified |
 | Cargo context | Package/lib names, dependency renames, workspace path dependencies; explicit and automatic lib/bin/src/bin/examples/tests/benches/build.rs roots. Loose files retain structure without invented crate membership |
 | Imports | Nested groups, renames, self/super/crate/absolute/raw paths; chained and cross-crate reexports; anonymous imports do not bind `_` |
-| Globs | Recursive captured reexports with cycle protection and importer visibility; intact local/explicit names beat globs. A glob edge's own target remains backlog |
+| Globs | Recursive captured reexports with cycle protection and importer visibility; intact local/explicit bindings beat globs only in their proved namespaces; unknown external import namespaces retain glob hints. A glob edge's own target remains backlog |
 | Free calls, type/pattern/value paths | Definite from proved bindings; complete captured alternatives become candidates. Unknown alternatives remain unverified. Missing names stay unresolved with names retained |
 | Values | Unit structs/variants and Self/path expressions extracted. Struct/named-variant literal names are constructor-capable type references. Locals/generics never acquire outer item targets |
 | Pattern bindings | Structural shorthand/ref/mut/captured/tuple/slice/struct/or patterns across parameters, closures, let/else, if/while-let, match and for; binding regions mask outer functions |
@@ -84,8 +84,13 @@ does not supply expected tokens at ERROR nodes; none are invented. Diagnostic
 text is deterministic and contains no absolute path.
 
 A valid-file non-dot link is `unresolved` with `data.uncertainty: "invalid-code"`
-only when lookup actually traverses a module whose own file failed, directly or
-through an explicit import in a valid file. `data.cause.files` names those
+only in two cases: a path names a module whose own file failed, or an explicit
+non-glob use names an item in such a module (including names bound by that use).
+A glob whose source module failed has UNKNOWN exports: falling through to it
+never establishes invalid-code. Such names stay unresolved with
+`failed-file-unseen-declarations`, without a cause, including prelude and macro
+names. Captured paths/explicit reexports in a valid module retain their own
+named failed-file dependency evidence. `data.cause.files` names those
 project-relative files, sorted. It has **no target, candidates or data.targets**.
 A missing name or an associated call with no captured targets is not evidence of
 an item in a failed file: it remains unresolved, without a cause. Fixing and
@@ -300,7 +305,7 @@ Fresh seeded source inspection: **30 definite, 15 restored, 15 closed sets, 15 u
 
 Loaded-machine observations: direct module parse 37.4s, analysis 30.0s, resolve 26.1s, total 105.9s. Real store total 232.9s; parse 33.5s, analysis 28.7s, resolve 27.0s; peak RSS 5,134,984 KiB. Timings are observations, not assertions.
 
-## Round 7 review response (current head)
+## Round 7 review response (d1694457)
 
 Normal merges of current origin/main: 3400dd82 and 89d77a13. Rust runtime version 8. Same owned paths; no core, dependency or other-language edits. D16 no-toolchain scope is unchanged.
 
@@ -338,3 +343,39 @@ Final required checks strictly sequential: npm ci --ignore-scripts; supplied PYM
 Fresh seeded source samples and individual judgments: round8-samples.json. 135 fresh source inspections: 30 definite, 15 restored, 15 closed candidate sets, 15 unresolved, 20 unverified name-hint links, 20 invalid-code causes, plus 20 typed self calls with a captured same-file inherent body. No wrong definite, incomplete closed set or wrong cause. In the extra self population, 19 retain the known body; one macro-hidden module has no proved crate membership and remains plain unresolved (an existing macro-expansion limit). Some sampled hint links actually call std/external methods; they are not misreported as project callees. No further ordinary pattern provable under the stated fallback rules was found.
 
 Loaded-machine observations: direct parse 51.1s, analysis 17.3s, resolve 16.2s, total 97.2s. Real store total 317.4s; parse 53.8s, analysis 22.7s, resolve 34.2s; peak RSS 5,305,896 KiB. Timings are observations, not assertions.
+
+## Round 8 review response
+
+Normal merges of current `origin/main` retained; Rust module version 9. Same owned paths, D16 scope and 16-ID hint cap. No core or other-language changes.
+
+- **B1 — namespace-aware presence:** an explicit import excludes glob fallback only in a namespace it provably binds. Uncaptured external imports retain project alternatives as unverified hints. One shared filter handles type/value/macro lookup, including unit/tuple versus braced constructors, local/explicit imports, conditional families, enum variants, structural patterns and tuple patterns. Presence of a known type still excludes globs independently of the completeness of its associated-member lookup. The site audit is in `round9-scope-audit.md`.
+- **B2 — failed globs are not causes:** an unreadable glob source has unknown exports; falling through to it is unresolved with `failed-file-unseen-declarations` and no cause. This supersedes the previous failed-glob-only positive control. Only named failed-module traversal and explicit non-glob imports through such modules establish `invalid-code`; captured explicit reexports retain their evidence. A merely possible fallback route cannot establish a cause either. Regression coverage includes all nine requested std/prelude names and the existing Option/None fixture.
+- **Small — path reasons:** unresolved associated paths use `path-type-unverified`, never a receiver-type reason. Internal parser errors keep their existing path/parser reason.
+
+Final required checks ran sequentially after the last source change and current main merge: `npm ci --ignore-scripts`; supplied `PYM_TLC_JAR` full suite (**1,660 pass, 0 skipped**); `format:check`; separate Rust tests (**262 pass, 0 skipped**). All exit 0; no process-test hang on this final run. Native controls and mutations run only in scratch copies; the module and its tests never invoke Rust. Earlier unfinished development measurements are recorded explicitly as unfinished, never passes.
+
+### Whole Vector against d1694457
+
+Pinned commit remains `515e87d9861b564f521a8992d224892cd8cae120`; all 1,563 Rust files through a fresh schema-3 production store. Default heap: `execArgv: []`, `NODE_OPTIONS: ""`. No analysis/resolution errors. Every one of the **365,514 stored link facts equals direct output**, including state, target IDs and all metadata (`round9-equality.json`).
+
+| Fact | d1694457 | Version 9 |
+|---|---:|---:|
+| Clean / partial / failed files | 1,552 / 0 / 11 | 1,552 / 0 / 11 |
+| Symbols / links | 35,422 / 365,514 | 35,422 / 365,514 |
+| Definite / closed sets / unresolved | 76,125 / 90 / 289,299 | 76,125 / 90 / 289,299 |
+| invalid-code | 247 | 247 |
+| Failed-file uncertainty annotations | 175,056 | 175,055 |
+
+**0 gains / 0 withdrawals / 0 retargets.** Exactly **one hint-list change**, no removed hint IDs: `Record` in `src/sinks/aws_kinesis/streams/integration_tests.rs` retains the project `Record` trait beside its unknown external import namespace. The actual source import is SDK `Record`; the project alternative is explicitly unverified, not claimed as that external type. Its opaque fallback reason replaces the old opaque/reach reason, clearing one reach annotation. No count-only lists change. B2 changes **0 of Vector's 247 causes**: none came from an unreadable glob source. Captured explicit reexports in valid modules keep their named traversal evidence.
+
+There are 26,670 path-prefix-only reason changes, plus 380 path-prefix changes among 2,764 other reason-text changes. The latter preserve every decision, target list/count and cause: after normalizing the path prefix, 1,123 only differ in ordering/duplication; 1,173 add opaque-scope fallback context; 466 replace generic unknown-structure text with that context; two replace it with namespace-binding-unverified. This is B1's retained fallback, not new dispatch proof (`round9-reason-classification.json`).
+
+Hints remain IDs only, capped at 16: **30,560 overflow counts; 80,514 nonempty lists; 55,558 singletons; 200,524 stored hint IDs**. Analysis return bytes: 163,551,621 → 163,744,929; graph-fact bytes: 292,492,641 → 292,685,949. The added pattern-namespace marker and reason text account for the small metadata growth. Full integrity audit passes; no closed dot sets, failed-file targets or truncated lists.
+
+Native syntax acceptance of the same 11 grammar gaps remains as recorded in round8-grammar.json; this patch changes no grammar or parse-failure policy. They still fail completely, contributing no symbols or links. No grammar special cases were added.
+
+**48 native controls; 47 mutations killed; baseline passes.** The namespace, failed-glob and path-reason mutations fail the new regressions. Source/tests are frozen across checks, mutations, direct analysis and store measurement. Fresh source judgments are in `round9-samples.json`: 30 definite, 15 closed sets, 15 unresolved, 20 unverified project-hint lists and 20 causes. No new wrong definite/closed set or wrong cause was identified; std/external actual callees are explicitly distinguished from project name hints. The existing macro-hidden Windows module remains unplaced without expansion and is not claimed as a new precision gain.
+
+Loaded-machine observations: direct parse 110.8s, analysis 48.9s, resolve 48.0s, total 225.3s. Production-store run 413.3s; parse 83.9s, analysis 45.8s, resolve 62.6s; peak RSS 5,348,332 KiB. Timings are observations, not acceptance assertions.
+
+The traversal-instrumented scratch resolver reproduces every original decision/hint/count/reason/cause before accepting its evidence: **all 247 remaining causes have named witnesses — 19 direct module/crate paths or declarations (i), 228 captured explicit non-glob imports/reexport chains (ii)** (`round9-cause-audit.json`). The independent manifest/module audit validates every **175,055** reach annotation. Neither audit edits production facts. Original 152 re-derived unchanged: **19 restored / 0 identified wrong-before / 133 unverified by named D16 rules / 0 correct-and-provable under that fallback policy still lost** (`round9-original-152.json`). This is not a claim that Rust itself cannot prove those 133 links.

@@ -1263,6 +1263,9 @@ async function createHelper(): Promise<Helper> {
             {
               implType: nextImpl,
               structLiteral: n.parent?.type === "struct_expression",
+              ...(pattern
+                ? { structPattern: n.parent?.type === "struct_pattern" }
+                : {}),
               implScope,
               blocked: genericShadow(n, n.text.split("::")[0]!),
             },

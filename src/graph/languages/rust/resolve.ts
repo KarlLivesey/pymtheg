@@ -30,14 +30,7 @@ const withoutLifetimes = (s: string) =>
     )
     .replace(/,\s*>/g, ">")
     .replace(/<\s*>/g, "");
-type Namespace =
-  | "type"
-  | "value"
-  | "macro"
-  | "pattern"
-  | "any"
-  | "import"
-  | "importType";
+type Namespace = "type" | "value" | "macro" | "any" | "import" | "importType";
 interface Place {
   crate: Crate;
   local: string;
@@ -65,8 +58,6 @@ const accepts = (s: GraphSymbol, ns: Namespace) => {
   if (ns === "importType" && s.kind === "variant") return true;
   if (ns === "type" || ns === "importType")
     return ["module", "struct", "enum", "trait", "type"].includes(s.kind);
-  if (ns === "pattern")
-    return ["variant", "struct", "const", "static"].includes(s.kind);
   return (
     ["function", "const", "static"].includes(s.kind) ||
     (s.kind === "variant" && data(s).constructorForm !== "named") ||
@@ -82,6 +73,12 @@ export function resolveRust(
     files?: string[],
   ) => void,
 ): LinkResolution[] {
+  // Cache only unproved import namespaces, never targets or positive proofs.
+  // Facts are immutable for this run; caller conditions and placement are in
+  // the key. A failed proof keeps alternatives, it never asserts a binding.
+  const unprovedImports = new Set<string>();
+  const namespaceParents = new WeakMap<Place, number>();
+  let nextNamespaceParent = 0;
   const implicationCache = new Map<string, boolean>();
   const possibilityCache = new Map<string, boolean>();
   const implies = (caller: readonly string[], condition: string): boolean => {
@@ -615,28 +612,90 @@ export function resolveRust(
     // First-segment presence is independent of member-lookup completeness.
     // A present local/explicit binding shadows globs even when its member is
     // unresolved (for example, A::default or an unexpanded imported item).
+    const importHeads = new Map<string, Found>();
     const withFallback = (
       found: Found,
       bindings: (GraphSymbol | GraphLink)[],
     ): Found => {
+      // Declaration bindings are already namespace-filtered. An explicit use
+      // needs independent proof about its first segment, not its members or
+      // an unknown external namespace. Unknown is not a binding in every ns.
+      bindings = bindings.filter((binding) => {
+        if (!("targetName" in binding)) return accepts(binding, headNs);
+        let parent = 0;
+        if (loc.parent) {
+          parent = namespaceParents.get(loc.parent) ?? ++nextNamespaceParent;
+          namespaceParents.set(loc.parent, parent);
+        }
+        const proofKey = JSON.stringify([
+          parent,
+          loc.symbol?.id,
+          binding.id,
+          loc.crate.root,
+          loc.crate.manifest,
+          loc.crate.name,
+          loc.crate.kind,
+          loc.file,
+          loc.local,
+          loc.scope,
+          headNs,
+          allowGlobs,
+          [
+            ...new Set([...(loc.conditions ?? []), ...conditionsFor(binding)]),
+          ].sort(),
+        ]);
+        if (unprovedImports.has(proofKey)) return false;
+        const head =
+          importHeads.get(binding.id) ??
+          find(
+            importPath(binding),
+            {
+              ...loc,
+              conditions: [
+                ...(loc.conditions ?? []),
+                ...conditionsFor(binding),
+              ],
+            },
+            str(data(binding).scope),
+            headNs,
+            seen,
+            allowGlobs,
+          );
+        const proven =
+          head.complete && head.symbols.some((s) => accepts(s, headNs));
+        if (!proven) unprovedImports.add(proofKey);
+        return proven;
+      });
+      found = conditional(found, bindings, loc);
       const bound = present(bindings, loc);
       if (bound || found.complete || found.failedFiles?.length)
         return { ...found, bound };
+      const fallback =
+        inScope(
+          name,
+          rest,
+          loc,
+          local,
+          q,
+          ns,
+          seen,
+          allowGlobs,
+          accessFrom,
+          true,
+        ) ?? empty();
+      // This route is only possible while the primary namespace is unproved.
+      // Its failed module cannot establish which binding the name actually uses.
+      const { failedFiles: possibleFiles, ...possibleFallback } = fallback;
       return {
         ...merge([
           found,
-          inScope(
-            name,
-            rest,
-            loc,
-            local,
-            q,
-            ns,
-            seen,
-            allowGlobs,
-            accessFrom,
-            true,
-          ) ?? empty(),
+          possibleFiles?.length
+            ? {
+                ...possibleFallback,
+                complete: false,
+                reason: "failed-file-unseen-declarations",
+              }
+            : possibleFallback,
         ]),
         bound: false,
       };
@@ -655,6 +714,24 @@ export function resolveRust(
       !l.targetName.includes("::") && loc.crate.deps.has(compact(l.targetName))
         ? "::" + l.targetName
         : l.targetName;
+    const imported = (l: GraphLink): Found => {
+      const found = find(
+        [importPath(l), ...rest].join("::"),
+        {
+          ...loc,
+          conditions: [...(loc.conditions ?? []), ...conditionsFor(l)],
+        },
+        str(data(l).scope),
+        ns,
+        seen,
+        allowGlobs,
+      );
+      // With no remaining member path this IS the head-namespace lookup.
+      // Reuse its exact result, including uncertainty, rather than recursively
+      // repeating incomplete reexport chains while proving the same binding.
+      if (!rest.length) importHeads.set(l.id, found);
+      return found;
+    };
     if (declared.length) {
       const direct = merge(
         declared.map((s) =>
@@ -665,48 +742,18 @@ export function resolveRust(
         return withFallback(conditional(direct, declared, loc), declared);
       // Conditional declarations and explicit imports are one binding family.
       // Do not discard import alternatives merely because a local item exists.
-      const imported = merge(
-        explicit.map((l) =>
-          find(
-            [importPath(l), ...rest].join("::"),
-            {
-              ...loc,
-              conditions: [
-                ...(loc.conditions ?? []),
-                ...((data(l).conditions ?? []) as string[]),
-              ],
-            },
-            str(data(l).scope),
-            ns,
-            seen,
-            allowGlobs,
-          ),
-        ),
-      );
+      const alternatives = merge(explicit.map(imported));
       return withFallback(
-        conditional(merge([direct, imported]), [...declared, ...explicit], loc),
+        conditional(
+          merge([direct, alternatives]),
+          [...declared, ...explicit],
+          loc,
+        ),
         [...declared, ...explicit],
       );
     }
     if (explicit.length) {
-      const result = merge(
-        explicit.map((l) =>
-          find(
-            [importPath(l), ...rest].join("::"),
-            {
-              ...loc,
-              conditions: [
-                ...(loc.conditions ?? []),
-                ...((data(l).conditions ?? []) as string[]),
-              ],
-            },
-            str(data(l).scope),
-            ns,
-            seen,
-            allowGlobs,
-          ),
-        ),
-      );
+      const result = merge(explicit.map(imported));
       // A type-only import does not mask a value of the same name.
       if (result.symbols.length || !result.complete)
         return withFallback(conditional(result, explicit, loc), explicit);
@@ -742,27 +789,40 @@ export function resolveRust(
         )
       : [];
     if (globs.length) {
+      // A failed glob has unknown exports. It is never evidence that this
+      // particular name traverses the failed file (the prelude may supply it).
+      const throughGlob = (found: Found): Found => {
+        if (!found.failedFiles?.length) return found;
+        const { failedFiles: ignored, ...rest } = found;
+        return {
+          ...rest,
+          complete: false,
+          reason: "failed-file-unseen-declarations",
+        };
+      };
       const suppliers: GraphLink[] = [];
       let result = merge(
         globs.map((l) => {
-          const imported = find(
-            l.targetName.replace(/::\*$/, ""),
-            {
-              ...loc,
-              conditions: [
-                ...new Set([
-                  ...(loc.conditions ?? []),
-                  ...((data(l).conditions ?? []) as string[]),
-                ]),
-              ],
-            },
-            str(data(l).scope),
-            "type",
-            seen,
-            true,
+          const imported = throughGlob(
+            find(
+              l.targetName.replace(/::\*$/, ""),
+              {
+                ...loc,
+                conditions: [
+                  ...new Set([
+                    ...(loc.conditions ?? []),
+                    ...((data(l).conditions ?? []) as string[]),
+                  ]),
+                ],
+              },
+              str(data(l).scope),
+              "type",
+              seen,
+              true,
+            ),
           );
           if (!imported.symbols.length)
-            return imported.failedFiles?.length ? imported : empty(false);
+            return imported.reason ? imported : empty(false);
           const found = merge(
             imported.symbols.map((s) =>
               children(
@@ -1690,7 +1750,10 @@ export function resolveRust(
           !instance &&
             type.reason?.split(/;\s*/).includes("parser-internal-error")
             ? type.reason
-            : ["receiver-type-unverified", type.reason]
+            : [
+                instance ? "receiver-type-unverified" : "path-type-unverified",
+                type.reason,
+              ]
                 .filter(Boolean)
                 .join("; "),
         ),
@@ -1944,7 +2007,9 @@ export function resolveRust(
             : l.kind === "macros"
               ? "macro"
               : l.kind === "patterns"
-                ? "pattern"
+                ? d.structPattern
+                  ? "importType"
+                  : "value"
                 : l.kind === "types" && d.structLiteral
                   ? "importType"
                   : ["types", "implements"].includes(l.kind)
@@ -1980,6 +2045,15 @@ export function resolveRust(
             );
             result = callableFound ? merge([result, associated]) : associated;
           }
+          if (l.kind === "patterns")
+            result = {
+              ...result,
+              symbols: result.symbols.filter((s) =>
+                ["variant", "struct", "type", "const", "static"].includes(
+                  s.kind,
+                ),
+              ),
+            };
           if (l.kind === "calls")
             result = {
               ...result,
