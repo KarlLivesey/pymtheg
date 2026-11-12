@@ -1065,8 +1065,12 @@ export function createJudge(input: JudgeInput): Judge {
     TrueKeyword: clean,
     FalseKeyword: clean,
     NullKeyword: clean,
-    PrefixUnaryExpression: clean,
-    PostfixUnaryExpression: clean,
+    // An operator's result type follows its operand's (`-x` is `bigint` or
+    // `number`): only a plain clean operand keeps.
+    PrefixUnaryExpression: (node) =>
+      operands([(node as ts.PrefixUnaryExpression).operand]),
+    PostfixUnaryExpression: (node) =>
+      operands([(node as ts.PostfixUnaryExpression).operand]),
     TypeOfExpression: clean,
     VoidExpression: clean,
     DeleteExpression: clean,
@@ -1120,6 +1124,15 @@ export function createJudge(input: JudgeInput): Judge {
       return expression(node.expression);
     return type(node.type, { env: EMPTY, visiting: NONE, at: node });
   }
+  /** An operator's result: clean only when every operand is plainly clean. */
+  function operands(nodes: readonly ts.Expression[]): Judged {
+    const judged = join(nodes.map((node) => expression(node)));
+    return judged.k === "clean"
+      ? CLEAN
+      : judged.k === "failed"
+        ? judged
+        : failed("an operator over an operand that is not plainly clean");
+  }
   function binary(node: ts.BinaryExpression): Judged {
     switch (node.operatorToken.kind) {
       case ts.SyntaxKind.BarBarToken:
@@ -1134,8 +1147,9 @@ export function createJudge(input: JudgeInput): Judge {
         return expression(node.right);
       default:
         // Arithmetic, comparison, `instanceof`, `in`, bitwise and their
-        // assignments: a primitive.
-        return CLEAN;
+        // assignments: a primitive whose type follows the operands' (`any +
+        // 1` is `any`), so only plain clean operands keep.
+        return operands([node.left, node.right]);
     }
   }
   function arrayLiteral(node: ts.ArrayLiteralExpression): Judged {
@@ -1242,6 +1256,13 @@ export function createJudge(input: JudgeInput): Judge {
   function elementAccess(node: ts.ElementAccessExpression): Judged {
     const object = expression(node.expression);
     const key = node.argumentExpression;
+    // A computed key keeps only when the key itself is plainly clean.
+    if (
+      !ts.isStringLiteralLike(key) &&
+      !ts.isNumericLiteral(key) &&
+      expression(key).k !== "clean"
+    )
+      return failed("element access with a key that is not plainly clean");
     if (!ts.isStringLiteralLike(key) && !ts.isNumericLiteral(key))
       return object.k === "clean" || object.k === "checked"
         ? object.k === "clean"

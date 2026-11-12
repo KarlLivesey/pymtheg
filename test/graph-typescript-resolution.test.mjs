@@ -5124,3 +5124,176 @@ test("heritage through a name only a failed script declares taints the member se
     "script-heritage",
   );
 });
+
+test("operators and computed keys keep only plainly clean operands (B1)", async () => {
+  const bad =
+    'export interface Failed { kind: "yes"; count: number; big: bigint; big2: bigint; key: "a" }\n';
+  const files = {
+    "bad.ts": bad,
+    "use.ts": [
+      'import { Failed } from "./bad";',
+      "class A { m() {} }",
+      "class B { m() {} }",
+      "declare const f: Failed;",
+      "declare function k(x: bigint): A;",
+      "declare function k(x: number): B;",
+      "k(-f.big).m(); // b1-negate",
+      "k(f.big - f.big2).m(); // b1-subtract",
+      "let i = f.big;",
+      "k(i++).m(); // b1-postfix",
+      "declare function k2(x: number): A;",
+      "declare function k2(x: string): B;",
+      "k2(f.count + 1).m(); // b1-add",
+      "const r = k2(f.count + 1);",
+      "r.m(); // b1-variable",
+      "declare const obj: { a: A; b: B };",
+      "obj[f.key].m(); // b1-key",
+      "(f.count + 1).toFixed(); // b1-number",
+      // An operand that is a container over the failed type (not failed
+      // itself, not plainly clean).
+      "class Box<T> { t!: T; }",
+      "declare const bx: Box<Failed>;",
+      'k2(bx + "").m(); // b1-object-operand',
+      // Plainly clean operands and keys keep.
+      "declare const n: number;",
+      "k2(n + 1).m(); // b1-clean-add",
+      'declare const key: "a" | "b";',
+      "obj[key].m(); // b1-clean-key",
+      "",
+    ].join("\n"),
+  };
+  const broken = await brokenOf(files, {
+    "bad.ts": bad + "const broken = (;\n",
+  });
+  for (const [marker, at] of [
+    ["b1-negate", "m"],
+    ["b1-subtract", "m"],
+    ["b1-postfix", "m"],
+    ["b1-add", "m"],
+    ["b1-variable", "m"],
+    ["b1-key", "m"],
+    ["b1-number", "toFixed"],
+    ["b1-object-operand", "m"],
+  ])
+    isFailed(
+      linkAt(broken, "use.ts", `// ${marker}`, at),
+      { file: "bad.ts" },
+      marker,
+    );
+  isResolved(
+    linkAt(broken, "use.ts", "// b1-clean-add", "m"),
+    "use.ts#A.m",
+    "b1-clean-add",
+  );
+  keeps(linkAt(broken, "use.ts", "// b1-clean-key", "m"), "b1-clean-key");
+});
+
+// Known limits (the contract for a program with a failed file, W2-D.md):
+// a link the module cannot attribute to the failed file is FLAGGED
+// `no-unseen-declarations` (unverified: computed without the failed file)
+// and may differ from the clean index. Each case pins that it is flagged
+// and what it gives today, with the clean index's answer for the record.
+const knownLimitFiles = (() => {
+  const bad = [
+    'export interface Failed { kind: "yes" }',
+    "export declare function isF(v: unknown): v is Failed;",
+    "export declare function assertF(v: unknown): asserts v is Failed;",
+    'export const KIND_A = "a";',
+    'export enum Kind { A = "a", B = "b" }',
+    "",
+  ].join("\n");
+  return {
+    bad,
+    use: [
+      'import { Failed, isF, assertF, KIND_A, Kind } from "./bad";',
+      'class A { m() {} kind!: "a" }',
+      'class B { m() {} kind!: "b" }',
+      "class Param { value!: Failed }",
+      "function pick(x: Param): A;",
+      "function pick(x: { value: number }): B;",
+      "function pick(x: unknown): A | B { return new A(); }",
+      "pick({ value: 123 }).m(); // kl-structural-overload",
+      "type Select<T> = T extends { value: number } ? A : B;",
+      "declare let sel: Select<Param>;",
+      "sel.m(); // kl-structural-computation",
+      "declare const x: A | B;",
+      "if (isF(x)) x.m(); // kl-guard-union",
+      "declare const y: B;",
+      "if (isF(y)) y.m(); // kl-guard-single",
+      "declare const z: A | B;",
+      "assertF(z); z.m(); // kl-asserts",
+      "declare const w1: A | B;",
+      "if (w1.kind === KIND_A) w1.m(); // kl-constant",
+      "declare const w2: A | B;",
+      "if (w2.kind === Kind.A) w2.m(); // kl-enum",
+      "declare const w3: A | B;",
+      "switch (w3.kind) { case Kind.B: w3.m(); } // kl-switch",
+      "",
+    ].join("\n"),
+  };
+})();
+let knownLimitIndex;
+const knownLimitBroken = () =>
+  (knownLimitIndex ??= indexFiles({
+    "bad.ts": knownLimitFiles.bad + "const broken = (;\n",
+    "use.ts": knownLimitFiles.use,
+  }));
+for (const [marker, title, today] of [
+  [
+    "kl-structural-overload",
+    "overload selection through a class property's type (clean B.m)",
+    { resolution: "resolved", targets: ["use.ts#A.m"] },
+  ],
+  [
+    "kl-structural-computation",
+    "a conditional type over a class whose member type is failed (clean B.m)",
+    { resolution: "resolved", targets: ["use.ts#A.m"] },
+  ],
+  [
+    "kl-guard-union",
+    "narrowing by a type guard declared in the failed file (clean no-symbol)",
+    { resolution: "ambiguous", targets: ["use.ts#A.m", "use.ts#B.m"] },
+  ],
+  [
+    "kl-guard-single",
+    "a type guard that narrows to never when readable (clean no-symbol)",
+    { resolution: "resolved", targets: ["use.ts#B.m"] },
+  ],
+  [
+    "kl-asserts",
+    "an assertion function declared in the failed file (clean no-symbol)",
+    { resolution: "ambiguous", targets: ["use.ts#A.m", "use.ts#B.m"] },
+  ],
+  [
+    "kl-constant",
+    "narrowing by `=== KIND_A`, a constant of the failed file (clean A.m)",
+    { resolution: "ambiguous", targets: ["use.ts#A.m", "use.ts#B.m"] },
+  ],
+  [
+    "kl-enum",
+    "narrowing by `=== Kind.A`, an enum of the failed file (clean A.m)",
+    { resolution: "ambiguous", targets: ["use.ts#A.m", "use.ts#B.m"] },
+  ],
+  [
+    "kl-switch",
+    "narrowing by `switch … case Kind.B` (clean B.m)",
+    { resolution: "ambiguous", targets: ["use.ts#A.m", "use.ts#B.m"] },
+  ],
+])
+  test(`known limit: ${title}`, async () => {
+    const link = linkAt(
+      await knownLimitBroken(),
+      "use.ts",
+      `// ${marker}`,
+      "m",
+    );
+    // The requirement: the link is flagged unverified.
+    assert.ok(
+      link.assumes?.includes("no-unseen-declarations"),
+      `${marker}: flagged (${JSON.stringify(link.assumes)})`,
+    );
+    assert.notEqual(link.reason, "invalid-code", `${marker}: not attributed`);
+    // What it gives today (recorded so that a change is visible).
+    assert.equal(link.resolution, today.resolution, `${marker}: resolution`);
+    assert.deepEqual(link.targets, today.targets, `${marker}: targets`);
+  });
