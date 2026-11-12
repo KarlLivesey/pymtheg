@@ -765,9 +765,10 @@ require(…)`); named and type-only re-exports; a variable, a declared and
     resolved into it; a candidate set it would extend;
   - anything else that flows through the compiler's inference.
 - **Measured on BullMQ** (one syntax error in `class Job`, the clean index
-  as the oracle; Observations): 920 links whose clean target is in
-  `job.ts` are failed and attributed to it (all of them); 0 of the links the
-  comparison covers changed target or non-failed reason; 8 correct links
+  as the reference; Observations): 920 links whose clean target is in
+  `job.ts` are failed and attributed to it (all of them); 0 of the flagged
+  links the comparison covers changed target or non-failed reason (an
+  observation: a flagged link is permitted to differ); 8 correct links
   were thrown away (failed although their clean target was elsewhere); 63
   links unresolved when clean were attributed. The comparison covers what
   the clean index can show; the known limits above are why a flagged link
@@ -776,8 +777,13 @@ require(…)`); named and type-only re-exports; a variable, a declared and
   and with files broken, and checks every link of a valid file: identical
   (perhaps plus the flag), or `invalid-code` naming a broken file with a
   `via`; and every link whose clean target is in a broken file fails,
-  naming it. Fixtures that exercise the attribution rules use it; the
-  known-limit fixtures do not (their flagged links differ by design).
+  naming it. That is stricter than the contract, which requires equality
+  only of UNFLAGGED links; fixtures that exercise the attribution rules use
+  it, and the known-limit fixtures do not (their flagged links differ). The
+  evidence script `clean-broken-diff.mjs` reports the contract's
+  requirements (unflagged links unchanged; `invalid-code` links with no
+  target, a cause in the failed files and a `via`; no target in a failed
+  file) separately from its observations (categories A-E).
 - **`data.assumes`** is a sorted array of unique names, so it is
   independent of order: `bundler-require` (below), `no-unseen-declarations`,
   or both. Tied configs keep the union.
@@ -997,7 +1003,8 @@ Full numbers, the comparison across rounds and every hand check are in
 - **One syntax error in BullMQ's `class Job`** (`isFailed(x: , y)`): the
   whole of `src/classes/job.ts` fails. 4 programs, as unbroken. Compared link
   by link with the clean index (`evidence/w2-d/clean-broken-diff.mjs`, the
-  clean index as the oracle):
+  clean index as the reference; the requirements on unflagged and
+  `invalid-code` links all hold, and A-E are observations):
   - **A.** Clean target in `job.ts`: 920, all `invalid-code` naming it (0
     exceptions).
   - **B.** Resolved elsewhere when clean, the same target when broken:
@@ -1027,7 +1034,9 @@ Job`): members `Job` would have (`job.moveToWait`, `job.log`, …,
     `jobDataByType.reduce`), and 1 member the receiver does not have
     (`this.removeListener.bind` in `flow-producer.ts`, `no-symbol` when
     clean).
-  - **E.** Changed target or changed non-failed reason: 0 / 0.
+  - **E.** Flagged links with a changed target or non-failed reason: 0 / 0
+    (an observation; permitted under the contract). Unflagged links that
+    changed: 0 (a requirement).
   - 22,803 links unresolved in both, unchanged; 439 belonged to `job.ts`.
     Six-way: 1 failed file, 991 failed links (all cause `src/classes/job.ts`),
     15,979 resolved and flagged, 634 resolved and unflagged, 4 candidate

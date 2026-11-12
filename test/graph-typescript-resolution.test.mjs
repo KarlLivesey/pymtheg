@@ -3450,10 +3450,14 @@ async function indexFiles(files) {
 }
 
 /**
- * Indexes `files` clean and with `broken` replacing some of them. Every link
- * of a valid file is then identical (maybe plus the flag) or `invalid-code`
- * naming a broken file; never another target or another non-failed reason;
- * and a link whose clean target is in a broken file fails, naming it.
+ * Indexes `files` clean and with `broken` replacing some of them, for
+ * fixtures that exercise the attribution rules. It checks, for every link of
+ * a valid file: identical to the clean index (maybe plus the flag), or
+ * `invalid-code` naming a broken file with a `via`; and a link whose clean
+ * target is in a broken file fails, naming it. That is STRICTER than the
+ * contract (W2-D.md), which requires equality only of unflagged links: a
+ * flagged link may differ from the clean index, and the known-limit
+ * fixtures, whose flagged links do differ, do not use this helper.
  */
 async function differential(files, broken) {
   const clean = await indexFiles(files);
