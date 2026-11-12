@@ -3459,7 +3459,7 @@ async function indexFiles(files) {
  * flagged link may differ from the clean index, and the known-limit
  * fixtures, whose flagged links do differ, do not use this helper.
  */
-async function differential(files, broken) {
+async function differential(files, broken, unflaggedFiles = []) {
   const clean = await indexFiles(files);
   const bad = await indexFiles({ ...files, ...broken });
   const brokenPaths = new Set(Object.keys(broken));
@@ -3506,8 +3506,17 @@ async function differential(files, broken) {
       problems.push(
         `${key} (${c.text} in ${c.line.trim()}): reason ${c.reason} -> ${b.reason}`,
       );
-    } else if (b.assumes?.includes("no-unseen-declarations")) counts.flagged++;
-    else counts.unflagged++;
+    }
+    // K3: in a program that includes a failed file, EVERY link that is not
+    // invalid-code is flagged (resolved or unresolved alike).
+    if (b.assumes?.includes("no-unseen-declarations")) counts.flagged++;
+    else {
+      counts.unflagged++;
+      if (!unflaggedFiles.includes(c.file))
+        problems.push(
+          `${key} (${c.text} in ${c.line.trim()}): ${b.resolution} ${b.reason ?? ""} is not flagged`,
+        );
+    }
   }
   return { counts, problems, clean, bad };
 }
@@ -5158,6 +5167,17 @@ test("operators and computed keys keep only plainly clean operands (B1)", async 
       "class Box<T> { t!: T; }",
       "declare const bx: Box<Failed>;",
       'k2(bx + "").m(); // b1-object-operand',
+      // A computed key that is not plainly clean, on objects whose own
+      // judgement is clean or the checker's (only the key check fails these).
+      "class C2 { a!: A; b!: B; }",
+      'declare const p: Pick<C2, "a" | "b">;',
+      "p[f.key].m(); // b1-pick-key",
+      "declare const s: string;",
+      "s[f.count].toUpperCase(); // b1-string-key",
+      'declare const rec: Record<"a" | "b", A>;',
+      "rec[f.key].m(); // b1-record-key",
+      'declare const mapped: { [K in "a" | "b"]: A };',
+      "mapped[f.key].m(); // b1-mapped-key",
       // Plainly clean operands and keys keep.
       "declare const n: number;",
       "k2(n + 1).m(); // b1-clean-add",
@@ -5178,6 +5198,10 @@ test("operators and computed keys keep only plainly clean operands (B1)", async 
     ["b1-key", "m"],
     ["b1-number", "toFixed"],
     ["b1-object-operand", "m"],
+    ["b1-pick-key", "m"],
+    ["b1-string-key", "toUpperCase"],
+    ["b1-record-key", "m"],
+    ["b1-mapped-key", "m"],
   ])
     isFailed(
       linkAt(broken, "use.ts", `// ${marker}`, at),
@@ -5301,3 +5325,43 @@ for (const [marker, title, today] of [
     assert.equal(link.resolution, today.resolution, `${marker}: resolution`);
     assert.deepEqual(link.targets, today.targets, `${marker}: targets`);
   });
+
+test("K3: in a program with a failed file, unresolved links are flagged too", async () => {
+  const bad = "export class Failed { m() {} }\n";
+  const files = {
+    "bad.ts": bad,
+    "use.ts": [
+      'import "./bad";',
+      'import { gone } from "./missing";',
+      'import { readFileSync } from "node:fs";',
+      "undeclaredName(); // no-symbol",
+      'readFileSync("x"); // external',
+      "Math.floor(1); // lib",
+      "gone(); // missing-module",
+      "export function outer() {",
+      "  const local = () => 1;",
+      "  local(); // local",
+      "  return (null as any).whatever(); // any-member",
+      "}",
+      "",
+    ].join("\n"),
+  };
+  const { bad: broken } = await differential(files, {
+    "bad.ts": bad + "const broken = (;\n",
+  });
+  const seen = new Set();
+  for (const link of broken.links.values()) {
+    if (link.file !== "use.ts" || link.reason === "invalid-code") continue;
+    assert.ok(
+      link.assumes?.includes("no-unseen-declarations"),
+      `${link.text} (${link.resolution} ${link.reason}) is flagged`,
+    );
+    if (link.resolution === "unresolved") seen.add(link.reason);
+  }
+  // The unresolved reasons this fixture produces, each flagged.
+  for (const reason of ["no-symbol", "external", "local", "missing-module"])
+    assert.ok(
+      seen.has(reason),
+      `an unresolved ${reason} link is covered (${[...seen]})`,
+    );
+});

@@ -585,25 +585,32 @@ imports of `./orig` are not linked to it; backlog).
   - **One consumer (T2): the structural rule, default-deny (P-E,
     `judge.ts`).** A name whose binding resolves into a failed file fails.
     When a member's receiver is tainted at any depth, its type is DERIVED
-    from the source, step by step, and each step
-    is trusted only through an EXPLICIT case; any form without one is FAILED.
-    Nothing reaches "keep" by omission, by a depth or pass limit, or by
-    falling back to whatever the checker found. The derivation is a set of
-    dispatch tables, each with a `default` that fails (`unhandled <switch>
-<kind> (default)` in `data.cause.via`); a test asserts the list of
+    from the source, step by step, and each step is trusted only through an
+    EXPLICIT case; any form without one is FAILED. Nothing reaches "keep" by
+    omission, by a depth or pass limit, or by falling back to whatever the
+    checker found. The derivation is a set of dispatch tables, each with a
+    `default` that fails (its `data.cause.via` reads
+    `unhandled <switch> <kind> (default)`); a test asserts the list of
     handled kinds of each: - **receiver expressions:** identifier, `this`, `super`, qualified name,
     property access (also optional chaining), element access with a
     literal key (the property, or else the index signature that answers
-    it; a computed key fails), call, `new`, tagged template, `await`,
-    parentheses, `!`, `as` and `<T>x` (the asserted type alone decides),
-    `satisfies` (the expression's own type), `?:`, `||`/`??`/`&&` (both
-    operands), comma and `=` (the right operand), arithmetic and comparison
-    (a primitive), array and object literals, function, arrow and class
-    expressions, and literals; - **declarations (member kinds):** variable (its annotation, JSDoc type,
+    it), call, `new`, tagged template, `await`, parentheses, `!`, `as` and
+    `<T>x` (the asserted type alone decides), `satisfies` (the
+    expression's own type), `?:`, `||`/`??`/`&&` (both operands), comma
+    and `=` (the right operand), array and object literals, function,
+    arrow and class expressions, and literals; - **operators and computed keys (V1):** an operator (arithmetic,
+    comparison, bitwise, `in`, `instanceof` and their assignments, and the
+    prefix and postfix `!`, `-`, `+`, `~`, `++`, `--`) keeps only when
+    every operand is plainly clean, because its result type follows the
+    operands' (`any + 1` is `any`; `-x` is `bigint` or `number`); element
+    access with a computed key keeps only when the key is plainly clean
+    (and then the object decides: a clean or checker-derived object keeps,
+    any other fails); - **declarations (member kinds):** variable (its annotation, JSDoc type,
     initialiser, the element of a `for … of`), parameter (annotation,
-    initialiser, else its contextual type), destructuring element, property
-    (class or interface), property assignment and shorthand, method,
-    function, getter, index signature, enum, class, namespace, module; - **type nodes:** keyword and literal types, `this`, references to a
+    initialiser, else its contextual type), destructuring element,
+    property (class or interface), property assignment and shorthand,
+    method, function, getter, index signature, enum, class, namespace,
+    module; - **type nodes:** keyword and literal types, `this`, references to a
     class, interface or enum, type parameters, alias references, arrays,
     tuples (named, optional and rest elements), function and constructor
     types, type literals, unions, intersections, parentheses, `readonly`,
@@ -615,48 +622,51 @@ imports of `./orig` are not linked to it; backlog).
     strings), **await** (`Promise`, `PromiseLike`, non-thenables) and
     **calls** (functions, `new` of a class, call and construct signatures
     of interfaces and type literals, unions).
-    **The gate: tainted at any depth.** A receiver is tainted when any name
-    in it reaches a failed file through a dependency graph over symbols:
-    each symbol's declarations (types, initialisers, bodies), a destructured
-    name's whole declaration, a `for … of` variable's iterated expression,
-    an untyped callback parameter's call (or typed variable or property),
-    `this` and `super`'s class, a shorthand property's value, dynamic
-    imports, `require` and import types of a failed module, bindings of a
-    failed module, and names only a failed script or `declare global`
-    declares. The graph is built lazily, once per program, and failed files
-    are propagated to dependents over reverse edges by a worklist, so an
-    answer never depends on the order of the questions. (T1's routes give the
-    cause and `via` when they apply; the graph is the gate.) Within the
-    derivation, a value that depends on itself (a cycle) is FAILED and is
-    never memoised, so no judgement depends on which node was evaluated
-    first.
-    The judgements: - **Substitution is explicit and per parameter.** A type node is
-    interpreted under an environment mapping each type parameter in scope
-    (the owner's, the method's, the alias's) to the judgement of its
-    argument; a type parameter is tainted only if its argument is
-    (`Two<string, Job>`'s `T extends string ? A : B` keeps `A`). A member's
-    type is interpreted under its owner's environment, reached through
-    heritage with each base's arguments substituted. `this` denotes the
-    receiver's own judged type with the same environment
-    (`box.self().value`). An alias reference expands under the
-    environment of its arguments, with a visited set and no depth limit
-    (re-entering an alias being expanded fails if anything tainted is in
-    scope). - **FAILED:** a failed declaration (a binding of a failed module, a name a
-    failed script declares), a type parameter bound to a FAILED type, a
-    union or intersection with a FAILED part, and a computation (iii) with
-    a tainted input: any type parameter or type reference inside it that is
-    FAILED or a container with a tainted argument at any depth (a function
-    type with a failed parameter type counts: `ReturnType<(j: Job) =>
-string>` fails, accepted). A computation with untainted inputs keeps
-    the checker's own derivation of its result (R-2): `InstanceType<typeof
-Worker>` is `Worker`, whose members are again judged by their
+
+        **The gate: tainted at any depth.** A receiver is tainted when any name
+        in it reaches a failed file through a dependency graph over symbols:
+        each symbol's declarations (types, initialisers, bodies), a destructured
+        name's whole declaration, a `for … of` variable's iterated expression,
+        an untyped callback parameter's call (or typed variable or property),
+        `this` and `super`'s class, a shorthand property's value, dynamic
+        imports, `require` and import types of a failed module, bindings of a
+        failed module, and names only a failed script or `declare global`
+        declares. The graph is built lazily, once per program, and failed files
+        are propagated to dependents over reverse edges by a worklist, so an
+        answer never depends on the order of the questions. (T1's routes give the
+        cause and `via` when they apply; the graph is the gate.) Within the
+        derivation, a value that depends on itself (a cycle) is FAILED and is
+        never memoised, so no judgement depends on which node was evaluated
+        first.
+        The judgements: - **Substitution is explicit and per parameter.** A type node is
+        interpreted under an environment mapping each type parameter in scope
+        (the owner's, the method's, the alias's) to the judgement of its
+        argument; a type parameter is tainted only if its argument is
+        (`Two<string, Job>`'s `T extends string ? A : B` keeps `A`). A member's
+        type is interpreted under its owner's environment, reached through
+        heritage with each base's arguments substituted. `this` denotes the
+        receiver's own judged type with the same environment
+        (`box.self().value`). An alias reference expands under the
+        environment of its arguments, with a visited set and no depth limit
+        (re-entering an alias being expanded fails if anything tainted is in
+        scope). - **FAILED:** a failed declaration (a binding of a failed module, a name a
+        failed script declares), a type parameter bound to a FAILED type, a
+        union or intersection with a FAILED part, and a computation (iii) with
+        a tainted input: any type parameter or type reference inside it that is
+        FAILED or a container with a tainted argument at any depth (a function
+        type with a failed parameter type counts: `ReturnType<(j: Job) =>
+
+        string>`fails, accepted). A computation with untainted inputs keeps
+
+    the checker's own derivation of its result (R-2):`InstanceType<typeof
+     Worker>`is`Worker`, whose members are again judged by their
     declarations. - **A class or interface `D<args>`** keeps its member set (`Array<Job>.map`,
     `Promise<Job>.then`), the member's type judged with `D`'s parameters
-    substituted (`Map<string, Job>.get(k)!.m()` fails). Function types keep
-    `.call`, `.bind` and `.apply`; calling one gives its declared return
-    type (`@returns` in JS). - **Calls.** For a single signature: its declared return type, with the
+    substituted (`Map<string, Job>.get(k)!.m()`fails). Function types keep
+    `.call`, `.bind`and`.apply`; calling one gives its declared return
+    type (`@returns`in JS). - **Calls.** For a single signature: its declared return type, with the
     call's type arguments, given or inferred from the arguments (an
-    argument where the parameter is exactly `T`, an element of `T[]`, a
+    argument where the parameter is exactly`T`, an element of `T[]`, a
     callback's return for `(…) => T`; the constraint is always part of
     it); a generic function without a declared return type and a tainted
     argument fails; a non-generic one gives its returned expressions,
@@ -672,6 +682,7 @@ Worker>` is `Worker`, whose members are again judged by their
     type arguments fails. The condition that the shared class be untainted
     is not needed: a tainted shared class is still governed by the
     member-set rule below (tested).
+
   - **Tainted member sets (O1).** A member lookup on a receiver whose class
     or interface reaches a failed file through heritage (`extends`,
     `implements`, interface `extends`), a merge, or a global a failed file
@@ -712,14 +723,21 @@ Worker>` is `Worker`, whose members are again judged by their
     depends on the failed file: `import of the failed file`, `binding Job`,
     `receiver job`, `type Derived`, `callee make`, `asserted type Job`,
     `argument b of overloaded o.f`, `name N declared in the failed file`,
-    `reference to the failed file`, `name job in the receiver`, followed by
-    the structural reason: `a type-level computation over a tainted input`,
-    `the result of an overloaded callee with a tainted argument`, `the
-result of an overloaded callee whose parameter types depend on the
-failed file`, `inherited member m of Derived, whose member set reaches
-the failed file`, `element access with a computed key`, or `unhandled
-<switch> <kind> (default)`; a call link that fails under O2 says
+    `reference to the failed file`, `name job in the receiver` or
+    `the receiver depends on the failed file`, followed by the structural
+    reason, one of:
+    - `a type-level computation over a tainted input`;
+    - `the result of an overloaded callee with a tainted argument`;
+    - `the result of an overloaded callee whose parameter types depend on the failed file`;
+    - `inherited member m of Derived, whose member set reaches the failed file`;
+    - `element access with a computed key`;
+    - `element access with a key that is not plainly clean` (V1);
+    - `an operator over an operand that is not plainly clean` (V1);
+    - `unhandled <switch> <kind> (default)`.
+
+    A call link that fails under O2 says
     `overloaded callee whose parameter types depend on the failed file`.
+
   - **One constructor (T3)** builds every failed link and cannot do so
     without a cause; a link marked `invalid-code` without one is a
     programming error that stops the analysis.
@@ -737,6 +755,7 @@ require(…)`); named and type-only re-exports; a variable, a declared and
     and `declare global` in a failed module.
   - An import whose specifier resolves to no file at all stays an ordinary
     unresolved import (`missing-module`, no cause): missing is not broken.
+
 - **The flag (K3).** If a program had at least one failed file among the
   files it would otherwise include (a root, or a file it imports), every
   link computed from that program, except the `invalid-code` links, carries
