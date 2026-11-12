@@ -12,7 +12,7 @@ const lines = (...items) => [...items, ""].join("\n");
 const ST = "struct{ p.T; B *bytes.Buffer; F p.T }";
 // [route, declarations, the value expression]
 const ROUTES = [
-  ["package var", `var S ${ST}`, "S"],
+  ["package-level var", "", "PS"],
   ["local var", `var s ${ST}`, "s"],
   ["local var, address taken", `var s ${ST}\n\t_ = &s`, "s"],
   ["parameter", "", "arg"],
@@ -37,6 +37,7 @@ const file = (route, decls, expr, range, member) =>
     '\t"example.com/m/p"',
     ")",
     `type AL = ${ST}`,
+    `var PS ${ST}`,
     `type O struct{ in ${ST} }`,
     `func mk() ${ST} { return ${ST}{} }`,
     `func Use(arg ${ST}, fv func() ${ST}, o O, ptr *${ST}) {`,

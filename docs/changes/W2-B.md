@@ -1122,7 +1122,7 @@ The module version is 19.
 
 The module version is 20.
 
-## Module version 21 (W2-B2, after merge)
+## Module version 22 (W2-B2, after merge)
 
 Fixes from a second-model review of the merged module; details in
 `docs/changes/W2-B2.md`.

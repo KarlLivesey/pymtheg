@@ -2293,8 +2293,7 @@ class GoResolver {
         desc(data.fn[use.i], symbol.file, depth + 1, use.then);
       // A defined type over a container literal (`type NS []struct{…}`) has
       // no target term: its element comes from the literal's description.
-      if (use.k === "comp" && data.v)
-        desc(data.v, symbol.file, depth + 1, use);
+      if (use.k === "comp" && data.v) desc(data.v, symbol.file, depth + 1, use);
       if (use.k === "members")
         for (const embed of this.embedsBySource.get(symbol.id) ?? [])
           ref(
