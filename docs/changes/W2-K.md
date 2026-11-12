@@ -1,112 +1,107 @@
 # W2-K: can the Rust build chain provide exact code-graph links?
 
-Investigation only (round 2, after review). Evidence, scripts and raw outputs:
-`evidence/w2-k/`. No product code, contract or support level changes.
+Investigation only (round 3, after two reviews). Evidence, scripts and raw
+outputs: `evidence/w2-k/`. No product code, contract or support level changes.
 
 ## The answer
 
-**Not completely, with `cargo` and `rustc` alone; what they cannot do is a known
-set of call classes.** On stable, LLVM IR with the default debug info is the
-only output that ties a call's position to its callee and the callee's
-definition. Where it exists it is exact: it got every compiled hard case right.
+**Partly, and exactly where it answers.** Stable `cargo`/`rustc` (LLVM IR, or
+the same data in `asm`, with the dev profile's debug info) give an exact
+call → callee record for every call rustc generates code for, including calls
+inlined at opt-level 0.
 
-Combining stable builds raises its coverage of `vector-common`'s 467 method
-calls:
+Measured on three Vector crates, with each crate built alone. Figures are shares
+of each crate's method calls, in the order `vector-common` / `file-source-common`
+/ `tracing-limit`:
 
-| Stable builds                               | Coverage                         |
-| ------------------------------------------- | -------------------------------- |
-| dev library build                           | 39.2%                            |
-| dev + test builds                           | 71.1%                            |
-| dev + test, with `-C link-dead-code`        | 72.2%                            |
-| every variant tried, including all features | **77.5%** (the measured ceiling) |
+| Build set            | With any record       | With a callee definition location |
+| -------------------- | --------------------- | --------------------------------- |
+| Dev library build    | 40.5% / 11.5% / 16.1% | 36.8% / 10.6% / 10.1%             |
+| Dev + test builds    | 74.3% / 93.8% / 100%  | 65.7% / 64.6% / 67.8%             |
+| Every stable variant | 80.7% / 93.8% / 100%  | 71.3% / 64.6% / 67.8%             |
 
-Four classes remain impossible whatever the flags:
+The rest of the "any record" share is calls whose callee is only declared, with
+no file or line. Building `vector-common`'s workspace dependents too raised it
+to at least 87.6% / 78.2%.
 
-- `dyn` calls (no static callee);
-- generic bodies never instantiated in any build;
-- cfg branches no built feature set selects;
-- every call in a crate that does not compile.
+What the stable route cannot give falls into three kinds:
 
-The IR also has no imports, type references or `implements`. Stable MIR names
-callees even where the IR does not, but carries no call-site positions and
-declares itself "for human consumers only". Macro expansion, MIR with spans and
-rustdoc JSON need nightly; save-analysis has been removed.
+- **Limits of debug information itself** (known classes, tested at opt-level 0):
+  calls evaluated at compile time, calls rustc rewrites away (`clone()` on a
+  `u32`), generic bodies never instantiated in the crates built, cfg branches
+  no built feature set selects, and anything in a crate that does not compile.
+- **Run-time dispatch:** a `dyn` call is indirect. A devirtualised inlined
+  instance names only a subset of its targets.
+- **Everything but calls:** no imports, type references or `implements`.
 
-(Round 1's "23.6%" was a bug in my IR parser, which missed `invoke` calls.)
+**rust-analyzer**, an optional rustup component, gives an occurrence for 98.7% /
+96.5% / 100% of the same calls, and 88.9% (default features) or 98.2% (all
+features) of all Vector calls. Where comparable, it agreed with rustc everywhere
+(0 disagreements). Calls into std and dependencies come back as symbols without
+locations. Correct results require running project code (switched off, they
+are wrong, with exit 0), and it degrades silently.
 
-**With rust-analyzer** (a rustup component, not in the default build chain), the
-hard cases all resolved to the method rustc calls. Vector coverage:
+Both toolchain routes run build scripts and proc macros. The IR route does so
+as any `cargo build` does.
 
-| Feature set  | Occurrence, of all 79,454 calls in the 1,563 tracked `.rs` files | Within the files it indexed |
-| ------------ | ---------------------------------------------------------------- | --------------------------- |
-| Default      | 88.9%                                                            | 97.7% (1,481 files)         |
-| All features | 98.2%                                                            | 99.8%                       |
+## The options
 
-In the default run, 82 files (9.0% of calls) are behind inactive features and
-were never analysed.
+Coverage is "method calls with a callee definition location", in the order
+`vector-common` / `file-source-common` / `tracing-limit`. For rust-analyzer it
+is occurrences, with the in-workspace share that has a location in brackets.
 
-The cross-check against rustc on `vector-common` found **0 disagreements**:
+| Option                                                         | Needs installed            | Runs project code       | Coverage                                                                           | Crate that does not compile               | Cost                                                                                                                          |
+| -------------------------------------------------------------- | -------------------------- | ----------------------- | ---------------------------------------------------------------------------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| (1) Hand-written W2-C only                                     | Nothing                    | No                      | Structure-level (not measured here)                                                | Partial                                   | Parsing only                                                                                                                  |
+| (2) Stable IR tier (dev + test), W2-C underneath               | `cargo`/`rustc` only (D16) | Yes, like `cargo build` | 65.7% / 64.6% / 67.8% (all variants: 71.3% / 64.6% / 67.8%)                        | That crate falls back to W2-C             | Debug builds per changed crate: cold about 1 min, 1.5 GiB, about 2.3 GB target; all variants about 6.4 GB for `vector-common` |
+| (3) rust-analyzer when present, W2-C fallback                  | rustup component           | Yes (off = wrong links) | 98.7% / 96.5% / 100% occurrences (22.1% / 17.4% / 8.7% in-workspace with location) | Partial, exit 0, sometimes silently wrong | Whole workspace per change: 4–8 min, 9–13 GiB                                                                                 |
+| (4) Layered: W2-C base, then (2), then (3) on top when present | (2); (3) optional          | Yes                     | (2) everywhere, (3) where installed                                                | W2-C (plus partial (3))                   | (2) plus optional (3)                                                                                                         |
 
-- 71 calls compared by definition position, all agreeing;
-- 217 compared by method name only, all agreeing;
-- 74 not comparable (macro-generated, external declarations, generic receivers).
+## Recommendation: option 4, layered
 
-The costs:
+The numbers argue for it, for these reasons:
 
-- **Project code runs.** By default it runs build scripts and proc macros.
-  `cargo.buildScripts.overrideCommand` switches that off, and then derive and
-  attribute calls resolve to the **wrong** method, with exit 0. No mode is both
-  execution-free and correct.
-- **Failures are silent.** Missing dependencies, a failing proc-macro crate, or
-  no network for the standard library's metadata give wrong or missing links,
-  still with exit 0. Offline: 7.4% or 30.0% coverage of all calls. Network was
-  needed once for the one toolchain observed.
-- **Runtime.** A whole-workspace run took about 4–8 minutes and up to about
-  12 GiB on Vector, one run per feature set.
-- **Identity.** Symbol strings are not unique, so links must be mapped by
-  definition position.
+1. **It uses only the default build chain, which D16 allows.** Option 2 alone
+   gives exact links for about two-thirds of method calls with dev + test
+   builds, and a record for 74–100%. Option 3's extra reach comes from a
+   component D16 makes optional, so it cannot be the base.
+2. **Neither toolchain route is safe on its own for code mid-edit.** IR gives
+   nothing for a crate that does not compile, and rust-analyzer can be silently
+   wrong. W2-C must stay underneath, and every link must record which route
+   produced it.
+3. **rust-analyzer adds what IR structurally cannot:** `dyn` and generic calls
+   to the trait declaration, uninstantiated and cfg-off code (with the chosen
+   feature set), and partial results in broken crates.
+4. **Option 3 alone** would leave machines without the component at
+   structure-level precision, which option 4 avoids.
 
-## Recommendation: option 3, rust-analyzer when present, hand-written fallback otherwise
+Conditions, each a decision or a chunk:
 
-| Option                                        | Precision                                                                                                                                                                                                                                                                | What it costs the user                                                                                                                                                                                                                              |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| (1) stable cargo/rustc only                   | Exact for generated code. Up to 77.5% of method calls in a crate that compiles, with every variant built; 39.2% from a dev build. Never `dyn`, uninstantiated generics or unselected cfg. Nothing for a crate with an error; no imports, type references or `implements` | Nothing to install. Several full debug builds per change (`vector-common`: about 1 minute and about 2 GB each, cold). Runs build scripts and proc macros                                                                                            |
-| (2) rust-analyzer required                    | All call classes, for the analysed cfg set: 88.9% of Vector's calls with default features, 98.2% with all features. Trait-impl relationships                                                                                                                             | `rustup component add rust-analyzer` (one command, about 45 MB). Network at least once. Dependencies fetched. Minutes and up to about 12 GiB per change on a Vector-sized workspace. Executes project code. Rust indexing refuses to run without it |
-| (3) rust-analyzer when present, W2-C fallback | (2) where present, otherwise structure-level                                                                                                                                                                                                                             | As (2) on machines that have it; nothing extra otherwise. Results differ by machine, so every link records the route that produced it                                                                                                               |
-
-Option (1) cannot give `dyn` or uninstantiated-generic calls, and loses every
-link in a crate mid-edit. Agents index broken trees, so it cannot be the
-precision route; it might serve as an extra cross-check. Option (2) contradicts
-D16's "optional extras unless Karl says otherwise". Option (3) keeps D16 and
-gets near-complete links where the developer has the component.
-
-Conditions for (3), each a decision or a chunk:
-
-1. Karl allows executing project code while indexing Rust. W1-C forbids it, and
-   the execution-free mode is wrong.
-2. Degraded runs are detected from the log (`cargo metadata failed`) and
-   `diagnostics` (`unresolved-macro-call`, `proc-macro not yet built`), and
-   handled with a per-crate fallback. The exit code cannot be trusted.
-3. Links are mapped by definition position, with disk checked against the
-   snapshot hashes. The cache key covers the snapshot hashes, context files,
-   `rustc -vV`, the rust-analyzer version and the feature set, so an unchanged
-   re-index does no work.
-4. The analysed feature set is a stated choice: default, all, or configured.
-5. Macro-generated targets with no location stay unresolved with the name kept.
-6. The supported rust-analyzer versions are pinned and tested; its CLI has no
-   stability promise.
+1. **Executing project code.** Karl allows it while indexing Rust; W1-C forbids
+   it today. Without that, only option 1 remains.
+2. **Several callees at one site.** Sites with more than one callee
+   (instantiations: 0–1 sites per crate built alone, 5 for `vector-common` with its dependents; one site had 32 callee
+   locations) become one definite `calls` link per impl, marked
+   per-instantiation. They are not an "ambiguous" candidate set, because all of
+   them are called.
+3. **Devirtualised `dyn` targets.** Never reported as "the" target.
+4. **Failures.** IR failures are visible (an error, no IR). rust-analyzer
+   failures are detected from its log and `diagnostics`, never its exit code.
+5. **Mapping and caching.** Links are mapped by definition position. Results are
+   cached on snapshot hashes, context files, `rustc -vV`, the tool version and
+   the feature set. The build set (dev + test by default) is a stated choice.
 
 Unanswered:
 
-- whether full Vector output repeats byte-for-byte (tiny crate did);
-- what the 1,691 default-run calls with no occurrence in indexed files are;
-- whether DWARF adds anything to IR;
+- what building the whole workspace adds, beyond the measured lower bound;
+- behaviour under `-O` beyond the `dyn` probe;
+- full-Vector byte repeatability;
 - LSIF under broken code;
-- network needs on toolchains other than the one observed.
+- network needs on other toolchains.
 
 Go is installed on this machine now (go1.27.4) but was not measured in this
 chunk; a separate Go investigation will measure it.
 
 Checks: `npm ci`; `npm test` without `PYM_TLC_JAR` gave 1,244 pass, 0 fail, 2
-skipped. The 2 skips are TLC backend tests, unresolved rather than passed.
-`npm run format:check` is clean.
+skipped (TLC backend tests: unresolved, not passed); `npm run format:check`
+clean.
