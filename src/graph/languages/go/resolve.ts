@@ -2504,20 +2504,15 @@ class GoResolver {
       return unseen
         ? { ids: [], definite: false, dispatch: true, unseen: true }
         : UNRESOLVED;
-    // Layer 1: an unseen type of a lossy package may implement any interface that
-    // package can reach.
     // Every dispatch set is open (no-toolchain fallback): membership is a crude
     // structural match, not proven. The label still says whether a type outside
     // the project could be in it: a set the earlier rules would have closed
-    // (static interface known, sealed, every member matched, nothing expanded,
-    // no lossy package reaching it) is open for that reason alone.
+    // (static interface known, sealed, every member matched, nothing expanded)
+    // is open for that reason alone. An unseen type of a lossy package that
+    // reaches the interface is said by `unseen` (declarations-may-be-unseen),
+    // not by claiming outside implementers.
     const sealedOnly =
-      exact &&
-      !found.open &&
-      staticTypes!.every(
-        (type) =>
-          this.sealed(type) && !this.lossyReaches(this.pkgOf(type)?.key),
-      );
+      exact && !found.open && staticTypes!.every((type) => this.sealed(type));
     return {
       ids: [...specs, ...found.targets].map((symbol) => symbol.id),
       definite: false,

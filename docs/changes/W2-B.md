@@ -432,29 +432,25 @@ p.New(); x.M()` fails when `p.New` is valid but its result type `T` is in a
     as not resolved fails when any type its source mentions needs a failed
     file. "Not resolved" means plainly unresolved, an unknown receiver, a
     name-only set, or an over-cap set; it excludes a definite target and an
-    interface-dispatch set over known types.
-    - Its cause is the union of the failed-file causes of every type term the
-      source mentions: the written types of the receiver chain's values,
-      variables, parameters, fields and results, including type arguments
-      (`Box[p.T]`), followed through valid declarations (underlying types of
-      defined types, alias targets, embedded fields).
-    - Types written in the receiver expression itself count the same way:
-      conversion types (`(*p.T)(nil)`, `interface{ Get() p.T }(nil)`),
-      composite-literal types (`struct{ p.T }{}`), anonymous struct, interface
-      and func types (in a declaration, `var w struct{ F p.T }`, or as an
-      element, `[2]struct{ p.T }`), and type arguments (`p.Id[*p.T](x)`). The
-      extractor keeps the named types written in such a type on the value's
-      description. A generic call's result counts the type arguments written on
-      the call, on the callee and on the receiver's declared type
-      (`var b Box[*p.T]; b.Get()`), since instantiation is not modelled.
-    - "Depends on a failed file" is decided by what the source mentions, not by
-      how far resolution got. Instantiation is not modelled.
-    - It follows only what the lookup depends on: for a call, the result it
-      uses; for a member found on a type, not what that type embeds; for a
-      named field of an anonymous struct, only that field's type (restic's
-      table tests, `for _, test := range []struct{ name string; damage
+    interface-dispatch set over known types. - Its cause is the union of the failed-file causes of every type term the
+    source mentions: the written types of the receiver chain's values,
+    variables, parameters, fields and results, including type arguments
+    (`Box[p.T]`), followed through valid declarations (underlying types of
+    defined types, alias targets, embedded fields). - Types written in the receiver expression itself count the same way:
+    conversion types (`(*p.T)(nil)`, `interface{ Get() p.T }(nil)`),
+    composite-literal types (`struct{ p.T }{}`), anonymous struct, interface
+    and func types (in a declaration, `var w struct{ F p.T }`, or as an
+    element, `[2]struct{ p.T }`), and type arguments (`p.Id[*p.T](x)`). The
+    extractor keeps the named types written in such a type on the value's
+    description. A generic call's result counts the type arguments written on
+    the call, on the callee and on the receiver's declared type
+    (`var b Box[*p.T]; b.Get()`), since instantiation is not modelled. - "Depends on a failed file" is decided by what the source mentions, not by
+    how far resolution got. Instantiation is not modelled. - It follows only what the lookup depends on: for a call, the result it
+    uses; for a member found on a type, not what that type embeds; for a
+    named field of an anonymous struct, only that field's type (restic's
+    table tests, `for _, test := range []struct{ name string; damage
 func(*Repository) }`, keep `test.name` free of the failed
-      `Repository`).
+    `Repository`).
   - The link has no target, no candidates, and no would-be target. No symbol
     inside a failed file is named, and it is never a member of any set.
   - An import of a package all of whose files failed is itself failed, with
@@ -485,11 +481,16 @@ func(*Repository) }`, keep `test.name` free of the failed
     one sealed by an unexported method only from a package that reaches its
     own. A directory whose every file failed counts too.
   - When no valid member is left (the only implementer was in the failed
-    file), the dispatch link is unresolved with `data.open.reason:
-"declarations-may-be-unseen"`, never plainly unresolved: its target may be
+    file), the dispatch link is unresolved with `data.open.reason` set to
+    `declarations-may-be-unseen`, never plainly unresolved: its target may be
     an unseen declaration. It is not `invalid-code`, because nothing proves it
     needs the failed file (a type outside the project may implement the
     interface).
+  - A set on a sealed interface (one with an unexported method) that a lossy
+    package reaches is labelled `structural-match-unverified` plus
+    `declarations-may-be-unseen`. It no longer says
+    `external-implementers-possible`: nothing outside the project can
+    implement it.
   - Build-variant sets with a member there are open with
     `declarations-may-be-unseen`.
   - Other packages are affected only through these rules.
@@ -1051,10 +1052,15 @@ The module version is 18.
 - **Known limit:** links on code that does not type-check are unspecified.
 - **Tests:** `test/graph-go-review15.test.mjs`, and the 29 diagnostic cases in
   `test/graph-go-failed-files.test.mjs`.
-- **Mutations:** M94–M104, and M93 re-targeted to the range. M102 tests the
-  container path with the backstop switched off and only the B3 test run,
-  because the backstop alone also catches that case. The control: with only
-  the backstop off, the B3 test passes.
+- **Mutations:** M94–M105, and M93 re-targeted to the range.
+  - The backstop also catches what M85 (failed receiver to a name-only set),
+    M89 (promotion cause dropped) and M102 (failed container) break. Each
+    therefore switches the backstop off too and runs only its own test, so
+    what is tested is the propagation path itself. The control: with only the
+    backstop off, each of those tests passes.
+  - M39 is retired with the clause it guarded: a sealed interface reached by
+    a lossy package is no longer labelled external. A new test pins the exact
+    reasons, and M47 is guarded by it again.
 
 The module version is 19.
 

@@ -358,3 +358,37 @@ test("(i) dispatch where a failed file could declare a member says so", async ()
     ),
   );
 });
+
+test("(i) a sealed interface a failed file's package reaches: unseen, never outside implementers", async () => {
+  const files = (bad) => ({
+    "go.mod": MOD,
+    "internal/x/x.go": lines(
+      "package x",
+      "type I interface{ M(); h() }",
+      "type Carrier struct{}",
+      "func (Carrier) M() {}",
+      "func (Carrier) h() {}",
+      "func Use(v I) { v.M() }",
+    ),
+    "internal/x/z/z.go": lines(
+      "package z",
+      'import "example.com/m/internal/x"',
+      "type Z struct{ x.Carrier }",
+      "var _ x.I = Z{}",
+    ),
+    ...(bad
+      ? { "internal/x/z/bad.go": lines("package z", "func F() { (( }") }
+      : {}),
+  });
+  // Z's method set is unknown while z has a failed file; only the project can
+  // implement I (unexported h), so no outside implementer is claimed.
+  let { links } = await project(files(true));
+  assert.deepEqual(call(links, "internal/x/x.go", "v.M").data.open, {
+    reason: "declarations-may-be-unseen",
+    reasons: ["declarations-may-be-unseen", "structural-match-unverified"],
+  });
+  ({ links } = await project(files(false)));
+  assert.deepEqual(call(links, "internal/x/x.go", "v.M").data.open, {
+    reason: "structural-match-unverified",
+  });
+});
