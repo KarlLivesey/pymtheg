@@ -124,6 +124,7 @@ export type AttributeRule = {
   category: "builtin" | "prelude" | "tool";
   effect: AttributeEffect;
   condition?: string;
+  shadowing?: "visible";
 };
 /** One classification table. Native shadow controls pin every builtin entry. */
 export const attributeRules = new Map<string, AttributeRule>([
@@ -180,8 +181,11 @@ export const attributeRules = new Map<string, AttributeRule>([
   ["windows_subsystem", { category: "builtin", effect: "inert" }],
   ["test", { category: "prelude", effect: "conditional", condition: "test" }],
   ["bench", { category: "prelude", effect: "conditional", condition: "test" }],
-  ["derive", { category: "prelude", effect: "inert" }],
-  ["global_allocator", { category: "prelude", effect: "inert" }],
+  ["derive", { category: "prelude", effect: "inert", shadowing: "visible" }],
+  [
+    "global_allocator",
+    { category: "prelude", effect: "inert", shadowing: "visible" },
+  ],
   ["test_case", { category: "prelude", effect: "opaque" }],
   ["cfg_eval", { category: "prelude", effect: "opaque" }],
   ["cfg_accessible", { category: "prelude", effect: "opaque" }],
@@ -191,6 +195,19 @@ export const attributeRules = new Map<string, AttributeRule>([
   ["miri", { category: "tool", effect: "inert" }],
   ["rust_analyzer", { category: "tool", effect: "inert" }],
 ]);
+/** E4: only captured bindings shadow these two heads; other heads stay strict. */
+export function attributeBindingShadows(
+  name: string,
+  visible: boolean,
+  unseen: boolean,
+): boolean {
+  return (
+    visible ||
+    (attributeRules.get(name.split("::")[0]!)?.shadowing !== "visible" &&
+      unseen)
+  );
+}
+export type MacroUseImport = { crate: string; names: string[] | null };
 export function attributeEffect(
   name: string,
   shadowed = false,
@@ -597,7 +614,13 @@ async function createHelper(): Promise<Helper> {
       }
       const attributeBindings = new Map<
         number,
-        { node: Node; names: Set<string>; unknown: boolean; macroUse: boolean }
+        {
+          node: Node;
+          names: Set<string>;
+          unknown: boolean;
+          macroUse: boolean;
+          macroUseImports: MacroUseImport[];
+        }
       >();
       const explicitCache = new Map<number, string[]>();
       function explicitConditionsOn(n: Node): string[] {
@@ -637,10 +660,17 @@ async function createHelper(): Promise<Helper> {
           if (name) names.push(compact(name.text));
         }
         let macroUse = false;
+        const macroUseImports: MacroUseImport[] = [];
         if (n.type === "extern_crate_declaration")
           for (const a of attributesOn(n))
             for (const app of applications(meta(a), n))
               if (app.meta.name === "macro_use") {
+                macroUseImports.push({
+                  crate: compact(field(n, "name")?.text ?? ""),
+                  names: app.meta.args
+                    ? payloads(app.meta.args).map((x) => x.name)
+                    : null,
+                });
                 if (!app.meta.args) macroUse = true;
                 else
                   for (const entry of payloads(app.meta.args))
@@ -661,6 +691,7 @@ async function createHelper(): Promise<Helper> {
             names: new Set<string>(),
             unknown: false,
             macroUse: false,
+            macroUseImports: [],
           };
           for (const name of names)
             if (
@@ -669,11 +700,13 @@ async function createHelper(): Promise<Helper> {
                 (["use_declaration", "macro_definition"].includes(n.type) ||
                   (n.type === "extern_crate_declaration" &&
                     names.includes(name) &&
+                    attributeRules.get(name)?.shadowing !== "visible" &&
                     attributesOn(n).some((a) => meta(a).name === "macro_use"))))
             )
               v.names.add(name);
           v.unknown ||= unknown;
           v.macroUse ||= macroUse;
+          v.macroUseImports.push(...macroUseImports);
           attributeBindings.set(scope.id, v);
         }
         for (const c of n.namedChildren) collectAttributeBindings(c);
@@ -687,9 +720,11 @@ async function createHelper(): Promise<Helper> {
           const b = attributeBindings.get(node.id);
           if (
             b &&
-            (b.unknown ||
-              b.names.has(head) ||
-              (rule.category === "prelude" && b.macroUse))
+            attributeBindingShadows(
+              head,
+              b.names.has(head),
+              b.unknown || (rule.category === "prelude" && b.macroUse),
+            )
           )
             return true;
           node = node.parent;
@@ -760,7 +795,15 @@ async function createHelper(): Promise<Helper> {
           return applications(m, n).flatMap(({ meta: m }) => {
             const rule = attributeRules.get(m.name.split("::")[0]!);
             return rule && rule.category !== "builtin" && !shadowed(m.name, n)
-              ? [{ name: m.name, scope: lexicalScopes.get(n.id) ?? "" }]
+              ? [
+                  {
+                    name: m.name,
+                    scope:
+                      lexicalScopes.get(
+                        (n.type === "source_file" ? n : bindingContainer(n)).id,
+                      ) ?? "",
+                  },
+                ]
               : [];
           });
         }
@@ -1850,6 +1893,7 @@ async function createHelper(): Promise<Helper> {
           names: [...b.names].sort(),
           unknown: b.unknown,
           macroUse: b.macroUse,
+          macroUseImports: b.macroUseImports,
         })),
         opaqueCrateAliases,
         opaqueItemScopes: [...opaqueItemScopes],

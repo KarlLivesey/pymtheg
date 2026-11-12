@@ -1,7 +1,7 @@
 # W2-C: Rust language module for the code graph
 
 This is the **no-toolchain fallback** under D16. Precise compiler-backed Rust
-resolution belongs to a later chunk. Version 11 uses the installed Rust WASM
+resolution belongs to a later chunk. Version 12 uses the installed Rust WASM
 grammar through the shared Tree-sitter helper and supplied source/manifest
 snapshots only. Runtime, installation and tests never invoke Cargo/rustc, read
 project files, expand macros or add dependencies. Private items are ordinary
@@ -43,9 +43,11 @@ Associated const/projection lookup, qualified `<T as Trait>::f`, custom receiver
 adjustment, general autoderef/unsizing, substitution/inference/bounds solving,
 trait-in-scope precision and generated declarations are not implemented.
 Direct optional-dependency activation (`feature="dep"` or a direct `dep:dep` entry) is captured. General Cargo feature closure and actual platform/build configuration are not evaluated: dependency proof uses captured predicates, not a feature solver.
-Cross-file macro exports/imports, external glob beside project glob, Copy receiver
+General cross-file macro_rules resolution, external glob beside project glob, Copy receiver
 refinement, inner/outer macro ordering, where clauses in impl identity text and a
 glob import's own link remain the manager-listed backlog.
+
+**Known limit E4:** unseen code is assumed not to bind the bare attribute heads `derive` or `global_allocator`. A native accepted macro-use counterexample violates that assumption and can produce a definite written target different from rustc. It is explicitly asserted in the known-limit tests in `test/graph-rust-round12.test.mjs`, documented below, and reserved for D17 to resolve. Captured visible bindings still shadow these heads; `test`, `bench` and tools stay strict.
 
 ## Dispatch and unverified target representation
 
@@ -88,12 +90,14 @@ Attribute classification is centralized in `parse.ts:attributeRules`; the same c
 | True builtin, conditional | cfg, cfg_attr | Existing predicate implication and conditional payload rules |
 | True builtin, macro declaration | proc_macro, proc_macro_attribute, proc_macro_derive | Retain AST function identity for stable structural IDs; export in macro namespace (derive's exported name), not an ordinary external value function. Source function remains callable within its own crate. Conditional macro kind is unverified |
 | Prelude attribute macro, conditional | test, bench | When unshadowed, function presence implies cfg(test); other syntactic targets stay unverified |
-| Prelude attribute macro, inert | derive, global_allocator | When unshadowed, preserve input; derive adds unseen code |
+| Prelude attribute macro, inert (E4) | derive, global_allocator | Only a **visible captured binding** shadows these heads. Unseen output is assumed not to bind them; otherwise preserve input |
 | Prelude attribute macro, unmodeled | test_case, cfg_eval, cfg_accessible | Opaque even without a shadow; no unsupported compiler transformation is proved |
 | Registered tool prefix | rustfmt, clippy, diagnostic, miri, rust_analyzer | Qualified paths only; inert only when unshadowed |
 | Other | All other paths, including bare imported names | Opaque |
 
-Prelude/tool classification requires no potentially binding explicit import/local macro (and type/module/extern alias for tool prefixes) in enclosing attribute scopes, including captured file-module parents. A binding that cannot be ruled out makes the attribute opaque. Captured dependency names can also shadow a registered tool prefix through the modern extern prelude. Glob `use` does **not** count as a shadow: supplying a prelude attribute that way is ambiguous, E0659. `#[macro_use] extern crate` is different: rustc accepts its replacement prelude attributes; unknown exports therefore make prelude names opaque, with named `macro_use(...)` lists limiting that uncertainty. Item-position code generation also prevents proof of absence of a binding. Scope provenance is captured: an import inside a function body does not shadow the function's own attribute, nor does a module body's item shadow its containing module attribute.
+`test`/`bench` and tool prefixes keep strict shadow classification: explicit/local bindings, potentially binding macro-use exports or item generation can make them opaque. Captured dependency names can shadow tool prefixes via the modern extern prelude. Glob `use` is not itself an attribute shadow (E0659 ambiguity).
+
+**E4 exception:** `derive` and `global_allocator` are shadowed only by a binding visible in captured source: an explicit non-glob import or local item/macro of that name in an enclosing scope, including named exports read from a captured macro-use crate. Named `macro_use(...)` lists limit which captured exports are imported. An uncaptured macro-use crate, item-position macro output, or opaque attribute output is **assumed not to bind either head**. This is an owner-selected assumption of the structure-level fallback, not proof that unseen code cannot replace them. Explicit captured bindings still prevent semantic proof. Scope provenance excludes a function's own body imports from its attribute's scope and a module body's bindings from its containing module attribute.
 
 Unsafe wrappers recurse. `cfg_attr` payloads apply only when their predicate can hold alongside the item's gates; impossible payloads add no opacity. Nested payload paths retain their full spelling, e.g. `pm::keep`. Attribute contexts are interned per file, rather than duplicated on every semantic link. Re-analysis recomputes contextual gates and opacity even for cached child parse facts.
 
@@ -175,11 +179,10 @@ not expand macros or establish a dispatch result.
 layout and mark missing alternatives unknown. Standard derive *spellings* only
 help this namespace annotation when unshadowed by named/glob imports or
 macro_use routes (including cfg_attr); no per-method derive knowledge
-remains. The inert attribute whitelist is shared from parse.ts:
-allow/warn/deny/forbid/expect, cfg/cfg_attr, repr/doc/deprecated/must_use/
-non_exhaustive, inline/cold/track_caller, no_mangle/export_name/link_section/used,
-automatically_derived, test/ignore/should_panic, path, macro_export/macro_use,
-link, no_std/no_implicit_prelude. Unknown attributes are opaque.
+remains. The current shared classification is `parse.ts:attributeRules`, with
+conditional test/bench behavior and E4 visible-binding exceptions as stated
+above; unknown attributes remain opaque. This namespace annotation does not
+turn later-step method dispatch into a definite link.
 
 ## Identity, performance and interface
 
@@ -498,9 +501,11 @@ Final required checks ran strictly sequentially with frozen source/tests: `npm c
 
 Development attempts are explicitly separated from acceptance in `round10-development-notes.md`: the initial duplicate dependency-route defect, rejected draft controls, stopped expanding-import probes and incomplete attribution attempts are not passes. Experimental lookup caches were removed; the shipped fix is the small self-expanding-import guard, with a native shrinking-reexport control. Source hashes, final completion assertions, full equality, cause/reach/hint integrity and ablation evidence are under `evidence/w2-c/round10-*`.
 
-## Round 11: structural TOML and contextual attribute identity
+## Round 11: structural TOML and contextual attribute identity — rejected strict variant
 
-The three round-10 blockers are fixed together:
+The figures in this section record fb8dd01a before E4. Its strict unseen-code shadow policy for derive/global_allocator was rejected; the round-12 section and current E4 rule above supersede that policy. These measurements are preserved, not rewritten.
+
+The three round-10 blockers were addressed together:
 
 1. **Cargo facts come from parsed TOML.** Quoted/escaped/dotted keys, inline/standard tables, arrays of tables and string spellings share one normalized tree. Package/workspace/per-target editions use that tree; unreadable documents and unread edition values never default to 2015. Other dependent facts and their unknown behavior are described above. The 48 full-fact spelling fixtures independently normalize with Python `tomllib`; 36 offline Cargo programs cover the actual compiler-facing controls, including table/inline inheritance, quoted editions, both bin-edition directions, collisions and explicit `dep:` activation. All 41 Vector manifests are understood; all 92 target roots and their editions agree with the baseline. Captured workspace patch selection remains unverified, rather than assuming registry/version selection; this changes metadata for an external route, not Vector's definite project targets.
 2. **Unshadowed test/bench functions imply `cfg(test)`.** These conditions use the existing implication/alternative logic, including cfg_attr and a caller already under test. An attributed function called from a cfg(test) module can still be definite. Compiler controls accept the normal and test-harness programs. Unsupported test_case/cfg_eval/cfg_accessible transformations stay opaque. Proc-macro declaration attributes preserve the source function's structural identity, but export the macro name in the macro namespace; the ordinary function facet is local to its defining crate. This avoids changing structural target IDs.
@@ -558,3 +563,56 @@ The same **11 real, syntax-valid grammar-gap files** still fail completely. They
 After normally merging the newly landed TypeScript module (9a1b7c2f), final frozen checks ran sequentially, all exit 0: npm ci --ignore-scripts; supplied PYM_TLC_JAR npm test (**2,049 pass, 0 skipped**); format:check; Rust tests (**523 pass, 0 skipped**). No process-test hang occurred. **67 mutations killed**, with an unmodified passing baseline and syntax checks on every mutated JS module; missing-package errors cannot count as kills. The 13 new mutations cover unread edition/TOML recovery, test/bench gates, shadowing/glob distinction, dead cfg_attr payloads/full paths, bare opacity, collisions, bin edition, optional dep activation and macro-use shadowing. Native evidence includes 48 rustc controls (one unmodeled test_case observation), 36 offline Cargo controls, 63 attribute classification probes, and the tool-dependency replacement control. Runtime/install/module tests never need the compiler.
 
 Fresh seeded source inspection: **30 definite, all 4 gains, 30 withdrawals, 15 closed sets, 15 unresolved, 20 project-hint links, 20 failed-file causes**. Individual judgments distinguish broad std/external/generic name hints from actual captured callees; none is silently upgraded to a compiler answer. All prior withdrawn IDs remain in the uncapped inventory. Original 152 re-derived: **5 restored / 147 unverified under named fallback rules / 0 newly identified wrong-before / 0 further provable under that policy identified still lost**. Seven of the preceding 12 restored links now pay the shadowing/presence cost; this is not a claim that rustc cannot resolve them. Intermediate/rejected attempts are identified in `round11-development-notes.md`. Full equality, source hashes, movement, attribution, samples and audits are under `evidence/w2-c/round11-*`.
+
+
+## Round 12: E4 visible bindings for derive/global_allocator
+
+E4 is an explicit no-toolchain fallback assumption: unseen code is assumed not to rebind `derive` or `global_allocator`. It does not weaken `test`/`bench` or tool-prefix classification. A shared `attributeBindingShadows` predicate reads the two heads' `shadowing: visible` classification; parser, inherited/cross-file attribute context and path-opacity lookup all use it. Captured macro-use import requests retain their source crate and optional name list. Readable captured macro exports remain visible bindings, including public module-glob forwarding and private module aliases. Their names propagate through a finite captured-module graph; function-local imports are excluded, conditional macro kinds remain possible, and an import-edge guard bounds alias expansion. This is positive binding evidence, not a claim of export completeness. Such captured bindings; missing/unreadable exports do not manufacture one.
+
+**Known limit (deliberate):** an uncaptured proc-macro crate can export an attribute named `derive`; `#[macro_use] extern crate pm; #[derive] impl A { fn f(self)->u8 {1} }` can replace that input with `impl Tr for A { fn f(self)->u16 {2} }`. Native Rust accepts it and calls the generated trait method (2). Under E4 the fallback can keep a definite link to the written inherent method (1), because it assumes the unseen export does not bind `derive`. The same counterexample works for `global_allocator`. These are labelled **known limit E4** tests asserting current behavior, with compiler evidence in `round12-rustc.json`. An explicit `use pm::derive`, or readable captured macro-use exports, stays opaque and does not get this exception. Compiler-backed precision belongs to D17. This assumption must not be presented as compiler correctness.
+
+Unseen item/attribute output policy controls also assert E4's chosen behavior. Native probes distinguish these from accepted counterexamples: importing a replacement through more-expanded output can produce E0659 ambiguity. Rejected probes are not counted as accepted programs. The uncaptured macro-use counterexamples themselves are accepted and demonstrate the actual limit.
+
+### Whole Vector: accepted E4 variant vs 81aba89e
+
+**4 gains / 451 withdrawals / 0 retargets. E4 restores 11,279 of the rejected variant's 11,730 withdrawals, without withdrawing or retargeting any link it had proved.** The remaining cost is 1.34% of the baseline's 33,768 definite semantic links, rather than the rejected 34.7%.
+
+Every remaining withdrawal is attributed, link by link, to **strict test/bench shadowing**: a fresh counterfactual disabling only those heads' shadow classification restores the exact baseline target ID for all 451. There are 217 direct `test` blockers and 234 indirect scope/path effects from potentially generated bindings. No remaining withdrawal reports `derive` or `global_allocator` as a blocker. **Tool-prefix cost is 0 withdrawals and 0 changed decisions** in the complete tool-only counterfactual; tools remain strict. Disabling all shadow classification gives the same definite results as the test/bench-only counterfactual. The production facts are never edited by these probes (`round12-attribution.json`).
+
+| Remaining withdrawn semantic kind | Count |
+|---|---:|
+| types | 260 |
+| calls | 114 |
+| values | 53 |
+| patterns | 16 |
+| imports | 5 |
+| implements | 3 |
+
+All 451 previous target IDs remain in the full new hint inventory; **445 have exactly one would-be target**, six have multiple targets, and none requires overflow. These remain unverified, not definite answers. All 90 old closed sets retain identical IDs; no dot call has a closed set. All 33,870 contains links stay definite. Opaque-marked symbols are **8,320**, down from 10,503 in the rejected variant (baseline 5,549); the retained test/bench uncertainty can mark nested items even when no semantic link uses them. The four gains vs 81aba89e are the same NamedInternalEvent import/reexport links from round 11's macro-export namespace fix; E4 adds no new gain beyond the baseline's former targets.
+
+Fresh full parse/analysis/resolution and full production indexer/store use pinned Vector `515e87d9861b564f521a8992d224892cd8cae120`:
+
+| Result | 81aba89e → E4 |
+|---|---:|
+| files | 1,563 → 1,563 |
+| clean / partial / failed | 1,552 / 0 / 11 → unchanged |
+| symbols / links | 35,422 / 365,530 → unchanged |
+| definite | 67,638 → 67,191 |
+| closed sets | 90 → 90 |
+| unresolved | 297,802 → 298,249 |
+| invalid-code | 170 → 168 |
+| failed-file reach annotations | 175,683 → 175,621 |
+| analysis return bytes | 170,130,391 → 173,332,402 |
+| graph-fact bytes | 299,076,732 → 300,720,139 |
+
+All 168 remaining causes have named failed-module traversal witnesses (18 direct module/crate paths/declarations; 150 explicit non-glob import/reexport chains). The same two conservative cause removals as round 11 remain: the opaque-test ConfigBuilder import and an unproved tracing_limit path. Both remain unresolved, not falsely assigned a cause. Every reach annotation has a captured dependency/module path. Reach changes are 26 additions (25 calls and one import) and 88 cleared import annotations. The **same 11 native-syntax-valid grammar gaps** fail completely and supply no targets; E4 does not alter the grammar or the whole-file failure rule. Their per-file syntax evidence remains in round8-grammar.json; no whole-Vector Cargo typecheck is claimed.
+
+Hint totals: **31,526 count-only overflows; 88,594 nonempty lists; 63,456 singleton lists; 209,584 retained IDs**. The full production store completes at the default heap: execArgv=[], NODE_OPTIONS empty, heap limit 4,496,293,888 bytes; all link decisions/metadata and symbol positions/metadata equal the direct run. Observed elapsed 405.5s and peak RSS 5,436,612 KiB are loaded-machine observations, not acceptance bounds. The final raw-identifier normalization is also checked to change no Vector link, symbol or file-context fact; all acceptance snapshots come from the final source.
+
+### Validation and recorded limits
+
+Current main, including E4, is normally merged. Required checks run sequentially with frozen implementation/tests: npm ci --ignore-scripts; supplied PYM_TLC_JAR npm test (**2,079 pass, 0 skipped**); format:check; Rust tests (**553 pass, 0 skipped**). All exit 0, no process-test hang. **72 mutations killed** with a passing unmodified baseline: the 67 retained rules and five E4 controls (unseen code shadows derive; readable exports ignored; visible bindings ignored; conditional exports absent; alias-edge guard removed). Mutated JS is syntax-checked and missing-package errors cannot count as kills. No core, grammar, other-language or dependency code changes.
+
+Native evidence records **19 accepted controls and 8 expected E0659 ambiguity rejections**, separately classified. Accepted controls include macro-use/named macro-use replacement of both E4 heads, visible named replacements, strict test/bench replacements, raw named exports, module/glob and private-alias forwarding, unexported/function-local negatives, and conditional exports. Known-limit tests deliberately assert the E4 assumption's behavior; they do not masquerade as compiler agreement. Module runtime, installation and tests never invoke Rust/Cargo.
+
+Fresh source inspection: 30 definite, all four gains, 30 remaining withdrawals, 15 unchanged closed sets, 15 unresolved, 20 project-hint links and 20 named failed-file causes. Broad std/external/generic name hints are identified as such rather than called actual project callees. Original 152 classification returns to **12 restored / 140 unverified under the fallback policy / 0 newly identified wrong-before / 0 further provable under that policy identified still lost**. “Proved” here is conditional on the explicit E4 assumption, not compiler-backed completeness. Full source hashes, movement, attribution, equality, native controls and samples are in `evidence/w2-c/round12-*`; round11 retains the rejected variant. Development attempts are separated in round12-development-notes.md.

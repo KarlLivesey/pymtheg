@@ -1,5 +1,10 @@
 import { implies as cfgImplies, possible as cfgPossible } from "./cfg.js";
-import { knownAttributeName, attributeRules } from "./parse.js";
+import {
+  knownAttributeName,
+  attributeRules,
+  attributeBindingShadows,
+  type MacroUseImport,
+} from "./parse.js";
 import { posix as p } from "node:path";
 import type {
   GraphSymbol,
@@ -130,7 +135,12 @@ export function resolveRust(
   };
   const attributeBindings = new Map<
     string,
-    { names: string[]; unknown: boolean; macroUse?: boolean }
+    {
+      names: string[];
+      unknown: boolean;
+      macroUse?: boolean;
+      macroUseImports?: MacroUseImport[];
+    }
   >();
   for (const file of ctx.files)
     for (const b of (data(file.result).attributeBindings ?? []) as {
@@ -138,6 +148,7 @@ export function resolveRust(
       names: string[];
       unknown: boolean;
       macroUse?: boolean;
+      macroUseImports?: MacroUseImport[];
     }[]) {
       const key = file.path + "|" + b.scope,
         old = attributeBindings.get(key);
@@ -145,6 +156,10 @@ export function resolveRust(
         names: [...new Set([...(old?.names ?? []), ...b.names])],
         unknown: !!old?.unknown || b.unknown,
         macroUse: !!old?.macroUse || !!b.macroUse,
+        macroUseImports: [
+          ...(old?.macroUseImports ?? []),
+          ...(b.macroUseImports ?? []),
+        ],
       });
     }
   type AttributeContext = {
@@ -168,6 +183,246 @@ export function resolveRust(
     (contextOf(item)?.implicit ?? []).map((g) => ({ ...g, file: item.file }));
   const origins = (item: GraphSymbol | GraphLink): AttributeOrigin[] =>
     (contextOf(item)?.shadowable ?? []).map((x) => ({ ...x, file: item.file }));
+  // A finite graph of captured module exports. A glob transfers only names
+  // visible in its source module; opaque/unreadable output contributes none
+  // under E4. This is positive binding evidence, never an export-completeness
+  // claim or a semantic target resolution.
+  let capturedMacroExports: Map<string, Set<string>> | undefined;
+  function readableMacroUseBinds(
+    head: string,
+    file: string,
+    scope: string,
+    imports: readonly MacroUseImport[],
+  ): boolean {
+    if (!imports.length) return false;
+    head = head.split("::")[0]!;
+    const manifests = new Set(
+      ownerPlace(file, scope).flatMap((own) =>
+        imports.flatMap((request) => {
+          if (request.names && !request.names.includes(head)) return [];
+          const manifest = own.crate.deps.get(request.crate);
+          return manifest &&
+            packages.some((c) => c.kind === "lib" && c.manifest === manifest)
+            ? [manifest]
+            : [];
+        }),
+      ),
+    );
+    if (!manifests.size) return false;
+    if (!capturedMacroExports) {
+      const libs = new Map(
+        packages.filter((c) => c.kind === "lib").map((c) => [c.root, c]),
+      );
+      const exports = new Map<string, Set<string>>();
+      const aliases = new Map<
+        string,
+        { raw: string; scope: string; crate: Crate }[]
+      >();
+      const globs: { raw: string; scope: string; crate: Crate }[] = [];
+      const key = (manifest: string, q: string) => manifest + "|" + q;
+      const get = (manifest: string, q: string) => {
+        const k = key(manifest, q);
+        let names = exports.get(k);
+        if (!names) {
+          names = new Set();
+          exports.set(k, names);
+        }
+        return names;
+      };
+      const qualifiedScope = (loc: Place, local: string) =>
+        [loc.scope, local.slice(loc.local.length).replace(/^::/, "")]
+          .filter(Boolean)
+          .join("::");
+      for (const loc of places)
+        if (libs.has(loc.crate.root)) get(loc.crate.manifest, loc.scope);
+      const watched = (name: string) => {
+        const rule = attributeRules.get(name);
+        return !!rule && rule.category !== "builtin";
+      };
+      for (const symbol of symbols)
+        if (data(symbol).visibility === "pub") {
+          const d = data(symbol),
+            conditionalMacro =
+              d.namespaceUnverified === true && Array.isArray(d.procMacroKinds);
+          const names = [
+            ...(symbol.kind === "macro" || d.semanticKind === "macro"
+              ? [str(d.exportedMacroName) || symbol.name]
+              : []),
+            ...(conditionalMacro
+              ? (d.procMacroKinds as string[]).some((k) =>
+                  ["proc_macro", "proc_macro_attribute"].includes(k),
+                )
+                ? [symbol.name]
+                : []
+              : []),
+            ...(conditionalMacro
+              ? ((d.exportedMacroNames ?? []) as string[])
+              : []),
+          ]
+            .map(compact)
+            .filter(watched);
+          if (!names.length) continue;
+          for (const loc of ownerPlace(symbol.file, str(d.scope)))
+            if (
+              libs.has(loc.crate.root) &&
+              possible([
+                ...(loc.conditions ?? []),
+                ...((d.conditions ?? []) as string[]),
+              ])
+            )
+              for (const name of names)
+                get(
+                  loc.crate.manifest,
+                  symbol.kind === "macro"
+                    ? ""
+                    : qualifiedScope(loc, str(d.scope)),
+                ).add(name);
+        }
+      const functionRegions = new Map<
+        string,
+        { start: number; end: number }[]
+      >();
+      for (const symbol of symbols)
+        if (["function", "method"].includes(symbol.kind)) {
+          const ranges = functionRegions.get(symbol.file) ?? [];
+          ranges.push(symbol.range);
+          functionRegions.set(symbol.file, ranges);
+        }
+      for (const link of ctx.links)
+        if (
+          link.kind === "imports" &&
+          !(functionRegions.get(link.file) ?? []).some(
+            (r) => r.start <= link.range.start && r.end >= link.range.end,
+          )
+        )
+          for (const loc of ownerPlace(link.file, str(data(link).scope)))
+            if (
+              libs.has(loc.crate.root) &&
+              possible([
+                ...(loc.conditions ?? []),
+                ...((data(link).conditions ?? []) as string[]),
+              ])
+            ) {
+              const q = qualifiedScope(loc, str(data(link).scope)),
+                raw = compact(link.targetName),
+                alias = compact(
+                  str(data(link).alias) || raw.split("::").at(-1)!,
+                );
+              if (!exports.has(key(loc.crate.manifest, q))) continue;
+              if (!data(link).glob) {
+                const k = key(
+                    loc.crate.manifest,
+                    [q, alias].filter(Boolean).join("::"),
+                  ),
+                  entries = aliases.get(k) ?? [];
+                entries.push({ raw, scope: q, crate: loc.crate });
+                aliases.set(k, entries);
+                if (data(link).visibility === "pub" && watched(alias))
+                  get(loc.crate.manifest, q).add(alias);
+              } else if (data(link).visibility === "pub")
+                globs.push({ raw, scope: q, crate: loc.crate });
+            }
+      const modules = (
+        raw: string,
+        c: Crate,
+        scope: string,
+        seen = new Set<string>(),
+      ): string[] => {
+        const visit = key(c.manifest, scope) + "|" + raw;
+        if (seen.has(visit)) return [];
+        const next = new Set([...seen, visit]);
+        const absolute = raw.startsWith("::"),
+          parts = raw
+            .replace(/^::/, "")
+            .split("::")
+            .filter((x) => x !== "*");
+        let current = scope,
+          explicit = false;
+        if (parts[0] === "crate") {
+          parts.shift();
+          current = "";
+          explicit = true;
+        } else if (parts[0] === "self") {
+          parts.shift();
+          explicit = true;
+        }
+        while (parts[0] === "super") {
+          parts.shift();
+          current = current.includes("::")
+            ? current.slice(0, current.lastIndexOf("::"))
+            : "";
+          explicit = true;
+        }
+        const found: string[] = [];
+        if (!explicit && parts.length) {
+          const dep = c.deps.get(parts[0]!);
+          if (dep) {
+            const k = key(dep, parts.slice(1).join("::"));
+            if (exports.has(k)) found.push(k);
+          }
+        }
+        for (const q of explicit
+          ? [current]
+          : absolute || c.edition === "2015"
+            ? [""]
+            : [...new Set([current, ""])]) {
+          const path = [q, ...parts].filter(Boolean).join("::"),
+            k = key(c.manifest, path);
+          if (exports.has(k)) found.push(k);
+          if (parts.length)
+            for (const a of aliases.get(
+              key(c.manifest, [q, parts[0]].filter(Boolean).join("::")),
+            ) ?? []) {
+              const edge =
+                "alias:" +
+                key(c.manifest, [q, parts[0]].filter(Boolean).join("::")) +
+                "|" +
+                a.raw;
+              if (next.has(edge)) continue;
+              found.push(
+                ...modules(
+                  [a.raw, ...parts.slice(1)].join("::"),
+                  a.crate,
+                  a.scope,
+                  new Set([...next, edge]),
+                ),
+              );
+            }
+        }
+        return [...new Set(found)];
+      };
+      const edges = globs.flatMap((g) =>
+        modules(g.raw, g.crate, g.scope).map((source) => ({
+          source,
+          dest: key(g.crate.manifest, g.scope),
+        })),
+      );
+      // Finite names and module nodes: deterministic fixed point, no time bound.
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const e of edges)
+          for (const name of exports.get(e.source) ?? []) {
+            const dest = exports.get(e.dest)!;
+            if (!dest.has(name)) {
+              dest.add(name);
+              changed = true;
+            }
+          }
+      }
+      capturedMacroExports = new Map(
+        packages
+          .filter((c) => c.kind === "lib")
+          .map((c) => [
+            c.manifest,
+            exports.get(key(c.manifest, "")) ?? new Set<string>(),
+          ]),
+      );
+    }
+    for (const manifest of manifests)
+      if (capturedMacroExports.get(manifest)?.has(head)) return true;
+    return false;
+  }
   const attributeShadowCache = new Map<string, boolean>();
   function shadowFromParents(origin: AttributeOrigin): boolean {
     const key = JSON.stringify(origin),
@@ -179,17 +434,27 @@ export function resolveRust(
     if (rule && rule.category !== "builtin")
       for (const own of ownerPlace(origin.file, origin.scope)) {
         if (rule.category === "tool" && own.crate.deps.has(head)) result = true;
-        let parent = own.parent;
+        let parent: Place | null = own;
         while (parent) {
-          if (parent.file !== origin.file) {
-            let scope = parent.local;
+          {
+            let scope = parent === own ? origin.scope : parent.local;
             while (true) {
               const b = attributeBindings.get(parent.file + "|" + scope);
               if (
                 b &&
-                (b.unknown ||
-                  b.names.includes(head) ||
-                  (rule.category === "prelude" && b.macroUse))
+                attributeBindingShadows(
+                  head,
+                  (parent.file !== origin.file && b.names.includes(head)) ||
+                    readableMacroUseBinds(
+                      head,
+                      parent.file,
+                      scope,
+                      b.macroUseImports ?? [],
+                    ),
+                  parent.file !== origin.file &&
+                    (b.unknown ||
+                      (rule.category === "prelude" && !!b.macroUse)),
+                )
               )
                 result = true;
               if (!scope) break;
@@ -1732,9 +1997,17 @@ export function resolveRust(
         const b = attributeBindings.get(loc.file + "|" + local);
         if (
           b &&
-          (b.unknown ||
+          attributeBindingShadows(
+            name,
             b.names.includes(name.split("::")[0]!) ||
-            (rule.category === "prelude" && b.macroUse))
+              readableMacroUseBinds(
+                name,
+                loc.file,
+                local,
+                b.macroUseImports ?? [],
+              ),
+            b.unknown || (rule.category === "prelude" && !!b.macroUse),
+          )
         )
           shadow = true;
         if (!local || local === loc.local) break;
