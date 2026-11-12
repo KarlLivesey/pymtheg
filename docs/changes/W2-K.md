@@ -12,17 +12,34 @@ Stable `cargo`/`rustc` (LLVM IR, or the same data in `asm`, with the dev
 profile's debug info) give an exact call → callee record for every call rustc
 generates code for, including calls inlined at opt-level 0. A callee the crate
 only declares gets its file:line from the dependencies' own IR, by building
-with `RUSTFLAGS="--emit=llvm-ir,link"`. std ones come from the DWARF in the
-toolchain's shipped rlibs.
+with `RUSTFLAGS="--emit=llvm-ir,link"`.
 
-On three Vector crates, building each crate alone (dev library + test harness),
-the share of method calls with an exact callee definition location is:
+std callees can additionally be located from the DWARF in the toolchain's
+shipped rlibs. That step needs a DWARF reader, which is **not part of the Rust
+toolchain** (`llvm-dwarfdump` from the system LLVM package was used here). std
+source files exist on disk only when the rustup `rust-src` component is
+installed; it is not in rustup's default profile.
 
-| Crate                | Stable cargo/rustc only | Plus std rlib DWARF |
-| -------------------- | ----------------------- | ------------------- |
-| `vector-common`      | 73.2%                   | 74.3%               |
-| `file-source-common` | 92.3%                   | 93.8%               |
-| `tracing-limit`      | 99.3%                   | 100%                |
+On three crates of one project (Vector), building each crate alone (dev library
+
+- test harness), the share of method calls with an exact callee definition
+  location is:
+
+| Crate                | `cargo`/`rustc` only | Plus a DWARF reader for std |
+| -------------------- | -------------------- | --------------------------- |
+| `vector-common`      | 73.2%                | 74.3%                       |
+| `file-source-common` | 92.3%                | 93.8%                       |
+| `tracing-limit`      | 99.3% (98.7%)        | 100%                        |
+
+**Counting rule.** A site counts when at least one of its callee records has a
+location. Counting only sites where _every_ callee record has a location gives
+the same numbers except the one in brackets. That site is `tracing-limit`'s
+`src/lib.rs:429:20` `self.start.elapsed()`:
+
+- the crate has `#[cfg(not(test))] use std::time::Instant` and
+  `#[cfg(test)] use mock_instant::global::Instant`;
+- so the dev build calls std's `elapsed` (located only with the DWARF reader),
+  and the test build calls `mock_instant`'s (located from dependency IR).
 
 All 68 distinct recovered locations were checked against source and are
 correct. The stable route gives no imports, type references or `implements`
@@ -41,21 +58,53 @@ rustup component). Shares of each crate's method calls:
 | Any target with location: stable IR                             | 74.3%                                       | 93.8%                | 100%            |
 | Any target with location: rust-analyzer LSIF                    | 98.7%                                       | 96.5%                | 100%            |
 
-Most method calls in these crates target std or dependencies (72–91% by
-rust-analyzer's own classification). For in-project targets the two routes give
-about the same coverage. Where both answer, they never disagreed.
+Most method calls in these three crates target std or dependencies (72–91% by
+rust-analyzer's own classification). Calls whose target is in the workspace
+are where the two routes differ:
 
-**The real gap is in-workspace targets.** Only 26.8% / 17.7% / 9.4% of calls
-target workspace symbols at all. Workspace here is decided by rust-analyzer: the
-symbol's package is a workspace member, meaning it has definitions in the index.
+- `file-source-common`: IR reaches all 60;
+- `tracing-limit`: IR reaches all 14;
+- `vector-common`: IR reaches 90 of 125.
+
+These are three crates of one project, not a general rate.
+
+"Workspace" is decided two ways, and the counts coincide (125 / 60 / 14):
+
+- for SCIP and `workspace-gap.mjs`, by rust-analyzer's package classification
+  (the symbol's package is a workspace member with definitions in the index);
+- for the LSIF rows, by the definition file being under the workspace root.
+
+**Where comparable, the two routes never disagreed.** On the dev + test records
+with the dependency lookup, three kinds of comparison were made:
+
+- **By definition position:** 64 / 56 / 13 sites, all agreeing.
+- **By method name only:** 256 / 258 / 128 sites outside the workspace, all
+  agreeing.
+- **Not compared:**
+  - 6 / 3 / 7 generic-receiver sites, where the two routes name different
+    levels (trait declaration vs instantiated impl);
+  - macro- or derive-generated targets that SCIP gives no location;
+  - 1 `vector-common` call with no SCIP occurrence.
+
+Among the in-workspace calls the IR reaches (90 / 60 / 14), the result is the
+same: 64 / 56 / 13 have the same definition file:line as rust-analyzer's
+target, the rest are macro output or a different level, and 0 differ.
+
+**The gap is in-workspace targets.** Only 26.8% / 17.7% / 9.4% of calls target
+workspace symbols at all.
 
 - `file-source-common` and `tracing-limit`: the stable IR tier reaches all of
   them.
-- `vector-common`: it reaches 90 of 125. Of the 35 missed, 14 sit in
-  `byte_size_of.rs`, whose module is behind a non-default feature that the
-  dev/test builds did not enable. The other 21 are in generic bodies or trait
-  default methods never instantiated in this crate's builds. None were
-  const-evaluated or unexplained.
+- `vector-common`: it reaches 90 of 125. Of the 35 missed:
+  - 12 sit in `byte_size_of.rs`, whose module is behind a non-default feature
+    the dev/test builds did not enable;
+  - 23 are in generic code never instantiated in this crate's builds: type
+    parameters, argument-position `impl Trait` (including the test-enabled
+    `emit(event: impl InternalEvent)`), or trait default methods;
+  - none were const-evaluated or unexplained.
+
+  cfg conditions were evaluated against the measured builds' cfg set; every
+  position is listed in `raw/vector/workspace-gap-audit-*.tsv`.
 
 Wider stable build sets (all features, dependents) were measured in round 3
 without the dependency lookup: up to 80.7%, and at least 87.6% with dependents.
@@ -81,21 +130,23 @@ also runs build scripts and proc macros, as any `cargo build` does.
 Coverage is "method calls with a callee definition location", in the order
 `vector-common` / `file-source-common` / `tracing-limit`.
 
-| Option                                                                 | Needs installed            | Runs project code       | Coverage                                                                                           | Crate that does not compile               | Cost                                                                                                               |
-| ---------------------------------------------------------------------- | -------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| (1) Hand-written W2-C only                                             | Nothing                    | No                      | Structure-level (not measured here)                                                                | Partial                                   | Parsing only                                                                                                       |
-| (2) Stable IR tier (dev + test, dependency IR lookup), W2-C underneath | `cargo`/`rustc` only (D16) | Yes, like `cargo build` | 73.2% / 92.3% / 99.3%; with std DWARF (a DWARF reader, `llvm-dwarfdump` here) 74.3% / 93.8% / 100% | That crate falls back to W2-C             | Cold dev 3–61 s + test 6–24 s per crate, 0.3–1.9 GB of IR, target 0.7–4.1 GB; cargo reuses dependencies afterwards |
-| (3) rust-analyzer when present, W2-C fallback                          | rustup component           | Yes (off = wrong links) | LSIF 98.7% / 96.5% / 100% (SCIP: workspace targets only)                                           | Partial, exit 0, sometimes silently wrong | Whole workspace per change: 4–8 min, 9–13 GiB; index 78 MB (SCIP) or 322 MB (LSIF)                                 |
-| (4) Layered: W2-C base, then (2), then (3) on top when present         | (2); (3) optional          | Yes                     | (2) everywhere, (3) where installed                                                                | W2-C (plus partial (3))                   | (2) plus optional (3)                                                                                              |
+| Option                                                                 | Needs installed                                                                                                        | Runs project code       | Coverage                                                 | Crate that does not compile               | Cost                                                                                                               |
+| ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ----------------------- | -------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| (1) Hand-written W2-C only                                             | Nothing                                                                                                                | No                      | Structure-level (not measured here)                      | Partial                                   | Parsing only                                                                                                       |
+| (2) Stable IR tier (dev + test, dependency IR lookup), W2-C underneath | `cargo`/`rustc` only (D16)                                                                                             | Yes, like `cargo build` | 73.2% / 92.3% / 99.3% (98.7% with every record located)  | That crate falls back to W2-C             | Cold dev 3–61 s + test 6–24 s per crate, 0.3–1.9 GB of IR, target 0.7–4.1 GB; cargo reuses dependencies afterwards |
+| (2+) As (2), plus std located from rlib DWARF                          | (2) plus a DWARF reader, which is not part of the Rust toolchain (`llvm-dwarfdump` here), and `rust-src` for std files | Yes                     | 74.3% / 93.8% / 100%                                     | As (2)                                    | As (2), plus building the std index (2.3 s)                                                                        |
+| (3) rust-analyzer when present, W2-C fallback                          | rustup component                                                                                                       | Yes (off = wrong links) | LSIF 98.7% / 96.5% / 100% (SCIP: workspace targets only) | Partial, exit 0, sometimes silently wrong | Whole workspace per change: 4–8 min, 9–13 GiB; index 78 MB (SCIP) or 322 MB (LSIF)                                 |
+| (4) Layered: W2-C base, then (2), then (3) on top when present         | (2); (3) optional                                                                                                      | Yes                     | (2) everywhere, (3) where installed                      | W2-C (plus partial (3))                   | (2) plus optional (3)                                                                                              |
 
 ## Recommendation: option 4, layered
 
 The numbers argue for it, for these reasons:
 
-1. **It uses only the default build chain, which D16 allows.** Option 2 alone
-   gives an exact, located callee for 73–99% of method calls in these crates
-   (74–100% with the std DWARF step), and all in-workspace targets in two of
-   the three. Option 3's extra reach comes from a component D16 makes optional,
+1. **Its base uses only the default build chain, which D16 allows.** Option 2
+   alone (cargo/rustc only) gives an exact, located callee for 73.2% / 92.3% /
+   99.3% of method calls in these three crates, and all in-workspace targets in
+   two of them. The std DWARF step (2+) adds about 1 point but needs a tool
+   outside the Rust toolchain, so it is optional. Option 3's extra reach comes from a component D16 makes optional,
    so it cannot be the base.
 2. **Neither toolchain route is safe on its own for code mid-edit.** IR gives
    nothing for a crate that does not compile, and rust-analyzer can be silently
@@ -103,7 +154,7 @@ The numbers argue for it, for these reasons:
    produced it.
 3. **rust-analyzer adds exactly what IR cannot reach:**
    - generic bodies never instantiated, and cfg-off code in the chosen feature
-     set (the 35 in-workspace misses in `vector-common`);
+     set (the 35 in-workspace misses in `vector-common`: 23 and 12);
    - `dyn` and generic calls to the trait declaration;
    - const-evaluated and rewritten calls (`Kc(3).c()`, `n.clone()`), which
      rust-analyzer resolves and IR cannot;
@@ -119,9 +170,18 @@ Conditions, each a decision or a chunk:
 
 1. **Executing project code.** Karl allows it while indexing Rust; W1-C forbids
    it today. Without that, only option 1 remains.
-2. **Several callees at one site.** A site with several callees (per
-   instantiation) becomes one definite `calls` link per impl, marked
-   per-instantiation, not an "ambiguous" candidate set.
+2. **Several callees at one site.** These come in two kinds, and they must be
+   represented differently:
+   - **Instantiations of a generic body.** Every instantiated impl is really
+     called (in that build), so each becomes a `calls` link, marked
+     per-instantiation, not an "ambiguous" candidate set.
+   - **Build configurations.** Example: `tracing-limit` `lib.rs:429:20` calls
+     std's `elapsed` in the dev build and `mock_instant`'s in the test build. A
+     toolchain link is true only for the named build configuration it came
+     from (dev vs test, feature set), never unconditionally. Targets that
+     differ between configurations are a set keyed by configuration, not
+     several definite links; otherwise production code would be shown calling
+     `mock_instant`.
 3. **Devirtualised `dyn` targets.** Never reported as "the" target.
 4. **Failures.** IR failures are visible (an error, no IR). rust-analyzer
    failures are detected from its log and `diagnostics`, never its exit code.
