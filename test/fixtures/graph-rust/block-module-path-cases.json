@@ -1,0 +1,216 @@
+[
+  {
+    "name": "function-name-rs",
+    "files": {
+      "src/main.rs": "mod a;fn main(){let n:u16=a::run();print!(\"{}\",n);}",
+      "src/a.rs": "pub fn run()->u16{mod inl{#[path=\"y.rs\"]pub mod m;}inl::m::f()}",
+      "src/inl/y.rs": "pub const fn f()->u16{16}",
+      "src/a/inl/y.rs": "pub const fn f()->u8{8}"
+    },
+    "target": "src/inl/y.rs",
+    "accepted": true,
+    "definite": false
+  },
+  {
+    "name": "function-inline-two-deep",
+    "files": {
+      "src/main.rs": "mod a;fn main(){let n:u16=a::run();print!(\"{}\",n);}",
+      "src/a.rs": "pub fn run()->u16{mod i{pub mod j{#[path=\"y.rs\"]pub mod m;}}i::j::m::f()}",
+      "src/i/j/y.rs": "pub const fn f()->u16{16}",
+      "src/a/i/j/y.rs": "pub const fn f()->u8{8}"
+    },
+    "target": "src/i/j/y.rs",
+    "accepted": true,
+    "definite": false
+  },
+  {
+    "name": "nested-name-rs",
+    "files": {
+      "src/main.rs": "mod a;fn main(){let n:u16=a::b::run();print!(\"{}\",n);}",
+      "src/a.rs": "pub mod b;",
+      "src/a/b.rs": "pub fn run()->u16{mod inl{#[path=\"y.rs\"]pub mod m;}inl::m::f()}",
+      "src/a/inl/y.rs": "pub const fn f()->u16{16}",
+      "src/a/b/inl/y.rs": "pub const fn f()->u8{8}"
+    },
+    "target": "src/a/inl/y.rs",
+    "accepted": true,
+    "definite": false
+  },
+  {
+    "name": "impl-method-body",
+    "files": {
+      "src/main.rs": "mod a;fn main(){let n:u16=a::A::run();print!(\"{}\",n);}",
+      "src/a.rs": "pub struct A;impl A{pub fn run()->u16{mod inl{#[path=\"y.rs\"]pub mod m;}inl::m::f()}}",
+      "src/inl/y.rs": "pub const fn f()->u16{16}",
+      "src/a/inl/y.rs": "pub const fn f()->u8{8}"
+    },
+    "target": "src/inl/y.rs",
+    "accepted": true,
+    "definite": false
+  },
+  {
+    "name": "closure-body",
+    "files": {
+      "src/main.rs": "mod a;fn main(){let n:u16=a::run();print!(\"{}\",n);}",
+      "src/a.rs": "pub fn run()->u16{let c=||{mod inl{#[path=\"y.rs\"]pub mod m;}inl::m::f()};c()}",
+      "src/inl/y.rs": "pub const fn f()->u16{16}",
+      "src/a/inl/y.rs": "pub const fn f()->u8{8}"
+    },
+    "target": "src/inl/y.rs",
+    "accepted": true,
+    "definite": false
+  },
+  {
+    "name": "const-body",
+    "files": {
+      "src/main.rs": "mod a;fn main(){let n:u16=a::N;print!(\"{}\",n);}",
+      "src/a.rs": "pub const N:u16={mod inl{#[path=\"y.rs\"]pub mod m;}inl::m::f()};",
+      "src/inl/y.rs": "pub const fn f()->u16{16}",
+      "src/a/inl/y.rs": "pub const fn f()->u8{8}"
+    },
+    "target": "src/inl/y.rs",
+    "accepted": true,
+    "definite": false
+  },
+  {
+    "name": "static-body",
+    "files": {
+      "src/main.rs": "mod a;fn main(){let n:u16=a::N;print!(\"{}\",n);}",
+      "src/a.rs": "pub static N:u16={mod inl{#[path=\"y.rs\"]pub mod m;}inl::m::f()};",
+      "src/inl/y.rs": "pub const fn f()->u16{16}",
+      "src/a/inl/y.rs": "pub const fn f()->u8{8}"
+    },
+    "target": "src/inl/y.rs",
+    "accepted": true,
+    "definite": false
+  },
+  {
+    "name": "neighbour-mod-rs",
+    "files": {
+      "src/main.rs": "mod a;fn main(){let n:u16=a::run();print!(\"{}\",n);}",
+      "src/a/mod.rs": "pub fn run()->u16{mod inl{#[path=\"y.rs\"]pub mod m;}inl::m::f()}",
+      "src/a/inl/y.rs": "pub const fn f()->u16{16}",
+      "src/inl/y.rs": "pub const fn f()->u8{8}"
+    },
+    "target": "src/a/inl/y.rs",
+    "accepted": true,
+    "definite": false
+  },
+  {
+    "name": "neighbour-crate-root",
+    "files": {
+      "src/main.rs": "pub fn run()->u16{mod inl{#[path=\"y.rs\"]pub mod m;}inl::m::f()}fn main(){let n:u16=run();print!(\"{}\",n);}",
+      "src/inl/y.rs": "pub const fn f()->u16{16}",
+      "src/main/inl/y.rs": "pub const fn f()->u8{8}"
+    },
+    "target": "src/inl/y.rs",
+    "accepted": true,
+    "definite": false
+  },
+  {
+    "name": "neighbour-bin-root",
+    "files": {
+      "src/main.rs": "fn main(){let n:u16=0u16;print!(\"{}\",n);}",
+      "src/bin/tool.rs": "pub fn run()->u16{mod inl{#[path=\"y.rs\"]pub mod m;}inl::m::f()}fn main(){let n:u16=run();print!(\"{}\",n);}",
+      "src/bin/inl/y.rs": "pub const fn f()->u16{16}",
+      "src/bin/tool/inl/y.rs": "pub const fn f()->u8{8}"
+    },
+    "target": "src/bin/inl/y.rs",
+    "accepted": true,
+    "definite": false
+  },
+  {
+    "name": "neighbour-function-in-inline",
+    "files": {
+      "src/main.rs": "mod a;fn main(){let n:u16=a::outer::run();print!(\"{}\",n);}",
+      "src/a.rs": "pub mod outer{pub fn run()->u16{mod inl{#[path=\"y.rs\"]pub mod m;}inl::m::f()}}",
+      "src/a/outer/inl/y.rs": "pub const fn f()->u16{16}",
+      "src/outer/inl/y.rs": "pub const fn f()->u8{8}"
+    },
+    "target": "src/a/outer/inl/y.rs",
+    "accepted": true,
+    "definite": false
+  },
+  {
+    "name": "neighbour-direct-path-block",
+    "files": {
+      "src/main.rs": "mod a;fn main(){let n:u16=a::run();print!(\"{}\",n);}",
+      "src/a.rs": "pub fn run()->u16{#[path=\"y.rs\"]mod m;m::f()}",
+      "src/y.rs": "pub const fn f()->u16{16}",
+      "src/a/y.rs": "pub const fn f()->u8{8}"
+    },
+    "target": "src/y.rs",
+    "accepted": true,
+    "definite": true
+  },
+  {
+    "name": "no-path-inline-block",
+    "files": {
+      "src/main.rs": "mod a;fn main(){let n:u16=a::run();print!(\"{}\",n);}",
+      "src/a.rs": "pub fn run()->u16{mod inl{pub mod m;}inl::m::f()}",
+      "src/inl/m.rs": "pub const fn f()->u16{16}",
+      "src/a/inl/m.rs": "pub const fn f()->u8{8}"
+    },
+    "target": "src/inl/m.rs",
+    "accepted": false,
+    "definite": false
+  },
+  {
+    "name": "no-path-direct-block",
+    "files": {
+      "src/main.rs": "mod a;fn main(){let n:u16=a::run();print!(\"{}\",n);}",
+      "src/a.rs": "pub fn run()->u16{mod m;m::f()}",
+      "src/m.rs": "pub const fn f()->u16{16}",
+      "src/a/m.rs": "pub const fn f()->u8{8}"
+    },
+    "target": null,
+    "accepted": false,
+    "definite": false
+  },
+  {
+    "name": "no-path-inline-crate-root",
+    "files": {
+      "src/main.rs": "pub fn run()->u16{mod inl{pub mod m;}inl::m::f()}fn main(){let n:u16=run();print!(\"{}\",n);}",
+      "src/inl/m.rs": "pub const fn f()->u16{16}",
+      "src/main/inl/m.rs": "pub const fn f()->u8{8}"
+    },
+    "target": "src/inl/m.rs",
+    "accepted": false,
+    "definite": false
+  },
+  {
+    "name": "no-path-direct-crate-root",
+    "files": {
+      "src/main.rs": "fn run()->u16{mod m;m::f()}fn main(){let n:u16=run();print!(\"{}\",n);}",
+      "src/m.rs": "pub const fn f()->u16{16}",
+      "src/main/m.rs": "pub const fn f()->u8{8}"
+    },
+    "target": null,
+    "accepted": false,
+    "definite": false
+  },
+  {
+    "name": "neighbour-direct-block-in-module-inline",
+    "files": {
+      "src/main.rs": "mod a;fn main(){let n:u16=a::outer::run();print!(\"{}\",n);}",
+      "src/a.rs": "pub mod outer{pub fn run()->u16{#[path=\"y.rs\"]mod m;m::f()}}",
+      "src/a/outer/y.rs": "pub const fn f()->u16{16}",
+      "src/outer/y.rs": "pub const fn f()->u8{8}"
+    },
+    "target": "src/a/outer/y.rs",
+    "accepted": true,
+    "definite": true
+  },
+  {
+    "name": "guessed-failure-not-reach",
+    "files": {
+      "src/main.rs": "mod child;fn main(){let n:u16=child::nested::run();print!(\"{}\",n);}",
+      "src/child.rs": "#![path=\"custom/alternate.rs\"]pub mod nested;",
+      "src/custom/nested.rs": "pub fn run()->u16{drop(());16}",
+      "src/unrelated/nested.rs": "pub fn broken( {"
+    },
+    "target": "src/custom/nested.rs",
+    "accepted": true,
+    "definite": false
+  }
+]

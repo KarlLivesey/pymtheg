@@ -1,0 +1,255 @@
+[
+  {
+    "name": "sol-inner-dotdot",
+    "files": {
+      "src/main.rs": "mod child;fn proof()->u16{child::nested::picked()}fn main(){print!(\"{}\",proof());}",
+      "src/child.rs": "#![path=\"redirect/..\"]pub mod nested;",
+      "src/redirect/nested.rs": "pub fn picked()->u16{73}",
+      "nested.rs": "pub fn picked()->u8{19}"
+    },
+    "target": "src/redirect/nested.rs",
+    "definite": false
+  },
+  {
+    "name": "outer-dotdot",
+    "files": {
+      "src/main.rs": "#[path=\"a/../b.rs\"]mod child;fn proof()->u16{child::picked()}fn main(){print!(\"{}\",proof());}",
+      "src/a/keep.rs": "",
+      "src/b.rs": "pub fn picked()->u16{73}",
+      "b.rs": "pub fn picked()->u8{19}"
+    },
+    "target": "src/b.rs",
+    "definite": false
+  },
+  {
+    "name": "outer-dot",
+    "files": {
+      "src/main.rs": "#[path=\"./b.rs\"]mod child;fn proof()->u16{child::picked()}fn main(){print!(\"{}\",proof());}",
+      "src/b.rs": "pub fn picked()->u16{73}",
+      "b.rs": "pub fn picked()->u8{19}"
+    },
+    "target": "src/b.rs",
+    "definite": false
+  },
+  {
+    "name": "outer-empty-component",
+    "files": {
+      "src/main.rs": "#[path=\"a//b.rs\"]mod child;fn proof()->u16{child::picked()}fn main(){print!(\"{}\",proof());}",
+      "src/a/b.rs": "pub fn picked()->u16{73}",
+      "src/b.rs": "pub fn picked()->u8{19}"
+    },
+    "target": "src/a/b.rs",
+    "definite": false
+  },
+  {
+    "name": "outer-absolute",
+    "files": {
+      "src/main.rs": "#[path=\"@ROOT@/src/b.rs\"]mod child;fn proof()->u16{child::picked()}fn main(){print!(\"{}\",proof());}",
+      "src/b.rs": "pub fn picked()->u16{73}",
+      "b.rs": "pub fn picked()->u8{19}"
+    },
+    "target": "src/b.rs",
+    "definite": false
+  },
+  {
+    "name": "inner-plain-file",
+    "files": {
+      "src/main.rs": "mod child;fn proof()->u16{child::nested::picked()}fn main(){print!(\"{}\",proof());}",
+      "src/child.rs": "#![path=\"alternate.rs\"]pub mod nested;",
+      "src/nested.rs": "pub fn picked()->u16{73}",
+      "src/child/nested.rs": "pub fn picked()->u8{19}"
+    },
+    "target": "src/nested.rs",
+    "definite": false
+  },
+  {
+    "name": "inner-parent-name-rs",
+    "files": {
+      "src/main.rs": "mod a;fn proof()->u16{a::b::c::picked()}fn main(){print!(\"{}\",proof());}",
+      "src/a.rs": "pub mod b;",
+      "src/a/b.rs": "#![path=\"z.rs\"]pub mod c;",
+      "src/c.rs": "pub fn picked()->u16{73}",
+      "src/a/c.rs": "pub fn picked()->u8{19}"
+    },
+    "target": "src/c.rs",
+    "definite": false
+  },
+  {
+    "name": "inner-cfg-attr-parent-name-rs",
+    "files": {
+      "src/main.rs": "mod a;fn proof()->u16{a::b::c::picked()}fn main(){print!(\"{}\",proof());}",
+      "src/a.rs": "pub mod b;",
+      "src/a/b.rs": "#![cfg_attr(all(),path=\"z.rs\")]pub mod c;",
+      "src/c.rs": "pub fn picked()->u16{73}",
+      "src/a/c.rs": "pub fn picked()->u8{19}"
+    },
+    "target": "src/c.rs",
+    "definite": false
+  },
+  {
+    "name": "outer-file-wins-inner",
+    "files": {
+      "src/main.rs": "#[path=\"p/q.rs\"]mod a;fn proof()->u16{a::c::picked()}fn main(){print!(\"{}\",proof());}",
+      "src/p/q.rs": "#![path=\"z/w.rs\"]pub mod c;",
+      "src/p/c.rs": "pub fn picked()->u16{73}",
+      "src/p/z/c.rs": "pub fn picked()->u8{19}"
+    },
+    "target": "src/p/c.rs",
+    "definite": true
+  },
+  {
+    "name": "inline-name-rs-outer",
+    "files": {
+      "src/main.rs": "mod a;fn proof()->u16{a::inl::c::picked()}fn main(){print!(\"{}\",proof());}",
+      "src/a.rs": "#[path=\"x\"]pub mod inl{pub mod c;}",
+      "src/x/c.rs": "pub fn picked()->u16{73}",
+      "src/a/x/c.rs": "pub fn picked()->u8{19}"
+    },
+    "target": "src/x/c.rs",
+    "definite": false
+  },
+  {
+    "name": "inline-name-rs-inner",
+    "files": {
+      "src/main.rs": "mod a;fn proof()->u16{a::inl::c::picked()}fn main(){print!(\"{}\",proof());}",
+      "src/a.rs": "pub mod inl{#![path=\"x\"]pub mod c;}",
+      "src/x/c.rs": "pub fn picked()->u16{73}",
+      "src/a/x/c.rs": "pub fn picked()->u8{19}"
+    },
+    "target": "src/x/c.rs",
+    "definite": false
+  },
+  {
+    "name": "inner-parent-mod-rs",
+    "files": {
+      "src/main.rs": "mod a;fn proof()->u16{a::b::c::picked()}fn main(){print!(\"{}\",proof());}",
+      "src/a/mod.rs": "pub mod b;",
+      "src/a/b.rs": "#![path=\"z.rs\"]pub mod c;",
+      "src/a/c.rs": "pub fn picked()->u16{73}",
+      "src/c.rs": "pub fn picked()->u8{19}"
+    },
+    "target": "src/a/c.rs",
+    "definite": false
+  },
+  {
+    "name": "inline-in-mod-rs",
+    "files": {
+      "src/main.rs": "mod a;fn proof()->u16{a::inl::c::picked()}fn main(){print!(\"{}\",proof());}",
+      "src/a/mod.rs": "pub mod inl{#![path=\"x\"]pub mod c;}",
+      "src/a/x/c.rs": "pub fn picked()->u16{73}",
+      "src/x/c.rs": "pub fn picked()->u8{19}"
+    },
+    "target": "src/a/x/c.rs",
+    "definite": false
+  },
+  {
+    "name": "inline-two-deep",
+    "files": {
+      "src/main.rs": "mod a;fn proof()->u16{a::one::two::c::picked()}fn main(){print!(\"{}\",proof());}",
+      "src/a.rs": "pub mod one{pub mod two{#![path=\"x\"]pub mod c;}}",
+      "src/one/x/c.rs": "pub fn picked()->u8{19}",
+      "src/a/one/x/c.rs": "pub fn picked()->u16{73}"
+    },
+    "target": "src/a/one/x/c.rs",
+    "definite": false
+  },
+  {
+    "name": "inline-outer-wins-inner",
+    "files": {
+      "src/main.rs": "mod a;fn proof()->u16{a::inl::c::picked()}fn main(){print!(\"{}\",proof());}",
+      "src/a.rs": "#[path=\"outer\"]pub mod inl{#![path=\"inner\"]pub mod c;}",
+      "src/outer/c.rs": "pub fn picked()->u16{73}",
+      "src/inner/c.rs": "pub fn picked()->u8{19}",
+      "src/a/outer/c.rs": "pub fn picked()->u8{19}"
+    },
+    "target": "src/outer/c.rs",
+    "definite": false
+  },
+  {
+    "name": "plain-outer-file",
+    "files": {
+      "src/main.rs": "#[path=\"p/q.rs\"]mod child;fn proof()->u16{child::nested::picked()}fn main(){print!(\"{}\",proof());}",
+      "src/p/q.rs": "pub mod nested;",
+      "src/p/nested.rs": "pub fn picked()->u16{73}",
+      "src/p/q/nested.rs": "pub fn picked()->u8{19}"
+    },
+    "target": "src/p/nested.rs",
+    "definite": true
+  },
+  {
+    "name": "plain-outer-cfg-attr",
+    "files": {
+      "src/main.rs": "#[cfg_attr(all(),path=\"p/q.rs\")]mod child;fn proof()->u16{child::nested::picked()}fn main(){print!(\"{}\",proof());}",
+      "src/p/q.rs": "pub mod nested;",
+      "src/p/nested.rs": "pub fn picked()->u16{73}",
+      "src/p/q/nested.rs": "pub fn picked()->u8{19}"
+    },
+    "target": "src/p/nested.rs",
+    "definite": true
+  },
+  {
+    "name": "first-outer-file-path-wins",
+    "files": {
+      "src/main.rs": "#[path=\"first.rs\"]#[path=\"second.rs\"]mod child;fn proof()->u16{child::picked()}fn main(){print!(\"{}\",proof());}",
+      "src/first.rs": "pub fn picked()->u16{73}",
+      "src/second.rs": "pub fn picked()->u8{19}"
+    },
+    "target": "src/first.rs",
+    "definite": true
+  },
+  {
+    "name": "outer-parent-component",
+    "files": {
+      "src/main.rs": "#[path=\"../extra/p.rs\"]mod child;fn proof()->u16{child::nested::picked()}fn main(){print!(\"{}\",proof());}",
+      "extra/p.rs": "pub mod nested;",
+      "extra/nested.rs": "pub fn picked()->u16{73}",
+      "extra/p/nested.rs": "pub fn picked()->u8{19}"
+    },
+    "target": "extra/nested.rs",
+    "definite": false
+  },
+  {
+    "name": "inner-body-mod-rs",
+    "files": {
+      "src/main.rs": "mod a;fn proof()->u16{a::c::picked()}fn main(){print!(\"{}\",proof());}",
+      "src/a/mod.rs": "#![path=\"z.rs\"]pub mod c;",
+      "src/c.rs": "pub fn picked()->u16{73}",
+      "src/a/c.rs": "pub fn picked()->u8{19}"
+    },
+    "target": "src/c.rs",
+    "definite": false
+  },
+  {
+    "name": "plain-outer-in-name-rs",
+    "files": {
+      "src/main.rs": "mod a;fn proof()->u16{a::child::picked()}fn main(){print!(\"{}\",proof());}",
+      "src/a.rs": "#[path=\"p/q.rs\"]pub mod child;",
+      "src/p/q.rs": "pub fn picked()->u16{73}",
+      "src/a/p/q.rs": "pub fn picked()->u8{19}"
+    },
+    "target": "src/p/q.rs",
+    "definite": true
+  },
+  {
+    "name": "plain-outer-in-mod-rs",
+    "files": {
+      "src/main.rs": "mod a;fn proof()->u16{a::child::picked()}fn main(){print!(\"{}\",proof());}",
+      "src/a/mod.rs": "#[path=\"p/q.rs\"]pub mod child;",
+      "src/a/p/q.rs": "pub fn picked()->u16{73}",
+      "src/a/a/p/q.rs": "pub fn picked()->u8{19}"
+    },
+    "target": "src/a/p/q.rs",
+    "definite": true
+  },
+  {
+    "name": "plain-outer-in-inline",
+    "files": {
+      "src/main.rs": "mod a;fn proof()->u16{a::inl::child::picked()}fn main(){print!(\"{}\",proof());}",
+      "src/a.rs": "pub mod inl{#[path=\"p/q.rs\"]pub mod child;}",
+      "src/a/inl/p/q.rs": "pub fn picked()->u16{73}",
+      "src/inl/p/q.rs": "pub fn picked()->u8{19}"
+    },
+    "target": "src/a/inl/p/q.rs",
+    "definite": true
+  }
+]

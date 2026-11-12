@@ -1,0 +1,72 @@
+[
+  {
+    "name": "enum-discriminant",
+    "sourceFile": "src/a.rs",
+    "files": {
+      "src/main.rs": "mod a;fn main(){print!(\"{}\",a::E::A as usize);}",
+      "src/a.rs": "pub enum E{A={mod inl{#[path=\"y.rs\"]pub mod m;}inl::m::f() as isize}}",
+      "src/inl/y.rs": "pub const fn f()->u16{16}",
+      "src/a/inl/y.rs": "pub const fn f()->u8{8}"
+    },
+    "target": "src/inl/y.rs",
+    "definite": false,
+    "alias": false,
+    "answer": "16"
+  },
+  {
+    "name": "array-type-alias",
+    "sourceFile": "src/a.rs",
+    "files": {
+      "src/main.rs": "mod a;fn main(){print!(\"{}\",std::mem::size_of::<a::T>());}",
+      "src/a.rs": "pub type T=[u8;{mod inl{#[path=\"y.rs\"]pub mod m;}inl::m::f() as usize}];",
+      "src/inl/y.rs": "pub const fn f()->u16{16}",
+      "src/a/inl/y.rs": "pub const fn f()->u8{8}"
+    },
+    "target": "src/inl/y.rs",
+    "definite": false,
+    "alias": false,
+    "answer": "16"
+  },
+  {
+    "name": "const-generic-argument",
+    "sourceFile": "src/a.rs",
+    "files": {
+      "src/main.rs": "mod a;fn main(){print!(\"{}\",std::mem::size_of::<a::T>());}",
+      "src/a.rs": "pub struct W<const N:usize>([u8;N]);pub type T=W<{mod inl{#[path=\"y.rs\"]pub mod m;}inl::m::f() as usize}>;",
+      "src/inl/y.rs": "pub const fn f()->u16{16}",
+      "src/a/inl/y.rs": "pub const fn f()->u8{8}"
+    },
+    "target": "src/inl/y.rs",
+    "definite": false,
+    "alias": false,
+    "answer": "16"
+  },
+  {
+    "name": "wrong-cause-enum-alias",
+    "sourceFile": "src/a.rs",
+    "files": {
+      "src/main.rs": "mod a;fn main(){print!(\"{}\",a::E::A as usize);}",
+      "src/a.rs": "pub enum E{A={mod inl{#[path=\"y.rs\"]pub mod m;}use inl::m::f;f() as isize}}",
+      "src/inl/y.rs": "pub const fn f()->u16{16}",
+      "src/a/inl/y.rs": "pub fn f()->u8{let raw=8u8;let r=&raw;*r}"
+    },
+    "target": "src/inl/y.rs",
+    "definite": false,
+    "alias": true,
+    "answer": "16"
+  },
+  {
+    "name": "ordinary-module-control",
+    "sourceFile": "src/a.rs",
+    "files": {
+      "src/main.rs": "mod a;fn main(){print!(\"{}\",a::run());}",
+      "src/a.rs": "pub mod inl{#[path=\"y.rs\"]pub mod m;}pub fn run()->u16{inl::m::f()}",
+      "src/a/inl/y.rs": "pub const fn f()->u16{16}",
+      "src/inl/y.rs": "pub const fn f()->u8{8}"
+    },
+    "target": "src/a/inl/y.rs",
+    "definite": true,
+    "alias": false,
+    "answer": "16"
+  }
+]

@@ -1,0 +1,381 @@
+[
+  {
+    "name": "function inner cfg",
+    "sources": {
+      "src/lib.rs": "fn f()->u8{#![cfg(feature=\"x\")]1}mod other{pub fn f()->u16{2}}#[cfg(not(feature=\"x\"))]use other::f;pub fn run()->u16{f() as u16}"
+    },
+    "off": "2",
+    "on": "1",
+    "checks": [
+      [
+        "candidates",
+        "f",
+        [
+          "f",
+          "other::f"
+        ]
+      ]
+    ],
+    "edition": "2024"
+  },
+  {
+    "name": "function inner cfg_attr",
+    "sources": {
+      "src/lib.rs": "fn f()->u8{#![cfg_attr(not(feature=\"x\"),cfg(any()))]1}mod other{pub fn f()->u16{2}}#[cfg(not(feature=\"x\"))]use other::f;pub fn run()->u16{f() as u16}"
+    },
+    "off": "2",
+    "on": "1",
+    "checks": [
+      [
+        "unknown",
+        "f"
+      ],
+      [
+        "would",
+        "f",
+        [
+          "f",
+          "other::f"
+        ]
+      ]
+    ],
+    "edition": "2024"
+  },
+  {
+    "name": "inline module inner cfg",
+    "sources": {
+      "src/lib.rs": "struct A;mod optional{#![cfg(feature=\"x\")]impl super::A{pub fn f(self)->u8{1}}}trait Tr{fn f(self)->u16;}impl Tr for A{fn f(self)->u16{2}}fn r(a:A)->u16{a.f() as u16}pub fn run()->u16{r(A)}"
+    },
+    "off": "2",
+    "on": "1",
+    "checks": [
+      [
+        "unknown",
+        "a.f"
+      ],
+      [
+        "hints",
+        "a.f",
+        2
+      ]
+    ],
+    "edition": "2024"
+  },
+  {
+    "name": "impl inner cfg",
+    "sources": {
+      "src/lib.rs": "struct A;impl A{#![cfg(feature=\"x\")]pub fn f(self)->u8{1}}trait Tr{fn f(self)->u16;}impl Tr for A{fn f(self)->u16{2}}fn r(a:A)->u16{a.f() as u16}pub fn run()->u16{r(A)}"
+    },
+    "off": "2",
+    "on": "1",
+    "checks": [
+      [
+        "unknown",
+        "a.f"
+      ],
+      [
+        "hints",
+        "a.f",
+        2
+      ]
+    ],
+    "edition": "2024"
+  },
+  {
+    "name": "trait inner cfg",
+    "sources": {
+      "src/lib.rs": "trait Tr{#![cfg(feature=\"x\")]fn f()->u8;}mod other{pub trait Tr{fn f()->u16;}}#[cfg(not(feature=\"x\"))]use other::Tr;struct A;#[cfg(feature=\"x\")]impl Tr for A{fn f()->u8{1}}#[cfg(not(feature=\"x\"))]impl Tr for A{fn f()->u16{2}}pub fn run()->u16{A::f() as u16}"
+    },
+    "off": "2",
+    "on": "1",
+    "checks": [
+      [
+        "allTargets",
+        "Tr",
+        "implements",
+        [
+          [
+            "Tr"
+          ],
+          [
+            "other::Tr"
+          ]
+        ]
+      ]
+    ],
+    "edition": "2024"
+  },
+  {
+    "name": "extern inner cfg",
+    "sources": {
+      "src/lib.rs": "extern \"C\"{#![cfg(feature=\"x\")]fn abs(x:i32)->i32;}#[cfg(not(feature=\"x\"))]fn abs(_:i32)->i32{2}pub fn run()->u16{unsafe{abs(-1) as u16}}"
+    },
+    "off": "2",
+    "on": "1",
+    "checks": [
+      [
+        "candidates",
+        "abs",
+        [
+          "abs",
+          "abs"
+        ]
+      ],
+      [
+        "symbolCondition",
+        "abs",
+        "feature=\"x\""
+      ]
+    ],
+    "edition": "2021"
+  },
+  {
+    "name": "file module conjunction",
+    "sources": {
+      "src/lib.rs": "#[cfg(feature=\"y\")]mod m;#[cfg(all(feature=\"x\",feature=\"y\"))]pub fn run()->u16{m::f() as u16}#[cfg(not(all(feature=\"x\",feature=\"y\")))]pub fn run()->u16{2}pub fn probe(){let _=m::f();}",
+      "src/m.rs": "#![cfg(feature=\"x\")]pub fn f()->u8{1}"
+    },
+    "off": null,
+    "on": null,
+    "checks": [
+      [
+        "states",
+        "m::f",
+        [
+          "resolved",
+          "unresolved"
+        ]
+      ]
+    ],
+    "edition": "2024"
+  },
+  {
+    "name": "conditional let",
+    "sources": {
+      "src/lib.rs": "fn f()->u16{2}fn g()->u16{1}pub fn run()->u16{#[cfg(feature=\"x\")]let f:fn()->u16=g;f()}"
+    },
+    "off": "2",
+    "on": "1",
+    "checks": [
+      [
+        "unknown",
+        "f"
+      ],
+      [
+        "reason",
+        "f",
+        "conditional-binding"
+      ]
+    ],
+    "edition": "2024"
+  },
+  {
+    "name": "conditional block use",
+    "sources": {
+      "src/lib.rs": "fn f()->u16{2}mod other{pub fn f()->u16{1}}pub fn run()->u16{#[cfg(feature=\"x\")]use other::f;f()}"
+    },
+    "off": "2",
+    "on": "1",
+    "checks": [
+      [
+        "unknown",
+        "f"
+      ],
+      [
+        "would",
+        "f",
+        [
+          "f",
+          "other::f"
+        ]
+      ]
+    ],
+    "edition": "2024"
+  },
+  {
+    "name": "block local item",
+    "sources": {
+      "src/lib.rs": "fn f()->u16{2}pub fn run()->u16{#[cfg(feature=\"x\")]fn f()->u16{1}f()}"
+    },
+    "off": "2",
+    "on": "1",
+    "checks": [
+      [
+        "unknown",
+        "f"
+      ],
+      [
+        "would",
+        "f",
+        [
+          "f",
+          "run::f"
+        ]
+      ]
+    ],
+    "edition": "2024"
+  },
+  {
+    "name": "statement and expression",
+    "sources": {
+      "src/lib.rs": "fn f()->u16{1}pub fn run()->u16{#[cfg(feature=\"x\")]return f();#[cfg(not(feature=\"x\"))]{2}}"
+    },
+    "off": "2",
+    "on": "1",
+    "checks": [
+      [
+        "one",
+        "f",
+        "f"
+      ]
+    ],
+    "edition": "2024"
+  },
+  {
+    "name": "fields",
+    "sources": {
+      "src/lib.rs": "#[cfg(feature=\"x\")]struct T;struct S{#[cfg(feature=\"x\")]f:T}pub fn run()->u16{let _=S{#[cfg(feature=\"x\")]f:T};#[cfg(feature=\"x\")]return 1;#[cfg(not(feature=\"x\"))]return 2;}"
+    },
+    "off": "2",
+    "on": "1",
+    "checks": [
+      [
+        "unconditional",
+        "S"
+      ],
+      [
+        "condition",
+        "T",
+        "types",
+        "feature=\"x\""
+      ]
+    ],
+    "edition": "2024"
+  },
+  {
+    "name": "variants",
+    "sources": {
+      "src/lib.rs": "enum E{#[cfg(feature=\"x\")]V,W}pub fn run()->u16{#[cfg(feature=\"x\")]let _=E::V;let _=E::W;#[cfg(feature=\"x\")]return 1;#[cfg(not(feature=\"x\"))]return 2;}"
+    },
+    "off": "2",
+    "on": "1",
+    "checks": [
+      [
+        "one",
+        "E::V",
+        "E::V",
+        "values"
+      ],
+      [
+        "one",
+        "E::W",
+        "E::W",
+        "values"
+      ],
+      [
+        "unconditional",
+        "E"
+      ]
+    ],
+    "edition": "2024"
+  },
+  {
+    "name": "match arm",
+    "sources": {
+      "src/lib.rs": "fn f()->u16{2}pub fn run()->u16{match 0{#[cfg(not(feature=\"x\"))]0=>f(),_=>1}}"
+    },
+    "off": "2",
+    "on": "1",
+    "checks": [
+      [
+        "one",
+        "f",
+        "f"
+      ],
+      [
+        "condition",
+        "f",
+        "calls",
+        "not(feature=\"x\")"
+      ]
+    ],
+    "edition": "2024"
+  },
+  {
+    "name": "parameters",
+    "sources": {
+      "src/lib.rs": "struct A;impl A{fn f(self)->u16{1}}fn f()->u16{2}fn r(#[cfg(feature=\"x\")]a:A)->u16{#[cfg(feature=\"x\")]return a.f();#[cfg(not(feature=\"x\"))]return f();}pub fn run()->u16{#[cfg(feature=\"x\")]return r(A);#[cfg(not(feature=\"x\"))]return r();}"
+    },
+    "off": "2",
+    "on": "1",
+    "checks": [
+      [
+        "one",
+        "a.f",
+        "impl A::f"
+      ],
+      [
+        "one",
+        "f",
+        "f"
+      ]
+    ],
+    "edition": "2024"
+  },
+  {
+    "name": "conditional self",
+    "sources": {
+      "src/lib.rs": "struct A;impl A{fn f(#[cfg(feature=\"x\")]&self)->u8{1}}trait Tr{fn f(&self)->u16;}impl Tr for A{fn f(&self)->u16{2}}fn r(a:&A)->u16{a.f() as u16}pub fn run()->u16{r(&A)}"
+    },
+    "off": "2",
+    "on": "1",
+    "checks": [
+      [
+        "unknown",
+        "a.f"
+      ],
+      [
+        "hints",
+        "a.f",
+        2
+      ]
+    ],
+    "edition": "2024"
+  },
+  {
+    "name": "inner crate cfg",
+    "sources": {
+      "src/lib.rs": "#![cfg(feature=\"x\")]fn f()->u16{1}pub fn run()->u16{f()}"
+    },
+    "off": "",
+    "on": "1",
+    "checks": [
+      [
+        "one",
+        "f",
+        "f"
+      ],
+      [
+        "unitCondition",
+        "feature=\"x\""
+      ]
+    ],
+    "edition": "2024"
+  },
+  {
+    "name": "cfg_attr non cfg",
+    "sources": {
+      "src/lib.rs": "#[cfg_attr(feature=\"x\",allow(dead_code))]fn f()->u16{1}pub fn run()->u16{f()}"
+    },
+    "off": "1",
+    "on": "1",
+    "checks": [
+      [
+        "one",
+        "f",
+        "f"
+      ]
+    ],
+    "edition": "2024"
+  }
+]

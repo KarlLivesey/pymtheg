@@ -1,0 +1,3084 @@
+{
+  "symbols": [
+    {
+      "file": "app/src/lib.rs",
+      "name": "impl Speak for B",
+      "kind": "impl",
+      "identity": "impl Speak for B",
+      "at": "impl Speak for B { fn speak(&self) {} }",
+      "range": {
+        "start": 520,
+        "end": 559
+      }
+    },
+    {
+      "file": "app/src/tree/leaf.rs",
+      "name": "leaf",
+      "kind": "function",
+      "identity": "leaf",
+      "at": "pub fn leaf() { super::branch(); }",
+      "range": {
+        "start": 0,
+        "end": 34
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "Two",
+      "kind": "variant",
+      "identity": "Choice::Two",
+      "at": "Two(A)",
+      "range": {
+        "start": 335,
+        "end": 341
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "tree",
+      "kind": "module",
+      "identity": "tree",
+      "at": "mod tree;",
+      "range": {
+        "start": 41,
+        "end": 50
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "collision",
+      "kind": "function",
+      "identity": "right::collision",
+      "at": "pub fn collision() {}",
+      "range": {
+        "start": 1214,
+        "end": 1235
+      }
+    },
+    {
+      "file": "app/src/flat.rs",
+      "name": "impl Thing",
+      "kind": "impl",
+      "identity": "impl Thing",
+      "at": "impl Thing { pub fn new() -> Self { Thing } }",
+      "range": {
+        "start": 32,
+        "end": 77
+      }
+    },
+    {
+      "file": "helper/src/lib.rs",
+      "name": "outside",
+      "kind": "function",
+      "identity": "outside",
+      "at": "pub fn outside() {}",
+      "range": {
+        "start": 0,
+        "end": 19
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "renamed",
+      "kind": "module",
+      "identity": "renamed",
+      "at": "mod renamed;",
+      "range": {
+        "start": 72,
+        "end": 84
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "check",
+      "kind": "function",
+      "identity": "tests::check",
+      "at": "fn check() { super::run(super::A, &super::B); }",
+      "range": {
+        "start": 1117,
+        "end": 1164
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "Speak",
+      "kind": "trait",
+      "identity": "Speak",
+      "at": "pub trait Speak { fn speak(&self) {} }",
+      "range": {
+        "start": 344,
+        "end": 382
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "new",
+      "kind": "method",
+      "identity": "impl B::new",
+      "at": "pub fn new() -> Self { B }",
+      "range": {
+        "start": 451,
+        "end": 477
+      }
+    },
+    {
+      "file": "helper/src/lib.rs",
+      "name": "hidden",
+      "kind": "function",
+      "identity": "hidden",
+      "at": "fn hidden() {}",
+      "range": {
+        "start": 20,
+        "end": 34
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "later",
+      "kind": "macro",
+      "identity": "later",
+      "at": "macro_rules! later { () => {}; }",
+      "range": {
+        "start": 1343,
+        "end": 1375
+      }
+    },
+    {
+      "file": "app/src/driver.rs",
+      "name": "app/src/driver.rs",
+      "kind": "module",
+      "identity": "$crate",
+      "at": "fn main() { sample_app::A::new(); helper::entry(); }\n",
+      "range": {
+        "start": 0,
+        "end": 53
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "run",
+      "kind": "function",
+      "identity": "run",
+      "at": "fn run(a: A, unknown: &dyn Speak) {\n    private(); branch(); globbed(); foreign();\n    A::new(); B::new(); Alias::new(); a.own(); unknown.speak();\n    inline::inside(); renamed::special();\n    local_macro!(); external_macro!(); std::mem::drop(a);\n    generic::<A>(A);\n    let private = || {};\n    private();\n}",
+      "range": {
+        "start": 782,
+        "end": 1091
+      }
+    },
+    {
+      "file": "app/src/tree/mod.rs",
+      "name": "globbed",
+      "kind": "function",
+      "identity": "globbed",
+      "at": "pub fn globbed() {}",
+      "range": {
+        "start": 74,
+        "end": 93
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "impl B",
+      "kind": "impl",
+      "identity": "impl B",
+      "at": "impl B { pub fn new() -> Self { B } }",
+      "range": {
+        "start": 442,
+        "end": 479
+      }
+    },
+    {
+      "file": "app/src/flat.rs",
+      "name": "app/src/flat.rs",
+      "kind": "module",
+      "identity": "$crate",
+      "at": "use super::A;\npub struct Thing;\nimpl Thing { pub fn new() -> Self { Thing } }\npub(super) fn private() { self::local(); super::tree::branch(); }\nfn local() {}\nfn sibling(a: A) { super::tree::globbed(); a.own(); }\n",
+      "range": {
+        "start": 0,
+        "end": 212
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "local_macro",
+      "kind": "macro",
+      "identity": "local_macro",
+      "at": "macro_rules! local_macro { () => { private() }; }",
+      "range": {
+        "start": 693,
+        "end": 742
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "flat",
+      "kind": "module",
+      "identity": "flat",
+      "at": "mod flat;",
+      "range": {
+        "start": 31,
+        "end": 40
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "COUNT",
+      "kind": "const",
+      "identity": "COUNT",
+      "at": "const COUNT: usize = 1;",
+      "range": {
+        "start": 643,
+        "end": 666
+      }
+    },
+    {
+      "file": "app/src/flat.rs",
+      "name": "Thing",
+      "kind": "struct",
+      "identity": "Thing",
+      "at": "pub struct Thing;",
+      "range": {
+        "start": 14,
+        "end": 31
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "speak",
+      "kind": "method",
+      "identity": "impl Speak for A::speak",
+      "at": "fn speak(&self) {}",
+      "range": {
+        "start": 499,
+        "end": 517
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "collision",
+      "kind": "function",
+      "identity": "left::collision",
+      "at": "pub fn collision() {}",
+      "range": {
+        "start": 1178,
+        "end": 1199
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "local",
+      "kind": "function",
+      "identity": "inline::local",
+      "at": "fn local() {}",
+      "range": {
+        "start": 133,
+        "end": 146
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "Renamed",
+      "kind": "type",
+      "identity": "Renamed",
+      "at": "type Renamed = A;",
+      "range": {
+        "start": 625,
+        "end": 642
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "tests",
+      "kind": "module",
+      "identity": "tests",
+      "at": "mod tests { fn check() { super::run(super::A, &super::B); } }",
+      "range": {
+        "start": 1105,
+        "end": 1166
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "One",
+      "kind": "variant",
+      "identity": "Choice::One",
+      "at": "One",
+      "range": {
+        "start": 330,
+        "end": 333
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "FLAG",
+      "kind": "static",
+      "identity": "FLAG",
+      "at": "static FLAG: bool = true;",
+      "range": {
+        "start": 667,
+        "end": 692
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "app/src/lib.rs",
+      "kind": "module",
+      "identity": "$crate",
+      "at": "// café 😀 before declarations\nmod flat;\nmod tree;\n#[path = \"other.rs\"]\nmod renamed;\nmod inline { pub fn inside() { self::local(); } fn local() {} }\nuse crate::{flat::{private, Thing as Alias}, tree::branch};\nuse crate::tree::*;\nuse helper::outside as foreign;\npub struct A;\npub struct B;\npub struct Wrap<T>(T);\npub enum Choice { One, Two(A) }\npub trait Speak { fn speak(&self) {} }\nimpl A { pub fn new() -> Self { A } pub fn own(&self) {} }\nimpl B { pub fn new() -> Self { B } }\nimpl Speak for A { fn speak(&self) {} }\nimpl Speak for B { fn speak(&self) {} }\nimpl<T> Wrap<T> { pub fn new(value: T) -> Self { Wrap(value) } }\ntype Renamed = A;\nconst COUNT: usize = 1;\nstatic FLAG: bool = true;\nmacro_rules! local_macro { () => { private() }; }\nfn generic<T>(value: T) -> T { value }\nfn run(a: A, unknown: &dyn Speak) {\n    private(); branch(); globbed(); foreign();\n    A::new(); B::new(); Alias::new(); a.own(); unknown.speak();\n    inline::inside(); renamed::special();\n    local_macro!(); external_macro!(); std::mem::drop(a);\n    generic::<A>(A);\n    let private = || {};\n    private();\n}\n#[cfg(test)]\nmod tests { fn check() { super::run(super::A, &super::B); } }\nmod left { pub fn collision() {} }\nmod right { pub fn collision() {} }\nuse crate::left::*;\nuse crate::right::*;\nfn ambiguous() { collision(); }\nfn before_macro() { later!(); }\nmacro_rules! later { () => {}; }\n",
+      "range": {
+        "start": 0,
+        "end": 1376
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "right",
+      "kind": "module",
+      "identity": "right",
+      "at": "mod right { pub fn collision() {} }",
+      "range": {
+        "start": 1202,
+        "end": 1237
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "inline",
+      "kind": "module",
+      "identity": "inline",
+      "at": "mod inline { pub fn inside() { self::local(); } fn local() {} }",
+      "range": {
+        "start": 85,
+        "end": 148
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "impl A",
+      "kind": "impl",
+      "identity": "impl A",
+      "at": "impl A { pub fn new() -> Self { A } pub fn own(&self) {} }",
+      "range": {
+        "start": 383,
+        "end": 441
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "A",
+      "kind": "struct",
+      "identity": "A",
+      "at": "pub struct A;",
+      "range": {
+        "start": 261,
+        "end": 274
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "B",
+      "kind": "struct",
+      "identity": "B",
+      "at": "pub struct B;",
+      "range": {
+        "start": 275,
+        "end": 288
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "left",
+      "kind": "module",
+      "identity": "left",
+      "at": "mod left { pub fn collision() {} }",
+      "range": {
+        "start": 1167,
+        "end": 1201
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "own",
+      "kind": "method",
+      "identity": "impl A::own",
+      "at": "pub fn own(&self) {}",
+      "range": {
+        "start": 419,
+        "end": 439
+      }
+    },
+    {
+      "file": "app/src/flat.rs",
+      "name": "private",
+      "kind": "function",
+      "identity": "private",
+      "at": "pub(super) fn private() { self::local(); super::tree::branch(); }",
+      "range": {
+        "start": 78,
+        "end": 143
+      }
+    },
+    {
+      "file": "app/src/driver.rs",
+      "name": "main",
+      "kind": "function",
+      "identity": "main",
+      "at": "fn main() { sample_app::A::new(); helper::entry(); }",
+      "range": {
+        "start": 0,
+        "end": 52
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "speak",
+      "kind": "method",
+      "identity": "Speak::speak",
+      "at": "fn speak(&self) {}",
+      "range": {
+        "start": 362,
+        "end": 380
+      }
+    },
+    {
+      "file": "helper/src/lib.rs",
+      "name": "helper/src/lib.rs",
+      "kind": "module",
+      "identity": "$crate",
+      "at": "pub fn outside() {}\nfn hidden() {}\npub fn entry() { hidden(); }\n",
+      "range": {
+        "start": 0,
+        "end": 64
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "Wrap",
+      "kind": "struct",
+      "identity": "Wrap",
+      "at": "pub struct Wrap<T>(T);",
+      "range": {
+        "start": 289,
+        "end": 311
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "new",
+      "kind": "method",
+      "identity": "impl<T> Wrap<T>::new",
+      "at": "pub fn new(value: T) -> Self { Wrap(value) }",
+      "range": {
+        "start": 578,
+        "end": 622
+      }
+    },
+    {
+      "file": "app/src/tree/mod.rs",
+      "name": "app/src/tree/mod.rs",
+      "kind": "module",
+      "identity": "$crate",
+      "at": "mod leaf;\npub fn branch() { self::leaf::leaf(); super::flat::private(); }\npub fn globbed() {}\n",
+      "range": {
+        "start": 0,
+        "end": 94
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "new",
+      "kind": "method",
+      "identity": "impl A::new",
+      "at": "pub fn new() -> Self { A }",
+      "range": {
+        "start": 392,
+        "end": 418
+      }
+    },
+    {
+      "file": "app/src/other.rs",
+      "name": "special",
+      "kind": "function",
+      "identity": "special",
+      "at": "pub fn special() {}",
+      "range": {
+        "start": 0,
+        "end": 19
+      }
+    },
+    {
+      "file": "app/src/tree/mod.rs",
+      "name": "leaf",
+      "kind": "module",
+      "identity": "leaf",
+      "at": "mod leaf;",
+      "range": {
+        "start": 0,
+        "end": 9
+      }
+    },
+    {
+      "file": "app/src/tree/mod.rs",
+      "name": "branch",
+      "kind": "function",
+      "identity": "branch",
+      "at": "pub fn branch() { self::leaf::leaf(); super::flat::private(); }",
+      "range": {
+        "start": 10,
+        "end": 73
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "impl<T> Wrap<T>",
+      "kind": "impl",
+      "identity": "impl<T> Wrap<T>",
+      "at": "impl<T> Wrap<T> { pub fn new(value: T) -> Self { Wrap(value) } }",
+      "range": {
+        "start": 560,
+        "end": 624
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "inside",
+      "kind": "function",
+      "identity": "inline::inside",
+      "at": "pub fn inside() { self::local(); }",
+      "range": {
+        "start": 98,
+        "end": 132
+      }
+    },
+    {
+      "file": "app/src/tree/leaf.rs",
+      "name": "app/src/tree/leaf.rs",
+      "kind": "module",
+      "identity": "$crate",
+      "at": "pub fn leaf() { super::branch(); }\n",
+      "range": {
+        "start": 0,
+        "end": 35
+      }
+    },
+    {
+      "file": "app/src/flat.rs",
+      "name": "new",
+      "kind": "method",
+      "identity": "impl Thing::new",
+      "at": "pub fn new() -> Self { Thing }",
+      "range": {
+        "start": 45,
+        "end": 75
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "speak",
+      "kind": "method",
+      "identity": "impl Speak for B::speak",
+      "at": "fn speak(&self) {}",
+      "range": {
+        "start": 539,
+        "end": 557
+      }
+    },
+    {
+      "file": "app/src/other.rs",
+      "name": "app/src/other.rs",
+      "kind": "module",
+      "identity": "$crate",
+      "at": "pub fn special() {}\n",
+      "range": {
+        "start": 0,
+        "end": 20
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "ambiguous",
+      "kind": "function",
+      "identity": "ambiguous",
+      "at": "fn ambiguous() { collision(); }",
+      "range": {
+        "start": 1279,
+        "end": 1310
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "impl Speak for A",
+      "kind": "impl",
+      "identity": "impl Speak for A",
+      "at": "impl Speak for A { fn speak(&self) {} }",
+      "range": {
+        "start": 480,
+        "end": 519
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "Choice",
+      "kind": "enum",
+      "identity": "Choice",
+      "at": "pub enum Choice { One, Two(A) }",
+      "range": {
+        "start": 312,
+        "end": 343
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "before_macro",
+      "kind": "function",
+      "identity": "before_macro",
+      "at": "fn before_macro() { later!(); }",
+      "range": {
+        "start": 1311,
+        "end": 1342
+      }
+    },
+    {
+      "file": "app/src/flat.rs",
+      "name": "sibling",
+      "kind": "function",
+      "identity": "sibling",
+      "at": "fn sibling(a: A) { super::tree::globbed(); a.own(); }",
+      "range": {
+        "start": 158,
+        "end": 211
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "name": "generic",
+      "kind": "function",
+      "identity": "generic",
+      "at": "fn generic<T>(value: T) -> T { value }",
+      "range": {
+        "start": 743,
+        "end": 781
+      }
+    },
+    {
+      "file": "helper/src/lib.rs",
+      "name": "entry",
+      "kind": "function",
+      "identity": "entry",
+      "at": "pub fn entry() { hidden(); }",
+      "range": {
+        "start": 35,
+        "end": 63
+      }
+    },
+    {
+      "file": "app/src/flat.rs",
+      "name": "local",
+      "kind": "function",
+      "identity": "local",
+      "at": "fn local() {}",
+      "range": {
+        "start": 144,
+        "end": 157
+      }
+    }
+  ],
+  "links": [
+    {
+      "file": "app/src/driver.rs",
+      "kind": "contains",
+      "targetName": "main",
+      "source": {
+        "name": "app/src/driver.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/driver.rs",
+        "name": "main",
+        "kind": "function"
+      },
+      "at": "fn main() { sample_app::A::new(); helper::entry(); }",
+      "range": {
+        "start": 0,
+        "end": 52
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "types",
+      "targetName": "A",
+      "source": {
+        "name": "impl A",
+        "kind": "impl"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "A",
+        "kind": "struct"
+      },
+      "at": "A",
+      "range": {
+        "start": 388,
+        "end": 389
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "calls",
+      "targetName": "renamed::special",
+      "source": {
+        "name": "run",
+        "kind": "function"
+      },
+      "target": null,
+      "at": "renamed::special",
+      "range": {
+        "start": 951,
+        "end": 967
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "types",
+      "targetName": "T",
+      "source": {
+        "name": "Wrap",
+        "kind": "struct"
+      },
+      "target": null,
+      "at": "T",
+      "range": {
+        "start": 308,
+        "end": 309
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "left",
+      "source": {
+        "name": "app/src/lib.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "left",
+        "kind": "module"
+      },
+      "at": "mod left { pub fn collision() {} }",
+      "range": {
+        "start": 1167,
+        "end": 1201
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "imports",
+      "targetName": "crate::tree::*",
+      "source": {
+        "name": "app/src/lib.rs",
+        "kind": "module"
+      },
+      "target": null,
+      "at": "crate::tree::*",
+      "range": {
+        "start": 213,
+        "end": 227
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "impl Speak for B",
+      "source": {
+        "name": "app/src/lib.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "impl Speak for B",
+        "kind": "impl"
+      },
+      "at": "impl Speak for B { fn speak(&self) {} }",
+      "range": {
+        "start": 520,
+        "end": 559
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "Speak",
+      "source": {
+        "name": "app/src/lib.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "Speak",
+        "kind": "trait"
+      },
+      "at": "pub trait Speak { fn speak(&self) {} }",
+      "range": {
+        "start": 344,
+        "end": 382
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "imports",
+      "targetName": "crate::flat::private",
+      "source": {
+        "name": "app/src/lib.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/flat.rs",
+        "name": "private",
+        "kind": "function"
+      },
+      "at": "private",
+      "range": {
+        "start": 168,
+        "end": 175
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "generic",
+      "source": {
+        "name": "app/src/lib.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "generic",
+        "kind": "function"
+      },
+      "at": "fn generic<T>(value: T) -> T { value }",
+      "range": {
+        "start": 743,
+        "end": 781
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "speak",
+      "source": {
+        "name": "impl Speak for A",
+        "kind": "impl"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "speak",
+        "kind": "method"
+      },
+      "at": "fn speak(&self) {}",
+      "range": {
+        "start": 499,
+        "end": 517
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "imports",
+      "targetName": "crate::right::*",
+      "source": {
+        "name": "app/src/lib.rs",
+        "kind": "module"
+      },
+      "target": null,
+      "at": "crate::right::*",
+      "range": {
+        "start": 1262,
+        "end": 1277
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "types",
+      "targetName": "T",
+      "source": {
+        "name": "generic",
+        "kind": "function"
+      },
+      "target": null,
+      "at": "T",
+      "range": {
+        "start": 764,
+        "end": 765
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "macros",
+      "targetName": "later",
+      "source": {
+        "name": "before_macro",
+        "kind": "function"
+      },
+      "target": null,
+      "at": "later",
+      "range": {
+        "start": 1331,
+        "end": 1336
+      }
+    },
+    {
+      "file": "app/src/flat.rs",
+      "kind": "contains",
+      "targetName": "new",
+      "source": {
+        "name": "impl Thing",
+        "kind": "impl"
+      },
+      "target": {
+        "file": "app/src/flat.rs",
+        "name": "new",
+        "kind": "method"
+      },
+      "at": "pub fn new() -> Self { Thing }",
+      "range": {
+        "start": 45,
+        "end": 75
+      }
+    },
+    {
+      "file": "helper/src/lib.rs",
+      "kind": "contains",
+      "targetName": "outside",
+      "source": {
+        "name": "helper/src/lib.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "helper/src/lib.rs",
+        "name": "outside",
+        "kind": "function"
+      },
+      "at": "pub fn outside() {}",
+      "range": {
+        "start": 0,
+        "end": 19
+      }
+    },
+    {
+      "file": "app/src/flat.rs",
+      "kind": "calls",
+      "targetName": "super::tree::branch",
+      "source": {
+        "name": "private",
+        "kind": "function"
+      },
+      "target": {
+        "file": "app/src/tree/mod.rs",
+        "name": "branch",
+        "kind": "function"
+      },
+      "at": "super::tree::branch",
+      "range": {
+        "start": 119,
+        "end": 138
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "types",
+      "targetName": "A",
+      "source": {
+        "name": "run",
+        "kind": "function"
+      },
+      "target": null,
+      "at": "A",
+      "range": {
+        "start": 1043,
+        "end": 1044
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "calls",
+      "targetName": "a.own",
+      "source": {
+        "name": "run",
+        "kind": "function"
+      },
+      "target": null,
+      "at": "a.own",
+      "range": {
+        "start": 903,
+        "end": 908
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "implements",
+      "targetName": "Speak",
+      "source": {
+        "name": "impl Speak for B",
+        "kind": "impl"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "Speak",
+        "kind": "trait"
+      },
+      "at": "Speak",
+      "range": {
+        "start": 525,
+        "end": 530
+      }
+    },
+    {
+      "file": "app/src/tree/mod.rs",
+      "kind": "contains",
+      "targetName": "leaf",
+      "source": {
+        "name": "app/src/tree/mod.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/tree/mod.rs",
+        "name": "leaf",
+        "kind": "module"
+      },
+      "at": "mod leaf;",
+      "range": {
+        "start": 0,
+        "end": 9
+      }
+    },
+    {
+      "file": "app/src/tree/mod.rs",
+      "kind": "contains",
+      "targetName": "branch",
+      "source": {
+        "name": "app/src/tree/mod.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/tree/mod.rs",
+        "name": "branch",
+        "kind": "function"
+      },
+      "at": "pub fn branch() { self::leaf::leaf(); super::flat::private(); }",
+      "range": {
+        "start": 10,
+        "end": 73
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "modules",
+      "targetName": "renamed",
+      "source": {
+        "name": "renamed",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/other.rs",
+        "name": "app/src/other.rs",
+        "kind": "module"
+      },
+      "at": "mod renamed;",
+      "range": {
+        "start": 72,
+        "end": 84
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "calls",
+      "targetName": "private",
+      "source": {
+        "name": "run",
+        "kind": "function"
+      },
+      "target": null,
+      "at": "private",
+      "range": {
+        "start": 822,
+        "end": 829
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "calls",
+      "targetName": "inline::inside",
+      "source": {
+        "name": "run",
+        "kind": "function"
+      },
+      "target": null,
+      "at": "inline::inside",
+      "range": {
+        "start": 933,
+        "end": 947
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "check",
+      "source": {
+        "name": "tests",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "check",
+        "kind": "function"
+      },
+      "at": "fn check() { super::run(super::A, &super::B); }",
+      "range": {
+        "start": 1117,
+        "end": 1164
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "types",
+      "targetName": "A",
+      "source": {
+        "name": "run",
+        "kind": "function"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "A",
+        "kind": "struct"
+      },
+      "at": "A",
+      "range": {
+        "start": 792,
+        "end": 793
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "One",
+      "source": {
+        "name": "Choice",
+        "kind": "enum"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "One",
+        "kind": "variant"
+      },
+      "at": "One",
+      "range": {
+        "start": 330,
+        "end": 333
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "tests",
+      "source": {
+        "name": "app/src/lib.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "tests",
+        "kind": "module"
+      },
+      "at": "mod tests { fn check() { super::run(super::A, &super::B); } }",
+      "range": {
+        "start": 1105,
+        "end": 1166
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "types",
+      "targetName": "Speak",
+      "source": {
+        "name": "impl Speak for A",
+        "kind": "impl"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "Speak",
+        "kind": "trait"
+      },
+      "at": "Speak",
+      "range": {
+        "start": 485,
+        "end": 490
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "types",
+      "targetName": "Speak",
+      "source": {
+        "name": "run",
+        "kind": "function"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "Speak",
+        "kind": "trait"
+      },
+      "at": "Speak",
+      "range": {
+        "start": 809,
+        "end": 814
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "impl Speak for A",
+      "source": {
+        "name": "app/src/lib.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "impl Speak for A",
+        "kind": "impl"
+      },
+      "at": "impl Speak for A { fn speak(&self) {} }",
+      "range": {
+        "start": 480,
+        "end": 519
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "modules",
+      "targetName": "tree",
+      "source": {
+        "name": "tree",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/tree/mod.rs",
+        "name": "app/src/tree/mod.rs",
+        "kind": "module"
+      },
+      "at": "mod tree;",
+      "range": {
+        "start": 41,
+        "end": 50
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "calls",
+      "targetName": "Wrap",
+      "source": {
+        "name": "new",
+        "kind": "method"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "Wrap",
+        "kind": "struct"
+      },
+      "at": "Wrap",
+      "range": {
+        "start": 609,
+        "end": 613
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "types",
+      "targetName": "Wrap",
+      "source": {
+        "name": "impl<T> Wrap<T>",
+        "kind": "impl"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "Wrap",
+        "kind": "struct"
+      },
+      "at": "Wrap",
+      "range": {
+        "start": 568,
+        "end": 572
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "calls",
+      "targetName": "collision",
+      "source": {
+        "name": "ambiguous",
+        "kind": "function"
+      },
+      "target": null,
+      "candidates": [
+        {
+          "file": "app/src/lib.rs",
+          "name": "collision",
+          "kind": "function"
+        },
+        {
+          "file": "app/src/lib.rs",
+          "name": "collision",
+          "kind": "function"
+        }
+      ],
+      "at": "collision",
+      "range": {
+        "start": 1296,
+        "end": 1305
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "renamed",
+      "source": {
+        "name": "app/src/lib.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "renamed",
+        "kind": "module"
+      },
+      "at": "mod renamed;",
+      "range": {
+        "start": 72,
+        "end": 84
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "imports",
+      "targetName": "crate::tree::branch",
+      "source": {
+        "name": "app/src/lib.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/tree/mod.rs",
+        "name": "branch",
+        "kind": "function"
+      },
+      "at": "tree::branch",
+      "range": {
+        "start": 194,
+        "end": 206
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "local_macro",
+      "source": {
+        "name": "app/src/lib.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "local_macro",
+        "kind": "macro"
+      },
+      "at": "macro_rules! local_macro { () => { private() }; }",
+      "range": {
+        "start": 693,
+        "end": 742
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "inside",
+      "source": {
+        "name": "inline",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "inside",
+        "kind": "function"
+      },
+      "at": "pub fn inside() { self::local(); }",
+      "range": {
+        "start": 98,
+        "end": 132
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "new",
+      "source": {
+        "name": "impl B",
+        "kind": "impl"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "new",
+        "kind": "method"
+      },
+      "at": "pub fn new() -> Self { B }",
+      "range": {
+        "start": 451,
+        "end": 477
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "imports",
+      "targetName": "crate::left::*",
+      "source": {
+        "name": "app/src/lib.rs",
+        "kind": "module"
+      },
+      "target": null,
+      "at": "crate::left::*",
+      "range": {
+        "start": 1242,
+        "end": 1256
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "types",
+      "targetName": "Self",
+      "source": {
+        "name": "new",
+        "kind": "method"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "A",
+        "kind": "struct"
+      },
+      "at": "Self",
+      "range": {
+        "start": 408,
+        "end": 412
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "types",
+      "targetName": "B",
+      "source": {
+        "name": "impl Speak for B",
+        "kind": "impl"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "B",
+        "kind": "struct"
+      },
+      "at": "B",
+      "range": {
+        "start": 535,
+        "end": 536
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "imports",
+      "targetName": "crate::flat::Thing",
+      "source": {
+        "name": "app/src/lib.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/flat.rs",
+        "name": "Thing",
+        "kind": "struct"
+      },
+      "at": "Thing as Alias",
+      "range": {
+        "start": 177,
+        "end": 191
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "types",
+      "targetName": "Self",
+      "source": {
+        "name": "new",
+        "kind": "method"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "B",
+        "kind": "struct"
+      },
+      "at": "Self",
+      "range": {
+        "start": 467,
+        "end": 471
+      }
+    },
+    {
+      "file": "app/src/other.rs",
+      "kind": "contains",
+      "targetName": "special",
+      "source": {
+        "name": "app/src/other.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/other.rs",
+        "name": "special",
+        "kind": "function"
+      },
+      "at": "pub fn special() {}",
+      "range": {
+        "start": 0,
+        "end": 19
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "before_macro",
+      "source": {
+        "name": "app/src/lib.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "before_macro",
+        "kind": "function"
+      },
+      "at": "fn before_macro() { later!(); }",
+      "range": {
+        "start": 1311,
+        "end": 1342
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "calls",
+      "targetName": "private",
+      "source": {
+        "name": "run",
+        "kind": "function"
+      },
+      "target": null,
+      "at": "private",
+      "range": {
+        "start": 1079,
+        "end": 1086
+      }
+    },
+    {
+      "file": "app/src/tree/leaf.rs",
+      "kind": "contains",
+      "targetName": "leaf",
+      "source": {
+        "name": "app/src/tree/leaf.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/tree/leaf.rs",
+        "name": "leaf",
+        "kind": "function"
+      },
+      "at": "pub fn leaf() { super::branch(); }",
+      "range": {
+        "start": 0,
+        "end": 34
+      }
+    },
+    {
+      "file": "app/src/tree/mod.rs",
+      "kind": "modules",
+      "targetName": "leaf",
+      "source": {
+        "name": "leaf",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/tree/leaf.rs",
+        "name": "app/src/tree/leaf.rs",
+        "kind": "module"
+      },
+      "at": "mod leaf;",
+      "range": {
+        "start": 0,
+        "end": 9
+      }
+    },
+    {
+      "file": "helper/src/lib.rs",
+      "kind": "contains",
+      "targetName": "entry",
+      "source": {
+        "name": "helper/src/lib.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "helper/src/lib.rs",
+        "name": "entry",
+        "kind": "function"
+      },
+      "at": "pub fn entry() { hidden(); }",
+      "range": {
+        "start": 35,
+        "end": 63
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "FLAG",
+      "source": {
+        "name": "app/src/lib.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "FLAG",
+        "kind": "static"
+      },
+      "at": "static FLAG: bool = true;",
+      "range": {
+        "start": 667,
+        "end": 692
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "types",
+      "targetName": "A",
+      "source": {
+        "name": "impl Speak for A",
+        "kind": "impl"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "A",
+        "kind": "struct"
+      },
+      "at": "A",
+      "range": {
+        "start": 495,
+        "end": 496
+      }
+    },
+    {
+      "file": "app/src/flat.rs",
+      "kind": "calls",
+      "targetName": "a.own",
+      "source": {
+        "name": "sibling",
+        "kind": "function"
+      },
+      "target": null,
+      "at": "a.own",
+      "range": {
+        "start": 201,
+        "end": 206
+      }
+    },
+    {
+      "file": "app/src/tree/mod.rs",
+      "kind": "contains",
+      "targetName": "globbed",
+      "source": {
+        "name": "app/src/tree/mod.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/tree/mod.rs",
+        "name": "globbed",
+        "kind": "function"
+      },
+      "at": "pub fn globbed() {}",
+      "range": {
+        "start": 74,
+        "end": 93
+      }
+    },
+    {
+      "file": "helper/src/lib.rs",
+      "kind": "contains",
+      "targetName": "hidden",
+      "source": {
+        "name": "helper/src/lib.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "helper/src/lib.rs",
+        "name": "hidden",
+        "kind": "function"
+      },
+      "at": "fn hidden() {}",
+      "range": {
+        "start": 20,
+        "end": 34
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "local",
+      "source": {
+        "name": "inline",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "local",
+        "kind": "function"
+      },
+      "at": "fn local() {}",
+      "range": {
+        "start": 133,
+        "end": 146
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "tree",
+      "source": {
+        "name": "app/src/lib.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "tree",
+        "kind": "module"
+      },
+      "at": "mod tree;",
+      "range": {
+        "start": 41,
+        "end": 50
+      }
+    },
+    {
+      "file": "app/src/flat.rs",
+      "kind": "types",
+      "targetName": "Thing",
+      "source": {
+        "name": "impl Thing",
+        "kind": "impl"
+      },
+      "target": {
+        "file": "app/src/flat.rs",
+        "name": "Thing",
+        "kind": "struct"
+      },
+      "at": "Thing",
+      "range": {
+        "start": 37,
+        "end": 42
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "calls",
+      "targetName": "Alias::new",
+      "source": {
+        "name": "run",
+        "kind": "function"
+      },
+      "target": null,
+      "at": "Alias::new",
+      "range": {
+        "start": 889,
+        "end": 899
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "flat",
+      "source": {
+        "name": "app/src/lib.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "flat",
+        "kind": "module"
+      },
+      "at": "mod flat;",
+      "range": {
+        "start": 31,
+        "end": 40
+      }
+    },
+    {
+      "file": "helper/src/lib.rs",
+      "kind": "calls",
+      "targetName": "hidden",
+      "source": {
+        "name": "entry",
+        "kind": "function"
+      },
+      "target": {
+        "file": "helper/src/lib.rs",
+        "name": "hidden",
+        "kind": "function"
+      },
+      "at": "hidden",
+      "range": {
+        "start": 52,
+        "end": 58
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "later",
+      "source": {
+        "name": "app/src/lib.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "later",
+        "kind": "macro"
+      },
+      "at": "macro_rules! later { () => {}; }",
+      "range": {
+        "start": 1343,
+        "end": 1375
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "run",
+      "source": {
+        "name": "app/src/lib.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "run",
+        "kind": "function"
+      },
+      "at": "fn run(a: A, unknown: &dyn Speak) {\n    private(); branch(); globbed(); foreign();\n    A::new(); B::new(); Alias::new(); a.own(); unknown.speak();\n    inline::inside(); renamed::special();\n    local_macro!(); external_macro!(); std::mem::drop(a);\n    generic::<A>(A);\n    let private = || {};\n    private();\n}",
+      "range": {
+        "start": 782,
+        "end": 1091
+      }
+    },
+    {
+      "file": "app/src/flat.rs",
+      "kind": "imports",
+      "targetName": "super::A",
+      "source": {
+        "name": "app/src/flat.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "A",
+        "kind": "struct"
+      },
+      "at": "super::A",
+      "range": {
+        "start": 4,
+        "end": 12
+      }
+    },
+    {
+      "file": "app/src/tree/mod.rs",
+      "kind": "calls",
+      "targetName": "self::leaf::leaf",
+      "source": {
+        "name": "branch",
+        "kind": "function"
+      },
+      "target": {
+        "file": "app/src/tree/leaf.rs",
+        "name": "leaf",
+        "kind": "function"
+      },
+      "at": "self::leaf::leaf",
+      "range": {
+        "start": 28,
+        "end": 44
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "modules",
+      "targetName": "flat",
+      "source": {
+        "name": "flat",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/flat.rs",
+        "name": "app/src/flat.rs",
+        "kind": "module"
+      },
+      "at": "mod flat;",
+      "range": {
+        "start": 31,
+        "end": 40
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "macros",
+      "targetName": "local_macro",
+      "source": {
+        "name": "run",
+        "kind": "function"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "local_macro",
+        "kind": "macro"
+      },
+      "at": "local_macro",
+      "range": {
+        "start": 975,
+        "end": 986
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "calls",
+      "targetName": "unknown.speak",
+      "source": {
+        "name": "run",
+        "kind": "function"
+      },
+      "target": null,
+      "at": "unknown.speak",
+      "range": {
+        "start": 912,
+        "end": 925
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "calls",
+      "targetName": "A::new",
+      "source": {
+        "name": "run",
+        "kind": "function"
+      },
+      "target": null,
+      "at": "A::new",
+      "range": {
+        "start": 869,
+        "end": 875
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "new",
+      "source": {
+        "name": "impl<T> Wrap<T>",
+        "kind": "impl"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "new",
+        "kind": "method"
+      },
+      "at": "pub fn new(value: T) -> Self { Wrap(value) }",
+      "range": {
+        "start": 578,
+        "end": 622
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "calls",
+      "targetName": "self::local",
+      "source": {
+        "name": "inside",
+        "kind": "function"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "local",
+        "kind": "function"
+      },
+      "at": "self::local",
+      "range": {
+        "start": 116,
+        "end": 127
+      }
+    },
+    {
+      "file": "app/src/flat.rs",
+      "kind": "types",
+      "targetName": "Self",
+      "source": {
+        "name": "new",
+        "kind": "method"
+      },
+      "target": {
+        "file": "app/src/flat.rs",
+        "name": "Thing",
+        "kind": "struct"
+      },
+      "at": "Self",
+      "range": {
+        "start": 61,
+        "end": 65
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "types",
+      "targetName": "T",
+      "source": {
+        "name": "generic",
+        "kind": "function"
+      },
+      "target": null,
+      "at": "T",
+      "range": {
+        "start": 770,
+        "end": 771
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "new",
+      "source": {
+        "name": "impl A",
+        "kind": "impl"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "new",
+        "kind": "method"
+      },
+      "at": "pub fn new() -> Self { A }",
+      "range": {
+        "start": 392,
+        "end": 418
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "calls",
+      "targetName": "super::run",
+      "source": {
+        "name": "check",
+        "kind": "function"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "run",
+        "kind": "function"
+      },
+      "at": "super::run",
+      "range": {
+        "start": 1130,
+        "end": 1140
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "calls",
+      "targetName": "branch",
+      "source": {
+        "name": "run",
+        "kind": "function"
+      },
+      "target": null,
+      "at": "branch",
+      "range": {
+        "start": 833,
+        "end": 839
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "collision",
+      "source": {
+        "name": "left",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "collision",
+        "kind": "function"
+      },
+      "at": "pub fn collision() {}",
+      "range": {
+        "start": 1178,
+        "end": 1199
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "calls",
+      "targetName": "B::new",
+      "source": {
+        "name": "run",
+        "kind": "function"
+      },
+      "target": null,
+      "at": "B::new",
+      "range": {
+        "start": 879,
+        "end": 885
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "Wrap",
+      "source": {
+        "name": "app/src/lib.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "Wrap",
+        "kind": "struct"
+      },
+      "at": "pub struct Wrap<T>(T);",
+      "range": {
+        "start": 289,
+        "end": 311
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "macros",
+      "targetName": "external_macro",
+      "source": {
+        "name": "run",
+        "kind": "function"
+      },
+      "target": null,
+      "at": "external_macro",
+      "range": {
+        "start": 991,
+        "end": 1005
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "types",
+      "targetName": "Speak",
+      "source": {
+        "name": "impl Speak for B",
+        "kind": "impl"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "Speak",
+        "kind": "trait"
+      },
+      "at": "Speak",
+      "range": {
+        "start": 525,
+        "end": 530
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "impl<T> Wrap<T>",
+      "source": {
+        "name": "app/src/lib.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "impl<T> Wrap<T>",
+        "kind": "impl"
+      },
+      "at": "impl<T> Wrap<T> { pub fn new(value: T) -> Self { Wrap(value) } }",
+      "range": {
+        "start": 560,
+        "end": 624
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "types",
+      "targetName": "A",
+      "source": {
+        "name": "Two",
+        "kind": "variant"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "A",
+        "kind": "struct"
+      },
+      "at": "A",
+      "range": {
+        "start": 339,
+        "end": 340
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "A",
+      "source": {
+        "name": "app/src/lib.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "A",
+        "kind": "struct"
+      },
+      "at": "pub struct A;",
+      "range": {
+        "start": 261,
+        "end": 274
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "calls",
+      "targetName": "generic",
+      "source": {
+        "name": "run",
+        "kind": "function"
+      },
+      "target": null,
+      "at": "generic",
+      "range": {
+        "start": 1033,
+        "end": 1040
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "COUNT",
+      "source": {
+        "name": "app/src/lib.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "COUNT",
+        "kind": "const"
+      },
+      "at": "const COUNT: usize = 1;",
+      "range": {
+        "start": 643,
+        "end": 666
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "impl B",
+      "source": {
+        "name": "app/src/lib.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "impl B",
+        "kind": "impl"
+      },
+      "at": "impl B { pub fn new() -> Self { B } }",
+      "range": {
+        "start": 442,
+        "end": 479
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "speak",
+      "source": {
+        "name": "impl Speak for B",
+        "kind": "impl"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "speak",
+        "kind": "method"
+      },
+      "at": "fn speak(&self) {}",
+      "range": {
+        "start": 539,
+        "end": 557
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "impl A",
+      "source": {
+        "name": "app/src/lib.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "impl A",
+        "kind": "impl"
+      },
+      "at": "impl A { pub fn new() -> Self { A } pub fn own(&self) {} }",
+      "range": {
+        "start": 383,
+        "end": 441
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "own",
+      "source": {
+        "name": "impl A",
+        "kind": "impl"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "own",
+        "kind": "method"
+      },
+      "at": "pub fn own(&self) {}",
+      "range": {
+        "start": 419,
+        "end": 439
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "types",
+      "targetName": "B",
+      "source": {
+        "name": "impl B",
+        "kind": "impl"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "B",
+        "kind": "struct"
+      },
+      "at": "B",
+      "range": {
+        "start": 447,
+        "end": 448
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "Choice",
+      "source": {
+        "name": "app/src/lib.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "Choice",
+        "kind": "enum"
+      },
+      "at": "pub enum Choice { One, Two(A) }",
+      "range": {
+        "start": 312,
+        "end": 343
+      }
+    },
+    {
+      "file": "app/src/flat.rs",
+      "kind": "contains",
+      "targetName": "sibling",
+      "source": {
+        "name": "app/src/flat.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/flat.rs",
+        "name": "sibling",
+        "kind": "function"
+      },
+      "at": "fn sibling(a: A) { super::tree::globbed(); a.own(); }",
+      "range": {
+        "start": 158,
+        "end": 211
+      }
+    },
+    {
+      "file": "app/src/driver.rs",
+      "kind": "calls",
+      "targetName": "helper::entry",
+      "source": {
+        "name": "main",
+        "kind": "function"
+      },
+      "target": {
+        "file": "helper/src/lib.rs",
+        "name": "entry",
+        "kind": "function"
+      },
+      "at": "helper::entry",
+      "range": {
+        "start": 34,
+        "end": 47
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "imports",
+      "targetName": "helper::outside",
+      "source": {
+        "name": "app/src/lib.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "helper/src/lib.rs",
+        "name": "outside",
+        "kind": "function"
+      },
+      "at": "helper::outside as foreign",
+      "range": {
+        "start": 233,
+        "end": 259
+      }
+    },
+    {
+      "file": "app/src/flat.rs",
+      "kind": "contains",
+      "targetName": "private",
+      "source": {
+        "name": "app/src/flat.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/flat.rs",
+        "name": "private",
+        "kind": "function"
+      },
+      "at": "pub(super) fn private() { self::local(); super::tree::branch(); }",
+      "range": {
+        "start": 78,
+        "end": 143
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "Renamed",
+      "source": {
+        "name": "app/src/lib.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "Renamed",
+        "kind": "type"
+      },
+      "at": "type Renamed = A;",
+      "range": {
+        "start": 625,
+        "end": 642
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "types",
+      "targetName": "Self",
+      "source": {
+        "name": "new",
+        "kind": "method"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "Wrap",
+        "kind": "struct"
+      },
+      "at": "Self",
+      "range": {
+        "start": 602,
+        "end": 606
+      }
+    },
+    {
+      "file": "app/src/flat.rs",
+      "kind": "contains",
+      "targetName": "impl Thing",
+      "source": {
+        "name": "app/src/flat.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/flat.rs",
+        "name": "impl Thing",
+        "kind": "impl"
+      },
+      "at": "impl Thing { pub fn new() -> Self { Thing } }",
+      "range": {
+        "start": 32,
+        "end": 77
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "speak",
+      "source": {
+        "name": "Speak",
+        "kind": "trait"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "speak",
+        "kind": "method"
+      },
+      "at": "fn speak(&self) {}",
+      "range": {
+        "start": 362,
+        "end": 380
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "implements",
+      "targetName": "Speak",
+      "source": {
+        "name": "impl Speak for A",
+        "kind": "impl"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "Speak",
+        "kind": "trait"
+      },
+      "at": "Speak",
+      "range": {
+        "start": 485,
+        "end": 490
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "calls",
+      "targetName": "std::mem::drop",
+      "source": {
+        "name": "run",
+        "kind": "function"
+      },
+      "target": null,
+      "at": "std::mem::drop",
+      "range": {
+        "start": 1010,
+        "end": 1024
+      }
+    },
+    {
+      "file": "app/src/tree/mod.rs",
+      "kind": "calls",
+      "targetName": "super::flat::private",
+      "source": {
+        "name": "branch",
+        "kind": "function"
+      },
+      "target": {
+        "file": "app/src/flat.rs",
+        "name": "private",
+        "kind": "function"
+      },
+      "at": "super::flat::private",
+      "range": {
+        "start": 48,
+        "end": 68
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "collision",
+      "source": {
+        "name": "right",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "collision",
+        "kind": "function"
+      },
+      "at": "pub fn collision() {}",
+      "range": {
+        "start": 1214,
+        "end": 1235
+      }
+    },
+    {
+      "file": "app/src/flat.rs",
+      "kind": "types",
+      "targetName": "A",
+      "source": {
+        "name": "sibling",
+        "kind": "function"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "A",
+        "kind": "struct"
+      },
+      "at": "A",
+      "range": {
+        "start": 172,
+        "end": 173
+      }
+    },
+    {
+      "file": "app/src/driver.rs",
+      "kind": "calls",
+      "targetName": "sample_app::A::new",
+      "source": {
+        "name": "main",
+        "kind": "function"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "new",
+        "kind": "method"
+      },
+      "at": "sample_app::A::new",
+      "range": {
+        "start": 12,
+        "end": 30
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "right",
+      "source": {
+        "name": "app/src/lib.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "right",
+        "kind": "module"
+      },
+      "at": "mod right { pub fn collision() {} }",
+      "range": {
+        "start": 1202,
+        "end": 1237
+      }
+    },
+    {
+      "file": "app/src/tree/leaf.rs",
+      "kind": "calls",
+      "targetName": "super::branch",
+      "source": {
+        "name": "leaf",
+        "kind": "function"
+      },
+      "target": {
+        "file": "app/src/tree/mod.rs",
+        "name": "branch",
+        "kind": "function"
+      },
+      "at": "super::branch",
+      "range": {
+        "start": 16,
+        "end": 29
+      }
+    },
+    {
+      "file": "app/src/flat.rs",
+      "kind": "calls",
+      "targetName": "self::local",
+      "source": {
+        "name": "private",
+        "kind": "function"
+      },
+      "target": {
+        "file": "app/src/flat.rs",
+        "name": "local",
+        "kind": "function"
+      },
+      "at": "self::local",
+      "range": {
+        "start": 104,
+        "end": 115
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "calls",
+      "targetName": "globbed",
+      "source": {
+        "name": "run",
+        "kind": "function"
+      },
+      "target": null,
+      "at": "globbed",
+      "range": {
+        "start": 843,
+        "end": 850
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "B",
+      "source": {
+        "name": "app/src/lib.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "B",
+        "kind": "struct"
+      },
+      "at": "pub struct B;",
+      "range": {
+        "start": 275,
+        "end": 288
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "types",
+      "targetName": "A",
+      "source": {
+        "name": "Renamed",
+        "kind": "type"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "A",
+        "kind": "struct"
+      },
+      "at": "A",
+      "range": {
+        "start": 640,
+        "end": 641
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "types",
+      "targetName": "T",
+      "source": {
+        "name": "impl<T> Wrap<T>",
+        "kind": "impl"
+      },
+      "target": null,
+      "at": "T",
+      "range": {
+        "start": 573,
+        "end": 574
+      }
+    },
+    {
+      "file": "app/src/flat.rs",
+      "kind": "contains",
+      "targetName": "Thing",
+      "source": {
+        "name": "app/src/flat.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/flat.rs",
+        "name": "Thing",
+        "kind": "struct"
+      },
+      "at": "pub struct Thing;",
+      "range": {
+        "start": 14,
+        "end": 31
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "types",
+      "targetName": "T",
+      "source": {
+        "name": "new",
+        "kind": "method"
+      },
+      "target": null,
+      "at": "T",
+      "range": {
+        "start": 596,
+        "end": 597
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "ambiguous",
+      "source": {
+        "name": "app/src/lib.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "ambiguous",
+        "kind": "function"
+      },
+      "at": "fn ambiguous() { collision(); }",
+      "range": {
+        "start": 1279,
+        "end": 1310
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "inline",
+      "source": {
+        "name": "app/src/lib.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "inline",
+        "kind": "module"
+      },
+      "at": "mod inline { pub fn inside() { self::local(); } fn local() {} }",
+      "range": {
+        "start": 85,
+        "end": 148
+      }
+    },
+    {
+      "file": "app/src/flat.rs",
+      "kind": "contains",
+      "targetName": "local",
+      "source": {
+        "name": "app/src/flat.rs",
+        "kind": "module"
+      },
+      "target": {
+        "file": "app/src/flat.rs",
+        "name": "local",
+        "kind": "function"
+      },
+      "at": "fn local() {}",
+      "range": {
+        "start": 144,
+        "end": 157
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "calls",
+      "targetName": "foreign",
+      "source": {
+        "name": "run",
+        "kind": "function"
+      },
+      "target": null,
+      "at": "foreign",
+      "range": {
+        "start": 854,
+        "end": 861
+      }
+    },
+    {
+      "file": "app/src/flat.rs",
+      "kind": "calls",
+      "targetName": "super::tree::globbed",
+      "source": {
+        "name": "sibling",
+        "kind": "function"
+      },
+      "target": {
+        "file": "app/src/tree/mod.rs",
+        "name": "globbed",
+        "kind": "function"
+      },
+      "at": "super::tree::globbed",
+      "range": {
+        "start": 177,
+        "end": 197
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "contains",
+      "targetName": "Two",
+      "source": {
+        "name": "Choice",
+        "kind": "enum"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "Two",
+        "kind": "variant"
+      },
+      "at": "Two(A)",
+      "range": {
+        "start": 335,
+        "end": 341
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "values",
+      "targetName": "value",
+      "source": {
+        "name": "new",
+        "kind": "method"
+      },
+      "target": null,
+      "range": {
+        "start": 614,
+        "end": 619
+      },
+      "at": "value"
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "values",
+      "targetName": "a",
+      "source": {
+        "name": "run",
+        "kind": "function"
+      },
+      "target": null,
+      "range": {
+        "start": 1025,
+        "end": 1026
+      },
+      "at": "a"
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "values",
+      "targetName": "super::B",
+      "source": {
+        "name": "check",
+        "kind": "function"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "B",
+        "kind": "struct"
+      },
+      "range": {
+        "start": 1152,
+        "end": 1160
+      },
+      "at": "super::B"
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "values",
+      "targetName": "B",
+      "source": {
+        "name": "new",
+        "kind": "method"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "B",
+        "kind": "struct"
+      },
+      "range": {
+        "start": 474,
+        "end": 475
+      },
+      "at": "B"
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "values",
+      "targetName": "super::A",
+      "source": {
+        "name": "check",
+        "kind": "function"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "A",
+        "kind": "struct"
+      },
+      "range": {
+        "start": 1141,
+        "end": 1149
+      },
+      "at": "super::A"
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "values",
+      "targetName": "value",
+      "source": {
+        "name": "generic",
+        "kind": "function"
+      },
+      "target": null,
+      "range": {
+        "start": 774,
+        "end": 779
+      },
+      "at": "value"
+    },
+    {
+      "file": "app/src/flat.rs",
+      "kind": "values",
+      "targetName": "Thing",
+      "source": {
+        "name": "new",
+        "kind": "method"
+      },
+      "target": {
+        "file": "app/src/flat.rs",
+        "name": "Thing",
+        "kind": "struct"
+      },
+      "range": {
+        "start": 68,
+        "end": 73
+      },
+      "at": "Thing"
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "values",
+      "targetName": "A",
+      "source": {
+        "name": "new",
+        "kind": "method"
+      },
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "A",
+        "kind": "struct"
+      },
+      "range": {
+        "start": 415,
+        "end": 416
+      },
+      "at": "A"
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "values",
+      "targetName": "A",
+      "source": {
+        "name": "run",
+        "kind": "function"
+      },
+      "target": null,
+      "range": {
+        "start": 1046,
+        "end": 1047
+      },
+      "at": "A"
+    }
+  ]
+}

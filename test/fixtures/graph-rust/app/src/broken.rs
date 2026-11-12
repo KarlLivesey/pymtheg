@@ -1,0 +1,2 @@
+fn good() {}
+fn broken( {
