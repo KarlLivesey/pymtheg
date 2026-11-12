@@ -13,7 +13,7 @@ const TOP_LEVEL = new Set([
   "comment",
 ]);
 
-/** 1-based line and column of a UTF-16 offset. */
+/** 1-based line and column of a UTF-16 offset (columns count UTF-16 units). */
 export function position(text: string, offset: number): string {
   const before = text.slice(0, offset);
   const line = before.split("\n").length;
@@ -21,7 +21,13 @@ export function position(text: string, offset: number): string {
   return `line ${line}, column ${column}`;
 }
 
-/** The first token of a node's text, on one line, at most 40 characters. */
+/** A token's text, on one line, at most 40 characters. */
+function show(text: string): string {
+  const line = text.split(/\r?\n/)[0] ?? "";
+  return line.length > 40 ? `${line.slice(0, 40)}…` : line;
+}
+
+/** The first token of a node's text. */
 function firstToken(node: Node): string {
   let current = node;
   while (current.childCount > 0) {
@@ -29,8 +35,76 @@ function firstToken(node: Node): string {
     if (!child) break;
     current = child;
   }
-  const text = (current.text || node.text).split(/\r?\n/)[0] ?? "";
-  return text.length > 40 ? `${text.slice(0, 40)}…` : text;
+  return show(current.text || node.text);
+}
+
+/** The first non-empty token starting at or after `offset` (undefined at end of file). */
+function tokenAt(root: Node, offset: number): Node | undefined {
+  let best: Node | undefined;
+  const stack: Node[] = [root];
+  while (stack.length) {
+    const node = stack.pop()!;
+    if (node.endIndex <= offset && node.endIndex > node.startIndex) continue;
+    if (best && node.startIndex >= best.startIndex) continue;
+    if (node.childCount === 0) {
+      if (
+        node.startIndex >= offset &&
+        node.endIndex > node.startIndex &&
+        node.type !== "comment"
+      )
+        best = node;
+      continue;
+    }
+    for (let index = node.childCount - 1; index >= 0; index--) {
+      const child = node.child(index);
+      if (child) stack.push(child);
+    }
+  }
+  return best;
+}
+
+/** Tokens that are wrong in themselves when an ERROR node holds only them. */
+const STRAY = new Set([")", "]", "}", ",", ";"]);
+
+/**
+ * Where a syntax error is, as close to a compiler's report as the tree allows
+ * (checked against `gofmt -e`): a MISSING node at the next real token; an
+ * ERROR node at the first token after its last child (the node may enclose
+ * valid code before the fault), unless it holds only stray closing or separator
+ * tokens, which are themselves the unexpected ones.
+ */
+function offending(
+  root: Node,
+  node: Node,
+): { at: number; end: number; message: string } {
+  if (node.isMissing) {
+    const next = tokenAt(root, node.endIndex);
+    return {
+      at: next?.startIndex ?? node.startIndex,
+      end: next?.endIndex ?? node.endIndex,
+      message: `missing \`${node.type}\``,
+    };
+  }
+  const children = node.children.filter(
+    (child): child is Node => !!child && child.type !== "comment",
+  );
+  const stray =
+    children.length > 0 &&
+    children.every((child) => child.childCount === 0 && STRAY.has(child.type));
+  const token = stray
+    ? children[0]!
+    : tokenAt(root, children.at(-1)?.endIndex ?? node.endIndex);
+  return token
+    ? {
+        at: token.startIndex,
+        end: token.endIndex,
+        message: `unexpected \`${show(token.text)}\``,
+      }
+    : {
+        at: node.endIndex,
+        end: node.endIndex,
+        message: "unexpected end of file",
+      };
 }
 
 /**
@@ -61,12 +135,10 @@ export function syntaxFailure(
       }
     }
     if (first) {
-      const message = first.isMissing
-        ? `missing \`${first.type}\``
-        : `unexpected \`${firstToken(first)}\``;
+      const { at, end, message } = offending(root, first);
       return {
-        message: `${position(text, first.startIndex)}: ${message}`,
-        range: { start: first.startIndex, end: first.endIndex },
+        message: `${position(text, at)}: ${message}`,
+        range: { start: at, end },
       };
     }
   }

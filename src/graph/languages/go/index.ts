@@ -136,9 +136,7 @@ function analyze({
           "type",
           "alias",
         ].includes(symbol.kind) &&
-        !(symbol.kind === "function" && symbol.name === "init") &&
-        // A recovered header (layer 2) never shadows anything.
-        !(symbol.data as { recovered?: boolean } | undefined)?.recovered
+        !(symbol.kind === "function" && symbol.name === "init")
       )
         (fact.test ? names.test : names.plain).add(symbol.name);
   }
@@ -281,7 +279,7 @@ function analyze({
 
 const go: LanguageModule = {
   id: ID,
-  version: "17",
+  version: "18",
   extensions: [".go"],
   contextFiles: ["go.mod", "go.work"],
   parse,

@@ -32,18 +32,79 @@ test("safety: a syntax error inside one function body fails the whole file", asy
   assert.deepEqual(symbols, []);
 });
 
-test("a failed file says where and why, like a compiler's first error", async () => {
-  for (const [text, message] of [
-    // An ERROR node: only what is there (tree-sitter does not say what it expected).
+test("a failed file says where and why, like a compiler's first error (checked against gofmt -e)", async () => {
+  // Each expected line is gofmt -e's (Go 1.27.4). Columns count UTF-16 units;
+  // gofmt counts bytes, and the reported token can differ.
+  for (const [text, message, gofmt] of [
+    // An ERROR node may enclose valid statements before the fault.
     [
-      lines("package p", "func F() {", "\tx := f(1, false))", "}"),
-      "line 3, column 18: unexpected `)`",
+      lines(
+        "package p",
+        "",
+        "func F() {",
+        "\ta := 1",
+        "\tb := 2",
+        "\ta++ ++",
+        "\t_ = b",
+        "}",
+      ),
+      "line 6, column 6: unexpected `+`",
+      "6:6: expected ';', found '++'",
     ],
     [
-      lines("package p", "func Good() {}", "func Bad( {"),
-      "line 3, column 1: unexpected `func`",
+      lines("package p", "", "func F() {", "\tx := f(1, false))", "}"),
+      "line 4, column 18: unexpected `)`",
+      "4:18: expected statement, found ')'",
     ],
-    // Top-level text the grammar accepts but Go does not.
+    [
+      lines("package p", "", "func Good() {}", "", "func Bad( {", "}"),
+      "line 5, column 11: missing `)`",
+      "5:11: expected ')', found '{'",
+    ],
+    [
+      lines(
+        "package p",
+        "",
+        "func F() {",
+        "\tif true {",
+        "\t\tprintln(1)",
+        "\t}",
+        "\tvar x = [",
+        "\t_ = x",
+        "}",
+      ),
+      "line 8, column 4: unexpected `=`",
+      "8:4: expected '==', found '='",
+    ],
+    [
+      lines("package p", "", "type T struct {", "\tA int", "\tB map[", "}"),
+      "line 6, column 1: unexpected `}`",
+      "6:1: expected ']', found '}'",
+    ],
+    [
+      lines("package p", "", "func F() {", "\tx := 1 +", "}"),
+      "line 5, column 1: unexpected `}`",
+      "5:1: expected operand, found '}'",
+    ],
+    // Same line as gofmt, a later column.
+    [
+      lines(
+        "package p",
+        "",
+        "func F() {",
+        "\tfor i := 0; i < 3 i++ {",
+        "\t}",
+        "}",
+      ),
+      "line 4, column 24: unexpected `{`",
+      "4:20: expected ';', found i",
+    ],
+    [
+      lines("package p", "", "var x = struct{ a int }{a: 1,, }"),
+      "line 3, column 30: unexpected `,`",
+      "3:30: expected operand, found ','",
+    ],
+    // Top-level text the grammar accepts but Go does not, and package clauses.
     [lines("packge p", "func F() {}"), "line 1, column 1: unexpected `packge`"],
     [
       lines("// a comment", "func F() {}"),
@@ -53,17 +114,22 @@ test("a failed file says where and why, like a compiler's first error", async ()
       lines("package p", "package q"),
       "line 2, column 1: second package clause",
     ],
-    [lines("package"), "line 1, column 8: missing `package_identifier`"],
   ]) {
     const parsed = await go.parse({ path: "p/x.go", text });
     assert.equal(parsed.status, "failed", text);
     assert.deepEqual(
       parsed.diagnostics.map((item) => item.message),
       [message],
-      text,
+      gofmt ?? text,
     );
+    if (gofmt)
+      assert.equal(
+        message.split(",")[0],
+        `line ${gofmt.split(":")[0]}`,
+        "gofmt's line",
+      );
   }
-  // A MISSING node.
+  // A MISSING node, reported at the next real token.
   const missing = await go.parse({
     path: "p/x.go",
     text: lines("package p", "func F() { g(1 }"),

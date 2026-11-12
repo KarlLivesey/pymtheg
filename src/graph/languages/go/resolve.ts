@@ -17,6 +17,9 @@ import {
 } from "./gomod.js";
 import type { GoProjectLayout } from "./gomod.js";
 import {
+  BUILTIN_FUNCTIONS,
+  PREDECLARED_TYPES,
+  PREDECLARED_VALUES,
   TYPE_KINDS,
   type Desc,
   type FileFact,
@@ -78,7 +81,9 @@ type TypeValue =
   | { kind: "func"; r: Desc[]; file: string }
   | { kind: "tparam"; c?: TypeRef; file: string }
   | { kind: "opaque" }
-  | { kind: "unknown" };
+  | { kind: "unknown" }
+  /** It needs code in failed files (`cause`): every link depending on it fails. */
+  | { kind: "failed"; cause: string[] };
 type Entity =
   | { e: "pkg"; pkgs: Pkg[]; path: string }
   | { e: "syms"; syms: GraphSymbol[] }
@@ -103,7 +108,9 @@ type Selection =
   | { kind: "ambiguous"; syms: GraphSymbol[] }
   | { kind: "none" }
   /** An external or unresolvable embedded type could supply or shadow the name. */
-  | { kind: "unknown" };
+  | { kind: "unknown" }
+  /** Unknown because of code in failed files (`cause`): links on it fail. */
+  | { kind: "failed"; cause: string[] };
 /** The structure of a type, from `view`. */
 interface View {
   /** An interface type: these interfaces' flat method set. */
@@ -313,8 +320,8 @@ class GoResolver {
     private readonly moduleId: string,
     private readonly context: ResolutionContext,
     /**
-     * Only to name an open set's reasons: resolve as if no file were lossy and no
-     * declaration broken (intact declarations of lossy files are kept).
+     * Only to name an open set's reasons: resolve as if no file were lossy
+     * (failed files' directories are not treated as holding unseen ones).
      */
     private readonly ignoreLossy = false,
   ) {
@@ -387,7 +394,7 @@ class GoResolver {
   /**
    * Why a set is open, truthfully. `declarations-may-be-unseen` (layer 1) when a
    * member is in a lossy package, or when the set would not be open with no file
-   * lossy and no declaration broken; `external-implementers-possible` only when
+   * lossy; `external-implementers-possible` only when
    * it is open even then.
    */
   private reasons(
@@ -413,7 +420,7 @@ class GoResolver {
   }
 
   private shadowResolver?: GoResolver;
-  /** The project without lossy packages or broken symbols (only to name reasons). */
+  /** The project without lossy packages (only to name reasons). */
   private shadow(): GoResolver {
     if (!this.shadowResolver) {
       this.shadowResolver = new GoResolver(this.moduleId, this.context, true);
@@ -656,7 +663,10 @@ class GoResolver {
     // code in those files, so it is failed with them as the cause.
     if (!pkgs.length && !outside) {
       const cause = directories.flatMap((directory) =>
-        this.failedCause(directory, false),
+        this.failedCause(
+          directory,
+          from.fact.test && from.directory === directory,
+        ),
       );
       if (cause.length) return { pkgs, uncertain: false, failed: cause };
     }
@@ -750,35 +760,73 @@ class GoResolver {
     return !!pkg && this.lossyPackages.has(pkg.key);
   }
 
+  /**
+   * The one package-level lookup (unqualified, qualified, dot-imported and
+   * universe names all go through it): `name` in the package block of `pkgs`, as
+   * the file `reader` sees it. The valid declarations; or, when there are none,
+   * the failed files that could have declared it (a link that needs them fails
+   * with them as its cause). Those are each directory's failed non-test files,
+   * and its failed `_test.go` files when the test build of the reader's own
+   * directory includes them: the reader is a test file there, or the name is a
+   * universe name (a test-file declaration shadows it for every file of the
+   * package).
+   */
+  private scopeLookup(
+    pkgs: Pkg[],
+    name: string,
+    reader: FileInfo,
+    exportedOnly: boolean,
+  ): { syms: GraphSymbol[]; cause: string[] } {
+    if (exportedOnly && !exported(name)) return { syms: [], cause: [] };
+    const syms = pkgs.flatMap((pkg) =>
+      this.packageDecl(pkg, name, reader.path),
+    );
+    if (syms.length) return { syms, cause: [] };
+    const universe =
+      PREDECLARED_TYPES.has(name) ||
+      PREDECLARED_VALUES.has(name) ||
+      BUILTIN_FUNCTIONS.has(name);
+    const cause = unique(
+      pkgs.flatMap((pkg) =>
+        this.failedCause(
+          pkg.directory,
+          pkg.directory === reader.directory && (reader.fact.test || universe),
+        ),
+      ),
+    ).sort();
+    return { syms: [], cause };
+  }
+
   private lookupName(name: string, from: string): Entity {
     const info = this.files.get(from);
     if (!info) return NONE;
-    if (info.pkg) {
-      // An intact package-level declaration: a second one would not compile.
-      const own = this.packageDecl(info.pkg, name, from);
-      if (own.length) return { e: "syms", syms: own };
-    }
+    // An intact package-level declaration: a second one would not compile.
+    const own = info.pkg
+      ? this.scopeLookup([info.pkg], name, info, false)
+      : { syms: [], cause: [] };
+    if (own.syms.length) return { e: "syms", syms: own.syms };
     // A file-block import cannot share a name with a package-level declaration.
     const imported = info.imports.get(name);
     if (imported?.failed) return { e: "unknown", cause: imported.failed };
     if (imported) return { e: "pkg", pkgs: imported.pkgs, path: imported.path };
+    // A failed file of the package could have declared it (a universe name too).
+    if (own.cause.length) return { e: "unknown", cause: own.cause };
     // Anything else (dot-import, builtin, predeclared, or nothing) an unseen
     // declaration of a lossy package could shadow; or, read by a non-test file, a
     // declaration in a same-package `_test.go` file shadows in the test build.
-    if (this.lossy(info.pkg)) {
-      const cause = this.failedCause(info.directory, info.fact.test);
-      return cause.length ? { e: "unknown", cause } : UNSEEN;
-    }
-    if (this.testShadowed(info, name)) return UNSEEN;
+    if (this.lossy(info.pkg) || this.testShadowed(info, name)) return UNSEEN;
     const dotted: GraphSymbol[] = [];
+    const cause: string[] = [];
     let externalDot = false;
     for (const dot of info.dots) {
-      if (dot.failed) return { e: "unknown", cause: dot.failed };
+      if (dot.failed) cause.push(...dot.failed);
       if (!dot.pkgs.length) externalDot = true;
-      for (const pkg of dot.pkgs)
-        if (exported(name)) dotted.push(...this.packageDecl(pkg, name, from));
+      const found = this.scopeLookup(dot.pkgs, name, info, true);
+      dotted.push(...found.syms);
+      cause.push(...found.cause);
     }
     if (dotted.length) return { e: "syms", syms: dotted };
+    if (cause.length) return { e: "unknown", cause: unique(cause).sort() };
     // A dot-imported external package may declare it.
     return externalDot && exported(name) ? { e: "external", name } : NONE;
   }
@@ -795,6 +843,8 @@ class GoResolver {
       const declared = this.lookupName(ref.n, from);
       if (declared.e === "syms" && declared.syms.every(isTypeSymbol))
         return this.typeSyms(declared.syms, depth + 1);
+      if (declared.e === "unknown" && declared.cause)
+        return { kind: "failed", cause: declared.cause };
       return declared.e === "unknown"
         ? { kind: "external", name: ref.n, shadowable: true }
         : { kind: "external", name: ref.n };
@@ -810,20 +860,26 @@ class GoResolver {
         // (a valid file's imports are all known).
         if (base.e === "none" || base.e === "external")
           value = { kind: "external", name: `${ref.q}.${ref.n}` };
-        else if (base.e === "pkg")
-          value = base.pkgs.length
-            ? this.typeSyms(
-                base.pkgs.flatMap((pkg) =>
-                  exported(ref.n) ? this.packageDecl(pkg, ref.n, from) : [],
-                ),
-                depth,
-              )
-            : { kind: "external", name: `${base.path}.${ref.n}` };
+        else if (base.e === "unknown" && base.cause)
+          value = { kind: "failed", cause: base.cause };
+        else if (base.e === "pkg") {
+          const reader = this.files.get(from);
+          const found = reader
+            ? this.scopeLookup(base.pkgs, ref.n, reader, true)
+            : { syms: [], cause: [] };
+          value = !base.pkgs.length
+            ? { kind: "external", name: `${base.path}.${ref.n}` }
+            : found.cause.length
+              ? { kind: "failed", cause: found.cause }
+              : this.typeSyms(found.syms, depth);
+        }
       } else {
         const found = this.lookupName(ref.n, from);
         if (found.e === "syms") value = this.typeSyms(found.syms, depth);
         else if (found.e === "external")
           value = { kind: "external", name: ref.n };
+        else if (found.e === "unknown" && found.cause)
+          value = { kind: "failed", cause: found.cause };
       }
     }
     this.memo.set(key, value);
@@ -850,9 +906,10 @@ class GoResolver {
           underlying?: TypeRef;
           underlyingPointer?: boolean;
         };
-        // `type A = *T` is a pointer type, not T: its method set (and, embedded,
-        // what it promotes) differs, so it is not reduced to T.
-        if (!data.underlying || data.underlyingPointer) return UNKNOWN;
+        // `type A = *T`: a value of A is a *T, whose method calls resolve on T
+        // (pointer method sets are kept where they matter: embedding, through
+        // `aliasPointer`, and defined types over A, which are unknown in `view`).
+        if (!data.underlying) return UNKNOWN;
         if (this.aliasesFollowed.has(symbol.id)) return UNKNOWN;
         this.aliasesFollowed.add(symbol.id);
         let target: TypeValue;
@@ -873,6 +930,8 @@ class GoResolver {
     const entity = this.denote(staticDesc(desc), file, depth + 1);
     if (entity.e === "value") return entity.type;
     if (entity.e === "external") return { kind: "external", name: entity.name };
+    if (entity.e === "unknown" && entity.cause)
+      return { kind: "failed", cause: entity.cause };
     if (entity.e === "syms")
       return this.sameType(
         entity.syms.map((symbol) => this.valueType(symbol, depth + 1)),
@@ -896,6 +955,11 @@ class GoResolver {
 
   private sameType(values: TypeValue[]): TypeValue {
     if (!values.length) return UNKNOWN;
+    // Any alternative that needs a failed file makes the whole value fail.
+    const failed = values.flatMap((value) =>
+      value.kind === "failed" ? value.cause : [],
+    );
+    if (failed.length) return { kind: "failed", cause: unique(failed).sort() };
     if (values.length === 1) return values[0]!;
     const keyOf = (value: TypeValue) =>
       value.kind === "project"
@@ -945,7 +1009,7 @@ class GoResolver {
       case "elem":
       case "key": {
         const container = this.typeOf(desc.x, from, depth + 1);
-        if (container.kind === "external")
+        if (container.kind === "external" || container.kind === "failed")
           return { e: "value", type: container };
         if (container.kind === "cont") {
           // A single range variable over a channel is its element.
@@ -1003,6 +1067,8 @@ class GoResolver {
     const callee = this.denote(desc.f, from, depth + 1);
     if (callee.e === "external")
       return { kind: "external", name: `${callee.name}()` };
+    if (callee.e === "unknown" && callee.cause)
+      return { kind: "failed", cause: callee.cause };
     // The builtin itself (no declaration shadows the name): its evident result.
     if (callee.e === "none")
       return desc.b ? this.typeOf(desc.b, from, depth + 1) : UNKNOWN;
@@ -1037,7 +1103,7 @@ class GoResolver {
           return result ? this.typeOf(result, symbol.file, depth + 1) : UNKNOWN;
         }),
       );
-    return type.kind === "external" ? type : UNKNOWN;
+    return type.kind === "external" || type.kind === "failed" ? type : UNKNOWN;
   }
 
   private select(
@@ -1049,18 +1115,13 @@ class GoResolver {
     if (base.e === "pkg") {
       if (!base.pkgs.length)
         return { e: "external", name: `${base.path}.${desc.n}` };
-      const syms = exported(desc.n)
-        ? base.pkgs.flatMap((pkg) => this.packageDecl(pkg, desc.n, from))
-        : [];
+      const reader = this.files.get(from);
+      if (!reader) return NONE;
       // Not among the package's valid files, which has failed files: those are
       // the cause (any of them might have declared it).
-      if (!syms.length && exported(desc.n)) {
-        const cause = base.pkgs.flatMap((pkg) =>
-          this.failedCause(pkg.directory, false),
-        );
-        if (cause.length) return { e: "unknown", cause };
-      }
-      return { e: "syms", syms };
+      const found = this.scopeLookup(base.pkgs, desc.n, reader, true);
+      if (found.cause.length) return { e: "unknown", cause: found.cause };
+      return { e: "syms", syms: found.syms };
     }
     if (base.e === "external")
       return { e: "external", name: `${base.name}.${desc.n}` };
@@ -1076,8 +1137,10 @@ class GoResolver {
       const type = this.typeSyms(base.syms, depth + 1);
       if (type.kind === "external")
         return { e: "external", name: `${type.name}.${desc.n}` };
+      if (type.kind === "failed") return { e: "unknown", cause: type.cause };
       if (type.kind !== "project") return NONE;
       const found = this.selectName(type.syms, desc.n, from);
+      if (found.kind === "failed") return { e: "unknown", cause: found.cause };
       return found.kind === "found" ? { e: "syms", syms: found.syms } : NONE;
     }
     const type =
@@ -1088,8 +1151,10 @@ class GoResolver {
           );
     if (type.kind === "external")
       return { e: "external", name: `${type.name}.${desc.n}` };
+    if (type.kind === "failed") return { e: "unknown", cause: type.cause };
     if (type.kind !== "project") return NONE;
     const found = this.selectName(type.syms, desc.n, from);
+    if (found.kind === "failed") return { e: "unknown", cause: found.cause };
     if (found.kind !== "found") return NONE;
     if (found.syms.every((symbol) => symbol.kind === "field"))
       return {
@@ -1109,6 +1174,9 @@ class GoResolver {
     return (this.embedsBySource.get(type.id) ?? []).map((link) => {
       const data = (link.data ?? {}) as { t?: TypeRef; pointer?: boolean };
       const value = data.t ? this.typeFromRef(data.t, link.file, 1) : UNKNOWN;
+      // Embedding an alias of a pointer (`type B = A; type A = *T`) embeds *T.
+      const pointer =
+        !!data.pointer || (!!data.t && this.aliasPointer(data.t, link.file));
       const key =
         value.kind === "project"
           ? value.syms
@@ -1116,8 +1184,35 @@ class GoResolver {
               .sort()
               .join(",")
           : `${value.kind}:${link.file}:${link.range.start}`;
-      return { value, pointer: !!data.pointer, key };
+      return { value, pointer, key };
     });
+  }
+
+  /**
+   * Does this written type name, followed through its chain of aliases, denote
+   * a pointer type (`type A = *T`, `type B = A`)? Cycle-safe.
+   */
+  private aliasPointer(ref: TypeRef, from: string): boolean {
+    if (ref.l !== undefined || ref.q === "") return false;
+    let term: TypeTerm =
+      ref.q === undefined
+        ? { k: "n", n: ref.n }
+        : { k: "n", n: ref.n, q: ref.q };
+    let file = from;
+    const seen = new Set<string>();
+    for (let step = 0; step <= MAX_DEPTH; step++) {
+      if (term.k === "ptr") return true;
+      if (term.k !== "n") return false;
+      const symbol = this.namedDeclaration(term, file);
+      if (!symbol || symbol.kind !== "alias" || seen.has(symbol.id))
+        return false;
+      seen.add(symbol.id);
+      const target = (symbol.data as { target?: TypeTerm } | undefined)?.target;
+      if (!target) return false;
+      term = target;
+      file = symbol.file;
+    }
+    return false;
   }
 
   private views = new Map<string, View>();
@@ -1173,7 +1268,11 @@ class GoResolver {
       result = { members: own, embedded: this.embedded(type) };
     else if (type.kind === "alias" || type.kind === "type") {
       if (!data.underlying) result = { members: declared, embedded: [] };
-      else if (data.underlyingPointer) result = unknown();
+      else if (
+        data.underlyingPointer ||
+        (type.kind === "type" && this.aliasPointer(data.underlying, type.file))
+      )
+        result = unknown();
       else {
         const target = this.typeFromRef(data.underlying, type.file, depth + 1);
         // A predeclared basic type (int, string, …) has no fields or promoted
@@ -1275,6 +1374,8 @@ class GoResolver {
     ];
     let externalAt: number | undefined;
     let result: Selection = { kind: "none" };
+    const causes: string[] = [];
+    const reader = from === undefined ? undefined : this.files.get(from);
     for (let depth = 0; level.length; depth++) {
       if (
         depth > MAX_EMBED_DEPTH ||
@@ -1289,21 +1390,30 @@ class GoResolver {
       for (const node of level) {
         const views = node.types.map((type) => this.view(type));
         // A structure that cannot be determined: its members at this depth are unknown.
-        if (
-          views.some(
-            (item, index) =>
-              item.unknown &&
-              !(item.externalOnly && skipExternal) &&
-              // A method declared on the type itself is known at this depth.
-              !item.declared?.(name).length &&
-              // Another package's unexported name can only come from a type whose
-              // package can reach that package.
-              (exported(name) ||
-                access === undefined ||
-                this.mayReach(this.pkgOf(node.types[index]!)?.key, access)),
-          )
-        )
-          externalAt = Math.min(externalAt ?? depth, depth);
+        views.forEach((item, index) => {
+          if (
+            item.unknown &&
+            !(item.externalOnly && skipExternal) &&
+            // A method declared on the type itself is known at this depth.
+            !item.declared?.(name).length &&
+            // Another package's unexported name can only come from a type whose
+            // package can reach that package.
+            (exported(name) ||
+              access === undefined ||
+              this.mayReach(this.pkgOf(node.types[index]!)?.key, access))
+          ) {
+            externalAt = Math.min(externalAt ?? depth, depth);
+            // Unknown because its package has failed files: they are the cause.
+            const pkg = this.pkgOf(node.types[index]!);
+            if (pkg && reader)
+              causes.push(
+                ...this.failedCause(
+                  pkg.directory,
+                  pkg.directory === reader.directory && reader.fact.test,
+                ),
+              );
+          }
+        });
         const found: GraphSymbol[] = [];
         // Interfaces: a flat method set; identical methods inherited along several
         // paths merge, so it is one occurrence and is not expanded further.
@@ -1339,6 +1449,7 @@ class GoResolver {
           if (seen.has(item.key)) continue; // same embedding in build variants
           seen.add(item.key);
           if (item.value.kind !== "project") {
+            if (item.value.kind === "failed") causes.push(...item.value.cause);
             // An external type cannot declare a project package's unexported name;
             // an unresolvable one could be anything.
             if (
@@ -1379,6 +1490,9 @@ class GoResolver {
     }
     if (result.kind === "none" && externalAt !== undefined)
       result = { kind: "unknown" };
+    // Unknown because of code in failed files: the selection fails with them.
+    if (result.kind === "unknown" && causes.length)
+      result = { kind: "failed", cause: unique(causes).sort() };
     this.selections.set(memoKey, result);
     return result;
   }
@@ -1670,12 +1784,11 @@ class GoResolver {
     path.add(iface.id);
     try {
       const set = new Map<string, InterfaceMethod>();
+      // The crude structural method set (no-toolchain fallback): methods
+      // inherited along several paths merge by name, without any identity proof
+      // (identity only annotates). The first declaration found is kept.
       const add = (method: InterfaceMethod): boolean => {
-        const existing = set.get(method.key);
-        // Merging needs proven-identical signatures.
-        if (existing && identical(existing.sig, method.sig) !== true)
-          return false;
-        set.set(method.key, method);
+        if (!set.has(method.key)) set.set(method.key, method);
         return true;
       };
       for (const symbol of this.ownMethods(iface)) {
@@ -1748,8 +1861,9 @@ class GoResolver {
     identity?: boolean | undefined;
   } {
     const found = this.selectName([type], name, undefined, access);
-    // An external embedded type could supply (or shadow) it: not refuted.
-    if (found.kind === "unknown")
+    // An external embedded type, or a failed file, could supply (or shadow) it:
+    // not refuted.
+    if (found.kind === "unknown" || found.kind === "failed")
       return { value: false, pointer: false, unknown: true };
     // By the selector rule (structure, not type identity): no method of that
     // name, or a field of that name, refutes it.
@@ -1758,20 +1872,23 @@ class GoResolver {
     // The crude, over-inclusive test (no-toolchain fallback, W2-B.md): the same
     // number of parameters (unless either is variadic) and of results, where
     // both are known. Type identity only annotates; "different" never refutes.
+    // Several declarations (build variants): refuted only when EVERY one fails;
+    // one that passes keeps the type in.
     let identity: boolean | undefined = true;
+    let passes = 0;
     for (const method of methods) {
-      if (method.kind !== "method") return { value: false, pointer: false };
+      if (method.kind !== "method") continue;
       const term = (method.data as { sig?: TypeTerm } | undefined)?.sig;
       if (term?.k === "fn" && sig.k === "fn") {
-        if (term.r.length !== sig.r.length)
-          return { value: false, pointer: false };
-        if (!term.v && !sig.v && term.p.length !== sig.p.length)
-          return { value: false, pointer: false };
+        if (term.r.length !== sig.r.length) continue;
+        if (!term.v && !sig.v && term.p.length !== sig.p.length) continue;
       }
+      passes++;
       const same = identical(this.identity(term, method.file), sig);
       if (same === false) identity = false;
       else if (same === undefined && identity !== false) identity = undefined;
     }
+    if (!passes) return { value: false, pointer: false };
     const needsPointer = methods.some((method) => {
       const data = (method.data ?? {}) as {
         pointer?: boolean;
@@ -1862,8 +1979,7 @@ class GoResolver {
         // A type whose every interface method is matched by name and count gets
         // an `implements` link, never definite (no-toolchain fallback): it is
         // unresolved with the interface kept in `data.interfaceId`, and the
-        // identity comparison only annotates it. A recovered header (layer 2)
-        // gets none.
+        // identity comparison only annotates it.
         if (unknown) continue;
         push2(this.implementers, iface.id, type);
         added.push({
@@ -1931,16 +2047,11 @@ class GoResolver {
       case "receiver": {
         const info = this.files.get(link.file);
         if (!info?.pkg || !data.t) return UNRESOLVED;
-        const types = this.packageDecl(info.pkg, data.t.n, link.file).filter(
-          isTypeSymbol,
-        );
+        const found = this.scopeLookup([info.pkg], data.t.n, info, false);
         // The receiver type is not among the package's valid files: failed if
         // the package has failed files (one of them may declare it).
-        if (!types.length) {
-          const cause = this.failedCause(info.directory, info.fact.test);
-          if (cause.length) return failed(cause);
-        }
-        return this.definite(types);
+        if (found.cause.length) return failed(found.cause);
+        return this.definite(found.syms.filter(isTypeSymbol));
       }
       case "embeds":
       case "references":
@@ -1966,18 +2077,9 @@ class GoResolver {
    * file: the files that might declare it (none: plainly unresolved).
    */
   private typeCause(ref: TypeRef, from: string): string[] | undefined {
-    if (ref.l !== undefined || ref.q === "") return undefined;
-    const entity =
-      ref.q !== undefined
-        ? this.select(
-            { k: "sel", x: { k: "name", n: ref.q }, n: ref.n },
-            from,
-            0,
-          )
-        : this.lookupName(ref.n, from);
-    return entity.e === "unknown" && entity.cause?.length
-      ? entity.cause
-      : undefined;
+    if (ref.l !== undefined) return undefined;
+    const type = this.typeFromRef(ref, from, 1);
+    return type.kind === "failed" ? type.cause : undefined;
   }
 
   /** Type references link to the declaration named, including aliases themselves. */
@@ -2061,20 +2163,10 @@ class GoResolver {
             ids: found.syms.map((symbol) => symbol.id),
             definite: false,
           };
-        if (found.kind !== "found") {
-          // The member is not among the valid declarations of a type whose
-          // package has failed files: one of them may declare it.
-          const cause = type.syms.flatMap((symbol) => {
-            const pkg = this.pkgOf(symbol);
-            return pkg && this.lossy(pkg)
-              ? this.failedCause(
-                  pkg.directory,
-                  !!this.files.get(link.file)?.fact.test,
-                )
-              : [];
-          });
-          return cause.length ? failed(cause) : UNRESOLVED;
-        }
+        // Not among the valid declarations of a type whose package (or an
+        // embedded type's) has failed files: one of them may declare it.
+        if (found.kind === "failed") return failed(found.cause);
+        if (found.kind !== "found") return UNRESOLVED;
         const specs = found.syms.filter(
           (symbol) =>
             (symbol.data as { interface?: boolean } | undefined)?.interface,
@@ -2105,6 +2197,10 @@ class GoResolver {
           ? this.dispatch(specs, name, constraint.syms)
           : UNRESOLVED;
       }
+      case "failed":
+        // The receiver's type needs a failed file: the link fails with it,
+        // never a name-only set.
+        return failed(type.cause);
       case "unknown":
         return link.kind === "calls"
           ? this.byName(name, link.file)
@@ -2396,18 +2492,17 @@ class GoResolver {
       for (const type of this.possible.get(iface.id) ?? []) {
         let found = this.selectName([type], name, undefined, access);
         let certain = proven.has(type.id);
-        if (found.kind === "unknown") {
+        if (found.kind === "unknown" || found.kind === "failed") {
           // An external embedded type might supply or shadow it; if not, Go selects
           // the project declaration found without that type. Keep it, unproven.
           certain = false;
           open = true;
           found = this.selectName([type], name, undefined, access, true);
           // Still unknown without external types: a structure that cannot be
-          // determined (a syntax error, an unresolvable type) may promote any
-          // project method of this name. List them all; the set is open.
-          // Only methods that pass the same crude test (parameter and result
-          // counts, where known) could be the interface's method.
-          if (found.kind === "unknown")
+          // determined (an unresolvable type, a failed file) may promote any
+          // project method of this name. List those that pass the same crude
+          // test (parameter and result counts, where known); the set is open.
+          if (found.kind === "unknown" || found.kind === "failed")
             out.push(
               ...(this.methodsByName.get(name) ?? []).filter(
                 (method) =>

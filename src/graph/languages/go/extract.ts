@@ -422,8 +422,9 @@ export class GoExtractor {
           this.packageValue(spec, node.type === "var_declaration");
         return;
       default:
-        // Recovered stray fragments outside ERROR nodes still yield references.
-        this.within("file", () => this.walk(node));
+        // Valid files only reach here (see `syntaxFailure`): every top-level
+        // node is a package clause, a comment or a declaration above.
+        return;
     }
   }
 
@@ -1284,8 +1285,6 @@ export class GoExtractor {
     }
     switch (node.type) {
       case "comment":
-      case "ERROR":
-        // Misparsed regions yield no facts: their identifiers cannot be trusted.
         return;
       case "short_var_declaration": {
         const left = named(node.childForFieldName("left"));

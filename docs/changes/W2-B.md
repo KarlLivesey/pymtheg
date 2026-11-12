@@ -21,6 +21,14 @@ calls resolve across files and packages.
   dispatch. A type is a possible implementer when its method set has every
   method name of the interface, with the same parameter and result counts where
   both are known. Every dispatch set is open (`structural-match-unverified`).
+  - Wherever the module answers "could this type have this method?", unknown
+    means yes.
+  - A method with build variants is refuted only when every variant fails the
+    count test.
+  - An interface's method set merges methods inherited along several paths by
+    name, without identity.
+  - An embedded alias of a pointer (`type A = *T; type B = A; type S struct{ B
+    }`) embeds `*T`, so `S` has `(*T)`'s methods.
   Go type identity is computed, but it only annotates (`data.identity`);
   nothing definite, closed or refuted depends on it.
 - **A file that cannot be read is not valid code; it has failed; nothing in it
@@ -207,10 +215,39 @@ and it returns only files whose facts changed.
 (no-toolchain fallback), signature identity only annotates `implements` links
 (`data.identity`). Membership in dispatch sets and `implements` links uses the
 crude name-and-count test; "different" never removes a member. The rows below
-say how exact the annotation is. One use remains: merging interface methods
-inherited along several paths needs them proven identical, and otherwise the
-interface's method set is unknown (its dispatch is then unresolved, never
-closed).
+say how exact the annotation is.
+
+The calls of the comparison (`identical`) since version 18 are:
+
+- in `hasMethod`, where it only sets the annotation;
+- inside `identity`, merging the methods of an interface literal written in a
+  signature (identity itself);
+- recursively inside `identical`.
+
+None gates membership, an `implements` link, method-set construction or
+promotion. Interface method sets merge by name.
+
+**Checked with Go's type checker** (`evidence/w2-b/implements-oracle.go`,
+`go/types` over restic with test files). It finds 230 (type, interface) pairs
+where the type or its pointer implements the interface. 204 have a
+non-definite `implements` link, and every `pointerReceiver` matches. The 26
+without one fall in two documented classes, and neither can cheaply be
+included:
+
+- **20: the interface embeds an external or generic interface** (`fs.File` and
+  `backend.RewindReader` embed `io` interfaces; `archiverRepo` embeds
+  `restic.SaverUnpacked[…]`). Such an interface's method set is not fully
+  known without the toolchain, so it gets no `implements` links. Including it
+  would need a partial method set through both dispatch and `implements`.
+- **6: the type has a needed method only through, or beside, an embedded
+  external type** at the same depth (`*testing.T`, `sync.Mutex`, `*os.File`,
+  `io.ReadCloser`). Its selection is unknown, so it is a possible member of
+  dispatch sets, but it gets no `implements` link. Emitting links for unknown
+  selections was measured: 276 `implements` links on restic would become
+  2,017, to recover these 6.
+
+On the conformance sample (without its broken file) the oracle finds 3 pairs,
+and all 3 have links.
 
 Signatures are compared by Go type identity (spec, "Type identity"), in one
 canonical form.
@@ -329,23 +366,53 @@ it is a target.**
   No file is `partial`.
 - **Where and why.** `diagnostics` holds the first error by position, like a
   compiler's: `line L, column C: <message>` (1-based), with its range.
-  - A MISSING node says ``missing `<token>` ``.
-  - An ERROR node says ``unexpected `<text>` ``, the first token of the
-    error's text, on one line, at most 40 characters. Tree-sitter does not say
-    what it expected, so the message only says what is there.
+  Columns count UTF-16 units; gofmt counts bytes.
+  - A MISSING node says ``missing `<token>` ``, reported at the next real token.
+  - An ERROR node says ``unexpected `<text>` ``, at the first token after the
+    node's last child, because the node may enclose valid statements before
+    the fault. The exception is a node made only of stray closing or
+    separator tokens (`)` `]` `}` `,` `;`), where that token itself is the
+    unexpected one. The text is on one line, at most 40 characters.
+    Tree-sitter does not say what it expected, so the message only says what
+    is there.
   - A clause problem says `no package clause` or `second package clause`.
-- **Links that need a failed file fail too.** A link from a valid file fails
-  (`unresolved`, `data.reason: "invalid-code"`) when the name it looks up is
-  not declared in the valid files of the package it is looked up in, while
-  that package's directory has failed files. The cause is recorded as
-  `data.cause = { files: [...] }`, sorted: the failed files a reader could see,
-  any of which might have declared it.
-  - A non-test file sees only the non-test failed files; a test file sees all.
+  - **Checked against `gofmt -e`** (Go 1.27.4) on eight broken files: the line
+    agrees on all eight, and the column on seven (`for i := 0; i < 3 i++ {`:
+    gofmt column 20, here 24).
+- **Links that need a failed file fail too.** One rule decides it: the scope
+  a name was looked up in includes a failed file that could have declared it,
+  and no valid file declares it. The link is then `unresolved` with
+  `data.reason: "invalid-code"` and `data.cause = { files: [...] }`, sorted:
+  those failed files.
+  - **Which failed files could have declared a name.** A package's failed
+    non-test files always count. Its failed `_test.go` files count when the
+    test build of the reader's own directory includes them:
+    - the reader is a test file of that directory (including an external
+      `_test` package reading `p.Name`: the `export_test.go` pattern);
+    - or the name is a universe name (`len`, `error`, `nil`, …). A test-file
+      declaration shadows it for every file of the package, so `status.go`'s
+      `len` fails when `status_test.go` failed.
+  - **One lookup function, `scopeLookup`, serves every entry point:**
+    - unqualified names (`lookupName`, the package block);
+    - dot-imported names;
+    - universe names;
+    - qualified `pkg.Name` in expressions (`select`) and in types
+      (`typeFromRef`);
+    - receivers;
+    - type references.
+
+    Promoted members go through the selector rule, which carries the cause of
+    an embedded type that failed or of a type whose package has failed files.
+  - **A failure propagates.** A type or lookup that needs a failed file is a
+    distinct value, `failed(cause)`, never "unknown". Every consumer passes it
+    through: a value's type, a call's result, an element or key of a
+    container, a field's type, an embedded type, a method expression, the
+    selector rule. The dependent link fails with the same cause. It is never a
+    name-only candidate set and never plainly unresolved. For example, `x :=
+    p.New(); x.M()` fails when `p.New` is valid but its result type `T` is in a
+    failed file.
   - The link has no target, no candidates, and no would-be target. No symbol
     inside a failed file is named, and it is never a member of any set.
-  - The same rule covers unqualified names, `pkg.Name`, type references,
-    receivers, and members of a type of that package not declared on the type
-    itself.
   - An import of a package all of whose files failed is itself failed, with
     those files as its cause, and so is every name through it.
   - A name missing from a package with no failed files stays plainly
@@ -369,6 +436,15 @@ it is a target.**
   - Build-variant sets with a member there are open with
     `declarations-may-be-unseen`.
   - Other packages are affected only through these rules.
+- **Known limits (not in this module).**
+  - "Syntax error" here means what the parser reports. Go text the grammar
+    accepts but the compiler rejects (`func F(a int, string) {}`, `go func(){}`
+    without a call, `defer 1`, `"abc\q"`, `package _`) is a valid file here. No
+    Go syntax checks are hand-written; the toolchain route (`gofmt`,
+    `go/parser`) will be the authority later.
+  - The frozen core re-parses a failed file on every index (an unchanged
+    restic re-run reports `indexed: 1`). Changing that is an interface
+    addition, for another chunk.
 - **Unprovable membership.** A file whose package clause is readable but whose
   membership cannot be proven is valid code, so it is not failed. It joins no
   package, and its directory's packages may hold unseen declarations, as above;
@@ -858,6 +934,27 @@ The module version is 16.
   `test/graph-go-review13.test.mjs`.
 
 The module version is 17.
+
+## Module version 18 (fourteenth review)
+
+- **A failure caused by a failed file propagates** as `failed(cause)` through
+  every type and lookup. A value whose type is in a failed file is
+  `invalid-code`, never a name-only set.
+- **One lookup function** (`scopeLookup`) for every package-level scope. The
+  cause now also reaches dot imports, external test packages reading a
+  package's test files, promotion through a failed type, and universe names
+  shadowable by a failed `_test.go` file.
+- **Crude test:** a method's build variants refute only when all fail.
+  Interface methods merge by name (identity only annotates). Embedded aliases
+  of pointers keep pointer method sets.
+- **Diagnostics** point past the valid statements an ERROR node encloses,
+  checked against `gofmt -e`.
+- **Tidied:** dead leftovers of the salvage code.
+- **Tests:** `test/graph-go-review14.test.mjs`, and diagnostics in
+  `test/graph-go-failed-files.test.mjs`.
+- **Mutations:** M85–M93. M72 is replaced by M92.
+
+The module version is 18.
 
 ## Core after PR 11 (W2-I)
 
