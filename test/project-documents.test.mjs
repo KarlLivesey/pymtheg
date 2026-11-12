@@ -39,7 +39,7 @@ test("documentation discovery offers existing design text without importing buil
     assert.equal(preview.status, "preview");
     assert.equal(preview.committed, false);
     await assert.rejects(
-      access(join(root, ".pymtheg-architecture", "architecture.sqlite")),
+      access(join(root, ".pymtheg/shared", "architecture.sqlite")),
     );
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -117,7 +117,7 @@ test("cancelled documentation discovery does not publish an architecture", async
       /abort/i,
     );
     await assert.rejects(
-      access(join(root, ".pymtheg-architecture", "architecture.sqlite")),
+      access(join(root, ".pymtheg/shared", "architecture.sqlite")),
     );
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -144,7 +144,7 @@ test("CLI init offers a preview, imports only on request and reports unchanged r
     const preview = JSON.parse(initial.stdout);
     assert.equal(preview.documentation.status, "preview");
     await assert.rejects(
-      access(join(root, ".pymtheg-architecture", "architecture.sqlite")),
+      access(join(root, ".pymtheg/shared", "architecture.sqlite")),
     );
     const imported = cli("--import-docs");
     assert.equal(imported.status, 0, imported.stderr);

@@ -13,7 +13,8 @@ const root = await mkdtemp(join(tmpdir(), "pym-gui-"));
 let app, browser;
 try {
   await cp("examples", join(root, "examples"), { recursive: true });
-  await cp(".pymtheg.json", join(root, ".pymtheg.json"));
+  await mkdir(join(root, ".pymtheg"), { recursive: true });
+  await cp(".pymtheg/settings.json", join(root, ".pymtheg/settings.json"));
   app = await startStudio({
     path: root,
     tlcJar: "/tmp/spec-language-research/tla2tools.jar",

@@ -81,7 +81,7 @@ test("source catalogue pages are read-only snapshots that remain stable across s
     assert.equal(fresh.total, 1);
     assert.equal(fresh.items[0].name, "replacement");
     assert.notEqual(first.snapshotId, fresh.snapshotId);
-    await assert.rejects(access(join(root, ".pymtheg-architecture")));
+    await assert.rejects(access(join(root, ".pymtheg/shared")));
     await assert.rejects(
       service.sourceContractPage({ offset: 20 }, new AbortController().signal),
       /snapshotId/,
@@ -143,7 +143,7 @@ test("saving a source-linked plan retains its real source identity and snapshot 
       record.data.sourceExpectations["source:pay.pym#charge"],
     );
     const { readFile } = await import("node:fs/promises");
-    const database = join(root, ".pymtheg-architecture", "architecture.sqlite");
+    const database = join(root, ".pymtheg/shared", "architecture.sqlite");
     const bytes = await readFile(database);
     writeFileSync(
       file,
@@ -350,7 +350,7 @@ test("empty source catalogue remains page-readable and aborted reads do not publ
       /abort/i,
     );
     assert.ok(
-      !existsSync(join(root, ".pymtheg-architecture", "architecture.sqlite")),
+      !existsSync(join(root, ".pymtheg/shared", "architecture.sqlite")),
     );
   } finally {
     await service.close();

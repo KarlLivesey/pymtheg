@@ -91,7 +91,7 @@ test("agents can browse checked source targets before an architecture store exis
     });
     assert.equal(current.total, 1);
     const { access } = await import("node:fs/promises");
-    await assert.rejects(access(join(root, ".pymtheg-architecture")));
+    await assert.rejects(access(join(root, ".pymtheg/shared")));
   }));
 test("real MCP discovery and check-fix-recheck preserve disk and evidence", async () =>
   fixture(async (client, root, original) => {

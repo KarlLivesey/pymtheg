@@ -29,8 +29,8 @@ test("storage compaction keeps original bytes, checkpoint IDs, rebuilt records a
       },
     ];
     const { mkdir } = await import("node:fs/promises");
-    await mkdir(join(root, ".pymtheg-architecture"));
-    const path = join(root, ".pymtheg-architecture", "architecture.sqlite");
+    await mkdir(join(root, ".pymtheg/shared"), { recursive: true });
+    const path = join(root, ".pymtheg/shared", "architecture.sqlite");
     const index = indexArchitecture(documents);
     const first = { id: "a".repeat(64) },
       second = { id: "b".repeat(64) };

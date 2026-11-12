@@ -67,17 +67,77 @@ single-folder creation, idempotent identity, durable shared content and unsaved
 drafts after cache deletion, identical graph regeneration, non-destructive old
 layout refusal, symlink rejection and the absence of feature SQLite openers.
 
-Existing tests and example/root configuration using `.pymtheg.json`,
-`.pymtheg-architecture/` and `.pymtheg-studio/` must be repointed in a separately
-owned fixture/documentation wiring change. This chunk cannot edit those tests.
-Old-format tests can still exercise stored-format handling at the new paths;
-old-layout migration expectations must become explicit refusal expectations.
-User-facing hard-coded old configuration wording (including the forbidden
-`src/reporting/explain.ts`) and current setup guides also need that follow-up.
-The full-suite failures are retained, not waived or reported as a passing suite.
+The initial required run had 2,189 passes and 31 failures caused by old layout
+assumptions. Its complete output is preserved as
+`evidence/w2-e/npm-test-initial-layout-failures.log`. The manager then authorized
+existing tests, fixtures and test configuration to be updated on this branch.
+The follow-up changes below only repoint physical storage and prepare its parent
+directories; all original behavioural assertions remain. Exact root-directory
+listings now check the single metadata directory and its complete file listing.
+Old stored-format migration tests still exercise their original database versions
+at the new path. Explicit old-layout refusal tests and historical import-inventory
+fixtures remain unchanged. No production code changed during this follow-up.
 
-Final required run: 2,189 passed, 31 failed, zero skipped (2,220 total).
-All failures were inspected and traced to old layout assumptions, including
-ancestor discovery of the repository's tracked `.pymtheg.json` in the mixed-file
-CLI test. The parser-owner test passed. Core build, formatting and all seven
-new storage tests passed. Full logs are preserved; this is not a green-suite claim.
+User-facing hard-coded old configuration wording (including the forbidden
+`src/reporting/explain.ts`) and current setup guides remain documentation follow-up.
+All of 3.3 remains deferred, as accepted by the manager.
+
+## Test and fixture file inventory
+
+Every test/fixture/configuration file changed in this PR is listed below.
+Browser controllers received only fixture-path edits and syntax checks; no browser
+was launched.
+
+| File | Reason |
+|---|---|
+| `.pymtheg/settings.json` (moved from `.pymtheg.json`) | Preserve the repository's scenario fixture bytes at the current configuration path. |
+| `test/architecture-agent-readonly.test.mjs` | Inspect the read-only planning backup and directory at the new shared path. |
+| `test/architecture-checkpoints.test.mjs` | Inspect checkpoints and create the legacy-schema database under the new shared directory. |
+| `test/architecture-long-record-search.test.mjs` | Mutate the retained legacy projection in the relocated planning database. |
+| `test/architecture-readonly.test.mjs` | Keep byte, permission and worker-cancellation checks on the relocated database. |
+| `test/architecture.test.mjs` | Build the legacy-schema migration fixture at the new planning location. |
+| `test/branch-v6-readonly.test.mjs` | Downgrade and inspect the relocated local planning database. |
+| `test/checkpoint-order.test.mjs` | Delete the actual planning directory when resetting the partial-lineage fixture. |
+| `test/config.test.mjs` | Create and discover scenarios under the metadata directory. |
+| `test/identity-rename.test.mjs` | Expect the shared configuration identity to name the new settings path. |
+| `test/implementation-capture.test.mjs` | Read retained observation bytes from the relocated planning database. |
+| `test/implementation-comparison.test.mjs` | Compare read-only HTTP access against the relocated database bytes. |
+| `test/implementation-mcp.test.mjs` | Keep graph paging and read-only retained-history byte checks on the new database. |
+| `test/implementation-versions.test.mjs` | Keep version-search immutability checks on the new planning database. |
+| `test/locale-portability.test.mjs` | Inject the corrupted blob into the actual relocated database. |
+| `test/mcp-init.test.mjs` | Expect one root metadata directory and verify its complete settings/identity file listing. |
+| `test/mcp-inventories.test.mjs` | Prepare large-inventory scenario configuration at the new settings path. |
+| `test/mcp.test.mjs` | Check that read-only MCP operations do not create the new planning directory. |
+| `test/plan-source-code-journey.test.mjs` | Track retained source-review bytes in the new planning database. |
+| `test/project-documents.test.mjs` | Check that preview-only document imports do not create the relocated database. |
+| `test/recovery.test.mjs` | Crash the writer against the actual shared draft database. |
+| `test/source-contracts.test.mjs` | Keep preview and atomic source-link persistence checks on the relocated database. |
+| `test/source-inventory.test.mjs` | Prepare source selection settings in the metadata directory. |
+| `test/storage-boundary.test.mjs` | Add the storage boundary, cache deletion/regeneration, legacy refusal and symlink safety acceptance tests. |
+| `test/storage-v4.test.mjs` | Build the original v4 compaction/migration fixtures at the new planning path. |
+| `test/studio-a11y.browser.mjs` | Copy the scenario fixture into the new settings directory. |
+| `test/studio-entry-dirty-switch.browser.mjs` | Copy scenario settings to the new metadata location. |
+| `test/studio-legacy-review.browser.mjs` | Downgrade the relocated local planning database for the legacy-review fixture. |
+| `test/studio-scenario.browser.mjs` | Read saved scenario settings from the new configuration path. |
+| `test/studio-unused-scope.browser.mjs` | Create the unused-scope scenario fixture at the new settings path. |
+| `test/studio-version-search.browser.mjs` | Compare version-search reads against the relocated planning database. |
+| `test/studio.browser.mjs` | Copy repository scenario settings into the new metadata directory. |
+| `test/studio.test.mjs` | Repoint conflict settings, damaged draft storage and source-selection configuration fixtures. |
+| `test/workspace-init.test.mjs` | Keep idempotence, configuration preservation, exact metadata listings and Git-ignore assertions on the new paths. |
+
+## Current validation after fixture updates
+
+The required foreground unit run passes: **2,220 passed, zero failures, zero
+skipped**. The known abrupt-owner-death parser test passed in that run; no isolated
+rerun was required. `npm run format:check` passes. The initial failed-run evidence
+is retained under its historical filename; current logs use `npm-test.log` and
+`format-check.log`. The 63-test targeted fixture run also passed. All modified
+JavaScript controllers were syntax-checked, with no browser launched.
+
+`PYM_TLC_JAR=/home/user/.t3/projects/pymtheg/evidence/project-fit/tools/tla2tools.jar npm run test:backend`
+also completed in the foreground: **95 passed, zero failures, one skipped**
+(96 total). The skipped case is `rust: real rich contracts compile with recursive
+records, outcomes and arbitrary precision integers`; it reports compiler/dependency
+unavailability or an exhausted resource budget. This remains unresolved compiler
+conformance evidence, not a pass. All other backend cases ran successfully.
+See `evidence/w2-e/backend-tests.log`. No check is left running.

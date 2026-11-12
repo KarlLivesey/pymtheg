@@ -60,7 +60,7 @@ test("one provisional-name definition controls discovery, imports, scenarios, re
       snapshot.sources.every((source) => source.file.endsWith(".design")),
     );
     // Renaming public commands does not rename on-disk compatibility formats.
-    assert.equal(identity.projectConfig, ".pymtheg.json");
+    assert.equal(identity.projectConfig, ".pymtheg/settings.json");
     assert.equal(identity.schema, "pymtheg.report/v1");
   } finally {
     Object.assign(identity, previous);
