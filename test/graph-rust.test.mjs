@@ -34,7 +34,7 @@ async function fixtures(dir = fixtureRoot, prefix = "") {
         ...(entry.name === "Cargo.toml"
           ? { context: true }
           : path.endsWith("broken.rs")
-            ? { status: "partial" }
+            ? { status: "failed" }
             : {}),
       });
   }
@@ -89,7 +89,7 @@ function unresolved(store, name, kind = "calls") {
   for (const l of values) assert.equal(l.resolution, "unresolved", name);
 }
 
-test("Rust sample workspace passes exact-position conformance including Unicode, partial and candidate facts", async () => {
+test("Rust sample workspace passes exact-position conformance including Unicode, failed and candidate facts", async () => {
   const expected = JSON.parse(
     await readFile(
       new URL("./fixtures/graph-rust/expected.json", import.meta.url),
@@ -101,7 +101,7 @@ test("Rust sample workspace passes exact-position conformance including Unicode,
 
 test("Rust sample: module layouts, private sibling calls, imports, distinct impls and workspace binaries", async () => {
   await project(await fixtures(), async (store, report, root) => {
-    assert.deepEqual(report.partial, ["app/src/broken.rs"]);
+    assert.deepEqual(report.failed, ["app/src/broken.rs"]);
     const crate = store
       .findSymbols({ file: "app/src/lib.rs" })
       .find((s) => s.key === "file");
@@ -121,25 +121,25 @@ test("Rust sample: module layouts, private sibling calls, imports, distinct impl
     );
     resolved(store, "super::flat::private", "private", "app/src/flat.rs");
     resolved(store, "self::leaf::leaf", "leaf", "app/src/tree/leaf.rs");
-    resolved(store, "renamed::special", "special", "app/src/other.rs");
-    resolved(store, "inline::inside", "inline::inside");
-    resolved(store, "Alias::new", "impl Thing::new");
-    resolved(store, "A::new", "impl A::new");
-    resolved(store, "B::new", "impl B::new");
+    unresolved(store, "renamed::special");
+    unresolved(store, "inline::inside");
+    unresolved(store, "Alias::new");
+    unresolved(store, "A::new");
+    unresolved(store, "B::new");
     resolved(store, "sample_app::A::new", "impl A::new", "app/src/lib.rs");
-    resolved(store, "a.own", "impl A::own");
-    resolved(store, "foreign", "outside", "helper/src/lib.rs");
-    resolved(store, "globbed", "globbed");
+    unresolved(store, "a.own");
+    unresolved(store, "foreign");
+    unresolved(store, "globbed");
     unresolved(store, "unknown.speak");
     unresolved(store, "std::mem::drop");
     assert.equal(
       calls(store, "private").filter((l) => l.resolution === "resolved").length,
-      1,
+      0,
     );
     assert.equal(
       calls(store, "private").filter((l) => l.resolution === "unresolved")
         .length,
-      1,
+      2,
     );
     assert.equal(
       store.findSymbols({ name: "private" })[0].data.visibility,
@@ -240,11 +240,11 @@ fn unknown() { missing::T::new(); std::f(); }
       unresolved(store, "std::f");
       assert.equal(
         calls(store, "x.f").filter((l) => l.resolution === "resolved").length,
-        2,
+        0,
       );
       assert.equal(
         calls(store, "x.f").filter((l) => l.resolution === "unresolved").length,
-        2,
+        4,
       );
       assert.deepEqual(
         calls(store, "scoped")
@@ -311,4 +311,37 @@ test("Rust Cargo context changes re-resolve cached sources and workspace depende
     assert.equal(repeat.indexed, 0);
     unresolved(store, "renamed::f");
   });
+});
+
+test("Rust failed-file causes clear when the file is fixed and reindexed", async () => {
+  await project(
+    [
+      manifest,
+      lib("mod broken;mod good;fn r(){broken::f();good::f();}"),
+      { path: "src/broken.rs", text: "pub fn f(){let x=;}" },
+      { path: "src/good.rs", text: "pub fn f(){}" },
+    ],
+    async (store, report, root) => {
+      assert.deepEqual(report.failed, ["src/broken.rs"]);
+      const failed = calls(store, "broken::f")[0];
+      assert.equal(failed.resolution, "unresolved");
+      assert.equal(failed.targetId, null);
+      assert.deepEqual(failed.candidates, []);
+      assert.equal(failed.data.uncertainty, "invalid-code");
+      assert.deepEqual(failed.data.cause, { files: ["src/broken.rs"] });
+      assert.equal(Object.hasOwn(failed.data, "targets"), false);
+      assert.deepEqual(store.findSymbols({ file: "src/broken.rs" }), []);
+      resolved(store, "good::f", "f", "src/good.rs");
+      await writeFile(join(root, "src/broken.rs"), "pub fn f(){}");
+      const fixed = await indexProject(
+        root,
+        new LanguageRegistry([rust]),
+        store,
+      );
+      assert.deepEqual(fixed.failed, []);
+      resolved(store, "broken::f", "f", "src/broken.rs");
+      assert.equal(calls(store, "broken::f")[0].data.cause, undefined);
+      assert.equal(calls(store, "broken::f")[0].data.uncertainty, undefined);
+    },
+  );
 });

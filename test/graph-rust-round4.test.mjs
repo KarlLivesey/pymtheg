@@ -8,7 +8,7 @@ const rust = (
 ).default;
 async function graph(
   sources,
-  manifests = { "Cargo.toml": '[package]\nname="app"\n' },
+  manifests = { "Cargo.toml": '[package]\nname="app"\nedition="2024"\n' },
 ) {
   const files = [];
   for (const [path, text] of Object.entries(sources)) {
@@ -72,8 +72,23 @@ async function graph(
   function unknown(name, kind = "calls") {
     for (const t of targets(name, kind)) assert.equal(t.length, 0, name);
   }
+  function would(name, kind = "calls") {
+    return links
+      .filter((l) => l.targetName === name && l.kind === kind)
+      .map((l) => (l.data?.targets ?? []).map((id) => byId.get(id)));
+  }
+  function unverified(name, identity, kind = "calls") {
+    unknown(name, kind);
+    for (const ts of would(name, kind))
+      assert.ok(
+        ts.some((s) => s.identity === identity),
+        `${name} retains ${identity}`,
+      );
+  }
   return {
     targets,
+    would,
+    unverified,
     one,
     unknown,
     files,
@@ -139,16 +154,14 @@ test("round 4 R2: alias blankets and chains cannot disappear", async () => {
           `${alias}struct A;trait Blanket{fn f(self){}}impl<T>Blanket for Id<T>{}${inherent ? "impl A{fn f(&self){}}" : "trait U{fn f(&self){}}trait V{fn f(&self){}}impl U for A{}impl V for A{}"}fn run(a:A){a.f();}`,
         ),
       );
-      if (alias.includes("Box") || alias.includes("(T,)")) {
-        if (inherent) g.one("a.f", "impl A::f");
-        else assert.equal(g.targets("a.f")[0].length, 2);
-      } else g.unknown("a.f");
+      g.unknown("a.f");
+      assert.ok(g.would("a.f")[0].length);
     }
   }
   const aliases = await graph(
     lib(`struct A;impl A{fn f(&self){}}type B=A;type C=B;fn run(x:C){x.f();}`),
   );
-  aliases.one("x.f", "impl A::f");
+  aliases.unverified("x.f", "impl A::f");
   const ref = await graph(
     lib(
       `struct A;impl A{fn f(&self){}}type Ref<'a>=&'a A;fn run(x:Ref<'_>){x.f();}`,
@@ -184,7 +197,7 @@ test("round 4 R3: standard blanket choices are unresolved with known targets", a
   ]) {
     const g = await graph(
       lib(
-        `struct A;impl A{fn ${name}(&self){}}fn run(a:A){a.${name}();A::${name}(&a);}`,
+        `use std::borrow::{Borrow,BorrowMut};use std::any::Any;struct A;impl A{fn ${name}(&self){}}fn run(a:A){a.${name}();A::${name}(&a);}`,
       ),
     );
     g.unknown(`a.${name}`);
@@ -208,7 +221,7 @@ test("round 4 R3: standard blanket choices are unresolved with known targets", a
   const ordinary = await graph(
     lib(`struct A;impl A{fn ordinary(&self){}}fn r(a:A){a.ordinary();}`),
   );
-  ordinary.one("a.ordinary", "impl A::ordinary");
+  ordinary.unverified("a.ordinary", "impl A::ordinary");
 });
 test("round 4 R4: opaque statement macros invalidate binding evidence in order", async () => {
   const g = await graph(
@@ -217,13 +230,15 @@ test("round 4 R4: opaque statement macros invalidate binding evidence in order",
     ),
   );
   const t = g.targets("a.f");
-  assert.equal(t[0].length, 1);
+  assert.equal(t[0].length, 0);
+  assert.equal(g.would("a.f")[0].length, 1);
   assert.equal(t[1].length, 0);
-  assert.equal(t[2].length, 1);
+  assert.equal(t[2].length, 0);
+  assert.equal(g.would("a.f")[2].length, 1);
   const other = await graph(
     lib(`struct A;impl A{fn f(&self){}}fn run(a:A){m!(other);a.f();}`),
   );
-  other.one("a.f", "impl A::f");
+  other.unverified("a.f", "impl A::f");
   const self = await graph(
     lib(`struct A;impl A{fn f(&self){}fn run(&self){m!(self);self.f();}}`),
   );
@@ -252,7 +267,7 @@ test("round 4 R4: item macro type tokens prevent complete dispatch", async () =>
   const other = await graph(
     lib(`struct A;struct B;impl A{fn f(&self){}}imp!(B);fn run(a:A){a.f();}`),
   );
-  other.one("a.f", "impl A::f");
+  other.unverified("a.f", "impl A::f");
 });
 test("round 4 R5: fully generic inherent impls apply to all instantiations", async () => {
   for (const impl of [
@@ -269,7 +284,7 @@ test("round 4 R5: fully generic inherent impls apply to all instantiations", asy
       "W::new",
       `${impl.includes("Copy>") ? "impl<T:Copy>" : "impl<T>"} W<T>::new`,
     );
-    if (impl === "impl<T>W<T>") g.one("x.get", "impl<T> W<T>::get");
+    if (impl === "impl<T>W<T>") g.unverified("x.get", "impl<T> W<T>::get");
     else g.unknown("x.get");
   }
   for (const specialised of ["impl<T>W<Vec<T>>", "impl W<u8>"]) {
@@ -301,38 +316,6 @@ test("round 4 R7: unit values are links in expression positions", async () => {
   shadow.unknown("Unit", "values");
   const named = await graph(lib(`enum E{Named{x:u8}}fn r(){let _x=E::Named;}`));
   named.unknown("E::Named", "values");
-});
-test("round 4 error regions and broken declaration headers cannot prove clean-file links", async () => {
-  for (const bad of [
-    "pub struct A{pub x: }",
-    "pub enum A{X(u8,,)}",
-    "pub trait T: ??? {fn f(&self){}}",
-    "pub struct A; impl Tr for A @ {pub fn f(&self){}}",
-  ]) {
-    const g = await graph({
-      "src/lib.rs": `mod bad;use bad::*;fn run(a:A){a.f();A::f(&a);let x:A;}`,
-      "src/bad.rs": bad,
-    });
-    assert.equal(
-      g.files.find((f) => f.path === "src/bad.rs").result.status,
-      "partial",
-    );
-    g.unknown("a.f");
-    g.unknown("A::f");
-    const unsafe = g.symbols.filter((s) => s.data?.unsafe);
-    assert.ok(
-      !g.decisions.some((d) =>
-        [d.targetId, ...(d.candidateIds ?? [])].some((id) =>
-          unsafe.some((s) => s.id === id),
-        ),
-      ),
-    );
-  }
-  const useError = await graph(
-    lib(`fn f(){}use missing::{, f};fn run(){f();}`),
-  );
-  assert.equal(useError.files[0].result.status, "partial");
-  useError.one("f", "f"); // Intact local declaration remains authoritative.
 });
 test("round 4 alias expansion cannot turn a specialised impl into universal", async () => {
   const g = await graph(
@@ -369,17 +352,6 @@ test("round 4 generic inherent shared receiver precedes nominal trait adjustment
   g.unknown("x.f");
   g.one("y.f", "impl<T> W<T>::f");
 });
-test("round 4 broken impl headers cannot prove an outer shape inapplicable", async () => {
-  const g = await graph({
-    "src/lib.rs": `mod bad;struct A;impl A{fn f(&self){}}fn run(a:A){a.f();}`,
-    "src/bad.rs": `impl<T> External for Box<T> @ {fn f(self){}}`,
-  });
-  assert.equal(
-    g.files.find((f) => f.path === "src/bad.rs").result.status,
-    "partial",
-  );
-  g.unknown("a.f");
-});
 test("round 4 external shape dispatch retains captured project impl evidence", async () => {
   const g = await graph(
     lib(
@@ -388,8 +360,14 @@ test("round 4 external shape dispatch retains captured project impl evidence", a
   );
   g.unknown("x.f");
   const l = g.links.find((l) => l.targetName === "x.f");
-  assert.equal(l.data.targets.length, 1);
-  assert.match(l.data.uncertainty, /Box/);
+  assert.ok(
+    l.data.targets.some(
+      (id) =>
+        g.symbols.find((s) => s.id === id)?.identity ===
+        "impl<T> Tr for Id<T>::f",
+    ),
+  );
+  assert.match(l.data.uncertainty, /receiver/);
 });
 test("round 4 custom receiver uncertainty retains known project members", async () => {
   const g = await graph(
@@ -400,7 +378,7 @@ test("round 4 custom receiver uncertainty retains known project members", async 
   g.unknown("self.f");
   const l = g.links.find((l) => l.targetName === "self.f");
   assert.equal(l.data.targets.length, 1);
-  assert.match(l.data.uncertainty, /receiver/);
+  assert.match(l.data.uncertainty, /later-probe|receiver/);
 });
 test("round 4 named-field variants remain imports and patterns, not bare values", async () => {
   const g = await graph(
@@ -420,7 +398,7 @@ test("round 4 alias applicability cannot poison a shared namespace cache", async
     ),
   );
   g.unknown("x.f");
-  g.one("a.f", "impl A::f");
+  g.unverified("a.f", "impl A::f");
   const reverse = await rust.resolve({
     projectId: "review",
     files: g.files,
@@ -445,15 +423,6 @@ test("round 4 generic alias and reference Self do not capture same-named project
   );
   const ts = g.targets("x.f");
   assert.equal(ts[0].length, 0);
-  g.one("x.g", "impl T::g");
+  g.unverified("x.g", "impl T::g");
   g.unknown("self.g");
-});
-
-test("round 4 syntax: recovered method headers cannot exclude an alternative", async () => {
-  const g = await graph({
-    "src/lib.rs":
-      "mod broken; pub struct A; impl A { pub fn f(&self) {} } pub fn run(a:A){a.f();}",
-    "src/broken.rs": "impl crate::A { fn f(&self, missing: ) {} }",
-  });
-  g.unknown("a.f");
 });

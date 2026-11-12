@@ -111,17 +111,6 @@
       }
     },
     {
-      "file": "app/src/broken.rs",
-      "name": "good",
-      "kind": "function",
-      "identity": "good",
-      "at": "fn good() {}",
-      "range": {
-        "start": 0,
-        "end": 12
-      }
-    },
-    {
       "file": "app/src/lib.rs",
       "name": "new",
       "kind": "method",
@@ -595,17 +584,6 @@
       }
     },
     {
-      "file": "app/src/broken.rs",
-      "name": "app/src/broken.rs",
-      "kind": "module",
-      "identity": "$crate",
-      "at": "fn good() {}\nfn broken( {\n",
-      "range": {
-        "start": 0,
-        "end": 26
-      }
-    },
-    {
       "file": "app/src/other.rs",
       "name": "app/src/other.rs",
       "kind": "module",
@@ -752,11 +730,7 @@
         "name": "run",
         "kind": "function"
       },
-      "target": {
-        "file": "app/src/other.rs",
-        "name": "special",
-        "kind": "function"
-      },
+      "target": null,
       "at": "renamed::special",
       "range": {
         "start": 951,
@@ -1017,11 +991,7 @@
         "name": "run",
         "kind": "function"
       },
-      "target": {
-        "file": "app/src/lib.rs",
-        "name": "A",
-        "kind": "struct"
-      },
+      "target": null,
       "at": "A",
       "range": {
         "start": 1043,
@@ -1036,11 +1006,7 @@
         "name": "run",
         "kind": "function"
       },
-      "target": {
-        "file": "app/src/lib.rs",
-        "name": "own",
-        "kind": "method"
-      },
+      "target": null,
       "at": "a.own",
       "range": {
         "start": 903,
@@ -1131,11 +1097,7 @@
         "name": "run",
         "kind": "function"
       },
-      "target": {
-        "file": "app/src/flat.rs",
-        "name": "private",
-        "kind": "function"
-      },
+      "target": null,
       "at": "private",
       "range": {
         "start": 822,
@@ -1150,11 +1112,7 @@
         "name": "run",
         "kind": "function"
       },
-      "target": {
-        "file": "app/src/lib.rs",
-        "name": "inside",
-        "kind": "function"
-      },
+      "target": null,
       "at": "inline::inside",
       "range": {
         "start": 933,
@@ -1584,25 +1542,6 @@
       }
     },
     {
-      "file": "app/src/broken.rs",
-      "kind": "contains",
-      "targetName": "good",
-      "source": {
-        "name": "app/src/broken.rs",
-        "kind": "module"
-      },
-      "target": {
-        "file": "app/src/broken.rs",
-        "name": "good",
-        "kind": "function"
-      },
-      "at": "fn good() {}",
-      "range": {
-        "start": 0,
-        "end": 12
-      }
-    },
-    {
       "file": "app/src/lib.rs",
       "kind": "contains",
       "targetName": "before_macro",
@@ -1739,11 +1678,7 @@
         "name": "sibling",
         "kind": "function"
       },
-      "target": {
-        "file": "app/src/lib.rs",
-        "name": "own",
-        "kind": "method"
-      },
+      "target": null,
       "at": "a.own",
       "range": {
         "start": 190,
@@ -1853,11 +1788,7 @@
         "name": "run",
         "kind": "function"
       },
-      "target": {
-        "file": "app/src/flat.rs",
-        "name": "new",
-        "kind": "method"
-      },
+      "target": null,
       "at": "Alias::new",
       "range": {
         "start": 889,
@@ -2039,11 +1970,7 @@
         "name": "run",
         "kind": "function"
       },
-      "target": {
-        "file": "app/src/lib.rs",
-        "name": "new",
-        "kind": "method"
-      },
+      "target": null,
       "at": "A::new",
       "range": {
         "start": 869,
@@ -2168,11 +2095,7 @@
         "name": "run",
         "kind": "function"
       },
-      "target": {
-        "file": "app/src/tree/mod.rs",
-        "name": "branch",
-        "kind": "function"
-      },
+      "target": null,
       "at": "branch",
       "range": {
         "start": 833,
@@ -2206,11 +2129,7 @@
         "name": "run",
         "kind": "function"
       },
-      "target": {
-        "file": "app/src/lib.rs",
-        "name": "new",
-        "kind": "method"
-      },
+      "target": null,
       "at": "B::new",
       "range": {
         "start": 879,
@@ -2335,11 +2254,7 @@
         "name": "run",
         "kind": "function"
       },
-      "target": {
-        "file": "app/src/lib.rs",
-        "name": "generic",
-        "kind": "function"
-      },
+      "target": null,
       "at": "generic",
       "range": {
         "start": 1033,
@@ -2806,11 +2721,7 @@
         "name": "run",
         "kind": "function"
       },
-      "target": {
-        "file": "app/src/tree/mod.rs",
-        "name": "globbed",
-        "kind": "function"
-      },
+      "target": null,
       "at": "globbed",
       "range": {
         "start": 843,
@@ -2969,11 +2880,7 @@
         "name": "run",
         "kind": "function"
       },
-      "target": {
-        "file": "helper/src/lib.rs",
-        "name": "outside",
-        "kind": "function"
-      },
+      "target": null,
       "at": "foreign",
       "range": {
         "start": 854,
@@ -3174,11 +3081,7 @@
         "name": "run",
         "kind": "function"
       },
-      "target": {
-        "file": "app/src/lib.rs",
-        "name": "A",
-        "kind": "struct"
-      },
+      "target": null,
       "candidates": [],
       "range": {
         "start": 1046,

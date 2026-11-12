@@ -79,7 +79,7 @@ fn run(a: A, b: B, t: &dyn Speak) { A::new(); B::new(); A::missing(); a.method()
   });
   assert.equal(g.target("A::new"), "impl A::new");
   assert.equal(g.target("B::new"), "impl B::new");
-  assert.equal(g.target("a.method"), "impl A::method");
+  assert.equal(g.target("a.method"), null);
   assert.equal(g.target("b.method"), null);
   assert.equal(g.target("t.f"), null);
   assert.equal(g.target("A::missing"), null);
@@ -139,30 +139,12 @@ test("Rust #[path] modules do not claim a similarly named adjacent file", async 
   assert.equal(g.target("named", "modules"), "$crate");
 });
 
-test("Rust no-toolchain grammar reports partial syntax and retains private constants/types/variants", async () => {
-  const g = await graph({
-    "src/lib.rs":
-      "// 😀\nstruct S; enum E { A, B(S) } type Alias = S; const C: usize = 1; static V: bool = false; fn f() {}\nfn broken( {",
-  });
-  assert.equal(g.files[0].result.status, "partial");
+test("Rust no-toolchain grammar fails the entire broken file", async () => {
+  const g = await graph({ "src/lib.rs": "struct S;fn f(){}fn broken( {" });
+  assert.equal(g.files[0].result.status, "failed");
   assert.ok(g.files[0].result.diagnostics.length);
-  for (const [name, kind] of [
-    ["S", "struct"],
-    ["E", "enum"],
-    ["A", "variant"],
-    ["B", "variant"],
-    ["Alias", "type"],
-    ["C", "const"],
-    ["V", "static"],
-    ["f", "function"],
-  ]) {
-    const s = g.symbols.find((s) => s.name === name && s.kind === kind);
-    assert.ok(s, name);
-    assert.equal(
-      s.data.visibility,
-      kind === "variant" ? "inherited" : "private",
-    );
-  }
+  assert.deepEqual(g.symbols, []);
+  assert.deepEqual(g.links, []);
 });
 
 test("Rust multiple opaque globs terminate structurally without inventing paths", async () => {
@@ -226,5 +208,5 @@ test("Rust parameter receiver types keep their annotation scope under local type
   fn run(x: A) { struct A; impl A { fn f(&self) {} } x.f(); }
   `,
   });
-  assert.equal(g.target("x.f"), "impl A::f");
+  assert.equal(g.target("x.f"), null);
 });

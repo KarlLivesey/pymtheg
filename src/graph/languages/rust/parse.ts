@@ -5,6 +5,37 @@ import type { ParseResult, SourceInput } from "../../types.js";
 const field = (n: Node, name: string) => n.childForFieldName(name);
 const span = (n: Node) => ({ start: n.startIndex, end: n.endIndex });
 const compact = (s: string) => s.replace(/\s+/g, "").replace(/\br#/g, "");
+export const inertAttributes = new Set([
+  "allow",
+  "warn",
+  "deny",
+  "forbid",
+  "expect",
+  "cfg",
+  "cfg_attr",
+  "repr",
+  "doc",
+  "deprecated",
+  "must_use",
+  "non_exhaustive",
+  "inline",
+  "cold",
+  "track_caller",
+  "no_mangle",
+  "export_name",
+  "link_section",
+  "used",
+  "automatically_derived",
+  "test",
+  "ignore",
+  "should_panic",
+  "path",
+  "macro_export",
+  "macro_use",
+  "link",
+  "no_std",
+  "no_implicit_prelude",
+]);
 const kinds: Record<string, string> = {
   mod_item: "module",
   function_item: "function",
@@ -32,13 +63,45 @@ export async function parseRust({
     // pass below maps all definitions once, including definitions absent from tags.
     mapDefinition: () => undefined,
     secondPass({ tree, result }) {
+      let first: Node | null = null;
+      function errorNode(n: Node): void {
+        if (
+          (n.type === "ERROR" || n.isMissing) &&
+          (!first ||
+            n.startIndex < first.startIndex ||
+            (n.startIndex === first.startIndex && n.endIndex < first.endIndex))
+        )
+          first = n;
+        for (const c of n.children) errorNode(c);
+      }
+      errorNode(tree.rootNode);
+      if (first) {
+        const bad = first as Node;
+        const textToken = (bad.text.trim().match(/^\S+/u)?.[0] ?? bad.type)
+          .slice(0, 40)
+          .replace(/[\r\n]/g, " ");
+        const lines = text.slice(0, bad.startIndex).split(/\r\n|[\r\n]/);
+        result.status = "failed";
+        result.symbols = [];
+        result.links = [];
+        result.diagnostics = [
+          {
+            message: `line ${lines.length}, column ${lines.at(-1)!.length + 1}: ${bad.isMissing ? `missing \`${bad.type}\`` : `unexpected \`${textToken}\``}`,
+            range: span(bad),
+          },
+        ];
+        return;
+      }
       const opaqueCrateAliases: string[] = [];
-      const opaqueImplTypes: {
-        name: string;
-        scope: string;
-        semantic?: boolean;
-        variables?: string;
-      }[] = [];
+      const opaqueItemScopes = new Set<string>();
+      // Macro expansion can shadow bare names only in a lexical item container.
+      // Fields/variants and associated items do not introduce lexical bindings.
+      const lexicalItemContainer = (n: Node | null): boolean =>
+        !!n &&
+        (["source_file", "block"].includes(n.type) ||
+          (n.type === "declaration_list" &&
+            !["impl_item", "trait_item"].includes(n.parent?.type ?? "")));
+
       result.symbols.push({
         key: "file",
         name: path,
@@ -53,7 +116,7 @@ export async function parseRust({
         scope: string,
         kind: string,
         targetName: string,
-        extra: Record<string, string | boolean | number> = {},
+        extra: Record<string, string | boolean | number | string[]> = {},
       ) => {
         if (
           targetName &&
@@ -73,6 +136,8 @@ export async function parseRust({
         owner: string,
         scope: string,
         visibility: string,
+        conditions: string[] = [],
+        names?: string[],
       ) {
         if (n.type === "scoped_use_list") {
           const p = field(n, "path")?.text;
@@ -82,10 +147,12 @@ export async function parseRust({
             owner,
             scope,
             visibility,
+            conditions,
+            names,
           );
         } else if (n.type === "use_list") {
           for (const c of n.namedChildren)
-            imports(c, prefix, owner, scope, visibility);
+            imports(c, prefix, owner, scope, visibility, conditions, names);
         } else {
           const rename = n.type === "use_as_clause";
           let name = prefix + compact(rename ? field(n, "path")!.text : n.text);
@@ -93,12 +160,101 @@ export async function parseRust({
           const alias = rename
             ? field(n, "alias")!.text
             : name.split("::").at(-1)!;
-          link(n, owner, scope, "imports", name, {
-            alias,
-            visibility,
-            glob: n.type === "use_wildcard",
-          });
+          if (names)
+            names.push(n.type === "use_wildcard" ? "*" : compact(alias));
+          else
+            link(n, owner, scope, "imports", name, {
+              alias,
+              visibility,
+              conditions,
+              glob: n.type === "use_wildcard",
+            });
         }
+      }
+      type Meta = {
+        name: string;
+        value?: Node | undefined;
+        args?: Node | undefined;
+      };
+      const parts = (nodes: Node[]): Meta => {
+        const ns = nodes.filter((c) => !c.type.endsWith("comment"));
+        return {
+          name: ns[0]?.text ?? "",
+          value: ns[1]?.type === "=" ? ns[2] : undefined,
+          args: ns[1]?.type === "token_tree" ? ns[1] : undefined,
+        };
+      };
+      const meta = (n: Node): Meta =>
+        parts(
+          (n.namedChildren.find((c) => c.type === "attribute") ?? n).children,
+        );
+      function payloads(n: Node): Meta[] {
+        const groups: Node[][] = [[]];
+        for (const c of n.children.slice(1, -1)) {
+          if (c.type === ",") groups.push([]);
+          else groups.at(-1)!.push(c);
+        }
+        return groups.filter((g) => g.length).map(parts);
+      }
+      // Compare cfg predicates by syntax tokens, preserving literal contents.
+      const cfgText = (n: Node): string =>
+        n.type.endsWith("comment")
+          ? ""
+          : n.type.includes("literal")
+            ? n.text
+            : n.children.length
+              ? n.children.map(cfgText).join("")
+              : n.text;
+      function cfg(meta: Meta): string[] {
+        if (meta.name === "cfg")
+          return [meta.args ? cfgText(meta.args).slice(1, -1) : "?"];
+        if (meta.name === "cfg_attr" && meta.args) {
+          const ps = payloads(meta.args);
+          return ps
+            .slice(1)
+            .flatMap((m) => cfg(m).map((c) => `cfg_attr?(Statement:${c})`));
+        }
+        return [];
+      }
+      function modulePath(nodes: Node[]): {
+        path: string;
+        paths: string[];
+        pathExplicit: boolean;
+        pathOpaque: boolean;
+      } {
+        const paths: string[] = [];
+        let path = "",
+          pathExplicit = false,
+          pathOpaque = false;
+        const read = (m: Meta, conditional = false): void => {
+          if (m.name === "cfg_attr" && m.args) {
+            for (const p of payloads(m.args).slice(1)) read(p, true);
+            return;
+          }
+          if (m.name !== "path") return;
+          if (!conditional) pathExplicit = true;
+          let value: string | undefined;
+          if (m.value?.type === "raw_string_literal")
+            value =
+              /^r(#[#]*)?"([\s\S]*)"\1$/.exec(m.value.text)?.[2] ??
+              /^r"([\s\S]*)"$/.exec(m.value.text)?.[1];
+          else if (m.value?.type === "string_literal") {
+            try {
+              value = JSON.parse(m.value.text) as string;
+            } catch {}
+          }
+          if (
+            value === undefined ||
+            /^(?:\/|[A-Za-z]:[\\\/]|\\\\)/.test(value)
+          ) {
+            pathOpaque = true;
+            return;
+          }
+          paths.push(value);
+          if (!conditional) path = value;
+        };
+        for (const n of nodes) read(meta(n));
+        return { path, paths: [...new Set(paths)], pathExplicit, pathOpaque };
       }
       const argumentSyntaxCache = new Map<number, string>();
       function argumentSyntax(type: Node | null): string {
@@ -107,10 +263,7 @@ export async function parseRust({
         if (cached !== undefined) return cached;
         function syntax(n: Node): unknown | null {
           if (
-            n.hasError ||
-            n.isMissing ||
             [
-              "ERROR",
               "function_type",
               "for_lifetimes",
               "higher_ranked_trait_bound",
@@ -154,6 +307,30 @@ export async function parseRust({
         argumentSyntaxCache.set(type.id, value);
         return value;
       }
+      const bindingAttributeOpaque = (m: Meta): boolean =>
+        m.name === "cfg_attr" && m.args
+          ? payloads(m.args).slice(1).some(bindingAttributeOpaque)
+          : !inertAttributes.has(m.name);
+      function bindingType(n: Node): Node | null {
+        const attrs = n.namedChildren.filter(
+          (c) => c.type === "attribute_item",
+        );
+        let prev = n.previousNamedSibling;
+        while (
+          prev &&
+          ["attribute_item", "line_comment", "block_comment"].includes(
+            prev.type,
+          )
+        ) {
+          if (prev.type === "attribute_item") attrs.push(prev);
+          prev = prev.previousNamedSibling;
+        }
+        return attrs.some(
+          (a) => cfg(meta(a)).length || bindingAttributeOpaque(meta(a)),
+        )
+          ? null
+          : field(n, "type");
+      }
       const lexicalScopes = new Map<number, string>();
       type ReceiverType = {
         name: string;
@@ -170,6 +347,7 @@ export async function parseRust({
         start: number;
         order: number;
         macro?: boolean;
+        item?: boolean;
       };
       type BindingScopes = Map<number, Map<string, Binding[]>>;
       const bindingCache = new Map<number, BindingScopes>();
@@ -240,6 +418,65 @@ export async function parseRust({
             scopes!.set(region.id, names);
           };
           function scan(n: Node, parameterRegion: Node) {
+            if (n.parent?.type === "block") {
+              const valueItem =
+                ["function_item", "const_item", "static_item"].includes(
+                  n.type,
+                ) ||
+                (n.type === "struct_item" &&
+                  !n.namedChildren.some(
+                    (c) => c.type === "field_declaration_list",
+                  ));
+              const imported: string[] = [];
+              if (n.type === "use_declaration")
+                imports(field(n, "argument")!, "", "", "", "", [], imported);
+              const wildcard =
+                imported.includes("*") ||
+                n.type === "macro_invocation" ||
+                (n.type === "expression_statement" &&
+                  n.namedChildren.some((c) => c.type === "macro_invocation")) ||
+                (n.type === "attribute_item" &&
+                  bindingAttributeOpaque(meta(n)));
+              for (const alias of imported.filter(
+                (x) => x !== "*" && x !== "_",
+              )) {
+                const names =
+                  scopes!.get(n.parent.id) ?? new Map<string, Binding[]>();
+                names.set("?" + alias, [
+                  { pattern: n, type: null, start: 0, order: order++ },
+                ]);
+                scopes!.set(n.parent.id, names);
+              }
+              const id = field(n, "name");
+              if (valueItem && id) {
+                const names =
+                  scopes!.get(n.parent.id) ?? new Map<string, Binding[]>();
+                const list = names.get(compact(id.text)) ?? [];
+                list.push({
+                  pattern: id,
+                  type: null,
+                  start: 0,
+                  order: order++,
+                  item: true,
+                });
+                names.set(compact(id.text), list);
+                scopes!.set(n.parent.id, names);
+              }
+              if (wildcard) {
+                const names =
+                  scopes!.get(n.parent.id) ?? new Map<string, Binding[]>();
+                const list = names.get("*") ?? [];
+                list.push({
+                  pattern: n,
+                  type: null,
+                  start: 0,
+                  order: order++,
+                  item: true,
+                });
+                names.set("*", list);
+                scopes!.set(n.parent.id, names);
+              }
+            }
             if (
               n.id !== root.id &&
               ["function_item", "impl_item", "mod_item"].includes(n.type)
@@ -258,10 +495,13 @@ export async function parseRust({
               return;
             }
             if (n.type === "closure_expression") parameterRegion = n;
-            if (n.type === "parameter")
-              add(field(n, "pattern"), field(n, "type"), parameterRegion, 0);
+            if (
+              n.type === "parameter" &&
+              n.parent?.parent?.id === parameterRegion.id
+            )
+              add(field(n, "pattern"), bindingType(n), parameterRegion, 0);
             if (n.type === "let_declaration" && n.parent)
-              add(field(n, "pattern"), field(n, "type"), n.parent, n.endIndex);
+              add(field(n, "pattern"), bindingType(n), n.parent, n.endIndex);
             if (n.type === "let_condition") {
               let control = n.parent;
               while (
@@ -312,7 +552,15 @@ export async function parseRust({
         const types = new Map<string, ReceiverType>();
         let ancestor: Node | null = at;
         while (ancestor) {
-          const list = scopes.get(ancestor.id)?.get(name);
+          const names = scopes.get(ancestor.id);
+          // Unknown block generation can shadow a receiver, but cannot erase
+          // an enclosing runtime binding and expose an outer function value.
+          if (
+            name !== "self" &&
+            (names?.get("*")?.length || names?.get("?" + name)?.length)
+          )
+            invalidated = true;
+          const list = names?.get(name);
           if (list) {
             let lo = 0,
               hi = list.length;
@@ -323,12 +571,13 @@ export async function parseRust({
             }
             const item = list[lo - 1];
             if (item) {
-              blocked.add(name);
-              invalidated = item.macro === true;
+              if (!item.item) blocked.add(name);
+              invalidated ||= item.macro === true;
               const { pattern, type } = item;
               const nominal =
                 type?.type === "reference_type" ? field(type, "type") : type;
               if (
+                !invalidated &&
                 type &&
                 nominal &&
                 [
@@ -477,19 +726,8 @@ export async function parseRust({
         fn: Node | null,
         implType: string,
         moduleScope = "",
-        unsafe = false,
+        conditions: string[] = [],
       ) {
-        unsafe ||= n.type === "ERROR" || n.isMissing;
-        if (kinds[n.type]) {
-          const body = field(n, "body");
-          if (body?.children.some((c) => c.isMissing && c.type === "}"))
-            unsafe = true;
-          unsafe ||= n.namedChildren.some(
-            (c) => c.id !== body?.id && (c.hasError || c.isMissing),
-          );
-          if (["struct_item", "enum_item", "type_item"].includes(n.type))
-            unsafe ||= n.hasError;
-        }
         // Signature types are outside the function body item's scope. Preserve
         // the annotation's namespace so a later local type cannot retarget it.
         const body = fn && field(fn, "body");
@@ -533,6 +771,7 @@ export async function parseRust({
                 ? "method"
                 : kind;
             const attrs: string[] = [];
+            const attributeNodes: Node[] = [];
             let previous = n.previousNamedSibling;
             while (
               previous &&
@@ -542,10 +781,14 @@ export async function parseRust({
             ) {
               if (previous.type === "attribute_item") {
                 attrs.unshift(previous.text);
-                unsafe ||= previous.hasError;
+                attributeNodes.unshift(previous);
               }
               previous = previous.previousNamedSibling;
             }
+            conditions = [
+              ...conditions,
+              ...attributeNodes.flatMap((n) => cfg(meta(n))),
+            ];
             result.symbols.push({
               key,
               name,
@@ -555,7 +798,7 @@ export async function parseRust({
               data: {
                 scope,
                 moduleScope,
-                unsafe,
+                conditions,
                 ...(["struct", "variant"].includes(actualKind)
                   ? {
                       constructorForm: n.namedChildren.some(
@@ -579,6 +822,13 @@ export async function parseRust({
                       receiverType: receiverInfo(n).type,
                       receiverMutable: receiverInfo(n).mutable,
                       defaultBody: !!field(n, "body"),
+                      methodBounded:
+                        n.namedChildren.some(
+                          (c) => c.type === "where_clause",
+                        ) ||
+                        !!field(n, "type_parameters")?.descendantsOfType(
+                          "trait_bounds",
+                        ).length,
                     }
                   : {}),
                 visibility:
@@ -608,10 +858,7 @@ export async function parseRust({
                 ...(n.type === "mod_item"
                   ? {
                       inline: !!field(n, "body"),
-                      path:
-                        attrs
-                          .join("\n")
-                          .match(/#\[\s*path\s*=\s*"([^"]+)"\s*\]/)?.[1] ?? "",
+                      ...modulePath(attributeNodes),
                     }
                   : {}),
                 ...(n.type === "type_item"
@@ -706,16 +953,16 @@ export async function parseRust({
             opaqueCrateAliases.push(alias);
         }
         if (n.type === "use_declaration") {
-          if (n.hasError) {
-            link(
-              n,
-              owner,
-              scope,
-              "imports",
-              compact(field(n, "argument")?.text ?? n.text),
-              { unsafe: true, alias: "*", glob: true },
-            );
-            return;
+          let prev = n.previousNamedSibling;
+          const cs = [...conditions];
+          while (
+            prev &&
+            ["attribute_item", "line_comment", "block_comment"].includes(
+              prev.type,
+            )
+          ) {
+            if (prev.type === "attribute_item") cs.push(...cfg(meta(prev)));
+            prev = prev.previousNamedSibling;
           }
           imports(
             field(n, "argument")!,
@@ -724,6 +971,7 @@ export async function parseRust({
             scope,
             n.namedChildren.find((c) => c.type === "visibility_modifier")
               ?.text ?? "private",
+            cs,
           );
           return;
         }
@@ -731,21 +979,14 @@ export async function parseRust({
         if (n.type === "macro_invocation") {
           const m = field(n, "macro");
           if (m) link(m, owner, scope, "macros", compact(m.text));
-          if (!fn || n.parent?.type === "expression_statement")
-            for (const t of n.namedChildren
-              .filter((c) => c.type === "token_tree")
-              .flatMap((c) =>
-                c.descendantsOfType(["identifier", "type_identifier", "self"]),
-              ))
-              if (["self", "Self"].includes(compact(t.text))) {
-                if (implType)
-                  opaqueImplTypes.push({
-                    name: compact(implType),
-                    scope: implScope,
-                    semantic: true,
-                    variables: genericBindings(fn ?? n),
-                  });
-              } else opaqueImplTypes.push({ name: compact(t.text), scope });
+          if (
+            lexicalItemContainer(
+              n.parent?.type === "expression_statement"
+                ? n.parent.parent
+                : n.parent,
+            )
+          )
+            opaqueItemScopes.add(scope);
           return;
         }
         if (n.type === "call_expression") {
@@ -808,7 +1049,6 @@ export async function parseRust({
                 implType,
                 implScope,
                 blocked:
-                  unsafe ||
                   !receiverType ||
                   genericShadow(n, receiverType.split("::")[0]!),
               });
@@ -823,7 +1063,6 @@ export async function parseRust({
                 argumentCount: arity(field(n, "arguments")).maximum,
                 argumentMinimum: arity(field(n, "arguments")).minimum,
                 blocked:
-                  unsafe ||
                   b.blocked.has(compact(f.text.split("::")[0]!)) ||
                   genericShadow(n, f.text.split("::")[0]!),
                 implType,
@@ -866,7 +1105,6 @@ export async function parseRust({
             implScope,
             blocked:
               n.type === "self" ||
-              unsafe ||
               !!b?.blocked.has(compact(n.text.split("::")[0]!)) ||
               genericShadow(n, n.text.split("::")[0]!),
           });
@@ -887,7 +1125,8 @@ export async function parseRust({
               : []),
           ].includes(n.type) &&
           n.parent?.type !== "scoped_type_identifier" &&
-          field(n.parent ?? n, "name")?.id !== n.id &&
+          (field(n.parent ?? n, "name")?.id !== n.id ||
+            n.parent?.type === "struct_expression") &&
           n.parent?.type !== "type_parameter"
         ) {
           let patternParent: Node | null = n.parent;
@@ -914,8 +1153,9 @@ export async function parseRust({
             compact(n.text),
             {
               implType: nextImpl,
+              structLiteral: n.parent?.type === "struct_expression",
               implScope,
-              blocked: unsafe || genericShadow(n, n.text.split("::")[0]!),
+              blocked: genericShadow(n, n.text.split("::")[0]!),
             },
           );
         }
@@ -927,60 +1167,47 @@ export async function parseRust({
             n.type === "mod_item" ? null : nextFn,
             n.type === "mod_item" ? "" : nextImpl,
             n.type === "mod_item" ? nextScope : moduleScope,
-            unsafe,
+            conditions,
           );
       }
       for (const n of tree.rootNode.namedChildren)
         visit(n, "file", "", null, "");
-      // A closed function/closure body cannot swallow surrounding declarations.
-      // Everywhere else an error can hide an item; do not infer its text.
-      function declarationLossy(n: Node, closedBody = false): boolean {
-        if (n.isMissing && n.type === "}") return true;
-        if ((n.type === "ERROR" || n.isMissing) && !closedBody) return true;
-        const item =
-          !!kinds[n.type] ||
-          n.type.endsWith("_item") ||
-          ["use_declaration", "extern_crate_declaration"].includes(n.type) ||
-          (n.type === "macro_invocation" &&
-            [
-              "source_file",
-              "declaration_list",
-              "expression_statement",
-            ].includes(n.parent?.type ?? ""));
-        for (const c of n.children) {
-          let protectedBody = item ? false : closedBody;
+      const opaqueAttributes: { scope: string; raw: string; module: string }[] =
+        [];
+      function attributes(n: Node): void {
+        if (["attribute_item", "inner_attribute_item"].includes(n.type)) {
+          let item =
+            n.type === "inner_attribute_item" ? n.parent : n.nextNamedSibling;
+          while (
+            item &&
+            ["attribute_item", "line_comment", "block_comment"].includes(
+              item.type,
+            )
+          )
+            item = item.nextNamedSibling;
           if (
-            c.type === "block" &&
-            ["function_item", "closure_expression"].includes(n.type)
-          ) {
-            const close = c.children.at(-1);
-            protectedBody = close?.type === "}" && !close.isMissing;
-          }
-          if (declarationLossy(c, protectedBody)) return true;
+            item &&
+            lexicalItemContainer(
+              n.type === "inner_attribute_item" ? item : item.parent,
+            )
+          )
+            opaqueAttributes.push({
+              scope: lexicalScopes.get(item.id) ?? "",
+              raw: n.text,
+              module:
+                item.type === "mod_item"
+                  ? compact(field(item, "name")?.text ?? "")
+                  : "",
+            });
         }
-        return false;
+        for (const c of n.namedChildren) attributes(c);
       }
+      attributes(tree.rootNode);
       result.data = {
         opaqueCrateAliases,
-        opaqueImplTypes,
-        declarationLossy: declarationLossy(tree.rootNode),
+        opaqueItemScopes: [...opaqueItemScopes],
+        opaqueAttributes,
       };
-      // No fact recovered inside an error or an invalid declaration header may
-      // be used as proof. Containment remains structural, not semantic support.
-      const bad = result.symbols.filter(
-        (s) => (s.data as Record<string, unknown>)?.unsafe,
-      );
-      for (const l of result.links)
-        if (
-          l.kind !== "contains" &&
-          bad.some(
-            (s) => s.range.start <= l.range.start && s.range.end >= l.range.end,
-          )
-        )
-          l.data = {
-            ...(l.data as Record<string, import("../../types.js").Json>),
-            blocked: true,
-          };
     },
   });
   try {

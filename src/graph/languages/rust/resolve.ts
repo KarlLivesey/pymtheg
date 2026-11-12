@@ -1,3 +1,4 @@
+import { inertAttributes } from "./parse.js";
 import { posix as p } from "node:path";
 import type {
   GraphSymbol,
@@ -43,12 +44,15 @@ interface Place {
   directory: string;
   file: string;
   parent: Place | null;
-  symbol: GraphSymbol;
+  symbol?: GraphSymbol;
+  uncertain?: boolean;
+  conditions?: string[];
 }
 interface Found {
   symbols: GraphSymbol[];
   complete: boolean;
   reason?: string;
+  failedFiles?: string[];
 }
 const unique = (ss: GraphSymbol[]) => [
   ...new Map(ss.map((s) => [s.id, s])).values(),
@@ -69,15 +73,23 @@ const accepts = (s: GraphSymbol, ns: Namespace) => {
 };
 export function resolveRust(
   ctx: ResolutionContext,
-  uncertain?: (link: GraphLink, targets: GraphSymbol[], reason: string) => void,
+  uncertain?: (
+    link: GraphLink,
+    targets: GraphSymbol[],
+    reason: string,
+    files?: string[],
+  ) => void,
 ): LinkResolution[] {
+  const failedFiles = new Set(
+    ctx.files
+      .filter((f) => f.module === "rust" && f.result.status === "failed")
+      .map((f) => f.path),
+  );
   const symbols = ctx.symbols.filter(
-    (s) => s.module === "rust" && s.status !== "failed",
+    (s) => s.module === "rust" && !failedFiles.has(s.file),
   );
   const files = new Set(
-    ctx.files
-      .filter((f) => f.module === "rust" && f.result.status !== "failed")
-      .map((f) => f.path),
+    ctx.files.filter((f) => f.module === "rust").map((f) => f.path),
   );
   const packages = crates(ctx.contextFiles, files);
   const byLocalKey = new Map(symbols.map((s) => [`${s.file}|${s.key}`, s]));
@@ -95,6 +107,7 @@ export function resolveRust(
   const places: Place[] = [];
   const moduleTargets = new Map<string, GraphSymbol[]>();
   const modulePlaces = new Map<string, Place[]>();
+  const moduleIncomplete = new Set<string>();
   function walk(place: Place, ancestors: Set<string>) {
     const visitKey = `${place.crate.root}|${place.file}|${place.local}`;
     if (ancestors.has(visitKey)) return;
@@ -102,8 +115,6 @@ export function resolveRust(
     const next = new Set([...ancestors, visitKey]);
     for (const s of moduleDeclarations.get(`${place.file}|${place.local}`) ??
       []) {
-      // Recovered module headers cannot establish another file's membership.
-      if (data(s).unsafe) continue;
       const local = s.identity;
       const relative = local.slice(place.local.length).replace(/^::/, "");
       const scope = [place.scope, relative].filter(Boolean).join("::");
@@ -116,23 +127,43 @@ export function resolveRust(
           directory: p.join(place.directory, s.name),
           parent: place,
           symbol: s,
+          conditions: [
+            ...(place.conditions ?? []),
+            ...((data(s).conditions ?? []) as string[]),
+          ],
+          uncertain: place.uncertain || moduleIncomplete.has(s.id),
         });
       else {
         const path = str(data(s).path);
-        const possible = path
-          ? [
-              p.normalize(
-                p.join(
-                  place.local ? place.directory : p.dirname(place.file),
-                  path,
-                ),
+        const pathTargets = new Set(
+          ((data(s).paths ?? []) as string[]).map((path) =>
+            p.normalize(
+              p.join(
+                place.local ? place.directory : p.dirname(place.file),
+                path,
               ),
-            ]
-          : [
-              p.join(place.directory, `${s.name}.rs`),
-              p.join(place.directory, s.name, "mod.rs"),
-            ];
+            ),
+          ),
+        );
+        const ordinary = [
+          p.join(place.directory, `${s.name}.rs`),
+          p.join(place.directory, s.name, "mod.rs"),
+        ];
+        const possible = [
+          ...new Set([
+            ...(data(s).pathExplicit || path ? [] : ordinary),
+            ...pathTargets,
+          ]),
+        ];
+        if (data(s).pathOpaque) moduleIncomplete.add(s.id);
+        if (
+          pathTargets.size &&
+          ([...pathTargets].some((f) => !files.has(f)) ||
+            (!path && !ordinary.some((f) => files.has(f))))
+        )
+          moduleIncomplete.add(s.id);
         const targets = possible.filter((f) => files.has(f));
+        if (!targets.length) moduleIncomplete.add(s.id);
         moduleTargets.set(
           s.id,
           unique([
@@ -140,19 +171,31 @@ export function resolveRust(
             ...targets.map((f) => units.get(f)!).filter(Boolean),
           ]),
         );
-        for (const file of targets)
-          destinations.push({
-            crate: place.crate,
-            file,
-            local: "",
-            scope,
-            parent: place,
-            symbol: s,
-            directory:
-              path || p.basename(file) === "mod.rs"
+        for (const file of targets) {
+          const directories = new Set<string>();
+          if (pathTargets.has(file)) directories.add(p.dirname(file));
+          if (!data(s).pathExplicit && !path && ordinary.includes(file))
+            directories.add(
+              p.basename(file) === "mod.rs"
                 ? p.dirname(file)
                 : p.join(p.dirname(file), p.basename(file, ".rs")),
-          });
+            );
+          for (const directory of directories)
+            destinations.push({
+              crate: place.crate,
+              file,
+              local: "",
+              scope,
+              parent: place,
+              symbol: s,
+              conditions: [
+                ...(place.conditions ?? []),
+                ...((data(s).conditions ?? []) as string[]),
+              ],
+              uncertain: place.uncertain || moduleIncomplete.has(s.id),
+              directory,
+            });
+        }
       }
       modulePlaces.set(s.id, [
         ...(modulePlaces.get(s.id) ?? []),
@@ -202,12 +245,29 @@ export function resolveRust(
     ownerCache.set(k, result);
     return result;
   };
-  const lossyFiles = new Set(
-    ctx.files.filter((f) => data(f.result).declarationLossy).map((f) => f.path),
-  );
-  const lossyCrates = new Set(
-    places.filter((p) => lossyFiles.has(p.file)).map((p) => p.crate.root),
-  );
+  const failedByScope = new Map<string, string[]>(),
+    failedByCrate = new Map<string, string[]>();
+  for (const loc of places)
+    if (failedFiles.has(loc.file)) {
+      const key = `${loc.crate.root}|${loc.scope}`;
+      failedByScope.set(
+        key,
+        [...new Set([...(failedByScope.get(key) ?? []), loc.file])].sort(),
+      );
+      failedByCrate.set(
+        loc.crate.root,
+        [
+          ...new Set([...(failedByCrate.get(loc.crate.root) ?? []), loc.file]),
+        ].sort(),
+      );
+    }
+  const opaqueScopes = new Set<string>();
+  const broken = (files: string[]): Found => ({
+    symbols: [],
+    complete: false,
+    reason: "invalid-code",
+    failedFiles: [...new Set(files)].sort(),
+  });
   const qualified = (loc: Place, local: string) =>
     [loc.scope, local.slice(loc.local.length).replace(/^::/, "")]
       .filter(Boolean)
@@ -219,6 +279,19 @@ export function resolveRust(
       .filter((s) => ["impl", "trait"].includes(s.kind))
       .map((s) => `${s.file}|${s.identity}`),
   );
+  const associatedNames = new Map<string, GraphSymbol[]>();
+  for (const s of symbols)
+    if (
+      members.has(`${s.file}|${str(data(s).scope)}`) &&
+      ["const", "type"].includes(s.kind)
+    ) {
+      associatedNames.set(s.name, [...(associatedNames.get(s.name) ?? []), s]);
+    }
+  const associatedUnknown = (name: string, ns: Namespace): Found => ({
+    symbols: (associatedNames.get(name) ?? []).filter((s) => accepts(s, ns)),
+    complete: false,
+    reason: "associated-member-lookup-unverified",
+  });
   for (const s of symbols) {
     if (members.has(`${s.file}|${str(data(s).scope)}`)) continue;
     for (const loc of ownerPlace(s.file, str(data(s).scope))) {
@@ -273,11 +346,18 @@ export function resolveRust(
   }
   const memo = new Map<string, Found>();
   const empty = (complete = true): Found => ({ symbols: [], complete });
-  const merge = (xs: Found[]): Found => ({
-    symbols: unique(xs.flatMap((x) => x.symbols)),
-    complete: xs.every((x) => x.complete),
-    reason: [...new Set(xs.map((x) => x.reason).filter(Boolean))].join("; "),
-  });
+  const merge = (xs: Found[]): Found => {
+    const causes = xs.flatMap((x) => x.failedFiles ?? []);
+    return causes.length
+      ? broken(causes)
+      : {
+          symbols: unique(xs.flatMap((x) => x.symbols)),
+          complete: xs.every((x) => x.complete),
+          reason: [...new Set(xs.map((x) => x.reason).filter(Boolean))].join(
+            "; ",
+          ),
+        };
+  };
   const isDescendant = (scope: string, parent: string) =>
     !parent || scope === parent || scope.startsWith(parent + "::");
   function visible(visibility: string, owner: Place, importer: Place): boolean {
@@ -312,19 +392,22 @@ export function resolveRust(
     allowGlobs: boolean,
     accessFrom?: Place,
   ): Found {
-    if (data(s).unsafe)
-      return {
-        symbols: [],
-        complete: false,
-        reason: "syntax-error declaration structure",
-      };
-    if (!rest.length)
+    if (s.kind !== "module" && !rest.length)
       return { symbols: accepts(s, ns) ? [s] : [], complete: true };
     if (s.kind === "module") {
       const destinations = data(s).unit
         ? [roots.get(s.file)!].filter(Boolean)
         : (modulePlaces.get(s.id) ?? []);
-      return destinations.length
+      const failed = destinations
+        .filter((p) => failedFiles.has(p.file))
+        .map((p) => p.file);
+      if (failed.length) return broken(failed);
+      if (!rest.length)
+        return {
+          symbols: accepts(s, ns) ? [s] : [],
+          complete: !moduleIncomplete.has(s.id),
+        };
+      const found = destinations.length
         ? merge(
             destinations.map((dest) =>
               find(
@@ -339,11 +422,42 @@ export function resolveRust(
             ),
           )
         : empty(false);
+      return moduleIncomplete.has(s.id)
+        ? {
+            ...found,
+            complete: false,
+            reason: "conditional module path lacks captured alternatives",
+          }
+        : found;
+    }
+    if (s.kind === "type" && rest.length) {
+      const rhs = str(data(s).aliasType);
+      if (
+        !rhs ||
+        (data(s).generics as string[] | undefined)?.length ||
+        !/^(?:::)?[\p{ID_Start}_][\p{ID_Continue}_]*(?:::[\p{ID_Start}_][\p{ID_Continue}_]*)*$/u.test(
+          rhs,
+        )
+      )
+        return empty(false);
+      return merge(
+        ownerPlace(s.file, str(data(s).scope)).map((p) =>
+          find(
+            [rhs, ...rest].join("::"),
+            p,
+            str(data(s).scope),
+            ns,
+            seen,
+            allowGlobs,
+            accessFrom,
+          ),
+        ),
+      );
     }
     if (s.kind === "enum" && rest.length === 1) {
       return merge(
-        ownerPlace(s.file, str(data(s).scope)).map((loc) => ({
-          symbols: (
+        ownerPlace(s.file, str(data(s).scope)).map((loc) => {
+          const listed =
             table.get(
               key(
                 loc.crate.root,
@@ -351,13 +465,56 @@ export function resolveRust(
                   .filter(Boolean)
                   .join("::"),
               ),
-            ) ?? []
-          ).filter((x) => accepts(x, ns)),
-          complete: true,
-        })),
+            ) ?? [];
+          const ss = listed.filter((x) => accepts(x, ns));
+          const branch = {
+            ...loc,
+            conditions: [
+              ...(loc.conditions ?? []),
+              ...((data(s).conditions ?? []) as string[]),
+            ],
+          };
+          const found = conditional(
+            { symbols: ss, complete: true },
+            listed,
+            branch,
+          );
+          return !listed.length || !found.complete
+            ? merge([found, associatedUnknown(rest[0]!, ns)])
+            : found;
+        }),
       );
     }
-    return empty();
+    return rest.length === 1 ? associatedUnknown(rest[0]!, ns) : empty(false);
+  }
+  function present(items: (GraphSymbol | GraphLink)[], loc: Place): boolean {
+    const cs = items.map((s) =>
+      ((data(s).conditions ?? []) as string[]).filter(
+        (c) => !(loc.conditions ?? []).includes(c),
+      ),
+    );
+    return (
+      cs.some((c) => !c.length) ||
+      cs.some(
+        (c) =>
+          c.length === 1 &&
+          !c[0]!.includes("?") &&
+          cs.some(
+            (d) =>
+              d.length === 1 &&
+              (d[0] === `not(${c[0]})` || c[0] === `not(${d[0]})`),
+          ),
+      )
+    );
+  }
+  function conditional(
+    found: Found,
+    items: (GraphSymbol | GraphLink)[],
+    loc: Place,
+  ): Found {
+    return !items.length || present(items, loc)
+      ? found
+      : { ...found, complete: false, reason: "conditional-name-may-be-absent" };
   }
   function inScope(
     name: string,
@@ -369,24 +526,55 @@ export function resolveRust(
     seen: Set<string>,
     allowGlobs: boolean,
     accessFrom?: Place,
+    fallbackOnly = false,
   ): Found | null {
     const headNs: Namespace = rest.length ? "type" : ns;
     const uses = importsByScope.get(`${loc.file}|${local}`);
 
-    const declared = (
-      table.get(key(loc.crate.root, [q, name].filter(Boolean).join("::"))) ?? []
-    ).filter(
-      (s) =>
-        accepts(s, headNs) &&
-        (!accessFrom || visible(str(data(s).visibility), loc, accessFrom)),
-    );
+    const declared = fallbackOnly
+      ? []
+      : (
+          table.get(
+            key(loc.crate.root, [q, name].filter(Boolean).join("::")),
+          ) ?? []
+        ).filter(
+          (s) =>
+            accepts(s, headNs) &&
+            (!accessFrom || visible(str(data(s).visibility), loc, accessFrom)),
+        );
+    const withFallback = (found: Found): Found =>
+      found.complete || found.failedFiles?.length
+        ? found
+        : merge([
+            found,
+            inScope(
+              name,
+              rest,
+              loc,
+              local,
+              q,
+              ns,
+              seen,
+              allowGlobs,
+              accessFrom,
+              true,
+            ) ?? empty(),
+          ]);
     if (declared.length)
-      return merge(
-        declared.map((s) =>
-          children(s, rest, ns, seen, allowGlobs, accessFrom),
+      return withFallback(
+        conditional(
+          merge(
+            declared.map((s) =>
+              children(s, rest, ns, seen, allowGlobs, accessFrom),
+            ),
+          ),
+          declared,
+          loc,
         ),
       );
-    const explicit = (uses?.explicit.get(name) ?? []).filter(
+    const explicit = (
+      fallbackOnly ? [] : (uses?.explicit.get(name) ?? [])
+    ).filter(
       (l) => !accessFrom || visible(str(data(l).visibility), loc, accessFrom),
     );
     const importPath = (l: GraphLink) =>
@@ -398,7 +586,13 @@ export function resolveRust(
         explicit.map((l) =>
           find(
             [importPath(l), ...rest].join("::"),
-            loc,
+            {
+              ...loc,
+              conditions: [
+                ...(loc.conditions ?? []),
+                ...((data(l).conditions ?? []) as string[]),
+              ],
+            },
             str(data(l).scope),
             ns,
             seen,
@@ -407,13 +601,8 @@ export function resolveRust(
         ),
       );
       // A type-only import does not mask a value of the same name.
-      if (explicit.some((l) => data(l).unsafe))
-        return {
-          ...result,
-          complete: false,
-          reason: "syntax-error import structure",
-        };
-      if (result.symbols.length || !result.complete) return result;
+      if (result.symbols.length || !result.complete)
+        return withFallback(conditional(result, explicit, loc));
       // Fall through namespaces only when the import is KNOWN to bind a
       // different namespace. An uncaptured external import could bind this one.
       const all = merge(
@@ -421,11 +610,21 @@ export function resolveRust(
           find(importPath(l), loc, str(data(l).scope), "any", seen, allowGlobs),
         ),
       );
-      if (!all.complete || !all.symbols.length) return empty(false);
+      if (!all.complete || !all.symbols.length)
+        return withFallback({
+          ...empty(false),
+          reason: "namespace-binding-unverified",
+        });
     }
     // Intact local declarations and explicit imports win. A hidden declaration
     // can shadow a glob or an enclosing name, including through a reexport.
-    const lossy = lossyFiles.has(loc.file) && local === loc.local;
+    const scopeFailures =
+      local === loc.local
+        ? (failedByScope.get(`${loc.crate.root}|${q}`) ?? [])
+        : [];
+    const shadowed =
+      scopeFailures.length > 0 ||
+      (ns !== "macro" && opaqueScopes.has(`${loc.crate.root}|${q}`));
     const globs = allowGlobs
       ? (uses?.globs ?? []).filter(
           (l) =>
@@ -433,45 +632,57 @@ export function resolveRust(
         )
       : [];
     if (globs.length) {
-      const result = merge(
+      const suppliers: GraphLink[] = [];
+      let result = merge(
         globs.map((l) => {
           const imported = find(
             l.targetName.replace(/::\*$/, ""),
-            loc,
+            {
+              ...loc,
+              conditions: [
+                ...new Set([
+                  ...(loc.conditions ?? []),
+                  ...((data(l).conditions ?? []) as string[]),
+                ]),
+              ],
+            },
             str(data(l).scope),
             "type",
             seen,
             true,
           );
-          if (!imported.symbols.length) return empty(false);
+          if (!imported.symbols.length)
+            return imported.failedFiles?.length ? imported : empty(false);
           const found = merge(
             imported.symbols.map((s) =>
               children(s, [name, ...rest], ns, seen, true, accessFrom ?? loc),
             ),
           );
+          if (found.symbols.length) suppliers.push(l);
           return {
             ...found,
-            complete: !data(l).unsafe && imported.complete && found.complete,
+            complete: imported.complete && found.complete,
           };
         }),
       );
+      result = conditional(result, suppliers, loc);
       if (result.symbols.length || !result.complete)
-        return lossy
+        return shadowed && !result.failedFiles?.length
           ? {
               ...result,
               complete: false,
-              reason: "declaration-lossy module may shadow glob/enclosing name",
+              reason: scopeFailures.length
+                ? "failed-file-unseen-declarations"
+                : "opaque-item-may-shadow-name",
             }
           : result;
     }
-    return lossy
-      ? {
-          symbols: [],
-          complete: false,
-          reason: "declaration-lossy module may hide a binding",
-        }
+    if (scopeFailures.length) return broken(scopeFailures);
+    return shadowed
+      ? { symbols: [], complete: false, reason: "opaque-item-may-shadow-name" }
       : null;
   }
+
   function find(
     raw: string,
     loc: Place,
@@ -481,6 +692,7 @@ export function resolveRust(
     allowGlobs = true,
     accessFrom?: Place,
   ): Found {
+    if (failedFiles.has(loc.file)) return broken([loc.file]);
     if (ns === "import")
       return merge(
         (["importType", "value", "macro"] as Namespace[]).map((n) =>
@@ -499,6 +711,7 @@ export function resolveRust(
       allowGlobs,
       accessFrom?.crate.root,
       accessFrom?.scope,
+      loc.conditions,
     ]);
     const cached = memo.get(guard);
     if (cached) return cached;
@@ -509,6 +722,9 @@ export function resolveRust(
     const parts = name.replace(/^::/, "").split("::");
     const first = parts.shift()!;
     let result: Found;
+    let fallbackShadow = false;
+    const conditionalTargets: GraphSymbol[] = [];
+    const fallbackReasons: string[] = [];
     if (!absolute && ["crate", "self", "super"].includes(first)) {
       let dest = first === "crate" ? roots.get(loc.crate.root)! : loc;
       if (first === "super") {
@@ -531,7 +747,13 @@ export function resolveRust(
             allowGlobs,
             accessFrom,
           )
-        : { symbols: [dest.symbol], complete: true };
+        : failedFiles.has(dest.file)
+          ? broken([dest.file])
+          : {
+              symbols:
+                dest.symbol && accepts(dest.symbol, ns) ? [dest.symbol] : [],
+              complete: !!dest.symbol,
+            };
     } else {
       let found: Found | null = null;
       if (!absolute) {
@@ -548,6 +770,19 @@ export function resolveRust(
             allowGlobs,
             accessFrom,
           );
+          if (
+            found &&
+            !found.complete &&
+            !found.failedFiles?.length &&
+            local !== loc.local
+          ) {
+            conditionalTargets.push(...found.symbols);
+            fallbackReasons.push(
+              found.reason || "namespace-binding-unverified",
+            );
+            fallbackShadow = true;
+            found = null;
+          }
           if (found || local === loc.local) break;
           if (!local.startsWith(loc.local) || !local) break;
           local = local.includes("::")
@@ -575,16 +810,28 @@ export function resolveRust(
                       seen,
                       allowGlobs,
                     )
-                  : {
-                      symbols: [units.get(c.root)!].filter(Boolean),
-                      complete: true,
-                    },
+                  : failedFiles.has(c.root)
+                    ? broken([c.root])
+                    : {
+                        symbols: [units.get(c.root)!].filter(
+                          (s) => s && accepts(s, ns),
+                        ),
+                        complete: true,
+                      },
               ),
             )
           : empty();
       }
     }
-    result.complete &&= result.symbols.every((s) => !data(s).unsafe);
+    if (fallbackShadow && !result.failedFiles?.length)
+      result = {
+        ...result,
+        symbols: unique([...conditionalTargets, ...result.symbols]),
+        complete: false,
+        reason: [
+          ...new Set([...fallbackReasons, result.reason].filter(Boolean)),
+        ].join("; "),
+      };
     if (result.complete) memo.set(guard, result);
     return result;
   }
@@ -599,78 +846,9 @@ export function resolveRust(
       opaqueStandardRoots.set(loc.crate.root, names);
     }
   }
-  // These standard traits have small, fixed method-name contracts. This is
-  // applicability evidence only: no external declaration or target is invented.
-  const standardTraits = new Map<string, string[]>([
-    ["ops::Drop", ["drop"]],
-    ["default::Default", ["default"]],
-    ["clone::Clone", ["clone", "clone_from"]],
-    ["convert::From", ["from"]],
-    ["convert::TryFrom", ["try_from"]],
-    ["convert::Into", ["into"]],
-    ["convert::TryInto", ["try_into"]],
-    ["iter::FromIterator", ["from_iter"]],
-    ["iter::IntoIterator", ["into_iter"]],
-    ["ops::Add", ["add"]],
-    ["ops::AddAssign", ["add_assign"]],
-    ["fmt::Debug", ["fmt"]],
-    ["fmt::Display", ["fmt"]],
-  ]);
-  const standardPrelude = new Map([
-    ["Drop", "ops::Drop"],
-    ["Default", "default::Default"],
-    ["Clone", "clone::Clone"],
-    ["From", "convert::From"],
-    ["TryFrom", "convert::TryFrom"],
-    ["Into", "convert::Into"],
-    ["TryInto", "convert::TryInto"],
-    ["FromIterator", "iter::FromIterator"],
-    ["IntoIterator", "iter::IntoIterator"],
-  ]);
-  function standardMethods(
-    raw: string,
-    loc: Place,
-    scope: string,
-    allowPrelude: boolean,
-  ): string[] | null {
-    let path = base(raw);
-    for (let depth = 0; depth < 16; depth++) {
-      const absolute = path.startsWith("::");
-      path = path.replace(/^::/, "");
-      if (/^(std|core)::/.test(path)) {
-        const crateName = path.split("::")[0]!;
-        if (
-          loc.crate.deps.has(crateName) ||
-          opaqueStandardRoots.get(loc.crate.root)?.has(crateName)
-        )
-          return null;
-        const shadow =
-          !absolute && find(path.split("::")[0]!, loc, scope, "type");
-        if (shadow && (shadow.symbols.length || !shadow.complete)) return null;
-        return standardTraits.get(path.replace(/^(std|core)::/, "")) ?? null;
-      }
-      const [first, ...rest] = path.split("::");
-      let local = scope,
-        bindings: GraphLink[] = [];
-      while (true) {
-        bindings =
-          importsByScope.get(`${loc.file}|${local}`)?.explicit.get(first!) ??
-          [];
-        if (bindings.length || local === loc.local || !local) break;
-        local = local.includes("::")
-          ? local.slice(0, local.lastIndexOf("::"))
-          : "";
-      }
-      if (bindings.length !== 1)
-        return allowPrelude && !bindings.length && !rest.length
-          ? (standardTraits.get(standardPrelude.get(first!) ?? "") ?? null)
-          : null;
-      path = [bindings[0]!.targetName, ...rest].join("::");
-    }
-    return null;
-  }
   type Method = {
     symbol: GraphSymbol;
+    conditions: string[];
     inherent: boolean;
     implType: string;
     generics: string[];
@@ -684,27 +862,6 @@ export function resolveRust(
     bounded: boolean;
   };
   const methodIndex = new Map<string, Method[]>();
-  type Blankets = {
-    names: Set<string>;
-    associatedNames: Set<string>;
-    opaque: boolean;
-    byType: Map<string, Set<string>>;
-    associatedByType: Map<string, Set<string>>;
-    opaqueTypes: Set<string>;
-    refs: Map<string, Set<string>>;
-    opaqueNormal: Set<string>;
-  };
-  const emptyBlankets = (): Blankets => ({
-    names: new Set(),
-    associatedNames: new Set(),
-    opaque: false,
-    byType: new Map(),
-    associatedByType: new Map(),
-    opaqueTypes: new Set(),
-    refs: new Map(),
-    opaqueNormal: new Set(),
-  });
-  const blanketsByCrate = new Map<string, Blankets>();
   const reachableCache = new Map<string, Set<string>>();
   function reachable(root: string): Set<string> {
     const cached = reachableCache.get(root);
@@ -780,12 +937,12 @@ export function resolveRust(
                 text,
               ))),
       };
-    if (aliases.length !== 1 || !target.complete)
+    if (aliases.length !== 1 || target.symbols.length !== 1 || !target.complete)
       return { text, loc, scope, unknown: true };
     const a = aliases[0]!,
       rhs = str(data(a).aliasType),
       key = a.id;
-    if (!rhs || data(a).unsafe || seen.has(key) || seen.size > 32)
+    if (!rhs || seen.has(key) || seen.size > 32)
       return { text, loc, scope, unknown: true };
     const owners = ownerPlace(a.file, str(data(a).scope));
     if (owners.length !== 1) return { text, loc, scope, unknown: true };
@@ -832,441 +989,265 @@ export function resolveRust(
     );
     return { ...next, unknown: next.unknown || shifted };
   }
-  const stdBlanketNames = new Set([
-    "from",
-    "into",
-    "try_from",
-    "try_into",
-    "borrow",
-    "borrow_mut",
-    "to_owned",
-    "to_string",
-    "type_id",
-    "as_ref",
-    "as_mut",
-    "clone",
-    "clone_from",
-    "into_iter",
-    "default",
+
+  const standardDerives = new Set([
+    "Clone",
+    "Copy",
+    "Debug",
+    "Default",
+    "Eq",
+    "PartialEq",
+    "Ord",
+    "PartialOrd",
+    "Hash",
   ]);
-  const deriveMethods: Record<string, string[]> = {
-    PartialEq: ["eq", "ne"],
-    PartialOrd: ["partial_cmp", "lt", "le", "gt", "ge"],
-    Ord: ["cmp", "max", "min", "clamp"],
-    Hash: ["hash"],
-    Clone: ["clone", "clone_from"],
-    Debug: ["fmt"],
-    Default: ["default"],
-    Eq: [],
-    Copy: [],
-  };
-  const inertAttributes = new Set([
-    "allow",
-    "warn",
-    "deny",
-    "forbid",
-    "expect",
-    "cfg",
-    "cfg_attr",
-    "repr",
-    "doc",
-    "deprecated",
-    "must_use",
-    "non_exhaustive",
-    "inline",
-    "cold",
-    "track_caller",
-    "no_mangle",
-    "export_name",
-    "link_section",
-    "used",
-    "automatically_derived",
-    "test",
-    "ignore",
-    "should_panic",
-    "path",
-    "macro_export",
-    "macro_use",
-    "link",
-    "no_std",
-    "no_implicit_prelude",
-  ]);
-  const attributeUnknown = new Map<string, Set<string>>();
-  const attributeSources = new Map<string, GraphSymbol[]>();
-  for (const t of symbols.filter((s) =>
-    ["struct", "enum", "type"].includes(s.kind),
-  )) {
-    const names = new Set<string>();
-    const inspect = (raw: string): void => {
-      const a = raw.replace(/^#!?\[|\]$/g, "").trim();
-      const head = a.match(/^[\w:]+/)?.[0] ?? "";
-      if (head === "derive") {
-        for (const trait of a
-          .slice(a.indexOf("(") + 1, a.lastIndexOf(")"))
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean)) {
-          const known = deriveMethods[trait];
-          if (known) for (const name of known) names.add(name);
-          else names.add("*");
-        }
-      } else if (head === "cfg_attr") {
-        // Conditional attributes may be enabled; recursively inspect payloads.
-        const contents = a.slice(a.indexOf("(") + 1, a.lastIndexOf(")"));
-        const args = splitArguments("<" + contents + ">");
-        if (!args) names.add("*");
-        else for (const nested of args.slice(1)) inspect(nested);
-      } else if (!inertAttributes.has(head)) names.add("*");
-    };
-    for (const a of (data(t).attributes ?? []) as string[]) inspect(a);
-    attributeUnknown.set(t.id, names);
-    if (names.size) attributeSources.set(t.id, [t]);
+  function importsMacroNames(raw: string): boolean {
+    const a = raw.replace(/^#!?\[|\]$/g, "").trim();
+    const name = a.match(/^[\w:]+/)?.[0] ?? "";
+    if (name === "macro_use") return true;
+    if (name !== "cfg_attr") return false;
+    const ps = splitArguments(
+      "<" + a.slice(a.indexOf("(") + 1, a.lastIndexOf(")")) + ">",
+    );
+    return !ps || ps.slice(1).some(importsMacroNames);
   }
-  // Attribute effects belong to semantic types, including alias synonyms.
-  // An attributed identity/unknown alias may denote any receiver in its crate.
-  const attributedAliasesByCrate = new Map<string, Set<string>>();
-  for (const alias of symbols.filter((s) => s.kind === "type")) {
-    const names = attributeUnknown.get(alias.id);
-    if (!names?.size) continue;
-    if (["tuple_type", "array_type"].includes(str(data(alias).aliasShape)))
-      continue;
-    const scope = str(data(alias).scope),
-      variables = new Set((data(alias).generics ?? []) as string[]);
-    for (const loc of ownerPlace(alias.file, scope)) {
-      const expanded = expandType(
-        str(data(alias).aliasType),
-        loc,
-        scope,
-        new Set(),
-        variables,
-      );
-      if (expanded.externalShape) continue;
-      const nominal = expanded.text.replace(/^&\s*(?:'\w+\s*)?(?:mut\s+)?/, "");
-      const targets = variables.has(base(nominal))
-        ? []
-        : find(nominal, expanded.loc, expanded.scope, "type").symbols.filter(
-            (s) => ["struct", "enum"].includes(s.kind),
-          );
-      for (const target of targets) {
-        const combined = attributeUnknown.get(target.id) ?? new Set<string>();
-        for (const name of names) combined.add(name);
-        attributeUnknown.set(target.id, combined);
-        attributeSources.set(
-          target.id,
-          unique([...(attributeSources.get(target.id) ?? []), alias]),
-        );
-      }
-      if (
-        !targets.length &&
-        !/^(?:[ui](?:8|16|32|64|128|size)|f(?:32|64)|bool|char|str|\(\))$/.test(
-          nominal,
-        )
-      ) {
-        const global =
-          attributedAliasesByCrate.get(loc.crate.root) ?? new Set<string>();
-        for (const name of names) global.add(name);
-        attributedAliasesByCrate.set(loc.crate.root, global);
-      }
-    }
-  }
-  const macroTypesByCrate = new Map<string, Set<string>>();
-  const nominalNames = new Map<string, GraphSymbol[]>();
-  for (const symbol of symbols)
-    if (["struct", "enum", "type"].includes(symbol.kind)) {
-      const list = nominalNames.get(symbol.name) ?? [];
-      list.push(symbol);
-      nominalNames.set(symbol.name, list);
-    }
+  const macroUseCrates = new Set<string>();
   for (const f of ctx.files)
-    for (const token of (data(f.result).opaqueImplTypes ?? []) as {
-      name: string;
-      scope: string;
-      semantic?: boolean;
-      variables?: string;
-    }[])
-      for (const loc of ownerPlace(f.path, token.scope)) {
-        const set = macroTypesByCrate.get(loc.crate.root) ?? new Set<string>();
-        macroTypesByCrate.set(loc.crate.root, set);
-        // Opaque token paths cannot be interpreted as unqualified names. Keep
-        // every reachable same-named nominal, including qualified/shadowed ones.
-        for (const candidate of token.semantic
-          ? []
-          : (nominalNames.get(token.name) ?? []))
-          if (
-            ownerPlace(candidate.file, str(data(candidate).scope)).some((p) =>
-              reachable(loc.crate.root).has(p.crate.root),
-            )
-          )
-            set.add(candidate.id);
-        const variables = new Set(
-          (token.variables ?? "").split(",").filter(Boolean),
-        );
-        const expanded = expandType(
-          token.name,
-          loc,
-          token.scope,
-          new Set(),
-          variables,
-        );
-        const nominal = expanded.text.replace(
-          /^&\s*(?:'\w+\s*)?(?:mut\s+)?/,
-          "",
-        );
-        if (variables.has(base(nominal))) continue;
-        for (const t of find(nominal, expanded.loc, expanded.scope, "type")
-          .symbols)
-          set.add(t.id);
-      }
+    if (
+      ((data(f.result).opaqueAttributes ?? []) as { raw: string }[]).some((e) =>
+        importsMacroNames(e.raw),
+      )
+    )
+      for (const loc of ownerPlace(f.path, ""))
+        macroUseCrates.add(loc.crate.root);
+  function opaqueAttribute(raw: string, loc: Place, scope: string): boolean {
+    const a = raw.replace(/^#!?\[|\]$/g, "").trim(),
+      name = a.match(/^[\w:]+/)?.[0] ?? "";
+    if (name === "cfg_attr") {
+      const ps = splitArguments(
+        "<" + a.slice(a.indexOf("(") + 1, a.lastIndexOf(")")) + ">",
+      );
+      return !ps || ps.slice(1).some((p) => opaqueAttribute(p, loc, scope));
+    }
+    if (name !== "derive") return !inertAttributes.has(name);
+    const names = a
+      .slice(a.indexOf("(") + 1, a.lastIndexOf(")"))
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (
+      macroUseCrates.has(loc.crate.root) ||
+      names.some((n) => !standardDerives.has(n))
+    )
+      return true;
+    let local = scope;
+    while (true) {
+      const uses = importsByScope.get(`${loc.file}|${local}`);
+      if (uses?.globs.length || names.some((n) => uses?.explicit.has(n)))
+        return true;
+      if (local === loc.local || !local) break;
+      local = local.includes("::")
+        ? local.slice(0, local.lastIndexOf("::"))
+        : "";
+    }
+    return false;
+  }
+  for (const f of ctx.files)
+    for (const loc of ownerPlace(f.path, "")) {
+      for (const scope of (data(f.result).opaqueItemScopes ?? []) as string[])
+        opaqueScopes.add(`${loc.crate.root}|${qualified(loc, scope)}`);
+      for (const e of (data(f.result).opaqueAttributes ?? []) as {
+        scope: string;
+        raw: string;
+        module: string;
+      }[])
+        if (opaqueAttribute(e.raw, loc, e.scope)) {
+          const q = qualified(loc, e.scope);
+          opaqueScopes.add(`${loc.crate.root}|${q}`);
+          if (e.module)
+            opaqueScopes.add(
+              `${loc.crate.root}|${[q, e.module].filter(Boolean).join("::")}`,
+            );
+        }
+    }
+  const manifestPaths = new Set(ctx.contextFiles.map((c) => c.path));
+  const projectEdgesKnown = packages.every((c) =>
+    [...c.deps.values()].every((m) => !!m && packagesByManifest.has(m)),
+  );
+  const dependencyGraphKnown =
+    projectEdgesKnown &&
+    ctx.contextFiles.every(
+      (c) =>
+        c.status === "clean" &&
+        !/\[patch|\[replace|workspace\s*=\s*true|\.workspace\s*=/.test(
+          c.text,
+        ) &&
+        [...c.text.matchAll(/\bpath\s*=\s*["']([^"']+)["']/g)].every(
+          (m) =>
+            m[1]!.endsWith(".rs") ||
+            manifestPaths.has(p.join(p.dirname(c.path), m[1]!, "Cargo.toml")),
+        ),
+    );
+  const failureCache = new Map<string, string[]>();
+  function relevantFailures(root: string): string[] {
+    const key = dependencyGraphKnown ? root : "*";
+    let fs = failureCache.get(key);
+    if (!fs) {
+      fs = [
+        ...new Set(
+          dependencyGraphKnown
+            ? [...reachable(root)].flatMap((r) => failedByCrate.get(r) ?? [])
+            : [...failedFiles],
+        ),
+      ].sort();
+      failureCache.set(key, fs);
+    }
+    return fs;
+  }
   const scopedMembers = (s: GraphSymbol) => membersByOwner.get(s.id) ?? [];
-  const shapeTargets = new Map<string, GraphSymbol[]>();
-  for (const impl of symbols.filter((s) => s.kind === "impl")) {
-    const implType = str(data(impl).implType);
-    const generics = (data(impl).generics ?? []) as string[];
+  const unknownImpls = new Map<string, GraphSymbol[]>(),
+    unknownInherent = new Set<string>();
+  const allMembers = new Map<string, GraphSymbol[]>();
+  const defaultMembers = new Map<string, GraphSymbol[]>();
+  const unknownTraitRoots = new Set<string>();
+  for (const owner of symbols.filter((s) => ["impl", "trait"].includes(s.kind)))
+    for (const m of scopedMembers(owner)) {
+      if (owner.kind === "trait" && !data(m).defaultBody) continue;
+      if (owner.kind === "trait")
+        defaultMembers.set(
+          m.name,
+          unique([...(defaultMembers.get(m.name) ?? []), m]),
+        );
+      allMembers.set(m.name, unique([...(allMembers.get(m.name) ?? []), m]));
+    }
+  function would(
+    root: string,
+    name: string,
+    instance = false,
+    defaultsOnly = false,
+  ): GraphSymbol[] {
+    // Unverified means name-based project hints, not a simulated dispatch set.
+    // Include all valid bodies: autoderef and unknown impl ownership cannot
+    // justify dropping a would-be project target.
+    return (
+      (defaultsOnly ? defaultMembers : allMembers).get(name) ?? []
+    ).filter((m) => !instance || data(m).receiverKind !== "none");
+  }
+
+  function unknownTraits(root: string): boolean {
+    return (
+      unknownTraitRoots.has("*") ||
+      (!dependencyGraphKnown && unknownTraitRoots.size > 0) ||
+      [...reachable(root)].some((r) => unknownTraitRoots.has(r))
+    );
+  }
+  function retainUnknown(
+    root: string,
+    ms: GraphSymbol[],
+    inherent: boolean,
+  ): void {
+    unknownImpls.set(root, unique([...(unknownImpls.get(root) ?? []), ...ms]));
+    if (inherent) for (const m of ms) unknownInherent.add(m.id);
+  }
+  for (const impl of symbols.filter((s) => s.kind === "impl"))
+    if (!ownerPlace(impl.file, str(data(impl).scope)).length) {
+      retainUnknown("*", scopedMembers(impl), !data(impl).trait);
+      if (data(impl).trait) unknownTraitRoots.add("*");
+    }
+  for (const impl of symbols.filter((s) => s.kind === "impl"))
     for (const loc of ownerPlace(impl.file, str(data(impl).scope))) {
-      const blankets = blanketsByCrate.get(loc.crate.root) ?? emptyBlankets();
-      blanketsByCrate.set(loc.crate.root, blankets);
+      const implType = str(data(impl).implType),
+        generics = (data(impl).generics ?? []) as string[];
       const trait = data(impl).trait
         ? find(str(data(impl).trait), loc, str(data(impl).scope), "type")
-        : empty();
-      const traitMethods = trait.symbols
-        .filter((t) => t.kind === "trait")
-        .flatMap(scopedMembers);
-      const standard =
-        data(impl).trait && !trait.symbols.length
-          ? standardMethods(
-              str(data(impl).trait),
-              loc,
-              str(data(impl).scope),
-              trait.complete,
-            )
-          : null;
-      const suppliedNames = new Set([
-        ...[...scopedMembers(impl), ...traitMethods].map((m) => m.name),
-        ...(standard ?? []),
-      ]);
-      const instanceNames = new Set([
-        ...[...scopedMembers(impl), ...traitMethods]
-          .filter((m) => data(m).receiver === true)
-          .map((m) => m.name),
-        ...(standard ?? []).filter(
-          (name) =>
-            !["default", "from", "try_from", "from_iter"].includes(name),
-        ),
-      ]);
-      const unknownTrait =
-        !!data(impl).trait &&
-        !standard &&
-        (!trait.complete || !trait.symbols.length);
-      const expanded = expandType(
+        : { symbols: [], complete: true };
+      if (data(impl).trait && (!trait.complete || !trait.symbols.length))
+        unknownTraitRoots.add(loc.crate.root);
+      const overrides = scopedMembers(impl),
+        defaults = trait.symbols
+          .filter((t) => t.kind === "trait")
+          .flatMap(scopedMembers)
+          .filter(
+            (m) =>
+              data(m).defaultBody &&
+              !overrides.some(
+                (o) =>
+                  o.name === m.name &&
+                  !((data(o).conditions ?? []) as string[]).length,
+              ),
+          );
+      const methods = unique([...overrides, ...defaults]);
+      const ex = expandType(
         implType,
         loc,
         str(data(impl).scope),
         new Set(),
         new Set(generics),
       );
-      const expandedImplType = expanded.text;
-      if (data(impl).unsafe) {
-        blankets.opaque = true;
-        continue;
-      }
-      if (expanded.externalShape) {
-        const overrides = scopedMembers(impl);
-        for (const method of [
-          ...overrides,
-          ...traitMethods.filter(
-            (m) =>
-              data(m).defaultBody && !overrides.some((o) => o.name === m.name),
-          ),
-        ]) {
-          const key = `${loc.crate.root}|${expanded.externalShape}|${method.name}`;
-          const list = shapeTargets.get(key) ?? [];
-          list.push(method);
-          shapeTargets.set(key, list);
-        }
-        continue;
-      }
-      if (data(impl).unsafe || expanded.unknown) {
-        for (const name of instanceNames) blankets.names.add(name);
-        for (const name of suppliedNames) blankets.associatedNames.add(name);
-        if (data(impl).trait && unknownTrait) blankets.opaque = true;
-        if (data(impl).unsafe) blankets.opaque = true;
-        continue;
-      }
-      const blanket =
-        !!data(impl).trait &&
-        generics
-          .filter((g) => !g.startsWith("'"))
-          .some((g) => identifiers(expandedImplType).includes(g));
-      if (blanket) {
-        const nominal = expandedImplType.replace(
-          /^&(?:'\w+\s+)?(?:mut\s+)?/,
-          "",
-        );
-        if (generics.includes(base(nominal))) {
-          for (const name of instanceNames) blankets.names.add(name);
-          for (const name of suppliedNames) blankets.associatedNames.add(name);
-          blankets.opaque ||= unknownTrait;
-        } else {
-          // A nominal wrapper cannot be selected for an unrelated explicit
-          // receiver type. Its generic arguments/bounds remain unsolved.
-          const nominalTargets = find(
-            nominal,
-            expanded.loc,
-            expanded.scope,
-            "type",
-          );
-          if (!nominalTargets.complete || !nominalTargets.symbols.length) {
-            for (const name of instanceNames) blankets.names.add(name);
-            for (const name of suppliedNames)
-              blankets.associatedNames.add(name);
-            blankets.opaque ||= unknownTrait;
-          }
-          for (const t of nominalTargets.symbols) {
-            const names = blankets.byType.get(t.id) ?? new Set<string>();
-            for (const name of instanceNames) names.add(name);
-            blankets.byType.set(t.id, names);
-            const associated =
-              blankets.associatedByType.get(t.id) ?? new Set<string>();
-            for (const name of suppliedNames) associated.add(name);
-            blankets.associatedByType.set(t.id, associated);
-            if (unknownTrait) blankets.opaqueTypes.add(t.id);
-          }
-        }
-        continue;
-      }
-      if (/^&/.test(expandedImplType.trim())) {
-        const nominal = expandedImplType.replace(
-          /^&(?:'\w+\s+)?(?:mut\s+)?/,
-          "",
-        );
-        for (const t of find(nominal, loc, str(data(impl).scope), "type")
-          .symbols) {
-          const names = blankets.refs.get(t.id) ?? new Set<string>();
-          for (const name of instanceNames) names.add(name);
-          if (unknownTrait) names.add("*");
-          blankets.refs.set(t.id, names);
-        }
-        continue;
-      }
-      const targets = find(
-        expandedImplType,
-        expanded.loc,
-        expanded.scope,
-        "type",
-      );
-      if (standard)
-        for (const target of targets.symbols) {
-          const names = blankets.byType.get(target.id) ?? new Set<string>();
-          for (const name of instanceNames) names.add(name);
-          blankets.byType.set(target.id, names);
-          // Clone::clone_from has an external default body; retain that unknown
-          // alternative for qualified calls too. Other catalogued methods are
-          // required overrides and are captured in the impl itself.
-          if (standard.includes("clone_from")) {
-            const associated =
-              blankets.associatedByType.get(target.id) ?? new Set<string>();
-            associated.add("clone_from");
-            blankets.associatedByType.set(target.id, associated);
-          }
-        }
-      const overrides = scopedMembers(impl);
-      let methods = overrides;
-      if (data(impl).trait) {
-        const traits = find(
-          str(data(impl).trait),
-          loc,
-          str(data(impl).scope),
-          "type",
-        );
-        if (!standard && (!traits.complete || !traits.symbols.length))
-          for (const t of targets.symbols) blankets.opaqueNormal.add(t.id);
-        methods = [
-          ...overrides,
-          ...traits.symbols
-            .filter((t) => t.kind === "trait")
-            .flatMap((t) =>
-              scopedMembers(t).filter(
-                (m) =>
-                  data(m).defaultBody &&
-                  !overrides.some((o) => o.name === m.name),
-              ),
-            ),
-        ];
-      }
-      for (const target of targets.symbols.filter((s) =>
-        ["struct", "enum", "type"].includes(s.kind),
+      const targetName = ex.text.replace(/^&\s*(?:'\w+\s*)?(?:mut\s+)?/, "");
+      const targets = find(targetName, ex.loc, ex.scope, "type");
+      const uncertain =
+        ex.unknown ||
+        !targets.complete ||
+        !targets.symbols.length ||
+        (!!data(impl).trait && (!trait.complete || !trait.symbols.length));
+      if (uncertain || ex.externalShape)
+        retainUnknown(loc.crate.root, methods, !data(impl).trait);
+      for (const t of targets.symbols.filter((t) =>
+        ["struct", "enum", "type"].includes(t.kind),
       ))
         for (const m of methods) {
-          const k = `${target.id}|${m.name}`;
+          const k = `${t.id}|${m.name}`;
           const list = methodIndex.get(k) ?? [];
+          const ps = generics.filter((g) => !g.startsWith("'")),
+            raw = withoutLifetimes(ex.text),
+            args = raw.includes("<")
+              ? splitArguments(raw.slice(raw.indexOf("<")))
+              : null;
+          const conditions = [
+            ...new Set([
+              ...(loc.conditions ?? []),
+              ...((data(impl).conditions ?? []) as string[]),
+              ...((data(m).conditions ?? []) as string[]),
+            ]),
+          ];
           list.push({
             symbol: m,
+            conditions,
             inherent: !data(impl).trait,
-            implType: expandedImplType,
+            implType: ex.text,
             generics,
-            uncertain:
-              !targets.complete || !!data(impl).unsafe || !!data(m).unsafe,
+            uncertain: uncertain || !!loc.uncertain,
             universal:
-              data(impl).universal === true &&
-              (() => {
-                const type = withoutLifetimes(expandedImplType),
-                  ps = generics.filter((g) => !g.startsWith("'"));
-                const args = type.includes("<")
-                  ? splitArguments(type.slice(type.indexOf("<")))
-                  : null;
-                return (
-                  !!args &&
-                  args.length === ps.length &&
-                  new Set(args.map(compact)).size === ps.length &&
-                  args.every((a, i) => compact(a) === ps[i])
-                );
-              })(),
+              !!args &&
+              args.length === ps.length &&
+              new Set(args.map(compact)).size === ps.length &&
+              args.every((a, i) => compact(a) === ps[i]),
             bounded: data(impl).bounded === true,
             implKey: `${impl.file}|${impl.key}`,
             ownerRoot: loc.crate.root,
-            argumentPlace: expanded.loc,
-            argumentScope: expanded.scope,
+            argumentPlace: ex.loc,
+            argumentScope: ex.scope,
             argumentSyntax:
-              expandedImplType === implType
-                ? str(data(impl).argumentSyntax)
-                : "",
+              ex.text === implType ? str(data(impl).argumentSyntax) : "",
           });
           methodIndex.set(k, list);
         }
     }
-  }
-  const activeBlankets = new Map<string, Blankets>();
-  function visibleBlankets(root: string): Blankets {
-    const cached = activeBlankets.get(root);
-    if (cached) return cached;
-    const result = emptyBlankets();
-    for (const owner of reachable(root)) {
-      const source = blanketsByCrate.get(owner);
-      if (!source) continue;
-      result.opaque ||= source.opaque;
-      for (const name of source.names) result.names.add(name);
-      for (const name of source.associatedNames)
-        result.associatedNames.add(name);
-      for (const [id, names] of source.associatedByType) {
-        const combined = result.associatedByType.get(id) ?? new Set<string>();
-        for (const name of names) combined.add(name);
-        result.associatedByType.set(id, combined);
-      }
-      for (const id of source.opaqueTypes) result.opaqueTypes.add(id);
-      for (const id of source.opaqueNormal) result.opaqueNormal.add(id);
-      for (const [id, names] of source.refs) {
-        const combined = result.refs.get(id) ?? new Set<string>();
-        for (const name of names) combined.add(name);
-        result.refs.set(id, combined);
-      }
-      for (const [id, names] of source.byType) {
-        const combined = result.byType.get(id) ?? new Set<string>();
-        for (const name of names) combined.add(name);
-        result.byType.set(id, combined);
-      }
+  const unknownCache = new Map<string, Map<string, GraphSymbol[]>>();
+  function unknownMethods(root: string, name: string): GraphSymbol[] {
+    const key = dependencyGraphKnown ? root : "*";
+    let index = unknownCache.get(key);
+    if (!index) {
+      index = new Map();
+      for (const r of dependencyGraphKnown
+        ? new Set(["*", ...reachable(root)])
+        : unknownImpls.keys())
+        for (const m of unknownImpls.get(r) ?? [])
+          index.set(m.name, unique([...(index.get(m.name) ?? []), m]));
+      unknownCache.set(key, index);
     }
-    activeBlankets.set(root, result);
-    return result;
+    return index.get(name) ?? [];
   }
   type ArgumentKey = { key: string; alias: boolean };
   function standardArgumentKey(
@@ -1502,81 +1483,89 @@ export function resolveRust(
     receiverSyntax = "",
   ): Found {
     name = compact(name);
-
-    const expansion = expandType(
+    if (instance && !typeName.trim())
+      return {
+        symbols: would(loc.crate.root, name, true),
+        complete: false,
+        reason:
+          "receiver-type-unverified" +
+          (relevantFailures(loc.crate.root).length
+            ? "; failed-file-unseen-declarations"
+            : ""),
+      };
+    const ex = expandType(
       typeName,
       loc,
       scope,
       new Set(),
       new Set(callerGenerics.split(",")),
     );
-    if (expansion.externalShape)
+    let type = find(ex.text, ex.loc, ex.scope, "type");
+    if (/^&/.test(ex.text)) {
+      borrow = /^&\s*(?:'\w+\s*)?mut\b/.test(ex.text) ? "mutable" : "shared";
+      typeName = ex.text.replace(/^&\s*(?:'\w+\s*)?(?:mut\s+)?/, "");
+      type = find(typeName, ex.loc, ex.scope, "type");
+    } else typeName = ex.text;
+    if (
+      type.complete &&
+      type.symbols.length &&
+      type.symbols.every((t) => t.kind === "module")
+    )
+      return empty();
+    const failures = relevantFailures(loc.crate.root);
+    const note = (reason: string) =>
+      reason + (failures.length ? "; failed-file-unseen-declarations" : "");
+    if (type.failedFiles?.length)
+      return instance
+        ? {
+            symbols: would(loc.crate.root, name, instance),
+            complete: false,
+            reason: note("receiver-type-unverified"),
+          }
+        : type;
+    if (
+      ex.externalShape ||
+      ex.unknown ||
+      !type.complete ||
+      !type.symbols.length ||
+      type.symbols.some((t) => t.kind === "trait" || t.kind === "type")
+    )
       return {
-        symbols: unique(
-          [...reachable(loc.crate.root)]
-            .flatMap(
-              (root) =>
-                shapeTargets.get(
-                  `${root}|${expansion.externalShape}|${name}`,
-                ) ?? [],
-            )
-            .filter((s) => !instance || data(s).receiver === true),
-        ),
+        symbols: would(loc.crate.root, name, instance),
         complete: false,
-        reason:
-          "external Box/tuple/array receiver dispatch is not proven; captured project impls retained",
+        reason: note("receiver-type-unverified"),
       };
-    const foundType = find(
-      expansion.text,
-      expansion.loc,
-      expansion.scope,
-      "type",
-    );
-    const type: Found = { ...foundType, symbols: [...foundType.symbols] };
-    type.complete &&= !expansion.unknown;
-    typeName = expansion.text;
-    if (/^&/.test(typeName)) {
-      borrow = /^&\s*(?:'\w+\s*)?mut\b/.test(typeName) ? "mutable" : "shared";
-      typeName = typeName.replace(/^&\s*(?:'\w+\s*)?(?:mut\s+)?/, "");
-      type.symbols = find(
-        typeName,
-        expansion.loc,
-        expansion.scope,
-        "type",
-      ).symbols;
-    }
-    const blankets = visibleBlankets(loc.crate.root);
-    if (instance && type.symbols.some((t) => t.kind === "type"))
-      return empty(false);
-    const ambiguousTypeView = type.symbols.some(
-      (t) =>
-        ownerPlace(t.file, str(data(t).scope)).filter((p) =>
-          reachable(loc.crate.root).has(p.crate.root),
-        ).length > 1,
-    );
-    const applicable = (m: Method) =>
-      m.implKey === sameImpl ||
-      (m.universal && !m.bounded) ||
-      (m.universal && !instance && !withoutLifetimes(typeName).includes("<"))
-        ? "yes"
-        : compatibility(
-            typeName,
-            m.implType,
-            m.generics,
-            loc,
-            scope,
-            m.argumentPlace,
-            m.argumentScope,
-            callerGenerics,
-            receiverSyntax,
-            m.argumentSyntax,
-          );
+    const applicable = (m: Method): "yes" | "no" | "unknown" =>
+      data(m.symbol).methodBounded
+        ? "unknown"
+        : m.implKey === sameImpl ||
+            (m.universal && !m.bounded) ||
+            (m.universal &&
+              !instance &&
+              !withoutLifetimes(typeName).includes("<"))
+          ? "yes"
+          : m.bounded
+            ? "unknown"
+            : compatibility(
+                typeName,
+                m.implType,
+                m.generics,
+                loc,
+                scope,
+                m.argumentPlace,
+                m.argumentScope,
+                callerGenerics,
+                receiverSyntax,
+                m.argumentSyntax,
+              );
     const matches = type.symbols
       .flatMap((t) => methodIndex.get(`${t.id}|${name}`) ?? [])
       .filter((m) => {
-        if (!reachable(loc.crate.root).has(m.ownerRoot)) return false;
-        // Recovered headers cannot prove arity, receiver form or applicability.
-        if (data(m.symbol).unsafe) return true;
+        if (
+          !reachable(loc.crate.root).has(m.ownerRoot) ||
+          applicable(m) === "no"
+        )
+          return false;
         if (
           typeof data(m.symbol).arity === "number" &&
           (Number(data(m.symbol).arity) <
@@ -1585,7 +1574,6 @@ export function resolveRust(
               argumentCount + (instance ? 1 : 0))
         )
           return false;
-        if (applicable(m) === "no") return false;
         if (!instance) return true;
         const receiver = compact(str(data(m.symbol).receiverKind));
         if (!receiver || receiver === "none") return false;
@@ -1595,157 +1583,113 @@ export function resolveRust(
           (borrow === "shared" || (borrow === "owned" && !mutable))
         )
           return false;
-        if (!receiver.includes("&") && borrow !== "owned") return false;
-        return true;
+        return receiver.includes("&") || borrow === "owned";
       });
-
-    const unknown = (reason: string): Found => ({
-      symbols: unique(matches.map((m) => m.symbol)),
+    const unknown = unknownMethods(loc.crate.root, name).filter(
+        (m) => !instance || data(m).receiverKind !== "none",
+      ),
+      targets = unique([...matches.map((m) => m.symbol), ...unknown]);
+    const unverified = (reason: string): Found => ({
+      symbols: instance
+        ? unique([...targets, ...would(loc.crate.root, name, true)]).filter(
+            (m) => data(m).receiverKind !== "none",
+          )
+        : unique([
+            ...targets,
+            ...(unknownTraits(loc.crate.root) || failures.length
+              ? would(loc.crate.root, name, false, true)
+              : []),
+          ]),
       complete: false,
-      reason,
+      reason: note(reason),
     });
-    if (
-      (instance && !["owned", "shared", "mutable"].includes(borrow)) ||
-      (ambiguousTypeView && !matches.some((m) => m.implKey === sameImpl))
-    )
-      return unknown("custom receiver adjustment or ambiguous module view");
     const inherent = matches.filter((m) => m.inherent);
     const proven = inherent.filter(
-      (m) =>
-        !m.uncertain &&
-        applicable(m) === "yes" &&
-        (!instance || str(data(m.symbol).receiverKind) !== "unknown"),
+      (m) => !m.uncertain && applicable(m) === "yes",
     );
-    const form = (m: Method): string => {
-      const text = compact(
+    const form = (m: Method) => {
+      const s = compact(
         str(data(m.symbol).receiverKind).replace(/'\w+\s*/g, ""),
       );
-      return text.startsWith("&mut")
+      return s.startsWith("&mut")
         ? "mutable"
-        : text.startsWith("&")
+        : s.startsWith("&")
           ? "shared"
-          : ["self", "mutself"].includes(text)
+          : ["self", "mutself"].includes(s)
             ? "owned"
             : "unknown";
     };
-    // The first receiver probe is its actual type: T, &T or &mut T.
-    // An intact inherent member at that step wins before ALL unseen traits.
+    const unknownInherentExists = unknown.some((m) =>
+      unknownInherent.has(m.id),
+    );
+    const conditions = (m: Method) => m.conditions;
     const firstStep =
       instance &&
       ["owned", "shared", "mutable"].includes(borrow) &&
+      proven.length === inherent.length &&
       proven.length > 0 &&
-      proven.every((m) => form(m) === borrow);
-    // Omitted arguments select an inherent family before inference. Explicit
-    // instantiations must establish applicability: a specialised or bounded
-    // impl can be unavailable while a trait member is callable instead.
+      type.symbols.every(
+        (t) =>
+          ownerPlace(t.file, str(data(t).scope)).length === 1 ||
+          proven.every(
+            (m) => m.implKey === sameImpl || m.symbol.file === t.file,
+          ),
+      ) &&
+      type.symbols.every((t) =>
+        (methodIndex.get(`${t.id}|${name}`) ?? []).some((m) =>
+          proven.includes(m),
+        ),
+      ) &&
+      !unknownInherentExists &&
+      proven.every((m) => form(m) === borrow && !conditions(m).length);
+    if (instance) {
+      if (firstStep && unique(proven.map((m) => m.symbol)).length === 1)
+        return { symbols: unique(proven.map((m) => m.symbol)), complete: true };
+      if (borrow === "unknown" || inherent.some((m) => form(m) === "unknown"))
+        return unverified("receiver-type-unverified");
+      return unverified(
+        inherent.length
+          ? proven.length !== inherent.length ||
+            unknownInherentExists ||
+            inherent.some((m) => conditions(m).length || form(m) === borrow)
+            ? "inherent-applicability-unverified"
+            : "later-probe-step"
+          : matches.length
+            ? "trait-dispatch"
+            : "receiver-type-unverified",
+      );
+    }
+    const covered =
+      inherent.some((m) => !conditions(m).length) ||
+      inherent.some(
+        (m) =>
+          conditions(m).length === 1 &&
+          !conditions(m)[0]!.includes("?") &&
+          inherent.some(
+            (n) =>
+              conditions(n).length === 1 &&
+              (conditions(n)[0] === `not(${conditions(m)[0]})` ||
+                conditions(m)[0] === `not(${conditions(n)[0]})`),
+          ),
+      );
     const pathInherent =
-      !instance &&
       inherent.length > 0 &&
+      type.symbols.every((t) =>
+        (methodIndex.get(`${t.id}|${name}`) ?? []).some((m) =>
+          inherent.includes(m),
+        ),
+      ) &&
+      covered &&
+      !unknownInherentExists &&
       inherent.every((m) => !m.uncertain) &&
       ((inherent.length === 1 && !withoutLifetimes(typeName).includes("<")) ||
         inherent.every((m) => applicable(m) === "yes"));
-    if (type.complete && (firstStep || pathInherent))
-      return {
-        symbols: unique((firstStep ? proven : inherent).map((m) => m.symbol)),
-        complete: true,
-      };
-    // ONE completeness rule for dot dispatch. Each source can hide an earlier
-    // trait probe; none may bypass first-step inherent precedence above.
-    const reasons: string[] = [];
-    if (stdBlanketNames.has(name))
-      reasons.push("uncaptured std/core blanket alternative: " + name);
-    const blanketNames = instance ? blankets.names : blankets.associatedNames;
-    if (
-      blankets.opaque ||
-      blanketNames.has(name) ||
-      type.symbols.some(
-        (t) =>
-          blankets.opaqueTypes.has(t.id) ||
-          (instance
-            ? blankets.byType.get(t.id)?.has(name) ||
-              blankets.refs.get(t.id)?.has(name) ||
-              blankets.refs.get(t.id)?.has("*")
-            : blankets.associatedByType.get(t.id)?.has(name)),
-      )
-    )
-      reasons.push(
-        "project blanket/reference impl applicability or defaults unknown",
-      );
-    if (
-      type.symbols.some((t) =>
-        [...reachable(loc.crate.root)].some((root) =>
-          macroTypesByCrate.get(root)?.has(t.id),
-        ),
-      )
-    )
-      reasons.push("opaque item macro may implement the receiver type");
-    if (
-      [...reachable(loc.crate.root)].some(
-        (root) =>
-          attributedAliasesByCrate.get(root)?.has("*") ||
-          attributedAliasesByCrate.get(root)?.has(name),
-      )
-    )
-      reasons.push(
-        "opaque attributed alias may supply an impl; expansion not restricted to a captured nominal",
-      );
-    const attributed = type.symbols.filter(
-      (t) =>
-        attributeUnknown.get(t.id)?.has("*") ||
-        attributeUnknown.get(t.id)?.has(name),
+    if (pathInherent)
+      return { symbols: unique(inherent.map((m) => m.symbol)), complete: true };
+    if (!targets.length && failures.length) return broken(failures);
+    return unverified(
+      inherent.length ? "inherent-applicability-unverified" : "trait-dispatch",
     );
-    if (attributed.length)
-      reasons.push(
-        "derive/attribute may supply earlier method: " +
-          name +
-          " on " +
-          unique(attributed.flatMap((t) => attributeSources.get(t.id) ?? [t]))
-            .map((t) => `${t.file}::${t.identity}`)
-            .join(", "),
-      );
-    if (
-      lossyCrates.has(loc.crate.root) ||
-      type.symbols.some((t) =>
-        ownerPlace(t.file, str(data(t).scope)).some((p) =>
-          lossyCrates.has(p.crate.root),
-        ),
-      )
-    )
-      reasons.push("declaration-lossy crate may hide impls");
-    if (type.symbols.some((t) => blankets.opaqueNormal.has(t.id)))
-      reasons.push("uncaptured trait defaults or trait-in-scope selection");
-    if (reasons.length) return unknown(reasons.join("; "));
-    const dominates =
-      proven.length > 0 &&
-      (!instance ||
-        matches
-          .filter((m) => !m.inherent)
-          .every((t) => proven.every((i) => form(t) === form(i))));
-    const selected = dominates ? inherent : matches;
-    const complete =
-      type.complete &&
-      (!instance || !matches.some((m) => form(m) === "unknown"));
-    const ss = unique(selected.map((m) => m.symbol));
-    // One trait implementation or a generic substitution never implies dispatch.
-    if (
-      ss.length === 1 &&
-      (!dominates ||
-        selected.some((m) => m.uncertain || applicable(m) !== "yes"))
-    )
-      return {
-        symbols: ss,
-        complete: false,
-        reason: "trait-only dispatch or generic substitution/bounds not proven",
-      };
-    return {
-      symbols: ss,
-      reason: expansion.unknown
-        ? "alias expansion unknown"
-        : "generic substitution or impl bounds not proven",
-      complete:
-        complete &&
-        !selected.some((m) => m.uncertain || applicable(m) !== "yes"),
-    };
   }
   const resolutions: LinkResolution[] = [];
   for (const l of ctx.links) {
@@ -1760,9 +1704,20 @@ export function resolveRust(
       const s = byLocalKey.get(`${l.file}|${str(d.key)}`);
       found = {
         symbols: s ? (moduleTargets.get(s.id) ?? []) : [],
-        complete: true,
+        complete: !s || !moduleIncomplete.has(s.id),
+        ...(s &&
+        (modulePlaces.get(s.id) ?? []).some((p) => failedFiles.has(p.file))
+          ? {
+              failedFiles: (modulePlaces.get(s.id) ?? [])
+                .filter((p) => failedFiles.has(p.file))
+                .map((p) => p.file),
+            }
+          : {}),
       };
-    } else if (!d.blocked && !(l.kind === "imports" && d.glob)) {
+    } else if (
+      (!d.blocked || !!d.method) &&
+      !(l.kind === "imports" && d.glob)
+    ) {
       found = merge(
         ownerPlace(l.file, str(d.scope)).map((loc) => {
           let name = compact(l.targetName);
@@ -1793,13 +1748,18 @@ export function resolveRust(
               ? "macro"
               : l.kind === "patterns"
                 ? "pattern"
-                : ["types", "implements"].includes(l.kind)
-                  ? "type"
-                  : "import";
+                : l.kind === "types" && d.structLiteral
+                  ? "importType"
+                  : ["types", "implements"].includes(l.kind)
+                    ? "type"
+                    : "import";
           let result = find(name, loc, scope, ns);
           if (
             l.kind === "calls" &&
-            !result.symbols.length &&
+            !result.symbols.some((s) =>
+              ["function", "method", "struct", "variant"].includes(s.kind),
+            ) &&
+            !result.failedFiles?.length &&
             name.includes("::")
           ) {
             const pathSyntax = selfPath
@@ -1846,9 +1806,9 @@ export function resolveRust(
             str(d.scope) === str(data(s).scope) ||
             str(d.scope).startsWith(str(data(s).scope) + "::")),
       );
-    if (found.symbols.some((s) => data(s).unsafe)) {
-      found.complete = false;
-      found.reason = "syntax-error declaration or recovered region";
+    if (found.failedFiles?.length) {
+      uncertain?.(l, [], "invalid-code", found.failedFiles);
+      continue;
     }
     if (!found.complete) {
       uncertain?.(
@@ -1867,6 +1827,10 @@ export function resolveRust(
         targets,
         "Simultaneous namespace bindings cannot be represented as one-of",
       );
+      continue;
+    }
+    if (d.method && targets.length > 1) {
+      uncertain?.(l, targets, "receiver-type-unverified");
       continue;
     }
     if (targets.length > 1)

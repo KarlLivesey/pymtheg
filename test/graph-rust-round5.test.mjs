@@ -8,7 +8,7 @@ const rust = (
 ).default;
 async function graph(
   sources,
-  manifests = { "Cargo.toml": '[package]\nname="app"\n' },
+  manifests = { "Cargo.toml": '[package]\nname="app"\nedition="2024"\n' },
 ) {
   const files = [];
   for (const [path, text] of Object.entries(sources)) {
@@ -72,8 +72,23 @@ async function graph(
   function unknown(name, kind = "calls") {
     for (const t of targets(name, kind)) assert.equal(t.length, 0, name);
   }
+  function would(name, kind = "calls") {
+    return links
+      .filter((l) => l.targetName === name && l.kind === kind)
+      .map((l) => (l.data?.targets ?? []).map((id) => byId.get(id)));
+  }
+  function unverified(name, identity, kind = "calls") {
+    unknown(name, kind);
+    for (const ts of would(name, kind))
+      assert.ok(
+        ts.some((s) => s.identity === identity),
+        `${name} retains ${identity}`,
+      );
+  }
   return {
     targets,
+    would,
+    unverified,
     one,
     unknown,
     files,
@@ -107,13 +122,13 @@ fn r(mut a:A,h:&mut std::collections::hash_map::DefaultHasher,formatter:&mut std
       ),
     );
     g.unknown(`a.${name}`);
-    g.one("a.safe", "impl A::safe");
+    g.unverified("a.safe", "impl A::safe");
     const isolated = await graph(
       lib(
         `#[derive(${derive})]struct A;impl A{fn safe(&self){}}fn r(a:A){a.safe();}`,
       ),
     );
-    isolated.one("a.safe", "impl A::safe");
+    isolated.unverified("a.safe", "impl A::safe");
   }
   const g = await graph(
     lib(
@@ -140,7 +155,7 @@ fn r(mut a:A,h:&mut std::collections::hash_map::DefaultHasher,formatter:&mut std
     const g = await graph(
       lib(`${attr}struct A;impl A{fn f(&self){}}fn r(a:A){a.f();}`),
     );
-    g.one("a.f", "impl A::f");
+    g.unverified("a.f", "impl A::f");
   }
 });
 test("round 5 A: first probe inherent beats ALL unseen alternatives", async () => {
@@ -185,55 +200,10 @@ test("round 5 A: path lookup to one inherent member needs no generic substitutio
   );
   g.one("A::new", "impl<X,Y> A<X,Y>::new");
 });
-test("round 5 B: wholly lost declarations make crate dispatch and glob lookup unknown", async () => {
-  for (const broken of [
-    "impl crate::Tr for Q<",
-    "impl crate::Tr",
-    "impl crate::Q { pub fn f(",
-    "impl crate::T2 for Q { impl crate::Tr for Q {}",
-  ]) {
-    const g = await graph({
-      "src/lib.rs": `mod d;pub trait Tr{fn f(&self){}}pub trait T2{fn f(&self){}}fn r(mut q:d::Q){q.f();}`,
-      "src/d.rs": `pub struct Q;impl Q{pub fn f(&mut self){}} ${broken}`,
-    });
-    g.unknown("q.f");
-  }
-  const g = await graph({
-    "src/lib.rs":
-      "mod broken;mod good;fn r(){broken::f();broken::g();broken::h();}",
-    "src/good.rs": "pub fn f(){} pub fn g(){}",
-    "src/broken.rs":
-      "pub use crate::good::*;pub use crate::good::g;pub fn h(){}pub fn f(",
-  });
-  g.unknown("broken::f");
-  g.one("broken::g", "g");
-  g.one("broken::h", "h");
-  const closed = await graph({
-    "src/lib.rs":
-      "mod broken;pub struct A;trait U{fn f(&self){}}trait V{fn f(&self){}}impl U for A{}impl V for A{}fn r(a:A){a.f();}",
-    "src/broken.rs": "impl crate::A { pub fn f(",
-  });
-  closed.unknown("a.f");
-});
-test("round 5 B: lossy crate preserves intact first probe, paths and explicit items", async () => {
-  const g = await graph({
-    "src/lib.rs":
-      "mod d;pub struct A;impl A{pub fn f(&self){}pub fn new(){}}fn r(a:&A){a.f();A::new();}fn free(){}fn run(){free();}",
-    "src/d.rs": "impl crate::A<",
-  });
-  g.one("a.f", "impl A::f");
-  g.one("A::new", "impl A::new");
-  g.one("free", "free");
-  const h = await graph(
-    lib(`struct A;impl A{fn f(&self){}}fn r(a:A){let x=;a.f();}`),
-  );
-  h.one("a.f", "impl A::f");
-});
-
 test("round 5 A/B: candidate completeness and crate boundaries", async () => {
   const source = `pub struct A;trait U{fn f(&self){}}trait V{fn f(&self){}}impl U for A{}impl V for A{}fn r(a:A){a.f();}`;
   const clean = await graph(lib(source));
-  assert.equal(clean.targets("a.f")[0].length, 2);
+  assert.equal(clean.would("a.f")[0].length, 2);
   const opaque = await graph(lib(`#[make::generate]${source}`));
   opaque.unknown("a.f");
   assert.equal(
@@ -252,7 +222,7 @@ test("round 5 A/B: candidate completeness and crate boundaries", async () => {
       "other/Cargo.toml": '[package]\nname="other"',
     },
   );
-  assert.equal(unrelated.targets("a.f")[0].length, 2);
+  assert.equal(unrelated.would("a.f")[0].length, 2);
   const d = await graph({
     "src/lib.rs":
       "mod good;mod broken;mod mid{pub use crate::broken::*;}fn r(){mid::f();}",
@@ -262,36 +232,10 @@ test("round 5 A/B: candidate completeness and crate boundaries", async () => {
   d.unknown("mid::f");
 });
 
-test("round 5 B: intact names can be reached through globs from a partial module", async () => {
-  const g = await graph({
-    "src/lib.rs": "mod broken;mod other;use broken::*;fn r(){f();g();}",
-    "src/broken.rs": "pub fn f(){}pub use crate::other::g;pub fn missing(",
-    "src/other.rs": "pub fn g(){}",
-  });
-  // The explicitly seen declaration is authoritative even though the file is partial.
-  g.one("f", "f");
-  g.one("g", "g");
-});
-
-test("round 5 B: attribute syntax errors belong to the declaration header", async () => {
-  for (const attribute of ["#[derive(]", "#[foo = ]"]) {
-    const g = await graph({
-      "src/lib.rs": "mod broken;fn r(a:&broken::A){a.f();broken::A::new();}",
-      "src/broken.rs": `${attribute} pub struct A;impl A{pub fn f(&self){}pub fn new(){}}`,
-    });
-    assert.equal(
-      g.files.find((f) => f.path === "src/broken.rs").result.status,
-      "partial",
-    );
-    g.unknown("a.f");
-    g.unknown("broken::A::new");
-  }
-});
-
 test("round 5 A/B: unseen impls also prevent closed trait path sets", async () => {
   const decl = `pub struct A;trait U{fn f(&self){}}trait V{fn f(&self){}}impl U for A{}impl V for A{}fn r(a:A){A::f(&a);}`;
   const clean = await graph(lib(decl));
-  assert.equal(clean.targets("A::f")[0].length, 2);
+  assert.equal(clean.would("A::f")[0].length, 2);
   for (const prefix of ["#[derive(Custom)]", "#[make::generate]", "imp!(A);"]) {
     const g = await graph(lib(prefix + decl));
     g.unknown("A::f");
@@ -335,21 +279,7 @@ test("round 5 A: attributed aliases feed the same nominal uncertainty index", as
       `#[make::generate]type A<T>=Box<T>;struct B;impl B{fn f(&self){}}fn run(b:B){b.f();}`,
     ),
   );
-  shape.one("b.f", "impl B::f");
-});
-
-test("round 5 B: use item headers inside closed function bodies are declaration-lossy", async () => {
-  const g = await graph(
-    lib(`struct A;impl A{fn f(&self){}}fn run(a:A){use missing::{, f};a.f();}`),
-  );
-  assert.equal(g.files[0].result.data.declarationLossy, true);
-  g.unknown("a.f");
-  const first = await graph(
-    lib(
-      `struct A;impl A{fn f(&self){}}fn run(a:&A){use missing::{, f};a.f();}`,
-    ),
-  );
-  first.one("a.f", "impl A::f");
+  shape.unverified("b.f", "impl B::f");
 });
 
 test("round 5 A: self retains its signature type across opaque statements", async () => {
@@ -370,7 +300,7 @@ test("round 5 A: self retains its signature type across opaque statements", asyn
       `mod a{pub struct A;impl A{fn f(&self){}fn run(&self){m!(self);self.f();}}}mod b{pub struct A;impl A{pub fn f(&self){}}}fn r(x:b::A){x.f();}`,
     ),
   );
-  unrelated.one("x.f", "b::impl A::f");
+  unrelated.unverified("x.f", "b::impl A::f");
 });
 
 test("round 5 A: sole path lookup cannot bypass unknown explicit specialisation", async () => {

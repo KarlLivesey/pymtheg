@@ -5,9 +5,11 @@ import { parseRust } from "./parse.js";
 import { fileFacts } from "../../identity.js";
 import { resolveRust } from "./resolve.js";
 
+const TARGET_HINT_LIMIT = 16;
+
 const rust: LanguageModule = {
   id: "rust",
-  version: "5",
+  version: "6",
   extensions: [".rs"],
   contextFiles: ["Cargo.toml"],
   parse: parseRust,
@@ -27,8 +29,8 @@ const rust: LanguageModule = {
           result: {
             ...f.result,
             links: f.result.links.map((l) => {
-              const { targets, uncertainty, ...rest } = (l.data ??
-                {}) as Record<string, Json>;
+              const { targets, targetCount, uncertainty, cause, ...rest } =
+                (l.data ?? {}) as Record<string, Json>;
               return { ...l, data: rest };
             }),
             symbols: f.result.symbols.map((s) =>
@@ -55,7 +57,15 @@ const rust: LanguageModule = {
       result: byPath.get(f.path)?.result ?? f.result,
     }));
     const facts = updated.map((f) => fileFacts(projectId, f));
-    const unknown = new Map<string, { targets: string[]; reason: string }>();
+    const unknown = new Map<
+      string,
+      {
+        targets?: string[];
+        targetCount?: number;
+        reason: string;
+        files?: string[] | undefined;
+      }
+    >();
     resolveRust(
       {
         projectId,
@@ -64,8 +74,19 @@ const rust: LanguageModule = {
         symbols: facts.flatMap((f) => f.symbols),
         links: facts.flatMap((f) => f.links),
       },
-      (l, targets, reason) =>
-        unknown.set(l.id, { targets: targets.map((t) => t.id), reason }),
+      (l, targets, reason, files) =>
+        unknown.set(l.id, {
+          ...(reason === "invalid-code"
+            ? {}
+            : targets.length > TARGET_HINT_LIMIT
+              ? { targetCount: targets.length }
+              : { targets: targets.map((t) => t.id).sort() }),
+          reason:
+            reason !== "invalid-code" && targets.length > TARGET_HINT_LIMIT
+              ? reason + "; too-many-targets"
+              : reason,
+          files: files ? [...new Set(files)].sort() : undefined,
+        }),
     );
     for (let i = 0; i < updated.length; i++) {
       const f = updated[i]!,
@@ -78,7 +99,11 @@ const rust: LanguageModule = {
                 ...l,
                 data: {
                   ...(l.data as Record<string, Json>),
-                  targets: u.targets,
+                  ...(u.reason === "invalid-code"
+                    ? { cause: { files: u.files ?? [] } }
+                    : u.targetCount !== undefined
+                      ? { targetCount: u.targetCount }
+                      : { targets: u.targets ?? [] }),
                   uncertainty: u.reason,
                 },
               }

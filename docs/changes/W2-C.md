@@ -1,297 +1,231 @@
 # W2-C: Rust language module for the code graph
 
-Round-five revision, module version 5. Current origin/main is merged normally.
-Only the owned Rust source, tests/fixtures, evidence and this note change. The
-module uses supplied snapshots and the installed Rust WASM grammar through the
-shared Tree-sitter helper. It never reads project files, shells out, expands
-macros or requires Rust/Cargo. Scratch compiler oracles are developer evidence,
-not runtime or test dependencies. Existing graph databases must be rebuilt
-with core schema 3; the evidence runs use a fresh store.
+This is the **no-toolchain fallback** under D16. Precise compiler-backed Rust
+resolution belongs to a later chunk. Version 6 uses the installed Rust WASM
+grammar through the shared Tree-sitter helper and supplied source/manifest
+snapshots only. Runtime, installation and tests never invoke Cargo/rustc, read
+project files, expand macros or add dependencies. Private items are ordinary
+linkable symbols. Old databases need rebuilding with schema 3.
 
-## Constructs and limits
+**A file that cannot be read is not valid code; it has failed; nothing in it is
+a target.** Any Tree-sitter ERROR or MISSING node, anywhere, makes the entire
+file `failed`, with no symbols or links. There is no `partial` result, recovered
+item, unsafe header, confinement exception or invalid-symbol salvage.
 
-| Construct | Result |
+**Grammar limitation:** all 11 files rejected in the pinned Vector revision are
+accepted by the native Rust syntax parser. These real, syntax-valid files now
+fail indexing under the owner's rule. There is no special case for them. The
+syntax-only oracle is not a claim to have typechecked all of Vector.
+
+## Constructs
+
+| Construct | Fallback result |
 |---|---|
-| Crates/files/modules, functions, structs, enums/variants, traits/default methods, scoped impls, aliases, const/static, macro_rules | Symbols and contains links; private items are ordinary linkable symbols; exact UTF-16 positions |
-| Namespaces and constructors | Separate type/value/macro lookup; named-field structs/variants cannot capture value calls; inference `_` never binds a name |
-| Modules | Inline and function-local barriers; name.rs/name/mod.rs and literal path attributes; children of path-loaded files are beside the file; unsafe recovered module headers cannot establish file membership |
-| Cargo context | Workspace path dependencies, library names and dependency renames; lib/bin and automatic src/bin/examples/tests/benches/build.rs roots; no Cargo execution |
-| Imports | Nested groups, renames, raw identifiers, self/super/crate/absolute paths, cross-crate and chained reexports; use sites share recursive import lookup |
-| Globs | Follow captured chains with cycle protection and visibility checks; local items/explicit imports shadow globs; a glob edge's own target remains backlog |
-| Free calls, type/pattern/value paths | Definite when intact captured bindings prove a target; complete cfg alternatives become candidates; unresolved names retained |
-| Expression values | Unit structs/variants, Self variants and simple paths emit values links. Local/self/generic references remain unresolved rather than acquiring outer item targets. Named-field variant imports/patterns are independent of bare values |
-| Pattern bindings | Structural shorthand/ref/mut/captured/tuple/slice/struct/or forms in parameters, closures, let/let-else, if/while-let, match and for; actual binding regions mask outer functions |
-| Alias/type applicability | Expand captured aliases/chains/references; known Box/tuple/array outer shapes cannot become universal blankets for unrelated types; cyclic/external/unsupported substitutions stay unknown |
-| Lifetimes and generics | Lifetimes do not select impls. Exactly distinct own parameters in Type<P1,...,Pn> prove fully generic applicability; bounds permit omitted-argument path family lookup, not unproven dot applicability. Explicit instantiated paths require applicability evidence; other specialised arguments need compatible captured evidence |
-| Associated path calls | An intact applicable inherent member wins over trait alternatives. A sole family with omitted type arguments is selected before inference; explicit instantiated paths cannot bypass unproved specialisation or bounds |
-| Dot calls | The shared probe/completeness rule below applies to every source of unseen impls. First-step inherent matches remain definite; unknown later alternatives retain targets on an unresolved link |
-| Custom receivers | Box/Rc/Pin syntax retained, without arbitrary Deref/projection/inference. Unknown custom receiver adjustment stays unresolved |
-| Trait-only calls | One captured trait impl does not prove dispatch. Multiple targets form a closed set only when all applicability/completeness conditions hold |
-| Macros | Local active macro_rules definitions/invocations linked; macro_export visibility pub. Opaque statement tokens invalidate affected binding evidence; literal type tokens in item macros feed the shared unseen-impl rule |
-| Conditional code | Both branches captured; no feature/platform selection. Cfg twins may form complete candidate sets; arity accounts for conditional arguments/parameters |
-| Syntax errors | Partial remains partial. Unsafe recovered symbols cannot prove links; file-level declaration loss independently marks module/crate uncertainty, even when no declaration survives |
-| Std/external/generated declarations | Unresolved with names retained; no toolchain/filesystem fallback |
+| Crate/module/file units; functions, structs, enums and variants, traits/default methods, scoped impls, aliases, const/static, macro_rules | Symbols with positions, visibility and contains links; failed files contribute none |
+| Type/value/macro namespaces | Separate lookup. Named-field structs do not capture value calls; unit/tuple constructors do. `_` never binds a name |
+| Modules | Inline and function-local barriers; name.rs/name/mod.rs; literal path attributes including raw strings. Path-loaded files' children are beside the file. Doc strings never become path attributes; absolute paths have no captured root proof and stay unverified |
+| Cargo context | Package/lib names, dependency renames, workspace path dependencies; explicit and automatic lib/bin/src/bin/examples/tests/benches/build.rs roots. Loose files retain structure without invented crate membership |
+| Imports | Nested groups, renames, self/super/crate/absolute/raw paths; chained and cross-crate reexports; anonymous imports do not bind `_` |
+| Globs | Recursive captured reexports with cycle protection and importer visibility; intact local/explicit names beat globs. A glob edge's own target remains backlog |
+| Free calls, type/pattern/value paths | Definite from proved bindings; complete captured alternatives become candidates. Unknown alternatives remain unverified. Missing names stay unresolved with names retained |
+| Values | Unit structs/variants and Self/path expressions extracted. Struct/named-variant literal names are constructor-capable type references. Locals/generics never acquire outer item targets |
+| Pattern bindings | Structural shorthand/ref/mut/captured/tuple/slice/struct/or patterns across parameters, closures, let/else, if/while-let, match and for; binding regions mask outer functions |
+| Alias/type applicability | Captured alias chains and generic/reference aliases expanded. Unsupported/cyclic/external substitutions remain unknown; unknown never means disjoint |
+| Lifetimes/generics | Lifetimes ignored for impl selection. Distinct own parameters in Type<P1,...,Pn> describe a fully generic family. Explicit instantiations, specialisation and bounds still require applicability evidence |
+| Associated path calls | A proved inherent name wins over traits. A sole family with omitted arguments can support name lookup before inference; explicit generic arguments cannot use that shortcut. Unknown alternative inherent impls block proof |
+| Dot calls | Definite ONLY a unique proved inherent first-probe match. Everything else is unresolved-with-targets, with no closed dot-call candidate sets |
+| Trait-only associated calls | Unresolved-with-targets: captured bodies/defaults are would-be targets, not proof of dispatch |
+| Conditional code | All captured branches retained; no feature selection. Complete namespace/path alternatives may be candidates. Dot cfg twins remain unverified, including bounded alternatives |
+| Macros/attributes | Local active macro_rules invocations link; macro_export records public visibility. Token trees are not expanded/extracted. Statement tokens and opaque block item generation can invalidate binding evidence; opaque item generation can shadow namespace fallback |
+| Std/external/generated declarations | Unresolved; no compiler or filesystem fallback |
 
-No macro token-tree bodies/generated declarations are extracted or expanded.
-Cross-file macro exports/imports, mixed external/project globs, Copy receiver
-refinement, generic substitution precision, custom receiver projection, inner/outer
-macro ordering, where clauses in impl identity text, qualified `<T as Trait>::f`
-and a glob edge's own target remain the manager-listed backlog. General
-trait-in-scope, result/closure/chained-receiver inference, bounds solving and
-associated-type projection are not implemented. Loose files retain symbols;
-nested support files are not invented as automatic Cargo roots.
+Associated const/projection lookup, qualified `<T as Trait>::f`, custom receiver
+adjustment, general autoderef/unsizing, substitution/inference/bounds solving,
+trait-in-scope precision and generated declarations are not implemented.
+Cross-file macro exports/imports, external glob beside project glob, Copy receiver
+refinement, inner/outer macro ordering, where clauses in impl identity text and a
+glob import's own link remain the manager-listed backlog.
 
-## One dot-dispatch rule
+## Dispatch and unverified target representation
 
-For a known receiver, Rust considers its actual type first, then shared and
-mutable autoref steps, repeating through autoderef. At each probe inherent
-methods precede trait methods. The module proves the nominal receiver forms it
-captures; custom autoderef remains unsupported.
+For `recv.name(...)`, the only definite result is an **inherent** method at the
+first probe of the captured receiver: owned T with self, &T with &self, or &mut T
+with &mut self. Receiver lifetime/mutability forms are parsed structurally. Every
+inherent alternative at that step must be proved applicable or inapplicable;
+unknown bounds, cfg conditions, unresolved inherent self types, ambiguous module
+views and unknown receiver adjustments prevent proof. First-step proofs survive
+unseen trait impls and failed dependencies.
 
-An intact, applicable inherent member at the **first probe** is definite despite
-unseen traits: `T` with `fn f(self)`, `&T` with `fn f(&self)`, `&mut T` with
-`fn f(&mut self)`, including syntactically exact self receivers. All cfg choices
-must satisfy that proof before a closed set is emitted. This check precedes every
-unseen-impl source below. It replaces the unconditional item-macro veto.
+Every other dot call is `unresolved`. Up to 16 valid project hint IDs are stored
+in `data.targets`; larger lists are omitted, with `data.targetCount` and a
+`too-many-targets` uncertainty reason. A count-only overflow is never a truncated
+list. Single-target hints are unchanged. Explanations in `data.uncertainty` include
+`later-probe-step`, `trait-dispatch`, `inherent-applicability-unverified` or
+`receiver-type-unverified`. These are **would-be targets, unverified**, even if
+there is exactly one. No dot call emits a closed candidate set. The hint inventory collects valid project instance bodies/defaults by name,
+including autoderef destinations and impls with unknown ownership; overflow
+stores only its count.
+This deliberately broad name-based superset does not simulate trait dispatch or
+claim the receiver can call every listed body. Unresolved impl self/trait lookup retains its valid method
+bodies as possible targets; failed files supply no bodies at all.
 
-For later probes, and for trait paths without a proven inherent member, these
-sources make the named dispatch incomplete:
+There is no derive-method table, std blanket-name table, trait-scope catalogue or
+macro/attribute unseen-impl proof in dispatch. Their sole later-step precision
+purpose was removed. Retired experimental table evidence is historical only.
 
-- A type's derives/attributes may supply the name.
-- Literal type-name tokens in opaque item macro invocations may add impls.
-- Captured project blankets/reference impls, unknown trait defaults, or the
-  std/core universal-name table may supply the name.
-- The caller's crate or the receiver's owning crate has declaration-loss evidence.
+## Failed files, causes and namespace uncertainty
 
-Each source feeds the same completeness decision. Incomplete trait-method sets
-are unresolved too. A proven inherent path member remains independent of
-these dot-probing uncertainties. With omitted arguments a sole inherent family
-wins name lookup before inference; with explicit arguments an unavailable
-specialised or bounded impl can instead expose a trait member. Such explicit
-paths require applicability evidence; unsupported substitution stays unresolved.
-Scratch compiler controls distinguish these cases. Unsafe headers cannot
-become proof through this precedence shortcut.
+The first grammar error by position yields one diagnostic with its source range
+and 1-based line/column. MISSING says ``missing `token` ``; ERROR says
+``unexpected `first-token` `` (one line, at most 40 token characters). Tree-sitter
+does not supply expected tokens at ERROR nodes; none are invented. Diagnostic
+text is deterministic and contains no absolute path.
 
-Known derives supply exactly these names:
+A valid-file non-dot link is `unresolved` with `data.uncertainty: "invalid-code"`
+when its path traverses a failed module file, or an absent name's lookup scope
+has failed files that could have declared it. `data.cause.files` names those
+project-relative files, sorted. It has **no target, candidates or data.targets**;
+the files are causes, never targets or named recovered items. A missing name in
+a scope with no failed files is ordinary unresolved. Fixing and re-indexing
+clears failure causes and resolves newly readable declarations.
 
-| Derive | Possible method names |
-|---|---|
-| PartialEq | eq, ne |
-| PartialOrd | partial_cmp, lt, le, gt, ge |
-| Ord | cmp, max, min, clamp |
-| Hash | hash |
-| Clone | clone, clone_from |
-| Debug | fmt |
-| Default | default |
-| Eq, Copy | none |
+A failed file also means unseen declarations may exist. Its owning module's
+fallback lookup through a glob or an enclosing scope cannot prove an unshadowed
+name; intact direct declarations and explicit imports in valid files remain
+authoritative. Unseen impls can reach the failed crate's types/dependencies and
+callers through manifest dependency reachability. If captured manifests cannot
+prove the dependency graph (workspace inheritance/patches/missing path context),
+all failed workspace files count conservatively. Dot calls never become
+invalid-code: they retain **only valid** would-be targets and a
+`failed-file-unseen-declarations` annotation. This annotation cannot undo a
+proved first-step inherent match.
 
-The same attribute index normalizes captured alias chains and references onto
-the underlying nominal type. An attributed identity or unexpanded alias which
-cannot be restricted to a captured nominal can supply an unrestricted impl;
-known Box/tuple/array outer shapes do not taint unrelated nominal receivers.
-First-probe and inherent-path precedence remain independent of these facts.
+Opaque item-position macros and non-builtin attributes in lexical item containers
+(module/file/function/block scopes) similarly make glob/outer
+namespace fallback uncertain. Direct intact local names and explicit imports
+still win. Hoisted block value items/imports cannot leave a shadowed parameter
+receiver type in the binding cache; named-field structs remain type-only. A block
+macro/attribute that could create a value item conservatively removes parameter
+type proof (never the special self receiver). Field/variant helper attributes cannot introduce lexical item bindings. Generated
+associated items in impl/trait bodies do not shadow bare module names. This one
+container rule also excludes expression-only macro positions. The guard does
+not expand macros or establish a dispatch result.
+`cfg_attr` payloads are inspected; conditional module paths retain every captured
+layout and mark missing alternatives unknown. Standard derive *spellings* only
+help this namespace annotation when unshadowed by named/glob imports or
+macro_use routes (including cfg_attr); no per-method derive knowledge
+remains. The inert attribute whitelist is shared from parse.ts:
+allow/warn/deny/forbid/expect, cfg/cfg_attr, repr/doc/deprecated/must_use/
+non_exhaustive, inline/cold/track_caller, no_mangle/export_name/link_section/used,
+automatically_derived, test/ignore/should_panic, path, macro_export/macro_use,
+link, no_std/no_implicit_prelude. Unknown attributes are opaque.
 
-Unknown/custom/qualified derives and opaque attributes make every later-step
-name uncertain. Comments between an attribute and item do not hide the attribute.
-`cfg_attr` payloads are inspected conservatively without choosing a configuration.
-The known-inert attribute list is exactly: `allow`, `warn`, `deny`, `forbid`,
-`expect`, `cfg`, `cfg_attr`, `repr`, `doc`, `deprecated`, `must_use`,
-`non_exhaustive`, `inline`, `cold`, `track_caller`, `no_mangle`, `export_name`,
-`link_section`, `used`, `automatically_derived`, `test`, `ignore`, `should_panic`,
-`path`, `macro_export`, `macro_use`, `link`, `no_std`, `no_implicit_prelude`.
-Only cfg_attr payloads can introduce dispatch uncertainty from this list.
+## Identity, performance and interface
 
-The std/core universal method-name table remains exactly: `from`, `into`,
-`try_from`, `try_into`, `borrow`, `borrow_mut`, `to_owned`, `to_string`, `type_id`,
-`as_ref`, `as_mut`, `clone`, `clone_from`, `into_iter`, `default`. Names outside
-this table are assumed not universally supplied by uncaptured standard blankets.
-Known derives are a separate per-type source, not additions to that global table.
+Identities use lexical module/function/type/trait/impl scope and position-free
+textual impl identities. Inherent A::new and B::new differ; trait-for-type impls
+differ from inherent impls; repeated headers get stable ordinals. Positions do
+not enter IDs. Blank-line conformance and incremental-store tests cover this.
 
-Opaque macros are guarded only by literal invocation tokens and statement/item
-positions. They can invent names absent from those tokens; no expansion attempts
-to discover them. Statement macros can invalidate receiver evidence before the
-probe rule is reached. The keywords `self`/`Self` cannot be rebound: their
-signature type is retained and their semantic impl type feeds the same macro
-effect index, so exact first probes resolve while later probes stay uncertain.
-New ordinary bindings can establish fresh evidence afterward.
+Imports, places, ownership, members, reachability and function binding analysis
+are indexed/cached per analysis. Analysis writes metadata through the frozen
+interface; resolve writes definite/closed decisions only. No core files change.
+The interface has no separate failed-link enum, so failed links use unresolved
+plus invalid-code/cause metadata. They are distinguishable from valid but
+unverified dot calls. Syntax diagnostics use the interface's message/range.
 
-## One declaration-loss rule
+## Review-response audit and validation
 
-Parsing records `data.declarationLossy` independently of surviving symbols. A
-top-level ERROR, an ERROR/missing syntax in an item header (including preceding
-attributes, use/extern items and macro definitions, even inside a closed function), or an unclosed body
-that might swallow declarations sets it. Closed function/closure expression-body
-errors alone do not imply lost surrounding declarations. This is tree structure,
-not a search of recovered text for impl/type spellings.
+The round-five F1/F2/F3/F4 and exact Sol custom Clone/impl-attribute repros are
+safety tests: no later-probe definite link, inherent body retained as unverified.
+F5 retains valid unresolved impl bodies and failed dependency reach. F6 is
+superseded by whole-file failure. F7 retains bounded/cfg alternatives instead of
+closing from a proven subset. Error-region recovery, unsafe-item tests and
+confinement mutations were retired rather than weakening whole-file failure.
+The detailed filter-site audit is d16-alternative-audit.md. Signature lookup stays outside body-local item scopes; opaque fallback retains known outer targets as unverified. Each impl view carries its own cfg conditions rather than overwriting a shared symbol's conditions.
 
-There are two consequences:
+Compiler oracles, scratch mutations, full real-indexer/store comparison,
+link-by-link movement, samples, original-152 classification and sequential check
+results are recorded in evidence/w2-c/d16-*. Runtime/tests do not invoke these
+developer compiler scripts. Compared with 6392ab71, the runtime diff removes 913 lines and adds 1,129
+(net +216). Recovery/confinement and later-probe dispatch proof code is gone;
+new lines implement structural binding/namespace evidence, failure accounting,
+diagnostics and bounded hints.
 
-1. At crate level unseen impls may exist. Later-step dot dispatch and trait-method
-   sets are incomplete throughout that crate, including clean callers and callers
-   using its types from other crates. First-step seen inherent members and seen
-   inherent path members remain usable.
-2. At module level unseen items may shadow glob, prelude or enclosing fallbacks.
-   Such lookup is incomplete, including across reexport chains. Intact local
-   declarations and explicit uses remain authoritative; a duplicate would not
-   compile. A partial module's intact declaration can still be reached through
-   a glob. Partial status alone is not a blanket namespace rejection.
+Pinned Vector: `515e87d9861b564f521a8992d224892cd8cae120`; comparison head: `6392ab7183b4df167abef330470fd0c45d6333bb`. Every repository `.rs` file was indexed through the real indexer and a fresh schema-3 store. No core edit, output truncation or raised Node heap in the final run.
 
-Unsafe/recovered/swallowed declarations can retain evidence but cannot establish
-proof or closed sets. Invalid headers make their surviving descendants unsafe;
-missing closing body braces taint swallowed structure. Lost headers which emit
-no symbol still trigger the file/crate rule. Recovered module declarations do not
-establish another file's membership. This replaces the earlier statement that
-simply excluding unsafe impls from an index suffices.
-
-## Identity, interface and resolution work
-
-IDs combine project/module/file, kind, scoped identity and duplicate ordinal;
-positions are excluded. Impl identities preserve self/trait/generic syntax;
-where clauses remain omitted and ordinals distinguish equal text. Method
-ownership uses contains source IDs. Raw identifier spelling normalizes while
-spans retain the source spelling. Structural block ordinals avoid positional IDs.
-The strict independent blank-line identity conformance test has no exclusions.
-
-All emitted candidate sets are **closed**. Incomplete choices use
-**unresolved-with-targets**: `data.targets` retains known project evidence and
-`data.uncertainty` states why it is incomplete. No `open` marker is emitted. This
-metadata is not an exhaustive one-of relation. Simultaneous import namespaces
-also cannot be asserted as one-of and remain unresolved. No core/interface change
-was made. Analyze uses one resolver pass to attach evidence; core resolve then
-runs normally, without reparsing or disk reads.
-
-Imports, places, declarations, members and per-function binding evidence are
-indexed once. Completed module-view lookups and reachability/dispatch guards are
-cached. Receiver filtering copies memoized results before applying uncertainty.
-Work depends on path depth, candidate memberships and reexport/dependency
-relationships; timings are observations, not assertions.
-
-## Round-five evidence
-
-| Observation | Fourth-review head `3f1c81f9` | Current release |
+| Metric | 6392ab71 | Final |
 |---|---:|---:|
-| Claimed / clean / partial / failed | 1,563 / 1,552 / 11 / 0 | 1,563 / 1,552 / 11 / 0 |
-| Symbols | 35,907 | 35,907 |
-| Links | 365,699 | 365,699 |
-| Resolved | 115,794 | 116,400 |
-| Closed candidate sets | 1,102 | 1,102 |
-| Unresolved | 248,803 | 248,197 |
+| Claimed files | 1,563 | 1,563 |
+| Clean / partial / failed | 1,552 / 11 / 0 | 1,552 / 0 / 11 |
+| Symbols | 35,907 | 35,422 |
+| Links | 365,699 | 365,514 |
+| Definite | 116,400 | 72,565 |
+| Closed candidate sets | 1,102 | 79 |
+| Unresolved | 248,197 | 292,870 |
 
-All Rust sources at Vector `515e87d9861b564f521a8992d224892cd8cae120` were freshly indexed through
-the real indexer and schema-3 store, with zero analysis/resolution errors. All
-365,699 derived links match the independent direct-module output, including
-target IDs and uncertainty data. Symbols/links by kind and top unresolved names
-are in `round5-release-store.json`. The 92 Cargo roots remain 36 lib, 11 bin,
-3 example, 18 test, 14 bench and 10 build.
+At shared positions: **0 gains / 45,191 withdrawals / 0 retargets**. Failed source files remove 6,726 links (1,394 formerly definite, 3 candidates); 6,541 added constructor/type references include 2,750 definite links. All counts reconcile with the final totals.
 
-Observed store wall time: 348.327 s; module parse
-133.791 s, analysis 12.778 s, resolve
-13.777 s. Direct module wall time: 195.714 s
-(parse 115.193 s, analysis 26.996 s,
-resolve 26.435 s). Different loaded-machine runs are
-observations, not speed assertions. Sources/stores stay in disposable scratch.
+Of 1,435 definite dot downgrades: 69 are identified later-probe inherent matches, 0 trait definite links, and 1,366 receiver/applicability/namespace-unknown cases. 593 retain one would-be target. All 1,425 prior targets still valid under whole-file failure are retained or explicitly omitted by overflow; 10 prior targets are in failed files and cannot be hints. There are no closed dot-call sets.
 
-The exhaustive comparison restores **864 definite dot
-calls at the first probe** and **72 inherent path calls**,
-936 calls total. A scratch-only trace verifies the actual proof
-branch and reproduces every production decision. Of the dot restorations,
-811 were blocked by the old item-macro veto.
-No definite link retargets. Every closed candidate set has the same key and
-project targets as the reviewed head; the temporarily introduced FromIterator
-path set was caught in development and is unresolved in release.
+Of the former 1,102 candidate sets: 79 remain closed, 1,020 become unresolved, and 3 disappear with failed source files. The one former dot-call candidate set becomes unresolved. Other withdrawals apply conditional-presence, opaque namespace and unknown-applicability rules; they are not newly discovered wrong callees.
 
-330 old definite links become uncertain (281 calls,
-43 imports, 6 types). Among the calls, **50**
-carry derive/attribute uncertainty: 29 solely
-that new reason, 21 also declaration loss.
-Another 3 explicit/generic path calls also carry
-attribute uncertainty after applicability was left unproved; these are separate
-from the dot-probe count. These overlapping reason counts are not additive. Fifteen seeded withdrawals
-were inspected: every one is a later probe on a genuinely attributed type;
-source declarations and receiver forms are recorded in
-`round5-dispatch-hand-check.json`.
+| Withdrawal rule (exclusive priority grouping) | Links |
+|---|---:|
+| opaque item namespace | 37,865 |
+| receiver unknown | 4,791 |
+| inherent applicability unknown | 1,934 |
+| conditional presence | 269 |
+| later probe | 69 |
+| invalid-code | 195 |
+| other namespace/alias | 68 |
 
-**895 dot calls** still have the
-item-macro reason, versus the old 1,588: 777 from that old
-cohort remain and 118 newly carry the reason
-(86 formerly definite and
-32 already unresolved). Keeping
-self/Self signature evidence also retains their semantic type in the macro
-effect index; this prevents newly exposed later-probe guesses. The common completeness check also records
-that reason on 2,657 already/incompletely
-resolved trait paths without a seen inherent member; all calls with the reason
-number 3,552. This is metadata coverage, not
-3,552 newly lost links. Limits around literal
-tokens, generated declarations, custom receivers and generic applicability remain.
+## Serialized output and overflow
 
-The structural rule marks these files declaration-lossy in the unchanged
-Vector snapshot: `lib/codecs/tests/avro.rs`, `lib/tracing-limit/src/lib.rs`, `src/config/builder.rs`, `src/config/compiler.rs`. The other grammar partials do not by themselves imply lost surrounding
-items under this structural test.
+Sizes are exact UTF-8 `JSON.stringify` lengths accumulated per item, never by constructing a monolithic graph string. `analysisReturnBytes` measures the module’s returned file analyses; graph-fact IR measures `fileFacts` symbols and links before storage/resolution. The three JSON profiles contain bytes by link kind, by top-level field and by nested data field, plus complete target-length histograms. Snapshot-only human-readable target descriptions are excluded.
 
-In the full captured snapshot, perturb `lib/vector-core/src/event/log_event.rs`
-in memory and reanalyze/resolve the module. The checkout is not edited:
-
-| Edit | Changed file: definite links lost | Rest of vector-core library | Other Cargo targets/crates |
+| Serialized bytes | 6392ab71 | Uncapped draft | Final cap 16 |
 |---|---:|---:|---:|
-| truncate after opening field-list brace | 332 | 143 | 482 |
-| insert < into impl header, retaining the rest of the file | 62 | 39 | 193 |
+| Module analysis return | 128,057,684 | 627,531,284 | 152,209,680 |
+| Graph link facts | 236,343,893 | 738,534,241 | 263,212,637 |
+| Symbols + link facts | 254,077,796 | 756,472,304 | 281,150,700 |
+| `data.targets` fields | 1,436,451 | 492,676,522 | 16,295,423 |
 
-The struct truncation removes 321 old source relationships;
-11 retained file links lose definiteness. The impl edit
-retains the rest of the source and maps positions across the two inserted characters;
-60 retained file links lose definiteness and
-2 old header relationships disappear in recovery.
-Counts include references to removed/unsafe declarations as well as the global
-uncertainty rule. They are not counts of wrong old links. Exact grouping and
-retained-versus-removed counts are in `round5-release-lossy-experiment.json`.
+The uncapped growth was module output: target fields grew from 1,436,451 to 492,676,522 bytes. Calls accounted for 6,507,700 of 6,623,268 target references. Final `data.targets` stores IDs only. Lists over 16 are omitted entirely, with `data.targetCount` and a `too-many-targets` uncertainty marker. No prefix is emitted.
 
-All original **152** are re-derived against round-one `d60ac141` on the same
-131 files. **94 are restored; 58 remain unresolved**.
-Remaining classification: (a) wrong before **0**, (b) unprovable under a named
-current rule **58**, (c) correct/provable still lost **0**.
+| Target-list distribution (all links; absent = 0) | 6392ab71 | Uncapped | Final |
+|---|---:|---:|---:|
+| median | 0 | 0 | 0 |
+| p99 | 1 | 609 | 11 |
+| max | 9 | 609 | 16 |
+| sum | 10,110 | 6,623,268 | 190,254 |
 
-The earlier c=0 claim for the 51 was inaccurate. This revision restores
-**7 of those 51**, including original #64,
-#65, #67 and #68, RegisteredEventCache::new and MaybeTlsIncomingStream::new.
-At the same time **14 previously restored
-entries** gain required attribute uncertainty (LogSchema getters and proto-origin
-metadata getters). Hence the restored total can fall despite fixing these
-provable losses. No old target is called wrong without evidence.
-`round5-release-loss-classification.{json,md}` enumerates every original edge,
-its old targets and its rule; `round5-classification-movement.json` makes the
-cohort movements explicit. Another 12 newly
-withheld edges in those two crates are listed separately.
+Count-only overflow: **30,733 links** (29,970 calls, 762 types, 1 value). **65,365 nonempty lists** remain; 190,166 including existing empty lists. **40,885 one-target lists are unchanged**. Every short list and every resolution decision matches the uncapped run; no truncated lists exist.
 
-Fresh seed 0x20261115: 30 resolved, every endpoint in 15 closed sets, 15 general
-unresolved and 20 in-project-target unresolved self calls. Source contexts and
-all endpoints were inspected. No sampled wrong definite or incomplete closed
-set was found. The targeted sample leaves only later-probe uncertainty or the
-explicit generated-type/module-membership/custom-receiver/cross-impl-bound limits;
-no further ordinary supported pattern was left merely as a finding. Additional
-15 attribute withdrawals and 15 first-probe restorations were hand checked.
-Sampling is not a universal accuracy proof. `round5-audit.md` and hand-check JSON
-retain individual judgments.
+Historical failures are preserved: the uncapped draft exhausted the default heap, then reached V8’s single-string limit in core `replaceAnalysis` at an 8 GiB heap. The bounded module completed through the same unmodified core at the default heap. These failed attempts are not presented as passes.
 
-## Validation and history
+## Whole-file policy and grammar cost
 
-The required isolated sequence passed: `npm ci --ignore-scripts`;
-`npm test` with the requested `PYM_TLC_JAR` (**1,357 passed**);
-`npm run format:check`; then `node --test test/graph-rust*.test.mjs`
-(**111 passed**). Zero failures, cancellations or skips.
-Source hashes were unchanged through the sequence. All **52**
-scratch compiler oracles pass. All three required mutations fail assertions
-against a passing baseline. Exact-position and independent blank-line identity
-conformance remain enforced without exclusions. `round5-validation.json` and
-`round5-README.md` identify final evidence; all earlier attempts are history.
+**All 11 rejected files are accepted by the native Rust syntax parser (11/11). These are real grammar gaps, and they fail completely under the owner’s rule.** This is syntax acceptance, not a claim to have run Cargo/typechecked all of Vector. `src/config/builder.rs:89` and compiler.rs use cfg attributes on destructuring-pattern fields. Other gaps are a parameter pattern attribute, turbofish inference, a higher-ranked bound, and contextual `raw` reference/pattern forms. Per-file constructs, first diagnostics and native results are in `round6-grammar-audit.json`, `round6-grammar-note.md` and `d16-failed-files.json`.
 
-Scratch-only compiled-module mutations turn off derive-name uncertainty, widen
-the first-step shortcut to later probes, and disable file lossiness. The baseline
-must pass and every mutation must fail an assertion. Scratch rustc oracles include
-an independent tiny proc-macro crate; no compiler is imported by tests/runtime.
-Earlier evidence and failed/development attempts are preserved and identified as
-superseded. Round-four's assertion that no correct/provable link remained among
-the 51 was inaccurate; the new classification is re-derived, not relabelled.
+Whole-file failure removes **485 symbols / 6,726 source links**. There are **267 targetless invalid-code links** with sorted failed-file causes. **104,099 links carry failed-file-unseen-declarations uncertainty**; 6,794 withdrawals carry that annotation, often alongside D16/type/applicability uncertainty. This is an annotation count, not a claim that file failure alone caused every one. The integrity audit checks all IDs, failure causes and absence of closed dot sets.
 
-A final normal refresh of origin/main changed only the manager build-plan ledger.
-The implementation/test hashes still match the completed required check sequence;
-no runtime/core change was introduced by that refresh.
+## Original 152 and fresh audit
+
+**16 restored; 0 identified wrong-before; 136 unverified under the final fallback policy; 0 correct-and-provable under that policy still lost.** Of those 136, 123 retain the original hint and 13 have count-only overflow. Every row records its rule. Reviewer-highlighted #64, #65, #67 and #68 are restored. This is a changed D16 precision contract, not a claim that Rust itself cannot prove the 136 calls.
+
+Fresh seeded source hand check: **30 definite / 30 newly downgraded / 15 unresolved**. No wrong definite link. Of the 30 downgraded calls, 26 retain the expected body and 4 omit the complete list by overflow; all four expected bodies are verified in the uncapped inventory. No unexpected missing hint. Individual judgments are in d16-samples.json.
+
+## Observations and checks
+
+Real indexer/store elapsed: 373.5 s; module parse 82.9 s, analysis 47.1 s, resolve 42.1 s. Node v24.21.0, execArgv `[]`, NODE_OPTIONS empty, default heap limit 4,496,293,888 bytes. Peak RSS 6,756,996 KiB. Timings/memory are observations on a loaded machine. All 365,514 links match direct module output including metadata.
+
+Valid Cargo roots observed: 35 libraries, 11 binaries, 3 examples, 17 tests, 14 benches, 10 build scripts. src/bin, examples, tests, benches and build.rs are crate roots under Cargo target discovery, not forced loose files. Failed targets contribute no unit symbols.
+
+Final sequential checks: npm ci --ignore-scripts; PYM_TLC_JAR=the supplied jar npm test (**1,389 pass, 0 skipped**); format:check; Rust tests (**143 pass**). All exit 0. **36 mutations killed**, including overflow; 71 native compiler cases plus the smaller namespace/binding/file controls pass. Runtime/tests never need rustc/Cargo.
+
+Symbols by kind: `{"const": 1287, "enum": 704, "function": 9158, "impl": 4502, "macro": 59, "method": 9191, "module": 3659, "static": 144, "struct": 2747, "trait": 155, "type": 1197, "variant": 2619}`.
+
+Links by kind: `{"calls": 134752, "contains": 33870, "implements": 2999, "imports": 28988, "macros": 24869, "modules": 1468, "patterns": 10937, "types": 73393, "values": 54238}`.
+
+Top unresolved: `[["Some", 7810], ["assert_eq", 7414], ["String", 4464], ["None", 4407], ["Option", 4311], ["assert", 3904], ["Ok", 3815], ["Vec", 3118], ["vec", 2431], ["Result", 2209]]`.
