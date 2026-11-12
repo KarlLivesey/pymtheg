@@ -59,7 +59,17 @@ correct. The stable route gives no imports, type references or `implements`
 links.
 
 **Like for like with rust-analyzer** (an optional rustup component). It
-analyses one cfg set: default features **plus `cfg(test)`**. Shares of each crate's method calls:
+analyses one cfg set of its own: default features, plus `cfg(test)`,
+`cfg(miri)` and `debug_assertions`. The last two are its default `cargo.cfgs`;
+`test` is set for workspace members and also for a non-member path dependency,
+while registry dependencies were not probed (`probe/cfg`,
+`raw/route-b/cfg-probe.txt`).
+
+**This matches neither the dev build nor the test build:** it skips
+`cfg(not(miri))` code that every real build compiles, and analyses
+`cfg(miri)` code no real build compiles. Vector has no `miri` cfg, so no figure
+here is affected. A rust-analyzer link must be keyed by rust-analyzer's own
+configuration, not filed under the IR's test build. Shares of each crate's method calls:
 
 | Share of method calls                                           | `vector-common`                             | `file-source-common` | `tracing-limit` |
 | --------------------------------------------------------------- | ------------------------------------------- | -------------------- | --------------- |
@@ -98,11 +108,12 @@ these comparisons were made:
   - 0 / 0 / 1 that **differ by build configuration**: `tracing-limit`
     `lib.rs:429:20`. The IR's dev build calls std's `elapsed` (`time.rs:390`),
     its test build calls `mock_instant`'s (`macros.rs:82`), and rust-analyzer,
-    analysing with `cfg(test)`, names only `mock_instant`'s. By definition this
+    under its own configuration (which has `test` on), names only
+    `mock_instant`'s. By definition this
     site does **not** agree for the dev build; it matches only by name.
   - 3 / 0 / 0 that differ in **level**: `vector-common`
-    `internal_event/cached_event.rs:79, 80, 86`, `tags.clone()` in a generic
-    impl. rust-analyzer names the trait declaration `core::clone::Clone::clone`;
+    `internal_event/cached_event.rs:79, 80, 86`: `self.fixed_tags.clone()` and
+    `tags.clone()` in a generic impl. rust-analyzer names the trait declaration `core::clone::Clone::clone`;
     the IR names the instantiated `String` impl in `alloc`.
   - The remaining 253 / 258 / 127 agree by name and defining package.
 - **Not compared:**
@@ -178,9 +189,11 @@ The numbers argue for it, for these reasons:
    wrong. W2-C must stay underneath, and every link must record which route
    produced it.
 3. **rust-analyzer adds what IR cannot reach,** though its links too hold only
-   for its own cfg set (default features + `cfg(test)`). At `tracing-limit`
-   `lib.rs:429:20` it names only `mock_instant`'s `elapsed`, the test-build
-   callee, which is the configuration-dependent link condition 2 warns about.
+   for its own cfg set (default features plus `cfg(test)`, `cfg(miri)` and `debug_assertions`, which matches no real build). At
+   `tracing-limit` `lib.rs:429:20` it names only `mock_instant`'s `elapsed`:
+   the callee under rust-analyzer's own configuration, which there coincides
+   with the test build's. That is the configuration-dependent link condition 2
+   warns about.
    What it adds:
    - generic bodies never instantiated, and cfg-off code in the chosen feature
      set (the 35 in-workspace misses in `vector-common`: 23 and 12);
@@ -208,9 +221,9 @@ Conditions, each a decision or a chunk:
      std's `elapsed` in the dev build and `mock_instant`'s in the test build. A
      link is true only for the named build configuration it came from (dev vs
      test, feature set), never unconditionally. That applies to **both**
-     routes: the IR's per-build records, and rust-analyzer, whose one cfg set
-     (default features + `cfg(test)`) gives only `mock_instant`'s `elapsed`
-     here. Targets that differ between configurations are a set keyed by
+     routes: the IR's per-build records, and rust-analyzer, whose own cfg set
+     (default features plus `cfg(test)`, `cfg(miri)` and `debug_assertions`) is a configuration of its own and gives only
+     `mock_instant`'s `elapsed` here. Targets that differ between configurations are a set keyed by
      configuration, not several definite links; otherwise production code would
      be shown calling `mock_instant`.
 3. **Devirtualised `dyn` targets.** Never reported as "the" target.
@@ -218,7 +231,7 @@ Conditions, each a decision or a chunk:
    failures are detected from its log and `diagnostics`, never its exit code.
 5. **Mapping, caching and the build set.** Links are mapped by definition
    position. Results are cached on snapshot hashes, context files, `rustc -vV`,
-   the tool version and the feature set. The build set (dev + test, and
+   the tool version, the feature set and rust-analyzer's `cargo.cfgs`. The build set (dev + test, and
    whether std DWARF is read) is a stated choice.
 
 Unanswered:
