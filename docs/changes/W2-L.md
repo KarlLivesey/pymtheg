@@ -82,29 +82,37 @@ the caller's is passed on:
   `/tmp`);
 - a hash assertion over the project.
 
-**What the helper itself reads from its caller** (exactly; `golinks.go`
-header):
+**What the helper's process reads from its caller** (`golinks.go` header):
 
-- `HOME`: only for the default `-gopath` (`$HOME/go`), and so which module
-  cache is used. Give `-gopath` or `-gomodcache` to fix it.
-- `GODEBUG`: if set, the helper re-executes itself without it. A setting the
-  Go runtime has removed aborts any Go program before `main`
-  (`raw/exec-attacks.txt`), so **the launcher must start the helper with a
-  clean environment**.
-- `PWD`: Go's `os.Getwd` uses it only when it names the current directory.
+- **The helper's own code acts on** only `HOME` (the default `-gopath`
+  `$HOME/go`, and so which module cache; give `-gopath` or `-gomodcache` to
+  fix it), `PWD` (Go's `os.Getwd` uses it only when it names the current
+  directory), `GODEBUG` (if set, the helper re-executes itself without it)
+  and the two experiment escapes below.
+- **The Go runtime and standard-library initialisation inside the helper's
+  process additionally read** variables including the runtime variables
+  `GODEBUG`, `GOMEMLIMIT`, `GOGC`, `GOMAXPROCS` and `GOTRACEBACK`, and the build-configuration variables `GOOS`, `GOARCH`, `GOROOT`, `GOPATH`, `CGO_ENABLED`, `GOEXPERIMENT`, `GOAMD64`, `GO386`, `GOARM`, `GOARM64`, `GOMIPS`, `GOMIPS64`, `GOPPC64`, `GORISCV64`, `GOWASM`, `GOFIPS140` and `GO_EXTLINK_ENABLED` (through
+  `go/build` and `internal/buildcfg`, which `go/importer` links in). A
+  malformed `GODEBUG` or `GOMEMLIMIT` aborts the helper before `main` (exit
+  2, 0 records); none of them changes the records: with hostile values for
+  every listed variable except `GODEBUG` (`GOMEMLIMIT` well-formed), the
+  sorted records were identical apart from the
+  fresh-cache path (`scripts/process-env.sh`, `raw/process-env.txt`;
+  `raw/exec-attacks.txt` for `GODEBUG`). So **the launcher must start the
+  helper with a clean environment**.
 - **Two experiment escapes**, `GOLINKS_EXTRA_ENV` (adds variables to `go`'s
   environment) and `GOLINKS_NOPIN` (turns off the pin of the four project
   files). They exist in this evidence helper only, so the scripts can
   re-open holes on purpose, and **a product must not have them**. They do
-  re-open every hole: with
-  `GOLINKS_EXTRA_ENV="GOCACHEPROG=<hook>"`, go runs the hook; with
-  `GOLINKS_NOPIN=1`, a workspace with a cached module and no `go.work.sum`
-  exits 3 (`project-written`) and leaves `go.work.sum` in the project
-  (`scripts/experiment-escapes.sh`, `raw/experiment-escapes.txt`).
+  re-open every hole: with `GOLINKS_EXTRA_ENV="GOCACHEPROG=<hook>"`, go runs
+  the hook; with `GOLINKS_NOPIN=1`, a workspace with a cached module and no
+  `go.work.sum` exits 3 (`project-written`) and leaves `go.work.sum` in the
+  project (`scripts/experiment-escapes.sh`, `raw/experiment-escapes.txt`).
 
-`TMPDIR` is not read: the fresh build cache goes under `-tmp`. Two default
-runs with a caller `TMPDIR` set made two distinct directories under `/tmp`,
-none under `TMPDIR`, and removed both (`raw/hazards.txt`, "defaults").
+`PATH` and `TMPDIR` are not read by the helper's code: there is no default
+`go`, and the fresh build cache goes under `-tmp`. Two default runs with a
+caller `TMPDIR` set made two distinct directories under `/tmp`, none under
+`TMPDIR`, and removed both (`raw/hazards.txt`, "defaults").
 
 **With the experiment escapes unset**, measured in the committed runs:
 
@@ -151,10 +159,10 @@ mechanism comes only from a reviewer's report, it says so.
 | 15  | hazard: no sandbox where unprivileged user namespaces are unavailable                           | bubblewrap needs them: with namespaces disabled, bwrap fails (`raw/escape.txt`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | when `-sandbox bwrap` is given, the helper refuses (exit 2, 0 records); not silently downgraded                                                                                                            |
 | 16  | sockets and FIFOs inside a bound tree are live IPC endpoints                                    | a read-only mount preserves IPC through special files. Under the allow-list sandbox, a planted program connected to a host listener at `<project>/listener` and wrote bytes into a project FIFO that a host process read; an unused trusted local `replace` made another directory's listener reachable. The helper exited 0 with unchanged project hashes: a content hash does not see special files (`raw/hazards.txt`, "row 14"). The reviewer's further step (a host process then writing outside every bound directory) depends on what the listener does | **open** — requirement for a real sandbox: present the project as plain files (copied or overlaid from the snapshot), never bind it                                                                        |
 | 17  | a required sandbox silently disappears                                                          | `-bwrap ''` was read as "unsandboxed"; a relative `-bwrap bwrap` resolved through the caller's PATH to a fake wrapper that stripped the sandbox                                                                                                                                                                                                                                                                                                                                                                                                                | `-bwrap` must be an absolute path when `-sandbox bwrap` is given, else exit 2 and 0 records; the fake never ran (`raw/escape.txt`); bubblewrap, like `go`, is trusted and named by the launcher            |
-| 18  | a caller `GODEBUG` naming a removed setting                                                     | the Go runtime aborts the helper before `main` (`raw/exec-attacks.txt`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | the launcher must start the helper with a clean environment (requirement)                                                                                                                                  |
+| 18  | a malformed caller `GODEBUG` (e.g. a removed setting) or `GOMEMLIMIT`                           | the Go runtime aborts the helper before `main` (`raw/exec-attacks.txt`, `raw/process-env.txt`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | the launcher must start the helper with a clean environment (requirement)                                                                                                                                  |
 | 19  | the helper's experiment escapes                                                                 | `GOLINKS_EXTRA_ENV` and `GOLINKS_NOPIN` re-open the holes above (`raw/experiment-escapes.txt`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | evidence helper only; a product must not have them                                                                                                                                                         |
 
-Rows 1–17 came from review, over six rounds with two reviewers each; rows
+Rows 1–17 came from review, over six rounds; rows
 18 and 19 from this investigation's own runs and review round 6. Each fix
 was followed by a new finding. That is why the sandbox is a prototype.
 
@@ -200,8 +208,9 @@ universe.
 
 **Requirement, not a choice:** the launcher names the trusted Go installation
 (`-go`, an absolute path) and starts the indexer with a clean environment. A
-`go` found on a PATH cannot be authenticated, and a removed `GODEBUG` setting
-aborts any Go program before `main`.
+`go` found on a PATH cannot be authenticated, and a malformed `GODEBUG` or
+`GOMEMLIMIT` aborts any Go program before `main` (`raw/exec-attacks.txt`,
+`raw/process-env.txt`).
 
 **Decisions for Karl:**
 
@@ -251,7 +260,8 @@ aborts any Go program before `main`.
        between trust levels;
      - module-cache lock files for a module go was asked to find;
      - with downloads, the modules and checksum state.
-   - **Never written:** the project (pinned and asserted on every run).
+   - **Never written**, with the experiment escapes unset: the project
+     (pinned and asserted on every run).
 
 Not measured: other projects; gopls; `x/tools/go/packages`; implementer sets
 in test packages; private module proxies; a project whose own packages need
