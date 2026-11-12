@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import { dirname, posix } from "node:path";
 import ts from "typescript";
 import { compare, matchesPattern } from "../../index.js";
-import type { ContextFile, GraphFile } from "../../types.js";
+import type { ContextFile, Diagnostic, GraphFile } from "../../types.js";
 import {
   freshNames,
   renameShadowed,
@@ -79,6 +79,15 @@ export interface ProjectModel {
   fresh: FreshNames;
   /** Files the compiler's parser could not parse, with the cause. */
   parseFailures: Map<string, string>;
+  /**
+   * Files with a syntax error (a TypeScript parser diagnostic, or heritage
+   * grammar the parser accepts but that has no meaning): failed, served to
+   * every program as absent. Their diagnostics, and whether the file was a
+   * script (its top-level declarations would be globals).
+   */
+  syntaxFailures: Map<string, { diagnostics: Diagnostic[]; script: boolean }>;
+  /** Failed files a host was asked for (roots or imports): unseen declarations. */
+  requested: (host: ts.CompilerHost) => ReadonlySet<string>;
   /** A compiler host over the snapshot; a variant replaces some files' text. */
   host: (group: ProjectGroup, variant?: HostVariant) => ts.CompilerHost;
 }
@@ -92,6 +101,105 @@ const INFERRED: ts.CompilerOptions = {
   allowImportingTsExtensions: true,
   resolveJsonModule: false,
 };
+/**
+ * A syntax error makes a file invalid: a TypeScript parser diagnostic, or
+ * heritage grammar the parser accepts but that has no meaning. Returns its
+ * errors sorted by position, each "Syntax error at line L, column C:" with
+ * the parser's own message and the offending text when there is a span
+ * (one line, at most 40 characters), and whether the file was a script.
+ * `parsed` may be the compiler's parse of a same-length renamed text.
+ */
+export function syntaxFailure(
+  path: string,
+  text: string,
+  parsed?: ts.SourceFile,
+): { diagnostics: Diagnostic[]; script: boolean } | undefined {
+  const source = (parsed ??
+    ts.createSourceFile(
+      toVirtual(path),
+      text,
+      ts.ScriptTarget.Latest,
+      true,
+    )) as ts.SourceFile & {
+    parseDiagnostics?: readonly ts.Diagnostic[];
+    externalModuleIndicator?: unknown;
+    commonJsModuleIndicator?: unknown;
+  };
+  const at = (start: number, length: number, message: string) => {
+    const { line, character } = source.getLineAndCharacterOfPosition(start);
+    const found = text
+      .slice(start, start + length)
+      .replace(/\s+/g, " ")
+      .trim();
+    const shown = found.length > 40 ? found.slice(0, 37) + "..." : found;
+    return {
+      message: `Syntax error at line ${line + 1}, column ${character + 1}: ${message}${shown ? ` Found: "${shown}".` : ""}`,
+      range: { start, end: Math.min(text.length, start + length) },
+    };
+  };
+  const diagnostics: Diagnostic[] = [
+    ...(source.parseDiagnostics ?? []).map((diagnostic) =>
+      at(
+        diagnostic.start ?? 0,
+        diagnostic.length ?? 0,
+        ts.flattenDiagnosticMessageText(diagnostic.messageText, " "),
+      ),
+    ),
+    ...heritageErrors(source).map((start) =>
+      at(
+        start,
+        0,
+        "Invalid heritage clauses (more than one base class, extends after implements, or implements on an interface).",
+      ),
+    ),
+  ].sort(
+    (a, b) => a.range!.start - b.range!.start || a.range!.end - b.range!.end,
+  );
+  if (!diagnostics.length) return undefined;
+  return {
+    diagnostics,
+    script: !source.externalModuleIndicator && !source.commonJsModuleIndicator,
+  };
+}
+
+/**
+ * Positions of heritage grammar the parser accepts but that has no meaning
+ * (`extends A, B`, two `extends` clauses, `extends` after `implements`,
+ * `implements` on an interface): a syntax error like any other.
+ */
+function heritageErrors(source: ts.SourceFile): number[] {
+  const errors: number[] = [];
+  const visit = (node: ts.Node): void => {
+    if (
+      (ts.isClassLike(node) || ts.isInterfaceDeclaration(node)) &&
+      node.heritageClauses?.length
+    ) {
+      const clauses = node.heritageClauses;
+      const extendsClauses = clauses.filter(
+        (c) => c.token === ts.SyntaxKind.ExtendsKeyword,
+      );
+      const implementsAt = clauses.findIndex(
+        (c) => c.token === ts.SyntaxKind.ImplementsKeyword,
+      );
+      const extendsAt = clauses.findIndex(
+        (c) => c.token === ts.SyntaxKind.ExtendsKeyword,
+      );
+      const bad =
+        (ts.isClassLike(node) &&
+          (extendsClauses.length > 1 ||
+            extendsClauses.some((c) => c.types.length > 1) ||
+            (implementsAt >= 0 &&
+              extendsAt >= 0 &&
+              implementsAt < extendsAt))) ||
+        (ts.isInterfaceDeclaration(node) && implementsAt >= 0);
+      if (bad) errors.push(clauses[0]!.getStart(source));
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return errors;
+}
+
 /** Options the snapshot analysis always overrides; recorded in the change note. */
 /** A host serving other compiler text for some files (differential analysis). */
 export interface HostVariant {
@@ -655,7 +763,13 @@ export function projectModel(
   }
   if (inferred) groups.push(inferred);
   const parseFailures = new Map<string, string>();
+  const syntaxFailures = new Map<
+    string,
+    { diagnostics: Diagnostic[]; script: boolean }
+  >();
   const caches = new WeakMap<ts.CompilerHost, Map<string, ts.SourceFile>>();
+  const asked = new WeakMap<ts.CompilerHost, Set<string>>();
+  const originals = new Map(files.map((file) => [file.path, file.text]));
   const host = (
     group: ProjectGroup,
     variant?: HostVariant,
@@ -663,6 +777,7 @@ export function projectModel(
     const sources = new Map<string, ts.SourceFile>();
     const failures = variant?.failures ?? parseFailures;
     const shared = variant?.base && caches.get(variant.base);
+    const requested = new Set<string>();
     const created: ts.CompilerHost = {
       getSourceFile(name, languageVersion) {
         if (name.startsWith(LIB_ROOT + "/")) return libFile(name);
@@ -670,8 +785,12 @@ export function projectModel(
         const override = variant?.texts.get(real.slice(1));
         const text = override ?? fs.files.get(real);
         if (text === undefined) return undefined;
-        // A file the parser or binder could not handle stays out of every program.
-        if (failures.has(real.slice(1))) return undefined;
+        // A file the parser or binder could not handle, or with a syntax
+        // error, stays out of every program: it is absent, not empty.
+        if (failures.has(real.slice(1))) {
+          requested.add(real.slice(1));
+          return undefined;
+        }
         // An unchanged file reuses the base host's parse (and binding).
         let file =
           sources.get(real) ??
@@ -686,6 +805,23 @@ export function projectModel(
               real.slice(1),
               `The TypeScript parser failed on this file: ${error instanceof Error ? error.message : String(error)}`,
             );
+            requested.add(real.slice(1));
+            return undefined;
+          }
+          // A file that cannot be read is not valid code: it has failed.
+          const path = real.slice(1);
+          const failure = syntaxFailure(
+            path,
+            originals.get(path) ?? text,
+            file,
+          );
+          if (failure) {
+            syntaxFailures.set(path, failure);
+            failures.set(
+              path,
+              "This file has a syntax error: it is not valid code",
+            );
+            requested.add(path);
             return undefined;
           }
         }
@@ -716,7 +852,19 @@ export function projectModel(
       realpath: (name) => fs.real(name),
     };
     caches.set(created, sources);
+    asked.set(created, requested);
     return created;
   };
-  return { groups, owner, ties, failures, renames, fresh, parseFailures, host };
+  return {
+    groups,
+    owner,
+    ties,
+    failures,
+    renames,
+    fresh,
+    parseFailures,
+    syntaxFailures,
+    requested: (host) => asked.get(host) ?? new Set(),
+    host,
+  };
 }

@@ -12,12 +12,7 @@ import type {
 } from "../../types.js";
 import { CheckerLimit, extractFile, type TargetFact } from "./extract.js";
 import type { Renamed } from "./rename.js";
-import {
-  errorPositions,
-  neutralizeAssumed,
-  neutralizeSpans,
-  untrustedSpans,
-} from "./untrusted.js";
+import { neutralizeAssumed } from "./untrusted.js";
 
 /** Program rebuilds per file after checker stack overflows before giving up. */
 const MAX_LIMIT_RETRIES = 25;
@@ -29,6 +24,7 @@ import {
   CONTEXT_PATTERNS,
   fromVirtual,
   projectModel,
+  syntaxFailure,
   toVirtual,
 } from "./project.js";
 
@@ -39,7 +35,7 @@ import {
  * facts; resolve maps those facts to symbol IDs. See docs/changes/W2-D.md.
  */
 // Bump the leading number whenever extraction or resolution semantics change.
-const MODULE_VERSION = `8+typescript-${ts.version}`;
+const MODULE_VERSION = `10+typescript-${ts.version}`;
 
 /** Observation counters for tests (programs built, files extracted). Not a correctness input. */
 export const statistics = {
@@ -206,6 +202,21 @@ function openSession(
   return session;
 }
 
+/**
+ * `data.assumes`: the assumptions a link's facts rest on, as a sorted array
+ * of unique names (absent when there are none). `bundler-require`: a free
+ * `require`/`module` in an ES module read as the loader. `no-unseen-declarations`:
+ * the link's project contains a file the parser could not fully read, and
+ * the facts hold provided that unread text declares nothing that changes them.
+ */
+function assume(data: { [key: string]: Json }, ...names: string[]) {
+  const all = new Set<string>([
+    ...((Array.isArray(data.assumes) ? data.assumes : []) as string[]),
+    ...names,
+  ]);
+  if (all.size) data.assumes = [...all].sort();
+}
+
 /** A link's comparable outcome: its target set and reason. */
 const outcomeOf = (link: LinkDraft): string => {
   const data = (link.data ?? {}) as { targets?: TargetFact[]; reason?: string };
@@ -239,32 +250,35 @@ function differing(normal: ParseResult, neutral: ParseResult): Set<number> {
   return marks;
 }
 
-/**
- * Labels links that depend on untrusted input. Partial structure: a link
- * with targets and no other reason becomes unresolved `partial-declaration`,
- * its targets kept (never completing a candidate set). Bundler assumption:
- * `assumes: "bundler-require"`. When both apply, partial-declaration wins.
- */
+/** Flags the links that rest on the bundler assumption. */
 function labelled(
   result: ParseResult,
-  partial: ReadonlySet<number> | undefined,
-  assumed: ReadonlySet<number> | undefined,
+  assumed: ReadonlySet<number>,
 ): ParseResult {
   const links = result.links.map((link, index) => {
-    const isPartial = !!partial?.has(index);
-    if (!isPartial && !assumed?.has(index)) return link;
+    if (!assumed.has(index)) return link;
     const data = { ...((link.data ?? {}) as { [key: string]: Json }) };
-    if (
-      isPartial &&
-      (data.targets as Json[] | undefined)?.length &&
-      !data.reason
-    )
-      data.reason = "partial-declaration";
-    else if (assumed?.has(index)) data.assumes = "bundler-require";
+    assume(data, "bundler-require");
     return { ...link, data };
   });
   return { ...result, links };
 }
+
+/** A file that cannot be read: failed, with its syntax errors, no facts. */
+const invalidResult = (
+  failure: { diagnostics: Diagnostic[] },
+  failedFiles: Json,
+): ParseResult => ({
+  status: "failed",
+  diagnostics: failure.diagnostics.map((item) => ({ ...item })),
+  symbols: [],
+  links: [],
+  data: {
+    analyzer: MODULE_VERSION,
+    invalid: true,
+    ...(failedFiles && Object.keys(failedFiles).length ? { failedFiles } : {}),
+  },
+});
 
 const failed = (message: string): ParseResult => ({
   status: "failed",
@@ -275,48 +289,83 @@ const failed = (message: string): ParseResult => ({
 
 /**
  * Merges one file's results from equally ranked configs, independent of
- * their order. Symbols are syntactic and must be identical. For each link the
- * merged facts are the weakest, most qualified of the variants:
- * - targets: the union (sorted);
- * - reason: none if no variant has one and the targets agree or every
- *   variant was complete (then two or more targets are candidates); the one
- *   reason if every variant gives the same reason and the same targets;
- *   otherwise `ambiguous-project`, with `tiedReasons` listing them;
- * - `assumes`: kept if any variant has it;
- * - any other field that differs between variants is not picked from one of
- *   them: it moves to `byProject` (config → value), for every variant.
+ * their order: nothing comes from "the first" variant. Every field is either
+ * identical across the variants, a sorted union, or listed per config:
+ * - symbols, and each link's kind, range, source and name, must be
+ *   identical (otherwise the file fails);
+ * - targets: the sorted union; reason: none if no variant has one (two or
+ *   more targets are candidates), the one reason if every variant gives it
+ *   with the same targets, otherwise `ambiguous-project` with `tiedReasons`;
+ *   `assumes`: the union;
+ * - any other link or file field that differs: per config in `byProject`;
+ * - diagnostics: the sorted union; status: the weakest.
  */
-function mergeTied(
+export function mergeTied(
   variants: ParseResult[],
   configs: (string | null)[],
 ): ParseResult {
-  if (variants.some((variant) => variant.status === "failed")) {
-    // The weakest: a failure (the same message whatever the order).
-    const failures = variants
-      .filter((variant) => variant.status === "failed")
-      .map((variant) => variant.diagnostics.map((d) => d.message).join("; "));
-    return failed([...new Set(failures)].sort().join("; "));
-  }
-  const [first] = variants;
+  const names = configs.map((config) => config ?? "(inferred)");
+  const projects = [...configs].sort((a, b) =>
+    (a ?? "") < (b ?? "") ? -1 : (a ?? "") > (b ?? "") ? 1 : 0,
+  );
   const same = (a: unknown, b: unknown) =>
     JSON.stringify(a) === JSON.stringify(b);
+  const byKey = <T>(entries: [string, T][]) =>
+    entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  if (variants.some((variant) => variant.status === "failed")) {
+    // The weakest: a failure, its diagnostics the sorted union.
+    const diagnostics = byKey(
+      variants
+        .filter((variant) => variant.status === "failed")
+        .flatMap((variant) => variant.diagnostics)
+        .map((d): [string, Diagnostic] => [JSON.stringify(d), d]),
+    );
+    return {
+      status: "failed",
+      diagnostics: [...new Map(diagnostics).values()],
+      symbols: [],
+      links: [],
+    };
+  }
+  /** Fields identical everywhere kept; differing ones listed per config. */
+  const mergeFields = (
+    datas: { [key: string]: Json }[],
+    skip: readonly string[],
+  ): { [key: string]: Json } => {
+    const merged: { [key: string]: Json } = {};
+    const byProject: { [key: string]: { [key: string]: Json } } = {};
+    const keys = [...new Set(datas.flatMap((data) => Object.keys(data)))]
+      .filter((key) => !skip.includes(key))
+      .sort();
+    for (const key of keys) {
+      if (datas.every((data) => same(data[key], datas[0]![key]))) {
+        if (datas[0]![key] !== undefined) merged[key] = datas[0]![key]!;
+      } else
+        datas.forEach((data, at) => {
+          const entry = (byProject[names[at]!] ??= {});
+          if (data[key] !== undefined) entry[key] = data[key]!;
+        });
+    }
+    const listed = byKey(Object.entries(byProject));
+    if (listed.length) merged.byProject = Object.fromEntries(listed);
+    return merged;
+  };
+  const shape = (link: LinkDraft) =>
+    JSON.stringify([link.kind, link.range, link.sourceKey, link.targetName]);
   if (
     variants.some(
       (variant) =>
-        !same(variant.symbols, first!.symbols) ||
-        variant.links.length !== first!.links.length ||
+        !same(variant.symbols, variants[0]!.symbols) ||
+        variant.links.length !== variants[0]!.links.length ||
         variant.links.some(
-          (link, index) =>
-            link.kind !== first!.links[index]!.kind ||
-            !same(link.range, first!.links[index]!.range),
+          (link, index) => shape(link) !== shape(variants[0]!.links[index]!),
         ),
     )
   )
     return failed(
-      `Equally ranked configs ${configs.join(", ")} produced different structure for this file`,
+      `Equally ranked configs ${projects.join(", ")} produced different structure for this file`,
     );
-  const names = configs.map((config) => config ?? "(inferred)");
-  const links = first!.links.map((link, index) => {
+  const links = variants[0]!.links.map((link, index) => {
     const datas = variants.map(
       (variant) =>
         (variant.links[index]!.data ?? {}) as { [key: string]: Json },
@@ -340,29 +389,12 @@ function mergeTied(
     const sameTargets = datas.every((data) =>
       same(keyed(data), keyed(datas[0]!)),
     );
-    const merged: { [key: string]: Json } = {};
-    const keys = [...new Set(datas.flatMap((data) => Object.keys(data)))]
-      .filter((key) => !["targets", "reason", "assumes"].includes(key))
-      .sort();
-    const byProject: { [key: string]: Json } = {};
-    for (const key of keys) {
-      if (datas.every((data) => same(data[key], datas[0]![key]))) {
-        if (datas[0]![key] !== undefined) merged[key] = datas[0]![key]!;
-      } else
-        datas.forEach((data, at) => {
-          const entry = (byProject[names[at]!] ??= {}) as {
-            [key: string]: Json;
-          };
-          if (data[key] !== undefined) entry[key] = data[key]!;
-        });
-    }
-    if (Object.keys(byProject).length) merged.byProject = byProject;
+    const merged = mergeFields(datas, ["targets", "reason", "assumes"]);
     if (targets.size)
-      merged.targets = [...targets.entries()]
-        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-        .map(([, t]) => ({ ...t }));
-    const allComplete = reasons.length === 0;
-    if (!allComplete) {
+      merged.targets = byKey([...targets.entries()]).map(([, t]) => ({
+        ...t,
+      }));
+    if (reasons.length) {
       const everyVariantSame =
         sameTargets &&
         reasons.length === 1 &&
@@ -370,35 +402,38 @@ function mergeTied(
       merged.reason = everyVariantSame ? reasons[0]! : "ambiguous-project";
       if (!everyVariantSame) merged.tiedReasons = reasons;
     }
-    if (!sameTargets || !allComplete) merged.projects = [...configs];
-    if (datas.some((data) => data.assumes)) merged.assumes = "bundler-require";
+    if (!sameTargets || reasons.length) merged.projects = [...projects];
+    assume(
+      merged,
+      ...datas.flatMap(
+        (data) => (Array.isArray(data.assumes) ? data.assumes : []) as string[],
+      ),
+    );
     return { ...link, data: merged };
   });
   const diagnostics = [
     ...new Map(
-      variants
-        .flatMap((variant) => variant.diagnostics)
-        .map((diagnostic) => [JSON.stringify(diagnostic), diagnostic]),
-    ).entries(),
-  ]
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-    .map(([, diagnostic]) => diagnostic);
+      byKey(
+        variants
+          .flatMap((variant) => variant.diagnostics)
+          .map((d): [string, Diagnostic] => [JSON.stringify(d), d]),
+      ),
+    ).values(),
+  ];
+  // A tie has no single owner: `projects` lists them; `project` is absent.
+  const data = mergeFields(
+    variants.map((variant) => (variant.data ?? {}) as { [key: string]: Json }),
+    ["project"],
+  );
+  data.projects = [...projects];
   return {
-    ...first!,
     status: variants.some((variant) => variant.status === "partial")
       ? "partial"
-      : first!.status,
+      : "clean",
     diagnostics,
+    symbols: variants[0]!.symbols,
     links,
-    data: (() => {
-      // A tie has no single owner: `projects` lists them; `project` is absent.
-      const merged: { [key: string]: Json } = {
-        ...(first!.data as { [key: string]: Json }),
-        projects: [...configs],
-      };
-      delete merged.project;
-      return merged;
-    })(),
+    data,
   };
 }
 
@@ -410,20 +445,46 @@ const module: LanguageModule = {
   contextFiles: CONTEXT_PATTERNS,
   analyze(context) {
     const files = context.files.filter(readable);
-    // Unchanged snapshot: stored facts came from a complete analysis of these exact
-    // sources and contexts by this module version, so they are reused unparsed.
+    // Unchanged snapshot: stored facts came from a complete analysis of these
+    // exact sources and contexts by this module version, so they are reused
+    // without building a program. The core always hands back a file that
+    // failed before as changed (its stored result replaced); if every changed
+    // file is such a failed file with the same content as recorded in
+    // `failedFiles`, nothing else can differ: only it is parsed again, for
+    // its diagnostics.
+    const changed = new Set(context.changedFiles);
+    const kept = files.filter((file) => !changed.has(file.path));
+    const dataOf = (file: GraphFile) =>
+      (file.result.data ?? {}) as { analyzer?: unknown; failedFiles?: Json };
+    const recorded = (kept[0] && dataOf(kept[0]).failedFiles) ?? {};
+    const recordedHash = (path: string) =>
+      (recorded as { [path: string]: Json })[path];
     if (
-      !context.changedFiles.length &&
       !context.changedContextFiles.length &&
-      files.every(
+      kept.every(
         (file) =>
-          file.result.status !== "failed" &&
-          (file.result.data as { analyzer?: unknown } | undefined)?.analyzer ===
-            MODULE_VERSION,
-      )
+          dataOf(file).analyzer === MODULE_VERSION &&
+          JSON.stringify(dataOf(file).failedFiles ?? {}) ===
+            JSON.stringify(recorded),
+      ) &&
+      [...changed].every((path) => {
+        const file = files.find((item) => item.path === path);
+        return file !== undefined && recordedHash(path) === file.hash;
+      })
     ) {
-      statistics.reused++;
-      return files.map((file) => ({ path: file.path, result: file.result }));
+      const again = files
+        .filter((file) => changed.has(file.path))
+        .map((file) => [file, syntaxFailure(file.path, file.text)] as const);
+      if (again.every(([, failure]) => failure)) {
+        statistics.reused++;
+        return [
+          ...kept.map((file) => ({ path: file.path, result: file.result })),
+          ...again.map(([file, failure]) => ({
+            path: file.path,
+            result: invalidResult(failure!, recorded),
+          })),
+        ];
+      }
     }
     const model = projectModel(files, context.contextFiles);
     const captured = new Set(files.map((file) => file.path));
@@ -437,8 +498,6 @@ const module: LanguageModule = {
         tiedResults.set(path, [...(tiedResults.get(path) ?? []), result]);
       else results.push({ path, result });
     };
-    /** Untrusted spans (syntax-error tails) and their neutral text, per file. */
-    const neutralMemo = new Map<string, string | null>();
     for (const group of model.groups) {
       if (!group.roots.length) continue;
       const roots = () =>
@@ -467,17 +526,19 @@ const module: LanguageModule = {
        */
       const moduleKind = (
         path: string,
-      ): "module" | "script" | "partial" | "unavailable" => {
+      ): "module" | "script" | "invalid" | "unavailable" => {
+        if (model.syntaxFailures.has(path)) return "invalid";
         if (model.parseFailures.has(path) || model.failures.has(path))
           return "unavailable";
         const source =
           normal.program.getSourceFile(toVirtual(path)) ??
           normal.host.getSourceFile(toVirtual(path), ts.ScriptTarget.Latest);
+        // Parsing it just now may have found a syntax error.
+        if (model.syntaxFailures.has(path)) return "invalid";
         if (!source) return "unavailable";
         const flags = source as ts.SourceFile & {
           externalModuleIndicator?: unknown;
           commonJsModuleIndicator?: unknown;
-          parseDiagnostics?: readonly ts.Diagnostic[];
         };
         if (
           !!flags.externalModuleIndicator ||
@@ -485,7 +546,7 @@ const module: LanguageModule = {
           /(^|[^.\w$])(module\.exports|exports\.[\w$]+)\s*=/.test(source.text)
         )
           return "module";
-        return flags.parseDiagnostics?.length ? "partial" : "script";
+        return "script";
       };
       /** Extracts one file, rebuilding the session after checker overflows. */
       const extractWith = (
@@ -494,7 +555,6 @@ const module: LanguageModule = {
         data: { [key: string]: Json },
         diagnostics: Diagnostic[],
         renamed: Renamed | undefined,
-        openRule = true,
       ): ParseResult => {
         if (session.rebuilds > MAX_PROGRAM_REBUILDS)
           return failed(
@@ -524,7 +584,7 @@ const module: LanguageModule = {
                 resolveModule,
                 skip,
                 moduleKind,
-                openRule,
+                failedScripts,
               },
             );
             statistics.extracted++;
@@ -551,9 +611,27 @@ const module: LanguageModule = {
           }
         }
       };
+      // Failed files this program would include (roots, or imported): any of
+      // them might have declared something that changes a link.
+      const unseen = new Set([
+        ...model.requested(normal.host),
+        ...group.roots
+          .map((root) => root.slice(1))
+          .filter((path) => model.parseFailures.has(path)),
+      ]);
+      const failedScripts = [...unseen]
+        .filter((path) => model.syntaxFailures.get(path)?.script)
+        .sort();
       const analysed: [string, ParseResult][] = [];
       for (const root of group.roots) {
         const path = root.slice(1);
+        // A file that cannot be read is not valid code: it has failed, with
+        // its syntax errors (first by position) as diagnostics.
+        const syntax = model.syntaxFailures.get(path);
+        if (syntax) {
+          analysed.push([path, invalidResult(syntax, {})]);
+          continue;
+        }
         const data: { [key: string]: Json } = {
           analyzer: MODULE_VERSION,
           project: group.config,
@@ -580,45 +658,34 @@ const module: LanguageModule = {
         ]);
       }
 
-      // ----- differential analysis (untrusted.ts) -----
-      // Untrusted input anywhere in this program: syntax-error tails of
-      // declarations, and free require/module read under the bundler
-      // assumption. Each kind gets one neutral program over the same
-      // snapshot; a link whose outcome differs there depends on it.
-      const spanTexts = new Map<string, string>();
+      // ----- differential analysis for the bundler assumption -----
+      // A free require/module in an ES module read as the loader: one
+      // neutral program with it renamed to an undeclared name; a link whose
+      // outcome differs there rests on the assumption.
       const assumedTexts = new Map<string, string>();
       for (const source of normal.program.getSourceFiles()) {
         const path = fromVirtual(source.fileName);
         if (path === undefined || !captured.has(path)) continue;
-        if (!neutralMemo.has(path)) {
-          const errors = errorPositions(
-            source,
-            normal.program.getSyntacticDiagnostics(source),
-          );
-          const spans = untrustedSpans(source, errors);
-          neutralMemo.set(
-            path,
-            spans.length ? neutralizeSpans(source, spans).text : null,
-          );
-        }
-        const neutral = neutralMemo.get(path);
-        if (neutral) spanTexts.set(path, neutral);
-        const assumed = model.renames.get(path)?.assumed ?? [];
-        if (assumed.length)
+        const offsets = model.renames.get(path)?.assumed ?? [];
+        if (offsets.length)
           assumedTexts.set(
             path,
-            neutralizeAssumed(source.text, assumed, model.fresh.uncertain),
+            neutralizeAssumed(source.text, offsets, model.fresh.uncertain),
           );
       }
-      const dependent = (texts: Map<string, string>, assumes: boolean) => {
-        const marks = new Map<string, Set<number>>();
-        if (!texts.size) return marks;
+      const assumed = new Map<string, Set<number>>();
+      if (assumedTexts.size) {
         statistics.neutralPrograms++;
         const failures = new Map(model.parseFailures);
         const neutral = openSession(
           () => group.roots.filter((root) => !failures.has(root.slice(1))),
           group.options,
-          () => model.host(group, { texts, base: normal.host, failures }),
+          () =>
+            model.host(group, {
+              texts: assumedTexts,
+              base: normal.host,
+              failures,
+            }),
           failures,
           captured,
         );
@@ -626,27 +693,37 @@ const module: LanguageModule = {
           if (result.status === "failed") continue;
           const renamed = model.renames.get(path);
           // The assumed loader becomes an undeclared name (see rename.ts).
-          const context: Renamed | undefined =
-            assumes && renamed?.assumed.length
-              ? {
-                  ...renamed,
-                  uncertain: [...renamed.uncertain, ...renamed.assumed],
-                  assumed: [],
-                }
-              : renamed;
-          // The neutral program answers only what the kept text supports.
-          const other = extractWith(neutral, path, {}, [], context, false);
+          const context: Renamed | undefined = renamed?.assumed.length
+            ? {
+                ...renamed,
+                uncertain: [...renamed.uncertain, ...renamed.assumed],
+                assumed: [],
+              }
+            : renamed;
+          const other = extractWith(neutral, path, {}, [], context);
           statistics.neutralExtracted++;
-          marks.set(path, differing(result, other));
+          assumed.set(path, differing(result, other));
         }
-        return marks;
-      };
-      const partial = dependent(spanTexts, false);
-      const assumed = dependent(assumedTexts, true);
+      }
       for (const [path, result] of analysed) {
-        const p = partial.get(path);
-        const a = assumed.get(path);
-        deliver(path, p || a ? labelled(result, p, a) : result);
+        let final = result;
+        const marks = assumed.get(path);
+        if (marks?.size) final = labelled(final, marks);
+        // One rule, one place: a program with a failed file among those it
+        // would include flags every link it computed (failed links excepted).
+        if (unseen.size && final.status !== "failed")
+          final = {
+            ...final,
+            links: final.links.map((link) => {
+              const data = {
+                ...((link.data ?? {}) as { [key: string]: Json }),
+              };
+              if (data.reason === "invalid-code") return link;
+              assume(data, "no-unseen-declarations");
+              return { ...link, data };
+            }),
+          };
+        deliver(path, final);
       }
     }
     for (const [path, variants] of tiedResults)
@@ -657,6 +734,20 @@ const module: LanguageModule = {
           model.ties.get(path)!.map((group) => group.config),
         ),
       });
+    // Every result records the module's failed files and their content, so
+    // an unchanged re-index can recognise them (see above).
+    const failedFiles = Object.fromEntries(
+      files
+        .filter((file) => model.syntaxFailures.has(file.path))
+        .map((file) => [file.path, file.hash] as const)
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+    );
+    if (Object.keys(failedFiles).length)
+      for (const item of results) {
+        const data = item.result.data as { [key: string]: Json } | undefined;
+        if (data?.analyzer === MODULE_VERSION)
+          item.result = { ...item.result, data: { ...data, failedFiles } };
+      }
     return results;
   },
   resolve({ symbols, links }) {

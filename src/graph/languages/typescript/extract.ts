@@ -7,8 +7,7 @@ import type {
   ParseResult,
   SymbolDraft,
 } from "../../types.js";
-import { fromVirtual } from "./project.js";
-import { heritageErrors, openInfo } from "./untrusted.js";
+import { fromVirtual, toVirtual } from "./project.js";
 import {
   NAMES,
   restoreNames,
@@ -25,10 +24,14 @@ export interface RenameContext {
   resolveModule: (specifier: string, from: string) => string | undefined;
   /** Nodes (and warm-up steps) whose checker lookups overflowed before. */
   skip: ReadonlySet<string>;
-  /** What a captured target file is: a module, a script (no exports), partial (syntax errors), or unavailable (failed). */
-  moduleKind: (path: string) => "module" | "script" | "partial" | "unavailable";
-  /** Apply the open-declaration rule (false in the neutral program). */
-  openRule?: boolean;
+  /**
+   * What a captured target file is: a module, a script (no exports),
+   * invalid (a syntax error: failed, absent from every program), or
+   * unavailable (failed for another reason).
+   */
+  moduleKind: (path: string) => "module" | "script" | "invalid" | "unavailable";
+  /** Failed (invalid) script files this program would include: their globals are unseen. */
+  failedScripts: readonly string[];
 }
 import {
   anchorOf,
@@ -58,6 +61,8 @@ interface Targets {
   viaAlias?: boolean;
   /** The receiver of a member lookup, if any. */
   receiver?: ts.Expression | undefined;
+  /** For `invalid-code`: the failed file(s) that caused it (never a target). */
+  cause?: string[];
   /**
    * Why there is no complete target set: external, local, no-symbol,
    * missing-module, external-package, unresolved-alias, computed-specifier.
@@ -102,7 +107,7 @@ const LIMIT = Object.freeze({ flags: 0 }) as unknown as ts.Symbol;
 const KIND_REASON = {
   module: "untyped-require",
   script: "not-a-module",
-  partial: "partial-target",
+  invalid: "invalid-code",
   unavailable: "target-unavailable",
 } as const;
 /** moduleReason: the compiler did not type the specifier, but it names a captured file. */
@@ -128,9 +133,6 @@ const isEntityChain = (node: ts.Expression): boolean =>
   (ts.isElementAccessExpression(node) &&
     ts.isStringLiteralLike(node.argumentExpression) &&
     isEntityChain(node.expression));
-
-const programOpenMemo = new WeakMap<ts.Program, boolean>();
-const scriptOpenMemo = new WeakMap<ts.Program, boolean>();
 
 export function extractFile(
   file: ts.SourceFile,
@@ -163,8 +165,6 @@ export function extractFile(
   // node in `skip`, whose links are then `compiler-limit` without asking.
   let limitHit = false;
   let limited = false;
-  /** The node being handled (where a name lookup happens). */
-  let current: ts.Node = file;
   function targetsOf(
     query: Lookup | ts.Symbol | undefined,
     meaning: Meaning,
@@ -188,13 +188,15 @@ export function extractFile(
       query && "flags" in query ? { symbol: query } : (query ?? {});
     const receiver = found.receiver;
     if (found.reason || !found.symbol)
-      return { targets: [], reason: found.reason ?? "no-symbol", receiver };
+      return failedThrough(
+        { targets: [], reason: found.reason ?? "no-symbol", receiver },
+        found,
+      );
     const facts = new Map<string, TargetFact>();
     let external = 0;
     let local = 0;
     let viaAlias = false;
     let firstAlias: ts.Symbol | undefined;
-    const declared: ts.Node[] = [];
     const record = (declaration: ts.Declaration): boolean => {
       const target = fromVirtual(declaration.getSourceFile().fileName);
       if (target === undefined || !captured.has(target)) return false;
@@ -202,7 +204,6 @@ export function extractFile(
       if (!anchor) return false;
       const key = keyOf(anchor);
       facts.set(`${target}\0${key}`, { file: target, key });
-      declared.push(declaration);
       return true;
     };
     const visit = (value: ts.Symbol, depth: number) => {
@@ -243,297 +244,129 @@ export function extractFile(
     };
     visit(found.symbol, 0);
     const targets = [...facts.values()];
-    if (!external && !local) {
-      // Declarations nobody saw (parser recovery) could change the answer.
-      if (
-        targets.length &&
-        context.openRule !== false &&
-        openWithheld(found.symbol, declared, receiver)
-      )
-        return {
-          targets,
-          reason: "partial-declaration",
-          viaAlias,
-          receiver,
-        };
-      return { targets, viaAlias, receiver };
-    }
+    if (!external && !local) return { targets, viaAlias, receiver };
     // An alias whose module did not resolve keeps that module's reason.
     const moduleFailure =
       external &&
       !targets.length &&
       ((firstAlias && bindingReason(firstAlias)) ||
         (receiver && receiverReason(receiver)));
-    return {
+    const result: Targets = {
       targets,
       reason: local ? "local" : moduleFailure || "external",
       viaAlias,
       receiver,
     };
+    return targets.length ? result : failedThrough(result, found);
   }
-  // ----- open declarations (untrusted.ts openInfo) -----
+  // ----- failed (invalid) files: nothing in them is a target -----
   /**
-   * Whether a lookup could land elsewhere because of declarations that parser
-   * recovery may have dropped. One rule, three sources of open owners:
-   * (a) member lookups: every class, interface, enum, namespace, type or
-   *     object literal (and module object) in the receiver's type closure;
-   * (b) aliases: every module consulted for the imported name (the
-   *     specifier's module, and its `export *` closure when the name is not
-   *     declared there);
-   * (b) other names: every open scope (file, namespace body) between the
-   *     use and the declaration.
-   * An open owner withholds the link unless every target lies inside it,
-   * wholly before the offset it is open from (type owners), or inside it at
-   * all (scopes and modules, where seen declarations are seen), and is not a
-   * declaration an unseen one could replace (`var`, a JS function).
+   * An unresolved lookup that a failed file could have answered is FAILED:
+   * `invalid-code`, no targets, and the failed file(s) as `cause`. Reached
+   * only through a failed file means: an alias chain whose module (or that
+   * module's `export *` closure) is a failed file; a receiver whose class or
+   * interface extends or implements such a name; or a bare name that no
+   * declaration answers while a failed script (whose top-level declarations
+   * would be globals) is part of the program.
    */
-  function openWithheld(
-    symbol: ts.Symbol,
-    declared: readonly ts.Node[],
-    receiver: ts.Expression | undefined,
-  ): boolean {
-    if (!programOpen()) return false;
-    const targets = declared.filter((d) => !ts.isSourceFile(d));
-    if (!targets.length) return false;
-    const owners = new Set<ts.Node>();
-    if (receiver) {
-      let type: ts.Type | undefined;
+  function failedThrough(result: Targets, found: Lookup): Targets {
+    const causes = new Set<string>(result.cause ?? []);
+    if (found.symbol && found.symbol.flags & ts.SymbolFlags.Alias)
+      for (const file of aliasCauses(found.symbol)) causes.add(file);
+    if (found.receiver) {
+      const root = rootOf(found.receiver);
+      const rootSymbol = root && symbolOf(root);
+      if (rootSymbol && rootSymbol !== LIMIT) {
+        if (rootSymbol.flags & ts.SymbolFlags.Alias)
+          for (const file of aliasCauses(rootSymbol)) causes.add(file);
+      }
       try {
-        type = checker.getTypeAtLocation(receiver);
+        for (const file of heritageCauses(
+          checker.getTypeAtLocation(found.receiver),
+          new Set(),
+        ))
+          causes.add(file);
       } catch (error) {
-        if (isLimit(error)) return true;
-        throw error;
+        if (!isLimit(error)) throw error;
       }
-      if (type) typeOwners(type, owners, new Set());
-      let root = checker.getSymbolAtLocation(receiver);
-      if (root && root.flags & ts.SymbolFlags.Alias)
-        root = checker.getAliasedSymbol(root);
-      for (const d of root?.declarations ?? []) owners.add(d);
-    } else if (symbol.flags & ts.SymbolFlags.Alias) consulted(symbol, owners);
-    else {
-      // Open scopes between the use and the declaration.
-      for (let node: ts.Node | undefined = current; node; node = node.parent)
-        if (
-          (ts.isSourceFile(node) || ts.isModuleDeclaration(node)) &&
-          openAt(node) !== undefined
-        )
-          for (const target of targets) {
-            if (!inside(node, target)) return true;
-            if (directlyIn(node, target) && replaceable(target)) return true;
-          }
-      // A global declared by another (script) file: any open script may
-      // declare it again.
-      if (
-        targets.some(
-          (target) =>
-            target.getSourceFile() !== file &&
-            !isModuleFile(target.getSourceFile()) &&
-            directlyIn(target.getSourceFile(), target),
-        ) &&
-        scriptOpen()
-      )
-        return true;
-    }
-    for (const owner of owners) {
-      const at = openAt(owner);
-      if (at === undefined) continue;
-      for (const target of targets) {
-        if (!inside(owner, target)) return true;
-        if (ts.isSourceFile(owner)) {
-          if (directlyIn(owner, target) && replaceable(target)) return true;
-        }
-        // A member must lie wholly before the offset: one whose name comes
-        // first but whose text runs past it (`isFailed(x: , y) {…}`) keeps
-        // its name in the neutral text, so only this check withholds it.
-        else if (target.end > at) return true;
-      }
-    }
-    return false;
-  }
-  const openAt = (node: ts.Node): number | undefined =>
-    openInfo(node.getSourceFile()).owners.get(node);
-  const inside = (owner: ts.Node, node: ts.Node): boolean =>
-    ts.isSourceFile(owner)
-      ? node.getSourceFile() === owner
-      : !!ts.findAncestor(node, (n) => n === owner);
-  /** The scope a declaration binds in (var hoists out of blocks). */
-  const bindingScope = (declaration: ts.Node): ts.Node | undefined => {
-    const hoists =
-      (ts.isVariableDeclaration(declaration) &&
-        ts.isVariableDeclarationList(declaration.parent) &&
-        !(
-          declaration.parent.flags &
-          (ts.NodeFlags.Let | ts.NodeFlags.Const)
-        )) ||
-      ts.isFunctionDeclaration(declaration);
-    for (let node = declaration.parent; node; node = node.parent) {
-      if (ts.isSourceFile(node) || ts.isModuleBlock(node)) return node;
-      if (ts.isFunctionLike(node) || ts.isClassStaticBlockDeclaration(node))
-        return node;
-      if (!hoists && ts.isBlock(node)) return node;
-      if (ts.isClassLike(node)) return node;
-    }
-    return undefined;
-  };
-  const directlyIn = (scope: ts.Node, declaration: ts.Node): boolean => {
-    const binding = bindingScope(declaration);
-    return ts.isModuleDeclaration(scope)
-      ? binding === scope.body
-      : binding === scope;
-  };
-  /** A declaration an unseen later one replaces: `var`, or a JS function. */
-  const replaceable = (declaration: ts.Node): boolean =>
-    (ts.isVariableDeclaration(declaration) &&
-      ts.isVariableDeclarationList(declaration.parent) &&
-      !(
-        declaration.parent.flags &
-        (ts.NodeFlags.Let | ts.NodeFlags.Const | ts.NodeFlags.Using)
-      )) ||
-    (ts.isFunctionDeclaration(declaration) &&
-      isJsFile(declaration.getSourceFile()));
-  const isModuleFile = (source: ts.SourceFile): boolean => {
-    const flags = source as ts.SourceFile & {
-      externalModuleIndicator?: unknown;
-      commonJsModuleIndicator?: unknown;
+    } else if (!found.symbol && context.failedScripts.length)
+      for (const file of context.failedScripts) causes.add(file);
+    if (!causes.size) return result;
+    return {
+      targets: [],
+      reason: "invalid-code",
+      receiver: result.receiver,
+      cause: [...causes].sort(),
     };
-    return !!flags.externalModuleIndicator || !!flags.commonJsModuleIndicator;
-  };
-  const capturedSources = () =>
-    program.getSourceFiles().filter((source) => {
-      const at = fromVirtual(source.fileName);
-      return at !== undefined && captured.has(at);
-    });
-  const programOpen = (): boolean => {
-    let known = programOpenMemo.get(program);
-    if (known === undefined) {
-      known = capturedSources().some(
-        (source) => openInfo(source).fileAt !== undefined,
-      );
-      programOpenMemo.set(program, known);
-    }
-    return known;
-  };
-  const scriptOpen = (): boolean => {
-    let known = scriptOpenMemo.get(program);
-    if (known === undefined) {
-      known = capturedSources().some(
-        (source) =>
-          !isModuleFile(source) && openInfo(source).fileAt !== undefined,
-      );
-      scriptOpenMemo.set(program, known);
-    }
-    return known;
-  };
-  /**
-   * Declarations a type's members can come from: its symbol's declarations
-   * and, through their heritage clauses, every base and implemented type;
-   * union and intersection parts; a reference's target; a mapped type's
-   * source; a type parameter's constraint; the open holders of its
-   * properties (spreads and other derived types keep their origins).
-   */
-  function typeOwners(type: ts.Type, out: Set<ts.Node>, seen: Set<ts.Type>) {
-    if (seen.has(type) || seen.size > 256) return;
-    seen.add(type);
-    const add = (symbol: ts.Symbol | undefined) => {
-      for (const declaration of symbol?.declarations ?? []) {
-        if (out.has(declaration)) continue;
-        out.add(declaration);
-        if (
-          (ts.isClassLike(declaration) ||
-            ts.isInterfaceDeclaration(declaration)) &&
-          declaration.heritageClauses
-        )
-          for (const clause of declaration.heritageClauses)
-            for (const base of clause.types) {
-              typeOwners(checker.getTypeAtLocation(base), out, seen);
-              typeOwners(checker.getTypeAtLocation(base.expression), out, seen);
-            }
-      }
-    };
-    if (type.isUnionOrIntersection()) {
-      for (const part of type.types) typeOwners(part, out, seen);
-      return;
-    }
-    add(type.getSymbol());
-    add(type.aliasSymbol);
-    if (type.flags & ts.TypeFlags.Object) {
-      const flags = (type as ts.ObjectType).objectFlags;
-      if (flags & ts.ObjectFlags.Reference) {
-        const target = (type as ts.TypeReference).target;
-        if (target && target !== type) typeOwners(target, out, seen);
-      }
-      if (flags & ts.ObjectFlags.Mapped) {
-        checker.getPropertiesOfType(type);
-        const modifiers = (type as { modifiersType?: ts.Type }).modifiersType;
-        if (modifiers) typeOwners(modifiers, out, seen);
-      }
-    }
-    if (type.flags & ts.TypeFlags.TypeParameter) {
-      const constraint = checker.getBaseConstraintOfType(type);
-      if (constraint && constraint !== type) typeOwners(constraint, out, seen);
-    }
-    // Members of a mapped or otherwise derived type keep their origins.
-    for (const property of checker.getPropertiesOfType(type).slice(0, 512))
-      for (const declaration of property.declarations ?? []) {
-        const holder = declaration.parent;
-        if (holder && !out.has(holder) && openAt(holder) !== undefined)
-          out.add(holder);
-      }
   }
-  /** Modules consulted while resolving an alias chain (and their `export *`). */
-  function consulted(symbol: ts.Symbol, out: Set<ts.Node>) {
-    let currentSymbol: ts.Symbol | undefined = symbol;
+  /** Failed files an alias chain goes through (or whose `export *` it consults). */
+  function aliasCauses(symbol: ts.Symbol): string[] {
+    const causes = new Set<string>();
+    let current: ts.Symbol | undefined = symbol;
     for (
       let steps = 0;
-      currentSymbol && currentSymbol.flags & ts.SymbolFlags.Alias && steps < 64;
+      current && current.flags & ts.SymbolFlags.Alias && steps < 64;
       steps++
     ) {
-      const specifier = bindingSpecifier(currentSymbol);
-      const module = specifier
-        ? moduleFileOf(specifier)
-        : currentSymbol.declarations?.[0]?.getSourceFile();
-      if (module) out.add(module);
+      const specifier = bindingSpecifier(current);
+      const from = current.declarations?.[0]?.getSourceFile();
+      const at = from && fromVirtual(from.fileName);
+      if (specifier && ts.isStringLiteralLike(specifier) && at !== undefined) {
+        const module = context.resolveModule(specifier.text, at);
+        if (module !== undefined)
+          for (const file of failedIn(module, new Set())) causes.add(file);
+      }
       const next: ts.Symbol | undefined =
-        checker.getImmediateAliasedSymbol(currentSymbol);
-      if (
-        module &&
-        next &&
-        !next.declarations?.some(
-          (declaration) => declaration.getSourceFile() === module,
-        )
-      )
-        for (const star of starClosure(module)) out.add(star);
-      if (next === currentSymbol) break;
-      currentSymbol = next;
+        checker.getImmediateAliasedSymbol(current);
+      if (!next || next === current) break;
+      current = next;
     }
+    return [...causes];
   }
-  const moduleFileOf = (
-    specifier: ts.Expression,
-  ): ts.SourceFile | undefined => {
-    const declaration =
-      checker.getSymbolAtLocation(specifier)?.valueDeclaration;
-    return declaration && ts.isSourceFile(declaration)
-      ? declaration
-      : undefined;
-  };
-  function starClosure(module: ts.SourceFile): ts.SourceFile[] {
-    const found: ts.SourceFile[] = [];
-    const queue = [module];
-    const seen = new Set<ts.SourceFile>([module]);
-    while (queue.length) {
-      const next = queue.shift()!;
-      for (const statement of next.statements)
-        if (
-          ts.isExportDeclaration(statement) &&
-          !statement.exportClause &&
-          statement.moduleSpecifier
-        ) {
-          const target = moduleFileOf(statement.moduleSpecifier);
-          if (target && !seen.has(target)) {
-            seen.add(target);
-            found.push(target);
-            queue.push(target);
-          }
+  /** The module if it failed, else the failed modules of its `export *` closure. */
+  function failedIn(module: string, seen: Set<string>): string[] {
+    if (seen.has(module)) return [];
+    seen.add(module);
+    if (context.moduleKind(module) === "invalid") return [module];
+    const source = program.getSourceFile(toVirtual(module));
+    if (!source) return [];
+    const found: string[] = [];
+    for (const statement of source.statements)
+      if (
+        ts.isExportDeclaration(statement) &&
+        !statement.exportClause &&
+        statement.moduleSpecifier &&
+        ts.isStringLiteralLike(statement.moduleSpecifier)
+      ) {
+        const next = context.resolveModule(
+          statement.moduleSpecifier.text,
+          module,
+        );
+        if (next !== undefined) found.push(...failedIn(next, seen));
+      }
+    return found;
+  }
+  /** Failed files behind the bases a receiver's type extends or implements. */
+  function heritageCauses(type: ts.Type, seen: Set<ts.Type>): string[] {
+    if (seen.has(type) || seen.size > 64) return [];
+    seen.add(type);
+    const found: string[] = [];
+    if (type.isUnionOrIntersection()) {
+      for (const part of type.types) found.push(...heritageCauses(part, seen));
+      return found;
+    }
+    for (const declaration of type.getSymbol()?.declarations ?? []) {
+      if (
+        !(ts.isClassLike(declaration) || ts.isInterfaceDeclaration(declaration))
+      )
+        continue;
+      for (const clause of declaration.heritageClauses ?? [])
+        for (const base of clause.types) {
+          const root = rootOf(base.expression);
+          const symbol = root && checker.getSymbolAtLocation(root);
+          if (symbol && symbol.flags & ts.SymbolFlags.Alias)
+            found.push(...aliasCauses(symbol));
+          found.push(...heritageCauses(checker.getTypeAtLocation(base), seen));
         }
     }
     return found;
@@ -616,6 +449,7 @@ export function extractFile(
       reason = "dynamic-scope";
     if (
       incompleteConfig &&
+      reason !== "invalid-code" &&
       (kind === "imports" ||
         kind === "exports" ||
         found.viaAlias ||
@@ -626,7 +460,12 @@ export function extractFile(
       if (reason) facts.reasonWithoutConfig = reason;
       reason = "incomplete-config";
     }
-    if (found.targets.length)
+    if (reason === "invalid-code") {
+      // Failed: nothing that names a likely answer, only the broken file.
+      const cause = found.cause ?? [];
+      if (cause.length === 1) facts.cause = { file: cause[0]! };
+      else if (cause.length) facts.cause = { files: [...cause] };
+    } else if (found.targets.length)
       facts.targets = found.targets.map((target) => ({ ...target }));
     if (reason) facts.reason = reason;
     links.push({
@@ -675,11 +514,14 @@ export function extractFile(
         : undefined;
     const kind = file ? context.moduleKind(file) : undefined;
     const found: Targets = file
-      ? {
-          targets: [{ file, key: "module@0" }],
-          // A target whose analysis failed has no facts to link to.
-          ...(kind === "unavailable" ? { reason: "target-unavailable" } : {}),
-        }
+      ? kind === "invalid"
+        ? // A file that cannot be read has failed: no target, its file the cause.
+          { targets: [], reason: "invalid-code", cause: [file] }
+        : {
+            targets: [{ file, key: "module@0" }],
+            // A target whose analysis failed has no facts to link to.
+            ...(kind === "unavailable" ? { reason: "target-unavailable" } : {}),
+          }
       : reason
         ? { targets: [], reason }
         : targetsOf(checker.getSymbolAtLocation(specifier), "any");
@@ -905,12 +747,22 @@ export function extractFile(
     // Bindings from a module that does not resolve share its reason.
     let reason = specifier && bindingModuleReason(specifier);
     if (!reason && specifier && ts.isStringLiteralLike(specifier)) {
-      const module = context.resolveModule(specifier.text, path);
-      if (module !== undefined && context.moduleKind(module) === "unavailable")
+      const target = context.resolveModule(specifier.text, path);
+      if (target !== undefined && context.moduleKind(target) === "unavailable")
         reason = "target-unavailable";
     }
+    const module =
+      specifier && ts.isStringLiteralLike(specifier)
+        ? context.resolveModule(specifier.text, path)
+        : undefined;
     let found: Targets = reason
-      ? { targets: [], reason }
+      ? {
+          targets: [],
+          reason,
+          ...(reason === "invalid-code" && module !== undefined
+            ? { cause: [module] }
+            : {}),
+        }
       : targetsOf(symbolOf(name), extra.typeOnly ? "type" : "any");
     // An export NAME `require`/`module`/`exports` is renamed in JS files only;
     // between a JS and a TS file (or a CommonJS property) the names differ.
@@ -1238,7 +1090,6 @@ export function extractFile(
   }
   /** Visits a node: its own links in a guard, then its children. */
   function visit(node: ts.Node, owner: string) {
-    current = node;
     const key = `${node.kind}@${node.getStart(file)}`;
     limited = context.skip.has(key);
     let next: string | null;
@@ -1314,19 +1165,6 @@ export function extractFile(
       },
     });
   }
-  // Heritage grammar the parser accepts but that has no meaning makes this
-  // file partial too (see untrusted.ts).
-  for (const at of heritageErrors(file))
-    if (
-      !program
-        .getSyntacticDiagnostics(file)
-        .some((diagnostic) => diagnostic.start === at)
-    )
-      diagnostics.push({
-        message:
-          "Invalid heritage clauses (more than one base class, extends after implements, or implements on an interface)",
-        range: { start: at, end: at },
-      });
   if (limitHit)
     diagnostics.push({
       message:

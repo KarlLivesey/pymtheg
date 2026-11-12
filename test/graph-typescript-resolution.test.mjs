@@ -880,24 +880,6 @@ test("several tsconfig projects in one repository each resolve by their own sett
   );
 });
 
-test("a syntax error makes the file partial while its recovered symbols stay linkable", async () => {
-  await project(
-    {
-      "bad.ts": "export function good() {}\nexport function bad( {\n",
-      "use.ts": 'import { good } from "./bad";\ngood();\n',
-    },
-    async (graph, report) => {
-      assert.deepEqual(report.partial, ["bad.ts"]);
-      const call = graph.link("use.ts", "good", "calls");
-      assert.equal(graph.target(call), "bad.ts#good");
-      assert.equal(call.targetStatus, "partial");
-      assert.ok(
-        graph.store.getFile("bad.ts").result.diagnostics.every((d) => d.range),
-      );
-    },
-  );
-});
-
 test("unreadable sources are reported failed and never cleaned by analysis", async () => {
   await project(
     {
@@ -2549,16 +2531,15 @@ test("a free require in an ES module is linked but flagged as a bundler assumpti
     },
     async (graph) => {
       for (const link of graph.links("esm.js", '"./dep"', "imports"))
-        assert.equal(link.data.assumes, "bundler-require");
-      assert.equal(
-        graph.link("esm.js", "d", "imports").data.assumes,
+        assert.deepEqual(link.data.assumes, ["bundler-require"]);
+      assert.deepEqual(graph.link("esm.js", "d", "imports").data.assumes, [
         "bundler-require",
-      );
+      ]);
       const member = graph.store
         .links()
         .find((l) => l.file === "esm.js" && l.targetName === "d.real");
       assert.equal(graph.target(member), "dep.ts#real");
-      assert.equal(member.data.assumes, "bundler-require");
+      assert.deepEqual(member.data.assumes, ["bundler-require"]);
       const destructured = graph.store
         .links()
         .find(
@@ -2567,7 +2548,7 @@ test("a free require in an ES module is linked but flagged as a bundler assumpti
             l.kind === "calls" &&
             l.targetName === "real",
         );
-      assert.equal(destructured.data.assumes, "bundler-require");
+      assert.deepEqual(destructured.data.assumes, ["bundler-require"]);
       // An ordinary CommonJS file carries no assumption.
       assert.equal(
         graph.link("cjs.js", '"./dep"', "imports").data.assumes,
@@ -2783,9 +2764,9 @@ test("the bundler assumption travels through aliases, destructuring, re-exports 
           );
         assert.ok(reached.length > 0, file);
         for (const link of reached)
-          assert.equal(
+          assert.deepEqual(
             link.data.assumes,
-            "bundler-require",
+            ["bundler-require"],
             `${file} ${link.kind} ${link.targetName}`,
           );
       }
@@ -2800,98 +2781,6 @@ test("the bundler assumption travels through aliases, destructuring, re-exports 
             ),
           name,
         );
-    },
-  );
-});
-
-test("partial declarations: name-only links stay, structure after the first error is withheld", async () => {
-  await project(
-    {
-      "broken.ts": [
-        "export interface I { a: ; b(): void }",
-        "export function f(x: , y): Box { return new Box(); }",
-        "export class Box { go() {} }",
-        "export class Base { m() {} ",
-        "",
-      ].join("\n"),
-      "heritage.ts": [
-        "export class Root { r() {} }",
-        "export class Other {}",
-        "export class C extends Root, Other {}",
-        "export class Good extends Root {}",
-        "",
-      ].join("\n"),
-      "use.ts": [
-        'import { I, f, Base, Box } from "./broken";',
-        'import { C, Good } from "./heritage";',
-        "export function run(x: I, c: C, g: Good) {",
-        "  x.b();",
-        "  f(1, 2);",
-        "  f(1, 2).go();",
-        "  new Box().go();",
-        "  new Base().m();",
-        "  c.r();",
-        "  g.r();",
-        "}",
-        "",
-      ].join("\n"),
-    },
-    async (graph, report) => {
-      const call = (name) =>
-        graph.store
-          .links()
-          .find(
-            (l) =>
-              l.file === "use.ts" &&
-              l.kind === "calls" &&
-              l.targetName === name,
-          );
-      // `b` follows the error inside I: withheld, target kept.
-      const b = call("x.b");
-      assert.equal(b.resolution, "unresolved");
-      assert.equal(b.data.reason, "partial-declaration");
-      assert.equal(b.data.targets.length, 1);
-      // The name of f is intact: the call links; nothing through its return type.
-      assert.equal(graph.target(call("f")), "broken.ts#f");
-      const text = graph.store.getFile("use.ts").text;
-      const goAt = (expression) => {
-        const start =
-          text.indexOf(expression) + expression.length - "go".length;
-        return graph.store
-          .links()
-          .find(
-            (l) =>
-              l.file === "use.ts" &&
-              l.kind === "calls" &&
-              l.range.start === start,
-          );
-      };
-      // Nothing resolves through f's return type, which follows the error.
-      const through = goAt("f(1, 2).go");
-      assert.equal(through.resolution, "unresolved");
-      assert.equal(through.data.reason, "partial-declaration");
-      // Intact declarations elsewhere in the file are unaffected (containment).
-      assert.equal(graph.target(goAt("new Box().go")), "broken.ts#Box.go");
-      // The module itself is linked: its existence does not depend on its contents.
-      assert.equal(
-        graph.target(graph.link("use.ts", '"./broken"', "imports")),
-        "broken.ts#broken.ts",
-      );
-      // `m` precedes the error in the truncated class.
-      assert.equal(graph.target(call("(expression).m")), "broken.ts#Base.m");
-      // A heritage clause with a grammar error supports nothing.
-      assert.equal(call("c.r").data.reason, "partial-declaration");
-      assert.equal(graph.target(call("g.r")), "heritage.ts#Root.r");
-      assert.ok(report.partial.includes("heritage.ts"));
-      const extendsLinks = graph.store
-        .links()
-        .filter((l) => l.file === "heritage.ts" && l.kind === "extends");
-      for (const link of extendsLinks.filter(
-        (l) =>
-          l.range.start <
-          graph.store.getFile("heritage.ts").text.indexOf("Good"),
-      ))
-        assert.equal(link.data.reason, "partial-declaration");
     },
   );
 });
@@ -2918,7 +2807,7 @@ test("indirect loader forms emit untyped-require bindings and members", async ()
   );
 });
 
-test("failed and partial targets get their own reasons, never not-a-module", async () => {
+test("failed and invalid targets get their own reasons, never not-a-module", async () => {
   await project(
     {
       "failed.js":
@@ -2936,11 +2825,15 @@ test("failed and partial targets get their own reasons, never not-a-module", asy
         graph.link("use.js", "f", "imports").data.reason,
         "target-unavailable",
       );
-      const partialEdge = graph.link("use.js", '"./partial"', "imports");
-      assert.equal(partialEdge.data.notAModule, undefined);
+      // A syntax error: the file failed, the edge and binding fail with it.
+      assert.ok(report.failed.includes("partial.js"));
+      const invalidEdge = graph.link("use.js", '"./partial"', "imports");
+      assert.equal(invalidEdge.data.notAModule, undefined);
+      assert.equal(invalidEdge.data.reason, "invalid-code");
+      assert.deepEqual(invalidEdge.data.cause, { file: "partial.js" });
       assert.equal(
         graph.link("use.js", "q", "imports").data.reason,
-        "partial-target",
+        "invalid-code",
       );
     },
   );
@@ -2978,102 +2871,6 @@ function markedCalls(graph, file, method) {
   }
   return found;
 }
-
-const BROKEN = [
-  "export class Box { go() {} }",
-  "export class Crate<T> { item!: T; open(): T { return this.item; } }",
-  "export function make(x: , y): Box { return new Box(); }",
-  "export function visit(x: , cb: (p: Box) => void) {}",
-  "export function list(x: , y): Box[] { return []; }",
-  "export function pair(x: , y): { box: Box } { return { box: new Box() }; }",
-  "export function crate(x: , y): Crate<Box> { return new Crate(); }",
-  "export class Later { run() { new Box().go(); } } // C",
-  "",
-].join("\n");
-
-test("partial declarations: every route the checker follows is withheld; independent links stay definite", async () => {
-  await project(
-    {
-      "broken.ts": BROKEN,
-      "mid.ts": [
-        'import { make, Box } from "./broken";',
-        "export const made = make(1, 2);",
-        "export const fine = new Box();",
-        "",
-      ].join("\n"),
-      "barrel.ts": 'export * from "./mid";\n',
-      "use.ts": [
-        'import { make, visit, list, pair, crate, Box, Crate } from "./broken";',
-        'import { made, fine } from "./mid";',
-        'import { made as viaBarrel, fine as fineViaBarrel } from "./barrel";',
-        "const result = make(1, 2);",
-        "result.go(); // D",
-        "visit(1, (p) => p.go()); // D",
-        "function wrap() { return make(1, 2); }",
-        "wrap().go(); // D",
-        "list(1, 2)[0].go(); // D",
-        "const arr = [make(1, 2)];",
-        "arr[0].go(); // D",
-        "const { box } = pair(1, 2);",
-        "box.go(); // D",
-        "const [first] = list(1, 2);",
-        "first.go(); // D",
-        "const copy = { ...pair(1, 2) };",
-        "copy.box.go(); // D",
-        "const items = [...list(1, 2)];",
-        "items[0].go(); // D",
-        "class Holder { field = make(1, 2); }",
-        "new Holder().field.go(); // D",
-        "crate(1, 2).open().go(); // D",
-        "function id<T>(v: T): T { return v; }",
-        "id(make(1, 2)).go(); // D",
-        "made.go(); // D",
-        "viaBarrel.go(); // D",
-        "new Box().go(); // C",
-        "new Crate<Box>().open().go(); // C",
-        "const typed: Box = make(1, 2);",
-        "typed.go(); // C",
-        "fine.go(); // C",
-        "fineViaBarrel.go(); // C",
-        "id(new Box()).go(); // C",
-        "",
-      ].join("\n"),
-    },
-    async (graph) => {
-      for (const [file, method] of [
-        ["use.ts", "go"],
-        ["broken.ts", "go"],
-      ])
-        for (const [mark, line, link] of markedCalls(graph, file, method)) {
-          if (mark === "D") {
-            assert.equal(link.resolution, "unresolved", line);
-            assert.equal(link.data.reason, "partial-declaration", line);
-            // The normal program's target is kept.
-            assert.deepEqual(
-              link.data.targets.map((t) => t.file),
-              ["broken.ts"],
-              line,
-            );
-          } else {
-            assert.equal(link.resolution, "resolved", line);
-            assert.equal(graph.target(link), "broken.ts#Box.go", line);
-            assert.equal(link.data.reason, undefined, line);
-          }
-        }
-      // Name-only links into the broken file stay definite.
-      for (const name of ["make", "visit", "list", "pair", "crate", "Box"])
-        assert.equal(
-          graph.link("use.ts", name, "imports").resolution,
-          "resolved",
-          name,
-        );
-      assert.equal(
-        graph.target(graph.link("mid.ts", "make", "calls")),
-        "broken.ts#make",
-      );
-    },
-  );
-});
 
 const DEP_CJS = "module.exports = { real() {} };\n";
 const ROUTES = [
@@ -3143,9 +2940,9 @@ test("the bundler label follows every route the checker follows; independent lin
               "dep.cjs#module.exports.real",
               `${file}: ${line}`,
             );
-            assert.equal(
+            assert.deepEqual(
               link.data.assumes,
-              "bundler-require",
+              ["bundler-require"],
               `${file}: ${line}`,
             );
           } else {
@@ -3165,77 +2962,6 @@ test("the bundler label follows every route the checker follows; independent lin
         assert.equal(graph.target(binding), `a.mjs#${name}`);
         assert.equal(binding.data.assumes, undefined, name);
       }
-    },
-  );
-});
-
-test("differential analysis: no untrusted input builds no second program; one broken file one per affected project", async () => {
-  const before = statistics.neutralPrograms;
-  await project(
-    {
-      "a.ts": "export class Box { go() {} }\n",
-      "b.ts": 'import { Box } from "./a";\nnew Box().go();\n',
-    },
-    async (graph, report) => {
-      clean(report);
-      assert.equal(statistics.neutralPrograms, before);
-    },
-  );
-  const start = statistics.neutralPrograms;
-  await project(
-    {
-      "one/tsconfig.json": '{ "include": ["*.ts"] }\n',
-      "one/a.ts": "export function f(x: ): number { return 1; }\n",
-      "one/b.ts": 'import { f } from "./a";\nf(1);\n',
-      "two/tsconfig.json": '{ "include": ["*.ts"] }\n',
-      "two/c.ts": "export function g() {}\ng();\n",
-    },
-    async (graph) => {
-      // Only the project holding the broken file gets a neutral program.
-      assert.equal(statistics.neutralPrograms - start, 1);
-      assert.equal(
-        graph.target(graph.link("one/b.ts", "f", "calls")),
-        "one/a.ts#f",
-      );
-      assert.equal(
-        graph.target(graph.link("two/c.ts", "g", "calls")),
-        "two/c.ts#g",
-      );
-    },
-  );
-});
-
-test("when a link rests on both kinds of untrusted input, partial-declaration wins", async () => {
-  await project(
-    {
-      "package.json": '{ "type": "module" }\n',
-      "dep.cjs": DEP_CJS,
-      "a.js": [
-        'export const d = require("./dep.cjs");',
-        "export function broken(x: , y) { return d; }",
-        "",
-      ].join("\n"),
-      "use.js": [
-        'import { d, broken } from "./a.js";',
-        "d.real(); // D",
-        "broken().real(); // D",
-        "",
-      ].join("\n"),
-    },
-    async (graph) => {
-      const [[, , viaD], [, , viaBroken]] = markedCalls(
-        graph,
-        "use.js",
-        "real",
-      );
-      // Only the loader assumption: resolved and flagged.
-      assert.equal(viaD.resolution, "resolved");
-      assert.equal(viaD.data.assumes, "bundler-require");
-      assert.equal(viaD.data.reason, undefined);
-      // Also through the recovered body of `broken`: partial-declaration.
-      assert.equal(viaBroken.resolution, "unresolved");
-      assert.equal(viaBroken.data.reason, "partial-declaration");
-      assert.equal(viaBroken.data.assumes, undefined);
     },
   );
 });
@@ -3290,7 +3016,7 @@ test("any call that receives the wrapper's arguments makes require uncertain; on
   });
 });
 
-// ----- Round 10: declarations parser recovery may have dropped -----
+// ----- Round 11: a file that cannot be read is not valid code -----
 
 /** The single `calls` link whose text is `name` on the line containing `marker`. */
 function callOn(graph, file, marker, name) {
@@ -3310,391 +3036,270 @@ function callOn(graph, file, marker, name) {
   assert.equal(found.length, 1, `one ${name} call on the ${marker} line`);
   return found[0];
 }
-const withheld = (link, what) => {
+/** Failed: unresolved, invalid-code, nothing that names a likely answer. */
+const failedLink = (link, cause, what) => {
   assert.equal(link.resolution, "unresolved", what);
-  assert.equal(link.data.reason, "partial-declaration", what);
-  assert.ok(link.data.targets?.length, `${what}: targets kept`);
+  assert.equal(link.data.reason, "invalid-code", what);
+  assert.equal(link.data.targets, undefined, `${what}: no targets`);
+  assert.equal(link.targetId ?? null, null, `${what}: no target`);
+  assert.deepEqual(link.candidates ?? [], [], `${what}: no candidates`);
+  assert.deepEqual(link.data.cause, cause, `${what}: cause`);
 };
-const definite = (graph, link, target, what) => {
+const FLAG = "no-unseen-declarations";
+const flagged = (graph, link, target, what) => {
   assert.equal(link.resolution, "resolved", what);
-  assert.equal(link.data.reason, undefined, what);
   assert.equal(graph.target(link), target, what);
+  assert.ok(link.data.assumes?.includes(FLAG), `${what}: flagged`);
 };
 
-test("a member list that recovery may have cut is open: lookups that fall through it are withheld", async () => {
-  const base = "export class Base { m() { return 1; } }\n";
-  const sub = (name, line) =>
-    `import { Base } from "./base";\nexport class ${name} extends Base {\n${line}\n  m() { return 2; }\n}\n`;
-  await project(
-    {
-      "tsconfig.json": '{ "compilerOptions": { "strict": true } }\n',
-      "base.ts": base,
-      "s1.ts": sub("S1", "  a = [1, ;"),
-      "s2.ts": sub("S2", "  a = function( { }"),
-      "s3.ts": sub("S3", "  a: ;"),
-      "s4.ts":
-        'import { Base } from "./base";\nexport class S4 extends Base {\n  /* note\n  m() { return 2; }\n}\n',
-      "s5.ts":
-        'import { Base } from "./base";\nexport class S5 extends Base {\n  label = "it\'s; m() { return 2; }\n}\n',
-      // The member holding the error: its name comes first, its text runs on.
-      "s6.ts":
-        "export class S6 {\n  before() {}\n  broken(x: , y) { return 1; }\n}\n",
-      "use.ts": [
-        'import { S1 } from "./s1";',
-        'import { S2 } from "./s2";',
-        'import { S3 } from "./s3";',
-        'import { S4 } from "./s4";',
-        'import { S5 } from "./s5";',
-        'import { S6 } from "./s6";',
-        "new S1().m(); // s1",
-        "new S2().m(); // s2",
-        "new S3().m(); // s3",
-        "new S4().m(); // s4",
-        "new S5().m(); // s5",
-        "new S6().before(); // s6-before",
-        "new S6().broken(); // s6-broken",
-        "",
-      ].join("\n"),
-    },
-    async (graph) => {
-      for (const marker of ["s1", "s2", "s4", "s5"]) {
-        const link = callOn(graph, "use.ts", `// ${marker}`, "m");
-        withheld(link, marker);
-        // Recovery dropped `m`: the would-be target is the inherited one.
-        assert.deepEqual(
-          link.data.targets.map((t) => t.file),
-          ["base.ts"],
-          marker,
-        );
-      }
-      withheld(callOn(graph, "use.ts", "// s6-broken", "broken"), "s6");
-      definite(
-        graph,
-        callOn(graph, "use.ts", "// s6-before", "before"),
-        "s6.ts#S6.before",
-        "s6 before",
-      );
-      // Control: recovery kept `m` (after the error): withheld too.
-      const kept = callOn(graph, "use.ts", "// s3", "m");
-      withheld(kept, "s3");
-      assert.deepEqual(
-        kept.data.targets.map((t) => t.file),
-        ["s3.ts"],
-      );
-    },
-  );
-});
+const BROKEN_FILES = {
+  "tsconfig.json": '{ "compilerOptions": { "allowJs": true } }\n',
+  // One syntax error in one function body: the whole file has failed.
+  "maths.ts": [
+    "export const pi = 3.14;",
+    "export const phi = 1.618;",
+    "export function absolute(x: number) {",
+    "  return x < 0 ? -x : x +;",
+    "}",
+    "export class Shape { area() { return 0; } }",
+    "",
+  ].join("\n"),
+  "other.ts": "export const other = () => 1;\n",
+  "barrel.ts": 'export * from "./maths";\nexport * from "./other";\n',
+  "globals.js": "function scriptHelper() {}\nvar broken = (;\n",
+  "use.ts": [
+    'import { pi, phi, absolute } from "./maths";',
+    'import { other } from "./barrel";',
+    'import { Shape as ViaBarrel } from "./barrel";',
+    'import { Shape } from "./maths";',
+    'import { gone } from "./nowhere";',
+    "absolute(phi); // absolute",
+    "other(); // other",
+    "class Square extends Shape {}",
+    "new Square().area(); // inherited",
+    "new ViaBarrel(); // via-barrel",
+    "scriptHelper(); // global",
+    "export const area = pi;",
+    "",
+  ].join("\n"),
+};
 
-for (const [variant, line] of [
-  ["recovery-kept", "  a: ;"],
-  ["recovery-dropped", "  a = [1, ;"],
-])
-  test(`open member sets through every route (${variant})`, async () => {
-    await project(
-      {
-        "tsconfig.json": '{ "compilerOptions": { "strict": true } }\n',
-        "base.ts":
-          "export class Base { kp = () => 1; m() { return 1; } k() { return 1; } static sb() {} }\n",
-        // An open class with no seen member of its own (missing brace).
-        "empty.ts":
-          'import { Base } from "./base";\nexport class Empty extends Base {\n  /* note\n  k() {}\n}\n',
-        "open.ts": [
-          'import { Base } from "./base";',
-          "export class Before { b() {} }",
-          "export class Open extends Base {",
-          "  seen() {}",
-          "  seenP = () => 1;",
-          line,
-          "  m() { return 2; }",
-          "}",
-          "export interface OpenI {",
-          "  seenI(): void;",
-          line.replace("a = [1, ;", "x: [1, ;"),
-          "  later(): void;",
-          "}",
-          "export class After { z() {} }",
-          "",
-        ].join("\n"),
-        "g1.ts": "interface Merged { p(): void }\n",
-        "g2.ts": `interface Merged {\n  q(): void;\n${line.replace("a = [1, ;", "x: [1, ;")}\n}\n`,
-        "use.ts": [
-          'import { Open, OpenI, Before, After } from "./open";',
-          'import { Empty } from "./empty";',
-          "declare const pe: Partial<Empty>;",
-          "const spread = { ...new Open() };",
-          "class Sub extends Open {}",
-          "class Impl implements OpenI { seenI() {} later() {} own() {} }",
-          "interface Extra { extra(): void }",
-          "declare const both: Open & Extra;",
-          "const instance = new Open();",
-          "declare const t: typeof instance;",
-          "declare const C: typeof Open;",
-          "type Holder = { inner: Open };",
-          "declare const h: Holder['inner'];",
-          "declare const p: Partial<Open>;",
-          "declare const mg: Merged;",
-          "new Open().seen(); // direct-seen",
-          "new Open().k(); // direct-inherited",
-          "new Sub().seen(); // sub-seen",
-          "new Sub().k(); // sub-inherited",
-          "both.seen(); // intersection-seen",
-          "both.extra(); // intersection-other",
-          "new Impl().own(); // implements",
-          "t.seen(); // typeof-seen",
-          "t.k(); // typeof-inherited",
-          "C.sb(); // static-inherited",
-          "h.seen(); // indexed-seen",
-          "h.k(); // indexed-inherited",
-          "p.seen?.(); // mapped-seen",
-          "p.k?.(); // mapped-inherited",
-          "mg.p(); // merged",
-          "pe.k?.(); // mapped-source",
-          "spread.seenP(); // spread-seen",
-          "spread.kp(); // spread-inherited",
-          "new Before().b(); // before-own",
-          "new After().z(); // after-own",
-          "",
-        ].join("\n"),
-      },
-      async (graph) => {
-        const seen = "open.ts#Open.seen";
-        for (const marker of [
-          "direct-seen",
-          "sub-seen",
-          "intersection-seen",
-          "typeof-seen",
-          "indexed-seen",
-          "mapped-seen",
-        ])
-          definite(
-            graph,
-            callOn(graph, "use.ts", `// ${marker}`, "seen"),
-            seen,
-            marker,
-          );
-        for (const [marker, name] of [
-          ["direct-inherited", "k"],
-          ["sub-inherited", "k"],
-          ["intersection-other", "extra"],
-          ["implements", "own"],
-          ["typeof-inherited", "k"],
-          ["static-inherited", "sb"],
-          ["indexed-inherited", "k"],
-          ["mapped-inherited", "k"],
-          ["merged", "p"],
-          ["mapped-source", "k"],
-          ["spread-inherited", "kp"],
-        ])
-          withheld(callOn(graph, "use.ts", `// ${marker}`, name), marker);
-        definite(
-          graph,
-          callOn(graph, "use.ts", "// spread-seen", "seenP"),
-          "open.ts#Open.seenP",
-          "spread-seen",
-        );
-        // Intact classes of the open file, before and after the error: their
-        // own members stay definite.
-        definite(
-          graph,
-          callOn(graph, "use.ts", "// before-own", "b"),
-          "open.ts#Before.b",
-          "before",
-        );
-        definite(
-          graph,
-          callOn(graph, "use.ts", "// after-own", "z"),
-          "open.ts#After.z",
-          "after",
-        );
-        // Names exported by the open file stay definite (seen declarations).
-        assert.equal(
-          graph.target(graph.link("use.ts", "Open", "imports")),
-          "open.ts#Open",
-        );
-      },
+test("a syntax error fails the whole file; every link into it fails and names the file", async () => {
+  await project(BROKEN_FILES, async (graph, report) => {
+    assert.ok(report.failed.includes("maths.ts"));
+    assert.ok(report.failed.includes("globals.js"));
+    assert.deepEqual(graph.store.findSymbols({ file: "maths.ts" }), []);
+    const maths = { file: "maths.ts" };
+    for (const edge of graph.links("use.ts", '"./maths"', "imports"))
+      failedLink(edge, maths, "import");
+    for (const name of ["pi", "phi", "absolute"])
+      failedLink(
+        graph.links("use.ts", name, "imports")[0],
+        maths,
+        `binding ${name}`,
+      );
+    failedLink(
+      callOn(graph, "use.ts", "// absolute", "absolute"),
+      maths,
+      "call",
     );
+    // Through `export *` from the failed file, and through a base in it.
+    failedLink(
+      callOn(graph, "use.ts", "// via-barrel", "ViaBarrel"),
+      maths,
+      "through export *",
+    );
+    failedLink(
+      callOn(graph, "use.ts", "// inherited", "area"),
+      maths,
+      "inherited from a class in the failed file",
+    );
+    // A global the failed script might have declared.
+    failedLink(
+      callOn(graph, "use.ts", "// global", "scriptHelper"),
+      { file: "globals.js" },
+      "script global",
+    );
+    // Missing is not broken: an ordinary unresolved import.
+    const missing = graph.link("use.ts", '"./nowhere"', "imports");
+    assert.equal(missing.data.reason, "missing-module");
+    assert.equal(missing.data.cause, undefined);
+    // Unrelated links of the same program: resolved, flagged.
+    flagged(
+      graph,
+      callOn(graph, "use.ts", "// other", "other"),
+      "other.ts#other",
+      "unrelated",
+    );
+    // Where and why, like a compiler error.
+    const failure = graph.store.getFile("maths.ts");
+    assert.equal(failure.result?.status ?? failure.status, "failed");
   });
-
-test("unterminated comments, strings, templates, regular expressions and JSX are untrusted from their opening delimiter", async () => {
-  const cls = (name, line) =>
-    `import { Base } from "./base";\nexport class ${name} extends Base {\n  seen() {}\n${line}\n  m() { return 2; }\n}\n`;
-  await project(
-    {
-      "tsconfig.json":
-        '{ "compilerOptions": { "strict": true, "jsx": "preserve" } }\n',
-      "base.ts": "export class Base { m() { return 1; } }\n",
-      "comment.ts": cls("Comment", "  /* note"),
-      "string.ts": cls("Str", "  label = \"it's;"),
-      "template.ts": cls("Tpl", "  a = `x${1}"),
-      "regex.ts": cls("Rx", "  a = /ab"),
-      "jsx.tsx": cls("Jsx", "  a = <div>"),
-      "use.ts": [
-        'import { Comment } from "./comment";',
-        'import { Str } from "./string";',
-        'import { Tpl } from "./template";',
-        'import { Rx } from "./regex";',
-        'import { Jsx } from "./jsx";',
-        ...["Comment", "Str", "Tpl", "Rx", "Jsx"].flatMap((name) => [
-          `new ${name}().seen(); // ${name}-seen`,
-          `new ${name}().m(); // ${name}-m`,
-        ]),
-        "",
-      ].join("\n"),
-    },
-    async (graph) => {
-      for (const name of ["Comment", "Str", "Tpl", "Rx", "Jsx"]) {
-        const file = {
-          Comment: "comment.ts",
-          Str: "string.ts",
-          Tpl: "template.ts",
-          Rx: "regex.ts",
-          Jsx: "jsx.tsx",
-        }[name];
-        assert.ok(graph.store.getFile(file), file);
-        definite(
-          graph,
-          callOn(graph, "use.ts", `// ${name}-seen`, "seen"),
-          `${file}#${name}.seen`,
-          `${name} seen`,
-        );
-        withheld(callOn(graph, "use.ts", `// ${name}-m`, "m"), `${name} m`);
-      }
-    },
-  );
 });
 
-test("an open file scope: shadowable names, replaceable declarations and star exports are withheld", async () => {
+test("a failed file reports its first syntax error with line, column, message and text", async () => {
   await project(
-    {
-      "tsconfig.json": '{ "compilerOptions": { "allowJs": true } }\n',
-      "globals.js": "function globalHelper() {}\n",
-      "helper.ts": "export function helper() { return 1; }\n",
-      "impl.ts": "export function tool() {}\n",
-      "openmod.ts": "export const ok = () => 1;\nconst broken = (;\n",
-      "barrel.ts": 'export * from "./openmod";\nexport * from "./impl";\n',
-      "clean-barrel.ts": 'export * from "./impl";\n',
-      "scope.ts": [
-        'import { helper } from "./helper";',
-        "export function bump() {}",
-        "helper(); // import",
-        "bump(); // ts-function",
-        "globalHelper(); // global",
-        "const broken = (;",
-        "export function later() {}",
-        "",
-      ].join("\n"),
-      "scripts.js": [
-        "var run = function () {};",
-        "function bumpJs() {}",
-        "run(); // var",
-        "bumpJs(); // js-function",
-        "const broken = (;",
-        "",
-      ].join("\n"),
-      "clean.ts": "globalHelper(); // clean-global\n",
-      "use.ts": [
-        'import { tool } from "./barrel";',
-        'import { tool as direct } from "./clean-barrel";',
-        'import { ok } from "./openmod";',
-        'import { later } from "./scope";',
-        "tool(); // star",
-        "direct(); // clean-star",
-        "ok(); // direct-export",
-        "later(); // seen-export",
-        "",
-      ].join("\n"),
-    },
-    async (graph) => {
-      definite(
-        graph,
-        callOn(graph, "scope.ts", "// import", "helper"),
-        "helper.ts#helper",
-        "import binding",
+    { "bad.ts": "export const a = 1;\nexport const b = (;\n" },
+    async (graph, report) => {
+      assert.ok(report.failed.includes("bad.ts"));
+      const result = graph.store.getFile("bad.ts");
+      const diagnostics =
+        result.result?.diagnostics ?? result.diagnostics ?? [];
+      assert.ok(diagnostics.length > 0, "diagnostics");
+      assert.equal(
+        diagnostics[0].message,
+        'Syntax error at line 2, column 19: Expression expected. Found: ";".',
       );
-      definite(
-        graph,
-        callOn(graph, "scope.ts", "// ts-function", "bump"),
-        "scope.ts#bump",
-        "TS function",
-      );
-      withheld(
-        callOn(graph, "scope.ts", "// global", "globalHelper"),
-        "global from an open file",
-      );
-      withheld(callOn(graph, "scripts.js", "// var", "run"), "var");
-      withheld(
-        callOn(graph, "scripts.js", "// js-function", "bumpJs"),
-        "JS function",
-      );
-      // scripts.js is an open script: any global may be declared there again.
-      withheld(
-        callOn(graph, "clean.ts", "// clean-global", "globalHelper"),
-        "global while a script is open",
-      );
-      withheld(callOn(graph, "use.ts", "// star", "tool"), "star via open");
-      definite(
-        graph,
-        callOn(graph, "use.ts", "// clean-star", "direct"),
-        "impl.ts#tool",
-        "clean star",
-      );
-      definite(
-        graph,
-        callOn(graph, "use.ts", "// direct-export", "ok"),
-        "openmod.ts#ok",
-        "direct export",
-      );
-      definite(
-        graph,
-        callOn(graph, "use.ts", "// seen-export", "later"),
-        "scope.ts#later",
-        "seen export after the error",
+      const starts = diagnostics.map((d) => d.range.start);
+      assert.deepEqual(
+        starts,
+        [...starts].sort((a, b) => a - b),
       );
     },
   );
 });
 
-test("neutral text keeps the length and every line break, and blanks each span", async () => {
-  const ts = (await import("typescript")).default;
-  const { errorPositions, untrustedSpans, neutralizeSpans } = await import(
-    "../dist/graph/languages/typescript/untrusted.js"
-  );
-  const samples = [
-    "export interface I { a: ; b(): void }\nexport function f(x: , y): Box {\n  return new Box();\n}\nexport class Box { go() {} }\n",
-    "export class K { m() { return [1, (2 } }\nexport const z = 1;\n",
-    "export const t = `a${ (x: ) }b`;\nexport const z = 1;\n",
-    "export class S4 {\n  /* note\n  m() { return 2; }\n}\n",
-    "export class S5 {\n  label = \"it's; m() { return 2; }\n}\nexport const after = 1;\n",
-    "export class C extends A, B {\n  x() {}\n}\n",
-  ];
-  for (const text of samples) {
-    const source = ts.createSourceFile("/a.ts", text, 99, true);
-    const spans = untrustedSpans(
-      source,
-      errorPositions(source, source.parseDiagnostics),
+test("a name through export * from two failed files names both; fixing them restores everything with no flags", async () => {
+  const files = {
+    "a.ts": "export function fromA() {}\nconst x = (;\n",
+    "b.ts": "export function fromB() {}\nconst y = (;\n",
+    "barrel.ts": 'export * from "./a";\nexport * from "./b";\n',
+    "use.ts": 'import { fromA } from "./barrel";\nfromA(); // call\n',
+  };
+  await project(files, async (graph) => {
+    failedLink(
+      callOn(graph, "use.ts", "// call", "fromA"),
+      { files: ["a.ts", "b.ts"] },
+      "two causes",
     );
-    assert.ok(spans.length, text);
-    for (const span of spans) assert.ok(span.end > span.start, text);
-    const neutral = neutralizeSpans(source, spans);
-    assert.equal(neutral.text.length, text.length, text);
-    const breaks = (value) =>
-      [...value].flatMap((c, i) => (c === "\n" || c === "\r" ? [i] : []));
-    assert.deepEqual(breaks(neutral.text), breaks(text), text);
-    for (let i = 0; i < text.length; i++) {
-      const inside = neutral.spans.some((s) => i >= s.start && i < s.end);
-      if (!inside) assert.equal(neutral.text[i], text[i], `${text} @${i}`);
-      else
-        assert.ok(
-          /[\s)\]}`]/.test(neutral.text[i]),
-          `${text} @${i}: ${JSON.stringify(neutral.text[i])}`,
-        );
+    // Unchanged re-index re-parses nothing.
+    const reused = statistics.reused;
+    const built = statistics.programs;
+    await graph.reindex();
+    assert.equal(statistics.reused, reused + 1);
+    assert.equal(statistics.programs, built);
+    // Fixed: resolved, and no assumption left anywhere.
+    await graph.write("a.ts", "export function fromA() {}\n");
+    await graph.write("b.ts", "export function fromB() {}\n");
+    const report = await graph.reindex();
+    assert.deepEqual(report.failed ?? [], []);
+    const call = callOn(graph, "use.ts", "// call", "fromA");
+    assert.equal(graph.target(call), "a.ts#fromA");
+    for (const link of graph.store.links()) {
+      assert.equal(link.data?.assumes, undefined, link.targetName);
+      assert.equal(link.data?.cause, undefined, link.targetName);
     }
-    // Only closing brackets survive inside a span.
-    const kept = neutral.spans
-      .map((s) => neutral.text.slice(s.start, s.end).replace(/\s/g, ""))
-      .join("");
-    assert.match(kept, /^[)\]}`]*$/, text);
-  }
+  });
+});
+
+test("only programs that would include a failed file are flagged", async () => {
+  await project(
+    {
+      "one/tsconfig.json": '{ "include": ["*.ts"] }\n',
+      "one/broken.ts": "export const lost = (;\n",
+      "one/a.ts": "export function f() {}\nf(); // one\n",
+      "two/tsconfig.json": '{ "include": ["*.ts"] }\n',
+      // Includes the failed file through an import: flagged too.
+      "two/b.ts":
+        'import { lost } from "../one/broken";\nexport function g() {}\ng(); // two\n',
+      "three/tsconfig.json": '{ "include": ["*.ts"] }\n',
+      "three/c.ts": "export function h() {}\nh(); // three\n",
+    },
+    async (graph) => {
+      flagged(
+        graph,
+        callOn(graph, "one/a.ts", "// one", "f"),
+        "one/a.ts#f",
+        "one",
+      );
+      flagged(
+        graph,
+        callOn(graph, "two/b.ts", "// two", "g"),
+        "two/b.ts#g",
+        "two",
+      );
+      failedLink(
+        graph.link("two/b.ts", "lost", "imports"),
+        { file: "one/broken.ts" },
+        "shared failed file",
+      );
+      const clean = callOn(graph, "three/c.ts", "// three", "h");
+      assert.equal(graph.target(clean), "three/c.ts#h");
+      assert.equal(clean.data.assumes, undefined);
+    },
+  );
+});
+
+test("the program flag and the bundler assumption together", async () => {
+  await project(
+    {
+      "package.json": '{ "type": "module" }\n',
+      "dep.cjs": "module.exports = { real() {} };\n",
+      "broken.js": "const lost = (;\n",
+      "a.js": 'export const d = require("./dep.cjs");\nd.real(); // real\n',
+    },
+    async (graph) => {
+      const link = callOn(graph, "a.js", "// real", "real");
+      assert.equal(link.resolution, "resolved");
+      assert.deepEqual(link.data.assumes, ["bundler-require", FLAG]);
+    },
+  );
+});
+
+test("tied configs: six orders of three variants merge to identical output", async () => {
+  const { mergeTied } = await import(
+    "../dist/graph/languages/typescript/index.js"
+  );
+  const variant = (config, extra) => ({
+    status: "clean",
+    diagnostics: [],
+    symbols: [],
+    links: [
+      {
+        sourceKey: "module@0",
+        kind: "calls",
+        targetName: "f",
+        range: { start: 0, end: 1 },
+        data: { targets: [{ file: "x.ts", key: "function@0" }], ...extra },
+      },
+    ],
+    data: {
+      analyzer: "a",
+      project: config,
+      ...(config === "tsconfig.b.json" ? { configNotes: ["missing ref"] } : {}),
+    },
+  });
+  const all = [
+    ["tsconfig.a.json", variant("tsconfig.a.json", {})],
+    [
+      "tsconfig.b.json",
+      variant("tsconfig.b.json", { assumes: ["bundler-require"] }),
+    ],
+    ["tsconfig.c.json", variant("tsconfig.c.json", { reason: "external" })],
+  ];
+  const orders = [
+    [0, 1, 2],
+    [0, 2, 1],
+    [1, 0, 2],
+    [1, 2, 0],
+    [2, 0, 1],
+    [2, 1, 0],
+  ];
+  const outputs = orders.map((order) =>
+    JSON.stringify(
+      mergeTied(
+        order.map((i) => all[i][1]),
+        order.map((i) => all[i][0]),
+      ),
+    ),
+  );
+  for (const output of outputs) assert.equal(output, outputs[0]);
+  const merged = JSON.parse(outputs[0]);
+  assert.deepEqual(merged.data.byProject["tsconfig.b.json"], {
+    configNotes: ["missing ref"],
+  });
+  assert.deepEqual(merged.links[0].data.assumes, ["bundler-require"]);
+  assert.equal(merged.links[0].data.reason, "ambiguous-project");
 });
 
 test("tied configs merge the same way whichever config comes first", async () => {
@@ -3719,7 +3324,7 @@ test("tied configs merge the same way whichever config comes first", async () =>
         .links()
         .find((l) => l.file === "use.ts" && l.targetName === "value.real");
       assert.ok(member, "value.real");
-      assert.equal(member.data.assumes, "bundler-require", order.join());
+      assert.deepEqual(member.data.assumes, ["bundler-require"], order.join());
       // Every link of use.ts, independent of which config maps what.
       outcomes.push(
         graph.store
@@ -3747,25 +3352,42 @@ test("tied configs merge the same way whichever config comes first", async () =>
   assert.deepEqual(outcomes[0], outcomes[1]);
 });
 
-test("a global stays definite when no script file is open; a JS class with a missing brace is open", async () => {
+test("meaningless heritage grammar is a syntax error: the file fails", async () => {
+  await project(
+    {
+      "bases.ts": "export class A {}\nexport class B {}\n",
+      "c.ts":
+        'import { A, B } from "./bases";\nexport class C extends A, B {}\n',
+      "use.ts": 'import { C } from "./c";\nnew C(); // c\n',
+    },
+    async (graph, report) => {
+      assert.ok(report.failed.includes("c.ts"));
+      const diagnostics = graph.store.getFile("c.ts").result.diagnostics;
+      assert.match(
+        diagnostics[0].message,
+        /^Syntax error at line 2, column 16: Invalid heritage clauses/,
+      );
+      failedLink(callOn(graph, "use.ts", "// c", "C"), { file: "c.ts" }, "C");
+    },
+  );
+});
+
+test("a failed file edited but still failing is analysed again when it changes what others see", async () => {
   await project(
     {
       "tsconfig.json": '{ "compilerOptions": { "allowJs": true } }\n',
-      "globals.js": "function globalHelper() {}\n",
-      "clean.ts": "globalHelper(); // clean-global\n",
-      "base.js": "export class Base { m() { return 1; } }\n",
-      "s4.js":
-        'import { Base } from "./base.js";\nexport class S4 extends Base {\n  /* note\n  m() { return 2; }\n}\n',
-      "use.js": 'import { S4 } from "./s4.js";\nnew S4().m(); // s4\n',
+      // A broken script: its globals are unseen.
+      "a.js": "function g() {}\nvar x = (;\n",
+      "use.js": "g(); // g\n",
     },
     async (graph) => {
-      definite(
-        graph,
-        callOn(graph, "clean.ts", "// clean-global", "globalHelper"),
-        "globals.js#globalHelper",
-        "global, no open script",
-      );
-      withheld(callOn(graph, "use.js", "// s4", "m"), "JS missing brace");
+      failedLink(callOn(graph, "use.js", "// g", "g"), { file: "a.js" }, "g");
+      // Still broken, but now a module: it declares no globals.
+      await graph.write("a.js", "export function g() {}\nvar x = (;\n");
+      await graph.reindex();
+      const call = callOn(graph, "use.js", "// g", "g");
+      assert.equal(call.data.reason, "no-symbol");
+      assert.equal(call.data.cause, undefined);
     },
   );
 });

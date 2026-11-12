@@ -528,6 +528,45 @@ const TEMPLATES = [
     modes: ["cjs", "cjs-strict"],
     category: "dynamic",
   },
+  // Round 11: only numeric reads 0-4 that are not called are harmless.
+  {
+    name: "a called read of the wrapper's __filename slot",
+    code: `__filename = function () { this[1] = () => __fake(); };\narguments[3]();\nS0`,
+    // Strict code has no mapped arguments: the call would throw.
+    modes: ["cjs"],
+    category: "dynamic",
+  },
+  {
+    name: "a called read of the wrapper's exports slot",
+    code: `exports = function () { this[1] = () => __fake(); };\narguments[0]();\nS0`,
+    // Strict code has no mapped arguments: the call would throw.
+    modes: ["cjs"],
+    category: "dynamic",
+  },
+  {
+    name: "an inherited method read through arguments with a string key",
+    code: `Object.prototype.describe = function () { this[1] = () => __fake(); };\narguments["describe"]();\ndelete Object.prototype.describe;\nS0`,
+    modes: ["cjs", "cjs-strict"],
+    category: "dynamic",
+  },
+  {
+    name: "an inherited method from another file read through arguments",
+    code: `const patch = require("./patch-describe.cjs");\npatch.install();\narguments["describe"]();\npatch.restore();\nS0`,
+    modes: ["cjs", "cjs-strict"],
+    category: "dynamic",
+  },
+  {
+    name: "an inherited getter at an index past the wrapper's own",
+    code: `Object.defineProperty(Object.prototype, 7, { get: function () { this[1] = () => __fake(); }, configurable: true });\narguments[7];\ndelete Object.prototype[7];\nS0`,
+    modes: ["cjs", "cjs-strict"],
+    category: "dynamic",
+  },
+  {
+    name: "an inherited getter from another file at an index past the wrapper's own",
+    code: `const patch = require("./patch-getter.cjs");\npatch.install();\narguments[7];\npatch.restore();\nS0`,
+    modes: ["cjs", "cjs-strict"],
+    category: "dynamic",
+  },
   // An array spread uses the arguments object's own Symbol.iterator (the
   // built-in values, captured at creation); none of these reach the object.
   {
@@ -847,6 +886,14 @@ export async function runOracle(scratch, cases) {
     "let saved;\nexports.install = () => { saved = Array.from; Array.from = function (a) { a[1] = () => __fake(); return []; }; };\nexports.restore = () => { Array.from = saved; };\n",
   );
   await writeFile(
+    join(scratch, "patch-describe.cjs"),
+    "exports.install = () => { Object.prototype.describe = function () { this[1] = () => __fake(); }; };\nexports.restore = () => { delete Object.prototype.describe; };\n",
+  );
+  await writeFile(
+    join(scratch, "patch-getter.cjs"),
+    "exports.install = () => { Object.defineProperty(Object.prototype, 7, { get() { this[1] = () => __fake(); }, configurable: true }); };\nexports.restore = () => { delete Object.prototype[7]; };\n",
+  );
+  await writeFile(
     join(scratch, "patch-identity.cjs"),
     "let saved;\nexports.install = () => { saved = Array.from; Array.from = (x) => x; };\nexports.restore = () => { Array.from = saved; };\n",
   );
@@ -990,10 +1037,10 @@ export function checkEmitted(item, id, node, ours, links, dep) {
     if (form !== "X") {
       if (importsIntoDep.length !== 1)
         return "expected one import link into dep.cjs";
-      if (importsIntoDep[0].data?.assumes !== "bundler-require")
+      if (!importsIntoDep[0].data?.assumes?.includes("bundler-require"))
         return "bundler import without data.assumes";
     }
-    if (member.data?.assumes !== "bundler-require")
+    if (!member.data?.assumes?.includes("bundler-require"))
       return "bundler member link without data.assumes";
     if (!untyped && !into(member))
       return "bundler member link not into dep.cjs";
@@ -1014,7 +1061,8 @@ export function checkEmitted(item, id, node, ours, links, dep) {
         : `expected an untyped-require member, got ${member.resolution} ${member.data?.reason}`;
     if (!(member.resolution === "resolved" && into(member)))
       return `expected the member resolved into dep.cjs, got ${member.resolution} ${member.data?.reason}`;
-    if (member.data?.assumes) return "an assumes flag on a real link";
+    if (member.data?.assumes?.includes("bundler-require"))
+      return "a bundler assumption on a real link";
     return null;
   }
   if (importsIntoDep.length)

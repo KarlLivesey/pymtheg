@@ -55,8 +55,13 @@ The module is **analyze-only** (no per-file `parse`). Each run:
      if every config's answer was complete); a reason that every variant
      gives with the same targets is kept, any other reason makes it
      `ambiguous-project` (the reasons listed in `tiedReasons`); `assumes`
-     is kept if any variant has it; any other field that differs is not
-     picked from one variant but listed per config in `byProject`;
+     is the union; any other field that differs is not picked from one
+     variant but listed per config in `byProject`;
+   - nothing in a merged result comes from "the first" variant: at file
+     level too, a field is identical across the variants, a sorted union
+     (diagnostics, `projects`), or listed per config in `byProject` (for
+     example one config's `configNotes`); the output is identical for every
+     order of the variants;
    - the file records `data.projects` listing the tied configs and has no
      `data.project` (there is no single owner).
 
@@ -99,11 +104,17 @@ link across packages.
 **Unchanged snapshot reuse.** When `changedFiles` and `changedContextFiles`
 are both empty and every stored result was produced by this module version
 (which embeds the compiler version; the leading number is bumped whenever
-extraction or resolution semantics change, and is now 8), the stored facts are
+extraction or resolution semantics change, and is now 10), the stored facts are
 returned as they are:
 no program is built and nothing is parsed. They are the complete analysis of the
 identical snapshot, and `resolve` re-derives every target from them. Any source,
 config or package-manifest change, or a version change, reanalyses everything.
+The core always hands a file that failed before back as changed, with its
+stored result replaced (see Interface gaps). So every result records the
+module's failed files and their content hashes (`data.failedFiles`). If the
+only changed files are those, with the same content, nothing else can
+differ: the other files' facts are reused, no program is built, and only the
+failed files are parsed again, for their diagnostics.
 
 ## Symbols and identity
 
@@ -316,7 +327,14 @@ require = …` at top level, `require = …`, compound or destructuring
 - in sloppy CommonJS code, any use of the **wrapper's** `arguments` other
   than a plain read or an array spread. `arguments` is mapped to the
   parameters `exports, require, module, __filename, __dirname`. Plain reads
-  are `arguments.length` and `arguments[i]`. Every call that receives it
+  are exactly `arguments.length` and `arguments[i]` with a numeric-literal
+  index 0-4 (the wrapper's own mapped data properties) whose value is not
+  called (directly, optionally or as a template tag), constructed, written or
+  deleted. A called read runs the value with `this` set to the arguments
+  object (`__filename = function () { this[1] = … }; arguments[3]()`), and any
+  other key can run an inherited method or getter with it as receiver
+  (`arguments["describe"]()`, a getter on `Object.prototype[7]`), so those
+  count as passing it on. Every call that receives it
   counts as passing it on, whatever the callee: `Array.from(arguments)`,
   `Array.prototype.slice.call(arguments)`, `[].slice.call(arguments)` and
   `f(...arguments)` included. Any of these callees can be replaced from
@@ -427,26 +445,25 @@ own resolver over the snapshot.
 
 **Unresolved, with the name kept and `data.reason`:**
 
-| reason                | Meaning                                                                                                                                                                                                                                                     |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `external`            | The checker found declarations, but outside the project (standard library); or a name that resolved through a binding whose module did resolve but whose member has no declaration                                                                          |
-| `external-package`    | A bare specifier that does not resolve (`node_modules` is never walked), every binding imported from it, and every call, `new`, type reference (including qualified names such as `ns.T`), heritage clause and member lookup reached through such a binding |
-| `missing-module`      | The same for a relative specifier with no captured file (for example `new FlowProducer()` imported from an unbuilt `../../dist/...`)                                                                                                                        |
-| `unresolved-alias`    | The same for a specifier matching a `paths` pattern of the owning config, or a `#` subpath import, that resolves to no captured file                                                                                                                        |
-| `no-symbol`           | The checker has no symbol: untyped JS, `any`/`unknown` receivers (often because the receiver's type came from an uncaptured package), computed callees                                                                                                      |
-| `local`               | The target is a parameter, local variable, local function or other non-symbol declaration                                                                                                                                                                   |
-| `computed-specifier`  | `import(expr)` or JS `require(expr)` with a non-literal specifier                                                                                                                                                                                           |
-| `compiler-limit`      | The TypeScript checker exhausted its stack on this lookup (deep inference chains); the file is partial                                                                                                                                                      |
-| `dynamic-scope`       | A `require`/`module`/`exports` whose meaning is decided at run time (see above), anything reached through its value, and unresolved names inside a `with` body                                                                                              |
-| `not-a-module`        | A binding from a captured file that was analysed, has no syntax errors, and has no imports or exports (a script). The import edge itself links to that file and carries `data.notAModule: true`; that flag means exactly this and nothing else              |
-| `partial-target`      | A binding from a captured file with syntax errors and no exports found (its exports cannot be ruled out)                                                                                                                                                    |
-| `target-unavailable`  | The target file failed analysis (parser, binder, scope analysis or a broken config); the import edge and its bindings are unresolved, the file kept in `data.targets`                                                                                       |
-| `untyped-require`     | A binding, call or member reached through a captured module required by a form the compiler does not type (`(0, require)(…)`, `(require)(…)`, `module.require(…)`, an escaped `require`). The import edge links to the module                               |
-| `partial-declaration` | The link's outcome depends on recovered text after a syntax error (see Status and "Differential analysis"); the normal program's targets are kept                                                                                                           |
-| `createrequire-base`  | A require through `createRequire` with a base other than this file's location; no would-be target is kept                                                                                                                                                   |
-| `renamed-export`      | An ES binding of an export named `require`/`module`/`exports` between a JS file and a TS file or a CommonJS property, whose spellings differ for the compiler                                                                                               |
-| `ambiguous-project`   | Equally ranked configs disagree and at least one has no complete answer; their targets are kept                                                                                                                                                             |
-| `incomplete-config`   | The file's config `extends` a base that was not captured, and the link's outcome depends on settings that base could supply (see Status); would-be targets are kept, the reason without that rule is in `data.reasonWithoutConfig`                          |
+| reason               | Meaning                                                                                                                                                                                                                                                     |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `external`           | The checker found declarations, but outside the project (standard library); or a name that resolved through a binding whose module did resolve but whose member has no declaration                                                                          |
+| `external-package`   | A bare specifier that does not resolve (`node_modules` is never walked), every binding imported from it, and every call, `new`, type reference (including qualified names such as `ns.T`), heritage clause and member lookup reached through such a binding |
+| `missing-module`     | The same for a relative specifier with no captured file (for example `new FlowProducer()` imported from an unbuilt `../../dist/...`)                                                                                                                        |
+| `unresolved-alias`   | The same for a specifier matching a `paths` pattern of the owning config, or a `#` subpath import, that resolves to no captured file                                                                                                                        |
+| `no-symbol`          | The checker has no symbol: untyped JS, `any`/`unknown` receivers (often because the receiver's type came from an uncaptured package), computed callees                                                                                                      |
+| `local`              | The target is a parameter, local variable, local function or other non-symbol declaration                                                                                                                                                                   |
+| `computed-specifier` | `import(expr)` or JS `require(expr)` with a non-literal specifier                                                                                                                                                                                           |
+| `compiler-limit`     | The TypeScript checker exhausted its stack on this lookup (deep inference chains); the file is partial                                                                                                                                                      |
+| `dynamic-scope`      | A `require`/`module`/`exports` whose meaning is decided at run time (see above), anything reached through its value, and unresolved names inside a `with` body                                                                                              |
+| `not-a-module`       | A binding from a captured file that was analysed, has no syntax errors, and has no imports or exports (a script). The import edge itself links to that file and carries `data.notAModule: true`; that flag means exactly this and nothing else              |
+| `invalid-code`       | Failed: the link goes into a file that cannot be read (see Status), or is answered only through one. No target, candidate or would-be target; `data.cause` names the failed file (`{ file }`, or `{ files: [...] }` sorted when several could be the cause) |
+| `target-unavailable` | The target file failed for another reason (a parser or binder stack overflow, scope analysis, a broken config); the import edge and its bindings are unresolved, the file kept in `data.targets`                                                            |
+| `untyped-require`    | A binding, call or member reached through a captured module required by a form the compiler does not type (`(0, require)(…)`, `(require)(…)`, `module.require(…)`, an escaped `require`). The import edge links to the module                               |
+| `createrequire-base` | A require through `createRequire` with a base other than this file's location; no would-be target is kept                                                                                                                                                   |
+| `renamed-export`     | An ES binding of an export named `require`/`module`/`exports` between a JS file and a TS file or a CommonJS property, whose spellings differ for the compiler                                                                                               |
+| `ambiguous-project`  | Equally ranked configs disagree and at least one has no complete answer; their targets are kept                                                                                                                                                             |
+| `incomplete-config`  | The file's config `extends` a base that was not captured, and the link's outcome depends on settings that base could supply (see Status); would-be targets are kept, the reason without that rule is in `data.reasonWithoutConfig`                          |
 
 **A target set is never narrowed.** If any possible declaration lies outside the
 project (standard library, uncaptured package, a local), the link is
@@ -466,138 +483,65 @@ imports of `./orig` are not linked to it; backlog).
 
 ## Status and errors
 
-- A syntax error makes the file **partial** with the compiler's syntactic
-  diagnostics (ranged). Heritage grammar the parser accepts but that has no
-  meaning also makes it partial, with a diagnostic: `class C extends A, B`,
-  two `extends` clauses, `extends` after `implements`, or `implements` on an
-  interface.
-- **What a partial declaration supports.** The text of a declaration from
-  its first syntax error to its end is recovered structure that the source
-  does not actually state. So is a whole heritage clause list when the error
-  is inside it (including the grammar defects above). Links that depend on
-  that text are decided by the differential analysis below:
-  - **Existence and name.** A name before the error is not untrusted, so a
-    call to `function f(x: , y) {}` links to `f`, `new Base()` links to a
-    truncated `class Base`, and an import of the file links to its module.
-  - **Anything that depends on the text after the error** is unresolved with
-    reason `partial-declaration`: a member declared after it (`x.b()` with
-    `interface I { a: ; b(): void }`), a return type after it
-    (`f(1, 2).go()`), and every value that carries such a type onward
-    (a variable, a callback parameter typed by the callee, a returned value,
-    an array element, a destructured or spread value, a class field, a
-    generic instantiation, another file, a barrel). Members inherited
-    through a heritage clause holding the error, and the `extends`/
-    `implements` links written in it, are withheld too.
-  - **Labelling.** The normal program's would-be targets are kept in
-    `data.targets`. Like any incomplete set, they never make a candidate set
-    complete.
-  - **Containment.** A link that resolves the same without the untrusted
-    text stays definite, even in the same file or through the same
-    declaration (`new Box().go()` beside a broken function returning `Box`).
-- **Open declarations: what recovery may have dropped.** The differential
-  analysis below sees only the text the parser kept. Recovery can also throw
-  text away (`a = [1, ;` swallows the next member; an unterminated comment
-  or string swallows everything after it), and a lookup that then falls
-  through to an inherited or outer declaration agrees in both programs. One
-  notion covers this: a declaration or scope is **open from offset N**, and
-  one check consumes it, for every definite target or candidate set.
-  - **Where trust ends** (`trustEnd`): the start of the construct the error
-    belongs to. An error inside or at the end of a comment, string,
-    template, regular expression or JSX element belongs to it from its
-    opening delimiter, so an unterminated one reported at the end of the
-    line or file is untrusted from where it opens. Only the parser's own
-    diagnostics count; grammar checks that drop no text (JS-only syntax,
-    heritage defects) open nothing. A parser diagnostic that drops no text
-    either (an octal literal) is not told apart and opens its file.
-  - **(a) Member lists.** A class, interface, enum, namespace, type literal
-    or object literal is open from the first trust end inside its member
-    list, or from its own end if its closing brace is missing. A lookup
-    through a receiver whose type involves an open one is withheld unless
-    every target is a member of it lying wholly before N. The receiver's
-    type is followed through its symbol's declarations (merged ones
-    included), base classes and interfaces, `implements` clauses, union and
-    intersection parts, type arguments, constraints, mapped types' source,
-    and the declarations of its properties (`typeof`, indexed access and
-    `Partial<…>` included). So `new S1().m()` with `class S1 extends Base {
-a = [1, ; m() {} }` is withheld, though both programs land on `Base.m`.
-    Members wholly before the error stay definite; the member that holds the
-    error (`broken(x: , y) {…}`, its name before it) is not wholly before it
-    and is withheld, though the neutral text keeps its name.
-  - **(b) Scopes.** A file with any parse error has an open scope from the
-    first trust end, and so does an open namespace body. Decided for names:
-    - a name used in an open scope whose declaration lies outside that
-      scope (an outer scope, a global from another file) is withheld: an
-      unseen declaration could shadow it. One declared in the scope is
-      withheld if an unseen one could replace it (`var`, or a function in a
-      JS file); imports, `let`/`const`, classes, interfaces, types and TS
-      functions are kept;
-    - a global declared by another script file is withheld from every file
-      while any captured script file is open (its unseen top-level
-      declarations would be globals too);
-    - an import, re-export or namespace member resolves through the modules
-      it consults: the specifier's module and, when the name is not declared
-      there, its whole `export *` closure. If one of them is open, the link
-      is withheld unless the target is declared in that open module and is
-      not replaceable. An unseen export of the same name could shadow a star
-      export or make it ambiguous. Names declared in the open file, before
-      or after the error, stay definite: they are seen;
-    - in a TS file with an open scope, every class, interface, enum and
-      namespace declared directly in it is open from its own end: an unseen
-      merge partner (a later `interface X`) could add members. Their own
-      members stay definite; anything that falls through them (an inherited
-      member) is withheld.
-
-    Cost: nothing for files without parse errors (BullMQ). With one broken
-    file, every name imported through a barrel whose `export *` closure
-    includes it is withheld. That is most of BullMQ's tests, which import
-    from `src/classes/index.ts` (see Observations). In a project of scripts,
-    one broken script withholds every cross-file global.
-
-  - **Spans for the differential analysis** start at the trust end too,
-    never at the reported position. They are never empty. Trust that ends
-    outside every statement (an unterminated comment after a recovered
-    class) is a span to the end of the file.
-  - Like the differential labels, these are `partial-declaration` with the
-    would-be targets kept. The neutral program does not apply the rule (it
-    answers only what the kept text supports).
-
-- **Differential analysis.** Two kinds of input are untrusted: (a) the
-  syntax-error tails above, and (b) each free `require`/`module` in an ES
-  module that is read as the loader only under the bundler assumption. When
-  a project's program contains neither (the normal case, as in BullMQ),
-  nothing else happens. Otherwise, for each kind present, a second program is
-  built over the same snapshot with that input neutralised **at the same
-  offsets** (`untrusted.ts`):
-  - (a) each tail becomes spaces (line breaks kept in place), starting with
-    exactly the closing brackets that were open where it starts (or, when the parser closed the
-    declaration in less room, only the tail's own closing brackets), so every
-    following statement parses at the same position as before. This is
-    checked: if any top-level statement outside the tails would move or
-    change kind, everything from the first tail to the end of the file is
-    neutralised instead;
-  - (b) the assumed `require`/`module` is renamed, at the same length, to an
-    undeclared name, as the dynamic-scope rule does.
-
-  Every file of the project is extracted again against that program, and
-  each link is compared with the link at the same site (kind and range). If
-  the target set and reason are the same, the link does not depend on the
-  untrusted input and is unchanged. If they differ, or the site has no link
-  there, the link depends on it. For (a), a link with targets and no other
-  reason becomes unresolved `partial-declaration` with the normal program's
-  targets kept. For (b), it keeps its outcome and gains
-  `data.assumes: "bundler-require"`. If both kinds apply to one link,
-  `partial-declaration` wins. The type checker does all the propagation;
-  there are no hand-written routes. Structural `contains` links come from the
-  parse alone and are not compared. A neutral extraction that fails or is cut
-  off marks every link of that file as dependent.
-
-  Cost: nothing for a project without untrusted input. Otherwise one extra
-  program and one extra extraction of the project's files per kind present
-  (two when a project has both). Unchanged files reuse the normal program's
-  parsed and bound source files. A project whose program does not reach an
-  untrusted file builds nothing extra. Measured on BullMQ with one broken
-  file: see `evidence/w2-d/README.md`.
-
+- **A file that cannot be read is not valid code: it has failed.** A file
+  with any syntax error (a diagnostic from the TypeScript parser, or heritage
+  grammar the parser accepts but that has no meaning: `class C extends A, B`,
+  two `extends` clauses, `extends` after `implements`, `implements` on an
+  interface) is `failed`. It contributes no symbols and no links, and its
+  diagnostics give each syntax error, sorted by position, the way a compiler
+  does: `Syntax error at line 2, column 19: Expression expected. Found: ";".`
+  (1-based line and column, the parser's own message, and the offending text
+  when the parser gives a span, on one line and cut to 40 characters). Type
+  errors do not fail a file. An error that loses no text (a legacy octal
+  literal `0777`) fails it too; there is no special case.
+- **Nothing in a failed file is a target.** The compiler host serves a
+  failed file to every program as **absent** (not as empty text): the module
+  specifier still names an existing captured file, so an import of it is
+  recognised as an import of a broken file, and nothing in it can be found. A
+  link that would go into it, or that only it could answer, is **failed**:
+  `unresolved`, reason `invalid-code`, its name kept, and no target, no
+  candidates and no would-be targets. `data.cause` names the broken file
+  (`{ "file": "maths.js" }`; `{ "files": [...] }`, sorted, when several could
+  be the cause), so a reader can see "this import is broken because the file
+  it imports is broken". No symbol inside the failed file is named. That
+  covers: the import itself and each name imported from it (`import { pi,
+phi, absolute } from "./maths.js"` fails all four, and `absolute(phi)`
+  fails too); members of a namespace import of it; a name reached through
+  an `export *` from it (in any barrel along the way); a member inherited
+  from a base class or interface declared in it; and a bare name that no
+  declaration answers while a failed script file is part of the program (its
+  top-level declarations would have been globals). An import whose specifier
+  resolves to no file at all stays an ordinary unresolved import
+  (`missing-module`, no cause): missing is not broken.
+- **Every other link in a program with a failed file is flagged.** If a
+  program had at least one failed file among the files it would otherwise
+  include (a root, or a file it imports), every link computed from that
+  program, except the failed links themselves, carries the assumption
+  `no-unseen-declarations` in `data.assumes`. It keeps the status and target
+  the compiler gave it. One rule in one place (`index.ts`), with no
+  exceptions by link kind. The flag means: correct provided the failed file
+  declares nothing that changes it. It does **not** prove that the failed
+  file declares no global, no module augmentation (`declare module "./x"`)
+  and no interface merge that would add or change a member, overload or
+  target; that no name the program resolved elsewhere would have resolved
+  into the failed file; or that a candidate set is complete. A program with
+  no failed file never carries the flag, and fixing the file removes it on
+  the next index.
+- **`data.assumes`** is a sorted array of unique names, so it is
+  independent of order: `bundler-require` (below), `no-unseen-declarations`,
+  or both. Tied configs keep the union.
+- **Differential analysis (bundler assumption only).** A free
+  `require`/`module` in an ES module is read as the loader only under the
+  bundler assumption. When a project's program has none (the normal case, as
+  in BullMQ), nothing else happens. Otherwise one second program is built over
+  the same snapshot, with each assumed `require`/`module` renamed, at the
+  same length, to an undeclared name (`untrusted.ts`). Every file of the
+  project is extracted again against it, and each link is compared with the
+  link at the same site (kind and range). If the target set and reason
+  differ, or the site has no link there, the link rests on the assumption and
+  gains `bundler-require`. The type checker does all the propagation; there
+  are no hand-written routes. Structural `contains` links are not compared.
+  Unchanged files reuse the normal program's parsed and bound source files.
 - **Compiler stack limits.** The checker's inference recurses once per step, so
   a long chain (`let v1 = v0; …` or `function f1() { return f0(); } …`) can
   exhaust the stack.
@@ -756,6 +700,17 @@ a = [1, ; m() {} }` is withheld, though both programs land on `Base.m`.
    would-be targets kept (see Status), never a silent guess.
    Closing this needs an interface way to request specific context paths
    discovered during analysis.
+6. **A failed file is always handed back as changed.** The core re-processes
+   every file whose stored result is `failed` (`src/graph/indexer.ts`), and
+   replaces its stored result before `analyze` runs, so an unchanged broken
+   file reaches the module as a change. The module recognises it from
+   `data.failedFiles` (see "Unchanged snapshot reuse"): it builds no program
+   and reuses every other file's facts, but has to parse the failed file
+   again to give its diagnostics. Parsing nothing at all would need the core
+   to keep an unchanged failed result.
+7. **"Failed" is a reason, not an outcome.** A failed link is `unresolved`
+   with reason `invalid-code` and `data.cause`; the interface has no
+   first-class failed link outcome (for the interface additions chunk).
 
 ## Observations
 
@@ -788,29 +743,21 @@ Full numbers, the comparison across rounds and every hand check are in
   totals identical to round 5. Rounds 9 and 10 build no second program
   there, and no BullMQ file uses the wrapper's `arguments` or has a parse
   error.
-- **One syntax error in BullMQ's `class Job`** (`isFailed(x: , y)`): 6
-  programs instead of 4. 2,030 links become `partial-declaration` (round 9:
-  388), against 15,782 still resolved:
-  - the same 388 as in round 9 (the differential analysis);
-  - 6 lookups through `interface JobQueue extends Omit<MinimalQueue, …>`
-    declared in the open `job.ts`, falling through to `MinimalQueue`
-    (open-scope merge partner);
-  - 18 calls of `job.isFailed()`: the member holding the error. Its name
-    comes first, but it is not wholly before the error;
-  - 1,618 names (1,243 calls, 225 imports, 148 type references, one
-    `extends`, one `implements`) imported through barrels whose `export *`
-    closure includes `job.ts`, chiefly `src/classes/index.ts` (29 star
-    exports, imported by 48 files). An unseen `export` in `job.ts` could
-    shadow or make ambiguous any of those names.
-- **`requirejs` in round 10:** 410 links become `partial-declaration`
-  (resolved 471 → 63, candidate sets 2 → 0). `tests/packagesMultiLevel/build.js`
-  is a script (a bare object literal) with parse errors, so its scope is open
-  and any global could be redeclared unseen. 407 calls to globals declared
-  by script files are withheld: `define` 404, `finished` 2 and `D` 1. In
-  `dist/file.js` the parser reports an octal literal (`0777`), so its own JS
-  functions `mkDir`/`mkFullDir` (3 calls) are replaceable in an open scope.
-  The rename and
-  import-edge figures are unchanged.
+- **One syntax error in BullMQ's `class Job`** (`isFailed(x: , y)`): the
+  whole of `src/classes/job.ts` fails (no symbols, no links). 434 links fail
+  (`invalid-code`, cause `src/classes/job.ts`): the imports of `job.ts`
+  and names reached through it, chiefly through `src/classes/index.ts`'s
+  `export * from './job'`. 15,987 links are resolved and flagged, 634 are
+  resolved without the flag (programs that do not include `job.ts`), the 4
+  candidate sets are flagged, and 23,348 links are otherwise unresolved. 4
+  programs, as unbroken.
+- **`requirejs`:** 2 files fail. `tests/packagesMultiLevel/build.js` is a
+  bare object literal (`';' expected`), and `dist/file.js` has the octal
+  literal `0777`. 106 links fail: 12 into `dist/file.js` (its imports and
+  bindings, cause that file), and 94 bare names that no declaration answers,
+  caused by both failed scripts, whose globals are unseen. All 462 resolved
+  links and the 2 candidate sets are flagged, because the project's single
+  program includes both files; 4,029 are otherwise unresolved.
 - **A project with a local `require`: `requirejs`** (`7faea649`, 406 files, 0
   failed). 133 files are renamed (`require` in 116, `exports` in 73, `module`
   in 61), almost all AMD `define(function (require, exports, module) {…})`

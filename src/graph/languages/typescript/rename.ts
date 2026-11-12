@@ -645,26 +645,47 @@ export function classify(
     return false;
   };
   /**
-   * `x.length`, a read `x[i]`, or a spread into an array literal
-   * (`[...x]`): none can change the object or let it escape. Every other use,
-   * including any call that receives it (`Array.from(x)`, `slice.call(x)`,
-   * `f(...x)`), counts as passing it on. An array spread is safe because it
-   * iterates through the arguments object's own `Symbol.iterator`, which is
-   * the built-in `Array.prototype.values` captured when the object is
-   * created (replacing `Array.prototype[Symbol.iterator]`, `values` or
-   * `Object.prototype[Symbol.iterator]` does not change it), and a replaced
-   * `%ArrayIteratorPrototype%.next` receives only the iterator, never the
-   * object (`caller.arguments` is an unmapped copy). Verified in Node; see
-   * docs/changes/W2-D.md. A call spread is treated as passing on purpose.
+   * The only harmless uses of the wrapper's `arguments`:
+   * - `arguments.length` read;
+   * - `arguments[i]` read with a numeric-literal index 0-4 (the wrapper's
+   *   own mapped data properties, so no inherited getter runs), when the
+   *   value is not called (directly, optionally or as a tag) or constructed:
+   *   a called value runs with `this` = the arguments object;
+   * - a spread into an array literal (`[...x]`): it iterates through the
+   *   object's own `Symbol.iterator`, the built-in `Array.prototype.values`
+   *   captured at creation, which reads only those same own indexes.
+   *   Replacing `Array.prototype[Symbol.iterator]`, `values`,
+   *   `Object.prototype[Symbol.iterator]` or the array iterator's `next`
+   *   never hands the object out (`caller.arguments` is an unmapped copy).
+   * Anything else counts as passing it on, including any call that
+   * receives it (`Array.from(x)`, `f(...x)`). Verified in Node.
    */
   const harmlessRead = (id: ts.Identifier): boolean => {
     const parent = id.parent;
-    const member =
-      (ts.isPropertyAccessExpression(parent) &&
-        parent.expression === id &&
-        parent.name.text === "length") ||
-      (ts.isElementAccessExpression(parent) && parent.expression === id);
-    if (member) return !isWriteTarget(parent);
+    if (
+      ts.isPropertyAccessExpression(parent) &&
+      parent.expression === id &&
+      parent.name.text === "length"
+    )
+      return !isWriteTarget(parent);
+    if (ts.isElementAccessExpression(parent) && parent.expression === id) {
+      const index = parent.argumentExpression;
+      if (!ts.isNumericLiteral(index) || !/^[0-4]$/.test(index.text))
+        return false;
+      if (isWriteTarget(parent)) return false;
+      let value: ts.Node = parent;
+      while (
+        ts.isParenthesizedExpression(value.parent) ||
+        ts.isNonNullExpression(value.parent)
+      )
+        value = value.parent;
+      const user = value.parent;
+      return !(
+        ((ts.isCallExpression(user) || ts.isNewExpression(user)) &&
+          user.expression === value) ||
+        (ts.isTaggedTemplateExpression(user) && user.tag === value)
+      );
+    }
     return (
       ts.isSpreadElement(parent) &&
       ts.isArrayLiteralExpression(parent.parent) &&

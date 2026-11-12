@@ -32,7 +32,8 @@ const fixtures = Object.entries(texts).map(([path, text]) => ({
   path,
   text,
   ...(isContext(path) ? { context: true } : {}),
-  ...(path === "src/broken.ts" ? { status: "partial" } : {}),
+  // A file that cannot be read is not valid code: it has failed.
+  ...(path === "src/broken.ts" ? { status: "failed" } : {}),
 }));
 
 /** Exact source text from the first `start` to the end of the following `end`. */
@@ -94,7 +95,6 @@ const SHAPES = "src/shapes.ts";
 const UTIL = "packages/util/src/index.ts";
 for (const file of [
   UTIL,
-  "src/broken.ts",
   "src/lazy.ts",
   "src/legacy.js",
   "src/loader.js",
@@ -107,9 +107,7 @@ for (const file of [
 ])
   module(file);
 sym(UTIL, "function", "helper", span(UTIL, "export function helper", "\n}"));
-sym("src/broken.ts", "function", "ok", "export function ok(): void {}");
-// Recovered from a file with a syntax error: the file is partial, the symbol is real.
-sym("src/broken.ts", "function", "broken", "export function broken(: void {");
+// src/broken.ts has a syntax error: failed, it contributes no symbols.
 sym("src/lazy.ts", "constant", "lazy", "export const lazy = 1;");
 sym(
   "src/legacy.js",
