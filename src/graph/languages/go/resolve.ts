@@ -2249,11 +2249,25 @@ class GoResolver {
           if (use.k === "result") term(t.r[use.i], file, depth + 1, use.then);
           return;
         case "st":
+          // A struct's own named field is found at depth 0: nothing it embeds
+          // matters (the same guard as for an anonymous struct value).
+          if (
+            use.k === "members" &&
+            use.n !== undefined &&
+            t.f.some((field) => !field.x && field.n === use.n)
+          )
+            return;
           if (use.k === "members" && use.embedded)
             for (const field of t.f)
               if (field.x) term(field.t, file, depth + 1, use);
           return;
         case "if":
+          if (
+            use.k === "members" &&
+            use.n !== undefined &&
+            t.m.some((method) => method.n === use.n)
+          )
+            return;
           if (use.k === "members" && use.embedded)
             for (const item of t.e) term(item, file, depth + 1, use);
           return;
@@ -2269,6 +2283,7 @@ class GoResolver {
         underlying?: TypeRef;
         target?: TypeTerm;
         fn?: Desc[];
+        v?: Desc;
       };
       // A member found on the type itself: nothing it contains matters.
       if (use.k === "members" && !use.embedded) return;
@@ -2276,6 +2291,10 @@ class GoResolver {
       term(data.target, symbol.file, depth, use);
       if (use.k === "result" && data.fn)
         desc(data.fn[use.i], symbol.file, depth + 1, use.then);
+      // A defined type over a container literal (`type NS []struct{…}`) has
+      // no target term: its element comes from the literal's description.
+      if (use.k === "comp" && data.v)
+        desc(data.v, symbol.file, depth + 1, use);
       if (use.k === "members")
         for (const embed of this.embedsBySource.get(symbol.id) ?? [])
           ref(
@@ -2403,8 +2422,15 @@ class GoResolver {
           if (use.k === "result") desc(d.r[use.i], file, depth + 1, use.then);
           return;
         case "local":
-          // An anonymous struct or interface: a member not among its own is
-          // looked up in what it embeds.
+          // An anonymous struct or interface: one of its own named fields or
+          // methods is found at depth 0, whatever route reached it, so nothing
+          // it embeds matters. Any other member is looked up in what it embeds.
+          if (
+            use.k === "members" &&
+            use.n !== undefined &&
+            d.f?.some((item) => item.n === use.n)
+          )
+            return;
           if (use.k === "members" && use.embedded)
             for (const item of d.m ?? []) {
               const found =
@@ -2455,8 +2481,15 @@ class GoResolver {
         case "local":
         case "cont":
         case "func":
-        case "val":
           return { d, file };
+        case "val": {
+          // A named type written as a literal (`type SA = []struct{…}`,
+          // `type FT func() …`): the literal, from its declaration.
+          const types = this.declaredTypes(d.t, file);
+          const type = types.length === 1 ? types[0]! : undefined;
+          const v = (type?.data as { v?: Desc } | undefined)?.v;
+          return v && type ? written(v, type.file, depth + 1) : { d, file };
+        }
         case "var":
           return written(d.d, file, depth + 1);
         case "name": {
@@ -2474,20 +2507,29 @@ class GoResolver {
         }
         case "call": {
           const callee = this.denote(d.f, file, 0);
+          // The builtin itself (`new`, `make`, `append`), as `desc` reads it.
+          if (callee.e === "none" && d.b) return written(d.b, file, depth + 1);
           const symbol = callee.e === "syms" ? one(callee.syms) : undefined;
-          if (symbol) {
+          // A declared function or method (also as a method value or method
+          // expression): its written result.
+          if (
+            symbol &&
+            (symbol.kind === "function" || symbol.kind === "method")
+          ) {
             const results = (symbol.data as { results?: Desc[] } | undefined)
               ?.results;
-            const result =
-              (symbol.kind === "function" || symbol.kind === "method") &&
-              results?.[d.i];
+            const result = results?.[d.i];
             return result ? written(result, symbol.file, depth + 1) : undefined;
           }
-          // A func value, or an indexed container of them (`h[0]()`).
-          let fn = written(d.f, file, depth + 1);
-          if (fn?.d.k === "cont") fn = written(fn.d.e, fn.file, depth + 1);
-          const result = fn?.d.k === "func" ? fn.d.r[d.i] : undefined;
-          return result && fn ? written(result, fn.file, depth + 1) : undefined;
+          // A conversion: not followed (undefined is the conservative answer).
+          if (symbol && TYPE_KINDS.has(symbol.kind)) return undefined;
+          // A function-typed variable, parameter or field, or any other func
+          // value (a literal called in place, an element of a container of
+          // functions, a result): the result of its written function type.
+          const fn = symbol
+            ? declared(symbol, depth)
+            : written(d.f, file, depth + 1);
+          return fn ? callResult(fn, d.i, depth + 1) : undefined;
         }
         case "elem":
         case "key": {
@@ -2496,9 +2538,55 @@ class GoResolver {
           const item = d.k === "key" && !x.d.ch ? x.d.key : x.d.e;
           return item ? written(item, x.file, depth + 1) : undefined;
         }
+        case "unknown":
+          // A call whose callee is not described (`(<-fc)()`, `(*p.T)(x)`):
+          // the value of calling what is written, as `desc` reads it.
+          return d.m?.length === 1
+            ? written({ k: "call", f: d.m[0]!, i: 0 }, file, depth + 1)
+            : undefined;
         default:
           return undefined;
       }
+    };
+    /**
+     * Result i of calling a value of this written type: a func type; an indexed
+     * container of functions (`fns[0]()` is described with the container as
+     * the callee); a named or aliased function type (`type F func() …`,
+     * `type F = func() …`), through its declaration.
+     */
+    const callResult = (
+      fn: { d: Desc; file: string },
+      i: number,
+      depth: number,
+    ): { d: Desc; file: string } | undefined => {
+      if (depth > MAX_DEPTH) return undefined;
+      if (fn.d.k === "func") {
+        const result = fn.d.r[i];
+        return result ? written(result, fn.file, depth + 1) : undefined;
+      }
+      if (fn.d.k === "cont") {
+        const item = written(fn.d.e, fn.file, depth + 1);
+        return item ? callResult(item, i, depth + 1) : undefined;
+      }
+      if (fn.d.k === "val") {
+        const types = this.declaredTypes(fn.d.t, fn.file);
+        const type = types.length === 1 ? types[0]! : undefined;
+        const data = (type?.data ?? {}) as {
+          fn?: Desc[];
+          underlying?: TypeRef;
+        };
+        if (type && data.fn) {
+          const result = data.fn[i];
+          return result ? written(result, type.file, depth + 1) : undefined;
+        }
+        if (type && data.underlying)
+          return callResult(
+            { d: { k: "val", t: data.underlying }, file: type.file },
+            i,
+            depth + 1,
+          );
+      }
+      return undefined;
     };
     /** A variable's, parameter's or field's declared type. */
     const declared = (symbol: GraphSymbol, depth: number) => {

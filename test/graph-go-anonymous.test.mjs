@@ -9,7 +9,7 @@ import { project } from "./fixtures/graph-go/harness.mjs";
 
 const MOD = "module example.com/m\n\ngo 1.22\n";
 const lines = (...items) => [...items, ""].join("\n");
-const ST = "struct{ p.T; B *bytes.Buffer }";
+const ST = "struct{ p.T; B *bytes.Buffer; F p.T }";
 // [route, declarations, the value expression]
 const ROUTES = [
   ["package var", `var S ${ST}`, "S"],
@@ -61,7 +61,7 @@ const link = (links, at) =>
     (item) => item.file === "q/q.go" && item.kind === "calls" && item.at === at,
   );
 
-test("every route to an anonymous struct: a named field is clean, an embedded member fails", async () => {
+test("every route to an anonymous struct value: a named field is clean, an embedded member or a failed field fails", async () => {
   assert.equal(ROUTES.length, 16);
   for (const [route, decls, expr, range] of ROUTES) {
     // The named field B does not depend on p.T: plainly unresolved (bytes is
@@ -82,16 +82,19 @@ test("every route to an anonymous struct: a named field is clean, an embedded me
       );
       assert.equal(found.data.cause, undefined, route);
     }
-    // M can only come from the embedded p.T: it needs the failed file.
-    const { links } = await project({
-      "go.mod": MOD,
-      "p/bad.go": bad(true),
-      "q/q.go": file(route, decls, expr, range, ".M()"),
-    });
-    const found = link(links, `${expr}.M`);
-    assert.ok(found, route);
-    assert.equal(found.data.reason, "invalid-code", route);
-    assert.deepEqual(found.data.cause, { files: ["p/bad.go"] }, route);
+    // M can only come from the embedded p.T; the named field F is itself a
+    // p.T. Both certainly need the failed file.
+    for (const member of [".M()", ".F.M()"]) {
+      const { links } = await project({
+        "go.mod": MOD,
+        "p/bad.go": bad(true),
+        "q/q.go": file(route, decls, expr, range, member),
+      });
+      const found = link(links, `${expr}${member.replace("()", "")}`);
+      assert.ok(found, `${route} ${member}`);
+      assert.equal(found.data.reason, "invalid-code", `${route} ${member}`);
+      assert.deepEqual(found.data.cause, { files: ["p/bad.go"] }, route);
+    }
   }
 });
 
@@ -203,4 +206,249 @@ test("backlog: a name-only set that a failed file could extend says so", async (
   // Control: no failed file.
   ({ links } = await project(files({})));
   assert.deepEqual(reasons(at(links, "j.Wait")), ["receiver-type-unknown"]);
+});
+
+// PR 19 round 1 (Sol): every callable whose result type is written. Each
+// fixture passes `go build ./... && go vet ./...` with p/bad.go fixed.
+const CST = "struct{ p.T; B *bytes.Buffer; F p.T }";
+// [route, declarations inside Use, the call expression]
+const CALLABLES = [
+  ["package-level function variable", "", "fn()"],
+  ["local function variable", `var f func() ${CST}`, "f()"],
+  ["local variable holding a declared function", "f := mk", "f()"],
+  ["function parameter", "", "pf()"],
+  ["named function type", "", "nf()"],
+  ["named function type over a named function type", "", "n2()"],
+  ["function-type alias", "", "af()"],
+  ["package-level slice of functions", "", "fns[0]()"],
+  ["array of functions", `var fa [2]func() ${CST}`, "fa[1]()"],
+  ["map of functions", `var fm map[string]func() ${CST}`, 'fm["a"]()'],
+  ["channel of functions", `var fc chan func() ${CST}`, "(<-fc)()"],
+  ["function-typed field", "", "o.f()"],
+  ["function-typed result", "", "mkf()()"],
+  [
+    "function literal called in place",
+    "",
+    `func() ${CST} { return ${CST}{} }()`,
+  ],
+  ["method", "", "h.Get()"],
+  ["method value", "g := h.Get", "g()"],
+  ["method expression", "", "H.Get(h)"],
+];
+const callFile = (decls, expr, member) =>
+  [
+    "package q",
+    "import (",
+    '\t"bytes"',
+    '\t"example.com/m/p"',
+    ")",
+    `type FN func() ${CST}`,
+    "type FN2 FN",
+    `type FA = func() ${CST}`,
+    `type O struct{ f func() ${CST} }`,
+    "type H struct{}",
+    `func (H) Get() ${CST} { return ${CST}{} }`,
+    `var fn func() ${CST}`,
+    `var fns []func() ${CST}`,
+    `func mk() ${CST} { return ${CST}{} }`,
+    `func mkf() func() ${CST} { return mk }`,
+    `func Use(pf func() ${CST}, nf FN, n2 FN2, af FA, o O, h H) {`,
+    ...(decls ? [`\t${decls}`] : []),
+    `\t${expr}${member}`,
+    "}",
+    "",
+  ].join("\n");
+
+test("every callable returning an anonymous struct: a named field is clean, an embedded member or a failed field fails", async () => {
+  assert.equal(CALLABLES.length, 17);
+  for (const [route, decls, expr] of CALLABLES) {
+    for (const broken of [true, false]) {
+      const { links } = await project({
+        "go.mod": MOD,
+        "p/bad.go": bad(broken),
+        "q/q.go": callFile(decls, expr, ".B.Write(nil)"),
+      });
+      const found = link(links, `${expr}.B.Write`);
+      assert.ok(found, route);
+      assert.equal(
+        found.data.reason,
+        undefined,
+        `${route} (broken: ${broken})`,
+      );
+      assert.equal(found.data.cause, undefined, route);
+    }
+    for (const member of [".M()", ".F.M()"]) {
+      const { links } = await project({
+        "go.mod": MOD,
+        "p/bad.go": bad(true),
+        "q/q.go": callFile(decls, expr, member),
+      });
+      const found = link(links, `${expr}${member.replace("()", "")}`);
+      assert.ok(found, `${route} ${member}`);
+      assert.equal(found.data.reason, "invalid-code", `${route} ${member}`);
+      assert.deepEqual(found.data.cause, { files: ["p/bad.go"] }, route);
+    }
+  }
+});
+
+test("the reviewer repro: a package-level function variable", async () => {
+  for (const broken of [true, false]) {
+    const { links } = await project({
+      "go.mod": MOD,
+      "p/p.go": lines(
+        "package p",
+        "type T struct{}",
+        "func (T) M() {}",
+        broken ? "func Broken() { (( }" : "",
+      ),
+      "q/q.go": lines(
+        "package q",
+        "import (",
+        '\t"bytes"',
+        '\t"example.com/m/p"',
+        ")",
+        "var fn func() struct{ p.T; B *bytes.Buffer }",
+        "func U() { fn().B.Write(nil) }",
+      ),
+    });
+    assert.equal(link(links, "fn().B.Write").data.reason, undefined);
+  }
+});
+
+test("written type not recoverable (two build variants): a named field still never takes an embedded cause", async () => {
+  // go build and go vet pass, for GOOS=linux and GOOS=windows, with p.go
+  // fixed. `written` refuses two declarations; the walk still reaches the
+  // anonymous struct, where B is its own named field (found at depth 0).
+  const ST = "struct{ p.T; B *bytes.Buffer }";
+  const imports = ["import (", '\t"bytes"', '\t"example.com/m/p"', ")"];
+  for (const broken of [true, false]) {
+    const { links } = await project({
+      "go.mod": MOD,
+      "p/p.go": lines(
+        "package p",
+        "type T struct{}",
+        "func (T) M() {}",
+        broken ? "func Broken() { (( }" : "",
+      ),
+      "q/v_linux.go": lines("package q", ...imports, `var fn func() ${ST}`),
+      "q/v_windows.go": lines("package q", ...imports, `var fn func() ${ST}`),
+      "q/q.go": lines("package q", "func U() { fn().B.Write(nil); fn().M() }"),
+    });
+    const at = (text) => links.find((item) => item.at === text);
+    assert.equal(
+      at("fn().B.Write").data.reason,
+      undefined,
+      `broken: ${broken}`,
+    );
+    assert.equal(
+      at("fn().M").data.reason,
+      broken ? "invalid-code" : undefined,
+      `broken: ${broken}`,
+    );
+  }
+});
+
+// PR 19 round 1 (Opus): builtins, named and aliased func and container types,
+// a local from new, a second result, a map key in range. Each fixture passes
+// `go build ./... && go vet ./...` with p/bad.go fixed.
+const ST2 = "struct{ p.T; B *bytes.Buffer; F p.T }";
+// [route, declarations inside Use, the value expression, inside a range over km]
+const ROUTES2 = [
+  ["builtin new", "", `new(${ST2})`],
+  ["builtin make", "", `make([]${ST2}, 1)[0]`],
+  ["builtin append", "", `append(sl, ${ST2}{})[0]`],
+  ["named func type", "", "ft()"],
+  ["aliased func type", "", "fa()"],
+  ["alias of a slice type", "", "sa[0]"],
+  ["defined slice type", "", "ns[0]"],
+  ["local initialised from new", `v := new(${ST2})`, "v"],
+  ["second result", "_, s2 := mk2()", "s2"],
+  ["map key in range", "", "k", true],
+];
+const file2 = (decls, expr, range, member) =>
+  [
+    "package q",
+    "import (",
+    '\t"bytes"',
+    '\t"example.com/m/p"',
+    ")",
+    `type FT func() ${ST2}`,
+    `type FA = func() ${ST2}`,
+    `type SA = []${ST2}`,
+    `type NS []${ST2}`,
+    `func mk2() (int, ${ST2}) { return 0, ${ST2}{} }`,
+    `func Use(ft FT, fa FA, sa SA, ns NS, sl []${ST2}, km map[${ST2}]int) {`,
+    ...(decls ? [`\t${decls}`] : []),
+    range
+      ? `\tfor k := range km {\n\t\t${expr}${member}\n\t}`
+      : `\t${expr}${member}`,
+    "}",
+    "",
+  ].join("\n");
+
+test("builtins, named types and other results: a named field is clean, an embedded member or a failed field fails", async () => {
+  assert.equal(ROUTES2.length, 10);
+  for (const [route, decls, expr, range] of ROUTES2) {
+    for (const broken of [true, false]) {
+      const { links } = await project({
+        "go.mod": MOD,
+        "p/bad.go": bad(broken),
+        "q/q.go": file2(decls, expr, range, ".B.Write(nil)"),
+      });
+      const found = link(links, `${expr}.B.Write`);
+      assert.ok(found, route);
+      assert.equal(
+        found.data.reason,
+        undefined,
+        `${route} (broken: ${broken})`,
+      );
+    }
+    for (const member of [".M()", ".F.M()"]) {
+      const { links } = await project({
+        "go.mod": MOD,
+        "p/bad.go": bad(true),
+        "q/q.go": file2(decls, expr, range, member),
+      });
+      const found = link(links, `${expr}${member.replace("()", "")}`);
+      assert.ok(found, `${route} ${member}`);
+      assert.equal(found.data.reason, "invalid-code", `${route} ${member}`);
+      assert.deepEqual(found.data.cause, { files: ["p/bad.go"] }, route);
+    }
+  }
+});
+
+test("written type not recoverable (an alias with two build variants): the type term keeps the guard", async () => {
+  // go build and go vet pass, for GOOS=linux and GOOS=windows, with p.go
+  // fixed. `written` refuses two declarations; the walk reaches the struct
+  // through the alias's type term, where B is its own named field.
+  const imports = ["import (", '\t"bytes"', '\t"example.com/m/p"', ")"];
+  const alias = "type SA = []struct{ p.T; B *bytes.Buffer }";
+  for (const broken of [true, false]) {
+    const { links } = await project({
+      "go.mod": MOD,
+      "p/p.go": lines(
+        "package p",
+        "type T struct{}",
+        "func (T) M() {}",
+        broken ? "func Broken() { (( }" : "",
+      ),
+      "q/v_linux.go": lines("package q", ...imports, alias),
+      "q/v_windows.go": lines("package q", ...imports, alias),
+      "q/q.go": lines(
+        "package q",
+        "func U(sa SA) { sa[0].B.Write(nil); sa[0].M() }",
+      ),
+    });
+    const at = (text) => links.find((item) => item.at === text);
+    assert.equal(
+      at("sa[0].B.Write").data.reason,
+      undefined,
+      `broken: ${broken}`,
+    );
+    assert.equal(
+      at("sa[0].M").data.reason,
+      broken ? "invalid-code" : undefined,
+      `broken: ${broken}`,
+    );
+  }
 });

@@ -130,6 +130,21 @@ const CASES = [
     "func U(v T) { (&v).PM() }",
   ],
   ["callee ((F))()", "func U() { ((F))() }", "func U() { F() }"],
+  [
+    "triple-nested parentheses",
+    "func U(t (((T))), u *(((T)))) { (((t))).M(); (((u))).PM() }",
+    "func U(t T, u *T) { t.M(); u.PM() }",
+  ],
+  [
+    "type switch case (T): and case (*T):",
+    "func U(x any) {\n\tswitch y := x.(type) {\n\tcase (T):\n\t\ty.M()\n\tcase (*T):\n\t\ty.PM()\n\t}\n}",
+    "func U(x any) {\n\tswitch y := x.(type) {\n\tcase T:\n\t\ty.M()\n\tcase *T:\n\t\ty.PM()\n\t}\n}",
+  ],
+  [
+    "embedded interface (I)",
+    "type J interface{ (I) }\nfunc U(j J) { j.M() }",
+    "type J interface{ I }\nfunc U(j J) { j.M() }",
+  ],
 ];
 
 const file = (text) => [...PRE, text, ""].join("\n");
@@ -162,7 +177,7 @@ const shape = ({ links, symbols }) => {
 };
 
 test("redundant parentheses do not change the graph (matrix)", async () => {
-  assert.equal(CASES.length, 23);
+  assert.equal(CASES.length, 26);
   for (const [label, withParens, without] of CASES) {
     const a = shape(
       await project({ "go.mod": MOD, "p/p.go": file(withParens) }),

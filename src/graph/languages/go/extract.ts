@@ -638,6 +638,11 @@ export class GoExtractor {
         if (kind === "alias" || kind === "type") {
           const underlying = this.typeRef(type);
           if (underlying) data.underlying = { ...underlying };
+          // A type literal (container, func, struct, interface): a value of
+          // this type, described as the literal's values are (the failed-file
+          // backstop follows it to a selected field's own type).
+          else if (!typeParameters)
+            data.v = this.typedValue(type) as unknown as Json;
           // `type P *T`: a defined pointer type has no methods of its own.
           if (underlying && literal.type === "pointer_type")
             data.underlyingPointer = true;

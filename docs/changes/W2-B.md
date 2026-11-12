@@ -1129,8 +1129,11 @@ Fixes from a second-model review of the merged module; details in
 
 - Redundant parentheses around a type or an expression are looked through in
   one place, so the graph is the same with and without them.
-- The backstop finds an anonymous struct along every route a value can take,
-  so a named field never takes an embedded type's failed-file cause.
+- The backstop no longer gives a named field of an anonymous struct an
+  embedded type's failed-file cause. Wherever it reaches the struct, a member
+  that is the struct's own named field never follows its embeddings. The
+  routes along which it also recovers the field's own type, and the
+  conservative fallback on the rest, are listed in `docs/changes/W2-B2.md`.
 - A name-only set that a failed file could extend carries
   `declarations-may-be-unseen`.
 
