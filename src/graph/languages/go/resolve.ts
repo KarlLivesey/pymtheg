@@ -143,6 +143,12 @@ interface Decision {
   open?: OpenReason;
   /** An interface-dispatch set (always open: structural match unverified). */
   dispatch?: true;
+  /**
+   * Dispatch only: a type declared in a failed or untrusted file could be a
+   * member (layer 1), so the set carries `declarations-may-be-unseen`; with no
+   * valid member left it is unresolved with that reason, not plain unresolved.
+   */
+  unseen?: true;
   /** Failed: it needs code in these failed files (`invalid-code`). */
   invalid?: string[];
 }
@@ -371,6 +377,26 @@ class GoResolver {
         dispatch,
       } = decision;
       const distinct = unique(ids).sort();
+      // Backstop: a link about to be emitted as not resolved (anything but a
+      // definite target or an interface-dispatch set over known types) fails
+      // when any type its source mentions needs a failed file.
+      if (
+        !decision.invalid?.length &&
+        !decision.dispatch &&
+        !(distinct.length === 1 && definite) &&
+        this.failedFiles.size
+      ) {
+        let cause: string[] = [];
+        try {
+          cause = this.involvedCause(link);
+        } catch {
+          cause = [];
+        }
+        if (cause.length) {
+          this.invalid.set(link.id, cause);
+          continue;
+        }
+      }
       if (decision.invalid?.length) {
         this.invalid.set(link.id, decision.invalid);
         continue;
@@ -383,10 +409,15 @@ class GoResolver {
         // Interface dispatch is always open: membership is unverified.
         if (dispatch && !reasons.includes("structural-match-unverified"))
           reasons.push("structural-match-unverified");
+        if (decision.unseen && !reasons.includes("declarations-may-be-unseen"))
+          reasons.push("declarations-may-be-unseen");
         if (reasons.length) this.open.set(link.id, reasons);
       } else if (distinct.length > limit)
         // Too many to list: unresolved with the name kept; a cut list could omit the target.
         this.overflow.set(link.id, { candidates: distinct.length, cap: limit });
+      else if (decision.unseen)
+        // A dispatch with no valid member: unresolved, its members may be unseen.
+        this.open.set(link.id, ["declarations-may-be-unseen"]);
     }
     return { resolutions, links: added };
   }
@@ -2073,6 +2104,219 @@ class GoResolver {
   }
 
   /**
+   * The failed-file causes of every type term a link's source mentions: the
+   * written types of its receiver chain's values, variables, parameters, fields
+   * and results, including type arguments, followed transitively through valid
+   * declarations (underlying types of defined types, alias targets, embedded
+   * fields). "Depends on a failed file" is decided by what the source mentions,
+   * not by how far resolution got. Instantiation is not modelled.
+   */
+  private involvedCause(link: GraphLink): string[] {
+    const causes = new Set<string>();
+    const seen = new Set<string>();
+    const add = (cause: string[] | undefined) =>
+      cause?.forEach((file) => causes.add(file));
+    // `embedded`: whether the lookup still depends on the types embedded in this
+    // type (not when the member was found on it, so depth 0 decided).
+    const ref = (
+      r: TypeRef | undefined,
+      file: string,
+      depth: number,
+      embedded = true,
+    ) => {
+      if (!r || r.q === "" || r.l !== undefined || depth > MAX_DEPTH) return;
+      const key = `ref\u0000${embedded}\u0000${file}\u0000${r.q ?? ""}\u0000${r.n}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      const type = this.typeFromRef(r, file, 1);
+      if (type.kind === "failed") return add(type.cause);
+      for (const symbol of this.declaredTypes(r, file))
+        typeSym(symbol, depth + 1, embedded);
+      if (type.kind === "project")
+        for (const symbol of type.syms) typeSym(symbol, depth + 1, embedded);
+    };
+    const term = (t: TypeTerm | undefined, file: string, depth: number) => {
+      if (!t || depth > MAX_DEPTH) return;
+      switch (t.k) {
+        case "n":
+          if (!t.p)
+            ref(
+              t.q === undefined ? { n: t.n } : { q: t.q, n: t.n },
+              file,
+              depth,
+            );
+          t.a?.forEach((item) => term(item, file, depth + 1));
+          return;
+        case "ptr":
+        case "sl":
+        case "ar":
+        case "ch":
+          return term(t.e, file, depth + 1);
+        case "map":
+          term(t.key, file, depth + 1);
+          return term(t.e, file, depth + 1);
+        case "fn":
+          return [...t.p, ...t.r].forEach((item) =>
+            term(item, file, depth + 1),
+          );
+        case "st":
+          return t.f.forEach((field) => term(field.t, file, depth + 1));
+        case "if":
+          t.m.forEach((method) => term(method.s, file, depth + 1));
+          return t.e.forEach((item) => term(item, file, depth + 1));
+        default:
+          return;
+      }
+    };
+    const typeSym = (symbol: GraphSymbol, depth: number, embedded = true) => {
+      const key = `type\u0000${embedded}\u0000${symbol.id}`;
+      if (seen.has(key) || depth > MAX_DEPTH) return;
+      seen.add(key);
+      const data = (symbol.data ?? {}) as {
+        underlying?: TypeRef;
+        target?: TypeTerm;
+      };
+      ref(data.underlying, symbol.file, depth, embedded);
+      term(data.target, symbol.file, depth);
+      if (embedded)
+        for (const embed of this.embedsBySource.get(symbol.id) ?? [])
+          ref(
+            (embed.data as { t?: TypeRef } | undefined)?.t,
+            embed.file,
+            depth,
+          );
+    };
+    const symbolDesc = (symbol: GraphSymbol, depth: number) => {
+      if (TYPE_KINDS.has(symbol.kind)) return typeSym(symbol, depth);
+      if (seen.has(symbol.id) || depth > MAX_DEPTH) return;
+      seen.add(symbol.id);
+      const data = (symbol.data ?? {}) as {
+        d?: Desc;
+        t?: TypeRef;
+        v?: Desc;
+        results?: Desc[];
+      };
+      desc(data.d, symbol.file, depth + 1);
+      ref(data.t, symbol.file, depth + 1);
+      desc(data.v, symbol.file, depth + 1);
+      data.results?.forEach((item) => desc(item, symbol.file, depth + 1));
+    };
+    const entity = (found: Entity, depth: number) => {
+      if (found.e === "unknown") add(found.cause);
+      if (found.e === "value" && found.type.kind === "failed")
+        add(found.type.cause);
+      if (found.e === "syms")
+        for (const symbol of found.syms) symbolDesc(symbol, depth + 1);
+    };
+    const desc = (
+      d: Desc | undefined,
+      file: string,
+      depth: number,
+      embedded = true,
+    ): void => {
+      if (!d || depth > MAX_DEPTH) return;
+      switch (d.k) {
+        case "val":
+          ref(d.t, file, depth, embedded);
+          return d.ta?.forEach((item) => desc(item, file, depth + 1));
+        case "name":
+          return entity(this.lookupName(d.n, file), depth);
+        case "sel": {
+          // A named field of an anonymous struct: only its own type matters.
+          const base = anonymous(d.x, depth);
+          const field = base?.f?.find((item) => item.n === d.n);
+          if (field) return desc(field.d, file, depth + 1);
+          // A member found on the operand's type: the types embedded in that
+          // type cannot change the answer.
+          const found = this.select(d, file, 0);
+          desc(
+            d.x,
+            file,
+            depth + 1,
+            !(found.e === "syms" || found.e === "value"),
+          );
+          return entity(found, depth);
+        }
+        case "call": {
+          // Only the result this call uses: a function's or method's declared
+          // result i; for anything else (a func value), what the callee is.
+          const callee = this.denote(d.f, file, 0);
+          const functions =
+            callee.e === "syms" &&
+            callee.syms.every(
+              (symbol) =>
+                (symbol.kind === "function" || symbol.kind === "method") &&
+                (symbol.data as { results?: Desc[] } | undefined)?.results,
+            );
+          if (!functions) {
+            desc(d.f, file, depth + 1);
+            return entity(callee, depth);
+          }
+          for (const symbol of callee.syms) {
+            const results = (symbol.data as { results: Desc[] }).results;
+            desc(results[d.i], symbol.file, depth + 1);
+          }
+          // A generic result is one of the type arguments written: on the
+          // call (`F[A](x)`), on the callee, or on the receiver's type.
+          d.ta?.forEach((item) => desc(item, file, depth + 1));
+          if (d.f.k === "inst")
+            d.f.ta?.forEach((item) => desc(item, file, depth + 1));
+          if (d.f.k === "sel") typeArgs(d.f.x, file, depth + 1);
+          return;
+        }
+        case "inst":
+          d.ta?.forEach((item) => desc(item, file, depth + 1));
+          return desc(d.x, file, depth + 1);
+        case "elem":
+        case "key":
+          return desc(d.x, file, depth + 1);
+        case "local":
+        case "unknown":
+          return d.m?.forEach((item) => desc(item, file, depth + 1));
+        case "cont":
+          desc(d.e, file, depth + 1);
+          return desc(d.key, file, depth + 1);
+        case "func":
+          return d.r.forEach((item) => desc(item, file, depth + 1));
+        case "tval":
+          return ref(d.c, file, depth);
+        case "var":
+          desc(d.d, file, depth + 1);
+          return d.alts?.forEach((item) => desc(item, file, depth + 1));
+        default:
+          return;
+      }
+    };
+    // The anonymous struct a value has, through variables and container elements.
+    const anonymous = (
+      d: Desc,
+      depth: number,
+    ): Extract<Desc, { k: "local" }> | undefined => {
+      if (depth > MAX_DEPTH) return undefined;
+      if (d.k === "local") return d;
+      if (d.k === "var") return anonymous(d.d, depth + 1);
+      if (d.k === "elem" || d.k === "key") {
+        let x = d.x;
+        while (x.k === "var") x = x.d;
+        if (x.k !== "cont") return undefined;
+        const item = d.k === "key" && !x.ch ? x.key : x.e;
+        return item ? anonymous(item, depth + 1) : undefined;
+      }
+      return undefined;
+    };
+    // The type arguments written on a receiver's declared type (`var b Box[A]`).
+    const typeArgs = (d: Desc, file: string, depth: number): void => {
+      if (depth > MAX_DEPTH) return;
+      if (d.k === "val") d.ta?.forEach((item) => desc(item, file, depth + 1));
+      if (d.k === "var") typeArgs(d.d, file, depth + 1);
+    };
+    const data = (link.data ?? {}) as { expr?: Desc; t?: TypeRef };
+    ref(data.t, link.file, 0);
+    desc(data.expr, link.file, 0);
+    return [...causes].sort();
+  }
+
+  /**
    * Why a written type name found no declaration, when the answer is a failed
    * file: the files that might declare it (none: plainly unresolved).
    */
@@ -2236,6 +2480,18 @@ class GoResolver {
     // Members come from the static interface's (possible) implementers. Without it,
     // the declaring interfaces' implementers are a superset, so the set is open.
     const sources = exact ? staticTypes! : this.ownersOf(specs);
+    // Layer 1: a type in a declaration-lossy package may be a member. An
+    // interface with only exported methods can be implemented from any package
+    // (a third package may convert); one sealed by an unexported method only
+    // from a lossy package that reaches its own.
+    // (A directory whose every file failed has no package here, but counts.)
+    const unseen =
+      (this.lossyPackages.size > 0 || this.failedFiles.size > 0) &&
+      (!sources.length ||
+        sources.some(
+          (iface) =>
+            !this.sealed(iface) || this.lossyReaches(this.pkgOf(iface)?.key),
+        ));
     const found = this.implementations(specs, name, sources, new Set());
     if (
       !found ||
@@ -2244,7 +2500,10 @@ class GoResolver {
           !(symbol.data as { interface?: boolean } | undefined)?.interface,
       )
     )
-      return UNRESOLVED;
+      // No valid member: unresolved, but its members may be unseen.
+      return unseen
+        ? { ids: [], definite: false, dispatch: true, unseen: true }
+        : UNRESOLVED;
     // Layer 1: an unseen type of a lossy package may implement any interface that
     // package can reach.
     // Every dispatch set is open (no-toolchain fallback): membership is a crude
@@ -2264,6 +2523,7 @@ class GoResolver {
       definite: false,
       limit: DISPATCH_LIMIT,
       dispatch: true,
+      ...(unseen ? { unseen: true as const } : {}),
       open: sealedOnly
         ? "structural-match-unverified"
         : "external-implementers-possible",

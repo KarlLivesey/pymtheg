@@ -63,6 +63,112 @@ function tokenAt(root: Node, offset: number): Node | undefined {
   return best;
 }
 
+/** The last non-empty token ending at or before `offset` (undefined at the start). */
+function tokenBefore(root: Node, offset: number): Node | undefined {
+  let best: Node | undefined;
+  const stack: Node[] = [root];
+  while (stack.length) {
+    const node = stack.pop()!;
+    if (node.startIndex >= offset) continue;
+    if (best && node.endIndex <= best.endIndex) continue;
+    if (node.childCount === 0) {
+      if (
+        node.endIndex <= offset &&
+        node.endIndex > node.startIndex &&
+        node.type !== "comment"
+      )
+        best = node;
+      continue;
+    }
+    for (let index = 0; index < node.childCount; index++) {
+      const child = node.child(index);
+      if (child) stack.push(child);
+    }
+  }
+  return best;
+}
+
+/** 1-based line of a UTF-16 offset. */
+const lineOf = (text: string, offset: number) =>
+  text.slice(0, Math.max(0, offset)).split("\n").length;
+
+/**
+ * The lines that bracket a syntax error (tree-sitter gives no exact position):
+ * from the line where the last valid token before the error node ends, to the
+ * line of the first real token after it (or the node's own end, if later).
+ * The exact position needs the Go toolchain.
+ */
+function bracket(
+  root: Node,
+  text: string,
+  node: Node,
+): { first: number; last: number } {
+  const before = tokenBefore(root, node.startIndex);
+  const after = tokenAt(root, node.endIndex);
+  const first = before ? lineOf(text, before.endIndex - 1) : 1;
+  const last = Math.max(
+    lineOf(text, Math.max(node.startIndex, node.endIndex - 1)),
+    after ? lineOf(text, after.startIndex) : lineOf(text, text.length),
+  );
+  return { first, last };
+}
+
+/** Lines `first`..`last`, whole, as a range of offsets. */
+function lineRange(
+  text: string,
+  first: number,
+  last: number,
+): { start: number; end: number } {
+  const lines = text.split("\n");
+  const start = lines
+    .slice(0, first - 1)
+    .reduce((sum, line) => sum + line.length + 1, 0);
+  const end = Math.min(
+    text.length,
+    lines.slice(0, last).reduce((sum, line) => sum + line.length + 1, 0),
+  );
+  return { start, end: Math.max(start, end) };
+}
+
+/**
+ * The first string or rune literal that is not terminated, found by reading the
+ * text as Go's scanner does (comments, raw strings, escapes): an interpreted
+ * string or rune ends at its line's end, a raw string at the end of the file.
+ * Tree-sitter reports such a literal late, at whatever it could not fit; Go
+ * reports it at the opening quote.
+ */
+function unterminated(
+  text: string,
+): { at: number; message: string } | undefined {
+  let index = 0;
+  while (index < text.length) {
+    const char = text[index]!;
+    if (char === "/" && text[index + 1] === "/") {
+      const end = text.indexOf("\n", index);
+      if (end < 0) return undefined;
+      index = end + 1;
+    } else if (char === "/" && text[index + 1] === "*") {
+      const end = text.indexOf("*/", index + 2);
+      if (end < 0) return undefined;
+      index = end + 2;
+    } else if (char === "`") {
+      const end = text.indexOf("`", index + 1);
+      if (end < 0) return { at: index, message: "raw string not terminated" };
+      index = end + 1;
+    } else if (char === '"' || char === "'") {
+      let at = index + 1;
+      while (at < text.length && text[at] !== char && text[at] !== "\n")
+        at += text[at] === "\\" && text[at + 1] !== "\n" ? 2 : 1;
+      if (at >= text.length || text[at] !== char)
+        return {
+          at: index,
+          message: `${char === '"' ? "string" : "rune"} not terminated`,
+        };
+      index = at + 1;
+    } else index++;
+  }
+  return undefined;
+}
 /** Tokens that are wrong in themselves when an ERROR node holds only them. */
 const STRAY = new Set([")", "]", "}", ",", ";"]);
 
@@ -134,11 +240,34 @@ export function syntaxFailure(
         if (child) stack.push(child);
       }
     }
+    // An unterminated literal at or before the error tree-sitter found is Go's
+    // first error: the range starts at its opening quote.
+    const literal = unterminated(text);
     if (first) {
-      const { at, end, message } = offending(root, first);
+      let { message } = offending(root, first);
+      let lines = bracket(root, text, first);
+      if (literal && lineOf(text, literal.at) <= lines.last) {
+        const line = lineOf(text, literal.at);
+        lines = { first: line, last: line < lines.first ? line : lines.last };
+        message = literal.message;
+      }
       return {
-        message: `${position(text, at)}: ${message}`,
-        range: { start: at, end },
+        message: `syntax error in ${
+          lines.first === lines.last
+            ? `line ${lines.first}`
+            : `lines ${lines.first}–${lines.last}`
+        }: ${message}`,
+        range: lineRange(text, lines.first, lines.last),
+      };
+    }
+  }
+  {
+    const literal = unterminated(text);
+    if (literal) {
+      const line = lineOf(text, literal.at);
+      return {
+        message: `syntax error in line ${line}: ${literal.message}`,
+        range: lineRange(text, line, line),
       };
     }
   }

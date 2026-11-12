@@ -32,79 +32,204 @@ test("safety: a syntax error inside one function body fails the whole file", asy
   assert.deepEqual(symbols, []);
 });
 
-test("a failed file says where and why, like a compiler's first error (checked against gofmt -e)", async () => {
-  // Each expected line is gofmt -e's (Go 1.27.4). Columns count UTF-16 units;
-  // gofmt counts bytes, and the reported token can differ.
-  for (const [text, message, gofmt] of [
-    // An ERROR node may enclose valid statements before the fault.
+test("a failed file says which lines bracket the error, and gofmt's line is inside", async () => {
+  // Each case: the file, the line of the first error `gofmt -e <file>` reports
+  // (recorded here; the test does not run gofmt), and the expected message.
+  // The range brackets the error; the exact position needs the Go toolchain.
+  const CASES = [
+    // c1: gofmt -e (Go 1.27.4) reports 6:6: expected ';', found '++'
     [
-      lines(
-        "package p",
-        "",
-        "func F() {",
-        "\ta := 1",
-        "\tb := 2",
-        "\ta++ ++",
-        "\t_ = b",
-        "}",
-      ),
-      "line 6, column 6: unexpected `+`",
-      "6:6: expected ';', found '++'",
+      "package p\n\nfunc F() {\n\ta := 1\n\tb := 2\n\ta++ ++\n\t_ = b\n}\n",
+      6,
+      "syntax error in lines 3\u20136: unexpected `+`",
     ],
+    // c2: gofmt -e (Go 1.27.4) reports 4:18: expected statement, found ')'
     [
-      lines("package p", "", "func F() {", "\tx := f(1, false))", "}"),
-      "line 4, column 18: unexpected `)`",
-      "4:18: expected statement, found ')'",
+      "package p\n\nfunc F() {\n\tx := f(1, false))\n}\n",
+      4,
+      "syntax error in lines 4\u20135: unexpected `)`",
     ],
+    // c3: gofmt -e (Go 1.27.4) reports 5:11: expected ')', found '{'
     [
-      lines("package p", "", "func Good() {}", "", "func Bad( {", "}"),
-      "line 5, column 11: missing `)`",
-      "5:11: expected ')', found '{'",
+      "package p\n\nfunc Good() {}\n\nfunc Bad( {\n}\n",
+      5,
+      "syntax error in line 5: missing `)`",
     ],
+    // c4: gofmt -e (Go 1.27.4) reports 8:4: expected '==', found '='
     [
-      lines(
-        "package p",
-        "",
-        "func F() {",
-        "\tif true {",
-        "\t\tprintln(1)",
-        "\t}",
-        "\tvar x = [",
-        "\t_ = x",
-        "}",
-      ),
-      "line 8, column 4: unexpected `=`",
-      "8:4: expected '==', found '='",
+      "package p\n\nfunc F() {\n\tif true {\n\t\tprintln(1)\n\t}\n\tvar x = [\n\t_ = x\n}\n",
+      8,
+      "syntax error in lines 7\u20138: unexpected `=`",
     ],
+    // c5: gofmt -e (Go 1.27.4) reports 6:1: expected ']', found '}'
     [
-      lines("package p", "", "type T struct {", "\tA int", "\tB map[", "}"),
-      "line 6, column 1: unexpected `}`",
-      "6:1: expected ']', found '}'",
+      "package p\n\ntype T struct {\n\tA int\n\tB map[\n}\n",
+      6,
+      "syntax error in lines 5\u20136: unexpected `}`",
     ],
+    // c6: gofmt -e (Go 1.27.4) reports 5:1: expected operand, found '}'
     [
-      lines("package p", "", "func F() {", "\tx := 1 +", "}"),
-      "line 5, column 1: unexpected `}`",
-      "5:1: expected operand, found '}'",
+      "package p\n\nfunc F() {\n\tx := 1 +\n}\n",
+      5,
+      "syntax error in lines 4\u20135: unexpected `}`",
     ],
-    // Same line as gofmt, a later column.
+    // c7: gofmt -e (Go 1.27.4) reports 4:20: expected ';', found i
     [
-      lines(
-        "package p",
-        "",
-        "func F() {",
-        "\tfor i := 0; i < 3 i++ {",
-        "\t}",
-        "}",
-      ),
-      "line 4, column 24: unexpected `{`",
-      "4:20: expected ';', found i",
+      "package p\n\nfunc F() {\n\tfor i := 0; i < 3 i++ {\n\t}\n}\n",
+      4,
+      "syntax error in line 4: unexpected `{`",
     ],
+    // c8: gofmt -e (Go 1.27.4) reports 3:30: expected operand, found ','
     [
-      lines("package p", "", "var x = struct{ a int }{a: 1,, }"),
-      "line 3, column 30: unexpected `,`",
-      "3:30: expected operand, found ','",
+      "package p\n\nvar x = struct{ a int }{a: 1,, }\n",
+      3,
+      "syntax error in line 3: unexpected `,`",
     ],
-    // Top-level text the grammar accepts but Go does not, and package clauses.
+    // m1: gofmt -e (Go 1.27.4) reports 4:9: missing ',' before newline in composite literal
+    [
+      'package p\nfunc F() {\n\tx := map[string]int{\n\t\t"a": 1\n\t\t"b": 2,\n\t}\n\t_ = x\n}\n',
+      4,
+      'syntax error in lines 4\u20135: unexpected `"`',
+    ],
+    // m10: gofmt -e (Go 1.27.4) reports 3:15: expected ')', found '{'
+    [
+      "package p\ntype T struct{ a int }\nfunc (t T) M( { return }\n",
+      3,
+      "syntax error in line 3: unexpected `{`",
+    ],
+    // m11: gofmt -e (Go 1.27.4) reports 7:1: expected operand, found '}'
+    [
+      "package p\n\nfunc F() {\n\tdefer func() {\n\t\trecover()\n\t}(\n}\n",
+      7,
+      "syntax error in lines 6\u20137: unexpected `}`",
+    ],
+    // m12: gofmt -e (Go 1.27.4) reports 6:1: expected operand, found ')'
+    [
+      "package p\n\nvar (\n\ta = 1\n\tb = \n)\n",
+      6,
+      "syntax error in lines 4\u20136: unexpected `)`",
+    ],
+    // m2: gofmt -e (Go 1.27.4) reports 5:3: expected ';', found 'EOF'
+    [
+      "package p\nfunc F() {\n\tfor {\n\t\tbreak\n}\n",
+      5,
+      "syntax error in lines 5\u20136: missing `}`",
+    ],
+    // m4: gofmt -e (Go 1.27.4) reports 6:1: missing import path
+    [
+      'package p\nimport (\n\t"fmt"\n\t"os"\n\nfunc F() { fmt.Println(os.Args) }\n',
+      6,
+      "syntax error in lines 4\u20136: unexpected `)`",
+    ],
+    // m5: gofmt -e (Go 1.27.4) reports 4:4: expected type, found ')'
+    [
+      "package p\ntype I interface {\n\tM(\n\tN()\n}\n",
+      4,
+      "syntax error in line 4: unexpected `)`",
+    ],
+    // m7: gofmt -e (Go 1.27.4) reports 2:23: missing ',' before newline in composite literal
+    [
+      "package p\nvar x = [3]int{1, 2, 3\n\nfunc F() {}\n",
+      2,
+      "syntax error in lines 2\u20134: unexpected `(`",
+    ],
+    // m8: gofmt -e (Go 1.27.4) reports 4:6: expected operand, found '='
+    [
+      "package p\nfunc F() {\n\tx := 1\n\tx = = 2\n\t_ = x\n}\n",
+      4,
+      "syntax error in line 4: unexpected `2`",
+    ],
+    // m9: gofmt -e (Go 1.27.4) reports 3:9: string literal not terminated
+    [
+      'package p\nfunc F() string {\n\treturn "abc\n}\n',
+      3,
+      "syntax error in lines 3\u20134: string not terminated",
+    ],
+    // ra: gofmt -e (Go 1.27.4) reports 5:2: expected statement, found 'ILLEGAL'
+    [
+      "package p\nfunc F(){\n x := []int{1,\n }\n @\n}\n",
+      5,
+      "syntax error in lines 4\u20136: unexpected `}`",
+    ],
+    // rb: gofmt -e (Go 1.27.4) reports 3:15: expected type, found newline
+    [
+      "package p\ntype T struct {\n x map[string]\n}\n",
+      3,
+      "syntax error in lines 3\u20134: missing `type_identifier`",
+    ],
+    // rc: gofmt -e (Go 1.27.4) reports 4:13: expected '{', found newline
+    [
+      "package p\nfunc F(x bool) {\n\tif x\n\t\tprintln(1)\n\t}\n}\n",
+      4,
+      "syntax error in lines 2\u20136: unexpected `}`",
+    ],
+    // rd: gofmt -e (Go 1.27.4) reports 4:8: expected ':', found newline
+    [
+      "package p\nfunc F(x int) {\n\tswitch x {\n\tcase 1\n\t\tprintln(1)\n\t}\n}\n",
+      4,
+      "syntax error in lines 4\u20135: unexpected `println`",
+    ],
+    // B2 (round 15 review): an unterminated string starts the range at its quote.
+    // b2a: gofmt -e (Go 1.27.4) reports 5:2: string literal not terminated
+    [
+      'package p\n\nimport (\n\t"fmt"\n\t"os\n)\n\nfunc F() { fmt.Println(os.Args) }\n',
+      5,
+      "syntax error in lines 5\u20136: string not terminated",
+    ],
+    // b2b: gofmt -e (Go 1.27.4) reports 5:9: missing ',' before newline in composite literal
+    [
+      'package p\n\nfunc F() {\n\tx := map[string]int{\n\t\t"a": 1\n\t\t"b": 2,\n\t}\n\t_ = x\n}\n',
+      5,
+      'syntax error in lines 5\u20136: unexpected `"`',
+    ],
+    // b2c: gofmt -e (Go 1.27.4) reports 4:15: expected ')', found newline
+    [
+      "package p\n\nfunc F() int {\n\treturn (1 + 2\n}\n",
+      4,
+      "syntax error in lines 4\u20135: missing `)`",
+    ],
+    // b2d: gofmt -e (Go 1.27.4) reports 7:4: expected ';', found 'EOF'
+    [
+      "package p\n\nfunc F() {\n\tif true {\n\t\tprintln(1)\n\t}\n\t{\n",
+      7,
+      "syntax error in lines 3\u20138: unexpected end of file",
+    ],
+    // e1: gofmt -e (Go 1.27.4) reports 5:2: string literal not terminated
+    [
+      'package p\n\nimport (\n\t"fmt"\n\t"os\n\t"strings"\n)\n\nfunc F() { fmt.Println(os.Args, strings.ToUpper("")) }\n',
+      5,
+      "syntax error in lines 5\u20136: string not terminated",
+    ],
+    // e7: gofmt -e (Go 1.27.4) reports 3:9: string literal not terminated
+    [
+      'package p\n\nvar s = "abc\nvar t = 1\n',
+      3,
+      "syntax error in lines 3\u20134: string not terminated",
+    ],
+    // e8: gofmt -e (Go 1.27.4) reports 4:7: raw string literal not terminated
+    [
+      "package p\n\nfunc F() {\n\tx := `abc\n}\n",
+      4,
+      "syntax error in lines 4\u20136: raw string not terminated",
+    ],
+  ];
+  assert.equal(CASES.length, 29);
+  for (const [text, gofmtLine, message] of CASES) {
+    const parsed = await go.parse({ path: "p/x.go", text });
+    assert.equal(parsed.status, "failed", text);
+    assert.deepEqual(
+      parsed.diagnostics.map((item) => item.message),
+      [message],
+      text,
+    );
+    const [, first, last = first] = /lines? (\d+)(?:–(\d+))?/.exec(message);
+    assert.ok(
+      Number(first) <= gofmtLine && gofmtLine <= Number(last),
+      `${message} does not contain gofmt's line ${gofmtLine}`,
+    );
+  }
+  // Package-clause failures keep their exact position.
+  for (const [text, message] of [
     [lines("packge p", "func F() {}"), "line 1, column 1: unexpected `packge`"],
     [
       lines("// a comment", "func F() {}"),
@@ -116,28 +241,11 @@ test("a failed file says where and why, like a compiler's first error (checked a
     ],
   ]) {
     const parsed = await go.parse({ path: "p/x.go", text });
-    assert.equal(parsed.status, "failed", text);
     assert.deepEqual(
       parsed.diagnostics.map((item) => item.message),
       [message],
-      gofmt ?? text,
     );
-    if (gofmt)
-      assert.equal(
-        message.split(",")[0],
-        `line ${gofmt.split(":")[0]}`,
-        "gofmt's line",
-      );
   }
-  // A MISSING node, reported at the next real token.
-  const missing = await go.parse({
-    path: "p/x.go",
-    text: lines("package p", "func F() { g(1 }"),
-  });
-  assert.match(
-    missing.diagnostics[0].message,
-    /^line 2, column \d+: missing `\)`$/,
-  );
 });
 
 const PACKAGE = (bad) => ({

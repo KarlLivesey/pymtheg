@@ -22,14 +22,18 @@ export type Desc =
   /** `x.n` */
   | { k: "sel"; x: Desc; n: string }
   /** A value whose named type is syntactically evident (declared type, literal, new, assertion). */
-  | { k: "val"; t: TypeRef }
+  | { k: "val"; t: TypeRef; ta?: Desc[] }
   /**
    * Result `i` of calling `f` (function, method, conversion or func value). `b`: the
    * result if `f` turns out to be the builtin itself (`new`, `make`, `append`).
+   * `ta`: type arguments written on a conversion-shaped callee (`G[A](x)`).
    */
-  | { k: "call"; f: Desc; i: number; b?: Desc }
-  /** The callee `x[…]` of a call: a generic instantiation when x is a function, else an element. */
-  | { k: "inst"; x: Desc }
+  | { k: "call"; f: Desc; i: number; b?: Desc; ta?: Desc[] }
+  /**
+   * The callee `x[…]` of a call: a generic instantiation when x is a function, else
+   * an element. `ta`: what the index expressions describe, read as type arguments.
+   */
+  | { k: "inst"; x: Desc; ta?: Desc[] }
   /** An element (`elem`) or key (`key`) of a slice/map/channel/array value: range, index, receive. */
   | { k: "elem"; x: Desc }
   | { k: "key"; x: Desc }
@@ -45,15 +49,20 @@ export type Desc =
    * (address taken, op-assignment, range/receive assignment).
    */
   | { k: "var"; d: Desc; alts?: Desc[] }
-  /** A local without a syntactically evident type. */
-  | { k: "local" }
+  /**
+   * A local without a syntactically evident type. For an anonymous struct or
+   * interface type: `m`, the named types written in it (a struct's embedded
+   * fields only), as values; `f`, a struct's named fields.
+   */
+  | { k: "local"; m?: Desc[]; f?: { n: string; d: Desc }[] }
   /** A value whose type is known to defeat member resolution (local named type). */
   | { k: "opaque" }
   /** A local type or type parameter declared inside a function or generic declaration. */
   | { k: "localtype"; tp?: boolean; c?: TypeRef; sym?: string }
   /** Parse-time only: a live local binding, replaced before facts are returned. */
   | { k: "ref"; b: object }
-  | { k: "unknown" };
+  /** Not described; `m`: what is written in it (a parenthesized conversion type). */
+  | { k: "unknown"; m?: Desc[] };
 
 export interface ImportFact {
   path: string;
