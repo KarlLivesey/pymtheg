@@ -167,13 +167,14 @@ test("failed macro_use entry starts after the mod item", async () => {
     calls[1].data.uncertainty.includes("failed-file-unseen-declarations"),
   );
 });
-test("failed module without macro_use cannot shadow textual macro", async () => {
-  // rustc: non-macro_use module leaves root m (1) in textual scope.
+test("failed module without outer macro_use has unknown inner status", async () => {
+  // Round 17 supersedes the old negative control: the failed file may have
+  // an unreadable leading inner macro_use, even when its declaration has none.
   const g = await graph({
     "src/main.rs": "macro_rules! m{()=>{1u8}}mod broken;fn main(){m!();}",
     "src/broken.rs": broken,
   });
-  g.one("m", "m", "macros");
+  failedText(g);
 });
 test("later known macro shadows unseen macro_use entry", async () => {
   // rustc: m defined after the failed module wins (3).

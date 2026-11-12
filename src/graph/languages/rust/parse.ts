@@ -598,6 +598,16 @@ async function createHelper(): Promise<Helper> {
       function effectiveAttributes(n: Node) {
         return attributesOn(n).flatMap((a) => applications(meta(a), n));
       }
+      function macroUseConditions(n: Node): string[][] {
+        return effectiveAttributes(n)
+          .filter((a) => a.meta.name === "macro_use")
+          .map((a) => a.guards);
+      }
+      function noImplicitPrelude(n: Node): boolean {
+        return effectiveAttributes(n).some(
+          (a) => a.meta.name === "no_implicit_prelude",
+        );
+      }
       /** The one cfg collector for every item/site, including inherited gates. */
       function conditionsOn(n: Node): string[] {
         const cached = conditionCache.get(n.id);
@@ -870,7 +880,16 @@ async function createHelper(): Promise<Helper> {
         presenceCache.set(n.id, result);
         return result;
       }
+      const fileMacroUse = macroUseConditions(tree.rootNode);
+      const fileModulePath = modulePath(tree.rootNode);
       result.symbols[0]!.data = {
+        ...(fileMacroUse.length ? { macroUseConditions: fileMacroUse } : {}),
+        ...(fileModulePath.paths.length || fileModulePath.pathOpaque
+          ? { innerModulePath: fileModulePath }
+          : {}),
+        ...(noImplicitPrelude(tree.rootNode)
+          ? { noImplicitPrelude: true }
+          : {}),
         scope: "",
         unit: true,
         visibility: "private",
@@ -1574,9 +1593,10 @@ async function createHelper(): Promise<Helper> {
                 ...(n.type === "mod_item"
                   ? {
                       inline: !!field(n, "body"),
-                      macroUseConditions: effectiveAttributes(n)
-                        .filter((a) => a.meta.name === "macro_use")
-                        .map((a) => a.guards),
+                      macroUseConditions: macroUseConditions(n),
+                      ...(noImplicitPrelude(n)
+                        ? { noImplicitPrelude: true }
+                        : {}),
                       ...modulePath(n),
                     }
                   : {}),

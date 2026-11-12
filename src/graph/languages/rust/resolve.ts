@@ -51,6 +51,7 @@ interface Place {
   opaqueAttributes?: string[];
   shadowableAttributes?: AttributeOrigin[];
   attributeGates?: AttributeGate[];
+  noImplicitPrelude?: boolean;
 }
 interface Found {
   symbols: GraphSymbol[];
@@ -477,6 +478,11 @@ export function resolveRust(
     const attributes = [
       ...new Set([
         ...((data(item).opaqueItemAttributes ?? []) as string[]),
+        ...("kind" in item && item.kind === "module" && !data(item).unit
+          ? (moduleTargets.get(item.id) ?? []).flatMap((unit) =>
+              itemPresence(unit),
+            )
+          : []),
         ...[
           ...origins(item),
           ...ownerPlace(item.file, str(data(item).scope)).flatMap(
@@ -553,6 +559,30 @@ export function resolveRust(
       ? [...new Set(conditions)].sort()
       : conditions;
   };
+  function moduleDirectories(
+    layout: Data,
+    defaults: string[],
+    base: string,
+    inline: boolean,
+  ): { directories: string[]; uncertain: boolean } {
+    const paths = (layout.paths ?? []) as string[];
+    if (!paths.length && !layout.pathOpaque)
+      return { directories: defaults, uncertain: false };
+    return {
+      directories: [
+        ...new Set([
+          ...(layout.pathExplicit && !layout.pathOpaque ? [] : defaults),
+          ...paths.map((value) =>
+            inline
+              ? p.normalize(p.join(base, value))
+              : p.dirname(p.join(base, value)),
+          ),
+        ]),
+      ],
+      uncertain:
+        !!layout.pathOpaque || (!layout.pathExplicit && paths.length > 0),
+    };
+  }
   function walk(place: Place, ancestors: Set<string>) {
     const visitKey = `${place.crate.root}|${place.file}|${place.local}`;
     if (ancestors.has(visitKey)) return;
@@ -560,34 +590,46 @@ export function resolveRust(
     const next = new Set([...ancestors, visitKey]);
     for (const s of moduleDeclarations.get(`${place.file}|${place.local}`) ??
       []) {
+      if (place.uncertain) moduleIncomplete.add(s.id);
       const local = s.identity;
       const relative = local.slice(place.local.length).replace(/^::/, "");
       const scope = [place.scope, relative].filter(Boolean).join("::");
       const destinations: Place[] = [];
-      if (data(s).inline)
-        destinations.push({
-          ...place,
-          scope,
-          local,
-          directory: p.join(place.directory, s.name),
-          parent: place,
-          symbol: s,
-          conditions: [
-            ...(place.conditions ?? []),
-            ...((data(s).conditions ?? []) as string[]),
-          ],
-          opaqueAttributes: [
-            ...(place.opaqueAttributes ?? []),
-            ...((data(s).opaqueItemAttributes ?? []) as string[]),
-          ],
-          shadowableAttributes: [
-            ...(place.shadowableAttributes ?? []),
-            ...origins(s),
-          ],
-          attributeGates: [...(place.attributeGates ?? []), ...gates(s)],
-          uncertain: place.uncertain || moduleIncomplete.has(s.id),
-        });
-      else {
+      if (data(s).inline) {
+        const layout = moduleDirectories(
+          data(s),
+          [p.join(place.directory, s.name)],
+          place.directory,
+          true,
+        );
+        if (layout.uncertain) moduleIncomplete.add(s.id);
+        for (const directory of layout.directories)
+          destinations.push({
+            ...place,
+            scope,
+            local,
+            directory,
+            noImplicitPrelude:
+              !!place.noImplicitPrelude || !!data(s).noImplicitPrelude,
+            parent: place,
+            symbol: s,
+            conditions: [
+              ...(place.conditions ?? []),
+              ...((data(s).conditions ?? []) as string[]),
+            ],
+            opaqueAttributes: [
+              ...(place.opaqueAttributes ?? []),
+              ...((data(s).opaqueItemAttributes ?? []) as string[]),
+            ],
+            shadowableAttributes: [
+              ...(place.shadowableAttributes ?? []),
+              ...origins(s),
+            ],
+            attributeGates: [...(place.attributeGates ?? []), ...gates(s)],
+            uncertain:
+              place.uncertain || moduleIncomplete.has(s.id) || layout.uncertain,
+          });
+      } else {
         const path = str(data(s).path);
         const pathTargets = new Set(
           ((data(s).paths ?? []) as string[]).map((path) =>
@@ -647,12 +689,25 @@ export function resolveRust(
                 ? p.dirname(file)
                 : p.join(p.dirname(file), p.basename(file, ".rs")),
             );
-          for (const directory of directories)
+          const innerLayout = (data(units.get(file) ?? {}).innerModulePath ??
+            {}) as Data;
+          const layout = moduleDirectories(
+            innerLayout,
+            [...directories],
+            p.dirname(file),
+            false,
+          );
+          if (layout.uncertain) moduleIncomplete.add(s.id);
+          for (const directory of layout.directories)
             destinations.push({
               crate: place.crate,
               file,
               local: "",
               scope,
+              noImplicitPrelude:
+                !!place.noImplicitPrelude ||
+                !!data(s).noImplicitPrelude ||
+                !!data(units.get(file) ?? {}).noImplicitPrelude,
               parent: place,
               symbol: s,
               conditions: [
@@ -676,7 +731,10 @@ export function resolveRust(
                 ...gates(s),
                 ...(units.get(file) ? gates(units.get(file)!) : []),
               ],
-              uncertain: place.uncertain || moduleIncomplete.has(s.id),
+              uncertain:
+                place.uncertain ||
+                moduleIncomplete.has(s.id) ||
+                layout.uncertain,
               directory,
             });
         }
@@ -697,6 +755,7 @@ export function resolveRust(
       local: "",
       directory: p.dirname(crate.root),
       parent: null,
+      noImplicitPrelude: !!data(units.get(crate.root) ?? {}).noImplicitPrelude,
       symbol: units.get(crate.root)!,
       conditions: (data(units.get(crate.root) ?? {}).conditions ??
         []) as string[],
@@ -918,63 +977,71 @@ export function resolveRust(
   // captured module files. Source order within that ending scope is retained.
   const modules = symbols.filter((s) => s.kind === "module" && !data(s).unit);
   const directText = [...textMacros];
-  function bodyContains(
-    m: GraphSymbol,
-    e: { file: string; scope: string },
-  ): boolean {
-    return data(m).inline
-      ? e.file === m.file && e.scope === m.identity
-      : (moduleTargets.get(m.id) ?? []).some(
-          (t) => t.file === e.file && e.scope === "",
-        );
-  }
   function importedText(m: GraphSymbol, seen = new Set<string>()): TextMacro[] {
-    const guards = (data(m).macroUseConditions ?? []) as string[][];
-    if (!guards.length || seen.has(m.id)) return [];
+    if (seen.has(m.id)) return [];
     seen = new Set([...seen, m.id]);
-    const entries = [
-      ...directText.filter((e) => bodyContains(m, e)),
-      ...modules
-        .filter((child) =>
-          bodyContains(m, { file: child.file, scope: str(data(child).scope) }),
-        )
-        .flatMap((child) => importedText(child, seen)),
-    ];
-    const failedBodies = (modulePlaces.get(m.id) ?? []).filter((p) =>
-      failedFiles.has(p.file),
-    );
-    if (failedBodies.length)
-      entries.push({
-        file: m.file,
-        scope: str(data(m).scope),
-        start: m.range.end,
-        order: [Number.MAX_SAFE_INTEGER],
-        conditions: [],
-        unseenReason: failedBodies.some((p) => !internalFailures.has(p.file))
-          ? "failed-file-unseen-declarations"
-          : "parser-internal-error",
-      });
-    return entries.map((entry) => {
-      const condition = `all(${[...conditionsFor(m), ...(entry.conditions ?? []), entry.symbol ? str(data(entry.symbol).macroPathCondition) || "all()" : "all()", `any(${guards.map((cs) => `all(${cs.join(",")})`).join(",")})`].join(",")})`;
-      return {
-        ...(entry.symbol
-          ? {
-              symbol: {
-                ...entry.symbol,
-                data: { ...data(entry.symbol), macroPathCondition: condition },
-              },
-            }
-          : {
-              conditions: [condition],
-              unseenReason:
-                entry.unseenReason ?? "failed-file-unseen-declarations",
-            }),
-        file: m.file,
-        scope: str(data(m).scope),
-        start: m.range.end,
-        order: [m.range.end, ...entry.order],
-      };
-    });
+    const result: TextMacro[] = [];
+    for (const body of modulePlaces.get(m.id) ?? []) {
+      const failed = failedFiles.has(body.file);
+      const guards = [
+        ...((data(m).macroUseConditions ?? []) as string[][]),
+        ...(data(m).inline
+          ? []
+          : ((data(units.get(body.file) ?? {}).macroUseConditions ??
+              []) as string[][])),
+        ...(failed ? [[]] : []),
+      ];
+      // A failed file's leading inner attributes cannot prove absence of macro_use.
+      if (!guards.length) continue;
+      const inBody = (e: { file: string; scope: string }) =>
+        data(m).inline
+          ? e.file === m.file && e.scope === m.identity
+          : e.file === body.file && e.scope === "";
+      const entries = [
+        ...directText.filter(inBody),
+        ...modules
+          .filter((child) =>
+            inBody({ file: child.file, scope: str(data(child).scope) }),
+          )
+          .flatMap((child) => importedText(child, seen)),
+      ];
+      if (failed)
+        entries.push({
+          file: m.file,
+          scope: str(data(m).scope),
+          start: m.range.end,
+          order: [Number.MAX_SAFE_INTEGER],
+          conditions: [],
+          unseenReason: internalFailures.has(body.file)
+            ? "parser-internal-error"
+            : "failed-file-unseen-declarations",
+        });
+      for (const entry of entries) {
+        const condition = `all(${[...conditionsFor(m), ...(body.conditions ?? []), ...(entry.conditions ?? []), entry.symbol ? str(data(entry.symbol).macroPathCondition) || "all()" : "all()", `any(${guards.map((cs) => `all(${cs.join(",")})`).join(",")})`].join(",")})`;
+        result.push({
+          ...(entry.symbol
+            ? {
+                symbol: {
+                  ...entry.symbol,
+                  data: {
+                    ...data(entry.symbol),
+                    macroPathCondition: condition,
+                  },
+                },
+              }
+            : {
+                conditions: [condition],
+                unseenReason:
+                  entry.unseenReason ?? "failed-file-unseen-declarations",
+              }),
+          file: m.file,
+          scope: str(data(m).scope),
+          start: m.range.end,
+          order: [m.range.end, ...entry.order],
+        });
+      }
+    }
+    return result;
   }
   for (const m of modules) textMacros.push(...importedText(m));
   const textMacrosByName = new Map<string, TextMacro[]>();
@@ -1020,6 +1087,10 @@ export function resolveRust(
       if (present(targets, loc)) break;
     }
     if (!targets.length && !unseen.size) return null;
+    // A fallback can guarantee coverage without proving each alternative's
+    // applicability (for example, a conditional module-file layout).
+    if (targets.some((s) => conditionsFor(s).some((c) => c.includes("?"))))
+      unseen.add("macro-applicability-unverified");
     const found = conditional(
       { symbols: unique(targets), complete: true },
       targets,
@@ -1375,6 +1446,7 @@ export function resolveRust(
           loc.local,
           loc.scope,
           headNs,
+          !!loc.noImplicitPrelude,
           allowGlobs,
           [
             ...new Set([...(loc.conditions ?? []), ...conditionsFor(binding)]),
@@ -1701,6 +1773,7 @@ export function resolveRust(
     allowGlobs: boolean,
     accessFrom: Place,
     explicit: boolean,
+    absolutePath = false,
   ): Found {
     if (loc.crate.edition === "2015" && !explicit) return empty();
     const edges = (loc.crate.dependencies ?? []).filter((e) => e.name === name);
@@ -1753,6 +1826,7 @@ export function resolveRust(
         );
         if (
           !proven ||
+          (!explicit && !absolutePath && loc.noImplicitPrelude) ||
           (collision &&
             !(
               explicit &&
@@ -1766,11 +1840,13 @@ export function resolveRust(
             ...rest,
             complete: false,
             reason:
-              !loc.crate.edition && !explicit
-                ? "edition-unverified"
-                : collision
-                  ? "dependency-namespace-collision-unverified"
-                  : "dependency-presence-unverified",
+              !explicit && !absolutePath && loc.noImplicitPrelude
+                ? "no-implicit-prelude-binding-unverified"
+                : !loc.crate.edition && !explicit
+                  ? "edition-unverified"
+                  : collision
+                    ? "dependency-namespace-collision-unverified"
+                    : "dependency-presence-unverified",
           };
         }
         return found;
@@ -1815,6 +1891,7 @@ export function resolveRust(
       scope,
       name,
       ns,
+      !!loc.noImplicitPrelude,
       allowGlobs,
       accessFrom?.crate.root,
       accessFrom?.scope,
@@ -1937,6 +2014,7 @@ export function resolveRust(
           allowGlobs,
           accessFrom,
           false,
+          absolute,
         );
         // An unproven lexical binding does not erase a captured dependency
         // alternative. Keep its bodies as hints, never upgrade the proof. A
