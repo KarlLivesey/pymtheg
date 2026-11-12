@@ -1396,25 +1396,20 @@ async function createHelper(): Promise<Helper> {
         )
           return;
         let inlineAncestor = false,
-          bodyAncestor = false;
+          blockAncestor = false;
         for (let a = n.parent; a && a.type !== "source_file"; a = a.parent) {
+          // Inline module bodies are declaration_list nodes, not blocks.
+          // A real block between an inline module and its module scope makes
+          // it block-local, regardless of the expression/item owning the block.
           if (a.type === "mod_item") inlineAncestor = true;
-          if (
-            [
-              "function_item",
-              "closure_expression",
-              "const_item",
-              "static_item",
-              "const_block",
-              "async_block",
-            ].includes(a.type)
-          ) {
-            bodyAncestor = true;
+          if (a.type === "block") {
+            blockAncestor = true;
             if (inlineAncestor) return "inline";
           }
         }
-        return bodyAncestor ? "direct" : undefined;
+        return blockAncestor ? "direct" : undefined;
       }
+
       const genericBindingsCache = new Map<number, string>();
       function genericBindings(n: Node): string {
         const cached = genericBindingsCache.get(n.id);

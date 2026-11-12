@@ -789,7 +789,7 @@ The final production indexer/store completes at the **default Node heap**, with 
 
 Review round 17 is addressed with the conservative rule. Both path-fixture JSONs now live under test/fixtures/graph-rust/; the graph tests, native controls and source-freeze driver read the moved paths. Their bytes are unchanged. Historical frozen path/hash records remain evidence of their reviewed revisions; new evidence uses the owned locations.
 
-The parser records a file module's block ancestry: under a block-local inline module at any depth, or directly in a function/method/closure/const/static body. Every file module under a block-local inline module is unverified, whether or not it has a path attribute, in every file shape. A direct block file module without a provably active path is also unverified: rustc rejects the tested no-path forms. Plain path modules directly in a block retain the existing definite captured-file rule. Inline-written declarations do not acquire new layout uncertainty merely for being inside a block. No rustc directory ownership algorithm is emulated. Module version 19 refreshes cached parses.
+Corrected by module version 20: block-local inline modules, wherever the block is. The parser checks actual block ancestors instead of enumerating owner kinds. The added tests cover an enum discriminant, an array length, a const-generic argument, and an alias call with a grammar-rejected decoy that rustc does not load; an ordinary module-level inline module remains a definite positive control. This is not a claim of exhaustive Rust coverage. A direct block file module without a provably active path is also unverified: rustc rejects the tested no-path forms. Plain path modules directly in a block retain the existing definite captured-file rule. Inline-written declarations do not acquire new layout uncertainty merely for being inside a block. No rustc directory ownership algorithm is emulated. The module-19 measurements below remain historical; current parses use module version 20.
 
 The old round-18 table/report's plain outer-path row is narrowed to module-level inline modules, and its heading no longer confuses review round and module version. Its frozen module-18 measurements remain historical. The new controls assert both the mod-to-file edge and the call answer.
 
@@ -811,3 +811,25 @@ Against pushed **a4c36690**, whole Vector is **0 gains / 0 withdrawals / 0 retar
 Totals stay **35,422 symbols / 365,530 links; 67,418 resolved / 90 candidate sets / 298,022 unresolved**, with **1,552 clean / 11 failed files**, **168 invalid-code links** and **175,528 failed-file reach annotations**. Analysis-return size is **173,585,779 bytes**, graph facts **300,755,013 bytes**. The production indexer/store passes at the **default Node heap**, without analysis/resolution errors; every stored link and symbol equals the direct result. Existing grammar-gap evidence is unchanged. round19-freeze.json hashes the final tested source and fixtures; round19-report.md provides the handback. The whole-PR owned-path audit is recorded in round19-owned-paths.json and checked again after commit before push.
 
 The whole-PR ownership audit covers **2,942 changed paths**, with **zero outside the permitted paths**. Both relocated fixtures appear only under test/fixtures/graph-rust/ in the PR diff.
+
+
+## Known limits (exotic shapes, further work)
+
+Under D18, exotic-but-legal cases are recorded for a later chunk rather than used to seek exhaustive fallback coverage. Compiler-backed precision belongs to D17.
+
+- **E4:** unseen code is assumed not to replace derive/global_allocator. Uncaptured bare macro_use exports or generated code can violate that assumption. Visible imports and named macro_use bindings still count as shadowing.
+- **Unverified-layout lost links:** conservative layout uncertainty can lose a module's own-file link despite an inner path only affecting its children, and can lose links to inline-written items whose source location is known. Restoring these needs separate proof state.
+- **Cross-file textual macro inheritance:** textual definitions before a parent mod declaration are not followed into the child file. A failed ownership file can also leave child ancestry unproved.
+- **Grammar gaps:** the pinned grammar rejects some valid Rust, including ordinary variables named raw used as &raw, edition-2024 unsafe extern blocks, and some struct patterns with turbofish. The file-failure rule then emits no symbols or links from that file. The earlier grammar-gap inventory is retained; there are no special cases here.
+
+## Round 20 — ancestor blocks, D18 scope
+
+The owner-kind list is removed. A block node, not the item/expression that owns it, determines block locality. The implementation retains the existing file-module proof boundary and does not emulate Rust's directory algorithm. Module version 20 refreshes cached parses.
+
+This follow-up adds five controls only: enum discriminant, array length, const-generic argument, the wrong-cause/import-alias variant, and the module-level inline positive control. The four affected cases stay unresolved with the real project file/target retained, and the wrong-cause case has no invalid-code cause on its mod, import or call links. No full table of exotic block positions is claimed. Other accepted limits are collected above.
+
+Post-merge sequential foreground checks pass: npm ci --ignore-scripts; full npm test with PYM_TLC_JAR **2,213/2,213**; format:check; Rust tests **675/675**. All five new programs pass both rustc and Cargo. The retained compiler controls also pass. The mutation baseline passes and **102/102 mutations are killed**; limiting block detection to function bodies fails all four affected follow-up cases.
+
+Whole Vector against **b18e2c1c** is **0 gains / 0 withdrawals / 0 retargets / 0 changed link facts**. Link snapshots are byte-identical, and every symbol/context fact is equal. Production indexing/storage completes at the **default Node heap**, without analysis/resolution errors, and every stored link and symbol equals the direct result. Counts and serialized sizes are unchanged; the prior grammar-gap record remains historical evidence. round20-freeze.json hashes the tested source and five-case fixture, and round20-owned-paths.json records the whole-PR merge-base audit.
+
+The whole-PR owned-path audit covers **3,108 changed paths**, with **zero outside the permitted paths**. It is rerun against HEAD after commit before push.
