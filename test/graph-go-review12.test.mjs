@@ -1,24 +1,17 @@
 // Regressions for the twelfth W2-B review: a directory whose package membership
-// cannot be proven is treated like one with a missing package clause; recovery
-// never changes an open set's reasons. Recovery on and off.
+// cannot be proven makes its packages lossy (like a failed file); replace
+// precedence. (Two clauses in one file now fail the file: see failed-files.)
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { recoveryOptions } from "../dist/graph/languages/go/recover.js";
 import { call, project } from "./fixtures/graph-go/harness.mjs";
 
 const MOD = "module example.com/m\n\ngo 1.22\n";
 const lines = (...items) => [...items, ""].join("\n");
+/** Dispatch the old rules closed: open now only because membership is unverified. */
+const SEALED = { reason: "structural-match-unverified" };
 
-async function both(check) {
-  for (const on of [true, false]) {
-    recoveryOptions.enabled = on;
-    try {
-      await check(on);
-    } finally {
-      recoveryOptions.enabled = true;
-    }
-  }
-}
+/** Each check once (the recovery switch no longer exists). */
+const both = (check) => check("-");
 
 const CLEAN = lines(
   "package p",
@@ -96,42 +89,8 @@ test("safety: a //go:build ignore generator beside a library changes nothing", a
       "p/clean.go:method:(a).M",
       "p/clean.go:method:i.M",
     ]);
-    assert.equal(dispatch.data.open, undefined);
+    assert.deepEqual(dispatch.data.open, SEALED);
   });
-});
-
-test("B1: recovery never changes an open set's reasons", async () => {
-  const reasons = [];
-  await both(async () => {
-    const { links } = await project({
-      "go.mod": MOD,
-      "internal/x/x.go": lines(
-        "package x",
-        "type I interface{ M(); h() }",
-        "type Carrier struct{}",
-        "func (Carrier) M() {}",
-        "func (Carrier) h() {}",
-        "func Use(v I) { v.M() }",
-      ),
-      "internal/y/y.go": lines(
-        "package y",
-        'import "example.com/m/internal/x"',
-        "type Mid struct{ x.Carrier }",
-      ),
-      "internal/w/w.go": lines(
-        "package w",
-        "var a = [",
-        'import "example.com/m/internal/y"',
-        "]int{}",
-        "type W struct{ y.Mid }",
-        "func (W) M() {}",
-      ),
-    });
-    const open = call(links, "internal/x/x.go", "v.M").data.open;
-    assert.ok(open);
-    reasons.push(open.reasons ?? [open.reason]);
-  });
-  assert.deepEqual(reasons[0], reasons[1]);
 });
 
 const LIB = lines("package lib", "func F() {}");
@@ -164,6 +123,7 @@ test("S3: a version-specific replace of the selected version wins over an unvers
       libProject(
         lines(
           "module example.com/m",
+          "go 1.22",
           "require example.com/lib v1.2.0",
           ...replaces,
         ),
@@ -182,6 +142,7 @@ test("S3: a replace for another version does not apply; the unversioned one does
     libProject(
       lines(
         "module example.com/m",
+        "go 1.22",
         "require example.com/lib v1.2.0",
         "replace example.com/lib v1.3.0 => ./specific",
         "replace example.com/lib => ./fallback",
@@ -201,6 +162,7 @@ test("S3: an unprovable selected version keeps both directories as candidates", 
     libProject(
       lines(
         "module example.com/m",
+        "go 1.22",
         "replace example.com/lib v1.2.0 => ./specific",
         "replace example.com/lib => ./fallback",
       ),
@@ -215,6 +177,7 @@ test("S3: an unprovable selected version keeps both directories as candidates", 
     libProject(
       lines(
         "module example.com/m",
+        "go 1.22",
         "require example.com/lib v1.2.0",
         "require example.com/other v0.0.0",
         "replace example.com/lib v1.2.0 => ./specific",
@@ -239,6 +202,7 @@ test("S3: a go.work replace overrides the module's replaces", async () => {
     ...libProject(
       lines(
         "module example.com/m",
+        "go 1.22",
         "require example.com/lib v1.2.0",
         "replace example.com/lib v1.2.0 => ./specific",
       ),

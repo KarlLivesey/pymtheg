@@ -461,7 +461,7 @@ test("9: a call on a type-parameter value includes the constraint method, or is 
   );
 });
 
-test("10: declarations containing a syntax error yield no call or reference links", async () => {
+test("10: a file with a syntax error has failed and contributes nothing", async () => {
   const { links, report, symbols } = await project({
     "go.mod": MOD,
     "p/p.go": lines(
@@ -477,21 +477,9 @@ test("10: declarations containing a syntax error yield no call or reference link
       "func Fine() { err() }",
     ),
   });
-  assert.deepEqual(report.partial, ["p/p.go"]);
-  assert.ok(symbols.some((symbol) => symbol.name === "Broken"));
-  const inBroken = links.filter(
-    (link) =>
-      ["calls", "references"].includes(link.kind) &&
-      link.at !== "err" &&
-      link.file === "p/p.go",
-  );
-  assert.deepEqual(inBroken, []);
-  // Only the call in the clean declaration remains.
-  const errCalls = links.filter(
-    (link) => link.kind === "calls" && link.at === "err",
-  );
-  assert.equal(errCalls.length, 1);
-  assert.equal(errCalls[0].target, "p/p.go:function:err");
+  assert.deepEqual(report.failed, ["p/p.go"]);
+  assert.deepEqual(symbols, []);
+  assert.deepEqual(links, []);
 });
 
 test("interface dispatch keeps sets up to its own cap; unknown receivers keep the smaller cap", async () => {

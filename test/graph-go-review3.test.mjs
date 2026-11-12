@@ -6,7 +6,12 @@ import { call, project } from "./fixtures/graph-go/harness.mjs";
 
 const MOD = "module example.com/m\n\ngo 1.22\n";
 const lines = (...items) => [...items, ""].join("\n");
-const OPEN_EXTERNAL = { reason: "external-implementers-possible" };
+/** Dispatch the old rules closed: open now only because membership is unverified. */
+const SEALED = { reason: "structural-match-unverified" };
+const OPEN_EXTERNAL = {
+  reason: "external-implementers-possible",
+  reasons: ["external-implementers-possible", "structural-match-unverified"],
+};
 const OPEN_UNKNOWN = { reason: "receiver-type-unknown" };
 
 test("1a: dispatch on an interface outside types could satisfy is marked open; unexported-method interfaces are closed", async () => {
@@ -272,8 +277,8 @@ test("3: in a workspace, a versioned replace applies only to the workspace-wide 
     const { links } = await project({
       ...base,
       "go.work": "go 1.22\nuse ./a\nuse ./b\n",
-      "a/go.mod": `module example.com/a\nrequire example.com/dep ${aVersion}\nreplace example.com/dep v1.3.0 => ../old\n`,
-      "b/go.mod": `module example.com/b\nrequire example.com/dep ${bVersion}\n`,
+      "a/go.mod": `module example.com/a\ngo 1.22\nrequire example.com/dep ${aVersion}\nreplace example.com/dep v1.3.0 => ../old\n`,
+      "b/go.mod": `module example.com/b\ngo 1.22\nrequire example.com/dep ${bVersion}\n`,
     });
     return [
       call(links, "a/a.go", "dep.Run").target,

@@ -79,14 +79,6 @@ export interface FileFact {
    * scope shadows the name; that is decided by `analyze` on every index.
    */
   predeclared?: PredeclaredUse[];
-  /** An import declaration had a syntax error: unmatched qualifiers are unknown. */
-  importsBroken?: boolean;
-  /**
-   * Declaration-lossy (layer 1, see W2-B.md): a top-level ERROR, or a declaration
-   * whose error could have swallowed following declarations. Decided from the
-   * tree alone.
-   */
-  lossy?: boolean;
 }
 export interface PredeclaredUse {
   n: string;

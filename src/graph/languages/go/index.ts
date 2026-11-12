@@ -2,12 +2,14 @@ import { posix } from "node:path";
 import { createTagsParser, tagsFromPackage } from "../../tree-sitter.js";
 import type {
   AnalyzedFile,
+  Diagnostic,
   Json,
   LanguageModule,
   ParseResult,
   SourceInput,
 } from "../../types.js";
 import { GoExtractor } from "./extract.js";
+import { syntaxFailure } from "./failure.js";
 import { importPathOf, readLayout } from "./gomod.js";
 import type { FileFact } from "./model.js";
 import { linkNotes, resolveGo } from "./resolve.js";
@@ -35,16 +37,25 @@ function parser(): Promise<Helper> {
       query: "(package_clause) @package",
       secondPass({ tree, result }) {
         const source = pending!;
+        // A file that cannot be read is not valid code: it has failed and
+        // contributes nothing (see W2-B.md, "Failed files").
+        const fail = (diagnostic: Diagnostic) => {
+          result.status = "failed";
+          result.symbols = [];
+          result.links = [];
+          result.diagnostics = [diagnostic];
+          delete result.data;
+        };
+        const failure = syntaxFailure(tree.rootNode, source.text);
+        if (failure) return fail(failure);
         const extractor = new GoExtractor(source.path, source.text);
         extractor.run(tree.rootNode);
+        if (extractor.truncated) return fail(extractor.truncated);
+        result.status = "clean";
         result.symbols = extractor.symbols;
         result.links = extractor.links;
-        result.diagnostics.push(...extractor.diagnostics);
+        result.diagnostics = [...extractor.diagnostics];
         result.data = { go: extractor.fact as unknown as Json };
-        if (extractor.fact.package === undefined) {
-          result.status = "partial";
-          result.diagnostics.push({ message: "Missing Go package clause" });
-        }
       },
     });
   })().catch((error: unknown) => {
@@ -186,17 +197,30 @@ function analyze({
     }
     const links = parsed.map((link) => {
       const data = link.data as { [key: string]: Json } | undefined;
-      if (!data || !("overflow" in data || "builtin" in data || "open" in data))
+      if (
+        !data ||
+        !(
+          "overflow" in data ||
+          "builtin" in data ||
+          "open" in data ||
+          "reason" in data ||
+          "cause" in data
+        )
+      )
         return link;
       const {
         overflow: _overflow,
         builtin: _builtin,
         open: _open,
+        reason: _reason,
+        cause: _cause,
         ...rest
       } = data;
       void _overflow;
       void _builtin;
       void _open;
+      void _reason;
+      void _cause;
       return { ...link, data: rest };
     });
     next.set(file.path, { ...file.result, symbols, links });
@@ -220,6 +244,11 @@ function analyze({
         data: {
           ...((link.data as { [key: string]: Json } | undefined) ?? {}),
           ...(note.builtin ? { builtin: true } : {}),
+          // A failed link: the code it needs is in failed files (named, never
+          // targets).
+          ...(note.invalid
+            ? { reason: "invalid-code", cause: { files: note.invalid } }
+            : {}),
           ...(note.open
             ? {
                 open: {
@@ -252,7 +281,7 @@ function analyze({
 
 const go: LanguageModule = {
   id: ID,
-  version: "15",
+  version: "17",
   extensions: [".go"],
   contextFiles: ["go.mod", "go.work"],
   parse,

@@ -7,7 +7,12 @@ import { call, project } from "./fixtures/graph-go/harness.mjs";
 
 const MOD = "module example.com/m\n\ngo 1.22\n";
 const lines = (...items) => [...items, ""].join("\n");
-const OPEN = { reason: "external-implementers-possible" };
+/** Dispatch the old rules closed: open now only because membership is unverified. */
+const SEALED = { reason: "structural-match-unverified" };
+const OPEN = {
+  reason: "external-implementers-possible",
+  reasons: ["external-implementers-possible", "structural-match-unverified"],
+};
 
 const internalP = lines(
   "package p",
@@ -29,7 +34,7 @@ test("1: an internal package's sealed interface stays closed only without a re-e
   // Control: genuinely internal, nothing re-exposed.
   let link = await dispatch({ "go.mod": MOD, "internal/p/p.go": internalP });
   assert.equal(link.candidates.length, 3);
-  assert.equal(link.data.open, undefined);
+  assert.deepEqual(link.data.open, SEALED);
   // Re-exposure through an exported struct in a public package.
   link = await dispatch({
     "go.mod": MOD,
@@ -110,7 +115,7 @@ test("1: a nested module under internal/ is its own module with a plain, reachab
     },
     "internal/sub/internal/p/p.go",
   );
-  assert.equal(inner.data.open, undefined);
+  assert.deepEqual(inner.data.open, SEALED);
 });
 
 test("1: defined types keep an interface's method set and a struct's promoted methods", async () => {
@@ -129,7 +134,7 @@ test("1: defined types keep an interface's method set and a struct's promoted me
     { "go.mod": MOD, "p/p.go": unexported() },
     "p/p.go",
   );
-  assert.equal(link.data.open, undefined);
+  assert.deepEqual(link.data.open, SEALED);
   for (const extra of [
     ["type Pub i"],
     ["type s2 struct{ a }", "type Pub s2"],
@@ -150,7 +155,7 @@ test("1: defined types keep an interface's method set and a struct's promoted me
     },
     "p/p.go",
   );
-  assert.equal(link.data.open, undefined);
+  assert.deepEqual(link.data.open, SEALED);
 });
 
 test("1: the same cases inside a go.work workspace", async () => {
@@ -162,7 +167,7 @@ test("1: the same cases inside a go.work workspace", async () => {
   };
   // Control: internal to module core, no re-exposure.
   let link = await dispatch(files, "core/internal/p/p.go");
-  assert.equal(link.data.open, undefined);
+  assert.deepEqual(link.data.open, SEALED);
   // core re-exposes a carrier in a public package of its own.
   link = await dispatch(
     {
@@ -214,7 +219,7 @@ test("2: in an open set, a type embedding an external type may have inherited th
     "internal/p/p.go",
   );
   assert.ok(!link.candidates.includes("q/q.go:method:(W).M"));
-  assert.equal(link.data.open, undefined);
+  assert.deepEqual(link.data.open, SEALED);
 });
 
 test("3: function-local and anonymous struct types are implementers", async () => {
@@ -246,7 +251,7 @@ test("3: function-local and anonymous struct types are implementers", async () =
     "p/p.go",
   );
   assert.deepEqual(link.candidates, expected);
-  assert.equal(link.data.open, undefined);
+  assert.deepEqual(link.data.open, SEALED);
   // A type declared inside the function.
   link = await dispatch(
     {
@@ -342,7 +347,7 @@ test("4: shadowed predeclared names resolve in call, selector, composite-literal
   assert.deepEqual(at("q/q.go", "nil"), ["references:q/q.go:var:nil"]);
 });
 
-test("4: a composite literal of a type named like a keyword-value is a grammar limit (partial, no links)", async () => {
+test("4: a composite literal of a type named like a keyword-value is a grammar limit (the file fails)", async () => {
   const { links, report } = await project({
     "go.mod": MOD,
     "p/p.go": lines(
@@ -353,10 +358,7 @@ test("4: a composite literal of a type named like a keyword-value is a grammar l
     ),
   });
   // tree-sitter-go parses nil/true/false/iota as keywords: `false{…}` is a syntax
-  // error. The file is partial and the erroneous declaration emits no links.
-  assert.deepEqual(report.partial, ["p/p.go"]);
-  assert.deepEqual(
-    links.filter((link) => ["calls", "references"].includes(link.kind)),
-    [],
-  );
+  // error to the grammar, so the file cannot be read and has failed.
+  assert.deepEqual(report.failed, ["p/p.go"]);
+  assert.deepEqual(links, []);
 });

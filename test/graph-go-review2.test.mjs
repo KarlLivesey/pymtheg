@@ -101,24 +101,27 @@ test("3: a version-specific replace applies only to that required version", asyn
   const cases = [
     // Negative: v1.2.0 is required, the replacement is for v1.1.0.
     [
-      "module example.com/m\nrequire example.com/dep v1.2.0\nreplace example.com/dep v1.1.0 => ./old\n",
+      "module example.com/m\ngo 1.22\nrequire example.com/dep v1.2.0\nreplace example.com/dep v1.1.0 => ./old\n",
       null,
     ],
     // Positive: the replaced version is the required one.
     [
-      "module example.com/m\nrequire example.com/dep v1.1.0\nreplace example.com/dep v1.1.0 => ./old\n",
+      "module example.com/m\ngo 1.22\nrequire example.com/dep v1.1.0\nreplace example.com/dep v1.1.0 => ./old\n",
       "old/o.go:function:F",
     ],
     // Positive: an unversioned replace applies to every version.
     [
-      "module example.com/m\nrequire example.com/dep v1.2.0\nreplace example.com/dep => ./old\n",
+      "module example.com/m\ngo 1.22\nrequire example.com/dep v1.2.0\nreplace example.com/dep => ./old\n",
       "old/o.go:function:F",
     ],
     // Not established: the module is not required in the captured go.mod.
-    ["module example.com/m\nreplace example.com/dep v1.1.0 => ./old\n", null],
+    [
+      "module example.com/m\ngo 1.22\nreplace example.com/dep v1.1.0 => ./old\n",
+      null,
+    ],
     // Block forms, with an indirect comment.
     [
-      "module example.com/m\nrequire (\n\texample.com/dep v1.1.0 // indirect\n)\nreplace (\n\texample.com/dep v1.1.0 => ./old\n)\n",
+      "module example.com/m\ngo 1.22\nrequire (\n\texample.com/dep v1.1.0 // indirect\n)\nreplace (\n\texample.com/dep v1.1.0 => ./old\n)\n",
       "old/o.go:function:F",
     ],
   ];
@@ -313,8 +316,10 @@ test("8: the builtin flag is set only when the builtin is what is called", async
   const flag = (file, at) => call(links, file, at).data.builtin;
   assert.equal(flag("p/p.go", "new"), undefined);
   assert.equal(call(links, "p/p.go", "new").target, "p/p.go:function:new");
-  // The test-only `len` shadows only for test files of the package.
-  assert.equal(flag("p/p.go", "len"), true);
+  // A test-only `len` shadows `len` for every file of the package in the test
+  // build, so p.go's reading differs between the builds: no builtin flag (W2-B
+  // round 13).
+  assert.equal(flag("p/p.go", "len"), undefined);
   assert.equal(flag("p/len_test.go", "len"), undefined);
   assert.equal(flag("p/p.go", "make"), true);
   assert.equal(flag("q/q.go", "new"), true);

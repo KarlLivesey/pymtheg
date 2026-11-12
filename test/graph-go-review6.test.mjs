@@ -6,7 +6,12 @@ import { call, project } from "./fixtures/graph-go/harness.mjs";
 
 const MOD = "module example.com/m\n\ngo 1.22\n";
 const lines = (...items) => [...items, ""].join("\n");
-const OPEN = { reason: "external-implementers-possible" };
+/** Dispatch the old rules closed: open now only because membership is unverified. */
+const SEALED = { reason: "structural-match-unverified" };
+const OPEN = {
+  reason: "external-implementers-possible",
+  reasons: ["external-implementers-possible", "structural-match-unverified"],
+};
 const base = (...extra) =>
   lines(
     "package p",
@@ -41,7 +46,7 @@ test("1: local types embedding local types are followed, scope-aware", async () 
       make,
     );
     // Everything is unexported and every member is proven: closed.
-    assert.equal(link.data.open, undefined, make);
+    assert.deepEqual(link.data.open, SEALED, make);
   }
 });
 
@@ -119,7 +124,7 @@ test("2: defined types over interfaces and structs, in dispatch as in reachabili
     link.candidates.join(),
   );
   assert.ok(link.candidates.includes("p/p.go:method:(s3).M"));
-  assert.equal(link.data.open, undefined);
+  assert.deepEqual(link.data.open, SEALED);
   // A defined type over an interface used as a static type dispatches on the interface.
   const { links } = await project({
     "go.mod": MOD,
@@ -130,7 +135,7 @@ test("2: defined types over interfaces and structs, in dispatch as in reachabili
     "p/p.go:method:(a).M",
     "p/p.go:method:i.M",
   ]);
-  assert.equal(viaBridge.data.open, undefined);
+  assert.deepEqual(viaBridge.data.open, SEALED);
 });
 
 test("3: type literals carry: aliases of struct/interface literals and embedded interface literals", async () => {
@@ -149,7 +154,7 @@ test("3: type literals carry: aliases of struct/interface literals and embedded 
     "type pub interface{ interface{ i } }",
   ]) {
     const { link } = await useM(base(extra));
-    assert.equal(link.data.open, undefined, extra);
+    assert.deepEqual(link.data.open, SEALED, extra);
   }
   // Internal package re-exposed through an alias literal in a public package.
   const internal = lines(
@@ -186,13 +191,13 @@ test("3: type literals carry: aliases of struct/interface literals and embedded 
     "go.mod": MOD,
     "internal/p/p.go": internal,
   });
-  assert.equal(call(links, "internal/p/p.go", "x.M").data.open, undefined);
+  assert.deepEqual(call(links, "internal/p/p.go", "x.M").data.open, SEALED);
 });
 
 test("4: an unknown structure opens the set, for every consumer", async () => {
   // Control: closed.
   let { link } = await useM(base());
-  assert.equal(link.data.open, undefined);
+  assert.deepEqual(link.data.open, SEALED);
   // Carrier reachability: an exported type whose structure is unknown might carry hidden.
   for (const extra of [
     "type Pub struct{ Missing }",

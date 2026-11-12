@@ -1,6 +1,8 @@
 // Go type identity in signatures (spec, "Type identity"): one canonical form,
-// applied at every depth. `implements` is definite only when identity is proven;
-// a mismatch is only claimed when proven; anything unprovable stays a candidate.
+// applied at every depth. Since version 16 (no-toolchain fallback) identity only
+// ANNOTATES: `implements` is never definite, and "different" never removes a
+// member. These tests check the annotation (`data.identity` on the non-definite
+// `implements` link) and that the member stays.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { call, project } from "./fixtures/graph-go/harness.mjs";
@@ -10,8 +12,8 @@ const lines = (...items) => [...items, ""].join("\n");
 
 /**
  * Interface `I` with `M(want)` in p/i.go, type `T` with `M(have)` in `file`;
- * returns whether `T implements I` is definite and whether (T).M is a candidate
- * of the dispatch `x.M()` on I.
+ * returns the identity annotation of `T implements I` (never definite) and
+ * whether (T).M is a candidate of the dispatch `x.M()` on I.
  */
 async function check({
   want,
@@ -38,42 +40,31 @@ async function check({
     ),
     ...extra,
   });
-  const definite = links.some(
-    (link) =>
-      link.kind === "implements" &&
-      link.file === file &&
-      link.targetName === "I",
+  const link = links.find(
+    (item) =>
+      item.kind === "implements" &&
+      item.file === file &&
+      item.targetName === "I",
   );
+  assert.equal(link?.target ?? null, null, "implements is never definite");
   const dispatch = links.find(
-    (link) => link.file === "p/i.go" && link.at === "x.M",
+    (item) => item.file === "p/i.go" && item.at === "x.M",
   );
+  // The member stays whatever identity says, and the set is open.
+  assert.ok(dispatch.data.open, "dispatch is always open");
   return {
-    definite,
+    identity: link?.data.identity,
     candidate: !!dispatch?.candidates.includes(`${file}:method:(T).M`),
   };
 }
-const yes = async (spec, message) => {
+const annotated = (expected) => async (spec, message) => {
   const result = await check(spec);
-  assert.equal(result.definite, true, message);
+  assert.equal(result.identity, expected, message);
+  assert.equal(result.candidate, true, `${message}: never removed`);
 };
-const no = async (spec, message) => {
-  const result = await check(spec);
-  assert.equal(result.definite, false, message);
-  assert.equal(
-    result.candidate,
-    false,
-    `${message}: refuted, so not a candidate`,
-  );
-};
-const unknown = async (spec, message) => {
-  const result = await check(spec);
-  assert.equal(result.definite, false, message);
-  assert.equal(
-    result.candidate,
-    true,
-    `${message}: unprovable, so still a candidate`,
-  );
-};
+const yes = annotated("identical");
+const no = annotated("different");
+const unknown = annotated("unknown");
 
 test("S1 nested grouped parameters keep their arity", async () => {
   await no(
@@ -264,7 +255,10 @@ test("generic instantiations compare their arguments; type parameters are not co
       "func (S[P]) M(P) {}",
     ),
   });
-  assert.ok(!links.some((link) => link.kind === "implements"));
+  assert.equal(
+    links.find((link) => link.kind === "implements")?.data.identity,
+    "unknown",
+  );
   assert.ok(
     call(links, "p/p.go", "x.M").candidates.includes("p/p.go:method:(S).M"),
   );

@@ -1,9 +1,5 @@
 // Exact expectations for the Go sample project. Reviewed by hand against the sources.
 export const symbols = [
-  {"file":"broken/broken.go","name":"broken.go","kind":"file","identity":"broken.go","at":"package broken\n\nfunc Good() int { return 1 }\n\nfunc Bad( {\n"},
-  {"file":"broken/broken.go","name":"broken","kind":"package","identity":"broken","at":"broken"},
-  {"file":"broken/broken.go","name":"Good","kind":"function","identity":"Good","at":"func Good() int { return 1 }"},
-  {"file":"broken/broken.go","name":"Bad","kind":"function","identity":"Bad","at":"Bad"},
   {"file":"cmd/app/main.go","name":"main.go","kind":"file","identity":"main.go","at":"package main\n\nimport (\n\t\"fmt\"\n\n\tg \"example.com/shapes/geom\"\n\t\"example.com/shapes/geom/internal/calc\"\n\t. \"example.com/shapes/internal/store\"\n)\n\ntype printer struct{}\n\nfunc (printer) Println(v string) {}\n\nfunc main() {\n\tsq := g.NewSquare(2)\n\tfmt.Println(sq.Area())\n\tvar c g.Circle\n\t_ = c.Name()\n\t_ = Save(\"x\")\n\tarea := (*g.Square).Area\n\t_ = area(sq)\n\tname := c.Name\n\t_ = name()\n\tvar s g.Shape = c\n\t_ = s.Name()\n\tints := g.Map[int, string]([]int{1}, show)\n\tst := &g.Stack[int]{}\n\tst.Push(len(ints))\n\t_ = calc.Double(1)\n\tdescribe(nil)\n\tmissing()\n}\n\nfunc show(v int) string { return fmt.Sprint(v) }\n\nfunc describe(items []interface{ Name() string }) {\n\tfmt := printer{}\n\tfor _, item := range items {\n\t\tfmt.Println(item.Name())\n\t}\n}\n"},
   {"file":"cmd/app/main.go","name":"main","kind":"package","identity":"main","at":"main","range":{"start":8,"end":12}},
   {"file":"cmd/app/main.go","name":"printer","kind":"struct","identity":"printer","at":"printer struct{}"},
@@ -62,8 +58,6 @@ export const symbols = [
   {"file":"internal/store/store.go","name":"Save","kind":"function","identity":"Save","at":"func Save(value string) error { return nil }"},
 ];
 export const links = [
-  {"file":"broken/broken.go","kind":"contains","targetName":"broken.go","source":{"name":"broken","kind":"package"},"target":{"file":"broken/broken.go","name":"broken.go","kind":"file"},"at":"broken"},
-  {"file":"broken/broken.go","kind":"contains","targetName":"Good","source":{"name":"broken.go","kind":"file"},"target":{"file":"broken/broken.go","name":"Good","kind":"function"},"at":"func Good() int { return 1 }"},
   {"file":"cmd/app/main.go","kind":"contains","targetName":"main.go","source":{"name":"main","kind":"package"},"target":{"file":"cmd/app/main.go","name":"main.go","kind":"file"},"at":"main","range":{"start":8,"end":12}},
   {"file":"cmd/app/main.go","kind":"imports","targetName":"fmt","source":{"name":"main.go","kind":"file"},"target":null,"at":"\"fmt\""},
   {"file":"cmd/app/main.go","kind":"imports","targetName":"example.com/shapes/geom","source":{"name":"main.go","kind":"file"},"target":{"file":"geom/area.go","name":"geom","kind":"package"},"at":"g \"example.com/shapes/geom\""},
@@ -111,7 +105,7 @@ export const links = [
   {"file":"geom/area.go","kind":"contains","targetName":"Shape.Area","source":{"name":"Shape","kind":"interface"},"target":{"file":"geom/area.go","name":"Area","kind":"method"},"at":"Area() float64","range":{"start":166,"end":180}},
   {"file":"geom/area.go","kind":"contains","targetName":"Shape.Name","source":{"name":"Shape","kind":"interface"},"target":{"file":"geom/area.go","name":"Name","kind":"method"},"at":"Name() string","range":{"start":182,"end":195}},
   {"file":"geom/area.go","kind":"contains","targetName":"Circle","source":{"name":"area.go","kind":"file"},"target":{"file":"geom/area.go","name":"Circle","kind":"struct"},"at":"Circle struct {\n\tR float64\n}"},
-  {"file":"geom/area.go","kind":"implements","targetName":"Shape","source":{"name":"Circle","kind":"struct"},"target":{"file":"geom/area.go","name":"Shape","kind":"interface"},"at":"Circle struct {\n\tR float64\n}"},
+  {"file":"geom/area.go","kind":"implements","targetName":"Shape","source":{"name":"Circle","kind":"struct"},"target":null,"at":"Circle struct {\n\tR float64\n}"},
   {"file":"geom/area.go","kind":"contains","targetName":"Circle.R","source":{"name":"Circle","kind":"struct"},"target":{"file":"geom/area.go","name":"R","kind":"field"},"at":"R float64"},
   {"file":"geom/area.go","kind":"contains","targetName":"(Circle).Area","source":{"name":"area.go","kind":"file"},"target":{"file":"geom/area.go","name":"Area","kind":"method"},"at":"func (c Circle) Area() float64 { return scale(c.R * c.R * Pi) }"},
   {"file":"geom/area.go","kind":"receiver","targetName":"Circle","source":{"name":"Area","kind":"method"},"target":{"file":"geom/area.go","name":"Circle","kind":"struct"},"at":"Circle","range":{"start":242,"end":248}},
@@ -145,7 +139,7 @@ export const links = [
   {"file":"geom/internal/calc/calc.go","kind":"contains","targetName":"Double","source":{"name":"calc.go","kind":"file"},"target":{"file":"geom/internal/calc/calc.go","name":"Double","kind":"function"},"at":"func Double(v float64) float64 { return v * 2 }"},
   {"file":"geom/platform_linux.go","kind":"contains","targetName":"platform","source":{"name":"platform_linux.go","kind":"file"},"target":{"file":"geom/platform_linux.go","name":"platform","kind":"function"},"at":"func platform() string { return \"linux\" }"},
   {"file":"geom/platform_windows.go","kind":"contains","targetName":"platform","source":{"name":"platform_windows.go","kind":"file"},"target":{"file":"geom/platform_windows.go","name":"platform","kind":"function"},"at":"func platform() string { return \"windows\" }"},
-  {"file":"geom/square.go","kind":"implements","targetName":"Shape","source":{"name":"Square","kind":"struct"},"target":{"file":"geom/area.go","name":"Shape","kind":"interface"},"at":"Square struct {\n\tSide float64\n}"},
+  {"file":"geom/square.go","kind":"implements","targetName":"Shape","source":{"name":"Square","kind":"struct"},"target":null,"at":"Square struct {\n\tSide float64\n}"},
   {"file":"geom/square.go","kind":"contains","targetName":"Square","source":{"name":"square.go","kind":"file"},"target":{"file":"geom/square.go","name":"Square","kind":"struct"},"at":"Square struct {\n\tSide float64\n}"},
   {"file":"geom/square.go","kind":"contains","targetName":"Square.Side","source":{"name":"Square","kind":"struct"},"target":{"file":"geom/square.go","name":"Side","kind":"field"},"at":"Side float64"},
   {"file":"geom/square.go","kind":"contains","targetName":"(*Square).Area","source":{"name":"square.go","kind":"file"},"target":{"file":"geom/square.go","name":"Area","kind":"method"},"at":"func (s *Square) Area() float64 { return scale(s.Side * s.Side) }"},
@@ -159,7 +153,7 @@ export const links = [
   {"file":"geom/square.go","kind":"contains","targetName":"NewSquare","source":{"name":"square.go","kind":"file"},"target":{"file":"geom/square.go","name":"NewSquare","kind":"function"},"at":"func NewSquare(side float64) *Square { return &Square{Side: side} }"},
   {"file":"geom/square.go","kind":"references","targetName":"Square","source":{"name":"NewSquare","kind":"function"},"target":{"file":"geom/square.go","name":"Square","kind":"struct"},"at":"Square","range":{"start":203,"end":209}},
   {"file":"geom/square.go","kind":"references","targetName":"Square","source":{"name":"NewSquare","kind":"function"},"target":{"file":"geom/square.go","name":"Square","kind":"struct"},"at":"Square","range":{"start":220,"end":226}},
-  {"file":"geom/square.go","kind":"implements","targetName":"Shape","source":{"name":"Labeled","kind":"struct"},"target":{"file":"geom/area.go","name":"Shape","kind":"interface"},"at":"Labeled struct {\n\tCircle\n\tLabel string\n}"},
+  {"file":"geom/square.go","kind":"implements","targetName":"Shape","source":{"name":"Labeled","kind":"struct"},"target":null,"at":"Labeled struct {\n\tCircle\n\tLabel string\n}"},
   {"file":"geom/square.go","kind":"contains","targetName":"Labeled","source":{"name":"square.go","kind":"file"},"target":{"file":"geom/square.go","name":"Labeled","kind":"struct"},"at":"Labeled struct {\n\tCircle\n\tLabel string\n}"},
   {"file":"geom/square.go","kind":"contains","targetName":"Labeled.Circle","source":{"name":"Labeled","kind":"struct"},"target":{"file":"geom/square.go","name":"Circle","kind":"field"},"at":"Circle","range":{"start":313,"end":319}},
   {"file":"geom/square.go","kind":"embeds","targetName":"Circle","source":{"name":"Labeled","kind":"struct"},"target":{"file":"geom/area.go","name":"Circle","kind":"struct"},"at":"Circle","range":{"start":313,"end":319}},

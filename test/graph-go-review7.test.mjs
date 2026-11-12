@@ -32,15 +32,18 @@ test("1a: local types in signatures compare by their scoped identity, not their 
       "}",
     ),
   });
+  // `implements` links are never definite (no-toolchain fallback); identity
+  // annotates them. The two `t` are different types: across scopes "different".
   const impl = links
     .filter((link) => link.kind === "implements")
-    .map((link) => `${link.at.split(" ")[0]}->${link.targetName}`);
-  // The legitimate links, within one scope.
-  assert.ok(impl.includes("w->p.go:F.i"), impl.join());
-  assert.ok(impl.includes("v->p.go:G.j"), impl.join());
-  // The two `t` are different types: no cross-scope links.
-  assert.ok(!impl.includes("w->p.go:G.j"), impl.join());
-  assert.ok(!impl.includes("v->p.go:F.i"), impl.join());
+    .map(
+      (link) =>
+        `${link.at.split(" ")[0]}->${link.targetName}:${link.data.identity}`,
+    );
+  assert.ok(impl.includes("w->p.go:F.i:identical"), impl.join());
+  assert.ok(impl.includes("v->p.go:G.j:identical"), impl.join());
+  assert.ok(!impl.includes("w->p.go:G.j:identical"), impl.join());
+  assert.ok(!impl.includes("v->p.go:F.i:identical"), impl.join());
 });
 
 test("1b: local types are unique per package: same-shaped init structs in several files", async () => {
@@ -178,6 +181,7 @@ test("2: a defined type over an unresolvable type keeps its own methods (depth 0
   assert.ok(!implementsOf(links).includes("w->J"));
   assert.deepEqual(link.data.open, {
     reason: "external-implementers-possible",
+    reasons: ["external-implementers-possible", "structural-match-unverified"],
   });
 });
 

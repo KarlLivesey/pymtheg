@@ -262,7 +262,7 @@ test("locals shadow imports and package functions", async () => {
   );
 });
 
-test("implicit interface satisfaction is structural, pointer-aware and signature-checked", async () => {
+test("implicit interface satisfaction is structural and pointer-aware; signatures only annotate", async () => {
   const { links } = await project({
     "go.mod": MOD,
     "api/api.go":
@@ -285,10 +285,22 @@ test("implicit interface satisfaction is structural, pointer-aware and signature
     .filter((link) => link.kind === "implements")
     .map(
       (link) =>
-        `${link.at.split(" ")[0]}->${link.targetName}${link.data.pointerReceiver ? "*" : ""}`,
+        `${link.at.split(" ")[0]}->${link.targetName}${link.data.pointerReceiver ? "*" : ""}:${link.data.identity}`,
     )
     .sort();
-  assert.deepEqual(impl, ["File->Both*", "File->Reader*", "Value->Reader"]);
+  // Never definite (no-toolchain fallback): matched by method name and count;
+  // `Wrong`'s Read(string) is kept, annotated as a different signature.
+  assert.ok(
+    links
+      .filter((link) => link.kind === "implements")
+      .every((link) => link.target === null),
+  );
+  assert.deepEqual(impl, [
+    "File->Both*:identical",
+    "File->Reader*:identical",
+    "Value->Reader:identical",
+    "Wrong->Reader:different",
+  ]);
 });
 
 test("calls through interface values are candidates with the interface method, or unresolved", async () => {
@@ -417,21 +429,20 @@ test("a go.mod-only change retargets imports with no source change", async () =>
   );
 });
 
-test("symbols recovered from a partial file remain linkable and flagged", async () => {
+test("a file with a syntax error has failed: nothing in it is a target", async () => {
   const { links, symbols, report } = await project({
     "go.mod": MOD,
     "p/bad.go": "package p\nfunc Good() {}\nfunc Bad( {\n",
     "p/use.go": "package p\nfunc Use() { Good() }\n",
   });
-  assert.deepEqual(report.partial, ["p/bad.go"]);
-  assert.equal(
-    call(links, "p/use.go", "Good").target,
-    "p/bad.go:function:Good",
-  );
-  assert.equal(
-    symbols.find((symbol) => symbol.name === "Good").status,
-    "partial",
-  );
+  assert.deepEqual(report.failed, ["p/bad.go"]);
+  assert.deepEqual(report.partial, []);
+  assert.ok(!symbols.some((symbol) => symbol.file === "p/bad.go"));
+  const link = call(links, "p/use.go", "Good");
+  assert.equal(link.target, null);
+  assert.deepEqual(link.candidates, []);
+  assert.equal(link.data.reason, "invalid-code");
+  assert.deepEqual(link.data.cause, { files: ["p/bad.go"] });
 });
 
 test("method identities are receiver-qualified; generics and multiple init keep distinct identities", async () => {

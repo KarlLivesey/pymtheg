@@ -7,7 +7,12 @@ import { call, project } from "./fixtures/graph-go/harness.mjs";
 
 const MOD = "module example.com/m\n\ngo 1.22\n";
 const lines = (...items) => [...items, ""].join("\n");
-const OPEN = { reason: "external-implementers-possible" };
+/** Dispatch the old rules closed: open now only because membership is unverified. */
+const SEALED = { reason: "structural-match-unverified" };
+const OPEN = {
+  reason: "external-implementers-possible",
+  reasons: ["external-implementers-possible", "structural-match-unverified"],
+};
 
 test("1: an implementer whose selection is uncertain keeps the project method it could select", async () => {
   const { links } = await project({
@@ -63,7 +68,7 @@ test("2: a dispatch set is closed only when no outside type can obtain the unexp
   // Closed: unexported interface, only unexported carriers.
   let link = await sealedCase({ "p/p.go": sealedPackage("p") });
   assert.equal(link.candidates.length, 3);
-  assert.equal(link.data.open, undefined);
+  assert.deepEqual(link.data.open, SEALED);
   // Open: the interface itself is exported (outside code can embed it).
   link = await sealedCase({
     "p/p.go": sealedPackage("p")
@@ -101,7 +106,7 @@ test("2: a dispatch set is closed only when no outside type can obtain the unexp
     "p/p.go": sealedPackage("p"),
     "p/p_test.go": lines("package p", "type Pub struct{ a }"),
   });
-  assert.equal(link.data.open, undefined);
+  assert.deepEqual(link.data.open, SEALED);
 });
 
 test("2: package main and internal packages seal exported interfaces", async () => {
@@ -119,12 +124,12 @@ test("2: package main and internal packages seal exported interfaces", async () 
     );
   let link = await sealedCase({ "p/p.go": exportedSealed("main") });
   assert.equal(link.candidates.length, 3);
-  assert.equal(link.data.open, undefined);
+  assert.deepEqual(link.data.open, SEALED);
   link = await sealedCase(
     { "lib/internal/p/p.go": exportedSealed("p") },
     "lib/internal/p",
   );
-  assert.equal(link.data.open, undefined);
+  assert.deepEqual(link.data.open, SEALED);
   // The same package outside internal/ is open.
   link = await sealedCase({ "p/p.go": exportedSealed("p") });
   assert.deepEqual(link.data.open, OPEN);
@@ -184,7 +189,7 @@ test("3: types that cannot supply another package's unexported method are ruled 
     "x/internal/p/p.go:method:(U).Do",
     "x/internal/p/p.go:method:Sealed.Do",
   ]);
-  assert.equal(link.data.open, undefined);
+  assert.deepEqual(link.data.open, SEALED);
 });
 
 test("3: dispatch members come from the static interface, not an embedded one", async () => {
@@ -212,10 +217,10 @@ test("3: dispatch members come from the static interface, not an embedded one", 
     "x/internal/p/p.go:method:(A2).M",
     "x/internal/p/p.go:method:E.M",
   ]);
-  assert.equal(link.data.open, undefined);
+  assert.deepEqual(link.data.open, SEALED);
 });
 
-test("invariant: a closed dispatch set lists only proven implementers of the static interface", async () => {
+test("invariant: no dispatch set is closed, and every member matches the static interface by name", async () => {
   const { links } = await project({
     "go.mod": MOD,
     "x/internal/p/p.go": lines(
@@ -260,24 +265,28 @@ test("invariant: a closed dispatch set lists only proven implementers of the sta
       .filter((link) => link.kind === "implements")
       .map((link) => `${link.at.split(" ")[0]}->${link.targetName}`),
   );
-  let closedSeen = 0;
+  // No-toolchain fallback: every dispatch set is open; a set the earlier rules
+  // closed says so with only `structural-match-unverified`, and its members are
+  // types matched by name (and count) to the static interface.
+  let sealedSeen = 0;
   for (const link of links.filter(
     (item) => item.kind === "calls" && item.candidates.length,
   )) {
     const iface = link.data.expr.x.t?.n;
     if (!iface) continue;
+    assert.ok(link.data.open, `${iface} set is open`);
+    if (link.data.open.reason !== "structural-match-unverified") continue;
+    sealedSeen++;
     for (const member of link.candidates) {
       const type = /:method:\(\*?(\w+)\)/.exec(member)?.[1];
       if (!type) continue; // the interface method itself
-      if (link.data.open) continue; // open sets may list unproven types
       assert.ok(
         implemented.has(`${type}->${iface}`),
-        `${type} in closed ${iface} set`,
+        `${type} in sealed ${iface} set`,
       );
     }
-    if (!link.data.open) closedSeen++;
   }
-  assert.ok(closedSeen >= 1, "the fixture has a closed set");
+  assert.ok(sealedSeen >= 1, "the fixture has a set the earlier rules closed");
   // Wrap may implement Seal (A.M promoted unless sync.Mutex has M): unproven, so the
   // Seal set lists A.M and is open; the Seal2 set is closed.
   const seal = links.find(
@@ -286,7 +295,7 @@ test("invariant: a closed dispatch set lists only proven implementers of the sta
   assert.ok(seal.candidates.includes("x/internal/p/p.go:method:(A).M"));
   assert.deepEqual(seal.data.open, OPEN);
   const seal2 = call(links, "x/internal/p/p.go", "x.M2");
-  assert.equal(seal2.data.open, undefined);
+  assert.deepEqual(seal2.data.open, SEALED);
   // X3 has its own M3, but N3 could only come from sync.Mutex: not ruled out, not
   // proven. It is listed (its M3 may be the target) and the sealed set is open.
   const seal3 = call(links, "x/internal/p/p.go", "x.M3");

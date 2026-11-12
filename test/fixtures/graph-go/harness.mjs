@@ -41,6 +41,12 @@ export async function project(files, steps = []) {
           ? `${symbol.file}:${symbol.kind}:${symbol.identity}`
           : null;
       };
+      // One read per file (a file's record can be large).
+      const texts = new Map();
+      const text = (path) => {
+        if (!texts.has(path)) texts.set(path, store.getFile(path).text);
+        return texts.get(path);
+      };
       const links = store
         .links()
         .sort(
@@ -52,9 +58,7 @@ export async function project(files, steps = []) {
           file: link.file,
           kind: link.kind,
           targetName: link.targetName,
-          at: store
-            .getFile(link.file)
-            .text.slice(link.range.start, link.range.end),
+          at: text(link.file).slice(link.range.start, link.range.end),
           target: name(link.targetId),
           candidates: link.candidates.map((item) => name(item.id)).sort(),
           data: link.data,

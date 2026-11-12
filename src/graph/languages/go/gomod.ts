@@ -8,17 +8,30 @@ export interface GoModuleRoot {
   /** A version-specific `replace` applies only to that version. */
   version?: string;
 }
-/** A go.mod in the snapshot, with its requirements and local `replace` directives. */
+/**
+ * A `replace` directive. `directory`: its destination inside the project; absent
+ * when the destination is a module path (outside the project) or a directory
+ * outside it. Every directive is kept, so precedence is decided before the
+ * destination is looked at.
+ */
+export interface GoReplacement {
+  path: string;
+  version?: string;
+  directory?: string;
+}
+/** A go.mod in the snapshot, with its requirements and `replace` directives. */
 export interface GoModule extends GoModuleRoot {
-  replacements: GoModuleRoot[];
+  replacements: GoReplacement[];
   /** `require` path -> version, as written. */
   requires: Map<string, string>;
+  /** The `go` directive, as written (absent: none). */
+  go?: string;
 }
 /** A go.work in the snapshot: its `use` directories and its local replacements. */
 export interface GoWorkspace {
   directory: string;
   uses: string[];
-  replacements: GoModuleRoot[];
+  replacements: GoReplacement[];
 }
 export interface GoProjectLayout {
   /** Deepest directory first, so the first enclosing module is the nearest. */
@@ -70,19 +83,21 @@ export const within = (directory: string, root: string): boolean =>
 function replacement(
   directory: string,
   args: string,
-): GoModuleRoot | undefined {
+): GoReplacement | undefined {
   const [from, to] = args.split("=>").map((part) => part.trim());
   const fromParts = from?.split(/\s+/) ?? [];
   const fromPath = unquote(fromParts[0] ?? "");
   const version = fromParts[1];
   const toPath = unquote(to?.split(/\s+/)[0] ?? "");
-  if (!fromPath || !(toPath.startsWith("./") || toPath.startsWith("../")))
-    return undefined;
-  const target = joinDirectory(directory, toPath);
-  if (target === undefined) return undefined;
-  return version
-    ? { directory: target, path: fromPath, version }
-    : { directory: target, path: fromPath };
+  if (!fromPath || !toPath) return undefined;
+  const local = toPath.startsWith("./") || toPath.startsWith("../");
+  // A module path, or a directory leaving the project: outside (no directory).
+  const target = local ? joinDirectory(directory, toPath) : undefined;
+  return {
+    path: fromPath,
+    ...(version ? { version } : {}),
+    ...(target === undefined ? {} : { directory: target }),
+  };
 }
 
 export function readLayout(
@@ -93,13 +108,16 @@ export function readLayout(
     if (file.status !== "clean") continue;
     const directory = directoryOf(file.path);
     const name = posix.basename(file.path);
-    const replacements: GoModuleRoot[] = [];
+    const replacements: GoReplacement[] = [];
     const requires = new Map<string, string>();
     const uses: string[] = [];
     let path: string | undefined;
+    let go: string | undefined;
     for (const { verb, args } of directives(file.text)) {
       if (verb === "module" && name === "go.mod")
         path = unquote(args.split(/\s+/)[0] ?? "") || undefined;
+      else if (verb === "go" && name === "go.mod")
+        go = args.split(/\s+/)[0] || undefined;
       else if (verb === "require") {
         const [path, version] = args.split(/\s+/);
         if (path && version) requires.set(unquote(path), version);
@@ -112,7 +130,13 @@ export function readLayout(
       }
     }
     if (name === "go.mod" && path !== undefined)
-      layout.modules.push({ directory, path, replacements, requires });
+      layout.modules.push({
+        directory,
+        path,
+        replacements,
+        requires,
+        ...(go === undefined ? {} : { go }),
+      });
     if (name === "go.work")
       layout.workspaces.push({ directory, uses, replacements });
   }
@@ -156,13 +180,21 @@ export function importPathOf(
  * from the module cache. A directory inside a different nested module than the
  * one it was mapped through is not that package.
  */
+export interface ImportDestinations {
+  /** Possible project directories of the package. */
+  directories: string[];
+  /** A possible destination is outside the project (module cache or path). */
+  outside: boolean;
+}
+
 export function directoryOfImport(
   layout: GoProjectLayout,
   importerDirectory: string,
   importPath: string,
-): string[] {
+): ImportDestinations {
+  const none: ImportDestinations = { directories: [], outside: true };
   const own = moduleOf(layout, importerDirectory);
-  if (!own) return [];
+  if (!own) return none;
   const workspace = layout.workspaces.find(
     (item) =>
       within(own.directory, item.directory) &&
@@ -177,9 +209,12 @@ export function directoryOfImport(
   // modules (since Go 1.17 the main go.mod lists every dependency at its selected
   // version, and a build whose requirements were raised fails until it does).
   // Not proven (undefined) when no main module requires the path, when a version
-  // cannot be parsed, or when another captured go.mod requires a higher version
-  // (the main requirement is then stale and selection may be higher).
+  // cannot be parsed, when another captured go.mod requires a higher version
+  // (the main requirement is then stale and selection may be higher), or when a
+  // main module's `go` directive is absent or below 1.17 (before graph pruning
+  // the main go.mod need not list indirect requirements).
   const selectedVersion = (path: string): string | undefined => {
+    if (!mains.every((main) => prunedGraph(main.go))) return undefined;
     let best: string | undefined;
     for (const main of mains) {
       const version = main.requires.get(path);
@@ -204,7 +239,10 @@ export function directoryOfImport(
   // a version-specific replacement of the selected version wins over an
   // unversioned one, whatever their order; with the version unproven, every
   // replacement that could apply is a candidate.
-  const pick = (items: GoModuleRoot[]): GoModuleRoot[] => {
+  // A destination outside the project (the module cache): a replacement with no
+  // directory, so it is kept as a candidate.
+  const cache = (path: string): GoReplacement => ({ path });
+  const pick = (items: GoReplacement[]): GoReplacement[] => {
     if (!items.length) return [];
     const plain = items.filter((item) => item.version === undefined);
     const versioned = items.filter((item) => item.version !== undefined);
@@ -212,44 +250,58 @@ export function directoryOfImport(
     const selected = selectedVersion(items[0]!.path);
     if (selected === undefined)
       // Without a plain replacement the package may come from the module cache.
-      return plain.length ? [...plain, ...versioned] : [];
+      return plain.length
+        ? [...plain, ...versioned]
+        : [...versioned, cache(items[0]!.path)];
     const hit = versioned.filter((item) => item.version === selected);
     return hit.length ? hit : plain;
   };
-  const byPath = (items: GoModuleRoot[]) => {
-    const out = new Map<string, GoModuleRoot[]>();
+  const byPath = (items: GoReplacement[]) => {
+    const out = new Map<string, GoReplacement[]>();
     for (const item of items)
       out.set(item.path, [...(out.get(item.path) ?? []), item]);
     return out;
   };
   const fromMains = byPath(mains.flatMap((main) => main.replacements));
   const fromWork = byPath(workspace?.replacements ?? []);
-  const replaced = new Map<string, GoModuleRoot[]>();
+  const replaced = new Map<string, GoReplacement[]>();
   for (const path of new Set([...fromMains.keys(), ...fromWork.keys()])) {
-    // A go.work replacement of a path overrides the modules' replacements.
-    const roots = pick(fromWork.get(path) ?? fromMains.get(path)!);
+    // A go.work replacement of a path overrides the modules' replacements of
+    // the same path (or version); when none of its replacements applies, the
+    // modules' replacements still do.
+    const work = pick(fromWork.get(path) ?? []);
+    const roots = work.length ? work : pick(fromMains.get(path) ?? []);
     if (roots.length) replaced.set(path, roots);
   }
   const matches = (path: string) =>
     importPath === path || importPath.startsWith(`${path}/`);
-  let best: { roots: GoModuleRoot[]; main?: GoModule } | undefined;
-  const consider = (roots: GoModuleRoot[], main?: GoModule) => {
+  let best: { roots: GoReplacement[]; main?: GoModule } | undefined;
+  const consider = (roots: GoReplacement[], main?: GoModule) => {
     const path = roots[0]!.path;
     if (matches(path) && (!best || path.length > best.roots[0]!.path.length))
       best = main ? { roots, main } : { roots };
   };
   for (const main of mains) consider([main], main);
   for (const roots of replaced.values()) consider(roots);
-  if (!best) return [];
-  const chosen: { roots: GoModuleRoot[]; main?: GoModule } = best;
+  if (!best) return none;
+  const chosen: { roots: GoReplacement[]; main?: GoModule } = best;
   const out: string[] = [];
+  let outside = false;
   for (const root of chosen.roots) {
+    if (root.directory === undefined) {
+      outside = true;
+      continue;
+    }
     const rest = importPath.slice(root.path.length + 1);
     const directory = joinDirectory(root.directory, rest || ".");
-    if (directory === undefined) continue;
+    if (directory === undefined) {
+      outside = true;
+      continue;
+    }
     const owner = moduleOf(layout, directory);
     if (chosen.main) {
       if (owner === chosen.main) out.push(directory);
+      else outside = true;
       continue;
     }
     // A replacement directory: the package must not sit inside a module nested below it.
@@ -257,11 +309,23 @@ export function directoryOfImport(
       owner &&
       owner.directory !== root.directory &&
       within(owner.directory, root.directory)
-    )
+    ) {
+      outside = true;
       continue;
+    }
     out.push(directory);
   }
-  return [...new Set(out)];
+  return { directories: [...new Set(out)], outside };
+}
+
+/** A `go` directive of 1.17 or later (module graph pruning). */
+function prunedGraph(go: string | undefined): boolean {
+  const match = /^1\.(\d+)(?:\.\d+)?(?:rc\d+|beta\d+)?$|^(\d+)\./.exec(
+    go ?? "",
+  );
+  if (!match) return false;
+  if (match[2] !== undefined) return Number(match[2]) > 1;
+  return Number(match[1]) >= 17;
 }
 
 /** Semantic version parts, or undefined when not a `vMAJOR.MINOR.PATCH[-pre][+build]` version. */

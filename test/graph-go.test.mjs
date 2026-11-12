@@ -26,7 +26,8 @@ async function fixtures() {
           path: name,
           text: await readFile(path, "utf8"),
           ...(name === "go.mod" ? { context: true } : {}),
-          ...(name === "broken/broken.go" ? { status: "partial" } : {}),
+          // A file that cannot be read is not valid code: it has failed.
+          ...(name === "broken/broken.go" ? { status: "failed" } : {}),
         });
       }
     }

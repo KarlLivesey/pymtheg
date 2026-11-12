@@ -22,12 +22,7 @@ import {
   type ImportFact,
   type TypeRef,
 } from "./model.js";
-import {
-  confined,
-  maskLiterals,
-  readHeaders,
-  recoveryOptions,
-} from "./recover.js";
+import { position } from "./failure.js";
 
 /** Scope nodes: each opens a lexical block whose declarations end with it. */
 const SCOPES = new Set([
@@ -48,38 +43,6 @@ const isName = (node: Node) =>
   node.type === "true" ||
   node.type === "false" ||
   node.type === "iota";
-/** A syntax error (ERROR or missing node) in `node` but not inside `inner` (its body). */
-function errorOutside(node: Node, inner: Node | null): boolean {
-  if (!node.hasError) return false;
-  const visit = (current: Node): boolean => {
-    if (
-      inner &&
-      current.startIndex >= inner.startIndex &&
-      current.endIndex <= inner.endIndex &&
-      !(
-        current.startIndex === node.startIndex &&
-        current.endIndex === node.endIndex
-      )
-    )
-      return false;
-    if (current.type === "ERROR" || current.isMissing) return true;
-    if (!current.hasError) return false;
-    for (const child of current.children)
-      if (child && visit(child)) return true;
-    return false;
-  };
-  return visit(node);
-}
-/** Top-level node kinds that are declarations (anything else is a recovery region). */
-const DECLARATIONS = new Set([
-  "import_declaration",
-  "function_declaration",
-  "method_declaration",
-  "type_declaration",
-  "var_declaration",
-  "const_declaration",
-  "comment",
-]);
 const range = (node: Node): SourceRange => ({
   start: node.startIndex,
   end: node.endIndex,
@@ -123,6 +86,66 @@ function tagValue(node: Node | null): string | null {
     return null;
   }
 }
+
+/**
+ * A channel type by the spec's rule, not the tree's shape: "the <- operator
+ * associates with the leftmost chan possible", so `chan<- chan int` is a
+ * send-only channel of `chan int` (tree-sitter nests it as `chan (<-chan int)`).
+ * The prefixes are read from the tokens; the element is the node spanning from
+ * the first non-prefix token to the end (a parenthesised element keeps its own
+ * direction). Unknown when no such node exists.
+ */
+function channelTerm(node: Node, element: (node: Node) => TypeTerm): TypeTerm {
+  const leaves: Node[] = [];
+  const collect = (current: Node) => {
+    if (current.type === "comment") return;
+    if (current.childCount === 0) leaves.push(current);
+    else for (const child of current.children) if (child) collect(child);
+  };
+  collect(node);
+  const directions: ("b" | "s" | "r")[] = [];
+  let index = 0;
+  while (index < leaves.length) {
+    const token = leaves[index]!.type;
+    const next = leaves[index + 1]?.type;
+    if (token === "<-" && next === "chan") {
+      directions.push("r");
+      index += 2;
+    } else if (token === "chan" && next === "<-") {
+      directions.push("s");
+      index += 2;
+    } else if (token === "chan") {
+      directions.push("b");
+      index += 1;
+    } else break;
+  }
+  if (!directions.length || index >= leaves.length) return UNKNOWN_TERM;
+  const start = leaves[index]!.startIndex;
+  // The outermost node from that token to the end of the channel type.
+  let found: Node | undefined;
+  const queue: Node[] = [node];
+  while (queue.length && !found) {
+    const current = queue.shift()!;
+    for (const child of current.namedChildren) {
+      if (!child) continue;
+      if (child.startIndex === start && child.endIndex === node.endIndex) {
+        found = child;
+        break;
+      }
+      queue.push(child);
+    }
+  }
+  if (!found) return UNKNOWN_TERM;
+  let term = element(found);
+  for (const direction of directions.reverse())
+    term = { k: "ch", d: direction, e: term };
+  return term;
+}
+
+/** Syntax nesting walked for links; deeper fails the file. */
+const MAX_WALK_DEPTH = 500;
+/** Type terms deeper than this are unknown (no unbounded recursion). */
+const MAX_TERM_DEPTH = 64;
 
 const unparen = (node: Node): Node => {
   let current = node;
@@ -175,10 +198,6 @@ export class GoExtractor {
   private scopes: Map<string, Desc>[] = [];
   private byKey = new Map<string, SymbolDraft>();
   private owner = "file";
-  /** Inside a declaration with a syntax error: no call/reference links (see W2-B.md). */
-  private quiet = false;
-  /** Top-level nodes that may have swallowed declarations (layer 1). */
-  private lossyRegions: SourceRange[] = [];
 
   constructor(
     private readonly path: string,
@@ -197,45 +216,26 @@ export class GoExtractor {
       range: { start: 0, end: this.text.length },
       data: fileData,
     });
+    // Only valid files reach extraction (see `syntaxFailure`): one package
+    // clause, no syntax error anywhere.
     let beforePackage = true;
-    let seenDeclaration = false;
-    let clauses = 0;
     for (const child of root.namedChildren) {
       if (child.type === "comment") {
         if (beforePackage) this.buildLine(child.text);
       } else if (child.type === "package_clause") {
         beforePackage = false;
-        clauses++;
         const name = named(child).find(
           (item) => item.type === "package_identifier",
         );
-        if (name && !name.isMissing && name.text && !child.hasError) {
+        if (name) {
           this.fact.package = name.text;
           this.fact.packageRange = range(name);
         }
       } else {
         beforePackage = false;
-        if (!DECLARATIONS.has(child.type)) {
-          // A region error recovery could not keep as a declaration. Before the
-          // first declaration it may hold imports.
-          this.lossy(child);
-          if (!seenDeclaration) this.fact.importsBroken = true;
-        } else {
-          if (child.hasError && !confined(child)) this.lossy(child);
-          if (child.type !== "import_declaration") seenDeclaration = true;
-        }
-        this.topLevel(child);
+        this.declaration(child);
       }
     }
-    // Layer 1: without one readable package clause (none, an unreadable one, or
-    // two) the file joins no package, so nothing it declares is trusted; every
-    // package of its directory may be missing its declarations (see the resolver).
-    if (clauses > 1) {
-      delete this.fact.package;
-      delete this.fact.packageRange;
-    }
-    if (this.fact.package === undefined) this.lossy(root);
-    if (this.fact.lossy && recoveryOptions.enabled) this.recoverAll();
     // Live local bindings become plain JSON only now that every write has been seen.
     for (const link of this.links) {
       const expr = (link.data as { expr?: Desc } | undefined)?.expr;
@@ -288,7 +288,6 @@ export class GoExtractor {
     data?: { [key: string]: Json },
     source = this.owner,
   ): void {
-    if (this.quiet && (kind === "calls" || kind === "references")) return;
     this.links.push({
       sourceKey: source,
       kind,
@@ -402,89 +401,11 @@ export class GoExtractor {
 
   // ---- declarations ------------------------------------------------------
 
-  /**
-   * Layer 2, precision only: declaration headers read from the text of the lossy
-   * regions, with comments and string, raw-string and rune literals masked first
-   * (the mask runs over the whole file, so literal state is always known). Each
-   * header becomes a `data.broken`, `data.recovered` symbol: a stable ID, and a
-   * possible (never definite) member or candidate; it gets no links. A header
-   * whose identity an intact declaration of this file already has is skipped, so
-   * no intact symbol's ID changes. Anything unreadable stays with layer 1.
-   */
-  private recoverAll(): void {
-    const masked = maskLiterals(this.text);
-    const taken = new Set(this.symbols.map((symbol) => symbol.identity));
-    const broken = { broken: true, recovered: true } as const;
-    const emit = (
-      kind: string,
-      name: string,
-      identity: string,
-      span: SourceRange,
-      data: { [key: string]: Json },
-    ) => {
-      if (taken.has(identity)) return;
-      taken.add(identity);
-      this.symbol(kind, name, identity, span, { ...data, ...broken });
-    };
-    for (const region of this.lossyRegions)
-      for (const header of readHeaders(masked, region.start, region.end)) {
-        // A lossy file's imports are already unknown (layer 1); recovery never
-        // changes what the resolver knows about imports.
-        if (header.kind === "import") continue;
-        if (header.kind === "unreadable") {
-          this.diagnostics.push({
-            message:
-              "Unreadable method header in a syntax error: its receiver is unknown",
-            range: header.span,
-          });
-          continue;
-        }
-        if (header.kind === "method")
-          emit(
-            "method",
-            header.name,
-            `(${header.pointer ? "*" : ""}${header.receiver}).${header.name}`,
-            header.span,
-            { receiver: header.receiver!, pointer: !!header.pointer },
-          );
-        else if (header.kind === "var" || header.kind === "const")
-          emit(header.kind, header.name, header.name, header.span, {
-            d: { k: "unknown" },
-          });
-        else emit(header.kind, header.name, header.name, header.span, {});
-      }
-  }
-
-  /**
-   * Layer 1 (see W2-B.md, "Declaration-lossy files"): this top-level node may have
-   * swallowed declarations. Decided from the tree alone; the file's package is then
-   * treated as possibly holding unseen declarations. The node's span is kept for
-   * the precision-only recovery (layer 2).
-   */
-  private lossy(node: Node): void {
-    this.fact.lossy = true;
-    this.lossyRegions.push({ start: node.startIndex, end: node.endIndex });
-  }
-
-  private topLevel(node: Node): void {
-    if (node.type === "ERROR") return;
-    const previous = this.quiet;
-    this.quiet = node.hasError;
-    try {
-      this.declaration(node);
-    } finally {
-      this.quiet = previous;
-    }
-  }
-
   private declaration(node: Node): void {
     switch (node.type) {
       case "import_declaration":
-        // A broken import declaration: its recovered specs cannot be trusted, and
-        // unmatched qualifiers in this file may name a lost project import.
-        if (node.hasError) this.fact.importsBroken = true;
         for (const spec of node.descendantsOfType("import_spec"))
-          if (spec && !spec.hasError) this.importSpec(spec);
+          if (spec) this.importSpec(spec);
         return;
       case "function_declaration":
         return this.functionDeclaration(node);
@@ -554,12 +475,8 @@ export class GoExtractor {
     const result = node.childForFieldName("result");
     const typeParameters = node.childForFieldName("type_parameters");
     const scope = this.typeParams(typeParameters);
-    // A header with a syntax error: its recovered signature is not trusted.
-    const header = errorOutside(node, node.childForFieldName("body"));
     const key = this.symbol("function", name.text, name.text, range(node), {
-      ...(header
-        ? { broken: true }
-        : this.signatureData(parameters, result, scope)),
+      ...this.signatureData(parameters, result, scope),
       ...(scope.size ? { generic: true } : {}),
     });
     this.contains("file", key, range(node));
@@ -597,15 +514,10 @@ export class GoExtractor {
     const identity = `(${pointer ? "*" : ""}${receiverType}).${name.text}`;
     const parameters = node.childForFieldName("parameters");
     const result = node.childForFieldName("result");
-    // A header with a syntax error (receiver, parameters, results): not trusted;
-    // the receiver type's structure then counts as unknown in resolution.
-    const header = errorOutside(node, node.childForFieldName("body"));
     const key = this.symbol("method", name.text, identity, range(node), {
       receiver: receiverType,
       pointer,
-      ...(header
-        ? { broken: true }
-        : this.signatureData(parameters, result, scope)),
+      ...this.signatureData(parameters, result, scope),
     });
     this.contains("file", key, range(node));
     this.within(key, () =>
@@ -665,16 +577,18 @@ export class GoExtractor {
     const data: { [key: string]: Json } = {};
     if (scope.size) data.generic = true;
     if (local !== undefined) data.local = true;
-    // Inside a declaration with a syntax error: the recovered structure (fields,
-    // embeddings, interface elements, underlying type) is not trusted.
-    if (this.quiet) data.broken = true;
     const key = this.symbol(kind, symbolName, symbolName, range(spec), data);
     this.contains(local !== undefined ? this.owner : "file", key, range(spec));
-    if (this.quiet) return;
     this.within(key, () =>
       this.scoped(() => {
         this.walkTypeParams(typeParameters);
         const literal = unparen(type);
+        // An alias is its target: kept as the full type term that identity
+        // compares (never a reduced base name). A generic alias is unknown.
+        if (kind === "alias")
+          data.target = (typeParameters
+            ? UNKNOWN_TERM
+            : this.typeTerm(type)) as unknown as Json;
         if (kind === "alias" || kind === "type") {
           const underlying = this.typeRef(type);
           if (underlying) data.underlying = { ...underlying };
@@ -880,10 +794,7 @@ export class GoExtractor {
       .filter((item): item is Node => !!item);
     const type = spec.childForFieldName("type");
     const values = named(spec.childForFieldName("value"));
-    // A spec with a syntax error: its type and value are not trusted.
-    const descs = spec.hasError
-      ? names.map((): Desc => ({ k: "unknown" }))
-      : this.specDescs(names, type, values);
+    const descs = this.specDescs(names, type, values);
     const keys = names.map((name, index) =>
       name.text === "_"
         ? "file"
@@ -952,11 +863,15 @@ export class GoExtractor {
    * types expanded to their arity (grouped names count one each), names
    * dropped, the final `...T` parameter marked variadic.
    */
-  private functionTerm(parameters: Node | null, result: Node | null): TypeTerm {
+  private functionTerm(
+    parameters: Node | null,
+    result: Node | null,
+    depth = 0,
+  ): TypeTerm {
     const list = (node: Node | null): TypeTerm[] =>
       named(node).flatMap((parameter) => {
         const type = parameter.childForFieldName("type");
-        const item = type ? this.typeTerm(type) : UNKNOWN_TERM;
+        const item = type ? this.typeTerm(type, depth + 1) : UNKNOWN_TERM;
         const term: TypeTerm =
           parameter.type === "variadic_parameter_declaration"
             ? { k: "sl", e: item }
@@ -975,7 +890,7 @@ export class GoExtractor {
         result?.type === "parameter_list"
           ? list(result)
           : result
-            ? [this.typeTerm(result)]
+            ? [this.typeTerm(result, depth + 1)]
             : [],
       ...(variadic ? { v: true } : {}),
     };
@@ -987,11 +902,13 @@ export class GoExtractor {
    * qualifier; the resolver binds them to declarations. Anything this cannot
    * represent exactly is `UNKNOWN_TERM`, never a guess.
    */
-  private typeTerm(node: Node): TypeTerm {
+  private typeTerm(node: Node, depth = 0): TypeTerm {
+    // Very deep (finite) nesting: unknown rather than unbounded recursion.
+    if (depth > MAX_TERM_DEPTH) return UNKNOWN_TERM;
     const current = unparen(node);
     const field = (name: string) => current.childForFieldName(name);
     const of = (child: Node | null): TypeTerm =>
-      child ? this.typeTerm(child) : UNKNOWN_TERM;
+      child ? this.typeTerm(child, depth + 1) : UNKNOWN_TERM;
     switch (current.type) {
       case "type_identifier": {
         const bound = this.local(current.text);
@@ -1015,6 +932,7 @@ export class GoExtractor {
         const args = named(field("type_arguments")).map((item) =>
           this.typeTerm(
             item.type === "type_elem" ? (named(item)[0] ?? item) : item,
+            depth + 1,
           ),
         );
         return base.k === "n" ? { ...base, a: args } : UNKNOWN_TERM;
@@ -1031,14 +949,16 @@ export class GoExtractor {
         };
       case "map_type":
         return { k: "map", key: of(field("key")), e: of(field("value")) };
-      case "channel_type": {
-        const tokens = current.children.map((child) => child?.type);
-        const dir =
-          tokens[0] === "<-" ? "r" : tokens.includes("<-") ? "s" : "b";
-        return { k: "ch", d: dir, e: of(field("value")) };
-      }
+      case "channel_type":
+        return channelTerm(current, (element) =>
+          this.typeTerm(element, depth + 1),
+        );
       case "function_type":
-        return this.functionTerm(field("parameters"), field("result"));
+        return this.functionTerm(
+          field("parameters"),
+          field("result"),
+          depth + 1,
+        );
       case "struct_type": {
         const fields: StructFieldTerm[] = [];
         const list = named(current).find(
@@ -1087,6 +1007,7 @@ export class GoExtractor {
               s: this.functionTerm(
                 element.childForFieldName("parameters"),
                 element.childForFieldName("result"),
+                depth + 1,
               ),
             });
           } else if (element.type === "type_elem") {
@@ -1094,7 +1015,7 @@ export class GoExtractor {
             // A union or `~T` makes a type set: not compared.
             if (parts.length !== 1 || parts[0]!.type === "negated_type")
               return UNKNOWN_TERM;
-            embeds.push(this.typeTerm(parts[0]!));
+            embeds.push(this.typeTerm(parts[0]!, depth + 1));
           } else if (element.type !== "comment") return UNKNOWN_TERM;
         }
         return { k: "if", m: methods, e: embeds };
@@ -1117,8 +1038,19 @@ export class GoExtractor {
     });
   }
 
-  /** What is known about a value of the written type. */
+  private typedDepth = 0;
+  /** What is known about a value of the written type (depth-bounded). */
   private typedValue(node: Node): Desc {
+    if (this.typedDepth >= MAX_TERM_DEPTH) return { k: "local" };
+    this.typedDepth++;
+    try {
+      return this.typedValueOf(node);
+    } finally {
+      this.typedDepth--;
+    }
+  }
+
+  private typedValueOf(node: Node): Desc {
     const current = unparen(node);
     const field = (name: string) => current.childForFieldName(name);
     const of = (child: Node | null): Desc =>
@@ -1188,7 +1120,19 @@ export class GoExtractor {
   // ---- expressions -------------------------------------------------------
 
   /** Syntactic description of an expression's value; never consults other files. */
+  private descDepth = 0;
+  /** An expression's description (depth-bounded: deeper is unknown). */
   private desc(node: Node): Desc {
+    if (this.descDepth >= MAX_TERM_DEPTH) return { k: "unknown" };
+    this.descDepth++;
+    try {
+      return this.descOf(node);
+    } finally {
+      this.descDepth--;
+    }
+  }
+
+  private descOf(node: Node): Desc {
     const current = unparen(node);
     switch (current.type) {
       case "nil":
@@ -1310,7 +1254,30 @@ export class GoExtractor {
     for (const child of node.namedChildren) if (child) this.walk(child);
   }
 
+  private walkDepth = 0;
+  /**
+   * Set when nesting is deeper than `MAX_WALK_DEPTH`: the file cannot be read in
+   * full, so it fails like a file with a syntax error (index.ts).
+   */
+  truncated: Diagnostic | undefined;
+
   private walk(node: Node): void {
+    if (this.walkDepth >= MAX_WALK_DEPTH) {
+      this.truncated ??= {
+        message: `${position(this.text, node.startIndex)}: nesting deeper than ${MAX_WALK_DEPTH} levels`,
+        range: range(node),
+      };
+      return;
+    }
+    this.walkDepth++;
+    try {
+      this.walkNode(node);
+    } finally {
+      this.walkDepth--;
+    }
+  }
+
+  private walkNode(node: Node): void {
     if (SCOPES.has(node.type)) {
       this.scoped(() => this.walkChildren(node));
       return;
@@ -1637,9 +1604,7 @@ export class GoExtractor {
         field.type === "field_declaration" &&
         !field.childrenForFieldName("name").length,
     );
-    // Inside a broken declaration recovery may have dropped embeddings: every
-    // anonymous struct there is a symbol of unknown structure.
-    if (!embeds && !this.quiet) return this.walkChildren(node);
+    if (!embeds) return this.walkChildren(node);
     const enclosing = this.byKey.get(this.owner)?.identity ?? "file";
     let name: string;
     if (localName !== undefined)
@@ -1651,17 +1616,15 @@ export class GoExtractor {
     }
     const key = this.symbol("struct", name, name, range(node), {
       local: true,
-      ...(this.quiet ? { broken: true } : {}),
     });
     this.contains(this.owner, key, range(node));
-    if (this.quiet) return;
     this.within(key, () => this.structFields(name, key, node));
   }
 
   /** A use of a predeclared name: a link only if a package declaration shadows it. */
   private predeclared(node: Node, kind: "value" | "type" | "call"): void {
     // A local of that name is in scope: not the predeclared identifier, not linked.
-    if (this.quiet || this.local(node.text)) return;
+    if (this.local(node.text)) return;
     (this.fact.predeclared ??= []).push({
       n: node.text,
       k: kind,
