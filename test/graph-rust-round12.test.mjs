@@ -119,13 +119,19 @@ for (const name of ["derive", "global_allocator"]) {
       undefined,
     );
   });
-  test(`known limit E4: named unseen macro_use does not shadow ${name}`, async () => {
+  test(`E4: named unseen macro_use visibly shadows ${name}`, async () => {
+    // rustc accepts the replacement attribute and calls Tr::f (u16), not the input f.
     const g = await graph(
       lib(
-        `#[macro_use(${name})]extern crate pm;struct A;#[${name}]impl A{pub fn f(self)->u8{1}}fn run(a:A){a.f();}`,
+        `#[macro_use(${name})]extern crate pm;pub struct A;pub trait Tr{fn f(self)->u16;}impl Tr for A{fn f(self)->u16{2}}#[${name}${name === "derive" ? "(Clone)" : ""}]impl A{pub fn f(self)->u8{1}}pub fn run(a:A)->u16{a.f()}`,
       ),
     );
-    g.one("a.f", "impl A::f");
+    g.unverified("a.f", "impl A::f");
+    assert.equal(
+      g.symbols.find((s) => s.identity === "impl A::f").data
+        .underOpaqueAttribute,
+      true,
+    );
   });
   test(`E4 policy: unseen item output does not shadow ${name}`, async () => {
     // A captured replacement export itself is not assumed to be an expansion.
@@ -364,4 +370,38 @@ test("E4 captured export alias expansion is bounded by import edges", async () =
     },
   );
   assert.ok(g.links.length);
+});
+
+test("named unseen macro_use(test) is opaque even in cfg(test) caller", async () => {
+  // rustc: pm::test can replace this impl; cfg(test) does not prove the input exists.
+  const g = await graph(
+    lib(
+      `#[macro_use(test)]extern crate pm;struct A;#[test]impl A{pub fn f(self)->u8{1}}#[cfg(test)]fn run(a:A){a.f();}`,
+    ),
+  );
+  g.unverified("a.f", "impl A::f");
+  assert.equal(
+    g.symbols.find((s) => s.identity === "impl A::f").data.underOpaqueAttribute,
+    true,
+  );
+});
+test("unsupported TOML datetime leaves inherited edition unverified", async () => {
+  const g = await graph(
+    {
+      "app/src/lib.rs": `mod a{pub fn f()->u16{2}}mod b{mod a{pub fn f()->u8{1}}use a::f;pub fn run(){f();}}`,
+    },
+    {
+      "Cargo.toml":
+        '[workspace]\nmembers=["app"]\n[workspace.package]\nedition="2024"\n[workspace.metadata]\ncreated=1979-05-27T07:32:00Z\n',
+      "app/Cargo.toml": '[package]\nname="app"\nedition.workspace=true\n',
+    },
+  );
+  g.unknown("f");
+  const calls = g.links.filter(
+    (l) => l.kind === "calls" && l.targetName === "f",
+  );
+  assert.ok(calls.length);
+  assert.ok(
+    calls.every((l) => l.data.uncertainty.includes("edition-unverified")),
+  );
 });

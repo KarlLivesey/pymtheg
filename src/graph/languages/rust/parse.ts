@@ -700,7 +700,6 @@ async function createHelper(): Promise<Helper> {
                 (["use_declaration", "macro_definition"].includes(n.type) ||
                   (n.type === "extern_crate_declaration" &&
                     names.includes(name) &&
-                    attributeRules.get(name)?.shadowing !== "visible" &&
                     attributesOn(n).some((a) => meta(a).name === "macro_use"))))
             )
               v.names.add(name);
