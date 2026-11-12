@@ -547,6 +547,8 @@ export function resolveRust(
           conditions = conditions.filter((c) => c !== gate.condition);
         else if (!conditions.includes(gate.condition))
           conditions = [...conditions, gate.condition];
+    if (data(s).macroPathCondition)
+      conditions = [...conditions, str(data(s).macroPathCondition)];
     return contextOf(s)?.implicit.length
       ? [...new Set(conditions)].sort()
       : conditions;
@@ -828,6 +830,43 @@ export function resolveRust(
   for (const s of symbols) {
     if (members.has(`${s.file}|${str(data(s).scope)}`)) continue;
     for (const loc of ownerPlace(s.file, str(data(s).scope))) {
+      if (data(s).macroRules) {
+        const exports = (data(s).macroExportConditions ?? []) as string[][];
+        if (exports.length) {
+          const k = key(loc.crate.root, s.name);
+          const residual = exports.map((cs) =>
+            cs.filter((c) => !implies(conditionsFor(s), c)),
+          );
+          const exportCondition = residual.some((cs) => !cs.length)
+            ? []
+            : [
+                residual.length === 1 && residual[0]!.length === 1
+                  ? residual[0]![0]!
+                  : `any(${residual.map((cs) => `all(${cs.join(",")})`).join(",")})`,
+              ];
+          const pathConditions = [
+            ...(loc.conditions ?? []).filter(
+              (c) => !implies(conditionsFor(s), c),
+            ),
+            ...exportCondition,
+          ];
+          const exported = {
+            ...s,
+            data: {
+              ...data(s),
+              visibility: "pub",
+              macroPathCondition:
+                pathConditions.length === 1
+                  ? pathConditions[0]!
+                  : pathConditions.length
+                    ? `all(${pathConditions.join(",")})`
+                    : "",
+            },
+          };
+          table.set(k, unique([...(table.get(k) ?? []), exported]));
+        }
+        continue;
+      }
       if (data(s).unit && loc.scope) continue;
       const q = data(s).unit
         ? loc.scope
@@ -855,6 +894,120 @@ export function resolveRust(
         table.set(aliasKey, unique([...(table.get(aliasKey) ?? []), s]));
       }
     }
+  }
+  const activeMacroImports: GraphLink[] = [];
+  type TextMacro = {
+    symbol: GraphSymbol;
+    file: string;
+    scope: string;
+    start: number;
+    order: number[];
+  };
+  const textMacros: TextMacro[] = symbols
+    .filter((s) => data(s).macroRules)
+    .map((symbol) => ({
+      symbol,
+      file: symbol.file,
+      scope: str(data(symbol).scope),
+      start: symbol.range.end,
+      order: [symbol.range.end],
+    }));
+  // macro_use transfers a module's ending textual scope, recursively across
+  // captured module files. Source order within that ending scope is retained.
+  const modules = symbols.filter((s) => s.kind === "module" && !data(s).unit);
+  const directText = [...textMacros];
+  function bodyContains(
+    m: GraphSymbol,
+    e: { file: string; scope: string },
+  ): boolean {
+    return data(m).inline
+      ? e.file === m.file && e.scope === m.identity
+      : (moduleTargets.get(m.id) ?? []).some(
+          (t) => t.file === e.file && e.scope === "",
+        );
+  }
+  function importedText(m: GraphSymbol, seen = new Set<string>()): TextMacro[] {
+    const guards = (data(m).macroUseConditions ?? []) as string[][];
+    if (!guards.length || seen.has(m.id)) return [];
+    seen = new Set([...seen, m.id]);
+    const entries = [
+      ...directText.filter((e) => bodyContains(m, e)),
+      ...modules
+        .filter((child) =>
+          bodyContains(m, { file: child.file, scope: str(data(child).scope) }),
+        )
+        .flatMap((child) => importedText(child, seen)),
+    ];
+    return entries.map((entry) => ({
+      symbol: {
+        ...entry.symbol,
+        data: {
+          ...data(entry.symbol),
+          macroPathCondition: `all(${[...conditionsFor(m), str(data(entry.symbol).macroPathCondition) || "all()", `any(${guards.map((cs) => `all(${cs.join(",")})`).join(",")})`].join(",")})`,
+        },
+      },
+      file: m.file,
+      scope: str(data(m).scope),
+      start: m.range.end,
+      order: [m.range.end, ...entry.order],
+    }));
+  }
+  for (const m of modules) textMacros.push(...importedText(m));
+  const textMacrosByName = new Map<string, TextMacro[]>();
+  for (const entry of textMacros)
+    textMacrosByName.set(entry.symbol.name, [
+      ...(textMacrosByName.get(entry.symbol.name) ?? []),
+      entry,
+    ]);
+  function textualMacro(
+    name: string,
+    site: GraphLink,
+    loc: Place,
+    scope: string,
+  ): Found | null {
+    const entries = (textMacrosByName.get(name) ?? [])
+      .filter(
+        (e) =>
+          e.file === site.file &&
+          e.start <= site.range.start &&
+          (!e.scope || e.scope === scope || scope.startsWith(e.scope + "::")) &&
+          possible([...(loc.conditions ?? []), ...conditionsFor(e.symbol)]),
+      )
+      .sort(
+        (a, b) =>
+          b.scope.length - a.scope.length ||
+          b.start - a.start ||
+          a.order.reduce((diff, v, i) => diff || (b.order[i] ?? 0) - v, 0),
+      );
+    const targets: GraphSymbol[] = [];
+    for (const entry of entries) {
+      targets.push(entry.symbol);
+      if (present(targets, loc)) break;
+    }
+    return targets.length
+      ? conditional({ symbols: unique(targets), complete: true }, targets, loc)
+      : null;
+  }
+  function macroLookup(
+    name: string,
+    site: GraphLink,
+    loc: Place,
+    scope: string,
+  ): Found {
+    const textual = !name.includes("::")
+      ? textualMacro(name, site, loc, scope)
+      : null;
+    if (textual?.complete) return textual;
+    const path = find(name, loc, scope, "macro");
+    // Cross-crate/proc-macro expansion paths remain outside this chunk.
+    path.symbols = path.symbols.filter(
+      (s) =>
+        ownerPlace(s.file, str(data(s).scope)).some(
+          (p) => p.crate.root === loc.crate.root,
+        ) &&
+        (s.kind === "macro" || s.file === site.file),
+    );
+    return textual ? merge([textual, path]) : path;
   }
   const importsByScope = new Map<
     string,
@@ -1257,6 +1410,7 @@ export function resolveRust(
       suffixes.push(suffix.length);
       importExpansions.set(expansionKey, suffixes);
       try {
+        activeMacroImports.push(l);
         return findUsePath(
           [l.targetName, ...suffix].join("::"),
           {
@@ -1271,6 +1425,7 @@ export function resolveRust(
           !l.targetName.includes("::") && data(l).alias === l.targetName,
         );
       } finally {
+        activeMacroImports.pop();
         suffixes.pop();
         if (!suffixes.length) importExpansions.delete(expansionKey);
       }
@@ -1415,8 +1570,44 @@ export function resolveRust(
     externCrate = false,
     selfBinding = false,
   ): Found {
+    const at = activeMacroImports.at(-1);
+    if (namespace === "import" && at)
+      return merge(
+        (["importType", "value", "macro"] as Namespace[]).map((ns) =>
+          findUsePath(
+            raw,
+            loc,
+            scope,
+            ns,
+            seen,
+            allowGlobs,
+            externCrate,
+            selfBinding,
+          ),
+        ),
+      );
     const lookup = (path: string) =>
       find(path, loc, scope, namespace, seen, allowGlobs);
+    if (
+      namespace === "macro" &&
+      !raw.includes("::") &&
+      loc.crate.edition !== "2015"
+    ) {
+      // Modern unqualified macro imports may capture a textual macro already
+      // in scope. Qualified imports and edition 2015 use path lookup only.
+      const at = activeMacroImports.at(-1);
+      if (at) {
+        const textual = textualMacro(raw, at, loc, scope);
+        if (textual?.complete && loc.crate.edition) return textual;
+        if (textual)
+          return {
+            ...merge([textual, lookup(raw)]),
+            ...(loc.crate.edition
+              ? {}
+              : { complete: false, reason: "edition-unverified" }),
+          };
+      }
+    }
     if (externCrate) return lookup("$extern::" + raw);
     const rooted = () =>
       lookup(
@@ -2765,17 +2956,26 @@ export function resolveRust(
                     : "import";
           let result =
             l.kind === "imports"
-              ? findUsePath(
-                  name,
-                  loc,
-                  scope,
-                  ns,
-                  new Set(),
-                  true,
-                  !!d.externCrate,
-                  !name.includes("::") && d.alias === name,
-                )
-              : find(name, loc, scope, ns);
+              ? (() => {
+                  activeMacroImports.push(l);
+                  try {
+                    return findUsePath(
+                      name,
+                      loc,
+                      scope,
+                      ns,
+                      new Set(),
+                      true,
+                      !!d.externCrate,
+                      !name.includes("::") && d.alias === name,
+                    );
+                  } finally {
+                    activeMacroImports.pop();
+                  }
+                })()
+              : l.kind === "macros"
+                ? macroLookup(name, l, loc, scope)
+                : find(name, loc, scope, ns);
           const callableFound = result.symbols.some((s) =>
             ["function", "method", "struct", "variant"].includes(s.kind),
           );
@@ -2865,15 +3065,6 @@ export function resolveRust(
         reason: "conditional-binding-may-shadow-name",
       };
     }
-    if (l.kind === "macros")
-      found.symbols = found.symbols.filter(
-        (s) =>
-          s.file === l.file &&
-          s.range.start < l.range.start &&
-          (!data(s).scope ||
-            str(d.scope) === str(data(s).scope) ||
-            str(d.scope).startsWith(str(data(s).scope) + "::")),
-      );
     if (
       !found.symbols.length &&
       !found.failedFiles?.length &&

@@ -9,7 +9,7 @@ const TARGET_HINT_LIMIT = 16;
 
 const rust: LanguageModule = {
   id: "rust",
-  version: "14",
+  version: "15",
   extensions: [".rs"],
   contextFiles: ["Cargo.toml"],
   parse: parseRust,

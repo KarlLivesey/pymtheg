@@ -163,7 +163,7 @@ test("effective named macro_use shadows attributes in a child module", async () 
 for (const [pred, visibility] of [
   ["all()", "pub"],
   ["any()", "private"],
-  ['feature="x"', "pub"],
+  ['feature="x"', "private"],
 ])
   test(`effective macro_export ${pred}`, async () => {
     const g = await graph(
@@ -180,11 +180,19 @@ for (const [pred, identity] of [
 ])
   test(`effective path ${pred}`, async () => {
     const g = await graph({
-      "src/lib.rs": `#[cfg_attr(${pred},path="alt.rs")]mod selected;fn run(){selected::${identity.split("::")[1]}();}`,
-      "src/alt.rs": "pub fn alternate(){}",
-      "src/selected.rs": "pub fn ordinary(){}",
+      "src/lib.rs": `#[cfg_attr(${pred},path="alt.rs")]mod selected;fn run(){selected::picked();}`,
+      "src/alt.rs": "pub fn picked()->u8{2}",
+      "src/selected.rs": "pub fn picked()->u8{1}",
     });
-    g.one(identity, identity.split("::")[1]);
+    g.one("selected::picked", "picked");
+    const call = g.links.find(
+      (l) => l.kind === "calls" && l.targetName === "selected::picked",
+    );
+    const target = g.decisions.find((d) => d.linkId === call.id).targetId;
+    assert.equal(
+      g.symbols.find((s) => s.id === target).file,
+      pred === "all()" ? "src/alt.rs" : "src/selected.rs",
+    );
   });
 
 test("bare macro_use extern crate alias is not an attribute namespace binding", async () => {

@@ -1535,10 +1535,22 @@ async function createHelper(): Promise<Helper> {
                         ).length,
                     }
                   : {}),
+                ...(actualKind === "macro"
+                  ? {
+                      macroRules: true,
+                      macroExportConditions: effectiveAttributes(n)
+                        .filter((a) => a.meta.name === "macro_export")
+                        .map((a) => a.guards),
+                    }
+                  : {}),
                 visibility:
                   actualKind === "macro" &&
                   effectiveAttributes(n).some(
-                    (a) => a.meta.name === "macro_export",
+                    (a) =>
+                      a.meta.name === "macro_export" &&
+                      a.guards.every((c) =>
+                        implies(explicitConditionsOn(n), c),
+                      ),
                   )
                     ? "pub"
                     : (n.namedChildren.find(
@@ -1562,6 +1574,9 @@ async function createHelper(): Promise<Helper> {
                 ...(n.type === "mod_item"
                   ? {
                       inline: !!field(n, "body"),
+                      macroUseConditions: effectiveAttributes(n)
+                        .filter((a) => a.meta.name === "macro_use")
+                        .map((a) => a.guards),
                       ...modulePath(n),
                     }
                   : {}),
