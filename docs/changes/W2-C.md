@@ -1,7 +1,7 @@
 # W2-C: Rust language module for the code graph
 
 This is the **no-toolchain fallback** under D16. Precise compiler-backed Rust
-resolution belongs to a later chunk. Version 7 uses the installed Rust WASM
+resolution belongs to a later chunk. Version 8 uses the installed Rust WASM
 grammar through the shared Tree-sitter helper and supplied source/manifest
 snapshots only. Runtime, installation and tests never invoke Cargo/rustc, read
 project files, expand macros or add dependencies. Private items are ordinary
@@ -35,13 +35,15 @@ syntax-only oracle is not a claim to have typechecked all of Vector.
 | Associated path calls | A proved inherent name wins over traits. A sole family with omitted arguments can support name lookup before inference; explicit generic arguments cannot use that shortcut. Unknown alternative inherent impls block proof |
 | Dot calls | Definite ONLY a unique proved inherent first-probe match. Everything else is unresolved-with-targets, with no closed dot-call candidate sets |
 | Trait-only associated calls | Unresolved-with-targets: captured bodies/defaults are would-be targets, not proof of dispatch |
-| Conditional code | All captured branches retained; no feature selection. Complete namespace/path alternatives may be candidates. Dot cfg twins remain unverified, including bounded alternatives |
+| Conditional code | One collector combines outer/inner cfg/cfg_attr, enclosing items, crate/module-file conditions and parent mod declarations. Statement/expression/binding/field/variant/arm/parameter gates are retained. Caller implication is same-crate only; no feature selection. Unknown predicates never prove a link. Complete namespace/path alternatives may be candidates; dot twins remain unverified |
 | Macros/attributes | Local active macro_rules invocations link; macro_export records public visibility. Token trees are not expanded/extracted. Statement tokens and opaque block item generation can invalidate binding evidence; opaque item generation can shadow namespace fallback |
 | Std/external/generated declarations | Unresolved; no compiler or filesystem fallback |
 
 Associated const/projection lookup, qualified `<T as Trait>::f`, custom receiver
 adjustment, general autoderef/unsizing, substitution/inference/bounds solving,
 trait-in-scope precision and generated declarations are not implemented.
+Cargo feature-enabling/dependency relationships are not inferred: cfg implication
+uses captured Rust predicates, not a Cargo feature graph.
 Cross-file macro exports/imports, external glob beside project glob, Copy receiver
 refinement, inner/outer macro ordering, where clauses in impl identity text and a
 glob import's own link remain the manager-listed backlog.
@@ -250,7 +252,7 @@ Links by kind: `{"calls": 134752, "contains": 33870, "implements": 2999, "import
 
 Top unresolved: `[["Some", 7810], ["assert_eq", 7414], ["String", 4464], ["None", 4407], ["Option", 4311], ["assert", 3904], ["Ok", 3815], ["Vec", 3118], ["vec", 2431], ["Result", 2209]]`.
 
-## Round 6 review response (current head)
+## Round 6 review response (3dba60a8)
 
 `origin/main` was merged normally (dcf83424), then refreshed by normal merge 7e46fde0 (upstream fe0d5b8c changes only the build-plan ledger; executable source/test hashes are unchanged). Runtime version is 7; no core, dependency or other-language edits. The module remains the D16 no-toolchain fallback.
 
@@ -297,3 +299,42 @@ Fresh seeded source inspection: **30 definite, 15 restored, 15 closed sets, 15 u
 **31 native controls, 32 mutations killed.** Required checks ran sequentially: npm ci --ignore-scripts; supplied PYM_TLC_JAR npm test (**1,578 pass, 0 skipped**); format:check; Rust tests (**180 pass, 0 skipped**). All exit 0. Draft cancellations are explicitly not passes (round7-development-attempts.json).
 
 Loaded-machine observations: direct module parse 37.4s, analysis 30.0s, resolve 26.1s, total 105.9s. Real store total 232.9s; parse 33.5s, analysis 28.7s, resolve 27.0s; peak RSS 5,134,984 KiB. Timings are observations, not assertions.
+
+## Round 7 review response (current head)
+
+Normal merges of current origin/main: 3400dd82 and 89d77a13. Rust runtime version 8. Same owned paths; no core, dependency or other-language edits. D16 no-toolchain scope is unchanged.
+
+- **Opus B1 — glob precedence:** first-segment binding presence is independent of member-lookup completeness. Present declarations and explicit imports exclude glob fallback, including function/block scopes, child super globs, type/value/macro/import/pattern lookup. Conditional absence still keeps alternatives; enum globs supply variants, not associated members. Site audit: round8-scope-audit.md.
+- **Sol S1 — inner cfg and every site:** one cached collector combines outer/inner cfg/cfg_attr and all enclosing AST gates. Module-file/root gates are combined with parent declarations. Same-crate caller implication remains structural; dependency feature names are independent. Conditional local/parameter bindings and conditional self parameters cannot prove presence. Fields, variants, arms, statements/expressions and block uses consume the same collector. Unknown cfg predicates remain unverified. Exact/sufficient caller conjuncts are proved before bounded full-DNF expansion, so unrelated complex predicates do not erase ordinary proved links.
+- **Small backlog:** cfg-twin failed scopes cannot accuse every failed file; internal-parser-error paths use a path/parser reason without a receiver-type prefix. Both have killed mutations.
+
+## Whole Vector
+
+Fresh scratch clone at 515e87d9861b564f521a8992d224892cd8cae120; all *.rs through production indexer and fresh schema-3 store at the default Node heap. execArgv [], NODE_OPTIONS ''. All direct/store states, IDs and metadata are equal.
+
+| Fact | 3dba60a8 | New |
+|---|---:|---:|
+| Claimed / clean / partial / failed | 1,563 / 1,552 / 0 / 11 | 1,563 / 1,552 / 0 / 11 |
+| Symbols | 35,422 | 35,422 |
+| Links | 365,514 | 365,514 |
+| Definite | 75,950 | 76,125 |
+| Closed sets | 88 | 90 |
+| Unresolved | 289,476 | 289,299 |
+| invalid-code | 247 | 247 |
+| Failed-file uncertainty annotations | 175,075 | 175,056 |
+
+Link-by-link **180 gains / 5 withdrawals / 0 retargets**. Kind/reason transitions and every changed decision are retained in round8-movement-*.json. All five withdrawals were inspected: two are contradictory unix/not(unix) field branches inside an already unix-only module; three require a Cargo feature-enabling relationship that is not a captured Rust predicate implication. The two new closed sets are local os_signals unix/windows functions, both captured; all 88 old closed sets remain. See round8-withdrawal-classification.json and round8-new-closed-sets.json. The same-module ablation (all fixes retained except leading inner attributes) moves 13 decisions: 10 restored and 3 made uncertain; no retargets. The other 170 gains come from glob/name precedence, outer/site gates and cfg proof; no definite dot dispatch was added. The 19 textual inner cfg/cfg_attr occurrences are listed in round8-vector-inner-cfg.txt; non-cfg payloads do not add gates.
+
+The same 11 native-syntax-valid grammar gaps still fail completely; all are rechecked with rustc syntax parsing in round8-grammar.json. No code in them is a target. Full ID/cause/cap/no-closed-dot integrity passes. Reach audit validates every failed-file annotation. Remaining causes are sorted failed-file paths with no targets or hints.
+
+Representation remains **unresolved-with-targets** (IDs only, cap 16; overflow has count and no list). 30,560 count-only links; 80,513 nonempty lists, 55,557 singleton lists. Analysis return: 163,280,974 → 163,551,621 bytes; graph facts 292,221,994 → 292,492,641. No heap override or core workaround.
+
+Original 152 re-derived: 19 restored / 0 identified wrong-before / 133 unverified under named D16 rules / 0 correct-and-provable under that policy still lost. This does not claim the Rust toolchain cannot prove the remaining links. Per-row rules are in round8-original-152.json.
+
+## Validation
+
+Final required checks strictly sequential: npm ci --ignore-scripts; supplied PYM_TLC_JAR npm test (1,613 pass, 0 skipped); format:check; Rust tests (215 pass, 0 skipped). 48 scratch-only native controls; 42 mutations killed; baseline passes. Development attempts preserve the initial expectation/fixture fixes, one inadequate typed-self control, and the initial Vector precision loss from expanding unrelated cfg disjunctions. The strengthened fixture kills the receiver mutation; the bounded-prover regression kills removal of the conjunct shortcuts. A draft mutation runner omitted the previous round test file; it was corrected before the final pass. A cross-crate mutation was updated to disable both condition checks rather than only the now-redundant one. The pre-conjunct store draft completed, then its source-freeze guard stopped the pipeline while the cfg fix was being made; the final whole run repeats it with frozen source. No failed/cancelled run is counted as a pass.
+
+Fresh seeded source samples and individual judgments: round8-samples.json. 135 fresh source inspections: 30 definite, 15 restored, 15 closed candidate sets, 15 unresolved, 20 unverified name-hint links, 20 invalid-code causes, plus 20 typed self calls with a captured same-file inherent body. No wrong definite, incomplete closed set or wrong cause. In the extra self population, 19 retain the known body; one macro-hidden module has no proved crate membership and remains plain unresolved (an existing macro-expansion limit). Some sampled hint links actually call std/external methods; they are not misreported as project callees. No further ordinary pattern provable under the stated fallback rules was found.
+
+Loaded-machine observations: direct parse 51.1s, analysis 17.3s, resolve 16.2s, total 97.2s. Real store total 317.4s; parse 53.8s, analysis 22.7s, resolve 34.2s; peak RSS 5,305,896 KiB. Timings are observations, not assertions.

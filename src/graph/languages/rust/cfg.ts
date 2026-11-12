@@ -48,6 +48,26 @@ function dnf(s: string, negate = false): Clause[] {
   );
 }
 export function implies(caller: readonly string[], condition: string): boolean {
+  if (condition.includes("?")) return false;
+  // A conjunction implies each of its own conjuncts, regardless of the
+  // expansion cost of unrelated predicates. Try individual conjuncts before
+  // expanding the whole caller into DNF.
+  if (caller.includes(condition)) return true;
+  for (const conjunct of caller) {
+    try {
+      const left = dnf(conjunct),
+        right = dnf(condition);
+      if (
+        left.length &&
+        left.every((x) =>
+          right.some((y) => [...y].every(([k, v]) => x.get(k) === v)),
+        )
+      )
+        return true;
+    } catch {
+      /* An unexpanded conjunct cannot prove anything by itself. */
+    }
+  }
   try {
     const left = caller.reduce((acc, s) => and(acc, dnf(s)), [
       new Map(),

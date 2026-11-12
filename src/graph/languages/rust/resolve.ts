@@ -54,6 +54,7 @@ interface Found {
   complete: boolean;
   reason?: string;
   failedFiles?: string[];
+  bound?: boolean;
 }
 const unique = (ss: GraphSymbol[]) => [
   ...new Map(ss.map((s) => [s.id, s])).values(),
@@ -129,6 +130,9 @@ export function resolveRust(
   const moduleTargets = new Map<string, GraphSymbol[]>();
   const modulePlaces = new Map<string, Place[]>();
   const moduleIncomplete = new Set<string>();
+  const moduleConditions = new Map<string, string[]>();
+  const conditionsFor = (s: GraphSymbol | GraphLink): string[] =>
+    moduleConditions.get(s.id) ?? ((data(s).conditions ?? []) as string[]);
   function walk(place: Place, ancestors: Set<string>) {
     const visitKey = `${place.crate.root}|${place.file}|${place.local}`;
     if (ancestors.has(visitKey)) return;
@@ -184,6 +188,19 @@ export function resolveRust(
         )
           moduleIncomplete.add(s.id);
         const targets = possible.filter((f) => files.has(f));
+        const fileConditions = targets.map(
+          (f) => (data(units.get(f) ?? {}).conditions ?? []) as string[],
+        );
+        if (fileConditions.length) {
+          const same = fileConditions.every(
+            (cs) => JSON.stringify(cs) === JSON.stringify(fileConditions[0]),
+          );
+          moduleConditions.set(s.id, [
+            ...((data(s).conditions ?? []) as string[]),
+            ...(same ? fileConditions[0]! : ["?module-file-cfg"]),
+          ]);
+        }
+
         if (!targets.length) moduleIncomplete.add(s.id);
         moduleTargets.set(
           s.id,
@@ -212,6 +229,7 @@ export function resolveRust(
               conditions: [
                 ...(place.conditions ?? []),
                 ...((data(s).conditions ?? []) as string[]),
+                ...((data(units.get(file) ?? {}).conditions ?? []) as string[]),
               ],
               uncertain: place.uncertain || moduleIncomplete.has(s.id),
               directory,
@@ -235,6 +253,8 @@ export function resolveRust(
       directory: p.dirname(crate.root),
       parent: null,
       symbol: units.get(crate.root)!,
+      conditions: (data(units.get(crate.root) ?? {}).conditions ??
+        []) as string[],
     };
     roots.set(crate.root, place);
     walk(place, new Set());
@@ -426,6 +446,7 @@ export function resolveRust(
     seen: Set<string>,
     allowGlobs: boolean,
     accessFrom?: Place,
+    variantsOnly = false,
   ): Found {
     if (s.kind !== "module" && !rest.length)
       return { symbols: accepts(s, ns) ? [s] : [], complete: true };
@@ -497,6 +518,7 @@ export function resolveRust(
         ),
       );
     }
+    if (variantsOnly && s.kind === "enum" && rest.length !== 1) return empty();
     if (s.kind === "enum" && rest.length === 1) {
       return merge(
         ownerPlace(s.file, str(data(s).scope)).map((loc) => {
@@ -509,20 +531,26 @@ export function resolveRust(
                   .join("::"),
               ),
             ) ?? [];
-          const ss = listed.filter((x) => accepts(x, ns));
           const branch = {
             ...loc,
             conditions: [
               ...(loc.conditions ?? []),
-              ...((data(s).conditions ?? []) as string[]),
+              ...(accessFrom?.crate.root === loc.crate.root
+                ? (accessFrom.conditions ?? [])
+                : []),
+              ...conditionsFor(s),
             ],
           };
+          const alternatives = listed.filter((x) =>
+            possible([...(branch.conditions ?? []), ...conditionsFor(x)]),
+          );
+          const ss = alternatives.filter((x) => accepts(x, ns));
           const found = conditional(
             { symbols: ss, complete: true },
-            listed,
+            alternatives,
             branch,
           );
-          return !listed.length || !found.complete
+          return !variantsOnly && (!listed.length || !found.complete)
             ? merge([found, associatedUnknown(rest[0]!, ns)])
             : found;
         }),
@@ -532,9 +560,7 @@ export function resolveRust(
   }
   function present(items: (GraphSymbol | GraphLink)[], loc: Place): boolean {
     const cs = items.map((s) =>
-      ((data(s).conditions ?? []) as string[]).filter(
-        (c) => !implies(loc.conditions ?? [], c),
-      ),
+      conditionsFor(s).filter((c) => !implies(loc.conditions ?? [], c)),
     );
     return (
       cs.some((c) => !c.length) ||
@@ -583,30 +609,38 @@ export function resolveRust(
         ).filter(
           (s) =>
             accepts(s, headNs) &&
-            possible([
-              ...(loc.conditions ?? []),
-              ...((data(s).conditions ?? []) as string[]),
-            ]) &&
+            possible([...(loc.conditions ?? []), ...conditionsFor(s)]) &&
             (!accessFrom || visible(str(data(s).visibility), loc, accessFrom)),
         );
-    const withFallback = (found: Found): Found =>
-      found.complete || found.failedFiles?.length
-        ? found
-        : merge([
-            found,
-            inScope(
-              name,
-              rest,
-              loc,
-              local,
-              q,
-              ns,
-              seen,
-              allowGlobs,
-              accessFrom,
-              true,
-            ) ?? empty(),
-          ]);
+    // First-segment presence is independent of member-lookup completeness.
+    // A present local/explicit binding shadows globs even when its member is
+    // unresolved (for example, A::default or an unexpanded imported item).
+    const withFallback = (
+      found: Found,
+      bindings: (GraphSymbol | GraphLink)[],
+    ): Found => {
+      const bound = present(bindings, loc);
+      if (bound || found.complete || found.failedFiles?.length)
+        return { ...found, bound };
+      return {
+        ...merge([
+          found,
+          inScope(
+            name,
+            rest,
+            loc,
+            local,
+            q,
+            ns,
+            seen,
+            allowGlobs,
+            accessFrom,
+            true,
+          ) ?? empty(),
+        ]),
+        bound: false,
+      };
+    };
     const explicit = (
       fallbackOnly ? [] : (uses?.explicit.get(name) ?? [])
     ).filter(
@@ -628,7 +662,7 @@ export function resolveRust(
         ),
       );
       if (present(declared, loc) || !explicit.length)
-        return withFallback(conditional(direct, declared, loc));
+        return withFallback(conditional(direct, declared, loc), declared);
       // Conditional declarations and explicit imports are one binding family.
       // Do not discard import alternatives merely because a local item exists.
       const imported = merge(
@@ -651,6 +685,7 @@ export function resolveRust(
       );
       return withFallback(
         conditional(merge([direct, imported]), [...declared, ...explicit], loc),
+        [...declared, ...explicit],
       );
     }
     if (explicit.length) {
@@ -674,7 +709,7 @@ export function resolveRust(
       );
       // A type-only import does not mask a value of the same name.
       if (result.symbols.length || !result.complete)
-        return withFallback(conditional(result, explicit, loc));
+        return withFallback(conditional(result, explicit, loc), explicit);
       // Fall through namespaces only when the import is KNOWN to bind a
       // different namespace. An uncaptured external import could bind this one.
       const all = merge(
@@ -683,10 +718,13 @@ export function resolveRust(
         ),
       );
       if (!all.complete || !all.symbols.length)
-        return withFallback({
-          ...empty(false),
-          reason: "namespace-binding-unverified",
-        });
+        return withFallback(
+          {
+            ...empty(false),
+            reason: "namespace-binding-unverified",
+          },
+          explicit,
+        );
     }
     // Intact local declarations and explicit imports win. A hidden declaration
     // can shadow a glob or an enclosing name, including through a reexport.
@@ -727,7 +765,15 @@ export function resolveRust(
             return imported.failedFiles?.length ? imported : empty(false);
           const found = merge(
             imported.symbols.map((s) =>
-              children(s, [name, ...rest], ns, seen, true, accessFrom ?? loc),
+              children(
+                s,
+                [name, ...rest],
+                ns,
+                seen,
+                true,
+                accessFrom ?? loc,
+                true,
+              ),
             ),
           );
           if (found.symbols.length) suppliers.push(l);
@@ -858,6 +904,7 @@ export function resolveRust(
           if (
             found &&
             !found.complete &&
+            !found.bound &&
             !found.failedFiles?.length &&
             local !== loc.local
           ) {
@@ -875,7 +922,8 @@ export function resolveRust(
             : "";
         }
       }
-      if (found?.complete || found?.failedFiles?.length) result = found;
+      if (found?.bound || found?.complete || found?.failedFiles?.length)
+        result = found;
       else {
         const dependency = loc.crate.deps.get(first);
         const targets = dependency
@@ -885,8 +933,8 @@ export function resolveRust(
           : [];
         const dependencyResult = targets.length
           ? merge(
-              targets.map((c) =>
-                parts.length
+              targets.map((c) => {
+                const branch: Found = parts.length
                   ? find(
                       parts.join("::"),
                       roots.get(c.root)!,
@@ -903,8 +951,16 @@ export function resolveRust(
                           (s) => s && accepts(s, ns),
                         ),
                         complete: true,
-                      },
-              ),
+                      };
+                const unit = units.get(c.root);
+                return unit
+                  ? conditional(branch, [unit], {
+                      ...loc,
+                      conditions:
+                        c.root === loc.crate.root ? (loc.conditions ?? []) : [],
+                    })
+                  : branch;
+              }),
             )
           : empty();
         // An unproven lexical binding does not erase a captured dependency
@@ -1631,11 +1687,25 @@ export function resolveRust(
         symbols: would(loc.crate.root, name, instance),
         complete: false,
         reason: note(
-          ["receiver-type-unverified", type.reason].filter(Boolean).join("; "),
+          !instance &&
+            type.reason?.split(/;\s*/).includes("parser-internal-error")
+            ? type.reason
+            : ["receiver-type-unverified", type.reason]
+                .filter(Boolean)
+                .join("; "),
         ),
       };
-    const applicable = (m: Method): "yes" | "no" | "unknown" =>
-      data(m.symbol).methodBounded
+    const applicable = (m: Method): "yes" | "no" | "unknown" => {
+      if (instance) {
+        const receiverConditions = (data(m.symbol).receiverConditions ??
+          []) as string[];
+        const caller =
+          m.ownerRoot === loc.crate.root ? (loc.conditions ?? []) : [];
+        if (!possible([...caller, ...receiverConditions])) return "no";
+        if (receiverConditions.some((c) => !implies(caller, c)))
+          return "unknown";
+      }
+      return data(m.symbol).methodBounded
         ? "unknown"
         : m.implKey === sameImpl ||
             (m.universal && !m.bounded) ||
@@ -1657,6 +1727,7 @@ export function resolveRust(
                 receiverSyntax,
                 m.argumentSyntax,
               );
+    };
     const matches = type.symbols
       .flatMap((t) => methodIndex.get(`${t.id}|${name}`) ?? [])
       .filter((m) => {
@@ -1834,7 +1905,7 @@ export function resolveRust(
             complete: !s || !moduleIncomplete.has(s.id),
           };
     } else if (
-      (!d.blocked || !!d.method) &&
+      (!d.blocked || !!d.method || !!d.conditionalBinding) &&
       !(l.kind === "imports" && d.glob)
     ) {
       found = merge(
@@ -1924,6 +1995,19 @@ export function resolveRust(
           return result;
         }),
       );
+    }
+    if (
+      l.kind !== "contains" &&
+      ((d.conditions ?? []) as string[]).some((c) => c.includes("?"))
+    )
+      found = { ...found, complete: false, reason: "cfg-condition-unverified" };
+    if (d.conditionalBinding) {
+      const { failedFiles: possibleFiles, ...binding } = found;
+      found = {
+        ...binding,
+        complete: false,
+        reason: "conditional-binding-may-shadow-name",
+      };
     }
     if (l.kind === "macros")
       found.symbols = found.symbols.filter(

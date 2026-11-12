@@ -1,3 +1,4 @@
+import { implies, possible } from "./cfg.js";
 import type { Node } from "web-tree-sitter";
 import { createTagsParser, tagsFromPackage } from "../../tree-sitter.js";
 import type { ParseResult, SourceInput } from "../../types.js";
@@ -190,7 +191,7 @@ async function createHelper(): Promise<Helper> {
       const parts = (nodes: Node[]): Meta => {
         const ns = nodes.filter((c) => !c.type.endsWith("comment"));
         return {
-          name: ns[0]?.text ?? "",
+          name: compact(ns[0]?.text ?? ""),
           value: ns[1]?.type === "=" ? ns[2] : undefined,
           args: ns[1]?.type === "token_tree" ? ns[1] : undefined,
         };
@@ -216,22 +217,110 @@ async function createHelper(): Promise<Helper> {
             : n.children.length
               ? n.children.map(cfgText).join("")
               : n.text;
+      function predicate(m: Meta): string | undefined {
+        if (!/^[_\p{ID_Start}][_\p{ID_Continue}]*$/u.test(m.name))
+          return undefined;
+        if (m.args) {
+          if (!["all", "any", "not"].includes(m.name)) return undefined;
+          const args = payloads(m.args).map(predicate);
+          if (
+            args.some((x) => x === undefined) ||
+            (m.name === "not" && args.length !== 1)
+          )
+            return undefined;
+          return `${m.name}(${args.join(",")})`;
+        }
+        if (
+          m.value &&
+          !["string_literal", "raw_string_literal"].includes(m.value.type)
+        )
+          return undefined;
+        return m.name + (m.value ? "=" + m.value.text : "");
+      }
       function cfg(meta: Meta): string[] {
-        if (meta.name === "cfg")
-          return [meta.args ? cfgText(meta.args).slice(1, -1) : "?"];
-        if (meta.name === "cfg_attr" && meta.args) {
+        if (meta.name === "cfg") {
+          const args = meta.args ? payloads(meta.args) : [];
+          return [args.length === 1 ? (predicate(args[0]!) ?? "?") : "?"];
+        }
+        if (meta.name === "cfg_attr") {
+          if (!meta.args) return ["?"];
           const ps = payloads(meta.args);
+          if (ps.length < 2) return ["?"];
+          const condition = predicate(ps[0]!) ?? "?";
           return ps
             .slice(1)
-            .flatMap((m) =>
-              cfg(m).map(
-                (c) =>
-                  `any(not(${ps[0] ? ps[0].name + (ps[0].value ? "=" + ps[0].value.text : ps[0].args ? cfgText(ps[0].args) : "") : "?"}),${c})`,
-              ),
-            );
+            .flatMap((m) => cfg(m).map((c) => `any(not(${condition}),${c})`));
         }
         return [];
       }
+      const attributeCache = new Map<number, Node[]>();
+      const conditionCache = new Map<number, string[]>();
+      const attributeContainers = new Set([
+        "source_file",
+        "block",
+        "declaration_list",
+        "parameters",
+        "closure_parameters",
+        "field_declaration_list",
+        "ordered_field_declaration_list",
+        "enum_variant_list",
+        "match_block",
+        "field_initializer_list",
+        "arguments",
+        "type_arguments",
+        "type_parameters",
+        "tuple_expression",
+        "array_expression",
+      ]);
+      function attributesOn(n: Node): Node[] {
+        const cached = attributeCache.get(n.id);
+        if (cached) return cached;
+        const attrs: Node[] = [];
+        let previous = n.previousNamedSibling;
+        while (
+          previous &&
+          ["attribute_item", "line_comment", "block_comment"].includes(
+            previous.type,
+          )
+        ) {
+          if (previous.type === "attribute_item") attrs.unshift(previous);
+          previous = previous.previousNamedSibling;
+        }
+        // Embedded outer attributes belong to their parameter/arm/expression,
+        // not to a container's first child (fields, parameters, statements).
+        if (!attributeContainers.has(n.type))
+          attrs.push(
+            ...n.namedChildren.filter((c) => c.type === "attribute_item"),
+          );
+        const body =
+          field(n, "body") ?? (attributeContainers.has(n.type) ? n : null);
+        for (const c of body?.namedChildren ?? []) {
+          if (c.type.endsWith("comment")) continue;
+          if (c.type !== "inner_attribute_item") break;
+          attrs.push(c);
+        }
+        const result = [...new Map(attrs.map((a) => [a.id, a])).values()];
+        attributeCache.set(n.id, result);
+        return result;
+      }
+      /** The one cfg collector for every item/site, including inherited gates. */
+      function conditionsOn(n: Node): string[] {
+        const cached = conditionCache.get(n.id);
+        if (cached) return cached;
+        const inherited = n.parent ? conditionsOn(n.parent) : [];
+        const own = attributesOn(n).flatMap((a) => cfg(meta(a)));
+        const result = own.length
+          ? [...new Set([...inherited, ...own])]
+          : inherited;
+        conditionCache.set(n.id, result);
+        return result;
+      }
+      result.symbols[0]!.data = {
+        scope: "",
+        unit: true,
+        visibility: "private",
+        conditions: conditionsOn(tree.rootNode),
+      };
       function modulePath(nodes: Node[]): {
         path: string;
         paths: string[];
@@ -328,22 +417,7 @@ async function createHelper(): Promise<Helper> {
           ? payloads(m.args).slice(1).some(bindingAttributeOpaque)
           : !inertAttributes.has(m.name);
       function bindingType(n: Node): Node | null {
-        const attrs = n.namedChildren.filter(
-          (c) => c.type === "attribute_item",
-        );
-        let prev = n.previousNamedSibling;
-        while (
-          prev &&
-          ["attribute_item", "line_comment", "block_comment"].includes(
-            prev.type,
-          )
-        ) {
-          if (prev.type === "attribute_item") attrs.push(prev);
-          prev = prev.previousNamedSibling;
-        }
-        return attrs.some(
-          (a) => cfg(meta(a)).length || bindingAttributeOpaque(meta(a)),
-        )
+        return attributesOn(n).some((a) => bindingAttributeOpaque(meta(a)))
           ? null
           : field(n, "type");
       }
@@ -364,6 +438,7 @@ async function createHelper(): Promise<Helper> {
         order: number;
         macro?: boolean;
         item?: boolean;
+        conditions?: string[];
       };
       type BindingScopes = Map<number, Map<string, Binding[]>>;
       const bindingCache = new Map<number, BindingScopes>();
@@ -401,6 +476,7 @@ async function createHelper(): Promise<Helper> {
         blocked: Set<string>;
         types: Map<string, ReceiverType>;
         invalidated: boolean;
+        conditional: Set<string>;
       } {
         name = compact(name);
         let scopes = bindingCache.get(root.id);
@@ -432,6 +508,7 @@ async function createHelper(): Promise<Helper> {
                 start,
                 order: order++,
                 macro,
+                conditions: conditionsOn(pattern),
               });
               names.set(compact(id.text), list);
             }
@@ -580,6 +657,8 @@ async function createHelper(): Promise<Helper> {
         }
         let invalidated = false;
         const blocked = new Set<string>();
+        const conditional = new Set<string>();
+        const callerConditions = conditionsOn(at);
         const types = new Map<string, ReceiverType>();
         let ancestor: Node | null = at;
         while (ancestor) {
@@ -600,8 +679,20 @@ async function createHelper(): Promise<Helper> {
               if (list[mid]!.start <= at.startIndex) lo = mid + 1;
               else hi = mid;
             }
-            const item = list[lo - 1];
+            let item = list[lo - 1];
+            while (
+              item &&
+              !possible([...callerConditions, ...(item.conditions ?? [])])
+            )
+              item = list[--lo - 1];
             if (item) {
+              const uncertain = (item.conditions ?? []).some(
+                (c) => !implies(callerConditions, c),
+              );
+              if (uncertain) {
+                conditional.add(name);
+                invalidated = true;
+              }
               if (!item.item) blocked.add(name);
               invalidated ||= item.macro === true;
               const { pattern, type } = item;
@@ -641,7 +732,7 @@ async function createHelper(): Promise<Helper> {
           if (ancestor.id === root.id) break;
           ancestor = ancestor.parent;
         }
-        return { blocked, types, invalidated };
+        return { blocked, types, invalidated, conditional };
       }
       function arity(list: Node | null) {
         let minimum = 0,
@@ -759,6 +850,7 @@ async function createHelper(): Promise<Helper> {
         moduleScope = "",
         conditions: string[] = [],
       ) {
+        conditions = conditionsOn(n);
         activeConditions = conditions;
         // Signature types are outside the function body item's scope. Preserve
         // the annotation's namespace so a later local type cannot retarget it.
@@ -802,25 +894,8 @@ async function createHelper(): Promise<Helper> {
                 n.parent?.parent?.type === "trait_item")
                 ? "method"
                 : kind;
-            const attrs: string[] = [];
-            const attributeNodes: Node[] = [];
-            let previous = n.previousNamedSibling;
-            while (
-              previous &&
-              ["attribute_item", "line_comment", "block_comment"].includes(
-                previous.type,
-              )
-            ) {
-              if (previous.type === "attribute_item") {
-                attrs.unshift(previous.text);
-                attributeNodes.unshift(previous);
-              }
-              previous = previous.previousNamedSibling;
-            }
-            conditions = [
-              ...conditions,
-              ...attributeNodes.flatMap((n) => cfg(meta(n))),
-            ];
+            const attributeNodes = attributesOn(n);
+            const attrs = attributeNodes.map((a) => a.text);
             activeConditions = conditions;
             result.symbols.push({
               key,
@@ -851,6 +926,14 @@ async function createHelper(): Promise<Helper> {
                       arity: arity(field(n, "parameters")).maximum,
                       arityMinimum: arity(field(n, "parameters")).minimum,
                       receiverKind: receiverInfo(n).kind,
+                      receiverConditions: (() => {
+                        const p = field(n, "parameters")?.namedChildren.find(
+                          (p) =>
+                            p.type === "self_parameter" ||
+                            field(p, "pattern")?.type === "self",
+                        );
+                        return p ? conditionsOn(p) : [];
+                      })(),
                       receiverSyntax: receiverInfo(n).syntax,
                       receiverType: receiverInfo(n).type,
                       receiverMutable: receiverInfo(n).mutable,
@@ -986,17 +1069,6 @@ async function createHelper(): Promise<Helper> {
             opaqueCrateAliases.push(alias);
         }
         if (n.type === "use_declaration") {
-          let prev = n.previousNamedSibling;
-          const cs = [...conditions];
-          while (
-            prev &&
-            ["attribute_item", "line_comment", "block_comment"].includes(
-              prev.type,
-            )
-          ) {
-            if (prev.type === "attribute_item") cs.push(...cfg(meta(prev)));
-            prev = prev.previousNamedSibling;
-          }
           imports(
             field(n, "argument")!,
             "",
@@ -1004,7 +1076,7 @@ async function createHelper(): Promise<Helper> {
             scope,
             n.namedChildren.find((c) => c.type === "visibility_modifier")
               ?.text ?? "private",
-            cs,
+            conditions,
           );
           return;
         }
@@ -1038,6 +1110,7 @@ async function createHelper(): Promise<Helper> {
                   blocked: new Set<string>(),
                   types: new Map<string, ReceiverType>(),
                   invalidated: false,
+                  conditional: new Set<string>(),
                 };
             if (f.type === "field_expression") {
               const receiver = field(f, "value")!;
@@ -1095,6 +1168,9 @@ async function createHelper(): Promise<Helper> {
                 genericBindings: genericBindings(fn ?? n),
                 argumentCount: arity(field(n, "arguments")).maximum,
                 argumentMinimum: arity(field(n, "arguments")).minimum,
+                ...(b.conditional.has(compact(f.text.split("::")[0]!))
+                  ? { conditionalBinding: true }
+                  : {}),
                 blocked:
                   b.blocked.has(compact(f.text.split("::")[0]!)) ||
                   genericShadow(n, f.text.split("::")[0]!),
@@ -1204,7 +1280,7 @@ async function createHelper(): Promise<Helper> {
           );
       }
       for (const n of tree.rootNode.namedChildren)
-        visit(n, "file", "", null, "");
+        visit(n, "file", "", null, "", "", conditionsOn(tree.rootNode));
       const opaqueAttributes: {
         scope: string;
         raw: string;
