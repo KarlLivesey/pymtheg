@@ -15,6 +15,7 @@ import {
   taintOf,
   type Taint,
 } from "./taint.js";
+import { createJudge, type Judge, type Judged } from "./judge.js";
 import {
   NAMES,
   restoreNames,
@@ -44,9 +45,9 @@ export interface RenameContext {
    * with those files: an unseen declaration can only introduce such a name.
    */
   failedNames: ReadonlyMap<string, readonly string[]>;
-  /** Whether a failed file could declare a member of this name (its whole text). */
-  couldDeclare: (file: string, name: string) => boolean;
 }
+/** One structural judgement per program (its checker), shared by its files. */
+const judges = new WeakMap<ts.TypeChecker, Judge>();
 import {
   anchorOf,
   containerOf,
@@ -134,10 +135,8 @@ const KIND_REASON = {
 const CAPTURED = "\0captured";
 /** A global a failed file augments counts as a member set it changes. */
 const GLOBAL_AUGMENTATION = true;
-/** A computation fails only with a tainted input (mutation switch). */
-const COMPUTATION_INPUTS = true;
-/** Overloads of one untainted class follow the class rule (mutation switch). */
-const SAME_CLASS_OVERLOADS = true;
+/** O2 for call links: overloads whose parameter types depend on a failed file (mutation switch). */
+const FAILED_PARAMETER_OVERLOADS = true;
 /** A `/// <reference path>` to a failed file is broken, not missing. */
 const REFERENCE_PATHS = true;
 /** At least one failed file: an `invalid-code` link cannot exist without one. */
@@ -253,7 +252,7 @@ export function extractFile(
     if (named) return invalid(named.causes, named.via, found.receiver);
     const result = resolveChecked(found, meaning);
     if (!found.receiver) return result;
-    const failed = structural(taint, found.receiver, result, found.name);
+    const failed = structural(taint, found.receiver, result);
     return failed ? invalid(failed.causes, failed.via, found.receiver) : result;
   }
   function resolveChecked(found: Lookup, meaning: Meaning): Targets {
@@ -347,48 +346,33 @@ export function extractFile(
       context.anyFailed,
     );
   /**
-   * The structural rule, for a member reached through a receiver: what the
-   * receiver's TYPE is decides, not the route its value took.
-   * - A type-level computation (conditional, mapped, indexed access,
-   *   `keyof`, `typeof`, an alias built from them) over a tainted input, the
-   *   result of an overloaded callee with a tainted argument, or of a single
-   *   generic signature whose declared return type is such a computation:
-   *   FAILED, and so is whatever is read from it.
-   * - A type the compiler could not compute (its error type, or `any`) that
-   *   a tainted input reached, alone or in a union or intersection: FAILED.
-   * - A class or interface whose member set depends on a failed file
-   *   (heritage, a merge, a global it augments): an own member keeps the
-   *   answer; an inherited or merged one the compiler found fails only if
-   *   the failed file could declare that member name (couldDeclare, a test
-   *   of its whole text); with no answer at all, it fails.
-   * - Any other class or interface (`Array`, `Promise`, project types
-   *   whatever their type arguments) or a function type: the compiler's
-   *   answer stands.
+   * The structural rule, for a member reached through a receiver (P-E,
+   * default-deny; judge.ts): when any name in the receiver is tainted, the
+   * receiver's type is derived by explicit cases only, and a receiver that
+   * is FAILED fails the member. Then the member set (O1): a receiver whose
+   * class or interface reaches a failed file through heritage, a merge or a
+   * global augmentation keeps only a member declared directly in one of its
+   * own declarations; any other answer, or none, fails.
    */
   function structural(
     taint: Taint,
     receiver: ts.Expression,
     result: Targets,
-    name: string | undefined,
   ): Dependence | undefined {
-    const through = receiverCauses(taint, receiver);
+    const through =
+      receiverCauses(taint, receiver) ??
+      namesInReceiver(taint, receiver) ??
+      reachedFrom(taint, receiver);
     if (through) {
-      const computed = computedFrom(taint, receiver, 0);
-      if (computed)
-        return { causes: through.causes, via: `${through.via}; ${computed}` };
+      let judged: Judged | undefined;
       try {
-        const type = checker.getTypeAtLocation(receiver);
-        const parts = type.isUnionOrIntersection() ? type.types : [type];
-        if (parts.some((part) => !!(part.flags & ts.TypeFlags.Any)))
-          return {
-            causes: through.causes,
-            via: `${through.via}; its type could not be computed`,
-          };
+        judged = judgeOf(taint).expression(receiver);
       } catch (error) {
         if (!isLimit(error)) throw error;
       }
+      if (judged?.k === "failed")
+        return { causes: through.causes, via: `${through.via}; ${judged.why}` };
     }
-    // Member sets that depend on a failed file.
     const membership: string[] = [];
     let owner = "";
     try {
@@ -396,13 +380,7 @@ export function extractFile(
       for (const part of type.isUnionOrIntersection() ? type.types : [type]) {
         const symbol = part.getSymbol();
         if (!symbol) continue;
-        const causes = [
-          ...causesOfSymbol(taint.all, symbol),
-          // A global interface or namespace a failed file augments.
-          ...(GLOBAL_AUGMENTATION && isGlobal(symbol)
-            ? (context.failedNames.get(symbol.name) ?? [])
-            : []),
-        ];
+        const causes = memberSetCauses(taint, symbol);
         if (causes.length) {
           membership.push(...causes);
           owner ||= symbol.name;
@@ -419,24 +397,97 @@ export function extractFile(
       ownMembers(result.declarations ?? [], receiver)
     )
       return undefined;
-    // No answer at all: the failed part of the member set is why (it could
-    // supply the member, or a base that does).
-    if (!result.targets.length)
-      return {
-        causes: files,
-        via: `member of ${owner}, whose member set depends on the failed file`,
-      };
-    // An answer the compiler found: it stands unless the failed file could
-    // declare a member of that name, which would take its place.
-    const declaring = causesOf(
-      files.filter((file) => !name || context.couldDeclare(file, name)),
-    );
-    return declaring
-      ? {
-          causes: declaring,
-          via: `inherited or merged member of ${owner}; ${name ?? "it"} could be declared in the failed file`,
-        }
-      : undefined;
+    return {
+      causes: files,
+      via: result.targets.length
+        ? `inherited or merged member of ${owner}, whose member set reaches the failed file`
+        : `member of ${owner}, whose member set reaches the failed file`,
+    };
+  }
+  /** The failed files a class's or interface's member set reaches. */
+  function memberSetCauses(taint: Taint, symbol: ts.Symbol): string[] {
+    return [
+      ...causesOfSymbol(taint.all, symbol),
+      // A global interface or namespace a failed file augments.
+      ...(GLOBAL_AUGMENTATION && isGlobal(symbol)
+        ? (context.failedNames.get(symbol.name) ?? [])
+        : []),
+    ];
+  }
+  /** Any name in the receiver, at any depth, that is tainted. */
+  function namesInReceiver(
+    taint: Taint,
+    receiver: ts.Expression,
+  ): Dependence | undefined {
+    let found: Dependence | undefined;
+    const visit = (node: ts.Node): void => {
+      if (found) return;
+      if (ts.isIdentifier(node)) {
+        const symbol = checker.getSymbolAtLocation(node);
+        const causes: string[] = [];
+        if (
+          !symbol ||
+          (!symbol.declarations?.length &&
+            !(symbol.flags & ts.SymbolFlags.Alias))
+        )
+          causes.push(...(context.failedNames.get(node.text) ?? []));
+        else
+          for (const step of aliasChain(checker, symbol))
+            causes.push(
+              ...(taint.seeds.get(step) ?? []),
+              ...causesOfSymbol(taint.all, step),
+              ...causesOfSymbol(taint.weak, step),
+            );
+        const files = causesOf(causes);
+        if (files)
+          found = { causes: files, via: `name ${node.text} in the receiver` };
+        return;
+      }
+      ts.forEachChild(node, visit);
+    };
+    try {
+      visit(receiver);
+    } catch (error) {
+      if (!isLimit(error)) throw error;
+    }
+    return found;
+  }
+  /** The gate at any depth: the failed files the receiver reaches through its names. */
+  function reachedFrom(
+    taint: Taint,
+    receiver: ts.Expression,
+  ): Dependence | undefined {
+    if (!taint.all.size && !taint.seeds.size) return undefined;
+    let files: string[];
+    try {
+      files = judgeOf(taint).reaches(receiver);
+    } catch (error) {
+      if (!isLimit(error)) throw error;
+      return undefined;
+    }
+    const causes = causesOf(files);
+    return causes && { causes, via: "the receiver depends on the failed file" };
+  }
+  function judgeOf(taint: Taint): Judge {
+    const known = judges.get(checker);
+    if (known) return known;
+    const judge = createJudge({
+      checker,
+      program,
+      taint,
+      failedNames: context.failedNames,
+      failedModule: (specifier) => {
+        if (!ts.isStringLiteralLike(specifier)) return undefined;
+        const from = fromVirtual(specifier.getSourceFile().fileName);
+        const module = from && context.resolveModule(specifier.text, from);
+        return module && context.moduleKind(module) === "invalid"
+          ? module
+          : undefined;
+      },
+      memberSetTainted: (symbol) => memberSetCauses(taint, symbol).length > 0,
+    });
+    judges.set(checker, judge);
+    return judge;
   }
   /** A global interface or namespace (lib, a script, or `declare global`). */
   function isGlobal(symbol: ts.Symbol): boolean {
@@ -456,239 +507,6 @@ export function extractFile(
         )
       );
     });
-  }
-  /** Does a type reference name a type alias whose body computes? */
-  function computingAlias(reference: ts.TypeReferenceNode, depth = 0): boolean {
-    if (depth >= 8) return false;
-    let symbol = checker.getSymbolAtLocation(
-      ts.isQualifiedName(reference.typeName)
-        ? reference.typeName.right
-        : reference.typeName,
-    );
-    if (symbol && symbol.flags & ts.SymbolFlags.Alias)
-      symbol = checker.getAliasedSymbol(symbol);
-    const alias = symbol?.declarations?.find(ts.isTypeAliasDeclaration);
-    return !!alias && isComputation(alias.type, depth + 1);
-  }
-  /** Is a node, or a type alias it names, a type-level computation? */
-  function isComputation(node: ts.Node, depth = 0): boolean {
-    let found = false;
-    const visit = (child: ts.Node): void => {
-      if (found) return;
-      if (
-        ts.isConditionalTypeNode(child) ||
-        ts.isMappedTypeNode(child) ||
-        ts.isIndexedAccessTypeNode(child) ||
-        ts.isInferTypeNode(child) ||
-        ts.isTemplateLiteralTypeNode(child) ||
-        ts.isTypeQueryNode(child) ||
-        (ts.isTypeOperatorNode(child) &&
-          child.operator === ts.SyntaxKind.KeyOfKeyword)
-      ) {
-        found = true;
-        return;
-      }
-      if (ts.isTypeReferenceNode(child) && computingAlias(child, depth)) {
-        found = true;
-        return;
-      }
-      ts.forEachChild(child, visit);
-    };
-    visit(node);
-    return found;
-  }
-  /**
-   * Why a receiver's value is FAILED by structure (its declared type is a
-   * computation, or it comes from an overloaded or computing generic call
-   * with a tainted argument), following unannotated variables to their
-   * initialisers; undefined when it is not.
-   */
-  function computedFrom(
-    taint: Taint,
-    expression: ts.Expression,
-    depth: number,
-    // The receiver is the value itself (not awaited, not a member of it):
-    // only then does one class's member set decide over the overload rule.
-    direct = true,
-  ): string | undefined {
-    if (depth > 32) return undefined;
-    let node: ts.Expression = expression;
-    while (
-      ts.isParenthesizedExpression(node) ||
-      ts.isNonNullExpression(node) ||
-      ts.isAwaitExpression(node)
-    ) {
-      if (ts.isAwaitExpression(node)) direct = false;
-      node = node.expression;
-    }
-    const declared = declaredType(node);
-    if (
-      declared &&
-      isComputation(declared) &&
-      computesOverTaint(taint, declared)
-    )
-      return "a type-level computation over it";
-    if (ts.isCallExpression(node) || ts.isNewExpression(node)) {
-      const type = checker.getTypeAtLocation(node.expression);
-      const signatures = ts.isNewExpression(node)
-        ? type.getConstructSignatures()
-        : type.getCallSignatures();
-      const argument = argumentCauses(taint, node, "the call to");
-      if (
-        argument &&
-        signatures.length > 1 &&
-        !(direct && sameClassResult(taint, signatures))
-      )
-        return `the result of overloaded ${node.expression.getText(file)} with a tainted argument`;
-      const signature = signatures.length === 1 ? signatures[0] : undefined;
-      const returned = (signature?.declaration as ts.SignatureDeclaration)
-        ?.type;
-      if (
-        argument &&
-        signature?.typeParameters?.length &&
-        returned &&
-        isComputation(returned)
-      )
-        return `the result of generic ${node.expression.getText(file)}, a type-level computation over a tainted argument`;
-      if (ts.isPropertyAccessExpression(node.expression))
-        return computedFrom(
-          taint,
-          node.expression.expression,
-          depth + 1,
-          false,
-        );
-      return undefined;
-    }
-    if (
-      ts.isPropertyAccessExpression(node) ||
-      ts.isElementAccessExpression(node)
-    )
-      return computedFrom(taint, node.expression, depth + 1, false);
-    if (ts.isIdentifier(node)) {
-      const declaration = checker.getSymbolAtLocation(node)?.valueDeclaration;
-      if (
-        declaration &&
-        ts.isVariableDeclaration(declaration) &&
-        !declaration.type
-      ) {
-        if (declaration.initializer)
-          return computedFrom(
-            taint,
-            declaration.initializer,
-            depth + 1,
-            direct,
-          );
-        const loop = declaration.parent?.parent;
-        if (loop && (ts.isForOfStatement(loop) || ts.isForInStatement(loop)))
-          return computedFrom(taint, loop.expression, depth + 1, false);
-      }
-    }
-    return undefined;
-  }
-  /**
-   * Whether a computation inside a type has a tainted input: a name the
-   * computation itself uses (not the rest of the type around it) whose type
-   * depends on a failed file, a name a failed file declares, or a type
-   * parameter (substituted from the receiver, which carries the taint).
-   */
-  function computesOverTaint(taint: Taint, node: ts.Node): boolean {
-    if (!COMPUTATION_INPUTS) return true;
-    const tainted = (name: ts.Identifier): boolean => {
-      const symbol = checker.getSymbolAtLocation(name);
-      const steps = symbol ? aliasChain(checker, symbol) : [];
-      return (
-        steps.some(
-          (step) =>
-            !!(step.flags & ts.SymbolFlags.TypeParameter) ||
-            (taint.seeds.get(step)?.size ?? 0) > 0 ||
-            causesOfSymbol(taint.all, step).length > 0,
-        ) ||
-        // A name no declaration answers that a failed file declares.
-        (steps.every((step) => !step.declarations?.length) &&
-          (context.failedNames.get(name.text)?.length ?? 0) > 0)
-      );
-    };
-    const inputs = (computation: ts.Node): boolean => {
-      let found = false;
-      const visit = (child: ts.Node): void => {
-        if (found) return;
-        if (ts.isIdentifier(child)) found = tainted(child);
-        else ts.forEachChild(child, visit);
-      };
-      visit(computation);
-      return found;
-    };
-    let found = false;
-    const visit = (child: ts.Node): void => {
-      if (found) return;
-      if (
-        ts.isConditionalTypeNode(child) ||
-        ts.isMappedTypeNode(child) ||
-        ts.isIndexedAccessTypeNode(child) ||
-        ts.isInferTypeNode(child) ||
-        ts.isTemplateLiteralTypeNode(child) ||
-        ts.isTypeQueryNode(child) ||
-        (ts.isTypeOperatorNode(child) &&
-          child.operator === ts.SyntaxKind.KeyOfKeyword) ||
-        // A reference to an alias that computes (`Pick<X, "m">`): its
-        // name and arguments are the inputs.
-        (ts.isTypeReferenceNode(child) && computingAlias(child))
-      ) {
-        if (inputs(child)) found = true;
-        // An alias reference's arguments may hold further computations.
-        else if (ts.isTypeReferenceNode(child))
-          child.typeArguments?.forEach(visit);
-        return;
-      }
-      ts.forEachChild(child, visit);
-    };
-    visit(node);
-    return found;
-  }
-  /**
-   * Overloads whose results are all one class or interface that does not
-   * itself depend on a failed file (a class's construct signatures always
-   * are): the choice of overload cannot change the member set, so the
-   * class rule decides instead of the overload rule.
-   */
-  function sameClassResult(
-    taint: Taint,
-    signatures: readonly ts.Signature[],
-  ): boolean {
-    if (!SAME_CLASS_OVERLOADS) return false;
-    let shared: ts.Symbol | undefined;
-    for (const signature of signatures) {
-      const symbol = checker.getReturnTypeOfSignature(signature).getSymbol();
-      if (
-        !symbol ||
-        !(symbol.flags & (ts.SymbolFlags.Class | ts.SymbolFlags.Interface)) ||
-        (shared && shared !== symbol)
-      )
-        return false;
-      shared = symbol;
-    }
-    return !!shared && !causesOfSymbol(taint.all, shared).length;
-  }
-  /** The declared type a value has: its annotation, member type or return type. */
-  function declaredType(node: ts.Expression): ts.TypeNode | undefined {
-    if (ts.isAsExpression(node) || ts.isTypeAssertionExpression(node))
-      return node.type;
-    const symbol = ts.isPropertyAccessExpression(node)
-      ? checker.getSymbolAtLocation(node.name)
-      : ts.isIdentifier(node)
-        ? checker.getSymbolAtLocation(node)
-        : undefined;
-    const declaration = symbol?.valueDeclaration ?? symbol?.declarations?.[0];
-    if (
-      declaration &&
-      (ts.isVariableDeclaration(declaration) ||
-        ts.isParameter(declaration) ||
-        ts.isPropertyDeclaration(declaration) ||
-        ts.isPropertySignature(declaration) ||
-        ts.isGetAccessorDeclaration(declaration))
-    )
-      return declaration.type;
-    return undefined;
   }
   /** Causes when a name's binding (its alias chain) resolves into a failed file. */
   function namedCauses(
@@ -873,15 +691,6 @@ export function extractFile(
     if (found) return { causes: found, via: via! };
     const weakFound = causesOf(weakCauses);
     return weakFound && { causes: weakFound, via: weakVia!, weak: true };
-  }
-  /** A type the compiler could not compute: its error type, or `any`. */
-  function errorType(expression: ts.Expression): boolean {
-    try {
-      const type = checker.getTypeAtLocation(expression);
-      return !!(type.flags & ts.TypeFlags.Any);
-    } catch {
-      return false;
-    }
   }
   /**
    * Whether every target is declared directly in the receiver type's own
@@ -1292,8 +1101,29 @@ export function extractFile(
     // The callee decides a call; its arguments only pick between distinct
     // overload targets. With two or more, a tainted argument fails the link.
     if (call && found.targets.length > 1 && !found.reason) {
-      const argument = argumentCauses(currentTaint(), call, "overloaded");
+      const taint = currentTaint();
+      const argument = argumentCauses(taint, call, "overloaded");
       if (argument) found = invalid(argument.causes, argument.via);
+      else if (FAILED_PARAMETER_OVERLOADS && taint.all.size) {
+        // O2: an overload whose parameter types depend on a failed file
+        // accepts anything there (the error type): selection is untrustworthy.
+        const signatures = (found.declarations ?? []).filter(
+          (declaration): declaration is ts.SignatureDeclaration =>
+            ts.isFunctionLike(declaration) &&
+            !(declaration as { body?: ts.Node }).body,
+        );
+        const judge = judgeOf(taint);
+        const files = causesOf(
+          signatures.flatMap((signature) =>
+            judge.signatureDependsOnFailed(signature),
+          ),
+        );
+        if (files)
+          found = invalid(
+            files,
+            "overloaded callee whose parameter types depend on the failed file",
+          );
+      }
     }
     link(owner, "calls", name, at, found, extra);
   }

@@ -112,10 +112,6 @@ export interface SyntaxFailure {
   diagnostics: Diagnostic[];
   /** Global names it declares: a script's top level and namespaces, `declare global`. */
   names: string[];
-  /** Its original text (for the member-name test only, never a target). */
-  text: string;
-  /** Identifier escapes or a computed member name: it could declare any member. */
-  anything: boolean;
 }
 
 /**
@@ -233,32 +229,10 @@ export function syntaxFailure(
     }
   };
   collect(source.statements, script);
-  // Whether it could declare a member of a given name, by a deliberately
-  // over-inclusive test of its whole text (readable or not): identifier
-  // escapes or a computed member name could declare anything.
-  let anything = /\\u/.test(text);
-  const computed = (node: ts.Node): void => {
-    if (anything) return;
-    if (ts.isComputedPropertyName(node)) anything = true;
-    else ts.forEachChild(node, computed);
-  };
-  computed(source);
   return {
     diagnostics,
     names: [...names].sort(),
-    text,
-    anything,
   };
-}
-
-/** Whether a failed file could declare a member of this name (see syntaxFailure). */
-export function couldDeclare(failure: SyntaxFailure, name: string): boolean {
-  if (failure.anything) return true;
-  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return (
-    new RegExp(`(^|[^\\w$])${escaped}($|[^\\w$])`).test(failure.text) ||
-    ['"', "'", "`"].some((quote) => failure.text.includes(quote + name + quote))
-  );
 }
 
 /**

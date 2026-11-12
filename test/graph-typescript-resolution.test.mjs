@@ -3490,14 +3490,18 @@ async function differential(files, broken) {
     }
     if (intoBroken.length)
       problems.push(
-        `${key} (${c.text}): clean target in ${intoBroken} but broken is ${b.resolution} ${b.reason}`,
+        `${key} (${c.text} in ${c.line.trim()}): clean target in ${intoBroken} but broken is ${b.resolution} ${b.reason}`,
       );
     if (JSON.stringify(c.targets) !== JSON.stringify(b.targets)) {
       counts.changedTarget++;
-      problems.push(`${key} (${c.text}): target ${c.targets} -> ${b.targets}`);
+      problems.push(
+        `${key} (${c.text} in ${c.line.trim()}): target ${c.targets} -> ${b.targets}`,
+      );
     } else if (c.reason !== b.reason) {
       counts.changedReason++;
-      problems.push(`${key} (${c.text}): reason ${c.reason} -> ${b.reason}`);
+      problems.push(
+        `${key} (${c.text} in ${c.line.trim()}): reason ${c.reason} -> ${b.reason}`,
+      );
     } else if (b.assumes?.includes("no-unseen-declarations")) counts.flagged++;
     else counts.unflagged++;
   }
@@ -4068,7 +4072,11 @@ test("each route the failure travels, and each that keeps a correct answer", asy
 // ----- Round 14: the structural rule -----
 
 const keeps = (link, what) => {
-  assert.notEqual(link.reason, "invalid-code", `${what}: kept`);
+  assert.notEqual(
+    link.reason,
+    "invalid-code",
+    `${what}: kept (failed via ${link.cause?.via})`,
+  );
   assert.equal(link.cause, undefined, `${what}: no cause`);
 };
 
@@ -4137,6 +4145,7 @@ test("the structural rule: the receiver's type decides, in both directions", asy
       "  constructor(n: string);",
       "  constructor(n: string, p?: (j: Failed) => void) {}",
       "  on() {}",
+      "  getF(): Failed { return null as any; }",
       "}",
       'const wk = new Wk("q", (j) => {});',
       "wk.on(); // ctor-overload",
@@ -4149,6 +4158,7 @@ test("the structural rule: the receiver's type decides, in both directions", asy
       // A computation's inputs decide, not the receiver's route.
       "declare const itc: InstanceType<typeof Wk>;",
       "itc.on(); // instance-type-clean",
+      "itc.getF().m(); // instance-type-member",
       "declare const itf: InstanceType<typeof Failed>;",
       "itf.m(); // instance-type-failed",
       "declare const cw: Required<{ k(): void }> & { p: Promise<Failed> };",
@@ -4158,7 +4168,8 @@ test("the structural rule: the receiver's type decides, in both directions", asy
       // An own member stands even when the failed file has that name.
       "class D2 extends Failed { m() {} }",
       "new D2().m(); // own-member-named-in-failed",
-      // A function type is not FAILED for its parameters.
+      // A function type with a failed parameter is a tainted input of a
+      // computation over it (iii): accepted over-fail.
       "type Proc = (j: Failed) => string;",
       "declare const pr: ReturnType<Proc>;",
       "pr.trim(); // return-of-function-type",
@@ -4195,6 +4206,8 @@ test("the structural rule: the receiver's type decides, in both directions", asy
     ["awaited-overload", "m"],
     ["instance-type-failed", "m"],
     ["parameter-of-function-type", "m"],
+    ["instance-type-member", "m"],
+    ["return-of-function-type", "trim"],
     ["long-chain", "m"],
   ];
   for (const [marker, at] of failedOn)
@@ -4218,7 +4231,6 @@ test("the structural rule: the receiver's type decides, in both directions", asy
     ["computation-clean-input", "k"],
     ["computation-beside-taint", "forEach"],
     ["own-member-named-in-failed", "m"],
-    ["return-of-function-type", "trim"],
     ["closure-any", "foo"],
   ])
     keeps(linkAt(broken, "use.ts", `// ${marker}`, at), marker);
@@ -4302,22 +4314,30 @@ test("failed scripts, declare global, import types and reference paths carry the
   assert.equal(reference.cause.file, "ref.ts");
 });
 
-test("an inherited or merged member the compiler found stands unless the failed file could declare its name", async () => {
+test("through a member set that reaches a failed file, only members declared in the receiver's own declarations stand (O1)", async () => {
   const bad =
     "export class Base { m() {} }\nexport interface BaseI { m(): void }\n";
   const files = {
     "bad.ts": bad,
     "use.ts": [
       'import { Base, BaseI } from "./bad";',
-      "class Other { own() {} m() {} }",
+      "class A { m() {} }",
+      "class Other { own() {} m() {} child(): A { return new A(); } }",
       "interface Derived extends Other {}",
-      "class Derived extends Base {}",
+      "class Derived extends Base { mine() {} }",
       "new Derived().own(); // derived-own",
       "new Derived().m(); // derived-m",
-      "interface I extends BaseI, Other {}",
+      "new Derived().mine(); // derived-mine",
+      "new Derived().child().m(); // through-inherited",
+      "interface Merged { merged(): void }",
+      "class Merged extends Base {}",
+      "declare const mg: Merged;",
+      "mg.merged(); // merged-own",
+      "interface I extends BaseI, Other { declared(): void }",
       "declare const i: I;",
       "i.own(); // interface-own",
       "i.m(); // interface-m",
+      "i.declared(); // interface-declared",
       "",
     ].join("\n"),
   };
@@ -4325,18 +4345,76 @@ test("an inherited or merged member the compiler found stands unless the failed 
     "bad.ts": bad + "const x = (;\n",
   });
   assert.deepEqual(problems, []);
-  for (const marker of ["derived-own", "interface-own"])
-    isResolved(
-      linkAt(broken, "use.ts", `// ${marker}`, "own"),
-      "use.ts#Other.own",
-      marker,
-    );
-  for (const marker of ["derived-m", "interface-m"])
+  // Inherited through any base, failed or valid: fails (accepted over-fail
+  // for `own`, which only the valid `Other` declares).
+  for (const [marker, at] of [
+    ["derived-own", "own"],
+    ["interface-own", "own"],
+    ["derived-m", "m"],
+    ["interface-m", "m"],
+    // The chain continues past an inherited member: it fails too.
+    ["through-inherited", "m"],
+  ])
     isFailed(
-      linkAt(broken, "use.ts", `// ${marker}`, "m"),
+      linkAt(broken, "use.ts", `// ${marker}`, at),
       { file: "bad.ts" },
       marker,
     );
+  // Declared directly in the class body or a merged declaration's body.
+  isResolved(
+    linkAt(broken, "use.ts", "// derived-mine", "mine"),
+    "use.ts#Derived.mine",
+    "derived-mine",
+  );
+  isResolved(
+    linkAt(broken, "use.ts", "// merged-own", "merged"),
+    "use.ts#Merged.merged",
+    "merged-own",
+  );
+  isResolved(
+    linkAt(broken, "use.ts", "// interface-declared", "declared"),
+    "use.ts#I.declared",
+    "interface-declared",
+  );
+});
+
+test("a failed base also has the members it inherits and computes: no token test (O1)", async () => {
+  const bad = [
+    'import { Root, Src } from "./root";',
+    "export class Base extends Root {}",
+    "export interface BaseI extends Readonly<Src> {}",
+    "",
+  ].join("\n");
+  const files = {
+    "root.ts":
+      "export class Root { m() {} }\nexport interface Src { r(): void }\n",
+    "bad.ts": bad,
+    "use.ts": [
+      'import { Base, BaseI } from "./bad";',
+      "export class Other { m() {} r() {} }",
+      "class Derived extends Base {}",
+      "interface Derived extends Other {}",
+      "new Derived().m(); // root-member",
+      "interface DI extends BaseI, Other {}",
+      "declare const di: DI;",
+      "di.r(); // computed-member",
+      "",
+    ].join("\n"),
+  };
+  const { problems, bad: broken } = await differential(files, {
+    "bad.ts": bad + "const x = (;\n",
+  });
+  assert.deepEqual(problems, []);
+  isFailed(
+    linkAt(broken, "use.ts", "// root-member", "m"),
+    { file: "bad.ts" },
+    "root-member",
+  );
+  isFailed(
+    linkAt(broken, "use.ts", "// computed-member", "r"),
+    { file: "bad.ts" },
+    "computed-member",
+  );
 });
 
 test("JSDoc import types in JS files carry the failure", async () => {
@@ -4369,4 +4447,680 @@ test("JSDoc import types in JS files carry the failure", async () => {
       { file: "bad.ts" },
       marker,
     );
+});
+
+/** Indexes clean and broken, checks the differential, and returns the broken index. */
+async function brokenOf(files, broken) {
+  const { problems, bad } = await differential(files, broken);
+  assert.deepEqual(problems, []);
+  return bad;
+}
+const failsWith = (link, cause, via, what) => {
+  isFailed(link, cause, what);
+  if (via)
+    assert.ok(link.cause.via.includes(via), `${what}: via ${link.cause.via}`);
+};
+
+test("default-deny: the four reproductions of round 13 (Sol)", async () => {
+  const bad = 'export interface Failed { kind: "yes" }\n';
+  const aliases = Array.from(
+    { length: 12 },
+    (_, i) => `type C${i + 1}<T> = C${i}<T>;`,
+  );
+  const files = {
+    "bad.ts": bad,
+    "use.ts": [
+      'import { Failed } from "./bad";',
+      "class A { m() {} }",
+      "class B { m() {} }",
+      // 1. Element access with a literal key, and an index signature.
+      'class Box<T> { value!: keyof T extends "kind" ? A : B; self(): this { return this; } }',
+      "declare let b: Box<Failed>;",
+      'b["value"].m(); // element-literal',
+      'class IBox<T> { [key: string]: keyof T extends "kind" ? A : B; }',
+      "declare let ib: IBox<Failed>;",
+      'ib["anything"].m(); // index-signature',
+      // 2. A method returning `this` keeps the receiver's type arguments.
+      "b.self().value.m(); // this-method",
+      // 3. No depth limit on alias expansion.
+      'type C0<T> = keyof T extends "kind" ? A : B;',
+      ...aliases,
+      "class Deep<T> { value!: C12<T>; }",
+      "declare let deep: Deep<Failed>;",
+      "deep.value.m(); // alias-chain",
+      // 4. A type parameter is tainted only if its argument is.
+      "class Two<T, U> { value!: T extends string ? A : B; u!: U; }",
+      "declare let two: Two<string, Failed>;",
+      "two.value.m(); // untainted-parameter",
+      "",
+    ].join("\n"),
+  };
+  const broken = await brokenOf(files, {
+    "bad.ts": bad + "const broken = (;\n",
+  });
+  for (const marker of [
+    "element-literal",
+    "index-signature",
+    "this-method",
+    "alias-chain",
+  ])
+    isFailed(
+      linkAt(broken, "use.ts", `// ${marker}`, "m"),
+      { file: "bad.ts" },
+      marker,
+    );
+  isResolved(
+    linkAt(broken, "use.ts", "// untainted-parameter", "m"),
+    "use.ts#A.m",
+    "untainted-parameter",
+  );
+});
+
+test("O2: an overload whose parameter type depends on a failed file is not chosen, whatever the arguments", async () => {
+  const bad = "export class Job { x() {} }\n";
+  const files = {
+    "bad.ts": bad,
+    "use.ts": [
+      'import { Job } from "./bad";',
+      "export class A { m() {} }",
+      "export class B { m() {} }",
+      "declare function k(x: Job): A;",
+      "declare function k(x: number): B;",
+      "declare let n: number;",
+      "k(n).m(); // direct",
+      "const r = k(n);",
+      "r.m(); // variable",
+      "class W<T> { val!: T; }",
+      "declare function f(x: Job): W<A>;",
+      "declare function f(x: number): W<B>;",
+      "f(n).val.m(); // member-of-result",
+      "class S { pick(x: Job): A; pick(x: number): B; pick(x: unknown): A | B { return null as any; } }",
+      "new S().pick(n).m(); // method",
+      // Routes: destructuring, assignment, conditional, comma, ??, ||,
+      // a wrapper, element access, a callback parameter.
+      "const { val: dv } = f(n);",
+      "dv.m(); // destructuring",
+      "let as2: A | B = new A();",
+      "(as2 = k(n)).m(); // assignment",
+      "declare const flag: boolean;",
+      "(flag ? k(n) : k(n)).m(); // conditional",
+      "(0, k(n)).m(); // comma",
+      "(k(n) ?? k(n)).m(); // nullish",
+      "(k(n) || k(n)).m(); // or",
+      "function wrap() { return k(n); }",
+      "wrap().m(); // wrapper",
+      "[k(n)][0].m(); // element",
+      "[k(n)].forEach((x) => x.m()); // callback",
+      // One signature: nothing to choose.
+      "declare function one(x: Job): A;",
+      "one(n).m(); // single-signature",
+      // R-1: every overload returns the same class: its member set decides.
+      "declare function same(x: Job): A;",
+      "declare function same(x: number): A;",
+      "same(n).m(); // same-class",
+      "",
+    ].join("\n"),
+  };
+  const broken = await brokenOf(files, {
+    "bad.ts": bad + "const broken = (;\n",
+  });
+  for (const marker of [
+    "direct",
+    "variable",
+    "member-of-result",
+    "method",
+    "destructuring",
+    "assignment",
+    "conditional",
+    "comma",
+    "nullish",
+    "or",
+    "wrapper",
+    "element",
+    "callback",
+  ])
+    failsWith(
+      linkAt(broken, "use.ts", `// ${marker}`, "m"),
+      { file: "bad.ts" },
+      "parameter types depend on the failed file",
+      marker,
+    );
+  isResolved(
+    linkAt(broken, "use.ts", "// single-signature", "m"),
+    "use.ts#A.m",
+    "single-signature",
+  );
+  isResolved(
+    linkAt(broken, "use.ts", "// same-class", "m"),
+    "use.ts#A.m",
+    "same-class",
+  );
+});
+
+test("R-1 does not need the shared class to be untainted: its member set rule decides (M6)", async () => {
+  const bad = "export class Job { x() {} inherited() {} }\n";
+  const files = {
+    "bad.ts": bad,
+    "use.ts": [
+      'import { Job } from "./bad";',
+      "export class TD extends Job { own() {} }",
+      "declare function same(x: Job): TD;",
+      "declare function same(x: number): TD;",
+      "declare let n: number;",
+      "same(n).own(); // own-member",
+      "same(n).inherited(); // inherited-member",
+      "",
+    ].join("\n"),
+  };
+  const broken = await brokenOf(files, {
+    "bad.ts": bad + "const broken = (;\n",
+  });
+  isResolved(
+    linkAt(broken, "use.ts", "// own-member", "own"),
+    "use.ts#TD.own",
+    "own-member",
+  );
+  isFailed(
+    linkAt(broken, "use.ts", "// inherited-member", "inherited"),
+    { file: "bad.ts" },
+    "inherited-member",
+  );
+});
+
+test("O3: `this` denotes the receiver with its type arguments, along every route", async () => {
+  const bad = "export class Failed { m() {} }\n";
+  const files = {
+    "bad.ts": bad,
+    "use.ts": [
+      'import { Failed } from "./bad";',
+      "class TT<T> { self(): this { return this; } v!: T; }",
+      "declare let t: TT<Failed>;",
+      "t.v.m(); // control",
+      "t.self().v.m(); // self",
+      "const s = t.self();",
+      "s.v.m(); // variable",
+      "const { v: dv } = t.self();",
+      "dv.m(); // destructuring",
+      "declare const flag: boolean;",
+      "(flag ? t.self() : t).v.m(); // conditional",
+      "(0, t.self()).v.m(); // comma",
+      "(t.self() ?? t).v.m(); // nullish",
+      "function wrap() { return t.self(); }",
+      "wrap().v.m(); // wrapper",
+      "[t.self()][0].v.m(); // element",
+      "[t.self()].forEach((x) => x.v.m()); // callback",
+      "",
+    ].join("\n"),
+  };
+  const broken = await brokenOf(files, {
+    "bad.ts": bad + "const broken = (;\n",
+  });
+  for (const marker of [
+    "control",
+    "self",
+    "variable",
+    "destructuring",
+    "conditional",
+    "comma",
+    "nullish",
+    "wrapper",
+    "element",
+    "callback",
+  ])
+    isFailed(
+      linkAt(broken, "use.ts", `// ${marker}`, "m"),
+      { file: "bad.ts" },
+      marker,
+    );
+});
+
+test("default-deny: each explicit case, in both directions", async () => {
+  const bad = "export class Failed { m() {} }\n";
+  const files = {
+    "bad.ts": bad,
+    "ok.ts": "export class Fine { m() {} }\n",
+    "use.ts": [
+      'import { Failed } from "./bad";',
+      "class A { m() {} n!: number; }",
+      "class Box<T> { t!: T; a!: A; count!: number; self(): this { return this; } get gt(): T { return null as any; } get ga(): A { return new A(); } }",
+      "declare const bf: Box<Failed>;",
+      "declare const flag: boolean;",
+      // Expressions.
+      "const idT = bf.t;",
+      "idT.m(); // e-identifier-fail",
+      "const idA = bf.a;",
+      "idA.m(); // e-identifier-keep",
+      "class HF { f!: Failed; a!: A; run() {",
+      "  this.f.m(); // e-this-fail",
+      "  this.a.m(); // e-this-keep",
+      "} }",
+      "class SubB extends Box<Failed> { run() {",
+      "  super.self().t.m(); // e-super-fail",
+      "  super.self().a.m(); // e-super-keep",
+      "} }",
+      'bf["t"].m(); // e-element-fail',
+      'bf["a"].m(); // e-element-keep',
+      'declare const key: "t" | "a";',
+      "bf[key].m(); // e-element-computed",
+      "new Box<Failed>().t.m(); // e-new-fail",
+      "new Box<Failed>().a.m(); // e-new-keep",
+      "declare function tag(s: TemplateStringsArray): Box<Failed>;",
+      "tag`x`.t.m(); // e-tagged-fail",
+      "tag`x`.a.m(); // e-tagged-keep",
+      "declare const pbf: Promise<Box<Failed>>;",
+      "export async function aw() {",
+      "  (await pbf).t.m(); // e-await-fail",
+      "  (await pbf).a.m(); // e-await-keep",
+      "}",
+      "declare const u: unknown;",
+      "(u as Box<Failed>).t.m(); // e-as-fail",
+      "(bf as unknown as Box<A>).t.m(); // e-as-keep",
+      "(<Box<Failed>>u).t.m(); // e-assertion-fail",
+      "(bf satisfies object).t.m(); // e-satisfies-fail",
+      "(bf satisfies object).a.m(); // e-satisfies-keep",
+      "(flag ? bf : bf).t.m(); // e-conditional-fail",
+      "(flag ? bf : bf).a.m(); // e-conditional-keep",
+      "(bf || bf).t.m(); // e-binary-fail",
+      "(bf || bf).a.m(); // e-binary-keep",
+      "(bf.a.n + bf.count).toFixed(); // e-arithmetic-keep",
+      "[bf][0].t.m(); // e-array-fail",
+      "[bf][0].a.m(); // e-array-keep",
+      "({ v: bf }).v.t.m(); // e-object-fail",
+      "({ v: bf }).v.a.m(); // e-object-keep",
+      "(() => bf)().t.m(); // e-arrow-fail",
+      "(() => bf)().a.m(); // e-arrow-keep",
+      "(function () { return bf; })().t.m(); // e-function-fail",
+      "(function () { return bf; })().a.m(); // e-function-keep",
+      "new (class { b = bf; })().b.t.m(); // e-class-fail",
+      "new (class { b = bf; })().b.a.m(); // e-class-keep",
+      // Types (members of a container over the failed type).
+      'class W<T> { arr!: T[]; tup!: [A, T]; named!: [a: A, t: T]; opt!: [A, T?]; rest!: [A, ...T[]]; par!: (T); fn!: (x: T) => A; fnr!: () => T; ctor!: new () => T; lit!: { t: T; a: A }; uni!: T | A; inter!: T & A; ro!: readonly T[]; cond!: T extends object ? A : A; cond2!: string extends string ? A : A; imp!: import("./ok").Fine; }',
+      "declare const w: W<Failed>;",
+      "w.arr[0].m(); // t-array-fail",
+      "w.arr.length.toFixed(); // t-array-keep",
+      "w.tup[1].m(); // t-tuple-fail",
+      "w.tup[0].m(); // t-tuple-keep",
+      "w.named[1].m(); // t-named-fail",
+      "w.named[0].m(); // t-named-keep",
+      "w.opt[1]!.m(); // t-optional-fail",
+      "w.rest[1]!.m(); // t-rest-fail",
+      "w.par.m(); // t-paren-fail",
+      "w.fn(null!).m(); // t-function-keep",
+      "w.fnr().m(); // t-function-fail",
+      "new w.ctor().m(); // t-constructor-fail",
+      "w.lit.t.m(); // t-literal-fail",
+      "w.lit.a.m(); // t-literal-keep",
+      "w.uni.m(); // t-union-fail",
+      "w.inter.m(); // t-intersection-fail",
+      "w.ro[0].m(); // t-readonly-fail",
+      "w.ro.length.toFixed(); // t-readonly-keep",
+      "w.cond.m(); // t-conditional-fail",
+      "w.cond2.m(); // t-conditional-keep",
+      "w.imp.m(); // t-import-keep",
+      // Declarations.
+      "function pf(p: Box<Failed>) {",
+      "  p.t.m(); // d-parameter-fail",
+      "  p.a.m(); // d-parameter-keep",
+      "}",
+      "const { t: dt, a: da } = bf;",
+      "dt.m(); // d-binding-fail",
+      "da.m(); // d-binding-keep",
+      "const t = bf;",
+      "({ t }).t.t.m(); // d-shorthand-fail",
+      "({ t }).t.a.m(); // d-shorthand-keep",
+      "interface I<T> { get(): T; a: A }",
+      "declare const ii: I<Failed>;",
+      "ii.get().m(); // d-method-signature-fail",
+      "ii.a.m(); // d-property-signature-keep",
+      "bf.gt.m(); // d-getter-fail",
+      "bf.ga.m(); // d-getter-keep",
+      // Contextual parameters.
+      "declare const arrF: Failed[];",
+      "arrF.forEach((x) => x.m()); // c-call-fail",
+      "class Runner<T> { constructor(run: (x: T) => void, a: (y: A) => void) {} }",
+      "new Runner<Failed>((x) => x.m(), (y) => y.m()); // c-new",
+      "const cbf: (x: Failed) => void = (x) => x.m(); // c-variable-fail",
+      "const cba: (x: A) => void = (x) => x.m(); // c-variable-keep",
+      // Elements.
+      "declare const setF: Set<Failed>;",
+      "for (const s of setF) s.m(); // l-set-fail",
+      "declare const mapF: Map<A, Failed>;",
+      "for (const [k, v] of mapF) {",
+      "  k.m(); // l-map-keep",
+      "  v.m(); // l-map-fail",
+      "}",
+      "",
+    ].join("\n"),
+  };
+  const broken = await brokenOf(files, {
+    "bad.ts": bad + "const broken = (;\n",
+  });
+  const lines = files["use.ts"].split("\n");
+  const markers = lines.flatMap((line) =>
+    [...line.matchAll(/\/\/ ([a-z]-[a-z0-9-]+)/g)].map((m) => m[1]),
+  );
+  for (const marker of markers) {
+    if (marker === "c-new") continue;
+    const at =
+      marker.startsWith("t-array-keep") || marker.startsWith("t-readonly-keep")
+        ? "toFixed"
+        : marker === "e-arithmetic-keep"
+          ? "toFixed"
+          : "m";
+    const link = linkAt(broken, "use.ts", marker, at);
+    if (marker.endsWith("-fail") || marker === "e-element-computed")
+      isFailed(link, { file: "bad.ts" }, marker);
+    else keeps(link, marker);
+  }
+  // A constructor's callback parameters: the first is the failed type.
+  const runner = [...broken.links.values()].filter(
+    (l) => l.file === "use.ts" && l.line.includes("// c-new") && l.text === "m",
+  );
+  assert.equal(runner.length, 2);
+  isFailed(runner[0], { file: "bad.ts" }, "c-new x");
+  keeps(runner[1], "c-new y");
+});
+
+test("default-deny: each default branch fails a kind it does not handle", async () => {
+  const bad = "export class Failed { m() {} }\n";
+  const files = {
+    "tsconfig.json":
+      '{ "compilerOptions": { "allowJs": true, "checkJs": false, "target": "es2020", "lib": ["es2020"] } }\n',
+    "bad.ts": bad,
+    "box.ts":
+      'import { Failed } from "./bad";\nexport class Box<T> { t!: T; }\nexport declare const bf: Box<Failed>;\n',
+    "use.ts": [
+      'import { Failed } from "./bad";',
+      'import { bf } from "./box";',
+      // expression: yield
+      "export function* gen() { (yield bf).t.m(); /* default-expression */ }",
+      // declaration: a set-only accessor
+      "class SA<T> { set w(x: T) {} }",
+      "declare const sa: SA<Failed>;",
+      "sa.w.m(); // default-declaration",
+      // contextual: a callback in an object literal property
+      "declare function takes(o: { f: (x: Failed) => void }): void;",
+      "takes({ f: (x) => x.m() }); // default-contextual",
+      // element: a project iterable
+      "class Bag<T> { *[Symbol.iterator](): Iterator<T> { } }",
+      "declare const bag: Bag<Failed>;",
+      "for (const x of bag) x.m(); // default-element",
+      // await: a project thenable
+      "class Th<T> { then(r: (v: T) => void) { } }",
+      "declare const th: Th<Failed>;",
+      "export async function aw() { (await th).m(); /* default-await */ }",
+      // call: a generator's result
+      "function* g2() { yield bf; }",
+      "g2().next(); // default-call",
+      "",
+    ].join("\n"),
+    "use.js": [
+      'import { bf } from "./box";',
+      "/** @type {?import('./box').Box<import('./bad').Failed>} */",
+      "let jn = bf;",
+      "jn.t.m(); // default-type",
+      "",
+    ].join("\n"),
+  };
+  const broken = await brokenOf(files, {
+    "bad.ts": bad + "const broken = (;\n",
+  });
+  const cases = [
+    [
+      "use.ts",
+      "default-expression",
+      "m",
+      "unhandled expression YieldExpression",
+    ],
+    ["use.ts", "default-declaration", "m", "unhandled declaration SetAccessor"],
+    [
+      "use.ts",
+      "default-contextual",
+      "m",
+      "unhandled contextual PropertyAssignment",
+    ],
+    ["use.ts", "default-element", "m", "unhandled element Bag"],
+    ["use.ts", "default-await", "m", "unhandled await Th"],
+    ["use.ts", "default-call", "next", "unhandled call a generator"],
+    ["use.js", "default-type", "m", "unhandled type JSDocNullableType"],
+  ];
+  for (const [file, marker, at, via] of cases)
+    failsWith(
+      linkAt(broken, file, marker, at),
+      { file: "bad.ts" },
+      via,
+      marker,
+    );
+});
+
+test("default-deny: the handled kinds of each switch are listed", async () => {
+  await indexFiles({ "a.ts": "export const a = 1;\n" });
+  const { HANDLED } = await import(
+    "../dist/graph/languages/typescript/judge.js"
+  );
+  // Only kinds with an explicit case; everything else is FAILED.
+  assert.deepEqual(HANDLED, {
+    types: [
+      "AnyKeyword",
+      "UnknownKeyword",
+      "NumberKeyword",
+      "BigIntKeyword",
+      "BooleanKeyword",
+      "StringKeyword",
+      "SymbolKeyword",
+      "VoidKeyword",
+      "UndefinedKeyword",
+      "NeverKeyword",
+      "ObjectKeyword",
+      "IntrinsicKeyword",
+      "LiteralType",
+      "TypePredicate",
+      "ThisType",
+      "TypeReference",
+      "ExpressionWithTypeArguments",
+      "ArrayType",
+      "TupleType",
+      "NamedTupleMember",
+      "OptionalType",
+      "RestType",
+      "ParenthesizedType",
+      "FunctionType",
+      "ConstructorType",
+      "TypeLiteral",
+      "UnionType",
+      "IntersectionType",
+      "TypeOperator",
+      "ConditionalType",
+      "MappedType",
+      "IndexedAccessType",
+      "InferType",
+      "TemplateLiteralType",
+      "TypeQuery",
+      "ImportType",
+    ],
+    expressions: [
+      "Identifier",
+      "ThisKeyword",
+      "SuperKeyword",
+      "QualifiedName",
+      "PropertyAccessExpression",
+      "ElementAccessExpression",
+      "CallExpression",
+      "NewExpression",
+      "TaggedTemplateExpression",
+      "AwaitExpression",
+      "ParenthesizedExpression",
+      "NonNullExpression",
+      "AsExpression",
+      "TypeAssertionExpression",
+      "SatisfiesExpression",
+      "ConditionalExpression",
+      "BinaryExpression",
+      "ArrayLiteralExpression",
+      "ObjectLiteralExpression",
+      "FunctionExpression",
+      "ArrowFunction",
+      "ClassExpression",
+      "StringLiteral",
+      "NumericLiteral",
+      "BigIntLiteral",
+      "NoSubstitutionTemplateLiteral",
+      "TemplateExpression",
+      "RegularExpressionLiteral",
+      "TrueKeyword",
+      "FalseKeyword",
+      "NullKeyword",
+      "PrefixUnaryExpression",
+      "PostfixUnaryExpression",
+      "TypeOfExpression",
+      "VoidExpression",
+      "DeleteExpression",
+      "MetaProperty",
+    ],
+    declarations: [
+      "VariableDeclaration",
+      "Parameter",
+      "BindingElement",
+      "PropertyDeclaration",
+      "PropertySignature",
+      "PropertyAssignment",
+      "ShorthandPropertyAssignment",
+      "MethodDeclaration",
+      "MethodSignature",
+      "FunctionDeclaration",
+      "FunctionExpression",
+      "ArrowFunction",
+      "GetAccessor",
+      "IndexSignature",
+      "EnumMember",
+      "EnumDeclaration",
+      "ClassDeclaration",
+      "ClassExpression",
+      "ModuleDeclaration",
+      "SourceFile",
+    ],
+    contextual: [
+      "CallExpression",
+      "NewExpression",
+      "VariableDeclaration",
+      "PropertyDeclaration",
+      "ExpressionStatement",
+    ],
+    element: [
+      "failed",
+      "clean",
+      "union",
+      "tuple",
+      "checked",
+      "object (library iterables)",
+    ],
+    await: [
+      "failed",
+      "clean",
+      "union",
+      "checked",
+      "object (library promises, non-thenables)",
+      "literal (non-thenable)",
+      "other non-thenables",
+    ],
+    call: [
+      "failed",
+      "clean",
+      "checked",
+      "function",
+      "static (new of a class)",
+      "object (call/construct signatures)",
+      "literal (call/construct signatures)",
+      "union",
+    ],
+  });
+});
+
+test("O2 at the call link: distinct targets with a failed parameter type fail; a tainted argument does too", async () => {
+  const bad = "export class Job { x() {} }\n";
+  const files = {
+    "bad.ts": bad,
+    "use.ts": [
+      'import { Job } from "./bad";',
+      "export class A { m() {} }",
+      "export class B { m() {} }",
+      "interface I1 { f(x: Job): A }",
+      "interface I2 { f(x: number): B }",
+      "declare const u12: I1 | I2;",
+      "declare let n: number;",
+      "u12.f(n as never); // union-targets",
+      // Neither signature mentions the failed file: the argument decides.
+      "declare function pk3(x: number): A;",
+      "declare function pk3(x: unknown): B;",
+      "declare const fv: Job;",
+      "pk3(fv).m(); // tainted-argument",
+      "",
+    ].join("\n"),
+  };
+  const broken = await brokenOf(files, {
+    "bad.ts": bad + "const broken = (;\n",
+  });
+  failsWith(
+    linkAt(broken, "use.ts", "// union-targets", "f"),
+    { file: "bad.ts" },
+    "overloaded callee whose parameter types depend on the failed file",
+    "union-targets",
+  );
+  failsWith(
+    linkAt(broken, "use.ts", "// tainted-argument", "m"),
+    { file: "bad.ts" },
+    "with a tainted argument",
+    "tainted-argument",
+  );
+});
+
+test("a member set reaches a failed file through any number of heritage steps (no pass limit)", async () => {
+  const bad = "export class Failed { m() {} }\n";
+  const chain = Array.from(
+    { length: 90 },
+    (_, i) => `class H${i + 1} extends H${i} {}`,
+  );
+  const files = {
+    "bad.ts": bad,
+    "use.ts": [
+      'import { Failed } from "./bad";',
+      "class V { v() {} }",
+      "class H0 extends Failed {}",
+      ...chain,
+      "interface H90 extends V {}",
+      "new H90().v(); // deep-heritage",
+      "",
+    ].join("\n"),
+  };
+  const broken = await brokenOf(files, {
+    "bad.ts": bad + "const broken = (;\n",
+  });
+  isFailed(
+    linkAt(broken, "use.ts", "// deep-heritage", "v"),
+    { file: "bad.ts" },
+    "deep-heritage",
+  );
+});
+
+test("heritage through a name only a failed script declares taints the member set (O1)", async () => {
+  const script = "class SC { m() {} }\n";
+  const files = {
+    "sc.ts": script,
+    "use.ts": [
+      "export {};",
+      "class V { v() {} }",
+      "class D extends SC {}",
+      "interface D extends V {}",
+      "new D().v(); // script-heritage",
+      "",
+    ].join("\n"),
+  };
+  const broken = await brokenOf(files, {
+    "sc.ts": script + "const broken = (;\n",
+  });
+  isFailed(
+    linkAt(broken, "use.ts", "// script-heritage", "v"),
+    { file: "sc.ts" },
+    "script-heritage",
+  );
 });
