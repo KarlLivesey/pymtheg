@@ -356,9 +356,7 @@ export class GoExtractor {
       case "sel":
         return { k: "sel", x: next(desc.x), n: desc.n };
       case "inst":
-        return desc.ta
-          ? { k: "inst", x: next(desc.x), ta: desc.ta.map(next) }
-          : { k: "inst", x: next(desc.x) };
+        return { k: "inst", x: next(desc.x) };
       case "local":
         return desc.m || desc.f
           ? {
@@ -382,7 +380,6 @@ export class GoExtractor {
           f: next(desc.f),
           i: desc.i,
           ...(desc.b ? { b: next(desc.b) } : {}),
-          ...(desc.ta ? { ta: desc.ta.map(next) } : {}),
         };
       case "elem":
       case "key":
@@ -1082,13 +1079,9 @@ export class GoExtractor {
     switch (current.type) {
       case "pointer_type":
         return of(named(current)[0] ?? null);
-      case "generic_type": {
-        // The base type, with its type arguments kept as written (instantiation
-        // is not modelled; the arguments only tell which types are mentioned).
-        const base = of(field("type"));
-        const args = this.typeArgs(field("type_arguments"));
-        return base.k === "val" && args.length ? { ...base, ta: args } : base;
-      }
+      case "generic_type":
+        // The base type; instantiation is not modelled.
+        return of(field("type"));
       case "type_identifier": {
         const bound = this.local(current.text);
         if (bound?.k === "localtype")
@@ -1139,11 +1132,32 @@ export class GoExtractor {
           ...(f.length ? { f } : {}),
         };
       }
-      default: {
-        // An anonymous interface type: keep the types written in it.
-        const m = this.mentioned(current);
-        return m.length ? { k: "local", m } : { k: "local" };
+      case "interface_type": {
+        // An anonymous interface: its methods (as func values), and the types
+        // it embeds.
+        const f: { n: string; d: Desc }[] = [];
+        const m: Desc[] = [];
+        for (const item of named(current)) {
+          if (item.type === "method_elem") {
+            const name = item.childForFieldName("name");
+            if (name)
+              f.push({
+                n: name.text,
+                d: {
+                  k: "func",
+                  r: this.resultDescs(item.childForFieldName("result")),
+                },
+              });
+          } else if (item.type !== "comment") m.push(...this.mentioned(item));
+        }
+        return {
+          k: "local",
+          ...(m.length ? { m } : {}),
+          ...(f.length ? { f } : {}),
+        };
       }
+      default:
+        return { k: "local" };
     }
   }
 
@@ -1281,25 +1295,13 @@ export class GoExtractor {
         // A callee not described (a parenthesized conversion type such as
         // `(*p.T)(x)`) keeps what is written in it.
         if (!f) return { k: "unknown", m: [this.desc(fn)] };
-        // `F[A](x)`: the type arguments written, for the failed-file backstop.
-        const operand =
-          callee.type === "index_expression"
-            ? callee.childForFieldName("operand")
-            : null;
-        const ta = operand ? this.instDesc(callee, operand).ta : undefined;
-        return ta ? { k: "call", f, i: 0, ta } : { k: "call", f, i: 0 };
+        return { k: "call", f, i: 0 };
       }
       case "type_conversion_expression": {
         const type = current.childForFieldName("type");
         if (!type) return { k: "unknown" };
         const f = this.typeNameDesc(type);
-        if (!f) return this.typedValue(type);
-        // `G[A](x)`: a generic function instantiated, or a generic type converted.
-        const ta =
-          type.type === "generic_type"
-            ? this.typeArgs(type.childForFieldName("type_arguments"))
-            : [];
-        return ta.length ? { k: "call", f, i: 0, ta } : { k: "call", f, i: 0 };
+        return f ? { k: "call", f, i: 0 } : this.typedValue(type);
       }
       default:
         return { k: "unknown" };
@@ -1318,37 +1320,6 @@ export class GoExtractor {
       return operand ? this.calleeDesc(unparen(operand)) : null;
     }
     return null;
-  }
-  /**
-   * `x[…]` as a callee, keeping index expressions that read as types (names,
-   * qualified names, type literals) as its possible type arguments.
-   */
-  private instDesc(callee: Node, operand: Node): Extract<Desc, { k: "inst" }> {
-    const ta = callee.namedChildren
-      .filter(
-        (child): child is Node =>
-          !!child &&
-          child.id !== operand.id &&
-          (child.type === "identifier" ||
-            child.type === "selector_expression" ||
-            child.type.endsWith("_type")),
-      )
-      .map((child) =>
-        child.type.endsWith("_type")
-          ? this.typedValue(child)
-          : this.desc(child),
-      );
-    return ta.length
-      ? { k: "inst", x: this.desc(operand), ta }
-      : { k: "inst", x: this.desc(operand) };
-  }
-  /** Type arguments as written, as values of each type. */
-  private typeArgs(node: Node | null): Desc[] {
-    return named(node).map((item) =>
-      this.typedValue(
-        item.type === "type_elem" ? (named(item)[0] ?? item) : item,
-      ),
-    );
   }
   private typeNameDesc(type: Node): Desc | null {
     const current =
@@ -1632,7 +1603,7 @@ export class GoExtractor {
         const operand = callee.childForFieldName("operand");
         this.link("calls", compact(callee), range(callee), {
           expr: (operand
-            ? this.instDesc(callee, operand)
+            ? { k: "inst", x: this.desc(operand) }
             : { k: "unknown" }) as unknown as Json,
         });
         // The container (or generic function) itself is referenced.

@@ -374,12 +374,16 @@ N–M: <message>`. Its `range` covers those whole lines. The range brackets
   - **The range** runs from the line where the last valid token before the
     ERROR or MISSING node ends, to the line of the first real token after it
     (or the node's own end, if later).
-  - **An unterminated string, rune or raw string** at or before that range is
-    Go's first error, and tree-sitter reports it late. The text is read as Go's
-    scanner does (comments, raw strings, escapes): an interpreted string or
-    rune ends at its line's end, a raw string at the end of the file. The range
-    then starts at the opening quote's line, and the message is `string not
-terminated` (`rune …`, `raw string …`).
+  - **An unterminated string, rune or raw string** may be Go's first error,
+    and tree-sitter reports it late. The text is read as Go's scanner does
+    (comments, raw strings, escapes): an interpreted string or rune ends at its
+    line's end, a raw string at the end of the file.
+    - Before the range, the literal is the first error: the range is its
+      opening quote's line.
+    - Inside the range, the range only widens to include the quote's line,
+      never narrows (round 16): an earlier error may be there.
+    - The message names it (`string not terminated`, `rune …`,
+      `raw string …`) only when the quote is on the range's first line.
   - **The message** is plain text from the tree. A MISSING node gives
     ``missing `<token>` ``. An ERROR node gives ``unexpected `<text>` ``: the
     first token after the node's last child, or a stray closing or separator
@@ -388,11 +392,13 @@ terminated` (`rune …`, `raw string …`).
   - **A clause problem** (`no package clause`, `second package clause`, or
     top-level text Go does not allow) keeps its exact `line L, column C`
     position, with columns counting UTF-16 units.
-  - **Checked against `gofmt -e`** (Go 1.27.4) on 29 broken files: my 8, the
+  - **Checked against `gofmt -e`** (Go 1.27.4) on 36 broken files: my 8, the
     reviewer's 4 from round 15, 10 more of mine, the 4 from the round-15 Opus
     review (an unterminated `"os` in an import block, a missing comma in a map
     literal, `return (1 + 2` before `}`, an unclosed `{` at the end of the
-    file) and 3 more unterminated literals. gofmt's first-error line lies
+    file), 3 more unterminated literals, and round 16's 7 (3 from Opus, 4
+    from Sol) where an unterminated literal follows an earlier error. gofmt's
+    first-error line lies
     inside the range in every case (`test/graph-go-failed-files.test.mjs`
     records gofmt's lines; the test does not run gofmt).
 - **Links that need a failed file fail too.** One rule decides it: the scope
@@ -429,28 +435,48 @@ terminated` (`rune …`, `raw string …`).
 p.New(); x.M()` fails when `p.New` is valid but its result type `T` is in a
     failed file.
   - **A backstop where every link is finalised.** A link about to be emitted
-    as not resolved fails when any type its source mentions needs a failed
-    file. "Not resolved" means plainly unresolved, an unknown receiver, a
-    name-only set, or an over-cap set; it excludes a definite target and an
-    interface-dispatch set over known types. - Its cause is the union of the failed-file causes of every type term the
-    source mentions: the written types of the receiver chain's values,
-    variables, parameters, fields and results, including type arguments
-    (`Box[p.T]`), followed through valid declarations (underlying types of
-    defined types, alias targets, embedded fields). - Types written in the receiver expression itself count the same way:
-    conversion types (`(*p.T)(nil)`, `interface{ Get() p.T }(nil)`),
-    composite-literal types (`struct{ p.T }{}`), anonymous struct, interface
-    and func types (in a declaration, `var w struct{ F p.T }`, or as an
-    element, `[2]struct{ p.T }`), and type arguments (`p.Id[*p.T](x)`). The
-    extractor keeps the named types written in such a type on the value's
-    description. A generic call's result counts the type arguments written on
-    the call, on the callee and on the receiver's declared type
-    (`var b Box[*p.T]; b.Get()`), since instantiation is not modelled. - "Depends on a failed file" is decided by what the source mentions, not by
-    how far resolution got. Instantiation is not modelled. - It follows only what the lookup depends on: for a call, the result it
-    uses; for a member found on a type, not what that type embeds; for a
-    named field of an anonymous struct, only that field's type (restic's
-    table tests, `for _, test := range []struct{ name string; damage
-func(*Repository) }`, keep `test.name` free of the failed
-    `Repository`).
+    as not resolved fails when it certainly depends on a failed file. "Not
+    resolved" means plainly unresolved, an unknown receiver, a name-only set,
+    or an over-cap set. It excludes a definite target and an interface-dispatch
+    set that has members.
+    - **A wrong cause is worse than a missing one** (round 16 ruling).
+      Plainly unresolved honestly says "not known". `invalid-code` asserts
+      that the link failed because that file is broken. So the backstop marks
+      a link only when the dependence is certain from what it can see, and
+      otherwise leaves it plainly unresolved.
+    - **What it follows.** The lookups that name the link (`p.X` where `p`'s
+      `X` could be in a failed file). Along the receiver chain, only the part
+      of each type the next step uses:
+      - a member set, and what a type embeds only when the member was not
+        found on the type itself (depth 0);
+      - a container's element (index, range value, receive) or key (range
+        key), never both;
+      - the one result of a call that is used;
+      - a named field or method of an anonymous struct or interface: only its
+        own type.
+
+      Each step carries this explicitly: the walk takes a required "use"
+      argument, so a route that forgets it does not compile.
+
+    - **Followed through valid declarations:** variables, parameters, fields,
+      results, defined types' underlying types, alias targets and embedded
+      fields.
+    - **And through types written in the receiver expression itself:**
+      - conversions, as in `(*p.T)(nil).M()`;
+      - composite literals, as in `struct{ p.T }{}.N()`;
+      - anonymous struct, interface and func types, as in `w.F.N()` for
+        `var w struct{ F p.T }`, and in `[2]struct{ p.T }` and
+        `[](func() p.T)`.
+    - **Not followed: type arguments.** There is no instantiation modelling.
+      A generic instantiation whose argument failed does not by itself fail a
+      link through the generic type. `var b Box[p.T]; b.X.M()` and
+      `b.Get().M()`, and `p.Id[*p.T](nil).M()`, are plainly unresolved. This
+      reverses round 15's examples, by the round 16 ruling.
+    - **The callee itself is not a dependent.** An anonymous interface- or
+      func-typed callee (`interface{ Get() p.T }(nil).Get`, `h[0]`, a
+      conversion callee `*p.T`) is what it would be without the failed file.
+      Only the method call on its result fails.
+
   - The link has no target, no candidates, and no would-be target. No symbol
     inside a failed file is named, and it is never a member of any set.
   - An import of a package all of whose files failed is itself failed, with
@@ -479,7 +505,8 @@ func(*Repository) }`, keep `test.name` free of the failed
     interface with only exported methods can be implemented from any package
     (a third package may do the conversion), so any such file anywhere counts;
     one sealed by an unexported method only from a package that reaches its
-    own. A directory whose every file failed counts too.
+    own. A directory whose every file failed counts too: it is a placeholder
+    package at its import path, lossy, for reach only (round 16).
   - When no valid member is left (the only implementer was in the failed
     file), the dispatch link is unresolved with `data.open.reason` set to
     `declarations-may-be-unseen`, never plainly unresolved: its target may be
@@ -1063,6 +1090,37 @@ The module version is 18.
     reasons, and M47 is guarded by it again.
 
 The module version is 19.
+
+## Module version 20 (sixteenth review)
+
+- **The backstop marks only certain dependence** (see "Failed files"). A
+  container contributes only the component used. Type arguments are not
+  followed. `embedded` is carried explicitly on every route. An anonymous
+  callee itself is not a dependent. Round 15's generic examples are now plainly
+  unresolved, by ruling.
+- **An unterminated literal after an earlier error** no longer narrows the
+  diagnostic range.
+- **A directory whose every file failed** reaches what it may import: a
+  sealed interface it reaches carries `declarations-may-be-unseen`.
+- **Combined decisions** (a call through several possible function values,
+  including reassigned interface method values) are merged by one function
+  over the whole decision record. Every field has a merge rule, checked at
+  compile time: reasons are unioned, openness is the weakest, a part without
+  targets leaves the whole without targets, and a failure fails it. `open` is
+  now a list of reasons on a decision. The other places a set is formed (build
+  variants, ambiguous selectors, multi-spec dispatch) build one decision from
+  symbols, not from decisions, and are labelled by the same `reasons` step.
+- **Logged, not in this PR:** `declarations-may-be-unseen` marks every set an
+  exported-method interface could in principle gain a member for, although
+  the failed file's package cannot reach most call sites (all 1,117 newly
+  marked restic sets). This is consistent with the stated rule: over-marking
+  by design.
+- **Tests:** `test/graph-go-review15.test.mjs` (round 16 cases), and 36
+  diagnostic cases.
+- **Mutations:** M106–M110 are new. M95–M99 and M105 are re-pointed: M98 now
+  follows type arguments and M99 follows the map key.
+
+The module version is 20.
 
 ## Core after PR 11 (W2-I)
 

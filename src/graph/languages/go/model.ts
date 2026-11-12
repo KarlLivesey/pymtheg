@@ -22,18 +22,14 @@ export type Desc =
   /** `x.n` */
   | { k: "sel"; x: Desc; n: string }
   /** A value whose named type is syntactically evident (declared type, literal, new, assertion). */
-  | { k: "val"; t: TypeRef; ta?: Desc[] }
+  | { k: "val"; t: TypeRef }
   /**
    * Result `i` of calling `f` (function, method, conversion or func value). `b`: the
    * result if `f` turns out to be the builtin itself (`new`, `make`, `append`).
-   * `ta`: type arguments written on a conversion-shaped callee (`G[A](x)`).
    */
-  | { k: "call"; f: Desc; i: number; b?: Desc; ta?: Desc[] }
-  /**
-   * The callee `x[…]` of a call: a generic instantiation when x is a function, else
-   * an element. `ta`: what the index expressions describe, read as type arguments.
-   */
-  | { k: "inst"; x: Desc; ta?: Desc[] }
+  | { k: "call"; f: Desc; i: number; b?: Desc }
+  /** The callee `x[…]` of a call: a generic instantiation when x is a function, else an element. */
+  | { k: "inst"; x: Desc }
   /** An element (`elem`) or key (`key`) of a slice/map/channel/array value: range, index, receive. */
   | { k: "elem"; x: Desc }
   | { k: "key"; x: Desc }
@@ -51,8 +47,8 @@ export type Desc =
   | { k: "var"; d: Desc; alts?: Desc[] }
   /**
    * A local without a syntactically evident type. For an anonymous struct or
-   * interface type: `m`, the named types written in it (a struct's embedded
-   * fields only), as values; `f`, a struct's named fields.
+   * interface type: `m`, the named types it embeds, as values; `f`, its named
+   * fields (a struct) or methods as func values (an interface).
    */
   | { k: "local"; m?: Desc[]; f?: { n: string; d: Desc }[] }
   /** A value whose type is known to defeat member resolution (local named type). */

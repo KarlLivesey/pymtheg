@@ -279,7 +279,7 @@ function analyze({
 
 const go: LanguageModule = {
   id: ID,
-  version: "19",
+  version: "20",
   extensions: [".go"],
   contextFiles: ["go.mod", "go.work"],
   parse,

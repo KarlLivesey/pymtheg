@@ -198,7 +198,7 @@ test("a failed file says which lines bracket the error, and gofmt's line is insi
     [
       'package p\n\nimport (\n\t"fmt"\n\t"os\n\t"strings"\n)\n\nfunc F() { fmt.Println(os.Args, strings.ToUpper("")) }\n',
       5,
-      "syntax error in lines 5\u20136: string not terminated",
+      'syntax error in lines 4\u20136: unexpected `"`',
     ],
     // e7: gofmt -e (Go 1.27.4) reports 3:9: string literal not terminated
     [
@@ -210,10 +210,53 @@ test("a failed file says which lines bracket the error, and gofmt's line is insi
     [
       "package p\n\nfunc F() {\n\tx := `abc\n}\n",
       4,
-      "syntax error in lines 4\u20136: raw string not terminated",
+      "syntax error in lines 3\u20136: unexpected end of file",
+    ],
+    // Round 16: an unterminated literal after an earlier error never narrows the range.
+    // z1 (Opus round 16): gofmt -e (Go 1.27.4) reports 4:17: missing ',' before newline in composite literal
+    [
+      'package p\n\nfunc f() {\n\ta := []int{1, 2\n\tb := "x\n}\n',
+      4,
+      "syntax error in lines 4\u20135: unexpected `x`",
+    ],
+    // z2 (Opus round 16): gofmt -e (Go 1.27.4) reports 3:30: missing ',' before newline in composite literal
+    [
+      'package p\n\nvar m = map[string]int{"a": 1\nvar s = "abc\n',
+      3,
+      "syntax error in lines 1\u20135: unexpected end of file",
+    ],
+    // z3 (Opus round 16): gofmt -e (Go 1.27.4) reports 5:4: expected '==', found '='
+    [
+      "package p\n\nfunc f() {\n\tx := ((\n\t_ = x\n\ty := `abc\n}\n",
+      5,
+      "syntax error in lines 3\u20138: unexpected end of file",
+    ],
+    // z4 (Sol round 16): gofmt -e (Go 1.27.4) reports 3:7: expected operand, found ')'
+    [
+      'package p\nfunc F(){\n x := )\n y := "abc\n}\n',
+      3,
+      'syntax error in lines 3\u20134: unexpected `"`',
+    ],
+    // z5 (Sol round 16): gofmt -e (Go 1.27.4) reports 3:7: expected operand, found ')'
+    [
+      "package p\nfunc F(){\n x := )\n y := 'a\n}\n",
+      3,
+      "syntax error in lines 3\u20134: unexpected `)`",
+    ],
+    // z6 (Sol round 16): gofmt -e (Go 1.27.4) reports 3:7: expected operand, found ')'
+    [
+      "package p\nfunc F(){\n x := )\n y := `abc\n}\n",
+      3,
+      "syntax error in lines 2\u20136: unexpected end of file",
+    ],
+    // z7 (Sol round 16): gofmt -e (Go 1.27.4) reports 2:9: expected operand, found ')'
+    [
+      'package p\nvar x = )\nvar y = "abc\n',
+      2,
+      "syntax error in lines 1\u20134: unexpected end of file",
     ],
   ];
-  assert.equal(CASES.length, 29);
+  assert.equal(CASES.length, 36);
   for (const [text, gofmtLine, message] of CASES) {
     const parsed = await go.parse({ path: "p/x.go", text });
     assert.equal(parsed.status, "failed", text);

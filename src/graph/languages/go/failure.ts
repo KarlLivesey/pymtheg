@@ -248,8 +248,12 @@ export function syntaxFailure(
       let lines = bracket(root, text, first);
       if (literal && lineOf(text, literal.at) <= lines.last) {
         const line = lineOf(text, literal.at);
-        lines = { first: line, last: line < lines.first ? line : lines.last };
-        message = literal.message;
+        // Before the bracket, the literal is the first error. Inside it, the
+        // range keeps its start (an earlier error may be there: the range
+        // never narrows), and the literal is named only on the first line.
+        if (line < lines.first) lines = { first: line, last: line };
+        if (line <= lines.first) message = literal.message;
+        lines = { first: Math.min(line, lines.first), last: lines.last };
       }
       return {
         message: `syntax error in ${

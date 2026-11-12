@@ -67,7 +67,6 @@ test("safety: every way of reaching a failed file's type fails with it as the ca
   for (const at of [
     "q.M",
     "qa.M",
-    "b.X.M",
     "a.B.T.M",
     "s[0].M",
     'm["a"].M',
@@ -93,6 +92,13 @@ test("safety: every way of reaching a failed file's type fails with it as the ca
     assert.equal(link.data.reason, "invalid-code", at);
     assert.deepEqual(link.data.cause, { files: ["p/bad.go"] }, at);
   }
+  // Round 16 ruling: type arguments are not followed. `X` is a type
+  // parameter of Box; that it is instantiated with p.T is not modelled.
+  const generic = links.find(
+    (item) => item.file === "q/q.go" && item.at === "b.X.M",
+  );
+  assert.equal(generic.data.reason, undefined);
+  assert.equal(generic.data.cause, undefined);
 });
 
 test("the backstop leaves valid code alone", async () => {
@@ -177,7 +183,7 @@ const failedWith = (link, label) => {
   assert.deepEqual(link.data.cause, { files: ["p/bad.go"] }, label);
 };
 
-test("safety: B1 types written in the receiver expression itself are involved", async () => {
+test("safety: B1 types written in the receiver expression itself are involved; the callee itself is not", async () => {
   // The reviewer's acceptance cases (round 15). `r` gives every name a
   // name-only match elsewhere, so a missed cause shows as a candidate set.
   const { links } = await project({
@@ -224,10 +230,7 @@ test("safety: B1 types written in the receiver expression itself are involved", 
     "interface{ Get() p.T }(nil).Get().N",
     "arr[1].N",
     "h[0]().N",
-    "*p.T",
     "(*p.T)(nil).M",
-    "b.Get().M",
-    "p.Id[*p.T](nil).M",
     "w.F.N",
   ])
     failedWith(
@@ -237,6 +240,23 @@ test("safety: B1 types written in the receiver expression itself are involved", 
       ),
       at,
     );
+  // Controls (round 16 ruling). The anonymous-typed callee itself does not
+  // depend on p.T, and type arguments are not followed: plainly unresolved.
+  for (const text of [
+    "interface{ Get() p.T }(nil).Get",
+    "h[0]",
+    "*p.T",
+    "b.Get().M",
+    "p.Id[*p.T](nil).M",
+  ]) {
+    const link = links.find(
+      (item) =>
+        item.file === "q/q.go" && item.kind === "calls" && item.at === text,
+    );
+    assert.ok(link, text);
+    assert.equal(link.data.reason, undefined, text);
+    assert.equal(link.data.cause, undefined, text);
+  }
   // Control: the generic method and function themselves are valid and definite.
   const at = (text) =>
     links.find(
@@ -391,4 +411,292 @@ test("(i) a sealed interface a failed file's package reaches: unseen, never outs
   assert.deepEqual(call(links, "internal/x/x.go", "v.M").data.open, {
     reason: "structural-match-unverified",
   });
+});
+
+test("round 16 B1: a cause only where the dependence is certain", async () => {
+  // Each snippet passes `go build` with bad.go fixed (Go 1.27.4).
+  const { links } = await project({
+    "go.mod": MOD,
+    "p/bad.go": lines(
+      "package p",
+      "type T struct{}",
+      "func (T) M() {}",
+      "func F() { (( }",
+    ),
+    "p/ok.go": lines("package p", "func G() {}"),
+    "r/r.go": lines("package r", "type A struct{}", "func (A) N() {}"),
+    "q/q.go": lines(
+      "package q",
+      "import (",
+      '\t"bytes"',
+      '\t"example.com/m/p"',
+      '\t"example.com/m/r"',
+      ")",
+      "type Pair[L, R any] struct {",
+      "\tL L",
+      "\tR R",
+      "}",
+      "type S struct {",
+      "\tp.T",
+      "\tB bytes.Buffer",
+      "}",
+      "var gs S",
+      "func Use(m map[p.T]*bytes.Buffer, k p.T, pr Pair[p.T, r.A], sl []S) {",
+      "\tfor _, v := range m {",
+      "\t\tv.Write(nil)",
+      "\t}",
+      "\tm[k].Write(nil)",
+      "\tpr.R.N()",
+      "\tgs.B.Write(nil)",
+      "\tvar s S",
+      "\tps := &s",
+      "\tps.B.Write(nil)",
+      "\ts.B.Write(nil)",
+      "\tsl[0].B.Write(nil)",
+      "\tvar x struct{ S }",
+      "\tx.B.Write(nil)",
+      "\tfor key := range m {",
+      "\t\tkey.M()",
+      "\t}",
+      "}",
+    ),
+  });
+  const at = (text) =>
+    links.find(
+      (item) =>
+        item.file === "q/q.go" && item.kind === "calls" && item.at === text,
+    );
+  // The map's key type failed, but only the element is used.
+  for (const text of [
+    "v.Write",
+    "m[k].Write",
+    // A type argument failed: not followed.
+    "pr.R.N",
+    // A depth-0 named field beside an embedded failed type, on every route.
+    "gs.B.Write",
+    "ps.B.Write",
+    "s.B.Write",
+    "sl[0].B.Write",
+    "x.B.Write",
+  ]) {
+    const link = at(text);
+    assert.ok(link, text);
+    assert.equal(link.data.reason, undefined, text);
+    assert.equal(link.data.cause, undefined, text);
+  }
+  // The range key is the failed type: certain.
+  assert.equal(at("key.M").data.reason, "invalid-code");
+  assert.deepEqual(at("key.M").data.cause, { files: ["p/bad.go"] });
+});
+
+test("round 16 Sol: a used map value and a generic's other argument are what they are with the file fixed", async () => {
+  const files = (broken) => ({
+    "go.mod": MOD,
+    "p/bad.go": lines(
+      "package p",
+      "type T struct{}",
+      "func (T) M() {}",
+      broken ? "func F() { (( }" : "func F() {}",
+    ),
+    "r/r.go": lines("package r", "type A struct{}", "func (A) M() {}"),
+    "q/q.go": lines(
+      "package q",
+      "import (",
+      '\t"time"',
+      '\t"example.com/m/p"',
+      '\t"example.com/m/r"',
+      ")",
+      "type Pair[F, S any] struct {",
+      "\tFirst  F",
+      "\tSecond S",
+      "}",
+      "func (v Pair[F, S]) Get() S { return v.Second }",
+      "func F(m map[p.T]time.Time, key p.T, v Pair[p.T, r.A]) {",
+      "\tvalue := m[key]",
+      "\tvalue.IsZero()",
+      "\tv.Second.M()",
+      "\tv.Get().M()",
+      "}",
+    ),
+  });
+  const shape = (links, text) => {
+    const link = links.find(
+      (item) =>
+        item.file === "q/q.go" && item.kind === "calls" && item.at === text,
+    );
+    assert.ok(link, text);
+    return {
+      target: link.target,
+      candidates: link.candidates,
+      reason: link.data.reason,
+      cause: link.data.cause,
+      open: link.data.open,
+    };
+  };
+  const broken = (await project(files(true))).links;
+  const fixed = (await project(files(false))).links;
+  for (const text of ["value.IsZero", "v.Second.M", "v.Get().M"])
+    assert.deepEqual(shape(broken, text), shape(fixed, text), text);
+  assert.equal(shape(broken, "value.IsZero").reason, undefined);
+});
+
+test("round 16 B3: a directory whose every file failed still reaches a sealed interface", async () => {
+  const files = (extra) => ({
+    "go.mod": MOD,
+    "a/internal/s/s.go": lines(
+      "package s",
+      "type Sealed interface{ M(); seal() }",
+      "type impl struct{}",
+      "func (impl) M() {}",
+      "func (impl) seal() {}",
+      "func Use(a Sealed) { a.M() }",
+    ),
+    ...extra,
+  });
+  const reasons = async (extra) => {
+    const { links } = await project(files(extra));
+    const open = call(links, "a/internal/s/s.go", "a.M").data.open;
+    return open.reasons ?? [open.reason];
+  };
+  const bad = { "a/c/bad.go": lines("package c", "func Bad() { (( }") };
+  // The failed file alone in its directory, and with a valid file beside it.
+  assert.ok((await reasons(bad)).includes("declarations-may-be-unseen"));
+  assert.ok(
+    (
+      await reasons({
+        ...bad,
+        "a/c/ok.go": lines("package c", "func Ok() {}"),
+      })
+    ).includes("declarations-may-be-unseen"),
+  );
+  // Control: a failed-only directory that may not import a/internal/s.
+  assert.deepEqual(
+    await reasons({ "b/bad.go": lines("package b", "func Bad() { (( }") }),
+    ["structural-match-unverified"],
+  );
+});
+
+test("round 16 Sol 4: combined decisions keep every property of every part", async () => {
+  const reasonsOf = (link) =>
+    link.data.open?.reasons ?? (link.data.open ? [link.data.open.reason] : []);
+  const UNSEEN = "declarations-may-be-unseen";
+  // The reviewer's repro: a reassigned interface method value.
+  const repro = (bad) => ({
+    "go.mod": MOD,
+    "p/p.go": lines(
+      "package p",
+      "type I interface{ M() }",
+      "type A struct{}",
+      "func (A) M() {}",
+      "func F(i I, a A, change bool) { f := i.M; if change { f = a.M }; f() }",
+    ),
+    ...(bad ? { "q/bad.go": lines("package q", "func Broken() { (( }") } : {}),
+  });
+  let { links } = await project(repro(true));
+  const f = call(links, "p/p.go", "f");
+  assert.deepEqual(f.candidates, ["p/p.go:method:(A).M", "p/p.go:method:I.M"]);
+  assert.ok(reasonsOf(f).includes(UNSEEN));
+  ({ links } = await project(repro(false)));
+  assert.ok(!reasonsOf(call(links, "p/p.go", "f")).includes(UNSEEN));
+  // Two interface method values: only one dispatch could gain an unseen
+  // member (E is sealed and nothing lossy reaches internal/j); the union
+  // keeps the reason.
+  ({ links } = await project({
+    "go.mod": MOD,
+    "internal/j/j.go": lines(
+      "package j",
+      "type E interface{ M(); h() }",
+      "type B struct{}",
+      "func (B) M() {}",
+      "func (B) h() {}",
+      "type I interface{ M() }",
+      "type A struct{}",
+      "func (A) M() {}",
+      "func F(i I, k E, change bool) { f := i.M; if change { f = k.M }; f() }",
+      // The sealed E's dispatch first (by ID too): only a union keeps I's outside
+      // implementers.
+      "func G(i I, k E, change bool) { g := k.M; if change { g = i.M }; g() }",
+    ),
+    "q/bad.go": lines("package q", "func Broken() { (( }"),
+  }));
+  const both = call(links, "internal/j/j.go", "f");
+  assert.ok(both.candidates.length >= 3, both.candidates.join());
+  assert.ok(reasonsOf(both).includes(UNSEEN));
+  const reversed = call(links, "internal/j/j.go", "g");
+  assert.deepEqual(reversed.candidates, both.candidates);
+  assert.ok(reasonsOf(reversed).includes("external-implementers-possible"));
+  assert.ok(reasonsOf(reversed).includes(UNSEEN));
+  // A part with no valid member (its only implementer was in the failed
+  // file): the whole is unresolved, with that part's reason.
+  ({ links } = await project({
+    "go.mod": MOD,
+    "p/p.go": lines(
+      "package p",
+      "type I interface{ M() }",
+      "type J interface{ N() }",
+      "type A struct{}",
+      "func (A) M() {}",
+      "func F(i I, j J, change bool) { f := i.M; if change { f = j.N }; f() }",
+    ),
+    "p/bad.go": lines("package p", "type B struct{}", "func (B) N() { (( }"),
+  }));
+  const lone = call(links, "p/p.go", "f");
+  assert.deepEqual(lone.candidates, []);
+  assert.ok(reasonsOf(lone).includes(UNSEEN), JSON.stringify(lone.data));
+});
+
+test("round 16 Sol 4: the one combining function merges every field", async () => {
+  const { combine } = await import("../dist/graph/languages/go/resolve.js");
+  const a = {
+    ids: ["x"],
+    definite: false,
+    limit: 50,
+    open: ["structural-match-unverified"],
+    dispatch: true,
+  };
+  const b = {
+    ids: ["y", "x"],
+    definite: false,
+    limit: 20,
+    open: ["external-implementers-possible", "declarations-may-be-unseen"],
+    unseen: true,
+  };
+  assert.deepEqual(combine([a, b]), {
+    ids: ["x", "y"],
+    definite: false,
+    limit: 20,
+    open: [
+      "structural-match-unverified",
+      "external-implementers-possible",
+      "declarations-may-be-unseen",
+    ],
+    dispatch: true,
+    unseen: true,
+  });
+  // A part without targets leaves the whole without targets, keeping its
+  // reasons; a failure fails the whole.
+  assert.deepEqual(combine([a, { ids: [], definite: false, unseen: true }]), {
+    ids: [],
+    definite: false,
+    limit: 50,
+    open: ["structural-match-unverified"],
+    dispatch: true,
+    unseen: true,
+  });
+  assert.deepEqual(
+    combine([a, { ids: [], definite: false, invalid: ["p/bad.go"] }]).ids,
+    [],
+  );
+  assert.deepEqual(
+    combine([a, { ids: [], definite: false, invalid: ["p/bad.go"] }]).invalid,
+    ["p/bad.go"],
+  );
+  // Definite only if every part is.
+  assert.equal(
+    combine([
+      { ids: ["x"], definite: true },
+      { ids: ["x"], definite: true },
+    ]).definite,
+    true,
+  );
 });
