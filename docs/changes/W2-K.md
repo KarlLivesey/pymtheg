@@ -133,8 +133,8 @@ measured in W2-K2 on the hard-case crate, two probe workspaces and
   where-bound, associated type, array length), syntax and dependency errors.
   In no variant did it list an impl rustc rejects for its header.
 - **Runs** build scripts and proc macros. **Cost**, `vector-common`: cold
-  38.9–50.7 s across the three committed runs (observations, not bounds: a
-  reviewer saw 54.2 s under load), 0.9 GiB, 1.0 GB target; re-run after a touch
+  38.9–50.7 s across the three committed runs (observations, not bounds;
+  they depend on machine load), 0.9 GiB, 1.0 GB target; re-run after a touch
   1.5–2.0 s.
 - **Stability:** HTML is rustdoc's output for people; its JSON output is
   nightly. The reader matches the 1.96.1 and 1.98.1 markup only. This bit in
