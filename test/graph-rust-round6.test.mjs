@@ -285,9 +285,11 @@ test("safety: hidden standard and custom generated trait methods never prove lat
     );
     assert.deepEqual(
       g.targets("a.f").map((t) => t.map((s) => s.identity)),
-      [[], ["impl A::f"]],
+      [[], []],
     );
-    assert.equal(g.would("a.f")[0][0].identity, "impl A::f");
+    assert.ok(
+      g.would("a.f").every((ts) => ts.some((s) => s.identity === "impl A::f")),
+    );
   }
 });
 
@@ -398,10 +400,11 @@ test("file failure: module paths and absent scope names name broken files, never
 test("failed dependency reach and valid unresolved impl targets only add uncertainty", async () => {
   const manifests = {
     "Cargo.toml": '[workspace]\nmembers=["x","y","z"]',
-    "x/Cargo.toml": '[package]\nname="x"',
-    "y/Cargo.toml": '[package]\nname="y"\n[dependencies]\nx={path="../x"}',
+    "x/Cargo.toml": '[package]\nedition="2024"\nname="x"',
+    "y/Cargo.toml":
+      '[package]\nedition="2024"\nname="y"\n[dependencies]\nx={path="../x"}',
     "z/Cargo.toml":
-      '[package]\nname="z"\n[dependencies]\nx={path="../x"}\ny={path="../y"}',
+      '[package]\nedition="2024"\nname="z"\n[dependencies]\nx={path="../x"}\ny={path="../y"}',
   };
   const g = await graph(
     {
@@ -501,7 +504,8 @@ test("opaque item generation guards fallback namespace lookup, not explicit inta
         `mod good{pub fn f(){}}mod user{${source}use crate::good::f;fn run(){f();}}`,
       ),
     );
-    direct.one("f", "good::f");
+    if (source.startsWith("#!")) direct.unverified("f", "good::f");
+    else direct.one("f", "good::f");
   }
 });
 
@@ -696,9 +700,9 @@ test("ambiguous manifest edges cannot accuse an unproven failed dependency crate
     },
     {
       "Cargo.toml":
-        '[package]\nname="app"\n[target.\'cfg(unix)\'.dependencies]\nchoice={path="one",package="one"}\n[target.\'cfg(windows)\'.dependencies]\nchoice={path="two",package="two"}',
-      "one/Cargo.toml": '[package]\nname="one"',
-      "two/Cargo.toml": '[package]\nname="two"',
+        '[package]\nedition="2024"\nname="app"\n[target.\'cfg(unix)\'.dependencies]\nchoice={path="one",package="one"}\n[target.\'cfg(windows)\'.dependencies]\nchoice={path="two",package="two"}',
+      "one/Cargo.toml": '[package]\nedition="2024"\nname="one"',
+      "two/Cargo.toml": '[package]\nedition="2024"\nname="two"',
     },
   );
   assert.doesNotMatch(

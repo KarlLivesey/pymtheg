@@ -65,7 +65,7 @@ async function project(inputs, run) {
 }
 const manifest = {
   path: "Cargo.toml",
-  text: '[package]\nname = "example"\nversion = "0.1.0"\n',
+  text: '[package]\nedition="2024"\nname = "example"\nversion = "0.1.0"\n',
 };
 const lib = (text) => ({ path: "src/lib.rs", text });
 const selector = (store, link) =>
@@ -287,9 +287,12 @@ test("Rust Cargo context changes re-resolve cached sources and workspace depende
     },
     {
       path: "app/Cargo.toml",
-      text: '[package]\nname = "app"\n[dependencies]\nrenamed.workspace = true\n',
+      text: '[package]\nedition="2024"\nname = "app"\n[dependencies]\nrenamed.workspace = true\n',
     },
-    { path: "dep-real/Cargo.toml", text: '[package]\nname = "dep-real"\n' },
+    {
+      path: "dep-real/Cargo.toml",
+      text: '[package]\nedition="2024"\nname = "dep-real"\n',
+    },
     { path: "dep-real/src/lib.rs", text: "pub fn f() {}" },
     {
       path: "app/src/lib.rs",
@@ -301,7 +304,7 @@ test("Rust Cargo context changes re-resolve cached sources and workspace depende
     unresolved(store, "dep_real::f");
     await writeFile(
       join(root, "app/Cargo.toml"),
-      '[package]\nname = "app"\n[dependencies]\nrenamed = "1"\n',
+      '[package]\nedition="2024"\nname = "app"\n[dependencies]\nrenamed = "1"\n',
     );
     const repeat = await indexProject(
       root,

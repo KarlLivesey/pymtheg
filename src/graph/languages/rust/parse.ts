@@ -6,6 +6,119 @@ import type { ParseResult, SourceInput } from "../../types.js";
 const field = (n: Node, name: string) => n.childForFieldName(name);
 const span = (n: Node) => ({ start: n.startIndex, end: n.endIndex });
 const compact = (s: string) => s.replace(/\s+/g, "").replace(/\br#/g, "");
+/** Classify references by their syntax, never by an enclosing guard's pattern. */
+function referencePosition(n: Node):
+  | {
+      namespace: "type" | "value" | "macro";
+      pattern?: boolean;
+      constructorHead?: "literal" | "pattern";
+    }
+  | undefined {
+  let head = n;
+  while (
+    head.parent &&
+    ["generic_type", "generic_type_with_turbofish"].includes(
+      head.parent.type,
+    ) &&
+    field(head.parent, "type")?.id === head.id
+  )
+    head = head.parent;
+  const parent = head.parent;
+  if (!parent) return undefined;
+  if (
+    parent.type === "macro_invocation" &&
+    field(parent, "macro")?.id === head.id
+  )
+    return { namespace: "macro" };
+  if (
+    parent.type === "struct_expression" &&
+    field(parent, "name")?.id === head.id
+  )
+    return { namespace: "type", constructorHead: "literal" };
+  if (parent.type === "struct_pattern" && field(parent, "type")?.id === head.id)
+    return { namespace: "type", constructorHead: "pattern", pattern: true };
+  if (
+    parent.type === "tuple_struct_pattern" &&
+    field(parent, "type")?.id === head.id
+  )
+    return { namespace: "value", pattern: true };
+  // A type nested in a pattern (e.g. a constructor's generic argument) is
+  // still a type. Cast types inside a match guard take this same route.
+  if (
+    [
+      "type_identifier",
+      "scoped_type_identifier",
+      "generic_type",
+      "generic_type_with_turbofish",
+    ].includes(head.type)
+  )
+    return { namespace: "type" };
+  if (
+    [
+      "identifier",
+      "scoped_identifier",
+      "self",
+      "field_expression",
+      "generic_function",
+    ].includes(n.type)
+  ) {
+    let child = head;
+    let ancestor: Node | null = parent;
+    while (ancestor) {
+      // Tree-sitter nests the guard in match_pattern.condition. Stop BEFORE
+      // treating that wrapper as a pattern; nested let-patterns still count.
+      if (
+        ancestor.type === "match_pattern" &&
+        field(ancestor, "condition")?.id === child.id
+      )
+        break;
+      if (ancestor.type.endsWith("_pattern"))
+        return { namespace: "value", pattern: true };
+      if (
+        [
+          "parameter",
+          "let_declaration",
+          "let_condition",
+          "match_arm",
+          "function_item",
+          "call_expression",
+          "block",
+        ].includes(ancestor.type)
+      )
+        break;
+      child = ancestor;
+      ancestor = ancestor.parent;
+    }
+    if (
+      [
+        "arguments",
+        "block",
+        "expression_statement",
+        "return_expression",
+        "array_expression",
+        "tuple_expression",
+        "binary_expression",
+        "reference_expression",
+        "assignment_expression",
+        "match_arm",
+        "field_initializer",
+        "struct_expression",
+        "let_declaration",
+        "if_expression",
+        "match_expression",
+        "call_expression",
+        "generic_function",
+        "field_expression",
+        "type_cast_expression",
+        "match_pattern",
+        "let_condition",
+        "parenthesized_expression",
+      ].includes(parent.type)
+    )
+      return { namespace: "value" };
+  }
+  return undefined;
+}
 export const inertAttributes = new Set([
   "allow",
   "warn",
@@ -36,7 +149,33 @@ export const inertAttributes = new Set([
   "link",
   "no_std",
   "no_implicit_prelude",
+  "derive",
+  "bench",
+  "global_allocator",
+  "panic_handler",
+  "target_feature",
+  "instruction_set",
+  "link_name",
+  "link_ordinal",
+  "proc_macro",
+  "proc_macro_attribute",
+  "proc_macro_derive",
+  "no_main",
+  "no_core",
+  "crate_name",
+  "crate_type",
+  "recursion_limit",
+  "type_length_limit",
+  "windows_subsystem",
+  "debugger_visualizer",
+  "collapse_debuginfo",
+  "naked",
+  "coverage",
+  "optimize",
+  "feature",
 ]);
+export const inertAttributeName = (name: string) =>
+  inertAttributes.has(name) || /^(rustfmt|clippy|diagnostic)::/.test(name);
 const kinds: Record<string, string> = {
   mod_item: "module",
   function_item: "function",
@@ -130,6 +269,26 @@ async function createHelper(): Promise<Helper> {
         targetName: string,
         extra: Record<string, string | boolean | number | string[]> = {},
       ) => {
+        if (!["contains", "modules", "imports"].includes(kind)) {
+          const position = referencePosition(n);
+          if (!position) extra = { ...extra, namespaceUnknown: true };
+          else if (["types", "patterns", "values"].includes(kind)) {
+            kind = position.pattern
+              ? "patterns"
+              : position.namespace === "type"
+                ? "types"
+                : "values";
+            extra = {
+              ...extra,
+              ...(position.constructorHead === "literal"
+                ? { structLiteral: true }
+                : {}),
+              ...(position.pattern
+                ? { structPattern: position.constructorHead === "pattern" }
+                : {}),
+            };
+          }
+        }
         if (
           targetName &&
           !(["types", "patterns"].includes(kind) && targetName === "_")
@@ -139,7 +298,14 @@ async function createHelper(): Promise<Helper> {
             kind,
             targetName,
             range: span(n),
-            data: { scope, conditions: activeConditions, ...extra },
+            data: {
+              scope,
+              conditions: activeConditions,
+              ...(presenceAttributes(n).length
+                ? { opaqueItemAttributes: presenceAttributes(n) }
+                : {}),
+              ...extra,
+            },
           });
       };
       function imports(
@@ -315,11 +481,36 @@ async function createHelper(): Promise<Helper> {
         conditionCache.set(n.id, result);
         return result;
       }
+      const presenceCache = new Map<number, string[]>();
+      function opaquePresence(meta: Meta): string[] {
+        if (meta.name === "cfg_attr")
+          return meta.args
+            ? payloads(meta.args).slice(1).flatMap(opaquePresence)
+            : ["cfg_attr"];
+        if (meta.name === "unsafe")
+          return meta.args
+            ? payloads(meta.args).flatMap(opaquePresence)
+            : ["unsafe"];
+        return inertAttributeName(meta.name) ? [] : [meta.name || "?attribute"];
+      }
+      /** One presence predicate, inherited through every enclosing AST item. */
+      function presenceAttributes(n: Node): string[] {
+        const cached = presenceCache.get(n.id);
+        if (cached) return cached;
+        const inherited = n.parent ? presenceAttributes(n.parent) : [];
+        const own = attributesOn(n).flatMap((a) => opaquePresence(meta(a)));
+        const result = own.length
+          ? [...new Set([...inherited, ...own])].sort()
+          : inherited;
+        presenceCache.set(n.id, result);
+        return result;
+      }
       result.symbols[0]!.data = {
         scope: "",
         unit: true,
         visibility: "private",
         conditions: conditionsOn(tree.rootNode),
+        opaqueItemAttributes: presenceAttributes(tree.rootNode),
       };
       function modulePath(nodes: Node[]): {
         path: string;
@@ -415,7 +606,7 @@ async function createHelper(): Promise<Helper> {
       const bindingAttributeOpaque = (m: Meta): boolean =>
         m.name === "cfg_attr" && m.args
           ? payloads(m.args).slice(1).some(bindingAttributeOpaque)
-          : !inertAttributes.has(m.name);
+          : m.name === "derive" || !inertAttributeName(m.name);
       function bindingType(n: Node): Node | null {
         return attributesOn(n).some((a) => bindingAttributeOpaque(meta(a)))
           ? null
@@ -907,6 +1098,9 @@ async function createHelper(): Promise<Helper> {
                 scope,
                 moduleScope,
                 conditions,
+                ...(presenceAttributes(n).length
+                  ? { opaqueItemAttributes: presenceAttributes(n) }
+                  : {}),
                 ...(["struct", "variant"].includes(actualKind)
                   ? {
                       constructorForm: n.namedChildren.some(
@@ -1060,6 +1254,15 @@ async function createHelper(): Promise<Helper> {
           }
         }
         if (n.type === "extern_crate_declaration") {
+          const name = field(n, "name");
+          if (name)
+            link(name, owner, scope, "imports", compact(name.text), {
+              alias: field(n, "alias")?.text ?? name.text,
+              externCrate: true,
+              visibility:
+                n.namedChildren.find((c) => c.type === "visibility_modifier")
+                  ?.text ?? "private",
+            });
           const alias = field(n, "alias")?.text;
           if (
             alias &&
@@ -1238,38 +1441,11 @@ async function createHelper(): Promise<Helper> {
             n.parent?.type === "struct_expression") &&
           n.parent?.type !== "type_parameter"
         ) {
-          let patternParent: Node | null = n.parent;
-          let pattern = false;
-          while (
-            patternParent &&
-            ![
-              "parameter",
-              "let_declaration",
-              "match_arm",
-              "function_item",
-              "call_expression",
-              "block",
-            ].includes(patternParent.type)
-          ) {
-            if (patternParent.type.endsWith("_pattern")) pattern = true;
-            patternParent = patternParent.parent;
-          }
-          link(
-            n,
-            nextOwner,
-            scope,
-            pattern ? "patterns" : "types",
-            compact(n.text),
-            {
-              implType: nextImpl,
-              structLiteral: n.parent?.type === "struct_expression",
-              ...(pattern
-                ? { structPattern: n.parent?.type === "struct_pattern" }
-                : {}),
-              implScope,
-              blocked: genericShadow(n, n.text.split("::")[0]!),
-            },
-          );
+          link(n, nextOwner, scope, "types", compact(n.text), {
+            implType: nextImpl,
+            implScope,
+            blocked: genericShadow(n, n.text.split("::")[0]!),
+          });
         }
         for (const c of n.namedChildren)
           visit(

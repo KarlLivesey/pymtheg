@@ -179,7 +179,7 @@ const workspace = {
   "Cargo.toml":
     '[workspace]\nmembers=["a","b"]\n[workspace.package]\nedition="2024"\n',
   "a/Cargo.toml": '[package]\nname="a"\nedition.workspace=true\n',
-  "b/Cargo.toml": '[package]\nname="b"\n',
+  "b/Cargo.toml": '[package]\nedition="2024"\nname="b"\n',
 };
 test("round 7 B3 package workspace inheritance cannot accuse unrelated failures", async () => {
   const g = await graph(
@@ -276,7 +276,10 @@ test("round 7 S2 real indexer parses a 2500-file project twice without internal 
   const store = new SqliteGraphStore(":memory:", "reuse");
   try {
     await mkdir(join(root, "src"));
-    await writeFile(join(root, "Cargo.toml"), '[package]\nname="reuse"\n');
+    await writeFile(
+      join(root, "Cargo.toml"),
+      '[package]\nedition="2024"\nname="reuse"\n',
+    );
     await writeFile(
       join(root, "src/lib.rs"),
       Array.from({ length: 2499 }, (_, i) => `mod f${i};`).join("\n"),
@@ -496,8 +499,8 @@ test("round 7 B3 workspace dependency definitions do not create unused root edge
     },
     {
       "Cargo.toml":
-        '[package]\nname="root"\n[workspace]\nmembers=["b"]\n[workspace.dependencies]\nb={path="b"}\n',
-      "b/Cargo.toml": '[package]\nname="b"\n',
+        '[package]\nedition="2024"\nname="root"\n[workspace]\nmembers=["b"]\n[workspace.dependencies]\nb={path="b"}\n',
+      "b/Cargo.toml": '[package]\nedition="2024"\nname="b"\n',
     },
   );
   const l = g.links.find((l) => l.targetName === "A::from");
@@ -540,8 +543,9 @@ for (const nested of [false, true]) {
         "dep/src/lib.rs": "pub struct S;pub fn f()->u8{2}",
       },
       {
-        "Cargo.toml": '[package]\nname="app"\n[dependencies]\ndep={path="dep"}',
-        "dep/Cargo.toml": '[package]\nname="dep"',
+        "Cargo.toml":
+          '[package]\nedition="2024"\nname="app"\n[dependencies]\ndep={path="dep"}',
+        "dep/Cargo.toml": '[package]\nedition="2024"\nname="dep"',
       },
     );
     g.unverified("dep::f", "f");
@@ -551,8 +555,9 @@ for (const nested of [false, true]) {
 }
 test("round 7 S1 an opaque dependency alternative is not a proved failed-file cause", async () => {
   const manifests = {
-    "Cargo.toml": '[package]\nname="app"\n[dependencies]\ndep={path="dep"}',
-    "dep/Cargo.toml": '[package]\nname="dep"',
+    "Cargo.toml":
+      '[package]\nedition="2024"\nname="app"\n[dependencies]\ndep={path="dep"}',
+    "dep/Cargo.toml": '[package]\nedition="2024"\nname="dep"',
   };
   const g = await graph(
     {
@@ -574,8 +579,9 @@ test("round 7 B5 unknown dependency binding can also denote a project type", asy
       "dep/src/lib.rs": "pub fn f()->u8{2}",
     },
     {
-      "Cargo.toml": '[package]\nname="app"\n[dependencies]\ndep={path="dep"}',
-      "dep/Cargo.toml": '[package]\nname="dep"',
+      "Cargo.toml":
+        '[package]\nedition="2024"\nname="app"\n[dependencies]\ndep={path="dep"}',
+      "dep/Cargo.toml": '[package]\nedition="2024"\nname="dep"',
     },
   );
   g.unverified("dep::f", "f");

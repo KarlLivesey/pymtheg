@@ -9,7 +9,7 @@ const TARGET_HINT_LIMIT = 16;
 
 const rust: LanguageModule = {
   id: "rust",
-  version: "9",
+  version: "10",
   extensions: [".rs"],
   contextFiles: ["Cargo.toml"],
   parse: parseRust,
@@ -29,25 +29,36 @@ const rust: LanguageModule = {
           result: {
             ...f.result,
             links: f.result.links.map((l) => {
-              const { targets, targetCount, uncertainty, cause, ...rest } =
-                (l.data ?? {}) as Record<string, Json>;
+              const {
+                targets,
+                targetCount,
+                uncertainty,
+                cause,
+                opaqueAttributes,
+                ...rest
+              } = (l.data ?? {}) as Record<string, Json>;
               return { ...l, data: rest };
             }),
-            symbols: f.result.symbols.map((s) =>
-              s.key !== "file"
-                ? s
-                : {
-                    ...s,
-                    data: {
-                      ...(s.data as Record<string, Json>),
-                      unitKind: crate ? "crate" : "module",
-                      crateName: crate?.name ?? "",
-                      targetKind: crate?.kind ?? "",
-                      manifest: crate?.manifest ?? "",
-                      workspace: crate?.workspace ?? null,
-                    },
-                  },
-            ),
+            symbols: f.result.symbols.map((s) => {
+              const { underOpaqueAttribute, opaqueAttributes, ...rest } =
+                (s.data ?? {}) as Record<string, Json>;
+              return {
+                ...s,
+                data: {
+                  ...rest,
+                  ...(s.key === "file"
+                    ? {
+                        unitKind: crate ? "crate" : "module",
+                        crateName: crate?.name ?? "",
+                        targetKind: crate?.kind ?? "",
+                        edition: crate?.edition ?? null,
+                        manifest: crate?.manifest ?? "",
+                        workspace: crate?.workspace ?? null,
+                      }
+                    : {}),
+                } as Record<string, Json>,
+              };
+            }),
           },
         };
       });
@@ -64,8 +75,10 @@ const rust: LanguageModule = {
         targetCount?: number;
         reason: string;
         files?: string[] | undefined;
+        attributes?: string[] | undefined;
       }
     >();
+    const presence = new Map<string, string[]>();
     resolveRust(
       {
         projectId,
@@ -74,7 +87,7 @@ const rust: LanguageModule = {
         symbols: facts.flatMap((f) => f.symbols),
         links: facts.flatMap((f) => f.links),
       },
-      (l, targets, reason, files) =>
+      (l, targets, reason, files, attributes) =>
         unknown.set(l.id, {
           ...(reason === "invalid-code"
             ? {}
@@ -86,11 +99,29 @@ const rust: LanguageModule = {
               ? reason + "; too-many-targets"
               : reason,
           files: files ? [...new Set(files)].sort() : undefined,
+          attributes: attributes?.length
+            ? [...new Set(attributes)].sort()
+            : undefined,
         }),
+      (symbol, attributes) => presence.set(symbol.id, attributes),
     );
     for (let i = 0; i < updated.length; i++) {
       const f = updated[i]!,
         a = byPath.get(f.path);
+      if (a)
+        a.result.symbols = a.result.symbols.map((symbol, j) => {
+          const attributes = presence.get(facts[i]!.symbols[j]!.id);
+          return attributes?.length
+            ? {
+                ...symbol,
+                data: {
+                  ...(symbol.data as Record<string, Json>),
+                  underOpaqueAttribute: true,
+                  opaqueAttributes: attributes,
+                },
+              }
+            : symbol;
+        });
       if (a)
         a.result.links = a.result.links.map((l, j) => {
           const u = unknown.get(facts[i]!.links[j]!.id);
@@ -105,6 +136,9 @@ const rust: LanguageModule = {
                       ? { targetCount: u.targetCount }
                       : { targets: u.targets ?? [] }),
                   uncertainty: u.reason,
+                  ...(u.reason !== "invalid-code" && u.attributes?.length
+                    ? { opaqueAttributes: u.attributes }
+                    : {}),
                 },
               }
             : l;

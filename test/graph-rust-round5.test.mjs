@@ -175,8 +175,13 @@ test("round 5 A: first probe inherent beats ALL unseen alternatives", async () =
           `${source}impl A{fn f(${receiver}){} fn own(${receiver}){self.f();}}fn r(${mut}a:${binding}){a.f();}`,
         ),
       );
-      g.one("a.f", "impl A::f");
-      g.one("self.f", "impl A::f");
+      if (source.startsWith("#[make::generate]")) {
+        g.unverified("a.f", "impl A::f");
+        g.unverified("self.f", "impl A::f");
+      } else {
+        g.one("a.f", "impl A::f");
+        g.one("self.f", "impl A::f");
+      }
     }
   }
   const g = await graph(
@@ -218,8 +223,8 @@ test("round 5 A/B: candidate completeness and crate boundaries", async () => {
   const unrelated = await graph(
     { "src/lib.rs": source, "other/src/lib.rs": "pub struct Broken<" },
     {
-      "Cargo.toml": '[package]\nname="app"',
-      "other/Cargo.toml": '[package]\nname="other"',
+      "Cargo.toml": '[package]\nedition="2024"\nname="app"',
+      "other/Cargo.toml": '[package]\nedition="2024"\nname="other"',
     },
   );
   assert.equal(unrelated.would("a.f")[0].length, 2);

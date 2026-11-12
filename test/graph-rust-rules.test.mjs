@@ -5,7 +5,7 @@ import rust from "../dist/graph/languages/rust/index.js";
 
 async function graph(
   sources,
-  manifests = { "Cargo.toml": '[package]\nname="rules"\n' },
+  manifests = { "Cargo.toml": '[package]\nedition="2024"\nname="rules"\n' },
 ) {
   const files = [];
   for (const [path, text] of Object.entries(sources)) {
@@ -194,9 +194,10 @@ test("Rust platform-dependent aliases never pick the last manifest branch", asyn
       "two/src/lib.rs": "pub fn f() {}",
     },
     {
-      "Cargo.toml": `[package]\nname="app"\n[target.'cfg(unix)'.dependencies]\nchoice={ path="one" }\n[target.'cfg(windows)'.dependencies]\nchoice={ path="two" }\n`,
-      "one/Cargo.toml": '[package]\nname="one"\n',
-      "two/Cargo.toml": '[package]\nname="two"\n',
+      "Cargo.toml":
+        '[package]\nedition="2024"\nname="app"\n[target.\'cfg(unix)\'.dependencies]\nchoice={ path="one" }\n[target.\'cfg(windows)\'.dependencies]\nchoice={ path="two" }\n',
+      "one/Cargo.toml": '[package]\nedition="2024"\nname="one"\n',
+      "two/Cargo.toml": '[package]\nedition="2024"\nname="two"\n',
     },
   );
   assert.equal(g.target("choice::f"), null);

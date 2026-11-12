@@ -1,7 +1,7 @@
 # W2-C: Rust language module for the code graph
 
 This is the **no-toolchain fallback** under D16. Precise compiler-backed Rust
-resolution belongs to a later chunk. Version 9 uses the installed Rust WASM
+resolution belongs to a later chunk. Version 10 uses the installed Rust WASM
 grammar through the shared Tree-sitter helper and supplied source/manifest
 snapshots only. Runtime, installation and tests never invoke Cargo/rustc, read
 project files, expand macros or add dependencies. Private items are ordinary
@@ -24,16 +24,16 @@ syntax-only oracle is not a claim to have typechecked all of Vector.
 | Crate/module/file units; functions, structs, enums and variants, traits/default methods, scoped impls, aliases, const/static, macro_rules | Symbols with positions, visibility and contains links; failed files contribute none |
 | Type/value/macro namespaces | Separate lookup. Named-field structs do not capture value calls; unit/tuple constructors do. `_` never binds a name |
 | Modules | Inline and function-local barriers; name.rs/name/mod.rs; literal path attributes including raw strings. Path-loaded files' children are beside the file. Doc strings never become path attributes; absolute paths have no captured root proof and stay unverified |
-| Cargo context | Package/lib names, dependency renames, workspace path dependencies; explicit and automatic lib/bin/src/bin/examples/tests/benches/build.rs roots. Loose files retain structure without invented crate membership |
+| Cargo context | Captured/default/inherited/per-target editions, conditioned normal/dev/build/optional dependency edges, dependency renames, workspace path dependencies; explicit and automatic lib/bin/src/bin/examples/tests/benches/build.rs roots. Loose files retain structure without invented crate membership |
 | Imports | Nested groups, renames, self/super/crate/absolute/raw paths; chained and cross-crate reexports; anonymous imports do not bind `_` |
 | Globs | Recursive captured reexports with cycle protection and importer visibility; intact local/explicit bindings beat globs only in their proved namespaces; unknown external import namespaces retain glob hints. A glob edge's own target remains backlog |
-| Free calls, type/pattern/value paths | Definite from proved bindings; complete captured alternatives become candidates. Unknown alternatives remain unverified. Missing names stay unresolved with names retained |
+| Free calls, type/pattern/value paths | Definite from proved, present-as-written bindings; complete captured alternatives become candidates. Unknown alternatives remain unverified. Missing names stay unresolved with names retained |
 | Values | Unit structs/variants and Self/path expressions extracted. Struct/named-variant literal names are constructor-capable type references. Locals/generics never acquire outer item targets |
 | Pattern bindings | Structural shorthand/ref/mut/captured/tuple/slice/struct/or patterns across parameters, closures, let/else, if/while-let, match and for; binding regions mask outer functions |
 | Alias/type applicability | Captured alias chains and generic/reference aliases expanded. Unsupported/cyclic/external substitutions remain unknown; unknown never means disjoint |
 | Lifetimes/generics | Lifetimes ignored for impl selection. Distinct own parameters in Type<P1,...,Pn> describe a fully generic family. Explicit instantiations, specialisation and bounds still require applicability evidence |
 | Associated path calls | A proved inherent name wins over traits. A sole family with omitted arguments can support name lookup before inference; explicit generic arguments cannot use that shortcut. Unknown alternative inherent impls block proof |
-| Dot calls | Definite ONLY a unique proved inherent first-probe match. Everything else is unresolved-with-targets, with no closed dot-call candidate sets |
+| Dot calls | Definite ONLY a unique proved, present-as-written inherent first-probe match. Everything else is unresolved-with-targets, with no closed dot-call candidate sets |
 | Trait-only associated calls | Unresolved-with-targets: captured bodies/defaults are would-be targets, not proof of dispatch |
 | Conditional code | One collector combines outer/inner cfg/cfg_attr, enclosing items, crate/module-file conditions and parent mod declarations. Statement/expression/binding/field/variant/arm/parameter gates are retained. Caller implication is same-crate only; no feature selection. Unknown predicates never prove a link. Complete namespace/path alternatives may be candidates; dot twins remain unverified |
 | Macros/attributes | Local active macro_rules invocations link; macro_export records public visibility. Token trees are not expanded/extracted. Statement tokens and opaque block item generation can invalidate binding evidence; opaque item generation can shadow namespace fallback |
@@ -42,8 +42,7 @@ syntax-only oracle is not a claim to have typechecked all of Vector.
 Associated const/projection lookup, qualified `<T as Trait>::f`, custom receiver
 adjustment, general autoderef/unsizing, substitution/inference/bounds solving,
 trait-in-scope precision and generated declarations are not implemented.
-Cargo feature-enabling/dependency relationships are not inferred: cfg implication
-uses captured Rust predicates, not a Cargo feature graph.
+Direct optional-dependency activation (`feature="dep"` or a direct `dep:dep` entry) is captured. General Cargo feature closure and actual platform/build configuration are not evaluated: dependency proof uses captured predicates, not a feature solver.
 Cross-file macro exports/imports, external glob beside project glob, Copy receiver
 refinement, inner/outer macro ordering, where clauses in impl identity text and a
 glob import's own link remain the manager-listed backlog.
@@ -53,8 +52,8 @@ glob import's own link remain the manager-listed backlog.
 For `recv.name(...)`, the only definite result is an **inherent** method at the
 first probe of the captured receiver: owned T with self, &T with &self, or &mut T
 with &mut self. The inherent method must be visible from the caller module; private, pub(crate), pub(super) and pub(in path) restrictions are checked. Receiver lifetime/mutability forms are parsed structurally. Every
-inherent alternative at that step must be proved applicable or inapplicable;
-unknown bounds, cfg conditions, unresolved inherent self types, ambiguous module
+inherent alternative at that step must be proved applicable or inapplicable; the receiver type and selected method must also be present-as-written (see the opaque-attribute rule below).
+Unknown bounds, cfg conditions, unresolved inherent self types, ambiguous module
 views and unknown receiver adjustments prevent proof. First-step proofs survive
 unseen trait impls and failed dependencies.
 
@@ -74,6 +73,22 @@ bodies as possible targets; failed files supply no bodies at all.
 There is no derive-method table, std blanket-name table, trait-scope catalogue or
 macro/attribute unseen-impl proof in dispatch. Their sole later-step precision
 purpose was removed. Retired experimental table evidence is historical only.
+
+## Item presence and structural containment
+
+`contains` remains definite: it describes the captured source AST, including cfg-gated or opaque-attributed items. It is **not** a claim that an item survives macro expansion. Every affected symbol is marked `data.underOpaqueAttribute: true`, with the full inherited attribute paths in `data.opaqueAttributes`. This includes attributes inherited through a file-module declaration or crate inner attribute. Re-analysis clears old markings when the attribute is removed, even when the child file's parse result is cached.
+
+For **semantic** links (calls, imports, implements, module/path/type/struct/variant/const/macro references), one shared presence predicate requires the item and every enclosing item to be free of non-builtin attributes. Unknown attributes may replace or remove their input. Such input stays a would-be target, never a definite target or closed set; `item-under-opaque-attribute` explains the uncertainty and `data.opaqueAttributes` identifies the relevant paths. A first-probe match does not bypass this rule. Derive preserves its input item; its expansion remains unseen.
+
+The explicit builtin list is exported by `parse.ts`: cfg/cfg_attr; derive; allow/warn/deny/forbid/expect; doc; inline/cold/must_use/deprecated/repr/non_exhaustive/track_caller; no_mangle/export_name/link/link_name/link_section/link_ordinal/used; test/ignore/should_panic/bench/automatically_derived; path/macro_use/macro_export; global_allocator/panic_handler/target_feature/instruction_set; proc_macro/proc_macro_attribute/proc_macro_derive; no_std/no_core/no_main/no_implicit_prelude; crate_name/crate_type/recursion_limit/type_length_limit/windows_subsystem/debugger_visualizer/collapse_debuginfo/naked/coverage/optimize/feature. Unsafe wrappers recurse into the same list. The reserved tool prefixes rustfmt::, clippy:: and diagnostic:: are inert. cfg_attr payloads recurse; any opaque payload makes presence unproved. All other paths, including tokio::main, tracing::instrument, async_trait, tonic::async_trait, typetag::serde and project/helper attributes, are opaque. References: [Rust attributes](https://doc.rust-lang.org/reference/attributes.html), [procedural attributes](https://doc.rust-lang.org/reference/procedural-macros.html#attribute-macros), [derive macros](https://doc.rust-lang.org/reference/procedural-macros.html#derive-macros).
+
+## Cargo editions and conditioned bindings
+
+Literal editions 2015/2018/2021/2024, missing-edition default 2015, package workspace inheritance, and per-target overrides are captured. The same edition-aware import lookup serves import links and forwarded names/reexports. In 2015, unqualified use and absolute paths start at the crate root; ordinary expression paths remain lexical. In modern editions, uniform imports and the extern prelude apply. Explicit extern-crate aliases are captured. Unknown edition compares both interpretations and withholds certainty when they differ.
+
+Every dependency route retains target cfg, optional-feature activation and dependency kind. Dev edges require a test/example/bench target or an implied test predicate; build edges belong only to build scripts. Unproved edge presence keeps captured bodies as hints and cannot accuse a failed file. Multiple captured routes are retained; they are not flattened into an unconditional winner. Failed-file reach annotations use only provably present captured edges, never an unproved conditional edge.
+
+Without a complete prelude catalogue, sysroot names std/core/alloc/proc_macro/test, drop, and conservatively every capitalized dependency name cannot prove an implicit external binding. An unconditional explicit `extern crate ... as ...` can prove a non-sysroot crate binding, including a prelude-name collision: the explicit declaration names that crate in the type namespace. Sysroot collisions remain conservative even then. No std method table is reintroduced. References: [paths and editions](https://doc.rust-lang.org/reference/paths.html), [extern prelude](https://doc.rust-lang.org/reference/names/preludes.html#extern-prelude), [extern crate](https://doc.rust-lang.org/reference/items/extern-crates.html), [Cargo dependency kinds](https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html).
 
 ## Failed files, causes and namespace uncertainty
 
@@ -379,3 +394,87 @@ Native syntax acceptance of the same 11 grammar gaps remains as recorded in roun
 Loaded-machine observations: direct parse 110.8s, analysis 48.9s, resolve 48.0s, total 225.3s. Production-store run 413.3s; parse 83.9s, analysis 45.8s, resolve 62.6s; peak RSS 5,348,332 KiB. Timings are observations, not acceptance assertions.
 
 The traversal-instrumented scratch resolver reproduces every original decision/hint/count/reason/cause before accepting its evidence: **all 247 remaining causes have named witnesses — 19 direct module/crate paths or declarations (i), 228 captured explicit non-glob imports/reexport chains (ii)** (`round9-cause-audit.json`). The independent manifest/module audit validates every **175,055** reach annotation. Neither audit edits production facts. Original 152 re-derived unchanged: **19 restored / 0 identified wrong-before / 133 unverified by named D16 rules / 0 correct-and-provable under that fallback policy still lost** (`round9-original-152.json`). This is not a claim that Rust itself cannot prove those 133 links.
+
+## Round 9 review response (version 10)
+
+Same owned paths; normal merge of current `origin/main` retained. No core or other-language edits. The module remains the D16 no-toolchain fallback.
+
+- **B1 — syntactic namespace:** one `referencePosition` classifier separates match patterns from their condition/guard expressions, including struct heads and casts. Type/value/macro lookup follows the local syntax; unknown callee forms cannot prove a semantic target. The node-kind inventory and same-name controls are in `round10-scope-and-presence-audit.md`.
+- **B2 — inner possible shadow:** an unproved inner import, glob or opaque item source defeats an outer failed-file cause. Captured project alternatives are retained, while proved different-namespace bindings leave the outer route intact. Negative namespace proofs are not cached when a cycle/depth guard cut the lookup. A repeated import cannot grow its own suffix indefinitely; shrinking recursive reexport paths remain supported.
+- **W1 — editions:** package default/inherited/literal editions and target overrides drive both import links and forwarded bindings. 2015 imports root at the crate; modern imports use uniform paths and the extern prelude. Unknown edition retains both routes without selecting a winner. Explicit extern-crate aliases are captured.
+- **W2 — dependency conditions:** target cfg, optional activation and normal/dev/build scope remain on each edge. Same-manifest routes are a disjunction, rather than an unconditional flattened map or a conjunction of unrelated routes. Only an implied route proves binding/reach. Sysroot/prelude collisions use the conservative policy stated above.
+- **W3 — present-as-written:** one predicate blocks every semantic proof through an opaque attribute on the item or any enclosing item/file-module declaration. Would-be targets are retained with `item-under-opaque-attribute`. `contains` stays a definite structural relationship, and every affected symbol carries `underOpaqueAttribute` plus its inherited attribute paths. Removing the attribute clears cached-child markings on re-analysis.
+
+Source-site audit, native controls, development attempts and final source hashes are retained under `evidence/w2-c/round10-*`. The module and its tests never invoke rustc/Cargo; compiler controls and mutations run in scratch only.
+
+### Whole Vector against c61bdccc
+
+Fresh clone at `515e87d9861b564f521a8992d224892cd8cae120`; all 1,563 Rust files through direct analysis and a fresh schema-3 production store. Default Node heap: `execArgv: []`, `NODE_OPTIONS: ""`; no core workaround. Every **365,530 link fact** and every symbol position/metadata field agrees between direct and stored output, including opacity flags (`round10-equality.json`). No analysis or resolution errors.
+
+| Fact | c61bdccc | Version 10 |
+|---|---:|---:|
+| Clean / partial / failed files | 1,552 / 0 / 11 | 1,552 / 0 / 11 |
+| Symbols | 35,422 | 35,422 |
+| Links | 365,514 | 365,530 |
+| Definite | 76,125 | 67,638 |
+| Closed sets | 90 | 90 |
+| Unresolved | 289,299 | 297,802 |
+| invalid-code | 247 | 170 |
+| Failed-file uncertainty annotations | 175,055 | 175,683 |
+
+Shared links: **1,525 gains / 10,014 withdrawals / 0 retargets**. No removed links. Sixteen added links are captured `extern crate` imports (two definite, fourteen unresolved). All 90 closed sets remain; no closed dot-call set exists. The gains are 1,200 type references, 188 imports, 93 calls (nine dot calls), 27 values and 17 patterns. A scratch ablation removing the new explicit extern-crate bindings and restoring the old builtin catalog loses all 1,525 proofs; restoring only the old builtin catalog loses 175, while the old negative-cache policy alone loses none. These are import/builtin-presence precision gains, not broader dispatch. Fresh gain samples include root `Result`/`Error` reexports and an exact `&mut SourceShutdownCoordinator` receiver.
+
+Exactly **10,012 withdrawals are W3 semantic-presence cost**. The other two are dependency-conditioned `super::arrow` and `super::reply::protobuf` imports whose activation is not implied by captured site predicates. A Cargo feature closure might enable them in a native build; this fallback does not solve that closure. The two would-be project targets remain listed.
+
+B2 clears 77 old causes, with zero new causes. All 77 remain cleared in the full W3-disabled experiment, so this is not charged to strict item presence. Every remaining cause has a named witness: **19 direct module/crate paths or module declarations; 151 explicit non-glob imports/reexport chains**. The independent reach audit validates all **175,683** annotations. The net reach change is +628: 701 shared links gain the annotation, 79 clear it, and six added extern-crate links carry it. Mere missing names, failed globs and possible inner-shadow routes do not accuse files.
+
+### W3 semantic cost and structural markers
+
+The ablation runs a **fresh parse, analysis and resolution** with only `itemPresence` disabled in a scratch module. A withdrawal is attributed to W3 only when that otherwise-final module proves the same old target. A read-only ownership trace first reproduces every production decision, hint/count, reason, cause and attribute list; it then records indirect opaque self-type blockers. **328** W3 withdrawals have indirect impl/receiver applicability blockers rather than an attribute list on the link itself. Their source blockers are retained in `round10-w3-cost.json`.
+
+**10,012 semantic links withdrawn; 9,394 retain exactly one would-be target.** Every former target is retained in the uncapped inventory, including links whose public representation is count-only overflow. **5,549 / 35,422 symbols** carry `underOpaqueAttribute: true` and sorted inherited paths. **Zero structural contains withdrawals**: all 33,870 containment edges remain definite facts about captured text.
+
+| Semantic link kind | W3 withdrawals |
+|---|---:|
+| types | 6,079 |
+| patterns | 1,670 |
+| calls | 1,178 |
+| values | 735 |
+| implements | 218 |
+| imports | 132 |
+
+Top 15 attribute-path blockers follow. Counts are **non-exclusive**: one link can have several blockers, including a retained alternative impl whose nominal type is opaque. These are source dependencies preventing proof, not claims that removing each individual path alone would restore the link. The exact combinations and per-link rows are retained in the cost JSON.
+
+| Attribute path | Withdrawn semantic links with that blocker |
+|---|---:|
+| `configurable_component` | 6,233 |
+| `serde` | 5,666 |
+| `configurable` | 1,719 |
+| `snafu` | 636 |
+| `serde_as` | 615 |
+| `derivative` | 522 |
+| `async_trait` | 441 |
+| `default` | 356 |
+| `pin_project` | 278 |
+| `typetag::serde` | 275 |
+| `strum` | 270 |
+| `command` | 174 |
+| `display` | 167 |
+| `tokio::test` | 104 |
+| `enum_dispatch` | 48 |
+
+This deliberately strict rule also treats helper-looking attributes such as `serde`, `configurable`, `default` and `snafu` as opaque unless on the explicit builtin list. The module does not assume that a familiar name is harmless. The owner can use the measured cost to decide a later policy change; this patch adds no special cases.
+
+Hints remain **unresolved-with-targets**, IDs only, cap 16. There are **31,522 count-only overflows; 88,055 nonempty lists; 62,964 singleton lists; 208,996 retained hint IDs**. Analysis return bytes: **163,744,929 → 170,130,391**; graph-fact bytes: **292,685,949 → 299,076,732**. The full production store succeeds at the default heap. Its observed peak RSS is 5,350,360 KiB; elapsed 237.4s, parse 48.1s, analysis 24.9s, resolution 22.2s. Direct parse/analysis/resolution timings are in the Vector summary. These are loaded-machine observations, not timing assertions.
+
+The same **11 native-syntax-valid grammar gaps** still fail completely and contribute no symbols or links. Their individual native checks and rejected constructs remain recorded in `round8-grammar.json`; neither the grammar nor the whole-file failure contract changed. These valid Rust files being failed by the grammar remain a real limitation, not invalid user source or a passed parser property.
+
+### Classification, source inspection and validation
+
+Original 152 re-derived: **12 restored / 0 newly identified wrong-before / 140 unverified under named fallback rules / 0 further correct-and-provable under that policy identified still lost** (`round10-original-152.json`). Seven formerly restored links become unverified under W3: #64, #65, #67, #68 (`TagValueSet` methods), #144 (`peer_addr`), #146 and #147 (`Self::Tls`/`Self::Raw`). This is the declared presence-policy cost, not a claim that Rust cannot prove those calls. Every unverified row names its actual current rule.
+
+Fresh seeded manual source inspection: **30 definite, 15 gains, 30 withdrawals, 15 closed sets, 15 unresolved, 20 project-hint links, 20 failed-file causes**. No wrong definite, incomplete closed set or wrong cause identified. Std/external and generic actual callees are distinguished from broad project name hints; the sample is not misreported as 20 proven project callees. Excerpts and individual judgments are in `round10-samples.json` and `round10-sample-judgments.json`.
+
+Final required checks ran strictly sequentially with frozen source/tests: `npm ci --ignore-scripts`; supplied `PYM_TLC_JAR` full `npm test` (**1,755 pass, 0 skipped**); `npm run format:check`; separate Rust tests (**357 pass, 0 skipped**). All exit 0, with no process-test hang. **68 native controls** (41 rustc, 27 offline Cargo), plus all three supplied production reproductions, pass. **54 mutations killed**, baseline passes. Mutated modules and native controls are scratch-only; runtime/tests never invoke Rust/Cargo.
+
+Development attempts are explicitly separated from acceptance in `round10-development-notes.md`: the initial duplicate dependency-route defect, rejected draft controls, stopped expanding-import probes and incomplete attribution attempts are not passes. Experimental lookup caches were removed; the shipped fix is the small self-expanding-import guard, with a native shrinking-reexport control. Source hashes, final completion assertions, full equality, cause/reach/hint integrity and ablation evidence are under `evidence/w2-c/round10-*`.

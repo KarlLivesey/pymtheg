@@ -1,5 +1,12 @@
 import { posix as p } from "node:path";
 import type { ContextFile } from "../../types.js";
+export type Edition = "2015" | "2018" | "2021" | "2024";
+export interface Dependency {
+  name: string;
+  manifest: string;
+  kind: "normal" | "dev" | "build";
+  conditions: string[];
+}
 
 export interface Crate {
   root: string;
@@ -9,6 +16,8 @@ export interface Crate {
   deps: Map<string, string>;
   workspace: string | null;
   dependencyGraphKnown?: boolean;
+  edition?: Edition | null;
+  dependencies?: Dependency[];
 }
 /** Deliberately bounded TOML context reader: literal strings, arrays and inline
  * dependency tables. No evaluation, filesystem reads or Cargo execution. */
@@ -101,6 +110,15 @@ export function crates(
     }
   }
   const graphKnown = new Map<string, boolean>();
+  const packageEditions = new Map<string, Edition | null>();
+  const targetEditions = new Map<string, Edition | null>();
+  const edges = new Map<string, Dependency[]>();
+  const edition = (raw: string | undefined): Edition | null => {
+    const e = raw === undefined ? "2015" : literal(raw);
+    return ["2015", "2018", "2021", "2024"].includes(e ?? "")
+      ? (e as Edition)
+      : null;
+  };
   const roots: Crate[] = [];
   for (const doc of docs) {
     const pkg = doc.sections.get("package");
@@ -111,6 +129,15 @@ export function crates(
         ? literal(workspace?.sections.get("workspace.package")?.name)
         : undefined);
     if (!name) continue;
+    packageEditions.set(
+      doc.path,
+      pkg?.["edition.workspace"] === "true" ||
+        /workspace\s*=\s*true/.test(pkg?.edition ?? "")
+        ? workspace?.sections.get("workspace.package")?.edition === undefined
+          ? null
+          : edition(workspace.sections.get("workspace.package")!.edition)
+        : edition(pkg?.edition),
+    );
     graphKnown.set(
       doc.path,
       ![...doc.sections.keys()].some((s) => /^(patch|replace)(\.|$)/.test(s)),
@@ -119,13 +146,11 @@ export function crates(
     const deps = new Map<string, string>();
     const buildDeps = new Map<string, string>();
     let dependencyMap = deps;
+    let dependencyKind: Dependency["kind"] = "normal";
+    let dependencyConditions: string[] = [];
     const dependency = (alias: string, path: string, renamed: boolean) => {
       const target = docsByPath.get(path);
-      if (
-        (path && !target) ||
-        (dependencyMap.has(alias) && dependencyMap.get(alias) !== path)
-      )
-        graphKnown.set(doc.path, false);
+      if (path && !target) graphKnown.set(doc.path, false);
       if (target && !renamed)
         alias =
           literal(target.sections.get("lib")?.name) ??
@@ -133,12 +158,18 @@ export function crates(
           alias;
       alias = alias.replace(/-/g, "_");
       const previous = dependencyMap.get(alias);
-      if (previous !== undefined && previous !== path)
-        graphKnown.set(doc.path, false);
       dependencyMap.set(
         alias,
         previous === undefined || previous === path ? path : "",
       );
+      const list = edges.get(doc.path) ?? [];
+      list.push({
+        name: alias,
+        manifest: path,
+        kind: dependencyKind,
+        conditions: dependencyConditions,
+      });
+      edges.set(doc.path, list);
     };
     for (const [section, values] of doc.sections) {
       if (
@@ -149,6 +180,21 @@ export function crates(
       )
         continue;
       dependencyMap = section.endsWith("build-dependencies") ? buildDeps : deps;
+      dependencyKind = section.endsWith("build-dependencies")
+        ? "build"
+        : section.endsWith("dev-dependencies")
+          ? "dev"
+          : "normal";
+      const target = /^target\.(["'])(.*?)\1\./.exec(section)?.[2];
+      const targetCondition = target
+        ? target.startsWith("cfg(") && target.endsWith(")")
+          ? target
+              .slice(4, -1)
+              .replace(/\s+(?=(?:[^"\n]*"[^"\n]*")*[^"\n]*$)/g, "")
+          : "?target:" + target
+        : section.startsWith("target.")
+          ? "?target"
+          : undefined;
       const entries: [string, string][] = Object.entries(values).map(
         ([alias, raw]) =>
           alias.endsWith(".workspace") && raw === "true"
@@ -157,10 +203,24 @@ export function crates(
       );
       for (const [alias, raw] of entries) {
         let value = raw;
+        const optional = /optional\s*=\s*true/.test(raw);
+        dependencyConditions = targetCondition ? [targetCondition] : [];
+        const optionalCondition = () => {
+          const features = doc.sections.get("features") ?? {};
+          const named = Object.entries(features)
+            .filter(([, v]) => new RegExp(`["']dep:${alias}["']`).test(v))
+            .map(([k]) => k);
+          if (!named.length && features[alias] === undefined) named.push(alias);
+          return named.length
+            ? `any(${named.map((n) => `feature=${JSON.stringify(n)}`).join(",")})`
+            : "?optional:" + alias;
+        };
         if (/workspace\s*=\s*true/.test(raw)) {
           value =
             workspace?.sections.get("workspace.dependencies")?.[alias] ?? "";
           if (!value) graphKnown.set(doc.path, false);
+          if (optional || /optional\s*=\s*true/.test(value))
+            dependencyConditions.push(optionalCondition());
           const depPath = /path\s*=\s*["']([^"']+)["']/.exec(value)?.[1];
           dependency(
             alias,
@@ -170,6 +230,7 @@ export function crates(
             /package\s*=/.test(value),
           );
         } else {
+          if (optional) dependencyConditions.push(optionalCondition());
           const depPath = /path\s*=\s*["']([^"']+)["']/.exec(value)?.[1];
           dependency(
             alias,
@@ -181,6 +242,8 @@ export function crates(
     }
     const lib = doc.sections.get("lib");
     const libRoot = p.join(doc.dir, literal(lib?.path) ?? "src/lib.rs");
+    if (lib?.edition !== undefined)
+      targetEditions.set(libRoot, edition(lib.edition));
     const libName = (literal(lib?.name) ?? name).replace(/-/g, "_");
     if (paths.has(libRoot) && (lib || pkg?.autolib !== "false"))
       roots.push({
@@ -208,6 +271,8 @@ export function crates(
           workspace: workspacePath,
           deps: new Map([...deps, [libName, doc.path]]),
         });
+      if (bin.edition !== undefined)
+        targetEditions.set(root, edition(bin.edition));
     }
     if (
       pkg?.autobins !== "false" &&
@@ -227,7 +292,10 @@ export function crates(
       root: string,
       targetName: string,
       kind: Crate["kind"],
+      targetEdition?: string,
     ) => {
+      if (targetEdition !== undefined)
+        targetEditions.set(root, edition(targetEdition));
       if (paths.has(root) && !roots.some((c) => c.root === root))
         roots.push({
           root,
@@ -250,6 +318,7 @@ export function crates(
             p.join(doc.dir, literal(values.path) ?? `${dir}/${targetName}.rs`),
             targetName,
             kind,
+            values.edition,
           );
       }
     for (const [dir, kind, flag] of [
@@ -279,5 +348,36 @@ export function crates(
   return roots.map((c) => ({
     ...c,
     dependencyGraphKnown: graphKnown.get(c.manifest) ?? false,
+    edition: targetEditions.has(c.root)
+      ? targetEditions.get(c.root)!
+      : (packageEditions.get(c.manifest) ?? null),
+    dependencies: [
+      ...(edges.get(c.manifest) ?? [])
+        .filter((e) =>
+          c.kind === "build" ? e.kind === "build" : e.kind !== "build",
+        )
+        .map((e) => ({
+          ...e,
+          conditions: [
+            ...e.conditions,
+            ...(e.kind === "dev" &&
+            !["test", "example", "bench"].includes(c.kind)
+              ? ["test"]
+              : []),
+          ],
+        })),
+      ...(c.kind !== "lib" && c.kind !== "build"
+        ? [
+            {
+              name:
+                roots.find((r) => r.kind === "lib" && r.manifest === c.manifest)
+                  ?.name ?? "",
+              manifest: c.manifest,
+              kind: "normal" as const,
+              conditions: [],
+            },
+          ]
+        : []),
+    ].filter((e) => e.name),
   }));
 }

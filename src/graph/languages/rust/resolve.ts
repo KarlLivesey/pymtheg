@@ -1,5 +1,5 @@
 import { implies as cfgImplies, possible as cfgPossible } from "./cfg.js";
-import { inertAttributes } from "./parse.js";
+import { inertAttributeName } from "./parse.js";
 import { posix as p } from "node:path";
 import type {
   GraphSymbol,
@@ -41,6 +41,7 @@ interface Place {
   symbol?: GraphSymbol;
   uncertain?: boolean;
   conditions?: string[];
+  opaqueAttributes?: string[];
 }
 interface Found {
   symbols: GraphSymbol[];
@@ -48,6 +49,7 @@ interface Found {
   reason?: string;
   failedFiles?: string[];
   bound?: boolean;
+  opaqueAttributes?: string[];
 }
 const unique = (ss: GraphSymbol[]) => [
   ...new Map(ss.map((s) => [s.id, s])).values(),
@@ -71,12 +73,15 @@ export function resolveRust(
     targets: GraphSymbol[],
     reason: string,
     files?: string[],
+    attributes?: string[],
   ) => void,
+  markPresence?: (symbol: GraphSymbol, attributes: string[]) => void,
 ): LinkResolution[] {
   // Cache only unproved import namespaces, never targets or positive proofs.
   // Facts are immutable for this run; caller conditions and placement are in
   // the key. A failed proof keeps alternatives, it never asserts a binding.
   const unprovedImports = new Set<string>();
+  let cycleCuts = 0;
   const namespaceParents = new WeakMap<Place, number>();
   let nextNamespaceParent = 0;
   const implicationCache = new Map<string, boolean>();
@@ -90,6 +95,21 @@ export function resolveRust(
     }
     return result;
   };
+  const itemPresenceCache = new Map<string, string[]>();
+  function itemPresence(item: GraphSymbol | GraphLink): string[] {
+    const cached = itemPresenceCache.get(item.id);
+    if (cached) return cached;
+    const attributes = [
+      ...new Set([
+        ...((data(item).opaqueItemAttributes ?? []) as string[]),
+        ...ownerPlace(item.file, str(data(item).scope)).flatMap(
+          (p) => p.opaqueAttributes ?? [],
+        ),
+      ]),
+    ].sort();
+    itemPresenceCache.set(item.id, attributes);
+    return attributes;
+  }
   const possible = (conditions: readonly string[]): boolean => {
     const key = JSON.stringify(conditions);
     let result = possibilityCache.get(key);
@@ -152,6 +172,10 @@ export function resolveRust(
           conditions: [
             ...(place.conditions ?? []),
             ...((data(s).conditions ?? []) as string[]),
+          ],
+          opaqueAttributes: [
+            ...(place.opaqueAttributes ?? []),
+            ...((data(s).opaqueItemAttributes ?? []) as string[]),
           ],
           uncertain: place.uncertain || moduleIncomplete.has(s.id),
         });
@@ -228,6 +252,12 @@ export function resolveRust(
                 ...((data(s).conditions ?? []) as string[]),
                 ...((data(units.get(file) ?? {}).conditions ?? []) as string[]),
               ],
+              opaqueAttributes: [
+                ...(place.opaqueAttributes ?? []),
+                ...((data(s).opaqueItemAttributes ?? []) as string[]),
+                ...((data(units.get(file) ?? {}).opaqueItemAttributes ??
+                  []) as string[]),
+              ],
               uncertain: place.uncertain || moduleIncomplete.has(s.id),
               directory,
             });
@@ -252,6 +282,8 @@ export function resolveRust(
       symbol: units.get(crate.root)!,
       conditions: (data(units.get(crate.root) ?? {}).conditions ??
         []) as string[],
+      opaqueAttributes: (data(units.get(crate.root) ?? {})
+        .opaqueItemAttributes ?? []) as string[],
     };
     roots.set(crate.root, place);
     walk(place, new Set());
@@ -283,6 +315,11 @@ export function resolveRust(
     ownerCache.set(k, result);
     return result;
   };
+  if (markPresence)
+    for (const symbol of symbols) {
+      const attributes = itemPresence(symbol);
+      if (attributes.length) markPresence(symbol, attributes);
+    }
   const failedByScope = new Map<string, string[]>(),
     failedByCrate = new Map<string, string[]>();
   for (const loc of places)
@@ -397,17 +434,32 @@ export function resolveRust(
     membersByOwner.set(l.sourceId, list);
   }
   const memo = new Map<string, Found>();
+  const importExpansions = new Map<string, number[]>();
   const empty = (complete = true): Found => ({ symbols: [], complete });
   const merge = (xs: Found[]): Found => {
     const causes = xs.flatMap((x) => x.failedFiles ?? []);
+    const alternatives = xs.some(
+      (x) => !x.failedFiles?.length && (x.symbols.length || !x.complete),
+    );
     return causes.length
-      ? broken(causes)
+      ? {
+          ...(alternatives
+            ? { complete: false, reason: "failed-file-unseen-declarations" }
+            : broken(causes)),
+          symbols: unique(xs.flatMap((x) => x.symbols)),
+          opaqueAttributes: [
+            ...new Set(xs.flatMap((x) => x.opaqueAttributes ?? [])),
+          ].sort(),
+        }
       : {
           symbols: unique(xs.flatMap((x) => x.symbols)),
           complete: xs.every((x) => x.complete),
           reason: [...new Set(xs.map((x) => x.reason).filter(Boolean))].join(
             "; ",
           ),
+          opaqueAttributes: [
+            ...new Set(xs.flatMap((x) => x.opaqueAttributes ?? [])),
+          ].sort(),
         };
   };
   const isDescendant = (scope: string, parent: string) =>
@@ -556,9 +608,11 @@ export function resolveRust(
     return rest.length === 1 ? associatedUnknown(rest[0]!, ns) : empty(false);
   }
   function present(items: (GraphSymbol | GraphLink)[], loc: Place): boolean {
-    const cs = items.map((s) =>
-      conditionsFor(s).filter((c) => !implies(loc.conditions ?? [], c)),
-    );
+    const cs = items
+      .filter((s) => !itemPresence(s).length)
+      .map((s) =>
+        conditionsFor(s).filter((c) => !implies(loc.conditions ?? [], c)),
+      );
     return (
       cs.some((c) => !c.length) ||
       cs.some(
@@ -578,6 +632,22 @@ export function resolveRust(
     items: (GraphSymbol | GraphLink)[],
     loc: Place,
   ): Found {
+    if (items.some((s) => itemPresence(s).length)) {
+      const { failedFiles: possibleFailure, ...rest } = found;
+      return {
+        ...rest,
+        complete: false,
+        opaqueAttributes: [
+          ...new Set([
+            ...(found.opaqueAttributes ?? []),
+            ...items.flatMap(itemPresence),
+          ]),
+        ].sort(),
+        reason:
+          "item-under-opaque-attribute" +
+          (possibleFailure?.length ? "; failed-file-unseen-declarations" : ""),
+      };
+    }
     return !items.length || present(items, loc)
       ? found
       : { ...found, complete: false, reason: "conditional-name-may-be-absent" };
@@ -612,7 +682,7 @@ export function resolveRust(
     // First-segment presence is independent of member-lookup completeness.
     // A present local/explicit binding shadows globs even when its member is
     // unresolved (for example, A::default or an unexpanded imported item).
-    const importHeads = new Map<string, Found>();
+    const importHeads = new Map<string, { found: Found; cycleFree: boolean }>();
     const withFallback = (
       found: Found,
       bindings: (GraphSymbol | GraphLink)[],
@@ -645,25 +715,13 @@ export function resolveRust(
           ].sort(),
         ]);
         if (unprovedImports.has(proofKey)) return false;
-        const head =
-          importHeads.get(binding.id) ??
-          find(
-            importPath(binding),
-            {
-              ...loc,
-              conditions: [
-                ...(loc.conditions ?? []),
-                ...conditionsFor(binding),
-              ],
-            },
-            str(data(binding).scope),
-            headNs,
-            seen,
-            allowGlobs,
-          );
+        const reused = importHeads.get(binding.id);
+        const before = cycleCuts;
+        const head = reused?.found ?? resolveUse(binding, [], headNs);
         const proven =
           head.complete && head.symbols.some((s) => accepts(s, headNs));
-        if (!proven) unprovedImports.add(proofKey);
+        if (!proven && (reused ? reused.cycleFree : cycleCuts === before))
+          unprovedImports.add(proofKey);
         return proven;
       });
       found = conditional(found, bindings, loc);
@@ -710,26 +768,56 @@ export function resolveRust(
         ]) &&
         (!accessFrom || visible(str(data(l).visibility), loc, accessFrom)),
     );
-    const importPath = (l: GraphLink) =>
-      !l.targetName.includes("::") && loc.crate.deps.has(compact(l.targetName))
-        ? "::" + l.targetName
-        : l.targetName;
-    const imported = (l: GraphLink): Found => {
-      const found = find(
-        [importPath(l), ...rest].join("::"),
-        {
-          ...loc,
-          conditions: [...(loc.conditions ?? []), ...conditionsFor(l)],
-        },
-        str(data(l).scope),
-        ns,
-        seen,
+    function resolveUse(
+      l: GraphLink,
+      suffix: string[],
+      namespace: Namespace,
+    ): Found {
+      // A cyclic import can prepend its own path indefinitely, defeating an
+      // exact-path guard (quote::quote -> quote::quote::quote -> ...). Only
+      // stop expansion: repeated reexports with a shrinking suffix are valid.
+      const expansionKey = JSON.stringify([
+        l.id,
+        namespace,
+        loc.crate.root,
+        loc.file,
         allowGlobs,
-      );
+      ]);
+      const suffixes = importExpansions.get(expansionKey) ?? [];
+      if (suffixes.some((length) => suffix.length > length)) {
+        cycleCuts++;
+        return { ...empty(false), reason: "import-cycle-unverified" };
+      }
+      suffixes.push(suffix.length);
+      importExpansions.set(expansionKey, suffixes);
+      try {
+        return findUsePath(
+          [l.targetName, ...suffix].join("::"),
+          {
+            ...loc,
+            conditions: [...(loc.conditions ?? []), ...conditionsFor(l)],
+          },
+          str(data(l).scope),
+          namespace,
+          seen,
+          allowGlobs,
+          !!data(l).externCrate,
+          !l.targetName.includes("::") && data(l).alias === l.targetName,
+        );
+      } finally {
+        suffixes.pop();
+        if (!suffixes.length) importExpansions.delete(expansionKey);
+      }
+    }
+
+    const imported = (l: GraphLink): Found => {
+      const before = cycleCuts;
+      const found = resolveUse(l, rest, ns);
       // With no remaining member path this IS the head-namespace lookup.
       // Reuse its exact result, including uncertainty, rather than recursively
       // repeating incomplete reexport chains while proving the same binding.
-      if (!rest.length) importHeads.set(l.id, found);
+      if (!rest.length)
+        importHeads.set(l.id, { found, cycleFree: cycleCuts === before });
       return found;
     };
     if (declared.length) {
@@ -759,11 +847,7 @@ export function resolveRust(
         return withFallback(conditional(result, explicit, loc), explicit);
       // Fall through namespaces only when the import is KNOWN to bind a
       // different namespace. An uncaptured external import could bind this one.
-      const all = merge(
-        explicit.map((l) =>
-          find(importPath(l), loc, str(data(l).scope), "any", seen, allowGlobs),
-        ),
-      );
+      const all = merge(explicit.map((l) => resolveUse(l, [], "any")));
       if (!all.complete || !all.symbols.length)
         return withFallback(
           {
@@ -804,21 +888,10 @@ export function resolveRust(
       let result = merge(
         globs.map((l) => {
           const imported = throughGlob(
-            find(
-              l.targetName.replace(/::\*$/, ""),
-              {
-                ...loc,
-                conditions: [
-                  ...new Set([
-                    ...(loc.conditions ?? []),
-                    ...((data(l).conditions ?? []) as string[]),
-                  ]),
-                ],
-              },
-              str(data(l).scope),
+            resolveUse(
+              { ...l, targetName: l.targetName.replace(/::\*$/, "") },
+              [],
               "type",
-              seen,
-              true,
             ),
           );
           if (!imported.symbols.length)
@@ -866,6 +939,141 @@ export function resolveRust(
       : null;
   }
 
+  function findUsePath(
+    raw: string,
+    loc: Place,
+    scope: string,
+    namespace: Namespace,
+    seen = new Set<string>(),
+    allowGlobs = true,
+    externCrate = false,
+    selfBinding = false,
+  ): Found {
+    const lookup = (path: string) =>
+      find(path, loc, scope, namespace, seen, allowGlobs);
+    if (externCrate) return lookup("$extern::" + raw);
+    const rooted = () =>
+      lookup(
+        /^(?:crate|self|super)(?:::|$)/.test(raw)
+          ? raw
+          : "crate::" + raw.replace(/^::/, ""),
+      );
+    if (loc.crate.edition === "2015") return rooted();
+    if (loc.crate.edition)
+      return lookup(
+        selfBinding && loc.crate.deps.has(raw.split("::")[0]!)
+          ? "::" + raw
+          : raw,
+      );
+    const a = rooted(),
+      b = lookup(raw);
+    if (
+      a.complete &&
+      b.complete &&
+      a.symbols
+        .map((s) => s.id)
+        .sort()
+        .join() ===
+        b.symbols
+          .map((s) => s.id)
+          .sort()
+          .join()
+    )
+      return a;
+    const { failedFiles: ignored, ...both } = merge([a, b]);
+    return {
+      ...both,
+      symbols: unique([...a.symbols, ...b.symbols]),
+      complete: false,
+      reason: "edition-unverified",
+    };
+  }
+  function dependencyLookup(
+    name: string,
+    parts: string[],
+    loc: Place,
+    ns: Namespace,
+    seen: Set<string>,
+    allowGlobs: boolean,
+    accessFrom: Place,
+    explicit: boolean,
+  ): Found {
+    if (loc.crate.edition === "2015" && !explicit) return empty();
+    const edges = (loc.crate.dependencies ?? []).filter((e) => e.name === name);
+    return merge(
+      edges.map((edge) => {
+        const targets = packagesByManifest.get(edge.manifest) ?? [];
+        let found = merge(
+          targets.map((c) => {
+            const branch: Found = parts.length
+              ? find(
+                  parts.join("::"),
+                  roots.get(c.root)!,
+                  "",
+                  ns,
+                  seen,
+                  allowGlobs,
+                  accessFrom,
+                )
+              : failedFiles.has(c.root)
+                ? broken([c.root])
+                : {
+                    symbols: [units.get(c.root)!].filter(
+                      (s) => s && accepts(s, ns),
+                    ),
+                    complete: true,
+                  };
+            const unit = units.get(c.root);
+            return unit
+              ? conditional(branch, [unit], {
+                  ...loc,
+                  conditions:
+                    c.root === loc.crate.root ? (loc.conditions ?? []) : [],
+                })
+              : branch;
+          }),
+        );
+        const collision =
+          ["std", "core", "alloc", "proc_macro", "test", "drop"].includes(
+            name,
+          ) || /^[A-Z]/.test(name);
+        const proven = edges.some(
+          (candidate) =>
+            candidate.manifest === edge.manifest &&
+            candidate.conditions.every((c) => implies(loc.conditions ?? [], c)),
+        );
+        const unconditional = edges.some(
+          (candidate) =>
+            candidate.manifest === edge.manifest &&
+            !candidate.conditions.length,
+        );
+        if (
+          !proven ||
+          (collision &&
+            !(
+              explicit &&
+              unconditional &&
+              !["std", "core", "alloc", "proc_macro", "test"].includes(name)
+            )) ||
+          (!explicit && !loc.crate.edition)
+        ) {
+          const { failedFiles: ignored, ...rest } = found;
+          found = {
+            ...rest,
+            complete: false,
+            reason:
+              !loc.crate.edition && !explicit
+                ? "edition-unverified"
+                : collision
+                  ? "dependency-namespace-collision-unverified"
+                  : "dependency-presence-unverified",
+          };
+        }
+        return found;
+      }),
+    );
+  }
+
   function find(
     raw: string,
     loc: Place,
@@ -885,6 +1093,16 @@ export function resolveRust(
         ),
       );
     const name = base(raw);
+    if (name.startsWith("::") && loc.crate.edition === "2015")
+      return find(
+        "crate::" + name.slice(2),
+        loc,
+        scope,
+        ns,
+        seen,
+        allowGlobs,
+        accessFrom,
+      );
     if (name === "_") return empty();
     const guard = JSON.stringify([
       loc.crate.root,
@@ -900,17 +1118,37 @@ export function resolveRust(
     ]);
     const cached = memo.get(guard);
     if (cached) return cached;
-    if (seen.has(guard)) return empty(!accessFrom ? false : true);
-    if (seen.size > 128) return empty(false);
+    if (seen.has(guard)) {
+      cycleCuts++;
+      return empty(!accessFrom ? false : true);
+    }
+    if (seen.size > 128) {
+      cycleCuts++;
+      return empty(false);
+    }
     seen = new Set([...seen, guard]);
     const absolute = name.startsWith("::");
     const parts = name.replace(/^::/, "").split("::");
-    const first = parts.shift()!;
+    let first = parts.shift()!;
+    const forcedExtern = first === "$extern";
+    if (forcedExtern) first = parts.shift() ?? "";
     let result: Found;
     let fallbackShadow = false;
     const conditionalTargets: GraphSymbol[] = [];
     const fallbackReasons: string[] = [];
-    if (!absolute && ["crate", "self", "super"].includes(first)) {
+    const fallbackAttributes: string[] = [];
+    if (forcedExtern)
+      result = dependencyLookup(
+        first,
+        parts,
+        loc,
+        ns,
+        seen,
+        allowGlobs,
+        accessFrom,
+        true,
+      );
+    else if (!absolute && ["crate", "self", "super"].includes(first)) {
       let dest = first === "crate" ? roots.get(loc.crate.root)! : loc;
       if (first === "super") {
         if (!dest.parent) return empty(false);
@@ -969,6 +1207,7 @@ export function resolveRust(
             local !== loc.local
           ) {
             conditionalTargets.push(...found.symbols);
+            fallbackAttributes.push(...(found.opaqueAttributes ?? []));
             fallbackReasons.push(
               found.reason || "namespace-binding-unverified",
             );
@@ -985,44 +1224,16 @@ export function resolveRust(
       if (found?.bound || found?.complete || found?.failedFiles?.length)
         result = found;
       else {
-        const dependency = loc.crate.deps.get(first);
-        const targets = dependency
-          ? packages.filter(
-              (c) => c.manifest === dependency && c.kind === "lib",
-            )
-          : [];
-        const dependencyResult = targets.length
-          ? merge(
-              targets.map((c) => {
-                const branch: Found = parts.length
-                  ? find(
-                      parts.join("::"),
-                      roots.get(c.root)!,
-                      "",
-                      ns,
-                      seen,
-                      allowGlobs,
-                      accessFrom,
-                    )
-                  : failedFiles.has(c.root)
-                    ? broken([c.root])
-                    : {
-                        symbols: [units.get(c.root)!].filter(
-                          (s) => s && accepts(s, ns),
-                        ),
-                        complete: true,
-                      };
-                const unit = units.get(c.root);
-                return unit
-                  ? conditional(branch, [unit], {
-                      ...loc,
-                      conditions:
-                        c.root === loc.crate.root ? (loc.conditions ?? []) : [],
-                    })
-                  : branch;
-              }),
-            )
-          : empty();
+        const dependencyResult = dependencyLookup(
+          first,
+          parts,
+          loc,
+          ns,
+          seen,
+          allowGlobs,
+          accessFrom,
+          false,
+        );
         // An unproven lexical binding does not erase a captured dependency
         // alternative. Keep its bodies as hints, never upgrade the proof. A
         // failed dependency route is only possible here, not a proved cause.
@@ -1044,15 +1255,50 @@ export function resolveRust(
           : dependencyResult;
       }
     }
-    if (fallbackShadow && !result.failedFiles?.length)
+    if (absolute && !loc.crate.edition) {
+      const rooted = find(
+        "crate::" + name.slice(2),
+        loc,
+        scope,
+        ns,
+        seen,
+        allowGlobs,
+        accessFrom,
+      );
+      const { failedFiles: ignored, ...both } = merge([result, rooted]);
       result = {
-        ...result,
+        ...both,
+        symbols: unique([...result.symbols, ...rooted.symbols]),
+        complete: false,
+        reason: "edition-unverified",
+      };
+    }
+    if (fallbackShadow) {
+      // A possible inner binding defeats an outer failure as a CAUSE too.
+      // Retain every captured alternative, but the failed route is unproved.
+      const { failedFiles: possibleOuterFailure, ...outer } = result;
+      result = {
+        ...outer,
         symbols: unique([...conditionalTargets, ...result.symbols]),
+        opaqueAttributes: [
+          ...new Set([
+            ...fallbackAttributes,
+            ...(result.opaqueAttributes ?? []),
+          ]),
+        ].sort(),
         complete: false,
         reason: [
-          ...new Set([...fallbackReasons, result.reason].filter(Boolean)),
+          ...new Set(
+            [
+              ...fallbackReasons,
+              possibleOuterFailure?.length
+                ? "failed-file-unseen-declarations"
+                : result.reason,
+            ].filter(Boolean),
+          ),
         ].join("; "),
       };
+    }
     if (result.complete) memo.set(guard, result);
     return result;
   }
@@ -1085,8 +1331,9 @@ export function resolveRust(
   };
   const methodIndex = new Map<string, Method[]>();
   const reachableCache = new Map<string, Set<string>>();
-  function reachable(root: string): Set<string> {
-    const cached = reachableCache.get(root);
+  function reachable(root: string, definite = false): Set<string> {
+    const cacheKey = root + "|" + definite;
+    const cached = reachableCache.get(cacheKey);
     if (cached) return cached;
     const result = new Set<string>(),
       pending = [root];
@@ -1094,11 +1341,12 @@ export function resolveRust(
       const next = pending.pop()!;
       if (result.has(next)) continue;
       result.add(next);
-      for (const manifest of roots.get(next)?.crate.deps.values() ?? [])
-        for (const dep of packagesByManifest.get(manifest) ?? [])
-          pending.push(dep.root);
+      for (const edge of roots.get(next)?.crate.dependencies ?? [])
+        if (!definite || edge.conditions.every((c) => implies([], c)))
+          for (const dep of packagesByManifest.get(edge.manifest) ?? [])
+            pending.push(dep.root);
     }
-    reachableCache.set(root, result);
+    reachableCache.set(cacheKey, result);
     return result;
   }
   // Alias expansion never treats an unexpanded alias as a disjoint nominal.
@@ -1251,7 +1499,13 @@ export function resolveRust(
       );
       return !ps || ps.slice(1).some((p) => opaqueAttribute(p, loc, scope));
     }
-    if (name !== "derive") return !inertAttributes.has(name);
+    if (name === "unsafe") {
+      const ps = splitArguments(
+        "<" + a.slice(a.indexOf("(") + 1, a.lastIndexOf(")")) + ">",
+      );
+      return !ps || ps.some((p) => opaqueAttribute(p, loc, scope));
+    }
+    if (name !== "derive") return !inertAttributeName(name);
     const names = a
       .slice(a.indexOf("(") + 1, a.lastIndexOf(")"))
       .split(",")
@@ -1303,7 +1557,7 @@ export function resolveRust(
     if (!fs) {
       fs = [
         ...new Set(
-          [...reachable(root)].flatMap((r) => failedByCrate.get(r) ?? []),
+          [...reachable(root, true)].flatMap((r) => failedByCrate.get(r) ?? []),
         ),
       ].sort();
       failureCache.set(root, fs);
@@ -1746,6 +2000,7 @@ export function resolveRust(
       return {
         symbols: would(loc.crate.root, name, instance),
         complete: false,
+        opaqueAttributes: type.opaqueAttributes ?? [],
         reason: note(
           !instance &&
             type.reason?.split(/;\s*/).includes("parser-internal-error")
@@ -1850,7 +2105,14 @@ export function resolveRust(
               : []),
           ]).filter(accessibleHint),
       complete: false,
-      reason: note(reason),
+      opaqueAttributes: [
+        ...new Set(matches.flatMap((m) => itemPresence(m.symbol))),
+      ].sort(),
+      reason: note(
+        matches.some((m) => itemPresence(m.symbol).length)
+          ? "item-under-opaque-attribute"
+          : reason,
+      ),
     });
     const inherent = matches.filter(
       (m) =>
@@ -1858,7 +2120,10 @@ export function resolveRust(
         visible(str(data(m.symbol).visibility), m.declarationPlace, loc),
     );
     const proven = inherent.filter(
-      (m) => !m.uncertain && applicable(m) === "yes",
+      (m) =>
+        !m.uncertain &&
+        !itemPresence(m.symbol).length &&
+        applicable(m) === "yes",
     );
     const form = (m: Method) => {
       const s = compact(
@@ -1939,6 +2204,7 @@ export function resolveRust(
       covered &&
       !unknownInherentExists &&
       inherent.every((m) => !m.uncertain) &&
+      inherent.every((m) => !itemPresence(m.symbol).length) &&
       ((inherent.length === 1 && !withoutLifetimes(typeName).includes("<")) ||
         inherent.every((m) => applicable(m) === "yes"));
     if (pathInherent)
@@ -1967,6 +2233,8 @@ export function resolveRust(
             symbols: s ? (moduleTargets.get(s.id) ?? []) : [],
             complete: !s || !moduleIncomplete.has(s.id),
           };
+    } else if (d.namespaceUnknown) {
+      found = { ...empty(false), reason: "namespace-position-unverified" };
     } else if (
       (!d.blocked || !!d.method || !!d.conditionalBinding) &&
       !(l.kind === "imports" && d.glob)
@@ -2015,7 +2283,19 @@ export function resolveRust(
                   : ["types", "implements"].includes(l.kind)
                     ? "type"
                     : "import";
-          let result = find(name, loc, scope, ns);
+          let result =
+            l.kind === "imports"
+              ? findUsePath(
+                  name,
+                  loc,
+                  scope,
+                  ns,
+                  new Set(),
+                  true,
+                  !!d.externCrate,
+                  !name.includes("::") && d.alias === name,
+                )
+              : find(name, loc, scope, ns);
           const callableFound = result.symbols.some((s) =>
             ["function", "method", "struct", "variant"].includes(s.kind),
           );
@@ -2070,6 +2350,28 @@ export function resolveRust(
         }),
       );
     }
+    if (["imports", "modules"].includes(l.kind) && itemPresence(l).length) {
+      const { failedFiles: ignored, ...rest } = found;
+      found = {
+        ...rest,
+        complete: false,
+        reason: "item-under-opaque-attribute",
+        opaqueAttributes: itemPresence(l),
+      };
+    }
+    if (
+      l.kind !== "contains" &&
+      found.complete &&
+      found.symbols.some((s) => itemPresence(s).length)
+    )
+      found = {
+        ...found,
+        complete: false,
+        reason: "item-under-opaque-attribute",
+        opaqueAttributes: [
+          ...new Set(found.symbols.flatMap(itemPresence)),
+        ].sort(),
+      };
     if (
       l.kind !== "contains" &&
       ((d.conditions ?? []) as string[]).some((c) => c.includes("?"))
@@ -2121,6 +2423,8 @@ export function resolveRust(
         l,
         unique(found.symbols),
         found.reason || "namespace/import/alias structure is unknown",
+        undefined,
+        found.opaqueAttributes,
       );
       continue;
     }

@@ -8,7 +8,7 @@ const rust = (
 ).default;
 async function graph(
   sources,
-  manifests = { "Cargo.toml": '[package]\nname="app"\n' },
+  manifests = { "Cargo.toml": '[package]\nedition="2024"\nname="app"\n' },
 ) {
   const files = [];
   for (const [path, text] of Object.entries(sources)) {
@@ -173,8 +173,9 @@ test("review 6: library target names and explicit Cargo renames", async () => {
   };
   const g = await graph(src, {
     "Cargo.toml":
-      '[package]\nname="app"\n[dependencies]\nfoo={path="dep"}\nrenamed={package="foo",path="dep"}\n',
-    "dep/Cargo.toml": '[package]\nname="foo"\n[lib]\nname="bar-name"\n',
+      '[package]\nedition="2024"\nname="app"\n[dependencies]\nfoo={path="dep"}\nrenamed={package="foo",path="dep"}\n',
+    "dep/Cargo.toml":
+      '[package]\nedition="2024"\nname="foo"\n[lib]\nname="bar-name"\n',
   });
   g.one("bar_name::f", "f");
   g.unknown("foo::f");
@@ -217,8 +218,9 @@ test("review 9: dependency reexports use the destination crate", async () => {
       "dep/src/lib.rs": "mod inner{pub fn f(){}} pub use inner::f as exported;",
     },
     {
-      "Cargo.toml": '[package]\nname="app"\n[dependencies]\ndep={path="dep"}\n',
-      "dep/Cargo.toml": '[package]\nname="dep"\n',
+      "Cargo.toml":
+        '[package]\nedition="2024"\nname="app"\n[dependencies]\ndep={path="dep"}\n',
+      "dep/Cargo.toml": '[package]\nedition="2024"\nname="dep"\n',
     },
   );
   g.one("dep::exported", "inner::f");
@@ -320,8 +322,8 @@ test("review Cargo target flags and build dependency environments", async () => 
     },
     {
       "Cargo.toml":
-        '[package]\nname="app"\nautobins=false\nautotests=false\n[build-dependencies]\ntool={path="dep"}\n',
-      "dep/Cargo.toml": '[package]\nname="tool"\n',
+        '[package]\nedition="2024"\nname="app"\nautobins=false\nautotests=false\n[build-dependencies]\ntool={path="dep"}\n',
+      "dep/Cargo.toml": '[package]\nedition="2024"\nname="tool"\n',
     },
   );
   const ts = g.targets("tool::f");
@@ -725,8 +727,9 @@ test("round 3 unresolved audit: blanket impls in unrelated crates do not affect 
     "other/src/lib.rs": `pub trait Tr{fn f(self){}}impl<T>Tr for T{}`,
   };
   const manifests = {
-    "Cargo.toml": `[package]\nname="app"\n[workspace]\nmembers=["other"]\n`,
-    "other/Cargo.toml": `[package]\nname="other"\n`,
+    "Cargo.toml":
+      '[package]\nedition="2024"\nname="app"\n[workspace]\nmembers=["other"]\n',
+    "other/Cargo.toml": '[package]\nedition="2024"\nname="other"\n',
   };
   const isolated = await graph(sources, manifests);
   isolated.unverified("a.f", "impl A::f");
@@ -853,8 +856,9 @@ test("round 3 standard trait evidence respects Cargo and extern-crate aliases", 
       "dep/src/lib.rs": `pub mod clone{pub use external::Clone;}`,
     },
     {
-      "Cargo.toml": `[package]\nname="app"\n[dependencies]\nstd={path="dep"}\n`,
-      "dep/Cargo.toml": `[package]\nname="std"\n`,
+      "Cargo.toml":
+        '[package]\nedition="2024"\nname="app"\n[dependencies]\nstd={path="dep"}\n',
+      "dep/Cargo.toml": '[package]\nedition="2024"\nname="std"\n',
     },
   );
   g.one("self.f", "impl<T> W<T>::f");
@@ -978,8 +982,9 @@ test("round 3 unresolved audit: a dependency crate can be reexported by its own 
       "dep/src/lib.rs": `pub fn f(){}`,
     },
     {
-      "Cargo.toml": `[package]\nname="app"\n[dependencies]\ndep={path="dep"}`,
-      "dep/Cargo.toml": `[package]\nname="dep"`,
+      "Cargo.toml":
+        '[package]\nedition="2024"\nname="app"\n[dependencies]\ndep={path="dep"}',
+      "dep/Cargo.toml": '[package]\nedition="2024"\nname="dep"',
     },
   );
   g.one("dep::f", "f");
