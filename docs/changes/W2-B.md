@@ -1122,6 +1122,18 @@ The module version is 19.
 
 The module version is 20.
 
+## Module version 21 (W2-B2, after merge)
+
+Fixes from a second-model review of the merged module; details in
+`docs/changes/W2-B2.md`.
+
+- Redundant parentheses around a type or an expression are looked through in
+  one place, so the graph is the same with and without them.
+- The backstop finds an anonymous struct along every route a value can take,
+  so a named field never takes an embedded type's failed-file cause.
+- A name-only set that a failed file could extend carries
+  `declarations-may-be-unseen`.
+
 ## Core after PR 11 (W2-I)
 
 The branch is merged with `main` after PR 11 (the linear-time core, on-disk schema
