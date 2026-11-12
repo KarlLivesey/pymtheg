@@ -52,17 +52,27 @@ const kinds: Record<string, string> = {
   impl_item: "impl",
 };
 
-/** Each invocation owns and frees its WASM resources. Only JSON facts escape. */
-export async function parseRust({
-  path,
-  text,
-}: SourceInput): Promise<ParseResult> {
-  const helper = await createTagsParser({
+type Helper = Awaited<ReturnType<typeof createTagsParser>>;
+let sharedHelper: Promise<Helper> | undefined;
+let pending: SourceInput | undefined;
+
+/** One grammar/query/parser per process; parse() is synchronous after loading.
+ * The shared helper deletes each borrowed tree in its finally block. */
+function parser(): Promise<Helper> {
+  sharedHelper ??= createHelper().catch((error: unknown) => {
+    sharedHelper = undefined;
+    throw error;
+  });
+  return sharedHelper;
+}
+async function createHelper(): Promise<Helper> {
+  return createTagsParser({
     ...(await tagsFromPackage("tree-sitter-rust", "tree-sitter-rust.wasm")),
     // The bundled query emits function AND method at one start. The scoped AST
     // pass below maps all definitions once, including definitions absent from tags.
     mapDefinition: () => undefined,
     secondPass({ tree, result }) {
+      const { path, text } = pending!;
       let first: Node | null = null;
       function errorNode(n: Node): void {
         if (
@@ -110,6 +120,7 @@ export async function parseRust({
         range: { start: 0, end: text.length },
         data: { scope: "", unit: true, visibility: "private" },
       });
+      let activeConditions: string[] = [];
       const link = (
         n: Node,
         owner: string,
@@ -127,7 +138,7 @@ export async function parseRust({
             kind,
             targetName,
             range: span(n),
-            data: { scope, ...extra },
+            data: { scope, conditions: activeConditions, ...extra },
           });
       };
       function imports(
@@ -212,7 +223,12 @@ export async function parseRust({
           const ps = payloads(meta.args);
           return ps
             .slice(1)
-            .flatMap((m) => cfg(m).map((c) => `cfg_attr?(Statement:${c})`));
+            .flatMap((m) =>
+              cfg(m).map(
+                (c) =>
+                  `any(not(${ps[0] ? ps[0].name + (ps[0].value ? "=" + ps[0].value.text : ps[0].args ? cfgText(ps[0].args) : "") : "?"}),${c})`,
+              ),
+            );
         }
         return [];
       }
@@ -370,7 +386,11 @@ export async function parseRust({
           return value ? patternNames(value) : [];
         }
         return n.namedChildren
-          .filter((c) => field(n, "type")?.id !== c.id)
+          .filter(
+            (c) =>
+              field(n, "type")?.id !== c.id &&
+              field(n, "condition")?.id !== c.id,
+          )
           .flatMap(patternNames);
       }
       function bindings(
@@ -506,12 +526,23 @@ export async function parseRust({
               let control = n.parent;
               while (
                 control &&
-                !["if_expression", "while_expression"].includes(control.type)
+                !["if_expression", "while_expression", "match_arm"].includes(
+                  control.type,
+                )
               )
                 control = control.parent;
               const region =
                 control &&
-                (field(control, "consequence") ?? field(control, "body"));
+                (field(control, "consequence") ??
+                  field(control, "body") ??
+                  field(control, "value"));
+              if (control) {
+                const chain =
+                  field(control, "condition") ??
+                  (field(control, "pattern") &&
+                    field(field(control, "pattern")!, "condition"));
+                if (chain) add(field(n, "pattern"), null, chain, n.endIndex);
+              }
               if (region) add(field(n, "pattern"), null, region, 0);
             }
             if (
@@ -728,6 +759,7 @@ export async function parseRust({
         moduleScope = "",
         conditions: string[] = [],
       ) {
+        activeConditions = conditions;
         // Signature types are outside the function body item's scope. Preserve
         // the annotation's namespace so a later local type cannot retarget it.
         const body = fn && field(fn, "body");
@@ -789,6 +821,7 @@ export async function parseRust({
               ...conditions,
               ...attributeNodes.flatMap((n) => cfg(meta(n))),
             ];
+            activeConditions = conditions;
             result.symbols.push({
               key,
               name,
@@ -1172,8 +1205,11 @@ export async function parseRust({
       }
       for (const n of tree.rootNode.namedChildren)
         visit(n, "file", "", null, "");
-      const opaqueAttributes: { scope: string; raw: string; module: string }[] =
-        [];
+      const opaqueAttributes: {
+        scope: string;
+        raw: string;
+        module: string;
+      }[] = [];
       function attributes(n: Node): void {
         if (["attribute_item", "inner_attribute_item"].includes(n.type)) {
           let item =
@@ -1210,9 +1246,27 @@ export async function parseRust({
       };
     },
   });
+}
+export async function parseRust(source: SourceInput): Promise<ParseResult> {
   try {
-    return helper.parse(text);
+    const helper = await parser();
+    pending = source;
+    const result = helper.parse(source.text);
+    if (
+      result.status === "failed" &&
+      !result.diagnostics[0]?.message.startsWith("line ")
+    )
+      throw new Error(
+        "Rust parser internal error: " +
+          (result.diagnostics[0]?.message ?? "no tree"),
+      );
+    return result;
+  } catch (error) {
+    throw new Error(
+      `Rust parser internal error: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
+    );
   } finally {
-    helper.dispose();
+    pending = undefined;
   }
 }

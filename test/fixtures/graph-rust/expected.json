@@ -192,10 +192,10 @@
       "name": "app/src/flat.rs",
       "kind": "module",
       "identity": "$crate",
-      "at": "use super::A;\npub struct Thing;\nimpl Thing { pub fn new() -> Self { Thing } }\nfn private() { self::local(); super::tree::branch(); }\nfn local() {}\nfn sibling(a: A) { super::tree::globbed(); a.own(); }\n",
+      "at": "use super::A;\npub struct Thing;\nimpl Thing { pub fn new() -> Self { Thing } }\npub(super) fn private() { self::local(); super::tree::branch(); }\nfn local() {}\nfn sibling(a: A) { super::tree::globbed(); a.own(); }\n",
       "range": {
         "start": 0,
-        "end": 201
+        "end": 212
       }
     },
     {
@@ -412,10 +412,10 @@
       "name": "private",
       "kind": "function",
       "identity": "private",
-      "at": "fn private() { self::local(); super::tree::branch(); }",
+      "at": "pub(super) fn private() { self::local(); super::tree::branch(); }",
       "range": {
         "start": 78,
-        "end": 132
+        "end": 143
       }
     },
     {
@@ -645,8 +645,8 @@
       "identity": "sibling",
       "at": "fn sibling(a: A) { super::tree::globbed(); a.own(); }",
       "range": {
-        "start": 147,
-        "end": 200
+        "start": 158,
+        "end": 211
       }
     },
     {
@@ -678,8 +678,8 @@
       "identity": "local",
       "at": "fn local() {}",
       "range": {
-        "start": 133,
-        "end": 146
+        "start": 144,
+        "end": 157
       }
     }
   ],
@@ -979,8 +979,8 @@
       },
       "at": "super::tree::branch",
       "range": {
-        "start": 108,
-        "end": 127
+        "start": 119,
+        "end": 138
       }
     },
     {
@@ -1681,8 +1681,8 @@
       "target": null,
       "at": "a.own",
       "range": {
-        "start": 190,
-        "end": 195
+        "start": 201,
+        "end": 206
       }
     },
     {
@@ -2409,8 +2409,8 @@
       },
       "at": "fn sibling(a: A) { super::tree::globbed(); a.own(); }",
       "range": {
-        "start": 147,
-        "end": 200
+        "start": 158,
+        "end": 211
       }
     },
     {
@@ -2464,10 +2464,10 @@
         "name": "private",
         "kind": "function"
       },
-      "at": "fn private() { self::local(); super::tree::branch(); }",
+      "at": "pub(super) fn private() { self::local(); super::tree::branch(); }",
       "range": {
         "start": 78,
-        "end": 132
+        "end": 143
       }
     },
     {
@@ -2633,8 +2633,8 @@
       },
       "at": "A",
       "range": {
-        "start": 161,
-        "end": 162
+        "start": 172,
+        "end": 173
       }
     },
     {
@@ -2709,8 +2709,8 @@
       },
       "at": "self::local",
       "range": {
-        "start": 93,
-        "end": 104
+        "start": 104,
+        "end": 115
       }
     },
     {
@@ -2868,8 +2868,8 @@
       },
       "at": "fn local() {}",
       "range": {
-        "start": 133,
-        "end": 146
+        "start": 144,
+        "end": 157
       }
     },
     {
@@ -2902,8 +2902,8 @@
       },
       "at": "super::tree::globbed",
       "range": {
-        "start": 166,
-        "end": 186
+        "start": 177,
+        "end": 197
       }
     },
     {
@@ -2934,7 +2934,6 @@
         "kind": "method"
       },
       "target": null,
-      "candidates": [],
       "range": {
         "start": 614,
         "end": 619
@@ -2950,7 +2949,6 @@
         "kind": "function"
       },
       "target": null,
-      "candidates": [],
       "range": {
         "start": 1025,
         "end": 1026
@@ -2970,7 +2968,6 @@
         "name": "B",
         "kind": "struct"
       },
-      "candidates": [],
       "range": {
         "start": 1152,
         "end": 1160
@@ -2990,7 +2987,6 @@
         "name": "B",
         "kind": "struct"
       },
-      "candidates": [],
       "range": {
         "start": 474,
         "end": 475
@@ -3010,7 +3006,6 @@
         "name": "A",
         "kind": "struct"
       },
-      "candidates": [],
       "range": {
         "start": 1141,
         "end": 1149
@@ -3026,7 +3021,6 @@
         "kind": "function"
       },
       "target": null,
-      "candidates": [],
       "range": {
         "start": 774,
         "end": 779
@@ -3046,7 +3040,6 @@
         "name": "Thing",
         "kind": "struct"
       },
-      "candidates": [],
       "range": {
         "start": 68,
         "end": 73
@@ -3066,7 +3059,6 @@
         "name": "A",
         "kind": "struct"
       },
-      "candidates": [],
       "range": {
         "start": 415,
         "end": 416
@@ -3082,7 +3074,6 @@
         "kind": "function"
       },
       "target": null,
-      "candidates": [],
       "range": {
         "start": 1046,
         "end": 1047

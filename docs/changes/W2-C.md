@@ -1,7 +1,7 @@
 # W2-C: Rust language module for the code graph
 
 This is the **no-toolchain fallback** under D16. Precise compiler-backed Rust
-resolution belongs to a later chunk. Version 6 uses the installed Rust WASM
+resolution belongs to a later chunk. Version 7 uses the installed Rust WASM
 grammar through the shared Tree-sitter helper and supplied source/manifest
 snapshots only. Runtime, installation and tests never invoke Cargo/rustc, read
 project files, expand macros or add dependencies. Private items are ordinary
@@ -50,7 +50,7 @@ glob import's own link remain the manager-listed backlog.
 
 For `recv.name(...)`, the only definite result is an **inherent** method at the
 first probe of the captured receiver: owned T with self, &T with &self, or &mut T
-with &mut self. Receiver lifetime/mutability forms are parsed structurally. Every
+with &mut self. The inherent method must be visible from the caller module; private, pub(crate), pub(super) and pub(in path) restrictions are checked. Receiver lifetime/mutability forms are parsed structurally. Every
 inherent alternative at that step must be proved applicable or inapplicable;
 unknown bounds, cfg conditions, unresolved inherent self types, ambiguous module
 views and unknown receiver adjustments prevent proof. First-step proofs survive
@@ -82,23 +82,43 @@ does not supply expected tokens at ERROR nodes; none are invented. Diagnostic
 text is deterministic and contains no absolute path.
 
 A valid-file non-dot link is `unresolved` with `data.uncertainty: "invalid-code"`
-when its path traverses a failed module file, or an absent name's lookup scope
-has failed files that could have declared it. `data.cause.files` names those
-project-relative files, sorted. It has **no target, candidates or data.targets**;
-the files are causes, never targets or named recovered items. A missing name in
-a scope with no failed files is ordinary unresolved. Fixing and re-indexing
-clears failure causes and resolves newly readable declarations.
+only when lookup actually traverses a module whose own file failed, directly or
+through an explicit import in a valid file. `data.cause.files` names those
+project-relative files, sorted. It has **no target, candidates or data.targets**.
+A missing name or an associated call with no captured targets is not evidence of
+an item in a failed file: it remains unresolved, without a cause. Fixing and
+re-indexing clears causes and resolves newly readable declarations.
 
 A failed file also means unseen declarations may exist. Its owning module's
 fallback lookup through a glob or an enclosing scope cannot prove an unshadowed
 name; intact direct declarations and explicit imports in valid files remain
-authoritative. Unseen impls can reach the failed crate's types/dependencies and
-callers through manifest dependency reachability. If captured manifests cannot
-prove the dependency graph (workspace inheritance/patches/missing path context),
-all failed workspace files count conservatively. Dot calls never become
-invalid-code: they retain **only valid** would-be targets and a
-`failed-file-unseen-declarations` annotation. This annotation cannot undo a
-proved first-step inherent match.
+authoritative. Dependency reach is proved only by captured manifest edges.
+Workspace dependencies use the root workspace manifest; workspace package
+inheritance does not make the graph unknown, and registry dependencies do not
+create project edges. Ambiguous/missing edges never justify accusing unrelated
+failed files. `failed-file-unseen-declarations` is attached only for provable
+reach. Dot calls never become invalid-code and this annotation cannot undo a
+proved first-step inherent match. Internal parser exceptions are reported as
+parser errors by the indexer, with their own diagnostic; they are not syntax
+failures and cannot create an invalid-code cause.
+
+Captured cfg predicates are compared structurally with bounded propositional
+implication (all/any/not; string contents preserved). A condition gating the
+caller in the same crate is satisfied whenever that call compiles: all(a,b) implies a, while a
+does not imply b or not(a). Conditions from another crate are not assumed: equal feature names in two crates do not establish equal feature selections. Other alternatives remain unknown. Conditional local
+items and explicit imports form one binding family so import alternatives do
+not disappear from closed sets or unverified hints. An opaque lexical binding likewise cannot erase a captured dependency route: its known project bodies remain hints, with no proof upgrade or guessed failure cause. No feature selection runs.
+Let-chain bindings activate after their initializer, covering subsequent
+conditions and the body; arm patterns exclude guard expressions, whose own
+let-bindings activate separately. Let-else binds after the statement, never in
+its else block. Closures, labelled blocks, loops and nested/or patterns retain
+their lexical boundaries.
+
+The grammar, parser and query are lazily loaded **once per process**. Calls are
+synchronous after loading, with invocation-local source state reset in finally;
+the shared helper deletes every tree after extraction. Only JSON facts escape.
+The query/parser remain alive for reuse, rather than repeatedly allocating WASM
+grammar instances that disposal cannot free.
 
 Opaque item-position macros and non-builtin attributes in lexical item containers
 (module/file/function/block scopes) similarly make glob/outer
@@ -132,7 +152,7 @@ are indexed/cached per analysis. Analysis writes metadata through the frozen
 interface; resolve writes definite/closed decisions only. No core files change.
 The interface has no separate failed-link enum, so failed links use unresolved
 plus invalid-code/cause metadata. They are distinguishable from valid but
-unverified dot calls. Syntax diagnostics use the interface's message/range.
+unverified dot calls. Syntax diagnostics use the interface's message/range. A thrown per-file parser exception is recorded by the frozen indexer in `report.errors`; it is not converted to a source-syntax diagnostic or an invalid-code cause.
 
 ## Review-response audit and validation
 
@@ -208,11 +228,11 @@ Historical failures are preserved: the uncapped draft exhausted the default heap
 
 **All 11 rejected files are accepted by the native Rust syntax parser (11/11). These are real grammar gaps, and they fail completely under the owner’s rule.** This is syntax acceptance, not a claim to have run Cargo/typechecked all of Vector. `src/config/builder.rs:89` and compiler.rs use cfg attributes on destructuring-pattern fields. Other gaps are a parameter pattern attribute, turbofish inference, a higher-ranked bound, and contextual `raw` reference/pattern forms. Per-file constructs, first diagnostics and native results are in `round6-grammar-audit.json`, `round6-grammar-note.md` and `d16-failed-files.json`.
 
-Whole-file failure removes **485 symbols / 6,726 source links**. There are **267 targetless invalid-code links** with sorted failed-file causes. **104,099 links carry failed-file-unseen-declarations uncertainty**; 6,794 withdrawals carry that annotation, often alongside D16/type/applicability uncertainty. This is an annotation count, not a claim that file failure alone caused every one. The integrity audit checks all IDs, failure causes and absence of closed dot sets.
+Whole-file failure removes **485 symbols / 6,726 source links**. At 97040580 there were **267 targetless invalid-code links** with sorted failed-file causes. **104,099 links carried failed-file-unseen-declarations uncertainty**; 6,794 withdrawals carry that annotation, often alongside D16/type/applicability uncertainty. This is an annotation count, not a claim that file failure alone caused every one. The integrity audit checks all IDs, failure causes and absence of closed dot sets.
 
 ## Original 152 and fresh audit
 
-**16 restored; 0 identified wrong-before; 136 unverified under the final fallback policy; 0 correct-and-provable under that policy still lost.** Of those 136, 123 retain the original hint and 13 have count-only overflow. Every row records its rule. Reviewer-highlighted #64, #65, #67 and #68 are restored. This is a changed D16 precision contract, not a claim that Rust itself cannot prove the 136 calls.
+At 97040580: **16 restored; 0 identified wrong-before; 136 unverified under the D16 fallback policy; 0 correct-and-provable under that policy still lost.** Of those 136, 123 retain the original hint and 13 have count-only overflow. Every row records its rule. Reviewer-highlighted #64, #65, #67 and #68 are restored. This is a changed D16 precision contract, not a claim that Rust itself cannot prove the 136 calls.
 
 Fresh seeded source hand check: **30 definite / 30 newly downgraded / 15 unresolved**. No wrong definite link. Of the 30 downgraded calls, 26 retain the expected body and 4 omit the complete list by overflow; all four expected bodies are verified in the uncapped inventory. No unexpected missing hint. Individual judgments are in d16-samples.json.
 
@@ -222,10 +242,58 @@ Real indexer/store elapsed: 373.5 s; module parse 82.9 s, analysis 47.1 s, resol
 
 Valid Cargo roots observed: 35 libraries, 11 binaries, 3 examples, 17 tests, 14 benches, 10 build scripts. src/bin, examples, tests, benches and build.rs are crate roots under Cargo target discovery, not forced loose files. Failed targets contribute no unit symbols.
 
-Final sequential checks: npm ci --ignore-scripts; PYM_TLC_JAR=the supplied jar npm test (**1,389 pass, 0 skipped**); format:check; Rust tests (**143 pass**). All exit 0. **36 mutations killed**, including overflow; 71 native compiler cases plus the smaller namespace/binding/file controls pass. Runtime/tests never need rustc/Cargo.
+At 97040580, sequential checks: npm ci --ignore-scripts; PYM_TLC_JAR=the supplied jar npm test (**1,389 pass, 0 skipped**); format:check; Rust tests (**143 pass**). All exit 0. **36 mutations killed**, including overflow; 71 native compiler cases plus the smaller namespace/binding/file controls pass. Runtime/tests never need rustc/Cargo.
 
 Symbols by kind: `{"const": 1287, "enum": 704, "function": 9158, "impl": 4502, "macro": 59, "method": 9191, "module": 3659, "static": 144, "struct": 2747, "trait": 155, "type": 1197, "variant": 2619}`.
 
 Links by kind: `{"calls": 134752, "contains": 33870, "implements": 2999, "imports": 28988, "macros": 24869, "modules": 1468, "patterns": 10937, "types": 73393, "values": 54238}`.
 
 Top unresolved: `[["Some", 7810], ["assert_eq", 7414], ["String", 4464], ["None", 4407], ["Option", 4311], ["assert", 3904], ["Ok", 3815], ["Vec", 3118], ["vec", 2431], ["Result", 2209]]`.
+
+## Round 6 review response (current head)
+
+`origin/main` was merged normally (dcf83424), then refreshed by normal merge 7e46fde0 (upstream fe0d5b8c changes only the build-plan ledger; executable source/test hashes are unchanged). Runtime version is 7; no core, dependency or other-language edits. The module remains the D16 no-toolchain fallback.
+
+- **B1:** every first-probe/path inherent proof checks accessibility from the caller module. Private/public restriction tests include descendant access, pub(crate), pub(super), pub(in path), enum paths through private modules and public reexports. Associated const/type projections already have no definite proof; fields remain out of scope. See round7-scope-audit.md.
+- **B2:** let bindings activate in the rest of a condition chain and its body; match guard let-bindings are handled separately from arm patterns. The Reference scope audit and compiler controls cover initializers, guard/body boundaries, let-else, closures, labels, for and nested or-patterns. The signature-constant safety control is rejected by rustc, so it remains unverified rather than acquiring an outer function.
+- **B3 / S1:** captured workspace inheritance does not make reach unknown. Workspace dependency definitions do not create unused package edges. Registry dependencies are distinguished from unknown project edges. Failed-file uncertainty uses only captured provable reach; a missing name/associated target never creates invalid-code. Causes require a traversed failed module, directly or through named imports. An uncertain dependency alternative cannot accuse a failed file.
+- **B4:** bounded all/any/not implication respects caller conditions in the same crate, including inherited module and item conditions. Predicates are cached per run and canonicalised for cycle guards. Equal feature names in different crates are independent: native controls return `2 2` with dependency feature off and `1 1` with it on. No toolchain or feature evaluation runs in the module.
+- **B5:** conditional declaration/import families retain both bodies. Opaque lexical lookup retains captured dependency alternatives and associated-method alternatives without upgrading uncertainty. The fresh audit found a lost SchemaGenerator hint; this shared fallback fix restores it. Identity/alias proc-attribute controls select dependency f (2) or project associated A::f (3), both retained as hints.
+- **S2:** one lazily loaded parser/query/grammar per module process; each parse frees its borrowed tree through the shared helper and resets source state in finally. Internal exceptions throw a distinct parser diagnostic, enter the frozen indexer's report.errors, and never create a syntax invalid-code cause. Tests exercise 5,000 direct parses and two production-indexer passes over 2,500 files (2,499 force-reparsed in the second pass), all clean. Previous published Vector totals were not affected: every measured pass was a fresh process below the 1,996-load threshold, and 97040580 reproduces exactly here. Long-lived repeated indexing was unsafe and is now covered.
+
+## Whole Vector through the real indexer/store
+
+Fresh scratch clone, commit `515e87d9861b564f521a8992d224892cd8cae120`; every .rs, all 41 captured Cargo manifests, fresh schema-3 DB. Default heap: execArgv [], NODE_OPTIONS empty, heap limit 4,496,293,888 bytes. All 365,514 direct/store links match state, IDs and metadata exactly.
+
+| Fact | 97040580 | New |
+|---|---:|---:|
+| Claimed / clean / partial / failed | 1,563 / 1,552 / 0 / 11 | 1,563 / 1,552 / 0 / 11 |
+| Symbols | 35,422 | 35,422 |
+| Links | 365,514 | 365,514 |
+| Definite | 72,565 | 75,950 |
+| Closed candidate sets | 79 | 88 |
+| Unresolved | 292,870 | 289,476 |
+| invalid-code | 267 | 247 |
+| Failed-file uncertainty annotations | 104,099 | 175,075 |
+
+Link-by-link: **3,385 gains / 0 withdrawals / 0 retargets**. 730 dot gains (583 self calls); 1,084 other call gains; 1,571 type/pattern/import/value/implements gains. The extra movement beyond the review's narrow patch comes from carrying item-level predicates and applying structural presence proof to namespace lookup too. Of the prior candidate sets, 77 remain closed and two become definite; 11 previously unresolved complete families become closed. No closed dot-call sets. All 11 new sets are recorded separately for review.
+
+The 20 wrong causes are gone; all other 247 invalid-code links keep targetless sorted causes. Twenty fresh cause samples traverse the actual failed module/import path. The annotation count is not a failed-link or causal-dependency count: 27,426 old call annotations clear, 76,673 remain, and 98,402 previously plain unresolved names now carry reach-only context (imports/types/values/macros/calls/patterns/implements). The independent module/dependency audit validates provable reach for **every 175,075 annotation**. No unknown edge adds workspace-wide reach.
+
+All 11 grammar-failed files are freshly accepted by native syntax parsing (round7-grammar.json): syntax acceptance, not a whole-crate Cargo/type check. The grammar still rejects real code, including cfg pattern-field attributes and contextual raw forms; none is special-cased. The old round6-grammar-note's graph-scope paragraph is superseded by this reach rule. Nothing in failed files contributes symbols/links or targets.
+
+## Bounded unverified hints / output size
+
+Representation stays **unresolved-with-targets**, no open closed-set marker. Hints are name-based project bodies, not verified dispatch, and may accompany an actual std/external callee. Up to 16 IDs only; overflow emits no list, only targetCount plus too-many-targets. First-step inherent proof is the only definite dot outcome.
+
+Analysis return: 152,209,680 → 163,280,974 bytes. Graph facts: 281,150,700 → 292,221,994 bytes. 30,564 count-only links; 80,689 nonempty lists, including 55,721 singletons; 200,701 stored IDs, maximum 16. Full ID/cap/failure integrity audit passes. No core workaround or heap override.
+
+## Classification / hand check / checks
+
+Original 152: **19 restored; 0 identified wrong-before; 133 unverified by named fallback rules; 0 correct-and-provable under those rules still lost**. This is not a claim that Rust itself cannot prove the remaining calls. Each source position has its actual D16/later-probe, method/impl applicability, unknown receiver, opaque namespace or multi-namespace rule in round7-original-152.json.
+
+Fresh seeded source inspection: **30 definite, 15 restored, 15 closed sets, 15 unresolved, 20 unverified project-hint links, 20 invalid-code causes**. No wrong definite, incomplete closed set, or wrong cause. The hint population intentionally includes some external actual callees; it is not misreported as 20 proven project callees. Two draft findings (cross-crate cfg and dependency-hint erasure) were fixed and natively confirmed. No further ordinary first-probe/path pattern was found in the final sample. Individual judgments and source excerpts are in round7-samples.json.
+
+**31 native controls, 32 mutations killed.** Required checks ran sequentially: npm ci --ignore-scripts; supplied PYM_TLC_JAR npm test (**1,578 pass, 0 skipped**); format:check; Rust tests (**180 pass, 0 skipped**). All exit 0. Draft cancellations are explicitly not passes (round7-development-attempts.json).
+
+Loaded-machine observations: direct module parse 37.4s, analysis 30.0s, resolve 26.1s, total 105.9s. Real store total 232.9s; parse 33.5s, analysis 28.7s, resolve 27.0s; peak RSS 5,134,984 KiB. Timings are observations, not assertions.

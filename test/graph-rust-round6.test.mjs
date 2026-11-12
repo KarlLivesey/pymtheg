@@ -686,7 +686,7 @@ test("unplaced valid impls and inherited defaults are not absent", async () => {
   });
   defaults.unverified("A::f", "Tr::f");
 });
-test("ambiguous manifest edges cannot hide a failed dependency crate", async () => {
+test("ambiguous manifest edges cannot accuse an unproven failed dependency crate", async () => {
   const g = await graph(
     {
       "src/lib.rs":
@@ -701,7 +701,7 @@ test("ambiguous manifest edges cannot hide a failed dependency crate", async () 
       "two/Cargo.toml": '[package]\nname="two"',
     },
   );
-  assert.match(
+  assert.doesNotMatch(
     g.links.find((l) => l.targetName === "a.f").data.uncertainty,
     /failed-file/,
   );

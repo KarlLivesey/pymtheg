@@ -142,7 +142,7 @@ test("Rust sample: module layouts, private sibling calls, imports, distinct impl
       2,
     );
     assert.equal(
-      store.findSymbols({ name: "private" })[0].data.visibility,
+      store.findSymbols({ name: "local" })[0].data.visibility,
       "private",
     );
     assert.deepEqual(

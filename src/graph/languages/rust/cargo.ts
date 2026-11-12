@@ -8,6 +8,7 @@ export interface Crate {
   manifest: string;
   deps: Map<string, string>;
   workspace: string | null;
+  dependencyGraphKnown?: boolean;
 }
 /** Deliberately bounded TOML context reader: literal strings, arrays and inline
  * dependency tables. No evaluation, filesystem reads or Cargo execution. */
@@ -99,18 +100,32 @@ export function crates(
       automaticPaths.set(dir, list);
     }
   }
+  const graphKnown = new Map<string, boolean>();
   const roots: Crate[] = [];
   for (const doc of docs) {
     const pkg = doc.sections.get("package");
-    const name = literal(pkg?.name);
-    if (!name) continue;
     const workspace = workspaceFor(doc.dir);
+    const name =
+      literal(pkg?.name) ??
+      (pkg?.["name.workspace"] === "true"
+        ? literal(workspace?.sections.get("workspace.package")?.name)
+        : undefined);
+    if (!name) continue;
+    graphKnown.set(
+      doc.path,
+      ![...doc.sections.keys()].some((s) => /^(patch|replace)(\.|$)/.test(s)),
+    );
     const workspacePath = workspace?.path ?? null;
     const deps = new Map<string, string>();
     const buildDeps = new Map<string, string>();
     let dependencyMap = deps;
     const dependency = (alias: string, path: string, renamed: boolean) => {
       const target = docsByPath.get(path);
+      if (
+        (path && !target) ||
+        (dependencyMap.has(alias) && dependencyMap.get(alias) !== path)
+      )
+        graphKnown.set(doc.path, false);
       if (target && !renamed)
         alias =
           literal(target.sections.get("lib")?.name) ??
@@ -118,6 +133,8 @@ export function crates(
           alias;
       alias = alias.replace(/-/g, "_");
       const previous = dependencyMap.get(alias);
+      if (previous !== undefined && previous !== path)
+        graphKnown.set(doc.path, false);
       dependencyMap.set(
         alias,
         previous === undefined || previous === path ? path : "",
@@ -125,6 +142,7 @@ export function crates(
     };
     for (const [section, values] of doc.sections) {
       if (
+        section.startsWith("workspace.") ||
         !/(^|\.)(dependencies|dev-dependencies|build-dependencies)$/.test(
           section,
         )
@@ -142,6 +160,7 @@ export function crates(
         if (/workspace\s*=\s*true/.test(raw)) {
           value =
             workspace?.sections.get("workspace.dependencies")?.[alias] ?? "";
+          if (!value) graphKnown.set(doc.path, false);
           const depPath = /path\s*=\s*["']([^"']+)["']/.exec(value)?.[1];
           dependency(
             alias,
@@ -257,5 +276,8 @@ export function crates(
         "build",
       );
   }
-  return roots;
+  return roots.map((c) => ({
+    ...c,
+    dependencyGraphKnown: graphKnown.get(c.manifest) ?? false,
+  }));
 }

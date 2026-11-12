@@ -158,7 +158,7 @@ test("review 5: path-loaded files have sibling child modules", async () => {
   for (const wrong of [false, true]) {
     const g = await graph({
       "src/lib.rs": '#[path="../extra/p.rs"] mod p; fn run(){p::child::f();}',
-      "extra/p.rs": "mod child;",
+      "extra/p.rs": "pub mod child;",
       "extra/child.rs": "pub fn f(){}",
       ...(wrong ? { "extra/p/child.rs": "pub fn wrong(){}" } : {}),
     });
@@ -376,7 +376,7 @@ test("review audit: mixed-namespace imports are not a one-of candidate set", asy
 test("review audit: imports combine direct and reexported namespaces without asserting one winner", async () => {
   const g = await graph(
     lib(
-      `mod a{mod f{}mod inner{pub fn f(){}}pub use inner::f;}use crate::a::f;fn run(){f();}`,
+      `mod a{pub mod f{}mod inner{pub fn f(){}}pub use inner::f;}use crate::a::f;fn run(){f();}`,
     ),
   );
   g.unknown("crate::a::f", "imports");
@@ -386,7 +386,7 @@ test("review audit: imports combine direct and reexported namespaces without ass
 test("review path-child negative: a stem directory is not searched for a path-loaded file", async () => {
   const g = await graph({
     "src/lib.rs": '#[path="../extra/p.rs"]mod p;fn run(){p::child::f();}',
-    "extra/p.rs": "mod child;",
+    "extra/p.rs": "pub mod child;",
     "extra/p/child.rs": "pub fn f(){}",
   });
   g.unknown("p::child::f");
@@ -869,13 +869,13 @@ test("round 3 standard trait evidence respects Cargo and extern-crate aliases", 
 test("round 3 R3: equal type-argument spelling is not equal namespace binding", async () => {
   const g = await graph(
     lib(
-      `struct F<T>(T);mod a{use super::F;pub type X=u8;impl F<X>{fn f(&self){}}}mod b{use super::F;type X=String;fn run(x:F<X>){x.f();}}`,
+      `struct F<T>(T);mod a{use super::F;pub type X=u8;impl F<X>{pub fn f(&self){}}}mod b{use super::F;type X=String;fn run(x:F<X>){x.f();}}`,
     ),
   );
   g.unknown("x.f");
   const same = await graph(
     lib(
-      `struct F<T>(T);mod a{use super::F;pub type X=u8;impl F<X>{fn f(&self){}}}use a::X as Y;fn run(x:F<Y>){x.f();}`,
+      `struct F<T>(T);mod a{use super::F;pub type X=u8;impl F<X>{pub fn f(&self){}}}use a::X as Y;fn run(x:F<Y>){x.f();}`,
     ),
   );
   same.unverified("x.f", "a::impl F<X>::f");
