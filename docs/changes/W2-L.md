@@ -1,6 +1,6 @@
 # W2-L: can the Go build chain supply exact code-graph links, and at what cost?
 
-Investigation only (round 5). Evidence, helper, scripts and raw outputs:
+Investigation only (round 6). Evidence, helper, scripts and raw outputs:
 `evidence/w2-l/`. No product code, contract or support level changes.
 
 ## The answer
@@ -15,8 +15,10 @@ configuration.** Two rules decide which facts are definite:
   has errors, because they are searched over every package.
 
 A standard-library helper (`go list` + `go/parser` + `go/types`) starts the
-trusted `go` (`-go`, or the first on PATH resolved to its Go installation)
-in a **closed environment that inherits nothing from its caller**:
+`go` named by its required `-go` flag (an absolute path; no PATH lookup). The
+Go installation is **trusted**: it is the user's compiler, a `go` cannot be
+authenticated, and choosing it is the launcher's job. It runs in a **closed
+environment that inherits nothing from its caller**:
 
 - configuration and locations from command-line flags only;
 - `GOENV=off`; PATH = the Go installation's `bin`;
@@ -27,12 +29,17 @@ in a **closed environment that inherits nothing from its caller**:
 It also guards the project directly:
 
 - it pins `go.mod`, `go.sum`, `go.work` and `go.work.sum` through
-  `-overlay`, so go cannot write them;
-- it requires checksum evidence for every dependency;
-- it fails if any file of the project changes.
+  `-overlay`, so go cannot write them. As a consequence, a dependency without
+  a checksum line makes go refuse the whole load;
+- it fails if any file changes in the project or its local `replace` /
+  `go.work` directories.
 
-An optional OS sandbox (`-sandbox bwrap`) runs `go` with no network and a
-read-only filesystem except a private build cache.
+An optional OS sandbox (`-sandbox bwrap`) is an **allow-list**:
+
+- `go` sees only the Go installation, the module cache and the project's
+  directories (read-only), plus the private build cache (read-write);
+- it has no network, no other host file or socket, and its own pid, user,
+  ipc, uts and cgroup namespaces.
 
 It gives:
 
@@ -110,8 +117,27 @@ some attacks get through **without** the sandbox:
 - a checksum-database fetch writes `go.work.sum` into the project (the
   helper's assertion catches it).
 
-**With the sandbox each fails closed:** no network, nothing written outside
-the private cache.
+**The sandbox, as measured in round 6.** Round 5's sandbox (a read-only
+view of the whole filesystem) **did not contain a planted program**: through
+the session bus it started a process outside the sandbox (`systemd-run`),
+which wrote a host file and reached a host listener. It also reached
+`docker.sock` and read `~/.ssh`.
+
+The round-6 allow-list sandbox stopped each of these:
+
+- a planted program's attempts on every host path and socket failed;
+- loopback and abstract sockets were refused;
+- it saw 3 processes;
+- host-side witnesses saw no marker, no connection and no new systemd
+  unit.
+
+It does not protect against:
+
+- a kernel exploit;
+- whatever is deliberately bound: the project and module cache are
+  readable, the private cache writable;
+- a system without unprivileged user namespaces. There the helper refuses
+  to run with `-sandbox`, and never silently runs without it (measured).
 
 ## One-minute table
 
@@ -141,14 +167,16 @@ warm). It adds nothing measured here, so it is not recommended.
      across configurations.
 2. **Two layers of protection:**
    - **The closed environment, always.** It fixes the configuration, keeps
-     cgo out, requires checksums, never writes the project, and starts
-     nothing but `go`.
-   - **The OS sandbox wherever the platform offers one.** It costs about
-     1 s and changes no record. **Without the sandbox, the no-network and
-     no-write guarantees rest on the environment policy being complete** —
-     and each of the last three review rounds found a hole in it. With the
-     sandbox a hole fails closed: an injected hook can still execute, but it
-     can neither write nor reach the network.
+     cgo out, never writes the project, and starts nothing but `go`.
+   - **The allow-list OS sandbox wherever the platform offers one.** It
+     costs about 1 s and changes no record. **Without the sandbox, the
+     no-network and no-write guarantees rest on the environment policy being
+     complete** — and each of the last four review rounds found a hole in the
+     protection.
+
+     In the measured allow-list sandbox, a planted program that does start
+     reaches nothing outside the bound paths. Round 5's read-only-root
+     sandbox did not stop it, so the allow-list form matters.
 
    Linux has `unshare` (util-linux) everywhere and bubblewrap as a package;
    both ran unprivileged here. Not measured: macOS `sandbox-exec` (ships,
@@ -182,6 +210,12 @@ Costs:
 
 **Decisions for Karl:**
 
+**Requirement, not a choice:** the launcher names the Go installation
+(`-go`, an absolute path) and starts the indexer with a clean environment.
+The Go installation is trusted; a `go` found on a PATH cannot be
+authenticated. A layout-passing fake first on PATH is not consulted when
+`-go` names the real one (measured).
+
 1. **May indexing start programs?** Recommended: only `go` (and the
    sandbox's `bwrap`), in the closed environment, part F. That rules out:
    - git for VCS stamping;
@@ -201,7 +235,9 @@ Costs:
    - Recommended: **offline-first** — never download and never ask the
      checksum database (`GOPROXY=off`, `GOSUMDB=off`); report missing
      modules. With a warm cache the links are identical; with a cold one,
-     571 of the cold run's 136,338 located links (0.4%) stay definite.
+     571 of the cold run's 136,338 located links (0.4%) stay definite. A
+     dependency with no line in `go.sum` / `go.work.sum` makes go refuse the
+     **whole load** (0 records), not just that module.
    - Alternative: a **module proxy only** (HTTP, with the checksum
      database; no `direct`, no auth). This is incompatible with the sandbox,
      so downloads would be a separate, unsandboxed step.
@@ -213,8 +249,8 @@ Costs:
    - **(iii) `-cgo real`:** exact, but it runs the C toolchain, against
      decision 1.
 5. **Configurations.** Index one configuration — the one the helper sets
-   (cgo off, `GOAMD64=v1`, the given GOOS/GOARCH; not necessarily the host's
-   default build) — or a set covering all files (six for restic, about six
+   from its flags (cgo off, `GOAMD64=v1`, the required GOOS/GOARCH; not
+   necessarily the host's default build) — or a set covering all files (six for restic, about six
    times the cost)? Links are keyed by configuration either way.
 6. **What indexing reads and writes outside the snapshot.** Project files
    can come from the snapshot alone (restic overlaid into an empty
@@ -231,7 +267,8 @@ Costs:
        go was asked to find;
      - with `-net proxy`, downloaded modules and checksum state under
        `$GOPATH/pkg/sumdb`.
-   - **Never written:** the project (pinned and asserted).
+   - **Never written:** the project and its local `replace` / `go.work`
+     directories (pinned and asserted, also on error exits).
 
    The re-index cache key covers every non-immutable file read, plus the
    helper's flags and the Go installation.
