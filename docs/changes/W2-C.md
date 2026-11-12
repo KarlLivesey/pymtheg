@@ -758,10 +758,11 @@ The native rustc AND cargo-run decoy matrix uses edition 2024, a u16 result retu
 | Inner FILE path with crate-root parent | Unverified | inner-plain-file |
 | Inner FILE path with name.rs parent; cfg_attr form | Unverified | inner-parent-name-rs; inner-cfg-attr-parent-name-rs |
 | Inner FILE path with mod.rs parent or in mod.rs itself | Unverified | inner-parent-mod-rs; inner-body-mod-rs |
-| Plain outer FILE path inside name.rs, mod.rs, or inline module | Definite | plain-outer-in-name-rs; plain-outer-in-mod-rs; plain-outer-in-inline |
+| Plain outer FILE path inside name.rs, mod.rs, or module-level inline module (not block-local) | Definite | plain-outer-in-name-rs; plain-outer-in-mod-rs; plain-outer-in-inline |
 | Inline outer/inner path in name.rs | Unverified | inline-name-rs-outer; inline-name-rs-inner |
 | Inline inner path in mod.rs | Unverified | inline-in-mod-rs |
 | Two nested inline modules | Unverified | inline-two-deep |
+| File module beneath a block-local inline module, with or without path | Unverified | round19-block-rustc.json / block-module-path-cases.json |
 | Inline outer plus inner path | Unverified; first value retained | inline-outer-wins-inner |
 | Inner redirect/.. | Unverified | sol-inner-dotdot |
 | Outer a/../b.rs; ../extra/p.rs | Unverified | outer-dotdot; outer-parent-component |
@@ -782,3 +783,31 @@ Against pushed **b2f4b886**, the final whole-Vector result is **0 gains / 0 with
 Totals remain **35,422 symbols / 365,530 links; 67,418 resolved / 90 candidate sets / 298,022 unresolved**; **1,552 clean / 11 failed files**, **168 invalid-code links**, and **175,528 failed-file reach annotations**. The existing grammar-gap record is unchanged. Analysis return remains **173,585,779 bytes**, graph facts **300,755,013 bytes**.
 
 The final production indexer/store completes at the **default Node heap**, with no analysis/resolution errors; every stored link and symbol equals the direct run. The retained compiler controls and the 30-module-control / 65-attribute-legality matrix also pass. round18-freeze.json hashes the final tested source and fixtures, and records all sequential checks. round18-report.md and round18-attribution.json provide the handback and full-equality evidence. No core/grammar/dependency changes or heap override.
+
+
+## Round 19 — owned fixtures and block-local module locations
+
+Review round 17 is addressed with the conservative rule. Both path-fixture JSONs now live under test/fixtures/graph-rust/; the graph tests, native controls and source-freeze driver read the moved paths. Their bytes are unchanged. Historical frozen path/hash records remain evidence of their reviewed revisions; new evidence uses the owned locations.
+
+The parser records a file module's block ancestry: under a block-local inline module at any depth, or directly in a function/method/closure/const/static body. Every file module under a block-local inline module is unverified, whether or not it has a path attribute, in every file shape. A direct block file module without a provably active path is also unverified: rustc rejects the tested no-path forms. Plain path modules directly in a block retain the existing definite captured-file rule. Inline-written declarations do not acquire new layout uncertainty merely for being inside a block. No rustc directory ownership algorithm is emulated. Module version 19 refreshes cached parses.
+
+The old round-18 table/report's plain outer-path row is narrowed to module-level inline modules, and its heading no longer confuses review round and module version. Its frozen module-18 measurements remain historical. The new controls assert both the mod-to-file edge and the call answer.
+
+| Shape | Module version 19 result | Native controls |
+| --- | --- | --- |
+| File child beneath block-local inline modules in name.rs or nested name.rs | Unverified | function-name-rs; function-inline-two-deep; nested-name-rs |
+| The same in an impl method, closure, const or static body | Unverified | impl-method-body; closure-body; const-body; static-body |
+| Previously correct neighbours in mod.rs, crate root, bin root, or a function within an ordinary inline module | Unverified by the ANY-block-local-inline rule | neighbour-mod-rs; neighbour-crate-root; neighbour-bin-root; neighbour-function-in-inline |
+| Plain path file module directly in a block, without a block-local inline ancestor | Definite | neighbour-direct-path-block; neighbour-direct-block-in-module-inline |
+| No-path file modules directly in a block or beneath block-local inline modules | Unverified; four native forms are rejected | no-path-inline-block; no-path-direct-block; no-path-inline-crate-root; no-path-direct-crate-root |
+| Guessed failed file not loaded by rustc | Cannot prove failed-file reach | guessed-failure-not-reach |
+
+The failed-reach control calls the prelude drop from the valid candidate file. Counting the unrelated failed candidate in failedByScope alone now fails that test; no implementation change to reach was needed. The optional own-file and same-file inline-item restorations remain deferred. The existing moduleIncomplete/directoryUnverified/?module-layout state jointly controls own-file, item and descendant proof; safely restoring only those edges requires separating those proof boundaries and checking alias/import/macro routes. That is not an obviously safe local restoration in this fix.
+
+Required sequential foreground checks pass after the normal main merge: npm ci --ignore-scripts; full npm test with PYM_TLC_JAR **2,208/2,208**; format:check; Rust tests **670/670**. The mutation baseline passes and **101/101 mutations are killed**. Both new mutants fail their intended new tests: treating block-local inline file locations as certain, and crediting guessed failures in failedByScope alone. Native checks cover **44 path programs under both rustc and Cargo** (40 accepted, four expected rejections), plus all retained compiler controls and the module-attribute legality matrix.
+
+Against pushed **a4c36690**, whole Vector is **0 gains / 0 withdrawals / 0 retargets / 0 changed link facts**. Link snapshots are byte-identical; every symbol/context fact is equal. There are no affected block-local file declarations in captured Vector code. All four existing plain outer paths are unchanged; there are no parent-component or inner paths.
+
+Totals stay **35,422 symbols / 365,530 links; 67,418 resolved / 90 candidate sets / 298,022 unresolved**, with **1,552 clean / 11 failed files**, **168 invalid-code links** and **175,528 failed-file reach annotations**. Analysis-return size is **173,585,779 bytes**, graph facts **300,755,013 bytes**. The production indexer/store passes at the **default Node heap**, without analysis/resolution errors; every stored link and symbol equals the direct result. Existing grammar-gap evidence is unchanged. round19-freeze.json hashes the final tested source and fixtures; round19-report.md provides the handback. The whole-PR owned-path audit is recorded in round19-owned-paths.json and checked again after commit before push.
+
+The whole-PR ownership audit covers **2,942 changed paths**, with **zero outside the permitted paths**. Both relocated fixtures appear only under test/fixtures/graph-rust/ in the PR diff.

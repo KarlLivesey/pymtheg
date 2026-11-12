@@ -669,7 +669,10 @@ export function resolveRust(
           !!data(s).pathOpaque ||
           pathValues.some((value) => !plainModulePath(value));
         const locationUnverified =
-          !!place.directoryUnverified || pathUnverified;
+          !!place.directoryUnverified ||
+          pathUnverified ||
+          data(s).blockModuleLocation === "inline" ||
+          (data(s).blockModuleLocation === "direct" && !data(s).pathExplicit);
         const pathTargets = new Set(
           ((data(s).paths ?? []) as string[]).map((path) =>
             p.normalize(

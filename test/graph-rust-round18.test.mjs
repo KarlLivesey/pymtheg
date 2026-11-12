@@ -103,7 +103,10 @@ async function graph(
 
 const cases = JSON.parse(
   await readFile(
-    new URL("./fixtures/rust-module-path-cases.json", import.meta.url),
+    new URL(
+      "./fixtures/graph-rust/rust-module-path-cases.json",
+      import.meta.url,
+    ),
     "utf8",
   ),
 );
@@ -155,7 +158,10 @@ test("backslash path never proves a module binding", async () => {
 });
 const macroCases = JSON.parse(
   await readFile(
-    new URL("./fixtures/rust-path-macro-cases.json", import.meta.url),
+    new URL(
+      "./fixtures/graph-rust/rust-path-macro-cases.json",
+      import.meta.url,
+    ),
     "utf8",
   ),
 );

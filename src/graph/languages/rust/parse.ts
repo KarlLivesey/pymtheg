@@ -1385,6 +1385,36 @@ async function createHelper(): Promise<Helper> {
           type: type?.text ?? "Self",
         };
       }
+      // Rust's directory ownership changes across block-local modules.
+      // Record the class only for file declarations; inline text stays written
+      // in the same file, while descendants in other files inherit uncertainty.
+      function blockModuleLocation(n: Node): "inline" | "direct" | undefined {
+        if (
+          n.type !== "mod_item" ||
+          field(n, "body") ||
+          !possible(explicitConditionsOn(n))
+        )
+          return;
+        let inlineAncestor = false,
+          bodyAncestor = false;
+        for (let a = n.parent; a && a.type !== "source_file"; a = a.parent) {
+          if (a.type === "mod_item") inlineAncestor = true;
+          if (
+            [
+              "function_item",
+              "closure_expression",
+              "const_item",
+              "static_item",
+              "const_block",
+              "async_block",
+            ].includes(a.type)
+          ) {
+            bodyAncestor = true;
+            if (inlineAncestor) return "inline";
+          }
+        }
+        return bodyAncestor ? "direct" : undefined;
+      }
       const genericBindingsCache = new Map<number, string>();
       function genericBindings(n: Node): string {
         const cached = genericBindingsCache.get(n.id);
@@ -1596,6 +1626,12 @@ async function createHelper(): Promise<Helper> {
                 ...(n.type === "mod_item"
                   ? {
                       inline: !!field(n, "body"),
+                      ...(() => {
+                        const location = blockModuleLocation(n);
+                        return location
+                          ? { blockModuleLocation: location }
+                          : {};
+                      })(),
                       macroUseConditions: macroUseConditions(n),
                       ...(noImplicitPrelude(n)
                         ? { noImplicitPrelude: true }
