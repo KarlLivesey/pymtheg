@@ -171,3 +171,28 @@ test("an internal exception is reported as the module's fault, transient, distin
     injectedExtractionFaults.clear();
   }
 });
+
+test("a file of two tied configs keeps the transient marking of an internal error", async () => {
+  // Two configs of the same rank both include src/: the file is analysed
+  // under both and merged (mergeTied). A transient failure in any variant
+  // keeps the merged failure transient (retried, never cached as content).
+  injectedExtractionFaults.add("src/a.ts");
+  try {
+    const result = await indexFiles({
+      "tsconfig.a.json": '{ "include": ["src"] }\n',
+      "tsconfig.b.json": '{ "include": ["src"] }\n',
+      "src/a.ts": "export const a = 1;\n",
+      "src/b.ts": 'import { a } from "./a";\nexport const b = a;\n',
+    });
+    const a = result.results.get("src/a.ts");
+    assert.equal(a.status, "failed");
+    assert.equal(a.failureKind, "transient");
+    assert.match(
+      a.diagnostics[0].message,
+      /^Internal error in the TypeScript module while reading src\/a\.ts/,
+    );
+    assert.equal(result.results.get("src/b.ts").status, "clean");
+  } finally {
+    injectedExtractionFaults.clear();
+  }
+});

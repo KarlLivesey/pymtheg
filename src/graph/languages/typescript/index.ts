@@ -356,12 +356,24 @@ export function mergeTied(
         .flatMap((variant) => variant.diagnostics)
         .map((d): [string, Diagnostic] => [JSON.stringify(d), d]),
     );
-    return {
+    const merged: ParseResult & { failureKind?: "transient" } = {
       status: "failed",
       diagnostics: [...new Map(diagnostics).values()],
       symbols: [],
       links: [],
     };
+    // A failure that is transient in any config (an internal error or an
+    // environment limit) makes the merged failure transient: it is retried,
+    // never cached as content, even if another config failed on content
+    // (the retry finds that content failure again).
+    if (
+      variants.some(
+        (variant) =>
+          (variant as { failureKind?: string }).failureKind === "transient",
+      )
+    )
+      merged.failureKind = "transient";
+    return merged;
   }
   /** Fields identical everywhere kept; differing ones listed per config. */
   const mergeFields = (
@@ -645,11 +657,17 @@ const module: LanguageModule = {
             if (injectedExtractionFaults.has(path))
               throw new TypeError("injected internal fault (test)");
             const source = session.program.getSourceFile(toVirtual(path));
-            if (!source)
-              throw Error(
-                session.failures.get(path) ??
-                  "The compiler did not load this source",
-              );
+            if (!source) {
+              const failure = session.failures.get(path);
+              // The parser or binder exhausted its stack on this file: an
+              // environment limit, like the checker's, not invalid code.
+              if (failure?.includes("exhausted its stack"))
+                return operationalFailure(
+                  `${failure} (a resource limit of the TypeScript compiler in this environment, not a defect in the file; it is retried on the next index)`,
+                );
+              // Anything else the compiler threw is an internal error.
+              throw Error(failure ?? "The compiler did not load this source");
+            }
             const result = extractFile(
               source,
               session.checker,

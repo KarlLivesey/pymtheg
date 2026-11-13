@@ -76,8 +76,26 @@ on the next index): <message>`.
   a content failure. The current core ignores the field and re-reads every
   failed file anyway; W2-M's core retries it.
 - The same marking applies to the compiler-limit failures that depend on
-  the environment, not on the file's text: the checker exhausting its stack
-  more than the retry limit in one file, and the project-wide rebuild cap.
+  the environment (the stack size), not on the file's text. They are
+  worded as resource limits, neither as a defect in pymtheg nor as invalid
+  code:
+  - the PARSER exhausting its stack on a file (`The TypeScript parser
+exhausted its stack on this file (a resource limit of the TypeScript
+compiler in this environment, not a defect in the file; it is retried
+on the next index)`), for example `export const x = ` with thousands of
+    nested parentheses;
+  - the BINDER exhausting its stack on a file (`The TypeScript binder
+exhausted its stack on this file (…)`, the same wording);
+  - the checker exhausting its stack more than the retry limit in one file;
+  - the project-wide rebuild cap.
+    Any other exception the compiler throws while parsing a file is an
+    internal error (`The TypeScript parser threw on this file: …`, reported
+    with the internal-error wording above).
+- A file analysed under two equally ranked configs (`mergeTied`): if any
+  variant failed transiently, the merged failure is transient, even when
+  another variant failed on content. That is the safe answer: the file is
+  retried, and the retry finds the content failure again, so nothing is
+  cached that a later index would not reproduce.
 - The module's own reuse of an unchanged snapshot never reuses such a
   result: it reuses only results that carry the module's analysis data, and
   re-reads failed files only when they are recorded syntax failures.
@@ -106,6 +124,13 @@ extraction of a given path throw, to pin this behaviour.
   in the same project (no `failureKind`, `Syntax error at line …`), other
   files unaffected, and read again on the next index with the same content.
 
+- a file of two tied configs with an injected internal exception keeps
+  `failureKind: "transient"` through the merge;
+- a parser stack overflow (at a nesting depth found by search in the test's
+  own process, so it does not depend on the stack size) is a transient
+  resource limit with that wording, and the other file is unaffected
+  (`test/graph-typescript-resolution.test.mjs`).
+
 ## Evidence
 
 `evidence/w2-u/`: the reproduction on this repository's sources (before and
@@ -124,3 +149,12 @@ Module version 16.
 
 - None new. A construct that makes the extractor throw still fails only
   that file, now reported as an internal error and retried.
+
+## Further work
+
+- Links INTO a file whose extraction failed internally carry no reason
+  (their target's symbols are missing, so they are unresolved without one).
+  Giving them a reason that names the internal failure of the target file
+  needs a pass over every result's targets after extraction; it is left for
+  a later chunk (no such link occurs in the corpora: after this fix no file
+  of them fails internally).
