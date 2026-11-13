@@ -1,0 +1,64 @@
+diff --git a/grammar.js b/grammar.js
+index 3648f02..03bcf2b 100644
+--- a/grammar.js
++++ b/grammar.js
+@@ -90,6 +90,7 @@ module.exports = grammar({
+     [$.qualified_type, $._expression],
+     [$.generic_type, $._simple_type],
+     [$.parameter_declaration, $._simple_type],
++    [$.type_parameter_declaration, $._simple_type],
+     [$.type_parameter_declaration, $._simple_type, $._expression],
+     [$.type_parameter_declaration, $._expression],
+     [$.type_parameter_declaration, $._simple_type, $.generic_type, $._expression],
+@@ -231,6 +232,7 @@ module.exports = grammar({
+       'func',
+       field('receiver', $.parameter_list),
+       field('name', $._field_identifier),
++      field('type_parameters', optional($.type_parameter_list)),
+       field('parameters', $.parameter_list),
+       field('result', optional(choice($.parameter_list, $._simple_type))),
+       field('body', optional($.block)),
+diff --git a/test/corpus/declarations.txt b/test/corpus/declarations.txt
+index 66e510f..f79aa50 100644
+--- a/test/corpus/declarations.txt
++++ b/test/corpus/declarations.txt
+@@ -549,6 +549,7 @@ package main
+ func (self Person) Equals(other Person) bool {}
+ func (v *Value) ObjxMap(optionalDefault ...(Map)) Map {}
+ func (p *T1) M1()
++func (p Pair[A, B]) Map[C comparable](value C) C {}
+ 
+ --------------------------------------------------------------------------------
+ 
+@@ -588,7 +589,30 @@ func (p *T1) M1()
+         (pointer_type
+           (type_identifier))))
+     (field_identifier)
+-    (parameter_list)))
++    (parameter_list))
++  (method_declaration
++    (parameter_list
++      (parameter_declaration
++        (identifier)
++        (generic_type
++          (type_identifier)
++          (type_arguments
++            (type_elem
++              (type_identifier))
++            (type_elem
++              (type_identifier))))))
++    (field_identifier)
++    (type_parameter_list
++      (type_parameter_declaration
++        (identifier)
++        (type_constraint
++          (type_identifier))))
++    (parameter_list
++      (parameter_declaration
++        (identifier)
++        (type_identifier)))
++    (type_identifier)
++    (block)))
+ 
+ ================================================================================
+ Type declarations

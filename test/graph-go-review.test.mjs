@@ -469,7 +469,9 @@ test("10: a file with a syntax error has failed and contributes nothing", async 
       "var pw = 1",
       "func err() {}",
       "func Broken() {",
-      "\tterm := new(io.NopCloser(x), y)",
+      // A real syntax error (missing `)`). `new(io.NopCloser(x), y)` itself
+      // parses since the vendored grammar (W2-S): a user-declared `new`.
+      "\tterm := new(io.NopCloser(x), y",
       "\tpw, err := term.Read()",
       "\t_ = pw",
       "\terr()",
