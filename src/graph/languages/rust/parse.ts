@@ -306,6 +306,10 @@ async function createHelper(): Promise<Helper> {
       }
       const opaqueCrateAliases: string[] = [];
       const opaqueItemScopes = new Set<string>();
+      const standardMacroScopes: { name: string; scope: string }[] = [];
+      const neutralMacro = (n: Node): boolean =>
+        n.type === "macro_invocation" &&
+        standardMacroName(compact(field(n, "macro")?.text ?? "")) !== null;
       // Macro expansion can shadow bare names only in a lexical item container.
       // Fields/variants and associated items do not introduce lexical bindings.
       const lexicalItemContainer = (n: Node | null): boolean =>
@@ -1021,7 +1025,7 @@ async function createHelper(): Promise<Helper> {
         conditions?: string[];
       };
       type BindingScopes = Map<number, Map<string, Binding[]>>;
-      const bindingCache = new Map<number, BindingScopes>();
+      const bindingCache = new Map<string, BindingScopes>();
       function patternNames(n: Node): Node[] {
         if (
           ["identifier", "shorthand_field_identifier", "self"].includes(n.type)
@@ -1052,6 +1056,7 @@ async function createHelper(): Promise<Helper> {
         root: Node,
         at: Node,
         name: string,
+        conservative = false,
       ): {
         blocked: Set<string>;
         types: Map<string, ReceiverType>;
@@ -1059,7 +1064,7 @@ async function createHelper(): Promise<Helper> {
         conditional: Set<string>;
       } {
         name = compact(name);
-        let scopes = bindingCache.get(root.id);
+        let scopes = bindingCache.get(`${root.id}|${conservative}`);
         if (!scopes) {
           scopes = new Map();
           let order = 0;
@@ -1109,9 +1114,14 @@ async function createHelper(): Promise<Helper> {
                 imports(field(n, "argument")!, "", "", "", "", [], imported);
               const wildcard =
                 imported.includes("*") ||
-                n.type === "macro_invocation" ||
+                (n.type === "macro_invocation" &&
+                  (conservative || !neutralMacro(n))) ||
                 (n.type === "expression_statement" &&
-                  n.namedChildren.some((c) => c.type === "macro_invocation")) ||
+                  n.namedChildren.some(
+                    (c) =>
+                      c.type === "macro_invocation" &&
+                      (conservative || !neutralMacro(c)),
+                  )) ||
                 (n.type === "attribute_item" &&
                   bindingAttributeOpaque(meta(n), n));
               for (const alias of imported.filter(
@@ -1164,7 +1174,10 @@ async function createHelper(): Promise<Helper> {
               n.parent?.type === "expression_statement" &&
               n.parent.parent?.type === "block"
             ) {
-              for (const token of n.namedChildren
+              for (const token of (conservative || !neutralMacro(n)
+                ? n.namedChildren
+                : []
+              )
                 .filter((c) => c.type === "token_tree")
                 .flatMap((c) => c.descendantsOfType(["identifier", "self"])))
                 if (!["self", "Self"].includes(compact(token.text)))
@@ -1233,7 +1246,7 @@ async function createHelper(): Promise<Helper> {
           for (const names of scopes.values())
             for (const list of names.values())
               list.sort((a, b) => a.start - b.start || a.order - b.order);
-          bindingCache.set(root.id, scopes);
+          bindingCache.set(`${root.id}|${conservative}`, scopes);
         }
         let invalidated = false;
         const blocked = new Set<string>();
@@ -1757,7 +1770,9 @@ async function createHelper(): Promise<Helper> {
                 : n.parent,
             )
           )
-            opaqueItemScopes.add(scope);
+            if (neutralMacro(n))
+              standardMacroScopes.push({ name: compact(m!.text), scope });
+            else opaqueItemScopes.add(scope);
           return;
         }
         if (n.type === "call_expression") {
@@ -1778,6 +1793,19 @@ async function createHelper(): Promise<Helper> {
                   invalidated: false,
                   conditional: new Set<string>(),
                 };
+            const old = fn
+              ? bindings(
+                  fn,
+                  n,
+                  f.type === "field_expression"
+                    ? field(f, "value")!.text
+                    : f.text.split("::")[0]!,
+                  true,
+                )
+              : b;
+            const fallbackBlocked = old.blocked.has(
+              compact(f.text.split("::")[0]!),
+            );
             if (f.type === "field_expression") {
               const receiver = field(f, "value")!;
               const method = field(f, "field")!;
@@ -1795,6 +1823,13 @@ async function createHelper(): Promise<Helper> {
                 argumentCount: arity(field(n, "arguments")).maximum,
                 argumentMinimum: arity(field(n, "arguments")).minimum,
                 method: method.text,
+                ...(!!receiverType &&
+                receiver.type !== "struct_expression" &&
+                (receiver.text === "self"
+                  ? old.invalidated
+                  : !old.types.has(compact(receiver.text)))
+                  ? { stdFallbackReceiverUnknown: true }
+                  : {}),
                 receiverType,
                 receiverArgumentSyntax:
                   receiver.text === "self"
@@ -1826,6 +1861,14 @@ async function createHelper(): Promise<Helper> {
               });
             } else
               link(f, owner, scope, "calls", compact(f.text), {
+                ...(fallbackBlocked &&
+                !b.blocked.has(compact(f.text.split("::")[0]!))
+                  ? { stdFallbackBlocked: true }
+                  : {}),
+                ...(old.conditional.has(compact(f.text.split("::")[0]!)) &&
+                !b.conditional.has(compact(f.text.split("::")[0]!))
+                  ? { stdFallbackConditional: true }
+                  : {}),
                 pathSyntax: f.text,
                 pathArgumentSyntax: argumentSyntax(field(f, "path")),
                 implArgumentSyntax: argumentSyntax(
@@ -1875,7 +1918,12 @@ async function createHelper(): Promise<Helper> {
           )
         ) {
           const b = fn ? bindings(fn, n, n.text.split("::")[0]!) : null;
+          const old = fn ? bindings(fn, n, n.text.split("::")[0]!, true) : null;
           link(n, owner, scope, "values", compact(n.text), {
+            ...(old?.blocked.has(compact(n.text.split("::")[0]!)) &&
+            !b?.blocked.has(compact(n.text.split("::")[0]!))
+              ? { stdFallbackBlocked: true }
+              : {}),
             implType,
             implScope,
             blocked:
@@ -1973,10 +2021,39 @@ async function createHelper(): Promise<Helper> {
         })),
         opaqueCrateAliases,
         opaqueItemScopes: [...opaqueItemScopes],
+        standardMacroScopes,
         opaqueAttributes,
       };
     },
   });
+}
+// These standard expansions cannot add bindings/items to the caller's scope.
+// Identity is checked against captured bindings by the resolver (E4 assumption).
+export const scopeNeutralStandardMacros = new Set([
+  "print",
+  "println",
+  "eprint",
+  "eprintln",
+  "assert",
+  "assert_eq",
+  "assert_ne",
+  "debug_assert",
+  "debug_assert_eq",
+  "debug_assert_ne",
+  "vec",
+  "format",
+  "write",
+  "writeln",
+  "panic",
+  "todo",
+  "unreachable",
+  "unimplemented",
+  "dbg",
+  "matches",
+]);
+export function standardMacroName(path: string): string | null {
+  const match = /^(?:(?:::)?(?:std|core|alloc)::)?([a-z_]+)$/.exec(path);
+  return match && scopeNeutralStandardMacros.has(match[1]!) ? match[1]! : null;
 }
 export async function parseRust(source: SourceInput): Promise<ParseResult> {
   try {
