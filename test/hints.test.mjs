@@ -270,6 +270,110 @@ test("printed verify commands keep --scenario for the checked file", () => {
   }
 });
 
+// Run every printed verify command as pasted; none may fail on its options.
+function runPrinted(stdout) {
+  const commands = [
+    ...stdout.matchAll(
+      /^ {2}(\w+) \(\d+ invariants?\): pymtheg (verify .*)$/gm,
+    ),
+  ];
+  assert.ok(commands.length, stdout);
+  return Object.fromEntries(
+    commands.map(([, name, command]) => {
+      const pasted = spawnSync(
+        "sh",
+        ["-c", `"$PYM_NODE" "$PYM_CLI" ${command}`],
+        {
+          encoding: "utf8",
+          env: { ...process.env, PYM_NODE: process.execPath, PYM_CLI: cli },
+        },
+      );
+      assert.ok(
+        [0, 1].includes(pasted.status),
+        `${command}\n${pasted.stdout}${pasted.stderr}`,
+      );
+      assert.match(
+        pasted.stdout,
+        new RegExp(
+          `^${name}/invariant/\\w+: (counterexample|no_counterexample) \\(finite_model_check, complete\\)$`,
+          "m",
+        ),
+        `${command}\n${pasted.stdout}${pasted.stderr}`,
+      );
+      return [name, command];
+    }),
+  );
+}
+
+function withScenario(source, scenario, body) {
+  const root = mkdtempSync(join(tmpdir(), "pym-hints-"));
+  try {
+    const file = join(root, "mixed.pym");
+    writeFileSync(file, source);
+    writeFileSync(
+      join(root, ".pymtheg.json"),
+      JSON.stringify({
+        version: 1,
+        scenarios: { small: { file: "mixed.pym", ...scenario } },
+      }),
+    );
+    const checked = run("check", file, "--scenario", "small");
+    assert.equal(checked.status, 0, checked.stdout + checked.stderr);
+    return body(file, checked.stdout);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+test("--scenario is kept only for the machine that is the scenario's entry", () =>
+  withScenario(
+    `machine X {
+  state n: Nat in 0..2 = 0;
+  event up when n < 2 { n = n + 1; }
+  invariant small = n <= 1;
+}
+machine Y {
+  state b: Bool = false;
+  event flip when !b { b = true; }
+  invariant ok = b || !b;
+}
+`,
+    {
+      entry: "X",
+      scope: { domains: { n: "0..2" }, assumptions: ["one counter"] },
+    },
+    (file, stdout) => {
+      const commands = runPrinted(stdout);
+      assert.equal(commands.X, `verify ${file} --entry X --scenario small`);
+      assert.equal(commands.Y, `verify ${file} --entry Y`);
+    },
+  ));
+
+test("a flow-entry scenario is not added to any machine's verify command", () =>
+  withScenario(
+    `flow step(n: Nat) -> Bool {
+  return n < 2;
+}
+machine Counter {
+  state n: Nat in 0..2 = 0;
+  event up when n < 2 { n = n + 1; }
+  invariant ok = n <= 2;
+}
+`,
+    { entry: "step", scope: { inputs: { n: [0, 1, 2] } } },
+    (file, stdout) => {
+      const commands = runPrinted(stdout);
+      assert.deepEqual(commands, {
+        Counter: `verify ${file} --entry Counter`,
+      });
+    },
+  ));
+
+test("shellWord quotes a word starting with = (zsh expands =word)", () => {
+  assert.equal(shellWord("=ls"), "'=ls'");
+  assert.equal(shellWord("a=b"), "a=b");
+});
+
 test("more than five machines: the remainder is counted, singular for one", () => {
   const machines = (count) =>
     Array.from(

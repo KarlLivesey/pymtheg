@@ -14,10 +14,13 @@ fix them first.
 - Machines are those `check` reported a `types-effects-outcomes` result for, so
   related-file consumers excluded from the selected status are not listed.
 - Each command is valid POSIX shell as printed: any path or name that is not a
-  plain word is single-quoted (so `$`, backticks, quotes and spaces paste
-  correctly). If `check` was run with `--scenario S`, the commands for machines
-  in the checked file keep `--scenario S`. The scenario belongs to that file, so
-  machines in other files are printed without it.
+  plain word is single-quoted, so `$`, backticks, quotes, spaces and a leading
+  `=` (which zsh expands) paste correctly.
+- A saved scenario belongs to one entry and carries that entry's scope. If
+  `check` was run with `--scenario S`, only the command for the machine that is
+  that scenario's entry (the resolved `--entry`, in the checked file) keeps
+  `--scenario S`. Every other machine is printed without it. If the scenario's
+  entry is a flow, no command gets it.
 - Text output only (manager ruling, PR 21 round 1): JSON reports, `--out`
   reports, MCP and Studio are unchanged. No result, outcome or exit status
   changes.

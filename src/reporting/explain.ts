@@ -562,7 +562,11 @@ export function findingPresenter(report: Report) {
 export function uncheckedBehaviourNotice(
   ir: ProjectIR,
   report: Report,
-  invocation: { file?: string; scenario?: string | undefined } = {},
+  invocation: {
+    file?: string;
+    scenario?: string | undefined;
+    scenarioEntry?: string | undefined;
+  } = {},
 ): string {
   const reported = new Set(report.results.map((r) => r.propertyId));
   const machines = ir.declarations.filter(
@@ -572,9 +576,12 @@ export function uncheckedBehaviourNotice(
   if (!machines.length) return "";
   const shown = machines.slice(0, 5).map((d) => {
     const invariants = d.kind === "machine" ? d.invariants.length : 0;
-    // A saved scenario belongs to the checked file, so keep it only there.
+    // A saved scenario belongs to one entry in the checked file and carries
+    // that entry's scope, so keep it only on that entry's command.
     const scenario =
-      invocation.scenario !== undefined && d.span.file === invocation.file
+      invocation.scenario !== undefined &&
+      d.name === invocation.scenarioEntry &&
+      d.span.file === invocation.file
         ? ` --scenario ${shellWord(invocation.scenario)}`
         : "";
     return `  ${d.name} (${invariants} invariant${invariants === 1 ? "" : "s"}): pymtheg verify ${shellWord(d.span.file)} --entry ${shellWord(d.name)}${scenario}`;
@@ -591,6 +598,11 @@ export function uncheckedBehaviourNotice(
     ].join("\n") + "\n"
   );
 }
-/** One POSIX shell word: plain when safe, otherwise single-quoted. */
+/**
+ * One POSIX shell word: plain when safe, otherwise single-quoted. A leading
+ * `=` is quoted because zsh expands `=word` to a command path.
+ */
 export const shellWord = (word: string): string =>
-  /^[\w./@:+=-]+$/.test(word) ? word : `'${word.replaceAll("'", `'\\''`)}'`;
+  /^[\w./@:+-][\w./@:+=-]*$/.test(word)
+    ? word
+    : `'${word.replaceAll("'", `'\\''`)}'`;

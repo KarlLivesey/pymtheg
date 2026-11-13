@@ -995,6 +995,7 @@ try {
         uncheckedBehaviourNotice(ir, report, {
           file: resolve(file),
           scenario: options.get("--scenario"),
+          scenarioEntry: options.get("--entry"),
         }),
       );
     process.exitCode = exitStatus(report);
