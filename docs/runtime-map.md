@@ -1439,7 +1439,7 @@ established acceptance checks pass. Exact deltas and checks are in
 evidence/product-audit/review-36-follow-up/validation.json. Independent
 sign-off is pending; unchanged reviewed areas carry review36 evidence.
 
-## Rebuild components (merged through W2-U)
+## Rebuild components (merged through W2-C2)
 
 The mega-plan rebuild adds parts that the CLI, MCP and Studio mostly do not use
 yet. Only the built-in engines (CLI `verify`/`simulate`) and the storage

@@ -88,7 +88,7 @@ successful graph. Scope examples and operation protocol restrictions are in
 [the Studio guide](studio.md). Source graphs are a bounded checking method,
 not a general compiler equivalence proof. No temporal liveness claim is made.
 
-## Rebuild state: engines, storage and code graph (merged through W2-U)
+## Rebuild state: engines, storage and code graph (merged through W2-C2)
 
 This section folds the merged per-chunk notes under [changes/](changes/) for
 mega-plan Stages 1–4 and 6–7 as they stand on `main`. Open pull requests are not
@@ -255,11 +255,12 @@ The manifest records the upstream commit, patches, tool versions and sha256, and
 `test/grammar-vendored.test.mjs` checks the file against it; rebuilding is a
 maintainer step (`node grammars/build.mjs go`) that install and tests never run.
 Still failing a valid file: an empty statement followed by another statement on
-the same line (`{; G() }`), and a non-BMP character at the parser runtime's
-5,119-unit input chunk boundary. Sources: [W2-B](changes/W2-B.md),
+the same line (`{; G() }`), and a non-BMP character in an identifier that
+straddles the parser runtime's first 5,119-unit input chunk boundary (the same
+character in a comment or string there is read). Sources: [W2-B](changes/W2-B.md),
 [W2-B2](changes/W2-B2.md), [W2-S](changes/W2-S.md), `grammars/README.md`.
 
-#### Rust (module version 20)
+#### Rust (module version 23)
 
 No-toolchain module; nothing runs `cargo` or `rustc`, and macros are not expanded.
 Claims `*.rs`; context `Cargo.toml`, read by a snapshot-only TOML reader (an
@@ -278,23 +279,41 @@ manifest unknown). Private items are ordinary symbols.
   would-be targets and a reason (`later-probe-step`, `trait-dispatch`,
   `receiver-type-unverified`, …); no dot call has a closed candidate set.
   A receiver's type comes from a parameter or an annotated `let`; an
-  unannotated `let a = A::new();` is not given a type.
-- **Not definite:** anything under a non-builtin attribute (it may be replaced by
-  a macro; `item-under-opaque-attribute`); standard-library and external items;
-  cross-file use of project `macro_rules!` macros; code where a statement-position
-  macro could bind names (`opaque-item-may-shadow-name`).
+  unannotated `let a = A::new();` is not given a type. Even with an annotated
+  `let b: A = A;`, a call of a `&self` method (`b.r()`) is a later probe step and
+  stays unresolved.
+- **Non-builtin attributes:** a link whose **target** is an item under a
+  non-builtin attribute, or inside an item with one, is not definite (the
+  attribute may replace the item; `item-under-opaque-attribute`, target kept as a
+  would-be target), and so are `use` and `mod` declarations under one. Links
+  written **inside** such an item (for example the body of a `#[tokio::main]`
+  function) are resolved as written.
+- **Macros:** a function body that invokes an unknown macro (for example
+  `tracing::info!`) withholds the links in it (`opaque-item-may-shadow-name`). The
+  twenty standard statement macros (`print`, `println`, `eprint`, `eprintln`,
+  `assert`, `assert_eq`, `assert_ne`, the three `debug_assert` forms, `vec`,
+  `format`, `write`, `writeln`, `panic`, `todo`, `unreachable`, `unimplemented`,
+  `dbg`, `matches`) no longer do, unless a captured binding of that name could
+  compete. A child module file inherits its parent's textual macros at its
+  `mod child;` declaration, so `#[macro_use] mod macros;` macros used in later
+  child files resolve. Macro arguments get no links. Cross-crate `#[macro_export]`
+  macros are unresolved. Standard-library and external items are unresolved.
 - Cargo features and target platforms are not evaluated; `cfg` conditions are
   compared structurally.
 - **Assumption E4:** unseen code (a bare `#[macro_use] extern crate`, opaque macro
   output) is assumed not to rebind `derive` or `global_allocator`; only a binding
-  visible in captured source shadows them. A counterexample can give a wrong
-  definite link; this is pinned as a known limit in
-  `test/graph-rust-round12.test.mjs`.
+  visible in captured source shadows them. Extended: unseen macro output, bare
+  uncaptured `macro_use` exports and failed or unverified textual module entries
+  are assumed not to define a macro named like one of the twenty standard macros.
+  A counterexample can give a wrong definite link (for example a failed
+  `macros.rs` that defines its own `println!` emitting an item); both are pinned
+  as known limits (`test/graph-rust-round12.test.mjs`, the macro-recall tests).
 
 Grammar: npm `tree-sitter-rust` 0.24.0, unpatched. It rejects some valid Rust,
 which fails the whole file (11 files of Vector): `&raw` where `raw` is a variable,
-`unsafe extern "C" { … }` (edition 2024), `#[cfg]` on a struct-pattern field, an
-attribute on a function parameter, a turbofish on a function named like a
+`unsafe extern "C" { … }` (edition 2024), `#[cfg]` on a struct-pattern field, two
+or more attributes on one parameter or an attribute on a closure parameter (a
+single attribute on a function or method parameter parses), a turbofish on a function named like a
 primitive (`char::<_, E>(…)`), and `impl A + for<'a> B<'a>`. Sources:
 [W2-C](changes/W2-C.md), [W2-P](changes/W2-P.md).
 

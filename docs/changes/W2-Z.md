@@ -1,10 +1,10 @@
 # W2-Z: fold the documentation fragments
 
 Build-plan Rule 5. Documentation only: no source, test, build-plan, mega-plan or
-per-chunk change note was edited. Base: `origin/main` at `8e63a009`. Folded:
-the merged chunks in the build-plan ledger (W0-2, W1-A–F, W2-A–L, W2-B2, W2-K2,
-W2-P, W2-Q, W2-S, W2-U). Open pull requests (W2-C2 #22, W2-M #23, W2-T #27) are
-not described as done.
+per-chunk change note was edited. Base: `origin/main` at `8e63a009`, then
+`origin/main` at `93ffca8e` merged in round 1. Folded: the merged chunks in the
+build-plan ledger (W0-2, W1-A–F, W2-A–L, W2-B2, W2-C2, W2-K2, W2-P, W2-Q, W2-S,
+W2-U). Open pull requests (W2-M #23, W2-T #27) are not described as done.
 
 Every added claim was checked against the code on this base or by running the
 built tool (`npm ci --ignore-scripts && npm run build`). Probe outputs are in
@@ -98,7 +98,7 @@ built tool (`npm ci --ignore-scripts && npm run build`). Probe outputs are in
 | Graph not used by any command; `openProjectGraph` path                                                                                                                                                     | only `src/storage/graph.ts` imports the graph outside `src/graph/`; `src/storage/layout.ts`                                                                   |
 | `observe` still the old TypeScript/JavaScript reader                                                                                                                                                       | `evidence/w2-z/old-layout-probe.txt` (`observe ok.pym` message)                                                                                               |
 | Schema 3, rebuild message                                                                                                                                                                                  | `src/graph/store.ts:44-50`                                                                                                                                    |
-| Discovered modules and versions (`go@23`, `rust@20`, `typescript@16`), toy not offered                                                                                                                     | `evidence/w2-z/graph-probe.txt`                                                                                                                               |
+| Discovered modules and versions (`go@23`, `rust@23` after the round-1 merge; `rust@20` before, `typescript@16`), toy not offered                                                                           | `evidence/w2-z/graph-probe.txt`                                                                                                                               |
 | Claims and context files per module                                                                                                                                                                        | `src/graph/languages/go/index.ts:286-293`; `rust/index.ts:13-14`; `typescript/index.ts:522-523`, `typescript/project.ts:436-439`                              |
 | Whole-file rule, `invalid-code` with `data.cause` (Go/TS `reason`, Rust `uncertainty`), TS `no-unseen-declarations`                                                                                        | `evidence/w2-z/graph-probe.txt` ("broken" fixtures)                                                                                                           |
 | Go: definite import/call/receiver; build-variant candidates; open interface dispatch; `implements` unresolved `structural-match-unverified`; stdlib unresolved                                             | `evidence/w2-z/graph-probe.txt`                                                                                                                               |
@@ -109,7 +109,7 @@ built tool (`npm ci --ignore-scripts && npm run build`). Probe outputs are in
 | Go grammar vendored, patches, sha256 test                                                                                                                                                                  | `grammars/README.md`, `grammars/go/manifest.json`, `src/graph/languages/go/index.ts:23-28`, `test/grammar-vendored.test.mjs`                                  |
 | Go remaining gaps (`{; G() }`, chunk boundary)                                                                                                                                                             | `test/graph-go-grammar.test.mjs`; `docs/changes/W2-S.md`                                                                                                      |
 | Rust grammar npm 0.24.0, gaps list                                                                                                                                                                         | `src/graph/languages/rust/parse.ts:272`; `docs/changes/W0-2.md`; `docs/changes/W2-P.md`; build-plan grammar-gap note                                          |
-| E4 on `main` is `derive`/`global_allocator` only; no standard-macro list                                                                                                                                   | `src/graph/languages/rust/parse.ts:186`; `grep -n println src/graph/languages/rust/*.ts` (no match); known-limit test file `test/graph-rust-round12.test.mjs` |
+| (round 0, superseded by W2-C2) E4 on `main` was `derive`/`global_allocator` only                                                                                                                           | `src/graph/languages/rust/parse.ts:186`; `grep -n println src/graph/languages/rust/*.ts` (no match); known-limit test file `test/graph-rust-round12.test.mjs` |
 | Walker skips `.codegraph`                                                                                                                                                                                  | `src/graph/indexer.ts:88`                                                                                                                                     |
 | num-bigint 0.4.8                                                                                                                                                                                           | `test/fixtures/rust-rich/Cargo.toml:6`, `Cargo.lock`                                                                                                          |
 | Decisions D16, D17, D18, whole-file rule, candidate-set rule, E4 + extension, grammar route, stable-ID ruling, compile-correctness ruling                                                                  | `docs/build-plan.md` section 10 notes (quoted); `docs/mega-plan.md` section 2                                                                                 |
@@ -126,7 +126,9 @@ built tool (`npm ci --ignore-scripts && npm run build`). Probe outputs are in
 - `W2-B.md`: "parsing uses the installed `tree-sitter-go` 0.25.0 WASM grammar"
   and "a user-declared `new` called with a non-type argument misparses, and the
   file fails" are superseded by the vendored grammar (W2-S). Module version is 23.
-- `W2-C.md`: "Version 12"; the module is now version 20.
+- `W2-C.md`: "Version 12"; the module is now version 23 (W2-C2). Its "General
+  cross-file macro_rules resolution" backlog is partly done: child files inherit
+  their parent's textual macros (W2-C2).
 - `W2-D.md`: module version "now 12"; it is 16. Its statement that an internal
   extraction exception is an ordinary failed result is superseded by W2-U.
 - `W2-A.md`: Studio wiring line `src/studio/service.ts:3392` is now line 3445
@@ -167,18 +169,72 @@ built tool (`npm ci --ignore-scripts && npm run build`). Probe outputs are in
 
 - **W2-M (#23), graph core robustness:** `support.md` "Failed files are parsed
   again on every index" and "Links into a file that failed internally …"; the
-  runtime-map "Graph indexing" paragraph (parse for "previously failed files";
-  analysis written as one string); a `failedFiles()` / broken-file report API
+  runtime-map "Graph indexing" paragraph (parse for "previously failed files"); a `failedFiles()` / broken-file report API
   and failure caching (with `failureKind: "transient"` honoured) will need adding.
-- **W2-C2 (#22), Rust macro recall:** `support.md` Rust "Not definite" bullet
-  (statement-position macros, cross-file `macro_rules!`); the E4 entry's
-  parenthesis in `decisions.md` ("the standard-macro exemption itself is in an
-  open pull request"); Rust module version 20.
+- **W2-C3, W2-V** (started per the ledger, no PR described here): any further
+  Rust or other module change makes the module versions and the Rust "Macros"
+  bullet stale.
 - **W2-T (#27), deterministic process tests:** `support.md`'s "Correctness tests
   do not use benchmark thresholds or startup sleeps" paragraph is the rule those
   tests are being brought into line with; note the fix there if wording changes.
 - The TLC/Quint removal chunk (Wave 3) will make the engine rows, README TLC
   section, `runtime-map.md` adapter and lifecycle text, and the D2 entry stale.
+
+## Round 1 review fixes
+
+Reviewer findings (PR 30 round 1), each re-verified by my own run:
+
+1. **Non-builtin attributes** (`support.md` Rust): the old "not definite: anything
+   under a non-builtin attribute" was false. Now: a link whose target is an item
+   under, or inside an item with, a non-builtin attribute is withheld, and so are
+   `use` and `mod` under one; links written inside such an item resolve as
+   written. Run: `evidence/w2-z/round1-attribute-probe.txt` (inside
+   `#[tokio::main] fn f`, `helper()`, `m::g()` and `a.own()` resolve; a call of
+   `#[my::attr] fn hidden`, `#[my::attr] use m::g as g2` and `#[my::attr] mod gm;`
+   are `item-under-opaque-attribute`). Code: `src/graph/languages/rust/resolve.ts`
+   (`itemPresence`).
+2. **Parameter attributes** (`support.md` Rust grammar): a single attribute on a
+   function or method parameter parses; two or more on one parameter, or one on a
+   closure parameter, fail the file. Run: same probe (`two.rs`, `clos.rs` failed;
+   `params`, `S::meth` read). Matches `docs/changes/W2-P.md:59`.
+3. **Go chunk boundary** (`support.md` Go): applies to a non-BMP character in an
+   identifier. Run: `evidence/w2-z/round1-go-chunk-boundary-probe.txt` — with
+   U+1D465 starting at UTF-16 offset 5118 (straddling the first 5,119-unit
+   chunk), the identifier file fails and the comment and string files are read.
+   (At offsets 5117, 5119 and 5120 the identifier file is read.)
+4. **D16 quotation** (`decisions.md`): the quoted text was the mega-plan's D16
+   row, not Karl's recorded words. Quotation marks removed and the text cited as
+   the mega-plan entry. Every quotation in the section was then checked against
+   `docs/build-plan.md` (`evidence/w2-z/round1-quote-audit.txt`): only text the
+   build plan shows in quotation marks is quoted; also removed: "unreadable code
+   is invalid code…" (unquoted in the build plan), "I trust this project enough
+   to build it" (mega-plan row), the rust-analyzer line; "Probably this,
+   unverified" is now cited as the build plan's words with its exact casing.
+5. **Owner/manager attribution** (`decisions.md`): every ruling under the
+   whole-file entry now names its author and round (cause propagation: manager,
+   W2-B round 14; certain causes only: manager, W2-B round 16; TypeScript
+   `no-unseen-declarations`: manager, ruling on W2-D; surface wording: manager,
+   W2-C round 6; internal errors: W2-U, cut by the manager). Rechecked every
+   entry: D2/D5–D7 now separate Karl's decision from the chunk's implementation;
+   D16's consequences, D17's "why", D18's systems-idiom reading and the D18
+   lesson are labelled manager; the candidate-set rule and grammar route are
+   labelled manager; E4 says the build plan names no author (W2-C's note calls it
+   owner-selected) and its extension is the manager's.
+6. **Small:** `decisions.md` heading-identities passage marked superseded (the name
+   is now a logical document key inside the planning database:
+   `src/architecture/heading-identities.ts:50`). `support.md` adds that an
+   annotated `let b: A = A; b.r()` (`&self` method) stays unresolved
+   (`later-probe-step`; same probe).
+7. **Merged `origin/main`** (`93ffca8e`, normal merge). Newly merged since the
+   first base: W2-C2 (PR 22). Folded, verified by
+   `evidence/w2-z/round1-rust-macro-probe.txt` and the code: Rust module version
+   23 (`src/graph/languages/rust/index.ts:12`); `println!` no longer withholds the
+   links in its function while an unknown macro (`tracing::info!`) still does;
+   a child file resolves a macro from its parent's `#[macro_use] mod macros;`;
+   macro arguments get no links. The twenty standard macro names and the extended
+   E4 known limit are from `docs/changes/W2-C2.md` (names) and its tests
+   (`test/graph-rust-macro-recall*.test.mjs`). The E4 decision entry's "open pull
+   request" parenthesis is removed. PRs 28 and 29 were already covered.
 
 ## Checks
 
