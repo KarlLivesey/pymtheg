@@ -189,7 +189,9 @@ Events carry monotone run sequence numbers. The host confines canonical paths,
 requires a per-session bearer token and rejects foreign origins. Browser validators
 are precompiled: CSP does not require `unsafe-eval`.
 
-`.pymtheg.json` version 1 names scenarios and a default file. GUI and CLI share
+`.pymtheg.json` version 1 names scenarios and a default file (superseded location:
+the file is now `.pymtheg/settings.json`; see
+[single project folder](#single-project-folder-d5-d6-d7)). GUI and CLI share
 validation for seed, steps, samples, timeout and finite scope. An empty scope means
 use source-declared machine domains or default supported flow domains; a nonempty
 machine override must match all declared domains exactly. Scenario integer values
@@ -255,7 +257,9 @@ an advanced escape hatch, not the default. Named scenarios use the existing
 versioned project configuration and expected-hash saves.
 
 Durable GUI state will live in a project-local `.pymtheg-studio/` directory with
-private file permissions. It is recovery data, never the original `.pym` source.
+private file permissions (superseded location: drafts are now
+`.pymtheg/shared/drafts.sqlite` and recent runs `.pymtheg/rebuildable/runs.sqlite`;
+see [single project folder](#single-project-folder-d5-d6-d7)). It is recovery data, never the original `.pym` source.
 Draft state records the original disk hash so edits on disk can be detected on
 restore. Writes are queued and atomically replaced. Revision conflicts and failed
 writes are visible. Saved run evidence retains its frozen sources; interrupted
@@ -540,7 +544,8 @@ every visible type. Search/pagination bounds the initial list and type dropdown.
 Edits to loaded definitions retain per-file source preconditions and body preservation.
 
 Native plans may retain a separate linkReviewRevision. New links use the supplied
-source revision; explicit review acknowledgement changes that revision, not the
+source revision (superseded: since W2-H a new link gets a server-set *baseline*,
+never a review; see [a link's baseline is not a review](#a-links-baseline-is-not-a-review)); explicit review acknowledgement changes that revision, not the
 original proposal's originRevision. A retitled target produces a review reminder,
 not a proof the link is wrong. Unavailable review revisions remain visible.
 The historical projection adds target names while still retaining only linked
@@ -781,7 +786,7 @@ ambiguous names stay unmatched. It compares target-independent interface contrac
 not emitted syntax or implementation behavior, and reports field-level changes.
 Rewritten type comments retain explicit previous-member context rather than being
 silently attached to a new final variant. Rich compiler regressions use real locked
-num-bigint 0.4.6, not synthetic stand-in definitions.
+num-bigint 0.4.6 (now 0.4.8, W2-Q), not synthetic stand-in definitions.
 
 ## Initialized project identity (post-ninth freeze)
 
@@ -2144,3 +2149,191 @@ resolution changes. All 38 reported wrong targets are withheld, and
 established acceptance checks pass. Exact deltas and checks are in
 evidence/product-audit/review-36-follow-up/validation.json. Independent
 sign-off is pending; unchanged reviewed areas carry review36 evidence.
+
+## Rebuild plan decisions (10–13 November 2026)
+
+Decisions made for the [mega plan](mega-plan.md) while building it, as recorded in
+the [build plan](build-plan.md) (sections 9–10). IDs D1–D18 follow the mega plan's
+table; D16 and D17 are also in that table. Each entry says what was decided, why,
+and what it rules out. Quotations are Karl's words as the build plan records
+them. Earlier entries in this ledger stay as written; where one is superseded,
+it says so and links here.
+
+### Built-in engines are the CLI default (D2, in progress)
+
+**Decided:** `verify` and `simulate` run built-in engines (exhaustive
+breadth-first search; seeded sampler) in a worker, with one verdict per invariant
+and a named state budget. **Why:** D2 (no Java, no TLC JAR, no Quint), and TLC's
+stack overflow on flow checks and stop-at-first-violation behaviour. **Rules out:**
+a sampled run reported as an exhaustive pass; a budget-limited run reported as a
+pass. TLC and Quint remain selectable, and MCP and Studio still use them, until
+the removal chunk.
+
+### Single project folder (D5, D6, D7)
+
+**Decided:** everything Pymtheg stores for a project lives under `.pymtheg/`:
+`project.json`, `settings.json`, `shared/` (requirements, links, decisions,
+history, unsaved drafts), `rebuildable/` (code graph cache, recent runs) and
+`local/` (writer identity). One storage boundary (`src/storage/`) chooses paths
+and opens every database. Unsaved drafts are shared, not rebuildable, because
+deleting rebuildable state must not discard an unfinished design. Old layouts are
+refused, not migrated (D7); file-scope analysis that touches no project state
+still works in an old-layout folder. **Why:** project data was scattered over four
+locations (S27). **Rules out:** migration of old layouts, fallback reads,
+automatic moves or deletion, and features opening SQLite directly. Supersedes the
+`.pymtheg.json` and `.pymtheg-studio/` locations named earlier in this ledger.
+
+### Stable global IDs and recorded history (3.3, first slice)
+
+**Decided:** shared records get a random UUID alongside their existing local ID;
+edits keep it; a recorded removal keeps the old UUID as a tombstone; **a key that
+reappears after removal gets a new UUID with a `previous` reference to its
+predecessor; there is no restore workflow.** Changes are recorded as receipts with
+change UUID, author, machine, actor, time and a database sequence, ordered by
+`(sequence, machine, actor, change UUID)`. **Why:** records from two machines must
+be told apart and ordered (mega-plan 3.3) without rewriting existing IDs.
+**Rules out:** ordering by timestamp or author name; guessing a move or rename from
+equal text; treating the order across independent stores as causality.
+
+### A link's baseline is not a review
+
+**Decided (W2-H):** a planning record's document link gets a server-set baseline
+(`linkBaselines`) when it is added; `linkReviewRevision` is set only by explicit
+acknowledgement and must name a real revision. A new link whose target is absent
+from the edit's base revision is refused with 409. **Why:** filling the review
+field on save recorded reviews nobody made (S26). **Rules out:** a server-invented
+review; hiding a target change made between the version the user saw and the
+save.
+
+### D16: a language's own build chain may be required
+
+**Decided (Karl, 11 November 2026, amending D8):** "indexing a language may
+require that language's own default build chain (Rust needs `cargo`, Go needs
+`go`), which a developer's machine is assumed to have. What stays ruled out is an
+unrelated runtime: nobody installs Java to get Go data." **Consequences:** the
+hand-written Go and Rust modules are the no-toolchain fallback; they stay sound
+and aim only for structure-level accuracy, and an area where review keeps finding
+wrong definite links is downgraded to candidates or unresolved, not re-proved.
+Precision comes from later toolchain chunks. Tools outside the default build chain
+(`rust-analyzer`, `gopls`) are optional extras at most. **Rules out:** an unrelated
+runtime as an indexing requirement. Supersedes the mega-plan line "Considered and
+not used: … compiler-grade indexers such as rust-analyzer (need language
+toolchains)" as a reason in itself.
+
+### Unreadable code is failed; the unit is the file
+
+**Decided (Karl, 11 November 2026, for all language modules):** "unreadable code is
+invalid code, and invalid code has failed." On granularity: "the target is the
+file and the file is invalid so what target?" A file with any syntax error is
+reported failed and contributes no symbols and no links. A link whose site lies
+in unreadable text, or whose target would be in a failed file or reached through
+one, is failed: `unresolved` with reason `invalid-code`, the name kept, no target,
+no candidate and no would-be target. Each failed link records the failed file(s)
+that caused it (`data.cause`), as a cause, never as a target: "these imports are
+broken because the file they import is broken." A failed file's package, crate or
+program may contain unseen declarations. Further rulings under this rule: a cause
+propagates (a link depending on a lookup that ended in `invalid-code` is itself
+`invalid-code`); `invalid-code` is asserted only when the dependence is certain,
+because a wrong cause is worse than a missing one; in TypeScript every other link
+in a program with a failed file carries `no-unseen-declarations`, which means
+unverified. An internal error in a module (a defect in Pymtheg or a resource
+limit) is reported as such and retried, never as invalid code. **Why:** agents
+index working trees mid-edit; per-declaration salvage of broken files kept
+producing wrong links in review. **Rules out:** lexical recovery, partial-file
+symbols and "probably this" targets for syntax errors (all deleted from the
+modules); "probably this, unverified" is kept only for valid code whose resolution
+needs information the module lacks. Surfaces should say a file "could not be
+parsed by Pymtheg", not that it is broken, unless the language's own parser
+agrees.
+
+### Candidate sets must be honest about completeness
+
+**Decided (from the W2-B and W2-D reviews, 11 November 2026, all modules):** a
+**closed** set contains every possible target and is closed only when provably
+complete with every member provably possible. A set that cannot be complete (a
+type outside the project could be the target, or the receiver's type is unknown)
+is either unresolved with the known targets kept, or marked **open** with the
+reason on the link; it still lists every project target. "Open" excuses only
+targets outside the project. A member that is possible but unproven may appear
+only in an open set. A visibility rule alone does not prove closure when an
+outside package can import the package and embed an implementer. Would-be target
+lists are capped with a count and a reason, never truncated. **Rules out:** a
+candidate list read as exhaustive without its open marker; a guessed single pick.
+
+Related ruling (manager, W2-B round 15): the no-toolchain modules must be right for
+code that compiles; a definite link on code the type checker rejects is outside
+the contract. A wrong definite link in a program the compiler accepts always
+blocks.
+
+### D17: toolchain-backed links are opt-in per project
+
+**Decided (Karl, 12 November 2026):** "yes for recommendations", and keep it
+simple. Using a language's own toolchain for exact links is an explicit
+per-project opt-in ("I trust this project enough to build it"); every other
+project gets the hand-written modules, which never run anything. No sandbox chunk
+for now. Offline by default: missing dependencies are reported as missing. Go:
+cgo off. One build configuration to start, and every toolchain-backed link is
+keyed by the configuration it came from. The toolchain route reads the language's
+installation and dependency cache and writes only a throwaway cache, never the
+project. **Why:** the W2-K and W2-L investigations showed that running a toolchain
+on a project is as trusted as building it, and five review rounds found five
+different escapes from the prototype sandbox. **Rules out:** running a toolchain
+on a project automatically; downloads by default; presenting the closed
+environment as a security boundary; `rust-analyzer` unless Karl asks. The escape
+tables in [W2-L](changes/W2-L.md) remain the requirements should a sandbox be
+wanted. Not built yet.
+
+### D18: close enough for now
+
+**Decided (Karl, 12 November 2026):** "we need to at some point say it's close
+enough for now and it's further work; we don't need 100% coverage, just 100% of
+things that should be used." A review finding blocks only if it is a wrong result
+or failed check in a code shape real projects write (it occurs in a test corpus,
+is a mainstream idiom, or real public code does it). A wrong result that needs an
+exotic but legal shape is logged as a known limit and does not block. False
+claims in change notes, failed checks, out-of-ownership changes and regressions
+in real shapes still block. Context: "I'm going to be using this in some
+complicated rust projects/go projects (database and filesystem)", so systems-code
+idioms (macros, cfg/feature/platform gating, unsafe, FFI, generics, large
+workspaces; Go build tags, cgo, generics, many-implementer interfaces) count as
+real shapes. Follow-up: "I want a good attempt at covering anything then I'll ask
+my tools to build their designs in it and we can see if it covers all of our use
+cases or not." Real use by the owner's tools is the coverage test; gaps found
+there become fix chunks. **Why:** one pull request went eighteen review rounds, the
+last six each finding one rarer shape absent from the test corpus. **Rules out:**
+blocking on exotic shapes; treating "known limit" as permission for wrong results
+in real shapes. Lesson recorded with it: measure a "cheap, same class" fix on the
+corpus before asking for it.
+
+### E4: unseen code does not rebind `derive` or standard macros (Rust)
+
+**Decided (W2-C, 12 November 2026):** `derive` and `global_allocator` are shadowed
+only by a binding visible in captured source; unseen code (a bare `#[macro_use]
+extern crate` whose crate is not captured, opaque macro output) is assumed not to
+bind them. A named `#[macro_use(derive)] extern crate` is a visible binding and
+does shadow. `test` and `bench` stay strict. **Why:** the strict rule cost 11,730
+definite links (34.7%) on Vector, nearly all for a possibility real code does not
+use. **Extension (manager, 13 November 2026, W2-C2 round 2):** a failed file or
+unverified module in a textual macro chain is unseen code and is assumed not to
+define a macro named like a standard macro, so the standard-macro exemption stays
+on across such chains. **Rules out:** treating every builtin-looking attribute as
+possibly replaced. **Known limit:** a counterexample to the assumption can give a
+wrong definite link; it is pinned in a known-limit test, and D17's toolchain route
+is the exact answer. (The standard-macro exemption itself is in an open pull
+request; only the `derive`/`global_allocator` part is on `main`.)
+
+### Own builds of tree-sitter grammars
+
+**Decided (manager, from the W2-P investigation):** where a grammar rejects valid
+code and the fix exists only as unmerged upstream pull requests, Pymtheg builds
+its own grammar `.wasm` from a pinned upstream commit plus committed patch files,
+with the build script, tool versions and sha256 checked in, and gates a change on
+a pinned corpus (every file that parsed before gives identical output; every other
+change is explained by newly read files). The files live in top-level
+`grammars/<language>/`; the language module loads its `.wasm` relative to its
+compiled file. **Why:** under the whole-file rule a grammar gap fails whole valid
+files (Vector 11, restic 1), and no newer npm release exists. **Rules out:** an
+install hook or native build for end users; a patch that changes the trees of
+files that already parse (PR #190 for Go was rejected on that ground); token
+rewriting of source except sound error-site repairs. Done for Go (v0.25.0 + #202 +
+#198); Rust is still the npm 0.24.0 grammar.
