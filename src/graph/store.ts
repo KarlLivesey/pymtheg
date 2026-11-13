@@ -6,6 +6,7 @@ import { LinkDecider, resolutionFacts } from "./analysis.js";
 import type {
   ContextFile,
   GraphStorage,
+  FailedFile,
   GraphFile,
   GraphLink,
   GraphSymbol,
@@ -50,6 +51,7 @@ export class SqliteGraphStore implements GraphStorage {
         throw Error("Unsupported graph schema; rebuild the index");
       this.db
         .exec(`CREATE TABLE IF NOT EXISTS graph_files(path TEXT PRIMARY KEY,body TEXT NOT NULL,status TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS graph_parse_failures(path TEXT PRIMARY KEY REFERENCES graph_files(path) ON DELETE CASCADE);
         CREATE TABLE IF NOT EXISTS graph_contexts(path TEXT PRIMARY KEY,body TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS graph_symbols(id TEXT PRIMARY KEY,file TEXT NOT NULL REFERENCES graph_files(path) ON DELETE CASCADE,name TEXT NOT NULL,kind TEXT NOT NULL,body TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS graph_links(id TEXT PRIMARY KEY,file TEXT NOT NULL REFERENCES graph_files(path) ON DELETE CASCADE,source TEXT REFERENCES graph_symbols(id) ON DELETE CASCADE,target TEXT REFERENCES graph_symbols(id) ON DELETE SET NULL,kind TEXT NOT NULL,body TEXT NOT NULL,module TEXT NOT NULL,origin TEXT NOT NULL,resolution TEXT NOT NULL);
@@ -158,7 +160,30 @@ export class SqliteGraphStore implements GraphStorage {
       for (const [path, body] of changed) insert.run(path, body);
     });
   }
-  replaceFile(file: GraphFile): void {
+  isParseFailure(path: string): boolean {
+    return !!this.db
+      .prepare("SELECT path FROM graph_parse_failures WHERE path=?")
+      .get(path);
+  }
+  failedFiles(): FailedFile[] {
+    return this.db
+      .prepare(
+        "SELECT body FROM graph_files WHERE status='failed' ORDER BY path",
+      )
+      .all()
+      .map((row) => {
+        const file = this.decodeFile(row.body as string);
+        const first = file.result.diagnostics[0]!;
+        return {
+          path: file.path,
+          language: file.module,
+          reason: first.message,
+          ...(first.range === undefined ? {} : { range: first.range }),
+        };
+      })
+      .sort((a, b) => compare(a.path, b.path));
+  }
+  replaceFile(file: GraphFile, parseFailure = false): void {
     if (
       !file.path ||
       file.path.startsWith("/") ||
@@ -177,6 +202,17 @@ export class SqliteGraphStore implements GraphStorage {
           "INSERT INTO graph_files VALUES (?,?,?) ON CONFLICT(path) DO UPDATE SET body=excluded.body,status=excluded.status",
         )
         .run(file.path, JSON.stringify(file), file.result.status);
+      this.db
+        .prepare("DELETE FROM graph_parse_failures WHERE path=?")
+        .run(file.path);
+      if (
+        parseFailure &&
+        file.result.status === "failed" &&
+        file.result.failureKind !== "transient"
+      )
+        this.db
+          .prepare("INSERT INTO graph_parse_failures VALUES (?)")
+          .run(file.path);
       const insert = this.db.prepare(
         "INSERT INTO graph_symbols VALUES (?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,kind=excluded.kind,body=excluded.body",
       );
@@ -337,7 +373,7 @@ export class SqliteGraphStore implements GraphStorage {
     const desired = current.map((link) =>
       decider.decide(link, decisions.get(link.id)),
     );
-    if (JSON.stringify(current) !== JSON.stringify(desired))
+    if (!sameLinks(current, desired))
       this.transaction(() => this.writeTargets(current, desired));
   }
   replaceAnalysis(module: string, result: ResolutionResult): void {
@@ -350,7 +386,7 @@ export class SqliteGraphStore implements GraphStorage {
       this.findSymbols(),
       current,
     );
-    if (JSON.stringify(current) === JSON.stringify(desired)) return;
+    if (sameLinks(current, desired)) return;
     this.transaction(() => {
       const wanted = new Map(desired.map((link) => [link.id, link]));
       const previous = new Map(current.map((link) => [link.id, link]));
@@ -425,4 +461,12 @@ export class SqliteGraphStore implements GraphStorage {
   close(): void {
     this.db.close();
   }
+}
+
+/** Compare one persisted row at a time: never allocate a module-sized JSON string. */
+function sameLinks(a: readonly GraphLink[], b: readonly GraphLink[]): boolean {
+  return (
+    a.length === b.length &&
+    a.every((link, i) => JSON.stringify(link) === JSON.stringify(b[i]))
+  );
 }
