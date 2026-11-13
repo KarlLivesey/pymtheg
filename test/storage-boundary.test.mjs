@@ -142,7 +142,7 @@ for (const old of [
   ".pymtheg-architecture",
   ".pymtheg-studio",
 ]) {
-  test(`old layout ${old} is reported and preserved by every entry point`, () =>
+  test(`old layout ${old} is reported and preserved by project storage entry points`, () =>
     fixture(async (root) => {
       await writeFile(join(root, old), "important old bytes");
       for (const action of [

@@ -1,4 +1,8 @@
-import { storagePath, storageDirectory } from "../storage/local.js";
+import {
+  storagePath,
+  storageDirectory,
+  findProjectRoot,
+} from "../storage/local.js";
 import { randomUUID } from "node:crypto";
 import {
   lstat,
@@ -62,21 +66,16 @@ export async function readWorkspace(
     );
   }
 }
-/** Nearest initialized ancestor. Read-only; no implicit workspace creation. */
+/** Workspace at the nearest metadata/Git boundary. Read-only; no creation. */
 export async function findWorkspace(
   input: string,
 ): Promise<{ root: string; workspace: WorkspaceIdentity } | null> {
   const resolved = await realpath(input);
-  let root = (await lstat(resolved)).isDirectory()
-    ? resolved
-    : dirname(resolved);
-  for (;;) {
-    const workspace = await readWorkspace(root);
-    if (workspace) return { root, workspace };
-    const parent = dirname(root);
-    if (parent === root) return null;
-    root = parent;
-  }
+  const root = findProjectRoot(
+    (await lstat(resolved)).isDirectory() ? resolved : dirname(resolved),
+  );
+  const workspace = await readWorkspace(root);
+  return workspace ? { root, workspace } : null;
 }
 async function createOnce(path: string, text: string): Promise<boolean> {
   const staged = resolve(

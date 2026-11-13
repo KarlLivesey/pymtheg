@@ -111,8 +111,9 @@ export class RecoveryConflict extends Error {
 export class RecoveryStore {
   private constructor(
     private db: Database,
-    private runsDb: Database,
+    private runsDb: Database | null,
     private validateReport: (value: unknown) => boolean,
+    private cacheError: string | null = null,
   ) {}
   static async openOrCreate(root: string): Promise<RecoveryStore> {
     const directory = storageDirectory(root, "drafts", true);
@@ -155,7 +156,8 @@ export class RecoveryStore {
     }
     await atomicWrite(resolve(directory, ".gitignore"), "*\n");
     const db = openDatabase(file);
-    let runsDb: Database | undefined;
+    let runsDb: Database | null = null;
+    let cacheError: string | null = null;
     try {
       const version = db.prepare("PRAGMA user_version").get()?.user_version;
       if (version !== 0 && version !== 1)
@@ -167,11 +169,17 @@ export class RecoveryStore {
         "CREATE TABLE IF NOT EXISTS workspace (id INTEGER PRIMARY KEY CHECK(id=1), revision INTEGER NOT NULL, payload TEXT NOT NULL); PRAGMA user_version=1;",
       );
       await chmod(file, 0o600);
-      runsDb = openDatabase(storagePath(root, "runs", true));
-      runsDb.exec(
-        "CREATE TABLE IF NOT EXISTS history (sequence INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL UNIQUE, payload TEXT NOT NULL)",
-      );
-      await chmod(storagePath(root, "runs"), 0o600);
+      try {
+        runsDb = openDatabase(storagePath(root, "runs", true));
+        runsDb.exec(
+          "CREATE TABLE IF NOT EXISTS history (sequence INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL UNIQUE, payload TEXT NOT NULL)",
+        );
+        await chmod(storagePath(root, "runs"), 0o600);
+      } catch (error) {
+        runsDb?.close();
+        runsDb = null;
+        cacheError = runCacheError(error);
+      }
       const schema = JSON.parse(
         await readFile(
           fileURLToPath(
@@ -181,7 +189,7 @@ export class RecoveryStore {
         ),
       ) as object;
       const validate = new Ajv({ strict: true }).compile(schema);
-      return new RecoveryStore(db, runsDb, validate);
+      return new RecoveryStore(db, runsDb, validate, cacheError);
     } catch (e) {
       runsDb?.close();
       db.close();
@@ -197,7 +205,7 @@ export class RecoveryStore {
         revision: 0,
         drafts: [],
         context: null,
-        error: null,
+        error: this.cacheError,
         enabled: true,
       };
     if (
@@ -207,7 +215,12 @@ export class RecoveryStore {
     )
       throw Error("Invalid recovery record");
     const workspace = workspaceSchema.parse(JSON.parse(row.payload) as unknown);
-    return { ...workspace, revision: row.revision, error: null, enabled: true };
+    return {
+      ...workspace,
+      revision: row.revision,
+      error: this.cacheError,
+      enabled: true,
+    };
   }
   save(expectedRevision: number, value: unknown): RecoveryView {
     const parsed = workspaceSchema.parse(value),
@@ -230,13 +243,14 @@ export class RecoveryStore {
         )
         .run(revision, payload);
       this.db.exec("COMMIT");
-      return { ...parsed, revision, error: null, enabled: true };
+      return { ...parsed, revision, error: this.cacheError, enabled: true };
     } catch (e) {
       this.db.exec("ROLLBACK");
       throw e;
     }
   }
   saveRun(run: StudioRun): void {
+    if (!this.runsDb) return;
     const payload = json({ ...run, request: { ...run.request, buffers: {} } });
     if (Buffer.byteLength(payload) > 16 * 1024 * 1024)
       throw Error(
@@ -259,7 +273,18 @@ export class RecoveryStore {
     }
   }
   runs(): StudioRun[] {
-    return this.runsDb
+    if (!this.runsDb) return [];
+    try {
+      return this.readRuns(this.runsDb);
+    } catch (error) {
+      this.runsDb.close();
+      this.runsDb = null;
+      this.cacheError = runCacheError(error);
+      return [];
+    }
+  }
+  private readRuns(db: Database): StudioRun[] {
+    return db
       .prepare("SELECT payload FROM history ORDER BY sequence DESC LIMIT 3")
       .all()
       .map((row) => {
@@ -336,7 +361,10 @@ export class RecoveryStore {
       });
   }
   close() {
-    this.runsDb.close();
+    this.runsDb?.close();
     this.db.close();
   }
+}
+function runCacheError(error: unknown): string {
+  return `Run history unavailable at .pymtheg/rebuildable/runs.sqlite: ${String(error)}. Draft recovery remains available; the run cache was ignored.`;
 }

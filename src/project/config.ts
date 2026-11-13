@@ -1,8 +1,8 @@
-import { storagePath } from "../storage/local.js";
+import { storagePath, findProjectRoot } from "../storage/local.js";
 import { readFile, realpath, stat } from "node:fs/promises";
-import { resolve, dirname, relative, sep } from "node:path";
+import { relative, sep } from "node:path";
 import { projectConfig, type ProjectConfig } from "../shared/config.js";
-import { identity, hash } from "../shared/identity.js";
+import { hash } from "../shared/identity.js";
 export async function loadConfig(
   root: string,
 ): Promise<{ config: ProjectConfig; hash: string | null }> {
@@ -27,11 +27,6 @@ export async function loadConfig(
 export async function findConfig(
   start: string,
 ): Promise<{ root: string; config: ProjectConfig; hash: string | null }> {
-  let root = resolve(start);
-  for (;;) {
-    const result = await loadConfig(root);
-    if (result.hash !== null || dirname(root) === root)
-      return { root, ...result };
-    root = dirname(root);
-  }
+  const root = findProjectRoot(start);
+  return { root, ...(await loadConfig(root)) };
 }

@@ -2939,10 +2939,11 @@ export class StudioService {
     try {
       const { RecoveryStore } = await import("./recovery.js");
       this.recoveryStore = await RecoveryStore.openOrCreate(this.root);
+      const runs = this.recoveryStore.runs();
       this.recovery = this.recoveryStore.read();
       for (const draft of this.recovery.drafts)
         await this.path(draft.path, true);
-      this.runs.push(...this.recoveryStore.runs());
+      this.runs.push(...runs);
     } catch (error) {
       this.recovery = {
         ...this.recovery,
@@ -3149,7 +3150,7 @@ export class StudioService {
     if (paths.length >= 10000) {
       complete = false;
       warnings.push(
-        "Showing at most 10,000 source files. Narrow sources.include/exclude in .pymtheg.json to browse a smaller source set.",
+        "Showing at most 10,000 source files. Narrow sources.include/exclude in .pymtheg/settings.json to browse a smaller source set.",
       );
     }
     const chosen = preferred ? resolve(this.root, preferred) : undefined;
@@ -3264,7 +3265,7 @@ export class StudioService {
     if (!sourceIncluded(relative(this.root, path), policy))
       throw new StudioError(
         400,
-        "This path is outside sources.include/exclude in .pymtheg.json. Choose an included location or update that configuration.",
+        "This path is outside sources.include/exclude in .pymtheg/settings.json. Choose an included location or update that configuration.",
       );
     let output: StudioFile | undefined;
     const task = this.saveQueue.then(async () => {

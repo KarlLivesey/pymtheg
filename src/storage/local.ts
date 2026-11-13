@@ -1,6 +1,6 @@
 /** Local storage boundary. Feature stores own schemas, transactions and queries;
  * only this module chooses project locations and opens SQLite connections. */
-import { lstatSync, mkdirSync } from "node:fs";
+import { lstatSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { DatabaseSync, type DatabaseSyncOptions } from "node:sqlite";
 
@@ -30,6 +30,20 @@ export function assertCurrentLayout(root: string): void {
       `Old Pymtheg storage layout at ${root}: ${found.join(", ")}. No migration is provided. Preserve/export this data with the old version before creating a new project; nothing was changed.`,
     );
 }
+/** Discover a project without interpreting unrelated ancestors' legacy state. */
+export function findProjectRoot(start: string): string {
+  const initial = resolve(start);
+  for (let root = initial; ; root = dirname(root)) {
+    for (const marker of [".pymtheg", ".git"])
+      try {
+        lstatSync(join(root, marker));
+        return root;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      }
+    if (dirname(root) === root) return initial;
+  }
+}
 /** Read paths never create directories. Every existing component must be real. */
 export function storagePath(
   root: string,
@@ -57,6 +71,15 @@ export function storagePath(
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     }
+    if (create && directory === resolve(root, ".pymtheg/rebuildable"))
+      try {
+        writeFileSync(join(directory, ".gitignore"), "*\n", {
+          flag: "wx",
+          mode: 0o600,
+        });
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      }
   }
   const file = resolve(root, layout[item]);
   validateDatabaseFiles(file);

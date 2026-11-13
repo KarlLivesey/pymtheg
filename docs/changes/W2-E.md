@@ -33,9 +33,26 @@ exclusion option; the graph core's traversal interface is unchanged.
 
 Read-only path resolution creates nothing. Existing symlink storage directories,
 files and SQLite sidecars are rejected, including dangling links. Old top-level
-settings/architecture/Studio layouts produce a clear error before writes, even
-when new-layout files coexist. Preserve/export with the previous version, then
-initialize a separate new project. No automatic moves, deletion or fallback reads.
+settings/architecture/Studio layouts are refused only when an operation reads or
+writes managed project state in the resolved project root, even when new-layout
+files coexist. This is not a blanket ban on commands inside an old-layout folder.
+
+Commands that access that state refuse: `init`, `studio`, `mcp`,
+`import-architecture` (including previews), `scaffold` (reads workspace identity),
+`observe` captures (read identity, with or without `--retain`), `check` with
+`--check-scope related|project`, and analysis commands using `--scenario` (read
+settings). Plain file-scope `check`, `verify`, `simulate` and `emit`, without a
+project scenario, do not consult managed storage and remain usable. `observe
+--list`, `fmt`, `doctor`, help and version reporting also do not access that state.
+Explicit report/output destinations and source formatting are separate user
+requests; no implicit project storage is created by file-scope analysis.
+
+Upward discovery stops at the nearest `.pymtheg/` or Git root (including a Git
+worktree's `.git` file). Legacy artifacts are examined only in the selected root,
+not in unrelated parents or intermediate source folders. With neither boundary,
+the requested starting directory is the root. Preserve/export old project state
+with the previous version, then initialize a separate new project. No automatic
+moves, deletion or fallback reads.
 Internal document names such as `.pymtheg-source-contracts.json` are logical
 snapshot keys inside the planning database, not additional files in the project.
 
@@ -45,7 +62,8 @@ snapshot keys inside the planning database, not additional files in the project.
 - `src/architecture/store.ts`: select the planning directory and open its database
   through the boundary, including existing read-only snapshot handling.
 - `src/studio/service.ts`: planning presence checks and scenario settings writes
-  use the boundary's paths.
+  use the boundary's paths; initialize run history before reading its independent
+  draft recovery view, and correct both settings-path suggestions.
 - `src/graph/store.ts`: connection creation uses the boundary; no schema, query,
   indexing, language-module or public-interface changes.
 
@@ -113,7 +131,8 @@ was launched.
 | `test/recovery.test.mjs` | Crash the writer against the actual shared draft database. |
 | `test/source-contracts.test.mjs` | Keep preview and atomic source-link persistence checks on the relocated database. |
 | `test/source-inventory.test.mjs` | Prepare source selection settings in the metadata directory. |
-| `test/storage-boundary.test.mjs` | Add the storage boundary, cache deletion/regeneration, legacy refusal and symlink safety acceptance tests. |
+| `test/storage-boundary.test.mjs` | Add the storage boundary, cache deletion/regeneration, project-state legacy refusal and symlink safety acceptance tests. |
+| `test/storage-review.test.mjs` | Pin file-scope versus project-state behaviour, lazy cache Git ignores, damaged-cache draft isolation and bounded root discovery. |
 | `test/storage-v4.test.mjs` | Build the original v4 compaction/migration fixtures at the new planning path. |
 | `test/studio-a11y.browser.mjs` | Copy the scenario fixture into the new settings directory. |
 | `test/studio-entry-dirty-switch.browser.mjs` | Copy scenario settings to the new metadata location. |
@@ -125,7 +144,7 @@ was launched.
 | `test/studio.test.mjs` | Repoint conflict settings, damaged draft storage and source-selection configuration fixtures. |
 | `test/workspace-init.test.mjs` | Keep idempotence, configuration preservation, exact metadata listings and Git-ignore assertions on the new paths. |
 
-## Current validation after fixture updates
+## Fixture-update validation before round 1 review
 
 The required foreground unit run passes: **2,220 passed, zero failures, zero
 skipped**. The known abrupt-owner-death parser test passed in that run; no isolated
@@ -141,3 +160,57 @@ records, outcomes and arbitrary precision integers`; it reports compiler/depende
 unavailability or an exhausted resource budget. This remains unresolved compiler
 conformance evidence, not a pass. All other backend cases ran successfully.
 See `evidence/w2-e/backend-tests.log`. No check is left running.
+
+
+## Round 1 review fixes
+
+- File-scope analysis remains available inside old-layout projects. Tests run
+  `check`, `verify` and `simulate` against old and new layouts and compare every
+  project file byte for byte; project-scope `check` refuses the old layout.
+- Every storage-boundary creator of `rebuildable/` creates a local `.gitignore`
+  covering its files, without requiring initialization. Tests check independent
+  graph/run creation and a real Studio check in a never-initialized Git repository.
+- Run-cache open/schema/decode failures yield empty history and a warning naming
+  `.pymtheg/rebuildable/runs.sqlite`. They do not disable shared draft recovery.
+  A garbage-cache test restores and edits an unsaved draft through Studio while
+  preserving the corrupt cache bytes. The cache is ignored for that session.
+- Project discovery is bounded as described above. A stray home-folder legacy
+  config cannot block initialization or discovery of a new, Git, or metadata-only
+  project below it. Tests also distinguish intermediate files from root-owned data.
+- Studio's two source-selection suggestions now name `.pymtheg/settings.json`.
+
+### Remaining wording outside this chunk's permitted edits
+
+- `src/reporting/explain.ts:54`: source-discovery repair advice names old settings.
+- `docs/project-init.md:20,112,114`: creation, ignoring and commit instructions.
+- `docs/studio.md:141,198`: recovery and planning database locations.
+- `docs/runtime-map.md:219`: private recovery database location.
+- `docs/support.md:192`: configuration support wording; fold in via the doc owner.
+- `docs/decisions.md:192,257`: superseded settings/recovery decisions; annotate
+  the current contract without erasing historical decisions.
+- `docs/architecture-workspace-plan.md:74` and `docs/seventh-review-work.md:12`:
+  old planning/storage descriptions; distinguish historical intent from current use.
+- `docs/mega-plan.md:107`: S27's historical scattered-layout problem statement;
+  preserve it as historical context, not current setup advice.
+
+### Further work explicitly outside round 1
+
+The explicit-path `openDatabase` API can bypass project path selection; the
+runtime-import guard does not catch a re-export such as `export ... from
+"node:sqlite"`; the rebuildable run cache has no `user_version` validation.
+These are recorded follow-ups, not claims made by this chunk's current tests.
+All of 3.3 remains deferred.
+
+### Round 1 validation
+
+The required foreground `npm test` run passes: **2,227 passed, zero failures,
+zero skipped**. The parser-owner death test passed; no isolated retry was needed.
+All **15 storage tests** and **23 targeted tests** pass, and
+`npm run format:check` passes. Logs for this review round use the `round-1-`
+prefix under `evidence/w2-e/`, preserving earlier validation logs unchanged.
+
+The foreground backend rerun completed with exit 0: **95 passed, zero failures,
+one skipped** (96 total). As before, the skipped Rust rich-contract compiler
+case reports compiler/dependency unavailability or exhausted budget; that compiler
+conformance evidence remains unresolved, not passed. The complete core/web/Vite
+build also passed. See `round-1-backend-tests.log`. All checks have finished.
