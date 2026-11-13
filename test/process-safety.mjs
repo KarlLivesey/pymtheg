@@ -1,3 +1,4 @@
+import { readFileSync, readdirSync } from "node:fs";
 /** This bound reports missing evidence; it never establishes correctness. */
 export async function within(promise, waitingFor, cleanup = () => {}) {
   let timer,
@@ -47,4 +48,43 @@ export async function processState(pid, states, waitingFor, allowGone = false) {
     waitingFor,
     () => controller.abort(),
   );
+}
+
+/** Independent of runProcess: discover and kill tagged fixture groups/leaves. */
+export function killFixtureGroups(token) {
+  const groups = new Set();
+  const members = [];
+  const ownStat = readFileSync("/proc/self/stat", "utf8");
+  const ownGroup = Number(
+    ownStat.slice(ownStat.lastIndexOf(")") + 2).split(" ")[2],
+  );
+  for (const entry of readdirSync("/proc")) {
+    if (!/^\d+$/.test(entry)) continue;
+    try {
+      const env = readFileSync(`/proc/${entry}/environ`, "utf8");
+      if (!env.split("\0").includes(`PYM_TEST_PROCESS_OWNER=${token}`))
+        continue;
+      const stat = readFileSync(`/proc/${entry}/stat`, "utf8");
+      const fields = stat.slice(stat.lastIndexOf(")") + 2).split(" ");
+      const group = Number(fields[2]);
+      members.push(Number(entry));
+      if (group !== ownGroup) groups.add(group);
+    } catch (error) {
+      if (!["ENOENT", "ESRCH", "EACCES"].includes(error.code)) throw error;
+    }
+  }
+  for (const pid of members) {
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch (error) {
+      if (error.code !== "ESRCH") throw error;
+    }
+  }
+  for (const group of groups) {
+    try {
+      process.kill(-group, "SIGKILL");
+    } catch (error) {
+      if (error.code !== "ESRCH") throw error;
+    }
+  }
 }

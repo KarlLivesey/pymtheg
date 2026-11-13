@@ -1,4 +1,5 @@
-import { within, processState } from "./process-safety.mjs";
+import { randomUUID } from "node:crypto";
+import { within, processState, killFixtureGroups } from "./process-safety.mjs";
 import { controlledClock as manualClock } from "./controlled-clock.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -11,12 +12,19 @@ import { parseItf } from "../dist/backends/adapter.js";
 const opts = { cwd: process.cwd(), timeoutMs: 2000 };
 function runProcess(command, args, options) {
   const clock = options.clock ?? manualClock();
-  const running = productionRunProcess(command, args, { ...options, clock });
+  const token = randomUUID();
+  const running = productionRunProcess(command, args, {
+    ...options,
+    clock,
+    env: { ...(options.env ?? process.env), PYM_TEST_PROCESS_OWNER: token },
+  });
   return within(
     running,
     "process leader reaping and output pipe closure",
     async () => {
-      // On a failed safety bound, terminate even an uncooperative group.
+      // Do not rely on production signaling/escalation to clean a failed test.
+      killFixtureGroups(token);
+      // Deliver any finish callback after independently killing the group.
       while (clock.pending) clock.fireNext();
       await within(running, "forced process cleanup after safety failure");
     },
