@@ -8,15 +8,20 @@ import { scaffold } from "../dist/contracts/scaffold.js";
 import { runProcess } from "../dist/backends/process.js";
 
 // A precise, truthful reason why a real compiler run gives no evidence, or
-// undefined when the run produced a real compiler verdict.
-function unavailableReason(target, result, timeoutMs) {
-  const tool =
-    target === "typescript" ? "tsc" : target === "rust" ? "cargo" : "go";
+// undefined when the run produced a real compiler verdict. `tool` names the
+// program that was actually spawned.
+function unavailableReason(tool, result, timeoutMs) {
   if (result.kind === "spawn_failed")
     return `${tool} could not be started (${(result.stderr || "spawn failed").trim()})`;
   if (result.kind === "timed_out")
     return `${tool} exceeded its explicit ${timeoutMs} ms budget; unresolved`;
-  if (target !== "rust") return undefined;
+  if (tool !== "cargo") return undefined;
+  const notRun =
+    /could not execute process `(\S+)[^`]*` \(never executed\)/.exec(
+      result.stderr,
+    );
+  if (notRun)
+    return `cargo ran but could not start ${notRun[1]} (${result.stderr.trim().split("\n").at(-1).trim()})`;
   const download = /failed to download `([^`]+)`/.exec(result.stderr);
   if (download)
     return `crate ${download[1]} pinned by test/fixtures/rust-rich/Cargo.lock is not in the offline cargo cache`;
@@ -29,6 +34,75 @@ function unavailableReason(target, result, timeoutMs) {
     return `cargo needed network access in --offline mode: ${result.stderr.trim().split("\n")[0]}`;
   return undefined;
 }
+const tscTool = `node (${process.execPath}) running node_modules/typescript/bin/tsc`;
+const goTool = process.env.PYM_GO ?? "go";
+
+test("unavailableReason names the spawned tool and the missing crate", async () => {
+  const missingTool = "pym-w2q-no-such-compiler";
+  const spawned = await runProcess(missingTool, [], { timeoutMs: 45000 });
+  assert.equal(spawned.kind, "spawn_failed");
+  assert.match(
+    unavailableReason("rustc", spawned, 45000),
+    /^rustc could not be started \(.*ENOENT/,
+  );
+  assert.equal(
+    unavailableReason("rustc", { kind: "timed_out", stderr: "" }, 45000),
+    "rustc exceeded its explicit 45000 ms budget; unresolved",
+  );
+  assert.equal(
+    unavailableReason(
+      "cargo",
+      {
+        kind: "exited",
+        code: 101,
+        stderr:
+          "error: failed to download `num-bigint v0.4.6`\n\nCaused by:\n  attempting to make an HTTP request, but --offline was specified\n",
+      },
+      45000,
+    ),
+    "crate num-bigint v0.4.6 pinned by test/fixtures/rust-rich/Cargo.lock is not in the offline cargo cache",
+  );
+  assert.equal(
+    unavailableReason(
+      "cargo",
+      {
+        kind: "exited",
+        code: 101,
+        stderr:
+          "error: no matching package named `num-bigint` found\nlocation searched: crates.io index\n",
+      },
+      45000,
+    ),
+    "crate num-bigint is not in the offline cargo registry index",
+  );
+  assert.equal(
+    unavailableReason(
+      "cargo",
+      {
+        kind: "exited",
+        code: 101,
+        stderr:
+          "error: could not execute process `rustc -vV` (never executed)\n\nCaused by:\n  No such file or directory (os error 2)\n",
+      },
+      45000,
+    ),
+    "cargo ran but could not start rustc (No such file or directory (os error 2))",
+  );
+  // A real compiler rejection is a verdict, never a skip.
+  assert.equal(
+    unavailableReason(
+      "cargo",
+      { kind: "exited", code: 101, stderr: "error[E0053]: method `decide`" },
+      45000,
+    ),
+    undefined,
+  );
+  assert.equal(
+    unavailableReason(goTool, { kind: "exited", code: 1, stderr: "x" }, 45000),
+    undefined,
+  );
+});
+
 for (const target of ["typescript", "rust", "go"])
   test(`${target}: regeneration preserves user code and compiler rejects incompatible contracts`, async (t) => {
     const root = await mkdtemp(join(tmpdir(), "pym-regenerate-"));
@@ -100,7 +174,15 @@ for (const target of ["typescript", "rust", "go"])
       const before = await compiler();
       if (before.kind === "spawn_failed" || before.kind === "timed_out") {
         t.skip(
-          unavailableReason(target, before, 45000) + "; conformance unresolved",
+          unavailableReason(
+            target === "typescript"
+              ? tscTool
+              : target === "rust"
+                ? "rustc"
+                : goTool,
+            before,
+            45000,
+          ) + "; conformance unresolved",
         );
         return;
       }
@@ -233,7 +315,15 @@ for (const target of ["typescript", "rust", "go"])
             ? runProcess("cargo", ["check", "--offline", "--locked"], options)
             : runProcess(process.env.PYM_GO ?? "go", ["test"], options);
       const first = await compile();
-      const unavailable = unavailableReason(target, first, options.timeoutMs);
+      const unavailable = unavailableReason(
+        target === "typescript"
+          ? tscTool
+          : target === "rust"
+            ? "cargo"
+            : goTool,
+        first,
+        options.timeoutMs,
+      );
       if (unavailable) {
         t.skip(unavailable + "; no conformance claim");
         return;
