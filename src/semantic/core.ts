@@ -384,9 +384,34 @@ export function typecheck(snapshot: Snapshot): ProjectIR {
     }
   }
   type Env = Map<string, { type: Type; span: Span }>;
-  function expect(a: Type, b: Type, span: Span, related: Span[] = []): void {
-    if (!compatible(a, b))
-      add("T002", `Expected ${typeKey(b)}, got ${typeKey(a)}`, span, related);
+  // Arithmetic expressions whose Int type comes from a subtraction, so a Nat
+  // mismatch can say why and suggest a bounded Int (S21). "nat" means the
+  // subtraction started from a Nat; "int" means its left side was already Int.
+  const subtractions = new WeakMap<Span, "nat" | "int">();
+  function expect(
+    a: Type,
+    b: Type,
+    span: Span,
+    related: Span[] = [],
+    natHint = "If the value can go below zero, change Nat to Int in its declaration. For machine state, keep a finite range, for example `state count: Int in 0..3 = 0;`.",
+  ): void {
+    if (!compatible(a, b)) {
+      const subtraction =
+        typeKey(a) === "Int" && typeKey(b) === "Nat"
+          ? subtractions.get(span)
+          : undefined;
+      add(
+        "T002",
+        `Expected ${typeKey(b)}, got ${typeKey(a)}` +
+          (subtraction === "nat"
+            ? `. Subtracting from a Nat gives an Int, because the result may be below zero. ${natHint}`
+            : subtraction === "int"
+              ? `. The result of this subtraction is Int, and the target is Nat. ${natHint}`
+              : ""),
+        span,
+        related,
+      );
+    }
   }
   function bind(env: Env, name: string, type: Type, span: Span): void {
     if (env.has(name))
@@ -636,6 +661,16 @@ export function typecheck(snapshot: Snapshot): ProjectIR {
                     ? "Nat"
                     : "Int",
               );
+        if (!bool && !cmp) {
+          const origin =
+            e.op === "-"
+              ? typeKey(a) === "Nat"
+                ? "nat"
+                : "int"
+              : (subtractions.get(e.left.span) ??
+                subtractions.get(e.right.span));
+          if (origin) subtractions.set(e.span, origin);
+        }
         break;
       }
     }
@@ -1113,7 +1148,17 @@ export function typecheck(snapshot: Snapshot): ProjectIR {
           const target = env.get(u.name);
           if (!target) add("N002", `Unknown state ${u.name}`, u.span);
           const t = expression(u.expr, env, d, target?.type);
-          if (target) expect(t, target.type, u.expr.span, [target.span]);
+          const state = d.states.find((s) => s.name === u.name);
+          if (target)
+            expect(
+              t,
+              target.type,
+              u.expr.span,
+              [target.span],
+              state && state.min !== null && state.max !== null
+                ? `Change Nat to Int in the declaration of ${state.name}, keeping its range: \`state ${state.name}: Int in ${state.min}..${state.max} = ${sourcesByFile.get(state.init.span.file)?.text.slice(state.init.span.start, state.init.span.end) ?? "0"};\``
+                : undefined,
+            );
         }
       }
       for (const i of d.invariants) {
