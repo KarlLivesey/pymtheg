@@ -306,11 +306,13 @@ function runPrinted(stdout) {
   );
 }
 
-function withScenario(source, scenario, body) {
+function withScenario(source, scenario, body, extra = [], files = {}) {
   const root = mkdtempSync(join(tmpdir(), "pym-hints-"));
   try {
     const file = join(root, "mixed.pym");
     writeFileSync(file, source);
+    for (const [name, text] of Object.entries(files))
+      writeFileSync(join(root, name), text);
     mkdirSync(join(root, ".pymtheg"));
     writeFileSync(
       join(root, ".pymtheg", "settings.json"),
@@ -319,9 +321,9 @@ function withScenario(source, scenario, body) {
         scenarios: { small: { file: "mixed.pym", ...scenario } },
       }),
     );
-    const checked = run("check", file, "--scenario", "small");
+    const checked = run("check", file, "--scenario", "small", ...extra);
     assert.equal(checked.status, 0, checked.stdout + checked.stderr);
-    return body(file, checked.stdout);
+    return body(file, checked.stdout, root);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -369,6 +371,75 @@ machine Counter {
         Counter: `verify ${file} --entry Counter`,
       });
     },
+  ));
+
+const flowAndCounter = `flow step(n: Nat) -> Bool {
+  return n < 2;
+}
+machine Counter {
+  state n: Nat in 0..2 = 0;
+  event up when n < 2 { n = n + 1; }
+  invariant ok = n <= 2;
+}
+`;
+const twoMachines = `machine X {
+  state n: Nat in 0..2 = 0;
+  event up when n < 2 { n = n + 1; }
+  invariant small = n <= 1;
+}
+machine Y {
+  state b: Bool = false;
+  event flip when !b { b = true; }
+  invariant ok = b || !b;
+}
+`;
+const xScope = {
+  entry: "X",
+  scope: { domains: { n: "0..2" }, assumptions: ["one counter"] },
+};
+
+test("explicit --entry naming a machine does not move a flow scenario onto it", () =>
+  withScenario(
+    flowAndCounter,
+    { entry: "step", scope: { inputs: { n: [0, 1, 2] } } },
+    (file, stdout) => {
+      assert.deepEqual(runPrinted(stdout), {
+        Counter: `verify ${file} --entry Counter`,
+      });
+    },
+    ["--entry", "Counter"],
+  ));
+
+test("explicit --entry naming another machine keeps --scenario on the scenario's own machine", () =>
+  withScenario(
+    twoMachines,
+    xScope,
+    (file, stdout) => {
+      assert.deepEqual(runPrinted(stdout), {
+        X: `verify ${file} --entry X --scenario small`,
+        Y: `verify ${file} --entry Y`,
+      });
+    },
+    ["--entry", "Y"],
+  ));
+
+test("a scenario for an imported machine is printed against the checked file", () =>
+  withScenario(
+    `import "lib.pym";
+flow step(n: Nat) -> Bool {
+  return n < 2;
+}
+`,
+    xScope,
+    (file, stdout, root) => {
+      const commands = runPrinted(stdout);
+      assert.deepEqual(commands, {
+        X: `verify ${file} --entry X --scenario small`,
+        Y: `verify ${join(root, "lib.pym")} --entry Y`,
+      });
+    },
+    [],
+    { "lib.pym": twoMachines },
   ));
 
 test("shellWord quotes a word starting with = (zsh expands =word)", () => {

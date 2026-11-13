@@ -574,17 +574,33 @@ export function uncheckedBehaviourNotice(
       d.kind === "machine" && reported.has(d.id + "/types-effects-outcomes"),
   );
   if (!machines.length) return "";
+  // A saved scenario belongs to one entry of the checked file and carries
+  // that entry's scope, so only that entry's command keeps it. If the entry
+  // is a machine imported into the checked file, verify still runs it from
+  // the checked file, so the command names that file.
+  const closure = new Set<string>();
+  const visit = (file: string) => {
+    if (closure.has(file)) return;
+    closure.add(file);
+    for (const imported of ir.snapshot.sources.find((x) => x.file === file)
+      ?.imports ?? [])
+      visit(imported);
+  };
+  if (invocation.file !== undefined) visit(invocation.file);
+  const scenarioMachine =
+    invocation.scenario !== undefined && invocation.file !== undefined
+      ? ir.declarations.filter(
+          (d) =>
+            d.name === invocation.scenarioEntry && closure.has(d.span.file),
+        )
+      : [];
   const shown = machines.slice(0, 5).map((d) => {
     const invariants = d.kind === "machine" ? d.invariants.length : 0;
-    // A saved scenario belongs to one entry in the checked file and carries
-    // that entry's scope, so keep it only on that entry's command.
-    const scenario =
-      invocation.scenario !== undefined &&
-      d.name === invocation.scenarioEntry &&
-      d.span.file === invocation.file
-        ? ` --scenario ${shellWord(invocation.scenario)}`
-        : "";
-    return `  ${d.name} (${invariants} invariant${invariants === 1 ? "" : "s"}): pymtheg verify ${shellWord(d.span.file)} --entry ${shellWord(d.name)}${scenario}`;
+    const own = scenarioMachine.length === 1 && scenarioMachine[0] === d;
+    const command = own
+      ? `pymtheg verify ${shellWord(invocation.file!)} --entry ${shellWord(d.name)} --scenario ${shellWord(invocation.scenario!)}`
+      : `pymtheg verify ${shellWord(d.span.file)} --entry ${shellWord(d.name)}`;
+    return `  ${d.name} (${invariants} invariant${invariants === 1 ? "" : "s"}): ${command}`;
   });
   const more = machines.length - shown.length;
   if (more > 0)

@@ -783,7 +783,7 @@ try {
         throw Error(`Missing value for ${key}`);
       options.set(key, value);
     }
-    let selectedScope: unknown;
+    let selectedScope: unknown, scenarioEntry: string | undefined;
     if (options.has("--scenario")) {
       const loaded = await findConfig(dirname(resolve(file)));
       const selected = loaded.config.scenarios[options.get("--scenario")!];
@@ -801,6 +801,7 @@ try {
       for (const [key, value] of Object.entries(defaults))
         if (!options.has(key)) options.set(key, value);
       selectedScope = selected.scope;
+      scenarioEntry = selected.entry;
     }
     if (
       options.has("--format") &&
@@ -995,7 +996,7 @@ try {
         uncheckedBehaviourNotice(ir, report, {
           file: resolve(file),
           scenario: options.get("--scenario"),
-          scenarioEntry: options.get("--entry"),
+          scenarioEntry,
         }),
       );
     process.exitCode = exitStatus(report);
