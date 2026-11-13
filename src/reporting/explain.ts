@@ -1,5 +1,6 @@
 import type { Finding, Span } from "../shared/identity.js";
 import type { Report } from "./report.js";
+import type { ProjectIR } from "../semantic/core.js";
 export interface SourceLocation extends Span {
   line: number | null;
   column: number | null;
@@ -517,6 +518,22 @@ export function findingPresenter(report: Report) {
           nextStep: `For ${operation}, model request/effect/response with a protocol if they can interleave. Only if treating the call as one indivisible step is intended, add atomic before its semicolon; this is an environment assumption.`,
         };
     }
+    if (finding.code === "T002") {
+      const subtraction =
+        /^Expected Nat, got Int\. (Subtracting from a Nat|The result of this subtraction)/.exec(
+          finding.message,
+        )?.[1];
+      if (subtraction)
+        help = {
+          title:
+            subtraction === "Subtracting from a Nat"
+              ? "Subtracting from a Nat can go below zero"
+              : "This subtraction gives an Int where a Nat is needed",
+          why: "Nat has no negative values, so a subtraction result is typed Int. The checker cannot assume a guard keeps it at zero or above.",
+          nextStep:
+            "If the value can go below zero, change Nat to Int in its declaration; for machine state keep the same finite range. Keep Nat only where the value can never decrease.",
+        };
+    }
     if (finding.code === "B010" && finding.message.startsWith("Invariant "))
       help = {
         title: "A modelled safety rule can fail",
@@ -535,3 +552,45 @@ export function findingPresenter(report: Report) {
     };
   };
 }
+
+/**
+ * Text for `check` when the checked declarations include machines. `check`
+ * establishes types, effects and outcomes only; it never explores machine
+ * events or tests invariants, so a clean `check` says nothing about
+ * behaviour (S20). Returns "" when there is no machine to point at.
+ */
+export function uncheckedBehaviourNotice(
+  ir: ProjectIR,
+  report: Report,
+  invocation: { file?: string; scenario?: string | undefined } = {},
+): string {
+  const reported = new Set(report.results.map((r) => r.propertyId));
+  const machines = ir.declarations.filter(
+    (d) =>
+      d.kind === "machine" && reported.has(d.id + "/types-effects-outcomes"),
+  );
+  if (!machines.length) return "";
+  const shown = machines.slice(0, 5).map((d) => {
+    const invariants = d.kind === "machine" ? d.invariants.length : 0;
+    // A saved scenario belongs to the checked file, so keep it only there.
+    const scenario =
+      invocation.scenario !== undefined && d.span.file === invocation.file
+        ? ` --scenario ${shellWord(invocation.scenario)}`
+        : "";
+    return `  ${d.name} (${invariants} invariant${invariants === 1 ? "" : "s"}): pymtheg verify ${shellWord(d.span.file)} --entry ${shellWord(d.name)}${scenario}`;
+  });
+  const more = machines.length - shown.length;
+  if (more > 0)
+    shown.push(`  and ${more} more machine${more === 1 ? "" : "s"}`);
+  const errors = report.diagnostics.some((d) => d.severity === "error");
+  return (
+    [
+      `BEHAVIOUR NOT CHECKED: check covers types, effects and outcomes only. It did not run any machine events or test any invariant, so the results above are not behavioural evidence.`,
+      `To check behaviour, ${errors ? "fix the errors above, then " : ""}run verify for each machine:`,
+      ...shown,
+    ].join("\n") + "\n"
+  );
+}
+/** One POSIX shell word: plain when safe, otherwise single-quoted. */
+export const shellWord = (word: string): string =>
+  /^[\w./@:+=-]+$/.test(word) ? word : `'${word.replaceAll("'", `'\\''`)}'`;
