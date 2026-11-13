@@ -7,8 +7,9 @@ outputs are in `evidence/w2-p/` (index: `evidence/w2-p/README.md`).
 ## The answer
 
 - **The grammars reject much more valid code than the known list.** Of 116
-  Rust and 46 Go snippets, rustc 1.98 / Go 1.27 accept all but 6 (nightly or
-  removed syntax). The installed grammars reject **39 valid Rust and 13 valid
+  Rust and 46 Go snippets (162), 153 pass the stable compilers (rustc 1.98,
+  Go 1.27). Nine do not: six need nightly Rust, and three are rejected
+  outright (`dyn-star`, `impl-const`, `generic-interface-method`). The installed grammars reject **39 valid Rust and 13 valid
   Go** snippets (`gaps-output.txt`). On real code: Vector 11 files and restic 1
   (both fully explained, below); the local crates.io cache 1,904 of ~63,700
   `.rs` files (1,468 of them are `wasm-bindgen` input in 6 crates); the Go
@@ -131,6 +132,19 @@ because their gaps are all grammar-level.
    files), then `impl A + for<'a> B`, then the generic-argument shapes
    (generated code), then the where-clause and tuple-attribute shapes.
    Upstreaming each patch is optional.
+
+## Notes for the follow-up chunks
+
+- **Pin the corpus.** The corpus counts come from live checkouts and caches:
+  Vector has since moved to `edfcf9000`, and restic now has 570 `.go` files.
+  Follow-up chunks must gate on a pinned or exported corpus, not on whatever
+  is checked out.
+- **FFI test cases.** `unsafe extern` blocks with variadic declarations
+  (`fn printf(fmt: *const c_char, ...)`) and with `#[link(...)]` are the common
+  FFI shapes. They must be test cases in the grammar chunk.
+- **Go `;` repair and labels.** Blanking an empty statement can re-attach a
+  label (`L: ;` followed by `goto L` makes `L` label the next statement). This
+  is harmless, and the repair chunk's soundness notes must name it.
 
 ## What I could not determine
 
