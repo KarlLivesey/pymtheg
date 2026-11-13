@@ -1,0 +1,85 @@
+{
+  "language": "rust",
+  "output": "tree-sitter-rust.wasm",
+  "upstream": {
+    "repository": "https://github.com/tree-sitter/tree-sitter-rust",
+    "tag": "v0.24.2",
+    "commit": "77a3747266f4d621d0757825e6b11edcbf991ca5",
+    "license": "MIT (LICENSE in this directory, copied from the commit above)"
+  },
+  "patches": [
+    {
+      "file": "patches/0001-pr319-struct-pattern-field-attributes.patch",
+      "pullRequest": "https://github.com/tree-sitter/tree-sitter-rust/pull/319",
+      "headCommit": "70157d40a8e148ca547fd08f34826e7ba3a98958",
+      "baseCommit": "77a3747266f4d621d0757825e6b11edcbf991ca5",
+      "what": "Attributes (e.g. #[cfg]) on struct-pattern fields",
+      "paths": [
+        "grammar.js",
+        "test/corpus/attributes_on_struct_patterns.txt"
+      ]
+    },
+    {
+      "file": "patches/0002-pr271-unit-struct-where.patch",
+      "pullRequest": "https://github.com/tree-sitter/tree-sitter-rust/pull/271",
+      "headCommit": "1660fa6c950ed3f6d56210c56627b7fdf67fadc0",
+      "baseCommit": "77a3747266f4d621d0757825e6b11edcbf991ca5",
+      "what": "A where clause on a unit struct (`struct X where T: Eq;`)",
+      "paths": [
+        "grammar.js",
+        "test/corpus/declarations.txt"
+      ]
+    },
+    {
+      "file": "patches/0003-pr317-tilde-in-token-trees.patch",
+      "pullRequest": "https://github.com/tree-sitter/tree-sitter-rust/pull/317",
+      "headCommit": "1bf4964e4afa48e53e848a285a6b0c89fd23ad01",
+      "baseCommit": "77a3747266f4d621d0757825e6b11edcbf991ca5",
+      "what": "The `~` token inside macro token trees",
+      "paths": [
+        "grammar.js",
+        "test/corpus/macros.txt"
+      ]
+    },
+    {
+      "file": "patches/0004-pr312-le-after-cast.patch",
+      "pullRequest": "https://github.com/tree-sitter/tree-sitter-rust/pull/312",
+      "headCommit": "1d3d5d6df51d5edfac3bdd3178433eb0aa437ea5",
+      "baseCommit": "77a3747266f4d621d0757825e6b11edcbf991ca5",
+      "what": "`<=` after a cast to a named type (`x as size_t <= y`)",
+      "paths": [
+        "grammar.js",
+        "test/corpus/expressions.txt"
+      ]
+    },
+    {
+      "file": "patches/0005-pr283-unicode-escape-underscore.patch",
+      "pullRequest": "https://github.com/tree-sitter/tree-sitter-rust/pull/283",
+      "headCommit": "bb723fa5db73847d77d33891db2e51fb4baea5a2",
+      "baseCommit": "261b20226c04ef601adbdf185a800512a5f66291",
+      "what": "Underscores in unicode escapes (`\\u{4_e}`)",
+      "paths": [
+        "grammar.js",
+        "test/corpus/literals.txt"
+      ]
+    },
+    {
+      "file": "patches/0006-pr281-extern-types.patch",
+      "pullRequest": "https://github.com/tree-sitter/tree-sitter-rust/pull/281",
+      "headCommit": "7d6fe656932a6f0f27bdc92ea80c075585a00943",
+      "baseCommit": "261b20226c04ef601adbdf185a800512a5f66291",
+      "what": "`type X;` (foreign types) in extern blocks",
+      "paths": [
+        "grammar.js",
+        "test/corpus/declarations.txt"
+      ]
+    }
+  ],
+  "tools": {
+    "tree-sitter-cli": "0.27.2",
+    "wasi-sdk": "34.0",
+    "binaryen": "version_132"
+  },
+  "abi": 15,
+  "sha256": "ae20d895a6178dcba3051f8caa32f6f6d30e32e94e337d205880433becfed3ea"
+}

@@ -253,7 +253,7 @@ test("round 9 B1 conditional type-only import cannot complete a value binding fa
     ["X", "glob::X"],
   );
 });
-const broken = "pub fn hidden()->u8{let raw=1u8;let r=&raw;*r}";
+const broken = "pub fn hidden()->u8{fn gap()->u8{1}gap::<>()}";
 test("round 9 B2 failed glob never accuses prelude or unknown names", async () => {
   // rustc accepts the grammar-gap file and prints the usual std results. Globs
   // cannot prove whether any of these names would come from the failed file.
@@ -286,7 +286,7 @@ test("round 9 B2 failed glob never accuses prelude or unknown names", async () =
   }
   const fixed = await graph({
     ...sources,
-    "src/broken.rs": sources["src/broken.rs"].replaceAll("raw", "renamed"),
+    "src/broken.rs": sources["src/broken.rs"].replaceAll("gap::<>()", "gap()"),
   });
   for (const l of fixed.links) assert.equal(l.data?.cause, undefined);
   fixed.one("OnlyThere", "OnlyThere");
@@ -394,7 +394,7 @@ test("round 9 B1/B2 an unverified namespace cannot accuse a possible glob module
     "src/lib.rs":
       'mod glob;use std::string::String;use glob::*;fn r()->String{String::from("x")}fn project()->u8{glob::String::from("x")}',
     "src/glob.rs": "pub mod String;",
-    "src/glob/String.rs": "pub fn from(_: &str)->u8{let raw=3u8;let r=&raw;*r}",
+    "src/glob/String.rs": "pub fn from(_: &str)->u8{fn gap()->u8{3}gap::<>()}",
   });
   g.unknown("String::from");
   noCause(g, "String::from");

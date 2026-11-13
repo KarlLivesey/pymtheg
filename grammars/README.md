@@ -36,3 +36,33 @@ MIT) plus:
 Not taken: PR #190, which changes the tree of 1,785 files that already parse
 (W2-P). Built with tree-sitter CLI 0.27.2, wasi-sdk 34.0 and binaryen
 version_132. Three builds from these inputs gave the same bytes: W2-P's scratch build, this chunk's `--write` build and the verify run in `evidence/w2-s/build-verify.txt`.
+
+## rust
+
+Upstream `tree-sitter-rust` v0.24.2 (`77a3747266f4d621d0757825e6b11edcbf991ca5`,
+MIT; a GitHub release only, not on npm) plus, in order:
+
+1. [PR #319](https://github.com/tree-sitter/tree-sitter-rust/pull/319) at
+   `70157d40a8e148ca547fd08f34826e7ba3a98958`: attributes (`#[cfg]`) on
+   struct-pattern fields.
+2. [PR #271](https://github.com/tree-sitter/tree-sitter-rust/pull/271) at
+   `1660fa6c950ed3f6d56210c56627b7fdf67fadc0`: a where clause on a unit
+   struct.
+3. [PR #317](https://github.com/tree-sitter/tree-sitter-rust/pull/317) at
+   `1bf4964e4afa48e53e848a285a6b0c89fd23ad01`: `~` in macro token trees.
+4. [PR #312](https://github.com/tree-sitter/tree-sitter-rust/pull/312) at
+   `1d3d5d6df51d5edfac3bdd3178433eb0aa437ea5`: `<=` after a cast to a named
+   type.
+5. [PR #283](https://github.com/tree-sitter/tree-sitter-rust/pull/283) at
+   `bb723fa5db73847d77d33891db2e51fb4baea5a2`: `_` in unicode escapes.
+6. [PR #281](https://github.com/tree-sitter/tree-sitter-rust/pull/281) at
+   `7d6fe656932a6f0f27bdc92ea80c075585a00943`: foreign `type X;` in extern
+   blocks.
+
+v0.24.2 itself already reads `&raw` on a variable named `raw` and
+`unsafe extern` blocks. Not taken: PR #256, which makes `safe` a reserved
+word (29 registry files with a parameter, field or macro named `safe` break),
+and PR #297, which breaks `macro_rules` used as an identifier (W2-P). Built
+with the same tools as Go. The `--write` build here and W2-P's scratch build
+of the same inputs gave the same bytes, and `evidence/w2-v/build-verify.txt`
+records a third.
