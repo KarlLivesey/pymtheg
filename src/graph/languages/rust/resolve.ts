@@ -2507,28 +2507,8 @@ export function resolveRust(
       );
     });
   }
-  const standardMacroSites = new Map(
-    ctx.links
-      .filter((l) => l.kind === "macros")
-      .map((l) => [`${l.file}|${l.range.start}`, l]),
-  );
-  function unseenTextualStandardName(
-    file: string,
-    scope: string,
-    start: number | undefined,
-  ): boolean {
-    const site = standardMacroSites.get(`${file}|${start}`);
-    // Older cached parse facts lack a position: do not guess textual scope.
-    if (!site) return true;
-    return ownerPlace(file, scope).some((place) => {
-      const loc = {
-        ...place,
-        conditions: [...(place.conditions ?? []), ...conditionsFor(site)],
-      };
-      const found = textualMacro(compact(site.targetName), site, loc, scope);
-      return !!found && (!found.complete || !!found.symbols.length);
-    });
-  }
+  // E4: failed/unverified textual entries are unseen code. Assume they do
+  // not rebind the standard names; ordinary textual macro lookup stays strict.
   const unsafeStandardScopes = new Set<string>();
   for (const f of ctx.files)
     for (const loc of ownerPlace(f.path, "")) {
@@ -2541,8 +2521,7 @@ export function resolveRust(
           (entry.name.includes("::")
             ? visiblePrefixes.has(entry.name.replace(/^::/, "").split("::")[0]!)
             : visibleMacroNames.has(standardMacroName(entry.name)!) ||
-              importedStandardName(f.path, entry.scope, entry.name) ||
-              unseenTextualStandardName(f.path, entry.scope, entry.start)) ||
+              importedStandardName(f.path, entry.scope, entry.name)) ||
           ownerPlace(f.path, entry.scope).some((p) => p.noImplicitPrelude)
         ) {
           opaqueScopes.add(`${loc.crate.root}|${qualified(loc, entry.scope)}`);

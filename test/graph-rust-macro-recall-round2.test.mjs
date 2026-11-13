@@ -111,6 +111,8 @@ for (const c of cases)
   test("macro competing binding: " + c.name, async () => {
     // The three-crate native controls capture only app for graph analysis. A
     // nativeFiles replacement is the readable equivalent of a failed module.
+    // Cases labelled known limit E4 intentionally keep a visible helper link
+    // despite that replacement calling an unseen macro-generated helper.
     const g = await graph(c.files, {
       "Cargo.toml":
         '[package]\nname="app"\nedition="2024"\n[dependencies]\ndep={path="../dep"}\n',
