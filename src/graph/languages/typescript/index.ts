@@ -35,7 +35,7 @@ import {
  * facts; resolve maps those facts to symbol IDs. See docs/changes/W2-D.md.
  */
 // Bump the leading number whenever extraction or resolution semantics change.
-const MODULE_VERSION = `15+typescript-${ts.version}`;
+const MODULE_VERSION = `16+typescript-${ts.version}`;
 
 /** Observation counters for tests (programs built, files extracted). Not a correctness input. */
 export const statistics = {
@@ -290,6 +290,36 @@ const failed = (message: string): ParseResult => ({
   symbols: [],
   links: [],
 });
+/**
+ * A failure that says nothing about the file's content: an exception inside
+ * this module, or a compiler limit that depends on the environment (stack
+ * size, how often the checker overflowed in the project). It is reported as
+ * the module's own fault, never as invalid code, and is marked
+ * `failureKind: "transient"` so that a core with content-failure caching
+ * retries it on the next index instead of caching it (the core without that
+ * field re-reads every failed file anyway).
+ */
+const operationalFailure = (message: string): ParseResult => {
+  const result: ParseResult & { failureKind: "transient" } = {
+    status: "failed",
+    failureKind: "transient",
+    diagnostics: [{ message }],
+    symbols: [],
+    links: [],
+  };
+  return result;
+};
+/**
+ * Test hook: extraction of these paths throws, as an internal defect would,
+ * so tests can pin how an internal exception is reported. Empty in normal
+ * use; nothing in the module adds to it.
+ */
+export const injectedExtractionFaults = new Set<string>();
+/** The diagnostic for an unexpected exception while extracting one file. */
+export function internalErrorMessage(path: string, error: unknown): string {
+  const detail = error instanceof Error ? error.message : String(error);
+  return `Internal error in the TypeScript module while reading ${path} (a defect in pymtheg, not a problem in this file; it is retried on the next index): ${detail}`;
+}
 
 /**
  * Merges one file's results from equally ranked configs, independent of
@@ -606,12 +636,14 @@ const module: LanguageModule = {
         renamed: Renamed | undefined,
       ): ParseResult => {
         if (session.rebuilds > MAX_PROGRAM_REBUILDS)
-          return failed(
+          return operationalFailure(
             `The TypeScript checker overflowed so often in this project (${session.rebuilds} rebuilds) that the remaining files were not analysed`,
           );
         const skip = new Set<string>();
         for (let attempt = 0; ; attempt++) {
           try {
+            if (injectedExtractionFaults.has(path))
+              throw new TypeError("injected internal fault (test)");
             const source = session.program.getSourceFile(toVirtual(path));
             if (!source)
               throw Error(
@@ -653,10 +685,10 @@ const module: LanguageModule = {
             }
             // Never leave an overflowed checker in use for the next file.
             if (error instanceof CheckerLimit) session.rebuild();
-            return failed(
+            return operationalFailure(
               error instanceof CheckerLimit
                 ? `The TypeScript checker exhausted its stack more than ${MAX_LIMIT_RETRIES} times in this file`
-                : `TypeScript extraction failed: ${error instanceof Error ? error.message : String(error)}`,
+                : internalErrorMessage(path, error),
             );
           }
         }

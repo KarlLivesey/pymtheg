@@ -50,6 +50,7 @@ export interface RenameContext {
 const judges = new WeakMap<ts.TypeChecker, Judge>();
 import {
   anchorOf,
+  rootDeclaration,
   containerOf,
   identityOf,
   isEntityName,
@@ -1036,16 +1037,19 @@ export function extractFile(
         (ts.isVariableDeclaration(declaration) ||
           ts.isBindingElement(declaration))
       ) {
-        let holder: ts.Node = declaration;
-        while (!ts.isVariableDeclaration(holder)) holder = holder.parent;
-        const init = (holder as ts.VariableDeclaration).initializer;
+        // A destructured parameter has no variable declaration: only a
+        // variable's initialiser can be a `require(...)`.
+        const holder = ts.isVariableDeclaration(declaration)
+          ? declaration
+          : rootDeclaration(declaration);
+        const init = holder?.initializer;
         const initRoot = init && rootOf(init);
         const initCall = init && unwrap(init);
         if (
           initCall &&
           ts.isCallExpression(initCall) &&
           requireForm(initCall) &&
-          holder.getSourceFile() === file
+          holder!.getSourceFile() === file
         )
           return { reason: "untyped-require", receiver };
         if (initRoot && uncertainAt.has(initRoot.getStart(file)))
