@@ -102,7 +102,7 @@ try {
     join(root, "main.ts"),
     "export function send(): boolean { return true; }",
   );
-  const db = join(root, ".pymtheg-architecture/architecture.sqlite"),
+  const db = join(root, ".pymtheg/shared/architecture.sqlite"),
     before = await readFile(db);
   app = await startStudio({ path: root });
   browser = await browserType().launch({

@@ -100,8 +100,9 @@ test("generated Rust and Go folders are excluded by default and can be opted int
       (await service.project()).files.map((f) => f.path),
       ["src/main.pym"],
     );
+    await mkdir(join(root, ".pymtheg"), { recursive: true });
     await writeFile(
-      join(root, ".pymtheg.json"),
+      join(root, ".pymtheg/settings.json"),
       JSON.stringify({
         version: 1,
         scenarios: {},
@@ -150,8 +151,9 @@ test("explicit source roots prune unrelated directories before attempting to rea
     await mkdir(unrelated);
     await chmod(unrelated, 0);
     await writeFile(join(root, "src", "main.pym"), "flow main() -> Unit {}");
+    await mkdir(join(root, ".pymtheg"), { recursive: true });
     await writeFile(
-      join(root, ".pymtheg.json"),
+      join(root, ".pymtheg/settings.json"),
       JSON.stringify({
         version: 1,
         scenarios: {},

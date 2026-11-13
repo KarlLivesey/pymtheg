@@ -1,3 +1,4 @@
+import { storagePath } from "../storage/local.js";
 import { errorMessage } from "../shared/error-message.js";
 import { decodeObservation } from "../implementation/storage.js";
 import { implementationDesignPlans } from "../implementation/design-attention.js";
@@ -926,12 +927,7 @@ export class StudioService {
     if (create)
       return (this.architectureStore ??= ArchitectureStore.open(this.root));
     if (this.architectureStore) return this.architectureStore;
-    if (
-      !existsSync(
-        resolve(this.root, ".pymtheg-architecture", "architecture.sqlite"),
-      )
-    )
-      return null;
+    if (!existsSync(storagePath(this.root, "planning"))) return null;
     if (this.architectureReader) {
       const reader = await this.architectureReader;
       if (await reader.snapshotChanged()) {
@@ -2943,10 +2939,11 @@ export class StudioService {
     try {
       const { RecoveryStore } = await import("./recovery.js");
       this.recoveryStore = await RecoveryStore.openOrCreate(this.root);
+      const runs = this.recoveryStore.runs();
       this.recovery = this.recoveryStore.read();
       for (const draft of this.recovery.drafts)
         await this.path(draft.path, true);
-      this.runs.push(...this.recoveryStore.runs());
+      this.runs.push(...runs);
     } catch (error) {
       this.recovery = {
         ...this.recovery,
@@ -3153,7 +3150,7 @@ export class StudioService {
     if (paths.length >= 10000) {
       complete = false;
       warnings.push(
-        "Showing at most 10,000 source files. Narrow sources.include/exclude in .pymtheg.json to browse a smaller source set.",
+        "Showing at most 10,000 source files. Narrow sources.include/exclude in .pymtheg/settings.json to browse a smaller source set.",
       );
     }
     const chosen = preferred ? resolve(this.root, preferred) : undefined;
@@ -3225,9 +3222,7 @@ export class StudioService {
       workspace: await readWorkspace(this.root),
       root: this.root,
       outputTargets: this.outputRegistry.targets(),
-      architectureAvailable: existsSync(
-        resolve(this.root, ".pymtheg-architecture", "architecture.sqlite"),
-      ),
+      architectureAvailable: existsSync(storagePath(this.root, "planning")),
       agentConnection: {
         command: process.execPath,
         args: [
@@ -3270,7 +3265,7 @@ export class StudioService {
     if (!sourceIncluded(relative(this.root, path), policy))
       throw new StudioError(
         400,
-        "This path is outside sources.include/exclude in .pymtheg.json. Choose an included location or update that configuration.",
+        "This path is outside sources.include/exclude in .pymtheg/settings.json. Choose an included location or update that configuration.",
       );
     let output: StudioFile | undefined;
     const task = this.saveQueue.then(async () => {
@@ -3330,7 +3325,7 @@ export class StudioService {
         scenarios: { ...current.config.scenarios, [name.trim()]: selected },
       };
       const text = json(config);
-      await atomicWrite(resolve(this.root, identity.projectConfig), text);
+      await atomicWrite(storagePath(this.root, "settings", true), text);
       output = { config, hash: hash(text) };
     });
     this.saveQueue = task.catch(() => {});

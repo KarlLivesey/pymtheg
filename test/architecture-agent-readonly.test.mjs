@@ -8,7 +8,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { ArchitectureStore } from "../dist/architecture/store.js";
 test("real read_architecture MCP browses a read-only backup without changing any stored bytes", async () => {
   const root = await mkdtemp(join(tmpdir(), "pym-mcp-readonly-")),
-    dir = join(root, ".pymtheg-architecture"),
+    dir = join(root, ".pymtheg/shared"),
     file = join(dir, "architecture.sqlite");
   let client, store;
   try {

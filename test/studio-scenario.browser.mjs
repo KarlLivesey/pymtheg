@@ -105,7 +105,7 @@ try {
     .analyze();
   if (audit.violations.length) throw Error(JSON.stringify(audit.violations));
   const config = JSON.parse(
-    await readFile(join(root, ".pymtheg.json"), "utf8"),
+    await readFile(join(root, ".pymtheg/settings.json"), "utf8"),
   );
   if (config.scenarios["guided valid"].scope.inputs.reader[0].remaining !== "2")
     throw Error("Named scenario was not persisted");

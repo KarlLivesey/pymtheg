@@ -1,6 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, writeFile, readFile, rm, symlink } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  writeFile,
+  readFile,
+  rm,
+  symlink,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startStudio } from "../dist/studio/server.js";
@@ -121,7 +128,11 @@ test("named scenarios save the validated scope and refuse configuration conflict
       version: 1,
       scenarios: { other: { file: "main.pym", entry: "f" } },
     };
-    await writeFile(join(dir, ".pymtheg.json"), JSON.stringify(external));
+    await mkdir(join(dir, ".pymtheg"), { recursive: true });
+    await writeFile(
+      join(dir, ".pymtheg/settings.json"),
+      JSON.stringify(external),
+    );
     await assert.rejects(
       () =>
         app.service.saveScenario(
@@ -132,7 +143,7 @@ test("named scenarios save the validated scope and refuse configuration conflict
       /changed on disk/,
     );
     assert.deepEqual(
-      JSON.parse(await readFile(join(dir, ".pymtheg.json"), "utf8")),
+      JSON.parse(await readFile(join(dir, ".pymtheg/settings.json"), "utf8")),
       external,
     );
   }));
@@ -142,9 +153,9 @@ test("a corrupt recovery database is reported without altering source or suppres
   try {
     const { mkdir } = await import("node:fs/promises");
     await writeFile(join(dir, "main.pym"), source);
-    await mkdir(join(dir, ".pymtheg-studio"));
+    await mkdir(join(dir, ".pymtheg/shared"), { recursive: true });
     const damaged = "not a sqlite database";
-    await writeFile(join(dir, ".pymtheg-studio/workspace.sqlite"), damaged);
+    await writeFile(join(dir, ".pymtheg/shared/drafts.sqlite"), damaged);
     app = await startStudio({ path: dir });
     const project = await app.service.project();
     assert.equal(project.recovery.enabled, false);
@@ -172,7 +183,7 @@ test("a corrupt recovery database is reported without altering source or suppres
     const run = await finished;
     assert.ok(run.report.results.some((r) => r.completion === "complete"));
     assert.equal(
-      await readFile(join(dir, ".pymtheg-studio/workspace.sqlite"), "utf8"),
+      await readFile(join(dir, ".pymtheg/shared/drafts.sqlite"), "utf8"),
       damaged,
     );
   } finally {
@@ -196,8 +207,9 @@ test("source creation protects existing and excluded files and creates requested
       /excluded/,
     );
     await mkdir(join(root, "research"));
+    await mkdir(join(root, ".pymtheg"), { recursive: true });
     await writeFile(
-      join(root, ".pymtheg.json"),
+      join(root, ".pymtheg/settings.json"),
       JSON.stringify({
         version: 1,
         scenarios: {},

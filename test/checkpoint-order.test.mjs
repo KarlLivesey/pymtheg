@@ -119,7 +119,7 @@ test("partial legacy lineage cannot introduce a cycle into an existing history",
     const legacy = store.exportHistory();
     delete legacy.revisions[0].parentId;
     store.close();
-    await rm(join(root, ".pymtheg-architecture"), {
+    await rm(join(root, ".pymtheg/shared"), {
       recursive: true,
       force: true,
     });

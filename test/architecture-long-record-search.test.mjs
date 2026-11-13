@@ -72,7 +72,7 @@ test("legacy catalogue records remain searchable past 64 KiB without rewriting h
     ]);
     store.close();
     store = null;
-    const file = join(root, ".pymtheg-architecture", "architecture.sqlite");
+    const file = join(root, ".pymtheg/shared", "architecture.sqlite");
     // Reproduce the retained v16 projection, not only a fresh v17 import.
     const db = new DatabaseSync(file);
     const legacy = structuredClone(index);

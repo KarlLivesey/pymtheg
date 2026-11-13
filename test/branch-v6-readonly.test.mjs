@@ -27,7 +27,7 @@ test("legacy pair-only reviews are visible read-only and their IDs survive writa
     local = null;
     remote.close();
     remote = null;
-    const directory = join(root, "local", ".pymtheg-architecture"),
+    const directory = join(root, "local", ".pymtheg/shared"),
       path = join(directory, "architecture.sqlite");
     const db = new DatabaseSync(path);
     db.exec("DROP TABLE acknowledgement_records; PRAGMA user_version=6");

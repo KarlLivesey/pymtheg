@@ -40,7 +40,7 @@ test("different checkpoint names survive unchanged content without duplicating s
     );
     assert.equal(store.readDraft().draft.baseRevision, first.id);
     const db = new DatabaseSync(
-      join(root, ".pymtheg-architecture", "architecture.sqlite"),
+      join(root, ".pymtheg/shared", "architecture.sqlite"),
     );
     db.exec(
       "CREATE TRIGGER reject_active BEFORE UPDATE ON meta WHEN new.key='active' BEGIN SELECT RAISE(FAIL, 'controlled failure'); END",
@@ -60,10 +60,10 @@ test("different checkpoint names survive unchanged content without duplicating s
 });
 test("v2 migration preserves legacy revision IDs, document bytes and draft references", async () => {
   const root = await mkdtemp(join(tmpdir(), "pym-checkpoint-legacy-")),
-    dir = join(root, ".pymtheg-architecture");
+    dir = join(root, ".pymtheg/shared");
   let store;
   try {
-    await mkdir(dir);
+    await mkdir(dir, { recursive: true });
     const db = new DatabaseSync(join(dir, "architecture.sqlite")),
       doc = { path: "design.md", text: "Legacy design" },
       index = indexArchitecture([doc]);

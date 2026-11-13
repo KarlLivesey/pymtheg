@@ -40,11 +40,11 @@ test("MCP launched without a path recognizes an initialized empty project from i
     const result =
       checked.structuredContent ?? JSON.parse(checked.content[0].text);
     assert.equal(result.exitStatus, 0);
-    assert.deepEqual((await readdir(root)).sort(), [
-      ".pymtheg",
-      ".pymtheg-architecture",
-      ".pymtheg.json",
-      "src",
+    assert.deepEqual((await readdir(root)).sort(), [".pymtheg", "src"]);
+    assert.deepEqual((await readdir(join(root, ".pymtheg"))).sort(), [
+      ".gitignore",
+      "project.json",
+      "settings.json",
     ]);
     assert.equal(
       await readFile(join(root, ".pymtheg/project.json"), "utf8"),
