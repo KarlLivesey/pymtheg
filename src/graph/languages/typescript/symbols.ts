@@ -99,7 +99,12 @@ function commonJsAssignment(node: ts.Node): node is ts.BinaryExpression {
     )
   );
 }
-function rootDeclaration(
+/**
+ * The variable declaration a destructured name belongs to, climbing only
+ * through binding patterns; undefined for a destructured PARAMETER (or any
+ * other holder), so a caller never walks past the pattern.
+ */
+export function rootDeclaration(
   node: ts.BindingElement,
 ): ts.VariableDeclaration | undefined {
   let current: ts.Node = node;

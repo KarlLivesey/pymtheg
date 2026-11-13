@@ -11,6 +11,7 @@ import {
 import typescript, {
   statistics,
 } from "../dist/graph/languages/typescript/index.js";
+import tsCompiler from "typescript";
 
 // Resolution rules of the TypeScript/JavaScript module: each rule has a positive
 // case, a look-alike negative case and, where relevant, an ambiguous case.
@@ -2332,27 +2333,45 @@ test("checker stack limits: warm-up makes a deep chain clean; an overflow stays 
   );
 });
 
-test("a parser stack overflow fails only that file", async (t) => {
-  const nested = `export const x = ${"(".repeat(10000)}1${")".repeat(10000)};\n`;
+test("a parser stack overflow fails only that file, as a transient resource limit", async (t) => {
+  // A nesting depth at which the parser overflows in THIS process (it
+  // depends on the stack size), found by search rather than assumed.
+  let depth = 10000;
+  const nestedAt = (n) =>
+    `export const x = ${"(".repeat(n)}1${")".repeat(n)};\n`;
+  const overflows = (n) => {
+    try {
+      tsCompiler.createSourceFile(
+        "probe.ts",
+        nestedAt(n),
+        tsCompiler.ScriptTarget.Latest,
+        true,
+      );
+      return false;
+    } catch (error) {
+      if (error instanceof RangeError) return true;
+      throw error;
+    }
+  };
+  while (depth <= 1_280_000 && !overflows(depth)) depth *= 2;
+  if (depth > 1_280_000) {
+    t.skip("the parser never overflowed up to 1,280,000 nested parentheses");
+    return;
+  }
   await project(
-    { "nested.ts": nested, "fine.ts": "export function f() {}\nf();\n" },
+    {
+      "nested.ts": nestedAt(depth),
+      "fine.ts": "export function f() {}\nf();\n",
+    },
     async (graph, report) => {
       assert.deepEqual(report.analysisErrors, []);
-      assert.equal(
-        graph.target(graph.link("fine.ts", "f", "calls")),
-        "fine.ts#f",
-      );
-      // Whether 10,000 parentheses overflow the parser depends on the stack.
-      if (graph.store.getFile("nested.ts").result.status !== "failed") {
-        t.skip(
-          "10,000 nested parentheses parsed at this stack size; containment not exercised",
-        );
-        return;
-      }
       assert.deepEqual(report.failed, ["nested.ts"]);
+      const result = graph.store.getFile("nested.ts").result;
+      // An environment limit, not invalid code and not a defect.
+      assert.equal(result.failureKind, "transient");
       assert.match(
-        graph.store.getFile("nested.ts").result.diagnostics[0].message,
-        /parser failed/,
+        result.diagnostics[0].message,
+        /^The TypeScript parser exhausted its stack on this file \(a resource limit of the TypeScript compiler in this environment, not a defect in the file; it is retried on the next index\)$/,
       );
       assert.equal(
         graph.target(graph.link("fine.ts", "f", "calls")),

@@ -890,7 +890,9 @@ export function projectModel(
           } catch (error) {
             failures.set(
               real.slice(1),
-              `The TypeScript parser failed on this file: ${error instanceof Error ? error.message : String(error)}`,
+              error instanceof RangeError && /call stack/i.test(error.message)
+                ? "The TypeScript parser exhausted its stack on this file"
+                : `The TypeScript parser threw on this file: ${error instanceof Error ? error.message : String(error)}`,
             );
             requested.add(real.slice(1));
             return undefined;
