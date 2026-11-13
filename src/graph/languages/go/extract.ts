@@ -24,6 +24,23 @@ import {
 } from "./model.js";
 import { position } from "./failure.js";
 
+/** Node types of the grammar's `_type` (a type, not a value, in that position). */
+const TYPE_NODES = new Set([
+  "type_identifier",
+  "qualified_type",
+  "generic_type",
+  "pointer_type",
+  "struct_type",
+  "interface_type",
+  "array_type",
+  "implicit_length_array_type",
+  "slice_type",
+  "map_type",
+  "channel_type",
+  "function_type",
+  "negated_type",
+  "parenthesized_type",
+]);
 /** Scope nodes: each opens a lexical block whose declarations end with it. */
 const SCOPES = new Set([
   "block",
@@ -555,6 +572,12 @@ export class GoExtractor {
           scope.set(argument.text, { k: "localtype", tp: true });
       typeNode = fieldOf(typeNode, "type");
     }
+    // Go 1.27 generic methods: the method's own type parameters
+    // (`func (T) M[U any]()`) scope like a generic function's, after the
+    // receiver's, so `U` never reads as a package-level type of that name.
+    const typeParameters = fieldOf(node, "type_parameters");
+    for (const [paramName, desc] of this.typeParams(typeParameters))
+      scope.set(paramName, desc);
     const receiverType =
       typeNode?.type === "type_identifier" ? typeNode.text : "?";
     const identity = `(${pointer ? "*" : ""}${receiverType}).${name.text}`;
@@ -564,6 +587,7 @@ export class GoExtractor {
       receiver: receiverType,
       pointer,
       ...this.signatureData(parameters, result, scope),
+      ...(typeParameters ? { generic: true } : {}),
     });
     this.contains("file", key, range(node));
     this.within(key, () =>
@@ -578,6 +602,7 @@ export class GoExtractor {
             k: "val",
             t: { n: receiverType },
           });
+        this.walkTypeParams(typeParameters);
         this.parameters(parameters);
         this.parameters(result);
         const body = fieldOf(node, "body");
@@ -1305,12 +1330,20 @@ export class GoExtractor {
           // only if the builtin is what is called. A package-level declaration in
           // any file may shadow it, so resolution decides: `b` is used only when
           // the name does not resolve to a declaration.
+          // Go 1.26: `new(expr)` takes a value; the grammar keeps the type
+          // reading whenever the argument also reads as a type, so an
+          // expression node here is always a value, and the result points at
+          // that value's type.
           const hint =
-            (callee.text === "new" || callee.text === "make") && args[0]
-              ? this.typedValue(args[0])
-              : callee.text === "append" && args[0]
-                ? this.desc(args[0])
-                : undefined;
+            callee.text === "new" &&
+            args[0] &&
+            !TYPE_NODES.has(unparen(args[0]).type)
+              ? this.desc(args[0])
+              : (callee.text === "new" || callee.text === "make") && args[0]
+                ? this.typedValue(args[0])
+                : callee.text === "append" && args[0]
+                  ? this.desc(args[0])
+                  : undefined;
           if (hint)
             return {
               k: "call",

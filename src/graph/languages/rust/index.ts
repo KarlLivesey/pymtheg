@@ -9,7 +9,7 @@ const TARGET_HINT_LIMIT = 16;
 
 const rust: LanguageModule = {
   id: "rust",
-  version: "20",
+  version: "23",
   extensions: [".rs"],
   contextFiles: ["Cargo.toml"],
   parse: parseRust,
@@ -24,6 +24,17 @@ const rust: LanguageModule = {
       .filter((f) => f.result.status !== "failed")
       .map((f) => {
         const crate = roots.get(f.path);
+        const metadata = (f.result.data ?? {}) as Record<string, Json>;
+        const contexts = (metadata.attributeContexts ?? []) as {
+          sourceConditions?: string[];
+        }[];
+        const initialConditions = (d: Record<string, Json>): string[] => [
+          ...new Set(
+            metadata.hasSourceConditions
+              ? (contexts[Number(d.attributeContext)]?.sourceConditions ?? [])
+              : ((d.conditions ?? []) as string[]),
+          ),
+        ];
         return {
           path: f.path,
           result: {
@@ -37,7 +48,13 @@ const rust: LanguageModule = {
                 opaqueAttributes,
                 ...rest
               } = (l.data ?? {}) as Record<string, Json>;
-              return { ...l, data: rest };
+              return {
+                ...l,
+                data: {
+                  ...rest,
+                  conditions: initialConditions(rest),
+                } as Record<string, Json>,
+              };
             }),
             symbols: f.result.symbols.map((s) => {
               const { underOpaqueAttribute, opaqueAttributes, ...rest } =
@@ -46,6 +63,7 @@ const rust: LanguageModule = {
                 ...s,
                 data: {
                   ...rest,
+                  conditions: initialConditions(rest),
                   ...(s.key === "file"
                     ? {
                         unitKind: crate ? "crate" : "module",

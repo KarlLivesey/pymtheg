@@ -1,4 +1,5 @@
 import ts from "typescript";
+import { rootDeclaration } from "./symbols.js";
 
 /**
  * Same-length renaming of locally bound module-system names in JavaScript.
@@ -843,15 +844,16 @@ export function classify(
       );
     if (ts.isBindingElement(declaration) && isConstBinding(declaration)) {
       const key = declaration.propertyName ?? declaration.name;
-      let root: ts.Node = declaration;
-      while (!ts.isVariableDeclaration(root)) root = root.parent;
+      // Climb only through binding patterns (never past a parameter).
+      const root = rootDeclaration(declaration);
       return (
+        !!root &&
         ts.isIdentifier(key) &&
         key.text === exported &&
         ts.isObjectBindingPattern(declaration.parent) &&
         declaration.parent.parent === root &&
-        !!(root as ts.VariableDeclaration).initializer &&
-        realRequireOf((root as ts.VariableDeclaration).initializer!, modules)
+        !!root.initializer &&
+        realRequireOf(root.initializer, modules)
       );
     }
     if (

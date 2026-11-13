@@ -1,0 +1,240 @@
+[
+  {
+    "name": "explicit import",
+    "files": {
+      "src/lib.rs": "#![no_std] use dep::bind as println;pub struct A; pub struct B; impl A { fn read(self)->u32{11} } impl B { fn read(self)->u32{22} }pub fn run(a:A)->u32 { println!(a); a.read() }"
+    },
+    "external": true,
+    "answer": 22,
+    "unknown": "a.read",
+    "would": "impl B::read"
+  },
+  {
+    "name": "captured glob alias",
+    "files": {
+      "src/lib.rs": "#![no_std] mod prelude { pub use dep::bind as println; } use prelude::*;pub struct A; pub struct B; impl A { fn read(self)->u32{11} } impl B { fn read(self)->u32{22} }pub fn run(a:A)->u32 { println!(a); a.read() }"
+    },
+    "external": true,
+    "answer": 22,
+    "unknown": "a.read",
+    "would": "impl B::read"
+  },
+  {
+    "name": "captured glob original name",
+    "files": {
+      "src/lib.rs": "#![no_std] mod prelude { pub use dep::println; } use prelude::*;pub struct A; pub struct B; impl A { fn read(self)->u32{11} } impl B { fn read(self)->u32{22} }pub fn run(a:A)->u32 { println!(a); a.read() }"
+    },
+    "external": true,
+    "answer": 22,
+    "unknown": "a.read",
+    "would": "impl B::read"
+  },
+  {
+    "name": "nested re-export alias",
+    "files": {
+      "src/lib.rs": "#![no_std] mod origin { pub use dep::bind as renamed; } mod prelude { pub use crate::origin::renamed as println; } use prelude::*;pub struct A; pub struct B; impl A { fn read(self)->u32{11} } impl B { fn read(self)->u32{22} }pub fn run(a:A)->u32 { println!(a); a.read() }"
+    },
+    "external": true,
+    "answer": 22,
+    "unknown": "a.read",
+    "would": "impl B::read"
+  },
+  {
+    "name": "glob of glob",
+    "files": {
+      "src/lib.rs": "#![no_std] mod origin { pub use dep::bind as println; } mod middle { pub use crate::origin::*; } mod prelude { pub use crate::middle::*; } use prelude::*;pub struct A; pub struct B; impl A { fn read(self)->u32{11} } impl B { fn read(self)->u32{22} }pub fn run(a:A)->u32 { println!(a); a.read() }"
+    },
+    "external": true,
+    "answer": 22,
+    "unknown": "a.read",
+    "would": "impl B::read"
+  },
+  {
+    "name": "crate-visible re-export",
+    "files": {
+      "src/lib.rs": "#![no_std] mod prelude { pub(crate) use dep::bind as println; } use prelude::*;pub struct A; pub struct B; impl A { fn read(self)->u32{11} } impl B { fn read(self)->u32{22} }pub fn run(a:A)->u32 { println!(a); a.read() }"
+    },
+    "external": true,
+    "answer": 22,
+    "unknown": "a.read",
+    "would": "impl B::read"
+  },
+  {
+    "name": "extern crate alias",
+    "files": {
+      "src/lib.rs": "#![no_std] mod prelude { extern crate dep as x; pub use x::bind as println; } use prelude::*;pub struct A; pub struct B; impl A { fn read(self)->u32{11} } impl B { fn read(self)->u32{22} }pub fn run(a:A)->u32 { println!(a); a.read() }"
+    },
+    "external": true,
+    "answer": 22,
+    "unknown": "a.read",
+    "would": "impl B::read"
+  },
+  {
+    "name": "block-local glob",
+    "files": {
+      "src/lib.rs": "#![no_std] pub struct A; pub struct B; impl A { fn read(self)->u32{11} } impl B { fn read(self)->u32{22} }pub fn run(a:A)->u32 {mod prelude {pub use dep::bind as println;} use prelude::*; println!(a); a.read() }"
+    },
+    "external": true,
+    "answer": 22,
+    "unknown": "a.read",
+    "would": "impl B::read"
+  },
+  {
+    "name": "unrelated re-export does not shadow std",
+    "files": {
+      "src/lib.rs": "mod unused {pub use dep::bind as println;} pub struct A; pub struct B; impl A { fn read(self)->u32{11} } impl B { fn read(self)->u32{22} }pub fn run(a:A)->u32{println!(); a.read()}"
+    },
+    "external": true,
+    "answer": 11,
+    "definite": {
+      "name": "a.read",
+      "identity": "impl A::read"
+    }
+  },
+  {
+    "name": "known value namespace through glob does not shadow std",
+    "files": {
+      "src/lib.rs": "mod prelude {pub fn println(){}} use prelude::*; pub struct A; pub struct B; impl A { fn read(self)->u32{11} } impl B { fn read(self)->u32{22} }pub fn run(a:A)->u32{println!();a.read()}"
+    },
+    "external": true,
+    "answer": 11,
+    "definite": {
+      "name": "a.read",
+      "identity": "impl A::read"
+    }
+  },
+  {
+    "name": "readable macro_use module shadows std",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{10} #[macro_use] mod macros; pub fn run()->u32 {println!(); helper()}",
+      "src/macros.rs": "macro_rules! println { () => { fn helper()->u32{20} }; }"
+    },
+    "answer": 20,
+    "unknown": "helper",
+    "would": "helper"
+  },
+  {
+    "name": "known limit E4: failed macro_use module before site assumed not to shadow std",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{10} #[macro_use] mod macros; pub fn run()->u32 {println!(); helper()} mod later;",
+      "src/macros.rs": "macro_rules! println { () => { fn helper()->u32{20} }; } pub fn broken( {",
+      "src/later.rs": ""
+    },
+    "nativeFiles": {
+      "src/macros.rs": "macro_rules! println { () => { fn helper()->u32{20} }; }"
+    },
+    "answer": 20,
+    "knownLimit": "E4 assumes failed/unverified textual entries do not rebind standard macro names. Native readable replacement calls the macro-generated helper, but captured graph intentionally links the visible helper.",
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    }
+  },
+  {
+    "name": "known limit E4: failed textual chain flows into child file",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{10} #[macro_use] mod macros; mod later; pub use later::run;",
+      "src/macros.rs": "macro_rules! println { () => { fn helper()->u32{20} }; } pub fn broken( {",
+      "src/later.rs": "use crate::helper; pub fn run()->u32 {println!(); helper()}"
+    },
+    "nativeFiles": {
+      "src/macros.rs": "macro_rules! println { () => { fn helper()->u32{20} }; }"
+    },
+    "answer": 20,
+    "knownLimit": "E4 assumes failed/unverified textual entries do not rebind standard macro names. Native readable replacement calls the macro-generated helper, but captured graph intentionally links the visible helper.",
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    }
+  },
+  {
+    "name": "known limit E4: failed nested macro_use chain",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{10} #[macro_use] mod outer; mod later; pub use later::run;",
+      "src/outer.rs": "#[macro_use] mod macros;",
+      "src/outer/macros.rs": "macro_rules! println { () => { fn helper()->u32{20} }; } pub fn broken( {",
+      "src/later.rs": "use crate::helper; pub fn run()->u32 {println!(); helper()}"
+    },
+    "nativeFiles": {
+      "src/outer/macros.rs": "macro_rules! println { () => { fn helper()->u32{20} }; }"
+    },
+    "answer": 20,
+    "knownLimit": "E4 assumes failed/unverified textual entries do not rebind standard macro names. Native readable replacement calls the macro-generated helper, but captured graph intentionally links the visible helper.",
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    }
+  },
+  {
+    "name": "failed module after the site does not shadow std",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{10} pub fn run()->u32 {println!(); helper()} #[macro_use] mod macros;",
+      "src/macros.rs": "macro_rules! println { () => { fn helper()->u32{20} }; } pub fn broken( {"
+    },
+    "nativeFiles": {
+      "src/macros.rs": "macro_rules! println { () => { fn helper()->u32{20} }; }"
+    },
+    "answer": 10,
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    }
+  },
+  {
+    "name": "cfg false failed module does not shadow std",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{10} #[cfg(any())] #[macro_use] mod macros; pub fn run()->u32 {println!(); helper()}",
+      "src/macros.rs": "macro_rules! println { () => { fn helper()->u32{20} }; } pub fn broken( {"
+    },
+    "answer": 10,
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    }
+  },
+  {
+    "name": "known limit E4: unknown cfg failed module assumed not to shadow std",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{10} #[cfg(feature=\"x\")] #[macro_use] mod macros; pub fn run()->u32 {println!(); helper()}",
+      "src/macros.rs": "macro_rules! println { () => { fn helper()->u32{20} }; } pub fn broken( {"
+    },
+    "nativeFiles": {
+      "src/macros.rs": "macro_rules! println { () => { fn helper()->u32{20} }; }"
+    },
+    "answer": 10,
+    "featureAnswer": 20,
+    "knownLimit": "E4 assumes failed/unverified textual entries do not rebind standard macro names. Native readable replacement calls the macro-generated helper, but captured graph intentionally links the visible helper.",
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    }
+  },
+  {
+    "name": "known limit E4: failed file inner macro_use assumed not to shadow std",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{10} mod macros; pub fn run()->u32 {println!(); helper()}",
+      "src/macros.rs": "#![macro_use] macro_rules! println { () => { fn helper()->u32{20} }; } pub fn broken( {"
+    },
+    "nativeFiles": {
+      "src/macros.rs": "#![macro_use] macro_rules! println { () => { fn helper()->u32{20} }; }"
+    },
+    "answer": 20,
+    "knownLimit": "E4 assumes failed/unverified textual entries do not rebind standard macro names. Native readable replacement calls the macro-generated helper, but captured graph intentionally links the visible helper.",
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    }
+  },
+  {
+    "name": "E4 unverified module layout preserves the standard exemption",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{10} #[path=\"./macros.rs\"] #[macro_use] mod macros; pub fn run()->u32 {println!(); helper()}",
+      "src/macros.rs": ""
+    },
+    "answer": 10,
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    }
+  }
+]
