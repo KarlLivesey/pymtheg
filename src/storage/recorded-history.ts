@@ -16,6 +16,7 @@ export interface SharedRecord {
   kind: string;
   key: string;
   hash: string | null;
+  previous?: string;
 }
 export interface RecordedChange {
   id: string;
@@ -42,6 +43,7 @@ export function compareRecordedChanges(
 }
 export function initializeRecordedHistory(db: DatabaseSync): void {
   db.exec(`CREATE TABLE IF NOT EXISTS shared_record_ids(kind TEXT,key TEXT,id TEXT NOT NULL UNIQUE,hash TEXT,PRIMARY KEY(kind,key));
+    CREATE TABLE IF NOT EXISTS shared_record_lineage(id TEXT PRIMARY KEY,kind TEXT NOT NULL,key TEXT NOT NULL,previous TEXT);
     CREATE TABLE IF NOT EXISTS recorded_changes(id TEXT PRIMARY KEY,sequence INTEGER NOT NULL,body TEXT NOT NULL);`);
 }
 export function recordedHistoryBytes(db: DatabaseSync): number {
@@ -51,7 +53,21 @@ export function recordedHistoryBytes(db: DatabaseSync): number {
       .get()
   )
     return 0;
+  const lineageBytes = db
+    .prepare(
+      "SELECT name FROM sqlite_master WHERE name='shared_record_lineage'",
+    )
+    .get()
+    ? Number(
+        db
+          .prepare(
+            "SELECT coalesce(sum(length(CAST(id||kind||key||coalesce(previous,'') AS BLOB))),0) AS n FROM shared_record_lineage",
+          )
+          .get()!.n,
+      )
+    : 0;
   return (
+    lineageBytes +
     Number(
       db
         .prepare(
@@ -82,6 +98,28 @@ export function exportRecordedHistory(db: DatabaseSync) {
   const records = db
     .prepare("SELECT id,kind,key,hash FROM shared_record_ids ORDER BY id")
     .all() as unknown as SharedRecord[];
+  if (
+    db
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE name='shared_record_lineage'",
+      )
+      .get()
+  ) {
+    const byId = new Map(records.map((record) => [record.id, record]));
+    for (const row of db
+      .prepare("SELECT id,kind,key,previous FROM shared_record_lineage")
+      .all()) {
+      const record = byId.get(String(row.id)) ?? {
+        id: String(row.id),
+        kind: String(row.kind),
+        key: String(row.key),
+        hash: null,
+      };
+      if (row.previous !== null) record.previous = String(row.previous);
+      if (!byId.has(record.id)) records.push(record);
+    }
+    records.sort((a, b) => compare(a.id, b.id));
+  }
   const changes = db
     .prepare("SELECT body FROM recorded_changes")
     .all()
@@ -110,7 +148,11 @@ export class RecordedHistory {
     return time;
   }
   record(kind: string, key: string, value: unknown, checkpoint: string | null) {
-    this.commit([[kind, key, digest(value)]], checkpoint, false);
+    this.commit(
+      [[kind, key, value === null ? null : digest(value)]],
+      checkpoint,
+      false,
+    );
   }
   capture(index: ArchitectureIndex, checkpoint: string, time: string) {
     const records: [string, string, string][] = index.documents.map((d) => [
@@ -140,10 +182,10 @@ export class RecordedHistory {
     this.commit(records, checkpoint, true, time);
   }
   private commit(
-    values: [string, string, string][],
+    values: [string, string, string | null][],
     checkpoint: string | null,
     replace: boolean,
-    time = this.now(),
+    time?: string,
   ) {
     if (!this.db.isTransaction)
       throw Error("Recorded changes require a transaction");
@@ -159,15 +201,25 @@ export class RecordedHistory {
     const deltas: RecordedChange["changes"] = [];
     const retained = new Set<string>();
     const put = this.db.prepare(
-      "INSERT INTO shared_record_ids VALUES(?,?,?,?) ON CONFLICT(kind,key) DO UPDATE SET hash=excluded.hash",
+      "INSERT INTO shared_record_ids VALUES(?,?,?,?) ON CONFLICT(kind,key) DO UPDATE SET id=excluded.id,hash=excluded.hash",
     );
     for (const [kind, key, hash] of values) {
       const token = JSON.stringify([kind, key]);
       if (retained.has(token)) continue;
       retained.add(token);
       const before = previous.get(token);
-      const id = before?.id ?? randomUUID();
-      if (before?.hash === hash) continue;
+      if (before?.hash === hash || (!before && hash === null)) continue;
+      const id = before && before.hash !== null ? before.id : randomUUID();
+      if (before && before.hash === null) {
+        this.db
+          .prepare(
+            "INSERT OR IGNORE INTO shared_record_lineage VALUES(?,?,?,NULL)",
+          )
+          .run(before.id, kind, key);
+        this.db
+          .prepare("INSERT INTO shared_record_lineage VALUES(?,?,?,?)")
+          .run(id, kind, key, before.id);
+      }
       put.run(kind, key, id, hash);
       deltas.push({ record: id, before: before?.hash ?? null, after: hash });
     }
@@ -183,6 +235,7 @@ export class RecordedHistory {
             .run(record.id);
           deltas.push({ record: record.id, before: record.hash, after: null });
         }
+    if (!deltas.length) return;
     const sequence = Number(
       this.db
         .prepare(
@@ -196,7 +249,7 @@ export class RecordedHistory {
       id: randomUUID(),
       sequence,
       origin: this.writer.origin,
-      time,
+      time: time ?? this.now(),
       checkpoint,
       changes: deltas.sort((a, b) => compare(a.record, b.record)),
     };

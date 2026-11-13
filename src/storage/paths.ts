@@ -18,6 +18,8 @@ export function sharedProjectPath(root: string, path: string): string {
     ? relative(root, path).split(sep).join("/")
     : path;
   if (
+    !candidate ||
+    candidate === "." ||
     win32.isAbsolute(candidate) ||
     isAbsolute(candidate) ||
     candidate.includes("\\") ||

@@ -1,7 +1,10 @@
+import { createHash } from "node:crypto";
+import { localHistoryWriter } from "../dist/storage/writer.js";
+import { sharedProjectPath } from "../dist/storage/paths.js";
 import { StudioService } from "../dist/studio/service.js";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, readFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { ArchitectureStore } from "../dist/architecture/store.js";
@@ -47,7 +50,10 @@ function plan(title = "Requirement", linked = true) {
 }
 const entity = (records, name) =>
   records.find(
-    (r) => r.kind === "entity" && JSON.parse(r.key)[1] === `plan:${name}`,
+    (r) =>
+      r.kind === "entity" &&
+      r.hash !== null &&
+      JSON.parse(r.key)[1] === `plan:${name}`,
   );
 
 test("two machines export globally distinct identities and deterministic change order despite tied/backward clocks", () =>
@@ -126,7 +132,7 @@ test("two machines export globally distinct identities and deterministic change 
     }
   }));
 
-test("IDs survive edits, removal/reappearance, reopen and a different actor; changes retain immutable before/after hashes", () =>
+test("Edits and reopen keep IDs; re-added links get new linked IDs and immutable change receipts", () =>
   fixture(async (root) => {
     const w = writer("machine-A");
     let store = await ArchitectureStore.open(root, { writer: w });
@@ -157,7 +163,13 @@ test("IDs survive edits, removal/reappearance, reopen and a different actor; cha
       store.save("linked again", "local", plan());
       const after = store.exportRecordedHistory();
       assert.equal(entity(after.records, "R1").id, requirement.id);
-      assert.equal(after.records.find((r) => r.id === link.id).hash, link.hash);
+      assert.equal(after.records.find((r) => r.id === link.id).hash, null);
+      const readded = after.records.find(
+        (r) => r.kind === "link" && r.hash !== null,
+      );
+      assert.notEqual(readded.id, link.id);
+      assert.equal(readded.hash, link.hash);
+      assert.equal(readded.previous, link.id);
       assert.deepEqual(after.changes[0], before.changes[0]);
       assert.equal(after.changes.at(-1).sequence, 4);
       assert.equal(after.changes.at(-1).origin.author, "Bob");
@@ -383,5 +395,203 @@ test("Studio persists shared recovery buffer/context paths relative to the proje
       assert.equal(service.readRecovery().revision, 1);
     } finally {
       await service.close();
+    }
+  }));
+
+for (const [label, lookupValue, environment, expected] of [
+  [
+    "failed lookup prefers USER",
+    null,
+    { USER: " CI author ", LOGNAME: "Other" },
+    "CI author",
+  ],
+  [
+    "failed lookup uses LOGNAME",
+    null,
+    { USER: " ", LOGNAME: "Build bot" },
+    "Build bot",
+  ],
+  ["empty lookup falls back", "", { USER: "Container user" }, "Container user"],
+  ["missing passwd and environment", null, {}, "Unknown author"],
+  ["empty names", " ", { USER: " ", LOGNAME: "" }, "Unknown author"],
+  [
+    "successful lookup wins",
+    " Named author ",
+    { USER: "Other" },
+    "Named author",
+  ],
+]) {
+  test(`local writer: ${label}; existing identity never repeats lookup`, () =>
+    fixture(async (root) => {
+      let calls = 0;
+      const lookupAuthor = () => {
+        calls++;
+        if (lookupValue === null)
+          throw Error("uv_os_get_passwd returned ENOENT");
+        return lookupValue;
+      };
+      const first = localHistoryWriter(root, { lookupAuthor, environment });
+      assert.equal(first.origin.author, expected);
+      assert.equal(calls, 1);
+      const file = join(root, ".pymtheg/local/writer.json");
+      await writeFile(
+        file,
+        JSON.stringify({ ...first.origin, author: "Configured author" }),
+      );
+      const reopened = localHistoryWriter(root, { lookupAuthor, environment });
+      assert.equal(calls, 1);
+      assert.deepEqual(reopened.origin, {
+        ...first.origin,
+        author: "Configured author",
+      });
+    }));
+}
+
+test("a removed requirement key gets a new UUID with an unbroken previous chain; ordinary edits keep it", () =>
+  fixture(async (root) => {
+    const store = await ArchitectureStore.open(root, {
+      writer: writer("machine-A"),
+    });
+    const requirement = (title) => [
+      {
+        path: "requirements.json",
+        text: JSON.stringify({
+          schema: "pymtheg.plan/v1",
+          items: [{ ...newPlanItem("R3"), title }],
+        }),
+      },
+    ];
+    const empty = [
+      {
+        path: "requirements.json",
+        text: JSON.stringify({ schema: "pymtheg.plan/v1", items: [] }),
+      },
+    ];
+    try {
+      store.save("first", "local", requirement("Encrypt backups"));
+      const first = entity(store.exportRecordedHistory().records, "R3");
+      store.save("removed", "local", empty);
+      store.save(
+        "unrelated",
+        "local",
+        requirement("Expose Prometheus metrics"),
+      );
+      const second = entity(store.exportRecordedHistory().records, "R3");
+      assert.notEqual(second.id, first.id);
+      assert.equal(second.previous, first.id);
+      assert.equal(
+        store.exportRecordedHistory().records.find((r) => r.id === first.id)
+          .hash,
+        null,
+      );
+      store.save("edited", "local", requirement("Expose more metrics"));
+      assert.equal(
+        entity(store.exportRecordedHistory().records, "R3").id,
+        second.id,
+      );
+      store.save("removed again", "local", empty);
+      store.save("third", "local", requirement("Another requirement"));
+      const all = store.exportRecordedHistory().records;
+      assert.equal(entity(all, "R3").previous, second.id);
+      assert.equal(all.find((r) => r.id === second.id).previous, first.id);
+      assert.equal(all.find((r) => r.id === second.id).hash, null);
+      assert.equal(all.find((r) => r.id === first.id).hash, null);
+    } finally {
+      store.close();
+    }
+  }));
+
+test("unchanged draft writes and repeated empty clears append no receipt, and receipt failure rolls the draft back", () =>
+  fixture(async (root) => {
+    const store = await ArchitectureStore.open(root, {
+      writer: writer("machine-A"),
+    });
+    const draft = {
+      kind: "document",
+      baseRevision: "",
+      label: "draft",
+      document: { path: "draft.md", text: "unfinished" },
+    };
+    try {
+      store.saveDraft(0, null);
+      assert.equal(store.exportRecordedHistory().changes.length, 0);
+      store.saveDraft(1, draft);
+      const before = store.exportRecordedHistory();
+      store.saveDraft(2, draft);
+      assert.deepEqual(store.exportRecordedHistory(), before);
+      const db = openDatabase(storagePath(root, "planning"));
+      db.exec(
+        "CREATE TRIGGER reject_draft_receipt BEFORE INSERT ON recorded_changes BEGIN SELECT RAISE(ABORT,'reject draft receipt'); END",
+      );
+      db.close();
+      assert.throws(
+        () => store.saveDraft(3, { ...draft, label: "Changed" }),
+        /reject draft receipt/,
+      );
+      assert.equal(store.readDraft().version, 3);
+      assert.deepEqual(store.readDraft().draft, draft);
+      assert.deepEqual(store.exportRecordedHistory(), before);
+      const cleanup = openDatabase(storagePath(root, "planning"));
+      cleanup.exec("DROP TRIGGER reject_draft_receipt");
+      cleanup.close();
+      store.saveDraft(3, null);
+      const cleared = store.exportRecordedHistory();
+      assert.equal(cleared.changes.length, before.changes.length + 1);
+      store.saveDraft(4, null);
+      assert.deepEqual(store.exportRecordedHistory(), cleared);
+    } finally {
+      store.close();
+    }
+  }));
+
+test("project root is not a shared file path, while an explicitly unanswered path remains empty", () =>
+  fixture(async (root) => {
+    assert.throws(() => sharedProjectPath(root, root), /Shared paths/);
+    assert.throws(() => sharedProjectPath(root, "."), /Shared paths/);
+    assert.equal(sharedProjectPath(root, ""), "");
+  }));
+
+test("unchanged legacy drafts do not invent registrations or receipts", () =>
+  fixture(async (root) => {
+    for (const draft of [
+      null,
+      {
+        kind: "document",
+        baseRevision: "",
+        label: "legacy",
+        document: { path: "draft.md", text: "unfinished" },
+      },
+    ]) {
+      const directory = join(root, draft ? "populated" : "empty");
+      await mkdir(directory);
+      let store = await ArchitectureStore.open(directory, {
+        writer: writer("machine-A"),
+      });
+      store.saveDraft(0, draft);
+      store.close();
+      const db = openDatabase(storagePath(directory, "planning"));
+      db.exec(
+        "DELETE FROM recorded_changes; DELETE FROM shared_record_ids; DELETE FROM shared_record_lineage",
+      );
+      if (draft === null)
+        db.prepare("INSERT INTO shared_record_ids VALUES(?,?,?,?)").run(
+          "architecture-draft",
+          "active",
+          "00000000-0000-4000-8000-000000000001",
+          createHash("sha256").update("null").digest("hex"),
+        );
+      db.close();
+      store = await ArchitectureStore.open(directory, {
+        writer: writer("machine-B"),
+      });
+      try {
+        const before = store.exportRecordedHistory();
+        store.saveDraft(1, draft);
+        assert.deepEqual(store.exportRecordedHistory(), before);
+        assert.equal(store.readDraft().version, 2);
+        assert.deepEqual(store.readDraft().draft, draft);
+      } finally {
+        store.close();
+      }
     }
   }));

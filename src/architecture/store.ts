@@ -1405,12 +1405,13 @@ export class ArchitectureStore {
           "INSERT INTO authoring_draft VALUES('active',?,?) ON CONFLICT(key) DO UPDATE SET version=excluded.version,json=excluded.json",
         )
         .run(expectedVersion + 1, text);
-      this.recorded!.record(
-        "architecture-draft",
-        "active",
-        draft,
-        this.activeRevisionId(),
-      );
+      if (JSON.stringify(current.draft) !== text)
+        this.recorded!.record(
+          "architecture-draft",
+          "active",
+          draft,
+          this.activeRevisionId(),
+        );
       this.db.exec("COMMIT");
       return { version: expectedVersion + 1, draft };
     } catch (error) {
