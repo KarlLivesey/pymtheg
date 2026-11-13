@@ -1982,6 +1982,10 @@ class GoResolver {
     let passes = 0;
     for (const method of methods) {
       if (method.kind !== "method") continue;
+      // A method with its own type parameters (Go 1.27) is never in a method
+      // set that satisfies an interface: interface methods cannot have type
+      // parameters, so Go reports "wrong type for method".
+      if (ownTypeParameters(method)) continue;
       const term = (method.data as { sig?: TypeTerm } | undefined)?.sig;
       if (term?.k === "fn" && sig.k === "fn") {
         if (term.r.length !== sig.r.length) continue;
@@ -3049,6 +3053,7 @@ class GoResolver {
             out.push(
               ...(this.methodsByName.get(name) ?? []).filter(
                 (method) =>
+                  !ownTypeParameters(method) &&
                   (exported(name) || this.pkgOf(method)?.key === access) &&
                   specs.some((spec) => countsMatch(spec, method)),
               ),
@@ -3230,6 +3235,14 @@ function identical(a: Identity, b: Identity): boolean | undefined {
  * The crude, over-inclusive signature test: the same number of results, and of
  * parameters unless either is variadic, where both signatures are known.
  */
+/** A method declared with its own type parameters (`func (T) M[U any]()`). */
+function ownTypeParameters(method: GraphSymbol): boolean {
+  return (
+    method.kind === "method" &&
+    !!(method.data as { generic?: boolean } | undefined)?.generic
+  );
+}
+
 function countsMatch(a: GraphSymbol, b: GraphSymbol): boolean {
   const x = (a.data as { sig?: TypeTerm } | undefined)?.sig;
   const y = (b.data as { sig?: TypeTerm } | undefined)?.sig;

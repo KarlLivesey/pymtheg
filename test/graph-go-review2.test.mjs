@@ -302,8 +302,8 @@ test("8: the builtin flag is set only when the builtin is what is called", async
     "p/p.go": lines(
       "package p",
       "func new(v int) int { return v }",
-      // `new(1)` would misparse (tree-sitter-go reads `new(` as the builtin); an
-      // identifier argument parses, as in restic's termstatus.
+      // An identifier argument, as in restic's termstatus (`new(1)` parses too
+      // since the vendored grammar, W2-S; see graph-go-grammar.test.mjs).
       "func Use(xs []int, v int) { _ = new(v); _ = len(xs); _ = make([]int, 0) }",
     ),
     "p/len_test.go": lines(

@@ -1,5 +1,6 @@
 import { posix } from "node:path";
-import { createTagsParser, tagsFromPackage } from "../../tree-sitter.js";
+import { fileURLToPath } from "node:url";
+import { createTagsParser } from "../../tree-sitter.js";
 import type {
   AnalyzedFile,
   Diagnostic,
@@ -18,6 +19,15 @@ const ID = "go";
 /** Key of the one package symbol hosted per directory package (added by analyze). */
 const PACKAGE_KEY = "package";
 
+/**
+ * The vendored, patched grammar (grammars/go: upstream v0.25.0 + PRs #202 and
+ * #198, see its manifest.json and docs/changes/W2-S.md). Resolved from this
+ * file so it works from dist/ and from the installed package alike.
+ */
+const GRAMMAR = fileURLToPath(
+  new URL("../../../../grammars/go/tree-sitter-go.wasm", import.meta.url),
+);
+
 type Helper = { parse(text: string): ParseResult };
 let helper: Promise<Helper> | undefined;
 let pending: SourceInput | undefined;
@@ -28,12 +38,8 @@ let pending: SourceInput | undefined;
  */
 function parser(): Promise<Helper> {
   helper ??= (async () => {
-    const assets = await tagsFromPackage(
-      "tree-sitter-go",
-      "tree-sitter-go.wasm",
-    );
     return createTagsParser({
-      wasmPath: assets.wasmPath,
+      wasmPath: GRAMMAR,
       query: "(package_clause) @package",
       secondPass({ tree, result }) {
         const source = pending!;
@@ -279,7 +285,7 @@ function analyze({
 
 const go: LanguageModule = {
   id: ID,
-  version: "22",
+  version: "23",
   extensions: [".go"],
   contextFiles: ["go.mod", "go.work"],
   parse,

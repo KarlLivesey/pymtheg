@@ -14,8 +14,14 @@ const samples = [
   {
     package: "tree-sitter-go",
     wasm: "tree-sitter-go.wasm",
+    // The Go module loads the vendored, patched build (grammars/go, W2-S);
+    // the npm package still supplies the tags query checked against it.
+    vendored: new URL("../grammars/go/tree-sitter-go.wasm", import.meta.url)
+      .pathname,
     node: "function_declaration",
-    source: "package example\nfunc greet() int { return 42 }\n",
+    // Go 1.26 `new(expr)`: only the vendored build reads it.
+    source:
+      "package example\nfunc greet() int { return 42 }\nvar p = new(42)\n",
   },
   {
     package: "tree-sitter-rust",
@@ -43,7 +49,7 @@ for (const sample of samples) {
     await readFile(require.resolve(`${sample.package}/package.json`), "utf8"),
   );
   const language = await Language.load(
-    require.resolve(`${sample.package}/${sample.wasm}`),
+    sample.vendored ?? require.resolve(`${sample.package}/${sample.wasm}`),
   );
   const parser = new Parser();
   let tree;
@@ -81,7 +87,7 @@ for (const sample of samples) {
       `${sample.package}: no definition of sample function`,
     );
     console.log(
-      `PASS ${sample.package}@${metadata.version}: ABI ${language.abiVersion}; ` +
+      `PASS ${sample.vendored ? `${sample.package} (vendored grammars/go; npm ${metadata.version} queries)` : `${sample.package}@${metadata.version}`}: ABI ${language.abiVersion}; ` +
         `no parse errors; named ${sample.node}; ` +
         `tags.scm definitions: ${definitions.map((capture) => capture.name).join(", ")}`,
     );

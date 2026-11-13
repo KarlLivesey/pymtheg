@@ -68,6 +68,10 @@
     "pymtheg",
     "README.md",
     "examples/workbench/",
-    "examples/plugins/"
+    "examples/plugins/",
+    "grammars/*/tree-sitter-*.wasm",
+    "grammars/*/manifest.json",
+    "grammars/*/LICENSE",
+    "grammars/README.md"
   ]
 }
