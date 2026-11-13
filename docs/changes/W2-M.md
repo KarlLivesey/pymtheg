@@ -116,3 +116,38 @@ and malformed facts; every case retries unchanged content after reopening and
 succeeds. These use deterministic calls, not real timeouts or elapsed assertions.
 
 Final command results and logs are recorded in `evidence/w2-m/README.md`.
+
+## Round 1 hardening before confirmation
+
+Merged the moved `origin/main` with a normal merge before this pass. Failure
+markers now carry the content hash, module ID and module version, and a cache
+lookup joins them to the current file row and requires all three to match.
+A stale marker left by a writer that only rewrites a file body cannot suppress
+parsing of changed content. Lookups also require a failed content result. Direct
+`replaceFile` without the cache argument still clears provenance. Early path-only
+marker tables gain nullable key columns in a transaction; their unverified old
+markers miss until the parser records fresh provenance. No old marker is promoted
+using the current file's keys: that could bless a stale marker accidentally.
+
+New hardening tests exercise each mismatched key, changed content with a retained
+old marker, direct replacement, and reopening/upgrading path-only markers. They
+also verify the no-tree Tree-sitter result is transient; reject `"Transient"` as
+an invalid failure kind; inspect both the indexer's cache request and the raw
+marker table for transient analysis; and exclude a partial file next to a failed
+file before and after reopening. The injected-string-ceiling test now directly
+runs `resolveLinks` through changed targets, unchanged equality and clearing.
+Evidence and final checks for this pass are in `evidence/w2-m/round-2/`.
+
+Follow-up for the docs chunk (outside this chunk's owned documentation):
+
+- `docs/changes/W1-C.md:277` and `docs/changes/W2-I.md:93` describe the old
+  “failed parses are retried” contract. Preserve their historical evidence while
+  clearly linking/superseding that contract with content-failure caching here.
+- `docs/support.md` and `docs/decisions.md` still need entries for content-failure
+  caching, retryable operational failures, and the `failedFiles()` read API.
+
+All nine targeted mutations now fail their regression assertions: removing any
+one provenance comparison, no-tree transience, failure-kind validation, the
+indexer or store transient guard, failed-only query filtering, or row-wise
+`resolveLinks` equality. The reproducible harness restores generated JS in finally;
+production source is never mutated, and the final full suite rebuilds it.

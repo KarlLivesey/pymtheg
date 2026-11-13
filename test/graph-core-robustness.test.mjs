@@ -41,7 +41,18 @@ test("module analysis uses row-sized JSON on writes, equality, reads and reopen"
       hash: "hash",
       module: "x",
       version: "1",
-      result: clean(),
+      result: {
+        ...clean(),
+        symbols: [
+          {
+            key: "target",
+            name: "target",
+            identity: "target",
+            kind: "function",
+            range: { start: 0, end: 1 },
+          },
+        ],
+      },
     });
     const links = Array.from({ length: 300 }, (_, i) => ({
       key: String(i),
@@ -79,6 +90,18 @@ test("module analysis uses row-sized JSON on writes, equality, reads and reopen"
       assert.deepEqual(await readFile(database), before);
       store = reopen();
       assert.equal(store.links().length, links.length);
+      const targetId = store.findSymbols()[0].id;
+      store.resolveLinks(
+        store.links().map((link) => ({ linkId: link.id, targetId })),
+      );
+      assert.ok(store.links().every((link) => link.targetId === targetId));
+      store.resolveLinks(
+        store.links().map((link) => ({ linkId: link.id, targetId })),
+      );
+      store.resolveLinks([]);
+      assert.ok(
+        store.links().every((link) => link.resolution === "unresolved"),
+      );
       store.replaceAnalysis("x", result);
       const changed = {
         ...result,

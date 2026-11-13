@@ -51,7 +51,7 @@ export class SqliteGraphStore implements GraphStorage {
         throw Error("Unsupported graph schema; rebuild the index");
       this.db
         .exec(`CREATE TABLE IF NOT EXISTS graph_files(path TEXT PRIMARY KEY,body TEXT NOT NULL,status TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS graph_parse_failures(path TEXT PRIMARY KEY REFERENCES graph_files(path) ON DELETE CASCADE);
+        CREATE TABLE IF NOT EXISTS graph_parse_failures(path TEXT PRIMARY KEY REFERENCES graph_files(path) ON DELETE CASCADE,hash TEXT,module TEXT,version TEXT);
         CREATE TABLE IF NOT EXISTS graph_contexts(path TEXT PRIMARY KEY,body TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS graph_symbols(id TEXT PRIMARY KEY,file TEXT NOT NULL REFERENCES graph_files(path) ON DELETE CASCADE,name TEXT NOT NULL,kind TEXT NOT NULL,body TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS graph_links(id TEXT PRIMARY KEY,file TEXT NOT NULL REFERENCES graph_files(path) ON DELETE CASCADE,source TEXT REFERENCES graph_symbols(id) ON DELETE CASCADE,target TEXT REFERENCES graph_symbols(id) ON DELETE SET NULL,kind TEXT NOT NULL,body TEXT NOT NULL,module TEXT NOT NULL,origin TEXT NOT NULL,resolution TEXT NOT NULL);
@@ -83,6 +83,24 @@ export class SqliteGraphStore implements GraphStorage {
         END;
         CREATE INDEX IF NOT EXISTS graph_link_source ON graph_links(source,kind);
         CREATE INDEX IF NOT EXISTS graph_link_target ON graph_links(target,kind);`);
+      // Path-only markers from early W2-M builds have unknown provenance. Adding
+      // nullable columns makes them cache misses until a successful parse stamps them.
+      const markerColumns = new Set(
+        this.db
+          .prepare("PRAGMA table_info(graph_parse_failures)")
+          .all()
+          .map((row) => row.name),
+      );
+      if (
+        ["hash", "module", "version"].some((name) => !markerColumns.has(name))
+      )
+        this.transaction(() => {
+          for (const name of ["hash", "module", "version"])
+            if (!markerColumns.has(name))
+              this.db.exec(
+                `ALTER TABLE graph_parse_failures ADD COLUMN ${name} TEXT`,
+              );
+        });
       this.db
         .prepare("INSERT OR IGNORE INTO graph_meta VALUES ('project',?)")
         .run(projectId ?? randomUUID());
@@ -162,7 +180,14 @@ export class SqliteGraphStore implements GraphStorage {
   }
   isParseFailure(path: string): boolean {
     return !!this.db
-      .prepare("SELECT path FROM graph_parse_failures WHERE path=?")
+      .prepare(
+        `SELECT p.path FROM graph_parse_failures p JOIN graph_files f ON f.path=p.path
+        WHERE p.path=? AND f.status='failed'
+        AND p.hash=json_extract(f.body,'$.hash')
+        AND p.module=json_extract(f.body,'$.module')
+        AND p.version=json_extract(f.body,'$.version')
+        AND coalesce(json_extract(f.body,'$.result.failureKind'),'content')='content'`,
+      )
       .get(path);
   }
   failedFiles(): FailedFile[] {
@@ -211,8 +236,10 @@ export class SqliteGraphStore implements GraphStorage {
         file.result.failureKind !== "transient"
       )
         this.db
-          .prepare("INSERT INTO graph_parse_failures VALUES (?)")
-          .run(file.path);
+          .prepare(
+            "INSERT INTO graph_parse_failures (path,hash,module,version) VALUES (?,?,?,?)",
+          )
+          .run(file.path, file.hash, file.module, file.version);
       const insert = this.db.prepare(
         "INSERT INTO graph_symbols VALUES (?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,kind=excluded.kind,body=excluded.body",
       );
