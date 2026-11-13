@@ -52,7 +52,7 @@ const guidance: Record<
     title: "A source file was skipped during caller discovery",
     why: "The selected source can still be checked, but the importer inventory may be incomplete.",
     nextStep:
-      "Repair the named file or narrow sources.include/exclude in .pymtheg.json. Use entry scope when you only want the selected import closure.",
+      "Repair the named file or narrow sources.include/exclude in .pymtheg/settings.json. Use entry scope when you only want the selected import closure.",
   },
   L002: {
     title: "These imports form a cycle",

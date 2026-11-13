@@ -247,8 +247,9 @@ test("printed verify commands keep --scenario for the checked file", () => {
   try {
     const file = join(root, "broken.pym");
     writeFileSync(file, broken);
+    mkdirSync(join(root, ".pymtheg"));
     writeFileSync(
-      join(root, ".pymtheg.json"),
+      join(root, ".pymtheg", "settings.json"),
       JSON.stringify({
         version: 1,
         scenarios: { small: { file: "broken.pym", entry: "Dedup" } },
@@ -310,8 +311,9 @@ function withScenario(source, scenario, body) {
   try {
     const file = join(root, "mixed.pym");
     writeFileSync(file, source);
+    mkdirSync(join(root, ".pymtheg"));
     writeFileSync(
-      join(root, ".pymtheg.json"),
+      join(root, ".pymtheg", "settings.json"),
       JSON.stringify({
         version: 1,
         scenarios: { small: { file: "mixed.pym", ...scenario } },
@@ -390,4 +392,24 @@ test("more than five machines: the remainder is counted, singular for one", () =
     const { stdout } = run("check", file);
     assert.match(stdout, /^ {2}and 2 more machines$/m);
   });
+});
+
+test("source-discovery guidance points at .pymtheg/settings.json", () => {
+  const explain = findingPresenter({
+    snapshot: { files: [] },
+    results: [],
+  });
+  const help = explain({
+    code: "L003",
+    severity: "warning",
+    message: "skipped",
+    span: { file: "x.pym", start: 0, end: 0 },
+    related: [],
+    path: [],
+  });
+  assert.match(
+    help.nextStep,
+    /sources\.include\/exclude in \.pymtheg\/settings\.json\./,
+  );
+  assert.doesNotMatch(help.nextStep, /\.pymtheg\.json/);
 });
