@@ -1,0 +1,2603 @@
+[
+  {
+    "name": "no_std println via glob",
+    "files": {
+      "src/lib.rs": "#![no_std] pub struct A;pub struct B; impl A {pub fn read(self)->u32{11}} impl B{pub fn read(self)->u32{22}}use dep::*;pub fn run(a:A)->u32{println!(a);a.read()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ndep=\"1\"\n"
+    },
+    "unknown": "a.read",
+    "would": "impl B::read",
+    "nativeName": "println",
+    "nativeAnswer": 22,
+    "nativeFailedReplacement": false
+  },
+  {
+    "name": "no_std println via reexport",
+    "files": {
+      "src/lib.rs": "#![no_std] pub struct A;pub struct B; impl A {pub fn read(self)->u32{11}} impl B{pub fn read(self)->u32{22}}mod prelude {pub use dep::*;}use prelude::*;pub fn run(a:A)->u32{println!(a);a.read()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ndep=\"1\"\n"
+    },
+    "unknown": "a.read",
+    "would": "impl B::read",
+    "nativeName": "println",
+    "nativeAnswer": 22,
+    "nativeFailedReplacement": false
+  },
+  {
+    "name": "no_std println via failed-glob",
+    "files": {
+      "src/lib.rs": "#![no_std] pub struct A;pub struct B; impl A {pub fn read(self)->u32{11}} impl B{pub fn read(self)->u32{22}}mod prelude;use prelude::*;pub fn run(a:A)->u32{println!(a);a.read()}",
+      "src/prelude.rs": "pub use dep::*;"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ndep=\"1\"\n"
+    },
+    "unknown": "a.read",
+    "would": "impl B::read",
+    "nativeName": "println",
+    "nativeAnswer": 22,
+    "replacements": {
+      "src/prelude.rs": {
+        "status": "failed",
+        "symbols": [],
+        "links": [],
+        "diagnostics": [
+          {
+            "message": "injected grammar rejection (independent of grammar version)",
+            "range": {
+              "start": 0,
+              "end": 1
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "no_std print via glob",
+    "files": {
+      "src/lib.rs": "#![no_std] pub struct A;pub struct B; impl A {pub fn read(self)->u32{11}} impl B{pub fn read(self)->u32{22}}use dep::*;pub fn run(a:A)->u32{print!(a);a.read()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ndep=\"1\"\n"
+    },
+    "unknown": "a.read",
+    "would": "impl B::read",
+    "nativeName": "print",
+    "nativeAnswer": 22,
+    "nativeFailedReplacement": false
+  },
+  {
+    "name": "no_std print via reexport",
+    "files": {
+      "src/lib.rs": "#![no_std] pub struct A;pub struct B; impl A {pub fn read(self)->u32{11}} impl B{pub fn read(self)->u32{22}}mod prelude {pub use dep::*;}use prelude::*;pub fn run(a:A)->u32{print!(a);a.read()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ndep=\"1\"\n"
+    },
+    "unknown": "a.read",
+    "would": "impl B::read",
+    "nativeName": "print",
+    "nativeAnswer": 22,
+    "nativeFailedReplacement": false
+  },
+  {
+    "name": "no_std print via failed-glob",
+    "files": {
+      "src/lib.rs": "#![no_std] pub struct A;pub struct B; impl A {pub fn read(self)->u32{11}} impl B{pub fn read(self)->u32{22}}mod prelude;use prelude::*;pub fn run(a:A)->u32{print!(a);a.read()}",
+      "src/prelude.rs": "pub use dep::*;"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ndep=\"1\"\n"
+    },
+    "unknown": "a.read",
+    "would": "impl B::read",
+    "nativeName": "print",
+    "nativeAnswer": 22,
+    "replacements": {
+      "src/prelude.rs": {
+        "status": "failed",
+        "symbols": [],
+        "links": [],
+        "diagnostics": [
+          {
+            "message": "injected grammar rejection (independent of grammar version)",
+            "range": {
+              "start": 0,
+              "end": 1
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "no_std eprintln via glob",
+    "files": {
+      "src/lib.rs": "#![no_std] pub struct A;pub struct B; impl A {pub fn read(self)->u32{11}} impl B{pub fn read(self)->u32{22}}use dep::*;pub fn run(a:A)->u32{eprintln!(a);a.read()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ndep=\"1\"\n"
+    },
+    "unknown": "a.read",
+    "would": "impl B::read",
+    "nativeName": "eprintln",
+    "nativeAnswer": 22,
+    "nativeFailedReplacement": false
+  },
+  {
+    "name": "no_std eprintln via reexport",
+    "files": {
+      "src/lib.rs": "#![no_std] pub struct A;pub struct B; impl A {pub fn read(self)->u32{11}} impl B{pub fn read(self)->u32{22}}mod prelude {pub use dep::*;}use prelude::*;pub fn run(a:A)->u32{eprintln!(a);a.read()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ndep=\"1\"\n"
+    },
+    "unknown": "a.read",
+    "would": "impl B::read",
+    "nativeName": "eprintln",
+    "nativeAnswer": 22,
+    "nativeFailedReplacement": false
+  },
+  {
+    "name": "no_std eprintln via failed-glob",
+    "files": {
+      "src/lib.rs": "#![no_std] pub struct A;pub struct B; impl A {pub fn read(self)->u32{11}} impl B{pub fn read(self)->u32{22}}mod prelude;use prelude::*;pub fn run(a:A)->u32{eprintln!(a);a.read()}",
+      "src/prelude.rs": "pub use dep::*;"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ndep=\"1\"\n"
+    },
+    "unknown": "a.read",
+    "would": "impl B::read",
+    "nativeName": "eprintln",
+    "nativeAnswer": 22,
+    "replacements": {
+      "src/prelude.rs": {
+        "status": "failed",
+        "symbols": [],
+        "links": [],
+        "diagnostics": [
+          {
+            "message": "injected grammar rejection (independent of grammar version)",
+            "range": {
+              "start": 0,
+              "end": 1
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "no_std eprint via glob",
+    "files": {
+      "src/lib.rs": "#![no_std] pub struct A;pub struct B; impl A {pub fn read(self)->u32{11}} impl B{pub fn read(self)->u32{22}}use dep::*;pub fn run(a:A)->u32{eprint!(a);a.read()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ndep=\"1\"\n"
+    },
+    "unknown": "a.read",
+    "would": "impl B::read",
+    "nativeName": "eprint",
+    "nativeAnswer": 22,
+    "nativeFailedReplacement": false
+  },
+  {
+    "name": "no_std eprint via reexport",
+    "files": {
+      "src/lib.rs": "#![no_std] pub struct A;pub struct B; impl A {pub fn read(self)->u32{11}} impl B{pub fn read(self)->u32{22}}mod prelude {pub use dep::*;}use prelude::*;pub fn run(a:A)->u32{eprint!(a);a.read()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ndep=\"1\"\n"
+    },
+    "unknown": "a.read",
+    "would": "impl B::read",
+    "nativeName": "eprint",
+    "nativeAnswer": 22,
+    "nativeFailedReplacement": false
+  },
+  {
+    "name": "no_std eprint via failed-glob",
+    "files": {
+      "src/lib.rs": "#![no_std] pub struct A;pub struct B; impl A {pub fn read(self)->u32{11}} impl B{pub fn read(self)->u32{22}}mod prelude;use prelude::*;pub fn run(a:A)->u32{eprint!(a);a.read()}",
+      "src/prelude.rs": "pub use dep::*;"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ndep=\"1\"\n"
+    },
+    "unknown": "a.read",
+    "would": "impl B::read",
+    "nativeName": "eprint",
+    "nativeAnswer": 22,
+    "replacements": {
+      "src/prelude.rs": {
+        "status": "failed",
+        "symbols": [],
+        "links": [],
+        "diagnostics": [
+          {
+            "message": "injected grammar rejection (independent of grammar version)",
+            "range": {
+              "start": 0,
+              "end": 1
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "no_std vec via glob",
+    "files": {
+      "src/lib.rs": "#![no_std] pub struct A;pub struct B; impl A {pub fn read(self)->u32{11}} impl B{pub fn read(self)->u32{22}}use dep::*;pub fn run(a:A)->u32{vec!(a);a.read()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ndep=\"1\"\n"
+    },
+    "unknown": "a.read",
+    "would": "impl B::read",
+    "nativeName": "vec",
+    "nativeAnswer": 22,
+    "nativeFailedReplacement": false
+  },
+  {
+    "name": "no_std vec via reexport",
+    "files": {
+      "src/lib.rs": "#![no_std] pub struct A;pub struct B; impl A {pub fn read(self)->u32{11}} impl B{pub fn read(self)->u32{22}}mod prelude {pub use dep::*;}use prelude::*;pub fn run(a:A)->u32{vec!(a);a.read()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ndep=\"1\"\n"
+    },
+    "unknown": "a.read",
+    "would": "impl B::read",
+    "nativeName": "vec",
+    "nativeAnswer": 22,
+    "nativeFailedReplacement": false
+  },
+  {
+    "name": "no_std vec via failed-glob",
+    "files": {
+      "src/lib.rs": "#![no_std] pub struct A;pub struct B; impl A {pub fn read(self)->u32{11}} impl B{pub fn read(self)->u32{22}}mod prelude;use prelude::*;pub fn run(a:A)->u32{vec!(a);a.read()}",
+      "src/prelude.rs": "pub use dep::*;"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ndep=\"1\"\n"
+    },
+    "unknown": "a.read",
+    "would": "impl B::read",
+    "nativeName": "vec",
+    "nativeAnswer": 22,
+    "replacements": {
+      "src/prelude.rs": {
+        "status": "failed",
+        "symbols": [],
+        "links": [],
+        "diagnostics": [
+          {
+            "message": "injected grammar rejection (independent of grammar version)",
+            "range": {
+              "start": 0,
+              "end": 1
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "no_std format via glob",
+    "files": {
+      "src/lib.rs": "#![no_std] pub struct A;pub struct B; impl A {pub fn read(self)->u32{11}} impl B{pub fn read(self)->u32{22}}use dep::*;pub fn run(a:A)->u32{format!(a);a.read()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ndep=\"1\"\n"
+    },
+    "unknown": "a.read",
+    "would": "impl B::read",
+    "nativeName": "format",
+    "nativeAnswer": 22,
+    "nativeFailedReplacement": false
+  },
+  {
+    "name": "no_std format via reexport",
+    "files": {
+      "src/lib.rs": "#![no_std] pub struct A;pub struct B; impl A {pub fn read(self)->u32{11}} impl B{pub fn read(self)->u32{22}}mod prelude {pub use dep::*;}use prelude::*;pub fn run(a:A)->u32{format!(a);a.read()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ndep=\"1\"\n"
+    },
+    "unknown": "a.read",
+    "would": "impl B::read",
+    "nativeName": "format",
+    "nativeAnswer": 22,
+    "nativeFailedReplacement": false
+  },
+  {
+    "name": "no_std format via failed-glob",
+    "files": {
+      "src/lib.rs": "#![no_std] pub struct A;pub struct B; impl A {pub fn read(self)->u32{11}} impl B{pub fn read(self)->u32{22}}mod prelude;use prelude::*;pub fn run(a:A)->u32{format!(a);a.read()}",
+      "src/prelude.rs": "pub use dep::*;"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ndep=\"1\"\n"
+    },
+    "unknown": "a.read",
+    "would": "impl B::read",
+    "nativeName": "format",
+    "nativeAnswer": 22,
+    "replacements": {
+      "src/prelude.rs": {
+        "status": "failed",
+        "symbols": [],
+        "links": [],
+        "diagnostics": [
+          {
+            "message": "injected grammar rejection (independent of grammar version)",
+            "range": {
+              "start": 0,
+              "end": 1
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "no_std dbg via glob",
+    "files": {
+      "src/lib.rs": "#![no_std] pub struct A;pub struct B; impl A {pub fn read(self)->u32{11}} impl B{pub fn read(self)->u32{22}}use dep::*;pub fn run(a:A)->u32{dbg!(a);a.read()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ndep=\"1\"\n"
+    },
+    "unknown": "a.read",
+    "would": "impl B::read",
+    "nativeName": "dbg",
+    "nativeAnswer": 22,
+    "nativeFailedReplacement": false
+  },
+  {
+    "name": "no_std dbg via reexport",
+    "files": {
+      "src/lib.rs": "#![no_std] pub struct A;pub struct B; impl A {pub fn read(self)->u32{11}} impl B{pub fn read(self)->u32{22}}mod prelude {pub use dep::*;}use prelude::*;pub fn run(a:A)->u32{dbg!(a);a.read()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ndep=\"1\"\n"
+    },
+    "unknown": "a.read",
+    "would": "impl B::read",
+    "nativeName": "dbg",
+    "nativeAnswer": 22,
+    "nativeFailedReplacement": false
+  },
+  {
+    "name": "no_std dbg via failed-glob",
+    "files": {
+      "src/lib.rs": "#![no_std] pub struct A;pub struct B; impl A {pub fn read(self)->u32{11}} impl B{pub fn read(self)->u32{22}}mod prelude;use prelude::*;pub fn run(a:A)->u32{dbg!(a);a.read()}",
+      "src/prelude.rs": "pub use dep::*;"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ndep=\"1\"\n"
+    },
+    "unknown": "a.read",
+    "would": "impl B::read",
+    "nativeName": "dbg",
+    "nativeAnswer": 22,
+    "replacements": {
+      "src/prelude.rs": {
+        "status": "failed",
+        "symbols": [],
+        "links": [],
+        "diagnostics": [
+          {
+            "message": "injected grammar rejection (independent of grammar version)",
+            "range": {
+              "start": 0,
+              "end": 1
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "#![no_std] assert!(true)",
+    "files": {
+      "src/lib.rs": "#![no_std]pub struct A;pub struct B; impl A {pub fn read(self)->u32{11}} impl B{pub fn read(self)->u32{22}}pub fn run(a:A)->u32{assert!(true);a.read()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n"
+    },
+    "definite": {
+      "name": "a.read",
+      "identity": "impl A::read"
+    },
+    "nativeAnswer": 11
+  },
+  {
+    "name": "#![no_std] #[macro_use]extern crate std; println!()",
+    "files": {
+      "src/lib.rs": "#![no_std] #[macro_use]extern crate std;pub struct A;pub struct B; impl A {pub fn read(self)->u32{11}} impl B{pub fn read(self)->u32{22}}pub fn run(a:A)->u32{println!();a.read()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n"
+    },
+    "definite": {
+      "name": "a.read",
+      "identity": "impl A::read"
+    },
+    "nativeAnswer": 11
+  },
+  {
+    "name": "#![no_std] extern crate std; std::println!()",
+    "files": {
+      "src/lib.rs": "#![no_std] extern crate std;pub struct A;pub struct B; impl A {pub fn read(self)->u32{11}} impl B{pub fn read(self)->u32{22}}pub fn run(a:A)->u32{std::println!();a.read()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n"
+    },
+    "definite": {
+      "name": "a.read",
+      "identity": "impl A::read"
+    },
+    "nativeAnswer": 11
+  },
+  {
+    "name": "#![no_std] #[macro_use]extern crate alloc; vec![1u8]",
+    "files": {
+      "src/lib.rs": "#![no_std] #[macro_use]extern crate alloc;pub struct A;pub struct B; impl A {pub fn read(self)->u32{11}} impl B{pub fn read(self)->u32{22}}pub fn run(a:A)->u32{vec![1u8];a.read()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n"
+    },
+    "definite": {
+      "name": "a.read",
+      "identity": "impl A::read"
+    },
+    "nativeAnswer": 11
+  },
+  {
+    "name": "#![no_std] #[macro_use]extern crate alloc; format!(\"x\")",
+    "files": {
+      "src/lib.rs": "#![no_std] #[macro_use]extern crate alloc;pub struct A;pub struct B; impl A {pub fn read(self)->u32{11}} impl B{pub fn read(self)->u32{22}}pub fn run(a:A)->u32{format!(\"x\");a.read()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n"
+    },
+    "definite": {
+      "name": "a.read",
+      "identity": "impl A::read"
+    },
+    "nativeAnswer": 11
+  },
+  {
+    "name": "#![no_std] extern crate alloc; alloc::vec![1u8]",
+    "files": {
+      "src/lib.rs": "#![no_std] extern crate alloc;pub struct A;pub struct B; impl A {pub fn read(self)->u32{11}} impl B{pub fn read(self)->u32{22}}pub fn run(a:A)->u32{alloc::vec![1u8];a.read()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n"
+    },
+    "definite": {
+      "name": "a.read",
+      "identity": "impl A::read"
+    },
+    "nativeAnswer": 11
+  },
+  {
+    "name": "ecosystem tracing::trace qualified",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11} pub fn run()->u32{tracing::trace!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntracing = {version=\"=0.1.44\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "tracing",
+    "macro": "trace",
+    "route": "qualified",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem tracing::trace use",
+    "files": {
+      "src/lib.rs": "use tracing::trace;pub fn helper()->u32{11} pub fn run()->u32{trace!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntracing = {version=\"=0.1.44\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "tracing",
+    "macro": "trace",
+    "route": "use",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem tracing::trace macro_use",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate tracing;pub fn helper()->u32{11} pub fn run()->u32{trace!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntracing = {version=\"=0.1.44\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "tracing",
+    "macro": "trace",
+    "route": "macro_use",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem tracing::debug qualified",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11} pub fn run()->u32{tracing::debug!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntracing = {version=\"=0.1.44\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "tracing",
+    "macro": "debug",
+    "route": "qualified",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem tracing::debug use",
+    "files": {
+      "src/lib.rs": "use tracing::debug;pub fn helper()->u32{11} pub fn run()->u32{debug!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntracing = {version=\"=0.1.44\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "tracing",
+    "macro": "debug",
+    "route": "use",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem tracing::debug macro_use",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate tracing;pub fn helper()->u32{11} pub fn run()->u32{debug!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntracing = {version=\"=0.1.44\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "tracing",
+    "macro": "debug",
+    "route": "macro_use",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem tracing::info qualified",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11} pub fn run()->u32{tracing::info!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntracing = {version=\"=0.1.44\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "tracing",
+    "macro": "info",
+    "route": "qualified",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem tracing::info use",
+    "files": {
+      "src/lib.rs": "use tracing::info;pub fn helper()->u32{11} pub fn run()->u32{info!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntracing = {version=\"=0.1.44\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "tracing",
+    "macro": "info",
+    "route": "use",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem tracing::info macro_use",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate tracing;pub fn helper()->u32{11} pub fn run()->u32{info!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntracing = {version=\"=0.1.44\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "tracing",
+    "macro": "info",
+    "route": "macro_use",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem tracing::warn qualified",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11} pub fn run()->u32{tracing::warn!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntracing = {version=\"=0.1.44\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "tracing",
+    "macro": "warn",
+    "route": "qualified",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem tracing::warn use",
+    "files": {
+      "src/lib.rs": "use tracing::warn;pub fn helper()->u32{11} pub fn run()->u32{warn!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntracing = {version=\"=0.1.44\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "tracing",
+    "macro": "warn",
+    "route": "use",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem tracing::warn macro_use",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate tracing;pub fn helper()->u32{11} pub fn run()->u32{warn!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntracing = {version=\"=0.1.44\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "tracing",
+    "macro": "warn",
+    "route": "macro_use",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem tracing::error qualified",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11} pub fn run()->u32{tracing::error!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntracing = {version=\"=0.1.44\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "tracing",
+    "macro": "error",
+    "route": "qualified",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem tracing::error use",
+    "files": {
+      "src/lib.rs": "use tracing::error;pub fn helper()->u32{11} pub fn run()->u32{error!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntracing = {version=\"=0.1.44\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "tracing",
+    "macro": "error",
+    "route": "use",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem tracing::error macro_use",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate tracing;pub fn helper()->u32{11} pub fn run()->u32{error!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntracing = {version=\"=0.1.44\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "tracing",
+    "macro": "error",
+    "route": "macro_use",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem tracing::event qualified",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11} pub fn run()->u32{tracing::event!(tracing::Level::INFO,\"event\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntracing = {version=\"=0.1.44\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "tracing",
+    "macro": "event",
+    "route": "qualified",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem tracing::event use",
+    "files": {
+      "src/lib.rs": "use tracing::event;pub fn helper()->u32{11} pub fn run()->u32{event!(tracing::Level::INFO,\"event\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntracing = {version=\"=0.1.44\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "tracing",
+    "macro": "event",
+    "route": "use",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem tracing::event macro_use",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate tracing;pub fn helper()->u32{11} pub fn run()->u32{event!(tracing::Level::INFO,\"event\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntracing = {version=\"=0.1.44\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "tracing",
+    "macro": "event",
+    "route": "macro_use",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem log::trace qualified",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11} pub fn run()->u32{log::trace!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nlog = {version=\"=0.4.35\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "log",
+    "macro": "trace",
+    "route": "qualified",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem log::trace use",
+    "files": {
+      "src/lib.rs": "use log::trace;pub fn helper()->u32{11} pub fn run()->u32{trace!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nlog = {version=\"=0.4.35\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "log",
+    "macro": "trace",
+    "route": "use",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem log::trace macro_use",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate log;pub fn helper()->u32{11} pub fn run()->u32{trace!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nlog = {version=\"=0.4.35\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "log",
+    "macro": "trace",
+    "route": "macro_use",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem log::debug qualified",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11} pub fn run()->u32{log::debug!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nlog = {version=\"=0.4.35\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "log",
+    "macro": "debug",
+    "route": "qualified",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem log::debug use",
+    "files": {
+      "src/lib.rs": "use log::debug;pub fn helper()->u32{11} pub fn run()->u32{debug!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nlog = {version=\"=0.4.35\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "log",
+    "macro": "debug",
+    "route": "use",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem log::debug macro_use",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate log;pub fn helper()->u32{11} pub fn run()->u32{debug!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nlog = {version=\"=0.4.35\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "log",
+    "macro": "debug",
+    "route": "macro_use",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem log::info qualified",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11} pub fn run()->u32{log::info!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nlog = {version=\"=0.4.35\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "log",
+    "macro": "info",
+    "route": "qualified",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem log::info use",
+    "files": {
+      "src/lib.rs": "use log::info;pub fn helper()->u32{11} pub fn run()->u32{info!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nlog = {version=\"=0.4.35\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "log",
+    "macro": "info",
+    "route": "use",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem log::info macro_use",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate log;pub fn helper()->u32{11} pub fn run()->u32{info!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nlog = {version=\"=0.4.35\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "log",
+    "macro": "info",
+    "route": "macro_use",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem log::warn qualified",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11} pub fn run()->u32{log::warn!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nlog = {version=\"=0.4.35\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "log",
+    "macro": "warn",
+    "route": "qualified",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem log::warn use",
+    "files": {
+      "src/lib.rs": "use log::warn;pub fn helper()->u32{11} pub fn run()->u32{warn!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nlog = {version=\"=0.4.35\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "log",
+    "macro": "warn",
+    "route": "use",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem log::warn macro_use",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate log;pub fn helper()->u32{11} pub fn run()->u32{warn!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nlog = {version=\"=0.4.35\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "log",
+    "macro": "warn",
+    "route": "macro_use",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem log::error qualified",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11} pub fn run()->u32{log::error!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nlog = {version=\"=0.4.35\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "log",
+    "macro": "error",
+    "route": "qualified",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem log::error use",
+    "files": {
+      "src/lib.rs": "use log::error;pub fn helper()->u32{11} pub fn run()->u32{error!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nlog = {version=\"=0.4.35\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "log",
+    "macro": "error",
+    "route": "use",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem log::error macro_use",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate log;pub fn helper()->u32{11} pub fn run()->u32{error!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nlog = {version=\"=0.4.35\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "log",
+    "macro": "error",
+    "route": "macro_use",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem metrics::counter qualified",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11} pub fn run()->u32{metrics::counter!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nmetrics = {version=\"=0.24.6\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "metrics",
+    "macro": "counter",
+    "route": "qualified",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem metrics::counter use",
+    "files": {
+      "src/lib.rs": "use metrics::counter;pub fn helper()->u32{11} pub fn run()->u32{counter!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nmetrics = {version=\"=0.24.6\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "metrics",
+    "macro": "counter",
+    "route": "use",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem metrics::counter macro_use",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate metrics;pub fn helper()->u32{11} pub fn run()->u32{counter!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nmetrics = {version=\"=0.24.6\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "metrics",
+    "macro": "counter",
+    "route": "macro_use",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem metrics::gauge qualified",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11} pub fn run()->u32{metrics::gauge!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nmetrics = {version=\"=0.24.6\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "metrics",
+    "macro": "gauge",
+    "route": "qualified",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem metrics::gauge use",
+    "files": {
+      "src/lib.rs": "use metrics::gauge;pub fn helper()->u32{11} pub fn run()->u32{gauge!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nmetrics = {version=\"=0.24.6\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "metrics",
+    "macro": "gauge",
+    "route": "use",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem metrics::gauge macro_use",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate metrics;pub fn helper()->u32{11} pub fn run()->u32{gauge!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nmetrics = {version=\"=0.24.6\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "metrics",
+    "macro": "gauge",
+    "route": "macro_use",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem metrics::histogram qualified",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11} pub fn run()->u32{metrics::histogram!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nmetrics = {version=\"=0.24.6\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "metrics",
+    "macro": "histogram",
+    "route": "qualified",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem metrics::histogram use",
+    "files": {
+      "src/lib.rs": "use metrics::histogram;pub fn helper()->u32{11} pub fn run()->u32{histogram!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nmetrics = {version=\"=0.24.6\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "metrics",
+    "macro": "histogram",
+    "route": "use",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem metrics::histogram macro_use",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate metrics;pub fn helper()->u32{11} pub fn run()->u32{histogram!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nmetrics = {version=\"=0.24.6\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "metrics",
+    "macro": "histogram",
+    "route": "macro_use",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "ecosystem anyhow::ensure qualified",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11} pub fn run()->anyhow::Result<u32>{anyhow::ensure!(true,\"ok\");Ok(helper())}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nanyhow = {version=\"=1.0.104\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "anyhow",
+    "macro": "ensure",
+    "route": "qualified",
+    "async": false,
+    "result": true
+  },
+  {
+    "name": "ecosystem anyhow::ensure use",
+    "files": {
+      "src/lib.rs": "use anyhow::ensure;pub fn helper()->u32{11} pub fn run()->anyhow::Result<u32>{ensure!(true,\"ok\");Ok(helper())}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nanyhow = {version=\"=1.0.104\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "anyhow",
+    "macro": "ensure",
+    "route": "use",
+    "async": false,
+    "result": true
+  },
+  {
+    "name": "ecosystem anyhow::ensure macro_use",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate anyhow;pub fn helper()->u32{11} pub fn run()->anyhow::Result<u32>{ensure!(true,\"ok\");Ok(helper())}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nanyhow = {version=\"=1.0.104\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "anyhow",
+    "macro": "ensure",
+    "route": "macro_use",
+    "async": false,
+    "result": true
+  },
+  {
+    "name": "ecosystem anyhow::bail qualified",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11} pub fn run()->anyhow::Result<u32>{if false {anyhow::bail!(\"message\");}Ok(helper())}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nanyhow = {version=\"=1.0.104\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "anyhow",
+    "macro": "bail",
+    "route": "qualified",
+    "async": false,
+    "result": true
+  },
+  {
+    "name": "ecosystem anyhow::bail use",
+    "files": {
+      "src/lib.rs": "use anyhow::bail;pub fn helper()->u32{11} pub fn run()->anyhow::Result<u32>{if false {bail!(\"message\");}Ok(helper())}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nanyhow = {version=\"=1.0.104\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "anyhow",
+    "macro": "bail",
+    "route": "use",
+    "async": false,
+    "result": true
+  },
+  {
+    "name": "ecosystem anyhow::bail macro_use",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate anyhow;pub fn helper()->u32{11} pub fn run()->anyhow::Result<u32>{if false {bail!(\"message\");}Ok(helper())}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nanyhow = {version=\"=1.0.104\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "anyhow",
+    "macro": "bail",
+    "route": "macro_use",
+    "async": false,
+    "result": true
+  },
+  {
+    "name": "ecosystem anyhow::anyhow qualified",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11} pub fn run()->anyhow::Result<u32>{anyhow::anyhow!(\"message\");Ok(helper())}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nanyhow = {version=\"=1.0.104\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "anyhow",
+    "macro": "anyhow",
+    "route": "qualified",
+    "async": false,
+    "result": true
+  },
+  {
+    "name": "ecosystem anyhow::anyhow use",
+    "files": {
+      "src/lib.rs": "use anyhow::anyhow;pub fn helper()->u32{11} pub fn run()->anyhow::Result<u32>{anyhow!(\"message\");Ok(helper())}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nanyhow = {version=\"=1.0.104\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "anyhow",
+    "macro": "anyhow",
+    "route": "use",
+    "async": false,
+    "result": true
+  },
+  {
+    "name": "ecosystem anyhow::anyhow macro_use",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate anyhow;pub fn helper()->u32{11} pub fn run()->anyhow::Result<u32>{anyhow!(\"message\");Ok(helper())}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nanyhow = {version=\"=1.0.104\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "anyhow",
+    "macro": "anyhow",
+    "route": "macro_use",
+    "async": false,
+    "result": true
+  },
+  {
+    "name": "ecosystem tokio::select qualified",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11} pub async fn run()->u32{tokio::select!(_ = std::future::ready(()) => {});helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntokio = {version=\"=1.54.1\",features=[\"macros\"]}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "tokio",
+    "macro": "select",
+    "route": "qualified",
+    "async": true,
+    "result": false
+  },
+  {
+    "name": "ecosystem tokio::select use",
+    "files": {
+      "src/lib.rs": "use tokio::select;pub fn helper()->u32{11} pub async fn run()->u32{select!(_ = std::future::ready(()) => {});helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntokio = {version=\"=1.54.1\",features=[\"macros\"]}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "tokio",
+    "macro": "select",
+    "route": "use",
+    "async": true,
+    "result": false
+  },
+  {
+    "name": "ecosystem tokio::select macro_use",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate tokio;pub fn helper()->u32{11} pub async fn run()->u32{select!(_ = std::future::ready(()) => {});helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntokio = {version=\"=1.54.1\",features=[\"macros\"]}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "tokio",
+    "macro": "select",
+    "route": "macro_use",
+    "async": true,
+    "result": false
+  },
+  {
+    "name": "competing package renamed to tracing::trace",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11}pub fn run()->u32{tracing::trace!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntracing={package=\"evil\",path=\"../evil\"}\n"
+    },
+    "unknown": "helper",
+    "would": "helper",
+    "nativeAnswer": 22,
+    "ecosystem": "tracing",
+    "macro": "trace",
+    "evil": true
+  },
+  {
+    "name": "competing package renamed to tracing::debug",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11}pub fn run()->u32{tracing::debug!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntracing={package=\"evil\",path=\"../evil\"}\n"
+    },
+    "unknown": "helper",
+    "would": "helper",
+    "nativeAnswer": 22,
+    "ecosystem": "tracing",
+    "macro": "debug",
+    "evil": true
+  },
+  {
+    "name": "competing package renamed to tracing::info",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11}pub fn run()->u32{tracing::info!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntracing={package=\"evil\",path=\"../evil\"}\n"
+    },
+    "unknown": "helper",
+    "would": "helper",
+    "nativeAnswer": 22,
+    "ecosystem": "tracing",
+    "macro": "info",
+    "evil": true
+  },
+  {
+    "name": "competing package renamed to tracing::warn",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11}pub fn run()->u32{tracing::warn!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntracing={package=\"evil\",path=\"../evil\"}\n"
+    },
+    "unknown": "helper",
+    "would": "helper",
+    "nativeAnswer": 22,
+    "ecosystem": "tracing",
+    "macro": "warn",
+    "evil": true
+  },
+  {
+    "name": "competing package renamed to tracing::error",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11}pub fn run()->u32{tracing::error!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntracing={package=\"evil\",path=\"../evil\"}\n"
+    },
+    "unknown": "helper",
+    "would": "helper",
+    "nativeAnswer": 22,
+    "ecosystem": "tracing",
+    "macro": "error",
+    "evil": true
+  },
+  {
+    "name": "competing package renamed to tracing::event",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11}pub fn run()->u32{tracing::event!(tracing::Level::INFO,\"event\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntracing={package=\"evil\",path=\"../evil\"}\n"
+    },
+    "unknown": "helper",
+    "would": "helper",
+    "nativeAnswer": 22,
+    "ecosystem": "tracing",
+    "macro": "event",
+    "evil": true
+  },
+  {
+    "name": "competing package renamed to log::trace",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11}pub fn run()->u32{log::trace!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nlog={package=\"evil\",path=\"../evil\"}\n"
+    },
+    "unknown": "helper",
+    "would": "helper",
+    "nativeAnswer": 22,
+    "ecosystem": "log",
+    "macro": "trace",
+    "evil": true
+  },
+  {
+    "name": "competing package renamed to log::debug",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11}pub fn run()->u32{log::debug!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nlog={package=\"evil\",path=\"../evil\"}\n"
+    },
+    "unknown": "helper",
+    "would": "helper",
+    "nativeAnswer": 22,
+    "ecosystem": "log",
+    "macro": "debug",
+    "evil": true
+  },
+  {
+    "name": "competing package renamed to log::info",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11}pub fn run()->u32{log::info!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nlog={package=\"evil\",path=\"../evil\"}\n"
+    },
+    "unknown": "helper",
+    "would": "helper",
+    "nativeAnswer": 22,
+    "ecosystem": "log",
+    "macro": "info",
+    "evil": true
+  },
+  {
+    "name": "competing package renamed to log::warn",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11}pub fn run()->u32{log::warn!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nlog={package=\"evil\",path=\"../evil\"}\n"
+    },
+    "unknown": "helper",
+    "would": "helper",
+    "nativeAnswer": 22,
+    "ecosystem": "log",
+    "macro": "warn",
+    "evil": true
+  },
+  {
+    "name": "competing package renamed to log::error",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11}pub fn run()->u32{log::error!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nlog={package=\"evil\",path=\"../evil\"}\n"
+    },
+    "unknown": "helper",
+    "would": "helper",
+    "nativeAnswer": 22,
+    "ecosystem": "log",
+    "macro": "error",
+    "evil": true
+  },
+  {
+    "name": "competing package renamed to metrics::counter",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11}pub fn run()->u32{metrics::counter!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nmetrics={package=\"evil\",path=\"../evil\"}\n"
+    },
+    "unknown": "helper",
+    "would": "helper",
+    "nativeAnswer": 22,
+    "ecosystem": "metrics",
+    "macro": "counter",
+    "evil": true
+  },
+  {
+    "name": "competing package renamed to metrics::gauge",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11}pub fn run()->u32{metrics::gauge!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nmetrics={package=\"evil\",path=\"../evil\"}\n"
+    },
+    "unknown": "helper",
+    "would": "helper",
+    "nativeAnswer": 22,
+    "ecosystem": "metrics",
+    "macro": "gauge",
+    "evil": true
+  },
+  {
+    "name": "competing package renamed to metrics::histogram",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11}pub fn run()->u32{metrics::histogram!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nmetrics={package=\"evil\",path=\"../evil\"}\n"
+    },
+    "unknown": "helper",
+    "would": "helper",
+    "nativeAnswer": 22,
+    "ecosystem": "metrics",
+    "macro": "histogram",
+    "evil": true
+  },
+  {
+    "name": "competing package renamed to anyhow::ensure",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11}pub fn run()->u32{anyhow::ensure!(true,\"ok\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nanyhow={package=\"evil\",path=\"../evil\"}\n"
+    },
+    "unknown": "helper",
+    "would": "helper",
+    "nativeAnswer": 22,
+    "ecosystem": "anyhow",
+    "macro": "ensure",
+    "evil": true
+  },
+  {
+    "name": "competing package renamed to anyhow::bail",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11}pub fn run()->u32{anyhow::bail!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nanyhow={package=\"evil\",path=\"../evil\"}\n"
+    },
+    "unknown": "helper",
+    "would": "helper",
+    "nativeAnswer": 22,
+    "ecosystem": "anyhow",
+    "macro": "bail",
+    "evil": true
+  },
+  {
+    "name": "competing package renamed to anyhow::anyhow",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11}pub fn run()->u32{anyhow::anyhow!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\nanyhow={package=\"evil\",path=\"../evil\"}\n"
+    },
+    "unknown": "helper",
+    "would": "helper",
+    "nativeAnswer": 22,
+    "ecosystem": "anyhow",
+    "macro": "anyhow",
+    "evil": true
+  },
+  {
+    "name": "competing package renamed to tokio::select",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11}pub fn run()->u32{tokio::select!(_ = std::future::ready(()) => {});helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntokio={package=\"evil\",path=\"../evil\"}\n"
+    },
+    "unknown": "helper",
+    "would": "helper",
+    "nativeAnswer": 22,
+    "ecosystem": "tokio",
+    "macro": "select",
+    "evil": true
+  },
+  {
+    "name": "visible competing module",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11} mod tracing {pub use evil::info;} pub fn run()->u32{tracing::info!(\"x\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntracing=\"=0.1.44\"\nevil={path=\"../evil\"}\n"
+    },
+    "unknown": "helper",
+    "would": "helper",
+    "nativeAnswer": 22,
+    "macro": "info",
+    "evil": true
+  },
+  {
+    "name": "visible competing explicit",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate log;pub fn helper()->u32{11} use evil::info; pub fn run()->u32{info!(\"x\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntracing=\"=0.1.44\"\nevil={path=\"../evil\"}\nlog=\"=0.4.35\"\n"
+    },
+    "unknown": "helper",
+    "would": "helper",
+    "nativeAnswer": 22,
+    "macro": "info",
+    "evil": true
+  },
+  {
+    "name": "visible competing textual",
+    "files": {
+      "src/lib.rs": "use tracing::info;pub fn helper()->u32{11} macro_rules! info{($($t:tt)*)=>{fn helper()->u32{22}}} pub fn run()->u32{info!(\"x\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntracing=\"=0.1.44\"\nevil={path=\"../evil\"}\n"
+    },
+    "unknown": "helper",
+    "would": "helper",
+    "nativeAnswer": 22,
+    "macro": "info",
+    "evil": true
+  },
+  {
+    "name": "identity unproven unread version",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11} pub fn run()->u32{tracing::info!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntracing=\"wat\"\n"
+    },
+    "unknown": "helper",
+    "would": "helper"
+  },
+  {
+    "name": "identity unproven uninspected release",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11} pub fn run()->u32{tracing::info!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntracing=\"=0.1.41\"\n"
+    },
+    "unknown": "helper",
+    "would": "helper"
+  },
+  {
+    "name": "identity unproven unlocked range",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11} pub fn run()->u32{tracing::info!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntracing=\"0.1\"\n"
+    },
+    "unknown": "helper",
+    "would": "helper"
+  },
+  {
+    "name": "identity unproven path same-name package",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11} pub fn run()->u32{tracing::info!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntracing={path=\"../tracing\"}\n"
+    },
+    "unknown": "helper",
+    "would": "helper"
+  },
+  {
+    "name": "identity unproven patch",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11} pub fn run()->u32{tracing::info!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntracing=\"=0.1.44\"\n[patch.crates-io]\ntracing={path=\"../tracing\"}\n"
+    },
+    "unknown": "helper",
+    "would": "helper"
+  },
+  {
+    "name": "workspace exported macro qualified",
+    "files": {
+      "src/lib.rs": "pub fn run()->u32{dep::bail!()}",
+      "dep/src/lib.rs": "pub fn helper()->u32{2} #[macro_export]macro_rules! bail{()=>{$crate::helper()}}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"dep\"]\n[dependencies]\ndep={path=\"dep\"}\n",
+      "dep/Cargo.toml": "[package]\nname=\"dep\"\nversion=\"1.0.0\"\nedition=\"2024\"\n"
+    },
+    "definite": {
+      "name": "dep::bail",
+      "identity": "bail",
+      "kind": "macros"
+    },
+    "targetFile": "dep/src/lib.rs",
+    "nativeAnswer": 2,
+    "crossCrate": true
+  },
+  {
+    "name": "workspace exported macro use",
+    "files": {
+      "src/lib.rs": "use dep::bail;pub fn run()->u32{bail!()}",
+      "dep/src/lib.rs": "pub fn helper()->u32{2} #[macro_export]macro_rules! bail{()=>{$crate::helper()}}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"dep\"]\n[dependencies]\ndep={path=\"dep\"}\n",
+      "dep/Cargo.toml": "[package]\nname=\"dep\"\nversion=\"1.0.0\"\nedition=\"2024\"\n"
+    },
+    "definite": {
+      "name": "bail",
+      "identity": "bail",
+      "kind": "macros"
+    },
+    "targetFile": "dep/src/lib.rs",
+    "nativeAnswer": 2,
+    "crossCrate": true
+  },
+  {
+    "name": "workspace exported macro macro_use",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate dep;pub fn run()->u32{bail!()}",
+      "dep/src/lib.rs": "pub fn helper()->u32{2} #[macro_export]macro_rules! bail{()=>{$crate::helper()}}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"dep\"]\n[dependencies]\ndep={path=\"dep\"}\n",
+      "dep/Cargo.toml": "[package]\nname=\"dep\"\nversion=\"1.0.0\"\nedition=\"2024\"\n"
+    },
+    "definite": {
+      "name": "bail",
+      "identity": "bail",
+      "kind": "macros"
+    },
+    "targetFile": "dep/src/lib.rs",
+    "nativeAnswer": 2,
+    "crossCrate": true
+  },
+  {
+    "name": "workspace exported macro alias",
+    "files": {
+      "src/lib.rs": "use dep::bail as stop;pub fn run()->u32{stop!()}",
+      "dep/src/lib.rs": "pub fn helper()->u32{2} #[macro_export]macro_rules! bail{()=>{$crate::helper()}}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"dep\"]\n[dependencies]\ndep={path=\"dep\"}\n",
+      "dep/Cargo.toml": "[package]\nname=\"dep\"\nversion=\"1.0.0\"\nedition=\"2024\"\n"
+    },
+    "definite": {
+      "name": "stop",
+      "identity": "bail",
+      "kind": "macros"
+    },
+    "targetFile": "dep/src/lib.rs",
+    "nativeAnswer": 2,
+    "crossCrate": true
+  },
+  {
+    "name": "local textual macro wins over workspace macro_use",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate dep;macro_rules! bail{()=>{1u32}} pub fn run()->u32{bail!()}",
+      "dep/src/lib.rs": "pub fn helper()->u32{2} #[macro_export]macro_rules! bail{()=>{$crate::helper()}}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"dep\"]\n[dependencies]\ndep={path=\"dep\"}\n",
+      "dep/Cargo.toml": "[package]\nname=\"dep\"\nversion=\"1.0.0\"\nedition=\"2024\"\n"
+    },
+    "definite": {
+      "name": "bail",
+      "identity": "bail",
+      "kind": "macros"
+    },
+    "targetFile": "src/lib.rs",
+    "nativeAnswer": 1,
+    "crossCrate": true
+  },
+  {
+    "name": "Cargo.lock selected",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11} pub fn run()->u32{tracing::info!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nversion=\"0.0.0\"\nedition=\"2024\"\n[dependencies]\ntracing=\"0.1\"\n",
+      "Cargo.lock": "version=4\n[[package]]\nname=\"app\"\nversion=\"0.0.0\"\ndependencies=[\"tracing\"]\n[[package]]\nname=\"tracing\"\nversion=\"0.1.44\"\nsource=\"registry+https://github.com/rust-lang/crates.io-index\"\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "tracing",
+    "macro": "info",
+    "route": "qualified",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "Cargo.lock wrong source",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11} pub fn run()->u32{tracing::info!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nversion=\"0.0.0\"\nedition=\"2024\"\n[dependencies]\ntracing=\"0.1\"\n",
+      "Cargo.lock": "version=4\n[[package]]\nname=\"app\"\nversion=\"0.0.0\"\ndependencies=[\"tracing\"]\n[[package]]\nname=\"tracing\"\nversion=\"0.1.44\"\nsource=\"git+https://example.invalid/repo\"\n"
+    },
+    "ecosystem": "tracing",
+    "macro": "info",
+    "route": "qualified",
+    "async": false,
+    "result": false,
+    "unknown": "helper",
+    "would": "helper"
+  },
+  {
+    "name": "Cargo.lock unread lock",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11} pub fn run()->u32{tracing::info!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nversion=\"0.0.0\"\nedition=\"2024\"\n[dependencies]\ntracing=\"0.1\"\n",
+      "Cargo.lock": "version=4\n[[package]]\nname=\"app\"\nversion=\"0.0.0\"\ndependencies=[\"tracing\"]\n[[package]]\nname=\"tracing\"\nversion=\"0.1.44\"\nsource=\"registry+https://github.com/rust-lang/crates.io-index\"\nbroken=["
+    },
+    "ecosystem": "tracing",
+    "macro": "info",
+    "route": "qualified",
+    "async": false,
+    "result": false,
+    "unknown": "helper",
+    "would": "helper"
+  },
+  {
+    "name": "Cargo.lock uninspected version",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11} pub fn run()->u32{tracing::info!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nversion=\"0.0.0\"\nedition=\"2024\"\n[dependencies]\ntracing=\"0.1\"\n",
+      "Cargo.lock": "version=4\n[[package]]\nname=\"app\"\nversion=\"0.0.0\"\ndependencies=[\"tracing\"]\n[[package]]\nname=\"tracing\"\nversion=\"0.1.41\"\nsource=\"registry+https://github.com/rust-lang/crates.io-index\"\n"
+    },
+    "ecosystem": "tracing",
+    "macro": "info",
+    "route": "qualified",
+    "async": false,
+    "result": false,
+    "unknown": "helper",
+    "would": "helper"
+  },
+  {
+    "name": "dependency activation target true",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11} pub fn run()->u32{tracing::info!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nversion=\"0.0.0\"\nedition=\"2024\"\n[target.'cfg(all())'.dependencies]\ntracing=\"=0.1.44\"\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "tracing",
+    "macro": "info",
+    "route": "qualified",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "dependency activation target false",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11} pub fn run()->u32{tracing::info!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nversion=\"0.0.0\"\nedition=\"2024\"\n[target.'cfg(any())'.dependencies]\ntracing=\"=0.1.44\"\n"
+    },
+    "ecosystem": "tracing",
+    "macro": "info",
+    "route": "qualified",
+    "async": false,
+    "result": false,
+    "unknown": "helper",
+    "would": "helper"
+  },
+  {
+    "name": "dependency activation target unknown",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11} pub fn run()->u32{tracing::info!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nversion=\"0.0.0\"\nedition=\"2024\"\n[target.'cfg(feature=\"x\")'.dependencies]\ntracing=\"=0.1.44\"\n"
+    },
+    "ecosystem": "tracing",
+    "macro": "info",
+    "route": "qualified",
+    "async": false,
+    "result": false,
+    "unknown": "helper",
+    "would": "helper"
+  },
+  {
+    "name": "dependency activation optional gated",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11} #[cfg(feature=\"tracing\")]pub fn run()->u32{tracing::info!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nversion=\"0.0.0\"\nedition=\"2024\"\n[dependencies]\ntracing={version=\"=0.1.44\",optional=true}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "tracing",
+    "macro": "info",
+    "route": "qualified",
+    "async": false,
+    "result": false,
+    "appCfg": [
+      "feature=\"tracing\""
+    ]
+  },
+  {
+    "name": "dependency activation optional ungated",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11} pub fn run()->u32{tracing::info!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nversion=\"0.0.0\"\nedition=\"2024\"\n[dependencies]\ntracing={version=\"=0.1.44\",optional=true}\n"
+    },
+    "ecosystem": "tracing",
+    "macro": "info",
+    "route": "qualified",
+    "async": false,
+    "result": false,
+    "unknown": "helper",
+    "would": "helper"
+  },
+  {
+    "name": "dependency activation dev library",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11} pub fn run()->u32{tracing::info!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nversion=\"0.0.0\"\nedition=\"2024\"\n[dev-dependencies]\ntracing=\"=0.1.44\"\n"
+    },
+    "ecosystem": "tracing",
+    "macro": "info",
+    "route": "qualified",
+    "async": false,
+    "result": false,
+    "unknown": "helper",
+    "would": "helper"
+  },
+  {
+    "name": "dependency activation dev test",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11} #[cfg(test)]pub fn run()->u32{tracing::info!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nversion=\"0.0.0\"\nedition=\"2024\"\n[dev-dependencies]\ntracing=\"=0.1.44\"\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "tracing",
+    "macro": "info",
+    "route": "qualified",
+    "async": false,
+    "result": false,
+    "appCfg": [
+      "test"
+    ]
+  },
+  {
+    "name": "workspace dependency identity",
+    "files": {
+      "app/src/lib.rs": "pub fn helper()->u32{11} pub fn run()->u32{tracing::info!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[workspace]\nmembers=[\"app\"]\n[workspace.dependencies]\ntracing=\"=0.1.44\"\n",
+      "app/Cargo.toml": "[package]\nname=\"app\"\nversion=\"0.0.0\"\nedition=\"2024\"\n[dependencies]\ntracing.workspace=true\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "tracing",
+    "macro": "info",
+    "route": "qualified",
+    "async": false,
+    "result": false,
+    "nativeFile": "app/src/lib.rs"
+  },
+  {
+    "name": "binding macro alias",
+    "files": {
+      "src/lib.rs": "use tracing::info as notice;pub fn helper()->u32{11}pub fn run()->u32{notice!(\"x\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nversion=\"0.0.0\"\nedition=\"2024\"\n[dependencies]\ntracing=\"=0.1.44\"\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11
+  },
+  {
+    "name": "binding dependency alias",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11}pub fn run()->u32{logs::info!(\"x\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nversion=\"0.0.0\"\nedition=\"2024\"\n[dependencies]\nlogs={package=\"tracing\",version=\"=0.1.44\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "nativeAliases": {
+      "logs": "tracing"
+    }
+  },
+  {
+    "name": "binding proven empty glob",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate log;mod prelude {pub const N:u32=1;}use prelude::*;pub fn helper()->u32{11}pub fn run()->u32{info!(\"x\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nversion=\"0.0.0\"\nedition=\"2024\"\n[dependencies]\nlog=\"=0.4.35\"\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11
+  },
+  {
+    "name": "competing glob import defeats macro_use",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate log;mod prelude{pub use evil::info;}use prelude::*;pub fn helper()->u32{11}pub fn run()->u32{info!(\"x\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nversion=\"0.0.0\"\nedition=\"2024\"\n[dependencies]\nlog=\"=0.4.35\"\nevil={path=\"../evil\"}\n"
+    },
+    "unknown": "helper",
+    "would": "helper",
+    "evil": true,
+    "nativeError": "E0659"
+  },
+  {
+    "name": "unrelated registry package renamed to tracing",
+    "files": {
+      "src/lib.rs": "pub fn helper()->u32{11} pub fn run()->u32{tracing::info!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nversion=\"0.0.0\"\nedition=\"2024\"\n[dependencies]\ntracing={package=\"unrelated\",version=\"=0.1.44\"}\n"
+    },
+    "ecosystem": "tracing",
+    "macro": "info",
+    "route": "qualified",
+    "async": false,
+    "result": false,
+    "unknown": "helper",
+    "would": "helper"
+  },
+  {
+    "name": "latest macro_use wins",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate dep;#[macro_use]extern crate other;pub fn run()->u32{bail!()}",
+      "dep/src/lib.rs": "pub fn helper()->u32{2} #[macro_export]macro_rules! bail{()=>{$crate::helper()}}",
+      "other/src/lib.rs": "#[macro_export]macro_rules! bail{()=>{3u32}}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"dep\"]\n[dependencies]\ndep={path=\"dep\"}\nother={path=\"other\"}\n",
+      "dep/Cargo.toml": "[package]\nname=\"dep\"\nversion=\"1.0.0\"\nedition=\"2024\"\n",
+      "other/Cargo.toml": "[package]\nname=\"other\"\nversion=\"1.0.0\"\nedition=\"2024\"\n"
+    },
+    "definite": {
+      "name": "bail",
+      "identity": "bail",
+      "kind": "macros"
+    },
+    "targetFile": "other/src/lib.rs",
+    "nativeAnswer": 3,
+    "crossCrate": true,
+    "nativeExtraExtern": {
+      "other": "#[macro_export]macro_rules! bail{()=>{3u32}}"
+    }
+  },
+  {
+    "name": "explicit import beats macro_use",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate dep;use dep::bail;#[macro_use]extern crate other;pub fn run()->u32{bail!()}",
+      "dep/src/lib.rs": "pub fn helper()->u32{2} #[macro_export]macro_rules! bail{()=>{$crate::helper()}}",
+      "other/src/lib.rs": "#[macro_export]macro_rules! bail{()=>{3u32}}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"dep\"]\n[dependencies]\ndep={path=\"dep\"}\nother={path=\"other\"}\n",
+      "dep/Cargo.toml": "[package]\nname=\"dep\"\nversion=\"1.0.0\"\nedition=\"2024\"\n",
+      "other/Cargo.toml": "[package]\nname=\"other\"\nversion=\"1.0.0\"\nedition=\"2024\"\n"
+    },
+    "definite": {
+      "name": "bail",
+      "identity": "bail",
+      "kind": "macros"
+    },
+    "targetFile": "dep/src/lib.rs",
+    "nativeAnswer": 2,
+    "crossCrate": true,
+    "nativeExtraExtern": {
+      "other": "#[macro_export]macro_rules! bail{()=>{3u32}}"
+    }
+  },
+  {
+    "name": "later uncaptured macro_use defeats earlier proof",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate dep;#[macro_use]extern crate mystery;pub fn run()->u32{bail!()}",
+      "dep/src/lib.rs": "pub fn helper()->u32{2} #[macro_export]macro_rules! bail{()=>{$crate::helper()}}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"dep\"]\n[dependencies]\ndep={path=\"dep\"}\nmystery=\"1\"\n",
+      "dep/Cargo.toml": "[package]\nname=\"dep\"\nversion=\"1.0.0\"\nedition=\"2024\"\n"
+    },
+    "nativeAnswer": 3,
+    "crossCrate": true,
+    "nativeExtraExtern": {
+      "mystery": "#[macro_export]macro_rules! bail{()=>{3u32}}"
+    },
+    "unknown": "bail",
+    "kind": "macros",
+    "would": "bail"
+  },
+  {
+    "name": "macro_use named list ignores other names",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate dep;#[macro_use(other)]extern crate mystery;pub fn run()->u32{bail!()}",
+      "dep/src/lib.rs": "pub fn helper()->u32{2} #[macro_export]macro_rules! bail{()=>{$crate::helper()}}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"dep\"]\n[dependencies]\ndep={path=\"dep\"}\nmystery=\"1\"\n",
+      "dep/Cargo.toml": "[package]\nname=\"dep\"\nversion=\"1.0.0\"\nedition=\"2024\"\n"
+    },
+    "definite": {
+      "name": "bail",
+      "identity": "bail",
+      "kind": "macros"
+    },
+    "targetFile": "dep/src/lib.rs",
+    "nativeAnswer": 2,
+    "crossCrate": true,
+    "nativeExtraExtern": {
+      "mystery": "#[macro_export]macro_rules! other{()=>{3u32}}"
+    }
+  },
+  {
+    "name": "foreign export guard does not inherit caller feature",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate dep;#[cfg(feature=\"x\")]pub fn run()->u32{bail!()}",
+      "dep/src/lib.rs": "# [cfg(feature=\"x\")] #[macro_export]macro_rules! bail{()=>{2u32}}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"dep\"]\n[dependencies]\ndep={path=\"dep\"}\n",
+      "dep/Cargo.toml": "[package]\nname=\"dep\"\nversion=\"1.0.0\"\nedition=\"2024\"\n"
+    },
+    "nativeAnswer": 2,
+    "crossCrate": true,
+    "depCfg": [
+      "feature=\"x\""
+    ],
+    "appCfg": [
+      "feature=\"x\""
+    ],
+    "unknown": "bail",
+    "kind": "macros",
+    "would": "bail"
+  },
+  {
+    "name": "exported macro lives at crate root",
+    "files": {
+      "src/lib.rs": "pub fn run()->u32{dep::bail!()}",
+      "dep/src/lib.rs": "mod inner {#[macro_export]macro_rules! bail{()=>{2u32}}}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"dep\"]\n[dependencies]\ndep={path=\"dep\"}\n",
+      "dep/Cargo.toml": "[package]\nname=\"dep\"\nversion=\"1.0.0\"\nedition=\"2024\"\n"
+    },
+    "definite": {
+      "name": "dep::bail",
+      "identity": "inner::bail",
+      "kind": "macros"
+    },
+    "targetFile": "dep/src/lib.rs",
+    "nativeAnswer": 2,
+    "crossCrate": true
+  },
+  {
+    "name": "availability plain extern std",
+    "files": {
+      "src/lib.rs": "#![no_std]extern crate std; pub struct A;pub struct B; impl A {pub fn read(self)->u32{11}} impl B{pub fn read(self)->u32{22}}use dep::*;pub fn run(a:A)->u32{println!(a);a.read()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ndep=\"1\"\n"
+    },
+    "unknown": "a.read",
+    "would": "impl B::read",
+    "nativeName": "println",
+    "nativeAnswer": 22,
+    "nativeFailedReplacement": false
+  },
+  {
+    "name": "availability conditional no_std",
+    "files": {
+      "src/lib.rs": "#![cfg_attr(feature=\"nostd\",no_std)] pub struct A;pub struct B; impl A {pub fn read(self)->u32{11}} impl B{pub fn read(self)->u32{22}}use dep::*;pub fn run(a:A)->u32{println!(a);a.read()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ndep=\"1\"\n"
+    },
+    "unknown": "a.read",
+    "would": "impl B::read",
+    "nativeName": "println",
+    "nativeAnswer": 22,
+    "nativeFailedReplacement": false,
+    "appCfg": [
+      "feature=\"nostd\""
+    ]
+  },
+  {
+    "name": "availability caller excludes no_std",
+    "files": {
+      "src/lib.rs": "#![cfg_attr(feature=\"nostd\",no_std)] pub struct A;pub struct B; impl A {pub fn read(self)->u32{11}} impl B{pub fn read(self)->u32{22}}#[cfg(feature=\"nostd\")]use dep::*;#[cfg(not(feature=\"nostd\"))]pub fn run(a:A)->u32{println!();a.read()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ndep=\"1\"\n"
+    },
+    "nativeName": "println",
+    "nativeAnswer": 11,
+    "nativeFailedReplacement": false,
+    "definite": {
+      "name": "a.read",
+      "identity": "impl A::read"
+    }
+  },
+  {
+    "name": "macro_use prelude disabled by no_implicit_prelude",
+    "files": {
+      "src/lib.rs": "#![no_implicit_prelude]#[macro_use]extern crate dep;pub fn run()->u32{bail!()}",
+      "dep/src/lib.rs": "pub fn helper()->u32{2} #[macro_export]macro_rules! bail{()=>{$crate::helper()}}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"dep\"]\n[dependencies]\ndep={path=\"dep\"}\n",
+      "dep/Cargo.toml": "[package]\nname=\"dep\"\nversion=\"1.0.0\"\nedition=\"2024\"\n"
+    },
+    "crossCrate": true,
+    "nativeError": "cannot find macro",
+    "absent": "bail",
+    "kind": "macros"
+  },
+  {
+    "name": "explicit macro import with no_implicit_prelude",
+    "files": {
+      "src/lib.rs": "#![no_implicit_prelude]extern crate tracing;use tracing::info;pub fn helper()->u32{11} pub fn run()->u32{info!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntracing = {version=\"=0.1.44\"}\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper"
+    },
+    "nativeAnswer": 11,
+    "ecosystem": "tracing",
+    "macro": "info",
+    "route": "use",
+    "async": false,
+    "result": false
+  },
+  {
+    "name": "conditional macro_use dependency is not unconditional",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate tracing;pub fn helper()->u32{11} pub fn run()->u32{info!(\"message\");helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntracing = {version=\"=0.1.44\",optional=true}\n"
+    },
+    "ecosystem": "tracing",
+    "macro": "info",
+    "route": "macro_use",
+    "async": false,
+    "result": false,
+    "unknown": "helper",
+    "would": "helper"
+  },
+  {
+    "name": "foreign cfg_attr export guard stays conditional",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate dep;#[cfg(feature=\"x\")]pub fn run()->u32{bail!()}",
+      "dep/src/lib.rs": "#[cfg_attr(feature=\"x\",macro_export)]macro_rules! bail{()=>{2u32}}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"dep\"]\n[dependencies]\ndep={path=\"dep\"}\n",
+      "dep/Cargo.toml": "[package]\nname=\"dep\"\nversion=\"1.0.0\"\nedition=\"2024\"\n"
+    },
+    "nativeAnswer": 2,
+    "crossCrate": true,
+    "depCfg": [
+      "feature=\"x\""
+    ],
+    "appCfg": [
+      "feature=\"x\""
+    ],
+    "unknown": "bail",
+    "kind": "macros",
+    "would": "bail"
+  },
+  {
+    "name": "workspace macro_use into child module file",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate dep;mod child;pub use child::run;",
+      "dep/src/lib.rs": "pub fn helper()->u32{2} #[macro_export]macro_rules! bail{()=>{$crate::helper()}}",
+      "src/child.rs": "pub fn run()->u32{bail!()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"dep\"]\n[dependencies]\ndep={path=\"dep\"}\n",
+      "dep/Cargo.toml": "[package]\nname=\"dep\"\nversion=\"1.0.0\"\nedition=\"2024\"\n"
+    },
+    "definite": {
+      "name": "bail",
+      "identity": "bail",
+      "kind": "macros"
+    },
+    "targetFile": "dep/src/lib.rs",
+    "nativeAnswer": 2,
+    "crossCrate": true
+  },
+  {
+    "name": "effective cfg_attr macro_use",
+    "files": {
+      "src/lib.rs": "#[cfg_attr(all(),macro_use)]extern crate dep;pub fn run()->u32{bail!()}",
+      "dep/src/lib.rs": "pub fn helper()->u32{2} #[macro_export]macro_rules! bail{()=>{$crate::helper()}}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"dep\"]\n[dependencies]\ndep={path=\"dep\"}\n",
+      "dep/Cargo.toml": "[package]\nname=\"dep\"\nversion=\"1.0.0\"\nedition=\"2024\"\n"
+    },
+    "definite": {
+      "name": "bail",
+      "identity": "bail",
+      "kind": "macros"
+    },
+    "targetFile": "dep/src/lib.rs",
+    "nativeAnswer": 2,
+    "crossCrate": true
+  },
+  {
+    "name": "false cfg_attr macro_use does not override previous import",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate other;#[cfg_attr(any(),macro_use)]extern crate dep;pub fn run()->u32{bail!()}",
+      "dep/src/lib.rs": "pub fn helper()->u32{2} #[macro_export]macro_rules! bail{()=>{$crate::helper()}}",
+      "other/src/lib.rs": "#[macro_export]macro_rules! bail{()=>{3u32}}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"dep\"]\n[dependencies]\ndep={path=\"dep\"}\nother={path=\"other\"}\n",
+      "dep/Cargo.toml": "[package]\nname=\"dep\"\nversion=\"1.0.0\"\nedition=\"2024\"\n",
+      "other/Cargo.toml": "[package]\nname=\"other\"\nversion=\"1.0.0\"\nedition=\"2024\"\n"
+    },
+    "definite": {
+      "name": "bail",
+      "identity": "bail",
+      "kind": "macros"
+    },
+    "targetFile": "other/src/lib.rs",
+    "nativeAnswer": 3,
+    "crossCrate": true,
+    "nativeExtraExtern": {
+      "other": "#[macro_export]macro_rules! bail{()=>{3u32}}"
+    }
+  },
+  {
+    "name": "foreign cfg alternatives form a closed macro set",
+    "files": {
+      "src/lib.rs": "pub fn run()->u32{dep::bail!()}",
+      "dep/src/lib.rs": "#[cfg(feature=\"x\")]#[macro_export]macro_rules! bail{()=>{2u32}}#[cfg(not(feature=\"x\"))]#[macro_export]macro_rules! bail{()=>{3u32}}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"dep\"]\n[dependencies]\ndep={path=\"dep\"}\n",
+      "dep/Cargo.toml": "[package]\nname=\"dep\"\nversion=\"1.0.0\"\nedition=\"2024\"\n"
+    },
+    "nativeAnswer": 3,
+    "crossCrate": true,
+    "closed": {
+      "name": "dep::bail",
+      "kind": "macros",
+      "count": 2
+    }
+  }
+]
