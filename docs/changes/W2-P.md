@@ -135,10 +135,15 @@ because their gaps are all grammar-level.
 
 ## Notes for the follow-up chunks
 
-- **Pin the corpus.** The corpus counts come from live checkouts and caches:
-  Vector has since moved to `edfcf9000`, and restic now has 570 `.go` files.
-  Follow-up chunks must gate on a pinned or exported corpus, not on whatever
-  is checked out.
+- **Pin the corpus.** The measurements used clean shallow clones of Vector at
+  `515e87d9` (1,564 files walked) and restic at `c734245` (559 files walked;
+  how to recreate them: `evidence/w2-p/README.md`). The long-lived trial
+  checkouts on this machine do not reproduce these counts. The Vector trial
+  checkout is at `edfcf9000`, 3 commits older, and also has 19 untracked
+  trial files (1,583 walked). The restic trial checkout is at `c734245` but
+  has 11 untracked trial `.go` files (570 walked). Follow-up chunks must gate
+  on a pinned or exported corpus, with the commit and the clone command
+  stated, not on whichever checkout is at hand.
 - **FFI test cases.** `unsafe extern` blocks with variadic declarations
   (`fn printf(fmt: *const c_char, ...)`) and with `#[link(...)]` are the common
   FFI shapes. They must be test cases in the grammar chunk.
