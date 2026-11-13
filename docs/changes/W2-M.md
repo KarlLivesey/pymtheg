@@ -151,3 +151,35 @@ one provenance comparison, no-tree transience, failure-kind validation, the
 indexer or store transient guard, failed-only query filtering, or row-wise
 `resolveLinks` equality. The reproducible harness restores generated JS in finally;
 production source is never mutated, and the final full suite rebuilds it.
+
+## Round 2 confirmation follow-up
+
+Corrected the earlier merge provenance in `evidence/w2-m/round-2/README.md`:
+merge `fb0675d852c4da7dc02bb95a0e799a95a9176634` actually merged main at
+`27d3f81935abbbcd92ffa4d1cdeac1ff49acde41`. The previously recorded `82f53c1d…`
+was false; it is not an ancestor of the round-2 hand-back head. The reproducible
+round-2 audit verifies both recorded hashes against Git, all three test counts
+and zero failures/skips against the raw logs, and all nine assertion-killed
+mutations against their JSON records and individual logs.
+
+Then normally merged current main at `f7a42b1e871b9434367d85a3fa3db6a90ccbd979`
+(merge `3b60fc836b52ec31346e6ade0386af9c4fd1d9f6`, using its actual second parent).
+The imported Go/Rust versions are both 23; TypeScript is
+`16+typescript-5.9.3`. All three compile with the core; language sources are
+unchanged from that merged main, verified by diff and entrypoint blob hashes.
+
+The existing `test/graph-typescript-crash.test.mjs` test “an internal exception
+is reported as the module's fault, transient, distinct from a syntax error, and
+retried” exercises the real TypeScript module through the production indexer:
+an injected internal failure returns `failureKind: "transient"`, then recovers
+on unchanged content after the injected fault is removed. Its tied-config test
+also preserves the transient classification. Both are run unchanged in the
+focused, full and graph suites.
+
+Added the missing content-parse-failure plus thrown-analysis-failure regression.
+It verifies that `!analysisFailed` clears provenance, including after reopening,
+so unchanged content is parsed again; after analysis recovers, the resulting
+content failure can be cached. Deleting that guard fails the new test by assertion.
+The mutation touches only generated JS and is restored in finally. New audit,
+merged-parent/module records and final foreground logs are in
+`evidence/w2-m/round-3/`; test scratch directories are removed in finally.

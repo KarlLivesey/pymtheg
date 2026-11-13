@@ -302,3 +302,55 @@ test("failedFiles excludes partial files beside a failed file, warm and reopened
     assert.deepEqual(store.failedFiles(), expected);
   });
 });
+
+test("analysis exceptions invalidate a content failure before the next index", async () => {
+  await project(async ({ root, store, reopen }) => {
+    await writeFile(join(root, "a.x"), "bad");
+    let parses = 0;
+    let analyses = 0;
+    const registry = new LanguageRegistry([
+      {
+        id: "x",
+        version: "1",
+        extensions: [".x"],
+        parse() {
+          parses++;
+          return failed("syntax");
+        },
+        analyze({ files }) {
+          if (++analyses === 1) throw Error("analysis crash");
+          return files.map((file) => ({
+            path: file.path,
+            result: file.result,
+          }));
+        },
+      },
+    ]);
+    const first = await indexProject(root, registry, store);
+    assert.equal(first.analysisErrors.length, 1);
+    assert.equal(parses, 1);
+    assert.equal(store.isParseFailure("a.x"), false);
+    const hash = store.getFile("a.x").hash;
+    store = reopen();
+    const second = await indexProject(root, registry, store);
+    assert.equal(
+      parses,
+      2,
+      "analysis exception must force unchanged content to be parsed again",
+    );
+    assert.equal(second.indexed, 1);
+    assert.deepEqual(second.analysisErrors, []);
+    assert.equal(store.getFile("a.x").hash, hash);
+    assert.deepEqual(store.getFile("a.x").result.diagnostics, [
+      { message: "syntax" },
+    ]);
+    assert.equal(store.isParseFailure("a.x"), true);
+    const third = await indexProject(root, registry, store);
+    assert.equal(
+      parses,
+      2,
+      "a recovered analysis can retain the valid content cache",
+    );
+    assert.equal(third.unchanged, 1);
+  });
+});
