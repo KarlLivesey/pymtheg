@@ -1,3 +1,4 @@
+import { sharedSourceLabel, sharedProjectPath } from "../storage/paths.js";
 import { storagePath } from "../storage/local.js";
 import { errorMessage } from "../shared/error-message.js";
 import { decodeObservation } from "../implementation/storage.js";
@@ -1520,6 +1521,7 @@ export class StudioService {
               kind: bundle ? ("bundle" as const) : ("upload" as const),
             }
           : importSourceSchema.parse(raw.source);
+      source.label = sharedSourceLabel(this.root, source.label);
       const mode = raw.mode ?? "add";
       if (mode !== "add" && mode !== "refresh")
         throw new StudioError(400, "Choose add or refresh");
@@ -1610,6 +1612,7 @@ export class StudioService {
       current = head
         ? head.documents.map((d) => store.document(head.id, d.path))
         : [];
+    source = { ...source, label: sharedSourceLabel(this.root, source.label) };
     const merged = mergeArchitectureImport(current, documents, source, mode),
       prepared = await prepareAndIndexInWorker(
         current,
@@ -2988,7 +2991,25 @@ export class StudioService {
         await this.path(draft.path, true);
       }
       try {
-        this.recovery = this.recoveryStore.save(expectedRevision, value);
+        const normalized: Record<string, unknown> = {
+          ...value,
+          drafts: value.drafts.map((draft) => ({
+            ...draft,
+            path: sharedProjectPath(this.root, draft.path),
+          })),
+        };
+        if (
+          "context" in value &&
+          value.context &&
+          typeof value.context === "object" &&
+          "file" in value.context &&
+          typeof value.context.file === "string"
+        )
+          normalized.context = {
+            ...value.context,
+            file: sharedProjectPath(this.root, value.context.file),
+          };
+        this.recovery = this.recoveryStore.save(expectedRevision, normalized);
         output = this.recovery;
         this.emit({
           kind: "recovery",

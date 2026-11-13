@@ -1,3 +1,12 @@
+import { sharedSourceLabel, sharedProjectPath } from "../storage/paths.js";
+import {
+  RecordedHistory,
+  initializeRecordedHistory,
+  exportRecordedHistory,
+  recordedHistoryBytes,
+  type HistoryWriter,
+} from "../storage/recorded-history.js";
+import { localHistoryWriter } from "../storage/writer.js";
 import { storageDirectory, openDatabase } from "../storage/local.js";
 import {
   acknowledgementSchema,
@@ -73,6 +82,8 @@ const legacyAcknowledgement = (
 });
 
 export class ArchitectureStore {
+  private recorded?: RecordedHistory;
+  private projectRoot = "";
   private closed = false;
   private readAbort = new AbortController();
   private readTasks = new Set<Promise<ArchitectureIndex | null>>();
@@ -84,7 +95,10 @@ export class ArchitectureStore {
     private snapshotSource?: { path: string; hash: string },
     private storageVersion = 7,
   ) {}
-  static async open(root: string, options: { readOnly?: boolean } = {}) {
+  static async open(
+    root: string,
+    options: { readOnly?: boolean; writer?: HistoryWriter } = {},
+  ) {
     const dir = storageDirectory(root, "planning", !options.readOnly);
     if (!options.readOnly)
       await mkdir(dir, { mode: 0o700, recursive: false }).catch((e) => {
@@ -220,13 +234,24 @@ export class ArchitectureStore {
               JSON.stringify(record),
             );
           }
+        initializeRecordedHistory(db);
         db.exec("PRAGMA user_version=7; COMMIT");
       } catch (error) {
         db.exec("ROLLBACK");
         throw error;
       }
       await chmod(file, 0o600);
-      return new ArchitectureStore(db);
+      const store = new ArchitectureStore(db);
+      store.projectRoot = root;
+      store.recorded = new RecordedHistory(
+        db,
+        options.writer ?? localHistoryWriter(root),
+        () => {
+          if (store.retainedBytes() > architectureLimits.retainedBytes)
+            throw Error("Recorded history exceeds retained-content quota");
+        },
+      );
+      return store;
     } catch (e) {
       db.close();
       if (snapshotDirectory)
@@ -262,6 +287,7 @@ export class ArchitectureStore {
   }
   private retainedBytes() {
     return (
+      recordedHistoryBytes(this.db) +
       Number(
         this.db
           .prepare(
@@ -347,6 +373,10 @@ export class ArchitectureStore {
       throw new ArchitectureConflict("This architecture is open read-only.");
     if (!label.trim() || label.length > 160)
       throw Error("Choose a revision name of 1–160 characters");
+    source = sharedSourceLabel(this.projectRoot, source);
+    for (const document of documents)
+      if (sharedProjectPath(this.projectRoot, document.path) !== document.path)
+        throw Error("Use project-relative shared document paths");
     const supplied = prepared ?? indexArchitecture(documents);
     let snapshotId = supplied.snapshotHash ?? supplied.id;
     const { snapshotHash: discarded, ...snapshotFields } = supplied;
@@ -414,7 +444,7 @@ export class ArchitectureStore {
               .filter((d) => !existingBlob.get(hashes.get(d.path)!))
               .map((d) => [hashes.get(d.path)!, d.text]),
       );
-      const created = new Date().toISOString(),
+      const created = this.recorded!.now(),
         id = hash("checkpoint:" + randomUUID());
       const additional =
         [...novel.values()].reduce(
@@ -451,6 +481,7 @@ export class ArchitectureStore {
           "INSERT INTO meta VALUES('active',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
         )
         .run(id);
+      this.recorded!.capture(index, id, created);
       this.db.exec("COMMIT");
       return this.presentIndex(
         id,
@@ -659,7 +690,7 @@ export class ArchitectureStore {
           id: hash("review:" + randomUUID()),
           against: expectedActive,
           ...metadata,
-          created: new Date().toISOString(),
+          created: this.recorded!.now(),
         });
         if (
           Number(
@@ -677,6 +708,12 @@ export class ArchitectureStore {
         this.db
           .prepare("INSERT INTO acknowledgement_records VALUES(?,?,?,?)")
           .run(record.id, tip, expectedActive, JSON.stringify(record));
+        this.recorded!.record(
+          "acknowledgement",
+          record.id,
+          record,
+          expectedActive,
+        );
         this.db
           .prepare("INSERT OR IGNORE INTO checkpoint_reviews VALUES(?,?)")
           .run(tip, expectedActive);
@@ -716,11 +753,12 @@ export class ArchitectureStore {
         JSON.parse(String(row.record)),
       );
       if (!original.withdrawal) {
-        const withdrawal = { ...metadata, created: new Date().toISOString() },
+        const withdrawal = { ...metadata, created: this.recorded!.now() },
           record = acknowledgementSchema.parse({ ...original, withdrawal });
         this.db
           .prepare("UPDATE acknowledgement_records SET record=? WHERE id=?")
           .run(JSON.stringify(record), id);
+        this.recorded!.record("acknowledgement", id, record, expectedActive);
         // A legacy pair-only archive must not resurrect a withdrawn acknowledgement.
         const legacy = legacyAcknowledgement(
           String(row.checkpoint),
@@ -927,6 +965,9 @@ export class ArchitectureStore {
       index,
       documents,
     };
+  }
+  exportRecordedHistory() {
+    return exportRecordedHistory(this.db);
   }
   exportHistory() {
     const snapshots = this.db
@@ -1338,8 +1379,18 @@ export class ArchitectureStore {
   saveDraft(expectedVersion: number, raw: unknown) {
     if (this.readOnly)
       throw new ArchitectureConflict("This architecture is open read-only.");
-    const draft = architectureDraftSchema.nullable().parse(raw),
-      text = JSON.stringify(draft);
+    const draft = architectureDraftSchema.nullable().parse(raw);
+    if (draft?.kind === "document")
+      draft.document.path = sharedProjectPath(
+        this.projectRoot,
+        draft.document.path,
+      );
+    if (draft?.kind === "plan" && draft.target)
+      draft.target.document = sharedProjectPath(
+        this.projectRoot,
+        draft.target.document,
+      );
+    const text = JSON.stringify(draft);
     if (Buffer.byteLength(text) > architectureLimits.documentBytes)
       throw Error("Architecture draft exceeds 16 MiB");
     this.db.exec("BEGIN IMMEDIATE");
@@ -1354,6 +1405,12 @@ export class ArchitectureStore {
           "INSERT INTO authoring_draft VALUES('active',?,?) ON CONFLICT(key) DO UPDATE SET version=excluded.version,json=excluded.json",
         )
         .run(expectedVersion + 1, text);
+      this.recorded!.record(
+        "architecture-draft",
+        "active",
+        draft,
+        this.activeRevisionId(),
+      );
       this.db.exec("COMMIT");
       return { version: expectedVersion + 1, draft };
     } catch (error) {
