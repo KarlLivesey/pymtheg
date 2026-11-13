@@ -92,7 +92,7 @@ test("observe --list discovers candidates without parsing source or retaining me
     assert.equal(invalid.status, 3);
     assert.match(invalid.stderr, /omit files, --retain/);
     await assert.rejects(
-      readFile(join(root, ".pymtheg-architecture", "architecture.sqlite")),
+      readFile(join(root, ".pymtheg/shared", "architecture.sqlite")),
       { code: "ENOENT" },
     );
   } finally {

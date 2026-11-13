@@ -100,7 +100,7 @@ test("Studio and HTTP version search read metadata without changing retained his
       );
     store.close();
     store = null;
-    const path = join(root, ".pymtheg-architecture/architecture.sqlite"),
+    const path = join(root, ".pymtheg/shared/architecture.sqlite"),
       before = await readFile(path);
     app = await startStudio({ path: root });
     const res = await fetch(

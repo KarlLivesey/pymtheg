@@ -49,7 +49,7 @@ test("MCP lists pinned candidate files before a workspace exists, then captures 
     });
     assert.deepEqual(first.files, ["main.ts"]);
     await assert.rejects(
-      readFile(join(root, ".pymtheg-architecture", "architecture.sqlite")),
+      readFile(join(root, ".pymtheg/shared", "architecture.sqlite")),
       { code: "ENOENT" },
     );
     await writeFile(join(root, "later.ts"), "export const later = 1;");
@@ -240,7 +240,7 @@ test("real MCP retains code versions, pages both graphs and records explicit stu
     assert.equal(unlinked.items[0].status, "unlinked");
     assert.equal(await readFile(join(root, "main.ts"), "utf8"), source);
     const before = await readFile(
-      join(root, ".pymtheg-architecture/architecture.sqlite"),
+      join(root, ".pymtheg/shared/architecture.sqlite"),
     );
     await call(client, "read_implementation", {
       section: "versions",
@@ -248,7 +248,7 @@ test("real MCP retains code versions, pages both graphs and records explicit stu
     });
     await call(client, "read_implementation", { section: "graph", limit: 1 });
     assert.deepEqual(
-      await readFile(join(root, ".pymtheg-architecture/architecture.sqlite")),
+      await readFile(join(root, ".pymtheg/shared/architecture.sqlite")),
       before,
     );
   } finally {

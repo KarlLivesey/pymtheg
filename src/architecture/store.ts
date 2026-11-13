@@ -1,3 +1,4 @@
+import { storageDirectory, openDatabase } from "../storage/local.js";
 import {
   acknowledgementSchema,
   mergeAcknowledgement,
@@ -84,7 +85,7 @@ export class ArchitectureStore {
     private storageVersion = 7,
   ) {}
   static async open(root: string, options: { readOnly?: boolean } = {}) {
-    const dir = resolve(root, ".pymtheg-architecture");
+    const dir = storageDirectory(root, "planning", !options.readOnly);
     if (!options.readOnly)
       await mkdir(dir, { mode: 0o700, recursive: false }).catch((e) => {
         if (e.code !== "EEXIST") throw e;
@@ -101,7 +102,6 @@ export class ArchitectureStore {
       } catch (e) {
         if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
       }
-    const { DatabaseSync } = await import("node:sqlite");
     let databaseFile = file,
       snapshotDirectory: string | undefined,
       snapshotSource: { path: string; hash: string } | undefined;
@@ -135,7 +135,7 @@ export class ArchitectureStore {
         };
       }
     }
-    const db = new DatabaseSync(databaseFile, {
+    const db = openDatabase(databaseFile, {
       readOnly: options.readOnly ?? false,
     });
     try {

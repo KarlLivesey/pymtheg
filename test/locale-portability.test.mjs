@@ -178,7 +178,7 @@ test("stored content checksums reject a valid replacement blob under an unchange
     store = null;
     const { DatabaseSync } = await import("node:sqlite");
     const db = new DatabaseSync(
-      join(root, ".pymtheg-architecture", "architecture.sqlite"),
+      join(root, ".pymtheg/shared", "architecture.sqlite"),
     );
     const replacement = "different but internally hashed";
     const digest = hash(replacement);

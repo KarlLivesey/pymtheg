@@ -11,7 +11,7 @@ test("read-only architecture browsing preserves the database bytes and permissio
   const { DatabaseSync } = await import("node:sqlite");
   const root = await mkdtemp(join(tmpdir(), "pym-readonly-"));
   let store, service;
-  const directory = join(root, ".pymtheg-architecture"),
+  const directory = join(root, ".pymtheg/shared"),
     file = join(directory, "architecture.sqlite");
   try {
     store = await ArchitectureStore.open(root);
@@ -69,7 +69,7 @@ test("legacy projection rebuilding uses an owned worker that can be cancelled be
     store.close();
     const { DatabaseSync } = await import("node:sqlite");
     const db = new DatabaseSync(
-      join(root, ".pymtheg-architecture", "architecture.sqlite"),
+      join(root, ".pymtheg/shared", "architecture.sqlite"),
     );
     db.prepare("UPDATE revisions SET index_json=?").run(
       JSON.stringify({ ...index, indexVersion: 3 }),

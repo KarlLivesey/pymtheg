@@ -237,7 +237,7 @@ test("comparison HTTP is read-only and retains explicit legacy limits", async ()
     );
     const legacy = f.store.save("Legacy links", "fixture", documents);
     f.store.close();
-    const db = join(f.root, ".pymtheg-architecture/architecture.sqlite");
+    const db = join(f.root, ".pymtheg/shared/architecture.sqlite");
     const old = await readFile(db);
     app = await startStudio({ path: f.root });
     const query = {

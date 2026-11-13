@@ -27,8 +27,9 @@ test("project scenarios are discovered from imported file directories", async ()
   const dir = await mkdtemp(join(tmpdir(), "pym-config-"));
   try {
     await mkdir(join(dir, "source"));
+    await mkdir(join(dir, ".pymtheg"), { recursive: true });
     await writeFile(
-      join(dir, ".pymtheg.json"),
+      join(dir, ".pymtheg/settings.json"),
       JSON.stringify({
         version: 1,
         scenarios: {

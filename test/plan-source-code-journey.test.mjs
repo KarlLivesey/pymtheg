@@ -66,7 +66,7 @@ test("source review, code gaps and retained versions stay distinct through a rol
       ).items[0].status,
       "body-present",
     );
-    const database = join(root, ".pymtheg-architecture", "architecture.sqlite");
+    const database = join(root, ".pymtheg/shared", "architecture.sqlite");
     const beforeReads = await readFile(database);
     await writeFile(
       join(root, "pay.pym"),

@@ -13,7 +13,8 @@ const root = await mkdtemp(join(tmpdir(), "pym-a11y-"));
 let browser, app, typedRoot;
 try {
   await cp("examples", join(root, "examples"), { recursive: true });
-  await cp(".pymtheg.json", join(root, ".pymtheg.json"));
+  await mkdir(join(root, ".pymtheg"), { recursive: true });
+  await cp(".pymtheg/settings.json", join(root, ".pymtheg/settings.json"));
   app = await startStudio({ path: root });
   browser = await browserType().launch({
     headless: true,

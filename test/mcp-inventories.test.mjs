@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
-import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
@@ -17,8 +17,9 @@ test("large project inventories page consistently while source and configuration
     for (let i = 0; i < names.length; i++)
       await writeFile(join(root, names[i]), `flow file${i}() -> Unit {}`);
     const assumption = "scope assumption ".repeat(3000);
+    await mkdir(join(root, ".pymtheg"), { recursive: true });
     await writeFile(
-      join(root, ".pymtheg.json"),
+      join(root, ".pymtheg/settings.json"),
       JSON.stringify({
         version: 1,
         scenarios: {

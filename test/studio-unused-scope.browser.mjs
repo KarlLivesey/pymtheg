@@ -1,7 +1,7 @@
 import { browserExecutable, browserType } from "./browser-launch.mjs";
 import { chromium, expect as baseExpect } from "@playwright/test";
 import assert from "node:assert/strict";
-import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startStudio } from "../dist/studio/server.js";
@@ -13,8 +13,9 @@ const source =
   "op mk() -> Int ensures result > 5; op need(v: Int) -> Int requires v > 0; flow main() -> Int { call mk() as c; let k = c - 10; call need(k) as d; return d; }";
 try {
   await writeFile(join(root, "main.pym"), source);
+  await mkdir(join(root, ".pymtheg"), { recursive: true });
   await writeFile(
-    join(root, ".pymtheg.json"),
+    join(root, ".pymtheg/settings.json"),
     JSON.stringify({
       version: 1,
       scenarios: {

@@ -32,7 +32,7 @@ try {
   const database = join(
     root,
     "local",
-    ".pymtheg-architecture",
+    ".pymtheg/shared",
     "architecture.sqlite",
   );
   const legacy = new DatabaseSync(database);

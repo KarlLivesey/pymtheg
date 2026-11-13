@@ -158,9 +158,9 @@ test("legacy storage migrates transactionally without dropping documents", async
   const root = await mkdtemp(join(tmpdir(), "pym-arch-legacy-"));
   let store;
   try {
-    await mkdir(join(root, ".pymtheg-architecture"));
+    await mkdir(join(root, ".pymtheg/shared"), { recursive: true });
     const db = new DatabaseSync(
-      join(root, ".pymtheg-architecture/architecture.sqlite"),
+      join(root, ".pymtheg/shared/architecture.sqlite"),
     );
     const doc = source(),
       index = indexArchitecture([doc]);

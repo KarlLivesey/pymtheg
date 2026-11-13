@@ -22,7 +22,7 @@ test("blank initialization is idempotent, portable and discoverable from a child
     assert.equal(first.created, true);
     const bytes = await readFile(join(root, ".pymtheg/project.json"), "utf8");
     assert.deepEqual(
-      JSON.parse(await readFile(join(root, ".pymtheg.json"), "utf8")),
+      JSON.parse(await readFile(join(root, ".pymtheg/settings.json"), "utf8")),
       { version: 1, scenarios: {} },
     );
     assert.equal((await initializeWorkspace(root)).created, false);
@@ -45,14 +45,22 @@ test("initialization preserves existing configuration and concurrent initializer
   try {
     const config =
       '{"version":1,"scenarios":{},"sources":{"include":["design/**/*.pym"]}}';
-    await writeFile(join(root, ".pymtheg.json"), config);
+    await mkdir(join(root, ".pymtheg"), { recursive: true });
+    await writeFile(join(root, ".pymtheg/settings.json"), config);
     const results = await Promise.all(
       Array.from({ length: 8 }, () => initializeWorkspace(root)),
     );
     assert.equal(new Set(results.map((r) => r.workspace.id)).size, 1);
     assert.equal(results.filter((r) => r.created).length, 1);
-    assert.equal(await readFile(join(root, ".pymtheg.json"), "utf8"), config);
-    assert.deepEqual(await readdir(join(root, ".pymtheg")), ["project.json"]);
+    assert.equal(
+      await readFile(join(root, ".pymtheg/settings.json"), "utf8"),
+      config,
+    );
+    assert.deepEqual((await readdir(join(root, ".pymtheg"))).sort(), [
+      ".gitignore",
+      "project.json",
+      "settings.json",
+    ]);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -128,10 +136,11 @@ test("the CLI initializes an empty directory without generating example source",
     assert.equal(result.status, 0, result.stderr);
     const info = JSON.parse(result.stdout);
     assert.equal(info.workspace.name, "Empty design");
-    assert.deepEqual((await readdir(root)).sort(), [
-      ".pymtheg",
-      ".pymtheg-architecture",
-      ".pymtheg.json",
+    assert.deepEqual((await readdir(root)).sort(), [".pymtheg"]);
+    assert.deepEqual((await readdir(join(root, ".pymtheg"))).sort(), [
+      ".gitignore",
+      "project.json",
+      "settings.json",
     ]);
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -164,14 +173,15 @@ test("reinitialization does not hide invalid configuration or replace the projec
   try {
     await initializeWorkspace(root);
     const marker = await readFile(join(root, ".pymtheg/project.json"), "utf8");
-    await writeFile(join(root, ".pymtheg.json"), "not json");
+    await mkdir(join(root, ".pymtheg"), { recursive: true });
+    await writeFile(join(root, ".pymtheg/settings.json"), "not json");
     await assert.rejects(initializeWorkspace(root));
     assert.equal(
       await readFile(join(root, ".pymtheg/project.json"), "utf8"),
       marker,
     );
     assert.equal(
-      await readFile(join(root, ".pymtheg.json"), "utf8"),
+      await readFile(join(root, ".pymtheg/settings.json"), "utf8"),
       "not json",
     );
   } finally {
@@ -300,8 +310,8 @@ test("nested init reuses the parent identity and keeps SQLite out of Git", async
       "git",
       [
         "check-ignore",
-        ".pymtheg-architecture/architecture.sqlite",
-        ".pymtheg-architecture/architecture.sqlite-wal",
+        ".pymtheg/shared/architecture.sqlite",
+        ".pymtheg/shared/architecture.sqlite-wal",
       ],
       { cwd: root, encoding: "utf8" },
     );

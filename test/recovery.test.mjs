@@ -55,7 +55,7 @@ test("killing a writer before commit leaves the previous draft intact", async ()
         "--input-type=module",
         "-e",
         `import {DatabaseSync} from 'node:sqlite';const db=new DatabaseSync(process.argv[1]);db.exec('BEGIN IMMEDIATE');db.prepare('UPDATE workspace SET payload=? WHERE id=1').run(JSON.stringify({drafts:[],context:null}));console.log('READY');setInterval(()=>{},1000);`,
-        join(root, ".pymtheg-studio/workspace.sqlite"),
+        join(root, ".pymtheg/shared/drafts.sqlite"),
       ],
       { stdio: ["ignore", "pipe", "pipe"] },
     );
