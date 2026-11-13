@@ -1,0 +1,638 @@
+[
+  {
+    "name": "std print",
+    "files": {
+      "src/main.rs": "pub struct A; impl A { pub fn take(self)->u16 { 2 } } pub enum E { V } pub const K:u8=1; pub fn target()->u16{3} pub fn run(a:A)->u16{print!(\"ok\"); let value: A = a; let _ = E::V; let _ = K; value.take() + target()} fn main(){println!(\"RESULT {}\",run(A));}"
+    },
+    "answer": 5,
+    "definite": [
+      {
+        "name": "target",
+        "identity": "target"
+      },
+      {
+        "name": "value.take",
+        "identity": "impl A::take"
+      }
+    ]
+  },
+  {
+    "name": "std println",
+    "files": {
+      "src/main.rs": "pub struct A; impl A { pub fn take(self)->u16 { 2 } } pub enum E { V } pub const K:u8=1; pub fn target()->u16{3} pub fn run(a:A)->u16{println!(\"ok\"); let value: A = a; let _ = E::V; let _ = K; value.take() + target()} fn main(){println!(\"RESULT {}\",run(A));}"
+    },
+    "answer": 5,
+    "definite": [
+      {
+        "name": "target",
+        "identity": "target"
+      },
+      {
+        "name": "value.take",
+        "identity": "impl A::take"
+      }
+    ]
+  },
+  {
+    "name": "std eprint",
+    "files": {
+      "src/main.rs": "pub struct A; impl A { pub fn take(self)->u16 { 2 } } pub enum E { V } pub const K:u8=1; pub fn target()->u16{3} pub fn run(a:A)->u16{eprint!(\"ok\"); let value: A = a; let _ = E::V; let _ = K; value.take() + target()} fn main(){println!(\"RESULT {}\",run(A));}"
+    },
+    "answer": 5,
+    "definite": [
+      {
+        "name": "target",
+        "identity": "target"
+      },
+      {
+        "name": "value.take",
+        "identity": "impl A::take"
+      }
+    ]
+  },
+  {
+    "name": "std eprintln",
+    "files": {
+      "src/main.rs": "pub struct A; impl A { pub fn take(self)->u16 { 2 } } pub enum E { V } pub const K:u8=1; pub fn target()->u16{3} pub fn run(a:A)->u16{eprintln!(\"ok\"); let value: A = a; let _ = E::V; let _ = K; value.take() + target()} fn main(){println!(\"RESULT {}\",run(A));}"
+    },
+    "answer": 5,
+    "definite": [
+      {
+        "name": "target",
+        "identity": "target"
+      },
+      {
+        "name": "value.take",
+        "identity": "impl A::take"
+      }
+    ]
+  },
+  {
+    "name": "std assert",
+    "files": {
+      "src/main.rs": "pub struct A; impl A { pub fn take(self)->u16 { 2 } } pub enum E { V } pub const K:u8=1; pub fn target()->u16{3} pub fn run(a:A)->u16{assert!(true); let value: A = a; let _ = E::V; let _ = K; value.take() + target()} fn main(){println!(\"RESULT {}\",run(A));}"
+    },
+    "answer": 5,
+    "definite": [
+      {
+        "name": "target",
+        "identity": "target"
+      },
+      {
+        "name": "value.take",
+        "identity": "impl A::take"
+      }
+    ]
+  },
+  {
+    "name": "std assert_eq",
+    "files": {
+      "src/main.rs": "pub struct A; impl A { pub fn take(self)->u16 { 2 } } pub enum E { V } pub const K:u8=1; pub fn target()->u16{3} pub fn run(a:A)->u16{assert_eq!(1,1); let value: A = a; let _ = E::V; let _ = K; value.take() + target()} fn main(){println!(\"RESULT {}\",run(A));}"
+    },
+    "answer": 5,
+    "definite": [
+      {
+        "name": "target",
+        "identity": "target"
+      },
+      {
+        "name": "value.take",
+        "identity": "impl A::take"
+      }
+    ]
+  },
+  {
+    "name": "std assert_ne",
+    "files": {
+      "src/main.rs": "pub struct A; impl A { pub fn take(self)->u16 { 2 } } pub enum E { V } pub const K:u8=1; pub fn target()->u16{3} pub fn run(a:A)->u16{assert_ne!(1,2); let value: A = a; let _ = E::V; let _ = K; value.take() + target()} fn main(){println!(\"RESULT {}\",run(A));}"
+    },
+    "answer": 5,
+    "definite": [
+      {
+        "name": "target",
+        "identity": "target"
+      },
+      {
+        "name": "value.take",
+        "identity": "impl A::take"
+      }
+    ]
+  },
+  {
+    "name": "std debug_assert",
+    "files": {
+      "src/main.rs": "pub struct A; impl A { pub fn take(self)->u16 { 2 } } pub enum E { V } pub const K:u8=1; pub fn target()->u16{3} pub fn run(a:A)->u16{debug_assert!(true); let value: A = a; let _ = E::V; let _ = K; value.take() + target()} fn main(){println!(\"RESULT {}\",run(A));}"
+    },
+    "answer": 5,
+    "definite": [
+      {
+        "name": "target",
+        "identity": "target"
+      },
+      {
+        "name": "value.take",
+        "identity": "impl A::take"
+      }
+    ]
+  },
+  {
+    "name": "std debug_assert_eq",
+    "files": {
+      "src/main.rs": "pub struct A; impl A { pub fn take(self)->u16 { 2 } } pub enum E { V } pub const K:u8=1; pub fn target()->u16{3} pub fn run(a:A)->u16{debug_assert_eq!(1,1); let value: A = a; let _ = E::V; let _ = K; value.take() + target()} fn main(){println!(\"RESULT {}\",run(A));}"
+    },
+    "answer": 5,
+    "definite": [
+      {
+        "name": "target",
+        "identity": "target"
+      },
+      {
+        "name": "value.take",
+        "identity": "impl A::take"
+      }
+    ]
+  },
+  {
+    "name": "std debug_assert_ne",
+    "files": {
+      "src/main.rs": "pub struct A; impl A { pub fn take(self)->u16 { 2 } } pub enum E { V } pub const K:u8=1; pub fn target()->u16{3} pub fn run(a:A)->u16{debug_assert_ne!(1,2); let value: A = a; let _ = E::V; let _ = K; value.take() + target()} fn main(){println!(\"RESULT {}\",run(A));}"
+    },
+    "answer": 5,
+    "definite": [
+      {
+        "name": "target",
+        "identity": "target"
+      },
+      {
+        "name": "value.take",
+        "identity": "impl A::take"
+      }
+    ]
+  },
+  {
+    "name": "std vec",
+    "files": {
+      "src/main.rs": "pub struct A; impl A { pub fn take(self)->u16 { 2 } } pub enum E { V } pub const K:u8=1; pub fn target()->u16{3} pub fn run(a:A)->u16{vec![1]; let value: A = a; let _ = E::V; let _ = K; value.take() + target()} fn main(){println!(\"RESULT {}\",run(A));}"
+    },
+    "answer": 5,
+    "definite": [
+      {
+        "name": "target",
+        "identity": "target"
+      },
+      {
+        "name": "value.take",
+        "identity": "impl A::take"
+      }
+    ]
+  },
+  {
+    "name": "std format",
+    "files": {
+      "src/main.rs": "pub struct A; impl A { pub fn take(self)->u16 { 2 } } pub enum E { V } pub const K:u8=1; pub fn target()->u16{3} pub fn run(a:A)->u16{format!(\"ok\"); let value: A = a; let _ = E::V; let _ = K; value.take() + target()} fn main(){println!(\"RESULT {}\",run(A));}"
+    },
+    "answer": 5,
+    "definite": [
+      {
+        "name": "target",
+        "identity": "target"
+      },
+      {
+        "name": "value.take",
+        "identity": "impl A::take"
+      }
+    ]
+  },
+  {
+    "name": "std write",
+    "files": {
+      "src/main.rs": "pub struct A; impl A { pub fn take(self)->u16 { 2 } } pub enum E { V } pub const K:u8=1; pub fn target()->u16{3} pub fn run(a:A)->u16{use std::fmt::Write; let mut output = String::new();write!(&mut output, \"ok\").unwrap(); let value: A = a; let _ = E::V; let _ = K; value.take() + target()} fn main(){println!(\"RESULT {}\",run(A));}"
+    },
+    "answer": 5,
+    "definite": [
+      {
+        "name": "target",
+        "identity": "target"
+      },
+      {
+        "name": "value.take",
+        "identity": "impl A::take"
+      }
+    ]
+  },
+  {
+    "name": "std writeln",
+    "files": {
+      "src/main.rs": "pub struct A; impl A { pub fn take(self)->u16 { 2 } } pub enum E { V } pub const K:u8=1; pub fn target()->u16{3} pub fn run(a:A)->u16{use std::fmt::Write; let mut output = String::new();writeln!(&mut output, \"ok\").unwrap(); let value: A = a; let _ = E::V; let _ = K; value.take() + target()} fn main(){println!(\"RESULT {}\",run(A));}"
+    },
+    "answer": 5,
+    "definite": [
+      {
+        "name": "target",
+        "identity": "target"
+      },
+      {
+        "name": "value.take",
+        "identity": "impl A::take"
+      }
+    ]
+  },
+  {
+    "name": "std dbg",
+    "files": {
+      "src/main.rs": "pub struct A; impl A { pub fn take(self)->u16 { 2 } } pub enum E { V } pub const K:u8=1; pub fn target()->u16{3} pub fn run(a:A)->u16{dbg!(1); let value: A = a; let _ = E::V; let _ = K; value.take() + target()} fn main(){println!(\"RESULT {}\",run(A));}"
+    },
+    "answer": 5,
+    "definite": [
+      {
+        "name": "target",
+        "identity": "target"
+      },
+      {
+        "name": "value.take",
+        "identity": "impl A::take"
+      }
+    ]
+  },
+  {
+    "name": "std matches",
+    "files": {
+      "src/main.rs": "pub struct A; impl A { pub fn take(self)->u16 { 2 } } pub enum E { V } pub const K:u8=1; pub fn target()->u16{3} pub fn run(a:A)->u16{matches!(Some(1), Some(_)); let value: A = a; let _ = E::V; let _ = K; value.take() + target()} fn main(){println!(\"RESULT {}\",run(A));}"
+    },
+    "answer": 5,
+    "definite": [
+      {
+        "name": "target",
+        "identity": "target"
+      },
+      {
+        "name": "value.take",
+        "identity": "impl A::take"
+      }
+    ]
+  },
+  {
+    "name": "std panic",
+    "files": {
+      "src/main.rs": "pub struct A; impl A { pub fn take(self)->u16 { 2 } } pub enum E { V } pub const K:u8=1; pub fn target()->u16{3} pub fn run(a:A)->u16{let answer = target(); return answer; panic!(\"unreachable\");} fn main(){println!(\"RESULT {}\",run(A));}"
+    },
+    "answer": 3,
+    "definite": [
+      {
+        "name": "target",
+        "identity": "target"
+      }
+    ]
+  },
+  {
+    "name": "std todo",
+    "files": {
+      "src/main.rs": "pub struct A; impl A { pub fn take(self)->u16 { 2 } } pub enum E { V } pub const K:u8=1; pub fn target()->u16{3} pub fn run(a:A)->u16{let answer = target(); return answer; todo!();} fn main(){println!(\"RESULT {}\",run(A));}"
+    },
+    "answer": 3,
+    "definite": [
+      {
+        "name": "target",
+        "identity": "target"
+      }
+    ]
+  },
+  {
+    "name": "std unreachable",
+    "files": {
+      "src/main.rs": "pub struct A; impl A { pub fn take(self)->u16 { 2 } } pub enum E { V } pub const K:u8=1; pub fn target()->u16{3} pub fn run(a:A)->u16{let answer = target(); return answer; unreachable!();} fn main(){println!(\"RESULT {}\",run(A));}"
+    },
+    "answer": 3,
+    "definite": [
+      {
+        "name": "target",
+        "identity": "target"
+      }
+    ]
+  },
+  {
+    "name": "std unimplemented",
+    "files": {
+      "src/main.rs": "pub struct A; impl A { pub fn take(self)->u16 { 2 } } pub enum E { V } pub const K:u8=1; pub fn target()->u16{3} pub fn run(a:A)->u16{let answer = target(); return answer; unimplemented!();} fn main(){println!(\"RESULT {}\",run(A));}"
+    },
+    "answer": 3,
+    "definite": [
+      {
+        "name": "target",
+        "identity": "target"
+      }
+    ]
+  },
+  {
+    "name": "std arguments do not bind",
+    "files": {
+      "src/main.rs": "pub struct A; impl A { pub fn f(self)->u16{2} } pub fn target()->u16{3} pub fn run(a:A)->u16 { println!(\"{}\", target()); a.f()+target() } fn main(){println!(\"RESULT {}\",run(A));}"
+    },
+    "answer": 5,
+    "definite": [
+      {
+        "name": "target",
+        "identity": "target"
+      },
+      {
+        "name": "a.f",
+        "identity": "impl A::f"
+      }
+    ]
+  },
+  {
+    "name": "parent definition",
+    "files": {
+      "src/main.rs": "macro_rules! m {()=>{2u16}} mod child; fn main(){println!(\"RESULT {}\",child::run());}",
+      "src/child.rs": "pub fn run()->u16{m!()}"
+    },
+    "answer": 2,
+    "definite": [
+      {
+        "name": "m",
+        "kind": "macros",
+        "identity": "m"
+      }
+    ]
+  },
+  {
+    "name": "macro_use file",
+    "files": {
+      "src/main.rs": "#[macro_use] mod macros; mod child; fn main(){println!(\"RESULT {}\",child::run());}",
+      "src/macros.rs": "macro_rules! m {()=>{2u16}}",
+      "src/child.rs": "pub fn run()->u16{m!()}"
+    },
+    "answer": 2,
+    "definite": [
+      {
+        "name": "m",
+        "kind": "macros",
+        "identity": "m",
+        "file": "src/macros.rs"
+      }
+    ]
+  },
+  {
+    "name": "macro_use nested",
+    "files": {
+      "src/main.rs": "#[macro_use] mod macros; mod child; fn main(){println!(\"RESULT {}\",child::run());}",
+      "src/macros.rs": "#[macro_use] mod inner;",
+      "src/macros/inner.rs": "macro_rules! m {()=>{2u16}}",
+      "src/child.rs": "pub fn run()->u16{m!()}"
+    },
+    "answer": 2,
+    "definite": [
+      {
+        "name": "m",
+        "kind": "macros",
+        "identity": "m",
+        "file": "src/macros/inner.rs"
+      }
+    ]
+  },
+  {
+    "name": "nested child",
+    "files": {
+      "src/main.rs": "macro_rules! m {()=>{2u16}} mod child; fn main(){println!(\"RESULT {}\",child::grand::run());}",
+      "src/child.rs": "pub mod grand;",
+      "src/child/grand.rs": "pub fn run()->u16{m!()}"
+    },
+    "answer": 2,
+    "definite": [
+      {
+        "name": "m",
+        "kind": "macros",
+        "identity": "m"
+      }
+    ]
+  },
+  {
+    "name": "inline parent",
+    "files": {
+      "src/main.rs": "mod outer { macro_rules! m {()=>{2u16}} pub mod child; } fn main(){println!(\"RESULT {}\",outer::child::run());}",
+      "src/outer/child.rs": "pub fn run()->u16{m!()}"
+    },
+    "answer": 2,
+    "definite": [
+      {
+        "name": "m",
+        "kind": "macros",
+        "identity": "outer::m"
+      }
+    ]
+  },
+  {
+    "name": "child shadows parent",
+    "files": {
+      "src/main.rs": "macro_rules! m {()=>{1u8}} mod child; fn main(){println!(\"RESULT {}\",child::run());}",
+      "src/child.rs": "macro_rules! m {()=>{2u16}} pub fn run()->u16{m!()}"
+    },
+    "answer": 2,
+    "definite": [
+      {
+        "name": "m",
+        "kind": "macros",
+        "identity": "m",
+        "file": "src/child.rs"
+      }
+    ]
+  },
+  {
+    "name": "later parent excluded",
+    "files": {
+      "src/main.rs": "macro_rules! m {()=>{2u16}} mod child; macro_rules! m {()=>{1u8}} fn main(){println!(\"RESULT {}\",child::run());}",
+      "src/child.rs": "pub fn run()->u16{m!()}"
+    },
+    "answer": 2,
+    "definite": [
+      {
+        "name": "m",
+        "kind": "macros",
+        "identity": "m",
+        "file": "src/main.rs",
+        "start": 0
+      }
+    ]
+  },
+  {
+    "name": "later macro_use excluded",
+    "files": {
+      "src/main.rs": "macro_rules! m {()=>{2u16}} mod child; #[macro_use] mod later {macro_rules! m {()=>{1u8}}} fn main(){println!(\"RESULT {}\",child::run());}",
+      "src/child.rs": "pub fn run()->u16{m!()}"
+    },
+    "answer": 2,
+    "definite": [
+      {
+        "name": "m",
+        "kind": "macros",
+        "identity": "m",
+        "file": "src/main.rs",
+        "start": 0
+      }
+    ]
+  },
+  {
+    "name": "qualified path ignores parent text",
+    "files": {
+      "src/main.rs": "macro_rules! m {()=>{1u8}} mod sub { #[macro_export] macro_rules! exported {()=>{2u16}} } mod child; fn main(){println!(\"RESULT {}\",child::run());}",
+      "src/child.rs": "pub fn run()->u16{crate::exported!()}"
+    },
+    "answer": 2,
+    "definite": [
+      {
+        "name": "crate::exported",
+        "kind": "macros",
+        "identity": "sub::exported"
+      }
+    ]
+  },
+  {
+    "name": "visible println rebinds receiver",
+    "files": {
+      "src/main.rs": "struct A; struct B; impl A {fn take(self)->u8{1}} impl B {fn take(self)->u16{2}} macro_rules! println {($a:ident)=>{let $a=B;}} fn run(a:A)->u16 { println!(a); a.take() } fn main(){std::println!(\"RESULT {}\",run(A));}"
+    },
+    "answer": 2,
+    "unresolved": [
+      "a.take"
+    ],
+    "would": [
+      {
+        "name": "a.take",
+        "identity": "impl B::take"
+      }
+    ]
+  },
+  {
+    "name": "parent println shadows std in child",
+    "files": {
+      "src/main.rs": "struct A; struct B; impl A {fn take(self)->u8{1}} impl B {fn take(self)->u16{2}} macro_rules! println {($a:ident)=>{let $a=crate::B;}} mod child; fn main(){std::println!(\"RESULT {}\",child::run(A));}",
+      "src/child.rs": "pub fn run(a:crate::A)->u16{println!(a);a.take()}"
+    },
+    "answer": 2,
+    "unresolved": [
+      "a.take"
+    ],
+    "would": [
+      {
+        "name": "a.take",
+        "identity": "impl B::take"
+      }
+    ]
+  },
+  {
+    "name": "explicit macro alias shadows std",
+    "files": {
+      "src/main.rs": "struct A; struct B; impl A {fn take(self)->u8{1}} impl B {fn take(self)->u16{2}} macro_rules! replace {($a:ident)=>{let $a=B;}} use replace as println; fn run(a:A)->u16 { println!(a); a.take() } fn main(){std::println!(\"RESULT {}\",run(A));}"
+    },
+    "answer": 2,
+    "unresolved": [
+      "a.take"
+    ],
+    "would": [
+      {
+        "name": "a.take",
+        "identity": "impl B::take"
+      }
+    ]
+  },
+  {
+    "name": "qualified std ignores local println",
+    "files": {
+      "src/main.rs": "struct A; impl A {fn take(self)->u16{2}} macro_rules! println {()=>{}} fn run(a:A)->u16 { std::println!(\"ok\"); a.take() } fn main(){std::println!(\"RESULT {}\",run(A));}"
+    },
+    "answer": 2,
+    "definite": [
+      {
+        "name": "a.take",
+        "identity": "impl A::take"
+      }
+    ]
+  },
+  {
+    "name": "qualified project std is not sysroot",
+    "files": {
+      "src/main.rs": "struct A; struct B; impl A {fn take(self)->u8{1}} impl B {fn take(self)->u16{2}} #[macro_export] macro_rules! replace {($a:ident)=>{let $a=B;}} mod std {pub(crate) use crate::replace as println;} fn run(a:A)->u16 { std::println!(a); a.take() } fn main(){::std::println!(\"RESULT {}\",run(A));}"
+    },
+    "answer": 2,
+    "unresolved": [
+      "a.take"
+    ],
+    "would": [
+      {
+        "name": "a.take",
+        "identity": "impl B::take"
+      }
+    ]
+  },
+  {
+    "name": "std retains type pattern value and path",
+    "files": {
+      "src/main.rs": "pub struct S {pub x:u16} pub enum E {V} pub const K:u16=2; pub fn target()->u16{3} pub fn run()->u16{println!(\"ok\"); let s:S=S{x:K}; match E::V {E::V=>s.x+target()}} fn main(){println!(\"RESULT {}\",run());}"
+    },
+    "answer": 5,
+    "definite": [
+      {
+        "name": "target",
+        "identity": "target"
+      },
+      {
+        "name": "S",
+        "kind": "types",
+        "identity": "S"
+      },
+      {
+        "name": "E::V",
+        "kind": "patterns",
+        "identity": "E::V"
+      },
+      {
+        "name": "K",
+        "kind": "values",
+        "identity": "K"
+      }
+    ]
+  },
+  {
+    "name": "child macro_use does not feed itself before definition",
+    "files": {
+      "src/main.rs": "macro_rules! m {()=>{2u16}} #[macro_use] mod child; fn main(){println!(\"RESULT {}\",child::run());}",
+      "src/child.rs": "pub fn run()->u16{m!()} macro_rules! m {()=>{1u8}}"
+    },
+    "answer": 2,
+    "definite": [
+      {
+        "name": "m",
+        "kind": "macros",
+        "identity": "m",
+        "file": "src/main.rs"
+      }
+    ]
+  },
+  {
+    "name": "conditional child includes inherited target",
+    "files": {
+      "src/main.rs": "macro_rules! m {()=>{2u16}} mod child; fn main(){println!(\"RESULT {}\",child::run());}",
+      "src/child.rs": "#[cfg(feature=\"x\")] macro_rules! m {()=>{1u8}} pub fn run()->u16{m!() as u16}"
+    },
+    "answer": 2,
+    "featureAnswer": 1,
+    "candidateMacros": 2
+  },
+  {
+    "name": "standard macros in nested block and closure",
+    "files": {
+      "src/main.rs": "pub struct A; impl A {pub fn take(self)->u16{2}} pub fn target()->u16{3} pub fn run(a:A)->u16 { let n=if true {assert_eq!(1,1);target()} else {0}; let f=|b:A| {println!(\"ok\");b.take()}; n+f(a) } fn main(){println!(\"RESULT {}\",run(A));}"
+    },
+    "answer": 5,
+    "definite": [
+      {
+        "name": "target",
+        "identity": "target"
+      },
+      {
+        "name": "b.take",
+        "identity": "impl A::take"
+      }
+    ]
+  }
+]

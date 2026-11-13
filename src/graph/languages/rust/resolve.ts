@@ -1,5 +1,7 @@
 import { implies as cfgImplies, possible as cfgPossible } from "./cfg.js";
 import {
+  scopeNeutralStandardMacros,
+  standardMacroName,
   knownAttributeName,
   attributeRules,
   attributeBindingShadows,
@@ -61,6 +63,9 @@ interface Found {
   failedFiles?: string[];
   bound?: boolean;
   opaqueAttributes?: string[];
+  // Captured import spellings survive even when their target/namespace cannot
+  // be resolved. These are shadowing evidence, never semantic target proofs.
+  possibleImportNames?: string[];
 }
 const unique = (ss: GraphSymbol[]) => [
   ...new Map(ss.map((s) => [s.id, s])).values(),
@@ -239,7 +244,10 @@ export function resolveRust(
         if (libs.has(loc.crate.root)) get(loc.crate.manifest, loc.scope);
       const watched = (name: string) => {
         const rule = attributeRules.get(name);
-        return !!rule && rule.category !== "builtin";
+        return (
+          scopeNeutralStandardMacros.has(name) ||
+          (!!rule && rule.category !== "builtin")
+        );
       };
       for (const symbol of symbols)
         if (data(symbol).visibility === "pub") {
@@ -566,9 +574,9 @@ export function resolveRust(
       )
     )
       conditions = [...conditions, "?module-layout"];
-    return contextOf(s)?.implicit.length
-      ? [...new Set(conditions)].sort()
-      : conditions;
+    // Always return a fresh canonical array, including module-file gates.
+    const canonical = [...new Set(conditions)];
+    return contextOf(s)?.implicit.length ? canonical.sort() : canonical;
   };
   // Captured paths are lexical hints, never evidence about symlinks or
   // rustc's special directory tracking for inner/inline path attributes.
@@ -1117,7 +1125,11 @@ export function resolveRust(
     site: GraphLink,
     loc: Place,
     scope: string,
+    seen = new Set<string>(),
   ): Found | null {
+    const guard = `${site.file}|${scope}|${site.range.start}`;
+    if (seen.has(guard)) return null;
+    seen = new Set([...seen, guard]);
     const entries = [...(textMacrosByName.get(name) ?? []), ...unseenTextMacros]
       .filter(
         (e) =>
@@ -1145,7 +1157,43 @@ export function resolveRust(
       targets.push(entry.symbol);
       if (present(targets, loc)) break;
     }
-    if (!targets.length && !unseen.size) return null;
+    // A child inherits the parent's textual environment at its declaration,
+    // not at the end of the parent file. Local unconditional definitions win.
+    let boundary: Place | null = loc;
+    while (boundary?.parent && boundary.parent.file === site.file)
+      boundary = boundary.parent;
+    let inherited =
+      boundary?.parent && boundary.symbol
+        ? textualMacro(
+            name,
+            {
+              ...site,
+              file: boundary.parent.file,
+              range: boundary.symbol.range,
+            },
+            {
+              ...boundary.parent,
+              conditions: [
+                ...(boundary.parent.conditions ?? []),
+                ...(loc.conditions ?? []),
+              ],
+            },
+            str(data(boundary.symbol).scope),
+            seen,
+          )
+        : null;
+    if (inherited && (boundary?.directoryUnverified || boundary?.uncertain))
+      inherited = {
+        ...inherited,
+        complete: false,
+        reason: "module-layout-unverified",
+      };
+    if (!targets.length && !unseen.size) return inherited;
+    if (inherited && !present(targets, loc)) {
+      targets.push(...inherited.symbols);
+      if (!inherited.complete)
+        unseen.add(inherited.reason ?? "macro-applicability-unverified");
+    }
     // A fallback can guarantee coverage without proving each alternative's
     // applicability (for example, a conditional module-file layout).
     if (targets.some((s) => conditionsFor(s).some((c) => c.includes("?"))))
@@ -1228,11 +1276,15 @@ export function resolveRust(
   const empty = (complete = true): Found => ({ symbols: [], complete });
   const merge = (xs: Found[]): Found => {
     const causes = xs.flatMap((x) => x.failedFiles ?? []);
+    const possibleImportNames = [
+      ...new Set(xs.flatMap((x) => x.possibleImportNames ?? [])),
+    ];
     const alternatives = xs.some(
       (x) => !x.failedFiles?.length && (x.symbols.length || !x.complete),
     );
     return causes.length
       ? {
+          possibleImportNames,
           ...(alternatives
             ? { complete: false, reason: "failed-file-unseen-declarations" }
             : broken(causes)),
@@ -1242,6 +1294,7 @@ export function resolveRust(
           ].sort(),
         }
       : {
+          possibleImportNames,
           symbols: unique(xs.flatMap((x) => x.symbols)),
           complete: xs.every((x) => x.complete),
           reason: [...new Set(xs.map((x) => x.reason).filter(Boolean))].join(
@@ -1489,6 +1542,13 @@ export function resolveRust(
       found: Found,
       bindings: (GraphSymbol | GraphLink)[],
     ): Found => {
+      if (!rest.length && bindings.some((binding) => "targetName" in binding))
+        found = {
+          ...found,
+          possibleImportNames: [
+            ...new Set([...(found.possibleImportNames ?? []), name]),
+          ],
+        };
       // Declaration bindings are already namespace-filtered. An explicit use
       // needs independent proof about its first segment, not its members or
       // an unknown external namespace. Unknown is not a binding in every ns.
@@ -1983,6 +2043,7 @@ export function resolveRust(
     const conditionalTargets: GraphSymbol[] = [];
     const fallbackReasons: string[] = [];
     const fallbackAttributes: string[] = [];
+    const fallbackImportNames: string[] = [];
     if (forcedExtern)
       result = dependencyLookup(
         first,
@@ -2053,6 +2114,7 @@ export function resolveRust(
             local !== loc.local
           ) {
             conditionalTargets.push(...found.symbols);
+            fallbackImportNames.push(...(found.possibleImportNames ?? []));
             fallbackAttributes.push(...(found.opaqueAttributes ?? []));
             fallbackReasons.push(
               found.reason || "namespace-binding-unverified",
@@ -2127,6 +2189,12 @@ export function resolveRust(
       result = {
         ...outer,
         symbols: unique([...conditionalTargets, ...result.symbols]),
+        possibleImportNames: [
+          ...new Set([
+            ...fallbackImportNames,
+            ...(result.possibleImportNames ?? []),
+          ]),
+        ],
         opaqueAttributes: [
           ...new Set([
             ...fallbackAttributes,
@@ -2388,8 +2456,77 @@ export function resolveRust(
     }
     return false;
   }
+  // Visible captured bindings defeat the std assumption. Checking the whole
+  // project for definitions is intentionally conservative; imports are checked
+  // in the caller's lexical module. Unseen output is ignored under E4.
+  const visibleMacroNames = new Set(
+    symbols
+      .filter((s) => s.kind === "macro" || data(s).semanticKind === "macro")
+      .map((s) => s.name),
+  );
+
+  for (const f of ctx.files)
+    for (const b of (data(f.result).attributeBindings ?? []) as {
+      macroUseImports?: MacroUseImport[];
+    }[])
+      for (const request of b.macroUseImports ?? []) {
+        for (const name of request.names ?? []) visibleMacroNames.add(name);
+        if (!request.names)
+          for (const name of scopeNeutralStandardMacros)
+            if (readableMacroUseBinds(name, f.path, "", [request]))
+              visibleMacroNames.add(name);
+      }
+  const visiblePrefixes = new Set(
+    symbols
+      .filter((s) => ["module", "type", "struct", "enum"].includes(s.kind))
+      .map((s) => s.name),
+  );
+  for (const l of ctx.links)
+    if (l.kind === "imports" && !data(l).glob)
+      visiblePrefixes.add(str(data(l).alias));
+  for (const c of packages)
+    for (const name of c.deps.keys()) visiblePrefixes.add(name);
+  function importedStandardName(
+    file: string,
+    scope: string,
+    name: string,
+  ): boolean {
+    return ownerPlace(file, scope).some((loc) => {
+      let local = scope;
+      while (true) {
+        if (importsByScope.get(`${file}|${local}`)?.explicit.has(name))
+          return true;
+        if (!local || local === loc.local) break;
+        local = local.includes("::")
+          ? local.slice(0, local.lastIndexOf("::"))
+          : "";
+      }
+      const found = find(name, loc, scope, "macro");
+      return (
+        !!found.symbols.length || !!found.possibleImportNames?.includes(name)
+      );
+    });
+  }
+  // E4: failed/unverified textual entries are unseen code. Assume they do
+  // not rebind the standard names; ordinary textual macro lookup stays strict.
+  const unsafeStandardScopes = new Set<string>();
   for (const f of ctx.files)
     for (const loc of ownerPlace(f.path, "")) {
+      for (const entry of (data(f.result).standardMacroScopes ?? []) as {
+        name: string;
+        scope: string;
+        start?: number;
+      }[])
+        if (
+          (entry.name.includes("::")
+            ? visiblePrefixes.has(entry.name.replace(/^::/, "").split("::")[0]!)
+            : visibleMacroNames.has(standardMacroName(entry.name)!) ||
+              importedStandardName(f.path, entry.scope, entry.name)) ||
+          ownerPlace(f.path, entry.scope).some((p) => p.noImplicitPrelude)
+        ) {
+          opaqueScopes.add(`${loc.crate.root}|${qualified(loc, entry.scope)}`);
+          unsafeStandardScopes.add(`${f.path}|${entry.scope}`);
+        }
       for (const scope of (data(f.result).opaqueItemScopes ?? []) as string[])
         opaqueScopes.add(`${loc.crate.root}|${qualified(loc, scope)}`);
       for (const e of (data(f.result).opaqueAttributes ?? []) as {
@@ -2407,6 +2544,8 @@ export function resolveRust(
             );
         }
     }
+  memo.clear();
+  unprovedImports.clear();
   // Only captured dependency edges prove reach. Unknown edges never accuse a
   // failed file in an unrelated crate; they cannot justify invalid-code.
   const dependencyGraphKnown = packages.every(
@@ -3076,7 +3215,26 @@ export function resolveRust(
   }
   const resolutions: LinkResolution[] = [];
   for (const l of ctx.links) {
-    const d = data(l);
+    let d = data(l);
+    let scope = str(d.scope);
+    let unsafe = false;
+    while (true) {
+      unsafe ||= unsafeStandardScopes.has(`${l.file}|${scope}`);
+      if (!scope) break;
+      scope = scope.includes("::")
+        ? scope.slice(0, scope.lastIndexOf("::"))
+        : "";
+    }
+    if (unsafe)
+      d = {
+        ...d,
+        blocked: d.blocked || d.stdFallbackBlocked || false,
+        conditionalBinding:
+          d.conditionalBinding || d.stdFallbackConditional || false,
+        receiverType: d.stdFallbackReceiverUnknown
+          ? ""
+          : (d.receiverType ?? ""),
+      };
     let found: Found = empty();
     if (l.kind === "contains")
       found = {
