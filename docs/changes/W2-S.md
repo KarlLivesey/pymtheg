@@ -14,10 +14,20 @@ in the next chunk.
   failing. On restic `c734245`, `internal/ui/termstatus/status_test.go` is now
   read. Its two `new(…)` calls resolve to restic's own `func new`.
 - Go module version 22 → 23. The parser that produces the stored results has
-  changed, so stored Go results are re-parsed once. The corpus comparison
-  below shows that every file that parsed before produces the same output.
-- Two Go module changes were needed because the grammar now produces trees it
-  could not produce before:
+  changed, so stored Go results are re-parsed once.
+- **Files that parsed before keep their output except where a newly read file
+  changes what they can see.** Measured on the pinned corpus (below):
+  - **Control comparison** (main's build on each project _without_ the newly
+    read files, against this branch's build): 0 changed files, symbols or
+    links.
+  - **Full project against main** (restic): 174 previously parsed files
+    change. All the changes come from `status_test.go` no longer being a
+    failed file: links lose the `declarations-may-be-unseen` reason and
+    candidates that could not be ruled out before, builtin calls lose their
+    `invalid-code` cause, and one `implements` identity goes from unknown to
+    identical. Exact counts are under Evidence.
+- Three Go module changes were needed because the grammar now produces trees
+  it could not produce before:
   - **Generic methods** (`extract.ts`, `methodDeclaration`): a method's own
     type parameters are scoped like a generic function's, and the method gets
     `generic: true`. Without this, a method type parameter `U` read as a
@@ -28,19 +38,34 @@ in the next chunk.
     value, so `p := new(S(v)); p.M()` resolves to `(S).M`. Under the old
     grammar this argument was always a type node, so no previously parsed file
     can reach the new branch.
-- Known limit, not a wrong result: an explicitly instantiated generic method
-  call `t.Map[C](x)` stays unresolved. The grammar reads it as a conversion to
-  a package-qualified generic type `t.Map[C]`, the same shape as `pkg.F[T](x)`.
-  Describing a local operand differently would also change existing calls
-  such as `s.handlers[k](req)`. The inferred form `t.Map(x)` resolves.
+  - **Interface satisfaction** (`resolve.ts`, `hasMethod` and the dispatch
+    fallback): a method with its own type parameters is never matched
+    against an interface method. Go rejects it ("wrong type for method",
+    checked by a test with `go vet`). Before this, `func (Box) Map[U any](x int) string`
+    produced `Box implements Mapper` (identity "identical") and made
+    `(Box).Map` a candidate for `m.Map(1)`. A non-generic method on a generic
+    type (`func (Gen[T]) Map(x int) string`) still implements, as in Go. A
+    direct call on a value of unknown type (`x.Map(1)`) still lists generic
+    methods of that name, because such a call can reach one.
+- Known limits, not wrong results:
+  - An explicitly instantiated generic method call `t.Map[C](x)` stays
+    unresolved. The grammar reads it as a conversion to a package-qualified
+    generic type `t.Map[C]`, the same shape as `pkg.F[T](x)`. Describing a
+    local operand differently would also change existing calls such as
+    `s.handlers[k](req)`. The inferred form `t.Map(x)` resolves.
+  - `new(variable)`: with `x` a variable, both `new(x).M()` and
+    `p := new(x); p.M()` stay unresolved. The grammar keeps the type reading
+    of `x` (a type identifier that names a local), which the module describes
+    as unknown. `new(S(v))`, `new(S)` and other expressions that cannot read
+    as a type resolve.
 
 ## Gaps that remain (tests: `test/graph-go-grammar.test.mjs`)
 
-| Shape                                                                    | Outcome                                                                                                                                                                                   |
-| ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Empty statement `;` right after `{` (function literal, body, `if` block) | File fails (as before)                                                                                                                                                                    |
-| Non-BMP identifier on web-tree-sitter's 5,119-unit chunk boundary        | File fails (runtime limit; fix belongs to `src/graph/tree-sitter.ts`, another chunk)                                                                                                      |
-| No final newline after the last `}` / `)`                                | Read (as on main): the grammar reports only a zero-width missing terminator at end of file, which the Go module's error walk does not reach. Go accepts the file and the tree is complete |
+| Shape                                                                                                                                                          | Outcome                                                                                                                                                                                   |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| An empty statement (`;` directly after `{` or after another `;`) followed by another statement **on the same line**: `{; G() }`, `{ ; G() }`, `{ G(); ; G() }` | File fails (as before). `;` before a newline (`{;` then a new line), `{;}`, `{ ; }`, `G();;` at the end of a line and `L: ;` are read                                                     |
+| Non-BMP identifier on web-tree-sitter's 5,119-unit chunk boundary                                                                                              | File fails (runtime limit; fix belongs to `src/graph/tree-sitter.ts`, another chunk)                                                                                                      |
+| No final newline after the last `}` / `)`                                                                                                                      | Read (as on main): the grammar reports only a zero-width missing terminator at end of file, which the Go module's error walk does not reach. Go accepts the file and the tree is complete |
 
 ## Evidence (`evidence/w2-s/`)
 
@@ -61,12 +86,24 @@ in the next chunk.
   - **Byte-identical apart from the version field**: all 18 module-cache
     entries, and both controls (restic without the file, the toolchain subset
     without the two files).
-  - **restic**: 1 failed file → 0. It gains 14 symbols and 146 links of its
-    own (plus the package's `contains` link to it), and both `new(…)` calls
-    resolve to restic's `func new`. Links in 174 other
-    files lose the `declarations-may-be-unseen` reason, and 30 builtin calls
-    lose their `invalid-code` cause. Both existed only because a failed file
-    might have declared the names.
+  - **restic, full project against main** (`diffs/restic.txt`): 1 failed
+    file → 0. `status_test.go` gains 14 symbols and 146 links of its own (plus
+    the package's `contains` link to it), and both its `new(…)` calls resolve
+    to restic's `func new`. In the other 558 files: 174 files change
+    (0 symbols, 1,387 links):
+    - 1,355 links in 172 files lose the `declarations-may-be-unseen` reason;
+    - 168 of those links (167 calls, 1 reference; all stay ambiguous) also
+      lose candidates, 551 candidate entries in all;
+    - 30 builtin calls lose their `invalid-code` cause. This is all that
+      changes in the two other files, `stdio_wrapper.go` and
+      `stdio_wrapper_test.go`;
+    - 1 `implements` link (`status.go`, `Terminal`) goes from identity
+      `unknown` to `identical`;
+    - 1 `contains` link is added.
+
+    Every one of these existed only because a failed file might have declared
+    names in that package.
+
   - **Toolchain subset**: 2 failed files (`encoding/json/v2/arshal_test.go`,
     a parameter named `make`; `runtime/secret/secret_test.go`, `new(T(v))`)
     → 0. They gain 556 symbols and 8,299 links of their own (plus two
@@ -78,6 +115,13 @@ in the next chunk.
     reaching a declaration in a newly read file, an overflow candidate count
     grown by that file's same-named declarations, or the package's `contains`
     link to the new file.
+
+- **Round-1 fixes re-checked** (`restic-rerun-round1.txt`): after the
+  interface-satisfaction change, the restic full-project diff, the restic
+  control (0 changes) and `explain-restic.txt` are identical to the outputs
+  above. restic declares no generic methods. Module version stays 23: `main`
+  has 22, so 23 already forces the one re-parse, and no file that parses on
+  `main` changes output because of the round-1 changes.
 - `fixtures-go-vet.txt`: `go vet ./...` (Go 1.27.4) passes on
   `test/fixtures/graph-go/grammar`.
 - `npm-pack.txt`, `clean-build.txt`: package contents and a clean

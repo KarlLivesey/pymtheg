@@ -35,4 +35,4 @@ MIT) plus:
 
 Not taken: PR #190, which changes the tree of 1,785 files that already parse
 (W2-P). Built with tree-sitter CLI 0.27.2, wasi-sdk 34.0 and binaryen
-version_132. Two independent builds gave the same bytes.
+version_132. Three builds from these inputs gave the same bytes: W2-P's scratch build, this chunk's `--write` build and the verify run in `evidence/w2-s/build-verify.txt`.

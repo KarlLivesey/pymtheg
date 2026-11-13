@@ -4,7 +4,14 @@
 // output also in evidence/w2-s/fixtures-go-vet.txt).
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFileSync, readdirSync } from "node:fs";
+import {
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { test } from "node:test";
 import { call, project } from "./fixtures/graph-go/harness.mjs";
@@ -158,10 +165,75 @@ test("Go 1.27 generic methods: declared, called, and their type parameters scope
   assert.equal(call(links, file, "u.Close").target, null);
 });
 
+test(
+  "Go's own check: a generic method does not satisfy an interface method",
+  { skip: go.status !== 0 && "go toolchain not installed" },
+  () => {
+    const scratch = mkdtempSync(join(tmpdir(), "pymtheg-generic-iface-"));
+    try {
+      writeFileSync(
+        join(scratch, "go.mod"),
+        "module example.com/neg\n\ngo 1.27\n",
+      );
+      const source = readFileSync(
+        join(fixture, "fixed/genericiface/genericiface.go"),
+        "utf8",
+      );
+      writeFileSync(join(scratch, "a.go"), source);
+      writeFileSync(
+        join(scratch, "neg.go"),
+        "package genericiface\n\nvar _ Mapper = Box{}\n",
+      );
+      const vet = spawnSync("go", ["vet", "."], {
+        cwd: scratch,
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          GOTOOLCHAIN: "local",
+          GOFLAGS: "-mod=mod",
+          GOWORK: "off",
+        },
+      });
+      assert.notEqual(vet.status, 0);
+      assert.match(
+        vet.stderr,
+        /Box does not implement Mapper \(wrong type for method Map\)/,
+      );
+    } finally {
+      rmSync(scratch, { recursive: true, force: true });
+    }
+  },
+);
+
+test("a generic method is not an implementer or a dispatch candidate; a generic type's plain method is", async () => {
+  const { report, links } = await project(read("fixed/genericiface"));
+  assert.deepEqual(report.failed, []);
+  const file = "fixed/genericiface/genericiface.go";
+  const implementers = links
+    .filter(
+      (link) => link.kind === "implements" && link.targetName === "Mapper",
+    )
+    .map((link) => link.at.split(/[\s[]/)[0])
+    .sort();
+  // `at` is the implementing type's spec; Box is not among them.
+  assert.deepEqual(implementers, ["Gen", "Plain"]);
+  const dispatch = call(links, file, "m.Map");
+  assert.equal(dispatch.target, null);
+  assert.deepEqual(
+    dispatch.candidates,
+    [
+      `${file}:method:Mapper.Map`,
+      `${file}:method:(Gen).Map`,
+      `${file}:method:(Plain).Map`,
+    ].sort(),
+  );
+  assert.ok(!dispatch.candidates.includes(`${file}:method:(Box).Map`));
+});
+
 test("remaining gaps still fail the file honestly", async () => {
   const { report, symbols, links } = await project(read("remaining"));
-  // An empty statement `;` right after `{` (function literal, body, block),
-  // and a non-BMP identifier on web-tree-sitter's 5,119-unit chunk boundary.
+  // An empty statement (`;` after `{` or another `;`) followed by another
+  // statement on the same line, and a non-BMP identifier on web-tree-sitter's 5,119-unit chunk boundary.
   assert.deepEqual(report.failed, [
     "remaining/chunkboundary/chunkboundary.go",
     "remaining/emptyblock/emptyblock.go",
