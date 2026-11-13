@@ -1,5 +1,6 @@
 import type { Finding, Span } from "../shared/identity.js";
 import type { Report } from "./report.js";
+import type { ProjectIR } from "../semantic/core.js";
 export interface SourceLocation extends Span {
   line: number | null;
   column: number | null;
@@ -51,7 +52,7 @@ const guidance: Record<
     title: "A source file was skipped during caller discovery",
     why: "The selected source can still be checked, but the importer inventory may be incomplete.",
     nextStep:
-      "Repair the named file or narrow sources.include/exclude in .pymtheg.json. Use entry scope when you only want the selected import closure.",
+      "Repair the named file or narrow sources.include/exclude in .pymtheg/settings.json. Use entry scope when you only want the selected import closure.",
   },
   L002: {
     title: "These imports form a cycle",
@@ -517,6 +518,22 @@ export function findingPresenter(report: Report) {
           nextStep: `For ${operation}, model request/effect/response with a protocol if they can interleave. Only if treating the call as one indivisible step is intended, add atomic before its semicolon; this is an environment assumption.`,
         };
     }
+    if (finding.code === "T002") {
+      const subtraction =
+        /^Expected Nat, got Int\. (Subtracting from a Nat|The result of this subtraction)/.exec(
+          finding.message,
+        )?.[1];
+      if (subtraction)
+        help = {
+          title:
+            subtraction === "Subtracting from a Nat"
+              ? "Subtracting from a Nat can go below zero"
+              : "This subtraction gives an Int where a Nat is needed",
+          why: "Nat has no negative values, so a subtraction result is typed Int. The checker cannot assume a guard keeps it at zero or above.",
+          nextStep:
+            "If the value can go below zero, change Nat to Int in its declaration; for machine state keep the same finite range. Keep Nat only where the value can never decrease.",
+        };
+    }
     if (finding.code === "B010" && finding.message.startsWith("Invariant "))
       help = {
         title: "A modelled safety rule can fail",
@@ -535,3 +552,73 @@ export function findingPresenter(report: Report) {
     };
   };
 }
+
+/**
+ * Text for `check` when the checked declarations include machines. `check`
+ * establishes types, effects and outcomes only; it never explores machine
+ * events or tests invariants, so a clean `check` says nothing about
+ * behaviour (S20). Returns "" when there is no machine to point at.
+ */
+export function uncheckedBehaviourNotice(
+  ir: ProjectIR,
+  report: Report,
+  invocation: {
+    file?: string;
+    scenario?: string | undefined;
+    scenarioEntry?: string | undefined;
+  } = {},
+): string {
+  const reported = new Set(report.results.map((r) => r.propertyId));
+  const machines = ir.declarations.filter(
+    (d) =>
+      d.kind === "machine" && reported.has(d.id + "/types-effects-outcomes"),
+  );
+  if (!machines.length) return "";
+  // A saved scenario belongs to one entry of the checked file and carries
+  // that entry's scope, so only that entry's command keeps it. If the entry
+  // is a machine imported into the checked file, verify still runs it from
+  // the checked file, so the command names that file.
+  const closure = new Set<string>();
+  const visit = (file: string) => {
+    if (closure.has(file)) return;
+    closure.add(file);
+    for (const imported of ir.snapshot.sources.find((x) => x.file === file)
+      ?.imports ?? [])
+      visit(imported);
+  };
+  if (invocation.file !== undefined) visit(invocation.file);
+  const scenarioMachine =
+    invocation.scenario !== undefined && invocation.file !== undefined
+      ? ir.declarations.filter(
+          (d) =>
+            d.name === invocation.scenarioEntry && closure.has(d.span.file),
+        )
+      : [];
+  const shown = machines.slice(0, 5).map((d) => {
+    const invariants = d.kind === "machine" ? d.invariants.length : 0;
+    const own = scenarioMachine.length === 1 && scenarioMachine[0] === d;
+    const command = own
+      ? `pymtheg verify ${shellWord(invocation.file!)} --entry ${shellWord(d.name)} --scenario ${shellWord(invocation.scenario!)}`
+      : `pymtheg verify ${shellWord(d.span.file)} --entry ${shellWord(d.name)}`;
+    return `  ${d.name} (${invariants} invariant${invariants === 1 ? "" : "s"}): ${command}`;
+  });
+  const more = machines.length - shown.length;
+  if (more > 0)
+    shown.push(`  and ${more} more machine${more === 1 ? "" : "s"}`);
+  const errors = report.diagnostics.some((d) => d.severity === "error");
+  return (
+    [
+      `BEHAVIOUR NOT CHECKED: check covers types, effects and outcomes only. It did not run any machine events or test any invariant, so the results above are not behavioural evidence.`,
+      `To check behaviour, ${errors ? "fix the errors above, then " : ""}run verify for each machine:`,
+      ...shown,
+    ].join("\n") + "\n"
+  );
+}
+/**
+ * One POSIX shell word: plain when safe, otherwise single-quoted. A leading
+ * `=` is quoted because zsh expands `=word` to a command path.
+ */
+export const shellWord = (word: string): string =>
+  /^[\w./@:+-][\w./@:+=-]*$/.test(word)
+    ? word
+    : `'${word.replaceAll("'", `'\\''`)}'`;

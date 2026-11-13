@@ -49,6 +49,7 @@ import {
   type BackendOptions,
 } from "../backends/adapter.js";
 import { findConfig } from "../project/config.js";
+import { uncheckedBehaviourNotice } from "../reporting/explain.js";
 const args = process.argv.slice(2);
 const wantsJson = args.some(
   (a, i) => a === "--format" && args[i + 1] === "json",
@@ -782,7 +783,7 @@ try {
         throw Error(`Missing value for ${key}`);
       options.set(key, value);
     }
-    let selectedScope: unknown;
+    let selectedScope: unknown, scenarioEntry: string | undefined;
     if (options.has("--scenario")) {
       const loaded = await findConfig(dirname(resolve(file)));
       const selected = loaded.config.scenarios[options.get("--scenario")!];
@@ -800,6 +801,7 @@ try {
       for (const [key, value] of Object.entries(defaults))
         if (!options.has(key)) options.set(key, value);
       selectedScope = selected.scope;
+      scenarioEntry = selected.entry;
     }
     if (
       options.has("--format") &&
@@ -989,6 +991,14 @@ try {
       }
     }
     writeReport();
+    if (command === "check" && ir && !wantsJson && !cancel.signal.aborted)
+      process.stdout.write(
+        uncheckedBehaviourNotice(ir, report, {
+          file: resolve(file),
+          scenario: options.get("--scenario"),
+          scenarioEntry,
+        }),
+      );
     process.exitCode = exitStatus(report);
   }
 } catch (e) {
