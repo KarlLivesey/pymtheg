@@ -63,6 +63,9 @@ interface Found {
   failedFiles?: string[];
   bound?: boolean;
   opaqueAttributes?: string[];
+  // Captured import spellings survive even when their target/namespace cannot
+  // be resolved. These are shadowing evidence, never semantic target proofs.
+  possibleImportNames?: string[];
 }
 const unique = (ss: GraphSymbol[]) => [
   ...new Map(ss.map((s) => [s.id, s])).values(),
@@ -571,9 +574,9 @@ export function resolveRust(
       )
     )
       conditions = [...conditions, "?module-layout"];
-    return contextOf(s)?.implicit.length
-      ? [...new Set(conditions)].sort()
-      : conditions;
+    // Always return a fresh canonical array, including module-file gates.
+    const canonical = [...new Set(conditions)];
+    return contextOf(s)?.implicit.length ? canonical.sort() : canonical;
   };
   // Captured paths are lexical hints, never evidence about symlinks or
   // rustc's special directory tracking for inner/inline path attributes.
@@ -1273,11 +1276,15 @@ export function resolveRust(
   const empty = (complete = true): Found => ({ symbols: [], complete });
   const merge = (xs: Found[]): Found => {
     const causes = xs.flatMap((x) => x.failedFiles ?? []);
+    const possibleImportNames = [
+      ...new Set(xs.flatMap((x) => x.possibleImportNames ?? [])),
+    ];
     const alternatives = xs.some(
       (x) => !x.failedFiles?.length && (x.symbols.length || !x.complete),
     );
     return causes.length
       ? {
+          possibleImportNames,
           ...(alternatives
             ? { complete: false, reason: "failed-file-unseen-declarations" }
             : broken(causes)),
@@ -1287,6 +1294,7 @@ export function resolveRust(
           ].sort(),
         }
       : {
+          possibleImportNames,
           symbols: unique(xs.flatMap((x) => x.symbols)),
           complete: xs.every((x) => x.complete),
           reason: [...new Set(xs.map((x) => x.reason).filter(Boolean))].join(
@@ -1534,6 +1542,13 @@ export function resolveRust(
       found: Found,
       bindings: (GraphSymbol | GraphLink)[],
     ): Found => {
+      if (!rest.length && bindings.some((binding) => "targetName" in binding))
+        found = {
+          ...found,
+          possibleImportNames: [
+            ...new Set([...(found.possibleImportNames ?? []), name]),
+          ],
+        };
       // Declaration bindings are already namespace-filtered. An explicit use
       // needs independent proof about its first segment, not its members or
       // an unknown external namespace. Unknown is not a binding in every ns.
@@ -2028,6 +2043,7 @@ export function resolveRust(
     const conditionalTargets: GraphSymbol[] = [];
     const fallbackReasons: string[] = [];
     const fallbackAttributes: string[] = [];
+    const fallbackImportNames: string[] = [];
     if (forcedExtern)
       result = dependencyLookup(
         first,
@@ -2098,6 +2114,7 @@ export function resolveRust(
             local !== loc.local
           ) {
             conditionalTargets.push(...found.symbols);
+            fallbackImportNames.push(...(found.possibleImportNames ?? []));
             fallbackAttributes.push(...(found.opaqueAttributes ?? []));
             fallbackReasons.push(
               found.reason || "namespace-binding-unverified",
@@ -2172,6 +2189,12 @@ export function resolveRust(
       result = {
         ...outer,
         symbols: unique([...conditionalTargets, ...result.symbols]),
+        possibleImportNames: [
+          ...new Set([
+            ...fallbackImportNames,
+            ...(result.possibleImportNames ?? []),
+          ]),
+        ],
         opaqueAttributes: [
           ...new Set([
             ...fallbackAttributes,
@@ -2478,7 +2501,32 @@ export function resolveRust(
           ? local.slice(0, local.lastIndexOf("::"))
           : "";
       }
-      return !!find(name, loc, scope, "macro").symbols.length;
+      const found = find(name, loc, scope, "macro");
+      return (
+        !!found.symbols.length || !!found.possibleImportNames?.includes(name)
+      );
+    });
+  }
+  const standardMacroSites = new Map(
+    ctx.links
+      .filter((l) => l.kind === "macros")
+      .map((l) => [`${l.file}|${l.range.start}`, l]),
+  );
+  function unseenTextualStandardName(
+    file: string,
+    scope: string,
+    start: number | undefined,
+  ): boolean {
+    const site = standardMacroSites.get(`${file}|${start}`);
+    // Older cached parse facts lack a position: do not guess textual scope.
+    if (!site) return true;
+    return ownerPlace(file, scope).some((place) => {
+      const loc = {
+        ...place,
+        conditions: [...(place.conditions ?? []), ...conditionsFor(site)],
+      };
+      const found = textualMacro(compact(site.targetName), site, loc, scope);
+      return !!found && (!found.complete || !!found.symbols.length);
     });
   }
   const unsafeStandardScopes = new Set<string>();
@@ -2487,12 +2535,14 @@ export function resolveRust(
       for (const entry of (data(f.result).standardMacroScopes ?? []) as {
         name: string;
         scope: string;
+        start?: number;
       }[])
         if (
           (entry.name.includes("::")
             ? visiblePrefixes.has(entry.name.replace(/^::/, "").split("::")[0]!)
             : visibleMacroNames.has(standardMacroName(entry.name)!) ||
-              importedStandardName(f.path, entry.scope, entry.name)) ||
+              importedStandardName(f.path, entry.scope, entry.name) ||
+              unseenTextualStandardName(f.path, entry.scope, entry.start)) ||
           ownerPlace(f.path, entry.scope).some((p) => p.noImplicitPrelude)
         ) {
           opaqueScopes.add(`${loc.crate.root}|${qualified(loc, entry.scope)}`);

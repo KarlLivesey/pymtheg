@@ -306,7 +306,11 @@ async function createHelper(): Promise<Helper> {
       }
       const opaqueCrateAliases: string[] = [];
       const opaqueItemScopes = new Set<string>();
-      const standardMacroScopes: { name: string; scope: string }[] = [];
+      const standardMacroScopes: {
+        name: string;
+        scope: string;
+        start: number;
+      }[] = [];
       const neutralMacro = (n: Node): boolean =>
         n.type === "macro_invocation" &&
         standardMacroName(compact(field(n, "macro")?.text ?? "")) !== null;
@@ -840,6 +844,7 @@ async function createHelper(): Promise<Helper> {
         return result;
       }
       const attributeContexts: {
+        sourceConditions: string[];
         shadowable: { name: string; scope: string }[];
         implicit: {
           name: string;
@@ -851,10 +856,16 @@ async function createHelper(): Promise<Helper> {
       const contextIds = new Map<string, number>();
       function attributeContext(n: Node) {
         const context = {
+          sourceConditions: conditionsOn(n),
           shadowable: shadowableOn(n),
           implicit: implicitConditionsOn(n),
         };
-        if (!context.shadowable.length && !context.implicit.length) return {};
+        if (
+          !context.sourceConditions.length &&
+          !context.shadowable.length &&
+          !context.implicit.length
+        )
+          return {};
         const key = JSON.stringify(context);
         let id = contextIds.get(key);
         if (id === undefined) {
@@ -1771,7 +1782,11 @@ async function createHelper(): Promise<Helper> {
             )
           )
             if (neutralMacro(n))
-              standardMacroScopes.push({ name: compact(m!.text), scope });
+              standardMacroScopes.push({
+                name: compact(m!.text),
+                scope,
+                start: m!.startIndex,
+              });
             else opaqueItemScopes.add(scope);
           return;
         }
@@ -2011,6 +2026,9 @@ async function createHelper(): Promise<Helper> {
       }
       attributes(tree.rootNode);
       result.data = {
+        // Source gates are interned separately from derived output conditions,
+        // so cached analyzed facts can be analyzed again without feedback.
+        hasSourceConditions: true,
         attributeContexts,
         attributeBindings: [...attributeBindings.values()].map((b) => ({
           scope: lexicalScopes.get(b.node.id) ?? "",
