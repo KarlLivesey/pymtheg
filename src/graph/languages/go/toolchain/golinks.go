@@ -35,7 +35,8 @@
 //	E  id where message                      first errors (at most 20 in all)
 //	C  file funEnd nameEnd cat class defFile defOff pkg name   call expression
 //	U  file identEnd kind class defFile defOff pkg name        identifier use (not local, not universe)
-//	D  file funEnd ext defFile:defOff,...    interface call: main-module methods reached; ext = implementers outside the main module
+//	D  file funEnd ext defFile:defOff,...    interface call: main-module methods reached ("?": incomplete, a generic
+//	                                         type may implement it); ext = implementers outside the main module
 //	I  typeFile typeOff ifaceFile ifaceOff how                  implements pair (how = value|pointer)
 //	S  key value                             summary
 package main
@@ -579,6 +580,33 @@ func dispatch(pkgs []*pkg, checked map[string]*types.Package, dyn []ifaceCall) {
 		main bool
 	}
 	var cands []cand
+	// Method names of main-module generic types: an instantiation of one may
+	// implement the interface, and the search below does not instantiate, so a
+	// set that could reach such a method is marked incomplete (and the same
+	// for test-file types, below).
+	genericMethods := map[string]bool{}
+	// Method names declared on types in main-module _test.go files: a call in
+	// a plain package also runs in its test binary, where such a type may be
+	// the dynamic value; the search below covers plain packages only.
+	for _, p := range pkgs {
+		if p.Module == nil || !p.Module.Main || (p.ForTest == "" && !strings.HasSuffix(p.ImportPath, "_test")) {
+			continue
+		}
+		tp := checked[p.ImportPath]
+		if tp == nil {
+			continue
+		}
+		for _, tn := range namedTypes(tp) {
+			if !strings.HasSuffix(fset.Position(tn.Pos()).Filename, "_test.go") {
+				continue
+			}
+			if nt, ok := tn.Type().(*types.Named); ok {
+				for i := 0; i < nt.NumMethods(); i++ {
+					genericMethods[nt.Method(i).Name()] = true
+				}
+			}
+		}
+	}
 	for _, p := range pkgs {
 		if p.ForTest != "" || strings.HasSuffix(p.ImportPath, ".test") || strings.Contains(p.ImportPath, " ") {
 			continue
@@ -587,12 +615,21 @@ func dispatch(pkgs []*pkg, checked map[string]*types.Package, dyn []ifaceCall) {
 		if tp == nil {
 			continue
 		}
+		main := p.Module != nil && p.Module.Main
 		for _, tn := range namedTypes(tp) {
 			nt := tn.Type().(*types.Named)
-			if nt.TypeParams().Len() > 0 || types.IsInterface(nt) || nt.Underlying() == types.Typ[types.Invalid] {
+			if nt.TypeParams().Len() > 0 {
+				if main {
+					for i := 0; i < nt.NumMethods(); i++ {
+						genericMethods[nt.Method(i).Name()] = true
+					}
+				}
 				continue
 			}
-			cands = append(cands, cand{nt, p.Module != nil && p.Module.Main})
+			if types.IsInterface(nt) || nt.Underlying() == types.Typ[types.Invalid] {
+				continue
+			}
+			cands = append(cands, cand{nt, main})
 		}
 	}
 	memo := map[string]string{}
@@ -638,6 +675,10 @@ func dispatch(pkgs []*pkg, checked map[string]*types.Package, dyn []ifaceCall) {
 			}
 			sort.Strings(meth)
 			meth = dedup(meth)
+			if genericMethods[d.fn.Name()] {
+				// incomplete: a generic type's method of this name may be reached
+				meth = []string{"?"}
+			}
 			line = fmt.Sprint(ext) + "\t" + strings.Join(meth, ",")
 			if key != "" {
 				memo[key] = line

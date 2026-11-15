@@ -164,14 +164,34 @@ test(
     assert.deepEqual(set.data.open, {
       reason: "external-implementers-possible",
     });
-    // implements: definite, to the interface, only the real implementer.
+    // A generic implementer, or one in a _test.go file, may be the dynamic
+    // value: no implementer set is claimed, the source-only set stands.
+    for (const at of ["s.Shut", "p.Ping"]) {
+      const kept = link(dump, "store/store.go", at);
+      assert.deepEqual(
+        kept.candidates,
+        link(off, "store/store.go", at).candidates,
+        at,
+      );
+      assert.equal(kept.data.toolchain, undefined, at);
+    }
+    // implements: the toolchain's pairs are definite, to the interface, and
+    // the same-count Logger is not one; the generic Pool's source-only link
+    // stands (the toolchain does not instantiate generics).
     const pairs = dump.links.filter((item) => item.kind === "implements");
-    assert.deepEqual(
-      pairs.map((item) => [item.file, item.at, item.target]),
-      [["store/store.go", "Writer", "store/store.go:Writer"]],
-    );
-    assert.equal(pairs[0].data.origin, "toolchain");
-    assert.equal(pairs[0].data.pointerReceiver, true);
+    const verified = pairs
+      .filter((item) => item.data.origin === "toolchain")
+      .map((item) => [item.file, item.at, item.target])
+      .sort();
+    assert.deepEqual(verified, [
+      ["store/store.go", "Writer", "store/store.go:Writer"],
+      ["store/store_test.go", "Pinger", "store/store.go:Pinger"],
+    ]);
+    const writer = pairs.find((item) => item.at === "Writer");
+    assert.equal(writer.data.pointerReceiver, true);
+    const shutter = pairs.find((item) => item.at === "Shutter");
+    assert.equal(shutter.target, null);
+    assert.equal(shutter.data.unverified, "structural-match-unverified");
   },
 );
 

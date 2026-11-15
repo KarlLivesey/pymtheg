@@ -154,6 +154,8 @@ async function toolchainFacts(
     configuration: install.configuration,
     cached: run.cached,
     key: run.key,
+    // An observation only; nothing depends on it.
+    helperMs: Math.round(run.elapsedMs),
     packages: facts.packages,
     universeClean: facts.universe,
     errors: facts.errors.slice(0, 20),
@@ -447,7 +449,7 @@ async function analyze({
 
 const go: LanguageModule = {
   id: ID,
-  version: "23",
+  version: "24",
   extensions: [".go"],
   contextFiles: ["go.mod", "go.work"],
   parse,

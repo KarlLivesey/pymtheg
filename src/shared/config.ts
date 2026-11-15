@@ -97,9 +97,7 @@ export function projectConfig(value: unknown): ProjectConfig {
     throw Error("Project configuration requires version: 1 and scenarios: {}");
   for (const key of Object.keys(value))
     if (
-      !["version", "defaultFile", "scenarios", "sources", "graph"].includes(
-        key,
-      )
+      !["version", "defaultFile", "scenarios", "sources", "graph"].includes(key)
     )
       throw Error(`Unknown project setting: ${key}`);
   if (value.defaultFile !== undefined && typeof value.defaultFile !== "string")

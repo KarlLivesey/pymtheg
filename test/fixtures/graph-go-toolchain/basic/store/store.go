@@ -30,3 +30,19 @@ func (*Base) Close() error { return nil }
 type Conn struct{ *Base }
 
 func Open() *Conn { return &Conn{&Base{}} }
+
+// Shutter's only implementer is generic: an implementer set that does not
+// instantiate generics would miss it, so none is claimed.
+type Shutter interface{ Shut() error }
+
+type Pool[T any] struct{ items []T }
+
+func (*Pool[T]) Shut() error { return nil }
+
+func ShutAll(s Shutter) error { return s.Shut() }
+
+// Pinger's only implementer is declared in a _test.go file: the call also runs
+// in the test binary, so no implementer set is claimed either.
+type Pinger interface{ Ping() }
+
+func PingIt(p Pinger) { p.Ping() }

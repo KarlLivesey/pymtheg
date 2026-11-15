@@ -188,7 +188,10 @@ export function parseFacts(
         ];
         const methods: [string, number, string][] = [];
         let complete = true;
-        for (const item of (list ?? "").split(",").filter(Boolean)) {
+        if (list === "?") complete = false;
+        for (const item of (list ?? "")
+          .split(",")
+          .filter((x) => x && x !== "?")) {
           const split = item.lastIndexOf(":");
           const mfile = item.slice(0, split);
           const offset = u16(mfile, Number(item.slice(split + 1)));

@@ -2198,6 +2198,21 @@ class GoResolver {
     return best;
   }
 
+  private outside?: Set<string>;
+  /** A file the toolchain's configuration leaves out (its links are source-only). */
+  private outsideConfiguration(path: string): boolean {
+    if (!this.outside) {
+      this.outside = new Set();
+      for (const file of this.context.files)
+        if (
+          (file.result.data as { toolchain?: { status?: string } } | undefined)
+            ?.toolchain?.status === "outside-configuration"
+        )
+          this.outside.add(file.path);
+    }
+    return this.outside.has(path);
+  }
+
   private describe(id: string): string {
     const symbol = this.symbolsById.get(id);
     return symbol ? `${symbol.file}:${symbol.identity}` : id;
@@ -2235,9 +2250,31 @@ class GoResolver {
         // interface method alone decides nothing.
         if (!fact.d) return undefined;
         const methods = fact.d.map((at) => this.symbolAt(at));
-        if (methods.some((method) => !method)) return undefined;
+        // A method outside the graph (a failed file, or promoted from an
+        // external embedded type), or an interface method (promoted from an
+        // embedded interface: a nested dispatch the list does not expand):
+        // not a complete set, so the source decision stands.
+        if (
+          methods.some(
+            (method) =>
+              !method ||
+              (method.data as { interface?: boolean } | undefined)?.interface,
+          )
+        )
+          return undefined;
+        // Members the source-only route found in files outside this
+        // configuration (other GOOS, build tags, cgo) are kept: the toolchain
+        // can neither confirm nor refute them.
+        const elsewhere = ids.filter((id) => {
+          const symbol = this.symbolsById.get(id);
+          return !!symbol && this.outsideConfiguration(symbol.file);
+        });
         return {
-          ids: unique([target.id, ...methods.map((method) => method!.id)]),
+          ids: unique([
+            target.id,
+            ...methods.map((method) => method!.id),
+            ...elsewhere,
+          ]),
           definite: false,
           dispatch: true,
           limit: DISPATCH_LIMIT,
@@ -2249,6 +2286,14 @@ class GoResolver {
           from,
         };
       }
+      // A reference to an interface method (a method value): the identifier
+      // names the interface method, but what it calls is a dispatch set; the
+      // source-only set is kept.
+      if (
+        source.dispatch &&
+        (target.data as { interface?: boolean } | undefined)?.interface
+      )
+        return undefined;
       return {
         ids: [target.id],
         definite: true,
@@ -2262,13 +2307,15 @@ class GoResolver {
     // A standard-library, dependency or builtin object: the store has no
     // external symbols, so the link stays as it is, unless the source-only
     // route named a project target (a disagreement: withdrawn).
-    if ((fact.ext || fact.b) && sourceTarget)
+    if ((fact.ext || fact.b) && (sourceTarget || from === "invalid"))
+      // A failed-file cause (a valid file the grammar could not read) is
+      // withdrawn too: go/types checked this link clean.
       return {
         ids: [],
         definite: false,
         toolchain: "external",
         from,
-        sourceOnly: this.describe(sourceTarget),
+        ...(sourceTarget ? { sourceOnly: this.describe(sourceTarget) } : {}),
       };
     return undefined;
   }
@@ -2293,8 +2340,19 @@ class GoResolver {
         pairs.push({ file: file.path, pair });
     }
     if (!universe) return;
-    for (let index = added.length - 1; index >= 0; index--)
-      if (added[index]!.kind === "implements") added.splice(index, 1);
+    // The toolchain lists pairs of non-generic types and interfaces only: a
+    // source-only link of a generic type or interface stands.
+    const generic = (id: string | null | undefined) =>
+      !!id &&
+      !!(this.symbolsById.get(id)?.data as { generic?: boolean } | undefined)
+        ?.generic;
+    for (let index = added.length - 1; index >= 0; index--) {
+      const link = added[index]!;
+      if (link.kind !== "implements") continue;
+      const iface = (link.data as { interfaceId?: string } | undefined)
+        ?.interfaceId;
+      if (!generic(link.sourceId) && !generic(iface)) added.splice(index, 1);
+    }
     const seen = new Set<string>();
     for (const { file, pair } of pairs) {
       const [typeOffset, ifaceFile, ifaceOffset, how] = pair;
