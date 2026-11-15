@@ -44,7 +44,13 @@ const withoutLifetimes = (s: string) =>
     .replace(/,\s*>/g, ">")
     .replace(/<\s*>/g, "");
 type Namespace = "type" | "value" | "macro" | "any" | "import" | "importType";
-type AttributeOrigin = { name: string; scope: string; file: string };
+type AttributeOrigin = {
+  name: string;
+  scope: string;
+  file: string;
+  helper?: true;
+  nested?: boolean;
+};
 type AttributeGate = AttributeOrigin & { condition: string; explicit: boolean };
 interface Place {
   crate: Crate;
@@ -151,6 +157,7 @@ export function resolveRust(
     {
       names: string[];
       unknown: boolean;
+      helperUnknown?: boolean;
       macroUse?: boolean;
       macroUseImports?: MacroUseImport[];
     }
@@ -160,6 +167,7 @@ export function resolveRust(
       scope: string;
       names: string[];
       unknown: boolean;
+      helperUnknown?: boolean;
       macroUse?: boolean;
       macroUseImports?: MacroUseImport[];
     }[]) {
@@ -168,6 +176,7 @@ export function resolveRust(
       attributeBindings.set(key, {
         names: [...new Set([...(old?.names ?? []), ...b.names])],
         unknown: !!old?.unknown || b.unknown,
+        helperUnknown: !!old?.helperUnknown || !!b.helperUnknown,
         macroUse: !!old?.macroUse || !!b.macroUse,
         macroUseImports: [
           ...(old?.macroUseImports ?? []),
@@ -176,7 +185,12 @@ export function resolveRust(
       });
     }
   type AttributeContext = {
-    shadowable: { name: string; scope: string }[];
+    shadowable: {
+      name: string;
+      scope: string;
+      helper?: true;
+      nested?: boolean;
+    }[];
     implicit: {
       name: string;
       scope: string;
@@ -196,17 +210,28 @@ export function resolveRust(
     (contextOf(item)?.implicit ?? []).map((g) => ({ ...g, file: item.file }));
   const origins = (item: GraphSymbol | GraphLink): AttributeOrigin[] =>
     (contextOf(item)?.shadowable ?? []).map((x) => ({ ...x, file: item.file }));
+  const inferredHelperNames = new Set(
+    [...contextsByFile.values()].flatMap((contexts) =>
+      contexts.flatMap((c) =>
+        c.shadowable.filter((a) => a.helper).map((a) => a.name),
+      ),
+    ),
+  );
   // A finite graph of captured module exports. A glob transfers only names
   // visible in its source module; opaque/unreadable output contributes none
   // under E4. This is positive binding evidence, never an export-completeness
   // claim or a semantic target resolution.
   let capturedMacroExports: Map<string, Set<string>> | undefined;
+  let capturedHelperExports: Map<string, Set<string>> | undefined;
+  let buildingHelperExports = false;
   function readableMacroUseBinds(
     head: string,
     file: string,
     scope: string,
     imports: readonly MacroUseImport[],
+    helpersOnly = false,
   ): boolean {
+    if (helpersOnly && buildingHelperExports) return true;
     if (!imports.length) return false;
     head = head.split("::")[0]!;
     const manifests = new Set(
@@ -222,7 +247,9 @@ export function resolveRust(
       ),
     );
     if (!manifests.size) return false;
-    if (!capturedMacroExports) {
+    let captured = helpersOnly ? capturedHelperExports : capturedMacroExports;
+    if (!captured) {
+      if (helpersOnly) buildingHelperExports = true;
       const libs = new Map(
         packages.filter((c) => c.kind === "lib").map((c) => [c.root, c]),
       );
@@ -251,6 +278,7 @@ export function resolveRust(
       const watched = (name: string) => {
         const rule = attributeRules.get(name);
         return (
+          (helpersOnly && inferredHelperNames.has(name)) ||
           scopeNeutralStandardMacros.has(name) ||
           (!!rule && rule.category !== "builtin")
         );
@@ -333,8 +361,15 @@ export function resolveRust(
                   entries = aliases.get(k) ?? [];
                 entries.push({ raw, scope: q, crate: loc.crate });
                 aliases.set(k, entries);
-                if (data(link).visibility === "pub" && watched(alias))
-                  get(loc.crate.manifest, q).add(alias);
+                if (data(link).visibility === "pub" && watched(alias)) {
+                  // macro_use imports only the macro namespace. A captured
+                  // module/type re-export is not a competing helper attribute.
+                  const target = helpersOnly
+                    ? findUsePath(raw, loc, str(data(link).scope), "macro")
+                    : null;
+                  if (!target?.complete || target.symbols.length)
+                    get(loc.crate.manifest, q).add(alias);
+                }
               } else if (data(link).visibility === "pub")
                 globs.push({ raw, scope: q, crate: loc.crate });
             }
@@ -426,7 +461,7 @@ export function resolveRust(
             }
           }
       }
-      capturedMacroExports = new Map(
+      captured = new Map(
         packages
           .filter((c) => c.kind === "lib")
           .map((c) => [
@@ -434,13 +469,81 @@ export function resolveRust(
             exports.get(key(c.manifest, "")) ?? new Set<string>(),
           ]),
       );
+      if (helpersOnly) {
+        capturedHelperExports = captured;
+        buildingHelperExports = false;
+      } else capturedMacroExports = captured;
     }
     for (const manifest of manifests)
-      if (capturedMacroExports.get(manifest)?.has(head)) return true;
+      if (captured.get(manifest)?.has(head)) return true;
     return false;
+  }
+  // E5 (owner): unseen output/exports do not bind inferred derive-helper names.
+  // Captured symbols and named imports still defeat the item-level inference.
+  const assumeUnseenHelperBindings = true;
+  function helperShadowed(origin: AttributeOrigin): boolean {
+    // Stable Rust does not apply procedural attribute macros to fields/variants.
+    if (origin.nested) return false;
+    if (!helperReady) return true;
+    const key = JSON.stringify(origin),
+      cached = helperCache.get(key);
+    if (cached !== undefined) return cached;
+    if (helperBusy.has(key)) return true;
+    helperBusy.add(key);
+    let shadow = false;
+    try {
+      for (const own of ownerPlace(origin.file, origin.scope)) {
+        let loc: Place | null = own;
+        while (loc) {
+          let scope = loc === own ? origin.scope : loc.local;
+          while (true) {
+            const b = attributeBindings.get(loc.file + "|" + scope);
+            if (b) {
+              if (
+                readableMacroUseBinds(
+                  origin.name,
+                  loc.file,
+                  scope,
+                  b.macroUseImports ?? [],
+                  true,
+                ) ||
+                (b.macroUseImports ?? []).some((r) =>
+                  r.names?.includes(origin.name),
+                )
+              )
+                shadow = true;
+              if (
+                !assumeUnseenHelperBindings &&
+                (b.unknown || b.macroUse || b.helperUnknown)
+              )
+                shadow = true; // unseen helper binding
+            }
+            const found = find(origin.name, loc, scope, "macro");
+            if (
+              found.symbols.some(
+                (s) => s.kind === "macro" || data(s).semanticKind === "macro",
+              ) ||
+              found.possibleImportNames?.includes(origin.name)
+            )
+              shadow = true;
+            if (!assumeUnseenHelperBindings && !found.complete) shadow = true; // unseen helper lookup
+            if (!scope) break;
+            scope = scope.includes("::")
+              ? scope.slice(0, scope.lastIndexOf("::"))
+              : "";
+          }
+          loc = loc.parent;
+        }
+      }
+      helperCache.set(key, shadow);
+      return shadow;
+    } finally {
+      helperBusy.delete(key);
+    }
   }
   const attributeShadowCache = new Map<string, boolean>();
   function shadowFromParents(origin: AttributeOrigin): boolean {
+    if (origin.helper) return helperShadowed(origin);
     const key = JSON.stringify(origin),
       cached = attributeShadowCache.get(key);
     if (cached !== undefined) return cached;
@@ -486,6 +589,10 @@ export function resolveRust(
     return result;
   }
   let attributeContextReady = false;
+  let helperReady = false;
+  const helperBusy = new Set<string>();
+  const helperCache = new Map<string, boolean>();
+  const deferredHelpers: AttributeOrigin[] = [];
   const itemPresenceCache = new Map<string, string[]>();
   function itemPresence(item: GraphSymbol | GraphLink): string[] {
     const cached = itemPresenceCache.get(item.id);
@@ -887,11 +994,6 @@ export function resolveRust(
       ]),
     ];
   }
-  if (markPresence)
-    for (const symbol of symbols) {
-      const attributes = itemPresence(symbol);
-      markPresence(symbol, attributes, conditionsFor(symbol));
-    }
   if (markConditions)
     for (const link of ctx.links)
       if (contextOf(link)?.implicit.length)
@@ -2896,8 +2998,12 @@ export function resolveRust(
         raw: string;
         module: string;
         conditions?: string[];
+        name: string;
+        helper?: true;
+        nested?: boolean;
       }[])
-        if (opaqueAttribute(e.raw, loc, e.scope, e.conditions ?? [])) {
+        if (e.helper) deferredHelpers.push({ ...e, file: f.path });
+        else if (opaqueAttribute(e.raw, loc, e.scope, e.conditions ?? [])) {
           const q = qualified(loc, e.scope);
           opaqueScopes.add(`${loc.crate.root}|${q}`);
           if (e.module)
@@ -2926,6 +3032,24 @@ export function resolveRust(
     }
     return fs;
   }
+  helperReady = true;
+  itemPresenceCache.clear();
+  attributeShadowCache.clear();
+  memo.clear();
+  unprovedImports.clear();
+  for (const origin of deferredHelpers)
+    if (helperShadowed(origin))
+      for (const loc of ownerPlace(origin.file, origin.scope))
+        opaqueScopes.add(`${loc.crate.root}|${qualified(loc, origin.scope)}`);
+  itemPresenceCache.clear();
+  helperCache.clear();
+  memo.clear();
+  unprovedImports.clear();
+  if (markPresence)
+    for (const symbol of symbols) {
+      const attributes = itemPresence(symbol);
+      markPresence(symbol, attributes, conditionsFor(symbol));
+    }
   const scopedMembers = (s: GraphSymbol) => membersByOwner.get(s.id) ?? [];
   const unknownImpls = new Map<string, GraphSymbol[]>(),
     unknownInherent = new Set<string>();
