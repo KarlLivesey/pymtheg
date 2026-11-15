@@ -1,13 +1,35 @@
+import { randomUUID } from "node:crypto";
+import { within, processState, killFixtureGroups } from "./process-safety.mjs";
 import { controlledClock as manualClock } from "./controlled-clock.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, writeFile, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runProcess } from "../dist/backends/process.js";
+import { runProcess as productionRunProcess } from "../dist/backends/process.js";
 import { atomicWrite } from "../dist/reporting/publish.js";
 import { parseItf } from "../dist/backends/adapter.js";
-const opts = { cwd: process.cwd(), timeoutMs: 2000, clock: manualClock() };
+const opts = { cwd: process.cwd(), timeoutMs: 2000 };
+function runProcess(command, args, options) {
+  const clock = options.clock ?? manualClock();
+  const token = randomUUID();
+  const running = productionRunProcess(command, args, {
+    ...options,
+    clock,
+    env: { ...(options.env ?? process.env), PYM_TEST_PROCESS_OWNER: token },
+  });
+  return within(
+    running,
+    "process leader reaping and output pipe closure",
+    async () => {
+      // Do not rely on production signaling/escalation to clean a failed test.
+      killFixtureGroups(token);
+      // Deliver any finish callback after independently killing the group.
+      while (clock.pending) clock.fireNext();
+      await within(running, "forced process cleanup after safety failure");
+    },
+  );
+}
 test("process distinguishes success, crash, spawn failure and nonzero result", async () => {
   assert.equal(
     (await runProcess(process.execPath, ["-e", 'console.log("ok")'], opts))
@@ -31,36 +53,51 @@ test("process distinguishes success, crash, spawn failure and nonzero result", a
   assert.equal(crash.kind, "exited");
 });
 test("timeout and cancellation terminate group, including retained pipes and child", async () => {
-  const script =
-    'const c=require("child_process").spawn(process.execPath,["-e","setInterval(()=>{},1000)"],{stdio:"inherit"}); process.on("SIGTERM",()=>{c.once("exit",()=>process.exit(0));c.kill("SIGTERM");}); console.log(c.pid); setInterval(()=>{},1000);';
+  // Both processes ignore TERM, so completion requires the controlled KILL.
+  const leaf = `process.on('SIGTERM',()=>{});process.send('READY');setInterval(()=>{},1000);`;
+  const script = `process.on('SIGTERM',()=>{});const c=require('child_process').spawn(process.execPath,['-e',${JSON.stringify(leaf)}],{stdio:['ignore','inherit','inherit','ipc']});c.once('message',()=>console.log(c.pid));setInterval(()=>{},1000);`;
   const clock = manualClock();
   let ready = "";
+  let triggered = false;
   const p = await runProcess(process.execPath, ["-e", script], {
     ...opts,
     clock,
     onStdout(text) {
       ready += text;
-      if (ready.includes("\n")) clock.fireNext();
+      if (!triggered && ready.includes("\n")) {
+        triggered = true;
+        assert.equal(clock.fireNext(), opts.timeoutMs);
+        assert.equal(clock.fireNext(), 100, "advance TERM grace explicitly");
+      }
     },
   });
   assert.equal(p.kind, "timed_out");
   const pid = Number(p.stdout.trim());
   assert.ok(pid > 0);
-  try {
-    const status = await readFile(`/proc/${pid}/stat`, "utf8");
-    assert.equal(
-      status.slice(status.lastIndexOf(")") + 2).split(" ")[0],
-      "Z",
-      "descendant must not be running",
-    );
-  } catch (e) {
-    if (e.code !== "ENOENT") throw e;
-  }
+  await processState(
+    pid,
+    ["Z"],
+    "descendant termination after group SIGKILL",
+    true,
+  );
   const c = new AbortController();
+  const cancelClock = manualClock();
   const running = runProcess(
     process.execPath,
-    ["-e", 'console.log("READY");setInterval(()=>{},1000)'],
-    { ...opts, signal: c.signal, onStdout: () => c.abort() },
+    [
+      "-e",
+      'process.on("SIGTERM",()=>{});console.log("READY");setInterval(()=>{},1000)',
+    ],
+    {
+      ...opts,
+      clock: cancelClock,
+      signal: c.signal,
+      onStdout: () => {
+        c.abort();
+        assert.equal(cancelClock.fireNext(), opts.timeoutMs);
+        assert.equal(cancelClock.fireNext(), 100);
+      },
+    },
   );
   assert.equal((await running).kind, "cancelled");
 });
