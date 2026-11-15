@@ -197,6 +197,9 @@ export interface GraphStorage {
   /** parseFailure distinguishes cacheable parser failures from retryable project failures. */
   replaceFile(file: GraphFile, parseFailure?: boolean): StorageResult<void>;
   removeFile(path: string): StorageResult<void>;
+  /** Optional: run a sequence of writes as one transaction. If write rejects,
+   * none of its writes are kept; each write inside stays individually atomic. */
+  writeBatch?<T>(write: () => Promise<T>): Promise<T>;
   findSymbols(query?: SymbolQuery): StorageResult<GraphSymbol[]>;
   links(): StorageResult<GraphLink[]>;
   outgoing(id: string, kind?: string): StorageResult<GraphLink[]>;
