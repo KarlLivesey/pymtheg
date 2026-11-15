@@ -19,6 +19,15 @@
   one assigned chunk, push its branch and open a pull request. Reviewers review
   one pull request and do not change its branch. The manager merges passing pull
   requests into main. Builders and reviewers do not start further agents.
+- Heavy work runs on the dev server, not on the workstation (Karl, 15 November
+  2026): dependency installs, builds, the test suite, compiler checks
+  (`go`, `cargo`, `rustc`), grammar builds and corpus indexing. From the
+  worktree run `pymtheg-dev --name <unique-name> -- <command>`; it mirrors the
+  working tree to the server and runs the command there with the pinned
+  toolchains and `PYM_TLC_JAR` set. Pinned corpora are on the server, clean
+  and read-only, at `~/pymtheg-dev/corpora/vector` and `…/restic` (copy, never
+  edit). Use `$PYM_SCRATCH` for scratch, and `pymtheg-dev --name <name>
+  --clean` when finished. Editing, git and `gh` stay local.
 - No package publishing or deployment without Karl's request.
 - Keep agent preview/browser access disabled. CLI/compiler checks need no browser.
   Follow Karl's pc-tools restrictions for any separately authorised browser work.

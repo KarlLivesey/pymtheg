@@ -1,12 +1,16 @@
 import { posix as p } from "node:path";
 import type { ContextFile } from "../../types.js";
 import { readToml, table, type TomlTable, type TomlValue } from "./toml.js";
+import { matchesVersion } from "./macro-catalog.js";
 export type Edition = "2015" | "2018" | "2021" | "2024";
 export interface Dependency {
   name: string;
   manifest: string;
   kind: "normal" | "dev" | "build";
   conditions: string[];
+  packageName?: string;
+  registryVersion?: string | undefined;
+  registryRequirement?: string;
 }
 export interface Crate {
   root: string;
@@ -80,12 +84,55 @@ export function crates(
   contexts: readonly ContextFile[],
   paths: Set<string>,
 ): Crate[] {
-  const docs = contexts.map((c) => ({
-    path: c.path,
-    dir: p.dirname(c.path),
-    value: c.status === "clean" ? readToml(c.text) : null,
-  }));
+  const docs = contexts
+    .filter((c) => p.basename(c.path) === "Cargo.toml")
+    .map((c) => ({
+      path: c.path,
+      dir: p.dirname(c.path),
+      value: c.status === "clean" ? readToml(c.text) : null,
+    }));
   const byPath = new Map(docs.map((d) => [d.path, d]));
+  const locks = new Map(
+    contexts
+      .filter((c) => p.basename(c.path) === "Cargo.lock")
+      .map((c) => [c.path, c.status === "clean" ? readToml(c.text) : null]),
+  );
+  function registrySelection(
+    manifest: string,
+    workspace: string | undefined,
+    owner: string,
+    name: string,
+    requirement: string | undefined,
+  ): Pick<Dependency, "registryVersion" | "registryRequirement"> {
+    if (!requirement) return {};
+    const lockPath = p.join(p.dirname(workspace ?? manifest), "Cargo.lock");
+    // Without a lock, retain the requirement for the semver-family proof.
+    if (!locks.has(lockPath)) return { registryRequirement: requirement };
+    const packages = locks.get(lockPath)?.package;
+    if (!Array.isArray(packages)) return {};
+    const rows = packages.map(table).filter((t): t is TomlTable => !!t);
+    const owners = rows.filter(
+      (t) => t.name === owner && t.source === undefined,
+    );
+    if (owners.length !== 1) return {};
+    const deps = strings(owners[0]!.dependencies);
+    if (!deps) return {};
+    const descriptors = deps.filter((d) => d.split(" ")[0] === name);
+    const candidates = rows.filter(
+      (t) =>
+        t.name === name &&
+        typeof t.version === "string" &&
+        matchesVersion(requirement, t.version) &&
+        descriptors.some((d) => d === name || d.split(" ")[1] === t.version),
+    );
+    if (
+      candidates.length !== 1 ||
+      candidates[0]!.source !==
+        "registry+https://github.com/rust-lang/crates.io-index"
+    )
+      return {};
+    return { registryVersion: string(candidates[0]!.version) };
+  }
   function workspaceFor(doc: (typeof docs)[number]): {
     doc?: typeof doc | undefined;
     known: boolean;
@@ -259,6 +306,8 @@ export function crates(
     for (const group of dependencyTables(value))
       for (const [alias, raw] of Object.entries(group.values)) {
         let fields = table(raw),
+          requirement =
+            typeof raw === "string" ? raw : string(table(raw)?.version),
           origin = doc,
           conditions = group.condition ? [group.condition] : [];
         if (typeof raw !== "string" && !fields) {
@@ -271,6 +320,10 @@ export function crates(
               ? table(ws?.dependencies)?.[alias]
               : undefined;
           const inheritedFields = table(inheritedValue);
+          requirement =
+            typeof inheritedValue === "string"
+              ? inheritedValue
+              : string(inheritedFields?.version);
           if (
             inheritedValue === undefined ||
             (typeof inheritedValue !== "string" && !inheritedFields)
@@ -367,6 +420,24 @@ export function crates(
             manifest: path,
             kind: group.kind,
             conditions: [...conditions],
+            packageName,
+            ...(!alternatives.length &&
+            workspace.known &&
+            (fields?.package === undefined ||
+              typeof fields.package === "string") &&
+            !["path", "git", "registry", "registry-index"].some(
+              (k) => fields?.[k] !== undefined,
+            )
+              ? {
+                  ...registrySelection(
+                    doc.path,
+                    workspace.doc?.path,
+                    name!,
+                    packageName,
+                    requirement,
+                  ),
+                }
+              : {}),
           });
         }
       }

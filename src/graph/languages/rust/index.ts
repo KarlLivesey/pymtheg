@@ -9,9 +9,9 @@ const TARGET_HINT_LIMIT = 16;
 
 const rust: LanguageModule = {
   id: "rust",
-  version: "23",
+  version: "24",
   extensions: [".rs"],
-  contextFiles: ["Cargo.toml"],
+  contextFiles: ["Cargo.toml", "Cargo.lock"],
   parse: parseRust,
   analyze({ projectId, files, contextFiles }) {
     const roots = new Map(
