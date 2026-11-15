@@ -2453,3 +2453,28 @@ the W2-A differential found no conclusive disagreement with TLC. **Rules out:**
 any external checker, runtime or download for behavioural checking; a compatibility
 path for the removed options or fields. **Known limits:** see
 [R1-A](changes/R1-A.md).
+
+### Pymtheg's own licence: RPL-1.5 with an output exception and a plugin statement (LIC-1)
+
+**Decided (Karl, 15 November 2026):** Pymtheg is licensed under the Reciprocal
+Public License 1.5 (SPDX `RPL-1.5`), copyright Karl Livesey, with an additional
+permission for output and project files and a plugin statement
+([LICENSE-EXCEPTIONS.md](../LICENSE-EXCEPTIONS.md)). His goals, in his words:
+"the main thing I want is code etc back and to be allowed to use that code on the
+project"; "I also want it to cover internal usage ie company x download it modify
+it and distribute that internally"; output is not covered (his example: a
+Photoshop clone under RPL-1.5 protects the code, not the images made with it);
+"you can make plugins but must be source available for us to intergrate into the
+core", including in-house plugins: "maybe theres an extra feature they want and
+so they ad it using a plugin rather than modifying the code". **Why:** RPL-1.5
+makes internal use of a modified copy a "Deploy" (Section 1.2) that requires the
+source to be published (Section 6.1); GPL and AGPL do not reach internal
+modification, and GPLv2-only was ruled out by Apache-2.0 runtime dependencies.
+**Rules out:** treating a plugin as a way round publishing changes; any duty on a
+user's own code, designs or Pymtheg's output. **Known limits:** the plugin
+statement is the Licensor's reading of Sections 1.10(ii) and 1.10(iii), not an
+extra condition (Section 7.1); whether a plugin that copies no Pymtheg code is an
+Extension is untested and a lawyer should read it before first publish. Per-file
+notices, the package `license` field and `docs/licences.md` follow in LIC-2;
+`"private": true` and publishing remain the owner's decisions. See
+[LIC-1](changes/LIC-1.md).

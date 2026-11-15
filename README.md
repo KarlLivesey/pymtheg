@@ -227,3 +227,14 @@ For a design that already has handwritten implementations, use
 `pymtheg scaffold design.pym --check contracts.manifest.json` lists added,
 removed or changed contracts. Studio offers the same workflow under output
 purpose. Neither comparison nor compilation proves the implementation's behaviour.
+
+## Licence
+
+Copyright (C) 2026 Karl Livesey. Pymtheg is licensed under the Reciprocal Public
+License 1.5 ([LICENSE](LICENSE)) with an additional permission and a plugin
+statement ([LICENSE-EXCEPTIONS.md](LICENSE-EXCEPTIONS.md)); contributions are
+accepted under the same terms ([CONTRIBUTING.md](CONTRIBUTING.md)).
+In plain terms: if you change Pymtheg or write a plugin for it and use it beyond
+personal use or research, even only inside your own organisation, you must
+publish the source under the same licence. What you make with Pymtheg, such as
+reports, graphs, links, generated code and your own designs, is yours.
