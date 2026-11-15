@@ -67,7 +67,7 @@ and its row commit or roll back together.
 ```ts
 { id, record: "plan:R1",
   symbol: { language: "go"|"rust"|"typescript", path, kind, identity, name, ordinal },
-  fingerprint: { signature: sha256, body: sha256 },
+  fingerprint: { signature: sha256, body: sha256, attributes: sha256 | "" },
   hint: { line, graphId },          // hints only, never identity
   twins: { path, fingerprint }[] | null,  // same-identity symbols in other files
                                           // at link/refresh time; null = not recorded
@@ -77,23 +77,42 @@ and its row commit or roll back together.
 `identity`, `kind` and `ordinal` are the graph's position-independent symbol
 identity (`src/graph/identity.ts`: the graph ID digests `module, file, kind,
 identity, ordinal`). The path is project-relative POSIX, taken from the graph.
-The fingerprint is computed from the symbol's source range in the graph's stored
-snapshot. **Exact rule:** CRLF is read as LF, and spaces/tabs at the end of a
-line are dropped; every other character counts. So a whitespace change inside a
-string literal is `changed` (never a false `ok`), and so is a formatter run that
-re-indents or re-spaces the code: a false `changed`, cleared by `refresh` after
-review. One consequence: trailing spaces inside a multi-line raw string literal
-are ignored. `signature` hashes the text before the first `{`; `body` hashes the
-text from the first `{` on (empty when there is none).
+The fingerprint is computed from the graph's stored snapshot of the file.
+
+**What text is fingerprinted, per language:**
+
+| Language | Text |
+|---|---|
+| All | The symbol's own source range from the graph. `signature` hashes the text before its first `{`; `body` hashes the text from that `{` on (empty when there is none). |
+| Rust | Plus `attributes`: the item's *outer* attributes (`#[...]`), each as written. A small lexer scans from the previous item boundary (the end of the previous symbol, or the start of the enclosing symbol) to the symbol start. It handles balanced brackets, strings, raw strings, char literals and nested comments, so multi-line attributes, attributes with `]` inside strings, attributes on the same line as the item, and attributes separated from the item only by comments are all included. Any other token, including an inner attribute `#![...]`, resets the collection. If the text cannot be scanned confidently (e.g. an unterminated string), the contiguous non-blank lines above the item, back to the boundary, are used instead. |
+| Go | Plus `attributes`: the compiler directive lines (`//go:…`, `//export …`) in the contiguous comment block directly above the line where the declaration starts. |
+| TypeScript/JavaScript | The symbol range alone, which already starts at `export` and at decorators (verified in review). |
+
+Doc comments (`///`, block doc comments, Go doc comments) and other comments are
+never fingerprinted. An inner attribute `#![...]` belongs to its enclosing
+module: it is inside that module's own range, so a link to the module sees it,
+and a link to an item that follows it does not (tested).
+
+**Normalisation, exact:** CRLF is read as LF and spaces/tabs at the end of each
+line are dropped; every other character counts, in each of the three parts. So
+a whitespace change inside a string literal is `changed` (never a false `ok`),
+and so is a formatter run that re-indents or re-spaces the code: a false
+`changed`, cleared by `refresh` after review. One consequence: trailing spaces
+inside a multi-line raw string literal are ignored.
+
+When only the attributes changed, `differs` is `["attributes"]`. Links made
+before attributes were fingerprinted (this branch at dc189066 and earlier) have
+no `attributes` hash and read `changed` (`attributes`) once; refresh them.
+Nothing has been released, so no user data is affected.
 
 ### States (computed on demand; the graph is synced first, as `pymtheg graph` does)
 
 | State | Meaning |
 |---|---|
 | `ok` | Same language, kind and identity at the recorded path; fingerprint equal |
-| `changed` | Found at the recorded path; `differs` lists `signature` and/or `body` |
+| `changed` | Found at the recorded path; `differs` lists `attributes`, `signature` and/or `body` |
 | `moved` | Continuity established: see the rule below. `differs` is `["path"]` (the text is identical by construction) |
-| `missing` | Not found at the recorded path, and no move is proven. `suggestions` always lists, first, same-kind symbols in the linked file whose body is identical (a rename in place), then every same-identity symbol elsewhere, each with its reason (already existed when linked; different text; identical text but the linked file still exists; not unique). `mayBeHiddenBy` names failed files of that language. Suggestions are never applied |
+| `missing` | Not found at the recorded path, and no move is proven. `suggestions` always lists, first, same-kind symbols in the linked file whose body is identical (a rename in place), then every same-identity symbol elsewhere, each with its reason (identical copies existed when the link was made, so it cannot tell which one moved; already existed when linked; different text; identical text but the linked file still exists; not unique). `mayBeHiddenBy` names failed files of that language. Suggestions are never applied |
 | `unverifiable` | The recorded file failed to parse (or parsed partially and the symbol is absent). `unverifiableFile` names it, with the reason |
 
 **What a link is.** A link identifies a symbol by project-relative path +
@@ -113,8 +132,8 @@ hold:
 1. The recorded file is no longer indexed. If it still exists and parses but no
    longer has the symbol, the link is `missing` (a rename or an edit in place),
    even when identical text appears in another file.
-2. Exactly one same-identity symbol has **identical text** (signature and body
-   fingerprints equal) at a path that held no same-identity symbol when the link
+2. Exactly one same-identity symbol has **identical text** (attributes,
+   signature and body fingerprints equal) at a path that held no same-identity symbol when the link
    was made or last refreshed (`twins`). A same-name symbol with different text
    is only a suggestion.
 3. No twin on record has the same text as the linked symbol. If identical
@@ -218,7 +237,7 @@ mayBeHiddenBy: string[], message}`.
 reason?}`. `GraphSummary = {complete, syncMode, failedFiles, staleFiles,
 warnings}`. A suggested wrapper mapping is one MCP tool per row. Pass `root` from
 the MCP project directory and the request's abort signal. Also exported:
-`failsCheck(resolved, allowMoved?)`, `fingerprintText(text)`, `CodeLinkError`
+`failsCheck(resolved, allowMoved?)`, `fingerprintText(text, attributes?)`, `rustOuterAttributes`, `goDirectives`, `CodeLinkError`
 and `codeLinkSchema`.
 
 `test/code-links.test.mjs` calls every function above directly, as a wrapper
@@ -307,6 +326,18 @@ a fixed probe path purely to run the standard sync and read failed/stale files),
     defined behaviour, labelled test);
   - the fingerprint rule (CRLF and trailing spaces `ok`; a space inside a
     literal and re-indentation `changed`);
+  - attributes (round 3): all five review cases read `changed` (`attributes`):
+    - `#[repr(C)]` removed;
+    - a narrower `#[derive]`;
+    - `#[no_mangle]` removed from an `extern "C" fn`;
+    - `#[cfg(unix)]` → `#[cfg(windows)]` on a fn and on an impl method;
+    - `#[inline(always)]` → `#[inline(never)]`.
+
+    So do an attribute added, attributes reordered, a same-line attribute
+    edited, a string inside a multi-line `#[cfg_attr(...)]` edited, and Go
+    `//go:noinline` added. A Rust doc-comment edit, a Go doc-comment edit and
+    an inner `#![...]` edit in the enclosing module all stay `ok`. The test
+    fails on dc189066;
   - the concurrent-writer handshake;
   - public TypeScript class methods in `unlinked`;
   - error codes and `notFollowed`.
@@ -333,8 +364,11 @@ a fixed probe path purely to run the standard sync and read failed/stale files),
   (hashes only). A link survives a graph rebuild, but not a planning-archive
   round trip.
 - **Fingerprint** follows the exact rule above. Any edit inside the symbol's
-  range is `changed`, including comments and reformatting. Doc comments outside
-  the range (Go `//` above `func`) are not covered. The signature/body split is
+  range or its attributes is `changed`, including comments and reformatting.
+  Doc comments are not covered. Attributes of an *enclosing* item are not part
+  of a member's fingerprint: a `#[cfg]` on an `impl` block or a module, or Go's
+  file-level `//go:build` constraint, changes what a member compiles to without
+  changing the member's state. The signature/body split is
   at the first `{`, so a `{` inside a Rust generic default or a TS type-literal
   parameter moves the split; that affects only which of `signature`/`body` is
   reported. Mega-plan 5.3's "behavioural edit flagged but comment edit not" is

@@ -44,6 +44,10 @@ export interface CodeFingerprint {
   signature: string;
   /** Text from the first `{` (the body); empty if none. */
   body: string;
+  /** Outer attributes/directives attached above the symbol (Rust `#[...]`, Go
+   * `//go:`/`//export` lines); empty string when none. Absent on links made
+   * before attributes were fingerprinted (they read `changed` once). */
+  attributes?: string;
 }
 export interface StoredCodeLink {
   /** Shared record UUID (stable; re-adding after removal gets a new one). */
@@ -87,7 +91,7 @@ export interface ResolvedCodeLink {
   /** Current symbol for ok/changed/moved. */
   current: SymbolSummary | null;
   /** What differs from the recorded fingerprint/location. */
-  differs: ("signature" | "body" | "path")[];
+  differs: ("attributes" | "signature" | "body" | "path")[];
   /** For missing: candidates to relink by hand. Never applied automatically. */
   suggestions: SymbolSummary[];
   /** For unverifiable: the failed or partial file, always named. */
@@ -114,17 +118,203 @@ export interface CodeLinkOptions {
 }
 
 const sha = (text: string) => createHash("sha256").update(text).digest("hex");
+const normalise = (text: string) =>
+  text.replace(/\r\n/g, "\n").replace(/[ \t]+$/gm, "");
 /** Exact rule: CRLF becomes LF and spaces/tabs at the end of each line are
  * dropped; every other character is significant (reformatting reads as
  * `changed`; a whitespace change inside a literal is never `ok`). The
- * signature/body split is at the first `{` of that text. */
-export function fingerprintText(text: string): CodeFingerprint {
-  const normal = text.replace(/\r\n/g, "\n").replace(/[ \t]+$/gm, "");
+ * signature/body split is at the first `{` of the symbol's text. `attributes`
+ * is the attribute/directive text found above the symbol (see
+ * `attachedAttributes`), hashed separately; "" when there is none. */
+export function fingerprintText(
+  text: string,
+  attributes = "",
+): CodeFingerprint {
+  const normal = normalise(text);
   const brace = normal.indexOf("{");
   return {
     signature: sha(brace < 0 ? normal : normal.slice(0, brace)),
     body: brace < 0 ? "" : sha(normal.slice(brace)),
+    attributes: attributes ? sha(normalise(attributes)) : "",
   };
+}
+
+/** Rust: the outer attributes (`#[...]`) between the previous item boundary
+ * (`from`) and the symbol start (`to`) that are attached to the symbol — i.e.
+ * not followed by any other token except comments and further attributes.
+ * Doc comments (`///` and block doc comments) and other comments are not included; an
+ * inner attribute (`#![...]`) or any other token resets the collection.
+ * Returns null when the text cannot be scanned confidently. */
+export function rustOuterAttributes(
+  text: string,
+  from: number,
+  to: number,
+): string[] | null {
+  let i = from;
+  let attached: string[] = [];
+  const skipString = (at: number): number | null => {
+    // at: index of opening quote of a normal string.
+    for (let j = at + 1; j < to; j++) {
+      if (text[j] === "\\") j++;
+      else if (text[j] === '"') return j + 1;
+    }
+    return null;
+  };
+  const skipRaw = (at: number): number | null => {
+    // at: index of `r` in r"..", r#".."#, or br/cr variants handled by caller.
+    let j = at + 1,
+      hashes = 0;
+    while (text[j] === "#") (hashes++, j++);
+    if (text[j] !== '"') return null;
+    const close = '"' + "#".repeat(hashes);
+    const end = text.indexOf(close, j + 1);
+    return end < 0 || end + close.length > to ? null : end + close.length;
+  };
+  const skipBlockComment = (at: number): number | null => {
+    let depth = 0;
+    for (let j = at; j < to - 1; j++) {
+      if (text[j] === "/" && text[j + 1] === "*") (depth++, j++);
+      else if (text[j] === "*" && text[j + 1] === "/") {
+        depth--;
+        j++;
+        if (depth === 0) return j + 1;
+      }
+    }
+    return null;
+  };
+  const skipLineComment = (at: number) => {
+    const end = text.indexOf("\n", at);
+    return end < 0 || end > to ? to : end + 1;
+  };
+  const rawStart = (j: number) =>
+    (text[j] === "r" && (text[j + 1] === '"' || text[j + 1] === "#")) ||
+    ((text[j] === "b" || text[j] === "c") &&
+      text[j + 1] === "r" &&
+      (text[j + 2] === '"' || text[j + 2] === "#"));
+  const identifierBefore = (j: number) => j > 0 && /[\w]/.test(text[j - 1]!);
+  /** Balanced `[...]` from `open`, skipping strings, chars and comments. */
+  const skipBrackets = (open: number): number | null => {
+    let depth = 0;
+    for (let j = open; j < to; ) {
+      const c = text[j]!;
+      if (c === "/" && text[j + 1] === "/") j = skipLineComment(j);
+      else if (c === "/" && text[j + 1] === "*") {
+        const end = skipBlockComment(j);
+        if (end === null) return null;
+        j = end;
+      } else if (c === '"') {
+        const end = skipString(j);
+        if (end === null) return null;
+        j = end;
+      } else if (rawStart(j) && !identifierBefore(j)) {
+        const end = skipRaw(text[j] === "r" ? j : j + 1);
+        if (end === null) return null;
+        j = end;
+      } else if (c === "'") {
+        const m = /^'(?:\\.[^']*|[^'\\])'/.exec(text.slice(j, j + 12));
+        j += m ? m[0].length : 1;
+      } else if (c === "[" || c === "(" || c === "{") (depth++, j++);
+      else if (c === "]" || c === ")" || c === "}") {
+        depth--;
+        j++;
+        if (depth === 0) return c === "]" ? j : null;
+        if (depth < 0) return null;
+      } else j++;
+    }
+    return null;
+  };
+  while (i < to) {
+    const c = text[i]!;
+    if (/\s/.test(c)) i++;
+    else if (c === "/" && text[i + 1] === "/") i = skipLineComment(i);
+    else if (c === "/" && text[i + 1] === "*") {
+      const end = skipBlockComment(i);
+      if (end === null) return null;
+      i = end;
+    } else if (c === "#") {
+      let j = i + 1;
+      const inner = text[j] === "!";
+      if (inner) j++;
+      while (j < to && /\s/.test(text[j]!)) j++;
+      if (text[j] !== "[") {
+        attached = [];
+        i++;
+        continue;
+      }
+      const end = skipBrackets(j);
+      if (end === null) return null;
+      if (inner) attached = [];
+      else attached.push(text.slice(i, end));
+      i = end;
+    } else if (c === '"') {
+      const end = skipString(i);
+      if (end === null) return null;
+      attached = [];
+      i = end;
+    } else if (rawStart(i) && !identifierBefore(i)) {
+      const end = skipRaw(text[i] === "r" ? i : i + 1);
+      if (end === null) return null;
+      attached = [];
+      i = end;
+    } else if (c === "'") {
+      const m = /^'(?:\\.[^']*|[^'\\])'/.exec(text.slice(i, i + 12));
+      attached = [];
+      i += m ? m[0].length : 1;
+    } else {
+      attached = [];
+      i++;
+    }
+  }
+  return attached;
+}
+
+/** Go: the compiler directive lines (`//go:…`, `//export …`) in the contiguous
+ * comment block directly above the line where the declaration starts. Ordinary
+ * doc-comment lines in that block are not included. */
+export function goDirectives(text: string, start: number): string[] {
+  let lineStart = text.lastIndexOf("\n", start - 1) + 1;
+  const found: string[] = [];
+  while (lineStart > 0) {
+    const previousStart = text.lastIndexOf("\n", lineStart - 2) + 1;
+    const line = text.slice(previousStart, lineStart - 1).replace(/\r$/, "");
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("//")) break;
+    if (/^\/\/(go:|export\s)/.test(trimmed)) found.unshift(trimmed);
+    lineStart = previousStart;
+  }
+  return found;
+}
+
+/** Text of the attributes attached above a symbol, per language; "" if none. */
+function attachedAttributes(
+  text: string,
+  symbol: GraphSymbol,
+  fileSymbols: readonly GraphSymbol[],
+): string {
+  const start = symbol.range.start;
+  if (symbol.module === "go") return goDirectives(text, start).join("\n");
+  if (symbol.module !== "rust") return "";
+  // Previous item boundary: the latest end of a symbol before this one, or the
+  // start of the innermost symbol containing it.
+  let from = 0;
+  for (const s of fileSymbols) {
+    if (s.id === symbol.id) continue;
+    if (s.range.end <= start) from = Math.max(from, s.range.end);
+    else if (s.range.start < start && s.range.end >= symbol.range.end)
+      from = Math.max(from, s.range.start);
+  }
+  // A container's own header (e.g. `impl X {`) starts at `from`; scanning from
+  // there resets on its tokens, so only attributes after it are kept.
+  const scanned = rustOuterAttributes(text, from, start);
+  if (scanned) return scanned.join("\n");
+  // Not scannable: the contiguous non-blank lines above, back to `from`.
+  let blockStart = text.lastIndexOf("\n", start - 1) + 1;
+  while (blockStart > from) {
+    const previousStart = text.lastIndexOf("\n", blockStart - 2) + 1;
+    if (!text.slice(previousStart, blockStart - 1).trim()) break;
+    blockStart = Math.max(from, previousStart);
+  }
+  return "unscanned:" + text.slice(blockStart, start);
 }
 
 /** Machine-readable failure codes for wrappers (`error.code`). */
@@ -300,6 +490,7 @@ function graphView(
     return texts.get(path)!;
   };
   const failedByPath = new Map(failed.map((f) => [f.path, f.reason]));
+  const fileSymbols = new Map<string, GraphSymbol[]>();
   return {
     summarize: (symbol, reason) => ({
       graphId: symbol.id,
@@ -311,10 +502,15 @@ function graphView(
       line: locations.locate(symbol.file, symbol.range)?.line ?? null,
       ...(reason ? { reason } : {}),
     }),
-    fingerprint: (symbol) =>
-      fingerprintText(
-        (text(symbol.file) ?? "").slice(symbol.range.start, symbol.range.end),
-      ),
+    fingerprint: (symbol) => {
+      const source = text(symbol.file) ?? "";
+      if (!fileSymbols.has(symbol.file))
+        fileSymbols.set(symbol.file, store.findSymbols({ file: symbol.file }));
+      return fingerprintText(
+        source.slice(symbol.range.start, symbol.range.end),
+        attachedAttributes(source, symbol, fileSymbols.get(symbol.file)!),
+      );
+    },
     inFile: (path) => store.findSymbols({ file: path }),
     named: (identity) => store.namedSymbols(identity, 10001),
     fileStatus: (path) => {
@@ -357,6 +553,8 @@ function resolveOne(
   const compare = (symbol: GraphSymbol) => {
     const now = view.fingerprint(symbol);
     const differs: ResolvedCodeLink["differs"] = [];
+    if ((now.attributes ?? "") !== (link.fingerprint.attributes ?? null))
+      differs.push("attributes");
     if (now.signature !== link.fingerprint.signature) differs.push("signature");
     if (now.body !== link.fingerprint.body) differs.push("body");
     return differs;
@@ -431,7 +629,9 @@ function resolveOne(
   const identicalTwin = (twins ?? []).some(
     (t) =>
       t.fingerprint.signature === link.fingerprint.signature &&
-      t.fingerprint.body === link.fingerprint.body,
+      t.fingerprint.body === link.fingerprint.body &&
+      (t.fingerprint.attributes ?? null) ===
+        (link.fingerprint.attributes ?? null),
   );
   const recordedFileGone = status === null;
   if (

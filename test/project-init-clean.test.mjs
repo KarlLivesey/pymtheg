@@ -419,7 +419,9 @@ test("help and no-argument first run direct users to init", () =>
 
 test(
   "this repository initializes and serves commands with fake legacy data, without touching the original checkout",
-  { timeout: 180000 },
+  // Hang guard only, not a performance assertion: generous so machine speed
+  // and suite load cannot fail it (it takes ~132 s on the dev server).
+  { timeout: 900000 },
   () =>
     fixture(async (root) => {
       const project = join(root, "pymtheg repository");

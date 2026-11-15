@@ -2385,9 +2385,14 @@ a requirement ↔ code-symbol link is shared planning data. It stores the graph'
 position-independent identity (language, project-relative path, kind, scoped
 identity, ordinal), a fingerprint of the symbol's source at link time, and the
 same-identity symbols that existed in other files at that time (`twins`).
-**Fingerprint rule:** CRLF is read as LF and trailing spaces/tabs at line ends
-are dropped; every other character counts. A formatter run therefore reads as
-`changed` (cleared by refresh), and a change inside a literal is never `ok`. The
+**Fingerprint rule:** the fingerprinted text is the symbol's own graph range,
+plus, for Rust, its outer `#[...]` attributes (found by a lexer scan back to the
+previous item boundary) and, for Go, the `//go:`/`//export` directive lines
+directly above it. TypeScript ranges already include `export` and decorators.
+Doc comments are never included. In that text, CRLF is read as LF and trailing
+spaces/tabs at line ends are dropped; every other character counts. A formatter
+run therefore reads as `changed` (cleared by refresh), and a change inside a
+literal or an attribute is never `ok`. The
 link does not store a graph row; the graph's symbol ID is a hint only. State is
 recomputed against the current graph each time.
 

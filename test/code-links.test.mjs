@@ -735,3 +735,189 @@ func Use(p Putter) { p.Put() }
     await rm(root, { recursive: true, force: true });
   }
 });
+
+// ---- round 3 review: attributes and directives above a symbol ----
+
+const rustAttributes = `#[repr(C)]
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct Header {
+    pub len: u32,
+}
+
+#[no_mangle]
+pub extern "C" fn ffi_entry() -> u32 {
+    1
+}
+
+#[cfg(unix)]
+pub fn platform() -> u32 {
+    2
+}
+
+pub struct Disk;
+impl Disk {
+    /// Reads.
+    #[cfg(unix)]
+    #[inline(always)]
+    pub fn read(&self) -> u32 {
+        3
+    }
+}
+
+#[inline] pub fn same_line() -> u32 { 4 }
+
+/// Multi-line attribute with brackets inside a string.
+#[cfg_attr(
+    feature = "f",
+    allow(unused, reason = "has ] and ( inside")
+)]
+pub fn multi() -> u32 {
+    5
+}
+
+pub mod m {
+    #![allow(dead_code)]
+    pub fn h() -> u32 {
+        6
+    }
+}
+`;
+const goDirectiveSource = `package one
+
+// Fast adds one.
+func Fast(x int) int {
+	return x + 1
+}
+`;
+test("attributes above a symbol are fingerprinted (Rust #[...], Go //go:), doc comments are not", async () => {
+  const root = await goProject({
+    "one/a.go": goDirectiveSource,
+    "rs/Cargo.toml":
+      '[package]\nname = "attrs"\nversion = "0.1.0"\nedition = "2021"\n',
+    "rs/src/lib.rs": rustAttributes,
+  });
+  const file = join(root, "rs", "src", "lib.rs");
+  const goFile = join(root, "one", "a.go");
+  const states = async () =>
+    Object.fromEntries(
+      (await listCodeLinks({ root, writer })).links.map((r) => [
+        r.link.symbol.name,
+        r.state === "changed" ? r.differs.join("+") : r.state,
+      ]),
+    );
+  const allOk = {
+    Header: "ok",
+    ffi_entry: "ok",
+    platform: "ok",
+    read: "ok",
+    same_line: "ok",
+    multi: "ok",
+    h: "ok",
+    Fast: "ok",
+  };
+  const only = (name, value) => ({ ...allOk, [name]: value });
+  const edit = async (
+    from,
+    to,
+    expected,
+    path = file,
+    base = rustAttributes,
+  ) => {
+    assert.ok(base.includes(from), from);
+    await writeFile(path, base.replace(from, to));
+    assert.deepEqual(await states(), expected, `${from} → ${to}`);
+    await writeFile(path, base);
+  };
+  try {
+    for (const selector of [
+      "Header",
+      "ffi_entry",
+      "platform",
+      "impl Disk::read",
+      "same_line",
+      "multi",
+      "h",
+      "Fast",
+    ]) {
+      const made = await createCodeLink({
+        root,
+        writer,
+        record: "R1",
+        selector,
+      });
+      assert.equal(made.status, "created", `${selector}: ${made.message}`);
+    }
+    assert.deepEqual(await states(), allOk);
+    // The five cases from review.
+    await edit("#[repr(C)]\n", "", only("Header", "attributes"));
+    await edit(
+      "#[derive(Clone, PartialEq, Eq, Hash)]",
+      "#[derive(Clone)]",
+      only("Header", "attributes"),
+    );
+    await edit("#[no_mangle]\n", "", only("ffi_entry", "attributes"));
+    await edit(
+      "#[cfg(unix)]\npub fn platform",
+      "#[cfg(windows)]\npub fn platform",
+      only("platform", "attributes"),
+    );
+    await edit(
+      "    #[cfg(unix)]\n    #[inline(always)]",
+      "    #[cfg(windows)]\n    #[inline(always)]",
+      only("read", "attributes"),
+    );
+    await edit(
+      "#[inline(always)]",
+      "#[inline(never)]",
+      only("read", "attributes"),
+    );
+    // Added, reordered; same-line attribute; multi-line attribute string.
+    await edit(
+      "#[cfg(unix)]\npub fn platform",
+      "#[cfg(unix)]\n#[must_use]\npub fn platform",
+      only("platform", "attributes"),
+    );
+    await edit(
+      "#[repr(C)]\n#[derive(Clone, PartialEq, Eq, Hash)]",
+      "#[derive(Clone, PartialEq, Eq, Hash)]\n#[repr(C)]",
+      only("Header", "attributes"),
+    );
+    await edit(
+      "#[inline] pub fn same_line",
+      "#[inline(never)] pub fn same_line",
+      only("same_line", "attributes"),
+    );
+    await edit(
+      '"has ] and ( inside"',
+      '"has ] and ( inside!"',
+      only("multi", "attributes"),
+    );
+    // Doc comments stay outside the fingerprint.
+    await edit("/// Reads.", "/// Reads bytes from disk.", allOk);
+    await edit(
+      "/// Multi-line attribute with brackets inside a string.",
+      "/// Changed doc.",
+      allOk,
+    );
+    // An inner attribute belongs to its module (inside the module's own range),
+    // not to the item that follows it.
+    await edit("#![allow(dead_code)]", "#![allow(unused)]", allOk);
+    // Go: directives directly above the declaration count; doc comments do not.
+    await edit(
+      "// Fast adds one.\n",
+      "// Fast adds one.\n//go:noinline\n",
+      only("Fast", "attributes"),
+      goFile,
+      goDirectiveSource,
+    );
+    await edit(
+      "// Fast adds one.",
+      "// Fast adds one to x.",
+      allOk,
+      goFile,
+      goDirectiveSource,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

@@ -410,8 +410,10 @@ recorded file gone, and identical text at a single new path that held no
 same-name symbol before; never when identical copies existed at link time),
 `missing` (with suggestions, never applied) and
 `unverifiable` (failed file named). `link check` exits 1 on `missing`,
-`changed`, `unverifiable` and `moved` (unless `--allow-moved`). Fingerprints
-ignore only line endings and trailing spaces. Project databases wait up to 30 s
+`changed`, `unverifiable` and `moved` (unless `--allow-moved`). The fingerprint
+covers the symbol's text plus Rust outer `#[...]` attributes and Go `//go:` /
+`//export` directives above it (not doc comments), and ignores only line endings
+and trailing spaces. Project databases wait up to 30 s
 for another writer's lock. A link identifies a symbol by project-relative path +
 qualified name + kind and verifies it by the text fingerprint. Identical text
 with that identity at the recorded path is the linked symbol (`ok`), whatever
