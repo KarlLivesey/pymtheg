@@ -1,0 +1,83 @@
+# R1-D real run on a copy of restic (dev server, 2026-11-15). Script: evidence/r1-d/restic-run.sh.
+# The graph index already existed (first index of the copy: 2m34s, observation). Author label = local OS user.
+# Verbatim output; the 'need attention' wording was corrected to 'needs' after this run.
+
+$ pymtheg link requirement R-PACK --title Blobs are packed before upload --text Saving a blob adds it to an open pack file.
+Created requirement plan:R-PACK “Blobs are packed before upload” in architecture/plan.json (checkpoint eafa230e5bcc).
+[exit 0]
+
+$ pymtheg link requirement R-INDEX --title Repository index loads on open
+Created requirement plan:R-INDEX “Repository index loads on open” in architecture/plan.json (checkpoint ca8ff3c74dcb).
+[exit 0]
+
+$ pymtheg link requirement R-FORGET --title Forget applies the retention policy
+Created requirement plan:R-FORGET “Forget applies the retention policy” in architecture/plan.json (checkpoint b25feee13d3f).
+[exit 0]
+
+$ pymtheg link add R-INDEX LoadIndex
+Selector “LoadIndex” matches 3 symbols; choose one (a symbol: ID or path:line). Nothing was linked.
+  match: method (*Checker).LoadIndex at internal/repository/checker.go:108 symbol:42bc4d68c3a3868dbad40cc4ee0941687614135a092f3a93f117036a31f5eb4f
+  match: method (*Repository).LoadIndex at internal/repository/repository.go:717 symbol:829b3a979c171c77b34b834d5a8b77c1890b9de7872dcd7a4f34f9a9d3f1a85a
+  match: method Repository.LoadIndex at internal/restic/repository.go:22 symbol:83f1bb9fda609d6a6b0b366739279f48bd77c72a6357328d179bd6cf654d63cc
+[exit 1]
+
+$ pymtheg link add R-INDEX (*Repository).LoadIndex
+Linked plan:R-INDEX to go method (*Repository).LoadIndex in internal/repository/repository.go.
+Link ID: 038a138c-557e-473b-a0a4-b5c19f06869c
+[exit 0]
+
+$ pymtheg link add R-PACK internal/repository/packer_manager.go:116
+Linked plan:R-PACK to go method (*packerManager).SaveBlob in internal/repository/packer_manager.go.
+Link ID: 0c036bd5-aaae-4db5-9e81-8d16eff1866a
+[exit 0]
+
+$ pymtheg link add R-FORGET runForget
+Linked plan:R-FORGET to go function runForget in cmd/restic/cmd_forget.go.
+Link ID: 4046b27f-0776-42cf-9c37-97e8a437eef1
+[exit 0]
+
+$ pymtheg link check
+3 code links: 3 ok, 0 changed, 0 moved, 0 missing, 0 unverifiable
+OK           038a138c plan:R-INDEX -> go method (*Repository).LoadIndex internal/repository/repository.go
+OK           0c036bd5 plan:R-PACK -> go method (*packerManager).SaveBlob internal/repository/packer_manager.go
+OK           4046b27f plan:R-FORGET -> go function runForget cmd/restic/cmd_forget.go
+Check passed.
+[exit 0]
+
+# edit: add a statement to the body of (*packerManager).SaveBlob
+func (r *packerManager) SaveBlob(ctx context.Context, t restic.BlobType, id restic.ID, ciphertext []byte, uncompressedLength int) (int, error) {
+	r.pm.Lock()
+	defer r.pm.Unlock()
+
+	packer, err := r.pickPacker(len(ciphertext))
+	_ = 0 // r1-d edit
+	if err != nil {
+
+$ pymtheg link check
+3 code links: 2 ok, 1 changed, 0 moved, 0 missing, 0 unverifiable
+OK           038a138c plan:R-INDEX -> go method (*Repository).LoadIndex internal/repository/repository.go
+CHANGED      0c036bd5 plan:R-PACK -> go method (*packerManager).SaveBlob internal/repository/packer_manager.go
+  Symbol (*packerManager).SaveBlob changed (body) since it was linked.
+  now: (*packerManager).SaveBlob at internal/repository/packer_manager.go:116
+OK           4046b27f plan:R-FORGET -> go function runForget cmd/restic/cmd_forget.go
+Check failed: 1 link need attention.
+[exit 1]
+
+$ pymtheg link touched (*Repository).LoadIndex --impact --depth 2
+2 planning records touched: plan:R-INDEX, plan:R-FORGET
+  plan:R-INDEX “Repository index loads on open” via direct: (*Repository).LoadIndex [ok] link 038a138c
+  plan:R-FORGET “Forget applies the retention policy” via caller (distance 2): runForget [ok] link 4046b27f
+Impact may be incomplete (bounds, candidate or unresolved calls): Unresolved links may hide additional callers or paths; returned routes are observations, not a completeness proof. Result reached a reported depth or result/node bound; omitted facts may exist.
+[exit 0]
+
+$ pymtheg link unlinked
+Requirements with no code link (0):
+[exit 0]
+
+$ pymtheg link history
+3 recorded code-link changes:
+  #4 2026-11-15T16:52:06.239Z karllivesey: added 038a138c plan:R-INDEX -> (*Repository).LoadIndex internal/repository/repository.go
+  #5 2026-11-15T16:52:07.652Z karllivesey: added 0c036bd5 plan:R-PACK -> (*packerManager).SaveBlob internal/repository/packer_manager.go
+  #6 2026-11-15T16:52:08.854Z karllivesey: added 4046b27f plan:R-FORGET -> runForget cmd/restic/cmd_forget.go
+[exit 0]
+

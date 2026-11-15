@@ -392,9 +392,22 @@ answer.
 Toolchain-backed exact links (Go through `go list` and `go/types`; Rust through
 `cargo`/`rustc`) are a later, explicit per-project opt-in (decision D17); the
 investigations are [W2-K](changes/W2-K.md) and [W2-L](changes/W2-L.md). Also
-later: automatic sync, the join with requirements and model declarations, the
-explore query, CLI/MCP/Studio surfaces for the graph, Lua, and a vendored Rust
-grammar.
+later: automatic sync, the join with model declarations, the explore query,
+MCP/Studio surfaces for the graph, Lua, and a vendored Rust grammar.
+
+#### Requirement ↔ code-symbol links (R1-D)
+
+Implemented: `pymtheg link` creates planning records and links them to Go, Rust
+and TypeScript/JavaScript graph symbols. A link stores the symbol's language,
+project-relative path, kind, scoped identity, ordinal and a source fingerprint in
+shared planning data, and records history. States are computed against the synced
+graph: `ok`, `changed`, `moved` (unambiguous only), `missing` (with suggestions,
+never applied) and `unverifiable` (failed file named). `link check` exits 1 on
+`missing`, `changed` or `unverifiable`. Also built: requirements touched by a
+symbol or file (optionally through definite callers), and unlinked requirements
+and public symbols. Not yet built: `.pym` declaration links, MCP tools (the data
+functions are exported), Studio display, carrying links in archive bundles, and
+comment-insensitive fingerprints. Source: [R1-D](changes/R1-D.md).
 
 ## Architecture and interactive authoring
 

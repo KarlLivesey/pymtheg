@@ -2371,3 +2371,21 @@ an install hook or native build for end users; a patch that changes the trees of
 files that already parse (PR #190 for Go was rejected on that ground); token
 rewriting of source except sound error-site repairs. Done for Go (v0.25.0 + #202 +
 #198); Rust is still the npm 0.24.0 grammar.
+
+### Code links store identity, never a resolved target
+
+**Decided (R1-D, 15 November 2026, under D19):** a requirement ↔ code-symbol link
+is shared planning data. It stores the graph's position-independent identity
+(language, project-relative path, kind, scoped identity, ordinal) and a
+whitespace-normalised fingerprint of the symbol's source at link time. It does
+not store a graph row, and the graph's symbol ID is kept only as a hint. State is
+recomputed against the current graph each time. A link is never dropped or
+retargeted by resolution. `moved` is reported only when exactly one same-identity
+symbol exists elsewhere and no failed file of that language could hide another.
+Otherwise the link is `missing`, with suggestions. Only an explicit refresh
+re-records a link's target. A link into a failed file is `unverifiable`, and a
+new link into a file that did not parse cleanly is refused. **Why:** the graph is
+rebuildable and can be deleted at any time; mega-plan stage 5 says "a suggested
+match … is not a link until confirmed"; and decision "Unreadable code is failed"
+applies. **Rules out:** auto-relinking renamed or moved symbols; keeping links in
+`.pymtheg/rebuildable/`.
