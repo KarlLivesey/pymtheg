@@ -116,7 +116,8 @@ function add(scenario, step, fields) {
 // ------------------------------------------------------------------ containers and images
 
 function run(image, name, extra = []) {
-  const r = docker("run", "-d", "--rm", "--name", name, ...LABELS, ...extra, image, ...LIFETIME);
+  // --pull never: the image was pulled (and recorded) by ensureImage; never re-pull here.
+  const r = docker("run", "-d", "--rm", "--pull", "never", "--name", name, ...LABELS, ...extra, image, ...LIFETIME);
   if (r.status === 0) containers.add(name);
   return r;
 }
@@ -347,7 +348,7 @@ function setup(s, name) {
     for (const [image, paths] of [["golang:1-bookworm", ["/usr/local/go"]], ["rust:1-slim-bookworm", ["/usr/local/cargo", "/usr/local/rustup"]]]) {
       if (!ensureImage(image)) return { ok: false, note: `cannot pull ${image}` };
       const source = `pymtheg-acc-src-${image.split(":")[0]}-${RUN_ID}`;
-      if (docker("create", "--name", source, ...LABELS, image).status !== 0) return { ok: false, note: `cannot create ${source}` };
+      if (docker("create", "--pull", "never", "--name", source, ...LABELS, image).status !== 0) return { ok: false, note: `cannot create ${source}` };
       containers.add(source);
       for (const path of paths) {
         const r = sh("sh", ["-c", `docker cp ${source}:${path} - | docker cp - ${name}:/usr/local`]);

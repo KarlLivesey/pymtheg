@@ -81,18 +81,20 @@ A step passes only if all of these hold:
 1. Its own exact expectation is met: exit code, and exact JSON fields or output
    lines.
 2. No `java`, `javac`, `quint` or `tlc` process ran.
-3. No `go`, `cargo`, `rustc` or `rustup` process ran, unless the step is the Go
-   opt-in.
-4. No Java/Quint/TLC wording appears in stdout, stderr or the decoded text of an
-   MCP answer. `wording.mjs` defines the wording (choices below).
+3. No `go`, `cargo`, `rustc` or `rustup` process ran. The Go opt-in steps may
+   run `go` only, never `cargo` or `rustc`.
+4. No Java/Quint/TLC wording appears in stdout, stderr or any string value of
+   parsed JSON output (see item 5). `wording.mjs` defines the wording (choices below).
 5. No internal-error output appears:
    - a stack frame (`^\s+at .+:\d+:\d+\)?$`);
    - a line starting `\w*Error: ` that the step does not list as an expected,
      asserted line;
    - an `unhandled` or `uncaught` rejection.
 
-   This also covers stack traces inside MCP JSON strings, because their text is
-   decoded before checking. No step today expects an `Error:` line: the
+   JSON keeps a stack trace on one line with escaped newlines, so every string
+   value of parsed JSON output is checked as text too: CLI `--json` output, MCP
+   `structuredContent`, and MCP text content (and JSON nested in a string is
+   expanded). No step today expects an `Error:` line: the
    broken-design diagnostic reads `…/broken.pym:7:27 error N002: …` and is
    asserted whole.
 6. No Node process warning (`^\(node:\d+\) (?:\[[A-Z0-9_]+\] )?\w*Warning: `,
@@ -137,7 +139,7 @@ The self-test checks every fixed string in `WORDING_CASES` (the count is in the 
 | 0-build | `npm ci`, `npm run build` and `npm pack` work from a clean checkout. The tarball has the CLI, web assets, both vendored grammars, README and the launcher. It ships no TypeScript sources, tests, evidence or research. The one helper source it runs (`src/graph/languages/go/toolchain/golinks.go`) is allowed and listed. |
 | a-node-only | The full list below, with Node only. |
 | b-node-git | Scenario (a) inside a git repository. After init, and again at the end, `git status` shows exactly the three `.pymtheg/` files, and tracked files are unchanged. The link edit is undone. |
-| c-node-go-rust | Scenario (a) with Go 1.27.4 and Cargo 1.100.0 on PATH: the graph answers are identical to (a), and with the setting off no `go` or `cargo` runs. With `graph.toolchain.go` set to the real `<GOROOT>/bin/go` on the sample's Go module, `go` must run and the route must report `used` with upgraded links > 0. The actual links are then checked: `graph callers Add` must return exactly five definite calls from `main`, each `decidedBy: "toolchain"`, including the generic-result call at `main.go:13` (`pricing.First(...).Add(5)`). With the setting removed, no `toolchain` is reported, and the same query must return exactly the four other calls (source-decided) and not line 13. So the check proves the opt-in made the difference. |
+| c-node-go-rust | Scenario (a) with Go 1.27.4 and Cargo 1.100.0 on PATH: the graph answers are identical to (a), and with the setting off no `go` or `cargo` runs. With `graph.toolchain.go` set to the real `<GOROOT>/bin/go` on the sample's Go module, the route must report `used` with upgraded links > 0. Its process evidence must show both `go env` and the resolving helper (built from `golinks.go`) running from the project's `.pymtheg/rebuildable/toolchain/`; `go env` alone does not count. The actual links are then checked: `graph callers Add` must return exactly five definite calls from `main`, each `decidedBy: "toolchain"`, including the generic-result call at `main.go:13` (`pricing.First(...).Add(5)`). With the setting removed, no `toolchain` is reported, and the same query must return exactly the four other calls (source-decided) and not line 13. So the check proves the opt-in made the difference. |
 | d-global / d-local | `npm i -g` and `npm i` of the tarball. The binary resolves to the installed package and everything works from there. |
 | e-node-24.0.0 / 25 / 26 | Required, because engines is `">=24"`: install, help, init, doctor (all ready), check, verify, simulate, the broken design, graph index, callers, and no writes outside the project. |
 | f-restic | The pinned restic corpus: init, index with 0 failed files, status and five queries. Time and memory are observations. |
@@ -233,8 +235,16 @@ below:
   `_update-notifier-last-checked`. npm and npx write there on every
   invocation. Nothing else under `~/.npm` is allowed, and neither is the global
   prefix after the install.
-- **Nothing in `/tmp`.** A temporary file left behind after the scenario fails
-  the step.
+- **Node's compile cache, `/tmp/node-compile-cache/`:** the npm CLI enables it
+  for itself, and Pymtheg's source never calls `enableCompileCache`. It appears
+  in d-local, where `npx` runs from the app folder. Nothing else in `/tmp` is
+  allowed, so a temporary file left behind after the scenario fails the step.
+- **Never inside the installed package.** Any written path containing
+  `/node_modules/pymtheg/` fails, even where its folder is otherwise allowed.
+  Separately, `install-unchanged` snapshots the installed package tree after
+  the install (paths, sizes and SHA-256, in the npx store, the global prefix or
+  the local `node_modules`). It requires that tree to be byte-for-byte
+  unchanged at the end of every scenario.
 - **In scenario c only:** Go's build cache (`~/.cache/go-build`), its module
   cache (`~/go`) and its config folder (`~/.config/go`, local telemetry
   counters). These are written by the `go` the project opted into.

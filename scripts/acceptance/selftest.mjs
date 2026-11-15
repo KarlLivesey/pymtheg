@@ -64,8 +64,11 @@ spawnSync("tar", ["-xzf", tarball, "-C", pristine], { stdio: "inherit" });
 // ---------------------------------------------------------------- 3. sabotage
 
 /** Replace exactly one match of `pattern` (string or RegExp), or refuse. */
+/** Files each sabotage changed: each must still parse, or a syntax slip would read as "caught". */
+const touched = new Set();
 function patch(dir, file, pattern, replacement) {
   const path = join(dir, "package", file);
+  touched.add(path);
   const text = readFileSync(path, "utf8");
   const re = typeof pattern === "string" ? new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g") : new RegExp(pattern.source, "g");
   const count = [...text.matchAll(re)].length;
@@ -75,6 +78,7 @@ function patch(dir, file, pattern, replacement) {
 /** Insert code at the top of the CLI entry point, after its shebang. */
 function prelude(dir, code) {
   const path = join(dir, "package/dist/cli/main.js");
+  touched.add(path);
   const [shebang, ...rest] = readFileSync(path, "utf8").split("\n");
   if (!shebang.startsWith("#!")) throw Error("dist/cli/main.js has no shebang line");
   writeFileSync(path, [shebang, code, ...rest].join("\n"));
@@ -82,6 +86,7 @@ function prelude(dir, code) {
 /** Make an MCP tool's handler throw: the first `async (…) => {` after its registration name. */
 function toolThrows(dir, name) {
   const path = join(dir, "package/dist/mcp/server.js");
+  touched.add(path);
   const text = readFileSync(path, "utf8");
   const at = text.indexOf(`"${name}"`);
   const m = at < 0 ? null : /async \([^)]*\) => \{/.exec(text.slice(at));
@@ -141,6 +146,30 @@ const SABOTAGES = [
   { id: "link-add-stores-nothing", what: "`add` reports created but stores no link", expect: ["mcp-requirement_links-add-go", "link-add-go"], apply: (d) => patch(d, "dist/architecture/code-links.js", /store!?\.writeCodeLink\(key, value, true\)/, '({ id: "sabotaged-link", changed: true })') },
   // Round 4: the Go opt-in must change the actual link, not only the counts.
   { id: "go-facts-discarded", what: "Go toolchain facts counted but discarded at final resolution", scenarios: "c-node-go-rust", expect: ["go-toolchain-callers"], apply: (d) => patch(d, "dist/graph/languages/go/resolve.js", "decision = decided;", "void decided;") },
+  // Round 4: stack traces inside JSON values, and writes into the install folder.
+  {
+    id: "stack-in-mcp-json",
+    what: "`project_info` carries a TypeError stack in a `debug` field (structuredContent and text)",
+    expect: ["mcp-project_info"],
+    apply: (d) =>
+      prelude(
+        d,
+        'if (process.argv[2] === "mcp") { const STACK = "TypeError: Cannot read properties of undefined (reading \'x\')\\n    at info (file:///opt/pymtheg/dist/mcp/server.js:10:5)"; const write = process.stdout.write.bind(process.stdout); process.stdout.write = (chunk, ...rest) => { const s = String(chunk); if (s.includes("\\"capabilities\\"")) { try { const m = JSON.parse(s); const r = m.result; if (r?.structuredContent?.capabilities) { r.structuredContent.debug = STACK; for (const c of r.content ?? []) if (c.type === "text") { const t = JSON.parse(c.text); t.debug = r.structuredContent.debug; c.text = JSON.stringify(t, null, 2); } chunk = JSON.stringify(m) + "\\n"; } } catch {} } return write(chunk, ...rest); }; }',
+      ),
+  },
+  {
+    id: "stack-in-graph-json",
+    what: "`graph status --json` carries a TypeError stack in a `debug` field",
+    expect: ["graph-status"],
+    apply: (d) => patch(d, "dist/cli/graph.js", GRAPH_JSON, 'JSON.stringify(positional[0] === "status" ? { ...response, debug: "TypeError: Cannot read properties of undefined (reading \'x\')\\n    at status (file:///opt/pymtheg/dist/cli/graph.js:1:2)" } : response) + "\\n"'),
+  },
+  {
+    id: "writes-into-install",
+    what: "`graph index` writes a cache file inside the installed package (next to import.meta.url)",
+    expect: ["install-unchanged", "writes-outside-project"],
+    apply: (d) =>
+      prelude(d, 'if (process.argv[2] === "graph" && process.argv[3] === "index") { const fs = await import("node:fs"); const dir = new URL("../../.index-cache/", import.meta.url); fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(new URL("state.json", dir), "{}\\n"); }'),
+  },
   { id: "code-graph-candidate", what: "MCP `code_graph` reports a definite caller as a candidate", expect: ["mcp-code_graph-callers-ts"], apply: (d) => patch(d, "dist/mcp/graph-view.js", "certainty: l.certainty,", 'certainty: l.certainty === "definite" ? "candidate-set" : l.certainty,') },
 ];
 
@@ -148,8 +177,13 @@ const cases = [{ id: "control", what: "unmodified tarball", expect: [], apply: (
 for (const c of cases) {
   const dir = join(WORK, c.id);
   cpSync(pristine, dir, { recursive: true });
+  touched.clear();
   try {
     c.apply(dir);
+    for (const file of touched) {
+      const check = spawnSync(process.execPath, ["--check", file], { encoding: "utf8" });
+      if (check.status !== 0) throw Error(`sabotaged ${file.slice(dir.length + 1)} does not parse: ${check.stderr.trim().split("\n").slice(0, 4).join(" | ")}`);
+    }
   } catch (e) {
     c.setupError = String(e.message ?? e);
     continue;

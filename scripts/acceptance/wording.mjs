@@ -7,9 +7,11 @@
 // own token (and "java_home_dir", a different identifier, does not match).
 // "java.exe" matches through `\bjava\b` ("." is not a word character).
 // "TLCs" matches: in this product's output the only plausible meaning is runs
-// of the TLC checker. "jdk", "jre" and "openjdk" match as whole words.
+// of the TLC checker. "jdk", "jre" and "openjdk" match as whole words, and
+// every token may carry a version suffix ("jdk21", "java21"). JAVA_OPTS and
+// JAVA_TOOL_OPTIONS ("Picked up JAVA_TOOL_OPTIONS: …") are their own tokens.
 // Shared by the driver and the self-test, which checks every case below.
-export const WORDING = /\b(?:java|javac|java_home|jdk|jre|openjdk|quint|tlcs?)\b|tla2tools|\bTLA\+/i;
+export const WORDING = /\b(?:java|javac|java_home|java_opts|java_tool_options|jdk|jre|openjdk|quint|tlcs?)\d*\b|tla2tools|\bTLA\+/i;
 
 /** Programs Pymtheg must never start (file name of the executable). */
 export const BACKEND_PROGRAM = /^(?:java|javac|quint|tlc)$/;
@@ -38,6 +40,11 @@ export const WORDING_CASES = {
     "openjdk 21.0.2",
     "Install a JDK",
     "JRE 17",
+    "jdk21",
+    "java21 is required",
+    "openjdk17",
+    "JAVA_OPTS=-Xmx2g",
+    "Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8",
     "Quint: ready — 0.33.1",
     "--backend quint",
     "path/to/quint",
@@ -62,6 +69,8 @@ export const WORDING_CASES = {
     "atlas",
     "java_home_dir",
     "jdkfoo",
+    "java_opts_file",
+    "JavaScript21",
     "",
   ],
 };

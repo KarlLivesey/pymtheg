@@ -28,7 +28,8 @@ if (log) {
   const proto = childProcess.ChildProcess.prototype;
   const spawn = proto.spawn;
   proto.spawn = function (options) {
-    record("spawn", options && options.file, options && options.args);
+    // options.args is the full argv, argv[0] included; record the arguments only.
+    record("spawn", options && options.file, options && Array.isArray(options.args) ? options.args.slice(1) : []);
     return spawn.apply(this, arguments);
   };
   for (const name of ["spawnSync", "execFileSync", "execSync"]) {

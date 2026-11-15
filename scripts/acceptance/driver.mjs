@@ -10,6 +10,7 @@
 // asserts on elapsed time; durations and sizes are observations only.
 // Uses only Node built-ins (the container has nothing else).
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import { appendFileSync, cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { BACKEND_ARGUMENT, BACKEND_PROGRAM, TOOLCHAIN_PROGRAM, wordingHits } from "./wording.mjs";
@@ -136,6 +137,7 @@ function resetTraces() {
 /** Every backend or toolchain process started during the step, from the PATH shims and the spawn trace. */
 function readTraces() {
   const calls = [];
+  const spawns = [];
   for (const line of readFileSync(SHIM_LOG, "utf8").split("\n").filter(Boolean)) calls.push({ tool: line.split(" ")[0], detail: `shim: ${line}` });
   for (const line of readFileSync(SPAWN_LOG, "utf8").split("\n").filter(Boolean)) {
     let s;
@@ -144,6 +146,7 @@ function readTraces() {
     } catch {
       continue;
     }
+    spawns.push({ path: s.file, args: s.args });
     const file = s.file.split("/").pop();
     const args = s.args.join(" ");
     const tool =
@@ -156,7 +159,7 @@ function readTraces() {
           : null;
     if (tool) calls.push({ tool, detail: `spawn: ${file} ${s.args.slice(0, 3).join(" ")}`.trim() });
   }
-  return calls;
+  return { calls, spawns };
 }
 
 // ---------------------------------------------------------------- output rules
@@ -185,6 +188,20 @@ function knownWarningGap(lines) {
 }
 
 /** Internal-error signs: stack frames, `XError: ` lines not expected by the step, unhandled/uncaught rejections. */
+/** Every string value nested in a parsed JSON value; strings that are themselves JSON are expanded too. */
+function jsonStrings(value, out = [], depth = 0) {
+  if (depth > 40 || value === null || value === undefined) return out;
+  if (typeof value === "string") {
+    out.push(value);
+    if (/^\s*[{[]/.test(value) && value.length < 8_000_000) {
+      try {
+        jsonStrings(JSON.parse(value), out, depth + 1);
+      } catch {}
+    }
+  } else if (typeof value === "object") for (const v of Object.values(value)) jsonStrings(v, out, depth + 1);
+  return out;
+}
+
 function internalErrors(text, allowedErrorLines = []) {
   const found = [];
   for (const line of text.split("\n")) {
@@ -244,19 +261,23 @@ function safe(fn, r) {
 function record(def, r) {
   const problems = [];
   const text = [r.stdout ?? "", r.stderr ?? "", r.extraText ?? ""].join("\n");
+  // JSON keeps a stack trace on one line with escaped newlines: check every
+  // string value of the parsed output (CLI --json, MCP structuredContent and
+  // text content) as text too.
+  const scanned = text + "\n" + jsonStrings(r.json).join("\n");
   if (r.harnessError) problems.push({ kind: "harness", reason: r.harnessError });
   const expectation = def.expect ? safe(def.expect, r) : null;
   if (expectation) problems.push({ kind: "expect", reason: expectation });
   if (!def.harnessOutput) {
-    const words = def.skipWording ? [] : wordingHits(text);
+    const words = def.skipWording ? [] : wordingHits(scanned);
     if (words.length) problems.push({ kind: "wording", reason: `mentions Java/Quint/TLC: ${words[0]}` });
-    const internal = def.skipWording ? [] : internalErrors(text, def.allowedErrorLines ?? []);
+    const internal = def.skipWording ? [] : internalErrors(scanned, def.allowedErrorLines ?? []);
     if (internal.length) problems.push({ kind: "internal", reason: `internal error output: ${internal.join("; ")}` });
     const warnings = def.skipWarnings ? [] : nodeWarnings(r.stderr ?? "");
     if (warnings.length) problems.push({ kind: "node-warning", reason: `Node warning: ${warnings.join(" / ").slice(0, 300)}`, gapChunk: knownWarningGap(warnings) });
   }
   for (const call of r.calls ?? []) {
-    if (TOOLCHAIN_PROGRAM.test(call.tool) && def.allowToolchain) continue;
+    if (TOOLCHAIN_PROGRAM.test(call.tool) && (def.allowToolchain ?? []).includes(call.tool)) continue;
     problems.push({ kind: "process", reason: `started ${call.tool} (${call.detail})` });
   }
 
@@ -314,7 +335,7 @@ async function step(def) {
   }
   r.stdout ??= "";
   r.stderr ??= "";
-  r.calls = readTraces();
+  ({ calls: r.calls, spawns: r.spawns } = readTraces());
   r.json = r.json ?? parseJson(r.stdout);
   return record(def, r);
 }
@@ -1150,6 +1171,8 @@ async function networkOff() {
  *  - npm's own cache, logs, npx store and update-notifier stamp
  *    (~/.npm/_cacache, _logs, _npx, _update-notifier-last-checked): npm and
  *    npx write there on every invocation, not Pymtheg;
+ *  - /tmp/node-compile-cache: Node's module compile cache, which the npm CLI
+ *    enables for itself (Pymtheg's source never calls enableCompileCache);
  *  - in scenario c only, Go's own build and module caches (~/.cache/go-build,
  *    ~/go) and its config folder (~/.config/go: Go's local telemetry
  *    counters), written by the `go` the project opted into;
@@ -1157,14 +1180,16 @@ async function networkOff() {
  */
 async function writesOutside({ go = false } = {}) {
   const npmOwn = ["_cacache/", "_logs/", "_npx/", "_update-notifier-last-checked"].map((p) => `${HOME}/.npm/${p}`);
-  const allowed = [`${PROJECT}/`, `${HOME}/legacy/`, `${GO_PROJECT}/`, `${HOME}/restic/`, `${APP}/`, ...npmOwn, "/acc/", ...(go ? [`${HOME}/.cache/go-build/`, `${HOME}/go/`, `${HOME}/.config/go/`] : [])];
+  const allowed = [`${PROJECT}/`, `${HOME}/legacy/`, `${GO_PROJECT}/`, `${HOME}/restic/`, `${APP}/`, ...npmOwn, "/tmp/node-compile-cache/", "/acc/", ...(go ? [`${HOME}/.cache/go-build/`, `${HOME}/go/`, `${HOME}/.config/go/`] : [])];
   await step({
     id: "writes-outside-project",
-    display: "no file created or modified outside the project folders and npm's own cache folders (nothing in /tmp)",
+    display: "no file created or modified outside the project folders and npm's own folders; nothing inside the installed package",
     harnessOutput: true,
     cmd: ["sh", "-c", `find / -xdev \\( -path /proc -o -path /sys -o -path /dev \\) -prune -o -newer ${OUT}/.marker \\( -type f -o -type l \\) -print 2>/dev/null`],
     expect: (r) => {
-      const outside = r.stdout.split("\n").filter(Boolean).filter((p) => !allowed.some((a) => p.startsWith(a)));
+      // Never inside the installed package, wherever it is installed (also
+      // checked byte-for-byte by install-unchanged).
+      const outside = r.stdout.split("\n").filter(Boolean).filter((p) => p.includes("/node_modules/pymtheg/") || !allowed.some((a) => p.startsWith(a)));
       return outside.length ? `written outside the allowed places: ${outside.slice(0, 8).join(", ")}${outside.length > 8 ? ` (+${outside.length - 8})` : ""}` : null;
     },
     note: (r) => {
@@ -1193,6 +1218,27 @@ function sizeOf(path) {
     else total += st.size;
   }
   return total;
+}
+
+/** The folder holding the installed pymtheg and its dependencies, and every file's size and SHA-256. */
+function installTree() {
+  const global = join(GLOBAL_PREFIX, "lib/node_modules/pymtheg");
+  const local = join(APP, "node_modules");
+  // npx: the whole store folder (every spec's install), so a second install or
+  // any write into an installed package shows up.
+  const root = existsSync(global) ? global : existsSync(join(local, "pymtheg")) ? local : existsSync(join(HOME, ".npm/_npx")) ? join(HOME, ".npm/_npx") : null;
+  const files = {};
+  const walk = (d, rel) => {
+    for (const e of readdirSync(d)) {
+      const p = join(d, e),
+        r = rel ? `${rel}/${e}` : e,
+        st = lstatSync(p);
+      if (st.isDirectory()) walk(p, r);
+      else files[r] = st.isSymbolicLink() ? `link` : `${st.size}:${createHash("sha256").update(readFileSync(p)).digest("hex")}`;
+    }
+  };
+  if (root) walk(root, "");
+  return { root, files };
 }
 
 function installedRoot(kind) {
@@ -1284,29 +1330,35 @@ async function goOptIn(pym) {
     display: `graph.toolchain.go = "${REAL_GO}"; graph index --json (Go module at the project root)`,
     cmd: pym(["graph", "index", "--root", GO_PROJECT, "--json"]),
     cwd: GO_PROJECT,
-    allowToolchain: true,
+    allowToolchain: ["go"],
     expect: (r) => {
       const go = r.json?.toolchain?.go;
-      const goCalls = r.calls.filter((c) => c.tool === "go").length;
+      // Evidence that the route really resolved: `go env` is not enough; the
+      // helper built from golinks.go must run from the project's rebuildable
+      // toolchain folder (it loads and type-checks the packages).
+      const goEnv = r.spawns.some((s) => s.path.split("/").pop() === "go" && s.args[0] === "env");
+      const helper = r.spawns.filter((s) => s.path.startsWith(`${GO_PROJECT}/.pymtheg/rebuildable/toolchain/`));
       return (
         exit(0)(r) ??
         (go?.state !== "used"
           ? `toolchain ${excerpt(JSON.stringify(r.json?.toolchain ?? "absent"), 300)}, expected state "used"`
           : !(go.upgradedLinks > 0)
             ? `upgradedLinks ${go.upgradedLinks}, expected > 0`
-            : goCalls === 0
-              ? "reported used, but no go process ran"
-              : null)
+            : !goEnv
+              ? "reported used, but `go env` never ran"
+              : !helper.length
+                ? `reported used, but the resolving helper never ran (spawns: ${r.spawns.map((s) => s.path.split("/").pop()).join(", ")})`
+                : null)
       );
     },
-    note: (r) => `${r.json.toolchain.go.upgradedLinks} links upgraded; ${r.calls.filter((c) => c.tool === "go").length} go processes`,
+    note: (r) => `${r.json.toolchain.go.upgradedLinks} links upgraded; processes: ${r.spawns.map((s) => [s.path.split("/").pop(), s.args[0]].join(" ")).join(", ")}`,
   });
   await step({
     id: "go-toolchain-callers",
     display: "opted in: graph callers Add --json (the generic-result call at main.go:13 is decided by the toolchain)",
     cmd: pym(["graph", "callers", "Add", "--root", GO_PROJECT, "--json"]),
     cwd: GO_PROJECT,
-    allowToolchain: true,
+    allowToolchain: ["go"],
     // Exactly five definite calls of (*Cart).Add from main, each decided or
     // confirmed by the toolchain, including line 13 (pricing.First(...).Add(5)).
     expect: all(exit(0), (r) => same(goAddLinks(r), ADD_CALLERS_ON, "callers of Add, opted in")),
@@ -1365,7 +1417,14 @@ async function restic(pym) {
 // `file:/abs/path.tgz` are package specs. The install step uses the documented
 // relative form from the tarball's folder; later steps use the same tarball.
 const npx = (args) => ["npx", "--yes", "file:" + TGZ, ...args];
-const npxInstall = () => installStep("install-npx", ["npx", "--yes", "./" + TGZ.split("/").pop(), "--help"], join(ACC, "pkg"), includes("graph index"));
+// npx keys its store by the spec: the documented `./name.tgz` form and the
+// `file:` form later steps use are two stores, so the install phase fills both
+// (otherwise npx would quietly install the second offline, from its cache,
+// during the run).
+const npxInstall = async () => {
+  await installStep("install-npx", ["npx", "--yes", "./" + TGZ.split("/").pop(), "--help"], join(ACC, "pkg"), includes("graph index"));
+  await installStep("install-npx-file-spec", npx(["--version"]), HOME);
+};
 
 const gitStatus = (id, extra = {}) => ({
   id,
@@ -1500,13 +1559,35 @@ if (!chosen || !["install", "run"].includes(phase)) {
 }
 mkdirSync(OUT, { recursive: true });
 await chosen[phase]();
+// The installed package (and the dependencies installed with it) must be
+// byte-for-byte unchanged by everything the scenario does: a product that
+// writes into its own install folder fails on read-only or root-owned
+// installs. Snapshot after the install, compare at the end of the run.
+const SNAPSHOT = join(OUT, "install-snapshot.json");
+if (phase === "install") writeFileSync(SNAPSHOT, JSON.stringify(installTree()));
+else
+  await step({
+    id: "install-unchanged",
+    display: "the installed package tree (paths, sizes, SHA-256) is unchanged since the install",
+    harnessOutput: true,
+    run: async () => {
+      const before = JSON.parse(readFileSync(SNAPSHOT, "utf8"));
+      const after = installTree();
+      const changed = [];
+      for (const k of new Set([...Object.keys(before.files), ...Object.keys(after.files)])) if (before.files[k] !== after.files[k]) changed.push(`${k} (${before.files[k] ? (after.files[k] ? "modified" : "removed") : "added"})`);
+      return { exitCode: null, before, after, changed: changed.sort() };
+    },
+    expect: (r) => (r.before.root !== r.after.root ? `install root moved: ${r.before.root} → ${r.after.root}` : r.changed.length ? `changed in ${r.after.root}: ${r.changed.slice(0, 8).join(", ")}${r.changed.length > 8 ? ` (+${r.changed.length - 8})` : ""}` : null),
+    note: (r) => `${Object.keys(r.after.files).length} files under ${r.after.root.replace(HOME, "~")} unchanged`,
+  });
 // Aggregate: every backend or toolchain process seen in any step of this phase.
 if (phase === "run") {
   const rows = readFileSync(RESULTS, "utf8")
     .split("\n")
     .filter(Boolean)
     .map((l) => JSON.parse(l));
-  const seen = rows.filter((r) => r.processes?.length && r.step !== "go-toolchain-index");
+  // The opted-in Go steps may run `go` (and only `go`; checked per step).
+  const seen = rows.filter((r) => r.processes?.length && !r.step.startsWith("go-toolchain-"));
   appendFileSync(
     RESULTS,
     JSON.stringify({
