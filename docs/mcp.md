@@ -70,19 +70,30 @@ const trial = await call("try_inputs", { file: "counter.pym", entry: "next", inp
 expect(trial.result.completion === "complete" && String(trial.result.output) === "42");
 ```
 
-Use **explore_behaviour** for finite verification or sampled simulation. A clean
-static check is not behavioural evidence. Inspect each property's method,
-completion, scope and outcome with read_run. Backend availability/prerequisites
-belong to the installed build; a missing backend is an error, never a pass.
+Use **explore_behaviour** with the built-in engines: `verify` searches the finite
+state space (default budget 1,000,000 distinct states); `simulate` samples seeded
+runs. No external backend needs installing or configuring. A clean static check
+is not behavioural evidence. Inspect each property's method, completion, scope
+and outcome with read_run; budget limits, timeouts and engine errors are unresolved
+or failed results, never passed checks.
+
+Every behaviour property carries `exhaustive`: true only for a completed verify
+that covered every reachable state, false for simulate or a search stopped early.
+The run summary's `results.exhaustive` is true only when all behaviour results
+qualify, false otherwise, and null without behaviour results. A complete, clean
+simulate means sampling finished without finding a counterexample; it is not a
+proof. Its summary explicitly says the run is not exhaustive.
 
 ```js
 // verified-mcp
 const verified = await call("explore_behaviour", { file: "counter.pym", entry: "Counter", method: "verify" });
 const proof = await call("read_run", { runId: verified.runId, section: "properties" });
-expect(proof.items.some(p => p.method === "finite_model_check" && p.completion === "complete" && p.outcome === "no_counterexample"));
+expect(verified.results.exhaustive === true);
+expect(proof.items.some(p => p.method === "finite_model_check" && p.completion === "complete" && p.outcome === "no_counterexample" && p.exhaustive === true));
 const simulated = await call("explore_behaviour", { file: "counter.pym", entry: "Counter", method: "simulate", seed: "42", maxSteps: 4, maxSamples: 10 });
 const samples = await call("read_run", { runId: simulated.runId, section: "properties" });
-expect(samples.items.some(p => p.method === "simulation" && p.completion === "complete" && p.outcome === "no_counterexample"));
+expect(simulated.results.exhaustive === false && simulated.meaning.includes("not exhaustive"));
+expect(samples.items.some(p => p.method === "simulation" && p.completion === "complete" && p.outcome === "no_counterexample" && p.exhaustive === false));
 ```
 
 Use **design_interface** to discover/describe checked interfaces or preview edits;

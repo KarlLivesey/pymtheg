@@ -23,15 +23,15 @@ const commands = [
   ],
   [
     `simulate FILE${identity.extension} --entry NAME [--seed 42 --max-steps 6 --max-samples 1000]`,
-    "Explore bounded event sequences with the built-in seeded sampler (default); --backend quint selects Quint.",
+    "Explore bounded event sequences with the built-in seeded sampler; a sampled run never proves a property.",
   ],
   [
-    `verify FILE${identity.extension} --entry NAME [--backend builtin|tlc] [--state-budget 1000000]`,
-    "Check all states with built-in breadth-first search (default); TLC requires --tlc-jar PATH.",
+    `verify FILE${identity.extension} --entry NAME [--state-budget 1000000]`,
+    "Check all reachable states with the built-in breadth-first search.",
   ],
   [
-    `emit FILE${identity.extension} --entry NAME --target quint --out MODEL.qnt`,
-    "Inspect a generated behavioural model.",
+    `emit FILE${identity.extension} --entry NAME --target json --out MODEL.json`,
+    "Write the behavioural model the built-in engines check, as JSON.",
   ],
   [
     `scaffold FILE${identity.extension} [--target typescript|rust|go] [--plugin FILE.mjs] [--mode stubs|contracts] [--body fail-fast|empty] [--manifest BASELINE.json | --check BASELINE.json] [--allow-incomplete] [--plugin-timeout 5s]`,
@@ -51,7 +51,7 @@ const commands = [
   ],
   [
     "doctor [--format json]",
-    "Check the local toolchain and optional backends.",
+    "Check Node, the built-in checking engines, storage, the code graph languages and Studio.",
   ],
 ] as const;
 export const commandNames = commands.map(([syntax]) => syntax.split(" ")[0]!);
@@ -61,6 +61,6 @@ export function help() {
     commands
       .map(([syntax, purpose]) => `${identity.cli} ${syntax}\n  ${purpose}`)
       .join("\n\n") +
-    `\n\nUse --scenario NAME for a saved ${identity.projectConfig} scenario. --scope FILE.json and --timeout 45s bound requested behavioural checks.\nLocal checking works offline. Simulation and verification use built-in workers by default. Explicit Quint/TLC backends require their pinned tools.\n`
+    `\n\nUse --scenario NAME for a saved ${identity.projectConfig} scenario. --scope FILE.json and --timeout 45s bound requested behavioural checks.\nLocal checking works offline. Simulation and verification run on built-in engines and need no external tools.\n`
   );
 }

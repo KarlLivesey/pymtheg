@@ -1,0 +1,48 @@
+✔ a new MCP check waits for cancelled work cleanup instead of reporting a spurious busy error (37.36361ms)
+✔ MCP-only design loop: ordinary source edits, diagnostic/hint, check, try without runId, verify and simulate (3385.372102ms)
+✔ every documented MCP call executes as written, including explicit legacy refusals (5733.581247ms)
+✔ large MCP code output is delivered exactly through bounded artifact pages (1308.364901ms)
+✔ reading retained output never reruns a registered emitter (1278.567006ms)
+✔ inline completion wins a controlled deadline and is exactly the graph_result first page (176.957083ms)
+✔ controlled deadline expiry returns a progress handle; later result is unchanged (80.938635ms)
+✔ wait:false never starts a deadline and cancellation of an inline wait joins the worker (152.035489ms)
+✔ graph lifecycle uses controlled readiness: busy rejection, cancellation, retention and close join (445.263376ms)
+✔ stdio mixed init-free graph: every action, certainty classes, failures, paging and auto-sync (10499.967511ms)
+✔ MCP graph jobs are nonblocking, cancellable, bounded, session-owned and confined (3322.164799ms)
+✔ graph MCP confines uninitialized subdirectories rather than indexing their parent (618.31158ms)
+✔ oversized names are explicitly clipped, exact details page, and wire responses stay bounded (3389.212962ms)
+✔ MCP launched without a path recognizes an initialized empty project from its subfolder (941.164509ms)
+✔ large project inventories page consistently while source and configuration change (2313.597952ms)
+✔ real MCP agrees with negative-list trials, surfaces mixed caller findings and retains partial code (3204.092595ms)
+✔ agent checks report affected plans against the proposed source and preserve uninspected scope (2282.304404ms)
+✔ MCP source comparison uses an explicit plan and never treats an absent baseline as unchanged (2578.121567ms)
+✔ MCP summaries count source-replayed call and return failures as counterexamples (944.986278ms)
+✔ agents can browse checked source targets before an architecture store exists (1144.303589ms)
+✔ real MCP discovery and check-fix-recheck preserve disk and evidence (1152.970047ms)
+✔ MCP refuses escaped paths and invalid tool arguments (586.532826ms)
+✔ modern MCP discovery supports scaffolds and preserves incomplete independent results (1520.28513ms)
+✔ old MCP results remain source-scoped after a file edit (816.309067ms)
+✔ MCP cancellation reaches the production CPU-worker coordinator (439.484788ms)
+✔ MCP verify needs no installed integration and still reports an unsupported design slice (1366.078199ms)
+✔ MCP emits all installed language targets without allowing executable plugin paths (779.792315ms)
+✔ agents can start from a recipe and see an actual returned value (943.399392ms)
+✔ agents can inspect retained architecture and page its complete documents (888.881606ms)
+✔ agents can check new virtual source files and imports without creating files or folders (1003.244991ms)
+✔ agents preview standalone shape changes, see affected callers and retain source (1087.971875ms)
+✔ agents can emit only the extra targets explicitly pinned at launch (1103.324672ms)
+✔ MCP builds rich interfaces and rejects malformed type shapes without saving (861.477247ms)
+✔ MCP reuses checked project types with explicit imports and previews body-preserving edits (1339.231334ms)
+✔ MCP source reads refuse malformed UTF-8 without returning replacement text (640.485636ms)
+✔ MCP pages a thousand types and callable IDs, then previews an edit with reverse callers (1504.271436ms)
+✔ interface search ignores workspace names and relative IDs survive opening the same design elsewhere (1744.602795ms)
+✔ agents page every concurrent withdrawal without downloading the whole review history (1190.60126ms)
+✔ agents preview create-only declarations from checked source, including virtual files (1119.353314ms)
+✔ agent findings include a replay-confirmed bad input and clear it after a guarded buffer-only fix (1230.512857ms)
+ℹ tests 40
+ℹ suites 0
+ℹ pass 40
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 23818.311435

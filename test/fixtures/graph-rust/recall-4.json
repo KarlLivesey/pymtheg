@@ -1,0 +1,950 @@
+[
+  {
+    "name": "Default enum helper",
+    "files": {
+      "src/lib.rs": "#[derive(Default)]enum A{#[default] X,Y}pub fn f()->A{A::X}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n"
+    },
+    "definite": {
+      "name": "A::X",
+      "identity": "A::X",
+      "kind": "values"
+    }
+  },
+  {
+    "name": "helper before derive stays withheld",
+    "files": {
+      "src/lib.rs": "#[helper]#[derive(Debug)]pub struct A;pub fn f(_:A){}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n"
+    },
+    "unknown": "A",
+    "would": "A",
+    "kind": "types"
+  },
+  {
+    "name": "qualified helper stays opaque",
+    "files": {
+      "src/lib.rs": "#[derive(Debug)]#[pm::helper]pub struct A;pub fn f(_:A){}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n"
+    },
+    "unknown": "A",
+    "would": "A",
+    "kind": "types"
+  },
+  {
+    "name": "empty derive does not enable helpers",
+    "files": {
+      "src/lib.rs": "#[derive()]#[helper]pub struct A;pub fn f(_:A){}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n"
+    },
+    "unknown": "A",
+    "would": "A",
+    "kind": "types"
+  },
+  {
+    "name": "real outer macro remains opaque",
+    "files": {
+      "src/lib.rs": "#[real]#[derive(Debug)]pub struct A;pub fn f(_:A){}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n"
+    },
+    "unknown": "A",
+    "would": "A",
+    "kind": "types"
+  },
+  {
+    "name": "tail helper(); m!()",
+    "files": {
+      "src/lib.rs": "macro_rules! m{()=>{{}}}pub fn helper(){}pub fn run(){helper(); m!()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper",
+      "kind": "calls"
+    }
+  },
+  {
+    "name": "tail helper(); m![]",
+    "files": {
+      "src/lib.rs": "macro_rules! m{()=>{{}}}pub fn helper(){}pub fn run(){helper(); m![]}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper",
+      "kind": "calls"
+    }
+  },
+  {
+    "name": "brace tail is still statement-capable",
+    "files": {
+      "src/lib.rs": "macro_rules! m{()=>{{}}}pub fn helper(){}pub fn run(){helper(); m!{}}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n"
+    },
+    "unknown": "helper",
+    "would": "helper",
+    "kind": "calls"
+  },
+  {
+    "name": "tail helper(); m!() // tail\n",
+    "files": {
+      "src/lib.rs": "macro_rules! m{()=>{{}}}pub fn helper(){}pub fn run(){helper(); m!() // tail\n}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n"
+    },
+    "definite": {
+      "name": "helper",
+      "identity": "helper",
+      "kind": "calls"
+    }
+  },
+  {
+    "name": "statement m!(); helper()",
+    "files": {
+      "src/lib.rs": "macro_rules! m{()=>{fn helper(){}}}pub fn helper(){}pub fn run(){m!(); helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n"
+    },
+    "unknown": "helper",
+    "would": "helper",
+    "kind": "calls"
+  },
+  {
+    "name": "statement m![]; helper()",
+    "files": {
+      "src/lib.rs": "macro_rules! m{()=>{fn helper(){}}}pub fn helper(){}pub fn run(){m![]; helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n"
+    },
+    "unknown": "helper",
+    "would": "helper",
+    "kind": "calls"
+  },
+  {
+    "name": "statement m!{} helper()",
+    "files": {
+      "src/lib.rs": "macro_rules! m{()=>{fn helper(){}}}pub fn helper(){}pub fn run(){m!{} helper()}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n"
+    },
+    "unknown": "helper",
+    "would": "helper",
+    "kind": "calls"
+  },
+  {
+    "name": "statement helper(); m!();",
+    "files": {
+      "src/lib.rs": "macro_rules! m{()=>{fn helper(){}}}pub fn helper(){}pub fn run(){helper(); m!();}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n"
+    },
+    "unknown": "helper",
+    "would": "helper",
+    "kind": "calls"
+  },
+  {
+    "name": "brace last item emission shadows earlier call",
+    "files": {
+      "src/lib.rs": "macro_rules! m{()=>{fn helper()->u32{22}}}pub fn helper()->u32{11}pub fn run(){let _=helper();m!{}}"
+    },
+    "unknown": "helper",
+    "would": "helper",
+    "kind": "calls"
+  },
+  {
+    "name": "helper item after derive",
+    "files": {
+      "src/lib.rs": "#[derive(pm::D)]#[helper]pub struct A{pub v:u8}pub fn take(_:crate::A){}pub fn run()->u32{let x:u8=crate::A{v:11}.v;x as u32}",
+      "pm/src/lib.rs": "extern crate proc_macro;use proc_macro::TokenStream;\n#[proc_macro_derive(D,attributes(helper,serde))]pub fn d(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(N)]pub fn n(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(Gen)]pub fn g(_:TokenStream)->TokenStream{\"use pm::helper;\".parse().unwrap()}\n#[proc_macro_attribute]pub fn helper(_:TokenStream,_:TokenStream)->TokenStream{\"pub struct A{pub v:u16}\".parse().unwrap()}\n#[proc_macro_attribute]pub fn outer(_:TokenStream,_:TokenStream)->TokenStream{\"#[derive(pm::D)]#[helper]pub struct A{pub v:u8}\".parse().unwrap()}\n"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"pm\"]\n[dependencies]\npm={path=\"pm\"}\n",
+      "pm/Cargo.toml": "[package]\nname=\"pm\"\nedition=\"2024\"\n[lib]\nproc-macro=true\n"
+    },
+    "nativeAnswer": 11,
+    "assumedGood": true,
+    "kind": "types",
+    "definite": {
+      "name": "crate::A",
+      "identity": "A",
+      "kind": "types"
+    }
+  },
+  {
+    "name": "field helper",
+    "files": {
+      "src/lib.rs": "#[derive(pm::D)]pub struct A{#[helper]pub v:u8}pub fn take(_:crate::A){}pub fn run()->u32{let x:u8=crate::A{v:11}.v;x as u32}",
+      "pm/src/lib.rs": "extern crate proc_macro;use proc_macro::TokenStream;\n#[proc_macro_derive(D,attributes(helper,serde))]pub fn d(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(N)]pub fn n(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(Gen)]pub fn g(_:TokenStream)->TokenStream{\"use pm::helper;\".parse().unwrap()}\n#[proc_macro_attribute]pub fn helper(_:TokenStream,_:TokenStream)->TokenStream{\"pub struct A{pub v:u16}\".parse().unwrap()}\n#[proc_macro_attribute]pub fn outer(_:TokenStream,_:TokenStream)->TokenStream{\"#[derive(pm::D)]#[helper]pub struct A{pub v:u8}\".parse().unwrap()}\n"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"pm\"]\n[dependencies]\npm={path=\"pm\"}\n",
+      "pm/Cargo.toml": "[package]\nname=\"pm\"\nedition=\"2024\"\n[lib]\nproc-macro=true\n"
+    },
+    "nativeAnswer": 11,
+    "assumedGood": true,
+    "definite": {
+      "name": "crate::A",
+      "identity": "A",
+      "kind": "types"
+    }
+  },
+  {
+    "name": "field visible same-name attribute",
+    "files": {
+      "src/lib.rs": "use pm::helper;#[derive(pm::D)]pub struct A{#[helper]pub v:u8}pub fn take(_:crate::A){}pub fn run()->u32{let x:u8=crate::A{v:11}.v;x as u32}",
+      "pm/src/lib.rs": "extern crate proc_macro;use proc_macro::TokenStream;\n#[proc_macro_derive(D,attributes(helper,serde))]pub fn d(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(N)]pub fn n(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(Gen)]pub fn g(_:TokenStream)->TokenStream{\"use pm::helper;\".parse().unwrap()}\n#[proc_macro_attribute]pub fn helper(_:TokenStream,_:TokenStream)->TokenStream{\"pub struct A{pub v:u16}\".parse().unwrap()}\n#[proc_macro_attribute]pub fn outer(_:TokenStream,_:TokenStream)->TokenStream{\"#[derive(pm::D)]#[helper]pub struct A{pub v:u8}\".parse().unwrap()}\n"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"pm\"]\n[dependencies]\npm={path=\"pm\"}\n",
+      "pm/Cargo.toml": "[package]\nname=\"pm\"\nedition=\"2024\"\n[lib]\nproc-macro=true\n"
+    },
+    "nativeAnswer": 11,
+    "assumedGood": true,
+    "definite": {
+      "name": "crate::A",
+      "identity": "A",
+      "kind": "types"
+    }
+  },
+  {
+    "name": "item visible non-helper attribute",
+    "files": {
+      "src/lib.rs": "use pm::helper;#[derive(pm::N)]#[helper]pub struct A{pub v:u8}pub fn take(_:crate::A){}pub fn run()->u32{let x:u16=crate::A{v:22}.v;x as u32}",
+      "pm/src/lib.rs": "extern crate proc_macro;use proc_macro::TokenStream;\n#[proc_macro_derive(D,attributes(helper,serde))]pub fn d(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(N)]pub fn n(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(Gen)]pub fn g(_:TokenStream)->TokenStream{\"use pm::helper;\".parse().unwrap()}\n#[proc_macro_attribute]pub fn helper(_:TokenStream,_:TokenStream)->TokenStream{\"pub struct A{pub v:u16}\".parse().unwrap()}\n#[proc_macro_attribute]pub fn outer(_:TokenStream,_:TokenStream)->TokenStream{\"#[derive(pm::D)]#[helper]pub struct A{pub v:u8}\".parse().unwrap()}\n"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"pm\"]\n[dependencies]\npm={path=\"pm\"}\n",
+      "pm/Cargo.toml": "[package]\nname=\"pm\"\nedition=\"2024\"\n[lib]\nproc-macro=true\n"
+    },
+    "nativeAnswer": 22,
+    "assumedGood": false,
+    "unknown": "crate::A",
+    "would": "A",
+    "kind": "types"
+  },
+  {
+    "name": "item visible renamed attribute",
+    "files": {
+      "src/lib.rs": "use pm::helper as serde;#[derive(pm::N)]#[serde]pub struct A{pub v:u8}pub fn take(_:crate::A){}pub fn run()->u32{let x:u16=crate::A{v:22}.v;x as u32}",
+      "pm/src/lib.rs": "extern crate proc_macro;use proc_macro::TokenStream;\n#[proc_macro_derive(D,attributes(helper,serde))]pub fn d(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(N)]pub fn n(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(Gen)]pub fn g(_:TokenStream)->TokenStream{\"use pm::helper;\".parse().unwrap()}\n#[proc_macro_attribute]pub fn helper(_:TokenStream,_:TokenStream)->TokenStream{\"pub struct A{pub v:u16}\".parse().unwrap()}\n#[proc_macro_attribute]pub fn outer(_:TokenStream,_:TokenStream)->TokenStream{\"#[derive(pm::D)]#[helper]pub struct A{pub v:u8}\".parse().unwrap()}\n"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"pm\"]\n[dependencies]\npm={path=\"pm\"}\n",
+      "pm/Cargo.toml": "[package]\nname=\"pm\"\nedition=\"2024\"\n[lib]\nproc-macro=true\n"
+    },
+    "nativeAnswer": 22,
+    "assumedGood": false,
+    "unknown": "crate::A",
+    "would": "A",
+    "kind": "types"
+  },
+  {
+    "name": "crate alias is type namespace",
+    "files": {
+      "src/lib.rs": "extern crate pm as serde;#[derive(serde::D)]#[serde]pub struct A{pub v:u8}pub fn take(_:crate::A){}pub fn run()->u32{let x:u8=crate::A{v:11}.v;x as u32}",
+      "pm/src/lib.rs": "extern crate proc_macro;use proc_macro::TokenStream;\n#[proc_macro_derive(D,attributes(helper,serde))]pub fn d(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(N)]pub fn n(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(Gen)]pub fn g(_:TokenStream)->TokenStream{\"use pm::helper;\".parse().unwrap()}\n#[proc_macro_attribute]pub fn helper(_:TokenStream,_:TokenStream)->TokenStream{\"pub struct A{pub v:u16}\".parse().unwrap()}\n#[proc_macro_attribute]pub fn outer(_:TokenStream,_:TokenStream)->TokenStream{\"#[derive(pm::D)]#[helper]pub struct A{pub v:u8}\".parse().unwrap()}\n"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"pm\"]\n[dependencies]\npm={path=\"pm\"}\n",
+      "pm/Cargo.toml": "[package]\nname=\"pm\"\nedition=\"2024\"\n[lib]\nproc-macro=true\n"
+    },
+    "nativeAnswer": 11,
+    "assumedGood": true,
+    "kind": "types",
+    "definite": {
+      "name": "crate::A",
+      "identity": "A",
+      "kind": "types"
+    }
+  },
+  {
+    "name": "qualified real attribute",
+    "files": {
+      "src/lib.rs": "#[derive(pm::D)]#[pm::helper]pub struct A{pub v:u8}pub fn take(_:crate::A){}pub fn run()->u32{let x:u16=crate::A{v:22}.v;x as u32}",
+      "pm/src/lib.rs": "extern crate proc_macro;use proc_macro::TokenStream;\n#[proc_macro_derive(D,attributes(helper,serde))]pub fn d(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(N)]pub fn n(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(Gen)]pub fn g(_:TokenStream)->TokenStream{\"use pm::helper;\".parse().unwrap()}\n#[proc_macro_attribute]pub fn helper(_:TokenStream,_:TokenStream)->TokenStream{\"pub struct A{pub v:u16}\".parse().unwrap()}\n#[proc_macro_attribute]pub fn outer(_:TokenStream,_:TokenStream)->TokenStream{\"#[derive(pm::D)]#[helper]pub struct A{pub v:u8}\".parse().unwrap()}\n"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"pm\"]\n[dependencies]\npm={path=\"pm\"}\n",
+      "pm/Cargo.toml": "[package]\nname=\"pm\"\nedition=\"2024\"\n[lib]\nproc-macro=true\n"
+    },
+    "nativeAnswer": 22,
+    "assumedGood": false,
+    "unknown": "crate::A",
+    "would": "A",
+    "kind": "types"
+  },
+  {
+    "name": "real outer attribute adds derive",
+    "files": {
+      "src/lib.rs": "#[pm::outer]#[helper]pub struct A{pub v:u16}pub fn take(_:crate::A){}pub fn run()->u32{let x:u8=crate::A{v:11}.v;x as u32}",
+      "pm/src/lib.rs": "extern crate proc_macro;use proc_macro::TokenStream;\n#[proc_macro_derive(D,attributes(helper,serde))]pub fn d(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(N)]pub fn n(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(Gen)]pub fn g(_:TokenStream)->TokenStream{\"use pm::helper;\".parse().unwrap()}\n#[proc_macro_attribute]pub fn helper(_:TokenStream,_:TokenStream)->TokenStream{\"pub struct A{pub v:u16}\".parse().unwrap()}\n#[proc_macro_attribute]pub fn outer(_:TokenStream,_:TokenStream)->TokenStream{\"#[derive(pm::D)]#[helper]pub struct A{pub v:u8}\".parse().unwrap()}\n"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"pm\"]\n[dependencies]\npm={path=\"pm\"}\n",
+      "pm/Cargo.toml": "[package]\nname=\"pm\"\nedition=\"2024\"\n[lib]\nproc-macro=true\n"
+    },
+    "nativeAnswer": 11,
+    "assumedGood": false,
+    "unknown": "crate::A",
+    "would": "A",
+    "kind": "types"
+  },
+  {
+    "name": "conditional matching derive/helper",
+    "files": {
+      "src/lib.rs": "#[cfg_attr(all(),derive(pm::D),helper)]pub struct A{pub v:u8}pub fn take(_:crate::A){}pub fn run()->u32{let x:u8=crate::A{v:11}.v;x as u32}",
+      "pm/src/lib.rs": "extern crate proc_macro;use proc_macro::TokenStream;\n#[proc_macro_derive(D,attributes(helper,serde))]pub fn d(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(N)]pub fn n(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(Gen)]pub fn g(_:TokenStream)->TokenStream{\"use pm::helper;\".parse().unwrap()}\n#[proc_macro_attribute]pub fn helper(_:TokenStream,_:TokenStream)->TokenStream{\"pub struct A{pub v:u16}\".parse().unwrap()}\n#[proc_macro_attribute]pub fn outer(_:TokenStream,_:TokenStream)->TokenStream{\"#[derive(pm::D)]#[helper]pub struct A{pub v:u8}\".parse().unwrap()}\n"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"pm\"]\n[dependencies]\npm={path=\"pm\"}\n",
+      "pm/Cargo.toml": "[package]\nname=\"pm\"\nedition=\"2024\"\n[lib]\nproc-macro=true\n"
+    },
+    "nativeAnswer": 11,
+    "assumedGood": true,
+    "kind": "types",
+    "definite": {
+      "name": "crate::A",
+      "identity": "A",
+      "kind": "types"
+    }
+  },
+  {
+    "name": "nested cfg_attr helpers",
+    "files": {
+      "src/lib.rs": "#[cfg_attr(all(),derive(pm::D))]#[cfg_attr(all(),cfg_attr(all(),helper))]pub struct A{pub v:u8}pub fn take(_:crate::A){}pub fn run()->u32{let x:u8=crate::A{v:11}.v;x as u32}",
+      "pm/src/lib.rs": "extern crate proc_macro;use proc_macro::TokenStream;\n#[proc_macro_derive(D,attributes(helper,serde))]pub fn d(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(N)]pub fn n(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(Gen)]pub fn g(_:TokenStream)->TokenStream{\"use pm::helper;\".parse().unwrap()}\n#[proc_macro_attribute]pub fn helper(_:TokenStream,_:TokenStream)->TokenStream{\"pub struct A{pub v:u16}\".parse().unwrap()}\n#[proc_macro_attribute]pub fn outer(_:TokenStream,_:TokenStream)->TokenStream{\"#[derive(pm::D)]#[helper]pub struct A{pub v:u8}\".parse().unwrap()}\n"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"pm\"]\n[dependencies]\npm={path=\"pm\"}\n",
+      "pm/Cargo.toml": "[package]\nname=\"pm\"\nedition=\"2024\"\n[lib]\nproc-macro=true\n"
+    },
+    "nativeAnswer": 11,
+    "assumedGood": true,
+    "kind": "types",
+    "definite": {
+      "name": "crate::A",
+      "identity": "A",
+      "kind": "types"
+    }
+  },
+  {
+    "name": "false helper predicate",
+    "files": {
+      "src/lib.rs": "#[derive(pm::D)]#[cfg_attr(any(),helper)]pub struct A{pub v:u8}pub fn take(_:crate::A){}pub fn run()->u32{let x:u8=crate::A{v:11}.v;x as u32}",
+      "pm/src/lib.rs": "extern crate proc_macro;use proc_macro::TokenStream;\n#[proc_macro_derive(D,attributes(helper,serde))]pub fn d(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(N)]pub fn n(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(Gen)]pub fn g(_:TokenStream)->TokenStream{\"use pm::helper;\".parse().unwrap()}\n#[proc_macro_attribute]pub fn helper(_:TokenStream,_:TokenStream)->TokenStream{\"pub struct A{pub v:u16}\".parse().unwrap()}\n#[proc_macro_attribute]pub fn outer(_:TokenStream,_:TokenStream)->TokenStream{\"#[derive(pm::D)]#[helper]pub struct A{pub v:u8}\".parse().unwrap()}\n"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"pm\"]\n[dependencies]\npm={path=\"pm\"}\n",
+      "pm/Cargo.toml": "[package]\nname=\"pm\"\nedition=\"2024\"\n[lib]\nproc-macro=true\n"
+    },
+    "nativeAnswer": 11,
+    "assumedGood": true,
+    "definite": {
+      "name": "crate::A",
+      "identity": "A",
+      "kind": "types"
+    }
+  },
+  {
+    "name": "KNOWN LIMIT E5: derive-generated import rewrites inferred helper",
+    "files": {
+      "src/lib.rs": "#[derive(pm::Gen)]#[helper]pub struct A{pub v:u8}pub fn take(_:crate::A){}pub fn run()->u32{let x:u16=crate::A{v:22}.v;x as u32}",
+      "pm/src/lib.rs": "extern crate proc_macro;use proc_macro::TokenStream;\n#[proc_macro_derive(D,attributes(helper,serde))]pub fn d(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(N)]pub fn n(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(Gen)]pub fn g(_:TokenStream)->TokenStream{\"use pm::helper;\".parse().unwrap()}\n#[proc_macro_attribute]pub fn helper(_:TokenStream,_:TokenStream)->TokenStream{\"pub struct A{pub v:u16}\".parse().unwrap()}\n#[proc_macro_attribute]pub fn outer(_:TokenStream,_:TokenStream)->TokenStream{\"#[derive(pm::D)]#[helper]pub struct A{pub v:u8}\".parse().unwrap()}\n"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"pm\"]\n[dependencies]\npm={path=\"pm\"}\n",
+      "pm/Cargo.toml": "[package]\nname=\"pm\"\nedition=\"2024\"\n[lib]\nproc-macro=true\n"
+    },
+    "nativeAnswer": 22,
+    "assumedGood": true,
+    "kind": "types",
+    "definite": {
+      "name": "crate::A",
+      "identity": "A",
+      "kind": "types"
+    },
+    "knownLimit": "E5 assumes no unseen binding; compiler prints 22 after rewriting A but graph keeps written A"
+  },
+  {
+    "name": "variant helper",
+    "files": {
+      "src/lib.rs": "#[derive(pm::D)]pub enum A{#[helper]V}pub fn run()->u32{let _=crate::A::V;11}",
+      "pm/src/lib.rs": "extern crate proc_macro;use proc_macro::TokenStream;\n#[proc_macro_derive(D,attributes(helper,serde))]pub fn d(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(N)]pub fn n(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(Gen)]pub fn g(_:TokenStream)->TokenStream{\"use pm::helper;\".parse().unwrap()}\n#[proc_macro_attribute]pub fn helper(_:TokenStream,_:TokenStream)->TokenStream{\"pub struct A{pub v:u16}\".parse().unwrap()}\n#[proc_macro_attribute]pub fn outer(_:TokenStream,_:TokenStream)->TokenStream{\"#[derive(pm::D)]#[helper]pub struct A{pub v:u8}\".parse().unwrap()}\n"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"pm\"]\n[dependencies]\npm={path=\"pm\"}\n",
+      "pm/Cargo.toml": "[package]\nname=\"pm\"\nedition=\"2024\"\n[lib]\nproc-macro=true\n"
+    },
+    "nativeAnswer": 11,
+    "definite": {
+      "name": "crate::A::V",
+      "identity": "A::V",
+      "kind": "values"
+    }
+  },
+  {
+    "name": "tuple field helper",
+    "files": {
+      "src/lib.rs": "pub struct T;#[derive(pm::D)]pub struct A(#[helper]crate::T);pub fn run()->u32{11}",
+      "pm/src/lib.rs": "extern crate proc_macro;use proc_macro::TokenStream;\n#[proc_macro_derive(D,attributes(helper,serde))]pub fn d(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(N)]pub fn n(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(Gen)]pub fn g(_:TokenStream)->TokenStream{\"use pm::helper;\".parse().unwrap()}\n#[proc_macro_attribute]pub fn helper(_:TokenStream,_:TokenStream)->TokenStream{\"pub struct A{pub v:u16}\".parse().unwrap()}\n#[proc_macro_attribute]pub fn outer(_:TokenStream,_:TokenStream)->TokenStream{\"#[derive(pm::D)]#[helper]pub struct A{pub v:u8}\".parse().unwrap()}\n"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"pm\"]\n[dependencies]\npm={path=\"pm\"}\n",
+      "pm/Cargo.toml": "[package]\nname=\"pm\"\nedition=\"2024\"\n[lib]\nproc-macro=true\n"
+    },
+    "nativeAnswer": 11,
+    "definite": {
+      "name": "crate::T",
+      "identity": "T",
+      "kind": "types"
+    }
+  },
+  {
+    "name": "field type helper",
+    "files": {
+      "src/lib.rs": "pub struct T;#[derive(pm::D)]pub struct A{#[helper]v:crate::T}pub fn run()->u32{11}",
+      "pm/src/lib.rs": "extern crate proc_macro;use proc_macro::TokenStream;\n#[proc_macro_derive(D,attributes(helper,serde))]pub fn d(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(N)]pub fn n(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(Gen)]pub fn g(_:TokenStream)->TokenStream{\"use pm::helper;\".parse().unwrap()}\n#[proc_macro_attribute]pub fn helper(_:TokenStream,_:TokenStream)->TokenStream{\"pub struct A{pub v:u16}\".parse().unwrap()}\n#[proc_macro_attribute]pub fn outer(_:TokenStream,_:TokenStream)->TokenStream{\"#[derive(pm::D)]#[helper]pub struct A{pub v:u8}\".parse().unwrap()}\n"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"pm\"]\n[dependencies]\npm={path=\"pm\"}\n",
+      "pm/Cargo.toml": "[package]\nname=\"pm\"\nedition=\"2024\"\n[lib]\nproc-macro=true\n"
+    },
+    "nativeAnswer": 11,
+    "definite": {
+      "name": "crate::T",
+      "identity": "T",
+      "kind": "types"
+    }
+  },
+  {
+    "name": "native paren tail",
+    "files": {
+      "src/lib.rs": "macro_rules! m{($v:expr)=>{{$v}}}pub const fn helper()->u32{11}pub fn run()->u32{let v=helper();m!(v)}"
+    },
+    "nativeAnswer": 11,
+    "definite": {
+      "name": "helper",
+      "identity": "helper",
+      "kind": "calls"
+    }
+  },
+  {
+    "name": "native bracket tail",
+    "files": {
+      "src/lib.rs": "macro_rules! m{($v:expr)=>{{$v}}}pub const fn helper()->u32{11}pub fn run()->u32{let v=helper();m![v]}"
+    },
+    "nativeAnswer": 11,
+    "definite": {
+      "name": "helper",
+      "identity": "helper",
+      "kind": "calls"
+    }
+  },
+  {
+    "name": "native if branch tail",
+    "files": {
+      "src/lib.rs": "macro_rules! m{($v:expr)=>{{$v}}}pub const fn helper()->u32{11}pub fn run()->u32{if true{let v=helper();m!(v)}else{0}}"
+    },
+    "nativeAnswer": 11,
+    "definite": {
+      "name": "helper",
+      "identity": "helper",
+      "kind": "calls"
+    }
+  },
+  {
+    "name": "native unsafe tail",
+    "files": {
+      "src/lib.rs": "macro_rules! m{($v:expr)=>{{$v}}}pub const fn helper()->u32{11}pub fn run()->u32{unsafe{let v=helper();m!(v)}}"
+    },
+    "nativeAnswer": 11,
+    "definite": {
+      "name": "helper",
+      "identity": "helper",
+      "kind": "calls"
+    }
+  },
+  {
+    "name": "native const tail",
+    "files": {
+      "src/lib.rs": "macro_rules! m{($v:expr)=>{{$v}}}pub const fn helper()->u32{11}pub fn run()->u32{const{let v=helper();m!(v)}}"
+    },
+    "nativeAnswer": 11,
+    "definite": {
+      "name": "helper",
+      "identity": "helper",
+      "kind": "calls"
+    }
+  },
+  {
+    "name": "native closure tail",
+    "files": {
+      "src/lib.rs": "macro_rules! m{($v:expr)=>{{$v}}}pub const fn helper()->u32{11}pub fn run()->u32{let f=||{let v=helper();m!(v)};f()}"
+    },
+    "nativeAnswer": 11,
+    "definite": {
+      "name": "helper",
+      "identity": "helper",
+      "kind": "calls"
+    }
+  },
+  {
+    "name": "native match arm block tail",
+    "files": {
+      "src/lib.rs": "macro_rules! m{($v:expr)=>{{$v}}}pub const fn helper()->u32{11}pub fn run()->u32{match 1{_=>{let v=helper();m!(v)}}}"
+    },
+    "nativeAnswer": 11,
+    "definite": {
+      "name": "helper",
+      "identity": "helper",
+      "kind": "calls"
+    }
+  },
+  {
+    "name": "native loop tail",
+    "files": {
+      "src/lib.rs": "macro_rules! m{($v:expr)=>{break $v}}pub const fn helper()->u32{11}pub fn run()->u32{loop{let v=helper();m!(v)}}"
+    },
+    "nativeAnswer": 11,
+    "definite": {
+      "name": "helper",
+      "identity": "helper",
+      "kind": "calls"
+    }
+  },
+  {
+    "name": "native block statement tail",
+    "files": {
+      "src/lib.rs": "macro_rules! m{()=>{{}}}pub const fn helper()->u32{11}pub fn run()->u32{let mut v=0;{v=helper();m!()}v}"
+    },
+    "nativeAnswer": 11,
+    "definite": {
+      "name": "helper",
+      "identity": "helper",
+      "kind": "calls"
+    }
+  },
+  {
+    "name": "native semicolon paren statement",
+    "files": {
+      "src/lib.rs": "macro_rules! m{()=>{fn helper()->u32{22}}}pub const fn helper()->u32{11}pub fn run()->u32{m!();helper()}"
+    },
+    "nativeAnswer": 22,
+    "unknown": "helper",
+    "would": "helper",
+    "kind": "calls"
+  },
+  {
+    "name": "native semicolon bracket statement",
+    "files": {
+      "src/lib.rs": "macro_rules! m{()=>{fn helper()->u32{22}}}pub const fn helper()->u32{11}pub fn run()->u32{m![];helper()}"
+    },
+    "nativeAnswer": 22,
+    "unknown": "helper",
+    "would": "helper",
+    "kind": "calls"
+  },
+  {
+    "name": "native brace middle statement",
+    "files": {
+      "src/lib.rs": "macro_rules! m{()=>{fn helper()->u32{22}}}pub const fn helper()->u32{11}pub fn run()->u32{m!{}helper()}"
+    },
+    "nativeAnswer": 22,
+    "unknown": "helper",
+    "would": "helper",
+    "kind": "calls"
+  },
+  {
+    "name": "native brace final statement",
+    "files": {
+      "src/lib.rs": "macro_rules! m{()=>{fn helper()->u32{22}}}pub const fn helper()->u32{11}pub fn run()->u32{let mut v=0;{v=helper();m!{}}v}"
+    },
+    "nativeAnswer": 22,
+    "unknown": "helper",
+    "would": "helper",
+    "kind": "calls"
+  },
+  {
+    "name": "native semicolon final statement",
+    "files": {
+      "src/lib.rs": "macro_rules! m{()=>{fn helper()->u32{22}}}pub const fn helper()->u32{11}pub fn run()->u32{let mut v=0;{v=helper();m!();}v}"
+    },
+    "nativeAnswer": 22,
+    "unknown": "helper",
+    "would": "helper",
+    "kind": "calls"
+  },
+  {
+    "name": "helper payload after derive",
+    "files": {
+      "src/lib.rs": "#[derive(pm::D)]#[helper(note=\"x\")]pub struct A{pub v:u8}pub fn take(_:crate::A){}pub fn run()->u32{let x:u8=crate::A{v:11}.v;x as u32}",
+      "pm/src/lib.rs": "extern crate proc_macro;use proc_macro::TokenStream;\n#[proc_macro_derive(D,attributes(helper,serde))]pub fn d(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(N)]pub fn n(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(Gen)]pub fn g(_:TokenStream)->TokenStream{\"use pm::helper;\".parse().unwrap()}\n#[proc_macro_attribute]pub fn helper(_:TokenStream,_:TokenStream)->TokenStream{\"pub struct A{pub v:u16}\".parse().unwrap()}\n#[proc_macro_attribute]pub fn outer(_:TokenStream,_:TokenStream)->TokenStream{\"#[derive(pm::D)]#[helper]pub struct A{pub v:u8}\".parse().unwrap()}\n"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"pm\"]\n[dependencies]\npm={path=\"pm\"}\n",
+      "pm/Cargo.toml": "[package]\nname=\"pm\"\nedition=\"2024\"\n[lib]\nproc-macro=true\n"
+    },
+    "nativeAnswer": 11,
+    "assumedGood": true,
+    "kind": "types",
+    "definite": {
+      "name": "crate::A",
+      "identity": "A",
+      "kind": "types"
+    }
+  },
+  {
+    "name": "helper and derive under feature",
+    "files": {
+      "src/lib.rs": "#[cfg_attr(feature=\"x\",derive(pm::D),helper)]pub struct A{pub v:u8}pub fn take(_:crate::A){}pub fn run()->u32{let x:u8=crate::A{v:11}.v;x as u32}",
+      "pm/src/lib.rs": "extern crate proc_macro;use proc_macro::TokenStream;\n#[proc_macro_derive(D,attributes(helper,serde))]pub fn d(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(N)]pub fn n(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(Gen)]pub fn g(_:TokenStream)->TokenStream{\"use pm::helper;\".parse().unwrap()}\n#[proc_macro_attribute]pub fn helper(_:TokenStream,_:TokenStream)->TokenStream{\"pub struct A{pub v:u16}\".parse().unwrap()}\n#[proc_macro_attribute]pub fn outer(_:TokenStream,_:TokenStream)->TokenStream{\"#[derive(pm::D)]#[helper]pub struct A{pub v:u8}\".parse().unwrap()}\n"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"pm\"]\n[dependencies]\npm={path=\"pm\"}\n",
+      "pm/Cargo.toml": "[package]\nname=\"pm\"\nedition=\"2024\"\n[lib]\nproc-macro=true\n"
+    },
+    "nativeAnswer": 11,
+    "assumedGood": true,
+    "kind": "types",
+    "definite": {
+      "name": "crate::A",
+      "identity": "A",
+      "kind": "types"
+    }
+  },
+  {
+    "name": "helper and derive under feature enabled",
+    "files": {
+      "src/lib.rs": "#[cfg_attr(feature=\"x\",derive(pm::D),helper)]pub struct A{pub v:u8}pub fn take(_:crate::A){}pub fn run()->u32{let x:u8=crate::A{v:11}.v;x as u32}",
+      "pm/src/lib.rs": "extern crate proc_macro;use proc_macro::TokenStream;\n#[proc_macro_derive(D,attributes(helper,serde))]pub fn d(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(N)]pub fn n(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(Gen)]pub fn g(_:TokenStream)->TokenStream{\"use pm::helper;\".parse().unwrap()}\n#[proc_macro_attribute]pub fn helper(_:TokenStream,_:TokenStream)->TokenStream{\"pub struct A{pub v:u16}\".parse().unwrap()}\n#[proc_macro_attribute]pub fn outer(_:TokenStream,_:TokenStream)->TokenStream{\"#[derive(pm::D)]#[helper]pub struct A{pub v:u8}\".parse().unwrap()}\n"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"pm\"]\n[dependencies]\npm={path=\"pm\"}\n",
+      "pm/Cargo.toml": "[package]\nname=\"pm\"\nedition=\"2024\"\n[lib]\nproc-macro=true\n"
+    },
+    "nativeAnswer": 11,
+    "assumedGood": true,
+    "kind": "types",
+    "appCfg": [
+      "feature=\"x\""
+    ],
+    "definite": {
+      "name": "crate::A",
+      "identity": "A",
+      "kind": "types"
+    }
+  },
+  {
+    "name": "native async block tail",
+    "files": {
+      "src/lib.rs": "macro_rules! m{($v:expr)=>{{$v}}}pub fn helper()->u32{11}pub async fn run()->u32{(async{let v=helper();m!(v)}).await}"
+    },
+    "nativeAnswer": 11,
+    "nativeAsync": true,
+    "definite": {
+      "name": "helper",
+      "identity": "helper",
+      "kind": "calls"
+    }
+  },
+  {
+    "name": "native closure expression body",
+    "files": {
+      "src/lib.rs": "macro_rules! m{($v:expr)=>{{$v}}}pub fn helper()->u32{11}pub fn run()->u32{let v=helper();let f=||m!(v);f()}"
+    },
+    "nativeAnswer": 11,
+    "definite": {
+      "name": "helper",
+      "identity": "helper",
+      "kind": "calls"
+    }
+  },
+  {
+    "name": "real outer macro with source derive and helper stays opaque",
+    "files": {
+      "src/lib.rs": "#[pm::outer]#[derive(pm::D)]#[helper]pub struct A{pub v:u16}pub fn take(_:crate::A){}pub fn run()->u32{let x:u8=crate::A{v:11}.v;x as u32}",
+      "pm/src/lib.rs": "extern crate proc_macro;use proc_macro::TokenStream;\n#[proc_macro_derive(D,attributes(helper,serde))]pub fn d(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(N)]pub fn n(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(Gen)]pub fn g(_:TokenStream)->TokenStream{\"use pm::helper;\".parse().unwrap()}\n#[proc_macro_attribute]pub fn helper(_:TokenStream,_:TokenStream)->TokenStream{\"pub struct A{pub v:u16}\".parse().unwrap()}\n#[proc_macro_attribute]pub fn outer(_:TokenStream,_:TokenStream)->TokenStream{\"#[derive(pm::D)]#[helper]pub struct A{pub v:u8}\".parse().unwrap()}\n"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"pm\"]\n[dependencies]\npm={path=\"pm\"}\n",
+      "pm/Cargo.toml": "[package]\nname=\"pm\"\nedition=\"2024\"\n[lib]\nproc-macro=true\n"
+    },
+    "nativeAnswer": 11,
+    "assumedGood": false,
+    "unknown": "crate::A",
+    "would": "A",
+    "kind": "types"
+  },
+  {
+    "name": "captured macro_use attribute export",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate pm;#[derive(pm::N)]#[helper]pub struct A{pub v:u8}pub fn take(_:crate::A){}pub fn run()->u32{let x:u16=crate::A{v:22}.v;x as u32}",
+      "pm/src/lib.rs": "extern crate proc_macro;use proc_macro::TokenStream;\n#[proc_macro_derive(D,attributes(helper,serde))]pub fn d(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(N)]pub fn n(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(Gen)]pub fn g(_:TokenStream)->TokenStream{\"use pm::helper;\".parse().unwrap()}\n#[proc_macro_attribute]pub fn helper(_:TokenStream,_:TokenStream)->TokenStream{\"pub struct A{pub v:u16}\".parse().unwrap()}\n#[proc_macro_attribute]pub fn outer(_:TokenStream,_:TokenStream)->TokenStream{\"#[derive(pm::D)]#[helper]pub struct A{pub v:u8}\".parse().unwrap()}\n"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"pm\"]\n[dependencies]\npm={path=\"pm\"}\n",
+      "pm/Cargo.toml": "[package]\nname=\"pm\"\nedition=\"2024\"\n[lib]\nproc-macro=true\n"
+    },
+    "nativeAnswer": 22,
+    "assumedGood": false,
+    "unknown": "crate::A",
+    "would": "A",
+    "kind": "types"
+  },
+  {
+    "name": "named macro_use attribute export",
+    "files": {
+      "src/lib.rs": "#[macro_use(helper)]extern crate pm;#[derive(pm::N)]#[helper]pub struct A{pub v:u8}pub fn take(_:crate::A){}pub fn run()->u32{let x:u16=crate::A{v:22}.v;x as u32}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\npm=\"=1.0.0\"\n"
+    },
+    "nativeAnswer": 22,
+    "assumedGood": false,
+    "unknown": "crate::A",
+    "would": "A",
+    "kind": "types",
+    "nativePm": "extern crate proc_macro;use proc_macro::TokenStream;\n#[proc_macro_derive(D,attributes(helper,serde))]pub fn d(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(N)]pub fn n(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(Gen)]pub fn g(_:TokenStream)->TokenStream{\"use pm::helper;\".parse().unwrap()}\n#[proc_macro_attribute]pub fn helper(_:TokenStream,_:TokenStream)->TokenStream{\"pub struct A{pub v:u16}\".parse().unwrap()}\n#[proc_macro_attribute]pub fn outer(_:TokenStream,_:TokenStream)->TokenStream{\"#[derive(pm::D)]#[helper]pub struct A{pub v:u8}\".parse().unwrap()}\n"
+  },
+  {
+    "name": "captured glob attribute export",
+    "files": {
+      "src/lib.rs": "mod p{pub use pm::helper;}use p::*;#[derive(pm::N)]#[helper]pub struct A{pub v:u8}pub fn take(_:crate::A){}pub fn run()->u32{let x:u16=crate::A{v:22}.v;x as u32}",
+      "pm/src/lib.rs": "extern crate proc_macro;use proc_macro::TokenStream;\n#[proc_macro_derive(D,attributes(helper,serde))]pub fn d(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(N)]pub fn n(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(Gen)]pub fn g(_:TokenStream)->TokenStream{\"use pm::helper;\".parse().unwrap()}\n#[proc_macro_attribute]pub fn helper(_:TokenStream,_:TokenStream)->TokenStream{\"pub struct A{pub v:u16}\".parse().unwrap()}\n#[proc_macro_attribute]pub fn outer(_:TokenStream,_:TokenStream)->TokenStream{\"#[derive(pm::D)]#[helper]pub struct A{pub v:u8}\".parse().unwrap()}\n"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"pm\"]\n[dependencies]\npm={path=\"pm\"}\n",
+      "pm/Cargo.toml": "[package]\nname=\"pm\"\nedition=\"2024\"\n[lib]\nproc-macro=true\n"
+    },
+    "nativeAnswer": 22,
+    "assumedGood": false,
+    "unknown": "crate::A",
+    "would": "A",
+    "kind": "types"
+  },
+  {
+    "name": "captured glob unresolved attribute target",
+    "files": {
+      "src/lib.rs": "mod p{pub use pm::helper;}use p::*;#[derive(pm::N)]#[helper]pub struct A{pub v:u8}pub fn take(_:crate::A){}pub fn run()->u32{let x:u16=crate::A{v:22}.v;x as u32}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\npm=\"=1.0.0\"\n"
+    },
+    "nativeAnswer": 22,
+    "assumedGood": false,
+    "unknown": "crate::A",
+    "would": "A",
+    "kind": "types",
+    "nativePm": "extern crate proc_macro;use proc_macro::TokenStream;\n#[proc_macro_derive(D,attributes(helper,serde))]pub fn d(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(N)]pub fn n(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(Gen)]pub fn g(_:TokenStream)->TokenStream{\"use pm::helper;\".parse().unwrap()}\n#[proc_macro_attribute]pub fn helper(_:TokenStream,_:TokenStream)->TokenStream{\"pub struct A{pub v:u16}\".parse().unwrap()}\n#[proc_macro_attribute]pub fn outer(_:TokenStream,_:TokenStream)->TokenStream{\"#[derive(pm::D)]#[helper]pub struct A{pub v:u8}\".parse().unwrap()}\n"
+  },
+  {
+    "name": "captured glob of glob attribute export",
+    "files": {
+      "src/lib.rs": "mod p{pub use pm::helper;}mod q{pub use super::p::*;}use q::*;#[derive(pm::N)]#[helper]pub struct A{pub v:u8}pub fn take(_:crate::A){}pub fn run()->u32{let x:u16=crate::A{v:22}.v;x as u32}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\npm=\"=1.0.0\"\n"
+    },
+    "nativeAnswer": 22,
+    "assumedGood": false,
+    "unknown": "crate::A",
+    "would": "A",
+    "kind": "types",
+    "nativePm": "extern crate proc_macro;use proc_macro::TokenStream;\n#[proc_macro_derive(D,attributes(helper,serde))]pub fn d(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(N)]pub fn n(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(Gen)]pub fn g(_:TokenStream)->TokenStream{\"use pm::helper;\".parse().unwrap()}\n#[proc_macro_attribute]pub fn helper(_:TokenStream,_:TokenStream)->TokenStream{\"pub struct A{pub v:u16}\".parse().unwrap()}\n#[proc_macro_attribute]pub fn outer(_:TokenStream,_:TokenStream)->TokenStream{\"#[derive(pm::D)]#[helper]pub struct A{pub v:u8}\".parse().unwrap()}\n"
+  },
+  {
+    "name": "union field helper",
+    "files": {
+      "src/lib.rs": "#[derive(Clone,Copy)]pub struct T(pub u8);#[derive(pm::D)]pub union A{#[helper]v:crate::T}pub fn run()->u32{11}",
+      "pm/src/lib.rs": "extern crate proc_macro;use proc_macro::TokenStream;\n#[proc_macro_derive(D,attributes(helper,serde))]pub fn d(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(N)]pub fn n(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(Gen)]pub fn g(_:TokenStream)->TokenStream{\"use pm::helper;\".parse().unwrap()}\n#[proc_macro_attribute]pub fn helper(_:TokenStream,_:TokenStream)->TokenStream{\"pub struct A{pub v:u16}\".parse().unwrap()}\n#[proc_macro_attribute]pub fn outer(_:TokenStream,_:TokenStream)->TokenStream{\"#[derive(pm::D)]#[helper]pub struct A{pub v:u8}\".parse().unwrap()}\n"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"pm\"]\n[dependencies]\npm={path=\"pm\"}\n",
+      "pm/Cargo.toml": "[package]\nname=\"pm\"\nedition=\"2024\"\n[lib]\nproc-macro=true\n"
+    },
+    "nativeAnswer": 11,
+    "definite": {
+      "name": "crate::T",
+      "identity": "T",
+      "kind": "types"
+    }
+  },
+  {
+    "name": "receiver before true tail expression",
+    "files": {
+      "src/lib.rs": "pub struct A;impl A{pub fn read(self)->u32{11}}macro_rules!m{($v:expr)=>{{$v}}}pub fn run(a:A)->u32{let v=a.read();m!(v)}"
+    },
+    "nativeAnswer": 11,
+    "nativeArg": "app::A",
+    "definite": {
+      "name": "a.read",
+      "identity": "impl A::read",
+      "kind": "calls"
+    }
+  },
+  {
+    "name": "qualified real attribute from uncaptured crate",
+    "files": {
+      "src/lib.rs": "#[derive(pm::D)]#[pm::helper]pub struct A{pub v:u8}pub fn take(_:crate::A){}pub fn run()->u32{let x:u16=crate::A{v:22}.v;x as u32}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\npm=\"=1.0.0\"\n"
+    },
+    "nativeAnswer": 22,
+    "assumedGood": false,
+    "unknown": "crate::A",
+    "would": "A",
+    "kind": "types",
+    "nativePm": "extern crate proc_macro;use proc_macro::TokenStream;\n#[proc_macro_derive(D,attributes(helper,serde))]pub fn d(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(N)]pub fn n(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(Gen)]pub fn g(_:TokenStream)->TokenStream{\"use pm::helper;\".parse().unwrap()}\n#[proc_macro_attribute]pub fn helper(_:TokenStream,_:TokenStream)->TokenStream{\"pub struct A{pub v:u16}\".parse().unwrap()}\n#[proc_macro_attribute]pub fn outer(_:TokenStream,_:TokenStream)->TokenStream{\"#[derive(pm::D)]#[helper]pub struct A{pub v:u8}\".parse().unwrap()}\n"
+  },
+  {
+    "name": "bare macro_use real attribute before derive",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate pm;#[outer]#[derive(pm::D)]#[helper]pub struct A{pub v:u16}pub fn take(_:crate::A){}pub fn run()->u32{let x:u8=crate::A{v:11}.v;x as u32}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\npm=\"=1.0.0\"\n"
+    },
+    "nativeAnswer": 11,
+    "assumedGood": false,
+    "unknown": "crate::A",
+    "would": "A",
+    "kind": "types",
+    "nativePm": "extern crate proc_macro;use proc_macro::TokenStream;\n#[proc_macro_derive(D,attributes(helper,serde))]pub fn d(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(N)]pub fn n(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(Gen)]pub fn g(_:TokenStream)->TokenStream{\"use pm::helper;\".parse().unwrap()}\n#[proc_macro_attribute]pub fn helper(_:TokenStream,_:TokenStream)->TokenStream{\"pub struct A{pub v:u16}\".parse().unwrap()}\n#[proc_macro_attribute]pub fn outer(_:TokenStream,_:TokenStream)->TokenStream{\"#[derive(pm::D)]#[helper]pub struct A{pub v:u8}\".parse().unwrap()}\n"
+  },
+  {
+    "name": "derive condition not implied by helper",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate pm;#[cfg_attr(feature=\"x\",derive(pm::D))]#[helper]pub struct A{pub v:u8}pub fn take(_:crate::A){}pub fn run()->u32{let x:u16=crate::A{v:22}.v;x as u32}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\npm=\"=1.0.0\"\n"
+    },
+    "nativeAnswer": 22,
+    "assumedGood": false,
+    "unknown": "crate::A",
+    "would": "A",
+    "kind": "types",
+    "nativePm": "extern crate proc_macro;use proc_macro::TokenStream;\n#[proc_macro_derive(D,attributes(helper,serde))]pub fn d(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(N)]pub fn n(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(Gen)]pub fn g(_:TokenStream)->TokenStream{\"use pm::helper;\".parse().unwrap()}\n#[proc_macro_attribute]pub fn helper(_:TokenStream,_:TokenStream)->TokenStream{\"pub struct A{pub v:u16}\".parse().unwrap()}\n#[proc_macro_attribute]pub fn outer(_:TokenStream,_:TokenStream)->TokenStream{\"#[derive(pm::D)]#[helper]pub struct A{pub v:u8}\".parse().unwrap()}\n"
+  },
+  {
+    "name": "attribute without any derive",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate pm;#[helper]pub struct A{pub v:u8}pub fn take(_:crate::A){}pub fn run()->u32{let x:u16=crate::A{v:22}.v;x as u32}"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\npm=\"=1.0.0\"\n"
+    },
+    "nativeAnswer": 22,
+    "assumedGood": false,
+    "unknown": "crate::A",
+    "would": "A",
+    "kind": "types",
+    "nativePm": "extern crate proc_macro;use proc_macro::TokenStream;\n#[proc_macro_derive(D,attributes(helper,serde))]pub fn d(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(N)]pub fn n(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(Gen)]pub fn g(_:TokenStream)->TokenStream{\"use pm::helper;\".parse().unwrap()}\n#[proc_macro_attribute]pub fn helper(_:TokenStream,_:TokenStream)->TokenStream{\"pub struct A{pub v:u16}\".parse().unwrap()}\n#[proc_macro_attribute]pub fn outer(_:TokenStream,_:TokenStream)->TokenStream{\"#[derive(pm::D)]#[helper]pub struct A{pub v:u8}\".parse().unwrap()}\n"
+  },
+  {
+    "name": "macro_use does not import a re-exported module named helper",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate dep;#[derive(pm::D)]#[helper]pub struct A{pub v:u8}pub fn take(_:crate::A){}pub fn run()->u32{let x:u8=crate::A{v:11}.v;x as u32}",
+      "pm/src/lib.rs": "extern crate proc_macro;use proc_macro::TokenStream;\n#[proc_macro_derive(D,attributes(helper,serde))]pub fn d(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(N)]pub fn n(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(Gen)]pub fn g(_:TokenStream)->TokenStream{\"use pm::helper;\".parse().unwrap()}\n#[proc_macro_attribute]pub fn helper(_:TokenStream,_:TokenStream)->TokenStream{\"pub struct A{pub v:u16}\".parse().unwrap()}\n#[proc_macro_attribute]pub fn outer(_:TokenStream,_:TokenStream)->TokenStream{\"#[derive(pm::D)]#[helper]pub struct A{pub v:u8}\".parse().unwrap()}\n",
+      "dep/src/lib.rs": "pub mod inner{} pub use inner as helper;"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"pm\",\"dep\"]\n[dependencies]\ndep={path=\"dep\"}\npm={path=\"pm\"}\n",
+      "pm/Cargo.toml": "[package]\nname=\"pm\"\nedition=\"2024\"\n[lib]\nproc-macro=true\n",
+      "dep/Cargo.toml": "[package]\nname=\"dep\"\nedition=\"2024\"\n[dependencies]\npm={path=\"../pm\"}\n"
+    },
+    "nativeAnswer": 11,
+    "assumedGood": true,
+    "kind": "types",
+    "definite": {
+      "name": "crate::A",
+      "identity": "A",
+      "kind": "types"
+    },
+    "nativeLibs": [
+      "dep"
+    ]
+  },
+  {
+    "name": "macro_use imports a macro sharing a re-exported module name",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate dep;#[derive(pm::N)]#[helper]pub struct A{pub v:u8}pub fn take(_:crate::A){}pub fn run()->u32{let x:u16=crate::A{v:22}.v;x as u32}",
+      "pm/src/lib.rs": "extern crate proc_macro;use proc_macro::TokenStream;\n#[proc_macro_derive(D,attributes(helper,serde))]pub fn d(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(N)]pub fn n(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(Gen)]pub fn g(_:TokenStream)->TokenStream{\"use pm::helper;\".parse().unwrap()}\n#[proc_macro_attribute]pub fn helper(_:TokenStream,_:TokenStream)->TokenStream{\"pub struct A{pub v:u16}\".parse().unwrap()}\n#[proc_macro_attribute]pub fn outer(_:TokenStream,_:TokenStream)->TokenStream{\"#[derive(pm::D)]#[helper]pub struct A{pub v:u8}\".parse().unwrap()}\n",
+      "dep/src/lib.rs": "pub mod helper{} pub use pm::helper;"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"pm\",\"dep\"]\n[dependencies]\ndep={path=\"dep\"}\npm={path=\"pm\"}\n",
+      "pm/Cargo.toml": "[package]\nname=\"pm\"\nedition=\"2024\"\n[lib]\nproc-macro=true\n",
+      "dep/Cargo.toml": "[package]\nname=\"dep\"\nedition=\"2024\"\n[dependencies]\npm={path=\"../pm\"}\n"
+    },
+    "nativeAnswer": 22,
+    "assumedGood": false,
+    "unknown": "crate::A",
+    "would": "A",
+    "kind": "types",
+    "nativeLibs": [
+      "dep"
+    ]
+  },
+  {
+    "name": "macro_use captured unresolved re-export can bind helper",
+    "files": {
+      "src/lib.rs": "#[macro_use]extern crate dep;#[derive(pm::N)]#[helper]pub struct A{pub v:u8}pub fn take(_:crate::A){}pub fn run()->u32{let x:u16=crate::A{v:22}.v;x as u32}",
+      "dep/src/lib.rs": "pub use pm::helper;"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"pm\",\"dep\"]\n[dependencies]\ndep={path=\"dep\"}\npm={path=\"pm\"}\n",
+      "dep/Cargo.toml": "[package]\nname=\"dep\"\nedition=\"2024\"\n[dependencies]\npm={path=\"../pm\"}\n"
+    },
+    "nativeAnswer": 22,
+    "assumedGood": false,
+    "unknown": "crate::A",
+    "would": "A",
+    "kind": "types",
+    "nativeLibs": [
+      "dep"
+    ],
+    "nativePm": "extern crate proc_macro;use proc_macro::TokenStream;\n#[proc_macro_derive(D,attributes(helper,serde))]pub fn d(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(N)]pub fn n(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(Gen)]pub fn g(_:TokenStream)->TokenStream{\"use pm::helper;\".parse().unwrap()}\n#[proc_macro_attribute]pub fn helper(_:TokenStream,_:TokenStream)->TokenStream{\"pub struct A{pub v:u16}\".parse().unwrap()}\n#[proc_macro_attribute]pub fn outer(_:TokenStream,_:TokenStream)->TokenStream{\"#[derive(pm::D)]#[helper]pub struct A{pub v:u8}\".parse().unwrap()}\n"
+  },
+  {
+    "name": "inherent method on inferred helper owner",
+    "files": {
+      "src/lib.rs": "#[derive(pm::D)]#[helper]pub struct A{pub v:u8}impl A{pub fn read(self)->u32{self.v as u32}}pub fn run(a:crate::A)->u32{a.read()}",
+      "pm/src/lib.rs": "extern crate proc_macro;use proc_macro::TokenStream;\n#[proc_macro_derive(D,attributes(helper,serde))]pub fn d(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(N)]pub fn n(_:TokenStream)->TokenStream{TokenStream::new()}\n#[proc_macro_derive(Gen)]pub fn g(_:TokenStream)->TokenStream{\"use pm::helper;\".parse().unwrap()}\n#[proc_macro_attribute]pub fn helper(_:TokenStream,_:TokenStream)->TokenStream{\"pub struct A{pub v:u16}\".parse().unwrap()}\n#[proc_macro_attribute]pub fn outer(_:TokenStream,_:TokenStream)->TokenStream{\"#[derive(pm::D)]#[helper]pub struct A{pub v:u8}\".parse().unwrap()}\n"
+    },
+    "manifests": {
+      "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[workspace]\nmembers=[\"pm\"]\n[dependencies]\npm={path=\"pm\"}\n",
+      "pm/Cargo.toml": "[package]\nname=\"pm\"\nedition=\"2024\"\n[lib]\nproc-macro=true\n"
+    },
+    "nativeAnswer": 11,
+    "assumedGood": true,
+    "definite": {
+      "name": "a.read",
+      "identity": "impl A::read",
+      "kind": "calls"
+    },
+    "nativeArg": "app::A{v:11}"
+  }
+]

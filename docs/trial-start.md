@@ -10,7 +10,6 @@ needed on this PC. Replace the example project path below:
 
 ```sh
 cd /home/user/.t3/projects/pymtheg
-export PYM_TLC_JAR=/tmp/spec-language-research/tla2tools.jar
 TRIAL_PROJECT="/absolute/path/to/your/trial-project"
 ./pymtheg init "$TRIAL_PROJECT" --import-docs
 ./pymtheg studio "$TRIAL_PROJECT"
@@ -26,8 +25,8 @@ history. It does not turn prose into a verified model.
    planning record** for the requirement you want to exercise.
 2. Use **Connect agent** to obtain the MCP configuration for this project. The
    server command is `/home/user/.t3/projects/pymtheg/pymtheg mcp
-   /absolute/path/to/your/trial-project`. Set `PYM_TLC_JAR` to the path above in
-   the client's server environment if you want TLC verification.
+   /absolute/path/to/your/trial-project`. Verification and simulation use the
+   built-in engines; nothing else needs configuring.
 3. Give the agent one real planned workflow. Ask it to model that workflow in
    `.pym`, link it to the requirement, check it, replay any returned
    counterexample and propose the minimum correction. Save only changes you
@@ -42,6 +41,8 @@ result, together with the input and expected/actual behavior. Cosmetic changes
 and feature ideas are backlog items. No new audit, polish or feature work starts
 automatically after this handoff.
 
-Host prerequisite check: Node 24.21.0, Quint 0.33.1, Java, the existing pinned
-TLC JAR and the built Studio all report ready. Candidate 37 and previous test
+Host prerequisite check: `./pymtheg doctor` reports Node 24 or newer, the built-in
+verifier and simulator, storage, the Go, Rust and TypeScript code graph and the
+built Studio. (Earlier trials
+also used Java, TLC and Quint; R1-A removed them.) Candidate 37 and previous test
 evidence remain available under `evidence/`.

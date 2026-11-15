@@ -30,7 +30,7 @@ unchanged historical `research/results/`.
 | R04 ownership/obligations/cancellation | partially implemented | conservative single owner/read borrow, local automata, transferred summaries; core tests; no general aliases, owned result collections or loop invariants |
 | R05 composed costs/budgets/repeated work | implemented | additive counters with exact/upper/unknown; cost regressions incl. bigint/zero/early return/recursion; `algorithm.json`, `quote-unknown.json` |
 | R06 exact independent rule copies | implemented | alpha canonical hash buckets, resolved symbols; core/import tests and deterministic benchmark; near copies deferred |
-| R07 real behavioural integration | implemented | explicit finite-machine subset; `test/backend.integration.mjs`; real Quint + direct TLC, all 3 checkout defects, task retry, renamed/reordered source |
+| R07 real behavioural integration | implemented | explicit finite-machine subset; `test/backend.integration.mjs`; built-in exhaustive search and seeded sampler (R1-A removed Quint and TLC), all 3 checkout defects, task retry, renamed/reordered source |
 | R07 bounded structured flow lowering | implemented bounded subset | `test/flow.test.mjs`, `test/flow.integration.mjs`; capability preflight rejects unsupported recursion/domains/concurrency |
 | R08 scoped evidence/unknowns/assumptions | implemented | result/exit policy, schema, model/session tests; never merges sampled/exhaustive/incomplete/cancelled into one pass |
 | R09 actionable text and versioned JSON | implemented | actual locations, related declarations, paths; independent Ajv schema validation, JSON stdout isolation |
@@ -44,7 +44,7 @@ unchanged historical `research/results/`.
 | General logical feasibility/postconditions | partially implemented | conjunctive scalar entry/guarantee consistency; branch-sensitive scalar/affine call facts and supported assumed return bounds; unresolved/general proofs explicit |
 | Arbitrary shared memory parallelism/aliasing | deferred | requires semantics beyond v0; unsupported lowering |
 | Recursive cost proofs, amortisation, probabilities, latency, peaks | deferred | recursive work unknown; reserved nonadditive metrics rejected |
-| Quint-to-TLC via Apalache | blocked | early probe failed acquiring missing distribution; adapter uses explicit direct TLC, never claims bridge evidence |
+| Quint-to-TLC via Apalache | withdrawn | external checkers removed in R1-A (decision D2); historical probe failed acquiring the missing distribution |
 | Full liveness/progress, refinement/conformance, production code generation | deferred | safety-only models and abstract environment contracts |
 | Guided local GUI and recovery | implemented | typed scope forms, transaction/restart/conflict tests, multi-file investigation and scope-aware comparisons; browser suites |
 | Agent-facing MCP | implemented | `test/mcp.test.mjs`, `test/mcp.integration.mjs`, installed package protocol smoke |

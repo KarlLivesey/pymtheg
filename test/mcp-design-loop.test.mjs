@@ -76,6 +76,8 @@ test("MCP-only design loop: ordinary source edits, diagnostic/hint, check, try w
         maxSamples: 10,
         seed: "42",
       });
+      assert.equal(run.results.exhaustive, method === "verify");
+      if (method === "simulate") assert.match(run.meaning, /not exhaustive/);
       const properties = await s.call("read_run", {
         runId: run.runId,
         section: "properties",
@@ -84,6 +86,7 @@ test("MCP-only design loop: ordinary source edits, diagnostic/hint, check, try w
         (p) => p.analysisKind === "behaviour",
       );
       assert.ok(evidence.length);
+      assert.ok(evidence.every((p) => p.exhaustive === (method === "verify")));
       assert.ok(
         evidence.every(
           (p) =>

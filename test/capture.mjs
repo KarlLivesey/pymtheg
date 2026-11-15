@@ -22,7 +22,7 @@ const cases = [
 ];
 for (const name of ["double-charge", "stock-leak", "missing-refund", "fixed"])
   cases.push([
-    "quint-" + name,
+    "simulate-" + name,
     ["simulate", `examples/mvp/checkout-${name}.pym`, "--entry", "Checkout"],
     name === "fixed" ? 0 : 1,
   ]);
@@ -32,24 +32,12 @@ for (const name of ["buggy", "fixed"])
     ["simulate", `examples/mvp/task-${name}.pym`, "--entry", "TaskRunner"],
     name === "fixed" ? 0 : 1,
   ]);
-const jar =
-  process.env.PYM_TLC_JAR ?? "/tmp/spec-language-research/tla2tools.jar";
-if (existsSync(jar))
-  for (const name of ["double-charge", "stock-leak", "missing-refund", "fixed"])
-    cases.push([
-      "tlc-" + name,
-      [
-        "verify",
-        `examples/mvp/checkout-${name}.pym`,
-        "--entry",
-        "Checkout",
-        "--backend",
-        "tlc",
-        "--tlc-jar",
-        jar,
-      ],
-      name === "fixed" ? 0 : 1,
-    ]);
+for (const name of ["double-charge", "stock-leak", "missing-refund", "fixed"])
+  cases.push([
+    "verify-" + name,
+    ["verify", `examples/mvp/checkout-${name}.pym`, "--entry", "Checkout"],
+    name === "fixed" ? 0 : 1,
+  ]);
 const selected = process.argv[2] === "--case" ? process.argv[3] : null;
 assert.ok(
   !selected || cases.some((c) => c[0] === selected),

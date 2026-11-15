@@ -34,8 +34,8 @@ The language is a bounded design tool, not a universal proof engine.
 | Ownership `src/analysis/ownership.ts` | resource automata + structured blocks + per-outcome summaries | state-set joins, move/borrow state, every exit and explicit cancellation handler; trusted settlement is an assumption |
 | Call contracts `src/analysis/contracts.ts` | typed calls + pre/post contracts -> discharged/violated/pending | signed scalar/affine facts, conservative Boolean joins, located infeasible assertions; typed abstract results and supported guarantees retain assumption provenance at consumers; unsupported proof visible |
 | Feasibility `src/analysis/feasibility.ts` | entry constraints -> interval/Bool witness or contradiction | only supported conjunctive scalar fragment; all other logic unsupported; postconditions remain obligations |
-| Lowering/reference semantics `src/behaviour/model.ts` | `lower(ir,entry): supported(model) / unsupported / incomplete`; `step`, `replay` | finite machine or source-flow graph; generated Q/TLA strings + source event map; hash validation before mapping |
-| Adapter `src/backends/adapter.ts` | typed IR + BackendOptions + AbortSignal -> property results | default `builtin` backend calls the explore runner (`method` exhaustive or sample); for TLC/Quint owns temporary workspace; pinned version/digest checks, runtime validation of external JSON/ITF; finally cleanup; retains partial results if cleanup fails |
+| Lowering/reference semantics `src/behaviour/model.ts` | `lower(ir,entry): supported(model) / unsupported / incomplete`; `step`, `replay`; `modelDocument` for `emit --target json` | finite machine or source-flow graph + source event/state/property map; model hash over machine, mapping and flow graph, validated before mapping |
+| Adapter `src/backends/adapter.ts` | typed IR + BackendOptions + AbortSignal -> property results | lowers in a worker, checks source-mapping identity, calls the explore runner (`method` exhaustive or sample) and maps each verdict to a result; only engine (CLI, Studio, MCP) |
 | Process runner `src/backends/process.ts` | executable + argument array + deadline/cancel/output cap -> discriminated ProcessResult | detached POSIX process group; TERM then KILL; leader reaped; kills group even when leader exited retaining child pipes |
 | Reporting `src/reporting/report.ts`, `publish.ts` | AnalysisResult[] -> same Report -> text/JSON; atomicWrite | no independent renderer verdict; JSON v1 schema; same-directory stage, fsync, rename, finally unlink |
 | Shared semantics `src/shared/` | identity, scalar operators, evidence/purity/hoist policies | pure CLI name/extension values in identity-values.ts, re-exported by identity.ts (+ package bin/wrapper); no global current project/cache |
@@ -137,30 +137,29 @@ probabilities, amortisation and precise peak live memory are outside v0.
   interrupted worker supplies no counts or witnesses; every unviolated property is
   incomplete. The timer starts before readiness, so a worker that never becomes
   ready still times out.
-- External checker: prepared -> spawned -> exited, or TERM -> 100ms -> KILL.
-  Group cleanup also runs after normal leader exit. The leader is reaped by Node;
+- External process (output plugins, `git` for capture): prepared -> spawned ->
+  exited, or TERM -> 100ms -> KILL. Group cleanup also runs after normal leader exit. The leader is reaped by Node;
   orphan descendant reaping is the OS's job. Descendants deliberately escaping a
   process group/session aren't contained by this POSIX mechanism (future cgroup
   containment); tests ensure normal inherited descendants are no longer running.
-- Temporary directory: allocated -> populated -> finally removed. Cleanup error
-  appends failed cleanup evidence. Output capture <=1 MiB; JSON artifacts <=16 MiB.
+- Process output capture <=1 MiB; scope JSON <=16 MiB.
 - Publication: unique same-directory 0600 staging -> fsync -> rename. No directory
   fsync/power-loss durability claim and no cross-file transaction guarantee.
-- Adapter errors: absent/wrong-version tool, wrong JAR digest, spawn failure,
-  unrecognised exit/crash, malformed output, invalid trace/map, timeout,
-  cancellation, output limit, cleanup failure. None becomes a successful check.
+- Adapter outcomes other than a verdict: unreadable scope file (B101),
+  unsupported or incomplete lowering (B001), identity/replay mismatch (B106),
+  state budget or domain boundary (B108), timeout (B124), cancellation (B130),
+  worker/engine error (B104, `failed`). None becomes a successful check.
 - Source machine updates leaving the declared data domain invalidate that model
   check; they are never silently disabled or clamped at the bound.
 
-Quint 0.33.1 is pinned via optional npm dependency + lockfile. Offline local check
-never starts it. TLC uses the official pinned v1.7.4 JAR digest and one worker,
-512 MiB heap, explicit seed and deadline. Its management socket needs an execution
-context allowing it. Quint's Apalache/TLC bridge was probed and is not used.
+Behavioural checking needs no external program: the engines run in Node worker
+threads (R1-A removed TLC, Quint and Java).
 
 ## Shared decisions and outstanding obligations
 
 The source/operator table and source evaluator define scalar operations;
-Q/TLA renderings are boundary translations of those operators. `result()` enforces
+the behavioural preflight accepts exactly the operators that evaluator implements
+(`scalarBinaryOperators`). `result()` enforces
 establishment prerequisites; `exitStatus()` is the single exit policy. Coverage,
 resource discharge and stability policies live with their analysis/shared
 judgements. The report renderer formats existing evidence only.
@@ -508,7 +507,8 @@ that limitation rather than inventing a matching original checksum.
 cached visits under its explicit reference/type bounds and models 64-record
 metadata chunks. Its abstract operations declare zero for the unrelated metric,
 so the checker never guesses it. The finite completion/cancellation model has
-eight reachable states checked by TLC; this is not a proof of implementation
+no counterexample under the built-in exhaustive search (TLC, when this was
+written, counted eight reachable states); this is not a proof of implementation
 conformance. `test/self-authoring.test.mjs` detects drift between the modelled
 bounds and the configured guided-shape/chunk limits.
 
@@ -1442,16 +1442,18 @@ sign-off is pending; unchanged reviewed areas carry review36 evidence.
 ## Rebuild components (merged through W2-C2)
 
 The mega-plan rebuild adds parts that the CLI, MCP and Studio mostly do not use
-yet. Only the built-in engines (CLI `verify`/`simulate`) and the storage
-boundary (every command that touches project state) are on a command path.
+yet. The built-in engines (`verify`/`simulate` in the CLI, Studio and MCP) and
+the storage boundary (every command that touches project state) are on a command
+path.
 
-**Engines.** `adapter.ts` treats an omitted backend as `builtin`. It lowers the
-model as before, calls `runExplore`, and maps each `PropertyVerdict` to a report
+**Engines.** `adapter.ts` has one engine path. It lowers the model as before,
+calls `runExplore`, and maps each `PropertyVerdict` to a report
 result: `violated` -> counterexample after source replay; `passed` ->
 `no_counterexample (finite_model_check)`; `no_violation_found` ->
 `no_counterexample (simulation)`; `incomplete` -> inconclusive with the limit
-named. MCP (`src/mcp/workspace.ts`) and Studio (`src/studio/service.ts`) still pass
-`tlc`/`quint` explicitly.
+named; a worker/engine error -> `failed` with B104. MCP (`src/mcp/workspace.ts`)
+and Studio (`src/studio/service.ts`) call the same adapter with `method`
+`exhaustive` (verify) or `sample` (simulate).
 
 **Storage.** `src/storage/layout.ts` is the dependency-free path catalogue
 (`marker`, `settings`, `planning`, `drafts`, `graph`, `runs`). `storagePath()`

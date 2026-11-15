@@ -42,12 +42,9 @@ import {
   assertNever,
 } from "../shared/identity.js";
 import { lowerInWorker } from "../behaviour/runner.js";
+import { modelDocument } from "../behaviour/model.js";
 import { readFile } from "node:fs/promises";
-import {
-  runBackend,
-  defaultQuint,
-  type BackendOptions,
-} from "../backends/adapter.js";
+import { runBackend, type BackendOptions } from "../backends/adapter.js";
 import { findConfig } from "../project/config.js";
 import { uncheckedBehaviourNotice } from "../reporting/explain.js";
 const args = process.argv.slice(2);
@@ -682,11 +679,7 @@ try {
             .map((c) => `${c.name}: ${c.status} — ${c.detail}`)
             .join("\n") + "\n",
     );
-    process.exitCode = diagnosis.checks.some(
-      (c) => c.name === "Node" && c.status !== "ready",
-    )
-      ? 3
-      : 0;
+    process.exitCode = diagnosis.ready ? 0 : 3;
   } else if (args[0] === "fmt") {
     if (!args[1] || args[1].startsWith("--"))
       throw Error("fmt requires a source file");
@@ -735,7 +728,6 @@ try {
     const app = await startStudio({
       path,
       port,
-      tlcJar: process.env.PYM_TLC_JAR ?? null,
       outputRegistry,
     });
     console.log(
@@ -783,12 +775,9 @@ try {
           "--max-steps",
           "--max-samples",
           "--timeout",
-          "--backend",
           "--state-budget",
           "--scope",
           "--check-scope",
-          "--quint",
-          "--tlc-jar",
         ].includes(key)
       )
         throw Error(`Unknown option ${key}`);
@@ -798,6 +787,7 @@ try {
         throw Error(`Missing value for ${key}`);
       options.set(key, value);
     }
+    const explicit = new Set(options.keys());
     let selectedScope: unknown, scenarioEntry: string | undefined;
     if (options.has("--scenario")) {
       const loaded = await findConfig(dirname(resolve(file)));
@@ -839,12 +829,16 @@ try {
     }
     if (
       command === "emit" &&
-      (!options.get("--out") || options.get("--target") !== "quint")
+      (!options.get("--out") || options.get("--target") !== "json")
     )
-      throw Error("emit requires --target quint --out PATH");
-    const backend = options.get("--backend") ?? "builtin";
-    if (!["builtin", "tlc", "quint"].includes(backend))
-      throw Error("--backend must be builtin, tlc or quint");
+      throw Error("emit requires --target json --out PATH");
+    if (command !== "emit" && options.has("--target"))
+      throw Error("--target is available for emit only");
+    if (command !== "verify" && options.has("--state-budget"))
+      throw Error("--state-budget is available for verify only");
+    for (const key of ["--seed", "--max-steps", "--max-samples"])
+      if (command !== "simulate" && explicit.has(key))
+        throw Error(`${key} is available for simulate only`);
     const intOption = (key: string, fallback: number, max: number): number => {
       const s = options.get(key) ?? String(fallback);
       if (!/^\d+$/.test(s)) throw Error(`${key} must be an integer`);
@@ -864,7 +858,6 @@ try {
       throw Error("Seed must be a nonnegative signed 64-bit integer");
     const backendOptions: BackendOptions = {
       entry: options.get("--entry") ?? "",
-      backend: backend as NonNullable<BackendOptions["backend"]>,
       method: command === "simulate" ? "sample" : "exhaustive",
       stateBudget: intOption(
         "--state-budget",
@@ -875,12 +868,6 @@ try {
       maxSteps: intOption("--max-steps", 6, 10000),
       maxSamples: intOption("--max-samples", 1000, 100000),
       timeoutMs,
-      quint: options.get("--quint")
-        ? resolve(options.get("--quint")!)
-        : defaultQuint,
-      tlcJar: options.get("--tlc-jar")
-        ? resolve(options.get("--tlc-jar")!)
-        : null,
       scope: selectedScope,
       scopeFile: options.get("--scope")
         ? resolve(options.get("--scope")!)
@@ -941,28 +928,12 @@ try {
           const output = resolve(options.get("--out")!);
           if (project.snapshot.sources.some((s) => s.file === output))
             throw Error("Refusing to overwrite source with generated model");
-          await atomicWrite(output, plan.model.quint, cancel.signal);
-          report.artifacts.push(output);
           await atomicWrite(
-            output + ".map.json",
-            json({
-              snapshotId: plan.model.snapshotId,
-              modelHash: plan.model.hash,
-              quintHash: hash(plan.model.quint),
-              variables: plan.model.variables,
-              events: plan.model.events,
-              properties: plan.model.properties,
-              sources: project.snapshot.sources.map((s) => ({
-                file: s.file,
-                hash: s.hash,
-                text: s.text,
-              })),
-              assumptions: plan.model.assumptions,
-              bounds: plan.model.bounds,
-            }),
+            output,
+            modelDocument(project, plan.model),
             cancel.signal,
           );
-          report.artifacts.push(output + ".map.json");
+          report.artifacts.push(output);
         } else
           report.results.push(
             result(project, backendOptions.entry + "/lowering", "lowering", {

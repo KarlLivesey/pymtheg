@@ -16,7 +16,7 @@ test("large source inventories remain usable and defer excess text until a file 
     await writeFile(join(root, "broken.pym"), Buffer.from([255, 254]));
     await mkdir(join(root, "evidence"));
     await writeFile(join(root, "evidence", "old.pym"), "not a source");
-    service = new StudioService(root, null, "file0.pym");
+    service = new StudioService(root, "file0.pym");
     const project = await service.project();
     assert.equal(project.files.length, 150);
     assert.ok(project.inventoryWarnings.some((w) => w.includes("broken.pym")));
@@ -55,7 +55,7 @@ test("an unreadable neighbouring directory warns without taking the selected sou
     await mkdir(restricted);
     await writeFile(join(restricted, "hidden.pym"), "broken source");
     await chmod(restricted, 0);
-    service = new StudioService(root, null, "main.pym");
+    service = new StudioService(root, "main.pym");
     const project = await service.project();
     assert.deepEqual(
       project.files.map((f) => f.path),
@@ -95,7 +95,7 @@ test("generated Rust and Go folders are excluded by default and can be opted int
       "generated template",
     );
     await writeFile(join(root, "vendor", "api.pym"), "op external() -> Unit;");
-    service = new StudioService(root, null, "src/main.pym");
+    service = new StudioService(root, "src/main.pym");
     assert.deepEqual(
       (await service.project()).files.map((f) => f.path),
       ["src/main.pym"],
@@ -160,7 +160,7 @@ test("explicit source roots prune unrelated directories before attempting to rea
         sources: { include: ["src/**/*.pym"] },
       }),
     );
-    service = new StudioService(root, null, "src/main.pym");
+    service = new StudioService(root, "src/main.pym");
     const project = await service.project();
     assert.deepEqual(
       project.files.map((f) => f.path),
@@ -200,7 +200,7 @@ test("root files stay visible above the inventory cap and interface impact discl
       );
     const file = join(root, "pay.pym");
     await writeFile(file, "op pay() -> Bool;");
-    service = new StudioService(root, null);
+    service = new StudioService(root);
     const view = await service.project();
     assert.equal(view.files.length, 10000);
     assert.ok(view.files.some((f) => f.path === "pay.pym"));

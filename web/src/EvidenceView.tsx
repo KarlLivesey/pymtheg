@@ -108,6 +108,9 @@ export function EvidenceView({
                 {outcomeLabel(r)}
               </span>
               <span className="badge">{r.method.replaceAll("_", " ")}</span>
+              {r.exhaustive === false && r.method === "simulation" && (
+                <span className="badge pending">sampled, not exhaustive</span>
+              )}
             </div>
             {span && (
               <button className="text-link" onClick={() => onJump(span)}>

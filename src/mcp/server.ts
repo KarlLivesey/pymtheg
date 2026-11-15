@@ -438,7 +438,7 @@ export function createAgentServer(workspace: AgentWorkspace) {
     "explore_behaviour",
     {
       description:
-        "Run the real Quint simulator or TLC verifier on a supported entry. Requires explicit finite scope where needed. Missing tools, unknowns and timeouts never count as a passed check.",
+        "Run the built-in seeded simulator or exhaustive verifier on a supported entry. Requires explicit finite scope where needed. Unknowns, budget limits and timeouts never count as a passed check.",
       inputSchema: z
         .object({
           file: path,
@@ -1006,11 +1006,7 @@ export async function runAgentStdio(
   signal: AbortSignal,
   outputs: OutputRegistry = OutputRegistry.empty(),
 ) {
-  const workspace = await AgentWorkspace.open(
-    root,
-    process.env.PYM_TLC_JAR ?? null,
-    outputs,
-  );
+  const workspace = await AgentWorkspace.open(root, outputs);
   let resolveClosed: () => void = () => {};
   const closed = new Promise<void>((resolve) => {
     resolveClosed = resolve;

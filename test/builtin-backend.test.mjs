@@ -14,19 +14,14 @@ const options = {
   maxSteps: 6,
   maxSamples: 40,
   timeoutMs: 120000,
-  quint: "/missing/quint",
-  tlcJar: null,
   scopeFile: null,
-};
-const noProcess = () => {
-  throw Error("External process started");
 };
 const run = (
   ir,
   extra = {},
   signal = new AbortController().signal,
   hooks = {},
-) => runBackend(ir, { ...options, ...extra }, signal, noProcess, hooks);
+) => runBackend(ir, { ...options, ...extra }, signal, hooks);
 const property = (records, name) =>
   records.find((r) => r.propertyId.endsWith("/" + name));
 test("default adapter uses worker BFS, preserves shortest replay and independent holding property", async () => {
@@ -84,7 +79,7 @@ test("sample results preserve deterministic seed, counts and fingerprints and ne
   assert.equal(property(first, "bounded").measurements.samples, 40);
   assert.equal(property(first, "bounded").scope.seed, "42");
 });
-test("production coordinator cancellation, controlled timeout and worker errors map every property to unresolved", async () => {
+test("production coordinator cancellation, controlled timeout and worker errors map every property to unresolved; worker errors are failures", async () => {
   const dir = mkdtempSync(join(tmpdir(), "pym-builtin-cancel-"));
   try {
     const huge = join(dir, "huge.pym");
@@ -128,8 +123,18 @@ test("production coordinator cancellation, controlled timeout and worker errors 
       assert.ok(records.every((r) => r.outcome === "inconclusive"));
       assert.ok(
         records.every(
-          (r) =>
-            r.completion === (kind === "engine_error" ? "incomplete" : kind),
+          (r) => r.completion === (kind === "engine_error" ? "failed" : kind),
+        ),
+      );
+      assert.ok(
+        records.every((r) =>
+          r.diagnostics.some(
+            (d) =>
+              d.code ===
+              { cancelled: "B130", timed_out: "B124", engine_error: "B104" }[
+                kind
+              ],
+          ),
         ),
       );
       assert.ok(
@@ -144,8 +149,8 @@ test("production coordinator cancellation, controlled timeout and worker errors 
     rmSync(dir, { recursive: true, force: true });
   }
 });
-test("default CLI verify and simulate work without Java, Quint or a TLC JAR", () => {
-  const env = { ...process.env, PATH: "", PYM_TLC_JAR: "" };
+test("default CLI verify and simulate need no external program on PATH", () => {
+  const env = { ...process.env, PATH: "" };
   for (const command of ["verify", "simulate"]) {
     const output = spawnSync(
       process.execPath,

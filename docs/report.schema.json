@@ -244,6 +244,10 @@
             "heuristic"
           ]
         },
+        "exhaustive": {
+          "type": "boolean",
+          "description": "Behaviour results only: true when every reachable state was searched (a completed verify); false for every simulate result and for any search that stopped early."
+        },
         "completion": {
           "enum": [
             "complete",
@@ -331,6 +335,23 @@
               "outstandingObligations": {
                 "maxItems": 0,
                 "type": "array"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "method": {
+                "const": "simulation"
+              }
+            },
+            "required": ["method"]
+          },
+          "then": {
+            "properties": {
+              "exhaustive": {
+                "const": false
               }
             }
           }
