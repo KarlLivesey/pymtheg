@@ -159,7 +159,7 @@ try {
     return r.structuredContent ?? JSON.parse(r.content[0].text);
   };
   const info = await call("project_info");
-  assert.equal(info.tools.quint, true);
+  assert.equal(info.tools, undefined);
   assert.equal(info.workspace.id, initialized.workspace.id);
   const guide = await client.readResource({ uri: "pymtheg://language/guide" });
   assert.match(guide.contents[0].text, /design_recipe/);
@@ -251,7 +251,11 @@ try {
   });
   assert.equal(eventForm.template.schema, "pymtheg.declaration-template/v1");
   eventForm.template.edit.name = "PackagedEvents";
-  eventForm.template.edit.events.push({ name: "advance", guard: "", updates: [] });
+  eventForm.template.edit.events.push({
+    name: "advance",
+    guard: "",
+    updates: [],
+  });
   const eventPreview = await call("design_interface", {
     action: "create",
     runId: checked.runId,
@@ -260,7 +264,10 @@ try {
     edit: eventForm.template.edit,
   });
   assert.match(eventPreview.text, /machine PackagedEvents/);
-  assert.match(eventPreview.text, /unknown "When advance may happen is not decided"/);
+  assert.match(
+    eventPreview.text,
+    /unknown "When advance may happen is not decided"/,
+  );
   assert.ok(eventPreview.notices.some((n) => n.includes("No safety rules")));
 
   assert.equal(

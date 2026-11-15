@@ -4,7 +4,7 @@ import { machineScope } from "../shared/config.js";
 import type { Machine, Expr } from "../language/ast.js";
 import { exprChildren } from "../language/ast.js";
 import { blockedSymbols, type ProjectIR } from "../semantic/core.js";
-import { backendOperator, type Scalar } from "../shared/operators.js";
+import { scalarBinaryOperators, type Scalar } from "../shared/operators.js";
 import {
   compileFlow,
   flowGraph,
@@ -24,15 +24,12 @@ export interface GeneratedModel {
     scope: FlowScope;
     graph: FlowGraph;
   };
-  quint: string;
-  tla: string;
-  config: string;
   hash: string;
   snapshotId: string;
   machine: Machine;
-  variables: { source: string; generated: string; span: Span }[];
+  variables: { source: string; span: Span }[];
   events: { source: string; index: number; span: Span }[];
-  properties: { source: string; generated: string; span: Span }[];
+  properties: { source: string; span: Span }[];
   assumptions: string[];
   bounds: Record<string, string>;
 }
@@ -41,14 +38,21 @@ function mappingFor(
 ): Pick<GeneratedModel, "variables" | "events" | "properties"> {
   const variables = [...d.states]
       .sort((a, b) => a.name.localeCompare(b.name))
-      .map((s, i) => ({ source: s.name, generated: `v${i}`, span: s.span })),
+      .map((s) => ({ source: s.name, span: s.span })),
     events = [...d.events]
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((e, i) => ({ source: e.name, index: i, span: e.span })),
     properties = [...d.invariants]
       .sort((a, b) => a.name.localeCompare(b.name))
-      .map((p, i) => ({ source: p.name, generated: `p${i}`, span: p.span }));
+      .map((p) => ({ source: p.name, span: p.span }));
   return { variables, events, properties };
+}
+/** Identity of the lowered machine and its source mapping. */
+function machineModelHash(m: Machine): string {
+  return hash(json({ machine: m, mapping: mappingFor(m) }));
+}
+function flowModelHash(model: GeneratedModel): string {
+  return hash(machineModelHash(model.machine) + json(model.flow));
 }
 export type Preflight =
   | { kind: "supported"; model: GeneratedModel }
@@ -133,12 +137,7 @@ export function lower(
         sourceStates: String(graph.states.length),
         inputScope: json(plan.scope),
       };
-      lowered.model.hash = hash(
-        lowered.model.quint +
-          lowered.model.tla +
-          lowered.model.config +
-          json(lowered.model.flow),
-      );
+      lowered.model.hash = flowModelHash(lowered.model);
       return lowered;
     } catch (error) {
       return { kind: "incomplete", reasons: [String(error)] };
@@ -147,7 +146,14 @@ export function lower(
   if (d.kind !== "machine")
     return { kind: "unsupported", reasons: ["Select a flow or machine entry"] };
   const reasons: string[] = [];
+  const stateNames = new Set(d.states.map((s) => s.name));
   function supported(e: Expr): void {
+    if (e.kind === "name" && !stateNames.has(e.name))
+      reasons.push(`Unknown state ${e.name} at ${e.span.start}`);
+    if (e.kind === "unary" && e.op !== "!" && e.op !== "-")
+      reasons.push(`Unsupported operator ${e.op} at ${e.span.start}`);
+    if (e.kind === "binary" && !scalarBinaryOperators.has(e.op))
+      reasons.push(`Unsupported operator ${e.op} at ${e.span.start}`);
     if (
       e.kind === "literal" &&
       typeof e.value !== "bigint" &&
@@ -162,7 +168,7 @@ export function lower(
       (e.value > 9007199254740991n || e.value < -9007199254740991n)
     )
       reasons.push(
-        "Backend integer literal exceeds exact supported interchange range",
+        "Behavioural integer literal exceeds the supported exact range",
       );
     for (const c of exprChildren(e)) supported(c);
   }
@@ -173,7 +179,7 @@ export function lower(
       (s.min < -9007199254740991n || s.max! > 9007199254740991n)
     )
       reasons.push(
-        `Backend domain ${s.name} exceeds supported interchange range`,
+        `Behavioural domain ${s.name} exceeds the supported exact range`,
       );
   }
   for (const e of d.events) {
@@ -193,100 +199,6 @@ export function lower(
     return { kind: "incomplete", reasons: [String(e)] };
   }
   const { variables, events, properties } = mappingFor(d);
-  const names = new Map(variables.map((v) => [v.source, v.generated]));
-  function emit(e: Expr, target: "quint" | "tlc"): string {
-    switch (e.kind) {
-      case "literal":
-        return typeof e.value === "boolean"
-          ? target === "quint"
-            ? String(e.value)
-            : e.value
-              ? "TRUE"
-              : "FALSE"
-          : String(e.value);
-      case "name": {
-        const n = names.get(e.name);
-        if (!n) throw Error(`Unknown state ${e.name}`);
-        return n;
-      }
-      case "unary":
-        return e.op === "!"
-          ? target === "quint"
-            ? `not(${emit(e.expr, target)})`
-            : `~(${emit(e.expr, target)})`
-          : `(-${emit(e.expr, target)})`;
-      case "binary":
-        return `(${emit(e.left, target)} ${backendOperator[e.op]![target]} ${emit(e.right, target)})`;
-      default:
-        throw Error(`Unreachable unsupported expression ${e.kind}`);
-    }
-  }
-  const qVars = variables.map(
-      (v) =>
-        `  var ${v.generated}: ${d.states.find((s) => s.name === v.source)!.type.name === "Bool" ? "bool" : "int"}`,
-    ),
-    allVars = [...variables.map((v) => v.generated), "eventId"];
-  const qAssign = (values: string[]): string => `all { ${values.join(", ")}, }`;
-  const qInit = qAssign([
-    ...variables.map(
-      (v) =>
-        `${v.generated}' = ${emit(d.states.find((s) => s.name === v.source)!.init, "quint")}`,
-    ),
-    "eventId' = -2",
-  ]);
-  const qEvents = events.map((e) => {
-    const src = d.events.find((x) => x.name === e.source)!;
-    return `  action e${e.index} = ${qAssign([emit(src.guard, "quint"), ...variables.map((v) => `${v.generated}' = ${src.updates.some((u) => u.name === v.source) ? emit(src.updates.find((u) => u.name === v.source)!.expr, "quint") : v.generated}`), `eventId' = ${e.index}`])}`;
-  });
-  const qEnabled = d.events.length
-      ? d.events.map((e) => `(${emit(e.guard, "quint")})`).join(" or ")
-      : "false",
-    qStutter = qAssign([
-      `not(${qEnabled})`,
-      ...variables.map((v) => `${v.generated}' = ${v.generated}`),
-      "eventId' = -1",
-    ]);
-  const qDomain =
-    variables
-      .map((v) => {
-        const s = d.states.find((s) => s.name === v.source)!;
-        return s.type.name === "Bool"
-          ? "true"
-          : `(${s.min} <= ${v.generated} and ${v.generated} <= ${s.max})`;
-      })
-      .join(" and ") || "true";
-  const quint = `module generated {\n${qVars.join("\n")}\n  var eventId: int\n  action init = ${qInit}\n${qEvents.join("\n")}\n  action idle = ${qStutter}\n  action step = any { ${[...events.map((e) => "e" + e.index), "idle"].join(", ")}, }\n  val domain = ${qDomain}\n${properties.map((p) => `  val ${p.generated} = ${emit(d.invariants.find((i) => i.name === p.source)!.expr, "quint")}`).join("\n")}\n  val safety = ${["domain", ...properties.map((p) => p.generated)].join(" and ")}\n}\n`;
-  const tlaConj = (values: string[]): string =>
-    values.map((s) => "/\\ " + s).join("\n");
-  const tInit = tlaConj([
-    ...variables.map(
-      (v) =>
-        `${v.generated} = ${emit(d.states.find((s) => s.name === v.source)!.init, "tlc")}`,
-    ),
-    "eventId = -2",
-  ]);
-  const tEvents = events.map((e) => {
-    const src = d.events.find((x) => x.name === e.source)!;
-    return `E${e.index} ==\n${tlaConj([emit(src.guard, "tlc"), ...variables.map((v) => `${v.generated}' = ${src.updates.some((u) => u.name === v.source) ? emit(src.updates.find((u) => u.name === v.source)!.expr, "tlc") : v.generated}`), `eventId' = ${e.index}`])}`;
-  });
-  const tEnabled = d.events.length
-      ? d.events.map((e) => `(${emit(e.guard, "tlc")})`).join(" \\/ ")
-      : "FALSE",
-    tIdle = tlaConj([
-      `~(${tEnabled})`,
-      ...variables.map((v) => `${v.generated}' = ${v.generated}`),
-      "eventId' = -1",
-    ]),
-    tDomain = variables
-      .map((v) => {
-        const s = d.states.find((s) => s.name === v.source)!;
-        return s.type.name === "Bool"
-          ? `${v.generated} \\in BOOLEAN`
-          : `${v.generated} \\in ${s.min}..${s.max}`;
-      })
-      .join(" /\\ ");
-  const tla = `---- MODULE Generated ----\nEXTENDS Integers\nVARIABLES ${allVars.join(", ")}\nInit ==\n${tInit}\n${tEvents.join("\n")}\nIdle ==\n${tIdle}\nNext == ${[...events.map((e) => "E" + e.index), "Idle"].join(" \\/ ")}\nDomain == ${tDomain}\n${properties.map((p) => `${p.generated} == ${emit(d.invariants.find((i) => i.name === p.source)!.expr, "tlc")}`).join("\n")}\nSafety == ${["Domain", ...properties.map((p) => p.generated)].join(" /\\ ")}\n====\n`,
-    config = "INIT Init\nNEXT Next\nINVARIANT Safety\n";
   const bounds = Object.fromEntries(
     d.states.map((s) => [
       s.name,
@@ -302,10 +214,7 @@ export function lower(
   return {
     kind: "supported",
     model: {
-      quint,
-      tla,
-      config,
-      hash: hash(quint + tla + config),
+      hash: machineModelHash(d),
       snapshotId: ir.snapshot.id,
       machine: d,
       variables,
@@ -471,8 +380,7 @@ export function sourceMappingValid(
       );
       return (
         model.snapshotId === ir.snapshot.id &&
-        model.hash ===
-          hash(model.quint + model.tla + model.config + json(model.flow)) &&
+        model.hash === flowModelHash(model) &&
         json(expected) === json(model.machine) &&
         json(mappingFor(expected)) ===
           json({
@@ -488,7 +396,7 @@ export function sourceMappingValid(
   if (source?.kind !== "machine") return false;
   return (
     model.snapshotId === ir.snapshot.id &&
-    model.hash === hash(model.quint + model.tla + model.config) &&
+    model.hash === machineModelHash(model.machine) &&
     hash(json(source)) === hash(json(model.machine)) &&
     json(mappingFor(source)) ===
       json({
@@ -513,4 +421,28 @@ export function displayTrace(
               ),
       }))
     : trace;
+}
+/** The model the built-in engines check, as JSON for `emit --target json`. */
+export function modelDocument(ir: ProjectIR, model: GeneratedModel): string {
+  return json({
+    schema: "pymtheg.model/v1",
+    snapshotId: model.snapshotId,
+    modelHash: model.hash,
+    machine: model.machine,
+    variables: model.variables,
+    events: model.events,
+    properties: model.properties,
+    assumptions: model.assumptions,
+    bounds: model.bounds,
+    ...(model.flow
+      ? {
+          flow: {
+            sourceId: model.flow.sourceId,
+            scope: model.flow.scope,
+            sourceStates: model.flow.graph.states.map(graphDisplay),
+          },
+        }
+      : {}),
+    sources: ir.snapshot.sources.map((s) => ({ file: s.file, hash: s.hash })),
+  });
 }

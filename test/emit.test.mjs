@@ -4,10 +4,10 @@ import { mkdtempSync, readFileSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
-test("emit produces a real model and snapshot-qualified source map", () => {
+test("emit writes the built-in engines' model with snapshot-qualified source mapping", () => {
   const dir = mkdtempSync(join(tmpdir(), "pym-emit-"));
   try {
-    const out = join(dir, "task.qnt");
+    const out = join(dir, "task.json");
     const p = spawnSync(
       process.execPath,
       [
@@ -17,7 +17,7 @@ test("emit produces a real model and snapshot-qualified source map", () => {
         "--entry",
         "TaskRunner",
         "--target",
-        "quint",
+        "json",
         "--out",
         out,
         "--format",
@@ -28,12 +28,17 @@ test("emit produces a real model and snapshot-qualified source map", () => {
     assert.ifError(p.error);
     assert.equal(p.status, 0, p.stdout);
     const r = JSON.parse(p.stdout),
-      map = JSON.parse(readFileSync(out + ".map.json", "utf8"));
-    assert.equal(map.snapshotId, r.snapshot.id);
-    assert.ok(readFileSync(out, "utf8").includes("module generated"));
-    assert.ok(map.events.some((e) => e.source === "runJob"));
-    assert.ok(map.sources[0].text.includes("machine TaskRunner"));
-    assert.equal(r.artifacts.length, 2);
+      model = JSON.parse(readFileSync(out, "utf8"));
+    assert.equal(model.schema, "pymtheg.model/v1");
+    assert.equal(model.snapshotId, r.snapshot.id);
+    assert.equal(model.machine.name, "TaskRunner");
+    assert.ok(model.events.some((e) => e.source === "runJob"));
+    assert.ok(model.properties.length > 0);
+    assert.deepEqual(
+      model.sources.map((s) => s.hash),
+      r.snapshot.files.map((s) => s.hash),
+    );
+    assert.deepEqual(r.artifacts, [out]);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -41,7 +46,7 @@ test("emit produces a real model and snapshot-qualified source map", () => {
 test("typed structured flow cannot silently emit a successful empty model", () => {
   const dir = mkdtempSync(join(tmpdir(), "pym-no-emit-"));
   try {
-    const out = join(dir, "invalid.qnt");
+    const out = join(dir, "invalid.json");
     const p = spawnSync(
       process.execPath,
       [
@@ -51,7 +56,7 @@ test("typed structured flow cannot silently emit a successful empty model", () =
         "--entry",
         "nestedScan",
         "--target",
-        "quint",
+        "json",
         "--out",
         out,
         "--format",
@@ -66,4 +71,23 @@ test("typed structured flow cannot silently emit a successful empty model", () =
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+test("emit names its one target instead of accepting the removed Quint target", () => {
+  const p = spawnSync(
+    process.execPath,
+    [
+      "dist/cli/main.js",
+      "emit",
+      "examples/mvp/task-buggy.pym",
+      "--entry",
+      "TaskRunner",
+      "--target",
+      "quint",
+      "--out",
+      join(tmpdir(), "never-written.qnt"),
+    ],
+    { encoding: "utf8" },
+  );
+  assert.notEqual(p.status, 0);
+  assert.match(p.stderr + p.stdout, /emit requires --target json --out PATH/);
 });

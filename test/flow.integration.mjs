@@ -79,75 +79,53 @@ const cases = [
   ],
 ];
 for (const [name, source, bad, entry = "main", scope] of cases)
-  for (const engine of ["quint", "tlc"])
-    test(
-      `real ${engine}: structured ${name}`,
-      {
-        skip:
-          engine === "tlc" &&
-          !existsSync(
-            process.env.PYM_TLC_JAR ??
-              "/tmp/spec-language-research/tla2tools.jar",
-          ),
-      },
-      (t) => {
-        const dir = mkdtempSync(join(tmpdir(), "pym-flow-backend-"));
-        try {
-          const file = join(dir, "source.pym");
-          writeFileSync(file, source);
-          const args = [
-            "dist/cli/main.js",
-            engine === "quint" ? "simulate" : "verify",
-            file,
-            "--entry",
-            entry,
-            "--format",
-            "json",
-            "--max-steps",
-            "30",
-            "--max-samples",
-            "1000",
-            "--timeout",
-            "12s",
-          ];
-          if (scope) {
-            const scopeFile = join(dir, "scope.json");
-            writeFileSync(scopeFile, JSON.stringify(scope));
-            args.push("--scope", scopeFile);
-          }
-          if (engine === "tlc")
-            args.push(
-              "--backend",
-              "tlc",
-              "--tlc-jar",
-              process.env.PYM_TLC_JAR ??
-                "/tmp/spec-language-research/tla2tools.jar",
-            );
-          else args.push("--backend", "quint");
-          const p = spawnSync(process.execPath, args, { encoding: "utf8" });
-          assert.ifError(p.error);
-          const report = JSON.parse(p.stdout);
-          if (report.results.some((r) => r.completion === "timed_out")) {
-            t.skip("Explicit checker budget exhausted");
-            return;
-          }
-          assert.equal(p.status, bad ? 1 : 0, JSON.stringify(report));
-          const results = report.results.filter(
-            (r) => r.analysisKind === "behaviour",
-          );
-          assert.ok(results.length);
-          if (bad)
-            assert.ok(
-              results.some(
-                (r) =>
-                  r.outcome === "counterexample" &&
-                  r.witnessValidation === "source_replayed",
-              ),
-            );
-          else
-            assert.ok(results.every((r) => r.outcome === "no_counterexample"));
-        } finally {
-          rmSync(dir, { recursive: true, force: true });
+  for (const command of ["simulate", "verify"])
+    test(`built-in ${command}: structured ${name}`, (t) => {
+      const dir = mkdtempSync(join(tmpdir(), "pym-flow-backend-"));
+      try {
+        const file = join(dir, "source.pym");
+        writeFileSync(file, source);
+        const args = [
+          "dist/cli/main.js",
+          command,
+          file,
+          "--entry",
+          entry,
+          "--format",
+          "json",
+          ...(command === "simulate"
+            ? ["--max-steps", "30", "--max-samples", "1000"]
+            : []),
+          "--timeout",
+          "12s",
+        ];
+        if (scope) {
+          const scopeFile = join(dir, "scope.json");
+          writeFileSync(scopeFile, JSON.stringify(scope));
+          args.push("--scope", scopeFile);
         }
-      },
-    );
+        const p = spawnSync(process.execPath, args, { encoding: "utf8" });
+        assert.ifError(p.error);
+        const report = JSON.parse(p.stdout);
+        if (report.results.some((r) => r.completion === "timed_out")) {
+          t.skip("Explicit checker budget exhausted");
+          return;
+        }
+        assert.equal(p.status, bad ? 1 : 0, JSON.stringify(report));
+        const results = report.results.filter(
+          (r) => r.analysisKind === "behaviour",
+        );
+        assert.ok(results.length);
+        if (bad)
+          assert.ok(
+            results.some(
+              (r) =>
+                r.outcome === "counterexample" &&
+                r.witnessValidation === "source_replayed",
+            ),
+          );
+        else assert.ok(results.every((r) => r.outcome === "no_counterexample"));
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });

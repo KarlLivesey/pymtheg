@@ -6,7 +6,8 @@ implementation evidence. This ledger refines its contracts. No approval gate.
 
 ## Settled boundaries
 
-- TypeScript strict on Node 24 LTS; one package. Hand-written lexer/Pratt
+- TypeScript strict on Node 24 LTS; one package. (Amended in R1-A at Karl's
+  request: Node 24 or newer, no upper bound; mega-plan 8.1.) Hand-written lexer/Pratt
   expression parser and recursive descent declarations/blocks: no framework,
   actual token spans and declaration-level recovery. UTF-16 half-open offsets,
   one-based UTF-16 columns. Whole file recovery holes taint that module; explicit
@@ -45,7 +46,8 @@ implementation evidence. This ledger refines its contracts. No approval gate.
   assumptions. Split request/effect/response as separate events when necessary.
   Structured flows are locally analysed but not implicitly compiled to machines.
   No liveness/fairness proof. Unsupported lowering returns status 2.
-- Quint 0.33.1 TypeScript simulation is mandatory integration; TLC invocation
+- (Superseded: Quint and TLC were removed; see "TLC, Quint and Java removed" at
+  the end of this ledger.) Quint 0.33.1 TypeScript simulation is mandatory integration; TLC invocation
   through Quint requires the Apalache distribution and is probed explicitly.
   Missing requested engine is integration failure, never skipped success.
   Counterexample replay uses the source machine transition relation, checks
@@ -83,6 +85,9 @@ Backend trace replay tests a supported finite transition relation, not a proof
 of general translation correctness. External operation summaries are assumptions.
 
 ## Probe-driven refinement: direct TLC
+
+(Superseded: TLC and Quint were removed in R1-A; see "TLC, Quint and Java
+removed" at the end of this ledger.)
 
 The first generic machine emitted valid Quint and TLA+. Quint's TypeScript
 simulator produced a real counterexample. Direct TLC parsed the generated model
@@ -2172,6 +2177,7 @@ and a named state budget. **Why:** D2, and TLC's stack overflow on flow checks a
 stop-at-first-violation behaviour. **Rules out:** a sampled run reported as an
 exhaustive pass; a budget-limited run reported as a pass. TLC and Quint remain
 selectable, and MCP and Studio still use them, until the removal chunk.
+(Superseded by "TLC, Quint and Java removed" below.)
 
 ### Single project folder (D5, D6, D7)
 
@@ -2419,3 +2425,26 @@ package or file, so a shared name is not continuity: in review, restic's
 - treating a same-name symbol as the same symbol;
 - token-aware or whitespace-insensitive fingerprints in this chunk;
 - keeping links in `.pymtheg/rebuildable/`.
+
+### TLC, Quint and Java removed (D2, D7; R1-A)
+
+**Decided (Karl's D2 and D7; carried out by R1-A, mega-plan 2.9):** the built-in
+exhaustive search and seeded sampler are the only behavioural engines, for the
+CLI, Studio and MCP. The TLC and Quint adapters, the generated TLA+ and Quint
+text, `emit --target quint`, `--backend`, `--quint`, `--tlc-jar`, `PYM_TLC_JAR`,
+the `@informalsystems/quint` dependency, the `doctor` Java/TLC/Quint checks, the
+Studio and MCP `tools` status field and the agent connection's `env` field were
+deleted, not deprecated. `emit --target json` writes the lowered model the engines
+check. `doctor` runs the real engines on a built-in probe and checks Node,
+`node:sqlite` storage, the code graph (one-line Go, Rust and TypeScript files
+indexed through the production registry, so each module loads its own vendored
+grammar or compiler) and the Studio build; Node 24 or newer, no upper bound
+(Karl, mega-plan 8.1). JSON behaviour results carry `exhaustive`. A built-in
+worker or engine error is a failure (`B104`, exit 3), not an incomplete run; the
+external-process codes B102, B103, B105 and B107 are gone. Options belonging to
+another command are rejected. **Why:** D2 (no Java, no TLC JAR, no Quint) and the
+initial-release definition that `npx pymtheg` runs on a clean machine with neither;
+the W2-A differential found no conclusive disagreement with TLC. **Rules out:**
+any external checker, runtime or download for behavioural checking; a compatibility
+path for the removed options or fields. **Known limits:** see
+[R1-A](changes/R1-A.md).
