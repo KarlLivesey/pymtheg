@@ -7,5 +7,3 @@ the additional permission and plugin statement in
 
 By submitting a contribution you confirm that you have the right to submit it
 under that licence.
-
-The owner may introduce a contributor licence agreement later.

@@ -21,14 +21,19 @@ Covered material:
    counterexamples and traces, graph data and code-graph databases, requirement
    and code links, recorded and exported history, and emitted or generated code
    (scaffolds, types, functions and stubs from `pymtheg scaffold`, `pymtheg emit`,
-   Studio or the MCP server).
+   Studio or the MCP server). Copies or builds of Pymtheg's own code are not
+   output, even when Pymtheg makes them while it runs (for example the Go
+   helper it compiles from its own `golinks.go`).
 2. **Project files.** The files `pymtheg init` writes into a project
    (`.pymtheg/project.json`, `.pymtheg/settings.json` and `.pymtheg/.gitignore`)
    and the local databases Pymtheg creates under `.pymtheg/`.
-3. **Starting points.** The bundled example designs and model files under
-   `examples/` (for instance `examples/mvp/`, `examples/self/` and
-   `examples/workbench/`), Studio's recipes, and the MCP server's design recipes
-   and declaration templates, when used as a starting point for your own designs.
+3. **Starting points.** When used as a starting point for your own designs:
+   the bundled example designs and model files under `examples/` (for instance
+   `examples/mvp/`, `examples/self/` and `examples/workbench/`), Studio's
+   recipes, the MCP server's design recipes and declaration templates, and the
+   examples in Pymtheg's documentation, including the language and workflow
+   guides the MCP server gives to agents (`docs/grammar.md`,
+   `docs/agent-workflow.md`).
 
 **Not covered: the bundled example plugins in `examples/plugins/`.** Part 2
 applies to them.
@@ -41,22 +46,25 @@ Required Component or an Extension, and need not carry the License Notice or
 any other notice.
 
 Your own source code, `.pym` designs, documents and data are not covered by
-the licence because Pymtheg read, checked, imported, graphed or linked them.
+the licence merely because Pymtheg read, checked, imported, graphed or linked
+them.
 
 This permission does not cover Pymtheg itself. Changing Pymtheg's own files,
 including a recipe, template or example as it ships inside Pymtheg, is a
-Modification under the licence; copying an example into your own project and
-changing that copy is not.
+Modification under the licence. Copying a covered example into your own
+project and changing that copy is not; this does not apply to the example
+plugins in `examples/plugins/`.
 
 ## 2. Plugin statement
 
 This part is not an extra term and not a relaxation of the licence. It states
 the Licensor's position and how the Licensor applies the licence to plugins.
 
-Plugins are welcome. A plugin is any software written to extend or change what
-Pymtheg does, whether through its plugin interface (for example a language
-emitter loaded with `--plugin`; see [docs/output-plugins.md](docs/output-plugins.md))
-or any other way.
+Plugins are welcome. A plugin is code that Pymtheg itself loads and runs to
+change or add to its behaviour: today, a language emitter loaded with
+`--plugin` (see [docs/output-plugins.md](docs/output-plugins.md)), and any
+plugin mechanism Pymtheg adds later. Software that only runs Pymtheg, talks to
+it over MCP or uses its output is not a plugin.
 
 - A plugin that copies or is derived from any part of Pymtheg, including the
   example plugins in `examples/plugins/`, is covered by the licence: a file
@@ -67,9 +75,10 @@ or any other way.
   file that alters Pymtheg's functionality at runtime, Section 1.10(iii)). The
   licence text does not settle this case for every such plugin.
 
-The Licensor expects anyone who Deploys a plugin, meaning any use other than
-for Research or Personal Use and including use only inside their own business
-or organisation, to make its Source Code available under the licence as
+The Licensor expects anyone who Deploys a plugin (Section 1.2: uses,
+Serves, sublicenses or distributes it other than for their own Research or
+Personal Use, including any use or distribution only inside their own business
+or organisation) to make its Source Code available under the licence as
 Section 6 describes, so that it can be integrated into Pymtheg's core. The
 Licensor does not accept writing a feature as a plugin, rather than as a change
 to Pymtheg's code, as a way round publishing it.

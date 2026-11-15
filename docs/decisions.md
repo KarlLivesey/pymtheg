@@ -2468,13 +2468,19 @@ Photoshop clone under RPL-1.5 protects the code, not the images made with it);
 core", including in-house plugins: "maybe theres an extra feature they want and
 so they ad it using a plugin rather than modifying the code". **Why:** RPL-1.5
 makes internal use of a modified copy a "Deploy" (Section 1.2) that requires the
-source to be published (Section 6.1); GPL and AGPL do not reach internal
-modification, and GPLv2-only was ruled out by Apache-2.0 runtime dependencies.
+source to be published (Section 6.1). GPL's source duty arises only when a
+modified copy is distributed; AGPL-3.0 §13 reaches a modified version only when it is
+offered to users over a network, and then only towards those users. Neither
+reaches purely internal modification or sends changes back to the owner.
+GPLv2-only was also ruled out by Apache-2.0 runtime dependencies.
 **Rules out:** treating a plugin as a way round publishing changes; any duty on a
-user's own code, designs or Pymtheg's output. **Known limits:** the plugin
-statement is the Licensor's reading of Sections 1.10(ii) and 1.10(iii), not an
-extra condition (Section 7.1); whether a plugin that copies no Pymtheg code is an
-Extension is untested and a lawyer should read it before first publish. Per-file
-notices, the package `license` field and `docs/licences.md` follow in LIC-2;
+user's own code, designs or Pymtheg's output. A plugin is code Pymtheg itself
+loads to change its behaviour; software that only runs Pymtheg, talks to it over
+MCP or uses its output is not one. **Known limits:** a plugin built from
+Pymtheg's code is covered by Section 1.10(ii); for an independently written
+plugin the statement is the Licensor's position and reading of Section
+1.10(iii), not an extra condition (Section 7.1); the text does not settle it,
+and a lawyer should read it before first publish. Per-file notices, the
+package `license` field and `docs/licences.md` follow in LIC-2;
 `"private": true` and publishing remain the owner's decisions. See
 [LIC-1](changes/LIC-1.md).

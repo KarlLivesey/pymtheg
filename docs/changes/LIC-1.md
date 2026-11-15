@@ -21,7 +21,7 @@ source, test or generated file changes.
   recipes and templates used as starting points, excluding `examples/plugins/`;
   part 2, the plugin statement.
 - `CONTRIBUTING.md`: contributions under the same licence; the contributor
-  confirms the right to submit; a CLA may come later.
+  confirms the right to submit.
 - README "Licence" section.
 - Decision ledger entry in `docs/decisions.md`.
 
@@ -42,13 +42,17 @@ was needed.
    convenience, not a substitute for the notice. Files that cannot hold a
    comment (JSON) are covered by a notice in a location a user would look
    (Section 6.4(b)), for example the README and `LICENSE-EXCEPTIONS.md`.
-4. A test that fails when a source file in scope lacks the header.
+4. In scope for headers: `src/` (including the shipped
+   `src/graph/languages/go/toolchain/golinks.go`), `web/src/`, `scripts/`,
+   `test/` (test code, not fixtures), `grammars/build.mjs`, and the root
+   `pymtheg` launcher. A test fails when a file in scope lacks the header.
 5. Excluded from headers: vendored grammars and their patches (`grammars/go`,
    `grammars/rust`, upstream `LICENSE` files), third-party files and bundled
    third-party code, generated files (`dist/`, `dist-web/`, built `.wasm`,
    `THIRD-PARTY-NOTICES` and other generated inventories), test fixtures, and
    scaffold and example files covered by the additional permission
-   (`examples/` except `examples/plugins/`, which does get the header).
+   (`examples/` except `examples/plugins/`, which does get the header), and
+   documentation examples.
    `research/`, `evidence/` and historical logs are not rewritten.
 6. Order: headers before the repository is made public. Section 1.0 applies the
    licence to Software "containing a License Notice", and until then only the
