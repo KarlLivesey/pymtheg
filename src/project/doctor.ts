@@ -1,3 +1,5 @@
+import { printLegacyNotice } from "../storage/legacy.js";
+import { findProjectRoot } from "../storage/local.js";
 import { createHash } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -8,6 +10,7 @@ export async function doctor(
   signal: AbortSignal,
   jar: string | null = process.env.PYM_TLC_JAR ?? null,
 ) {
+  printLegacyNotice(findProjectRoot(process.cwd()));
   const checks: {
     name: string;
     status: "ready" | "missing" | "incompatible";

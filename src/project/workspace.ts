@@ -78,6 +78,14 @@ export async function findWorkspace(
   return workspace ? { root, workspace } : null;
 }
 async function createOnce(path: string, text: string): Promise<boolean> {
+  try {
+    const info = await lstat(path);
+    if (!info.isFile() || info.isSymbolicLink())
+      throw Error(`Project metadata must be a regular file: ${path}`);
+    return false;
+  } catch (error) {
+    if (!missing(error)) throw error;
+  }
   const staged = resolve(
     dirname(path),
     `.${basename(path)}.${randomUUID()}.tmp`,
@@ -117,13 +125,27 @@ async function protectLocalStorage(root: string): Promise<string[]> {
   if (
     await createOnce(
       resolve(storage, ".gitignore"),
-      "# Local databases and rebuildable state. Share exported history.\nshared/\nrebuildable/\n",
+      "# Local databases and rebuildable state. Share exported history.\nshared/\nrebuildable/\n*.tmp\n",
     )
   )
     filesCreated.push(".pymtheg/.gitignore");
   return filesCreated;
 }
 export async function initializeWorkspace(input: string, name?: string) {
+  try {
+    return await initialize(input, name);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    const path = (error as NodeJS.ErrnoException).path ?? resolve(input);
+    const fix = ["EACCES", "EPERM", "EROFS"].includes(code ?? "")
+      ? "Choose a writable directory or grant your user write permission."
+      : "Check .pymtheg/project.json and .pymtheg/settings.json; repair invalid metadata without deleting your designs.";
+    throw Error(
+      `Cannot initialize project at ${path}: ${String(error)} ${fix}`,
+    );
+  }
+}
+async function initialize(input: string, name?: string) {
   const requested = name?.trim();
   if (name !== undefined && (!requested || requested.length > 160))
     throw Error("Choose a project name of 1–160 characters");
@@ -144,12 +166,16 @@ export async function initializeWorkspace(input: string, name?: string) {
       throw Error(
         `Project is already initialized as “${previous.name}”. Its identity and name were preserved.`,
       );
-    return {
-      root,
-      workspace: previous,
-      created: false,
-      filesCreated: await protectLocalStorage(root),
-    };
+    const filesCreated = await protectLocalStorage(root);
+    if (
+      await createOnce(
+        storagePath(root, "settings", true),
+        json({ version: 1, scenarios: {} }),
+      )
+    )
+      filesCreated.push(identity.projectConfig);
+    await loadConfig(root);
+    return { root, workspace: previous, created: false, filesCreated };
   }
   await loadConfig(root); // Validate existing configuration before creating metadata.
   const marker = await markerFile(root);

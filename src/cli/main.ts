@@ -134,13 +134,23 @@ try {
       },
     );
     const { documentation, ...initialized } = response;
+    const { printLegacyNotice } = await import("../storage/legacy.js");
+    printLegacyNotice(initialized.root);
     process.stdout.write(
       wantsJson
         ? json(response)
         : [
-            `${initialized.created ? "Initialized" : "Opened"} ${initialized.workspace.name} at ${initialized.root}`,
-            `Ready to design: ${identity.cli} studio ${JSON.stringify(initialized.root)}`,
-            `Agent connection: ${identity.cli} mcp ${JSON.stringify(initialized.root)}`,
+            initialized.created
+              ? `Initialized ${initialized.workspace.name} at ${initialized.root}`
+              : `Already initialized: opened ${initialized.workspace.name} at ${initialized.root}${initialized.filesCreated.length ? " (completed missing metadata)" : " (no metadata changes)"}`,
+            ...(initialized.filesCreated.length
+              ? [`Created: ${initialized.filesCreated.join(", ")}`]
+              : []),
+            "Commit .pymtheg/project.json, .pymtheg/settings.json and .pymtheg/.gitignore with your designs.",
+            "Planning/history in .pymtheg/shared/ and caches in .pymtheg/rebuildable/ stay local and ignored; share planning by exported history.",
+            `Next: ${identity.cli} doctor`,
+            `      ${identity.cli} studio ${JSON.stringify(initialized.root)}`,
+            `      ${identity.cli} mcp ${JSON.stringify(initialized.root)}`,
             documentation.status === "none"
               ? "No existing documentation found. Start with a requirement or component in Studio."
               : documentation.status === "unavailable"
