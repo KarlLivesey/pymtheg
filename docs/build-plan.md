@@ -538,3 +538,5 @@ Licence, plugins — owner decision (Karl, 15 November 2026): "we'll explicitly 
 
 LIC-1 merged (PR #46, head 44c076ae, merge c686c0fa; Opus 5.5 pass, Sol 6.1 pass after the M2 ruling that a true history paragraph in the change note does not block). Main now carries the MIT `LICENSE` (Copyright (c) 2026 Karl Livesey), `CONTRIBUTING.md` and a README Licence section. LIC-2 (package `license` field, own-licence line in `docs/licences.md`, SPDX tags with an enforcing test) follows once PR 41, PR 45 and W3-P1 are merged.
 
+W3-P1 in review (PR #47, head e2f3fea0, round 1; Sol 6.1 + Opus 5.5 high). Builder: about 115 lines in `src/graph/indexer.ts`, `store.ts`, `types.ts` plus one test; one commit per write phase instead of per file, and an added index on `graph_files(path, status)`; stored results and query output byte-identical to main on restic and Vector at cold, warm, one-file-changed and reverted; server timings (observations) restic cold 87 → 56 s, Vector cold 801 → 522 s, Vector one-file-changed 342 → 191 s; an interrupted run now redoes the whole phase. Further ideas listed, not built.
+
