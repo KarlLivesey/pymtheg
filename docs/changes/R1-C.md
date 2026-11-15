@@ -5,7 +5,7 @@ Adds two agent tools, `code_graph` and `graph_result`, over the existing
 module, CLI, backend selection or engine-status lines changed. The only server
 registration edits are one import and one call; `try_inputs` has its separately
 requested additive input form. Workspace edits own/close graph jobs. R1-A's
-TLC/Quint/Java lines remain untouched.
+backend removal is preserved: the merged workspace uses the built-in engines and retains exhaustive-result metadata.
 
 ## Agent surface
 
@@ -108,9 +108,10 @@ records every response size, and independently checks three Go-source answers.
 The copy/database and client/server are removed in finally. Final counts/results
 and source hashes are in evidence/r1-c/README.md and its companion artifacts.
 
-The design-loop proof uses the backends present on this main: this chunk does
-not claim the Java-free release work from R1-A, change engine status, perform the
-R1-E accuracy measurement, or establish production conformance. Other inherited
+The merged design loop uses R1-A's built-in verification and simulation engines,
+with exhaustive verify and non-exhaustive simulate assertions. This chunk does
+not repeat R1-A's clean-machine packaging proof, perform the R1-E accuracy
+measurement, or establish production conformance. Other inherited
 limits include core indexing cost, conservative/noisy possible callers,
 per-connection jobs, no cross-process index coordinator, and SQLite WAL -shm read
 marks. No MCP project initialization tool, watcher, HTTP transport, new language

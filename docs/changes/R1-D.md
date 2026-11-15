@@ -84,8 +84,8 @@ The fingerprint is computed from the graph's stored snapshot of the file.
 | Language | Text |
 |---|---|
 | All | The symbol's own source range from the graph. `signature` hashes the text before its first `{`; `body` hashes the text from that `{` on (empty when there is none). |
-| Rust | Plus `attributes`: the item's *outer* attributes (`#[...]`), each as written. A small lexer scans from the previous item boundary (the end of the previous symbol, or the start of the enclosing symbol) to the symbol start. It handles balanced brackets, strings, raw strings, char literals and nested comments, so multi-line attributes, attributes with `]` inside strings, attributes on the same line as the item, and attributes separated from the item only by comments are all included. Any other token, including an inner attribute `#![...]`, resets the collection. If the text cannot be scanned confidently (e.g. an unterminated string), the contiguous non-blank lines above the item, back to the boundary, are used instead. |
-| Go | Plus `attributes`: the compiler directive lines (`//go:…`, `//export …`) in the contiguous comment block directly above the line where the declaration starts. |
+| Rust | Plus `attributes`: the item's *outer* attributes (`#[...]`), each as written. A small lexer scans from the previous item boundary (the end of the previous symbol, or the start of the enclosing symbol) to the symbol start. It handles balanced brackets, strings, raw strings (distinguishing `r#ident` identifiers), char literals and nested comments, so multi-line attributes, attributes with `]` inside strings, attributes on the same line as the item, and attributes separated from the item only by comments are all included. Any other token, including an inner attribute `#![...]`, resets the collection. If the text cannot be scanned confidently (e.g. an unterminated string), the contiguous non-blank lines above the item, back to the boundary, are used instead. |
+| Go | Plus `attributes`: the compiler directive lines (`//go:…`, `//export …`) in the comment/blank-line block above the declaration, scanned back to the previous declaration (a non-comment code line also stops the scan). |
 | TypeScript/JavaScript | The symbol range alone, which already starts at `export` and at decorators (verified in review). |
 
 Doc comments (`///`, block doc comments, Go doc comments) and other comments are
@@ -144,8 +144,7 @@ hold:
    cannot tell which one moved". Twins with *different* text do not block a
    move (tested).
 4. No failed or partial file of that language could hide another candidate.
-5. The link has a `twins` record. Links made at the round-0 head have none, so
-   they are never `moved`.
+5. The link has a `twins` record. At creation/refresh it is `null` whenever any failed or partial source file of that language exists, because an unseen identical twin might exist. Links with no trustworthy twins record are never `moved`, even after the broken file is repaired.
 
 This covers a real move across Go packages (different directory, same text). A
 move combined with an edit is `missing` with a suggestion.
@@ -400,8 +399,7 @@ a fixed probe path purely to run the standard sync and read failed/stale files),
   `changed`.
 - `createRequirement` uses the local writer identity (the Studio path), not an
   injected `writer`.
-- The history view shows each link's latest body. Receipts for intermediate
-  refreshes hold hashes only.
+- History paths are retained by receipt-content hash when refreshed. New entries show the symbol path at that entry, not today's path. Legacy intermediate bodies not retained before this fix (or a lost concurrent history branch) are explicitly marked `[historical path unavailable]` with `pathKnown: false`; the original key still establishes the first path. No path is guessed from today's location.
 - Each call syncs the graph (an inventory hash of the project). `touched`
   without `--no-sync` makes several graph calls (one sync, the others with
   `noSync`). There is no cross-call cache.

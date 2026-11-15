@@ -1,0 +1,6 @@
+
+> pymtheg@1.0.0 format:check
+> prettier --check "src/**/*.ts" "test/*.mjs" "web/src/**/*.{ts,tsx,css}" package.json tsconfig.json docs/report.schema.json
+
+Checking formatting...
+All matched files use Prettier code style!
