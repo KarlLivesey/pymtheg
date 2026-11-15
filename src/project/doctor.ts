@@ -1,6 +1,7 @@
 import { printLegacyNotice } from "../storage/legacy.js";
 import { findProjectRoot, openDatabase } from "../storage/local.js";
 import { mkdtemp, rm, stat, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -80,15 +81,29 @@ async function engines(signal: AbortSignal): Promise<Check[]> {
                 ? "Built-in seeded sampler found the probe's known counterexample"
                 : "Built-in breadth-first search gave the probe's known verdicts",
           }
-        : {
-            name,
-            status: "failed",
-            detail:
-              "Probe verdicts were wrong: " +
-              records
-                .map((r) => `${r.propertyId}=${r.outcome}/${r.completion}`)
-                .join(", "),
-          };
+        : records.some((r) => r.completion === "failed")
+          ? {
+              name,
+              status: "failed",
+              detail:
+                "The built-in engine worker failed: " +
+                [
+                  ...new Set(
+                    records
+                      .filter((r) => r.completion === "failed")
+                      .flatMap((r) => r.diagnostics.map((d) => d.message)),
+                  ),
+                ].join("; "),
+            }
+          : {
+              name,
+              status: "failed",
+              detail:
+                "Probe verdicts were wrong: " +
+                records
+                  .map((r) => `${r.propertyId}=${r.outcome}/${r.completion}`)
+                  .join(", "),
+            };
     } catch (e) {
       return { name, status: "failed", detail: String(e) };
     }
@@ -236,10 +251,17 @@ export async function doctor(
       detail: "Built GUI available",
     });
   } catch {
+    // A source checkout has src/ and tsconfig.json beside dist/; an installed
+    // package does not (package.json `files` ships neither).
+    const checkout = ["../../tsconfig.json", "../../src/cli/main.ts"].every(
+      (path) => existsSync(fileURLToPath(new URL(path, import.meta.url))),
+    );
     checks.push({
       name: "Studio",
       status: "missing",
-      detail: "Run npm run build",
+      detail: checkout
+        ? "The Studio build (dist-web) is missing: run npm run build in this source checkout"
+        : "The Studio build (dist-web) is missing from the installed package: reinstall Pymtheg",
     });
   }
   return {

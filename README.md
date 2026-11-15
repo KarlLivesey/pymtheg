@@ -96,6 +96,38 @@ npm run build
 ./pymtheg check examples/mvp/checkout.pym
 ```
 
+### Install from a package tarball
+
+The package is not published yet, so install it from a tarball made with
+`npm pack` (after `npm run build`):
+
+```sh
+npm pack --ignore-scripts                     # writes pymtheg-1.0.0.tgz
+npx ./pymtheg-1.0.0.tgz --help                # one-off run; note the ./
+npm install --global ./pymtheg-1.0.0.tgz      # or a global install
+pymtheg doctor
+```
+
+Write the tarball as `./name.tgz` (or `file:/absolute/path/name.tgz`): npm treats
+a bare absolute path such as `npx /tmp/pymtheg-1.0.0.tgz` as a command and fails
+with exit 126. The installed package has five runtime dependencies (ten packages
+in all) and no install scripts; the browser app and grammars ship prebuilt.
+Licences of everything it ships are in [docs/licences.md](docs/licences.md) and
+`THIRD-PARTY-NOTICES`.
+
+For coding agents, prefer the MCP server (`pymtheg mcp`, one long-running
+process) or a global install over running `npx` per call: each `npx` call costs
+about 3 s and 165 MiB before any work (measured on the dev server).
+
+`pymtheg studio` and `pymtheg mcp` stop cleanly on SIGINT (Ctrl-C) and SIGTERM.
+When they run under `npx`, npm passes a signal sent to the `npx` process only to
+its own child, a `sh -c` shell. Where that shell keeps itself as the parent of
+the command instead of replacing itself with it (as in some Debian-based images),
+the signal never reaches Pymtheg and `npx`, the shell and the server keep running.
+A terminal's Ctrl-C signals the whole process group and is not affected. A
+supervisor that stops the server by PID should signal the process group
+(`kill -INT -- -PGID`) or run the installed `pymtheg` binary directly.
+
 The algorithm reports `N * N` comparisons (at most 40,000 for N <= 200) and an
 independent alpha-renamed policy copy. The bad file flow leaks on InvalidData;
 the corrected version closes on success, error and cancellation. The local task
@@ -129,10 +161,13 @@ Counterexamples are replayed against the source event semantics before they are
 reported. A corrected sampled run reports
 `no_counterexample (simulation, sampled, not exhaustive)`, never an unqualified
 verified result. In JSON (CLI `--format json`, MCP, Studio) every behaviour
-result carries `exhaustive`: `true` only when every reachable state was searched
-(a completed `verify`), `false` for every `simulate` result and every search that
-stopped early. Read `exhaustive`, not `completion`, to tell a proof from a sample:
-a sampled run reports `no_counterexample` / `complete` with `exhaustive: false`.
+result carries `exhaustive`. It describes the search, not the verdict: `true`
+only when every reachable state was searched (a completed `verify`), `false` for
+every `simulate` result and every search that stopped early or never started
+(budget, timeout, engine error, unsupported lowering). Read `exhaustive`, not
+`completion`, to tell a proof from a sample: a sampled run reports
+`no_counterexample` / `complete` with `exhaustive: false`. A counterexample is
+real whatever `exhaustive` says.
 `emit --target json` writes the lowered model the engines check
 (machine, source mapping, bounds, assumptions and, for flows, the finite
 source-state graph) so you can inspect it.

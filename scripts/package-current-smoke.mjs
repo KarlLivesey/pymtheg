@@ -408,7 +408,7 @@ try {
   });
   assert.equal(codeGraph.items[0].name, "observed");
   console.log(
-    "Private installed tarball: CLI check, shipped JavaScript plugin, hoisted Quint, architecture reads, workflow resource, recipe/input trial, all three built-ins, implementation-check generation, registered JavaScript target, real source counterexample, preserved contract/trial assumptions, portable incomplete output and real code observation passed.",
+    "Private installed tarball: CLI check, shipped JavaScript plugin, built-in engines (no external checker), architecture reads, workflow resource, recipe/input trial, all three built-ins, implementation-check generation, registered JavaScript target, real source counterexample, preserved contract/trial assumptions, portable incomplete output and real code observation passed.",
   );
 } finally {
   await client?.close();
