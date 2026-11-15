@@ -48,6 +48,7 @@ import {
   emitImplementationCheck,
   implementationCheckOptionsSchema,
 } from "../contracts/implementation-check.js";
+import { registerLinkTools } from "./links.js";
 import { registerArchitectureTools } from "./architecture.js";
 import { tryFlowInWorker } from "../behaviour/trial-runner.js";
 import { validateInterfaceType } from "../studio/interface-builder.js";
@@ -973,6 +974,7 @@ export function createAgentServer(workspace: AgentWorkspace) {
       });
     },
   );
+  registerLinkTools(server, workspace);
   return server;
 }
 export async function runAgentStdio(

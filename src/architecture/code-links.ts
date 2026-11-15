@@ -61,6 +61,8 @@ export interface StoredCodeLink {
   /** Same-identity symbols in other files at link/refresh time (never move
    * targets). `null`: not recorded or over the bound, so `moved` is never claimed. */
   twins: { path: string; fingerprint: CodeFingerprint }[] | null;
+  /** Prior symbol references keyed by the receipt's content hash, not wall time. */
+  pathHistory?: Record<string, CodeSymbolRef>;
   created: string;
   refreshed: string | null;
   note: string;
@@ -186,11 +188,13 @@ export function rustOuterAttributes(
     const end = text.indexOf("\n", at);
     return end < 0 || end > to ? to : end + 1;
   };
-  const rawStart = (j: number) =>
-    (text[j] === "r" && (text[j + 1] === '"' || text[j + 1] === "#")) ||
-    ((text[j] === "b" || text[j] === "c") &&
-      text[j + 1] === "r" &&
-      (text[j + 2] === '"' || text[j + 2] === "#"));
+  const rawStart = (j: number) => {
+    if ((text[j] === "b" || text[j] === "c") && text[j + 1] === "r") j++;
+    if (text[j++] !== "r") return false;
+    while (text[j] === "#") j++;
+    // r#ident is an identifier, not an unterminated raw string.
+    return text[j] === '"';
+  };
   const identifierBefore = (j: number) => j > 0 && /[\w]/.test(text[j - 1]!);
   /** Balanced `[...]` from `open`, skipping strings, chars and comments. */
   const skipBrackets = (open: number): number | null => {
@@ -268,17 +272,16 @@ export function rustOuterAttributes(
   return attached;
 }
 
-/** Go: the compiler directive lines (`//go:…`, `//export …`) in the contiguous
- * comment block directly above the line where the declaration starts. Ordinary
- * doc-comment lines in that block are not included. */
-export function goDirectives(text: string, start: number): string[] {
+/** Go directives in the comment/blank-line block above this declaration,
+ * bounded by the previous declaration. Ordinary doc comments are not included. */
+export function goDirectives(text: string, start: number, from = 0): string[] {
   let lineStart = text.lastIndexOf("\n", start - 1) + 1;
   const found: string[] = [];
   while (lineStart > 0) {
     const previousStart = text.lastIndexOf("\n", lineStart - 2) + 1;
     const line = text.slice(previousStart, lineStart - 1).replace(/\r$/, "");
     const trimmed = line.trim();
-    if (!trimmed.startsWith("//")) break;
+    if (previousStart < from || (trimmed && !trimmed.startsWith("//"))) break;
     if (/^\/\/(go:|export\s)/.test(trimmed)) found.unshift(trimmed);
     lineStart = previousStart;
   }
@@ -292,8 +295,7 @@ function attachedAttributes(
   fileSymbols: readonly GraphSymbol[],
 ): string {
   const start = symbol.range.start;
-  if (symbol.module === "go") return goDirectives(text, start).join("\n");
-  if (symbol.module !== "rust") return "";
+  if (symbol.module !== "go" && symbol.module !== "rust") return "";
   // Previous item boundary: the latest end of a symbol before this one, or the
   // start of the innermost symbol containing it.
   let from = 0;
@@ -303,6 +305,7 @@ function attachedAttributes(
     else if (s.range.start < start && s.range.end >= symbol.range.end)
       from = Math.max(from, s.range.start);
   }
+  if (symbol.module === "go") return goDirectives(text, start, from).join("\n");
   // A container's own header (e.g. `impl X {`) starts at `from`; scanning from
   // there resets on its tokens, so only attributes after it are kept.
   const scanned = rustOuterAttributes(text, from, start);
@@ -472,6 +475,7 @@ function openGraph(root: string): SqliteGraphStore | null {
 }
 
 interface GraphView {
+  hasIncomplete(language: string): boolean;
   summarize(symbol: GraphSymbol, reason?: string): SymbolSummary;
   fingerprint(symbol: GraphSymbol): CodeFingerprint;
   inFile(path: string): GraphSymbol[];
@@ -482,6 +486,12 @@ function graphView(
   store: SqliteGraphStore,
   failed: GraphResponse["failedFiles"],
 ): GraphView {
+  const incomplete = new Set(
+    store
+      .fileInventory()
+      .filter((f) => f.status !== "clean")
+      .map((f) => f.module),
+  );
   const locations = new GraphLocations(store);
   const texts = new Map<string, string | null>();
   const text = (path: string) => {
@@ -492,6 +502,9 @@ function graphView(
   const failedByPath = new Map(failed.map((f) => [f.path, f.reason]));
   const fileSymbols = new Map<string, GraphSymbol[]>();
   return {
+    hasIncomplete: (language) =>
+      incomplete.has(language) ||
+      failed.some((f) => f.language === language || f.language === null),
     summarize: (symbol, reason) => ({
       graphId: symbol.id,
       language: symbol.module,
@@ -683,6 +696,7 @@ function recordTwins(
   view: GraphView,
   symbol: GraphSymbol,
 ): StoredCodeLink["twins"] {
+  if (view.hasIncomplete(symbol.module)) return null;
   const twins = view
     .named(symbol.identity)
     .filter(
@@ -1045,14 +1059,6 @@ export async function refreshCodeLink(
         link,
         message: `Link ${link.id} is ${before.state}; only ok, changed or moved links can be refreshed. ${before.message}`,
       };
-    if (before.state === "ok")
-      return {
-        schema: codeLinkSchema,
-        status: "unchanged" as const,
-        before,
-        link,
-        message: "Link is already up to date.",
-      };
     const graph = openGraph(root)!;
     let fingerprint: CodeFingerprint,
       symbol: GraphSymbol,
@@ -1075,12 +1081,24 @@ export async function refreshCodeLink(
     } finally {
       graph.close();
     }
+    if (
+      before.state === "ok" &&
+      JSON.stringify(twins) === JSON.stringify(link.twins)
+    )
+      return {
+        schema: codeLinkSchema,
+        status: "unchanged" as const,
+        before,
+        link,
+        message: "Link is already up to date.",
+      };
     const row = store!.codeLinkRows().find((r) => r.id === link.id)!;
     const { id: _id, removed: _removed, ...stored } = link;
     void _id;
     void _removed;
     store!.writeCodeLink(row.key, {
       ...stored,
+      pathHistory: { ...stored.pathHistory, [sha(row.body)]: stored.symbol },
       symbol: {
         language: symbol.module,
         path: symbol.file,
@@ -1566,6 +1584,8 @@ export interface CodeLinkHistoryEntry {
   change: "added" | "updated" | "removed";
   record: string;
   symbol: CodeSymbolRef;
+  /** False for legacy/concurrent history whose old body was not retained. */
+  pathKnown: boolean;
 }
 export interface CodeLinkHistoryResult {
   schema: typeof codeLinkSchema;
@@ -1585,12 +1605,41 @@ export async function codeLinkHistory(
         .map((r) => [r.id, r]),
     );
     const bodies = new Map(readLinks(store, true).map((l) => [l.id, l]));
+    const rows = new Map(store.codeLinkRows().map((row) => [row.id, row]));
     const entries: CodeLinkHistoryEntry[] = [];
     for (const change of exported.changes)
       for (const delta of change.changes) {
         const record = linkRecords.get(delta.record);
         const body = bodies.get(delta.record);
         if (!record || !body) continue;
+        const hash = delta.after ?? delta.before;
+        const row = rows.get(delta.record)!;
+        const original = JSON.parse(record.key) as [
+          string,
+          string,
+          string,
+          string,
+          string,
+          number,
+        ];
+        const historical =
+          hash === sha(row.body)
+            ? body.symbol
+            : hash
+              ? body.pathHistory?.[hash]
+              : undefined;
+        const first =
+          delta.before === null
+            ? {
+                ...body.symbol,
+                language: original[1],
+                path: original[2],
+                kind: original[3],
+                identity: original[4],
+                ordinal: original[5],
+              }
+            : undefined;
+        const symbol = historical ?? first;
         entries.push({
           link: delta.record,
           previous: record.previous ?? null,
@@ -1604,7 +1653,11 @@ export async function codeLinkHistory(
                 ? "added"
                 : "updated",
           record: body.record,
-          symbol: body.symbol,
+          symbol: symbol ?? {
+            ...body.symbol,
+            path: "[historical path unavailable]",
+          },
+          pathKnown: symbol !== undefined,
         });
       }
     return { schema: codeLinkSchema, entries };

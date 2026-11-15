@@ -481,3 +481,81 @@ ordinary characters, not query operators: `npm test` searches those words togeth
 while `"npm test"` requires retained quote characters too. Use the unquoted phrase
 when the document does not contain quotes. Record search indexes decoded values;
 the separate literal-document search also searches retained schema text.
+
+## Requirements linked to code
+
+Use **requirement_links** for planning-to-code work. Its actions are `requirement`
+(create), `add`, `remove`, `refresh`, `list`, `check`, `requirements_for`, `unlinked`
+and `history`. Use **link_result** only for a running job or further pages.
+Selectors are the graph's names, qualified names, `path:line[:column]` or literal
+`symbol:<hex>` references. Library error codes are retained in `error.code`.
+These links record reviewed intent, never proof that code satisfies a requirement.
+
+Each call waits up to five seconds by default for its worker to finish and returns
+an inline first page, or `state:"running"` with jobId and progress. `wait:false`
+returns a handle immediately. `link_result {jobId,wait:true}` waits for completion;
+with a progress token it reports phase notifications. SQLite can wait up to 30 s
+inside the worker; the MCP event loop remains responsive. Cancellation/disconnect
+joins owned workers. A committed mutation cannot be undone by cancellation:
+read list/history before retrying an interrupted mutation. One link job runs per
+connection; finish graph indexing before linking on an unindexed project.
+
+Replies use `pymtheg.mcp-links/v1`, at most **64 KiB** including text and structured
+content. Page limit defaults to 20, max 100. `total`, `nextOffset`, `truncated`,
+summary counts and failed-file continuation are explicit. Sections are `items`,
+`matches`, `failed_files`, `symbols`, `not_followed`. Three immutable job results
+are retained per connection, each at most 8 MiB of compact data. Unlinked public
+symbols have a separate `symbolLimit` (default 200, max 1,000); source truncation
+requires a new query. Long messages/names are explicitly marked truncated. Narrow
+list by record, symbol or file; follow failed-file pages before interpreting an
+answer. If even a single row cannot fit, the call refuses with narrowing guidance.
+
+`check` puts links needing attention first, with `state`, `differs`, suggestions,
+named `unverifiableFile`/hidden files and a next action in the first page. States
+are `ok`, `changed`, `moved`, `missing`, `unverifiable`. Moved is unconfirmed until
+explicit `refresh`; `allowMoved:true` opts out of that default. Suggestions are
+never applied. `summary.passed` is false when the library finds failures **or**
+graph coverage is incomplete/failed/stale; `libraryPassed` preserves its narrower
+verdict. `requirements_for` accepts symbol OR file, optional impact/depth; only
+definite callers are followed. Candidate/possible callers are named separately
+in `not_followed`, with the library's total and incomplete flag, never promoted.
+
+The following is an MCP-only session plus ordinary file edits. The first public-
+symbol query indexes implicitly; after code-graph tools are installed, explicit
+index/search is also available. Helper `reqDemo` handles both valid response shapes.
+
+```js
+// verified-mcp
+// requirement-links
+async function reqDemo(action, args = {}) {
+  const first = await call("requirement_links", { action, ...args });
+  return first.state === "running"
+    ? call("link_result", { jobId: first.jobId, wait: true, section: args.section ?? "items" })
+    : first;
+}
+const reqSource = "package p\nfunc McpLinkDemo(n int) int { return n + 1 }\n";
+await write("mcp-link-demo.go", reqSource);
+const reqSymbols = await reqDemo("unlinked", { symbols: true, section: "symbols" });
+const reqSymbol = reqSymbols.items.find(s => s.name === "McpLinkDemo");
+expect(reqSymbol.ref.startsWith("symbol:"));
+const reqRecord = await reqDemo("requirement", { id: "MCPDOC1", title: "Demo preserves values" });
+expect(reqRecord.items[0].id === "plan:MCPDOC1");
+const reqAdded = await reqDemo("add", { record: "MCPDOC1", selector: reqSymbol.ref });
+expect(reqAdded.summary.status === "created");
+const reqId = reqAdded.items[0].id;
+const reqPage = await call("link_result", { jobId: reqAdded.jobId, section: "items" });
+expect(reqPage.items[0].id === reqId);
+await write("mcp-link-demo.go", reqSource.replace("n + 1", "n + 2"));
+const reqChanged = await reqDemo("check");
+expect(reqChanged.summary.passed === false && reqChanged.items.some(l => l.id === reqId && l.state === "changed" && l.differs.includes("body")));
+const reqFresh = await reqDemo("refresh", { link: reqId });
+expect(reqFresh.summary.status === "refreshed");
+const reqList = await reqDemo("list", { record: "MCPDOC1" });
+expect(reqList.items[0].state === "ok");
+const reqTouched = await reqDemo("requirements_for", { file: "mcp-link-demo.go", impact: true });
+expect(reqTouched.items.some(r => r.record === "plan:MCPDOC1"));
+const reqHistory = await reqDemo("history");
+expect(reqHistory.items.some(e => e.link === reqId && e.change === "updated"));
+const reqRemoved = await reqDemo("remove", { link: reqId });
+expect(reqRemoved.summary.status === "removed");
+```

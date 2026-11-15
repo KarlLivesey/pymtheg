@@ -1,3 +1,4 @@
+import { LinkJobs } from "./links-jobs.js";
 import { findWorkspace } from "../project/workspace.js";
 import { ProjectInventories, type InventoryQuery } from "./inventories.js";
 import { agentLimits } from "./limits.js";
@@ -38,6 +39,7 @@ export interface AgentRequest {
   scope?: Record<string, unknown>;
 }
 export class AgentWorkspace {
+  readonly links: LinkJobs;
   readonly runs = new Map<string, AgentRun>();
   readonly emissions = new EmissionStore();
   readonly inventories = new ProjectInventories();
@@ -52,6 +54,7 @@ export class AgentWorkspace {
     readonly outputs: OutputRegistry = OutputRegistry.empty(),
   ) {
     this.access = new StudioService(root);
+    this.links = new LinkJobs(root);
   }
   static async open(
     path: string,
@@ -355,6 +358,7 @@ export class AgentWorkspace {
   async close() {
     this.shutdown.abort();
     try {
+      await this.links.close();
       await this.outputs.close();
       await this.active?.catch(() => {});
       await this.access.close();
