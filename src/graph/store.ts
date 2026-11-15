@@ -57,6 +57,7 @@ export class SqliteGraphStore implements GraphStorage {
         CREATE TABLE IF NOT EXISTS graph_links(id TEXT PRIMARY KEY,file TEXT NOT NULL REFERENCES graph_files(path) ON DELETE CASCADE,source TEXT REFERENCES graph_symbols(id) ON DELETE CASCADE,target TEXT REFERENCES graph_symbols(id) ON DELETE SET NULL,kind TEXT NOT NULL,body TEXT NOT NULL,module TEXT NOT NULL,origin TEXT NOT NULL,resolution TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS graph_candidates(link TEXT NOT NULL REFERENCES graph_links(id) ON DELETE CASCADE,symbol TEXT NOT NULL REFERENCES graph_symbols(id) ON DELETE CASCADE,kind TEXT NOT NULL,PRIMARY KEY(link,symbol));
         CREATE INDEX IF NOT EXISTS graph_symbol_name ON graph_symbols(name,id);
+        CREATE INDEX IF NOT EXISTS graph_symbol_identity ON graph_symbols(json_extract(body,'$.identity'),file,id);
         CREATE INDEX IF NOT EXISTS graph_symbol_name_kind ON graph_symbols(name,kind,id);
         CREATE INDEX IF NOT EXISTS graph_symbol_name_file ON graph_symbols(name,file,id);
         CREATE INDEX IF NOT EXISTS graph_symbol_name_kind_file ON graph_symbols(name,kind,file,id);
@@ -620,14 +621,53 @@ export class SqliteGraphStore implements GraphStorage {
       .get(id);
     return row ? (JSON.parse(row.body as string) as GraphSymbol) : undefined;
   }
-  searchSymbols(text: string, limit: number): GraphSymbol[] {
-    if (!Number.isInteger(limit) || limit < 1 || limit > 10001)
-      throw Error("Invalid symbol search limit");
+  searchSymbols(
+    text: string,
+    limit: number,
+    caseSensitive = false,
+  ): GraphSymbol[] {
+    this.queryLimit(limit);
+    const name = caseSensitive ? "name" : "lower(name)";
+    const identity = caseSensitive
+      ? "json_extract(body,'$.identity')"
+      : "lower(json_extract(body,'$.identity'))";
+    const needle = caseSensitive ? "?" : "lower(?)";
     return this.db
       .prepare(
-        `SELECT body FROM graph_symbols WHERE instr(name,?)>0 OR instr(json_extract(body,'$.identity'),?)>0 ORDER BY name,id LIMIT ?`,
+        `SELECT body FROM graph_symbols
+      WHERE instr(${name},${needle})>0 OR instr(${identity},${needle})>0
+      ORDER BY CASE WHEN ${name}=${needle} OR ${identity}=${needle} THEN 0
+        WHEN instr(${name},${needle})=1 OR instr(${identity},${needle})=1 THEN 1 ELSE 2 END,
+        ${name},name,file,kind,id LIMIT ?`,
       )
-      .all(text, text, limit)
+      .all(text, text, text, text, text, text, limit)
+      .map((row) => JSON.parse(row.body as string) as GraphSymbol);
+  }
+  fileSnapshot(path: string): { text: string; hash: string } | undefined {
+    const row = this.db
+      .prepare(
+        "SELECT json_extract(body,'$.text') AS text,json_extract(body,'$.hash') AS hash FROM graph_files WHERE path=?",
+      )
+      .get(path);
+    return row
+      ? { text: row.text as string, hash: row.hash as string }
+      : undefined;
+  }
+  symbolsAt(
+    file: string,
+    start: number,
+    end: number,
+    point: boolean,
+  ): GraphSymbol[] {
+    const first = "json_extract(body,'$.range.start')",
+      last = "json_extract(body,'$.range.end')";
+    return this.db
+      .prepare(
+        `SELECT body FROM graph_symbols WHERE file=? AND
+      ${point ? `(${first}<=? AND ${last}>? OR ${first}=${last} AND ${first}=?)` : `(${first}<? AND ${last}>? OR ${first}=${last} AND ${first}>=? AND ${first}<?)`}
+      ORDER BY id`,
+      )
+      .all(file, ...(point ? [start, start, start] : [end, start, start, end]))
       .map((row) => JSON.parse(row.body as string) as GraphSymbol);
   }
   hasFile(path: string): boolean {
@@ -639,9 +679,9 @@ export class SqliteGraphStore implements GraphStorage {
     this.queryLimit(limit);
     return this.db
       .prepare(
-        "SELECT body FROM graph_symbols WHERE name=? ORDER BY id LIMIT ?",
+        "SELECT body FROM graph_symbols WHERE name=? OR json_extract(body,'$.identity')=? ORDER BY file,id LIMIT ?",
       )
-      .all(name, limit)
+      .all(name, name, limit)
       .map((row) => JSON.parse(row.body as string) as GraphSymbol);
   }
   symbolsForFile(path: string, limit: number): GraphSymbol[] {

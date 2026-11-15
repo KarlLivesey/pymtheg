@@ -80,6 +80,7 @@ test("mixed graph commands expose exact selections, certainty, failed files and 
     assert.deepEqual(search.data.matches.map((s) => s.name).sort(), [
       "LeafGo",
       "LeafTs",
+      "leaf_rust",
     ]);
     const selected = await run("symbol", "LeafGo");
     broken(selected);

@@ -1,4 +1,5 @@
 import type { SqliteGraphStore } from "./store.js";
+import { GraphLocations, type Located } from "./command-locations.js";
 import type { GraphLink, GraphSymbol } from "./types.js";
 
 export type QueryCommand =
@@ -21,15 +22,25 @@ export function queryGraph(
   args: readonly string[],
   depth: number,
   limit: number,
+  caseSensitive = false,
 ): QueryResult {
-  const cache = new Map<string, GraphSymbol | undefined>();
+  const locations = new GraphLocations(store);
+  const located = (value: GraphSymbol) => ({
+    ...value,
+    ...locations.locate(value.file, value.range),
+  });
+  const cache = new Map<string, (GraphSymbol & Located) | undefined>();
   const symbol = (id: string) => {
-    if (!cache.has(id)) cache.set(id, store.getSymbol(id));
+    if (!cache.has(id)) {
+      const value = store.getSymbol(id);
+      cache.set(id, value ? located(value) : undefined);
+    }
     return cache.get(id) ?? null;
   };
   const links = (items: GraphLink[]) =>
     items.map((link) => ({
       ...link,
+      ...locations.locate(link.file, link.range),
       certainty:
         link.resolution === "resolved"
           ? "definite"
@@ -43,19 +54,98 @@ export function queryGraph(
         symbol: symbol(item.id),
       })),
     }));
-  const select = (input: string) =>
-    /^symbol:[a-f0-9]{64}$/.test(input)
-      ? [symbol(input)].filter((s): s is GraphSymbol => s !== null)
-      : store.namedSymbols(input, limit + 1);
+  const select = (input: string): (GraphSymbol & Located)[] => {
+    if (/^symbol:[a-f0-9]{64}$/.test(input)) {
+      const value = symbol(input);
+      return value ? [value] : [];
+    }
+    const named = store.namedSymbols(input, limit + 1);
+    if (named.length) return named.map(located);
+    const match = /^(.*?):(\d+)(?::(\d+))?$/.exec(input);
+    if (!match) return [];
+    const path = match[1]!,
+      line = Number(match[2]),
+      column = match[3] === undefined ? null : Number(match[3]);
+    if (
+      !Number.isSafeInteger(line) ||
+      line < 1 ||
+      (column !== null && (!Number.isSafeInteger(column) || column < 1))
+    )
+      throw Error("Selector line and column must be positive integers");
+    if (
+      path.startsWith("/") ||
+      path.includes("\\") ||
+      path.split("/").some((part) => !part || part === "." || part === "..")
+    )
+      throw Error("Selector path must be project-relative POSIX");
+    const range = locations.lineRange(path, line);
+    if (!range) return [];
+    const offset =
+      column === null ? null : locations.offset(path, line, column);
+    if (column !== null && offset === null) return [];
+    const found = store.symbolsAt(
+      path,
+      offset ?? range.start,
+      offset ?? range.end,
+      column !== null,
+    );
+    // Remove strict containers, keeping equal-range declarations and same-line siblings ambiguous.
+    found.sort(
+      (a, b) =>
+        b.range.start - a.range.start ||
+        a.range.end - b.range.end ||
+        (a.id < b.id ? -1 : 1),
+    );
+    let minimumEnd = Infinity,
+      maximumStart = -1;
+    const inner: GraphSymbol[] = [];
+    for (let i = 0; i < found.length; ) {
+      const value = found[i]!;
+      let end = i + 1;
+      while (
+        end < found.length &&
+        found[end]!.range.start === value.range.start &&
+        found[end]!.range.end === value.range.end
+      )
+        end++;
+      if (
+        !(
+          minimumEnd < value.range.end ||
+          (minimumEnd === value.range.end && maximumStart > value.range.start)
+        )
+      )
+        inner.push(...found.slice(i, end));
+      if (value.range.end < minimumEnd) {
+        minimumEnd = value.range.end;
+        maximumStart = value.range.start;
+      } else if (value.range.end === minimumEnd)
+        maximumStart = Math.max(maximumStart, value.range.start);
+      i = end;
+    }
+    return inner
+      .sort(
+        (a, b) =>
+          a.range.start - b.range.start ||
+          a.range.end - b.range.end ||
+          (a.id < b.id ? -1 : 1),
+      )
+      .slice(0, limit + 1)
+      .map(located);
+  };
   const result = (
     data: Record<string, unknown>,
     truncated = false,
     status: QueryResult["status"] = "ok",
   ): QueryResult => ({ data, truncated, status });
   if (command === "search") {
-    const found = store.searchSymbols(args[0]!, limit + 1);
+    const found = store.searchSymbols(args[0]!, limit + 1, caseSensitive);
     return result(
-      { matches: found.slice(0, limit), limit },
+      {
+        matches: found.slice(0, limit).map(located),
+        limit,
+        caseSensitive,
+        caseFolding: caseSensitive ? "none" : "ASCII",
+      },
       found.length > limit,
     );
   }
@@ -75,7 +165,7 @@ export function queryGraph(
       {
         path,
         exists,
-        symbols: symbols.slice(0, limit),
+        symbols: symbols.slice(0, limit).map(located),
         links: links(found.slice(0, limit)),
         limit,
       },

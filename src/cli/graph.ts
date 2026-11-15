@@ -3,10 +3,20 @@ import {
   type GraphCommand,
   type GraphResponse,
 } from "../graph/commands.js";
+import type { Located } from "../graph/command-locations.js";
 import type { GraphLink, GraphSymbol } from "../graph/types.js";
 const quote = (value: unknown) => JSON.stringify(value);
-function symbolText(symbol: GraphSymbol) {
-  return `${quote(symbol.name)} (${symbol.kind}) ${quote(symbol.file)}:${symbol.range.start} ${symbol.id}`;
+type DisplaySymbol = GraphSymbol & Partial<Located>;
+function locationText(
+  file: string,
+  value: Partial<Located> & { range: { start: number; end: number } },
+) {
+  return typeof value.line === "number" && typeof value.column === "number"
+    ? `${file}:${value.line}:${value.column}${typeof value.endLine === "number" && typeof value.endColumn === "number" ? `-${value.endLine}:${value.endColumn}` : ""} [UTF-16 ${value.range.start}..${value.range.end}]`
+    : `${file} [UTF-16 ${value.range.start}..${value.range.end}; line unavailable]`;
+}
+function symbolText(symbol: DisplaySymbol) {
+  return `${quote(symbol.name)}${symbol.identity !== symbol.name ? " [" + symbol.identity + "]" : ""} (${symbol.kind}) ${locationText(symbol.file, symbol)} ${symbol.id}`;
 }
 export function formatGraph(response: GraphResponse): string {
   const lines = [
@@ -36,20 +46,24 @@ export function formatGraph(response: GraphResponse): string {
     );
   const data = response.data;
   const showSymbols = (items: unknown) => {
-    for (const symbol of (items ?? []) as GraphSymbol[])
+    for (const symbol of (items ?? []) as DisplaySymbol[])
       lines.push(`  ${symbolText(symbol)}`);
   };
   const showLinks = (items: unknown) => {
     for (const link of (items ?? []) as (Omit<GraphLink, "candidates"> & {
-      source: GraphSymbol | null;
-      target: GraphSymbol | null;
+      source: DisplaySymbol | null;
+      target: DisplaySymbol | null;
       certainty: string;
+      line: number;
+      column: number;
+      endLine: number;
+      endColumn: number;
       candidates: (GraphLink["candidates"][number] & {
-        symbol: GraphSymbol | null;
+        symbol: DisplaySymbol | null;
       })[];
     })[]) {
       lines.push(
-        `  ${link.certainty} ${link.kind}: ${link.source ? symbolText(link.source) : quote(link.file)} -> ${link.target ? symbolText(link.target) : link.resolution === "ambiguous" ? "one of [" + link.candidates.map((item) => (item.symbol ? symbolText(item.symbol) : item.id)).join("; ") + "]" : quote(link.targetName)} at ${quote(link.file)}:${link.range.start}`,
+        `  ${link.certainty} ${link.kind}: ${link.source ? symbolText(link.source) : quote(link.file)} -> ${link.target ? symbolText(link.target) : link.resolution === "ambiguous" ? "one of [" + link.candidates.map((item) => (item.symbol ? symbolText(item.symbol) : item.id)).join("; ") + "]" : quote(link.targetName)} at ${locationText(link.file, link)}`,
       );
       if (link.data !== undefined)
         lines.push(`    Stored details: ${quote(link.data)}`);
@@ -59,7 +73,7 @@ export function formatGraph(response: GraphResponse): string {
     if (data.inputs)
       for (const input of data.inputs as {
         input: string;
-        matches: GraphSymbol[];
+        matches: DisplaySymbol[];
       }[]) {
         lines.push(`Matches for ${quote(input.input)}:`);
         showSymbols(input.matches);
@@ -70,7 +84,7 @@ export function formatGraph(response: GraphResponse): string {
     showLinks(data.links);
     if (data.callers)
       for (const item of data.callers as {
-        symbol: GraphSymbol;
+        symbol: DisplaySymbol;
         certainty: string;
         distance: number;
       }[])
@@ -90,6 +104,12 @@ export function formatGraph(response: GraphResponse): string {
       showLinks(data.observedLinks);
     }
   }
+  if (response.truncated) {
+    const counts = response.resultCounts;
+    lines.push(
+      `Truncated: returned ${counts.matches} matches, ${counts.symbols} symbols, ${counts.links} links, ${counts.callers} callers, ${counts.observedLinks} observed links (limit ${response.limit}; traversal bounds above).`,
+    );
+  }
   return lines.join("\n") + "\n";
 }
 
@@ -105,7 +125,7 @@ export async function graphCommand(
     const flags = new Set<string>();
     for (let i = 0; i < args.length; i++) {
       const arg = args[i]!;
-      if (["--json", "--no-sync"].includes(arg)) {
+      if (["--json", "--no-sync", "--case-sensitive"].includes(arg)) {
         if (flags.has(arg)) throw Error("Duplicate " + arg);
         flags.add(arg);
       } else if (["--root", "--depth", "--limit"].includes(arg)) {
@@ -122,6 +142,7 @@ export async function graphCommand(
         args: positional.slice(1),
         root: values.get("--root"),
         noSync: flags.has("--no-sync"),
+        caseSensitive: flags.has("--case-sensitive"),
         depth: values.has("--depth")
           ? Number(values.get("--depth"))
           : undefined,

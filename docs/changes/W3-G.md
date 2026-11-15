@@ -11,7 +11,8 @@ wiring and filesystem watching remain future chunks.
 ## Usage
 
 All commands accept `--root DIRECTORY`, `--json`, `--no-sync`, `--depth N` and
-`--limit N`. Defaults: nearest `.pymtheg`/Git project boundary from the current
+`--limit N`; search additionally uses `--case-sensitive` to opt out of its default
+ASCII case folding. Defaults: nearest `.pymtheg`/Git project boundary from the current
 folder, depth 5 (allowed 0–100), limit 1000 (allowed 1–10000).
 
 - `graph index`: force a complete index invocation; unchanged files still skip
@@ -19,8 +20,11 @@ folder, depth 5 (allowed 0–100), limit 1000 (allowed 1–10000).
   and reasons, and index-phase duration in milliseconds as an observation.
 - `graph status`: read-only assessment of existence, versions, counts, failures,
   retryable files and changed/added/removed/context/version paths. It never syncs.
-- `graph search TEXT`: case-sensitive substring search over names/scoped identities.
-- `graph symbol NAME_OR_ID`: exact display name or full stable `symbol:…` ID.
+- `graph search TEXT`: ASCII case-insensitive search over names/scoped identities
+  by default, with `--case-sensitive` to opt out. Exact matches rank before prefix
+  matches, then substrings; ties use folded name, display name, file, kind and ID.
+- `graph symbol SELECTOR`: exact display name, recorded qualified/scoped identity,
+  full stable `symbol:…` ID, or `path:line` (optional `:column`).
 - `graph callers SYMBOL` / `graph callees SYMBOL`: direct `calls` links only.
 - `graph path FROM TO`: bounded breadth-first call-path search, preferring a
   definite path; otherwise returns a candidate route explicitly marked candidate.
@@ -28,12 +32,31 @@ folder, depth 5 (allowed 0–100), limit 1000 (allowed 1–10000).
   through every hop; a later definite route can strengthen a candidate result.
 - `graph file PATH`: symbols and links in an exact project-relative POSIX path.
 
-A symbol name with multiple matches produces the matches, never an arbitrary
-selection. Use a returned ID to disambiguate. Paths reject absolute, parent and
-backslash forms. Positions are half-open UTF-16 offsets, not line numbers.
+Every symbol-taking route (symbol/callers/callees/impact/path) accepts the same
+selector forms. Name/identity selection remains exact and case-sensitive; only
+search folds ASCII by default. IDs take precedence, then exact names/identities,
+then positional syntax. `path:line` returns the innermost declarations covering
+that indexed line; strict containers are removed, but same-line siblings and
+equal ranges remain ambiguous. `path:line:column` selects ranges containing that
+precise position. A selector with multiple matches lists them, never picks one.
+Paths reject absolute, parent and backslash forms.
+
+Every returned symbol, link and endpoint/candidate symbol carries 1-based `line`,
+`column`, `endLine` and `endColumn` alongside the existing half-open UTF-16 `range`
+offsets. Columns count UTF-16 code units, 1-based; end positions are exclusive.
+CRLF counts as one line break; lone CR/LF and Unicode line separators are also
+handled. Text prints `path:line:column-endLine:endColumn [UTF-16 start..end]`, plus kind
+and scoped identity where distinct; the opening path:line:column remains usable
+by editors while both end coordinates and original offsets remain visible.
+Positions are computed from the requested files' stored source snapshots, cached
+once per answer, never from a newer edited file. `locationSource:"stored-snapshot"`
+and `snapshotHash` identify that basis. With stale --no-sync, selectors and
+positions describe the indexed snapshot; the stale warning explicitly says the
+current file may differ. No guessed current-file line numbers are printed.
 `--limit` bounds search/match/direct-link/file lists and traversal nodes/edges;
 path's two passes share the node and edge budgets. `truncated`/reported bounds
-always disclose omissions. A missing path is only “not found within bounds”,
+always disclose omissions, with `limit` and `resultCounts` in JSON and a final
+`Truncated: returned …` line in text. A valid truncated answer exits 0. A missing path is only “not found within bounds”,
 never proof that no path exists. Candidate membership is preserved even when
 there is only one remaining candidate; it is never promoted to a definite link.
 
@@ -80,8 +103,10 @@ busy error or leave completion unverified; these are not reported as success.
 
 Warm queries still walk/hash claimed source and context bytes, which is necessary
 for content-based freshness. They load compact completion metadata and only the
-matching/visited graph facts, not stored source bodies, all symbols or all links.
-Tests reject even file-body metadata/count rescans on every warm query route.
+matching/visited graph facts, plus only the stored source snapshots needed for
+returned locations/selectors. They do not reload every stored source body, all
+symbols or all links. Tests reject project-wide file-body metadata/count rescans
+on every warm query route.
 Changed/incomplete indexes fall back to the existing full-snapshot indexer and
 mandatory module phases; this chunk does not make that path faster or smaller.
 TypeScript analysis-only failed files retain the core's existing retry behaviour.
@@ -111,7 +136,8 @@ Every successful execution, including incomplete/ambiguous answers, has:
  counts: {files, symbols, links, failed, partial, unresolved, ambiguous},
  failedFiles: [{path, language, reason, range?}],
  staleFiles: [{path, change}], warnings: [{code, message, files}],
- truncated, data}
+ truncated, limit,
+ resultCounts: {matches, symbols, links, callers, observedLinks}, data}
 ```
 
 `sync.mode` is index/updated/unchanged/disabled/status; durationMs and the full
@@ -130,7 +156,7 @@ Command-specific `data`:
 |---|---|
 | index | null (report is in sync.report) |
 | status | {retryableFiles} |
-| search | {matches, limit} |
+| search | {matches, limit, caseSensitive, caseFolding: "ASCII" or "none"} |
 | symbol | {symbol} |
 | callers/callees | {symbol, links, limit} |
 | file | {path, exists, symbols, links, limit} |
@@ -138,7 +164,8 @@ Command-specific `data`:
 | impact | {symbol, callers: [{symbol, certainty, distance}], links, depth, maxNodes, maxEdges, visited} |
 | unresolved/ambiguous selection | {inputs: [{input, matches, truncated, totalAtLeast}]} |
 
-Symbols retain all GraphSymbol fields. Links retain GraphLink fields and add
+Symbols retain all GraphSymbol fields and add the position/snapshot fields above.
+Links retain GraphLink fields, add those same location fields, and add
 `certainty: definite|candidate-set|unresolved`, `source`, `target` (symbols or null),
 and each candidate adds its symbol or null. Candidate lists are not claimed to
 be exhaustive; the module's stored openness/assumptions still apply. Some
@@ -149,9 +176,25 @@ paths have null certainty. `observedLinks` are exploration evidence, not a path.
 The node count for path is unique across its two passes. Selection totalAtLeast
 is a lower bound when truncated. On a missing index with --no-sync, data is null.
 
-Status is ok/incomplete/ambiguous/not-found/bounded. Exit 0 means the request ran
-without these warnings, not a completeness theorem; 1 means missing selection,
-2 incomplete/ambiguous/bounded, 3 invocation/storage/internal error, 130 cancellation.
+Status is ok/incomplete/ambiguous/not-found/bounded; it describes the result,
+not only execution success. Exit codes:
+
+- **0:** a valid answer, including truncation, ambiguity, no matches and bounded
+  path absence. Ordinary unresolved-link warnings are not errors. Status without
+  an index is a successful assessment; stale no-sync answers from a completed
+  historical index also succeed with explicit warnings.
+- **2:** actual capture/parser/analysis/resolution failure, partial/failed files,
+  an index run that cannot certify completion, or a query with no usable completed
+  index (including missing index with --no-sync). Returned partial facts and
+  failure names remain available; this is not caused by truncation alone.
+- **3:** invalid arguments, refused project state, storage/internal error.
+- **130:** cancellation.
+
+`resultCounts` counts only primary data lists: search/selector matches, explicit
+symbol(s), links, impact callers and observed links. Nested endpoint/candidate
+symbols are not double counted. Project-wide `counts` remain separate; selection
+`totalAtLeast` remains a lower bound when truncated.
+
 The CLI error variant is `{schema, command, status:"error", exitCode,
 error:{message}}`; it never mixes progress with JSON stdout.
 
@@ -168,7 +211,10 @@ preempted. No continuous watcher, workers, module toolchain opt-in, MCP/Studio,
 new language precision or missing dependency capture is implemented.
 
 Search uses SQLite substring scans; warm work scales with source bytes plus compact
-metadata, and queries with matching/visited facts. Metadata scales with file count.
+metadata, and queries with matching/visited facts plus stored source snapshots for the
+locations actually returned. A positional selector reads only the matching file's
+source and overlapping symbols; all overlapping declarations are needed before
+innermost selection and output bounds can be applied. Metadata scales with file count.
 Traversal is bounded, with no pagination/continuation tokens; narrow queries or
 increase --limit up to 10000. Failed-file/stale lists deliberately are not truncated.
 Future changes to indexing semantics/settings must change the completion schema
@@ -180,3 +226,16 @@ limits and assumptions still apply; no universal accuracy claim is made.
 
 Validation and the clean pinned restic trial, with three source checks and scratch
 cleanup, are recorded under `evidence/w3-g/`.
+
+## Pre-review usability follow-up
+
+Normally merged the documentation fold: merge abb26889f7683a7d7c6d3bbc2b846c595d898d92,
+actual second parent faff7a311d271cfbef4a0b3e27328861d84598e5. Added the positions,
+ranked search, scoped/positional selectors, result counts and exit semantics above.
+An additive identity expression index supports scoped lookup without a project-wide
+fact reload. Tests include Unicode/BOM/CRLF, stale snapshot positions, ASCII-only
+folding, ranking, qualified Go/Rust names, all positional routes and truncation's
+zero exit/final text notice. No Go toolchain opt-in is wired here. Superseded local
+iterations were removed from the branch tip; history retains them. Final evidence
+is one pinned clean shallow restic transcript, with path:line:column text views and
+source verification, plus the final check logs and a short change summary.

@@ -34,6 +34,7 @@ export interface GraphRequest {
   args?: readonly string[];
   root?: string | undefined;
   noSync?: boolean;
+  caseSensitive?: boolean;
   depth?: number | undefined;
   limit?: number | undefined;
 }
@@ -74,6 +75,14 @@ export interface GraphResponse {
   staleFiles: StaleFile[];
   warnings: { code: string; message: string; files: string[] }[];
   truncated: boolean;
+  limit: number;
+  resultCounts: {
+    matches: number;
+    symbols: number;
+    links: number;
+    callers: number;
+    observedLinks: number;
+  };
   data: Record<string, unknown> | null;
 }
 export interface GraphExecutionOptions {
@@ -381,6 +390,14 @@ export async function executeGraph(
         staleFiles: stale,
         warnings: [],
         truncated: false,
+        limit,
+        resultCounts: {
+          matches: 0,
+          symbols: 0,
+          links: 0,
+          callers: 0,
+          observedLinks: 0,
+        },
         data: null,
       };
       if (failed.size)
@@ -403,7 +420,7 @@ export async function executeGraph(
         response.warnings.push({
           code: "stale-files",
           message:
-            "Captured facts differ from current content or module versions; answers may be affected.",
+            "Captured facts differ from current content or module versions; answers may be affected. Line/column values use the stored snapshot and may not match the current file.",
           files: stale.map((f) => f.path),
         });
       if (report?.analysisErrors.length || report?.resolutionErrors.length)
@@ -439,6 +456,7 @@ export async function executeGraph(
           request.args ?? [],
           depth,
           limit,
+          request.caseSensitive ?? false,
         );
         response.data = query.data;
         response.truncated = query.truncated;
@@ -461,9 +479,35 @@ export async function executeGraph(
             "Result reached a reported depth or result/node bound; omitted facts may exist.",
           files: [],
         });
-      if (response.status !== "ok" || response.warnings.length) {
+      const data = response.data;
+      const length = (value: unknown) =>
+        Array.isArray(value) ? value.length : 0;
+      response.resultCounts = {
+        matches:
+          length(data?.matches) +
+          (Array.isArray(data?.inputs)
+            ? data.inputs.reduce(
+                (sum: number, item: { matches?: unknown }) =>
+                  sum + length(item.matches),
+                0,
+              )
+            : 0),
+        symbols: length(data?.symbols) + (data?.symbol ? 1 : 0),
+        links: length(data?.links),
+        callers: length(data?.callers),
+        observedLinks: length(data?.observedLinks),
+      };
+      const executionFailure =
+        failed.size > 0 ||
+        partial.length > 0 ||
+        !!report?.errors.length ||
+        !!report?.analysisErrors.length ||
+        !!report?.resolutionErrors.length ||
+        (request.command === "index" && !trusted) ||
+        (request.command !== "status" && (!store || !finalState));
+      if (executionFailure) {
         if (response.status === "ok") response.status = "incomplete";
-        response.exitCode = response.status === "not-found" ? 1 : 2;
+        response.exitCode = 2;
       }
       return response;
     };
