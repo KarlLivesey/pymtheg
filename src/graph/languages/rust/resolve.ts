@@ -1,5 +1,11 @@
 import { implies as cfgImplies, possible as cfgPossible } from "./cfg.js";
 import {
+  auditedMacro,
+  ecosystemMacros,
+  compatibleRelease,
+  compatibleRequirement,
+} from "./macro-catalog.js";
+import {
   scopeNeutralStandardMacros,
   standardMacroName,
   knownAttributeName,
@@ -1213,6 +1219,15 @@ export function resolveRust(
         }
       : found;
   }
+  const externCratesByFile = new Map<string, GraphLink[]>();
+  for (const l of ctx.links)
+    if (data(l).externCrate && str(data(l).scope) === "")
+      externCratesByFile.set(l.file, [
+        ...(externCratesByFile.get(l.file) ?? []),
+        l,
+      ]);
+  for (const links of externCratesByFile.values())
+    links.sort((a, b) => b.range.start - a.range.start);
   function macroLookup(
     name: string,
     site: GraphLink,
@@ -1223,15 +1238,75 @@ export function resolveRust(
       ? textualMacro(name, site, loc, scope)
       : null;
     if (textual?.complete) return textual;
-    const path = find(name, loc, scope, "macro");
-    // Cross-crate/proc-macro expansion paths remain outside this chunk.
+    let path = find(name, loc, scope, "macro");
+    // Captured macro_export definitions are path-based at the exporting crate
+    // root. Proc-macro expansion itself remains outside the fallback.
     path.symbols = path.symbols.filter(
       (s) =>
-        ownerPlace(s.file, str(data(s).scope)).some(
+        (ownerPlace(s.file, str(data(s).scope)).some(
           (p) => p.crate.root === loc.crate.root,
         ) &&
-        (s.kind === "macro" || s.file === site.file),
+          (s.kind === "macro" || s.file === site.file)) ||
+        (s.kind === "macro" &&
+          data(s).macroRules &&
+          ((data(s).macroExportConditions ?? []) as string[][]).length > 0),
     );
+    if (
+      !loc.noImplicitPrelude &&
+      !name.includes("::") &&
+      !(path.complete && path.symbols.length)
+    ) {
+      const imports: Found[] = [];
+      // macro_use prelude imports are fallback bindings; the most recent
+      // matching import wins. A later unknown export set defeats that proof.
+      const externs = externCratesByFile.get(loc.crate.root) ?? [];
+      outer: for (const l of externs) {
+        for (const request of (data(l).macroUseRequests ?? []) as {
+          names: string[] | null;
+          conditions: string[];
+        }[]) {
+          if (request.names && !request.names.includes(name)) continue;
+          const cs = [...conditionsFor(l), ...request.conditions];
+          if (!possible([...(loc.conditions ?? []), ...cs])) continue;
+          let branch = dependencyLookup(
+            l.targetName,
+            [name],
+            { ...loc, conditions: [...(loc.conditions ?? []), ...cs] },
+            "macro",
+            new Set(),
+            true,
+            loc,
+            true,
+          );
+          const { failedFiles: ignored, ...rest } = branch;
+          branch = {
+            ...rest,
+            symbols: branch.symbols.filter(
+              (s) =>
+                s.kind === "macro" &&
+                data(s).macroRules &&
+                ((data(s).macroExportConditions ?? []) as string[][]).length >
+                  0,
+            ),
+          };
+          if (!branch.symbols.length || ignored?.length)
+            branch = {
+              ...branch,
+              complete: false,
+              reason: "macro-use-exports-unverified",
+            };
+          const at = { ...l, data: { ...data(l), conditions: cs } };
+          branch = conditional(branch, [at], loc);
+          imports.push(branch);
+          if (branch.complete && branch.symbols.length) break outer;
+        }
+      }
+      if (imports.length)
+        path =
+          path.symbols.length || !path.complete
+            ? merge([path, ...imports])
+            : merge(imports);
+    }
     return textual ? merge([textual, path]) : path;
   }
   const importsByScope = new Map<
@@ -2459,6 +2534,79 @@ export function resolveRust(
   // Visible captured bindings defeat the std assumption. Checking the whole
   // project for definitions is intentionally conservative; imports are checked
   // in the caller's lexical module. Unseen output is ignored under E4.
+  const coreStatementMacros = new Set([
+    "assert",
+    "assert_eq",
+    "assert_ne",
+    "debug_assert",
+    "debug_assert_eq",
+    "debug_assert_ne",
+    "panic",
+    "todo",
+    "unreachable",
+    "unimplemented",
+    "matches",
+    "write",
+    "writeln",
+  ]);
+  const sysrootNames = new Set(["std", "core", "alloc"]);
+  const canonicalSysrootImport = (l: GraphLink, crate: Crate): boolean =>
+    !!data(l).externCrate &&
+    sysrootNames.has(l.targetName) &&
+    data(l).alias === l.targetName &&
+    !crate.deps.has(l.targetName) &&
+    !itemPresence(l).length;
+  const macroSites = new Map(
+    ctx.links
+      .filter((l) => l.kind === "macros")
+      .map((l) => [`${l.file}|${l.range.start}`, l]),
+  );
+  function standardAvailable(
+    entry: { name: string; scope: string; start?: number },
+    loc: Place,
+  ): boolean {
+    const site = macroSites.get(`${loc.file}|${entry.start}`);
+    const conditions = [
+      ...(loc.conditions ?? []),
+      ...(site ? conditionsFor(site) : []),
+    ];
+    const noStd = (
+      (data(units.get(loc.crate.root) ?? {}).noStdConditions ??
+        []) as string[][]
+    ).some((cs) => possible([...conditions, ...cs]));
+    const parts = entry.name.replace(/^::/, "").split("::");
+    const name = parts.at(-1)!;
+    const imported = (crate: string, macros: boolean) =>
+      (externCratesByFile.get(loc.crate.root) ?? []).some(
+        (l) =>
+          l.file === loc.crate.root &&
+          str(data(l).scope) === "" &&
+          l.targetName === crate &&
+          canonicalSysrootImport(l, loc.crate) &&
+          conditionsFor(l).every((c) => implies(conditions, c)) &&
+          (!macros ||
+            (
+              (data(l).macroUseRequests ?? []) as {
+                conditions: string[];
+                names: string[] | null;
+              }[]
+            ).some(
+              (r) =>
+                (!r.names || r.names.includes(name)) &&
+                r.conditions.every((c) => implies(conditions, c)),
+            )),
+      );
+    if (parts.length > 1) {
+      if (parts[0] === "alloc") return imported("alloc", false);
+      if (parts[0] === "std" && noStd) return imported("std", false);
+      return true;
+    }
+    if (!noStd || coreStatementMacros.has(name)) return true;
+    return (
+      imported("std", true) ||
+      (["vec", "format"].includes(name) && imported("alloc", true))
+    );
+  }
   const visibleMacroNames = new Set(
     symbols
       .filter((s) => s.kind === "macro" || data(s).semanticKind === "macro")
@@ -2470,6 +2618,13 @@ export function resolveRust(
       macroUseImports?: MacroUseImport[];
     }[])
       for (const request of b.macroUseImports ?? []) {
+        if (
+          sysrootNames.has(request.crate) &&
+          ownerPlace(f.path, "").every(
+            (loc) => !loc.crate.deps.has(request.crate),
+          )
+        )
+          continue;
         for (const name of request.names ?? []) visibleMacroNames.add(name);
         if (!request.names)
           for (const name of scopeNeutralStandardMacros)
@@ -2483,7 +2638,12 @@ export function resolveRust(
   );
   for (const l of ctx.links)
     if (l.kind === "imports" && !data(l).glob)
-      visiblePrefixes.add(str(data(l).alias));
+      if (
+        !ownerPlace(l.file, str(data(l).scope)).every((loc) =>
+          canonicalSysrootImport(l, loc.crate),
+        )
+      )
+        visiblePrefixes.add(str(data(l).alias));
   for (const c of packages)
     for (const name of c.deps.keys()) visiblePrefixes.add(name);
   function importedStandardName(
@@ -2509,6 +2669,203 @@ export function resolveRust(
   }
   // E4: failed/unverified textual entries are unseen code. Assume they do
   // not rebind the standard names; ordinary textual macro lookup stays strict.
+  function dependencyMacro(alias: string, name: string, loc: Place): boolean {
+    const edges = (loc.crate.dependencies ?? []).filter(
+      (e) =>
+        e.name === alias &&
+        possible([...(loc.conditions ?? []), ...e.conditions]),
+    );
+    return (
+      edges.length > 0 &&
+      edges.some((e) =>
+        e.conditions.every((c) => implies(loc.conditions ?? [], c)),
+      ) &&
+      edges.every((e) =>
+        auditedMacro(
+          e.packageName ?? "",
+          e.registryVersion,
+          name,
+          e.registryRequirement,
+        ),
+      )
+    );
+  }
+  function ecosystemPath(path: string, loc: Place, scope: string): boolean {
+    const parts = path.replace(/^::/, "").split("::");
+    if (parts.length !== 2 || !loc.crate.edition) return false;
+    const [alias, name] = parts as [string, string];
+    if (!dependencyMacro(alias, name, loc)) return false;
+    // A captured module/import or an unknown glob can override an extern-
+    // prelude name. Query the ordinary type namespace, not macro spelling.
+    const prefix = find(alias, loc, scope, "type");
+    if (
+      prefix.symbols.length ||
+      !prefix.complete ||
+      prefix.possibleImportNames?.length
+    ) {
+      // `extern crate tracing;` is the same dependency, not a local module.
+      let local = scope;
+      let direct: GraphLink[] = [];
+      let globs = false;
+      while (true) {
+        const uses = importsByScope.get(`${loc.file}|${local}`);
+        globs ||= !!uses?.globs.length;
+        direct = uses?.explicit.get(alias) ?? [];
+        if (direct.length || !local || local === loc.local) break;
+        local = local.includes("::")
+          ? local.slice(0, local.lastIndexOf("::"))
+          : "";
+      }
+      if (
+        prefix.symbols.length ||
+        !direct.length ||
+        !present(direct, loc) ||
+        direct.some(
+          (l) =>
+            (!(data(l).externCrate && l.targetName === alias) &&
+              // Audited `anyhow::anyhow` is macro-only: importing it does not
+              // shadow the crate's type-namespace name with its own macro alias.
+              !(
+                alias === "anyhow" &&
+                name === "anyhow" &&
+                !globs &&
+                l.targetName === "anyhow::anyhow" &&
+                data(l).alias === alias
+              )) ||
+            itemPresence(l).length,
+        )
+      )
+        return false;
+    }
+    if (loc.crate.edition === "2015")
+      return ctx.links.some(
+        (l) =>
+          l.file === loc.crate.root &&
+          data(l).externCrate &&
+          l.targetName === alias &&
+          data(l).alias === alias &&
+          conditionsFor(l).every((c) => implies(loc.conditions ?? [], c)),
+      );
+    return true;
+  }
+  function ecosystemProven(
+    entry: { name: string; scope: string; start?: number },
+    loc: Place,
+  ): boolean {
+    const site = macroSites.get(`${loc.file}|${entry.start}`);
+    if (!site) return false;
+    loc = {
+      ...loc,
+      conditions: [...(loc.conditions ?? []), ...conditionsFor(site)],
+    };
+    if (entry.name.includes("::"))
+      return ecosystemPath(entry.name, loc, entry.scope);
+    const textual = textualMacro(entry.name, site, loc, entry.scope);
+    if (textual && (textual.symbols.length || !textual.complete)) return false;
+    let scope = entry.scope;
+    while (true) {
+      const uses = importsByScope.get(`${loc.file}|${scope}`);
+      const direct = (uses?.explicit.get(entry.name) ?? []).filter(
+        (l) =>
+          !data(l).externCrate &&
+          possible([...(loc.conditions ?? []), ...conditionsFor(l)]),
+      );
+      if (direct.length)
+        return (
+          present(direct, loc) &&
+          direct.every(
+            (l) =>
+              !data(l).glob &&
+              ecosystemPath(
+                l.targetName,
+                {
+                  ...loc,
+                  conditions: [...(loc.conditions ?? []), ...conditionsFor(l)],
+                },
+                scope,
+              ),
+          )
+        );
+      if (uses?.globs.length) {
+        const supplied = find(entry.name, loc, scope, "macro");
+        if (
+          supplied.symbols.length ||
+          !supplied.complete ||
+          supplied.possibleImportNames?.includes(entry.name)
+        )
+          return false;
+      }
+      if (!scope || scope === loc.local) break;
+      scope = scope.includes("::")
+        ? scope.slice(0, scope.lastIndexOf("::"))
+        : "";
+    }
+    if (loc.noImplicitPrelude) return false;
+    let guaranteed = false;
+    for (const l of externCratesByFile.get(loc.crate.root) ?? []) {
+      for (const request of (data(l).macroUseRequests ?? []) as {
+        names: string[] | null;
+        conditions: string[];
+      }[]) {
+        if (request.names && !request.names.includes(entry.name)) continue;
+        const cs = [...conditionsFor(l), ...request.conditions];
+        if (!possible([...(loc.conditions ?? []), ...cs])) continue;
+        if (canonicalSysrootImport(l, loc.crate)) continue;
+        const edges = (loc.crate.dependencies ?? []).filter(
+          (e) => e.name === l.targetName,
+        );
+        if (
+          edges.length &&
+          edges.every((e) => {
+            const contract = ecosystemMacros.get(e.packageName ?? "");
+            return (
+              !!contract &&
+              (e.registryVersion === undefined
+                ? compatibleRequirement(
+                    contract.version,
+                    e.registryRequirement,
+                    contract.minimum,
+                  )
+                : compatibleRelease(
+                    contract.version,
+                    e.registryVersion,
+                    contract.minimum,
+                  )) &&
+              !contract.names.has(entry.name)
+            );
+          })
+        )
+          continue;
+        if (
+          !dependencyMacro(l.targetName, entry.name, {
+            ...loc,
+            conditions: [...(loc.conditions ?? []), ...cs],
+          })
+        )
+          return false;
+        guaranteed ||= cs.every((c) => implies(loc.conditions ?? [], c));
+      }
+    }
+    return guaranteed;
+  }
+  // Compute provenance before adding prospective macro-opacity scopes. An
+  // exemption cannot use the opacity it is deciding as its own premise.
+  const ecosystemSafe = new Set<string>();
+  for (const f of ctx.files)
+    for (const entry of (data(f.result).standardMacroScopes ?? []) as {
+      name: string;
+      scope: string;
+      start?: number;
+    }[])
+      if (
+        !standardMacroName(entry.name) &&
+        ownerPlace(f.path, entry.scope).every((loc) =>
+          ecosystemProven(entry, loc),
+        )
+      )
+        ecosystemSafe.add(`${f.path}|${entry.start}`);
+  memo.clear();
+  unprovedImports.clear();
   const unsafeStandardScopes = new Set<string>();
   for (const f of ctx.files)
     for (const loc of ownerPlace(f.path, "")) {
@@ -2518,11 +2875,16 @@ export function resolveRust(
         start?: number;
       }[])
         if (
-          (entry.name.includes("::")
-            ? visiblePrefixes.has(entry.name.replace(/^::/, "").split("::")[0]!)
-            : visibleMacroNames.has(standardMacroName(entry.name)!) ||
-              importedStandardName(f.path, entry.scope, entry.name)) ||
-          ownerPlace(f.path, entry.scope).some((p) => p.noImplicitPrelude)
+          !standardMacroName(entry.name)
+            ? !ecosystemSafe.has(`${f.path}|${entry.start}`)
+            : !standardAvailable(entry, { ...loc, file: f.path }) ||
+              (entry.name.includes("::")
+                ? visiblePrefixes.has(
+                    entry.name.replace(/^::/, "").split("::")[0]!,
+                  )
+                : visibleMacroNames.has(standardMacroName(entry.name)!) ||
+                  importedStandardName(f.path, entry.scope, entry.name)) ||
+              ownerPlace(f.path, entry.scope).some((p) => p.noImplicitPrelude)
         ) {
           opaqueScopes.add(`${loc.crate.root}|${qualified(loc, entry.scope)}`);
           unsafeStandardScopes.add(`${f.path}|${entry.scope}`);
