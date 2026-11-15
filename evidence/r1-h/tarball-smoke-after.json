@@ -39,7 +39,7 @@
   },
   "mcp": {
    "ok": true,
-   "tools": 17,
+   "tools": 19,
    "exit": 0
   },
   "studio": {
@@ -52,7 +52,7 @@
  },
  "install": {
   "status": 0,
-  "nodeModulesBytes": 52692480,
+  "nodeModulesBytes": 52960811,
   "packages": 11,
   "warnings": [],
   "installScriptWarnings": []

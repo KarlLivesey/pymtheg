@@ -120,7 +120,7 @@ start, page and script asset over HTTP, SIGINT stop: all pass before and after.
 
 | Production install | Before (main) | After |
 |---|---|---|
-| `node_modules` bytes | 88,964,435 | 52,692,480 |
+| `node_modules` bytes | 88,964,435 | 52,960,811 |
 | Packages (incl. pymtheg) | 134 | 11 |
 | `npm warn` lines | 6 | 0 |
 
@@ -156,7 +156,7 @@ loads a builtin while linking the ESM graph, before any module body runs, and
   `src` file imports `node:sqlite` as a value statically.
 
 The full suite passes on official Node 24.0.0, 24.21.0, 25.2.1, 25.9.0 and
-26.13.1 (2,750 tests; one existing environment skip on 26.13.1).
+26.13.1 (2,784 tests; one existing environment skip on 26.13.1).
 
 **Note for the manager:** the lazy load is in `src/storage/local.ts`, outside
 this chunk's owned paths (a three-line change); the filter import is the first

@@ -1,16 +1,16 @@
-== fresh mirror r1h3, Node v24.21.0, under evidence/r1-a/no-java.sh
+== fresh mirror r1h4 (origin/main merged), Node v24.21.0, under evidence/r1-a/no-java.sh
 -- ci
 no-java: shim log ($PYM_SCRATCH/r1a-java-calls.log) has 0 line(s)
 -- test
-ℹ tests 2750
-ℹ pass 2750
+ℹ tests 2784
+ℹ pass 2784
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 no-java: shim log ($PYM_SCRATCH/r1a-java-calls.log) has 0 line(s)
 -- backend
-✓ built in 5.80s
-﹣ rust: real rich contracts compile with recursive records, outcomes and arbitrary precision integers (93.023531ms) # crate num-bigint is not in the offline cargo registry index; no conformance claim
+✓ built in 4.64s
+﹣ rust: real rich contracts compile with recursive records, outcomes and arbitrary precision integers (91.975325ms) # crate num-bigint is not in the offline cargo registry index; no conformance claim
 ℹ tests 97
 ℹ pass 96
 ℹ fail 0
@@ -18,20 +18,18 @@ no-java: shim log ($PYM_SCRATCH/r1a-java-calls.log) has 0 line(s)
 ℹ skipped 1
 no-java: shim log ($PYM_SCRATCH/r1a-java-calls.log) has 0 line(s)
 -- build
-✓ built in 5.56s
+✓ built in 4.33s
 no-java: shim log ($PYM_SCRATCH/r1a-java-calls.log) has 0 line(s)
--- format
-All matched files use Prettier code style!
-no-java: shim log ($PYM_SCRATCH/r1a-java-calls.log) has 0 line(s)
+-- format: first run flagged src/storage/local.ts (merge line); fixed in 5bbeaff6, then: All matched files use Prettier code style!
 -- licence --check: rc=0
 -- npm pack
 npm notice 203.4kB THIRD-PARTY-NOTICES
-npm notice package size: 2.3 MB
-npm notice unpacked size: 10.5 MB
-npm notice total files: 889
-== npm test per official Node release (mirror r1h2, same head), under no-java.sh
--- v24.0.0: ℹ tests 2750 ℹ pass 2750 ℹ fail 0 ℹ skipped 0
--- v25.2.1: ℹ tests 2750 ℹ pass 2750 ℹ fail 0 ℹ skipped 0
--- v25.9.0: ℹ tests 2750 ℹ pass 2750 ℹ fail 0 ℹ skipped 0
--- v26.13.1: ℹ tests 2750 ℹ pass 2749 ℹ fail 0 ℹ skipped 1
-﹣ a binder stack overflow fails only that file (8351.744442ms) # no nesting depth at which parsing succeeds and the binder overflows on this machine (first failure: The TypeScript parser exhausted its
+npm notice package size: 2.4 MB
+npm notice unpacked size: 10.7 MB
+npm notice total files: 917
+== npm test per official Node release (same head), under no-java.sh
+-- v24.0.0: ℹ tests 2784 ℹ pass 2784 ℹ fail 0 ℹ skipped 0 
+-- v25.2.1: ℹ tests 2784 ℹ pass 2784 ℹ fail 0 ℹ skipped 0 
+-- v25.9.0: ℹ tests 2784 ℹ pass 2784 ℹ fail 0 ℹ skipped 0 
+-- v26.13.1: ℹ tests 2784 ℹ pass 2783 ℹ fail 0 ℹ skipped 1 
+﹣ a binder stack overflow fails only that file (8791.627663ms) # no nesting depth at which parsing succeeds and the binder overflows on this machine (first failure: The TypeScript parser exhausted its
