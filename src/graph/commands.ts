@@ -35,6 +35,7 @@ export interface GraphRequest {
   root?: string | undefined;
   noSync?: boolean;
   caseSensitive?: boolean;
+  includePossible?: boolean;
   depth?: number | undefined;
   limit?: number | undefined;
 }
@@ -133,7 +134,13 @@ export async function executeGraph(
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   }
   const registry = options.registry ?? (await discoverLanguages());
-  let store = exists ? new SqliteGraphStore(path) : null;
+  let store = exists
+    ? new SqliteGraphStore(path, undefined, {
+        readOnly:
+          request.command === "status" ||
+          (!!request.noSync && request.command !== "index"),
+      })
+    : null;
   try {
     let inventory = await captureInventory(root, registry, signal);
     const previousState = readCheckpoint(store);
@@ -457,6 +464,7 @@ export async function executeGraph(
           depth,
           limit,
           request.caseSensitive ?? false,
+          request.includePossible ?? false,
         );
         response.data = query.data;
         response.truncated = query.truncated;

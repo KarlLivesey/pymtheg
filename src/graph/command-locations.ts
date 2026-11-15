@@ -20,15 +20,11 @@ export class GraphLocations {
       const snapshot = this.store.fileSnapshot(path);
       if (!snapshot) this.files.set(path, null);
       else {
-        const starts = [0];
-        for (let i = 0; i < snapshot.text.length; i++) {
-          const c = snapshot.text.charCodeAt(i);
-          if (c === 13) {
-            if (snapshot.text.charCodeAt(i + 1) === 10) i++;
-            starts.push(i + 1);
-          } else if (c === 10 || c === 0x2028 || c === 0x2029)
-            starts.push(i + 1);
-        }
+        // Editors/tooling count LF (including CRLF), not CR or Unicode separators.
+        // A leading BOM occupies an offset but not a visible first-line column.
+        const starts = [snapshot.text.charCodeAt(0) === 0xfeff ? 1 : 0];
+        for (let i = 0; i < snapshot.text.length; i++)
+          if (snapshot.text.charCodeAt(i) === 10) starts.push(i + 1);
         this.files.set(path, { ...snapshot, starts });
       }
     }
@@ -39,8 +35,10 @@ export class GraphLocations {
     if (!file || line > file.starts.length) return null;
     const start = file.starts[line - 1]!;
     let end = file.starts[line] ?? file.text.length;
-    while (end > start && /[\r\n\u2028\u2029]/u.test(file.text[end - 1]!))
+    if (file.text[end - 1] === "\n") {
       end--;
+      if (file.text[end - 1] === "\r") end--;
+    }
     return { start, end };
   }
   offset(path: string, line: number, column: number): number | null {
@@ -68,7 +66,10 @@ export class GraphLocations {
         if (file.starts[middle]! <= offset) low = middle;
         else high = middle;
       }
-      return { line: low + 1, column: offset - file.starts[low]! + 1 };
+      return {
+        line: low + 1,
+        column: Math.max(1, offset - file.starts[low]! + 1),
+      };
     };
     const start = position(range.start),
       end = position(range.end);

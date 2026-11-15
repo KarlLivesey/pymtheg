@@ -82,6 +82,39 @@ export function formatGraph(response: GraphResponse): string {
     showSymbols(data.matches);
     showSymbols(data.symbols);
     showLinks(data.links);
+    if (data.hasPossibleCallers !== undefined) {
+      lines.push(
+        `Possible callers (unresolved): ${data.hasPossibleCallers ? "present; suggestions only, not candidate sets or definite calls" : "none matched within reported bounds"}`,
+      );
+      if (data.classCounts)
+        lines.push(`Call classes (returned): ${quote(data.classCounts)}`);
+      for (const item of (data.possibleCallers ?? []) as {
+        symbol?: DisplaySymbol;
+        links?: unknown[];
+        matchKind?: string;
+      }[]) {
+        if (item.symbol)
+          lines.push(
+            `  Possible frontier: ${symbolText(item.symbol)} ${(item as { classCounts?: unknown }).classCounts ? quote((item as { classCounts?: unknown }).classCounts) : ""}`,
+          );
+        for (const link of (item.links ?? [item]) as { matchKind: string }[]) {
+          lines.push(`  Possible match: ${link.matchKind}`);
+          showLinks([link]);
+        }
+      }
+      if (data.possiblePath) {
+        const path = data.possiblePath as { links: unknown[] };
+        lines.push("Possible call path (unresolved; not a proven path):");
+        showLinks(path.links);
+      }
+    }
+    if (
+      data.possibleTraversalLinks &&
+      (data.possibleTraversalLinks as unknown[]).length
+    ) {
+      lines.push("Traversed possible calls (unresolved; opt-in):");
+      showLinks(data.possibleTraversalLinks);
+    }
     if (data.callers)
       for (const item of data.callers as {
         symbol: DisplaySymbol;
@@ -125,7 +158,14 @@ export async function graphCommand(
     const flags = new Set<string>();
     for (let i = 0; i < args.length; i++) {
       const arg = args[i]!;
-      if (["--json", "--no-sync", "--case-sensitive"].includes(arg)) {
+      if (
+        [
+          "--json",
+          "--no-sync",
+          "--case-sensitive",
+          "--include-possible",
+        ].includes(arg)
+      ) {
         if (flags.has(arg)) throw Error("Duplicate " + arg);
         flags.add(arg);
       } else if (["--root", "--depth", "--limit"].includes(arg)) {
@@ -143,6 +183,7 @@ export async function graphCommand(
         root: values.get("--root"),
         noSync: flags.has("--no-sync"),
         caseSensitive: flags.has("--case-sensitive"),
+        includePossible: flags.has("--include-possible"),
         depth: values.has("--depth")
           ? Number(values.get("--depth"))
           : undefined,

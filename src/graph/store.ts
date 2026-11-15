@@ -36,9 +36,33 @@ export class SqliteGraphStore implements GraphStorage {
     this.decodedFiles.set(body, { body, file });
     return structuredClone(file);
   }
-  constructor(path: string, projectId?: string) {
-    this.db = openDatabase(path);
+  constructor(
+    path: string,
+    projectId?: string,
+    options: { readOnly?: boolean } = {},
+  ) {
+    this.db = openDatabase(path, { readOnly: options.readOnly ?? false });
     try {
+      if (options.readOnly) {
+        if (
+          this.db
+            .prepare("SELECT value FROM graph_meta WHERE key='schema'")
+            .get()?.value !== "3"
+        )
+          throw Error("Unsupported graph schema; rebuild the index");
+        const saved = this.db
+          .prepare("SELECT value FROM graph_meta WHERE key='project'")
+          .get()?.value;
+        if (
+          typeof saved !== "string" ||
+          (projectId !== undefined && saved !== projectId)
+        )
+          throw Error(
+            "Graph belongs to a different project or has no identity",
+          );
+        this.projectId = saved;
+        return;
+      }
       this.db.exec(`PRAGMA foreign_keys=ON;
         CREATE TABLE IF NOT EXISTS graph_meta(key TEXT PRIMARY KEY,value TEXT NOT NULL);`);
       this.db
@@ -714,6 +738,24 @@ export class SqliteGraphStore implements GraphStorage {
           [id, id],
           limit,
         );
+  }
+  /** Stream only unresolved call rows with a relevant spelling or explicit target hint.
+   * SQL is a broad prefilter; the caller must classify the stored evidence. */
+  *unresolvedCallHints(target: GraphSymbol): Generator<GraphLink> {
+    const rows = this.db.prepare(`SELECT id FROM graph_links
+      WHERE module=? AND kind='calls' AND resolution='unresolved' AND
+      (instr(json_extract(body,'$.targetName'),?)>0 OR instr(body,?)>0 OR EXISTS(
+        SELECT 1 FROM json_each(graph_links.body,'$.data.targets') hint
+        WHERE CASE WHEN hint.type='object' THEN json_extract(hint.value,'$.file') END=?
+          AND CASE WHEN hint.type='object' THEN json_extract(hint.value,'$.key') END=?)) ORDER BY id`);
+    for (const row of rows.iterate(
+      target.module,
+      target.name,
+      target.id,
+      target.file,
+      target.key,
+    ))
+      yield this.selectLinks("l.id=?", [row.id as string])[0]!;
   }
   close(): void {
     this.db.close();

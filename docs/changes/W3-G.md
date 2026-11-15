@@ -12,7 +12,7 @@ wiring and filesystem watching remain future chunks.
 
 All commands accept `--root DIRECTORY`, `--json`, `--no-sync`, `--depth N` and
 `--limit N`; search additionally uses `--case-sensitive` to opt out of its default
-ASCII case folding. Defaults: nearest `.pymtheg`/Git project boundary from the current
+ASCII case folding; impact additionally accepts `--include-possible`. Defaults: nearest `.pymtheg`/Git project boundary from the current
 folder, depth 5 (allowed 0–100), limit 1000 (allowed 1–10000).
 
 - `graph index`: force a complete index invocation; unchanged files still skip
@@ -28,8 +28,13 @@ folder, depth 5 (allowed 0–100), limit 1000 (allowed 1–10000).
 - `graph callers SYMBOL` / `graph callees SYMBOL`: direct `calls` links only.
 - `graph path FROM TO`: bounded breadth-first call-path search, preferring a
   definite path; otherwise returns a candidate route explicitly marked candidate.
+  A separate reverse walk reports unresolved suggestions and any `possiblePath`.
 - `graph impact SYMBOL`: bounded transitive callers, carrying candidate uncertainty
   through every hop; a later definite route can strengthen a candidate result.
+  Always reports possible unresolved callers at every visited frontier, including
+  the depth boundary; follows those suggestions only with `--include-possible`.
+  `distance` is the shortest observed distance within bounds, independent of
+  strongest certainty (which can come from a longer route).
 - `graph file PATH`: symbols and links in an exact project-relative POSIX path.
 
 Every symbol-taking route (symbol/callers/callees/impact/path) accepts the same
@@ -44,8 +49,8 @@ Paths reject absolute, parent and backslash forms.
 Every returned symbol, link and endpoint/candidate symbol carries 1-based `line`,
 `column`, `endLine` and `endColumn` alongside the existing half-open UTF-16 `range`
 offsets. Columns count UTF-16 code units, 1-based; end positions are exclusive.
-CRLF counts as one line break; lone CR/LF and Unicode line separators are also
-handled. Text prints `path:line:column-endLine:endColumn [UTF-16 start..end]`, plus kind
+Only LF (including CRLF) advances the line; lone CR, U+2028 and U+2029
+do not. A leading BOM occupies an offset but does not count toward first-line columns. Text prints `path:line:column-endLine:endColumn [UTF-16 start..end]`, plus kind
 and scoped identity where distinct; the opening path:line:column remains usable
 by editors while both end coordinates and original offsets remain visible.
 Positions are computed from the requested files' stored source snapshots, cached
@@ -54,7 +59,8 @@ and `snapshotHash` identify that basis. With stale --no-sync, selectors and
 positions describe the indexed snapshot; the stale warning explicitly says the
 current file may differ. No guessed current-file line numbers are printed.
 `--limit` bounds search/match/direct-link/file lists and traversal nodes/edges;
-path's two passes share the node and edge budgets. `truncated`/reported bounds
+path's definite/candidate passes share node/edge budgets; its separate reverse
+possible-path search reports its own `possibleBounds`. `truncated`/reported bounds
 always disclose omissions, with `limit` and `resultCounts` in JSON and a final
 `Truncated: returned …` line in text. A valid truncated answer exits 0. A missing path is only “not found within bounds”,
 never proof that no path exists. Candidate membership is preserved even when
@@ -69,13 +75,62 @@ The displayed certainty describes the stored relationship, not compilation or
 production conformance. Unresolved links anywhere in the graph trigger an
 additional completeness warning for callers, impact and path queries.
 
+## Possible callers: suggestions, not resolution
+
+Incoming queries include stored definite targets and candidate membership in
+`links`. `callers` additionally returns `possibleCallers`, a **separate** list of
+unresolved calls pointing toward the selected symbol. Every suggestion retains
+its stored `data`/reasons and adds `matchKind`:
+
+- `target-hint`: Rust's stored `data.targets` contains the symbol ID, or
+  TypeScript's `{file,key}` target fact names it. Spelling need not match.
+- `receiver-qualified`: the recorded selector/receiver type plus method name
+  matches the recorded scoped identity (normalizing pointer parentheses and
+  Rust `::` separators). Go uses `data.expr` selectors with recorded value/static types or named generic
+constraints; Rust may
+  record `receiverType`. This is a spelling match, not a type-resolution proof.
+- `name-only`: otherwise, the last call-name segment matches the symbol's name
+  exactly, after removing generic argument suffixes. Same-language matches only;
+  other packages/types with the same name are expected noise.
+
+`hasPossibleCallers:true` explicitly signals these suggestions even when `links`
+is empty and status is `ok`. Text prints “Possible callers (unresolved): present”.
+`classCounts:{definite,candidateSet,unresolved}` keeps the classes separate;
+callers counts describe returned lists and `countsTruncated` says if more exist.
+These are additional hints, never updates to stored resolution/candidate sets.
+
+Impact's `possibleCallers` contains `{symbol,distance,links,classCounts,truncated}`
+for every visited frontier node. Each unresolved link has `matchKind`; per-node
+class counts are observations capped at limit, with omissions flagged. The
+separate possible-report budget is at most `maxPossibleLinks=limit` associations
+across frontier nodes. `--include-possible` follows the reported hints with route
+certainty `unresolved`; those traversed edges are in `possibleTraversalLinks`,
+not the ordinary definite/candidate `links`. Following an ordinary edge after an
+unresolved hop remains unresolved. Without the flag no such hop is followed.
+Global class counts count unique reported edges per class, not whole-graph totals.
+Route states retain certainty and distance independently so a longer strong route
+does not create an imaginary short strong route during traversal.
+
+Path always reports possible hints during a bounded reverse walk from its target.
+`possiblePath` is null or `{certainty:"unresolved",symbols,links}`. It is separate
+from `found`/`certainty`/`links`, which only describe definite/candidate routes.
+`possibleBounds` reports its separate depth/node/edge/report limits and truncation.
+The reverse walk and impact report the depth-boundary frontier without following
+further hops. No path result claims absence beyond its bounds. SQL scans unresolved
+call rows using spelling/target prefilters and decodes only relevant rows, one at
+a time; reports cache each frontier's hints. This adds scan cost per frontier,
+not a new full-graph/source reload. No module or stored graph fact is changed.
+
 ## Sync, storage and completion
 
 Before queries, inventory and original-byte hashes (streamed, strict UTF-8) are
 compared with the recorded state. Mtimes never establish freshness. Additions,
 deletions, source/context changes, module versions/configuration and retryable
 failures cause an index invocation. `--no-sync` returns stored facts with explicit
-stale/unverified warnings instead. Indexing hashes again afterwards to report
+stale/unverified warnings instead. `status` and query `--no-sync` open SQLite
+read-only through the storage boundary, installing no schema/index/trigger or
+completion record. A main-written schema-3 database is assessed unchanged;
+without a completion record, no-sync queries remain unverified and exit 2. Indexing hashes again afterwards to report
 edits made during the run. Freshness is as of captured reads, not an atomic
 filesystem snapshot or a promise that the filesystem cannot change afterwards.
 
@@ -158,10 +213,11 @@ Command-specific `data`:
 | status | {retryableFiles} |
 | search | {matches, limit, caseSensitive, caseFolding: "ASCII" or "none"} |
 | symbol | {symbol} |
-| callers/callees | {symbol, links, limit} |
+| callees | {symbol, links, limit} |
+| callers | {symbol, links, limit, possibleCallers, hasPossibleCallers, classCounts, countsTruncated} |
 | file | {path, exists, symbols, links, limit} |
-| path | {from, to, found, certainty, symbols, links, observedLinks, depth, maxNodes, maxEdges, visited} |
-| impact | {symbol, callers: [{symbol, certainty, distance}], links, depth, maxNodes, maxEdges, visited} |
+| path | {from, to, found, certainty, symbols, links, observedLinks, possibleCallers, hasPossibleCallers, classCounts, possiblePath, possibleBounds, depth, maxNodes, maxEdges, visited} |
+| impact | {symbol, callers: [{symbol, certainty, distance}], links, includePossible, possibleTraversalLinks, possibleCallers, hasPossibleCallers, classCounts, maxPossibleLinks, depth, maxNodes, maxEdges, visited} |
 | unresolved/ambiguous selection | {inputs: [{input, matches, truncated, totalAtLeast}]} |
 
 Symbols retain all GraphSymbol fields and add the position/snapshot fields above.
@@ -171,7 +227,8 @@ and each candidate adds its symbol or null. Candidate lists are not claimed to
 be exhaustive; the module's stored openness/assumptions still apply. Some
 unresolved links have no explicit reason beyond stored facts; none is invented.
 All candidates/reasons are retained
-for every returned link. Path/impact certainty is definite/candidate; missing
+for every returned link. Path certainty is definite/candidate; impact additionally uses unresolved for a
+route through a possible call. Missing
 paths have null certainty. `observedLinks` are exploration evidence, not a path.
 The node count for path is unique across its two passes. Selection totalAtLeast
 is a lower bound when truncated. On a missing index with --no-sync, data is null.
@@ -191,7 +248,8 @@ not only execution success. Exit codes:
 - **130:** cancellation.
 
 `resultCounts` counts only primary data lists: search/selector matches, explicit
-symbol(s), links, impact callers and observed links. Nested endpoint/candidate
+symbol(s), ordinary links, impact callers and observed links. Possible-caller
+counts are separate in `data.classCounts` and frontier reports. Nested endpoint/candidate
 symbols are not double counted. Project-wide `counts` remain separate; selection
 `totalAtLeast` remains a lower bound when truncated.
 
@@ -239,3 +297,32 @@ zero exit/final text notice. No Go toolchain opt-in is wired here. Superseded lo
 iterations were removed from the branch tip; history retains them. Final evidence
 is one pinned clean shallow restic transcript, with path:line:column text views and
 source verification, plus the final check logs and a short change summary.
+
+## PR 34 round 1 follow-up
+
+Normal merge `2b089566a03cce66d0ad17e515d59e33f887f28c` includes main
+`0977992a2ee99ecc30fb1974c27071a99477ee67` (actual second parent). The Go
+toolchain opt-in remains unwired. All installs/builds/tests/corpus work in this
+round run on the dev server via `pymtheg-dev --name w3-g-r1-ce94`; git/edits stay
+local. The new read-only regression fixture is the schema emitted by that main
+commit's actual store, not a W3-G store with objects removed. Provenance, final
+checks, mutation kills and pinned-restic before/after/source audit are in
+`evidence/w3-g/round-1/README.md`.
+
+Final round-1 foreground validation: 2,595 full-suite tests passed, zero failures,
+cancellations or skips; formatting and all 25 graph-command tests passed. The
+known abrupt-owner-death test passed without a rerun. Five controlled certainty/
+possible-call mutations were killed by explicit assertions (passing controls).
+
+Pinned restic B1 comparisons (same store, ce94 query baseline): ToNode 0 ordinary
+links → 13 separately reported possible calls; MakeReadable 0 → 6 possible;
+SaverUnpacked.SaveUnpacked 0 → 2 possible. Default impact retains its 3 definite
+callers and reports 2 unique possible sites across two public-wrapper frontiers;
+opt-in additionally reaches SaveJSONUnpacked (distance 2), SaveSnapshot and
+SaveConfig (3), all with unresolved route certainty. An unresolved possible path
+is reported separately from found/definite/candidate paths. All 11 queries stay
+warm/complete and exit 0; bounded opted-in impact/possible-path results explicitly
+say truncated. The stratified 15-call audit finds 10 matches to the selected
+declared receiver, 5/15 conservative name-only noise on the distinct fs.File
+interface; this does not refute its structural compatibility with toNoder or
+estimate corpus-wide precision. The source and exact audit criterion are retained.

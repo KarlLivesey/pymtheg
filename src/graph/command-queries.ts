@@ -1,3 +1,4 @@
+import { possibleCalls, type PossibleCall } from "./command-possible.js";
 import type { SqliteGraphStore } from "./store.js";
 import { GraphLocations, type Located } from "./command-locations.js";
 import type { GraphLink, GraphSymbol } from "./types.js";
@@ -23,6 +24,7 @@ export function queryGraph(
   depth: number,
   limit: number,
   caseSensitive = false,
+  includePossible = false,
 ): QueryResult {
   const locations = new GraphLocations(store);
   const located = (value: GraphSymbol) => ({
@@ -190,41 +192,129 @@ export function queryGraph(
     );
   const start = inputs[0]!.matches[0]!;
   if (command === "symbol") return result({ symbol: start });
+  const classCounts = (items: GraphLink[], possible: number) => ({
+    definite: items.filter((l) => l.resolution === "resolved").length,
+    candidateSet: items.filter((l) => l.resolution === "ambiguous").length,
+    unresolved: possible,
+  });
+  const displayPossible = (items: PossibleCall[]) =>
+    items.map((item) => ({
+      ...links([item.link])[0]!,
+      matchKind: item.matchKind,
+    }));
+  const possibleCache = new Map<string, PossibleCall[]>();
+  let possibleRemaining = limit;
+  const possibleFrontier = (target: GraphSymbol) => {
+    let found = possibleCache.get(target.id);
+    if (!found) {
+      found = possibleCalls(store, target, limit + 1);
+      possibleCache.set(target.id, found);
+    }
+    const count = Math.min(found.length, limit);
+    const items = found.slice(0, possibleRemaining);
+    possibleRemaining -= items.length;
+    return { items, count, truncated: found.length > items.length };
+  };
   if (command === "callers" || command === "callees") {
-    const found =
-      command === "callers"
-        ? store.callLinks(start.id, "incoming", limit + 1)
-        : store.callLinks(start.id, "outgoing", limit + 1);
+    const found = store.callLinks(
+      start.id,
+      command === "callers" ? "incoming" : "outgoing",
+      limit + 1,
+    );
+    const possible =
+      command === "callers" ? possibleCalls(store, start, limit + 1) : [];
     return result(
-      { symbol: start, links: links(found.slice(0, limit)), limit },
-      found.length > limit,
+      {
+        symbol: start,
+        links: links(found.slice(0, limit)),
+        limit,
+        ...(command === "callers"
+          ? {
+              possibleCallers: displayPossible(possible.slice(0, limit)),
+              hasPossibleCallers: possible.length > 0,
+              classCounts: classCounts(
+                found.slice(0, limit),
+                Math.min(possible.length, limit),
+              ),
+              countsTruncated: found.length > limit || possible.length > limit,
+            }
+          : {}),
+      },
+      found.length > limit || possible.length > limit,
     );
   }
-  // Bounded breadth-first traversal. Candidate edges retain uncertainty at every hop.
+  // Bounded breadth-first traversal. Keep shortest distance independent of
+  // strongest route certainty: a longer definite route must not raise distance.
   const maxNodes = limit;
   if (command === "impact") {
+    type Certainty = "definite" | "candidate" | "unresolved";
+    const strength = { definite: 2, candidate: 1, unresolved: 0 };
     const visited = new Map<
       string,
-      {
-        symbol: GraphSymbol;
-        certainty: "definite" | "candidate";
-        distance: number;
-      }
+      { symbol: GraphSymbol; certainty: Certainty; distance: number }
     >();
     visited.set(start.id, {
       symbol: start,
       certainty: "definite",
       distance: 0,
     });
-    let frontier = [start.id];
+    let frontier: { id: string; certainty: Certainty; distance: number }[] = [
+      { id: start.id, certainty: "definite", distance: 0 },
+    ];
+    const seenRoutes = new Map<string, number>([[`${start.id}:definite`, 0]]);
     const edges = new Map<string, GraphLink>();
+    const reports = new Map<
+      string,
+      {
+        symbol: GraphSymbol;
+        distance: number;
+        links: ReturnType<typeof displayPossible>;
+        classCounts: ReturnType<typeof classCounts>;
+        truncated: boolean;
+      }
+    >();
     let truncated = false;
-    for (let level = 0; level < depth && frontier.length; level++) {
-      const next: string[] = [];
-      for (const id of frontier) {
-        const incident = store.callLinks(id, "incoming", limit + 1);
-        if (incident.length > limit) truncated = true;
-        for (const link of incident.slice(0, limit)) {
+    for (let level = 0; level <= depth && frontier.length; level++) {
+      const next: typeof frontier = [];
+      for (const current of frontier) {
+        const target = symbol(current.id)!;
+        const incident = store.callLinks(current.id, "incoming", limit + 1);
+        const priorReport = reports.get(current.id);
+        const possible = priorReport
+          ? {
+              items: (possibleCache.get(current.id) ?? []).slice(
+                0,
+                priorReport.links.length,
+              ),
+              count: priorReport.classCounts.unresolved,
+              truncated: priorReport.truncated,
+            }
+          : possibleFrontier(target);
+        reports.set(current.id, {
+          symbol: target,
+          distance: visited.get(current.id)!.distance,
+          links: displayPossible(possible.items),
+          classCounts: classCounts(incident.slice(0, limit), possible.count),
+          truncated: incident.length > limit || possible.truncated,
+        });
+        if (incident.length > limit || possible.truncated) truncated = true;
+        const steps = [
+          ...incident
+            .slice(0, limit)
+            .map((link) => ({ link, possible: false })),
+          ...(includePossible
+            ? possible.items.map((item) => ({
+                link: item.link,
+                possible: true,
+              }))
+            : []),
+        ];
+        if (level === depth) {
+          if (steps.length) truncated = true;
+          continue;
+        }
+        for (const step of steps) {
+          const link = step.link;
           if (!edges.has(link.id) && edges.size >= limit) {
             truncated = true;
             continue;
@@ -233,43 +323,63 @@ export function queryGraph(
           if (!link.sourceId) continue;
           const caller = symbol(link.sourceId);
           if (!caller) continue;
-          const certainty =
-            visited.get(id)!.certainty === "definite" && link.targetId === id
-              ? "definite"
-              : "candidate";
+          const certainty: Certainty =
+            step.possible || current.certainty === "unresolved"
+              ? "unresolved"
+              : current.certainty === "definite" && link.targetId === current.id
+                ? "definite"
+                : "candidate";
           const previous = visited.get(caller.id);
-          if (
-            previous &&
-            (previous.certainty === "definite" || certainty === "candidate")
-          )
-            continue;
+          const distance = current.distance + 1;
+          const routeKey = `${caller.id}:${certainty}`;
+          if ((seenRoutes.get(routeKey) ?? Infinity) <= distance) continue;
           if (!previous && visited.size >= maxNodes) {
             truncated = true;
             continue;
           }
           visited.set(caller.id, {
             symbol: caller,
-            certainty,
-            distance: level + 1,
+            certainty:
+              previous && strength[previous.certainty] > strength[certainty]
+                ? previous.certainty
+                : certainty,
+            distance: Math.min(previous?.distance ?? Infinity, distance),
           });
-          next.push(caller.id);
+          seenRoutes.set(routeKey, distance);
+          // Propagate the actual route, never a combined stronger/shorter imaginary route.
+          next.push({ id: caller.id, certainty, distance });
         }
       }
       frontier = next;
     }
-    if (
-      frontier.some(
-        (id) => store.callLinks(id, "incoming", limit + 1).length > 0,
-      )
-    )
-      truncated = true;
     return result(
       {
         symbol: start,
         callers: [...visited.values()].filter(
           (item) => item.symbol.id !== start.id,
         ),
-        links: links([...edges.values()]),
+        links: links(
+          [...edges.values()].filter(
+            (link) => link.resolution !== "unresolved",
+          ),
+        ),
+        possibleTraversalLinks: links(
+          [...edges.values()].filter(
+            (link) => link.resolution === "unresolved",
+          ),
+        ),
+        maxPossibleLinks: limit,
+        includePossible,
+        possibleCallers: [...reports.values()],
+        hasPossibleCallers: [...reports.values()].some(
+          (item) => item.links.length > 0,
+        ),
+        classCounts: classCounts(
+          [...edges.values()],
+          new Set(
+            [...reports.values()].flatMap((r) => r.links.map((l) => l.id)),
+          ).size,
+        ),
         depth,
         maxNodes,
         maxEdges: limit,
@@ -340,8 +450,105 @@ export function queryGraph(
     return null;
   }
   const path = find(false) ?? find(true);
+  // A separate reverse walk exposes unresolved suggestions, never relabels them
+  // as candidate/definite paths. It has its own explicitly reported budget.
+  const possibleReports = [];
+  const reversePossible = new Map<
+    string,
+    ReturnType<typeof possibleFrontier>
+  >();
+  const reverseQueue = [
+    {
+      id: target.id,
+      ids: [target.id],
+      edges: [] as GraphLink[],
+      unresolved: false,
+    },
+  ];
+  const reverseVisited = new Set([target.id]);
+  const reverseStates = new Set([`${target.id}:false`]);
+  let possiblePath: (typeof reverseQueue)[number] | null = null;
+  let possibleTruncated = false;
+  let reverseEdges = 0;
+  for (let cursor = 0; cursor < reverseQueue.length; cursor++) {
+    const current = reverseQueue[cursor]!;
+    const at = symbol(current.id)!;
+    const priorPossible = reversePossible.get(current.id);
+    const possible = priorPossible ?? possibleFrontier(at);
+    reversePossible.set(current.id, possible);
+    if (!priorPossible)
+      possibleReports.push({
+        symbol: at,
+        distance: current.edges.length,
+        links: displayPossible(possible.items),
+        classCounts: classCounts(
+          store.callLinks(current.id, "incoming", limit + 1).slice(0, limit),
+          possible.count,
+        ),
+        truncated: possible.truncated,
+      });
+    if (possible.truncated) possibleTruncated = true;
+    if (current.id === start.id && current.unresolved && !possiblePath)
+      possiblePath = current;
+    const incoming = store.callLinks(current.id, "incoming", limit + 1);
+    if (incoming.length > limit) possibleTruncated = true;
+    const steps = [
+      ...incoming.slice(0, limit).map((link) => ({ link, unresolved: false })),
+      ...possible.items.map((item) => ({ link: item.link, unresolved: true })),
+    ];
+    if (current.edges.length === depth) {
+      if (steps.length) possibleTruncated = true;
+      continue;
+    }
+    for (const step of steps) {
+      if (reverseEdges >= limit) {
+        possibleTruncated = true;
+        break;
+      }
+      reverseEdges++;
+      const id = step.link.sourceId;
+      const unresolved = current.unresolved || step.unresolved;
+      const state = `${id}:${unresolved}`;
+      if (!id || !symbol(id) || reverseStates.has(state)) continue;
+      if (!reverseVisited.has(id) && reverseVisited.size >= maxNodes) {
+        possibleTruncated = true;
+        continue;
+      }
+      reverseVisited.add(id);
+      reverseStates.add(state);
+      reverseQueue.push({
+        id,
+        ids: [id, ...current.ids],
+        edges: [step.link, ...current.edges],
+        unresolved,
+      });
+    }
+  }
+  truncated ||= possibleTruncated;
+
   return result(
     {
+      hasPossibleCallers: possibleReports.some((item) => item.links.length > 0),
+      possibleCallers: possibleReports,
+      classCounts: classCounts(
+        [...observed.values()],
+        new Set(possibleReports.flatMap((r) => r.links.map((l) => l.id))).size,
+      ),
+      possiblePath: possiblePath
+        ? {
+            certainty: "unresolved",
+            symbols: possiblePath.ids.map(symbol),
+            links: links(possiblePath.edges),
+          }
+        : null,
+      possibleBounds: {
+        maxPossibleLinks: limit,
+        depth,
+        maxNodes,
+        maxEdges: limit,
+        visited: reverseVisited.size,
+        truncated: possibleTruncated,
+      },
       from: start,
       to: target,
       found: path !== null,
