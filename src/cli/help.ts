@@ -51,7 +51,7 @@ const commands = [
   ],
   [
     "doctor [--format json]",
-    "Check Node, the built-in checking engines, storage, grammars and Studio.",
+    "Check Node, the built-in checking engines, storage, the code graph languages and Studio.",
   ],
 ] as const;
 export const commandNames = commands.map(([syntax]) => syntax.split(" ")[0]!);

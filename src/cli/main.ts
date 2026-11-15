@@ -679,13 +679,7 @@ try {
             .map((c) => `${c.name}: ${c.status} — ${c.detail}`)
             .join("\n") + "\n",
     );
-    process.exitCode = diagnosis.checks.some(
-      (c) =>
-        ["Node", "Verifier", "Simulator", "Storage"].includes(c.name) &&
-        c.status !== "ready",
-    )
-      ? 3
-      : 0;
+    process.exitCode = diagnosis.ready ? 0 : 3;
   } else if (args[0] === "fmt") {
     if (!args[1] || args[1].startsWith("--"))
       throw Error("fmt requires a source file");

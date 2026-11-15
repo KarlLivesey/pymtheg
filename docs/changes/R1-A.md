@@ -70,9 +70,31 @@ No capability became a false pass. Nothing was left "not supported yet".
   refuses an unused scope (B014) and never overwrites a source.
 - `doctor` runs the real lowering and search workers on a built-in probe machine
   (verifier: one failing and one holding invariant; simulator: the failing one),
-  opens in-memory SQLite through the storage boundary, loads the Go and Rust
-  Tree-sitter grammars, and checks the Studio build. Exit 3 if Node, the
-  verifier, the simulator or storage is not ready.
+  opens in-memory SQLite through the storage boundary, and indexes one-line Go,
+  Rust and TypeScript files through the production language registry, indexer
+  and graph store, so each language module loads exactly the grammar (the
+  vendored `grammars/go` and `grammars/rust` files) or compiler it uses; doctor
+  names no grammar path. A language module without a probe is reported as failed.
+  Each probe file must index `clean` with a symbol. The JSON report has `ready`;
+  the CLI exits 3 unless every check other than the Studio build is ready (the
+  Studio build is reported but optional: a source checkout has it only after
+  `npm run build`, and the CLI, MCP and graph work without it). It keeps R1-B's
+  legacy-folder notice.
+- Node: `engines.node` is `>=24` (was `>=24 <25`), at Karl's request (mega-plan
+  8.1). `doctor` reports Node 24 or newer as ready and older Node as "not
+  supported: Pymtheg needs Node 24 or newer" (exit 3). README, Studio guide,
+  trial start and the decision ledger say "24 or newer".
+- JSON behaviour results carry an additive `exhaustive` field: `true` only for
+  a completed exhaustive search (`verify` whose search finished), `false` for
+  every `simulate` result and every search that stopped early (budget, timeout,
+  cancellation, domain boundary, engine error, preflight failure). The schema
+  allows it and requires `false` whenever `method` is `simulation`; it is not
+  required on old stored reports. MCP `read_run` properties carry it (the
+  property output spreads the result), the MCP run summary has
+  `results.exhaustive` (`true` only when every behaviour result is exhaustive,
+  `null` without behaviour results) and its clean-simulate `meaning` says the run
+  is not exhaustive; Studio stores it in run reports and shows a "sampled, not
+  exhaustive" badge. Documented in README, `docs/mcp.md` and `docs/support.md`.
 - A built-in worker or engine error is now `completion: "failed"` with B104,
   error severity and exit 3 (W2-A backlog: it used to look like a budget-limited
   run, exit 2).
@@ -81,8 +103,9 @@ No capability became a false pass. Nothing was left "not supported yet".
   outside `simulate` (scenario defaults are still accepted); `--target` outside
   `emit`.
 - Plain-text `simulate` output shows `(simulation, sampled, not exhaustive)` for a
-  sampled no-counterexample result instead of `complete` (W2-A backlog). JSON is
-  unchanged.
+  sampled no-counterexample result instead of `complete` (W2-A backlog). JSON
+  keeps `completion: "complete"` (the sampling finished) and adds
+  `exhaustive: false`.
 - Studio and MCP pass `method: "exhaustive"` (verify) or `"sample"` (simulate).
 
 ## Tests: kept, converted, deleted
@@ -112,6 +135,20 @@ of Java. Expected values that were TLC's answers and are still right:
   refused.
 - `test/builtin-backend.test.mjs`: engine error is `failed` with B104; timeout
   B124; cancellation B130.
+- New `test/r1a-builtin-only.test.mjs`: every cross-command option refusal and
+  the removed `--backend`/`--tlc-jar`/`--quint` as unknown options (exit 3);
+  CLI exit 3 with B104 on `verify` and `simulate` when the search worker cannot
+  start (a test-only `--import` preload,
+  `test/fixtures/r1a/fail-explore-worker.mjs`, makes the real worker constructor
+  throw); the "sampled, not exhaustive" text; `exhaustive` in CLI JSON
+  (simulate false, completed verify true, budget-limited verify false), the MCP
+  workspace and Studio run reports; the Node check for 22.x and 23.x (not
+  supported) and 24.0.0, 24.21.0, 25.x and 26.x (ready); doctor all ready (exit
+  0); doctor exit 3 when the engine probe fails; and, on a copy of the built
+  product, doctor exit 3 with the Rust code graph check failed (Go still ready)
+  when the vendored Rust grammar is corrupt and when it is missing.
+- `test/project-init-clean.test.mjs` (R1-B's): `failed` added to the accepted
+  doctor statuses (that one statement).
 
 `npm run test:backend` keeps its name and now runs only built-in engines (plus
 the Rust/Go compiler and MCP integration tests it already had).
@@ -119,8 +156,12 @@ the Rust/Go compiler and MCP integration tests it already had).
 ## Justified mentions left by the grep
 
 `grep -ri "tlc\|tla2tools\|tla+\|quint\|java" src test package.json` finds only:
-"JavaScript" (language name, 52 lines), and `test/emit.test.mjs`, whose test
-checks that the removed `--target quint` is refused. In docs: the D2/R1-A
+"JavaScript" (language name), `test/emit.test.mjs`, whose test checks that the
+removed `--target quint` is refused, `test/r1a-builtin-only.test.mjs`, which
+checks the removed `--tlc-jar`/`--quint` options are unknown, and a comment in
+R1-B's `test/project-init-clean.test.mjs` ("Java/TLC/Quint and built web assets
+are not initialization requirements"), left because only one statement of that
+file is this chunk's to change. In docs: the D2/R1-A
 statements that the tools were removed; historical sentences in the README
 "Preserved research" section; `docs/support.md`/`runtime-map.md`/`decisions.md`
 lines about Quint's *source repository* as a TypeScript indexing corpus; and

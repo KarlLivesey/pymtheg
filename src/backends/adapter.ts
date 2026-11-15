@@ -48,6 +48,7 @@ export async function runBackend(
       outcome: "inconclusive",
       completion,
       method: options.method === "sample" ? "simulation" : "finite_model_check",
+      exhaustive: false,
       outstandingObligations: [message],
       diagnostics: [
         finding(
@@ -154,6 +155,7 @@ export async function runBackend(
             : "no_counterexample",
         completion,
         method: method === "sample" ? "simulation" : "finite_model_check",
+        exhaustive: method === "exhaustive" && search.completion === "complete",
         scope: {
           snapshotHash: ir.snapshot.id,
           modelHash: model.hash,

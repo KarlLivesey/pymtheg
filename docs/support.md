@@ -105,8 +105,8 @@ current.
 
 | Command | Engine | Result |
 |---|---|---|
-| `verify FILE --entry NAME [--state-budget N]` | Built-in exhaustive breadth-first search | One result per invariant plus `state-domains`; a violation has a shortest, source-replayed trace; `no_counterexample (finite_model_check, complete)` otherwise |
-| `simulate FILE --entry NAME [--seed --max-steps --max-samples]` | Built-in seeded sampler | `no_counterexample` at best (text output: `simulation, sampled, not exhaustive`), never an exhaustive pass; traces are replayed but need not be shortest; same seed and limits give the same result |
+| `verify FILE --entry NAME [--state-budget N]` | Built-in exhaustive breadth-first search | One result per invariant plus `state-domains`; a violation has a shortest, source-replayed trace; `no_counterexample (finite_model_check, complete)` with `exhaustive: true` otherwise |
+| `simulate FILE --entry NAME [--seed --max-steps --max-samples]` | Built-in seeded sampler | `no_counterexample` at best, with `exhaustive: false` in JSON (text output: `simulation, sampled, not exhaustive`), never an exhaustive pass; traces are replayed but need not be shortest; same seed and limits give the same result |
 | `emit FILE --entry NAME --target json --out MODEL.json` | none (lowering only) | The lowered model the engines check: machine, source mapping, bounds, assumptions and, for flows, the finite source-state graph |
 
 These are the only behavioural engines; the CLI, Studio and MCP all use them and

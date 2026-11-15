@@ -30,6 +30,12 @@ export interface AnalysisResult {
     | "simulation"
     | "finite_model_check"
     | "heuristic";
+  /**
+   * Behaviour results only: true when every reachable state was searched (a
+   * completed `verify`); false for every `simulate` result and every search
+   * that stopped early. A sampled run is never a proof.
+   */
+  exhaustive?: boolean;
   completion:
     | "complete"
     | "incomplete"

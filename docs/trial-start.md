@@ -41,7 +41,8 @@ result, together with the input and expected/actual behavior. Cosmetic changes
 and feature ideas are backlog items. No new audit, polish or feature work starts
 automatically after this handoff.
 
-Host prerequisite check: `./pymtheg doctor` reports Node 24, the built-in
-verifier and simulator, storage, grammars and the built Studio. (Earlier trials
+Host prerequisite check: `./pymtheg doctor` reports Node 24 or newer, the built-in
+verifier and simulator, storage, the Go, Rust and TypeScript code graph and the
+built Studio. (Earlier trials
 also used Java, TLC and Quint; R1-A removed them.) Candidate 37 and previous test
 evidence remain available under `evidence/`.

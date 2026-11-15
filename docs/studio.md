@@ -1,11 +1,12 @@
 # Pymtheg Studio
 
 Build with `npm ci --ignore-scripts --no-audit --no-fund && npm run build` on
-Node 24 LTS, then run `./pymtheg studio .` or `./pymtheg studio design.pym`.
+Node 24 or newer, then run `./pymtheg studio .` or `./pymtheg studio design.pym`.
 Open the printed private session URL in Firefox. Studio binds only to loopback;
 keep the token private. Ctrl-C closes the server and owned checkers. No account,
 cloud service or production adapters are required. `./pymtheg doctor` checks
-that the built-in checking engines, storage, grammars and the Studio build work.
+that the built-in checking engines, storage, the code graph languages and the
+Studio build work.
 
 ## First modelling session
 

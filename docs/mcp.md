@@ -38,6 +38,14 @@ exhaustive search (default state budget 1,000,000 distinct states) and
 configured. A budget limit, timeout or engine error is retained in the run record
 as an unresolved or failed result, never a successful design check.
 
+Every behaviour property in `read_run` carries `exhaustive`. It is `true` only
+when the search covered every reachable state (a completed verify) and `false`
+for every simulate property and any search that stopped early. A sampled run can
+report `no_counterexample` with `completion: "complete"`; that means the sampling
+finished, not that the property holds. The run summary's `results.exhaustive` is
+`true` only when every behaviour result is exhaustive (`null` without behaviour
+results), and a clean simulate summary says it is not exhaustive.
+
 ## A useful agent workflow
 
 1. Call `project_info` to find files, saved scenarios and backend availability.

@@ -6,7 +6,8 @@ implementation evidence. This ledger refines its contracts. No approval gate.
 
 ## Settled boundaries
 
-- TypeScript strict on Node 24 LTS; one package. Hand-written lexer/Pratt
+- TypeScript strict on Node 24 LTS; one package. (Amended in R1-A at Karl's
+  request: Node 24 or newer, no upper bound; mega-plan 8.1.) Hand-written lexer/Pratt
   expression parser and recursive descent declarations/blocks: no framework,
   actual token spans and declaration-level recovery. UTF-16 half-open offsets,
   one-based UTF-16 columns. Whole file recovery holes taint that module; explicit
@@ -2387,7 +2388,10 @@ the `@informalsystems/quint` dependency, the `doctor` Java/TLC/Quint checks, the
 Studio and MCP `tools` status field and the agent connection's `env` field were
 deleted, not deprecated. `emit --target json` writes the lowered model the engines
 check. `doctor` runs the real engines on a built-in probe and checks Node,
-`node:sqlite` storage, the Tree-sitter grammars and the Studio build. A built-in
+`node:sqlite` storage, the code graph (one-line Go, Rust and TypeScript files
+indexed through the production registry, so each module loads its own vendored
+grammar or compiler) and the Studio build; Node 24 or newer, no upper bound
+(Karl, mega-plan 8.1). JSON behaviour results carry `exhaustive`. A built-in
 worker or engine error is a failure (`B104`, exit 3), not an incomplete run; the
 external-process codes B102, B103, B105 and B107 are gone. Options belonging to
 another command are rejected. **Why:** D2 (no Java, no TLC JAR, no Quint) and the

@@ -83,7 +83,8 @@ remains unsigned. [Run the trial](docs/trial-start.md).
 
 ## Run locally
 
-Tested on **Node 24.21.0 LTS**. Dependencies and tool versions are pinned.
+Requires **Node 24 or newer** (tested on 24.21.0). Dependencies and tool versions
+are pinned. `./pymtheg doctor` reports an older Node as not supported.
 
 ```sh
 npm ci --ignore-scripts --no-audit --no-fund
@@ -127,7 +128,12 @@ Models and their source maps come from the typed project, not fixture names.
 Counterexamples are replayed against the source event semantics before they are
 reported. A corrected sampled run reports
 `no_counterexample (simulation, sampled, not exhaustive)`, never an unqualified
-verified result. `emit --target json` writes the lowered model the engines check
+verified result. In JSON (CLI `--format json`, MCP, Studio) every behaviour
+result carries `exhaustive`: `true` only when every reachable state was searched
+(a completed `verify`), `false` for every `simulate` result and every search that
+stopped early. Read `exhaustive`, not `completion`, to tell a proof from a sample:
+a sampled run reports `no_counterexample` / `complete` with `exhaustive: false`.
+`emit --target json` writes the lowered model the engines check
 (machine, source mapping, bounds, assumptions and, for flows, the finite
 source-state graph) so you can inspect it.
 
