@@ -89,7 +89,10 @@ export function openDatabase(
 ): DatabaseSync {
   if (file !== ":memory:" && !file.startsWith("file:"))
     validateDatabaseFiles(file);
-  return new (sqlite().DatabaseSync)(file, { timeout: writerWaitMs, ...options });
+  return new (sqlite().DatabaseSync)(file, {
+    timeout: writerWaitMs,
+    ...options,
+  });
 }
 export function storageDirectory(
   root: string,
