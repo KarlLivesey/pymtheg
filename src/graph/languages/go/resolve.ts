@@ -151,7 +151,34 @@ export interface Decision {
   unseen?: true;
   /** Failed: it needs code in these failed files (`invalid-code`). */
   invalid?: string[];
+  /**
+   * Decided by the opt-in toolchain route (W3-L): a definite target, a verified
+   * implementer set, or (where the source-only route had a definite project
+   * target) an external or builtin callee.
+   */
+  toolchain?: "definite" | "verified" | "external";
+  /** What the source-only route decided, for the report. */
+  from?: "definite" | "candidates" | "unresolved" | "invalid";
+  /** The source-only route's different definite target (a disagreement). */
+  sourceOnly?: string;
 }
+/** A toolchain fact on a link, written by `analyze` (toolchain-facts.ts). */
+export interface ToolchainFact {
+  /** Call category (go/types), e.g. func, method, iface, typeparam, conversion. */
+  c?: string;
+  /** Declaration of the callee or used object in the project: file, UTF-16 offset, name. */
+  at?: [string, number, string];
+  /** A standard-library or dependency object: package path and name. */
+  ext?: string;
+  /** A builtin (universe) object. */
+  b?: true;
+  /** Interface call: the project methods it can reach (verified implementer set). */
+  d?: [string, number, string][];
+  /** Interface call: implementers outside the project among the loaded packages. */
+  x?: number;
+}
+/** A toolchain `implements` pair on the type's file: type offset, interface file, offset, how. */
+export type ToolchainPair = [number, string, number, "value" | "pointer"];
 /**
  * What the failed-file backstop follows of a value's type: nothing but the
  * lookups (`none`), its member set (`embedded`: beyond depth 0; `n`: the member
@@ -204,6 +231,11 @@ const COMBINE: {
     const all = values.flatMap((value) => value ?? []);
     return all.length ? unique(all).sort() : undefined;
   },
+  // Toolchain decisions are never combined (they decide one link); the first
+  // part's value, if any, is kept.
+  toolchain: (values) => values.find((value) => value !== undefined),
+  from: (values) => values.find((value) => value !== undefined),
+  sourceOnly: (values) => values.find((value) => value !== undefined),
 };
 export const combine = (parts: Decision[]): Decision => {
   const out: Record<string, unknown> = {};
@@ -268,6 +300,12 @@ export interface LinkNote {
   builtin?: true;
   /** Failed (`invalid-code`): the code it needs is in these failed files. */
   invalid?: string[];
+  /** Decided by the toolchain route (see Decision.toolchain). */
+  toolchain?: {
+    upgrade: "definite" | "verified" | "external";
+    from: "definite" | "candidates" | "unresolved" | "invalid";
+    sourceOnly?: string;
+  };
 }
 
 /**
@@ -335,6 +373,8 @@ export function linkNotes(
   for (const linkId of resolver.builtins) note(linkId).builtin = true;
   for (const [linkId, reasons] of resolver.open) note(linkId).open = reasons;
   for (const [linkId, files] of resolver.invalid) note(linkId).invalid = files;
+  for (const [linkId, decided] of resolver.toolchain)
+    note(linkId).toolchain = decided;
   return output;
 }
 
@@ -347,6 +387,8 @@ class GoResolver {
   readonly open = new Map<string, OpenReason[]>();
   /** Links that failed because the code they need is in failed files. */
   readonly invalid = new Map<string, string[]>();
+  /** Links the toolchain route decided (W3-L), for the link notes. */
+  readonly toolchain = new Map<string, NonNullable<LinkNote["toolchain"]>>();
   /** Failed files by directory (a file that cannot be read is not valid code). */
   private failedFiles = new Map<string, { path: string; test: boolean }[]>();
   private layout: GoProjectLayout;
@@ -391,6 +433,7 @@ class GoResolver {
     this.index();
     const added: AddedLink[] = [];
     this.implementsLinks(added);
+    this.toolchainImplements(added);
     for (const pkg of this.pkgs.values())
       if (pkg.symbol)
         for (const path of pkg.files) {
@@ -422,6 +465,16 @@ class GoResolver {
         // example on pathological input) leaves that link unresolved.
         decision = UNRESOLVED;
       }
+      // The opt-in toolchain route decides where it has a fact (W3-L).
+      const decided = this.toolchainDecision(link, decision);
+      if (decided) {
+        decision = decided;
+        this.toolchain.set(link.id, {
+          upgrade: decided.toolchain!,
+          from: decided.from!,
+          ...(decided.sourceOnly ? { sourceOnly: decided.sourceOnly } : {}),
+        });
+      }
       const {
         ids,
         definite,
@@ -434,6 +487,7 @@ class GoResolver {
       // definite target or an interface-dispatch set over known types) fails
       // when any type its source mentions needs a failed file.
       if (
+        !decision.toolchain &&
         !decision.invalid?.length &&
         !(decision.dispatch && distinct.length) &&
         !(distinct.length === 1 && definite) &&
@@ -458,6 +512,11 @@ class GoResolver {
         resolutions.push({ linkId: link.id, targetId: distinct[0]! });
       else if (distinct.length > 1 && distinct.length <= limit) {
         resolutions.push({ linkId: link.id, candidateIds: distinct });
+        // A verified implementer set (toolchain) carries only its own reasons.
+        if (decision.toolchain) {
+          if (open?.length) this.open.set(link.id, [...open]);
+          continue;
+        }
         const reasons = this.reasons(link, distinct, open);
         // Interface dispatch is always open: membership is unverified.
         if (dispatch && !reasons.includes("structural-match-unverified"))
@@ -2111,6 +2170,168 @@ class GoResolver {
           },
         });
       }
+  }
+
+  // ---- the opt-in toolchain route (W3-L) ----------------------------------
+
+  private symbolsByFile?: Map<string, GraphSymbol[]>;
+  /** The graph symbol declared at a toolchain position (name inside its range). */
+  private symbolAt([file, offset, name]: [string, number, string]):
+    | GraphSymbol
+    | undefined {
+    if (!this.symbolsByFile) {
+      this.symbolsByFile = new Map();
+      for (const symbol of this.symbolsById.values())
+        push2(this.symbolsByFile, symbol.file, symbol);
+    }
+    let best: GraphSymbol | undefined;
+    for (const symbol of this.symbolsByFile.get(file) ?? [])
+      if (
+        symbol.name === name &&
+        symbol.range.start <= offset &&
+        offset < symbol.range.end &&
+        (!best ||
+          symbol.range.end - symbol.range.start <
+            best.range.end - best.range.start)
+      )
+        best = symbol;
+    return best;
+  }
+
+  private describe(id: string): string {
+    const symbol = this.symbolsById.get(id);
+    return symbol ? `${symbol.file}:${symbol.identity}` : id;
+  }
+
+  /**
+   * The toolchain's decision for a link with a fact, or undefined (the
+   * source-only decision stands). It may upgrade an unresolved, failed or
+   * candidate link to a definite target, or a candidate set to a verified
+   * implementer set. Where the source-only route has a different definite
+   * target, the toolchain's is used for this configuration and the source's
+   * is kept as `sourceOnly` (a disagreement, counted in the report).
+   */
+  private toolchainDecision(
+    link: GraphLink,
+    source: Decision,
+  ): Decision | undefined {
+    const fact = (link.data as { tc?: ToolchainFact } | undefined)?.tc;
+    if (!fact) return undefined;
+    const ids = unique(source.ids);
+    const from: Decision["from"] = source.invalid?.length
+      ? "invalid"
+      : ids.length === 1 && source.definite
+        ? "definite"
+        : ids.length > 1
+          ? "candidates"
+          : "unresolved";
+    const sourceTarget = from === "definite" ? ids[0] : undefined;
+    if (fact.at) {
+      const target = this.symbolAt(fact.at);
+      // Declared in a file the graph could not read: the source decision stands.
+      if (!target) return undefined;
+      if (fact.c === "iface" || fact.c === "typeparam") {
+        // Without the implementer set (the universe had errors), the
+        // interface method alone decides nothing.
+        if (!fact.d) return undefined;
+        const methods = fact.d.map((at) => this.symbolAt(at));
+        if (methods.some((method) => !method)) return undefined;
+        return {
+          ids: unique([target.id, ...methods.map((method) => method!.id)]),
+          definite: false,
+          dispatch: true,
+          limit: DISPATCH_LIMIT,
+          // Verified for the loaded packages of this configuration; a type
+          // outside them (another configuration, a dependent module, a
+          // dependency's type) may still implement the interface.
+          open: ["external-implementers-possible"],
+          toolchain: "verified",
+          from,
+        };
+      }
+      return {
+        ids: [target.id],
+        definite: true,
+        toolchain: "definite",
+        from,
+        ...(sourceTarget && sourceTarget !== target.id
+          ? { sourceOnly: this.describe(sourceTarget) }
+          : {}),
+      };
+    }
+    // A standard-library, dependency or builtin object: the store has no
+    // external symbols, so the link stays as it is, unless the source-only
+    // route named a project target (a disagreement: withdrawn).
+    if ((fact.ext || fact.b) && sourceTarget)
+      return {
+        ids: [],
+        definite: false,
+        toolchain: "external",
+        from,
+        sourceOnly: this.describe(sourceTarget),
+      };
+    return undefined;
+  }
+
+  /**
+   * With toolchain facts for a universe without errors, the `implements`
+   * links are exactly the toolchain's verified pairs (definite, to the
+   * interface); otherwise the source-only links stand.
+   */
+  private toolchainImplements(added: AddedLink[]): void {
+    const pairs: { file: string; pair: ToolchainPair }[] = [];
+    let universe = false;
+    for (const file of this.context.files) {
+      if (file.module !== this.moduleId) continue;
+      const data = (
+        file.result.data as
+          | { toolchain?: { universe?: boolean; implements?: ToolchainPair[] } }
+          | undefined
+      )?.toolchain;
+      if (data?.universe) universe = true;
+      for (const pair of data?.implements ?? [])
+        pairs.push({ file: file.path, pair });
+    }
+    if (!universe) return;
+    for (let index = added.length - 1; index >= 0; index--)
+      if (added[index]!.kind === "implements") added.splice(index, 1);
+    const seen = new Set<string>();
+    for (const { file, pair } of pairs) {
+      const [typeOffset, ifaceFile, ifaceOffset, how] = pair;
+      const type = this.typeAt(file, typeOffset);
+      const iface = this.typeAt(ifaceFile, ifaceOffset);
+      if (!type || !iface) continue;
+      const key = `implements:${type.key}:${iface.id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      added.push({
+        key,
+        file: type.file,
+        sourceId: type.id,
+        kind: "implements",
+        targetName: iface.name,
+        range: type.range,
+        targetId: iface.id,
+        data: { pointerReceiver: how === "pointer", origin: "toolchain" },
+      });
+    }
+  }
+
+  /** The type symbol whose declared name starts at this offset. */
+  private typeAt(file: string, offset: number): GraphSymbol | undefined {
+    if (!this.symbolsByFile) this.symbolAt([file, -1, ""]);
+    let best: GraphSymbol | undefined;
+    for (const symbol of this.symbolsByFile!.get(file) ?? [])
+      if (
+        TYPE_KINDS.has(symbol.kind) &&
+        symbol.range.start <= offset &&
+        offset < symbol.range.end &&
+        (!best ||
+          symbol.range.end - symbol.range.start <
+            best.range.end - best.range.start)
+      )
+        best = symbol;
+    return best;
   }
 
   // ---- link decisions ----------------------------------------------------

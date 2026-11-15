@@ -9,11 +9,41 @@ export interface Scenario {
   timeoutMs: number;
   scope: Record<string, unknown>;
 }
+/**
+ * Code-graph settings. `toolchain`: the explicit per-project opt-in to
+ * toolchain-backed links, by language module (`go`: true finds `go` on the
+ * user's PATH; an absolute path names the trusted `go`). Running a language's
+ * toolchain on a project is as trusted as building it. Off when absent.
+ */
+export interface GraphConfig {
+  toolchain?: { go?: boolean | string };
+}
 export interface ProjectConfig {
   version: 1;
   defaultFile?: string;
   sources?: SourcePolicy;
+  graph?: GraphConfig;
   scenarios: Record<string, Scenario>;
+}
+export function graphConfig(value: unknown): GraphConfig {
+  if (!object(value)) throw Error("graph must be an object");
+  for (const key of Object.keys(value))
+    if (key !== "toolchain") throw Error(`Unknown graph setting: ${key}`);
+  if (value.toolchain === undefined) return {};
+  const toolchain = value.toolchain;
+  if (!object(toolchain)) throw Error("graph.toolchain must be an object");
+  for (const key of Object.keys(toolchain))
+    if (key !== "go") throw Error(`Unknown graph.toolchain setting: ${key}`);
+  const go = toolchain.go;
+  if (
+    go !== undefined &&
+    typeof go !== "boolean" &&
+    !(typeof go === "string" && go.startsWith("/"))
+  )
+    throw Error(
+      "graph.toolchain.go must be true, false or an absolute path to go",
+    );
+  return { toolchain: go === undefined ? {} : { go } };
 }
 const object = (v: unknown): v is Record<string, unknown> =>
   v !== null && typeof v === "object" && !Array.isArray(v);
@@ -66,7 +96,11 @@ export function projectConfig(value: unknown): ProjectConfig {
   if (!object(value) || value.version !== 1 || !object(value.scenarios))
     throw Error("Project configuration requires version: 1 and scenarios: {}");
   for (const key of Object.keys(value))
-    if (!["version", "defaultFile", "scenarios", "sources"].includes(key))
+    if (
+      !["version", "defaultFile", "scenarios", "sources", "graph"].includes(
+        key,
+      )
+    )
       throw Error(`Unknown project setting: ${key}`);
   if (value.defaultFile !== undefined && typeof value.defaultFile !== "string")
     throw Error("defaultFile must be a path");
@@ -85,6 +119,7 @@ export function projectConfig(value: unknown): ProjectConfig {
     ...(value.sources === undefined
       ? {}
       : { sources: readSourcePolicy(value.sources) }),
+    ...(value.graph === undefined ? {} : { graph: graphConfig(value.graph) }),
   };
 }
 export function machineScope(
@@ -114,4 +149,11 @@ export function machineScope(
       "Scope domains must exactly match source domains; narrowing is never implicit",
     );
   return scope.assumptions as string[];
+}
+/** The opted-in toolchain routes, as IndexOptions.toolchains (empty when off). */
+export function graphToolchains(
+  config: ProjectConfig,
+): Record<string, boolean | string> {
+  const go = config.graph?.toolchain?.go;
+  return go === undefined || go === false ? {} : { go };
 }

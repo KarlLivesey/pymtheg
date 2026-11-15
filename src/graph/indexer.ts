@@ -8,9 +8,11 @@ import type {
   ContextFile,
   GraphFile,
   GraphStorage,
+  Json,
   LanguageModule,
   ParseResult,
   ResolutionResult,
+  ToolchainRequest,
 } from "./types.js";
 
 export interface IndexReport {
@@ -35,10 +37,22 @@ export interface IndexReport {
   errors: { path: string; message: string }[];
   analysisErrors: { module: string; message: string }[];
   resolutionErrors: { module: string; message: string }[];
+  /** Notes from opted-in toolchain routes; absent when no module made one. */
+  toolchains?: { module: string; note: Json }[];
 }
 export interface IndexOptions {
   excludeDirectories?: readonly string[];
   excludeFiles?: readonly string[];
+  /**
+   * Opt-in toolchain routes, by module id (`graph.toolchain` in
+   * .pymtheg/settings.json). A module not listed runs source-only.
+   */
+  toolchains?: Readonly<Record<string, Json>>;
+  /** Rebuildable directory for toolchain routes (default <root>/.pymtheg/rebuildable/toolchain). */
+  toolchainDirectory?: string;
+  /** The environment a toolchain is located from (default process.env). */
+  environment?: Readonly<Record<string, string | undefined>>;
+  signal?: AbortSignal;
 }
 const message = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
@@ -248,8 +262,24 @@ export async function indexProject(
       try {
         if (ownContexts.some((file) => file.status === "failed"))
           throw Error("Project context could not be captured");
+        const setting = options.toolchains?.[module.id];
+        const toolchain: ToolchainRequest | undefined =
+          setting === undefined || setting === false || setting === null
+            ? undefined
+            : {
+                root,
+                setting,
+                workDir:
+                  options.toolchainDirectory ??
+                  join(root, ".pymtheg", "rebuildable", "toolchain"),
+                environment: options.environment ?? process.env,
+                ...(options.signal ? { signal: options.signal } : {}),
+                note: (note) =>
+                  (report.toolchains ??= []).push({ module: module.id, note }),
+              };
         results = await module.analyze({
           projectId: store.projectId,
+          ...(toolchain ? { toolchain } : {}),
           files,
           contextFiles: ownContexts,
           changedFiles: [...changed]

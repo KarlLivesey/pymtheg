@@ -14,6 +14,13 @@ import { syntaxFailure } from "./failure.js";
 import { importPathOf, readLayout } from "./gomod.js";
 import type { FileFact } from "./model.js";
 import { linkNotes, resolveGo } from "./resolve.js";
+import { installation, runHelper } from "./toolchain.js";
+import {
+  factFor,
+  fileStatus,
+  parseFacts,
+  type ToolchainFacts,
+} from "./toolchain-facts.js";
 
 const ID = "go";
 /** Key of the one package symbol hosted per directory package (added by analyze). */
@@ -91,10 +98,76 @@ const directoryOf = (path: string) => {
  * file: the first non-test, clean file by path, else the first file by path.
  * Other files' facts are returned unchanged (omitted).
  */
-function analyze({
+/**
+ * The opt-in toolchain route's facts for this snapshot (W3-L), or undefined
+ * with a report note saying why they are not available. Source-only links
+ * stand wherever there is no fact.
+ */
+async function toolchainFacts(
+  request: NonNullable<
+    Parameters<NonNullable<LanguageModule["analyze"]>>[0]["toolchain"]
+  >,
+  files: Parameters<NonNullable<LanguageModule["analyze"]>>[0]["files"],
+  contextFiles: Parameters<
+    NonNullable<LanguageModule["analyze"]>
+  >[0]["contextFiles"],
+): Promise<ToolchainFacts | undefined> {
+  const unavailable = (reason: string) => {
+    request.note({ status: "unavailable", reason });
+    return undefined;
+  };
+  if (!contextFiles.some((file) => file.path === "go.mod"))
+    return unavailable("no go.mod at the project root");
+  if (contextFiles.some((file) => file.path === "go.work"))
+    return unavailable("go.work workspaces are not supported yet");
+  const workDir = `${request.workDir}/go`;
+  const install = await installation(
+    request.setting,
+    request.environment,
+    workDir,
+    request.signal,
+  );
+  if ("unavailable" in install) return unavailable(install.unavailable);
+  const sources = files
+    .filter((file) => file.path.endsWith(".go"))
+    .map((file) => ({ path: file.path, text: file.text, hash: file.hash }));
+  const run = await runHelper(
+    request.root,
+    install,
+    sources,
+    workDir,
+    request.signal,
+  );
+  if ("unavailable" in run) return unavailable(run.unavailable);
+  const facts = parseFacts(
+    run.output,
+    new Map(files.map((file) => [file.path, file.text])),
+  );
+  // The configuration as the installation reports it, on every record.
+  facts.configuration = install.configuration;
+  if (facts.listFailed)
+    return unavailable(`go list failed: ${facts.errors[0] ?? "no output"}`);
+  request.note({
+    status: "available",
+    go: install.go,
+    version: facts.goVersion,
+    configuration: install.configuration,
+    cached: run.cached,
+    key: run.key,
+    packages: facts.packages,
+    universeClean: facts.universe,
+    errors: facts.errors.slice(0, 20),
+  });
+  return facts;
+}
+
+async function analyze({
   files,
   contextFiles,
-}: Parameters<NonNullable<LanguageModule["analyze"]>>[0]): AnalyzedFile[] {
+  toolchain,
+}: Parameters<NonNullable<LanguageModule["analyze"]>>[0]): Promise<
+  AnalyzedFile[]
+> {
   const layout = readLayout(contextFiles);
   const groups = new Map<string, typeof files>();
   for (const file of files) {
@@ -208,7 +281,9 @@ function analyze({
           "builtin" in data ||
           "open" in data ||
           "reason" in data ||
-          "cause" in data
+          "cause" in data ||
+          "tc" in data ||
+          "toolchain" in data
         )
       )
         return link;
@@ -218,6 +293,8 @@ function analyze({
         open: _open,
         reason: _reason,
         cause: _cause,
+        tc: _tc,
+        toolchain: _toolchain,
         ...rest
       } = data;
       void _overflow;
@@ -225,10 +302,47 @@ function analyze({
       void _open;
       void _reason;
       void _cause;
+      void _tc;
+      void _toolchain;
       return { ...link, data: rest };
     });
-    next.set(file.path, { ...file.result, symbols, links });
+    // A previous run's toolchain record is recomputed too.
+    const { toolchain: _fileToolchain, ...fileData } = (file.result.data ??
+      {}) as { [key: string]: Json };
+    void _fileToolchain;
+    next.set(file.path, {
+      ...file.result,
+      ...(file.result.data === undefined ? {} : { data: fileData }),
+      symbols,
+      links,
+    });
   }
+  // The opt-in toolchain route (W3-L): its facts on each file and link, read
+  // by the resolver (both the notes run below and the real resolution).
+  const facts = toolchain
+    ? await toolchainFacts(toolchain, files, contextFiles)
+    : undefined;
+  if (facts)
+    for (const [path, result] of next) {
+      const status = fileStatus(facts, path);
+      result.data = {
+        ...((result.data as { [key: string]: Json } | undefined) ?? {}),
+        toolchain: status,
+      };
+      if (status.status !== "in-configuration") continue;
+      result.links = result.links.map((link) => {
+        const fact = factFor(facts, path, link);
+        return fact
+          ? {
+              ...link,
+              data: {
+                ...((link.data as { [key: string]: Json } | undefined) ?? {}),
+                tc: fact as unknown as Json,
+              },
+            }
+          : link;
+      });
+    }
   // Over-cap candidate sets (left unresolved) and real builtin calls are only known
   // project-wide; record them on the links themselves.
   const notes = linkNotes(
@@ -270,8 +384,56 @@ function analyze({
                 },
               }
             : {}),
+          // Where a toolchain fact decided the link: its origin, and what the
+          // source-only route said when it named another definite target.
+          ...(note.toolchain && facts
+            ? {
+                toolchain: {
+                  origin: "toolchain",
+                  go: facts.goVersion,
+                  configuration: facts.configuration,
+                  upgrade: note.toolchain.upgrade,
+                  from: note.toolchain.from,
+                  ...(note.toolchain.sourceOnly
+                    ? { sourceOnly: note.toolchain.sourceOnly }
+                    : {}),
+                },
+              }
+            : {}),
         },
       };
+    });
+  }
+  if (facts && toolchain) {
+    const counts: Record<string, number> = {};
+    const disagreements: Json[] = [];
+    let outside = 0;
+    for (const [path, group] of notes)
+      for (const [index, note] of group) {
+        if (!note.toolchain) continue;
+        const key = `${note.toolchain.upgrade}:${note.toolchain.from}`;
+        counts[key] = (counts[key] ?? 0) + 1;
+        if (note.toolchain.sourceOnly) {
+          const link = next.get(path)!.links[index]!;
+          disagreements.push({
+            file: path,
+            range: [link.range.start, link.range.end],
+            kind: link.kind,
+            name: link.targetName,
+            sourceOnly: note.toolchain.sourceOnly,
+          });
+        }
+      }
+    for (const [, result] of next) {
+      const status = (result.data as { toolchain?: { status?: string } })
+        .toolchain?.status;
+      if (status !== "in-configuration") outside += result.links.length;
+    }
+    toolchain.note({
+      status: "merged",
+      decided: counts,
+      disagreements,
+      sourceOnlyLinks: outside,
     });
   }
   const output: AnalyzedFile[] = [];
