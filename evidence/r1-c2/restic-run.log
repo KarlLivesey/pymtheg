@@ -1,0 +1,5 @@
+Indexing clean pinned restic copy through MCP
+Linking C2-ID ParseID
+Linking C2-INDEX (*Repository).LoadIndex
+Linking C2-PACK internal/repository/packer_manager.go:116
+Three MCP links and source checks passed; edit reported changed, never auto-refreshed.

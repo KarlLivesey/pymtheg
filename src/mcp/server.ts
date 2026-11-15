@@ -1,3 +1,4 @@
+import { firstFindings } from "./check-findings.js";
 import { registerGraphTools } from "./graph.js";
 import {
   describeOperationContract,
@@ -49,6 +50,7 @@ import {
   emitImplementationCheck,
   implementationCheckOptionsSchema,
 } from "../contracts/implementation-check.js";
+import { registerLinkTools } from "./links.js";
 import { registerArchitectureTools } from "./architecture.js";
 import { tryFlowInWorker } from "../behaviour/trial-runner.js";
 import { validateInterfaceType } from "../studio/interface-builder.js";
@@ -411,7 +413,7 @@ export function createAgentServer(workspace: AgentWorkspace) {
     "check_design",
     {
       description:
-        "Run local type, outcome, effect, ownership, cost and rule-copy checks on the entry, its imports and discovered callers by default; checkScope entry restricts to the import closure and project explicitly checks all selected source files. Optional buffers test edits without saving them. Returns an immutable run ID; use read_run for findings and evidence. A design problem is a finding, not a tool failure.",
+        "Run local type, outcome, effect, ownership, cost and rule-copy checks on the entry, its imports and discovered callers by default; checkScope entry restricts to the import closure and project explicitly checks all selected source files. Optional buffers test edits without saving them. Returns an immutable run ID and a bounded first page of finding reasons/hints. Use read_run for full findings and evidence. A design problem is a finding, not a tool failure.",
       inputSchema: z
         .object({
           file: path,
@@ -424,14 +426,22 @@ export function createAgentServer(workspace: AgentWorkspace) {
       annotations,
     },
     async (a, ctx) => {
-      const summary = workspace.summary(
-        await workspace.run(
-          { ...a, buffers: a.buffers ?? {} },
-          ctx.mcpReq.signal,
-          progress(ctx),
-        ),
+      const run = await workspace.run(
+        { ...a, buffers: a.buffers ?? {} },
+        ctx.mcpReq.signal,
+        progress(ctx),
       );
-      return output(summary, summary.exitStatus === 3);
+      const summary = workspace.summary(run);
+      return output(
+        {
+          ...summary,
+          findings: {
+            ...summary.findings,
+            ...firstFindings(workspace.root, run.report),
+          },
+        },
+        summary.exitStatus === 3,
+      );
     },
   );
   server.registerTool(
@@ -999,6 +1009,7 @@ export function createAgentServer(workspace: AgentWorkspace) {
       });
     },
   );
+  registerLinkTools(server, workspace);
   return server;
 }
 export async function runAgentStdio(

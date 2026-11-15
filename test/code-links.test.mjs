@@ -921,3 +921,274 @@ test("attributes above a symbol are fingerprinted (Rust #[...], Go //go:), doc c
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("move continuity is unknown if failed or partial files existed at link/refresh time", async () => {
+  const root = await project();
+  try {
+    await createRequirement({
+      root,
+      id: "HIDDEN",
+      title: "No inferred continuity",
+    });
+    const hidden = join(root, "ts", "hidden.ts");
+    await writeFile(hidden, "export function start( {");
+    const linked = await createCodeLink({
+      root,
+      record: "HIDDEN",
+      selector: "ts/app.ts:1",
+    });
+    assert.equal(linked.link.twins, null);
+    await rm(hidden);
+    await rename(join(root, "ts", "app.ts"), join(root, "ts", "moved.ts"));
+    assert.equal((await checkCodeLinks({ root })).links[0].state, "missing");
+    // Relink cleanly; a later refresh during a broken snapshot also clears twins.
+    await removeCodeLink({ root, link: linked.link.id });
+    const clean = await createCodeLink({
+      root,
+      record: "HIDDEN",
+      selector: "ts/moved.ts:1",
+    });
+    await writeFile(hidden, "export function hidden( {");
+    const refreshed = await refreshCodeLink({ root, link: clean.link.id });
+    assert.equal(refreshed.status, "refreshed");
+    assert.equal(refreshed.link.twins, null);
+    await rm(hidden);
+    await rename(join(root, "ts", "moved.ts"), join(root, "ts", "last.ts"));
+    assert.equal((await checkCodeLinks({ root })).links[0].state, "missing");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("history retains paths of repeated moves, body refresh and removal", async () => {
+  const root = await project();
+  try {
+    await createRequirement({ root, id: "PATHS", title: "Historical paths" });
+    const added = await createCodeLink({
+      root,
+      record: "PATHS",
+      selector: "Save",
+      writer,
+    });
+    await rename(
+      join(root, "gopkg", "store.go"),
+      join(root, "gopkg", "second.go"),
+    );
+    await refreshCodeLink({ root, link: added.link.id, writer });
+    await writeFile(
+      join(root, "gopkg", "second.go"),
+      goSource.replace("x + 1", "x + 2"),
+    );
+    await refreshCodeLink({ root, link: added.link.id, writer });
+    await rename(
+      join(root, "gopkg", "second.go"),
+      join(root, "gopkg", "third.go"),
+    );
+    await refreshCodeLink({ root, link: added.link.id, writer });
+    await removeCodeLink({ root, link: added.link.id, writer });
+    const entries = (await codeLinkHistory({ root })).entries.filter(
+      (e) => e.link === added.link.id,
+    );
+    assert.deepEqual(
+      entries.map((e) => e.symbol.path),
+      [
+        "gopkg/store.go",
+        "gopkg/second.go",
+        "gopkg/second.go",
+        "gopkg/third.go",
+        "gopkg/third.go",
+      ],
+    );
+    assert.ok(entries.every((e) => e.pathKnown));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("Rust raw identifiers do not hide outer attributes across blank lines; Go directives span blank lines", async () => {
+  const root = await project();
+  try {
+    const path = join(root, "rs", "src", "lib.rs");
+    const text =
+      "pub mod a {}\npub use self::r#a as b;\n#[cfg(unix)]\n\npub fn y() {}\n";
+    await writeFile(path, text);
+    await createRequirement({ root, id: "ATTR", title: "Attributes" });
+    const rust = await createCodeLink({ root, record: "ATTR", selector: "y" });
+    assert.equal(rust.status, "created");
+    await writeFile(path, text.replace("cfg(unix)", "cfg(windows)"));
+    assert.deepEqual((await checkCodeLinks({ root })).links[0].differs, [
+      "attributes",
+    ]);
+    await writeFile(
+      join(root, "gopkg", "store.go"),
+      goSource.replace("// Save writes.", "//go:noinline\n\n// Save writes."),
+    );
+    await createCodeLink({ root, record: "ATTR", selector: "Save" });
+    await writeFile(join(root, "gopkg", "store.go"), goSource);
+    assert.deepEqual(
+      (await checkCodeLinks({ root })).links.find(
+        (r) => r.link.symbol.identity === "Save",
+      ).differs,
+      ["attributes"],
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("partial files suppress twins at creation and refresh even when the chosen file is clean", async () => {
+  const { executeGraph } = await import("../dist/graph/commands.js");
+  const { SqliteGraphStore } = await import("../dist/graph/store.js");
+  const root = await project();
+  try {
+    await createRequirement({ root, id: "PARTIAL", title: "Partial snapshot" });
+    await writeFile(
+      join(root, "ts", "partial.ts"),
+      "export function hidden() {}\n",
+    );
+    const markPartial = async () => {
+      await executeGraph({ root, command: "index" });
+      const store = new SqliteGraphStore(
+        join(root, ".pymtheg", "rebuildable", "graph.sqlite"),
+      );
+      try {
+        const file = store.getFile("ts/partial.ts");
+        store.replaceFile({
+          ...file,
+          result: {
+            status: "partial",
+            diagnostics: [{ message: "test partial file" }],
+            symbols: [],
+            links: [],
+          },
+        });
+      } finally {
+        store.close();
+      }
+    };
+    await markPartial();
+    const added = await createCodeLink({
+      root,
+      noSync: true,
+      record: "PARTIAL",
+      selector: "start",
+    });
+    assert.equal(added.status, "created");
+    assert.equal(added.link.twins, null);
+    await writeFile(
+      join(root, "ts", "app.ts"),
+      tsSource.replace("n + 1", "n + 2"),
+    );
+    await markPartial();
+    const refreshed = await refreshCodeLink({
+      root,
+      noSync: true,
+      link: added.link.id,
+    });
+    assert.equal(refreshed.status, "refreshed");
+    assert.equal(refreshed.link.twins, null);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("legacy intermediate history is explicitly unavailable, never today's path", async () => {
+  const { ArchitectureStore } = await import("../dist/architecture/store.js");
+  const root = await project();
+  try {
+    await createRequirement({ root, id: "LEGACY", title: "Legacy history" });
+    const added = await createCodeLink({
+      root,
+      record: "LEGACY",
+      selector: "Save",
+      writer,
+    });
+    const store = await ArchitectureStore.open(root, { writer });
+    try {
+      const row = store.codeLinkRows().find((r) => r.id === added.link.id);
+      const value = JSON.parse(row.body);
+      store.writeCodeLink(row.key, {
+        ...value,
+        symbol: { ...value.symbol, path: "old-intermediate.go" },
+      });
+      store.writeCodeLink(row.key, {
+        ...value,
+        symbol: { ...value.symbol, path: "current.go" },
+      });
+    } finally {
+      store.close();
+    }
+    const entries = (await codeLinkHistory({ root })).entries.filter(
+      (e) => e.link === added.link.id,
+    );
+    assert.equal(entries[0].symbol.path, "gopkg/store.go");
+    assert.equal(entries[0].pathKnown, true);
+    assert.equal(entries[1].pathKnown, false);
+    assert.equal(entries[1].symbol.path, "[historical path unavailable]");
+    assert.equal(entries[2].symbol.path, "current.go");
+    assert.equal(entries[2].pathKnown, true);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("refresh journals the actual preceding receipt when another writer updates during graph sync", async () => {
+  const { ArchitectureStore } = await import("../dist/architecture/store.js");
+  const { createHash } = await import("node:crypto");
+  const root = await project();
+  let other;
+  try {
+    await createRequirement({
+      root,
+      id: "RACEPATH",
+      title: "Actual receipt path",
+    });
+    const added = await createCodeLink({
+      root,
+      record: "RACEPATH",
+      selector: "Save",
+      writer,
+    });
+    other = await ArchitectureStore.open(root, { writer });
+    const row = other.codeLinkRows().find((r) => r.id === added.link.id);
+    const prior = JSON.parse(row.body);
+    await writeFile(
+      join(root, "gopkg", "store.go"),
+      goSource.replace("x + 1", "x + 2"),
+    );
+    let injected = false;
+    const signal = new AbortController().signal;
+    Object.defineProperty(signal, "throwIfAborted", {
+      value() {
+        if (injected) return;
+        injected = true;
+        other.writeCodeLink(row.key, {
+          ...prior,
+          pathHistory: {
+            [createHash("sha256").update(row.body).digest("hex")]: prior.symbol,
+          },
+          symbol: { ...prior.symbol, path: "intermediate.go" },
+        });
+      },
+    });
+    const refreshed = await refreshCodeLink({
+      root,
+      link: added.link.id,
+      writer,
+      signal,
+    });
+    assert.equal(refreshed.status, "refreshed");
+    assert.equal(injected, true);
+    const history = (await codeLinkHistory({ root })).entries.filter(
+      (e) => e.link === added.link.id,
+    );
+    assert.deepEqual(
+      history.map((e) => e.symbol.path),
+      ["gopkg/store.go", "intermediate.go", "gopkg/store.go"],
+    );
+    assert.ok(history.every((e) => e.pathKnown));
+  } finally {
+    other?.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});

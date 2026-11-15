@@ -2,6 +2,10 @@ import { textPageCharacters } from "../shared/text-pages.js";
 /** Session transport/retention bounds; they are not semantic source-domain bounds. */
 export const agentLimits = {
   responseBytes: 262144,
+  linkJobs: 3,
+  linkInlineWaitMs: 5000,
+  linkResultBytes: 8 * 1024 * 1024,
+  linkResponseBytes: 65536,
   graphJobs: 3,
   graphInlineWaitMs: 5000,
   graphResultBytes: 8 * 1024 * 1024,

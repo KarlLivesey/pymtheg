@@ -1,0 +1,20 @@
+[
+  {
+    "path": "internal/restic/id.go",
+    "line": 21,
+    "excerpt": "func ParseID(s string) (ID, error) {",
+    "ref": "symbol:9d29e147233bbb3579c1c306c02adefda2092d18e18b117709e7bc2eea152487"
+  },
+  {
+    "path": "internal/repository/repository.go",
+    "line": 717,
+    "excerpt": "func (r *Repository) LoadIndex(ctx context.Context, p restic.TerminalCounterFactory) error {",
+    "ref": "symbol:b1c8d0912eaee0e5dd437a58601013b46ec8d6fcd4f887f2b7a5a5058fc7ced7"
+  },
+  {
+    "path": "internal/repository/packer_manager.go",
+    "line": 116,
+    "excerpt": "func (r *packerManager) SaveBlob(ctx context.Context, t restic.BlobType, id restic.ID, ciphertext []byte, uncompressedLength int) (int, error) {",
+    "ref": "symbol:07aa1e9eb2c86ad71672a732099d54ec5fcf98ea889b8e809bcdd2738d89a4a0"
+  }
+]
