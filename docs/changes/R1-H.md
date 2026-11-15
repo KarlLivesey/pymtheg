@@ -323,3 +323,22 @@ e. **The package ships user documentation only** (owner: "yeah better fix
    `evidence/`, `research/`, `web/src/` or `src/**/*.ts`. No step reads a
    shipped `docs/` file directly; MCP reads `docs/agent-workflow.md` and
    `docs/grammar.md`, which still ship. No harness change is needed.
+
+## Round 2 review (Sol): private network details
+
+R5. `test/package-contents.test.mjs` now also scans every shipped file for
+private network details: RFC 1918 IPv4 addresses (10/8, 172.16/12,
+192.168/16, as whole dotted quads), host names ending `.internal`, `.local` or
+`.lan`, and the bare name `devserver`. Loopback, `0.0.0.0` and documentation
+ranges stay allowed. In compiled code (`.js`, `.mjs`, `.d.ts`, `.css`) a member
+access such as `this.local` has the same shape as a host name, and the real
+package has many (first-party `dist/` and the third-party bundle alike), so
+there the host-suffix rule applies only inside strings and URLs (after a quote,
+backtick, `//` or `@`) and on comment lines, skipping backtick code spans in
+comments (`data.local`). Markdown and other text files get the full rule. The
+address and `devserver` rules apply to every shipped file; no file needed to be
+exempted. Regression cases prove each rule fires (an address in each private
+range, each suffix, `devserver`, in text and in code strings, URLs and comments)
+and that loopback, documentation and public addresses, version strings,
+ordinary words and real member accesses do not. Sol's reproduction (appending
+`192.168.88.47` or `private-box.internal` to README.md) now fails the test.
