@@ -227,3 +227,9 @@ For a design that already has handwritten implementations, use
 `pymtheg scaffold design.pym --check contracts.manifest.json` lists added,
 removed or changed contracts. Studio offers the same workflow under output
 purpose. Neither comparison nor compilation proves the implementation's behaviour.
+
+## Licence
+
+Pymtheg is licensed under the MIT License; see [LICENSE](LICENSE).
+Third-party components and their licences will be listed in `docs/licences.md`
+and `THIRD-PARTY-NOTICES` once the licence inventory work lands.
