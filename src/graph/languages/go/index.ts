@@ -1,4 +1,5 @@
-import { posix } from "node:path";
+import { realpath } from "node:fs/promises";
+import { posix, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createTagsParser } from "../../tree-sitter.js";
 import type {
@@ -120,7 +121,7 @@ async function toolchainFacts(
     return unavailable("no go.mod at the project root");
   if (contextFiles.some((file) => file.path === "go.work"))
     return unavailable("go.work workspaces are not supported yet");
-  const workDir = `${request.workDir}/go`;
+  const workDir = resolve(request.workDir, "go");
   const install = await installation(
     request.setting,
     request.environment,
@@ -131,13 +132,15 @@ async function toolchainFacts(
   const sources = files
     .filter((file) => file.path.endsWith(".go"))
     .map((file) => ({ path: file.path, text: file.text, hash: file.hash }));
-  const run = await runHelper(
-    request.root,
-    install,
-    sources,
-    workDir,
-    request.signal,
-  );
+  // An absolute, symlink-free root: go reports file paths under it, and the
+  // overlay of the snapshot's files is keyed by the same paths.
+  let root: string;
+  try {
+    root = await realpath(resolve(request.root));
+  } catch {
+    return unavailable(`the project root ${request.root} cannot be read`);
+  }
+  const run = await runHelper(root, install, sources, workDir, request.signal);
   if ("unavailable" in run) return unavailable(run.unavailable);
   const facts = parseFacts(
     run.output,
@@ -449,7 +452,7 @@ async function analyze({
 
 const go: LanguageModule = {
   id: ID,
-  version: "24",
+  version: "25",
   extensions: [".go"],
   contextFiles: ["go.mod", "go.work"],
   parse,

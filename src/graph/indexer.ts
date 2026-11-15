@@ -1,5 +1,5 @@
 import { readdir, readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { compare, contentHash, validateResult } from "./identity.js";
 import { resolutionFacts } from "./analysis.js";
 import { matchesPattern, type LanguageRegistry } from "./registry.js";
@@ -100,6 +100,8 @@ export async function indexProject(
     ".git",
     "node_modules",
     ".codegraph",
+    // The project's own Pymtheg storage (graph, toolchain helpers): never source.
+    ".pymtheg",
     ...(options.excludeDirectories ?? []),
   ]);
   async function walk(directory: string): Promise<void> {
@@ -271,7 +273,7 @@ export async function indexProject(
                 setting,
                 workDir:
                   options.toolchainDirectory ??
-                  join(root, ".pymtheg", "rebuildable", "toolchain"),
+                  resolve(root, ".pymtheg", "rebuildable", "toolchain"),
                 environment: options.environment ?? process.env,
                 ...(options.signal ? { signal: options.signal } : {}),
                 note: (note) =>

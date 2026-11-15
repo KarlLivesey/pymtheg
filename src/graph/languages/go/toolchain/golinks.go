@@ -35,6 +35,8 @@
 //	E  id where message                      first errors (at most 20 in all)
 //	C  file funEnd nameEnd cat class defFile defOff pkg name   call expression
 //	U  file identEnd kind class defFile defOff pkg name        identifier use (not local, not universe)
+//	M  file pathEnd dir                      import of a package whose directory is in the project
+//	FP sha256                                with -fingerprint only: every input of the facts (see fingerprint)
 //	D  file funEnd ext defFile:defOff,...    interface call: main-module methods reached ("?": incomplete, a generic
 //	                                         type may implement it); ext = implementers outside the main module
 //	I  typeFile typeOff ifaceFile ifaceOff how                  implements pair (how = value|pointer)
@@ -63,9 +65,11 @@ import (
 
 type module struct {
 	Path      string
+	Version   string
 	Dir       string
 	Main      bool
 	GoVersion string
+	GoMod     string
 }
 
 type listErr struct{ Pos, Err string }
@@ -168,6 +172,7 @@ func main() {
 	gomodcacheF := flag.String("gomodcache", "", "REQUIRED: module cache")
 	gocacheF := flag.String("gocache", "", "REQUIRED: a fresh, empty build cache directory for this run (the caller removes it)")
 	ovF := flag.String("overlay", "", "go list -overlay file; the helper reads those files from the overlay too")
+	fpF := flag.Bool("fingerprint", false, "print only the FP record: a digest of every input of the facts (the caller's cache key)")
 	flag.Parse()
 	if flag.NArg() != 1 {
 		fail(2, "usage: golinks [flags] <module-dir>")
@@ -247,6 +252,10 @@ func main() {
 	ovFile := filepath.Join(pinDir, "overlay.json")
 	check(os.WriteFile(ovFile, ovb, 0o444))
 
+	if *fpF {
+		emit("FP", fingerprint(ovFile))
+		return
+	}
 	// Only the fields used: a plain `go list -json` would also stamp VCS
 	// information (running git with the project's .git/config).
 	fields := "ImportPath,Dir,Name,GoFiles,CgoFiles,IgnoredGoFiles,InvalidGoFiles,TestGoFiles,XTestGoFiles,ForTest,ImportMap,Imports,Standard,Module,Error,DepsErrors"
@@ -489,6 +498,22 @@ func main() {
 					if (cat == "iface" || cat == "typeparam") && recv != nil && plain {
 						dyn = append(dyn, ifaceCall{file, funEnd, recv, obj.(*types.Func)})
 					}
+				case *ast.ImportSpec:
+					// M file pathEnd dir: the imported package's directory, when
+					// it is a file of the project (a main-module or vendored
+					// package); the module cache and GOROOT are not graph files.
+					path := strings.Trim(n.Path.Value, "\"`")
+					id := path
+					if m, ok := p.ImportMap[path]; ok {
+						id = m
+					}
+					if q := byID[id]; q != nil && path != "C" {
+						file, _ := pos(n.Path.Pos())
+						dir := rel(q.Dir)
+						if class(dir) == "module" {
+							rec("M", file, fmt.Sprint(fset.Position(n.Path.End()).Offset), dir)
+						}
+					}
 				case *ast.Ident:
 					obj := info.Uses[n]
 					if obj == nil || obj.Parent() == types.Universe {
@@ -519,6 +544,67 @@ func main() {
 		implementsPairs(mainPkgs, checked)
 		dispatch(pkgs, checked, dyn)
 	}
+}
+
+// fingerprint: a digest of everything the facts depend on that can change
+// without a version change: go list's own report (packages, files, imports,
+// module versions, errors), and the content of every listed file and go.mod
+// of every package outside GOROOT and the module cache (the main module,
+// local replace targets inside or outside the project, vendored packages),
+// read from the overlay where the caller gave one. Module-cache and GOROOT
+// files are immutable for their version, which the report includes.
+func fingerprint(ovFile string) string {
+	fields := "ImportPath,Dir,Name,GoFiles,CgoFiles,IgnoredGoFiles,InvalidGoFiles,TestGoFiles,XTestGoFiles,ForTest,ImportMap,Imports,Standard,Module,Error,DepsErrors"
+	cmd := runGo(root, "list", "-e", "-deps", "-test", "-buildvcs=false", "-json="+fields, "-overlay", ovFile, "./...")
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	data, _ := cmd.Output()
+	h := sha256.New()
+	h.Write([]byte("stderr\x00"))
+	h.Write(stderr.Bytes())
+	mutable := func(dir string) bool {
+		return dir != "" && !strings.HasPrefix(dir, goroot+"/") && dir != goroot && !strings.HasPrefix(dir, modroot+"/")
+	}
+	content := func(path string) {
+		fmt.Fprintf(h, "\x00%s\x00", path)
+		if r, ok := overlay[path]; ok {
+			path = r
+		}
+		if b, err := os.ReadFile(path); err == nil {
+			h.Write(b)
+		} else {
+			fmt.Fprintf(h, "unreadable %v", err)
+		}
+	}
+	mods := map[string]bool{}
+	dec := json.NewDecoder(bytes.NewReader(data))
+	for {
+		var p pkg
+		if err := dec.Decode(&p); err != nil {
+			break
+		}
+		// The generated test main lives in the per-run build cache (its paths
+		// change every run) and is not type-checked: left out.
+		if strings.HasSuffix(p.ImportPath, ".test") && p.ForTest == "" && p.Name == "main" {
+			continue
+		}
+		// go list's report of the package, re-encoded (stable field order).
+		b, _ := json.Marshal(p)
+		h.Write(b)
+		if p.Standard || !mutable(p.Dir) {
+			continue
+		}
+		for _, list := range [][]string{p.GoFiles, p.CgoFiles, p.TestGoFiles, p.XTestGoFiles} {
+			for _, f := range list {
+				content(filepath.Join(p.Dir, f))
+			}
+		}
+		if p.Module != nil && p.Module.GoMod != "" && mutable(filepath.Dir(p.Module.GoMod)) && !mods[p.Module.GoMod] {
+			mods[p.Module.GoMod] = true
+			content(p.Module.GoMod)
+		}
+	}
+	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
 func b2i(b bool) int {
@@ -632,6 +718,55 @@ func dispatch(pkgs []*pkg, checked map[string]*types.Package, dyn []ifaceCall) {
 			cands = append(cands, cand{nt, main})
 		}
 	}
+	// Unnamed struct types with embedded fields, as written in main-module code
+	// (`struct{ reader; closer }{}`): they have the promoted methods, so a
+	// value of one may implement the interface. Each distinct one (by
+	// types.Identical) is a candidate.
+	var anon []types.Type
+	for _, p := range pkgs {
+		if p.Module == nil || !p.Module.Main || p.ForTest != "" || strings.HasSuffix(p.ImportPath, "_test") {
+			continue
+		}
+		info := infoOf[checked[p.ImportPath]]
+		if info == nil {
+			continue
+		}
+		var exprs []ast.Expr
+		for e := range info.Types {
+			exprs = append(exprs, e)
+		}
+		sort.Slice(exprs, func(i, j int) bool { return exprs[i].Pos() < exprs[j].Pos() })
+		for _, e := range exprs {
+			t := info.Types[e].Type
+			if pt, ok := t.(*types.Pointer); ok {
+				t = pt.Elem()
+			}
+			st, ok := t.(*types.Struct)
+			if !ok {
+				continue
+			}
+			embeds := false
+			for i := 0; i < st.NumFields(); i++ {
+				if st.Field(i).Embedded() {
+					embeds = true
+				}
+			}
+			if !embeds {
+				continue
+			}
+			known := false
+			for _, a := range anon {
+				if types.Identical(a, st) {
+					known = true
+					break
+				}
+			}
+			if !known {
+				anon = append(anon, st)
+				cands = append(cands, cand{st, true})
+			}
+		}
+	}
 	memo := map[string]string{}
 	for _, d := range dyn {
 		tp, isTP := d.t.(*types.TypeParam)
@@ -648,10 +783,17 @@ func dispatch(pkgs []*pkg, checked map[string]*types.Package, dyn []ifaceCall) {
 		if isTP {
 			sat = types.Satisfies
 		}
+		// The memo key must identify the receiver TYPE, not its declaration:
+		// Getter[int] and Getter[string] share Obj() but have different method
+		// sets. Only an uninstantiated named type (its Obj() is the type) or a
+		// type parameter (unique object) is memoised; an instantiation is
+		// computed afresh.
 		key := ""
 		switch t := d.t.(type) {
 		case *types.Named:
-			key = fmt.Sprintf("%p.%s", t.Obj(), d.fn.Name())
+			if t.TypeArgs().Len() == 0 {
+				key = fmt.Sprintf("%p.%s", t.Obj(), d.fn.Name())
+			}
 		case *types.TypeParam:
 			key = fmt.Sprintf("tp%p.%s", t.Obj(), d.fn.Name())
 		}

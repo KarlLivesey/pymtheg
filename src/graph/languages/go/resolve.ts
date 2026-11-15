@@ -5,6 +5,7 @@ import type {
   GraphFile,
   GraphLink,
   GraphSymbol,
+  Json,
   LinkResolution,
   ResolutionContext,
   ResolutionResult,
@@ -176,6 +177,8 @@ export interface ToolchainFact {
   d?: [string, number, string][];
   /** Interface call: implementers outside the project among the loaded packages. */
   x?: number;
+  /** Import: the imported package's directory in the project (main module or vendor/). */
+  dir?: string;
 }
 /** A toolchain `implements` pair on the type's file: type offset, interface file, offset, how. */
 export type ToolchainPair = [number, string, number, "value" | "pointer"];
@@ -2241,6 +2244,27 @@ class GoResolver {
           ? "candidates"
           : "unresolved";
     const sourceTarget = from === "definite" ? ids[0] : undefined;
+    if (fact.dir !== undefined) {
+      // The package go compiles for this import, in the project's own tree
+      // (for a vendored module, its vendor/ directory).
+      const pkgs = [...this.symbolsById.values()].filter(
+        (symbol) =>
+          symbol.kind === "package" &&
+          (symbol.data as { directory?: string } | undefined)?.directory ===
+            (fact.dir === "." ? "" : fact.dir) &&
+          !symbol.name.endsWith("_test"),
+      );
+      if (pkgs.length !== 1) return undefined;
+      return {
+        ids: [pkgs[0]!.id],
+        definite: true,
+        toolchain: "definite",
+        from,
+        ...(sourceTarget && sourceTarget !== pkgs[0]!.id
+          ? { sourceOnly: this.describe(sourceTarget) }
+          : {}),
+      };
+    }
     if (fact.at) {
       const target = this.symbolAt(fact.at);
       // Declared in a file the graph could not read: the source decision stands.
@@ -2340,18 +2364,39 @@ class GoResolver {
         pairs.push({ file: file.path, pair });
     }
     if (!universe) return;
-    // The toolchain lists pairs of non-generic types and interfaces only: a
-    // source-only link of a generic type or interface stands.
+    // The toolchain lists pairs of non-generic types and interfaces among the
+    // packages it loaded. A source-only link it cannot judge stands: one of a
+    // generic type or interface, or one whose type or interface is declared in
+    // a file outside this configuration (marked so). Only a pair whose two
+    // sides were both loaded, and which go/types does not confirm, is refuted.
     const generic = (id: string | null | undefined) =>
       !!id &&
       !!(this.symbolsById.get(id)?.data as { generic?: boolean } | undefined)
         ?.generic;
+    const elsewhere = (id: string | null | undefined) => {
+      const symbol = id ? this.symbolsById.get(id) : undefined;
+      return !!symbol && this.outsideConfiguration(symbol.file);
+    };
     for (let index = added.length - 1; index >= 0; index--) {
       const link = added[index]!;
       if (link.kind !== "implements") continue;
       const iface = (link.data as { interfaceId?: string } | undefined)
         ?.interfaceId;
-      if (!generic(link.sourceId) && !generic(iface)) added.splice(index, 1);
+      if (generic(link.sourceId) || generic(iface)) continue;
+      if (elsewhere(link.sourceId) || elsewhere(iface)) {
+        added[index] = {
+          ...link,
+          data: {
+            ...((link.data as { [key: string]: Json } | undefined) ?? {}),
+            toolchain: {
+              origin: "source-only",
+              reason: "outside-configuration",
+            },
+          },
+        };
+        continue;
+      }
+      added.splice(index, 1);
     }
     const seen = new Set<string>();
     for (const { file, pair } of pairs) {

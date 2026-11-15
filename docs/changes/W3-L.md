@@ -3,7 +3,7 @@
 Implements the W2-L recommendation (`docs/changes/W2-L.md`) under decisions
 D16 and D17. A project can opt in to links decided by the Go toolchain's own
 loader and type checker (`go list` + `go/types`). Without the opt-in,
-everything is exactly as before. Go module version 24. Evidence:
+everything is exactly as before. Go module version 25 (round 1). Evidence:
 `evidence/w3-l/`.
 
 ## The opt-in
@@ -37,7 +37,12 @@ on demand with the user's own `go`, never at install. The binary lives in the
 rebuildable folder, `.pymtheg/rebuildable/toolchain/go/` by default
 (`IndexOptions.toolchainDirectory`), under a name that includes a hash of the
 helper source and the Go version. `package.json` lists the `.go` source so the
-installed package can build it.
+installed package can build it. The helper is built in a throwaway module of
+its own (its own `go.mod`, `GOWORK=off`), so a broken project `go.mod` or a
+`go.work` cannot break or redirect the build, and the build directory and its
+cache are removed afterwards. The indexer never walks `.pymtheg/` (Pymtheg's
+own storage), so nothing in the toolchain folder is ever indexed. The root may
+be given relative; it is resolved to an absolute, symlink-free path.
 
 Every process runs through `runProcess` (`src/backends/process.ts`, the owned
 process group of W2-T): it is bounded (30 minutes, 1 GiB of output) and
@@ -111,12 +116,24 @@ link notes, and again in the real resolution.
     instantiate generics);
   - a main-module `_test.go` type has a method of that name (the call also
     runs in the test binary).
+- **The implementer search** covers every named, non-generic, non-interface
+  type of the loaded plain packages, and every unnamed struct type with
+  embedded fields written in main-module code (`struct{ reader; closer }{}`:
+  its promoted methods are listed). Each instantiation of a generic interface
+  (`Getter[int]`, `Getter[string]`) is searched on its own: answers are
+  memoised only for an uninstantiated named type or a type parameter.
 - **References to an interface method** (method values) keep the source-only
   dispatch set.
 - **`implements`:** with a clean universe, the `implements` links are the
   toolchain's verified pairs: definite, to the interface,
-  `data.origin: "toolchain"`, with `pointerReceiver`. A source-only link
-  involving a generic type or interface stands.
+  `data.origin: "toolchain"`, with `pointerReceiver`. A source-only link the
+  toolchain cannot judge stands: one involving a generic type or interface,
+  and one whose type or interface is declared in a file outside the
+  configuration (marked `{ origin: "source-only", reason:
+  "outside-configuration" }`). Only a pair whose two sides were both loaded,
+  and which go/types does not confirm, is refuted.
+- **Imports:** an import of a package whose directory is in the project (the
+  main module, or `vendor/` with `-mod=vendor`) resolves to that package.
 - **Origin:** every link the toolchain decided records
   `data.toolchain = { origin: "toolchain", go, configuration, upgrade, from }`.
   Every file records `data.toolchain.status`:
@@ -134,10 +151,13 @@ link notes, and again in the real resolution.
     clean. That happens for a valid file the grammar misreads.
   - Restic: 0 disagreements.
 - **External targets:** the store has no external symbols. Calls into the
-  standard library and dependencies keep their source-only resolution; the
-  fact (`data.tc.ext`, package path and name) is recorded on the link but is
-  not a target. Adding external symbols needs a store change and is not done
-  here.
+  standard library and module-cache dependencies keep their source-only
+  resolution; the fact (`data.tc.ext`, package path and name) is recorded on
+  the link but is not a target. Adding external symbols needs a store change
+  and is not done here. A VENDORED dependency (`vendor/`, `-mod=vendor`) is
+  different: its files are project files in the graph and are what go
+  compiles, so calls and imports into it become definite links to the
+  vendored files.
 
 ## Caching
 
@@ -148,12 +168,20 @@ The helper's output is kept in the rebuildable folder, keyed by:
 - `go.mod`, `go.sum`, `go.work`, `go.work.sum` and `vendor/modules.txt`;
 - which `go.sum` modules have a zip in the module cache, so a later download
   changes the key;
-- every captured Go file's path and content hash.
+- every captured Go file's path and content hash;
+- the helper's **fingerprint**: a pass of `go list -deps -test` that hashes
+  go list's own report (packages, files, imports, module versions, errors)
+  and the content of every listed file and `go.mod` of every package outside
+  GOROOT and the module cache. That covers local `replace` targets inside or
+  outside the project, vendored packages, and Go files on disk the index did
+  not capture (excluded directories, symlinks). Module-cache and GOROOT files
+  are immutable for their version, which the report includes.
 
-Unchanged inputs reuse it without running anything. **Any change re-runs the
-whole helper.** Whether a package's links are definite depends on its whole
-import closure, and implementer sets depend on every loaded package, so no
-smaller re-run is sound. Warm == cold, byte for byte (tests; restic, evidence).
+The fingerprint runs on every index (one `go list`; 1.6 s on restic); a warm
+index never reuses facts whose inputs changed. **Any change re-runs the whole
+helper.** Whether a package's links are definite depends on its whole import
+closure, and implementer sets depend on every loaded package, so no smaller
+re-run is sound. Warm == cold, byte for byte (tests; restic, evidence).
 
 ## Core-file changes (all additive)
 
@@ -167,27 +195,44 @@ smaller re-run is sound. Warm == cold, byte for byte (tests; restic, evidence).
   `graphToolchains`).
 - `package.json`: `files` lists the helper source. No dependency, no install
   hook.
+- `src/graph/indexer.ts` (round 1): the walk never enters `.pymtheg/`; the
+  default toolchain folder is resolved to an absolute path.
 
 ## Results
 
 - **Fixtures** (`test/fixtures/graph-go-toolchain/`, compiler-checked;
-  `test/graph-go-toolchain.test.mjs`):
+  `test/graph-go-toolchain.test.mjs`, `test/graph-go-toolchain-review.test.mjs`):
   - methods on inferred and generic types upgraded;
   - a verified implementer set that drops a same-count wrong-signature
     method;
+  - two instantiations of a generic interface, each with its own set;
+  - an unnamed struct of embedded types in a verified set;
   - embedded promotion;
   - a type error: that package and its importers stay source-only, and there
     are no implementer sets;
-  - a cgo file and a `windows` file outside the configuration;
+  - a cgo file and a `windows` file outside the configuration; an
+    `implements` pair declared outside it kept, source-only;
   - a generic implementer and a test-file implementer: no set claimed;
+  - a vendored module: import and calls definite;
+  - a real disagreement (a dot import beside a `windows` declaration), and a
+    forged-fact resolver test (preference, both recorded, withdrawal);
+  - an edited local `replace` target invalidates the facts;
   - `go` missing: identical to off, with the report saying why;
   - opt-in off: no toolchain data anywhere;
-  - warm == cold; the project not written; cancellation.
+  - the default toolchain folder over three runs; a relative root; a broken
+    project `go.mod` does not break the helper build;
+  - warm == cold; the project not written; cancellation before start and
+    live (a helper blocked on a FIFO, aborted); the run limit (a controlled
+    clock); a Go version or configuration change invalidates.
 - **Restic** `c734245`, offline, local module cache (`evidence/w3-l/`):
   - every package loaded clean;
   - definite links 39,918 → 40,895: 744 upgraded links, plus 233 definite
-    `implements` (209 confirmed, 24 new, 61 refuted);
-  - 120 candidate sets verified;
+    `implements` (209 confirmed, 24 new);
+  - `implements`: 58 refuted (both sides loaded), 9 kept source-only (6
+    generic, 3 outside the configuration);
+  - 120 candidate sets are now verified sets, all EQUAL to the source-only
+    set (the change is the dropped `structural-match-unverified`); 4
+    unresolved calls gain a verified set;
   - 0 disagreements;
   - 30 sampled upgrades read and correct;
   - off == main and warm == cold, byte for byte.
@@ -196,13 +241,17 @@ smaller re-run is sound. Warm == cold, byte for byte (tests; restic, evidence).
 
 - **Configurations:** one only, the host's. Files of other configurations keep
   source-only links.
-- **Modules:** a single module at the project root. `go.work` workspaces and
-  nested modules are reported unavailable and stay source-only.
+- **Modules:** a single module at the project root. A `go.work` workspace is
+  reported unavailable and stays source-only. A nested module (`sub/go.mod`
+  under the root module) is NOT reported unavailable: the root module is
+  loaded, and `sub`'s files are `outside-configuration` ("not loaded by go
+  list (another module, testdata, or no package)"), with source-only links.
 - **cgo:** off. A package needing cgo has errors, so it and its importers stay
   source-only.
-- **Dependency and standard-library callees** are recorded on the link
-  (`data.tc.ext`) but are not targets, because the store has no external
-  symbols.
+- **Standard-library and module-cache dependency callees** are recorded on
+  the link (`data.tc.ext`) but are not targets, because the store has no
+  external symbols. Vendored dependencies are graph files: their calls and
+  imports are definite.
 - **Verified sets** are verified for the packages loaded in this
   configuration, and are left out in the four cases listed under "Merging".
   Calls inside test files (test variants) get no verified set, only definite

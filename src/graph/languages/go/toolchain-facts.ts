@@ -37,6 +37,8 @@ export interface ToolchainFacts {
   calls: Map<string, Map<number, ToolchainFact>>;
   /** Per file: identifier facts by identifier end (UTF-16). */
   uses: Map<string, Map<number, ToolchainFact>>;
+  /** Per file: import facts (a project directory) by import path end (UTF-16). */
+  imports: Map<string, Map<number, ToolchainFact>>;
   /** Per type file: implements pairs (UTF-16 offsets). */
   implements: Map<string, ToolchainPair[]>;
   /** No loaded package has an error: implementer sets and pairs are definite. */
@@ -71,6 +73,7 @@ export function parseFacts(
     excluded: new Map(),
     calls: new Map(),
     uses: new Map(),
+    imports: new Map(),
     implements: new Map(),
     universe: false,
     errors: [],
@@ -203,6 +206,12 @@ export function parseFacts(
         external.set(key, Number(ext));
         break;
       }
+      case "M": {
+        // M file pathEnd dir
+        const [, file, end, dir] = f as [string, string, string, string];
+        set(facts.imports, file, u16(file, Number(end)), { c: "import", dir });
+        break;
+      }
       case "I": {
         // I typeFile typeOff ifaceFile ifaceOff how
         const [, tfile, toff, ifile, ioff, how] = f as [
@@ -252,6 +261,8 @@ export function factFor(
   link: LinkDraft,
 ): ToolchainFact | undefined {
   if (link.kind === "calls") return facts.calls.get(file)?.get(link.range.end);
+  if (link.kind === "imports")
+    return facts.imports.get(file)?.get(link.range.end);
   if (JOINED_BY_USE.has(link.kind))
     return facts.uses.get(file)?.get(link.range.end);
   return undefined;
