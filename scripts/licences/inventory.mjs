@@ -59,9 +59,9 @@ const noticeFile = /^(NOTICE|ThirdPartyNotice|CopyrightNotice)/i;
  */
 const explanations = {
   "@modelcontextprotocol/server":
-    "LICENSE explains a licensing transition from MIT to Apache-2.0: code from authors who have not consented to relicensing stays MIT. The file carries both texts; treat the package as Apache-2.0 and MIT together",
+    "LICENSE explains a licensing transition from MIT to Apache-2.0: code from authors who have not consented to relicensing stays MIT. The file carries both texts; treat the package as Apache-2.0 and MIT together. It also says the project's documentation (not specifications) is CC-BY-4.0; the npm package ships code, a README and the LICENSE",
   "@modelcontextprotocol/core":
-    "same LICENSE as @modelcontextprotocol/server: MIT-to-Apache-2.0 transition, both texts apply",
+    "same LICENSE as @modelcontextprotocol/server: MIT-to-Apache-2.0 transition, both texts apply; documentation CC-BY-4.0",
 };
 
 /** Recognise a licence text by its distinctive wording. */
@@ -105,6 +105,20 @@ export function classify(text) {
         ? "BSD-3-Clause"
         : "BSD-2-Clause",
     );
+  if (/CC-BY-4\.0|Creative Commons Attribution 4\.0/i.test(t))
+    found.push("CC-BY-4.0");
+  if (
+    /\bW3C License\b|W3C\S* SOFTWARE (AND DOCUMENT )?NOTICE AND LICENSE/i.test(
+      t,
+    )
+  )
+    found.push("W3C");
+  if (
+    /UNICODE,? INC\.? LICENSE AGREEMENT|UNICODE LICENSE V3|Unicode License/i.test(
+      t,
+    )
+  )
+    found.push("Unicode");
   if (/GNU (LESSER|LIBRARY) GENERAL PUBLIC LICENSE/i.test(t))
     found.push("LGPL");
   else if (/GNU AFFERO GENERAL PUBLIC LICENSE/i.test(t)) found.push("AGPL");
@@ -513,45 +527,64 @@ async function assets() {
   };
 }
 
+/**
+ * Problems of one component, from its declared licence and licence/notice
+ * texts. The licence gate (`blocking`) and the test both use this.
+ */
+export function assess(c) {
+  const grant = c.texts.filter((_, i) => !noticeFile.test(c.files[i]));
+  // A notice file quotes other projects' licences; it is not the grant.
+  c.found = [...new Set(grant.flatMap(classify))];
+  // Every licence found anywhere in the package's licence or notice files.
+  c.embedded = [...new Set(c.texts.flatMap(classify))];
+  // Only the licence files' own copyright lines (a notice quotes other projects').
+  c.copyright = copyrights(grant);
+  const declared = spdxIds(c.declared);
+  c.problems = [];
+  if (c.unattributed)
+    c.problems.push("build-tool code in the bundle with no known origin");
+  if (!c.files.some((f) => !noticeFile.test(f)))
+    c.problems.push("no licence text in the package");
+  if (!c.declared) c.problems.push("no declared licence");
+  else if (!satisfiable(c.declared))
+    c.problems.push(`declared ${c.declared} is outside the allow-list`);
+  const extra = c.found.filter((id) => !declared.includes(id));
+  if (c.found.length && extra.length)
+    c.problems.push(
+      `licence file reads as ${extra.join(", ")} but ${c.declared ?? "nothing"} is declared`,
+    );
+  const disallowed = c.found.filter((id) => !allowed.has(id));
+  if (disallowed.length)
+    c.problems.push(
+      `licence file reads as ${disallowed.join(", ")}, outside the allow-list`,
+    );
+  if (c.files.length && !c.found.length)
+    c.problems.push("licence file text not recognised");
+  c.explanation = c.problems.length ? explanations[c.name] : undefined;
+  return c;
+}
+/**
+ * Problems that block shipping: a licence outside the allow-list (declared, or
+ * read from a licence file without a reviewed explanation), missing licence
+ * text, or build-tool code with no known origin.
+ */
+export function blocking(c) {
+  return c.problems.filter(
+    (p) =>
+      /no licence text|no known origin|no declared licence|^declared .* outside the allow-list/.test(
+        p,
+      ) ||
+      (/^licence file reads as .*, outside the allow-list$/.test(p) &&
+        !c.explanation),
+  );
+}
 export async function collect() {
   const components = [
     ...(await dependencies()),
     ...(await bundled()),
     ...(await vendored()),
   ];
-  for (const c of components) {
-    // A notice file quotes other projects' licences; it is not the grant.
-    c.found = [
-      ...new Set(
-        c.texts
-          .filter((_, i) => !noticeFile.test(c.files[i]))
-          .flatMap(classify),
-      ),
-    ];
-    // Licence files' own copyright lines first, then those quoted in notices.
-    c.copyright = copyrights([
-      ...c.texts.filter((_, i) => !noticeFile.test(c.files[i])),
-      ...c.texts.filter((_, i) => noticeFile.test(c.files[i])),
-    ]);
-    const declared = spdxIds(c.declared);
-    c.problems = [];
-    if (c.unattributed)
-      c.problems.push("build-tool code in the bundle with no known origin");
-    if (!c.files.some((f) => !noticeFile.test(f)))
-      c.problems.push("no licence text in the package");
-    if (!c.declared) c.problems.push("no declared licence");
-    else if (!satisfiable(c.declared))
-      c.problems.push(`declared ${c.declared} is outside the allow-list`);
-    const extra = c.found.filter((id) => !declared.includes(id));
-    if (c.found.length && extra.length)
-      c.problems.push(
-        `licence file reads as ${extra.join(", ")} but ${c.declared ?? "nothing"} is declared`,
-      );
-    if (c.files.length && !c.found.length)
-      c.problems.push("licence file text not recognised");
-    if (c.problems.length && explanations[c.name])
-      c.explanation = explanations[c.name];
-  }
+  for (const c of components) assess(c);
   components.sort((a, b) =>
     a.name === b.name
       ? a.version < b.version
@@ -595,6 +628,12 @@ export async function render(data) {
     "`test/licences.test.mjs` fails when this file or `THIRD-PARTY-NOTICES` is out of date.",
     "Do not edit by hand. This is an inventory, not legal advice.",
     "",
+    "The npm dependencies are as pinned by `package-lock.json`. A user's `npm install` of the",
+    "published tarball does not use that lockfile: npm resolves transitive dependencies afresh",
+    "within each package's version ranges, so a later install can receive newer versions (with",
+    "possibly different licences) than this inventory lists. The bundled, build-tool and",
+    "vendored code is fixed inside the tarball.",
+    "",
     `**Pymtheg's own licence is not yet chosen.** \`package.json\` has ${pkg.license ? `\`license: ${pkg.license}\`` : "no `license` field"}${pkg.private ? ' and `"private": true`' : ""}, and the repository has no LICENSE file for Pymtheg itself. That choice is the owner's.`,
     "",
     "## Summary",
@@ -618,7 +657,8 @@ export async function render(data) {
   md.push(
     "",
     `- Copyleft (GPL, LGPL, AGPL, MPL) in shipped components: ${components.some((c) => c.found.some((f) => /GPL|MPL/.test(f)) || spdxIds(c.declared).some((f) => /GPL|MPL/.test(f))) ? "**yes, see below**" : "none"}.`,
-    `- Licences outside the allow-list (${[...allowed].join(", ")}): ${unusual.length ? unusual.join(", ") : "none"}.`,
+    `- Declared licences outside the allow-list (${[...allowed].join(", ")}): ${unusual.length ? unusual.join(", ") : "none"}.` +
+      ' This covers each component\'s declared licence only; some shipped packages also carry other licences inside them, listed under "Licences embedded inside shipped packages".',
     `- Components with no licence text: ${
       components
         .filter((c) => c.problems.includes("no licence text in the package"))
@@ -647,6 +687,39 @@ export async function render(data) {
     `- \`dist/\` contains only the TypeScript compiler's output of \`src/\`; no third-party source is copied into it.`,
     "",
   );
+  const embedded = components
+    .map((c) => ({
+      c,
+      rows: c.files
+        .map((file, i) => ({
+          file,
+          ids: classify(c.texts[i]).filter(
+            (id) => !spdxIds(c.declared).includes(id),
+          ),
+        }))
+        .filter((r) => r.ids.length),
+    }))
+    .filter((e) => e.rows.length);
+  md.push(
+    "## Licences embedded inside shipped packages",
+    "",
+    "Licences found in a shipped package's licence or notice files that differ from the licence it",
+    "declares (recognised by wording; text the reader does not recognise is not listed here). They",
+    "cover parts of the package, such as code or data it took from other projects or its documentation.",
+    "",
+  );
+  if (embedded.length) {
+    md.push(
+      "| Component | Declared | Embedded | In file |",
+      "|---|---|---|---|",
+    );
+    for (const { c, rows } of embedded)
+      for (const r of rows)
+        md.push(
+          `| ${c.name}@${c.version} | ${c.declared} | ${r.ids.join(", ")} | ${r.file} |`,
+        );
+  } else md.push("None.");
+  md.push("");
   if (problems.length) {
     md.push(
       "## Flagged",
@@ -698,7 +771,7 @@ export async function render(data) {
     );
     for (const c of groups.get(g))
       md.push(
-        `| ${c.name.replace(/\|/g, "\\|")} | ${c.version.split(" @ ")[0]} | ${c.shipped}${c.direct ? " (direct)" : ""} | ${c.found.join(", ") || (c.files.length ? "unrecognised" : "no file")} | ${(c.copyright[0] ?? "—").replace(/\|/g, "\\|")}${c.copyright.length > 1 ? ` (+${c.copyright.length - 1})` : ""} | ${c.source ?? "—"} |`,
+        `| ${c.name.replace(/\|/g, "\\|")} | ${c.version.split(" @ ")[0]} | ${c.shipped}${c.direct ? " (direct)" : ""} | ${c.found.join(", ") || (c.files.length ? "unrecognised" : "no file")} | ${(c.copyright[0] ?? "none in its licence file").replace(/\|/g, "\\|")}${c.copyright.length > 1 ? ` (+${c.copyright.length - 1})` : ""} | ${c.source ?? "—"} |`,
       );
     md.push("");
   }
@@ -790,14 +863,10 @@ if (
         );
         stale = true;
       }
-    const blocking = data.components.filter((c) =>
-      c.problems.some((p) =>
-        /allow-list|no licence text|no known origin/.test(p),
-      ),
-    );
-    for (const c of blocking)
-      console.error(`${c.name}@${c.version}: ${c.problems.join("; ")}`);
-    process.exitCode = stale || blocking.length ? 1 : 0;
+    const blocked = data.components.filter((c) => blocking(c).length);
+    for (const c of blocked)
+      console.error(`${c.name}@${c.version}: ${blocking(c).join("; ")}`);
+    process.exitCode = stale || blocked.length ? 1 : 0;
   } else {
     process.stdout.write(markdown);
   }

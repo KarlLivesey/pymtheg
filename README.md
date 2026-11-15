@@ -68,18 +68,18 @@ current version without clearing other warnings.
 Linked-code review also flags changes to observed constants and resolved transitive
 callees, with retained dependency comparisons. Dynamic and uncaptured dependencies
 remain unknown. Capturing code is explicit; it is not continuous background indexing.
-These are initial working slices with open scope: see [the implementation-gap map](docs/implementation-gap-map.md)
-and [block-editor contract](docs/block-editor-map.md).
+These are initial working slices with open scope: see [the implementation-gap map](https://github.com/KarlLivesey/pymtheg/blob/main/docs/implementation-gap-map.md)
+and [block-editor contract](https://github.com/KarlLivesey/pymtheg/blob/main/docs/block-editor-map.md).
 
-See the [current completion audit](docs/current-completion-audit.md) for remaining
-gaps and exact validation boundaries. The [previous withdrawn review](docs/1.0-status.md)
+See the [current completion audit](https://github.com/KarlLivesey/pymtheg/blob/main/docs/current-completion-audit.md) for remaining
+gaps and exact validation boundaries. The [previous withdrawn review](https://github.com/KarlLivesey/pymtheg/blob/main/docs/1.0-status.md)
 is preserved as history. Pymtheg does not claim universal proofs or production conformance.
 
 Review-36 repairs pass the established acceptance checks: 1,100 local tests,
-96 real integrations and 111 journeys in each browser engine. Karl has stopped
-the review/polish cycle to proceed with the functional trial; independent sign-off
-remains unsigned. [Run the trial](docs/trial-start.md).
-[Repair evidence](evidence/product-audit/review-36-follow-up/README.md).
+96 real integrations and 111 journeys in each browser engine. The review/polish
+cycle has stopped to proceed with the functional trial; independent sign-off
+remains unsigned. [Run the trial](https://github.com/KarlLivesey/pymtheg/blob/main/docs/trial-start.md).
+[Repair evidence](https://github.com/KarlLivesey/pymtheg/blob/main/evidence/product-audit/review-36-follow-up/README.md).
 
 ## Run locally
 
@@ -201,7 +201,7 @@ resource results and linked provider protocols. General aliases, owned resource
 collections, outer-resource loop invariants, full logical proofs, recursive cost
 proofs, arbitrary parallelism, temporal liveness, extraction and production
 conformance remain outside this bounded release. Unsupported requested claims remain
-visible and fail with status 2. Read [decisions and risks](docs/decisions.md).
+visible and fail with status 2. Read [decisions and risks](https://github.com/KarlLivesey/pymtheg/blob/main/docs/decisions.md).
 
 The four domains are in [examples/mvp](examples/mvp). The separate
 `checkout-late.pym` models late effects and independently failing compensation;
@@ -227,16 +227,16 @@ time budget expires; that is never a passed correctness assertion. Set
 Correctness tests use readiness events, controlled clocks and deterministic counts;
 benchmark timings are informational only.
 
-- [Maintained self-map](docs/runtime-map.md), [initial prerequisite map](design/initial-system-map.md).
-- [Requirement/component/test checklist](docs/requirements.md), [loop record](docs/progress.md).
-- [Versioned report schema](docs/report.schema.json), [captured acceptance commands/results](evidence/acceptance.json).
-- [Measured parser/rule/graph/cost counters](evidence/benchmarks.json), [validation notes](evidence/validation.md).
+- [Maintained self-map](https://github.com/KarlLivesey/pymtheg/blob/main/docs/runtime-map.md), [initial prerequisite map](https://github.com/KarlLivesey/pymtheg/blob/main/design/initial-system-map.md).
+- [Requirement/component/test checklist](https://github.com/KarlLivesey/pymtheg/blob/main/docs/requirements.md), [loop record](https://github.com/KarlLivesey/pymtheg/blob/main/docs/progress.md).
+- [Versioned report schema](docs/report.schema.json), [captured acceptance commands/results](https://github.com/KarlLivesey/pymtheg/blob/main/evidence/acceptance.json).
+- [Measured parser/rule/graph/cost counters](https://github.com/KarlLivesey/pymtheg/blob/main/evidence/benchmarks.json), [validation notes](https://github.com/KarlLivesey/pymtheg/blob/main/evidence/validation.md).
 
 ## Preserved research
 
-[Comparison](research/comparison.md), [original proposal](design/proposal.md),
-[primary-source manifest](research/sources/index.json), and the hand-written
-[Quint](examples/checkout.qnt)/[TLA+](examples/Checkout.tla) baseline remain intact.
+[Comparison](https://github.com/KarlLivesey/pymtheg/blob/main/research/comparison.md), [original proposal](https://github.com/KarlLivesey/pymtheg/blob/main/design/proposal.md),
+[primary-source manifest](https://github.com/KarlLivesey/pymtheg/blob/main/research/sources/index.json), and the hand-written
+[Quint](https://github.com/KarlLivesey/pymtheg/blob/main/examples/checkout.qnt)/[TLA+](https://github.com/KarlLivesey/pymtheg/blob/main/examples/Checkout.tla) baseline remain intact.
 Historical logs are under `research/results/`. New implementation evidence is
 under `evidence/`; it does not retroactively upgrade the research spike.
 `examples/checkout.s15` is an aspirational incomplete sketch, **not accepted input**.

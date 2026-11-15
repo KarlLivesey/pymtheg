@@ -5,6 +5,12 @@ the installed packages, the browser bundle's module graph and `grammars/*/manife
 `test/licences.test.mjs` fails when this file or `THIRD-PARTY-NOTICES` is out of date.
 Do not edit by hand. This is an inventory, not legal advice.
 
+The npm dependencies are as pinned by `package-lock.json`. A user's `npm install` of the
+published tarball does not use that lockfile: npm resolves transitive dependencies afresh
+within each package's version ranges, so a later install can receive newer versions (with
+possibly different licences) than this inventory lists. The bundled, build-tool and
+vendored code is fixed inside the tarball.
+
 **Pymtheg's own licence is not yet chosen.** `package.json` has no `license` field and `"private": true`, and the repository has no LICENSE file for Pymtheg itself. That choice is the owner's.
 
 ## Summary
@@ -19,7 +25,7 @@ Do not edit by hand. This is an inventory, not legal advice.
 | ISC | 1 | keep the copyright notice and licence text with copies |
 
 - Copyleft (GPL, LGPL, AGPL, MPL) in shipped components: none.
-- Licences outside the allow-list (MIT, ISC, BSD-2-Clause, BSD-3-Clause, Apache-2.0, 0BSD, BlueOak-1.0.0, CC0-1.0, Unlicense): none.
+- Declared licences outside the allow-list (MIT, ISC, BSD-2-Clause, BSD-3-Clause, Apache-2.0, 0BSD, BlueOak-1.0.0, CC0-1.0, Unlicense): none. This covers each component's declared licence only; some shipped packages also carry other licences inside them, listed under "Licences embedded inside shipped packages".
 - Components with no licence text: none.
 - Declared licence disagreeing with the licence file, or text not recognised: @modelcontextprotocol/core@2.4.0, @modelcontextprotocol/server@2.4.0.
 - Components with NOTICE or third-party notice files (their text must travel with redistributions; all are in THIRD-PARTY-NOTICES): typescript@5.9.3 (ThirdPartyNoticeText.txt).
@@ -27,12 +33,24 @@ Do not edit by hand. This is an inventory, not legal advice.
 - Fonts: none (system fonts only). Images referenced by the web app: none.
 - `dist/` contains only the TypeScript compiler's output of `src/`; no third-party source is copied into it.
 
+## Licences embedded inside shipped packages
+
+Licences found in a shipped package's licence or notice files that differ from the licence it
+declares (recognised by wording; text the reader does not recognise is not listed here). They
+cover parts of the package, such as code or data it took from other projects or its documentation.
+
+| Component | Declared | Embedded | In file |
+|---|---|---|---|
+| @modelcontextprotocol/core@2.4.0 | Apache-2.0 | MIT, CC-BY-4.0 | LICENSE |
+| @modelcontextprotocol/server@2.4.0 | Apache-2.0 | MIT, CC-BY-4.0 | LICENSE |
+| typescript@5.9.3 | Apache-2.0 | MIT, CC-BY-4.0, W3C, Unicode | ThirdPartyNoticeText.txt |
+
 ## Flagged
 
 | Component | Shipped as | Problem | Explanation |
 |---|---|---|---|
-| @modelcontextprotocol/core@2.4.0 | dependency | licence file reads as MIT but Apache-2.0 is declared | same LICENSE as @modelcontextprotocol/server: MIT-to-Apache-2.0 transition, both texts apply |
-| @modelcontextprotocol/server@2.4.0 | dependency | licence file reads as MIT but Apache-2.0 is declared | LICENSE explains a licensing transition from MIT to Apache-2.0: code from authors who have not consented to relicensing stays MIT. The file carries both texts; treat the package as Apache-2.0 and MIT together |
+| @modelcontextprotocol/core@2.4.0 | dependency | licence file reads as MIT, CC-BY-4.0 but Apache-2.0 is declared; licence file reads as CC-BY-4.0, outside the allow-list | same LICENSE as @modelcontextprotocol/server: MIT-to-Apache-2.0 transition, both texts apply; documentation CC-BY-4.0 |
+| @modelcontextprotocol/server@2.4.0 | dependency | licence file reads as MIT, CC-BY-4.0 but Apache-2.0 is declared; licence file reads as CC-BY-4.0, outside the allow-list | LICENSE explains a licensing transition from MIT to Apache-2.0: code from authors who have not consented to relicensing stays MIT. The file carries both texts; treat the package as Apache-2.0 and MIT together. It also says the project's documentation (not specifications) is CC-BY-4.0; the npm package ships code, a README and the LICENSE |
 
 ## Code written by the build tools
 
@@ -179,9 +197,9 @@ built bundle's source maps independently, so emitted code from an unlisted origi
 
 | Component | Version | Shipped as | Licence file reads as | Copyright | Source |
 |---|---|---|---|---|---|
-| @modelcontextprotocol/core | 2.4.0 | dependency | Apache-2.0, MIT | Copyright (c) 2024-2025 Model Context Protocol a Series of LF Projects, LLC. | https://github.com/modelcontextprotocol/typescript-sdk |
-| @modelcontextprotocol/server | 2.4.0 | dependency (direct) | Apache-2.0, MIT | Copyright (c) 2024-2025 Model Context Protocol a Series of LF Projects, LLC. | https://github.com/modelcontextprotocol/typescript-sdk |
-| typescript | 5.9.3 | dependency (direct) | Apache-2.0 | Copyright (c) 1991-2017 Unicode, Inc. All rights reserved. (+2) | https://github.com/microsoft/TypeScript |
+| @modelcontextprotocol/core | 2.4.0 | dependency | Apache-2.0, MIT, CC-BY-4.0 | Copyright (c) 2024-2025 Model Context Protocol a Series of LF Projects, LLC. | https://github.com/modelcontextprotocol/typescript-sdk |
+| @modelcontextprotocol/server | 2.4.0 | dependency (direct) | Apache-2.0, MIT, CC-BY-4.0 | Copyright (c) 2024-2025 Model Context Protocol a Series of LF Projects, LLC. | https://github.com/modelcontextprotocol/typescript-sdk |
+| typescript | 5.9.3 | dependency (direct) | Apache-2.0 | none in its licence file | https://github.com/microsoft/TypeScript |
 
 ## BSD-3-Clause
 

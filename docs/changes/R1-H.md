@@ -55,6 +55,17 @@ bundled into `dist-web/`, 3 origins of code the build tools write into
 
 - No copyleft (GPL, LGPL, AGPL, MPL) is shipped. Nothing is outside the
   allow-list. Every shipped component has its licence text.
+- Licences embedded inside shipped packages (listed in their own section of
+  `docs/licences.md`, so "outside the allow-list: none" is read as covering
+  declared licences only): TypeScript's `ThirdPartyNoticeText.txt` carries MIT
+  (DefinitelyTyped), the Unicode licence, the W3C licence and CC-BY-4.0 (WHATWG
+  material); the MCP SDK's LICENSE also covers its documentation under
+  CC-BY-4.0. TypeScript's own LICENSE has no copyright line (the copyright
+  column says "none in its licence file").
+- The npm dependencies follow `package-lock.json`, but a user's `npm install` of
+  the tarball resolves transitive dependencies afresh within their version
+  ranges, so a later install can drift from this inventory (noted in
+  `docs/licences.md`; no shrinkwrap added).
 - Flagged: the MCP SDK packages declare Apache-2.0, but their LICENSE explains
   a licensing transition from MIT: contributions whose authors have not agreed
   to relicensing stay MIT. The file carries both texts; treat them as Apache-2.0
@@ -86,7 +97,7 @@ or are derived from other projects:
 |---|---|
 | `research/sources/*.txt` (37 files, 535 KB) and `research/sources/index.json` | Text captures of third-party documentation and web pages (Alloy, Dafny, F*, P, Quint, RAML, TLA+, VDM, Why3), fetched by `research/fetch_sources.py` on 8 November 2026. Copyrighted material with no licence to redistribute recorded; contains third-party names and email addresses (e.g. Quint and P authors). |
 | `research/sources/tlc-binary.json` | Metadata about the TLA+ tools JAR (no JAR). |
-| `research/results/tlc-*.txt` | TLC output logs; contain `/home/user/...` paths. |
+| `research/results/tlc-*.txt` | TLC output logs; contain `/home/<owner>/...` paths. |
 | `examples/checkout.qnt`, `examples/Checkout.tla`, `examples/double-charge.cfg`, `fixed.cfg`, `missing-refund.cfg`, `stock-leak.cfg` | Hand-written Quint/TLA+ research baseline. Written for this project, in the languages of Quint (Apache-2.0) and TLA+; no third-party text found. Not packed. |
 | `evidence/w2-c/**` and other evidence with `"text": "…"` fields (58 files, mostly `evidence/w2-c`, `evidence/w2-c2`, `evidence/w3-g`) | Verbatim excerpts of **Vector** source code (MPL-2.0) and file paths and identifiers from Vector and **restic** (BSD-2-Clause), from graph-accuracy runs on the pinned corpora. MPL-2.0 is file-level copyleft: excerpts of Vector files stay under MPL-2.0. |
 | `evidence/w2-b/*restic*`, `evidence/w1-e/restic-*` | Identifiers and summaries from restic; `restic-contracts.go`/`restic-backup_check.go` are Pymtheg-generated, not copied. |
@@ -99,9 +110,9 @@ Things to review before the repository is public:
 |---|---|
 | Credentials, tokens, keys | None found (patterns for GitHub, OpenAI-style, AWS, Slack tokens, private keys and `password=`/`token=` assignments). `test/implementation-process.test.mjs:144` has a fixture string `secret = "private source"`, not a credential. |
 | Private IP addresses and hostnames | None tracked. The dev server's address appears only in the untracked `pymtheg-dev` wrapper. `AGENTS.md` names `pymtheg-dev` and `~/pymtheg-dev/corpora/…` (no host). |
-| Personal paths `/home/user/…` | 1,468 tracked files: almost all under `evidence/` (1,205 in `evidence/w2-c`); outside it: `design/implementation-prompt-core.md` (also names `~/Scripts/pc-tools`), `docs/trial-start.md` and `docs/changes/W2-E.md` (both in `docs/`, which the npm package ships), `research/results/tlc-*.txt`, `scripts/first-use-audit.mjs`, `scripts/gui-check.mjs`, `scripts/project-c-workspace-audit.mjs` (default helper/browser paths). |
+| Personal paths `/home/<owner>/…` | 1,468 tracked files: almost all under `evidence/` (1,205 in `evidence/w2-c`); outside it: `design/implementation-prompt-core.md` (also names `~/Scripts/pc-tools`), `docs/trial-start.md` and `docs/changes/W2-E.md` (in the repository only: since round 1 the npm package no longer ships them, see e.), `research/results/tlc-*.txt`, `scripts/first-use-audit.mjs`, `scripts/gui-check.mjs`, `scripts/project-c-workspace-audit.mjs` (default helper/browser paths). |
 | Email addresses | Third-party authors' addresses inside `research/sources/` captures and package metadata quotes; `vector@example.com` in evidence. No personal address of the owner found. |
-| Owner's name | "Karl" appears in 82 tracked files (decision ledgers, plans, working rules). |
+| Owner's name | "Karl" appears in 82 tracked files (decision ledgers, plans, working rules), 33 of them in `docs/` (for example `build-plan.md`, `decisions.md`, `mega-plan.md`, `progress.md`, `requirements.md`, `roadmap-1.0.md`, review and audit documents, 7 files in `docs/changes/`). Since round 1 none of these ships in the npm package; the shipped files are checked by `test/package-contents.test.mjs`. |
 | Large files | 354 MB tracked in 5,766 files; 48 files over 1 MB (218 MB), 7 over 10 MB, the largest `evidence/w2-c/d16-movement-withdrawals.json` (33.6 MB); 18 compressed archives (`*.tar.gz`, `*.json.gz`, 3.9 MB) under `evidence/`; Studio screenshots (`evidence/{recovery,rework,studio}/*.png`). Git history also holds them. |
 | Third-party material without a licence | The `research/sources/` captures; the Vector excerpts in evidence (MPL-2.0 applies to them). |
 
@@ -256,3 +267,56 @@ installed binary.
 2. **Warning filter hid a real deprecation** when an `Error` was passed with a
    type in the second argument. Fixed as described in section 7; tested for
    each overload on Node 24.21.0, 24.0.0 and 25.2.1.
+
+## Round 1 review (Opus) and the owner's request: fixes
+
+a. **Licence file gate.** `assess()` (used by `--check` and the test) now
+   blocks when a licence file reads as a licence outside the allow-list, even
+   if the declared licence is allowed, unless the package has a reviewed
+   explanation entry; previously such a package only got a "not yet reviewed"
+   flag. The review's sabotage (crelt's LICENSE replaced with GPL text, MIT
+   declared) is a test case, along with a notice file quoting GPL (not the
+   grant, not blocking) and an explained package (not blocking). The MCP SDK's
+   explanation now also covers the CC-BY-4.0 documentation clause.
+b. **Embedded licences** section in `docs/licences.md` (see A above); the
+   reader also recognises CC-BY-4.0, the W3C licence and the Unicode licence.
+   Copyright lines come from a package's licence files only.
+c. **A.4 list** updated below for the shipped `docs/`.
+d. **Lockfile drift** note at the top of `docs/licences.md`.
+e. **The package ships user documentation only** (owner: "yeah better fix
+   that"). `package.json` `files` lists ten documents instead of `docs/`:
+
+   | Before | After |
+   |---|---|
+   | all of `docs/`: 74 top-level files and 40 under `docs/changes/` (114) | `agent-workflow.md`, `grammar.md`, `report.schema.json` (all three read by the product at run time), `mcp.md`, `output-plugins.md` (named in a CLI message), `studio.md`, `support.md`, `project-init.md`, `journeys.md`, `licences.md` (10) |
+
+   Not shipped any more, though still in the repository: the plans, ledgers
+   and history (`build-plan.md`, `decisions.md`, `mega-plan.md`,
+   `trial-start.md`, `progress.md`, `runtime-map.md`, `requirements.md`,
+   roadmap, review briefs, audits, remediation notes, authoring maps and
+   `docs/changes/**`). Before, the shipped `docs/` carried personal paths in 3
+   files (`trial-start.md`, `changes/W2-E.md` and this file), the owner's name in
+   36 files and private project names in 16. In the ten that still ship, three
+   sentences named the owner and were reworded in place (`project-init.md`
+   line 3, `studio.md` "a bounded local helper", `output-plugins.md` "Apex is
+   wanted"), and so was one in the README ("The review/polish cycle has
+   stopped"). Links from the README and the shipped docs to repository files
+   that no longer ship (46: 19 in the README, 24 in `support.md`, 2 in
+   `studio.md`, 1 in `project-init.md`) now point to the same files on GitHub
+   (`https://github.com/KarlLivesey/pymtheg/blob/main/...`), which resolve once
+   the repository is public. `test/package-contents.test.mjs` reads the real
+   pack list (`npm pack --dry-run --json`) and fails if `docs/` ships anything
+   but the ten, if an internal file ships, or if any shipped file (apart from
+   the licence texts) contains a personal path (`/home/<user>/`), the owner's
+   name or a private project name (ProjectA, ProjectB, ProjectC). A scan of all 813
+   shipped files found no hostname or IP address other than `127.0.0.1` (the
+   Studio loopback).
+
+   The acceptance harness (branch `r1-f-clean-machine-acceptance`, not edited):
+   its `tarball-contents` step (`scripts/acceptance/run.mjs`, `inspectTarball`)
+   requires only `dist/cli/main.js`, `dist-web/index.html`,
+   `grammars/go/tree-sitter-go.wasm`, `grammars/rust/tree-sitter-rust.wasm`,
+   `package.json`, `README.md` and `pymtheg`, and fails on files under `test/`,
+   `evidence/`, `research/`, `web/src/` or `src/**/*.ts`. No step reads a
+   shipped `docs/` file directly; MCP reads `docs/agent-workflow.md` and
+   `docs/grammar.md`, which still ship. No harness change is needed.

@@ -11,6 +11,8 @@ import {
   satisfiable,
   allowed,
   root,
+  assess,
+  blocking,
 } from "../scripts/licences/inventory.mjs";
 import {
   bundleOrigins,
@@ -47,6 +49,7 @@ test("every shipped component has an allowed licence and its licence text", asyn
       kind,
     );
   for (const c of data.components) {
+    assert.deepEqual(blocking(c), [], `${c.name}@${c.version}`);
     assert.ok(
       c.declared && satisfiable(c.declared),
       `${c.name}@${c.version}: licence ${c.declared ?? "not declared"} is outside the allow-list ${[...allowed].join(", ")}`,
@@ -162,4 +165,47 @@ test("unmapped build-tool code is recognised by shape, and anything else is repo
     ).unexplained,
     /__defProp/,
   );
+});
+
+test("a licence file outside the allow-list blocks even when the declared licence is allowed", () => {
+  const gpl =
+    "GNU GENERAL PUBLIC LICENSE\nVersion 3, 29 June 2007\nCopyright (C) 2007 Free Software Foundation, Inc.";
+  // The sabotage the round 1 review ran: crelt's LICENSE replaced by GPL text, MIT declared.
+  const sabotaged = assess({
+    name: "crelt",
+    version: "1.0.6",
+    declared: "MIT",
+    files: ["LICENSE"],
+    texts: [gpl],
+  });
+  assert.deepEqual(blocking(sabotaged), [
+    "licence file reads as GPL, outside the allow-list",
+  ]);
+  // A notice file quoting another licence is not the package's grant.
+  const notice = assess({
+    name: "crelt",
+    version: "1.0.6",
+    declared: "MIT",
+    files: ["LICENSE", "ThirdPartyNoticeText.txt"],
+    texts: [
+      "Permission is hereby granted, free of charge, to any person obtaining a copy",
+      gpl,
+    ],
+  });
+  assert.deepEqual(blocking(notice), []);
+  assert.ok(notice.embedded.includes("GPL"));
+  // Only a reviewed explanation entry lets a disallowed licence file pass.
+  const explained = assess({
+    name: "@modelcontextprotocol/server",
+    version: "0",
+    declared: "Apache-2.0",
+    files: ["LICENSE"],
+    texts: [
+      "Apache License, Version 2.0 ... Documentation contributions are licensed under CC-BY-4.0.",
+    ],
+  });
+  assert.ok(
+    explained.problems.some((p) => /CC-BY-4.0, outside the allow-list/.test(p)),
+  );
+  assert.deepEqual(blocking(explained), []);
 });

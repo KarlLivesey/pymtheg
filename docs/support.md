@@ -84,7 +84,7 @@ handshakes and fire deadlines and grace periods explicitly. Their named 60-secon
 outer safety budgets only turn missing evidence into an unresolved failure; they
 establish no timing property. They observe descendants through Linux `/proc` and
 use a test-only preload and Unix socket to observe the supervisor's completion.
-Source: [W2-T](changes/W2-T.md). Backend integration timeout is an explicit unresolved/skip,
+Source: [W2-T](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-T.md). Backend integration timeout is an explicit unresolved/skip,
 not a successful assertion of the source property.
 
 Flow lowering materialises at most 5,000 source states by default (explicit
@@ -96,7 +96,7 @@ not a general compiler equivalence proof. No temporal liveness claim is made.
 
 ## Rebuild state: engines, storage and code graph (merged through W2-C2)
 
-This section folds the merged per-chunk notes under [changes/](changes/) for
+This section folds the merged per-chunk notes under [changes/](https://github.com/KarlLivesey/pymtheg/tree/main/docs/changes) for
 mega-plan Stages 1–4 and 6–7 as they stand on `main`. Open pull requests are not
 described. Where this section and an older section below disagree, this one is
 current.
@@ -111,7 +111,7 @@ current.
 
 These are the only behavioural engines; the CLI, Studio and MCP all use them and
 no external program, runtime or download is needed. TLC, Quint and every Java
-dependency were removed in [R1-A](changes/R1-A.md) (decision D2). `--state-budget N`
+dependency were removed in [R1-A](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/R1-A.md) (decision D2). `--state-budget N`
 (positive safe integer, default 1,000,000 distinct states) bounds `verify`.
 Exhausting it, a timeout, cancellation or a domain boundary leaves every
 unviolated property inconclusive and incomplete with the limit named
@@ -120,8 +120,8 @@ budget or domain boundary. A worker or engine error is a failure (`B104`,
 completion `failed`, exit 3), never a verdict. Options that belong to another
 command (`--state-budget` outside `verify`; `--seed`, `--max-steps`,
 `--max-samples` outside `simulate`, unless supplied by a scenario; `--target`
-outside `emit`) are rejected. Engine contract: [W1-B](changes/W1-B.md), wiring:
-[W2-A](changes/W2-A.md), removal of the external engines: [R1-A](changes/R1-A.md).
+outside `emit`) are rejected. Engine contract: [W1-B](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W1-B.md), wiring:
+[W2-A](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-A.md), removal of the external engines: [R1-A](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/R1-A.md).
 
 ### `check` notices
 
@@ -136,7 +136,7 @@ outside `emit`) are rejected. Engine contract: [W1-B](changes/W1-B.md), wiring:
   and a fix; for machine state, the full replacement declaration with its range,
   for example `` `state n: Int in 0..3 = 3;` ``. The hint is part of the message,
   so it is also in JSON reports. It is lost when the subtraction passes through a
-  local. Typing is unchanged: `Nat - Nat` is `Int`. Source: [W2-F](changes/W2-F.md).
+  local. Typing is unchanged: `Nat - Nat` is `Int`. Source: [W2-F](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-F.md).
 
 ### Project storage
 
@@ -157,7 +157,7 @@ previews), `scaffold`, `observe` captures, `check --check-scope related|project`
 and any analysis given `--scenario`. File-scope `check`, `verify`, `simulate` and
 `emit` without `--scenario`, and `observe --list`, `fmt`, `doctor`, help and
 version still work there and write no project state. Symbolic-link storage
-directories, databases and SQLite sidecars are refused. Source: [W2-E](changes/W2-E.md).
+directories, databases and SQLite sidecars are refused. Source: [W2-E](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-E.md).
 
 **Stable global IDs and recorded history (first slice of 3.3).** Each checkpoint
 registers its documents, projected entities (including requirements and
@@ -176,7 +176,7 @@ ledger is not carried in history archives or preserved by archive import; UUIDs
 are not shown by CLI, MCP or Studio; no command sets the author; no move or
 rename identity resolution, synchronization or merge; some imported-data path
 fields still accept absolute paths; old records are not backfilled. Source:
-[W2-E2](changes/W2-E2.md).
+[W2-E2](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-E2.md).
 
 ### Document import
 
@@ -185,7 +185,7 @@ The folder reader accepts a single file, a `doc/` folder and reStructuredText
 (section recognition, not an RST renderer). `pymtheg import-architecture
 FILE|FOLDER --into PROJECT` uses it. Include/exclude path patterns and the
 structured summary of skipped files exist in the reader and summary renderer but
-are **not yet exposed** by the CLI, MCP or Studio. Source: [W1-D](changes/W1-D.md).
+are **not yet exposed** by the CLI, MCP or Studio. Source: [W1-D](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W1-D.md).
 
 ### Code graph
 
@@ -197,7 +197,7 @@ is schema 3; an older graph database is refused with a rebuild message. Nothing
 runs a language toolchain or project code, and nothing reads or writes
 `.codegraph/`. Language modules are discovered from `src/graph/languages/*/`;
 production discovery offers `go`, `rust` and `typescript` (the `toy` fixture is
-test-only). Interface: [W1-C](changes/W1-C.md), [W2-I](changes/W2-I.md).
+test-only). Interface: [W1-C](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W1-C.md), [W2-I](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-I.md).
 
 Link outcomes:
 
@@ -235,7 +235,7 @@ one row at a time, so no single string holds a whole module's analysis; this
 does not make an arbitrarily large snapshot fit in memory. Each module's
 `resolve` receives its own deep copy of files, symbols, links and context files,
 so a module that mutates its input cannot affect later modules or stored facts.
-Source: [W2-M](changes/W2-M.md).
+Source: [W2-M](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-M.md).
 
 **Internal errors are not invalid code.** An exception inside the TypeScript
 module while reading one file, and the TypeScript compiler's stack limits, fail
@@ -245,7 +245,7 @@ and is retried on the next index. An exception while building a project or
 program is reported as an analysis error for the module. Links into a file that
 failed internally are unresolved with no reason. In Go and Rust a thrown parser
 exception is a parser error in the index report, not a syntax failure, and cannot
-become an `invalid-code` cause. Source: [W2-U](changes/W2-U.md).
+become an `invalid-code` cause. Source: [W2-U](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-U.md).
 
 #### Go (module version 23)
 
@@ -285,8 +285,8 @@ maintainer step (`node grammars/build.mjs go`) that install and tests never run.
 Still failing a valid file: an empty statement followed by another statement on
 the same line (`{; G() }`), and a non-BMP character in an identifier that
 straddles one of the parser runtime's 5,119-unit input chunk boundaries (the same
-character in a comment or string there is read). Sources: [W2-B](changes/W2-B.md),
-[W2-B2](changes/W2-B2.md), [W2-S](changes/W2-S.md), `grammars/README.md`.
+character in a comment or string there is read). Sources: [W2-B](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-B.md),
+[W2-B2](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-B2.md), [W2-S](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-S.md), `grammars/README.md`.
 
 #### Rust (module version 23)
 
@@ -353,7 +353,7 @@ which fails the whole file (11 files of Vector): `&raw` where `raw` is a variabl
 or more attributes on one parameter or an attribute on a closure parameter (a
 single attribute on a function or method parameter parses), a turbofish on a function named like a
 primitive (`char::<_, E>(…)`), and `impl A + for<'a> B<'a>`. Sources:
-[W2-C](changes/W2-C.md), [W2-P](changes/W2-P.md).
+[W2-C](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-C.md), [W2-P](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-P.md).
 
 #### TypeScript and JavaScript (module version 16)
 
@@ -388,14 +388,14 @@ answer.
 - Known limits: JavaScript early errors the compiler does not report without
   `checkJs` (`let let = 1`, top-level `return`) leave a file clean; AMD
   `define(…)` modules are not modelled; module augmentation turns imports of the
-  augmented module into candidate sets. Sources: [W2-D](changes/W2-D.md),
-  [W2-U](changes/W2-U.md).
+  augmented module into candidate sets. Sources: [W2-D](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-D.md),
+  [W2-U](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-U.md).
 
 #### Not built yet
 
 Toolchain-backed exact links (Go through `go list` and `go/types`; Rust through
 `cargo`/`rustc`) are a later, explicit per-project opt-in (decision D17); the
-investigations are [W2-K](changes/W2-K.md) and [W2-L](changes/W2-L.md). Also
+investigations are [W2-K](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-K.md) and [W2-L](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-L.md). Also
 later: automatic sync, the join with model declarations, the explore query,
 MCP/Studio surfaces for the graph, Lua, and a vendored Rust grammar.
 
@@ -422,7 +422,7 @@ symbol or file (optionally through definite callers), and unlinked requirements
 and public symbols. Not yet built: `.pym` declaration links, MCP tools (the data
 functions are exported), Studio display, carrying links in archive bundles,
 comment- or format-insensitive fingerprints, and safe concurrent first-time graph
-indexing. Source: [R1-D](changes/R1-D.md).
+indexing. Source: [R1-D](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/R1-D.md).
 
 ## Architecture and interactive authoring
 

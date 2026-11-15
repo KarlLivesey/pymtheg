@@ -185,7 +185,7 @@ These checks do not establish the business behaviour of handwritten code.
 
 ## Requested future target
 
-Karl would like Apex as an additional output target later. It belongs in the
+Apex is wanted as an additional output target later. It belongs in the
 emitter-plugin extension path and is deliberately deferred to a future session;
 no Apex emitter is part of the current implementation or completion claims.
 
