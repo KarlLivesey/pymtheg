@@ -2454,42 +2454,24 @@ any external checker, runtime or download for behavioural checking; a compatibil
 path for the removed options or fields. **Known limits:** see
 [R1-A](changes/R1-A.md).
 
-### Pymtheg's own licence: RPL-1.5 with an output exception and a plugin declaration (LIC-1)
+### Pymtheg's own licence: MIT (LIC-1)
 
-**Decided (Karl, 15 November 2026):** Pymtheg is licensed under the Reciprocal
-Public License 1.5 (SPDX `RPL-1.5`), copyright Karl Livesey, with an additional
-permission for output and project files and a plugin declaration
-([LICENSE-EXCEPTIONS.md](../LICENSE-EXCEPTIONS.md)). His goals, in his words:
-"the main thing I want is code etc back and to be allowed to use that code on the
-project"; "I also want it to cover internal usage ie company x download it modify
-it and distribute that internally"; output is not covered (his example: a
-Photoshop clone under RPL-1.5 protects the code, not the images made with it);
-"you can make plugins but must be source available for us to intergrate into the
-core", including in-house plugins: "maybe theres an extra feature they want and
-so they ad it using a plugin rather than modifying the code"; and, on the
-plugin wording: "we'll explicitly state plugins or code that changes pymtheg
-behaviour is deemed covered by RPL-1.5 to be clear". **Why:** RPL-1.5
-makes internal use of a modified copy, other than for Research or Personal Use,
-a "Deploy" (Section 1.2), and the source of Extensions that are Deployed must
-be published (Section 6.1). GPL and AGPL were considered: neither requires
-publishing internal modifications or sends changes back to the owner.
-GPLv2-only was also ruled out by Apache-2.0 runtime dependencies.
-**Rules out:** treating a plugin as a way round publishing changes; any duty on
-Pymtheg's output, or on a user's own code or designs merely because Pymtheg
-read, checked or linked them. A plugin is code Pymtheg itself loads to change
-its behaviour; software that only runs Pymtheg, talks to it over MCP or uses
-its output is not one. `LICENSE-EXCEPTIONS.md` declares that a plugin, and
-any other code Pymtheg loads and runs to change or add to its behaviour, is
-deemed an Extension covered by RPL-1.5 on the same terms as a change to
-Pymtheg's own code, including use only inside one organisation, as a term on
-which Pymtheg is offered. **Known limits:** for code copied or derived from
-Pymtheg the licence's own definitions apply (Sections 1.10(ii), 1.3 and 1.5);
-for independently written code the Licensor relies on Sections 1.10(iii) and
-1.3. Open questions for a lawyer before first publish: whether an explicit
-added term makes this a modified licence that Section 7.1 says must be renamed
-(and so no longer plain SPDX `RPL-1.5`), whether the declaration binds code
-that would not otherwise be a Modification or Derivative Work, and how it fits
-Sections 13.5 and 13.9. Per-file notices, the
-package `license` field and `docs/licences.md` follow in LIC-2;
-`"private": true` and publishing remain the owner's decisions. See
-[LIC-1](changes/LIC-1.md).
+**Decided (Karl, 15 November 2026):** Pymtheg is licensed under the MIT License,
+copyright Karl Livesey. **History:** the owner first asked about GPLv2-only,
+which was ruled out because of Apache-2.0 runtime dependencies (`typescript`,
+the MCP SDK). He then chose the Reciprocal Public License 1.5 for share-back,
+including internal use and plugins; his goals then, in his words: "the main
+thing I want is code etc back and to be allowed to use that code on the
+project"; "I also want it to cover internal usage ie company x download it
+modify it and distribute that internally"; "you can make plugins but must be
+source available for us to intergrate into the core". The review of the RPL-1.5
+text (PR 46, rounds 1 and 2) showed that the plugin rule could not be made
+certain without a modified, renamed licence, and that the licence carries
+duties for users and the owner and a default US (Colorado) arbitration clause.
+The owner then chose MIT: "ah fuck it we'll just go MIT". **What MIT means:**
+anyone may use, change and redistribute Pymtheg, including in closed products,
+keeping the copyright and licence notice; there is no share-back duty. **Rules
+out:** the RPL-1.5 output exception and plugin statement (removed with
+`LICENSE-EXCEPTIONS.md`). The package `license` field, the own-licence line in
+`docs/licences.md` and per-file SPDX tags follow in LIC-2; `"private": true` and
+publishing remain the owner's decisions. See [LIC-1](changes/LIC-1.md).

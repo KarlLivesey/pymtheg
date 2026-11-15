@@ -230,13 +230,6 @@ purpose. Neither comparison nor compilation proves the implementation's behaviou
 
 ## Licence
 
-Copyright (C) 2026 Karl Livesey. Pymtheg is licensed under the Reciprocal Public
-License 1.5 ([LICENSE](LICENSE)) with an additional permission and a plugin
-declaration ([LICENSE-EXCEPTIONS.md](LICENSE-EXCEPTIONS.md)); contributions are
-accepted under the same terms ([CONTRIBUTING.md](CONTRIBUTING.md)).
-In plain terms: if you change Pymtheg, or write a plugin or other code that
-Pymtheg loads to change its behaviour, and use or distribute it other than for
-personal use or research, even only inside your own organisation, you must
-publish the source under the same licence. What you make with Pymtheg, such as
-reports, graphs, links, generated code and your own designs, carries no duty
-under the licence.
+Pymtheg is licensed under the MIT License; see [LICENSE](LICENSE).
+Third-party components and their licences will be listed in `docs/licences.md`
+and `THIRD-PARTY-NOTICES` once the licence inventory work lands.
