@@ -10,17 +10,7 @@
 // asserts on elapsed time; durations and sizes are observations only.
 // Uses only Node built-ins (the container has nothing else).
 import { spawn } from "node:child_process";
-import {
-  appendFileSync,
-  cpSync,
-  existsSync,
-  lstatSync,
-  mkdirSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { appendFileSync, cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { BACKEND_ARGUMENT, BACKEND_PROGRAM, TOOLCHAIN_PROGRAM, wordingHits } from "./wording.mjs";
 
@@ -34,14 +24,15 @@ const HOME = process.env.HOME ?? "/home/node";
 const PROJECT = join(HOME, "project");
 const DESIGN = join(PROJECT, "designs/order.pym");
 const BROKEN = join(PROJECT, "designs/broken.pym");
-const BROKEN_DIAGNOSTIC = `${BROKEN}:7:27 error N002: Unknown value or variant charge; did you mean charges?`;
-const TGZ = join(
-  ACC,
-  "pkg",
-  readdirSync(join(ACC, "pkg")).find((f) => f.endsWith(".tgz")),
-);
+const VIOLATION = join(PROJECT, "designs/overcharge.pym");
+/** The complete expected diagnostic for the broken design: location, code, message and suggestion. */
+const BROKEN_CODE = "N002";
+const BROKEN_MESSAGE = "Unknown value or variant charge; did you mean charges?";
+const BROKEN_DIAGNOSTIC = `${BROKEN}:7:27 error ${BROKEN_CODE}: ${BROKEN_MESSAGE}`;
+const TGZ = join(ACC, "pkg", readdirSync(join(ACC, "pkg")).find((f) => f.endsWith(".tgz")));
 const GLOBAL_PREFIX = join(HOME, ".npm-global");
 const APP = join(HOME, "app");
+const GO_PROJECT = join(HOME, "goproject");
 const NODE_VERSION = process.version;
 /** Source files in the sample project: web 3 (TypeScript), service 4 (Go), engine 2 (Rust). */
 const SAMPLE_SOURCE_FILES = 9;
@@ -73,10 +64,10 @@ function killGroup(child, signal) {
   }
 }
 
-function run(cmd, { cwd = PROJECT, env = baseEnv, timeoutMs = 900_000 } = {}) {
+function run(cmd, { cwd = PROJECT, timeoutMs = 900_000 } = {}) {
   return new Promise((resolve) => {
     const started = process.hrtime.bigint();
-    const child = spawn(cmd[0], cmd.slice(1), { cwd, env, stdio: ["ignore", "pipe", "pipe"], detached: true });
+    const child = spawn(cmd[0], cmd.slice(1), { cwd, env: baseEnv, stdio: ["ignore", "pipe", "pipe"], detached: true });
     const out = [],
       err = [];
     let timedOut = false;
@@ -145,8 +136,7 @@ function resetTraces() {
 /** Every backend or toolchain process started during the step, from the PATH shims and the spawn trace. */
 function readTraces() {
   const calls = [];
-  for (const line of readFileSync(SHIM_LOG, "utf8").split("\n").filter(Boolean))
-    calls.push({ tool: line.split(" ")[0], detail: `shim: ${line}` });
+  for (const line of readFileSync(SHIM_LOG, "utf8").split("\n").filter(Boolean)) calls.push({ tool: line.split(" ")[0], detail: `shim: ${line}` });
   for (const line of readFileSync(SPAWN_LOG, "utf8").split("\n").filter(Boolean)) {
     let s;
     try {
@@ -156,27 +146,47 @@ function readTraces() {
     }
     const file = s.file.split("/").pop();
     const args = s.args.join(" ");
-    const tool = BACKEND_PROGRAM.test(file) || TOOLCHAIN_PROGRAM.test(file)
-      ? file
-      : s.args.some((a) => BACKEND_ARGUMENT.test(a))
-        ? /quint/i.test(args)
-          ? "quint"
-          : "java"
-        : null;
+    const tool =
+      BACKEND_PROGRAM.test(file) || TOOLCHAIN_PROGRAM.test(file)
+        ? file
+        : s.args.some((a) => BACKEND_ARGUMENT.test(a))
+          ? /quint/i.test(args)
+            ? "quint"
+            : "java"
+          : null;
     if (tool) calls.push({ tool, detail: `spawn: ${file} ${s.args.slice(0, 3).join(" ")}`.trim() });
   }
   return calls;
 }
 
-/** Node's own process warnings on stderr, e.g. `(node:12) ExperimentalWarning: …`. */
-function nodeWarnings(stderr) {
-  return stderr.split("\n").filter((l) => /^\(node:\d+\) \w*Warning: /.test(l) || /^\(Use `node --trace-warnings/.test(l));
-}
+// ---------------------------------------------------------------- output rules
+
+/** Node's own process warnings, with or without a code: `(node:12) [DEP0040] DeprecationWarning: …`. */
+const NODE_WARNING = /^\(node:\d+\) (?:\[[A-Z0-9_]+\] )?\w*Warning: /;
+const TRACE_HINT = /^\(Use `node --trace-(?:warnings|deprecation) \.\.\.` to show where the warning was created\)$/;
 const SQLITE_WARNING = /^\(node:\d+\) ExperimentalWarning: SQLite is an experimental feature and might change at any time$/;
-const TRACE_HINT = /^\(Use `node --trace-warnings \.\.\.` to show where the warning was created\)$/;
-/** R1-H: exactly the SQLite warning, on exactly Node 24.0.x and 25.x, is the one known warning gap. */
+const STACK_LINE = /^\s+at .+:\d+:\d+\)?$/;
+const ERROR_LINE = /^\s*\w*Error: /;
+const UNHANDLED = /\bunhandled\b|\buncaught\b/i;
+
+function nodeWarnings(stderr) {
+  return stderr.split("\n").filter((l) => NODE_WARNING.test(l) || TRACE_HINT.test(l));
+}
+/** R1-H: exactly the SQLite warning (and its trace hint), on exactly Node 24.0.x and 25.x, is the one known warning gap. */
 function isKnownSqliteWarning(lines) {
-  return /^v24\.0\.|^v25\./.test(NODE_VERSION) && lines.length > 0 && lines.every((l) => SQLITE_WARNING.test(l) || TRACE_HINT.test(l)) && lines.some((l) => SQLITE_WARNING.test(l));
+  return /^v24\.0\.|^v25\./.test(NODE_VERSION) && lines.some((l) => SQLITE_WARNING.test(l)) && lines.every((l) => SQLITE_WARNING.test(l) || TRACE_HINT.test(l));
+}
+
+/** Internal-error signs: stack frames, `XError: ` lines not expected by the step, unhandled/uncaught rejections. */
+function internalErrors(text, allowedErrorLines = []) {
+  const found = [];
+  for (const line of text.split("\n")) {
+    if (STACK_LINE.test(line)) found.push(`stack frame: ${line.trim().slice(0, 140)}`);
+    else if (ERROR_LINE.test(line) && !allowedErrorLines.includes(line.trim())) found.push(`error line: ${line.trim().slice(0, 140)}`);
+    else if (UNHANDLED.test(line)) found.push(`unhandled: ${line.trim().slice(0, 140)}`);
+    if (found.length >= 3) break;
+  }
+  return found;
 }
 
 function excerpt(text, max = 360) {
@@ -198,8 +208,6 @@ function parseJson(text) {
 
 // ---------------------------------------------------------------- recording
 
-const scenarioOptions = { reportOnly: false };
-
 /** A note or fingerprint must never crash the run; a broken one reads as such. */
 function safe(fn, r) {
   if (!fn) return undefined;
@@ -213,30 +221,37 @@ function safe(fn, r) {
 /**
  * Classify one step. Statuses:
  *  pass          every expectation met; no backend or unrequested toolchain
- *                process; no Java/Quint/TLC wording; no Node process warning
- *  expected-fail the step must fail (a broken design) and failed exactly as specified
+ *                process; no Java/Quint/TLC wording; no Node process warning;
+ *                no stack frame, unexpected `XError:` line or unhandled rejection
+ *  expected-fail the step must fail (a broken design, a changed link) and
+ *                failed exactly as specified
  *  known-gap     the ONLY problem is the expectation failure, and the step's own
- *                gap matcher recognises the exact output that chunk will change
- *                (exact exit code and message); or the R1-H SQLite warning on
- *                Node 24.0.x / 25.x and nothing else
+ *                gap matcher recognises the exact output that chunk will change;
+ *                or the R1-H SQLite warning on Node 24.0.x / 25.x and nothing else
  *  fail          anything else, including a crash, an unexpected exit code or
  *                an exception inside the harness
  *  observed      report-only step (sizes, timings)
+ * `harnessOutput: true` marks steps whose output is the harness's own (git,
+ * find, du): only their expectation is judged.
  */
 function record(def, r) {
   const problems = [];
-  const text = (r.stdout ?? "") + "\n" + (r.stderr ?? "");
+  const text = [r.stdout ?? "", r.stderr ?? "", r.extraText ?? ""].join("\n");
   if (r.harnessError) problems.push({ kind: "harness", reason: r.harnessError });
   const expectation = def.expect ? safe(def.expect, r) : null;
   if (expectation) problems.push({ kind: "expect", reason: expectation });
-  const words = def.skipWording ? [] : wordingHits(text);
-  if (words.length) problems.push({ kind: "wording", reason: `mentions Java/Quint/TLC: ${words[0]}` });
+  if (!def.harnessOutput) {
+    const words = def.skipWording ? [] : wordingHits(text);
+    if (words.length) problems.push({ kind: "wording", reason: `mentions Java/Quint/TLC: ${words[0]}` });
+    const internal = def.skipWording ? [] : internalErrors(text, def.allowedErrorLines ?? []);
+    if (internal.length) problems.push({ kind: "internal", reason: `internal error output: ${internal.join("; ")}` });
+    const warnings = def.skipWarnings ? [] : nodeWarnings(r.stderr ?? "");
+    if (warnings.length) problems.push({ kind: "node-warning", reason: `Node warning: ${warnings.join(" / ").slice(0, 300)}`, sqlite: isKnownSqliteWarning(warnings) });
+  }
   for (const call of r.calls ?? []) {
     if (TOOLCHAIN_PROGRAM.test(call.tool) && def.allowToolchain) continue;
     problems.push({ kind: "process", reason: `started ${call.tool} (${call.detail})` });
   }
-  const warnings = def.skipWarnings ? [] : nodeWarnings(r.stderr ?? "");
-  if (warnings.length) problems.push({ kind: "node-warning", reason: `Node warning: ${warnings[0]}`, sqlite: isKnownSqliteWarning(warnings) });
 
   let status, reason, chunk;
   const gapOf = (p) => {
@@ -244,7 +259,7 @@ function record(def, r) {
     if (p.kind === "expect" && def.gap && safe(def.gap.when, r) === true) return def.gap.chunk;
     return null;
   };
-  if (def.observe || (scenarioOptions.reportOnly && def.observe !== false)) {
+  if (def.observe) {
     status = "observed";
     reason = problems.length ? "problems: " + problems.map((p) => p.reason).join(" | ") : safe(def.note, r) ?? "ok";
   } else if (!problems.length) {
@@ -266,9 +281,9 @@ function record(def, r) {
     required: !def.observe && def.required !== false,
     exitCode: r.exitCode ?? null,
     status,
-    reason,
+    reason: String(reason),
     ...(chunk ? { chunk } : {}),
-    outputBytes: Buffer.byteLength(text) - 1,
+    outputBytes: Buffer.byteLength(text) - 2,
     durationMs: r.durationMs === undefined ? null : Math.round(r.durationMs),
     ...(r.peakRssKiB ? { peakRssKiB: r.peakRssKiB } : {}),
     ...(r.timedOut ? { timedOut: true } : {}),
@@ -278,7 +293,7 @@ function record(def, r) {
     ...(def.observation ? { observation: safe(def.observation, r) } : {}),
   };
   appendFileSync(RESULTS, JSON.stringify(result) + "\n");
-  process.stdout.write(`${status.padEnd(13)} ${scenario}/${def.id}: ${reason.slice(0, 220)}\n`);
+  process.stdout.write(`${status.padEnd(13)} ${scenario}/${def.id}: ${result.reason.slice(0, 220)}\n`);
   return result;
 }
 
@@ -302,11 +317,7 @@ async function step(def) {
 const exit =
   (...codes) =>
   (r) =>
-    r.timedOut
-      ? "timed out (safety stop)"
-      : codes.includes(r.exitCode)
-        ? null
-        : `exit ${r.exitCode}${r.signal ? " (" + r.signal + ")" : ""}, expected ${codes.join(" or ")}`;
+    r.timedOut ? "timed out (safety stop)" : codes.includes(r.exitCode) ? null : `exit ${r.exitCode}${r.signal ? " (" + r.signal + ")" : ""}, expected ${codes.join(" or ")}`;
 const all =
   (...checks) =>
   (r) => {
@@ -316,24 +327,52 @@ const all =
     }
     return null;
   };
-const includes = (needle, what = JSON.stringify(needle)) => (r) =>
-  (r.stdout + "\n" + r.stderr).includes(needle) ? null : `output lacks ${what}`;
+const includes =
+  (needle, what = JSON.stringify(needle)) =>
+  (r) =>
+    (r.stdout + "\n" + r.stderr).includes(needle) ? null : `output lacks ${what}`;
+/** Some output line equals `line` exactly (after trimming trailing spaces). */
+const hasLine = (line) => (r) => ((r.stdout + "\n" + r.stderr).split("\n").some((l) => l.trimEnd() === line) ? null : `no output line equal to ${JSON.stringify(line)}`);
 const json = (check) => (r) => (r.json ? check(r.json) : "stdout is not JSON");
-const same = (actual, expected, what) =>
-  JSON.stringify(actual) === JSON.stringify(expected) ? null : `${what}: got ${JSON.stringify(actual)}, expected ${JSON.stringify(expected)}`;
+const same = (actual, expected, what) => (JSON.stringify(actual) === JSON.stringify(expected) ? null : `${what}: got ${JSON.stringify(actual)}, expected ${JSON.stringify(expected)}`);
 
 /** Exact callers: the set of (caller name, caller file, certainty) and the target name of every link. */
 function callers(symbol, expected) {
-  return all(exit(0), json((j) => {
-    if (j.status !== "ok") return `status ${j.status}`;
-    const links = j.data?.links ?? [];
-    const got = links.map((l) => `${l.source?.name}@${l.source?.file}:${l.certainty}`).sort();
-    const want = expected.map(([name, file]) => `${name}@${file}:definite`).sort();
-    const targets = [...new Set(links.map((l) => l.target?.name))];
-    return same(got, want, `callers of ${symbol}`) ?? same(targets, [symbol], "link targets");
-  }));
+  return all(
+    exit(0),
+    json((j) => {
+      if (j.status !== "ok") return `status ${j.status}`;
+      const links = j.data?.links ?? [];
+      const got = links.map((l) => `${l.source?.name}@${l.source?.file}:${l.certainty}`).sort();
+      const want = expected.map(([name, file]) => `${name}@${file}:definite`).sort();
+      const targets = [...new Set(links.map((l) => l.target?.name))];
+      return same(got, want, `callers of ${symbol}`) ?? same(targets, [symbol], "link targets");
+    }),
+  );
 }
 const linkSummary = (r) => (r.json?.data?.links ?? []).map((l) => `${l.source?.name}@${l.source?.file}:${l.certainty}`).join(", ");
+
+/** Every file under `dir` (excluding .pymtheg and .git) with size and mtime. */
+function snapshotTree(dir) {
+  const files = {};
+  const walk = (d, rel) => {
+    for (const e of readdirSync(d)) {
+      if (!rel && (e === ".pymtheg" || e === ".git")) continue;
+      const p = join(d, e),
+        r = rel ? `${rel}/${e}` : e,
+        st = lstatSync(p);
+      if (st.isDirectory()) walk(p, r);
+      else files[r] = `${st.size}:${st.mtimeMs}`;
+    }
+  };
+  walk(dir, "");
+  return files;
+}
+function treeChanges(before, after) {
+  const changed = [];
+  for (const k of new Set([...Object.keys(before), ...Object.keys(after)])) if (before[k] !== after[k]) changed.push(k);
+  return changed.sort();
+}
 
 // ---------------------------------------------------------------- MCP client
 
@@ -406,13 +445,6 @@ class Mcp {
   }
 }
 
-/** True when some object nested in `value` satisfies `predicate`. */
-function hasDeep(value, predicate) {
-  if (!value || typeof value !== "object") return false;
-  if (!Array.isArray(value) && predicate(value)) return true;
-  return Object.values(value).some((v) => hasDeep(v, predicate));
-}
-
 /** The JSON content of a tools/call answer: structuredContent, else the first text block parsed. */
 function toolContent(response) {
   const result = response?.result;
@@ -421,162 +453,313 @@ function toolContent(response) {
   const text = result.content?.find((c) => c.type === "text")?.text;
   return text ? parseJson(text) : null;
 }
+/** Decoded text blocks of every tools/call answer in a value, so stack traces inside JSON strings are seen. */
+function decodedTexts(value) {
+  const out = [];
+  const walk = (v) => {
+    if (!v || typeof v !== "object") return;
+    if (Array.isArray(v.content)) for (const c of v.content) if (c?.type === "text" && typeof c.text === "string") out.push(c.text);
+    for (const x of Object.values(v)) walk(x);
+  };
+  walk(value);
+  return out.join("\n");
+}
+
+/** The three legacy TypeScript implementation-link tools and the one future requirement-link tool family. */
+const REQUIREMENT_LINK_TOOL = (name) => /code_link|requirement|symbol_link/.test(name);
 
 async function mcpSteps(pym) {
   const mcp = new Mcp(pym(["mcp", PROJECT]), PROJECT);
-  let tools = [];
-  const call = (id, display, fn, def = {}) =>
+  let tools = null; // null until tools/list succeeds
+  const called = new Set();
+  const ctx = {};
+  // Each MCP step: needs a successful tools/list and the tool(s) it uses listed.
+  const call = (id, display, uses, fn, def = {}) =>
     step({
       id,
       display,
       ...def,
       run: async () => {
+        if (tools === null) return { exitCode: null, ...mcp.take(), json: { unavailable: "tools/list did not succeed" } };
+        const missing = uses.filter((u) => !tools.includes(u));
+        if (missing.length) return { exitCode: null, ...mcp.take(), json: { unavailable: `not in tools/list: ${missing.join(", ")}` } };
+        for (const u of uses) called.add(u);
         const value = await fn();
-        return { ...mcp.take(), exitCode: null, json: value };
+        return { ...mcp.take(), exitCode: null, json: value, extraText: decodedTexts(value) };
       },
+      expect: (r) => (r.json?.unavailable ? r.json.unavailable : def.expect ? def.expect(r) : null),
     });
-  const rpcError = (r) => (r.json?.error ? `JSON-RPC error: ${r.json.error.message}` : null);
-  const toolError = (r) => rpcError(r) ?? (!r.json?.result ? "no result" : r.json.result.isError ? `tool returned isError: ${excerpt(JSON.stringify(r.json.result.content ?? ""), 200)}` : null);
-  const toolCall = (name, args) => mcp.request("tools/call", { name, arguments: args });
+  const rpc = (response) => (response?.error ? `JSON-RPC error: ${response.error.message}` : !response?.result ? "no result" : response.result.isError ? `tool returned isError: ${excerpt(decodedTexts({ r: response.result }), 200)}` : null);
+  const tool = async (name, args) => {
+    const response = await mcp.request("tools/call", { name, arguments: args });
+    const problem = rpc(response);
+    if (problem) throw Object.assign(Error(`${name}: ${problem}`), { response });
+    return toolContent(response);
+  };
+  // A thrown tool error is the step's expectation failure, not a harness error.
+  const guarded = (fn) => async () => {
+    try {
+      return await fn();
+    } catch (e) {
+      if (e.response) return { toolError: e.message, response: e.response };
+      throw e;
+    }
+  };
+  const ok = (check) => (r) => (r.json?.toolError ? r.json.toolError : check(r.json));
 
-  await call(
-    "mcp-initialize",
-    "pymtheg mcp PROJECT (stdio) → initialize",
-    async () => {
-      const response = await mcp.request("initialize", {
-        protocolVersion: "2025-06-18",
-        capabilities: {},
-        clientInfo: { name: "pymtheg-acceptance", version: "1" },
-      });
+  await step({
+    id: "mcp-initialize",
+    display: "pymtheg mcp PROJECT (stdio) → initialize",
+    run: async () => {
+      const response = await mcp.request("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "pymtheg-acceptance", version: "1" } });
       mcp.notify("notifications/initialized", {});
-      return response;
+      return { exitCode: null, ...mcp.take(), json: response };
     },
-    { expect: (r) => rpcError(r) ?? (r.json?.result?.serverInfo?.name ? null : "no serverInfo in initialize result") },
-  );
-  await call(
-    "mcp-tools-list",
-    "tools/list (descriptions included in the wording check)",
-    async () => {
+    expect: (r) => (r.json?.error ? `JSON-RPC error: ${r.json.error.message}` : r.json?.result?.serverInfo?.name ? null : "no serverInfo in initialize result"),
+  });
+  await step({
+    id: "mcp-tools-list",
+    display: "tools/list (descriptions included in the output checks)",
+    run: async () => {
       const response = await mcp.request("tools/list", {});
-      tools = response.result?.tools ?? [];
-      return response;
+      if (!response.error && Array.isArray(response.result?.tools)) tools = response.result.tools.map((t) => t.name);
+      return { exitCode: null, ...mcp.take(), json: response };
     },
-    {
-      expect: (r) => {
-        const names = (r.json?.result?.tools ?? []).map((t) => t.name);
-        const missing = ["check_design", "read_run", "explore_behaviour", "project_info"].filter((n) => !names.includes(n));
-        return rpcError(r) ?? (missing.length ? `missing tools: ${missing.join(", ")}` : null);
-      },
-      note: (r) => `${r.json.result.tools.length} tools`,
-    },
-  );
+    expect: (r) => (r.json?.error ? `JSON-RPC error: ${r.json.error.message}` : tools === null ? "tools/list returned no tool array" : tools.length ? null : "tools/list is empty"),
+    note: () => `${tools.length} tools: ${tools.join(", ")}`,
+  });
+
+  // Start with project_info, as the server's instructions say.
+  await call("mcp-project_info", "project_info {}", ["project_info"], guarded(() => tool("project_info", {})), {
+    expect: ok((j) => same(j.totalFiles, 3, "project_info.totalFiles (.pym designs)")),
+  });
+  await call("mcp-design_recipe", 'design_recipe {action:"list"}', ["design_recipe"], guarded(() => tool("design_recipe", { action: "list" })), {
+    expect: ok((j) => (j.recipes?.some((x) => x.id === "decision") ? null : `recipes: ${JSON.stringify(j.recipes?.map((x) => x.id))}`)),
+  });
+  await call("mcp-read_source", 'read_source {file:"designs/order.pym", startLine:2, limit:1}', ["read_source"], guarded(() => tool("read_source", { file: "designs/order.pym", startLine: 2, limit: 1 })), {
+    expect: ok((j) => same(j.lines, ["machine Order {"], "line 2 of designs/order.pym")),
+  });
+  await call("mcp-check_design", 'check_design {file:"designs/order.pym"}', ["check_design"], guarded(() => tool("check_design", { file: "designs/order.pym" })), {
+    expect: ok((s) => same({ exitStatus: s.exitStatus, errors: s.findings?.errors, warnings: s.findings?.warnings }, { exitStatus: 0, errors: 0, warnings: 0 }, "valid design verdict")),
+  });
   await call(
-    "mcp-check-design",
-    'tools/call check_design {file:"designs/order.pym"}',
-    () => toolCall("check_design", { file: "designs/order.pym" }),
+    "mcp-check_design-broken",
+    'check_design {file:"designs/broken.pym"}, then read_run {section:"findings"}',
+    ["check_design", "read_run"],
+    guarded(async () => {
+      const summary = await tool("check_design", { file: "designs/broken.pym" });
+      const findings = await tool("read_run", { runId: summary.runId, section: "findings" });
+      return { summary, findings };
+    }),
     {
-      expect: (r) => {
-        const s = toolContent(r.json);
-        return (
-          toolError(r) ??
-          (!s ? "no structured result" : same({ exitStatus: s.exitStatus, errors: s.findings?.errors, warnings: s.findings?.warnings }, { exitStatus: 0, errors: 0, warnings: 0 }, "valid design verdict"))
-        );
-      },
-    },
-  );
-  await call(
-    "mcp-check-broken",
-    'tools/call check_design {file:"designs/broken.pym"}, then read_run {section:"findings"}',
-    async () => {
-      const checked = await toolCall("check_design", { file: "designs/broken.pym" });
-      const summary = toolContent(checked);
-      const findings = summary?.runId ? await toolCall("read_run", { runId: summary.runId, section: "findings" }) : null;
-      return { checked, summary, findings, findingsContent: toolContent(findings) };
-    },
-    {
-      expect: (r) => {
-        const { summary, findingsContent } = r.json;
-        if (!summary) return "check_design gave no structured result";
+      // The complete diagnostic on ONE finding: code, exact message, file, line, column; and nothing else.
+      expect: ok(({ summary, findings }) => {
         if (summary.exitStatus !== 1) return `exitStatus ${summary.exitStatus}, expected 1`;
-        if (!(summary.findings?.errors >= 1)) return `errors ${summary.findings?.errors}, expected at least 1`;
-        const items = findingsContent?.items ?? [];
-        const hit = items.find((i) => {
-          const s = JSON.stringify(i);
-          return s.includes("Unknown value or variant charge") && hasDeep(i, (o) => o.line === 7 && o.column === 27);
-        });
-        return hit ? null : `no finding at line 7, column 27 with "Unknown value or variant charge" (got ${excerpt(JSON.stringify(items), 200)})`;
-      },
+        const items = findings.items ?? [];
+        const got = items.map((i) => ({ code: i.code, message: i.message, file: i.location?.file, line: i.location?.line, column: i.location?.column, severity: i.severity }));
+        return same(got, [{ code: BROKEN_CODE, message: BROKEN_MESSAGE, file: "designs/broken.pym", line: 7, column: 27, severity: "error" }], "broken-design findings");
+      }),
     },
   );
   for (const method of ["verify", "simulate"])
     await call(
-      `mcp-explore-${method}`,
-      `tools/call explore_behaviour {entry:"Order", method:"${method}"}`,
-      () => toolCall("explore_behaviour", { file: "designs/order.pym", entry: "Order", method, maxSteps: 6, maxSamples: 200 }),
+      `mcp-explore_behaviour-${method}`,
+      `explore_behaviour {entry:"Order", method:"${method}"}, then read_run {section:"properties"}`,
+      ["explore_behaviour", "read_run"],
+      guarded(async () => {
+        const s = await tool("explore_behaviour", { file: "designs/order.pym", entry: "Order", method, maxSteps: 6, maxSamples: 200 });
+        const properties = await tool("read_run", { runId: s.runId, section: "properties" });
+        return { s, properties };
+      }),
       {
-        expect: (r) => {
-          const s = toolContent(r.json);
-          if (toolError(r)) return toolError(r);
-          if (!s) return "no structured result";
-          return same(
-            { exitStatus: s.exitStatus, exhaustive: s.results?.exhaustive, counterexamples: s.results?.counterexamples, unresolved: s.results?.unresolved },
-            { exitStatus: 0, exhaustive: method === "verify", counterexamples: 0, unresolved: 0 },
-            `${method} verdict`,
+        expect: ok(({ s, properties }) => {
+          const behaviour = (properties.items ?? []).filter((p) => p.analysisKind === "behaviour" || p.method === "finite_model_check" || p.method === "simulation");
+          return (
+            same(
+              { exitStatus: s.exitStatus, exhaustive: s.results?.exhaustive, counterexamples: s.results?.counterexamples, unresolved: s.results?.unresolved },
+              { exitStatus: 0, exhaustive: method === "verify", counterexamples: 0, unresolved: 0 },
+              `${method} summary`,
+            ) ??
+            same(
+              [...new Set(behaviour.map((p) => `${p.method}/${p.outcome}/${p.completion}/${p.exhaustive}`))],
+              [`${method === "verify" ? "finite_model_check" : "simulation"}/no_counterexample/complete/${method === "verify"}`],
+              `${method} properties`,
+            )
           );
-        },
+        }),
       },
     );
-  // R1-C (PR 40): the code-graph tool. Until it is in the build, the only
-  // accepted shortfall is its absence from tools/list.
-  await call(
-    "mcp-code-graph",
-    'tools/call code_graph {action:"callers", query:"formatTotal"}',
-    async () => {
-      if (!tools.some((t) => t.name === "code_graph")) return { absent: true };
-      let answer = await toolCall("code_graph", { action: "callers", query: "formatTotal" });
-      let content = toolContent(answer);
-      if (content?.jobId && content?.state !== "complete" && !JSON.stringify(content).includes("renderBasket")) {
-        answer = await toolCall("graph_result", { jobId: content.jobId, wait: true });
-        content = toolContent(answer);
-      }
-      return { answer, content };
-    },
-    {
-      expect: (r) => {
-        if (r.json.absent) return "tool code_graph is not in tools/list";
-        if (r.json.answer?.result?.isError || r.json.answer?.error) return `code_graph error: ${excerpt(JSON.stringify(r.json.answer), 200)}`;
-        const s = JSON.stringify(r.json.content ?? {});
-        return s.includes("renderBasket") && s.includes("definite") ? null : `callers of formatTotal lack definite renderBasket: ${excerpt(s, 200)}`;
-      },
-      gap: { chunk: "R1-C", reason: "tool `code_graph` not in the tool list", when: (r) => r.json?.absent === true },
-    },
-  );
-  // R1-D (PR 38) has no MCP tool yet. When one appears, this step fails until
-  // the harness exercises it: a present-but-untested tool never passes.
-  await call(
-    "mcp-requirement-links",
-    "tools/list has a requirement-to-symbol link tool",
-    async () => ({ names: tools.map((t) => t.name) }),
-    {
-      expect: (r) => {
-        const found = r.json.names.filter((n) => /code_link|requirement/.test(n));
-        return found.length
-          ? `requirement-link tool(s) ${found.join(", ")} present but not exercised by this harness: extend mcpSteps`
-          : "no tool named *code_link* or *requirement* in the tool list";
-      },
-      gap: {
-        chunk: "R1-D",
-        reason: "no tool named *code_link* or *requirement* in the tool list",
-        when: (r) => !r.json.names.some((n) => /code_link|requirement/.test(n)),
-      },
-    },
-  );
-  await step({
-    id: "mcp-shutdown",
-    display: "close stdin; server exits 0",
-    expect: exit(0),
-    run: async () => ({ exitCode: await mcp.close(), ...mcp.take() }),
+  const FLOW = "designs/next.pym";
+  const flowBuffers = { [FLOW]: "flow next(n: Nat) -> Nat { return n + 1; }\n" };
+  await call("mcp-try_inputs", `try_inputs {file:"${FLOW}" (buffer only), entry:"next", inputs:{n:"41"}}`, ["try_inputs"], guarded(() => tool("try_inputs", { file: FLOW, buffers: flowBuffers, entry: "next", inputs: { n: "41" } })), {
+    expect: ok((j) => same([j.result?.completion, String(j.result?.output)], ["complete", "42"], "try_inputs result")),
   });
+  await call(
+    "mcp-design_interface",
+    'check_design (flow buffer), then design_interface {action:"symbols", query:"next"}',
+    ["check_design", "design_interface"],
+    guarded(async () => {
+      const checked = await tool("check_design", { file: FLOW, buffers: flowBuffers });
+      ctx.flowRun = checked.runId;
+      const symbols = await tool("design_interface", { action: "symbols", runId: checked.runId, query: "next" });
+      return { checked, symbols };
+    }),
+    { expect: ok(({ checked, symbols }) => (checked.exitStatus !== 0 ? `flow check exitStatus ${checked.exitStatus}` : symbols.symbols?.some((x) => x.name === "next") ? null : `symbols: ${JSON.stringify(symbols.symbols?.map((x) => x.name))}`)) },
+  );
+  await call("mcp-emit_scaffold", 'emit_scaffold {target:"typescript"}', ["emit_scaffold"], guarded(async () => (ctx.scaffold = await tool("emit_scaffold", { runId: ctx.flowRun, target: "typescript" }))), {
+    expect: ok((j) => (typeof j.source === "string" && /function next\(/.test(j.source) && j.emissionId ? null : `scaffold: ${excerpt(JSON.stringify(j), 160)}`)),
+  });
+  // One page holding the whole source: it must equal what emit_scaffold returned.
+  await call("mcp-read_scaffold", 'read_scaffold {section:"source", offset:0, limit:4096}', ["read_scaffold"], guarded(() => tool("read_scaffold", { emissionId: ctx.scaffold?.emissionId, section: "source", offset: 0, limit: 4096 })), {
+    expect: ok((j) =>
+      typeof j.text !== "string" || !/^[0-9a-f]{64}$/.test(j.contentHash ?? "")
+        ? `page: ${excerpt(JSON.stringify(j), 200)}`
+        : same([j.text === ctx.scaffold?.source, j.nextOffset ?? null, j.totalCharacters], [true, null, ctx.scaffold?.source?.length], "scaffold page (equals emitted source, complete)"),
+    ),
+  });
+  await call(
+    "mcp-emit_implementation_check",
+    'emit_implementation_check {target:"go", implementationType:"*Worker"}',
+    ["emit_implementation_check"],
+    guarded(() => tool("emit_implementation_check", { runId: ctx.flowRun, target: "go", implementationType: "*Worker" })),
+    { expect: ok((j) => (typeof j.source === "string" && j.source.includes("PymthegContracts") ? null : `source: ${excerpt(String(j.source), 160)}`)) },
+  );
+
+  // Code graph over MCP (R1-C): index, search and exact callers in all three languages.
+  const graph = async (args) => {
+    const first = await tool("code_graph", args);
+    return first.state === "running" ? await tool("graph_result", { jobId: first.jobId, wait: true }) : first;
+  };
+  await call("mcp-code_graph-index", 'code_graph {action:"index"}', ["code_graph", "graph_result"], guarded(() => graph({ action: "index" })), {
+    expect: ok((j) => same([j.state, j.summary?.status, j.summary?.failedFileCount], ["complete", "ok", 0], "index job")),
+  });
+  await call(
+    "mcp-code_graph-search",
+    'code_graph {action:"search", query:"Total"} (+ symbols page)',
+    ["code_graph", "graph_result"],
+    guarded(async () => {
+      const answer = await graph({ action: "search", query: "Total" });
+      const symbols = await tool("graph_result", { jobId: answer.jobId, section: "symbols" });
+      return { answer, symbols };
+    }),
+    {
+      expect: ok(({ answer, symbols }) => {
+        const names = new Map((symbols.items ?? []).map((s) => [s.ref, `${s.name}@${s.file}`]));
+        const got = (answer.items ?? []).filter((i) => i.type === "match").map((i) => names.get(i.ref) ?? `${i.name ?? "?"}@${i.file ?? "?"}`).sort();
+        return answer.state !== "complete" ? `state ${answer.state}` : same(got, ["ComputeTotal@service/pricing/total.go", "formatTotal@web/src/format.ts", "total.go@service/pricing/total.go"], "search matches");
+      }),
+    },
+  );
+  const mcpCallers = (id, symbol, expected) =>
+    call(
+      id,
+      `code_graph {action:"callers", query:"${symbol}", section:"links"} (+ symbols page)`,
+      ["code_graph", "graph_result"],
+      guarded(async () => {
+        const links = await graph({ action: "callers", query: symbol, section: "links" });
+        const symbols = await tool("graph_result", { jobId: links.jobId, section: "symbols" });
+        return { links, symbols };
+      }),
+      {
+        expect: ok(({ links, symbols }) => {
+          const byRef = new Map((symbols.items ?? []).map((s) => [s.ref, s]));
+          const got = (links.items ?? []).map((l) => `${byRef.get(l.source)?.name}@${byRef.get(l.source)?.file}->${byRef.get(l.target)?.name}:${l.certainty}`).sort();
+          return same(got, expected.map(([name, file]) => `${name}@${file}->${symbol}:definite`).sort(), `MCP callers of ${symbol}`);
+        }),
+      },
+    );
+  await mcpCallers("mcp-code_graph-callers-ts", "formatTotal", [["renderBasket", "web/src/main.ts"]]);
+  await mcpCallers("mcp-code_graph-callers-go", "ComputeTotal", [["main", "service/main.go"]]);
+  await mcpCallers("mcp-code_graph-callers-rust", "apply_discount", [["main", "engine/src/main.rs"]]);
+
+  // Architecture and the older TypeScript implementation tools, end to end:
+  // the requirement R1 created by `pymtheg link requirement` is the plan record.
+  await call("mcp-read_architecture", 'read_architecture {section:"summary"}', ["read_architecture"], guarded(() => tool("read_architecture", { section: "summary" })), {
+    // `available:false` is reported only without a store; R1 made one revision.
+    expect: ok((j) => same([j.available, j.totalRevisions], [undefined, 1], "architecture summary (available, one revision)")),
+  });
+  await call(
+    "mcp-observe_implementation",
+    'read_implementation {section:"versions"}, then observe_implementation {files:["web/src/main.ts"]}',
+    ["read_implementation", "observe_implementation"],
+    guarded(async () => {
+      const versions = await tool("read_implementation", { section: "versions" });
+      const observed = await tool("observe_implementation", { files: ["web/src/main.ts"], label: "Acceptance observation", expectedRevision: versions.activeRevision });
+      ctx.observed = observed;
+      return { versions, observed };
+    }),
+    { expect: ok(({ versions, observed }) => (!Array.isArray(versions.items) ? "versions.items is not a list" : typeof observed.revision?.id === "string" ? null : `observed: ${excerpt(JSON.stringify(observed), 160)}`)) },
+  );
+  await call(
+    "mcp-link_implementation",
+    "read_implementation graph (planned R1, observed renderBasket), then link_implementation {reviewed:true}",
+    ["read_implementation", "link_implementation"],
+    guarded(async () => {
+      const plan = await tool("read_implementation", { section: "graph", mode: "gaps", limit: 1 });
+      const code = await tool("read_implementation", { section: "graph", mode: "existing", limit: 20 });
+      const decl = (code.items ?? []).find((i) => i.name === "renderBasket");
+      ctx.link = { planId: plan.items?.[0]?.id, nodeId: decl?.id };
+      const receipt = await tool("link_implementation", { revision: ctx.observed.revision.id, planId: plan.items[0].id, planHash: plan.items[0].planHash, nodeId: decl.id, observationId: code.observationId, note: "acceptance", reviewed: true });
+      const linked = await tool("read_implementation", { section: "graph" });
+      ctx.linkedRevision = linked.activeRevision;
+      return { plan, decl, receipt, linked };
+    }),
+    {
+      expect: ok(({ plan, decl, receipt, linked }) => {
+        if (!decl) return "observed declarations lack renderBasket";
+        if (plan.items?.[0]?.id !== "plan:R1") return `planned record ${JSON.stringify(plan.items?.[0]?.id)}, expected "plan:R1"`;
+        const item = (linked.items ?? []).find((i) => i.id === "plan:R1");
+        return receipt.reviewed !== true ? "receipt not reviewed" : same(item?.linkCount, 1, "links on plan:R1");
+      }),
+    },
+  );
+  await call(
+    "mcp-compare_implementation",
+    "compare_implementation {plan:R1, renderBasket}",
+    ["compare_implementation"],
+    guarded(() => tool("compare_implementation", { planId: ctx.link.planId, nodeId: ctx.link.nodeId, planRevision: ctx.linkedRevision, codeRevision: ctx.linkedRevision })),
+    { expect: ok((j) => same([j.source?.equal, j.note], [true, "acceptance"], "comparison")) },
+  );
+  await call(
+    "mcp-unlink_implementation",
+    "unlink_implementation {plan:R1, renderBasket}, then read_implementation graph",
+    ["unlink_implementation", "read_implementation"],
+    guarded(async () => {
+      const receipt = await tool("unlink_implementation", { revision: ctx.linkedRevision, planId: ctx.link.planId, nodeId: ctx.link.nodeId });
+      const after = await tool("read_implementation", { section: "graph" });
+      return { receipt, after };
+    }),
+    { expect: ok(({ receipt, after }) => (typeof receipt.revision?.id !== "string" ? "no revision receipt" : same((after.items ?? []).find((i) => i.id === "plan:R1")?.linkCount ?? 0, 0, "links on plan:R1 after unlink"))) },
+  );
+
+  // Every listed tool must have been exercised above; a new tool fails here
+  // until the harness calls it.
+  await step({
+    id: "mcp-tool-coverage",
+    display: "every tool in tools/list was called with a checked result",
+    run: async () => ({ exitCode: null, json: { listed: tools, called: [...called] } }),
+    expect: (r) => {
+      if (r.json.listed === null) return "tools/list did not succeed";
+      const unexercised = r.json.listed.filter((n) => !called.has(n));
+      return unexercised.length ? `listed but not exercised by the harness: ${unexercised.join(", ")}` : null;
+    },
+    note: (r) => `${r.json.listed.length} tools listed, all called`,
+  });
+  // R1-C2: requirement links over MCP. The only accepted shortfall: tools/list
+  // succeeded and no listed tool exposes requirement-link actions.
+  await step({
+    id: "mcp-requirement-links",
+    display: "tools/list exposes requirement-to-symbol link actions",
+    run: async () => ({ exitCode: null, json: { listed: tools } }),
+    expect: (r) =>
+      r.json.listed === null
+        ? "tools/list did not succeed"
+        : r.json.listed.some(REQUIREMENT_LINK_TOOL)
+          ? `requirement-link tool(s) ${r.json.listed.filter(REQUIREMENT_LINK_TOOL).join(", ")} listed: extend mcpSteps to create, list and check a link`
+          : "no tool exposes requirement-link actions",
+    gap: { chunk: "R1-C2", reason: "requirement links over MCP: tools/list succeeded and no tool exposes link actions", when: (r) => Array.isArray(r.json.listed) && !r.json.listed.some(REQUIREMENT_LINK_TOOL) },
+  });
+  await step({ id: "mcp-shutdown", display: "close stdin; server exits 0", expect: exit(0), run: async () => ({ exitCode: await mcp.close(), ...mcp.take() }) });
 }
 
 // ---------------------------------------------------------------- Studio
@@ -607,18 +790,10 @@ async function studioSteps(pym) {
     return io;
   };
   const get = async (path, auth) => {
-    const response = await fetch(url.origin + path, {
-      headers: auth ? { authorization: "Bearer " + url.token } : {},
-      signal: AbortSignal.timeout(120_000),
-    });
+    const response = await fetch(url.origin + path, { headers: auth ? { authorization: "Bearer " + url.token } : {}, signal: AbortSignal.timeout(120_000) });
     return { http: response.status, type: response.headers.get("content-type") ?? "", body: await response.text() };
   };
-  await step({
-    id: "studio-start",
-    display: "pymtheg studio PROJECT --port 0 (prints session URL)",
-    expect: () => (url ? null : "no session URL printed"),
-    run: async () => ({ exitCode: null, ...take() }),
-  });
+  await step({ id: "studio-start", display: "pymtheg studio PROJECT --port 0 (prints session URL)", expect: () => (url ? null : "no session URL printed"), run: async () => ({ exitCode: null, ...take() }) });
   await step({
     id: "studio-status",
     display: "GET /api/project (Bearer session token)",
@@ -628,10 +803,7 @@ async function studioSteps(pym) {
       const io = take();
       return { exitCode: null, http: r.http, type: r.type, stdout: r.body + io.stdout, stderr: io.stderr, json: parseJson(r.body) };
     },
-    expect: (r) =>
-      r.http !== 200 || !/json/.test(r.type)
-        ? `HTTP ${r.http} ${r.type}`
-        : same(r.json?.workspace?.name, "Acceptance shop", "workspace name"),
+    expect: (r) => (r.http !== 200 || !/json/.test(r.type) ? `HTTP ${r.http} ${r.type}` : same(r.json?.workspace?.name, "Acceptance shop", "workspace name")),
   });
   await step({
     id: "studio-assets",
@@ -650,7 +822,10 @@ async function studioSteps(pym) {
         ? `GET / HTTP ${r.http}`
         : !r.statuses.length
           ? "index.html references no assets"
-          : r.statuses.filter(([, s]) => s !== 200).map(([a, s]) => `${a} HTTP ${s}`).join(", ") || null,
+          : r.statuses
+              .filter(([, s]) => s !== 200)
+              .map(([a, s]) => `${a} HTTP ${s}`)
+              .join(", ") || null,
     note: (r) => `${r.statuses.length} assets HTTP 200`,
   });
   await step({
@@ -679,16 +854,15 @@ function graphFingerprint(r) {
     found: j.data?.found,
   };
 }
+const behaviour = (j) => (j.results ?? []).filter((p) => p.analysisKind === "behaviour");
+const propertyRows = (j, fields) => behaviour(j).map((p) => [p.propertyId.split("/").pop(), ...fields.map((f) => p[f])]).sort();
 
 /** The steps every install shape must pass. */
-async function coreSteps(pym) {
-  const P = pym;
-  await step({ id: "help", cmd: P(["--help"]), expect: all(exit(0), includes("graph index"), includes("init [DIRECTORY]")) });
-  await step({
-    id: "version",
-    cmd: P(["--version"]),
-    expect: all(exit(0), (r) => (/^\d+\.\d+\.\d+\n?$/.test(r.stdout) ? null : `version output ${JSON.stringify(r.stdout)}`)),
-  });
+async function coreSteps(P, { afterInit = [] } = {}) {
+  await step({ id: "help", cmd: P(["--help"]), expect: all(exit(0), includes("graph index"), includes("link requirement"), includes("init [DIRECTORY]")) });
+  await step({ id: "version", cmd: P(["--version"]), expect: all(exit(0), (r) => (/^\d+\.\d+\.\d+\n?$/.test(r.stdout) ? null : `version output ${JSON.stringify(r.stdout)}`)) });
+  // init: identity created; nothing outside .pymtheg/ created or changed.
+  const rootBefore = snapshotTree(PROJECT);
   await step({
     id: "init",
     cmd: P(["init", PROJECT, "--name", "Acceptance shop"]),
@@ -696,9 +870,10 @@ async function coreSteps(pym) {
       exit(0),
       includes("3 existing documents found"),
       () => (existsSync(join(PROJECT, ".pymtheg/project.json")) ? null : "no .pymtheg/project.json"),
+      () => same(treeChanges(rootBefore, snapshotTree(PROJECT)), [], "files changed outside .pymtheg/ by init"),
     ),
   });
-  const snapshot = () =>
+  const metadata = () =>
     ["project.json", "settings.json"].map((f) => {
       try {
         return readFileSync(join(PROJECT, ".pymtheg", f), "utf8");
@@ -706,91 +881,77 @@ async function coreSteps(pym) {
         return null;
       }
     });
-  const before = snapshot();
-  await step({
-    id: "init-repeat",
-    cmd: P(["init", PROJECT]),
-    expect: all(exit(0), () => (before.includes(null) ? "no metadata after init" : same(snapshot(), before, "metadata bytes after re-init"))),
-  });
-  for (const extra of coreSteps.afterInit ?? []) await step(extra);
+  const before = metadata();
+  await step({ id: "init-repeat", cmd: P(["init", PROJECT]), expect: all(exit(0), () => (before.includes(null) ? "no metadata after init" : same(metadata(), before, "metadata bytes after re-init"))) });
+  for (const extra of afterInit) await step(extra);
   await step({
     id: "doctor",
     cmd: P(["doctor", "--format", "json"]),
-    expect: all(exit(0), json((j) => {
-      const checks = j.checks ?? [];
-      const notReady = checks.filter((c) => c.status !== "ready").map((c) => `${c.name}: ${c.status}`);
-      return !checks.length ? "no checks" : notReady.length ? `not ready: ${notReady.join(", ")}` : null;
-    })),
+    expect: all(
+      exit(0),
+      json((j) => {
+        const checks = j.checks ?? [];
+        const notReady = checks.filter((c) => c.status !== "ready").map((c) => `${c.name}: ${c.status}`);
+        return !checks.length ? "no checks" : notReady.length ? `not ready: ${notReady.join(", ")}` : null;
+      }),
+    ),
     note: (r) => r.json.checks.map((c) => c.name).join(", ") + ": ready",
   });
-  await step({
-    id: "check-valid",
-    cmd: P(["check", DESIGN, "--format", "json"]),
-    expect: all(exit(0), json((j) => same((j.diagnostics ?? null)?.length, 0, "diagnostics"))),
-  });
-  const behaviour = (j) => (j.results ?? []).filter((p) => p.analysisKind === "behaviour");
+  await step({ id: "check-valid", cmd: P(["check", DESIGN, "--format", "json"]), expect: all(exit(0), json((j) => same((j.diagnostics ?? null)?.length, 0, "diagnostics"))) });
+  const allClean = (exhaustive) => [
+    ["chargedOnce", "no_counterexample", "complete", exhaustive],
+    ["shippedOnlyWhenPaid", "no_counterexample", "complete", exhaustive],
+    ["state-domains", "no_counterexample", "complete", exhaustive],
+  ];
   await step({
     id: "verify-valid",
     cmd: P(["verify", DESIGN, "--entry", "Order", "--format", "json"]),
-    expect: all(exit(0), json((j) =>
-      same(behaviour(j).map((p) => [p.propertyId.split("/").pop(), p.outcome, p.completion, p.exhaustive]).sort(), [
-        ["chargedOnce", "no_counterexample", "complete", true],
-        ["shippedOnlyWhenPaid", "no_counterexample", "complete", true],
-        ["state-domains", "no_counterexample", "complete", true],
-      ], "verify results"),
-    )),
+    expect: all(exit(0), json((j) => same(propertyRows(j, ["outcome", "completion", "exhaustive"]), allClean(true), "verify results"))),
   });
   await step({
     id: "simulate-valid",
     cmd: P(["simulate", DESIGN, "--entry", "Order", "--seed", "42", "--max-steps", "6", "--max-samples", "200", "--format", "json"]),
-    expect: all(exit(0), json((j) =>
-      same(behaviour(j).map((p) => [p.propertyId.split("/").pop(), p.outcome, p.exhaustive]).sort(), [
-        ["chargedOnce", "no_counterexample", false],
-        ["shippedOnlyWhenPaid", "no_counterexample", false],
-        ["state-domains", "no_counterexample", false],
-      ], "simulate results"),
-    )),
+    expect: all(exit(0), json((j) => same(propertyRows(j, ["outcome", "completion", "exhaustive"]), allClean(false), "simulate results"))),
   });
+  // A real behaviour violation must be reported as one (exhaustive search finds it).
   await step({
-    id: "check-broken",
+    id: "verify-violation",
     expectFail: true,
-    cmd: P(["check", BROKEN]),
-    expect: all(exit(1), includes(BROKEN_DIAGNOSTIC)),
+    cmd: P(["verify", VIOLATION, "--entry", "Overcharge", "--format", "json"]),
+    expect: all(
+      exit(1),
+      json((j) =>
+        same(
+          propertyRows(j, ["outcome", "completion"]),
+          [
+            ["chargedOnce", "counterexample", "complete"],
+            ["state-domains", "no_counterexample", "complete"],
+          ],
+          "verify results on the violating design",
+        ),
+      ),
+    ),
   });
-  await step({
-    id: "verify-broken",
-    expectFail: true,
-    cmd: P(["verify", BROKEN, "--entry", "BrokenOrder"]),
-    expect: all(exit(1), includes(BROKEN_DIAGNOSTIC)),
-  });
+  await step({ id: "check-broken", expectFail: true, cmd: P(["check", BROKEN]), expect: all(exit(1), hasLine(BROKEN_DIAGNOSTIC)) });
+  await step({ id: "verify-broken", expectFail: true, cmd: P(["verify", BROKEN, "--entry", "BrokenOrder"]), expect: all(exit(1), hasLine(BROKEN_DIAGNOSTIC)) });
   await step({
     id: "graph-index",
     cmd: P(["graph", "index", "--root", PROJECT, "--json"]),
-    expect: all(exit(0), json((j) =>
-      j.status !== "ok"
-        ? `status ${j.status}`
-        : j.failedFiles?.length
-          ? `failed files: ${j.failedFiles.map((f) => f.path).join(", ")}`
-          : same(j.counts?.files, SAMPLE_SOURCE_FILES, "indexed files"),
-    )),
+    expect: all(
+      exit(0),
+      json((j) => (j.status !== "ok" ? `status ${j.status}` : j.failedFiles?.length ? `failed files: ${j.failedFiles.map((f) => f.path).join(", ")}` : same(j.counts?.files, SAMPLE_SOURCE_FILES, "indexed files"))),
+    ),
     note: (r) => `${r.json.counts.files} files, ${r.json.counts.symbols} symbols, ${r.json.counts.links} links`,
     fingerprint: graphFingerprint,
   });
   await step({
     id: "graph-status",
     cmd: P(["graph", "status", "--root", PROJECT, "--json"]),
-    expect: all(exit(0), json((j) =>
-      j.status !== "ok"
-        ? `status ${j.status}`
-        : j.staleFiles?.length
-          ? "stale files right after index"
-          : same((j.modules ?? []).map((m) => m.id).sort(), ["go", "rust", "typescript"], "modules"),
-    )),
+    expect: all(exit(0), json((j) => (j.status !== "ok" ? `status ${j.status}` : j.staleFiles?.length ? "stale files right after index" : same((j.modules ?? []).map((m) => m.id).sort(), ["go", "rust", "typescript"], "modules")))),
   });
   // Five cross-file calls and one same-file call; each must be exactly this
   // caller, in this file, with definite certainty.
-  const q = (id, symbol, expected) =>
-    step({ id, cmd: P(["graph", "callers", symbol, "--root", PROJECT, "--json"]), expect: callers(symbol, expected), note: linkSummary, fingerprint: graphFingerprint });
+  const q = (id, symbol, expected) => step({ id, cmd: P(["graph", "callers", symbol, "--root", PROJECT, "--json"]), expect: callers(symbol, expected), note: linkSummary, fingerprint: graphFingerprint });
   await q("graph-ts-callers", "formatTotal", [["renderBasket", "web/src/main.ts"]]);
   await q("graph-ts-callers-2", "roundCents", [["formatTotal", "web/src/format.ts"]]);
   await q("graph-go-callers", "ComputeTotal", [["main", "service/main.go"]]);
@@ -816,36 +977,66 @@ async function coreSteps(pym) {
 }
 
 /**
- * R1-D (PR 38): `pymtheg link`. Until it merges, the only accepted shortfall
- * is today's exact unknown-command answer: exit 3, that message on stderr,
- * nothing on stdout. Any other exit or message fails.
+ * `pymtheg link` (R1-D): a requirement linked to a Go, a Rust and a TypeScript
+ * symbol; `check` passes; a body edit makes exactly that link `changed` and
+ * `check` exit 1; `refresh` makes it ok again. The edit is undone (and
+ * refreshed) at the end so the project is unchanged for later steps.
  */
-const UNKNOWN_COMMAND = /^pymtheg: Unknown command or missing file\. Commands: [a-z, -]+\. See --help\.\n?$/;
-const linkGap = {
-  chunk: "R1-D",
-  reason: "`pymtheg link` is an unknown command (exit 3, the unknown-command message)",
-  when: (r) => r.exitCode === 3 && r.stdout === "" && UNKNOWN_COMMAND.test(r.stderr),
-};
 async function linkSteps(P) {
   const root = ["--root", PROJECT, "--json"];
+  const DISCOUNT = join(PROJECT, "engine/src/discount.rs");
+  const original = readFileSync(DISCOUNT, "utf8");
+  const ids = {};
   await step({
     id: "link-requirement",
     cmd: P(["link", "requirement", "R1", "--title", "An order is charged at most once", ...root]),
-    expect: exit(0),
-    gap: linkGap,
+    expect: all(exit(0), json((j) => same([j.status, j.record?.id], ["created", "plan:R1"], "requirement"))),
   });
+  for (const [lang, symbol] of [
+    ["go", "ComputeTotal"],
+    ["rust", "apply_discount"],
+    ["ts", "formatTotal"],
+  ])
+    await step({
+      id: `link-add-${lang}`,
+      cmd: P(["link", "add", "R1", symbol, ...root]),
+      expect: all(
+        exit(0),
+        json((j) => {
+          ids[symbol] = j.link?.id;
+          return same([j.status, typeof j.link?.id], ["created", "string"], `link to ${symbol}`);
+        }),
+      ),
+    });
+  const states = (j) => (j.links ?? []).map((l) => `${l.current?.name ?? l.link?.symbol?.identity}:${l.state}`).sort();
+  const allOk = ["ComputeTotal:ok", "apply_discount:ok", "formatTotal:ok"];
   await step({
-    id: "link-add",
-    cmd: P(["link", "add", "R1", "ComputeTotal", ...root]),
-    expect: all(exit(0), json((j) => same(j.status, "created", "link status"))),
-    gap: linkGap,
+    id: "link-list",
+    cmd: P(["link", "list", "--record", "R1", ...root]),
+    expect: all(exit(0), json((j) => same(states(j), allOk, "links of R1") ?? same(j.counts?.ok, 3, "ok count"))),
   });
-  await step({
-    id: "link-check",
-    cmd: P(["link", "check", ...root]),
-    expect: all(exit(0), includes('"ComputeTotal"', "the linked symbol")),
-    gap: linkGap,
-  });
+  const check = (id, code, expectedStates, extra = {}) =>
+    step({
+      id,
+      cmd: P(["link", "check", ...root]),
+      ...extra,
+      expect: all(exit(code), json((j) => same(states(j), expectedStates, "link states") ?? same(j.passed, code === 0, "passed"))),
+    });
+  await check("link-check", 0, allOk);
+  writeFileSync(DISCOUNT, original.replace("cents - percent_of(cents, percent)", "cents - percent_of(cents, percent) * 1"));
+  await check("link-check-after-edit", 1, ["ComputeTotal:ok", "apply_discount:changed", "formatTotal:ok"], { expectFail: true });
+  const refresh = (id) =>
+    step({
+      id,
+      display: "pymtheg link refresh <apply_discount link> --json",
+      run: () => run(P(["link", "refresh", ids.apply_discount ?? "missing-link-id", ...root])),
+      expect: all(exit(0), json((j) => same(j.status, "refreshed", "refresh status"))),
+    });
+  await refresh("link-refresh");
+  await check("link-check-after-refresh", 0, allOk);
+  writeFileSync(DISCOUNT, original);
+  await refresh("link-refresh-restored");
+  await check("link-check-final", 0, allOk);
 }
 
 async function legacyInit(P) {
@@ -859,9 +1050,7 @@ async function legacyInit(P) {
     display: "pymtheg init (project with an old .pymtheg-studio/ folder)",
     cmd: P(["init", legacy]),
     cwd: legacy,
-    expect: all(exit(0), includes(".pymtheg-studio", "a notice naming the old folder"), () =>
-      existsSync(join(legacy, ".pymtheg-studio", "old.json")) ? null : "old folder was changed",
-    ),
+    expect: all(exit(0), includes(".pymtheg-studio", "a notice naming the old folder"), () => (readFileSync(join(legacy, ".pymtheg-studio", "old.json"), "utf8") === "{}" ? null : "old folder was changed")),
   });
 }
 
@@ -869,7 +1058,7 @@ async function networkOff() {
   await step({
     id: "network-off",
     display: "fetch https://registry.npmjs.org/ and http://1.1.1.1/ must both fail",
-    skipWording: true,
+    harnessOutput: true,
     run: async () => {
       const reached = [];
       for (const target of ["https://registry.npmjs.org/", "http://1.1.1.1/"]) {
@@ -885,18 +1074,37 @@ async function networkOff() {
   writeFileSync(join(OUT, ".marker"), "");
 }
 
-async function writesOutside() {
+/**
+ * After the whole scenario, nothing outside these places may have been created
+ * or modified (files newer than the marker written after the install):
+ *  - the project folders the scenario works in (sample, legacy copy, Go
+ *    project, restic, the local-install app);
+ *  - npm's own cache, logs and npx store (~/.npm) and the global prefix: npm
+ *    and npx write there on every invocation, not Pymtheg;
+ *  - the temp dir (/tmp): Pymtheg's workers use it for transient files;
+ *  - in scenario c only, Go's own build and module caches (~/.cache/go-build,
+ *    ~/go), written by the `go` the project opted into;
+ *  - /acc, the harness's own files.
+ */
+async function writesOutside({ go = false } = {}) {
+  const allowed = [`${PROJECT}/`, `${HOME}/legacy/`, `${GO_PROJECT}/`, `${HOME}/restic/`, `${APP}/`, `${HOME}/.npm/`, `${GLOBAL_PREFIX}/`, "/tmp/", "/acc/", ...(go ? [`${HOME}/.cache/go-build/`, `${HOME}/go/`] : [])];
   await step({
     id: "writes-outside-project",
-    display: "files written since the install, outside the project and harness",
-    observe: true,
-    skipWording: true,
-    cmd: [
-      "sh",
-      "-c",
-      `find / -xdev -newer ${OUT}/.marker -type f 2>/dev/null | grep -v -e '^/proc' -e '^/sys' -e '^/acc/' -e '^${HOME}/project/' -e '^${HOME}/legacy/' -e '^${HOME}/restic/' -e '^${HOME}/goproject/' | sed -E 's#^(/[^/]+/[^/]+/[^/]+/[^/]+).*#\\1#' | sort | uniq -c | sort -rn | head -20`,
-    ],
-    note: (r) => r.stdout.trim().split("\n").filter(Boolean).map((l) => l.trim()).join("; ") || "nothing",
+    display: "no file created or modified outside the project, npm's own folders and /tmp",
+    harnessOutput: true,
+    cmd: ["sh", "-c", `find / -xdev \\( -path /proc -o -path /sys -o -path /dev \\) -prune -o -newer ${OUT}/.marker \\( -type f -o -type l \\) -print 2>/dev/null`],
+    expect: (r) => {
+      const outside = r.stdout.split("\n").filter(Boolean).filter((p) => !allowed.some((a) => p.startsWith(a)));
+      return outside.length ? `written outside the allowed places: ${outside.slice(0, 8).join(", ")}${outside.length > 8 ? ` (+${outside.length - 8})` : ""}` : null;
+    },
+    note: (r) => {
+      const counts = {};
+      for (const p of r.stdout.split("\n").filter(Boolean)) {
+        const a = allowed.find((x) => p.startsWith(x)) ?? "other";
+        counts[a] = (counts[a] ?? 0) + 1;
+      }
+      return "all inside allowed places: " + Object.entries(counts).map(([k, v]) => `${k.replace(HOME, "~")} ${v}`).join("; ");
+    },
   });
 }
 
@@ -932,7 +1140,7 @@ function installSize() {
   return step({
     id: "install-size",
     observe: true,
-    skipWording: true,
+    harnessOutput: true,
     run: async () => {
       const roots = [join(HOME, ".npm/_npx"), join(HOME, ".npm/_cacache"), GLOBAL_PREFIX, join(APP, "node_modules")].filter(existsSync);
       const sizes = roots.map((p) => `${p.replace(HOME, "~")} ${(sizeOf(p) / 1048576).toFixed(1)} MiB`);
@@ -975,7 +1183,7 @@ async function npxAbsolute() {
     cmd: ["npx", "--yes", TGZ, "--help"],
     cwd: HOME,
     observe: true,
-    skipWording: true,
+    harnessOutput: true,
     note: (r) => (r.exitCode === 0 ? "works" : `exit ${r.exitCode}: ${excerpt(r.stdout + r.stderr, 120)}`),
   });
 }
@@ -983,10 +1191,9 @@ async function npxAbsolute() {
 // ---------------------------------------------------------------- Go toolchain opt-in
 
 /**
- * With graph.toolchain.go on, the index must actually run `go` and report the
- * route `used` with upgraded links. Until W3-L2 (PR 42) wires the setting into
- * `pymtheg graph`, the only accepted shortfall is exactly that: exit 0, status
- * ok, no `toolchain` field in the answer and no `go` process.
+ * With graph.toolchain.go set, the index must actually run `go` and report the
+ * route `used` with upgraded links; with it removed, no `go` runs and no
+ * toolchain is reported.
  */
 const REAL_GO = "/usr/local/go/bin/go";
 async function goOptIn(pym) {
@@ -994,18 +1201,17 @@ async function goOptIn(pym) {
   // sample's Go module as a project of its own (the shape a Go repository has).
   // The route accepts only <GOROOT>/bin/go, so the PATH shim (rightly) cannot
   // stand in: the setting names the real binary, and the spawn trace records it.
-  const G = join(HOME, "goproject");
-  rmSync(G, { recursive: true, force: true });
-  cpSync(join(PROJECT, "service"), G, { recursive: true });
-  await step({ id: "go-project-init", cmd: pym(["init", G]), cwd: G, expect: exit(0) });
-  const settingsFile = join(G, ".pymtheg/settings.json");
+  rmSync(GO_PROJECT, { recursive: true, force: true });
+  cpSync(join(PROJECT, "service"), GO_PROJECT, { recursive: true });
+  await step({ id: "go-project-init", cmd: pym(["init", GO_PROJECT]), cwd: GO_PROJECT, expect: exit(0) });
+  const settingsFile = join(GO_PROJECT, ".pymtheg/settings.json");
   const settings = JSON.parse(readFileSync(settingsFile, "utf8"));
   writeFileSync(settingsFile, JSON.stringify({ ...settings, graph: { ...(settings.graph ?? {}), toolchain: { go: REAL_GO } } }, null, 2) + "\n");
   await step({
     id: "go-toolchain-index",
     display: `graph.toolchain.go = "${REAL_GO}"; graph index --json (Go module at the project root)`,
-    cmd: pym(["graph", "index", "--root", G, "--json"]),
-    cwd: G,
+    cmd: pym(["graph", "index", "--root", GO_PROJECT, "--json"]),
+    cwd: GO_PROJECT,
     allowToolchain: true,
     expect: (r) => {
       const go = r.json?.toolchain?.go;
@@ -1021,19 +1227,14 @@ async function goOptIn(pym) {
               : null)
       );
     },
-    gap: {
-      chunk: "W3-L2",
-      reason: "W3-L2 wiring not merged: the setting is ignored (no toolchain field, no go process)",
-      when: (r) => r.exitCode === 0 && r.json?.status === "ok" && !("toolchain" in r.json) && !r.calls.some((c) => c.tool === "go"),
-    },
     note: (r) => `${r.json.toolchain.go.upgradedLinks} links upgraded; ${r.calls.filter((c) => c.tool === "go").length} go processes`,
   });
   writeFileSync(settingsFile, JSON.stringify(settings, null, 2) + "\n");
   await step({
     id: "go-toolchain-off-again",
     display: "setting removed; graph index --json runs no go",
-    cmd: pym(["graph", "index", "--root", G, "--json"]),
-    cwd: G,
+    cmd: pym(["graph", "index", "--root", GO_PROJECT, "--json"]),
+    cwd: GO_PROJECT,
     expect: all(exit(0), json((j) => (j.status !== "ok" ? `status ${j.status}` : "toolchain" in j ? `toolchain reported while off: ${JSON.stringify(j.toolchain)}` : null))),
   });
 }
@@ -1048,8 +1249,7 @@ async function restic(pym) {
       cmd: pym([...args, "--root", R, "--json"]),
       cwd: R,
       expect: all(exit(0), json((j) => (["ok", "ambiguous"].includes(j.status) ? null : `status ${j.status}`))),
-      note: (r) =>
-        `${r.json.status}; ${JSON.stringify(r.json.resultCounts)}; ${(r.durationMs / 1000).toFixed(1)} s, peak RSS ≥ ${((r.peakRssKiB ?? 0) / 1024).toFixed(0)} MiB (observations)`,
+      note: (r) => `${r.json.status}; ${JSON.stringify(r.json.resultCounts)}; ${(r.durationMs / 1000).toFixed(1)} s, peak RSS ≥ ${((r.peakRssKiB ?? 0) / 1024).toFixed(0)} MiB (observations)`,
     });
   await step({ id: "restic-init", cmd: pym(["init", R]), cwd: R, expect: exit(0), note: (r) => `${(r.durationMs / 1000).toFixed(1)} s (observation)` });
   await step({
@@ -1057,9 +1257,7 @@ async function restic(pym) {
     cmd: pym(["graph", "index", "--root", R, "--json"]),
     cwd: R,
     expect: all(exit(0), json((j) => (j.status !== "ok" ? `status ${j.status}` : j.failedFiles?.length ? `${j.failedFiles.length} failed files` : null))),
-    note: (r) =>
-      `${r.json.counts.files} files, ${r.json.counts.symbols} symbols, ${r.json.counts.links} links, 0 failed; ` +
-      `${(r.durationMs / 1000).toFixed(1)} s, peak RSS ≥ ${((r.peakRssKiB ?? 0) / 1024).toFixed(0)} MiB (observations)`,
+    note: (r) => `${r.json.counts.files} files, ${r.json.counts.symbols} symbols, ${r.json.counts.links} links, 0 failed; ${(r.durationMs / 1000).toFixed(1)} s, peak RSS ≥ ${((r.peakRssKiB ?? 0) / 1024).toFixed(0)} MiB (observations)`,
   });
   await q("restic-status", ["graph", "status"]);
   await q("restic-search", ["graph", "search", "Snapshot", "--limit", "20"]);
@@ -1075,20 +1273,15 @@ async function restic(pym) {
 // `file:/abs/path.tgz` are package specs. The install step uses the documented
 // relative form from the tarball's folder; later steps use the same tarball.
 const npx = (args) => ["npx", "--yes", "file:" + TGZ, ...args];
-const npxInstall = () =>
-  installStep("install-npx", ["npx", "--yes", "./" + TGZ.split("/").pop(), "--help"], join(ACC, "pkg"), includes("graph index"));
+const npxInstall = () => installStep("install-npx", ["npx", "--yes", "./" + TGZ.split("/").pop(), "--help"], join(ACC, "pkg"), includes("graph index"));
 
-const gitSteps = [
-  {
-    id: "git-status-after-init",
-    cmd: ["git", "status", "--porcelain", "--untracked-files=all"],
-    skipWording: true,
-    expect: all(exit(0), (r) =>
-      same(r.stdout.split("\n").filter(Boolean).sort(), ["?? .pymtheg/.gitignore", "?? .pymtheg/project.json", "?? .pymtheg/settings.json"], "untracked after init"),
-    ),
-  },
-  { id: "git-tracked-unchanged", cmd: ["sh", "-c", "git diff --exit-code --stat && git diff --cached --exit-code --stat"], skipWording: true, expect: exit(0) },
-];
+const gitStatus = (id, extra = {}) => ({
+  id,
+  cmd: ["git", "status", "--porcelain", "--untracked-files=all"],
+  harnessOutput: true,
+  expect: all(exit(0), (r) => same(r.stdout.split("\n").filter(Boolean).sort(), ["?? .pymtheg/.gitignore", "?? .pymtheg/project.json", "?? .pymtheg/settings.json"], "untracked files")),
+  ...extra,
+});
 
 const scenarios = {
   "a-node-only": {
@@ -1107,14 +1300,15 @@ const scenarios = {
       await networkOff();
       await step({
         id: "git-setup",
-        skipWording: true,
+        harnessOutput: true,
         cmd: ["sh", "-c", "git init -q -b main && git -c user.email=a@example.invalid -c user.name=acc add -A && git -c user.email=a@example.invalid -c user.name=acc commit -qm sample && git status --porcelain"],
         expect: all(exit(0), (r) => (r.stdout.trim() ? "tree not clean after commit" : null)),
       });
-      coreSteps.afterInit = gitSteps;
-      await coreSteps(npx);
-      // After graph, MCP and Studio, only the same three files are visible.
-      await step({ ...gitSteps[0], id: "git-status-end" });
+      await coreSteps(npx, {
+        afterInit: [gitStatus("git-status-after-init"), { id: "git-tracked-unchanged", cmd: ["sh", "-c", "git diff --exit-code --stat && git diff --cached --exit-code --stat"], harnessOutput: true, expect: exit(0) }],
+      });
+      // After graph, links (edit undone), MCP and Studio, only the same three files are visible.
+      await step(gitStatus("git-status-end"));
       await writesOutside();
     },
   },
@@ -1125,12 +1319,13 @@ const scenarios = {
       await step({
         id: "toolchains-present",
         observe: true,
-        skipWording: true,
+        harnessOutput: true,
         cmd: ["sh", "-c", "PATH=$(echo $PATH | sed 's#/acc/shims:##'); go version && cargo --version && rustc --version"],
         note: (r) => r.stdout.trim().split("\n").join("; "),
       });
       await coreSteps(npx);
       await goOptIn(npx);
+      await writesOutside({ go: true });
     },
   },
   "d-global": {
@@ -1140,11 +1335,12 @@ const scenarios = {
       await installSize();
       await step({
         id: "bin-location",
-        skipWording: true,
+        harnessOutput: true,
         cmd: ["sh", "-c", 'readlink -f "$(command -v pymtheg)"'],
         expect: all(exit(0), (r) => (r.stdout.trim() === GLOBAL_PREFIX + "/lib/node_modules/pymtheg/dist/cli/main.js" ? null : `resolves to ${r.stdout.trim()}`)),
       });
       await coreSteps((args) => ["pymtheg", ...args]);
+      await writesOutside();
     },
   },
   "d-local": {
@@ -1157,6 +1353,7 @@ const scenarios = {
       await networkOff();
       await installSize();
       await coreSteps((args) => ["sh", "-c", `cd ${APP} && exec npx --no-install pymtheg "$@"`, "pymtheg", ...args]);
+      await writesOutside();
     },
   },
   "f-restic": {
@@ -1164,6 +1361,7 @@ const scenarios = {
     run: async () => {
       await networkOff();
       await restic(npx);
+      await writesOutside();
     },
   },
 };
@@ -1175,27 +1373,31 @@ for (const edge of ["e-node-24.0.0", "e-node-25", "e-node-26"])
     install: npxInstall,
     run: async () => {
       await networkOff();
-      await step({ id: "node-version", cmd: ["node", "--version"], cwd: HOME, observe: true, skipWording: true, note: (r) => r.stdout.trim() });
+      await step({ id: "node-version", cmd: ["node", "--version"], cwd: HOME, observe: true, harnessOutput: true, note: (r) => r.stdout.trim() });
       await step({ id: "help", cmd: npx(["--help"]), expect: all(exit(0), includes("graph index")) });
       await step({ id: "init", cmd: npx(["init", PROJECT]), expect: exit(0) });
       await step({
         id: "doctor",
         cmd: npx(["doctor", "--format", "json"]),
-        expect: all(exit(0), json((j) => {
-          const bad = (j.checks ?? []).filter((c) => c.status !== "ready").map((c) => `${c.name}: ${c.status}`);
-          return !j.checks?.length ? "no checks" : bad.length ? `not ready: ${bad.join(", ")}` : null;
-        })),
+        expect: all(
+          exit(0),
+          json((j) => {
+            const bad = (j.checks ?? []).filter((c) => c.status !== "ready").map((c) => `${c.name}: ${c.status}`);
+            return !j.checks?.length ? "no checks" : bad.length ? `not ready: ${bad.join(", ")}` : null;
+          }),
+        ),
       });
       await step({ id: "check-valid", cmd: npx(["check", DESIGN, "--format", "json"]), expect: all(exit(0), json((j) => same(j.diagnostics?.length, 0, "diagnostics"))) });
       await step({ id: "verify-valid", cmd: npx(["verify", DESIGN, "--entry", "Order"]), expect: exit(0) });
       await step({ id: "simulate-valid", cmd: npx(["simulate", DESIGN, "--entry", "Order", "--seed", "42"]), expect: exit(0) });
-      await step({ id: "check-broken", expectFail: true, cmd: npx(["check", BROKEN]), expect: all(exit(1), includes(BROKEN_DIAGNOSTIC)) });
+      await step({ id: "check-broken", expectFail: true, cmd: npx(["check", BROKEN]), expect: all(exit(1), hasLine(BROKEN_DIAGNOSTIC)) });
       await step({
         id: "graph-index",
         cmd: npx(["graph", "index", "--root", PROJECT, "--json"]),
         expect: all(exit(0), json((j) => (j.failedFiles?.length ? "failed files" : same(j.counts?.files, SAMPLE_SOURCE_FILES, "indexed files")))),
       });
       await step({ id: "graph-ts-callers", cmd: npx(["graph", "callers", "formatTotal", "--root", PROJECT, "--json"]), expect: callers("formatTotal", [["renderBasket", "web/src/main.ts"]]) });
+      await writesOutside();
     },
   };
 
@@ -1208,8 +1410,11 @@ mkdirSync(OUT, { recursive: true });
 await chosen[phase]();
 // Aggregate: every backend or toolchain process seen in any step of this phase.
 if (phase === "run") {
-  const rows = readFileSync(RESULTS, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
-  const seen = rows.filter((r) => r.processes?.length && !r.step.startsWith("go-toolchain-index"));
+  const rows = readFileSync(RESULTS, "utf8")
+    .split("\n")
+    .filter(Boolean)
+    .map((l) => JSON.parse(l));
+  const seen = rows.filter((r) => r.processes?.length && r.step !== "go-toolchain-index");
   appendFileSync(
     RESULTS,
     JSON.stringify({

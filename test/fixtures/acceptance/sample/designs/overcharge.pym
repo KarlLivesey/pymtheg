@@ -1,0 +1,7 @@
+// Acceptance fixture with a deliberate behaviour violation: pay may run twice,
+// so the invariant fails. verify must report a counterexample.
+machine Overcharge {
+  state charges: Nat in 0..2 = 0;
+  event pay when charges < 2 { charges = charges + 1; }
+  invariant chargedOnce = charges <= 1;
+}

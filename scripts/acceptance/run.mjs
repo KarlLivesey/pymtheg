@@ -29,9 +29,10 @@
 // this harness, its owner and the run's pid; a container's own process is a
 // bounded `sleep`, so even a lost container removes itself (--rm). At start-up
 // the harness removes only its OWN owner's containers whose run has died.
-// Images present before any run are never removed; an image a run of this
-// harness pulled is removed by the last run to finish, once no container (of
-// any run) uses it. The list is shared in ~/.cache/pymtheg-acceptance.
+// The harness pulls an image only when it is absent, and records every image
+// it pulls; images it did not pull are never removed. A recorded image is
+// removed by the last run to finish, once no container (of any run) uses it.
+// The list is shared in ~/.cache/pymtheg-acceptance.
 import { spawnSync, spawn } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, existsSync, copyFileSync, rmSync, statSync } from "node:fs";
 import { join, resolve, basename } from "node:path";
@@ -140,9 +141,6 @@ function reapOrphans() {
   }
 }
 
-const imageSet = () => new Set(dockerQuiet("images", "--format", "{{.Repository}}:{{.Tag}}").stdout.trim().split("\n").filter(Boolean));
-/** Images on the server before this run that no run of this harness pulled: never removed. */
-const PRESENT_BEFORE = imageSet();
 /**
  * Images pulled by any run of this harness (this owner), shared between
  * overlapping runs in a small locked file, so whichever run finishes last
@@ -176,7 +174,10 @@ const readPulled = () => (existsSync(PULLED_FILE) ? readFileSync(PULLED_FILE, "u
 function ensureImage(image) {
   if (dockerQuiet("image", "inspect", image).status === 0) return true;
   const r = docker("pull", "-q", image);
-  if (r.status === 0 && !PRESENT_BEFORE.has(image))
+  // This run pulled it, so it was absent a moment ago: it is ours to clean
+  // up, whatever was on the server when the run started (another run may
+  // have removed an image that was present then).
+  if (r.status === 0)
     withLock(() => {
       if (!readPulled().includes(image)) writeFileSync(PULLED_FILE, [...readPulled(), image].join("\n") + "\n");
     });
