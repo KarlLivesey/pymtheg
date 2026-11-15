@@ -312,10 +312,18 @@ manifest unknown). Private items are ordinary symbols.
   would-be target), and so are `use` and `mod` declarations under one. Links
   written **inside** such an item (for example the body of a `#[tokio::main]`
   function) are resolved as written.
-- **Macros:** an unknown macro (for example `tracing::info!`) invoked as a
-  **statement** withholds the links in its enclosing block
-  (`opaque-item-may-shadow-name`); links outside that block are unaffected. One
-  used as an **expression** (`let x = m!();`, an operand) withholds nothing. The
+- **Macros:** an unknown macro (for example `tracing::info!`) that is a direct
+  child of a block, either as a statement (`m!();`, `m! { x }`) or as the
+  block's tail (`{ helper(); m!() }`, `if c { bail!("x") }`, a function ending in
+  `json!({…})`), withholds links in that block, including nested blocks and
+  closures inside it (`opaque-item-may-shadow-name`); links outside that block
+  are unaffected. Only lookups that an item defined by the macro could shadow are
+  withheld (`helper()`, `A::new()`); paths anchored with `crate::`, `self::`,
+  `super::` or `Self::` still resolve. A macro nested inside a larger expression
+  (`let x = m!();`, `helper() + m!()`, `Some(m!())`, a match arm value) withholds
+  nothing. The tail case is conservative: rustc treats a tail macro as an
+  expression, which cannot define an item, so links there are lost, never
+  wrong. The
   twenty standard statement macros (`print`, `println`, `eprint`, `eprintln`,
   `assert`, `assert_eq`, `assert_ne`, the three `debug_assert` forms, `vec`,
   `format`, `write`, `writeln`, `panic`, `todo`, `unreachable`, `unimplemented`,

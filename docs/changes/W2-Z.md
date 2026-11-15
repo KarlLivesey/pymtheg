@@ -105,7 +105,7 @@ built tool (`npm ci --ignore-scripts && npm run build`). Probe outputs are in
 | Go: definite import/call/receiver; build-variant candidates; open interface dispatch; `implements` unresolved `structural-match-unverified`; stdlib unresolved                                             | `evidence/w2-z/graph-probe.txt`                                                                                                                               |
 | Rust: `A::new` definite; written `impl Tr for A` definite; dot calls unresolved with would-be targets and reasons; first-probe definite (`p4(a: &A)`, annotated `let`); unannotated `let` not typed        | `evidence/w2-z/graph-probe.txt` (three `lib.rs` versions in `graph-fixtures/shapes/rs/src/`)                                                                  |
 | TS: union receiver candidates; `node:fs` `external-package`                                                                                                                                                | `evidence/w2-z/graph-probe.txt`                                                                                                                               |
-| Failed files parsed again every index                                                                                                                                                                      | `src/graph/indexer.ts:189-195`                                                                                                                                |
+| (superseded by W2-M) ~~Failed files parsed again every index~~: now a content failure from `parse` is stored and not re-parsed while hash, module and version match; operational failures are retried      | was `src/graph/indexer.ts:189-195` before the round-2 merge; now `src/graph/indexer.ts:185-205`, `src/graph/store.ts:180-191`                                 |
 | TS internal errors `failureKind: "transient"` and wording                                                                                                                                                  | `src/graph/languages/typescript/index.ts:298-306`; `test/graph-typescript-crash.test.mjs`                                                                     |
 | Go grammar vendored, patches, sha256 test                                                                                                                                                                  | `grammars/README.md`, `grammars/go/manifest.json`, `src/graph/languages/go/index.ts:23-28`, `test/grammar-vendored.test.mjs`                                  |
 | Go remaining gaps (`{; G() }`, chunk boundary)                                                                                                                                                             | `test/graph-go-grammar.test.mjs`; `docs/changes/W2-S.md`                                                                                                      |
@@ -231,8 +231,8 @@ Reviewer findings (PR 30 round 1), each re-verified by my own run:
    `evidence/w2-z/round1-rust-macro-probe.txt` and the code: Rust module version
    23 (`src/graph/languages/rust/index.ts:12`); a `println!` statement no longer
    withholds links while an unknown macro statement (`tracing::info!`) does
-   (corrected in round 2: only in its enclosing block, and only in statement
-   position);
+   (corrected in rounds 2 and 3: only in the block the macro is a direct child
+   of, as a statement or the block's tail);
    a child file resolves a macro from its parent's `#[macro_use] mod macros;`;
    macro arguments get no links. The twenty standard macro names and the extended
    E4 known limit are from `docs/changes/W2-C2.md` (names) and its tests
@@ -245,7 +245,8 @@ Reviewer findings (PR 30 round 1), each re-verified by my own run:
    "a function body that invokes an unknown macro withholds the links in it"
    overstated it. An unknown macro invoked as a statement withholds the links in
    its enclosing block (`opaque-item-may-shadow-name`); one used as an expression
-   withholds nothing. Run: `evidence/w2-z/round2-macro-position-probe.txt`
+   withholds nothing. (Round 3 corrects this further: a macro in a block's tail
+   position also withholds; see below.) Run: `evidence/w2-z/round2-macro-position-probe.txt`
    (inner-block statement: the two calls outside the inner block resolve, the one
    inside is withheld; `let _x = m!();` and `helper() + m!()`: all calls resolve).
 2. **Chunk boundary** (`support.md` Go): "first" dropped. Run: an identifier
@@ -270,6 +271,32 @@ Reviewer findings (PR 30 round 1), each re-verified by my own run:
      `test/capture-supervisor-observer.mjs` (preload and Unix socket). Added to
      the `support.md` correctness-tests paragraph. No production behaviour
      changed, so nothing else was folded.
+
+## Round 3 review fixes
+
+1. **Unknown macros** (`support.md` Rust "Macros"): round 2's "one used as an
+   expression withholds nothing" was false for a macro in a block's tail
+   position. `src/graph/languages/rust/parse.ts:1128-1129` makes any
+   `macro_invocation` that is a direct child of a block opaque. Now stated
+   exactly, each shape probed on main (`evidence/w2-z/round3-macro-position-probe.txt`,
+   input in `round3-fixtures/rust-macro-positions/`):
+   - statement `m!();` and `m! { x }`, block tail `{ helper(); m!() }`,
+     `if c { helper(); bail!("x") }` and a function ending in `json!({…})`:
+     `helper()` in that block is `opaque-item-may-shadow-name`, as are calls in a
+     nested block and a closure inside it; the `helper()` after the `if` block
+     resolves;
+   - `crate::helper()`, `self::helper()`, `crate::m::g()`, `Self::new()` and
+     `super::helper()` resolve beside `m!();`; `A::new()` is withheld;
+   - `let _x = m!();`, `helper() + m!()`, `Some(m!())` and a match arm value
+     withhold nothing.
+     The text says the tail case is conservative (rustc reads a tail macro as an
+     expression, which cannot define an item): links lost, never wrong.
+2. **Sources table** (this note): the "Failed files parsed again every index" row
+   is marked superseded by W2-M. A grep of this note and the eight folded
+   documents for the old retry-all wording (`parsed again`, `re-parse`,
+   `previously failed`, `failed parses are retried`, `ignores the field`,
+   `unless their last result failed`) finds only statements of the new behaviour
+   and the superseded-note entries for `W1-C.md:277` and `W2-I.md:93`.
 
 ## Checks
 
