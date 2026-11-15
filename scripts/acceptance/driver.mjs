@@ -894,7 +894,7 @@ async function writesOutside() {
     cmd: [
       "sh",
       "-c",
-      `find / -xdev -newer ${OUT}/.marker -type f 2>/dev/null | grep -v -e '^/proc' -e '^/sys' -e '^/acc/' -e '^${HOME}/project/' -e '^${HOME}/legacy/' -e '^${HOME}/restic/' | sed -E 's#^(/[^/]+/[^/]+/[^/]+/[^/]+).*#\\1#' | sort | uniq -c | sort -rn | head -20`,
+      `find / -xdev -newer ${OUT}/.marker -type f 2>/dev/null | grep -v -e '^/proc' -e '^/sys' -e '^/acc/' -e '^${HOME}/project/' -e '^${HOME}/legacy/' -e '^${HOME}/restic/' -e '^${HOME}/goproject/' | sed -E 's#^(/[^/]+/[^/]+/[^/]+/[^/]+).*#\\1#' | sort | uniq -c | sort -rn | head -20`,
     ],
     note: (r) => r.stdout.trim().split("\n").filter(Boolean).map((l) => l.trim()).join("; ") || "nothing",
   });
@@ -988,14 +988,24 @@ async function npxAbsolute() {
  * `pymtheg graph`, the only accepted shortfall is exactly that: exit 0, status
  * ok, no `toolchain` field in the answer and no `go` process.
  */
+const REAL_GO = "/usr/local/go/bin/go";
 async function goOptIn(pym) {
-  const settingsFile = join(PROJECT, ".pymtheg/settings.json");
+  // The route needs go.mod at the project root, so the opt-in runs on the
+  // sample's Go module as a project of its own (the shape a Go repository has).
+  // The route accepts only <GOROOT>/bin/go, so the PATH shim (rightly) cannot
+  // stand in: the setting names the real binary, and the spawn trace records it.
+  const G = join(HOME, "goproject");
+  rmSync(G, { recursive: true, force: true });
+  cpSync(join(PROJECT, "service"), G, { recursive: true });
+  await step({ id: "go-project-init", cmd: pym(["init", G]), cwd: G, expect: exit(0) });
+  const settingsFile = join(G, ".pymtheg/settings.json");
   const settings = JSON.parse(readFileSync(settingsFile, "utf8"));
-  writeFileSync(settingsFile, JSON.stringify({ ...settings, graph: { ...(settings.graph ?? {}), toolchain: { go: true } } }, null, 2) + "\n");
+  writeFileSync(settingsFile, JSON.stringify({ ...settings, graph: { ...(settings.graph ?? {}), toolchain: { go: REAL_GO } } }, null, 2) + "\n");
   await step({
     id: "go-toolchain-index",
-    display: 'graph.toolchain.go = true; graph index --json',
-    cmd: pym(["graph", "index", "--root", PROJECT, "--json"]),
+    display: `graph.toolchain.go = "${REAL_GO}"; graph index --json (Go module at the project root)`,
+    cmd: pym(["graph", "index", "--root", G, "--json"]),
+    cwd: G,
     allowToolchain: true,
     expect: (r) => {
       const go = r.json?.toolchain?.go;
@@ -1003,7 +1013,7 @@ async function goOptIn(pym) {
       return (
         exit(0)(r) ??
         (go?.state !== "used"
-          ? `toolchain state ${JSON.stringify(go?.state ?? r.json?.toolchain ?? "absent")}, expected "used"`
+          ? `toolchain ${excerpt(JSON.stringify(r.json?.toolchain ?? "absent"), 300)}, expected state "used"`
           : !(go.upgradedLinks > 0)
             ? `upgradedLinks ${go.upgradedLinks}, expected > 0`
             : goCalls === 0
@@ -1014,16 +1024,17 @@ async function goOptIn(pym) {
     gap: {
       chunk: "W3-L2",
       reason: "W3-L2 wiring not merged: the setting is ignored (no toolchain field, no go process)",
-      when: (r) => r.exitCode === 0 && r.json?.status === "ok" && r.json && !("toolchain" in r.json) && !r.calls.some((c) => c.tool === "go"),
+      when: (r) => r.exitCode === 0 && r.json?.status === "ok" && !("toolchain" in r.json) && !r.calls.some((c) => c.tool === "go"),
     },
-    note: (r) => `go ${r.json.toolchain.go.version ?? ""}; ${r.json.toolchain.go.upgradedLinks} links upgraded; ${r.calls.filter((c) => c.tool === "go").length} go processes`,
+    note: (r) => `${r.json.toolchain.go.upgradedLinks} links upgraded; ${r.calls.filter((c) => c.tool === "go").length} go processes`,
   });
   writeFileSync(settingsFile, JSON.stringify(settings, null, 2) + "\n");
   await step({
     id: "go-toolchain-off-again",
     display: "setting removed; graph index --json runs no go",
-    cmd: pym(["graph", "index", "--root", PROJECT, "--json"]),
-    expect: all(exit(0), json((j) => (j.status === "ok" ? null : `status ${j.status}`))),
+    cmd: pym(["graph", "index", "--root", G, "--json"]),
+    cwd: G,
+    expect: all(exit(0), json((j) => (j.status !== "ok" ? `status ${j.status}` : "toolchain" in j ? `toolchain reported while off: ${JSON.stringify(j.toolchain)}` : null))),
   });
 }
 

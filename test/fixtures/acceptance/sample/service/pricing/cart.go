@@ -19,3 +19,14 @@ func (c *Cart) Add(cents int) *Cart {
 func (c *Cart) Items() []int {
 	return c.items
 }
+
+// First returns the first element of xs.
+func First[T any](xs []T) T {
+	return xs[0]
+}
+
+// Load returns a cart and an error, so its result is typed only by the
+// toolchain when it is used through a multi-value assignment.
+func Load() (*Cart, error) {
+	return NewCart(), nil
+}
