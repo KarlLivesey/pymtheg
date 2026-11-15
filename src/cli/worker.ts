@@ -1,3 +1,5 @@
+// First: the same narrow warning filter as the CLI entry (a worker has its own process).
+import "./quiet-warnings.js";
 import { parentPort, workerData } from "node:worker_threads";
 import { analyseFile } from "../analysis/index.js";
 import { sourceCatalogue } from "../architecture/source-contracts.js";
