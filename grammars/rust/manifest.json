@@ -1,0 +1,111 @@
+{
+  "language": "rust",
+  "output": "tree-sitter-rust.wasm",
+  "upstream": {
+    "repository": "https://github.com/tree-sitter/tree-sitter-rust",
+    "tag": "v0.24.2",
+    "commit": "77a3747266f4d621d0757825e6b11edcbf991ca5",
+    "license": "MIT (LICENSE in this directory, copied from the commit above)"
+  },
+  "patches": [
+    {
+      "file": "patches/0001-pr319-struct-pattern-field-attributes.patch",
+      "pullRequest": "https://github.com/tree-sitter/tree-sitter-rust/pull/319",
+      "headCommit": "70157d40a8e148ca547fd08f34826e7ba3a98958",
+      "baseCommit": "77a3747266f4d621d0757825e6b11edcbf991ca5",
+      "what": "Attributes (e.g. #[cfg]) on struct-pattern fields",
+      "paths": [
+        "grammar.js",
+        "test/corpus/attributes_on_struct_patterns.txt"
+      ],
+      "origin": "upstream"
+    },
+    {
+      "file": "patches/0002-pr271-unit-struct-where.patch",
+      "pullRequest": "https://github.com/tree-sitter/tree-sitter-rust/pull/271",
+      "headCommit": "1660fa6c950ed3f6d56210c56627b7fdf67fadc0",
+      "baseCommit": "77a3747266f4d621d0757825e6b11edcbf991ca5",
+      "what": "A where clause on a unit struct (`struct X where T: Eq;`)",
+      "paths": [
+        "grammar.js",
+        "test/corpus/declarations.txt"
+      ],
+      "origin": "upstream"
+    },
+    {
+      "file": "patches/0003-pr317-tilde-in-token-trees.patch",
+      "pullRequest": "https://github.com/tree-sitter/tree-sitter-rust/pull/317",
+      "headCommit": "1bf4964e4afa48e53e848a285a6b0c89fd23ad01",
+      "baseCommit": "77a3747266f4d621d0757825e6b11edcbf991ca5",
+      "what": "The `~` token inside macro token trees",
+      "paths": [
+        "grammar.js",
+        "test/corpus/macros.txt"
+      ],
+      "origin": "upstream"
+    },
+    {
+      "file": "patches/0004-pr312-le-after-cast.patch",
+      "pullRequest": "https://github.com/tree-sitter/tree-sitter-rust/pull/312",
+      "headCommit": "1d3d5d6df51d5edfac3bdd3178433eb0aa437ea5",
+      "baseCommit": "77a3747266f4d621d0757825e6b11edcbf991ca5",
+      "what": "`<=` after a cast to a named type (`x as size_t <= y`)",
+      "paths": [
+        "grammar.js",
+        "test/corpus/expressions.txt"
+      ],
+      "origin": "upstream"
+    },
+    {
+      "file": "patches/0005-pr283-unicode-escape-underscore.patch",
+      "pullRequest": "https://github.com/tree-sitter/tree-sitter-rust/pull/283",
+      "headCommit": "bb723fa5db73847d77d33891db2e51fb4baea5a2",
+      "baseCommit": "261b20226c04ef601adbdf185a800512a5f66291",
+      "what": "Underscores in unicode escapes (`\\u{4_e}`)",
+      "paths": [
+        "grammar.js",
+        "test/corpus/literals.txt"
+      ],
+      "origin": "upstream"
+    },
+    {
+      "file": "patches/0006-pr281-extern-types.patch",
+      "pullRequest": "https://github.com/tree-sitter/tree-sitter-rust/pull/281",
+      "headCommit": "7d6fe656932a6f0f27bdc92ea80c075585a00943",
+      "baseCommit": "261b20226c04ef601adbdf185a800512a5f66291",
+      "what": "`type X;` (foreign types) in extern blocks",
+      "paths": [
+        "grammar.js",
+        "test/corpus/declarations.txt"
+      ],
+      "origin": "upstream"
+    },
+    {
+      "file": "patches/0007-own-raw-contextual-identifier.patch",
+      "origin": "pymtheg",
+      "author": "Pymtheg W2-V (not upstream)",
+      "what": "`raw` is not a keyword: the raw-borrow marker is an identifier aliased to the anonymous node `raw`, only directly after `&` and before `const`/`mut`; `raw` is removed from `_reserved_identifier`. Fixes the v0.24.x regression where `raw` as a type name, generic parameter, item name or `raw @ pattern` failed the file; `&raw` on a variable stays a plain borrow and `&raw const`/`&raw mut` trees are unchanged",
+      "paths": [
+        "grammar.js",
+        "test/corpus/pymtheg_raw.txt"
+      ]
+    },
+    {
+      "file": "patches/0008-own-safe-qualifier.patch",
+      "origin": "pymtheg",
+      "author": "Pymtheg W2-V (not upstream)",
+      "what": "The edition-2024 `safe` qualifier (`safe fn` / `safe static` in `unsafe extern` blocks) as an identifier aliased to the anonymous node `safe`, only at the start of a body-less function signature or a static item; `safe` stays an ordinary identifier elsewhere (unlike upstream PR #256, which reserves it)",
+      "paths": [
+        "grammar.js",
+        "test/corpus/pymtheg_safe.txt"
+      ]
+    }
+  ],
+  "tools": {
+    "tree-sitter-cli": "0.27.2",
+    "wasi-sdk": "34.0",
+    "binaryen": "version_132"
+  },
+  "abi": 15,
+  "sha256": "66a1d3577d8e3242d31c6ff1a094307000c385524dd6f7a9afee369b207adac0"
+}

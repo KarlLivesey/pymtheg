@@ -150,7 +150,7 @@ test("false child inner macro_use leaves earlier textual macro definite", async 
   assert.equal(g.symbols.find((s) => s.id === d.targetId).file, "src/lib.rs");
 });
 const rawBody =
-  "pub fn g()->u8{let raw=1u8;let r=&raw;*r}macro_rules! m{()=>{2u16}}";
+  "pub fn g()->u8{fn gap()->u8{1}gap::<>()}macro_rules! m{()=>{2u16}}";
 for (const header of ["", "#![macro_use]", "#![cfg_attr(all(),macro_use)]"])
   test(`failed child unknown inner attributes: ${header}`, async () => {
     const g = await graph({
@@ -281,7 +281,7 @@ test("repairing child file reads its inner macro_use and clears failure uncertai
   bad.unverified("m", "m", "macros");
   const good = await graph({
     ...sources,
-    "src/broken.rs": sources["src/broken.rs"].replaceAll("raw", "value"),
+    "src/broken.rs": sources["src/broken.rs"].replaceAll("gap::<>()", "gap()"),
   });
   const l = good.links.find((l) => l.kind === "macros" && l.targetName === "m");
   const d = good.decisions.find((d) => d.linkId === l.id);

@@ -264,7 +264,7 @@ test("round 10 B1 macro invocation has its own namespace", async () => {
   picked(g, "X", "macros", "macro", "X");
 });
 const broken =
-  'pub fn drop(_:Vec<u8>)->u8{let raw=1u8;let r=&raw;*r}pub fn format(_:std::fmt::Arguments<\'_>)->String{let raw=1u8;let r=&raw;let _=*r;String::from("outer")}';
+  'pub fn drop(_:Vec<u8>)->u8{fn gap()->u8{1}gap::<>()}pub fn format(_:std::fmt::Arguments<\'_>)->String{fn gap()->u8{1}gap::<>();String::from("outer")}';
 for (const [label, source, name] of [
   [
     "block std drop",
@@ -296,7 +296,7 @@ for (const [label, source, name] of [
     assert.match(l.data.uncertainty, /failed-file-unseen-declarations/);
     const fixed = await graph({
       "src/lib.rs": source,
-      "src/broken.rs": broken.replaceAll("raw", "renamed"),
+      "src/broken.rs": broken.replaceAll("gap::<>()", "gap()"),
     });
     noCause(fixed, name);
   });
