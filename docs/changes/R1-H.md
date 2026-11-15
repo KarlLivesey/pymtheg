@@ -120,7 +120,7 @@ start, page and script asset over HTTP, SIGINT stop: all pass before and after.
 
 | Production install | Before (main) | After |
 |---|---|---|
-| `node_modules` bytes | 88,964,435 | 52,672,514 |
+| `node_modules` bytes | 88,964,435 | 52,692,480 |
 | Packages (incl. pymtheg) | 134 | 11 |
 | `npm warn` lines | 6 | 0 |
 
@@ -134,19 +134,36 @@ After the move nothing in the production tree has an install script
 (`hasInstallScript` is absent from every production lockfile entry) and the
 install prints no warning.
 
-### 7. Node's SQLite ExperimentalWarning
+### 7. Node's ExperimentalWarnings
 
-Reproduced on official Node 24.0.0 and 25.2.1 (one warning per command, even
-`--version`); 24.21.0, 24.22.3, 25.9.0 and 26.13.1 do not warn. A warning
-filter alone could not work: Node loads a builtin while linking the ESM graph,
-before any module body runs, and `src/storage/local.ts` imported `node:sqlite`
-statically. Fix: `src/storage/local.ts` now loads `node:sqlite` at the first
-database open (`process.getBuiltinModule`), and `src/cli/quiet-warnings.ts`, the
-CLI entry's first import, drops only a warning whose type is
-`ExperimentalWarning` and whose message starts "SQLite is an experimental
-feature". Every other warning still prints. No `NODE_OPTIONS` or flag is
-needed. **Note for the manager:** the two-line change is in `src/storage/`,
-outside this chunk's owned paths; it is the only place that loads the module.
+Reproduced on official Node 24.0.0 and 25.2.1: `node:sqlite` warns on every
+command (even `--version`); on 24.0.0 `path.matchesGlob` (source selection,
+`src/language/source-selection.ts`) also warns, from the analysis worker, and
+broke 8 MCP tests' stderr assertions there. 24.21.0, 24.22.3, 25.9.0 and
+26.13.1 print neither. A warning filter alone could not catch SQLite's: Node
+loads a builtin while linking the ESM graph, before any module body runs, and
+`src/storage/local.ts` imported `node:sqlite` statically. Fix:
+
+- `src/storage/local.ts` loads `node:sqlite` at the first database open
+  (`process.getBuiltinModule`); it is the only module that loads it.
+- `src/cli/quiet-warnings.ts`, the first import of the CLI entry
+  (`src/cli/main.ts`) and of the analysis worker (`src/cli/worker.ts`, which has
+  its own `process`), drops only warnings whose type is `ExperimentalWarning`
+  and whose message starts "SQLite is an experimental feature" or "glob is an
+  experimental feature". Every other warning, including every other
+  ExperimentalWarning, still prints. No `NODE_OPTIONS` or flag is needed.
+- `test/r1h-packaging.test.mjs` checks the filter's exact scope and that no
+  `src` file imports `node:sqlite` as a value statically.
+
+The full suite passes on official Node 24.0.0, 24.21.0, 25.2.1, 25.9.0 and
+26.13.1 (2,750 tests; one existing environment skip on 26.13.1).
+
+**Note for the manager:** the lazy load is in `src/storage/local.ts`, outside
+this chunk's owned paths (a three-line change); the filter import is the first
+line of `src/cli/worker.ts`. Other workers (architecture, implementation query,
+behaviour) do not import the filter; none printed either warning in the suite
+on any version, but a future worker that calls `matchesGlob` on Node 24.0.0
+would need the same first import.
 
 ### 8. Signals
 
