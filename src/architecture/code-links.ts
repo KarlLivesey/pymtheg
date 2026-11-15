@@ -426,20 +426,19 @@ function resolveOne(
   const equalText = (s: GraphSymbol) => compare(s).length === 0;
   const fresh = elsewhere.filter((s) => !twinPaths.has(s.file));
   const sameText = fresh.filter(equalText);
-  // A recorded twin with the same text that left its own path could equally be
-  // the source of a same-text symbol at a new path: not provable.
-  const twinLeft = (twins ?? []).some(
+  // Identical copies on record: occupancy of a path proves nothing about which
+  // copy moved, so a move is never claimed for such a link.
+  const identicalTwin = (twins ?? []).some(
     (t) =>
       t.fingerprint.signature === link.fingerprint.signature &&
-      t.fingerprint.body === link.fingerprint.body &&
-      !elsewhere.some((s) => s.file === t.path),
+      t.fingerprint.body === link.fingerprint.body,
   );
   const recordedFileGone = status === null;
   if (
     twins !== null &&
+    !identicalTwin &&
     recordedFileGone &&
     sameText.length === 1 &&
-    !twinLeft &&
     !mayBeHiddenBy.length
   ) {
     const moved = sameText[0]!;
@@ -456,15 +455,17 @@ function resolveOne(
     suggestions.push(
       view.summarize(
         s,
-        twinPaths.has(s.file)
-          ? "a different symbol with the same name already existed here when the link was made"
-          : !equalText(s)
-            ? "same name in another file, different text"
-            : !recordedFileGone
-              ? "identical text at another path, but the linked file still exists (rename or copy?)"
-              : twins === null
-                ? "identical text at another path; this link has no record of same-name symbols at link time"
-                : "identical text at another path; not unique or could be another symbol's move",
+        identicalTwin
+          ? "identical copies existed when the link was made; cannot tell which one moved"
+          : twinPaths.has(s.file)
+            ? "a different symbol with the same name already existed here when the link was made"
+            : !equalText(s)
+              ? "same name in another file, different text"
+              : !recordedFileGone
+                ? "identical text at another path, but the linked file still exists (rename or copy?)"
+                : twins === null
+                  ? "identical text at another path; this link has no record of same-name symbols at link time"
+                  : "identical text at another path; not unique",
       ),
     );
   return {

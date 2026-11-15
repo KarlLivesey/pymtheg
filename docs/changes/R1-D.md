@@ -96,6 +96,16 @@ text from the first `{` on (empty when there is none).
 | `missing` | Not found at the recorded path, and no move is proven. `suggestions` always lists, first, same-kind symbols in the linked file whose body is identical (a rename in place), then every same-identity symbol elsewhere, each with its reason (already existed when linked; different text; identical text but the linked file still exists; not unique). `mayBeHiddenBy` names failed files of that language. Suggestions are never applied |
 | `unverifiable` | The recorded file failed to parse (or parsed partially and the symbol is absent). `unverifiableFile` names it, with the reason |
 
+**What a link is.** A link identifies a symbol by project-relative path +
+qualified name (scoped identity) + kind, and verifies it by the text
+fingerprint. A symbol at the recorded path with the same identity and identical
+text *is* the linked symbol by that definition. Which file or inode it came from
+(provenance) is not part of a link, and nothing about the code at that path
+differs. So if the linked file is moved away and an identical twin is moved
+onto the recorded path, the link reads `ok`. This is the defined behaviour
+(ruling, PR 38 round 2; pinned by a labelled test), not something the link
+tries to detect.
+
 **The `moved` rule.** Go and TypeScript identities carry no package or file, so
 a shared name proves nothing. `moved` is reported only when **all** of these
 hold:
@@ -107,10 +117,13 @@ hold:
    fingerprints equal) at a path that held no same-identity symbol when the link
    was made or last refreshed (`twins`). A same-name symbol with different text
    is only a suggestion.
-3. No recorded twin with the same text has left its own path. If one has, either
-   could be the source of the new symbol, so the link is `missing` with both
-   suggested. A twin still at its recorded path is excluded, and the single new
-   same-text symbol is taken as the move (tested).
+3. No twin on record has the same text as the linked symbol. If identical
+   copies existed when the link was made (or last refreshed), a path's
+   occupancy proves nothing about which copy moved, so `moved` is never claimed
+   for that link. The result is `missing`, with every same-name symbol
+   suggested and the reason "identical copies existed when the link was made;
+   cannot tell which one moved". Twins with *different* text do not block a
+   move (tested).
 4. No failed or partial file of that language could hide another candidate.
 5. The link has a `twins` record. Links made at the round-0 head have none, so
    they are never `moved`.
@@ -287,8 +300,11 @@ a fixed probe path purely to run the standard sync and read failed/stale files),
     `missing`, check fails;
   - a genuine move to another package → `moved`; `check` exits 1 until
     `--allow-moved` or a refresh; a different-text same-name symbol → `missing`;
-  - a move when a twin pre-exists → `moved` while the twin stays put, `missing`
-    with both suggested once the same-text twin also moves;
+  - identical-text twins (the round-2 swap case: twin `b/route.ts` → `d/`,
+    linked `a/route.ts` → `b/`) → `missing` with both suggested, check fails
+    even with `--allow-moved`; a genuine move with only different-text twins
+    → `moved`; an identical twin moved onto the recorded path → `ok` (the
+    defined behaviour, labelled test);
   - the fingerprint rule (CRLF and trailing spaces `ok`; a space inside a
     literal and re-indentation `changed`);
   - the concurrent-writer handshake;
@@ -327,11 +343,24 @@ a fixed probe path purely to run the standard sync and read failed/stale files),
   an edit, a move out of a file that still exists, and a Rust item moved to
   another module (its identity includes the module scope) are all `missing`
   with suggestions.
-- **Concurrent first indexing.** Several processes indexing a project with no
-  graph at once can fail inside the graph indexer (`UNIQUE constraint failed:
-  graph_links.id`, `FOREIGN KEY constraint failed`: 1 to 3 of 8 in two runs).
-  This is in `src/graph` (not changed here). Parallel `pymtheg graph index` has
-  the same issue. Once the graph exists, concurrent link writers succeed.
+- **Concurrent first indexing.** When several `link add` processes start at
+  once on a project with no graph yet, some can fail inside the graph indexer.
+  The builder observed this intermittently: 1–3 of 8 in two runs in round 1,
+  then 0, 4 and 1 of 8 in three fresh runs and 3 of 8 in another in round 2. It
+  was not reproduced in review (8/8 twice).
+
+  What the user sees: that `link add` exits 3 with error code `error` and a
+  graph message (`UNIQUE constraint failed: graph_links.id`, `FOREIGN KEY
+  constraint failed` or `Invalid or duplicate added link origin/key`), and
+  nothing is linked by that process.
+
+  Verified once (round 2, after a 3-of-8 failure): the next run recovers.
+  Re-running the eight adds one after another gave `created` or
+  `already-linked` for all; `link check` showed 8 ok; `graph status` was `ok`
+  with the index complete and no failed files; and a following `graph index`
+  completed. The cause is in `src/graph` (not changed here). Parallel `pymtheg
+  graph` commands on an unindexed project are likely affected the same way;
+  that was not tested. Once the graph exists, concurrent link writers succeed.
 - **Several same-identity symbols in one file** (Go `init`, TS overloads) are
   matched by recorded ordinal. Reordering them can report the wrong sibling as
   `changed`.

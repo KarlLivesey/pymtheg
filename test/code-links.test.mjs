@@ -493,13 +493,44 @@ test("a genuine file move is moved; check fails until refreshed unless --allow-m
   }
 });
 
-test("a move when a twin pre-exists: moved only if the twin stayed where it was", async () => {
-  // Chosen rule: a recorded twin still at its recorded path is excluded, so the
-  // single new same-text symbol is the linked one. If a same-text twin also left
-  // its path, either could be the source: missing, both suggested.
+const route =
+  'export async function GET() {\n  return new Response("ok");\n}\n';
+test("identical-text twins on record: moved is never claimed (swap case from review)", async () => {
+  const root = await goProject({ "a/route.ts": route, "b/route.ts": route });
+  try {
+    const made = await createCodeLink({
+      root,
+      writer,
+      record: "R1",
+      selector: "a/route.ts:1",
+    });
+    assert.deepEqual(
+      made.link.twins.map((t) => t.path),
+      ["b/route.ts"],
+    );
+    // Move the twin b → d, then the linked file a → b.
+    await mkdir(join(root, "d"));
+    await rename(join(root, "b", "route.ts"), join(root, "d", "route.ts"));
+    await rename(join(root, "a", "route.ts"), join(root, "b", "route.ts"));
+    await rm(join(root, "a"), { recursive: true });
+    const { check, link } = await only(root, true);
+    assert.equal(link.state, "missing");
+    assert.equal(check.passed, false); // even with allowMoved
+    assert.deepEqual(link.suggestions.map((s) => s.path).sort(), [
+      "b/route.ts",
+      "d/route.ts",
+    ]);
+    for (const suggestion of link.suggestions)
+      assert.match(suggestion.reason, /identical copies existed/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a genuine move with only different-text twins on record is moved", async () => {
   const root = await goProject({
     "one/a.go": goSave("one"),
-    "two/a.go": goSave("two"),
+    "two/b.go": goSave("two", "return x * 9"),
   });
   try {
     await createCodeLink({
@@ -511,18 +542,34 @@ test("a move when a twin pre-exists: moved only if the twin stayed where it was"
     await mkdir(join(root, "three"));
     await writeFile(join(root, "three", "a.go"), goSave("three"));
     await rm(join(root, "one"), { recursive: true });
-    let { link } = await only(root);
+    const { link } = await only(root, true);
     assert.equal(link.state, "moved");
     assert.equal(link.current.path, "three/a.go");
-    await mkdir(join(root, "four"));
-    await writeFile(join(root, "four", "a.go"), goSave("four"));
-    await rm(join(root, "two"), { recursive: true });
-    ({ link } = await only(root));
-    assert.equal(link.state, "missing");
-    assert.deepEqual(link.suggestions.map((s) => s.path).sort(), [
-      "four/a.go",
-      "three/a.go",
-    ]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("defined behaviour: an identical twin moved onto the recorded path is the linked symbol (ok)", async () => {
+  // A link is identified by project-relative path + qualified name + kind and
+  // verified by its text fingerprint. File provenance is not part of a link, so
+  // identical text with the same identity at the recorded path is `ok` (ruling,
+  // PR 38 round 2). This test pins that definition.
+  const root = await goProject({ "a/route.ts": route, "b/route.ts": route });
+  try {
+    await createCodeLink({
+      root,
+      writer,
+      record: "R1",
+      selector: "a/route.ts:1",
+    });
+    await mkdir(join(root, "c"));
+    await rename(join(root, "a", "route.ts"), join(root, "c", "route.ts"));
+    await rename(join(root, "b", "route.ts"), join(root, "a", "route.ts"));
+    const { check, link } = await only(root);
+    assert.equal(link.state, "ok");
+    assert.equal(link.current.path, "a/route.ts");
+    assert.equal(check.passed, true);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

@@ -2385,13 +2385,21 @@ are dropped; every other character counts. A formatter run therefore reads as
 link does not store a graph row; the graph's symbol ID is a hint only. State is
 recomputed against the current graph each time.
 
+**What a link is (ruling, PR 38 round 2):** a link identifies a symbol by
+project-relative path + qualified name + kind, and verifies it by the text
+fingerprint. A symbol at the recorded path with that identity and identical text
+is the linked symbol, whatever file it came from. Provenance is not part of a
+link and is not detected.
+
 A link is never dropped or retargeted by resolution. `moved` requires
 established continuity, all of the following:
 
 - the recorded file is gone;
 - exactly one same-identity symbol has identical text at a path that held no
   twin;
-- no same-text twin has left its path;
+- no twin on record has identical text (identical copies make every path's
+  occupancy unprovable, so such a link is never `moved`, only `missing` with
+  all copies suggested);
 - no failed file could hide another candidate.
 
 Anything else is `missing`, with suggestions. `link check` fails on `moved`
