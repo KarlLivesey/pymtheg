@@ -61,6 +61,7 @@
   },
   "files": [
     "dist/",
+    "src/graph/languages/go/toolchain/golinks.go",
     "dist-web/",
     "docs/",
     "examples/mvp/",

@@ -1,0 +1,21 @@
+
+> pymtheg@1.0.0 build
+> node scripts/schema.mjs && tsc && tsc -p web/tsconfig.json && vite build --configLoader runner --config web/vite.config.ts
+
+vite v7.2.2 building client environment for production...
+transforming...
+✓ 471 modules transformed.
+rendering chunks...
+computing gzip size...
+../dist-web/index.html                   0.57 kB │ gzip:   0.34 kB
+../dist-web/third-party-notices.txt    108.09 kB │ gzip:   3.67 kB
+../dist-web/assets/index-BqVh2Gmm.css   65.10 kB │ gzip:  13.76 kB
+../dist-web/assets/react-Con9QuWu.js   314.00 kB │ gzip:  97.85 kB
+../dist-web/assets/editor-DPqUEO-b.js  353.01 kB │ gzip: 113.77 kB
+../dist-web/assets/index-C5exiF9n.js   589.77 kB │ gzip: 167.00 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 4.57s
