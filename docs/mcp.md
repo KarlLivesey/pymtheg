@@ -111,22 +111,35 @@ exact names, recorded qualified names, `path:line[:column]` or an unchanged
 `symbol:<64 hex digits>` ref. Search folds ASCII case by default; opt out with
 `caseSensitive:true`. Name ambiguity lists matches, never picks one.
 
-Each call returns immediately with `state:"running"` and a `jobId`. Work runs in
-an owned worker thread, including cold/automatic indexing. **graph_result** polls
-its phase/files-done/total counters, reads results or cancels it. `wait:true` waits;
-with a client progressToken it emits progress notifications. Without wait, calls
-never wait for indexing. A first query on a large unindexed project starts the
-full sync; keep the jobId and poll rather than starting duplicate work. One graph
-job runs per connection. Other tools remain available while it works.
+By default `code_graph` waits **up to 5 seconds** for its owned worker to exit.
+A finished job returns its first result page **inline**, in exactly the same shape
+as `graph_result`, including jobId for further pages. `section` chooses that first
+page (default answer; for example links or possible_callers). The query limit also
+bounds the first page. The deadline changes only the response shape, never validity.
+If still running, it returns `state:"running"`, jobId, latest progress and the
+instruction to call `graph_result`. Always handle both shapes. `wait:false` opts
+out and returns a handle immediately, including for index/status.
+
+Work runs in an owned worker thread. `graph_result` polls phase/files-done/total,
+reads pages or cancels; its `wait:true` waits for completion without the 5-second
+inline bound. Both waits support progress notifications with a client progressToken
+and join on request cancellation. A first query on an unindexed large project
+starts full sync; retain its handle rather than starting duplicate work. One graph
+worker runs per connection, and other tools remain available during indexing.
 
 ```js
 // verified-mcp
 await write("app.ts", "export function greet() { return 1; }\n");
 const graphJob = await call("code_graph", { action: "search", query: "greet", limit: 10 });
-expect(graphJob.state === "running");
-const graph = await call("graph_result", { jobId: graphJob.jobId, wait: true });
+const graph = graphJob.state === "running"
+  ? await call("graph_result", { jobId: graphJob.jobId, wait: true })
+  : graphJob;
 expect(graph.state === "complete" && graph.items[0].at === "app.ts:1:1");
 expect(graph.items[0].kind === "function" && graph.items[0].ref.startsWith("symbol:"));
+const fire = await call("code_graph", { action: "status", wait: false });
+expect(fire.state === "running");
+const statusPage = await call("graph_result", { jobId: fire.jobId, wait: true });
+expect(statusPage.state === "complete");
 ```
 
 Queries auto-sync by content/context/module state, not mtimes. `noSync:true`

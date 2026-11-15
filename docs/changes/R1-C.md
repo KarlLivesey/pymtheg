@@ -10,7 +10,9 @@ TLC/Quint/Java lines remain untouched.
 ## Agent surface
 
 `code_graph` starts index/status/search/symbol/callers/callees/path/impact/file
-work and immediately returns a session job ID. Selectors, uncertainty, failed
+work and waits up to five seconds by default for the first page inline (with a
+session job ID for further pages). `wait:false` immediately returns a handle; an
+unfinished default wait returns a handle with progress instead. Selectors, uncertainty, failed
 files, staleness and auto-sync all come from `src/graph/commands.ts`; this layer
 only validates/shapes, pages and bounds results. No re-resolution, traversal or
 freshness algorithm is duplicated. **No additive graph export was needed.**
@@ -20,7 +22,10 @@ sections or cancels. Work runs in an owned Worker so synchronous parser/resolver
 phases cannot block stdio. One graph job runs per connection; disconnect cancels
 and joins workers. Status is read-only; queries sync unless noSync. Initial cold
 queries start full indexing, rather than answering from an incomplete graph.
-Clients should retain the jobId and poll for long runs; wait is an explicit choice.
+Clients should retain the jobId and poll for long runs. `code_graph.wait` defaults
+to true; `graph_result.wait` defaults to false and, when enabled, waits for completion.
+The inline deadline selects only a response shape, never the validity of an answer.
+`section` selects the first page, using the same renderer and byte cap as graph_result.
 Progress is the core's deterministic file/phase counters; initial inventory/hash
 work can have no progress event yet. No wall-clock assertions or scheduling sleeps.
 
@@ -111,7 +116,7 @@ per-connection jobs, no cross-process index coordinator, and SQLite WAL -shm rea
 marks. No MCP project initialization tool, watcher, HTTP transport, new language
 precision, package publication or requirement-to-symbol join is included.
 
-Final validation: **2,602 npm-test cases passed**, zero failures/cancellations/skips;
+Initial validation at `127b7508`: **2,602 npm-test cases passed**, zero failures/cancellations/skips;
 format:check and all seven new focused tests passed. The unchanged MCP regression
 subset plus the new cases passed 30 tests. The executable docs cover all 19
 registered tool names. Pinned restic index + five questions use 17 successful MCP
@@ -120,3 +125,29 @@ The initial over-broad try_inputs guard caused two intermediate failures; it was
 corrected without changing old assertions, and the regression/final results are
 recorded separately. The final source hashes match the corpus manifest; all copied
 corpus/database scratch, clients/workers and both dev mirrors are cleaned.
+
+
+## PR 40 inline-result follow-up
+
+Normally merged main `350b70cee19dfa6ef2b3e60a4fbe2503d8e38fa3` in merge
+`51a2e9ccbdeb27b800822c24cd4e02a2943a0334` (other parent:
+`127b7508679de45adf1e9e6ad09dd87ba8f66c78`). This brings in clean init and
+Go toolchain links; this follow-up adds no toolchain wiring and no dependency
+on the unmerged requirement-link wrapper.
+
+A shared wait helper releases progress/abort listeners and clears its deadline.
+Cancellation still joins the worker; a completed page is rendered only after
+worker exit. The existing one-worker and disconnect-cleanup rules remain.
+Three controlled-worker tests force completion before deadline, deadline before
+completion, fire-and-poll, and cancellation during an inline wait. An injectable
+deadline is test infrastructure, not an MCP setting. They compare the entire
+inline response with graph_result and assert the wire cap and worker cleanup.
+No elapsed-time assertion decides correctness. Executed docs show both valid
+shapes and explicit fire-and-poll. Follow-up validation and the new five-question
+restic transcript are recorded in `evidence/r1-c/inline/README.md`.
+
+Follow-up checks: **2,676 full-suite tests passed**, format check passed, and
+**33 focused MCP regressions passed**. All five warm restic questions returned
+inline in **one call each** (6,348 / 37,288 / 10,020 / 6,272 / 20,118 bytes).
+The explicit cold index used two calls; seven total versus the historical 17.
+All three pinned-source checks passed; source hashes match the recorded manifest.

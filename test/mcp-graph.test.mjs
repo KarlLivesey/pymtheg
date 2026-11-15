@@ -125,7 +125,7 @@ test("stdio mixed init-free graph: every action, certainty classes, failures, pa
 
 test("MCP graph jobs are nonblocking, cancellable, bounded, session-owned and confined", async () =>
   project(async (s, root) => {
-    const job = await s.call("code_graph", { action: "index" });
+    const job = await s.call("code_graph", { action: "index", wait: false });
     assert.equal(job.state, "running");
     // The server can service another tool while the worker indexes; no elapsed-time assertion.
     const tools = await s.client.listTools();
@@ -164,7 +164,7 @@ test("graph MCP confines uninitialized subdirectories rather than indexing their
     await mkdir(join(root, ".git"));
     await mkdir(join(root, "child"));
     s = await connect(join(root, "child"));
-    const r = await s.raw("code_graph", { action: "index" });
+    const r = await s.raw("code_graph", { action: "index", wait: false });
     assert.equal(r.result.isError, true);
     assert.match(r.body.error.message, /boundary/);
   } finally {

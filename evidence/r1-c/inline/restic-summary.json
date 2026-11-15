@@ -1,0 +1,123 @@
+{
+  "questions": 5,
+  "callsPerQuestion": [
+    {
+      "label": "Explicit cold index",
+      "action": "index",
+      "calls": 2,
+      "inline": false,
+      "responseBytes": [
+        616,
+        3348
+      ],
+      "totalBytes": 3964
+    },
+    {
+      "label": "1. Where is ParseID declared?",
+      "action": "search",
+      "calls": 1,
+      "inline": true,
+      "responseBytes": [
+        6348
+      ],
+      "totalBytes": 6348
+    },
+    {
+      "label": "2. Which call sites call ParseID?",
+      "action": "callers",
+      "calls": 1,
+      "inline": true,
+      "responseBytes": [
+        37288
+      ],
+      "totalBytes": 37288
+    },
+    {
+      "label": "3. What does ParseID call?",
+      "action": "callees",
+      "calls": 1,
+      "inline": true,
+      "responseBytes": [
+        10020
+      ],
+      "totalBytes": 10020
+    },
+    {
+      "label": "4. Are there possible callers of SaverUnpacked.SaveUnpacked?",
+      "action": "callers",
+      "calls": 1,
+      "inline": true,
+      "responseBytes": [
+        6272
+      ],
+      "totalBytes": 6272
+    },
+    {
+      "label": "5. What could a ParseID change affect within two call levels?",
+      "action": "impact",
+      "calls": 1,
+      "inline": true,
+      "responseBytes": [
+        20118
+      ],
+      "totalBytes": 20118
+    }
+  ],
+  "toolCalls": 7,
+  "responseBytes": [
+    {
+      "name": "code_graph",
+      "bytes": 616
+    },
+    {
+      "name": "graph_result",
+      "bytes": 3348
+    },
+    {
+      "name": "code_graph",
+      "bytes": 6348
+    },
+    {
+      "name": "code_graph",
+      "bytes": 37288
+    },
+    {
+      "name": "code_graph",
+      "bytes": 10020
+    },
+    {
+      "name": "code_graph",
+      "bytes": 6272
+    },
+    {
+      "name": "code_graph",
+      "bytes": 20118
+    }
+  ],
+  "maximumResponseBytes": 37288,
+  "counts": {
+    "files": 559,
+    "symbols": 7356,
+    "links": 63088,
+    "failed": 0,
+    "partial": 0,
+    "unresolved": 21686,
+    "ambiguous": 1484
+  },
+  "sourceChecks": [
+    {
+      "file": "internal/restic/id.go",
+      "line": 21
+    },
+    {
+      "file": "internal/data/snapshot_find.go",
+      "line": 98
+    },
+    {
+      "file": "internal/restic/id.go",
+      "line": 26
+    }
+  ],
+  "possibleCallerCount": 2,
+  "impactTruncated": true
+}

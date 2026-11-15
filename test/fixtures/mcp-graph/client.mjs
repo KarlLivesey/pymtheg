@@ -15,7 +15,7 @@ export async function connect(root) {
   const call=async(name,args={})=>{const {result,body}=await raw(name,args);if(result.isError)throw Error(JSON.stringify(body));return body;};
   async function graph(action,query,extra={}) {
     const job=await call("code_graph",{action,...(query!==undefined?{query}:{}),...extra});
-    const answer=await call("graph_result",{jobId:job.jobId,wait:true});
+    const answer=job.state === "running" ? await call("graph_result",{jobId:job.jobId,wait:true}) : job;
     return {jobId:job.jobId,answer,page:(section,extra={})=>call("graph_result",{jobId:job.jobId,section,...extra})};
   }
   return {client,call,raw,graph,log,stderr:()=>stderr,close:()=>client.close()};

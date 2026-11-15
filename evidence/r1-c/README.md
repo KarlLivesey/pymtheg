@@ -1,5 +1,9 @@
 # R1-C evidence
 
+This root records the initial `127b7508` implementation. For the current inline
+follow-up, checks and calls-per-question, see [inline/README.md](inline/README.md).
+The initial 17-call transcript below is historical.
+
 Base: `7b0caaa8a87f44eb053d1e43ecf32c08f3865061` (origin/main when this branch
 was created). Worktree branch: r1-c-mcp-graph. Source changes are confined to
 src/mcp, with new tests/fixtures, docs and this evidence. No graph export was
