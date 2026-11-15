@@ -136,12 +136,22 @@ export async function initializeWorkspace(input: string, name?: string) {
     return await initialize(input, name);
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
-    const path = (error as NodeJS.ErrnoException).path ?? resolve(input);
-    const fix = ["EACCES", "EPERM", "EROFS"].includes(code ?? "")
-      ? "Choose a writable directory or grant your user write permission."
-      : "Check .pymtheg/project.json and .pymtheg/settings.json; repair invalid metadata without deleting your designs.";
+    if (!["EACCES", "EPERM", "EROFS"].includes(code ?? "")) throw error;
+    const failed = (error as NodeJS.ErrnoException).path ?? resolve(input);
+    const path = basename(failed).endsWith(".tmp") ? dirname(failed) : failed;
     throw Error(
-      `Cannot initialize project at ${path}: ${String(error)} ${fix}`,
+      `Cannot initialize project: ${path} is not writable. Choose a writable directory or grant your user write permission.`,
+    );
+  }
+}
+async function validateInitConfig(root: string) {
+  try {
+    await loadConfig(root);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code) throw error;
+    const message = error instanceof Error ? error.message : String(error);
+    throw Error(
+      `Invalid project settings at ${storagePath(root, "settings")}: ${message}. Repair invalid metadata without deleting your designs.`,
     );
   }
 }
@@ -159,7 +169,7 @@ async function initialize(input: string, name?: string) {
       );
     return { ...ancestor, created: false, filesCreated: [] };
   }
-  await loadConfig(root);
+  await validateInitConfig(root);
   const previous = await readWorkspace(root);
   if (previous) {
     if (requested && requested !== previous.name)
@@ -174,10 +184,10 @@ async function initialize(input: string, name?: string) {
       )
     )
       filesCreated.push(identity.projectConfig);
-    await loadConfig(root);
+    await validateInitConfig(root);
     return { root, workspace: previous, created: false, filesCreated };
   }
-  await loadConfig(root); // Validate existing configuration before creating metadata.
+  await validateInitConfig(root); // Validate existing configuration before creating metadata.
   const marker = await markerFile(root);
   await mkdir(dirname(marker), { recursive: true });
   const filesCreated: string[] = [];
@@ -189,7 +199,7 @@ async function initialize(input: string, name?: string) {
     )
   )
     filesCreated.push(identity.projectConfig);
-  await loadConfig(root); // A concurrent writer's configuration must also validate.
+  await validateInitConfig(root); // A concurrent writer's configuration must also validate.
   const workspace: WorkspaceIdentity = {
     schema: "pymtheg.workspace/v1",
     id: randomUUID(),

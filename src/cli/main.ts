@@ -140,6 +140,7 @@ try {
     const { documentation, ...initialized } = response;
     const { printLegacyNotice } = await import("../storage/legacy.js");
     printLegacyNotice(initialized.root);
+    const shellRoot = "'" + initialized.root.replace(/'/g, "'\\''") + "'";
     process.stdout.write(
       wantsJson
         ? json(response)
@@ -153,8 +154,8 @@ try {
             "Commit .pymtheg/project.json, .pymtheg/settings.json and .pymtheg/.gitignore with your designs.",
             "Planning/history in .pymtheg/shared/ and caches in .pymtheg/rebuildable/ stay local and ignored; share planning by exported history.",
             `Next: ${identity.cli} doctor`,
-            `      ${identity.cli} studio ${JSON.stringify(initialized.root)}`,
-            `      ${identity.cli} mcp ${JSON.stringify(initialized.root)}`,
+            `      ${identity.cli} studio ${shellRoot}`,
+            `      ${identity.cli} mcp ${shellRoot}`,
             documentation.status === "none"
               ? "No existing documentation found. Start with a requirement or component in Studio."
               : documentation.status === "unavailable"

@@ -16,7 +16,11 @@ import { tmpdir } from "node:os";
 import { spawnSync, spawn } from "node:child_process";
 import { Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
-import { initializeWorkspace } from "../dist/project/workspace.js";
+import {
+  readWorkspace,
+  initializeWorkspace,
+} from "../dist/project/workspace.js";
+import { loadConfig } from "../dist/project/config.js";
 const cliFile = resolve("dist/cli/main.js");
 const model =
   "machine Ready { state done: Bool = false; event finish when !done { done = true; } invariant safe = true; }\n";
@@ -150,14 +154,57 @@ async function studio(root, id) {
     assert.equal((await exited).code, 0, stderr);
   }
 }
+async function diagnosis(root, id, old) {
+  const result = ok(cli(root, "doctor", "--format", "json"));
+  notice(result, old);
+  const report = JSON.parse(result.stdout);
+  assert.equal(report.schema, "pymtheg.doctor/v1");
+  assert.ok(Array.isArray(report.checks));
+  for (const check of report.checks) {
+    assert.equal(typeof check.name, "string");
+    assert.ok(["ready", "missing", "incompatible"].includes(check.status));
+    if (/project|metadata|storage/i.test(check.name))
+      assert.equal(check.status, "ready", JSON.stringify(check));
+  }
+  // Doctor currently has tool checks only. Validate init's own state directly;
+  // Java/TLC/Quint and built web assets are not initialization requirements.
+  assert.equal((await readWorkspace(root)).id, id);
+  assert.equal((await loadConfig(root)).config.version, 1);
+}
+async function graph(root, repository = false) {
+  await writeFile(
+    join(root, "init_probe.go"),
+    "package probe\nfunc InitProbe() {}\n",
+  );
+  const run = (...args) => {
+    const result = cli(root, "graph", ...args, "--root", root, "--json");
+    // The repository contains deliberately malformed language fixtures. A partial
+    // index is expected there and is never claimed as a clean analysis result.
+    assert.ok(
+      (repository ? [0, 2] : [0]).includes(result.status),
+      result.stdout + result.stderr,
+    );
+    const report = JSON.parse(result.stdout);
+    if (result.status === 2) {
+      assert.equal(report.status, "incomplete");
+      assert.ok(report.failedFiles.length > 0);
+    } else assert.equal(report.status, "ok");
+    return report;
+  };
+  const indexed = run("index");
+  assert.equal(indexed.indexExists, true);
+  const queried = run("search", "InitProbe", "--no-sync");
+  assert.ok(
+    queried.data.matches.some(
+      (symbol) =>
+        symbol.name === "InitProbe" && symbol.file === "init_probe.go",
+    ),
+  );
+}
 async function commands(root, id, old) {
   await writeFile(join(root, "ready.pym"), model);
-  const diagnosis = ok(cli(root, "doctor", "--format", "json"));
-  notice(diagnosis, old);
-  assert.ok(
-    JSON.parse(diagnosis.stdout).checks.every((c) => c.status === "ready"),
-    diagnosis.stdout,
-  );
+  await diagnosis(root, id, old);
+  await graph(root);
   for (const command of ["check", "verify", "simulate"]) {
     const result = ok(
       cli(root, command, "ready.pym", "--entry", "Ready", "--format", "json"),
@@ -356,7 +403,7 @@ test("read-only and invalid metadata errors identify the path and corrective act
     const result = cli(invalid, "init", ".");
     assert.equal(result.status, 3);
     assert.ok(result.stderr.includes(invalid));
-    assert.match(result.stderr, /repair invalid metadata/);
+    assert.match(result.stderr, /Repair invalid metadata/);
   }));
 
 test("help and no-argument first run direct users to init", () =>
@@ -413,12 +460,8 @@ test(
       );
       // Project-scope check here would intentionally include the repository's buggy modelling fixtures.
       await writeFile(join(project, "ready.pym"), model);
-      const diagnosis = ok(cli(project, "doctor", "--format", "json"));
-      notice(diagnosis, old);
-      assert.ok(
-        JSON.parse(diagnosis.stdout).checks.every((c) => c.status === "ready"),
-        diagnosis.stdout,
-      );
+      await diagnosis(project, value.workspace.id, old);
+      await graph(project, true);
       for (const command of ["check", "verify", "simulate"])
         ok(
           cli(
@@ -440,3 +483,70 @@ test(
         );
     }),
 );
+
+test("name and ownership errors never suggest repairing valid metadata", () =>
+  fixture(async (root) => {
+    await initializeWorkspace(root, "Original");
+    const nested = join(root, "nested");
+    await mkdir(nested);
+    const before = await tree(root);
+    for (const [cwd, name, message] of [
+      [
+        root,
+        "Different",
+        "Project is already initialized as “Original”. Its identity and name were preserved.",
+      ],
+      [root, "   ", "Choose a project name of 1–160 characters"],
+      [
+        nested,
+        "Other",
+        `This folder belongs to “Original” at ${root}. Initialize outside that project to create a separate workspace.`,
+      ],
+    ]) {
+      const result = cli(cwd, "init", ".", "--name", name);
+      assert.equal(result.status, 3);
+      assert.equal(result.stderr.trim(), "pymtheg: " + message);
+      assert.doesNotMatch(result.stderr, /repair|Error:|project.json/);
+    }
+    assert.deepEqual(await tree(root), before);
+  }));
+
+test("read-only metadata reports the directory rather than a staging file", () =>
+  fixture(async (root) => {
+    const storage = join(root, ".pymtheg");
+    await mkdir(storage);
+    await chmod(storage, 0o555);
+    try {
+      const result = cli(root, "init", ".");
+      assert.equal(result.status, 3);
+      assert.ok(
+        result.stderr.includes(storage + " is not writable"),
+        result.stderr,
+      );
+      assert.doesNotMatch(result.stderr, /\.tmp|Cannot read|Error:/);
+    } finally {
+      await chmod(storage, 0o700);
+    }
+  }));
+
+test("printed next commands quote shell metacharacters literally", () =>
+  fixture(async (scratch) => {
+    const root = join(scratch, "project $USER `id` 'quoted'");
+    await mkdir(root);
+    const output = ok(cli(root, "init", ".")).stdout;
+    for (const command of ["studio", "mcp"]) {
+      const line = output
+        .split("\n")
+        .find((line) => line.includes(`pymtheg ${command} `))
+        .trim();
+      // Replace only the executable with printf to inspect shell parsing without
+      // launching another server or executing the quoted path's contents.
+      const parsed = spawnSync(
+        "sh",
+        ["-c", line.replace(`pymtheg ${command}`, "printf '%s'")],
+        { encoding: "utf8" },
+      );
+      assert.equal(parsed.status, 0, parsed.stderr);
+      assert.equal(parsed.stdout, root);
+    }
+  }));

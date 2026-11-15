@@ -51,12 +51,50 @@ Existing test files changed only to replace obsolete refusal expectations:
   preserve their bytes instead of refusing them.
 - test/storage-review.test.mjs: assert project-scope checks succeed beside legacy
   entries without changing the file tree.
+- test/graph-command.test.mjs (merged from PR 34): replace its legacy refusal
+  expectation with indexing beside an untouched legacy folder; retain explicit
+  incomplete status and failed-file assertions for its deliberately broken fixture.
 
-Graph index CLI testing is conditional on PR 34 merging; it was still open when
-this branch was prepared. No graph implementation changes are included.
+Round 1 merges origin/main, including PRs 34 and 31. After-init tests now index
+the graph and query an actual probe symbol. The repository copy contains
+intentionally malformed language fixtures, so that smoke explicitly allows and
+asserts an incomplete index with named failed files; it does not claim a clean
+analysis of those fixtures. No graph implementation changes are included.
 All installation, build and test commands run on the dev server through
 pymtheg-dev; see evidence/r1-b for commands and results.
 
-Final dev-server checks: `npm test` passed 2,581 tests, zero failures, skips or
+Initial dev-server checks (with a full build and Java available): `npm test` passed 2,581 tests, zero failures, skips or
 cancellations; `npm run format:check` passed. Targeted initialization/storage
 checks passed 36 tests with zero failures or skips. No flaky rerun was needed.
+
+
+## Round 1 corrections since 9e1f5e09
+
+The first green run used existing dist-web assets and dev-server Java, hiding an
+unnecessary dependency in seven new tests. Doctor tests now assert exit success,
+parseable schema/checks, the legacy notice, and readiness of any metadata/storage
+checks. Current doctor exposes tool checks only, so workspace identity and settings
+are validated directly. Missing Java/TLC/Quint or web assets do not fail init tests.
+
+The init error wrapper now handles permission failures only. Name and ownership
+errors pass through cleanly without repair advice. Settings validation has a
+specific path and repair message. Read-only metadata names the directory as not
+writable, without exposing staging filenames or the CLI's misleading read error.
+The printed Studio/MCP next commands use shell single quoting, including escaping
+embedded quotes. Three new tests pin the requested name errors, read-only metadata,
+and literal shell parsing of paths containing dollar signs, backticks and quotes.
+
+Validation uses a new mirror r1b-review-f8d19c, npm ci --ignore-scripts, then
+npm test with PYM_TLC_JAR unset and a PATH containing no java executable.
+No full/web build runs; the harness asserts dist-web is absent before and after.
+The restricted PATH contains symlinks to other existing tools, preserving the
+pinned Node/Go/Rust versions. See round1-* logs and without-java.py in evidence.
+
+
+Final round-1 results: fresh npm ci + npm test passed with 2,642 passed, zero
+failed/cancelled, and two external TLC cases skipped because Java and the JAR
+override were intentionally absent. These skips are unresolved backend checks,
+not passed analyses. Format check passed; separate no-Java/no-web init smoke
+passed all 14 tests and the focused message/quoting run passed all three.
+The earlier round-1 full run had only the merged obsolete graph refusal assertion
+failing (2,641 passed, one failed, two skipped); both outputs are retained.
