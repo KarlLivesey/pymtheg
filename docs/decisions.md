@@ -2378,6 +2378,59 @@ files that already parse (PR #190 for Go was rejected on that ground); token
 rewriting of source except sound error-site repairs. Done for Go (v0.25.0 + #202 +
 #198); Rust is still the npm 0.24.0 grammar.
 
+### Code links store identity, never a resolved target
+
+**Decided (R1-D, 15 November 2026, under D19; revised after review round 1):**
+a requirement ↔ code-symbol link is shared planning data. It stores the graph's
+position-independent identity (language, project-relative path, kind, scoped
+identity, ordinal), a fingerprint of the symbol's source at link time, and the
+same-identity symbols that existed in other files at that time (`twins`).
+**Fingerprint rule:** the fingerprinted text is the symbol's own graph range,
+plus, for Rust, its outer `#[...]` attributes (found by a lexer scan back to the
+previous item boundary) and, for Go, the `//go:`/`//export` directive lines
+directly above it. TypeScript ranges already include `export` and decorators.
+Doc comments are never included. In that text, CRLF is read as LF and trailing
+spaces/tabs at line ends are dropped; every other character counts. A formatter
+run therefore reads as `changed` (cleared by refresh), and a change inside a
+literal or an attribute is never `ok`. The
+link does not store a graph row; the graph's symbol ID is a hint only. State is
+recomputed against the current graph each time.
+
+**What a link is (ruling, PR 38 round 2):** a link identifies a symbol by
+project-relative path + qualified name + kind, and verifies it by the text
+fingerprint. A symbol at the recorded path with that identity and identical text
+is the linked symbol, whatever file it came from. Provenance is not part of a
+link and is not detected.
+
+A link is never dropped or retargeted by resolution. `moved` requires
+established continuity, all of the following:
+
+- the recorded file is gone;
+- exactly one same-identity symbol has identical text at a path that held no
+  twin;
+- no twin on record has identical text (identical copies make every path's
+  occupancy unprovable, so such a link is never `moved`, only `missing` with
+  all copies suggested);
+- no failed file could hide another candidate.
+
+Anything else is `missing`, with suggestions. `link check` fails on `moved`
+unless `--allow-moved` is given, because a move is unconfirmed until refreshed.
+Only an explicit refresh re-records a link's target. A link into a failed file
+is `unverifiable`, and a new link into a file that did not parse cleanly is
+refused.
+
+**Why:** the graph is rebuildable and can be deleted at any time. Mega-plan
+stage 5 says "a suggested match … is not a link until confirmed", and decision
+"Unreadable code is failed" applies. Go and TypeScript identities carry no
+package or file, so a shared name is not continuity: in review, restic's
+`splitPath` and `PruneOptions` renames were reported as moves to unrelated
+`cmd/restic` symbols. **Rules out:**
+
+- auto-relinking renamed or moved symbols;
+- treating a same-name symbol as the same symbol;
+- token-aware or whitespace-insensitive fingerprints in this chunk;
+- keeping links in `.pymtheg/rebuildable/`.
+
 ### TLC, Quint and Java removed (D2, D7; R1-A)
 
 **Decided (Karl's D2 and D7; carried out by R1-A, mega-plan 2.9):** the built-in
