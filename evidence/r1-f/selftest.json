@@ -1,31 +1,33 @@
 {
   "schema": "pymtheg.acceptance-selftest/v1",
-  "generatedAt": "2026-11-15T20:22:57.300Z",
-  "commit": "43bee54d",
+  "generatedAt": "2026-11-15T21:29:32.437Z",
+  "commit": "0ab4b8cb",
   "passed": true,
   "matcher": {
-    "cases": 22,
+    "cases": 32,
     "failures": []
   },
   "outcomes": [
     {
       "id": "control",
       "what": "unmodified tarball",
+      "scenarios": "a-node-only",
       "expect": [],
       "exitCode": 2,
       "verdict": "clean",
-      "detail": "exit 2; 0 failed steps; link-requirement (R1-D), link-add (R1-D), link-check (R1-D), mcp-code-graph (R1-C), mcp-requirement-links (R1-D)",
+      "detail": "exit 2; 0 failed steps; gaps: mcp-requirement-links (R1-C2)",
       "failingSteps": []
     },
     {
       "id": "check-exits-0",
       "what": "`check` exits 0 on the broken design",
+      "scenarios": "a-node-only",
       "expect": [
         "check-broken"
       ],
       "exitCode": 1,
       "verdict": "caught",
-      "detail": "exit 1; check-broken: fail; failing steps: check-broken",
+      "detail": "exit 1; check-broken: fail; all failing: check-broken",
       "failingSteps": [
         {
           "step": "check-broken",
@@ -36,13 +38,14 @@
     {
       "id": "grammar-removed",
       "what": "the vendored Go grammar is missing from the tarball",
+      "scenarios": "a-node-only",
       "expect": [
         "tarball-contents",
         "graph-index"
       ],
       "exitCode": 1,
       "verdict": "caught",
-      "detail": "exit 1; tarball-contents: fail; graph-index: fail; failing steps: tarball-contents, doctor, graph-index, graph-status, graph-ts-callers, graph-ts-callers-2, graph-go-callers, graph-go-same-package, graph-rust-callers, graph-rust-same-file, graph-ts-path, graph-search",
+      "detail": "exit 1; tarball-contents: fail; graph-index: fail; all failing: tarball-contents, doctor, graph-index, graph-status, graph-ts-callers, graph-ts-callers-2, graph-go-callers, graph-go-same-package, graph-rust-callers, graph-rust-same-file, graph-ts-path, graph-search, link-add-go, link-list, link-check, link-check-after-edit, link-check-after-refresh, link-check-final, mcp-code_graph-index, mcp-code_graph-search, mcp-code_graph-callers-go",
       "failingSteps": [
         {
           "step": "tarball-contents",
@@ -91,38 +94,92 @@
         {
           "step": "graph-search",
           "reason": "exit 2, expected 0"
+        },
+        {
+          "step": "link-add-go",
+          "reason": "exit 1, expected 0"
+        },
+        {
+          "step": "link-list",
+          "reason": "links of R1: got [\"apply_discount:ok\",\"formatTotal:ok\"], expected [\"ComputeTotal:ok\",\"apply_discount:ok\",\"formatTotal:ok\"]"
+        },
+        {
+          "step": "link-check",
+          "reason": "link states: got [\"apply_discount:ok\",\"formatTotal:ok\"], expected [\"ComputeTotal:ok\",\"apply_discount:ok\",\"formatTotal:ok\"]"
+        },
+        {
+          "step": "link-check-after-edit",
+          "reason": "link states: got [\"apply_discount:changed\",\"formatTotal:ok\"], expected [\"ComputeTotal:ok\",\"apply_discount:changed\",\"formatTotal:ok\"]"
+        },
+        {
+          "step": "link-check-after-refresh",
+          "reason": "link states: got [\"apply_discount:ok\",\"formatTotal:ok\"], expected [\"ComputeTotal:ok\",\"apply_discount:ok\",\"formatTotal:ok\"]"
+        },
+        {
+          "step": "link-check-final",
+          "reason": "link states: got [\"apply_discount:ok\",\"formatTotal:ok\"], expected [\"ComputeTotal:ok\",\"apply_discount:ok\",\"formatTotal:ok\"]"
+        },
+        {
+          "step": "mcp-code_graph-index",
+          "reason": "index job: got [\"complete\",\"incomplete\",4], expected [\"complete\",\"ok\",0]"
+        },
+        {
+          "step": "mcp-code_graph-search",
+          "reason": "search matches: got [\"formatTotal@web/src/format.ts\"], expected [\"ComputeTotal@service/pricing/total.go\",\"formatTotal@web/src/format.ts\",\"total.go@service/pricing/total.go\"]"
+        },
+        {
+          "step": "mcp-code_graph-callers-go",
+          "reason": "MCP callers of ComputeTotal: got [], expected [\"main@service/main.go->ComputeTotal:definite\"]"
         }
       ]
     },
     {
       "id": "mcp-check-design-throws",
       "what": "MCP `check_design` throws",
+      "scenarios": "a-node-only",
       "expect": [
-        "mcp-check-design"
+        "mcp-check_design"
       ],
       "exitCode": 1,
       "verdict": "caught",
-      "detail": "exit 1; mcp-check-design: fail; failing steps: mcp-check-design, mcp-check-broken",
+      "detail": "exit 1; mcp-check_design: fail; all failing: mcp-check_design, mcp-check_design-broken, mcp-design_interface, mcp-emit_scaffold, mcp-read_scaffold, mcp-emit_implementation_check",
       "failingSteps": [
         {
-          "step": "mcp-check-design",
-          "reason": "tool returned isError: [{\"type\":\"text\",\"text\":\"sabotaged check_design\"}]"
+          "step": "mcp-check_design",
+          "reason": "check_design: tool returned isError: sabotaged check_design"
         },
         {
-          "step": "mcp-check-broken",
-          "reason": "check_design gave no structured result"
+          "step": "mcp-check_design-broken",
+          "reason": "check_design: tool returned isError: sabotaged check_design"
+        },
+        {
+          "step": "mcp-design_interface",
+          "reason": "check_design: tool returned isError: sabotaged check_design"
+        },
+        {
+          "step": "mcp-emit_scaffold",
+          "reason": "emit_scaffold: tool returned isError: Input validation error: Invalid arguments for tool emit_scaffold: runId: Invalid input: expected string, received undefined"
+        },
+        {
+          "step": "mcp-read_scaffold",
+          "reason": "read_scaffold: tool returned isError: Input validation error: Invalid arguments for tool read_scaffold: emissionId: Invalid input: expected string, received undefined"
+        },
+        {
+          "step": "mcp-emit_implementation_check",
+          "reason": "emit_implementation_check: tool returned isError: Input validation error: Invalid arguments for tool emit_implementation_check: runId: Invalid input: expected string, received undefined"
         }
       ]
     },
     {
       "id": "callers-no-links",
       "what": "`graph callers` returns no links",
+      "scenarios": "a-node-only",
       "expect": [
         "graph-ts-callers"
       ],
       "exitCode": 1,
       "verdict": "caught",
-      "detail": "exit 1; graph-ts-callers: fail; failing steps: graph-ts-callers, graph-ts-callers-2, graph-go-callers, graph-go-same-package, graph-rust-callers, graph-rust-same-file",
+      "detail": "exit 1; graph-ts-callers: fail; all failing: graph-ts-callers, graph-ts-callers-2, graph-go-callers, graph-go-same-package, graph-rust-callers, graph-rust-same-file",
       "failingSteps": [
         {
           "step": "graph-ts-callers",
@@ -153,12 +210,13 @@
     {
       "id": "caller-target-renamed",
       "what": "a caller link's target is renamed",
+      "scenarios": "a-node-only",
       "expect": [
         "graph-ts-callers"
       ],
       "exitCode": 1,
       "verdict": "caught",
-      "detail": "exit 1; graph-ts-callers: fail; failing steps: graph-ts-callers, graph-ts-callers-2, graph-go-callers, graph-go-same-package, graph-rust-callers, graph-rust-same-file",
+      "detail": "exit 1; graph-ts-callers: fail; all failing: graph-ts-callers, graph-ts-callers-2, graph-go-callers, graph-go-same-package, graph-rust-callers, graph-rust-same-file",
       "failingSteps": [
         {
           "step": "graph-ts-callers",
@@ -189,12 +247,13 @@
     {
       "id": "certainty-downgraded",
       "what": "caller certainty downgraded to name-only",
+      "scenarios": "a-node-only",
       "expect": [
         "graph-ts-callers"
       ],
       "exitCode": 1,
       "verdict": "caught",
-      "detail": "exit 1; graph-ts-callers: fail; failing steps: graph-ts-callers, graph-ts-callers-2, graph-go-callers, graph-go-same-package, graph-rust-callers, graph-rust-same-file",
+      "detail": "exit 1; graph-ts-callers: fail; all failing: graph-ts-callers, graph-ts-callers-2, graph-go-callers, graph-go-same-package, graph-rust-callers, graph-rust-same-file",
       "failingSteps": [
         {
           "step": "graph-ts-callers",
@@ -225,12 +284,13 @@
     {
       "id": "prints-java",
       "what": "a command prints \"java\"",
+      "scenarios": "a-node-only",
       "expect": [
         "help"
       ],
       "exitCode": 1,
       "verdict": "caught",
-      "detail": "exit 1; help: fail; failing steps: install-npx, help",
+      "detail": "exit 1; help: fail; all failing: install-npx, help",
       "failingSteps": [
         {
           "step": "install-npx",
@@ -245,13 +305,14 @@
     {
       "id": "index-runs-java",
       "what": "`graph index` silently runs `java -version`",
+      "scenarios": "a-node-only",
       "expect": [
         "graph-index",
         "no-toolchain-processes"
       ],
       "exitCode": 1,
       "verdict": "caught",
-      "detail": "exit 1; graph-index: fail; no-toolchain-processes: fail; failing steps: graph-index, no-toolchain-processes",
+      "detail": "exit 1; graph-index: fail; no-toolchain-processes: fail; all failing: graph-index, no-toolchain-processes",
       "failingSteps": [
         {
           "step": "graph-index",
@@ -266,48 +327,409 @@
     {
       "id": "mcp-wrong-verdict",
       "what": "MCP reports a failing verdict for the valid design",
+      "scenarios": "a-node-only",
       "expect": [
-        "mcp-check-design"
+        "mcp-check_design"
       ],
       "exitCode": 1,
       "verdict": "caught",
-      "detail": "exit 1; mcp-check-design: fail; failing steps: mcp-check-design, mcp-explore-verify, mcp-explore-simulate",
+      "detail": "exit 1; mcp-check_design: fail; all failing: mcp-check_design, mcp-explore_behaviour-verify, mcp-explore_behaviour-simulate, mcp-design_interface",
       "failingSteps": [
         {
-          "step": "mcp-check-design",
+          "step": "mcp-check_design",
           "reason": "valid design verdict: got {\"exitStatus\":1,\"errors\":0,\"warnings\":0}, expected {\"exitStatus\":0,\"errors\":0,\"warnings\":0}"
         },
         {
-          "step": "mcp-explore-verify",
-          "reason": "verify verdict: got {\"exitStatus\":1,\"exhaustive\":true,\"counterexamples\":0,\"unresolved\":0}, expected {\"exitStatus\":0,\"exhaustive\":true,\"counterexamples\":0,\"unresolved\":0}"
+          "step": "mcp-explore_behaviour-verify",
+          "reason": "verify summary: got {\"exitStatus\":1,\"exhaustive\":true,\"counterexamples\":0,\"unresolved\":0}, expected {\"exitStatus\":0,\"exhaustive\":true,\"counterexamples\":0,\"unresolved\":0}"
         },
         {
-          "step": "mcp-explore-simulate",
-          "reason": "simulate verdict: got {\"exitStatus\":1,\"exhaustive\":false,\"counterexamples\":0,\"unresolved\":0}, expected {\"exitStatus\":0,\"exhaustive\":false,\"counterexamples\":0,\"unresolved\":0}"
+          "step": "mcp-explore_behaviour-simulate",
+          "reason": "simulate summary: got {\"exitStatus\":1,\"exhaustive\":false,\"counterexamples\":0,\"unresolved\":0}, expected {\"exitStatus\":0,\"exhaustive\":false,\"counterexamples\":0,\"unresolved\":0}"
+        },
+        {
+          "step": "mcp-design_interface",
+          "reason": "flow check exitStatus 1"
         }
       ]
     },
     {
       "id": "link-crashes",
-      "what": "`pymtheg link` crashes (exit 77) instead of today's unknown-command answer",
+      "what": "`pymtheg link` crashes (exit 77)",
+      "scenarios": "a-node-only",
       "expect": [
         "link-requirement"
       ],
       "exitCode": 1,
       "verdict": "caught",
-      "detail": "exit 1; link-requirement: fail; failing steps: link-requirement, link-add, link-check",
+      "detail": "exit 1; link-requirement: fail; all failing: link-requirement, link-add-go, link-add-rust, link-add-ts, link-list, link-check, link-check-after-edit, link-refresh, link-check-after-refresh, link-refresh-restored, link-check-final, mcp-read_architecture, mcp-link_implementation, mcp-compare_implementation, mcp-unlink_implementation",
       "failingSteps": [
         {
           "step": "link-requirement",
           "reason": "exit 77, expected 0"
         },
         {
-          "step": "link-add",
+          "step": "link-add-go",
+          "reason": "exit 77, expected 0"
+        },
+        {
+          "step": "link-add-rust",
+          "reason": "exit 77, expected 0"
+        },
+        {
+          "step": "link-add-ts",
+          "reason": "exit 77, expected 0"
+        },
+        {
+          "step": "link-list",
           "reason": "exit 77, expected 0"
         },
         {
           "step": "link-check",
           "reason": "exit 77, expected 0"
+        },
+        {
+          "step": "link-check-after-edit",
+          "reason": "exit 77, expected 1"
+        },
+        {
+          "step": "link-refresh",
+          "reason": "exit 77, expected 0"
+        },
+        {
+          "step": "link-check-after-refresh",
+          "reason": "exit 77, expected 0"
+        },
+        {
+          "step": "link-refresh-restored",
+          "reason": "exit 77, expected 0"
+        },
+        {
+          "step": "link-check-final",
+          "reason": "exit 77, expected 0"
+        },
+        {
+          "step": "mcp-read_architecture",
+          "reason": "architecture summary (available, one revision): got [false,null], expected [null,1]"
+        },
+        {
+          "step": "mcp-link_implementation",
+          "reason": "harness error: TypeError: Cannot read properties of undefined (reading 'id')\n    at file:///acc/driver.mjs:702:117\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n  "
+        },
+        {
+          "step": "mcp-compare_implementation",
+          "reason": "compare_implementation: tool returned isError: Input validation error: Invalid arguments for tool compare_implementation: planRevision: Invalid inp … put: expected string, received undefined, planId: "
+        },
+        {
+          "step": "mcp-unlink_implementation",
+          "reason": "unlink_implementation: tool returned isError: Input validation error: Invalid arguments for tool unlink_implementation: revision: Invalid input: expected string, received undefined, planId: Invalid in"
+        }
+      ]
+    },
+    {
+      "id": "stack-trace-exit-0",
+      "what": "`--version` prints an internal-error stack trace and exits 0",
+      "scenarios": "a-node-only",
+      "expect": [
+        "version"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; version: fail; all failing: version",
+      "failingSteps": [
+        {
+          "step": "version",
+          "reason": "internal error output: error line: TypeError: Cannot read properties of undefined (reading 'x'); stack frame: at main (file:///usr/lib/node_modules/pymtheg/dist/cli/main.js:12:5)"
+        }
+      ]
+    },
+    {
+      "id": "wrong-diagnostic-message",
+      "what": "the N002 suggestion text changes",
+      "scenarios": "a-node-only",
+      "expect": [
+        "check-broken",
+        "mcp-check_design-broken"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; check-broken: fail; mcp-check_design-broken: fail; all failing: check-broken, verify-broken, mcp-check_design-broken",
+      "failingSteps": [
+        {
+          "step": "check-broken",
+          "reason": "no output line equal to \"/home/node/project/designs/broken.pym:7:27 error N002: Unknown value or variant charge; did you mean charges?\""
+        },
+        {
+          "step": "verify-broken",
+          "reason": "no output line equal to \"/home/node/project/designs/broken.pym:7:27 error N002: Unknown value or variant charge; did you mean charges?\""
+        },
+        {
+          "step": "mcp-check_design-broken",
+          "reason": "broken-design findings: got [{\"code\":\"N002\",\"message\":\"Unknown value or variant charge; did you mean charges instead?\",\"file\":\"designs/broken.pym\",\"line\":7,\"column\":27,\"severity\":\"error\"}], expected ["
+        }
+      ]
+    },
+    {
+      "id": "listed-tool-throws",
+      "what": "a listed MCP tool (`design_recipe`) throws",
+      "scenarios": "a-node-only",
+      "expect": [
+        "mcp-design_recipe"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; mcp-design_recipe: fail; all failing: mcp-design_recipe",
+      "failingSteps": [
+        {
+          "step": "mcp-design_recipe",
+          "reason": "design_recipe: tool returned isError: sabotaged design_recipe"
+        }
+      ]
+    },
+    {
+      "id": "deprecation-warning",
+      "what": "a coded DeprecationWarning (DEP0005) on Node 24.22",
+      "scenarios": "a-node-only",
+      "expect": [
+        "help"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; help: fail; all failing: help",
+      "failingSteps": [
+        {
+          "step": "help",
+          "reason": "Node warning: (node:215) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. / (Use `node --trace-deprecation ...` to show where the warning was created)"
+        }
+      ]
+    },
+    {
+      "id": "deprecation-warning-24.0.0",
+      "what": "the same DeprecationWarning on Node 24.0.0 (beside the R1-H SQLite warning)",
+      "scenarios": "e-node-24.0.0",
+      "expect": [
+        "help"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; help: fail; all failing: help",
+      "failingSteps": [
+        {
+          "step": "help",
+          "reason": "Node warning: (node:207) ExperimentalWarning: SQLite is an experimental feature and might change at any time / (Use `node --trace-warnings ...` to show where the warning was created) / (node:207) [DEP"
+        }
+      ]
+    },
+    {
+      "id": "tools-list-error",
+      "what": "`tools/list` answers with a JSON-RPC error",
+      "scenarios": "a-node-only",
+      "expect": [
+        "mcp-tools-list",
+        "mcp-project_info",
+        "mcp-tool-coverage",
+        "mcp-requirement-links"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; mcp-tools-list: fail; mcp-project_info: fail; mcp-tool-coverage: fail; mcp-requirement-links: fail; all failing: mcp-tools-list, mcp-project_info, mcp-design_recipe, mcp-read_source, mcp-check_design, mcp-check_design-broken, mcp-explore_behaviour-verify, mcp-explore_behaviour-simulate, mcp-try_inputs, mcp-design_interface, mcp-emit_scaffold, mcp-read_scaffold, mcp-emit_implementation_check, mcp-code_graph-index, mcp-code_graph-search, mcp-code_graph-callers-ts, mcp-code_graph-callers-go, mcp-code_graph-callers-rust, mcp-read_architecture, mcp-observe_implementation, mcp-link_implementation, mcp-compare_implementation, mcp-unlink_implementation, mcp-tool-coverage, mcp-requirement-links",
+      "failingSteps": [
+        {
+          "step": "mcp-tools-list",
+          "reason": "JSON-RPC error: sabotaged tools/list"
+        },
+        {
+          "step": "mcp-project_info",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-design_recipe",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-read_source",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-check_design",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-check_design-broken",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-explore_behaviour-verify",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-explore_behaviour-simulate",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-try_inputs",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-design_interface",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-emit_scaffold",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-read_scaffold",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-emit_implementation_check",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-code_graph-index",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-code_graph-search",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-code_graph-callers-ts",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-code_graph-callers-go",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-code_graph-callers-rust",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-read_architecture",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-observe_implementation",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-link_implementation",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-compare_implementation",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-unlink_implementation",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-tool-coverage",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-requirement-links",
+          "reason": "tools/list did not succeed"
+        }
+      ]
+    },
+    {
+      "id": "simulate-exhaustive-true",
+      "what": "MCP simulate reports `exhaustive: true`",
+      "scenarios": "a-node-only",
+      "expect": [
+        "mcp-explore_behaviour-simulate"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; mcp-explore_behaviour-simulate: fail; all failing: mcp-explore_behaviour-simulate",
+      "failingSteps": [
+        {
+          "step": "mcp-explore_behaviour-simulate",
+          "reason": "simulate summary: got {\"exitStatus\":0,\"exhaustive\":true,\"counterexamples\":0,\"unresolved\":0}, expected {\"exitStatus\":0,\"exhaustive\":false,\"counterexamples\":0,\"unresolved\":0}"
+        }
+      ]
+    },
+    {
+      "id": "init-writes-root-file",
+      "what": "`init` writes a file in the project root",
+      "scenarios": "a-node-only",
+      "expect": [
+        "init"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; init: fail; all failing: init",
+      "failingSteps": [
+        {
+          "step": "init",
+          "reason": "output lacks \"3 existing documents found\""
+        }
+      ]
+    },
+    {
+      "id": "engine-hides-violation",
+      "what": "the built-in engine turns a violation into no_counterexample",
+      "scenarios": "a-node-only",
+      "expect": [
+        "verify-violation"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; verify-violation: fail; all failing: doctor, verify-violation",
+      "failingSteps": [
+        {
+          "step": "doctor",
+          "reason": "exit 3, expected 0"
+        },
+        {
+          "step": "verify-violation",
+          "reason": "verify results on the violating design: got [[\"chargedOnce\",\"no_counterexample\",\"complete\"],[\"state-domains\",\"no_counterexample\",\"complete\"]], expected [[\"chargedOnce\",\"counterexample\",\"complete\"],[\"s"
+        }
+      ]
+    },
+    {
+      "id": "link-check-passes-changed",
+      "what": "`link check` exits 0 with a changed link",
+      "scenarios": "a-node-only",
+      "expect": [
+        "link-check-after-edit"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; link-check-after-edit: fail; all failing: link-check-after-edit",
+      "failingSteps": [
+        {
+          "step": "link-check-after-edit",
+          "reason": "exit 0, expected 1"
+        }
+      ]
+    },
+    {
+      "id": "code-graph-candidate",
+      "what": "MCP `code_graph` reports a definite caller as a candidate",
+      "scenarios": "a-node-only",
+      "expect": [
+        "mcp-code_graph-callers-ts"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; mcp-code_graph-callers-ts: fail; all failing: mcp-code_graph-callers-ts, mcp-code_graph-callers-go, mcp-code_graph-callers-rust",
+      "failingSteps": [
+        {
+          "step": "mcp-code_graph-callers-ts",
+          "reason": "MCP callers of formatTotal: got [\"renderBasket@web/src/main.ts->formatTotal:candidate-set\"], expected [\"renderBasket@web/src/main.ts->formatTotal:definite\"]"
+        },
+        {
+          "step": "mcp-code_graph-callers-go",
+          "reason": "MCP callers of ComputeTotal: got [\"main@service/main.go->ComputeTotal:candidate-set\"], expected [\"main@service/main.go->ComputeTotal:definite\"]"
+        },
+        {
+          "step": "mcp-code_graph-callers-rust",
+          "reason": "MCP callers of apply_discount: got [\"main@engine/src/main.rs->apply_discount:candidate-set\"], expected [\"main@engine/src/main.rs->apply_discount:definite\"]"
         }
       ]
     }
