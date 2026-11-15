@@ -11,7 +11,7 @@ are never started by local checks.
 | Imports, duplicate/ambiguous names, cycles | implemented; cycles diagnosed unsupported | deterministic single parse/file | selected explicit machine only |
 | Pure typed rules/calls | implemented; rule recursion rejected | exact alpha copies, effects, explicit cost overhead | flow evaluation with pre/postconditions; machine expressions exclude calls |
 | Abstract op signatures/effects/cost/settles/stable | implemented | contracts are visible assumptions | finite contract results or linked explicit provider protocol |
-| Structured flow call/let/if/match/return/propagate/assert | implemented | types, effects, costs, ownership | finite source graph; real Quint/TLC; replay |
+| Structured flow call/let/if/match/return/propagate/assert | implemented | types, effects, costs, ownership | finite source graph; CLI built-in search/sampler (TLC/Quint optional); replay |
 | Cardinality and List iteration, bounded retry | implemented | work upper bounds; loop-local ownership | bounded loops/retry execute; initial attempt included |
 | Single-owner resources/take/read borrow | implemented | states, moves, local exits, explicit cancellation | creation, transfer, terminal exits, cancellation |
 | Fresh direct/Result resource return | implemented via creates result | per-outcome ownership through match | supported; owned collections/shared mutation unsupported |
@@ -19,15 +19,15 @@ are never started by local checks.
 | Scalar conjunctive entry constraints | implemented | integer interval/Bool witness or contradiction | machine initial state explicit |
 | Call preconditions | implemented | branch-sensitive scalar/affine facts; supported abstract returns carry assumptions to consumers; other calls retain obligations | evaluated in finite flow execution |
 | Concrete postconditions | parsed/typed | scalar/affine fragment; unsupported reasoning stays pending | evaluated on finite flow returns |
-| Explicit finite machine/event/invariant | implemented | type checks; initial domain preflight | real Quint simulation and direct TLC finite safety |
+| Explicit finite machine/event/invariant | implemented | type checks; initial domain preflight | CLI: built-in exhaustive search and seeded sampler; optional Quint simulation and direct TLC finite safety |
 | Machine recursion/parallel calls/records/strings | outside behavioural expression subset | local supported constructs remain usable | preflight rejects |
 | Near-duplicate rule suggestions | deferred | exact copies only | not applicable |
 | Latency/peak live memory | reserved metric names rejected | no additive-work pretence | unsupported |
 | SMT/proof, liveness/fairness, code extraction/conformance, LSP, caches | deferred | no claims | no claims |
-| Agent-facing MCP | implemented local stdio | same worker, root-confined reads, paged explanations/evidence | same real backends, source-mapped trace steps |
+| Agent-facing MCP | implemented local stdio | same worker, root-confined reads, paged explanations/evidence | TLC (verify) and Quint (simulate), source-mapped trace steps |
 | TypeScript / Rust / Go scaffolds | one normalized contract document from checked IR | fail-fast stubs by default; optional empty bodies; arbitrary precision, explicit dependencies/omissions | no runtime implementation or conformance claim |
 | Language emitter plugins | explicitly registered local module; versioned API | bounded process, validated output/identities; JavaScript example | trusted executable code; registered launch targets work in CLI/MCP/GUI; no automatic discovery |
-| Local Studio | implemented | real compiler workers, typed scenario forms, source/durable-draft conflict saves | same backends/scopes; replay player; three durable runs |
+| Local Studio | implemented | real compiler workers, typed scenario forms, source/durable-draft conflict saves | TLC (verify) and Quint (simulate), same scopes; replay player; three cached runs |
 
 The [grammar](grammar.md) is normative for accepted source syntax. Historical
 `checkout.s15` remains an aspirational, incomplete sketch and is not accepted input.
@@ -73,12 +73,18 @@ rejects literal/domain magnitudes outside +/-9007199254740991; local bigint
 analysis retains larger integers. No source population or loop is silently reduced.
 An optional scope JSON must exactly match source domains, e.g.
 `{"domains":{"count":"0..2"},"assumptions":[]}`. It never silently narrows them.
-TLC exhausts reachable states of this finite machine; Quint samples traces up to
-the selected steps/samples. Neither proves unmodelled populations or production code.
+The built-in search and TLC exhaust reachable states of this finite machine; the
+built-in sampler and Quint sample traces up to the selected steps/samples. None of them proves unmodelled populations or production code.
 
 Correctness tests do not use benchmark thresholds or startup sleeps. Deadline
 classification uses controlled process boundaries; real process teardown starts
-after readiness. Backend integration timeout is an explicit unresolved/skip,
+after readiness. The process-ownership tests (`test/process.test.mjs`,
+`test/implementation-process.test.mjs`) wait for readiness and completion
+handshakes and fire deadlines and grace periods explicitly. Their named 60-second
+outer safety budgets only turn missing evidence into an unresolved failure; they
+establish no timing property. They observe descendants through Linux `/proc` and
+use a test-only preload and Unix socket to observe the supervisor's completion.
+Source: [W2-T](changes/W2-T.md). Backend integration timeout is an explicit unresolved/skip,
 not a successful assertion of the source property.
 
 Flow lowering materialises at most 5,000 source states by default (explicit
@@ -87,6 +93,308 @@ Exhausting a construction budget yields incomplete evidence, never a smaller
 successful graph. Scope examples and operation protocol restrictions are in
 [the Studio guide](studio.md). Source graphs are a bounded checking method,
 not a general compiler equivalence proof. No temporal liveness claim is made.
+
+## Rebuild state: engines, storage and code graph (merged through W2-C2)
+
+This section folds the merged per-chunk notes under [changes/](changes/) for
+mega-plan Stages 1–4 and 6–7 as they stand on `main`. Open pull requests are not
+described. Where this section and an older section below disagree, this one is
+current.
+
+### Built-in behaviour engines (CLI)
+
+| Command | Default engine | Result |
+|---|---|---|
+| `verify FILE --entry NAME` | Built-in exhaustive breadth-first search (`--backend builtin`) | One result per invariant plus `state-domains`; a violation has a shortest, source-replayed trace; `no_counterexample (finite_model_check, complete)` otherwise |
+| `simulate FILE --entry NAME` | Built-in seeded sampler | `no_counterexample (simulation, complete)` at best, never an exhaustive pass; traces are replayed but need not be shortest; same seed and limits give the same result |
+
+Neither needs Java, a TLC JAR or Quint. `--state-budget N` (positive safe
+integer, default 1,000,000 distinct states) bounds `verify`. Exhausting it, a
+timeout, cancellation, a domain boundary or a worker/engine error leaves every
+unviolated property inconclusive and incomplete with the limit named
+(`stateBudget=…`, `timeoutMs=…`); already replayed violations survive a budget or
+domain boundary. A worker or engine error currently gives the same exit status
+(2) as a budget-limited run. `--backend tlc --tlc-jar PATH` and `--backend quint`
+still select the external engines. **MCP and Studio still select TLC for verify
+and Quint for simulate**; their switch, and removal of TLC and Quint, are later
+work. Engine contract: [W1-B](changes/W1-B.md), wiring: [W2-A](changes/W2-A.md).
+
+### `check` notices
+
+- When the checked declarations include a machine, text output ends with
+  `BEHAVIOUR NOT CHECKED`: `check` covers types, effects and outcomes only, did not
+  run machine events or test any invariant, and is not behavioural evidence. It
+  lists each machine (up to five, then a count) with its invariant count and the
+  exact `pymtheg verify FILE --entry NAME` command. Text output only; JSON, `--out`,
+  MCP and Studio are unchanged. Flows with `assert` are verifiable but not listed.
+- A `T002 Expected Nat, got Int` caused by a subtraction gives the reason
+  ("Subtracting from a Nat gives an Int, because the result may be below zero")
+  and a fix; for machine state, the full replacement declaration with its range,
+  for example `` `state n: Int in 0..3 = 3;` ``. The hint is part of the message,
+  so it is also in JSON reports. It is lost when the subtraction passes through a
+  local. Typing is unchanged: `Nat - Nat` is `Int`. Source: [W2-F](changes/W2-F.md).
+
+### Project storage
+
+Everything Pymtheg stores for a project is under one `.pymtheg/` folder; the
+layout, what to commit and what is rebuildable are in
+[project initialization](project-init.md#local-state-and-sharing). Shared data
+(`.pymtheg/shared/`) holds requirements, links, decisions, history and unsaved
+drafts; rebuildable data (`.pymtheg/rebuildable/`) holds the code graph cache and
+the recent-run cache, and deleting it loses nothing that cannot be regenerated.
+All features open their SQLite databases through one storage boundary
+(`src/storage/`). Local storage only; no synchronization.
+
+Old layouts are refused, never migrated or read. A command that reads or writes
+managed project state refuses a root holding `.pymtheg.json`,
+`.pymtheg-architecture/`, `.pymtheg-studio/` or one of the old top-level
+`.pymtheg-*.json` files: `init`, `studio`, `mcp`, `import-architecture` (including
+previews), `scaffold`, `observe` captures, `check --check-scope related|project`
+and any analysis given `--scenario`. File-scope `check`, `verify`, `simulate` and
+`emit` without `--scenario`, and `observe --list`, `fmt`, `doctor`, help and
+version still work there and write no project state. Symbolic-link storage
+directories, databases and SQLite sidecars are refused. Source: [W2-E](changes/W2-E.md).
+
+**Stable global IDs and recorded history (first slice of 3.3).** Each checkpoint
+registers its documents, projected entities (including requirements and
+decisions) and relationships with a random UUID. Existing local IDs (`R1`,
+`plan:R1`, content hashes, checkpoint IDs) keep their meaning and remain what
+clients show. Edits keep a UUID; a recorded removal keeps the old UUID as a
+tombstone; a key that reappears after removal gets a new UUID with a `previous`
+reference; there is no restore workflow. Checkpoints, acknowledgements,
+withdrawals and architecture-draft writes append receipts with a random change
+UUID, author, machine and actor token, recorded time and a database-wide sequence.
+Order is `(sequence, machine, actor, change UUID)`, never timestamp or author
+name; across independent stores it is a deterministic presentation order, not
+causality. The writer identity is `.pymtheg/local/writer.json` (local OS user name
+as the default author; edit `author` there to change it). Not done yet: the
+ledger is not carried in history archives or preserved by archive import; UUIDs
+are not shown by CLI, MCP or Studio; no command sets the author; no move or
+rename identity resolution, synchronization or merge; some imported-data path
+fields still accept absolute paths; old records are not backfilled. Source:
+[W2-E2](changes/W2-E2.md).
+
+### Document import
+
+The folder reader accepts a single file, a `doc/` folder and reStructuredText
+(`.rst`): underline and overline/underline headings become linkable sections
+(section recognition, not an RST renderer). `pymtheg import-architecture
+FILE|FOLDER --into PROJECT` uses it. Include/exclude path patterns and the
+structured summary of skipped files exist in the reader and summary renderer but
+are **not yet exposed** by the CLI, MCP or Studio. Source: [W1-D](changes/W1-D.md).
+
+### Code graph
+
+The graph store, indexer and three production language modules exist as a
+library (`src/graph/`). **No command, MCP tool or Studio screen uses them yet**;
+`observe` still uses the older TypeScript/JavaScript reader. Project callers open
+the store at `.pymtheg/rebuildable/graph.sqlite` (`openProjectGraph`). The store
+is schema 3; an older graph database is refused with a rebuild message. Nothing
+runs a language toolchain or project code, and nothing reads or writes
+`.codegraph/`. Language modules are discovered from `src/graph/languages/*/`;
+production discovery offers `go`, `rust` and `typescript` (the `toy` fixture is
+test-only). Interface: [W1-C](changes/W1-C.md), [W2-I](changes/W2-I.md).
+
+Link outcomes:
+
+| Outcome | Meaning |
+|---|---|
+| `resolved` | One definite target |
+| `ambiguous` | A candidate set, never a pick. A set is **closed** only when it provably holds every possible target and every member is provably possible. Otherwise it is **open**, and `data.open` gives the reasons (for example a type outside the project could be the target); an open set still lists every project target |
+| `unresolved` | No target; the written name is kept. The reason, when recorded, is in `data` (`reason` in Go and TypeScript, `uncertainty` in Rust). Rust may also list unverified would-be targets in `data.targets` (at most 16, else a count) |
+| failed (`unresolved`, reason `invalid-code`) | The link depends on a file that could not be read. `data.cause` names the failed file(s). It has no target, no candidates and no would-be targets |
+
+**Unreadable code is failed; the unit is the file.** A file with any syntax error
+is reported in the index report's `failed` list with its syntax error located,
+and contributes no symbols and no links. Nothing in a failed file is a target. A
+link from a valid file that depends on it is failed with the cause recorded, and
+`invalid-code` is asserted only when that dependence is certain. The failed
+file's package, crate or program may contain unseen declarations, so lookups that
+such declarations could change are not definite: they become open sets or
+unresolved (Go, Rust) or are flagged unverified (TypeScript, below).
+Grammar gaps (below) make some valid files fail.
+
+**Failure caching and the broken-file report.** A content failure returned by a
+module's `parse` (a syntax error) is stored and reused: while the file's
+original-byte hash, module ID and module version are unchanged it is not parsed
+again, and it stays failed with its diagnostics. Editing the file or bumping the
+module version invalidates it. Go and Rust failures are cached this way.
+TypeScript content failures are never cached by the core, because that module is
+analyze-only and its failures come from project analysis; such a file is read
+again on every index. Failures marked `failureKind: "transient"`, thrown parser
+exceptions (crash, timeout, cancellation, resource budget), malformed parser
+output, unreadable captures and project-analysis failures are never cached; they
+are retried. `SqliteGraphStore.failedFiles()` lists the failed source files, ordered
+by path, as `{path, language, reason, range?}` (reason and range from the first
+diagnostic). Partial files are not in it. Derived links are compared and stored
+one row at a time, so no single string holds a whole module's analysis; this
+does not make an arbitrarily large snapshot fit in memory. Each module's
+`resolve` receives its own deep copy of files, symbols, links and context files,
+so a module that mutates its input cannot affect later modules or stored facts.
+Source: [W2-M](changes/W2-M.md).
+
+**Internal errors are not invalid code.** An exception inside the TypeScript
+module while reading one file, and the TypeScript compiler's stack limits, fail
+only that file with wording that says it is a defect in Pymtheg or a resource
+limit, not a problem in the file; the result is marked `failureKind: "transient"`
+and is retried on the next index. An exception while building a project or
+program is reported as an analysis error for the module. Links into a file that
+failed internally are unresolved with no reason. In Go and Rust a thrown parser
+exception is a parser error in the index report, not a syntax failure, and cannot
+become an `invalid-code` cause. Source: [W2-U](changes/W2-U.md).
+
+#### Go (module version 23)
+
+No-toolchain module; nothing runs `go`. Claims `*.go`; context `go.mod` and
+`go.work`. One `package` symbol per directory and package clause, hosted in one
+file (its ID can change when files are added or removed).
+
+- **Definite:** imports of packages in the importing file's module, a `go.work`
+  module or a proven local `replace`; package-qualified references; direct calls;
+  calls and selections on a concrete receiver whose type is evident from the
+  source, by Go's selector rule including promotion; field, type, receiver and
+  embedding references; `contains`.
+- **Candidates:** a name declared in several build variants (build constraints
+  are not evaluated); several equally shallow promotion paths; interface dispatch
+  (the interface method plus every project type whose method set matches by name
+  and parameter/result counts; always open, `structural-match-unverified`);
+  calls on a receiver with no evident type (name-only, open); reassigned
+  function-valued locals.
+- **Never definite:** `implements` links (unresolved, interface kept in
+  `data.interfaceId`, `structural-match-unverified`; computed type identity is an
+  annotation only).
+- **Unresolved:** standard library, third-party and non-local `replace` imports and
+  everything reached through them; imports Go forbids (`internal`, `package main`,
+  `testdata`); unexported names from another package; builtins (`data.builtin`);
+  elements of function containers; explicit generic-method instantiation
+  `t.Map[C](x)`; `new(variable).M()`.
+- **Not extracted:** locals, parameters and type parameters as symbols; keys of
+  keyed composite literals; generic type arguments (`Stack[int]` methods resolve
+  on `Stack`); cgo (`import "C"` is an unresolved import); imports into `vendor/`.
+
+Grammar: the module loads `grammars/go/tree-sitter-go.wasm`, built by Pymtheg
+from upstream `tree-sitter-go` v0.25.0 plus upstream PRs #202 (`new(expr)`, and
+user-declared `new`/`make` called with values) and #198 (Go 1.27 generic methods).
+The manifest records the upstream commit, patches, tool versions and sha256, and
+`test/grammar-vendored.test.mjs` checks the file against it; rebuilding is a
+maintainer step (`node grammars/build.mjs go`) that install and tests never run.
+Still failing a valid file: an empty statement followed by another statement on
+the same line (`{; G() }`), and a non-BMP character in an identifier that
+straddles one of the parser runtime's 5,119-unit input chunk boundaries (the same
+character in a comment or string there is read). Sources: [W2-B](changes/W2-B.md),
+[W2-B2](changes/W2-B2.md), [W2-S](changes/W2-S.md), `grammars/README.md`.
+
+#### Rust (module version 23)
+
+No-toolchain module; nothing runs `cargo` or `rustc`, and macros are not expanded.
+Claims `*.rs`; context `Cargo.toml`, read by a snapshot-only TOML reader (an
+unsupported or invalid manifest, including any TOML datetime, makes that whole
+manifest unknown). Private items are ordinary symbols.
+
+- **Definite:** module declarations and file modules; free-function, type, pattern
+  and value paths from proven bindings written in the source; imports, including
+  re-exports and globs where the binding is proven; associated calls such as
+  `A::new` on a proven inherent impl; written `impl Trait for Type` links;
+  `contains` (structure as written, not a claim that an item survives macro
+  expansion).
+- **Dot calls** (`recv.m()`) are definite only for a unique inherent method at the
+  first probe step of a proven receiver type (owned `T` with `self`, `&T` with
+  `&self`, `&mut T` with `&mut self`). Every other dot call is unresolved with
+  would-be targets and a reason (`later-probe-step`, `trait-dispatch`,
+  `receiver-type-unverified`, …); no dot call has a closed candidate set.
+  A receiver's type comes from a parameter or an annotated `let`; an
+  unannotated `let a = A::new();` is not given a type. Even with an annotated
+  `let b: A = A;`, a call of a `&self` method (`b.r()`) is a later probe step and
+  stays unresolved.
+- **Non-builtin attributes:** a link whose **target** is an item under a
+  non-builtin attribute, or inside an item with one, is not definite (the
+  attribute may replace the item; `item-under-opaque-attribute`, target kept as a
+  would-be target), and so are `use` and `mod` declarations under one. Links
+  written **inside** such an item (for example the body of a `#[tokio::main]`
+  function) are resolved as written.
+- **Macros:** an unknown macro (for example `tracing::info!`) that is a direct
+  child of a block, either as a statement (`m!();`, `m! { x }`) or as the
+  block's tail (`{ helper(); m!() }`, `if c { bail!("x") }`, a function ending in
+  `json!({…})`), withholds links in that block, including nested blocks and
+  closures inside it (`opaque-item-may-shadow-name`); links outside that block
+  are unaffected. Only lookups that an item defined by the macro could shadow are
+  withheld (`helper()`, `A::new()`); paths anchored with `crate::`, `self::`,
+  `super::` or `Self::` still resolve. A macro nested inside a larger expression
+  (`let x = m!();`, `helper() + m!()`, `Some(m!())`, a match arm value) withholds
+  nothing. The tail case is conservative: rustc treats a tail macro as an
+  expression, which cannot define an item, so links there are lost, never
+  wrong. The
+  twenty standard statement macros (`print`, `println`, `eprint`, `eprintln`,
+  `assert`, `assert_eq`, `assert_ne`, the three `debug_assert` forms, `vec`,
+  `format`, `write`, `writeln`, `panic`, `todo`, `unreachable`, `unimplemented`,
+  `dbg`, `matches`) no longer do, unless a captured binding of that name could
+  compete. A child module file inherits its parent's textual macros at its
+  `mod child;` declaration, so `#[macro_use] mod macros;` macros used in later
+  child files resolve. Macro arguments get no links. Cross-crate `#[macro_export]`
+  macros are unresolved. Standard-library and external items are unresolved.
+- Cargo features and target platforms are not evaluated; `cfg` conditions are
+  compared structurally.
+- **Assumption E4:** unseen code (a bare `#[macro_use] extern crate`, opaque macro
+  output) is assumed not to rebind `derive` or `global_allocator`; only a binding
+  visible in captured source shadows them. Extended: unseen macro output, bare
+  uncaptured `macro_use` exports and failed or unverified textual module entries
+  are assumed not to define a macro named like one of the twenty standard macros.
+  A counterexample can give a wrong definite link (for example a failed
+  `macros.rs` that defines its own `println!` emitting an item); both are pinned
+  as known limits (`test/graph-rust-round12.test.mjs`, the macro-recall tests).
+
+Grammar: npm `tree-sitter-rust` 0.24.0, unpatched. It rejects some valid Rust,
+which fails the whole file (11 files of Vector): `&raw` where `raw` is a variable,
+`unsafe extern "C" { … }` (edition 2024), `#[cfg]` on a struct-pattern field, two
+or more attributes on one parameter or an attribute on a closure parameter (a
+single attribute on a function or method parameter parses), a turbofish on a function named like a
+primitive (`char::<_, E>(…)`), and `impl A + for<'a> B<'a>`. Sources:
+[W2-C](changes/W2-C.md), [W2-P](changes/W2-P.md).
+
+#### TypeScript and JavaScript (module version 16)
+
+Uses the TypeScript compiler over the captured snapshot. The only other input
+is the installed compiler's standard-library declarations; `node_modules` is not
+read. Claims `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs`,
+`.cjs`; context `*tsconfig*.json`, `*jsconfig*.json` and `package.json`. Each file
+is analysed under its owning config (nearest containing directory, then
+`tsconfig` before `jsconfig`); genuinely tied configs are merged to the weakest
+answer.
+
+- **Definite:** module imports; import and export bindings to the original
+  declaration through barrels, `export *`, renames and default exports; CommonJS
+  `require` with a literal specifier; calls, `new`, JSX components, type
+  references and heritage when the checker gives one graph symbol (overloads are
+  one symbol); `contains`.
+- **Candidates:** several graph symbols for one callee (union receivers, merged
+  declarations, duplicate JavaScript functions).
+- **Unresolved:** standard library and `node_modules` packages
+  (`external`, `external-package`); computed `require` or `import()` specifiers;
+  workspace packages whose entry is not a captured file; pnpm-only workspaces.
+- **`partial` files** have complete but qualified facts, never syntax errors: an
+  `extends` base that was not captured (`incomplete-config`; a package preset
+  such as `@tsconfig/node20` leaves most cross-file links unresolved), compiler
+  stack limits on some lookups, or `require`/`module`/`exports` uses that cannot
+  be decided statically.
+- **A program that contains a failed file:** the failed file is absent;
+  `invalid-code` with a cause is best-effort attribution; **every other link in
+  that program carries `assumes: ["no-unseen-declarations"]`, which means
+  unverified** (computed without the failed file). In a program with no failed
+  file no link carries it.
+- Known limits: JavaScript early errors the compiler does not report without
+  `checkJs` (`let let = 1`, top-level `return`) leave a file clean; AMD
+  `define(…)` modules are not modelled; module augmentation turns imports of the
+  augmented module into candidate sets. Sources: [W2-D](changes/W2-D.md),
+  [W2-U](changes/W2-U.md).
+
+#### Not built yet
+
+Toolchain-backed exact links (Go through `go list` and `go/types`; Rust through
+`cargo`/`rustc`) are a later, explicit per-project opt-in (decision D17); the
+investigations are [W2-K](changes/W2-K.md) and [W2-L](changes/W2-L.md). Also
+later: automatic sync, the join with requirements and model declarations, the
+explore query, CLI/MCP/Studio surfaces for the graph, Lua, and a vendored Rust
+grammar.
 
 ## Architecture and interactive authoring
 
@@ -189,7 +497,7 @@ Studio local checks and MCP's default `check_design` use related scope: the
 selected import closure and discovered reverse importers. Unrelated invalid
 files do not poison these results; discovery limitations are visible warnings.
 MCP also offers explicit `entry` and `project` scopes. The source policy in
-`.pymtheg.json` controls discovery (`sources.include` / `sources.exclude`).
+`.pymtheg/settings.json` controls discovery (`sources.include` / `sources.exclude`).
 Evidence/research and Rust target/Go vendor directories are excluded unless explicitly included. Include patterns with known directory prefixes prune unrelated trees.
 Selected analysis is bounded to 2,048 files / 8 MiB; Studio's separate 10,000-path
 inventory loads larger files on demand. MCP interface metadata uses relative
@@ -242,7 +550,7 @@ warning marks interface impact previews incomplete.
 conflict and identity summary. JSON remains the default for compatibility.
 Contract comparisons follow unique kind/name declarations across file moves;
 ambiguous names remain unmatched. Rich output tests compile against real pinned
-num-bigint 0.4.6 in addition to TypeScript and Go. Saved-form merging includes
+num-bigint 0.4.8 in addition to TypeScript and Go. Saved-form merging includes
 parameter order, which can affect every caller.
 
 ## Ninth-review follow-up boundaries
