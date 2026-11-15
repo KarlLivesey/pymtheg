@@ -1,0 +1,15 @@
+{
+  "commit": "c734245fd3ae9bcac8ab3aaafb4482d4b5d0ae92",
+  "cleanBefore": true,
+  "shallow": "true",
+  "hashes": {
+    "src/mcp/graph.ts": "d4fc2600b2a93eaa636e4f1d97e0320dcdacb43bd072619e6f74b5404b902993",
+    "src/mcp/graph-jobs.ts": "cccdde45659e1075ddb4df5274b7f2c7badb7130fa8fb0ba177c4a4480af1c6a",
+    "src/mcp/graph-view.ts": "5c7dc0a03a349d012c6097bbe09ee94c693ad9c1437786dc920018a173b09ce0",
+    "src/mcp/graph-worker.ts": "fa970ad33ab24abd05144b3dbad105d659bfb73b87bf0487b38c111d14fe9f69",
+    "src/mcp/limits.ts": "27048e336c720f61ace3c01d61003bc455fbd92c683266c02748ad1046275d22",
+    "src/mcp/server.ts": "b4205248e806f3c601789b8a9b9fb4a69a4678182194400f57b29d10d8fc36b5",
+    "src/mcp/workspace.ts": "0e27a4475cdd6973fb168f19784e41e638089fced090d00d4b4d2ea5f17f68f6",
+    "docs/mcp.md": "9239bfcff1ce2acf16881c7bd069241082b9dc49eb821cccf3173b22243c6573"
+  }
+}

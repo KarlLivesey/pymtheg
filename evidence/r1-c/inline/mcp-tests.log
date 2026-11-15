@@ -1,0 +1,41 @@
+✔ MCP-only design loop: ordinary source edits, diagnostic/hint, check, try without runId, verify and simulate (5078.546981ms)
+✔ every documented MCP call executes as written, including explicit legacy refusals (7037.736104ms)
+✔ inline completion wins a controlled deadline and is exactly the graph_result first page (174.936693ms)
+✔ controlled deadline expiry returns a progress handle; later result is unchanged (63.026578ms)
+✔ wait:false never starts a deadline and cancellation of an inline wait joins the worker (105.283628ms)
+✔ graph lifecycle uses controlled readiness: busy rejection, cancellation, retention and close join (390.157256ms)
+✔ stdio mixed init-free graph: every action, certainty classes, failures, paging and auto-sync (9025.187868ms)
+✔ MCP graph jobs are nonblocking, cancellable, bounded, session-owned and confined (2815.222949ms)
+✔ graph MCP confines uninitialized subdirectories rather than indexing their parent (568.704534ms)
+✔ oversized names are explicitly clipped, exact details page, and wire responses stay bounded (2430.511977ms)
+✔ real MCP agrees with negative-list trials, surfaces mixed caller findings and retains partial code (2958.178063ms)
+✔ MCP summaries count source-replayed call and return failures as counterexamples (786.570074ms)
+✔ agents can browse checked source targets before an architecture store exists (922.67794ms)
+✔ real MCP discovery and check-fix-recheck preserve disk and evidence (1058.673344ms)
+✔ MCP refuses escaped paths and invalid tool arguments (571.396941ms)
+✔ modern MCP discovery supports scaffolds and preserves incomplete independent results (1445.408416ms)
+✔ old MCP results remain source-scoped after a file edit (741.436695ms)
+✔ MCP cancellation reaches the production CPU-worker coordinator (419.312016ms)
+✔ MCP distinguishes missing integration from an unsupported design slice (1155.969183ms)
+✔ MCP emits all installed language targets without allowing executable plugin paths (796.822606ms)
+✔ agents can start from a recipe and see an actual returned value (923.416777ms)
+✔ agents can inspect retained architecture and page its complete documents (837.085857ms)
+✔ agents can check new virtual source files and imports without creating files or folders (941.193924ms)
+✔ agents preview standalone shape changes, see affected callers and retain source (1040.407312ms)
+✔ agents can emit only the extra targets explicitly pinned at launch (1018.618865ms)
+✔ MCP builds rich interfaces and rejects malformed type shapes without saving (804.661205ms)
+✔ MCP reuses checked project types with explicit imports and previews body-preserving edits (1154.764701ms)
+✔ MCP source reads refuse malformed UTF-8 without returning replacement text (494.697277ms)
+✔ MCP pages a thousand types and callable IDs, then previews an edit with reverse callers (1303.834725ms)
+✔ interface search ignores workspace names and relative IDs survive opening the same design elsewhere (1506.876008ms)
+✔ agents page every concurrent withdrawal without downloading the whole review history (1089.169978ms)
+✔ agents preview create-only declarations from checked source, including virtual files (937.593588ms)
+✔ agent findings include a replay-confirmed bad input and clear it after a guarded buffer-only fix (1106.589531ms)
+ℹ tests 33
+ℹ suites 0
+ℹ pass 33
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 21414.372092

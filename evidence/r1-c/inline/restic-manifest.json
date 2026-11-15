@@ -1,0 +1,16 @@
+{
+  "commit": "c734245fd3ae9bcac8ab3aaafb4482d4b5d0ae92",
+  "cleanBefore": true,
+  "shallow": "true",
+  "hashes": {
+    "src/mcp/graph.ts": "00a0c25e3df5bd900468f0722597e529c1090e75d5a1abf5e75058fccee6eb0c",
+    "src/mcp/graph-wait.ts": "f79ba1205333a926d91e301ad030c5a0f69f26cf2c0e0a67766923063a102779",
+    "src/mcp/graph-jobs.ts": "cccdde45659e1075ddb4df5274b7f2c7badb7130fa8fb0ba177c4a4480af1c6a",
+    "src/mcp/graph-view.ts": "5c7dc0a03a349d012c6097bbe09ee94c693ad9c1437786dc920018a173b09ce0",
+    "src/mcp/graph-worker.ts": "fa970ad33ab24abd05144b3dbad105d659bfb73b87bf0487b38c111d14fe9f69",
+    "src/mcp/limits.ts": "9644457eb86c6d241aee65a995b876987c1ced454690958a9046c564006d9317",
+    "src/mcp/server.ts": "b4205248e806f3c601789b8a9b9fb4a69a4678182194400f57b29d10d8fc36b5",
+    "src/mcp/workspace.ts": "0e27a4475cdd6973fb168f19784e41e638089fced090d00d4b4d2ea5f17f68f6",
+    "docs/mcp.md": "43ed91fd900378622d6b31121558cf6d22257924682e494c3a86e8e618b7c609"
+  }
+}

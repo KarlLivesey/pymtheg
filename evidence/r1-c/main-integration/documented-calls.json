@@ -1,0 +1,234 @@
+[
+  {
+    "name": "project_info",
+    "args": {},
+    "bytes": 2889,
+    "isError": false
+  },
+  {
+    "name": "design_recipe",
+    "args": {
+      "action": "list"
+    },
+    "bytes": 6705,
+    "isError": false
+  },
+  {
+    "name": "read_source",
+    "args": {
+      "file": "counter.pym",
+      "startLine": 2,
+      "limit": 1
+    },
+    "bytes": 391,
+    "isError": false
+  },
+  {
+    "name": "check_design",
+    "args": {
+      "file": "counter.pym"
+    },
+    "bytes": 2879,
+    "isError": false
+  },
+  {
+    "name": "read_run",
+    "args": {
+      "runId": "2a8ed46d-d0aa-4f0c-b8db-bfae29a867d0",
+      "section": "findings"
+    },
+    "bytes": 6030,
+    "isError": false
+  },
+  {
+    "name": "check_design",
+    "args": {
+      "file": "counter.pym"
+    },
+    "bytes": 2891,
+    "isError": false
+  },
+  {
+    "name": "try_inputs",
+    "args": {
+      "file": "counter.pym",
+      "entry": "next",
+      "inputs": {
+        "n": "41"
+      }
+    },
+    "bytes": 1318,
+    "isError": false
+  },
+  {
+    "name": "explore_behaviour",
+    "args": {
+      "file": "counter.pym",
+      "entry": "Counter",
+      "method": "verify"
+    },
+    "bytes": 1943,
+    "isError": false
+  },
+  {
+    "name": "read_run",
+    "args": {
+      "runId": "5241c246-8f62-45e9-aa79-86532c659bb8",
+      "section": "properties"
+    },
+    "bytes": 10702,
+    "isError": false
+  },
+  {
+    "name": "explore_behaviour",
+    "args": {
+      "file": "counter.pym",
+      "entry": "Counter",
+      "method": "simulate",
+      "seed": "42",
+      "maxSteps": 4,
+      "maxSamples": 10
+    },
+    "bytes": 2077,
+    "isError": false
+  },
+  {
+    "name": "read_run",
+    "args": {
+      "runId": "57cf5cd7-d7ef-41ce-b58a-9cc4e9ccdaf9",
+      "section": "properties"
+    },
+    "bytes": 11394,
+    "isError": false
+  },
+  {
+    "name": "design_interface",
+    "args": {
+      "action": "symbols",
+      "runId": "5241c246-8f62-45e9-aa79-86532c659bb8",
+      "query": "next"
+    },
+    "bytes": 668,
+    "isError": false
+  },
+  {
+    "name": "emit_scaffold",
+    "args": {
+      "runId": "5241c246-8f62-45e9-aa79-86532c659bb8",
+      "target": "typescript"
+    },
+    "bytes": 6291,
+    "isError": false
+  },
+  {
+    "name": "read_scaffold",
+    "args": {
+      "emissionId": "3bd0515b-505f-4eed-995e-cffb0ffa3d7d",
+      "section": "source",
+      "offset": 0,
+      "limit": 100
+    },
+    "bytes": 2404,
+    "isError": false
+  },
+  {
+    "name": "emit_implementation_check",
+    "args": {
+      "runId": "5241c246-8f62-45e9-aa79-86532c659bb8",
+      "target": "go",
+      "implementationType": "*Worker"
+    },
+    "bytes": 1870,
+    "isError": false
+  },
+  {
+    "name": "code_graph",
+    "args": {
+      "action": "search",
+      "query": "greet",
+      "limit": 10
+    },
+    "bytes": 4688,
+    "isError": false
+  },
+  {
+    "name": "code_graph",
+    "args": {
+      "action": "status",
+      "wait": false
+    },
+    "bytes": 616,
+    "isError": false
+  },
+  {
+    "name": "graph_result",
+    "args": {
+      "jobId": "59a1791f-07c0-4333-a08f-752f282a256d",
+      "wait": true
+    },
+    "bytes": 3214,
+    "isError": false
+  },
+  {
+    "name": "read_architecture",
+    "args": {
+      "section": "summary"
+    },
+    "bytes": 470,
+    "isError": false
+  },
+  {
+    "name": "read_implementation",
+    "args": {
+      "section": "versions"
+    },
+    "bytes": 923,
+    "isError": false
+  },
+  {
+    "name": "observe_implementation",
+    "args": {
+      "files": [
+        "app.ts"
+      ],
+      "label": "Documented observation",
+      "expectedRevision": null
+    },
+    "bytes": 1121,
+    "isError": false
+  },
+  {
+    "name": "link_implementation",
+    "args": {
+      "revision": "2a690c159396a36c0ac62dfb0f00f6f171e4d4cd984061b1ac843368f570544e",
+      "planId": "plan:R1",
+      "nodeId": "missing-node",
+      "planHash": "missing-hash",
+      "observationId": "missing-observation",
+      "reviewed": true
+    },
+    "bytes": 156,
+    "isError": true
+  },
+  {
+    "name": "compare_implementation",
+    "args": {
+      "planRevision": "2a690c159396a36c0ac62dfb0f00f6f171e4d4cd984061b1ac843368f570544e",
+      "codeRevision": "2a690c159396a36c0ac62dfb0f00f6f171e4d4cd984061b1ac843368f570544e",
+      "planId": "plan:R1",
+      "nodeId": "missing-node"
+    },
+    "bytes": 94,
+    "isError": true
+  },
+  {
+    "name": "unlink_implementation",
+    "args": {
+      "revision": "missing-revision",
+      "planId": "plan:R1",
+      "nodeId": "missing-node"
+    },
+    "bytes": 126,
+    "isError": true
+  }
+]

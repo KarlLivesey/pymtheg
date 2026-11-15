@@ -1,0 +1,70 @@
+✔ unfinished declaration survives a real restart and preview cannot write a partial type (217.53962ms)
+✔ saved unanswered type and concurrent field change render both choices instead of crashing (162.333182ms)
+✔ saved unanswered input and output render in interface conflict choices (26.2039ms)
+✔ cached unchanged source stays on disk while edited, recovered, new and deleted sources retain their buffers (2.629388ms)
+✔ matching ten thousand cached sources does one path-index pass, independent of computer speed (52.575561ms)
+✔ MCP retains the real trace alongside an unused-scope warning (2457.49296ms)
+✔ unused return scope cannot discard a graph with a real source violation (53.108176ms)
+✔ safe unused entries and malformed used values remain refused (5.289606ms)
+✔ blank initialization is idempotent, portable and discoverable from a child directory (40.632863ms)
+✔ initialization preserves existing configuration and concurrent initializers publish one identity (62.023402ms)
+✔ invalid markers and metadata symlinks are refused without replacing data (8.948066ms)
+✔ MCP and Studio resolve an initialized project from a nested directory and expose the same identity (469.71801ms)
+✔ the CLI initializes an empty directory without generating example source (420.167152ms)
+✔ moving an initialized project preserves its identity without storing the old absolute root (21.876194ms)
+✔ reinitialization does not hide invalid configuration or replace the project identity (20.401617ms)
+✔ an already open MCP workspace sees initialization on its next fresh inventory (33.238405ms)
+✔ Studio project setup uses the same identity and imports documentation only after explicit request (444.543091ms)
+✔ Studio setup refuses to import documentation changed after its displayed preview (338.581171ms)
+✔ nested init reuses the parent identity and keeps SQLite out of Git (73.063489ms)
+ℹ tests 2602
+ℹ suites 0
+ℹ pass 2600
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 472010.432562
+
+✖ failing tests:
+
+test at test/mcp-loop-soundness.test.mjs:8:1
+✖ real MCP agrees with negative-list trials, surfaces mixed caller findings and retains partial code (816.492582ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+
+  + 'incomplete'
+  - 'violated'
+
+      at TestContext.<anonymous> (file:///home/user/pymtheg-dev/runs/r1c-73c371-final/tree/test/mcp-loop-soundness.test.mjs:46:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'incomplete',
+    expected: 'violated',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/mcp.test.mjs:915:1
+✖ agent findings include a replay-confirmed bad input and clear it after a guarded buffer-only fix (817.698841ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+
+  + 'incomplete'
+  - 'violated'
+
+      at file:///home/user/pymtheg-dev/runs/r1c-73c371-final/tree/test/mcp.test.mjs:942:12
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async fixture (file:///home/user/pymtheg-dev/runs/r1c-73c371-final/tree/test/mcp.test.mjs:33:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'incomplete',
+    expected: 'violated',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

@@ -1,0 +1,100 @@
+{
+  "questions": 5,
+  "toolCalls": 17,
+  "responseBytes": [
+    {
+      "name": "code_graph",
+      "bytes": 616
+    },
+    {
+      "name": "graph_result",
+      "bytes": 3348
+    },
+    {
+      "name": "code_graph",
+      "bytes": 616
+    },
+    {
+      "name": "graph_result",
+      "bytes": 6348
+    },
+    {
+      "name": "code_graph",
+      "bytes": 616
+    },
+    {
+      "name": "graph_result",
+      "bytes": 6316
+    },
+    {
+      "name": "graph_result",
+      "bytes": 37288
+    },
+    {
+      "name": "graph_result",
+      "bytes": 4274
+    },
+    {
+      "name": "code_graph",
+      "bytes": 616
+    },
+    {
+      "name": "graph_result",
+      "bytes": 5802
+    },
+    {
+      "name": "graph_result",
+      "bytes": 10020
+    },
+    {
+      "name": "code_graph",
+      "bytes": 616
+    },
+    {
+      "name": "graph_result",
+      "bytes": 6524
+    },
+    {
+      "name": "graph_result",
+      "bytes": 6272
+    },
+    {
+      "name": "graph_result",
+      "bytes": 3370
+    },
+    {
+      "name": "code_graph",
+      "bytes": 616
+    },
+    {
+      "name": "graph_result",
+      "bytes": 21094
+    }
+  ],
+  "maximumResponseBytes": 37288,
+  "counts": {
+    "files": 559,
+    "symbols": 7356,
+    "links": 63088,
+    "failed": 0,
+    "partial": 0,
+    "unresolved": 21686,
+    "ambiguous": 1484
+  },
+  "sourceChecks": [
+    {
+      "file": "internal/restic/id.go",
+      "line": 21
+    },
+    {
+      "file": "internal/data/snapshot_find.go",
+      "line": 98
+    },
+    {
+      "file": "internal/restic/id.go",
+      "line": 26
+    }
+  ],
+  "possibleCallerCount": 2,
+  "impactTruncated": true
+}

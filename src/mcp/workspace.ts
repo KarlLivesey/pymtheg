@@ -1,4 +1,5 @@
 import { LinkJobs } from "./links-jobs.js";
+import { GraphJobs } from "./graph-jobs.js";
 import { findWorkspace } from "../project/workspace.js";
 import { ProjectInventories, type InventoryQuery } from "./inventories.js";
 import { agentLimits } from "./limits.js";
@@ -40,6 +41,7 @@ export interface AgentRequest {
 }
 export class AgentWorkspace {
   readonly links: LinkJobs;
+  readonly graph: GraphJobs;
   readonly runs = new Map<string, AgentRun>();
   readonly emissions = new EmissionStore();
   readonly inventories = new ProjectInventories();
@@ -55,6 +57,7 @@ export class AgentWorkspace {
   ) {
     this.access = new StudioService(root);
     this.links = new LinkJobs(root);
+    this.graph = new GraphJobs(root);
   }
   static async open(
     path: string,
@@ -358,7 +361,7 @@ export class AgentWorkspace {
   async close() {
     this.shutdown.abort();
     try {
-      await this.links.close();
+      await Promise.all([this.links.close(), this.graph.close()]);
       await this.outputs.close();
       await this.active?.catch(() => {});
       await this.access.close();
