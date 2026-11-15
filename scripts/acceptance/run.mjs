@@ -461,11 +461,13 @@ function report(tarball, selected) {
     "Durations, sizes and memory are observations on the dev server, not limits.",
     "",
   ];
+  // An empty gap list is the normal, releasable state.
+  lines.push("## Known gaps", "");
   if (gaps.length) {
-    lines.push("## Known gaps", "", "| Scenario | Step | Chunk | Reason |", "|---|---|---|---|");
+    lines.push("| Scenario | Step | Chunk | Reason |", "|---|---|---|---|");
     for (const r of gaps) lines.push(`| ${r.scenario} | ${cell(r.step)} | ${r.chunk} | ${cell(r.reason)} |`);
-    lines.push("");
-  }
+  } else lines.push("None.");
+  lines.push("");
   for (const s of [{ id: "0-build", proves: "Release build: npm ci, npm run build, npm pack in a node:24.21.0 container." }, ...doc.scenarios]) {
     const rows = results.filter((r) => r.scenario === s.id);
     if (!rows.length) continue;

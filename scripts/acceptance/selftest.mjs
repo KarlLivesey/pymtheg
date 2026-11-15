@@ -10,8 +10,8 @@
 // 3. Makes sabotaged copies, each breaking one thing a release must not ship,
 //    and runs the real harness on each (scenario a-node-only unless a case
 //    names another), several at once, which also exercises overlapping runs.
-// 4. Requires: the unmodified control exits 2 (known gaps only) with no failed
-//    step; every sabotaged tarball exits 1 with the named step(s) reported
+// 4. Requires: the unmodified control exits 0 with no failed step and no gap
+//    (or 2 with only the R1-H warning gap); every sabotaged tarball exits 1 with the named step(s) reported
 //    `fail`, never `pass`, `expected-fail` or `known-gap`.
 // A sabotage whose anchor is not found exactly once is reported NOT APPLIED
 // (a failure): a break that did not happen proves nothing.
@@ -120,7 +120,7 @@ const SABOTAGES = [
   {
     id: "tools-list-error",
     what: "`tools/list` answers with a JSON-RPC error",
-    expect: ["mcp-tools-list", "mcp-project_info", "mcp-tool-coverage", "mcp-requirement-links"],
+    expect: ["mcp-tools-list", "mcp-project_info", "mcp-tool-coverage", "mcp-requirement_links-requirement"],
     apply: (d) =>
       prelude(
         d,
@@ -136,6 +136,9 @@ const SABOTAGES = [
   },
   { id: "engine-hides-violation", what: "the built-in engine turns a violation into no_counterexample", expect: ["verify-violation"], apply: (d) => patch(d, "dist/backends/adapter.js", /outcome: violation\s*\?\s*"counterexample"/, 'outcome: false ? "counterexample"') },
   { id: "link-check-passes-changed", what: "`link check` exits 0 with a changed link", expect: ["link-check-after-edit"], apply: (d) => prelude(d, 'if (process.argv[2] === "link" && process.argv[3] === "check") process.on("exit", () => { process.exitCode = 0; });') },
+  // Round 4: requirement links over MCP.
+  { id: "mcp-link-check-ok-after-edit", what: "MCP `requirement_links check` reports every link ok after a body edit", expect: ["mcp-requirement_links-check-after-edit"], apply: (d) => patch(d, "dist/mcp/links-view.js", "state: r.state,", 'state: "ok",') },
+  { id: "link-add-stores-nothing", what: "`add` reports created but stores no link", expect: ["mcp-requirement_links-add-go", "link-add-go"], apply: (d) => patch(d, "dist/architecture/code-links.js", /store!?\.writeCodeLink\(key, value, true\)/, '({ id: "sabotaged-link", changed: true })') },
   { id: "code-graph-candidate", what: "MCP `code_graph` reports a definite caller as a candidate", expect: ["mcp-code_graph-callers-ts"], apply: (d) => patch(d, "dist/mcp/graph-view.js", "certainty: l.certainty,", 'certainty: l.certainty === "definite" ? "candidate-set" : l.certainty,') },
 ];
 
@@ -172,7 +175,9 @@ async function runCase(c) {
   const statusOf = (step) => rows.filter((x) => x.step === step).map((x) => x.status);
   let ok, detail;
   if (c.id === "control") {
-    ok = r.code === 2 && !fails.length && rows.length > 0;
+    // Clean: exit 0 with no gap, or exit 2 whose only gaps are the R1-H warning.
+    const gaps = rows.filter((x) => x.status === "known-gap");
+    ok = !fails.length && rows.length > 0 && ((r.code === 0 && !gaps.length) || (r.code === 2 && gaps.length > 0 && gaps.every((x) => x.chunk === "R1-H")));
     detail = `exit ${r.code}; ${fails.length} failed steps; gaps: ${rows
       .filter((x) => x.status === "known-gap")
       .map((x) => `${x.step} (${x.chunk})`)

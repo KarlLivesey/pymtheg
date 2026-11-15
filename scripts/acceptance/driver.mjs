@@ -165,6 +165,12 @@ function readTraces() {
 const NODE_WARNING = /^\(node:\d+\) (?:\[[A-Z0-9_]+\] )?\w*Warning: /;
 const TRACE_HINT = /^\(Use `node --trace-(?:warnings|deprecation) \.\.\.` to show where the warning was created\)$/;
 const SQLITE_WARNING = /^\(node:\d+\) ExperimentalWarning: SQLite is an experimental feature and might change at any time$/;
+/**
+ * The known warning gaps, one entry per chunk still in flight. An empty list is
+ * the normal state: then any Node warning fails, and with no other gap the
+ * harness exits 0. Delete R1-H's entry when PR 45 merges.
+ */
+const KNOWN_WARNING_GAPS = [{ chunk: "R1-H", versions: /^v24\.0\.|^v25\./, warning: SQLITE_WARNING }];
 const STACK_LINE = /^\s+at .+:\d+:\d+\)?$/;
 const ERROR_LINE = /^\s*\w*Error: /;
 const UNHANDLED = /\bunhandled\b|\buncaught\b/i;
@@ -172,9 +178,10 @@ const UNHANDLED = /\bunhandled\b|\buncaught\b/i;
 function nodeWarnings(stderr) {
   return stderr.split("\n").filter((l) => NODE_WARNING.test(l) || TRACE_HINT.test(l));
 }
-/** R1-H: exactly the SQLite warning (and its trace hint), on exactly Node 24.0.x and 25.x, is the one known warning gap. */
-function isKnownSqliteWarning(lines) {
-  return /^v24\.0\.|^v25\./.test(NODE_VERSION) && lines.some((l) => SQLITE_WARNING.test(l)) && lines.every((l) => SQLITE_WARNING.test(l) || TRACE_HINT.test(l));
+/** The chunk whose known gap covers exactly these warning lines on this Node version, or null. */
+function knownWarningGap(lines) {
+  const gap = KNOWN_WARNING_GAPS.find((g) => g.versions.test(NODE_VERSION) && lines.some((l) => g.warning.test(l)) && lines.every((l) => g.warning.test(l) || TRACE_HINT.test(l)));
+  return gap?.chunk ?? null;
 }
 
 /** Internal-error signs: stack frames, `XError: ` lines not expected by the step, unhandled/uncaught rejections. */
@@ -246,7 +253,7 @@ function record(def, r) {
     const internal = def.skipWording ? [] : internalErrors(text, def.allowedErrorLines ?? []);
     if (internal.length) problems.push({ kind: "internal", reason: `internal error output: ${internal.join("; ")}` });
     const warnings = def.skipWarnings ? [] : nodeWarnings(r.stderr ?? "");
-    if (warnings.length) problems.push({ kind: "node-warning", reason: `Node warning: ${warnings.join(" / ").slice(0, 300)}`, sqlite: isKnownSqliteWarning(warnings) });
+    if (warnings.length) problems.push({ kind: "node-warning", reason: `Node warning: ${warnings.join(" / ").slice(0, 300)}`, gapChunk: knownWarningGap(warnings) });
   }
   for (const call of r.calls ?? []) {
     if (TOOLCHAIN_PROGRAM.test(call.tool) && def.allowToolchain) continue;
@@ -255,7 +262,7 @@ function record(def, r) {
 
   let status, reason, chunk;
   const gapOf = (p) => {
-    if (p.kind === "node-warning" && p.sqlite) return "R1-H";
+    if (p.kind === "node-warning" && p.gapChunk) return p.gapChunk;
     if (p.kind === "expect" && def.gap && safe(def.gap.when, r) === true) return def.gap.chunk;
     return null;
   };
@@ -465,8 +472,6 @@ function decodedTexts(value) {
   return out.join("\n");
 }
 
-/** The three legacy TypeScript implementation-link tools and the one future requirement-link tool family. */
-const REQUIREMENT_LINK_TOOL = (name) => /code_link|requirement|symbol_link/.test(name);
 
 async function mcpSteps(pym) {
   const mcp = new Mcp(pym(["mcp", PROJECT]), PROJECT);
@@ -672,11 +677,87 @@ async function mcpSteps(pym) {
   await mcpCallers("mcp-code_graph-callers-go", "ComputeTotal", [["main", "service/main.go"]]);
   await mcpCallers("mcp-code_graph-callers-rust", "apply_discount", [["main", "engine/src/main.rs"]]);
 
+  // Requirement links over MCP only (R1-C2): plan:R1 linked to a Go (by a
+  // code_graph symbol reference), a Rust and a TypeScript symbol; check, edit,
+  // refresh, undo; requirements_for; unlinked; one link_result handle followed.
+  const links = async (action, args = {}) => {
+    const first = await tool("requirement_links", { action, ...args });
+    return first.state === "running" ? await tool("link_result", { jobId: first.jobId, wait: true, section: args.section ?? "items" }) : first;
+  };
+  const linkIds = {};
+  const MONEY = join(PROJECT, "web/src/money.ts");
+  const moneyOriginal = readFileSync(MONEY, "utf8");
+  const row = (l) => `${l.record}/${l.symbol?.name}:${l.state}`;
+  // All six links: plan:R2's three from the CLI steps and plan:R1's three from MCP.
+  const allLinks = (r1 = {}) =>
+    ["plan:R1/percent_of", "plan:R1/roundCents", "plan:R1/taxFor", "plan:R2/ComputeTotal", "plan:R2/apply_discount", "plan:R2/formatTotal"].map((k) => `${k}:${r1[k] ?? "ok"}`).sort();
+  const linkCall = (id, display, fn, expect) => call(id, display, ["requirement_links", "link_result"], guarded(fn), { expect: ok(expect) });
+  await linkCall("mcp-requirement_links-requirement", 'requirement_links {action:"requirement", id:"R1"}', () => links("requirement", { id: "R1", title: "An order is charged at most once" }), (j) =>
+    same([j.summary?.status, j.items?.map((i) => i.id)], ["created", ["plan:R1"]], "requirement"),
+  );
+  await linkCall(
+    "mcp-requirement_links-add-go",
+    'code_graph {action:"symbol", query:"taxFor"}, then requirement_links {action:"add", record:"R1", selector:<symbol ref>}',
+    async () => {
+      const found = await graph({ action: "symbol", query: "taxFor" });
+      const ref = found.items?.[0]?.ref;
+      const added = await links("add", { record: "R1", selector: ref });
+      linkIds.taxFor = added.items?.[0]?.id;
+      return { ref, added };
+    },
+    ({ ref, added }) =>
+      !/^symbol:[0-9a-f]{64}$/.test(ref ?? "")
+        ? `code_graph symbol ref ${JSON.stringify(ref)}`
+        : same([added.summary?.status, added.items?.length, added.items?.[0]?.record, added.items?.[0]?.symbol?.name, added.items?.[0]?.symbol?.ref, typeof added.items?.[0]?.id], ["created", 1, "plan:R1", "taxFor", ref, "string"], "link to taxFor"),
+  );
+  for (const [lang, symbol, path] of [
+    ["rust", "percent_of", "engine/src/discount.rs"],
+    ["ts", "roundCents", "web/src/money.ts"],
+  ])
+    await linkCall(`mcp-requirement_links-add-${lang}`, `requirement_links {action:"add", record:"R1", selector:"${symbol}"}`, async () => {
+      const added = await links("add", { record: "R1", selector: symbol });
+      linkIds[symbol] = added.items?.[0]?.id;
+      return added;
+    }, (j) =>
+      same([j.summary?.status, j.items?.length, j.items?.[0]?.record, j.items?.[0]?.symbol?.name, j.items?.[0]?.symbol?.path, typeof j.items?.[0]?.id], ["created", 1, "plan:R1", symbol, path, "string"], `link to ${symbol}`),
+    );
+  await linkCall("mcp-requirement_links-list", 'requirement_links {action:"list", record:"R1"}', () => links("list", { record: "R1" }), (j) =>
+    same((j.items ?? []).map(row).sort(), ["plan:R1/percent_of:ok", "plan:R1/roundCents:ok", "plan:R1/taxFor:ok"], "links of plan:R1"),
+  );
+  const checkLinks = (id, expectedRows, passed, extra = () => null) =>
+    linkCall(id, 'requirement_links {action:"check"}', () => links("check"), (j) => same([(j.items ?? []).map(row).sort(), j.summary?.passed], [expectedRows, passed], "check") ?? extra(j));
+  await checkLinks("mcp-requirement_links-check", allLinks(), true);
+  writeFileSync(MONEY, moneyOriginal.replace("Math.round(value * 100) / 100", "Math.round(value * 100) / 100 + 0"));
+  await checkLinks("mcp-requirement_links-check-after-edit", allLinks({ "plan:R1/roundCents": "changed" }), false, (j) =>
+    same((j.items ?? []).filter((l) => l.state !== "ok").map((l) => [l.id, l.differs]), [[linkIds.roundCents, ["body"]]], "the changed link"),
+  );
+  const refreshRound = (id) => linkCall(id, 'requirement_links {action:"refresh", link:<roundCents link>}', () => links("refresh", { link: linkIds.roundCents }), (j) => same([j.summary?.status, j.items?.[0]?.id], ["refreshed", linkIds.roundCents], "refresh"));
+  await refreshRound("mcp-requirement_links-refresh");
+  await checkLinks("mcp-requirement_links-check-after-refresh", allLinks(), true);
+  writeFileSync(MONEY, moneyOriginal);
+  await refreshRound("mcp-requirement_links-refresh-restored");
+  await checkLinks("mcp-requirement_links-check-final", allLinks(), true);
+  await linkCall("mcp-requirement_links-requirements_for", 'requirement_links {action:"requirements_for", symbol:"percent_of"}', () => links("requirements_for", { symbol: "percent_of" }), (j) =>
+    same((j.items ?? []).map((t) => `${t.record}:${t.via}:${t.symbol?.name}`), ["plan:R1:direct:percent_of"], "requirements for percent_of"),
+  );
+  await linkCall("mcp-requirement_links-unlinked", 'requirement_links {action:"unlinked", symbols:true, section:"symbols"}', () => links("unlinked", { symbols: true, section: "symbols" }), (j) => {
+    const names = (j.items ?? []).map((x) => x.name);
+    return names.includes("renderBasket") ? (["formatTotal", "roundCents", "ComputeTotal"].find((n) => names.includes(n)) ? `linked symbol listed as unlinked: ${names.join(", ")}` : null) : `renderBasket missing from unlinked symbols: ${names.join(", ")}`;
+  });
+  // A handle followed from running to finished.
+  await linkCall("mcp-link_result-handle", 'requirement_links {action:"check", wait:false}, then link_result {jobId, wait:true}', async () => {
+    const handle = await tool("requirement_links", { action: "check", wait: false });
+    const done = await tool("link_result", { jobId: handle.jobId, wait: true });
+    return { handle, done };
+  }, ({ handle, done }) =>
+    same([handle.state, typeof handle.jobId, done.state, done.jobId === handle.jobId, done.summary?.passed, (done.items ?? []).map(row).sort()], ["running", "string", "complete", true, true, allLinks()], "handle → result"),
+  );
+
   // Architecture and the older TypeScript implementation tools, end to end:
   // the requirement R1 created by `pymtheg link requirement` is the plan record.
   await call("mcp-read_architecture", 'read_architecture {section:"summary"}', ["read_architecture"], guarded(() => tool("read_architecture", { section: "summary" })), {
-    // `available:false` is reported only without a store; R1 made one revision.
-    expect: ok((j) => same([j.available, j.totalRevisions], [undefined, 1], "architecture summary (available, one revision)")),
+    // `available:false` is reported only without a store; each requirement made one revision.
+    expect: ok((j) => same([j.available, j.totalRevisions], [undefined, 2], "architecture summary (available; two revisions: plan:R2 by CLI, plan:R1 by MCP)")),
   });
   await call(
     "mcp-observe_implementation",
@@ -695,7 +776,8 @@ async function mcpSteps(pym) {
     "read_implementation graph (planned R1, observed renderBasket), then link_implementation {reviewed:true}",
     ["read_implementation", "link_implementation"],
     guarded(async () => {
-      const plan = await tool("read_implementation", { section: "graph", mode: "gaps", limit: 1 });
+      const gaps = await tool("read_implementation", { section: "graph", mode: "gaps", limit: 20 });
+      const plan = { items: (gaps.items ?? []).filter((i) => i.id === "plan:R1") };
       const code = await tool("read_implementation", { section: "graph", mode: "existing", limit: 20 });
       const decl = (code.items ?? []).find((i) => i.name === "renderBasket");
       ctx.link = { planId: plan.items?.[0]?.id, nodeId: decl?.id };
@@ -744,20 +826,6 @@ async function mcpSteps(pym) {
       return unexercised.length ? `listed but not exercised by the harness: ${unexercised.join(", ")}` : null;
     },
     note: (r) => `${r.json.listed.length} tools listed, all called`,
-  });
-  // R1-C2: requirement links over MCP. The only accepted shortfall: tools/list
-  // succeeded and no listed tool exposes requirement-link actions.
-  await step({
-    id: "mcp-requirement-links",
-    display: "tools/list exposes requirement-to-symbol link actions",
-    run: async () => ({ exitCode: null, json: { listed: tools } }),
-    expect: (r) =>
-      r.json.listed === null
-        ? "tools/list did not succeed"
-        : r.json.listed.some(REQUIREMENT_LINK_TOOL)
-          ? `requirement-link tool(s) ${r.json.listed.filter(REQUIREMENT_LINK_TOOL).join(", ")} listed: extend mcpSteps to create, list and check a link`
-          : "no tool exposes requirement-link actions",
-    gap: { chunk: "R1-C2", reason: "requirement links over MCP: tools/list succeeded and no tool exposes link actions", when: (r) => Array.isArray(r.json.listed) && !r.json.listed.some(REQUIREMENT_LINK_TOOL) },
   });
   await step({ id: "mcp-shutdown", display: "close stdin; server exits 0", expect: exit(0), run: async () => ({ exitCode: await mcp.close(), ...mcp.take() }) });
 }
@@ -977,7 +1045,7 @@ async function coreSteps(P, { afterInit = [] } = {}) {
 }
 
 /**
- * `pymtheg link` (R1-D): a requirement linked to a Go, a Rust and a TypeScript
+ * `pymtheg link` (R1-D): requirement plan:R2 linked to a Go, a Rust and a TypeScript
  * symbol; `check` passes; a body edit makes exactly that link `changed` and
  * `check` exit 1; `refresh` makes it ok again. The edit is undone (and
  * refreshed) at the end so the project is unchanged for later steps.
@@ -989,8 +1057,8 @@ async function linkSteps(P) {
   const ids = {};
   await step({
     id: "link-requirement",
-    cmd: P(["link", "requirement", "R1", "--title", "An order is charged at most once", ...root]),
-    expect: all(exit(0), json((j) => same([j.status, j.record?.id], ["created", "plan:R1"], "requirement"))),
+    cmd: P(["link", "requirement", "R2", "--title", "Totals are computed from item prices", ...root]),
+    expect: all(exit(0), json((j) => same([j.status, j.record?.id], ["created", "plan:R2"], "requirement"))),
   });
   for (const [lang, symbol] of [
     ["go", "ComputeTotal"],
@@ -999,7 +1067,7 @@ async function linkSteps(P) {
   ])
     await step({
       id: `link-add-${lang}`,
-      cmd: P(["link", "add", "R1", symbol, ...root]),
+      cmd: P(["link", "add", "R2", symbol, ...root]),
       expect: all(
         exit(0),
         json((j) => {
@@ -1012,8 +1080,8 @@ async function linkSteps(P) {
   const allOk = ["ComputeTotal:ok", "apply_discount:ok", "formatTotal:ok"];
   await step({
     id: "link-list",
-    cmd: P(["link", "list", "--record", "R1", ...root]),
-    expect: all(exit(0), json((j) => same(states(j), allOk, "links of R1") ?? same(j.counts?.ok, 3, "ok count"))),
+    cmd: P(["link", "list", "--record", "R2", ...root]),
+    expect: all(exit(0), json((j) => same(states(j), allOk, "links of R2") ?? same(j.counts?.ok, 3, "ok count"))),
   });
   const check = (id, code, expectedStates, extra = {}) =>
     step({
