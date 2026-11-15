@@ -1,0 +1,2 @@
+Command: rg -n "assertCurrentLayout|Old Pymtheg storage layout" src test
+Result: no matches (rg exit 1). The refusal path and obsolete expectations are removed.

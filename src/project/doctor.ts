@@ -1,18 +1,35 @@
-import { stat } from "node:fs/promises";
-import { createRequire } from "node:module";
+import { printLegacyNotice } from "../storage/legacy.js";
+import { findProjectRoot, openDatabase } from "../storage/local.js";
+import { mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { identity } from "../shared/identity.js";
 import { analyseFile } from "../analysis/index.js";
 import { runBackend, type BackendOptions } from "../backends/adapter.js";
-import { openDatabase } from "../storage/local.js";
-type Check = {
+import { discoverLanguages } from "../graph/registry.js";
+import { indexProject } from "../graph/indexer.js";
+import { SqliteGraphStore } from "../graph/store.js";
+export type Check = {
   name: string;
   status: "ready" | "missing" | "incompatible" | "failed";
   detail: string;
 };
-const require = createRequire(import.meta.url);
+/** Node 24 or newer is supported; there is no upper bound. */
+export function nodeCheck(version: string = process.version): Check {
+  const major = Number(/^v?(\d+)\./.exec(version)?.[1]);
+  return Number.isInteger(major) && major >= 24
+    ? {
+        name: "Node",
+        status: "ready",
+        detail: `${version} (supported: 24 or newer)`,
+      }
+    : {
+        name: "Node",
+        status: "incompatible",
+        detail: `${version} is not supported: Pymtheg needs Node 24 or newer`,
+      };
+}
 /** A machine with one failing and one holding invariant; never written to disk. */
 const probe = `machine DoctorProbe {
   state n: Nat in 0..2 = 0;
@@ -100,60 +117,115 @@ async function storage(): Promise<Check> {
     return { name: "Storage", status: "missing", detail: String(e) };
   }
 }
-/** The Tree-sitter grammars the code graph loads (TypeScript uses its compiler). */
-async function grammars(): Promise<Check[]> {
-  const files: [string, () => string][] = [
-    [
-      "Go grammar",
-      () =>
-        fileURLToPath(
-          new URL("../../grammars/go/tree-sitter-go.wasm", import.meta.url),
-        ),
-    ],
-    [
-      "Rust grammar",
-      () => require.resolve("tree-sitter-rust/tree-sitter-rust.wasm"),
-    ],
-  ];
-  let Language: typeof import("web-tree-sitter").Language;
+/** One small source per production language module; each must index clean. */
+const graphProbes: Record<
+  string,
+  { label: string; file: string; text: string }
+> = {
+  go: {
+    label: "Go",
+    file: "probe.go",
+    text: "package probe\nfunc Probe() {}\n",
+  },
+  rust: { label: "Rust", file: "probe.rs", text: "pub fn probe() {}\n" },
+  typescript: {
+    label: "TypeScript",
+    file: "probe.ts",
+    text: "export function probe() {}\n",
+  },
+};
+/**
+ * Indexes the probe files through the production language registry, indexer
+ * and graph store, so each module loads exactly the grammar (or compiler) the
+ * code graph uses; nothing here names a grammar path.
+ */
+async function codeGraph(): Promise<Check[]> {
+  const name = (id: string) => `${graphProbes[id]?.label ?? id} code graph`;
+  let registry;
   try {
-    const sitter = await import("web-tree-sitter");
-    await sitter.Parser.init({
-      locateFile: () => require.resolve("web-tree-sitter/web-tree-sitter.wasm"),
-    });
-    Language = sitter.Language;
+    registry = await discoverLanguages();
   } catch (e) {
-    return files.map(([name]) => ({
-      name,
-      status: "missing",
-      detail: "Tree-sitter runtime unavailable: " + String(e),
+    return [
+      {
+        name: "Code graph",
+        status: "failed",
+        detail: "Language modules unavailable: " + String(e),
+      },
+    ];
+  }
+  const ids = registry.modules.map((m) => m.id);
+  const checks: Check[] = ids
+    .filter((id) => !graphProbes[id])
+    .map((id) => ({
+      name: name(id),
+      status: "failed",
+      detail: "doctor has no probe for this language module",
     }));
-  }
-  const checks: Check[] = [];
-  for (const [name, locate] of files) {
+  const probed = ids.filter((id) => graphProbes[id]);
+  const root = await mkdtemp(join(tmpdir(), "pymtheg-doctor-graph-"));
+  const store = new SqliteGraphStore(":memory:", "doctor-probe");
+  try {
+    for (const id of probed)
+      await writeFile(join(root, graphProbes[id]!.file), graphProbes[id]!.text);
+    let report;
     try {
-      const path = locate();
-      await Language.load(path);
-      checks.push({ name, status: "ready", detail: path });
+      report = await indexProject(root, registry, store);
     } catch (e) {
-      checks.push({ name, status: "missing", detail: String(e) });
+      return [
+        ...checks,
+        ...probed.map((id) => ({
+          name: name(id),
+          status: "failed" as const,
+          detail: "Indexing failed: " + String(e),
+        })),
+      ];
     }
+    const failed = new Map(
+      ((await store.failedFiles?.()) ?? []).map((f) => [f.path, f.reason]),
+    );
+    const symbols = await store.findSymbols();
+    for (const id of probed) {
+      const path = graphProbes[id]!.file;
+      const file = await store.getFile(path);
+      const count = symbols.filter((s) => s.file === path).length;
+      const problem =
+        failed.get(path) ??
+        report.errors.find((e) => e.path === path)?.message ??
+        report.analysisErrors.find((e) => e.module === id)?.message ??
+        (!file
+          ? "probe file was not indexed"
+          : file.module !== id
+            ? `probe file was claimed by ${file.module}`
+            : file.result.status !== "clean"
+              ? `probe parsed ${file.result.status}: ${file.result.diagnostics[0]?.message ?? ""}`
+              : count === 0
+                ? "probe produced no symbols"
+                : null);
+      checks.push(
+        problem
+          ? { name: name(id), status: "failed", detail: problem }
+          : {
+              name: name(id),
+              status: "ready",
+              detail: `Indexed a one-line ${path} (${count} symbol${count === 1 ? "" : "s"})`,
+            },
+      );
+    }
+    return checks;
+  } finally {
+    await store.close();
+    await rm(root, { recursive: true, force: true });
   }
-  return checks;
 }
-export async function doctor(signal: AbortSignal) {
-  const checks: Check[] = [];
-  checks.push({
-    name: "Node",
-    status:
-      Number(process.versions.node.split(".")[0]) === 24
-        ? "ready"
-        : "incompatible",
-    detail: process.version + " (supported: 24 LTS)",
-  });
+export async function doctor(
+  signal: AbortSignal,
+  options: { nodeVersion?: string } = {},
+) {
+  printLegacyNotice(findProjectRoot(process.cwd()));
+  const checks: Check[] = [nodeCheck(options.nodeVersion)];
   checks.push(...(await engines(signal)));
   checks.push(await storage());
-  checks.push(...(await grammars()));
+  checks.push(...(await codeGraph()));
   try {
     await stat(
       fileURLToPath(new URL("../../dist-web/index.html", import.meta.url)),
@@ -170,5 +242,15 @@ export async function doctor(signal: AbortSignal) {
       detail: "Run npm run build",
     });
   }
-  return { schema: "pymtheg.doctor/v1", version: identity.version, checks };
+  return {
+    schema: "pymtheg.doctor/v1",
+    version: identity.version,
+    /**
+     * Every required check ready; the CLI exits 3 otherwise. The Studio build is
+     * reported but optional: check, verify, simulate, MCP and the graph work
+     * without it, and a source checkout has it only after `npm run build`.
+     */
+    ready: checks.every((c) => c.status === "ready" || c.name === "Studio"),
+    checks,
+  };
 }

@@ -110,21 +110,23 @@ filesystem primitive, which has its own real concurrent-initializer regression.
 
 ## Local state and sharing
 
-Running init from a subfolder opens the nearest initialized project; it does not
-create a second identity inside it. Initialization creates
+A folder inside an initialised project uses that project; init names the workspace and its root.
+A nested Git root gets its own project.
+
+Initialization creates
 `.pymtheg/project.json`, `.pymtheg/settings.json` and `.pymtheg/.gitignore`. That
 ignore file excludes `.pymtheg/shared/` and `.pymtheg/rebuildable/`. No database
 is created by initialization or a document preview.
 
-| Path | Holds | Kind |
-|---|---|---|
-| `.pymtheg/project.json` | Stable workspace identity | Commit |
-| `.pymtheg/settings.json` | Project configuration and scenarios | Commit |
+| Path                                  | Holds                                                                                                                  | Kind                                                      |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| `.pymtheg/project.json`               | Stable workspace identity                                                                                              | Commit                                                    |
+| `.pymtheg/settings.json`              | Project configuration and scenarios                                                                                    | Commit                                                    |
 | `.pymtheg/shared/architecture.sqlite` | Requirements, links, decisions, retained observations, checkpoint history, recorded-change ledger, architecture drafts | Shared data, local database; share it by exported history |
-| `.pymtheg/shared/drafts.sqlite` | Unsaved Studio buffers and form/context drafts | Authored, local |
-| `.pymtheg/local/writer.json` | This installation's writer identity and author label | Local only; ignores itself; never copy to another machine |
-| `.pymtheg/rebuildable/graph.sqlite` | Code graph cache | Rebuildable; ignores itself |
-| `.pymtheg/rebuildable/runs.sqlite` | The three most recent Studio runs | Rebuildable; ignores itself |
+| `.pymtheg/shared/drafts.sqlite`       | Unsaved Studio buffers and form/context drafts                                                                         | Authored, local                                           |
+| `.pymtheg/local/writer.json`          | This installation's writer identity and author label                                                                   | Local only; ignores itself; never copy to another machine |
+| `.pymtheg/rebuildable/graph.sqlite`   | Code graph cache                                                                                                       | Rebuildable; ignores itself                               |
+| `.pymtheg/rebuildable/runs.sqlite`    | The three most recent Studio runs                                                                                      | Rebuildable; ignores itself                               |
 
 Deleting `.pymtheg/rebuildable/` loses nothing that cannot be regenerated.
 Commit `.pymtheg/project.json`, `.pymtheg/settings.json`, `.pym` files and ordinary
@@ -132,16 +134,22 @@ design documents with the project.
 
 Old layouts (`.pymtheg.json`, `.pymtheg-architecture/`, `.pymtheg-studio/`,
 `.pymtheg-implementation-links.json`, `.pymtheg-observed-code.json`,
-`.pymtheg-heading-identities.json` or `.pymtheg-source-contracts.json` in the
-project root) are not migrated or read. A command that reads or writes managed
-project state refuses such a root with "Old Pymtheg storage layout … No migration
-is provided" and changes nothing: `init`, `studio`, `mcp`, `import-architecture`
-(including previews), `scaffold`, `observe` captures, `check --check-scope
-related|project`, and any analysis command given `--scenario`. File-scope
-`check`, `verify`, `simulate` and `emit` without `--scenario`, and `observe --list`,
-`fmt`, `doctor`, help and version, still work in such a folder. Preserve or export
-the old data with the previous version, then initialize a new project. Upward
-discovery stops at the nearest `.pymtheg/` or Git root.
+`.pymtheg-heading-identities.json` and `.pymtheg-source-contracts.json`) are unused
+dead data. Pymtheg never reads, migrates or deletes them, and their presence does
+not affect discovery or refuse any command. Only `init` and `doctor` print one
+short notice naming the entries found at the project root and saying they are
+unused and safe to delete. The notice is text on stderr, leaving JSON output
+intact. Nothing is deleted automatically. Discovery stops at the nearest
+`.pymtheg/` or Git root.
+
+Re-running `init` reports the opened workspace and root and leaves complete
+metadata unchanged. If initialization was interrupted, running it again creates
+missing metadata while preserving existing settings and identity. Unpublished
+`*.tmp` staging files are ignored and left untouched. Invalid metadata is reported
+with its path and repair guidance; permission errors ask for a writable directory.
+After initialization, run `pymtheg doctor`, `pymtheg studio .`, and `pymtheg mcp`.
+Planning databases and rebuildable caches are created only when a feature needs
+them, rather than by `init` itself.
 
 To share planning records and their revisions, choose **Architecture → Export
 all history**, then put the resulting `pymtheg-architecture-history.json` in your
@@ -163,7 +171,6 @@ resolved preview before importing. The CLI equivalent is `init --import-docs
 --format json`, followed by `--resolutions choices.json` containing the displayed
 path, localHash, incomingHash and chosen resolution. `--allow-broken-links` is a
 separate explicit choice for an import that leaves planning links unresolved.
-
 
 Folder discovery imports visible documentation only. Dotfile documents and hidden
 directories are excluded consistently by CLI and Studio, including WebKit folder

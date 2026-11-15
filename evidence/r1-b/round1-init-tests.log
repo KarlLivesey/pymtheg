@@ -1,0 +1,23 @@
+Fresh mirror: no dist-web; java absent from PATH; PYM_TLC_JAR unset
+✔ clean init and live commands: empty-git (7009.824474ms)
+✔ clean init and live commands: non-git (7337.5639ms)
+✔ clean init and live commands: mixed-code (13189.973095ms)
+✔ clean init and live commands: legacy-ignored (7958.335144ms)
+✔ clean init and live commands: legacy-untracked (7524.264422ms)
+✔ clean init and live commands: path with spaces (8943.599911ms)
+✔ nested folders and monorepo packages open their parent; a nested Git root is independent (2073.011556ms)
+✔ init recovers from interrupted publication steps without changing existing metadata (3246.716751ms)
+✔ read-only and invalid metadata errors identify the path and corrective action (831.164707ms)
+✔ help and no-argument first run direct users to init (505.646836ms)
+✔ this repository initializes and serves commands with fake legacy data, without touching the original checkout (129159.390814ms)
+✔ name and ownership errors never suggest repairing valid metadata (1768.926096ms)
+✔ read-only metadata reports the directory rather than a staging file (375.936069ms)
+✔ printed next commands quote shell metacharacters literally (409.374961ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 190687.663876
