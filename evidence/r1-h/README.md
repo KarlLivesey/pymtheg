@@ -22,6 +22,13 @@ run's scratch directory and checked against `SHASUMS256.txt`.
   and `tarball-smoke-after.json` (this branch): every step passes in both;
   `node_modules` 88,964,435 → 52,960,811 bytes, 134 → 11 packages,
   `npm warn` lines 6 → 0.
+- Round 1 (head after merging main, fresh mirror, Java hidden): `npm test`
+  2,806 passed, 0 skipped; `npm run format:check` passes; `npm run test:backend`
+  96 passed plus the existing Rust skip; licence `--check` passes; `npm pack`
+  831 files (1.8 MB packed, 9.1 MB unpacked) after `docs/` was trimmed to user
+  documentation; the tarball smoke passes with 51,337,201 bytes, 11 packages and
+  no warnings; `test/r1h-packaging.test.mjs` (warning filter overloads) passes
+  on official Node 24.0.0 and 25.2.1.
 - `npx-signal-probe.mjs`, `noexec-sh`, `npx-signals.jsonl`: one SIGINT to the
   `npx ./pymtheg-1.0.0.tgz studio|mcp` process after readiness. With npm's
   default `sh` (which replaces itself with the command on this host) nothing
