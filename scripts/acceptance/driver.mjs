@@ -22,6 +22,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
+import { BACKEND_ARGUMENT, BACKEND_PROGRAM, TOOLCHAIN_PROGRAM, wordingHits } from "./wording.mjs";
 
 const [scenario, phase] = process.argv.slice(2);
 const ACC = "/acc";
@@ -31,6 +32,9 @@ const SHIM_LOG = join(OUT, "shim.log");
 const SPAWN_LOG = join(OUT, "spawn.log");
 const HOME = process.env.HOME ?? "/home/node";
 const PROJECT = join(HOME, "project");
+const DESIGN = join(PROJECT, "designs/order.pym");
+const BROKEN = join(PROJECT, "designs/broken.pym");
+const BROKEN_DIAGNOSTIC = `${BROKEN}:7:27 error N002: Unknown value or variant charge; did you mean charges?`;
 const TGZ = join(
   ACC,
   "pkg",
@@ -38,13 +42,9 @@ const TGZ = join(
 );
 const GLOBAL_PREFIX = join(HOME, ".npm-global");
 const APP = join(HOME, "app");
-const ELSEWHERE = join(HOME, "elsewhere");
-
-/** Words a user must not see once R1-A has removed the external backends. */
-const WORDING = /\b(java|quint|tlc|tla\+|tla2tools|apalache|jvm)\b/gi;
-/** Programs Pymtheg must not start on its own on a clean machine. */
-const FORBIDDEN_FILE = /^(java|quint|go|cargo|rustc|rustup|tlc)$/;
-const FORBIDDEN_ARG = /@informalsystems[/\\]quint|tla2tools|\.jar$/;
+const NODE_VERSION = process.version;
+/** Source files in the sample project: web 3 (TypeScript), service 4 (Go), engine 2 (Rust). */
+const SAMPLE_SOURCE_FILES = 9;
 
 const baseEnv = {
   ...process.env,
@@ -61,21 +61,28 @@ const baseEnv = {
 
 // ---------------------------------------------------------------- running
 
+function killGroup(child, signal) {
+  // npx does not forward signals, so signal the whole process group, as a
+  // terminal's Ctrl-C does.
+  try {
+    process.kill(-child.pid, signal);
+  } catch {
+    try {
+      child.kill(signal);
+    } catch {}
+  }
+}
+
 function run(cmd, { cwd = PROJECT, env = baseEnv, timeoutMs = 900_000 } = {}) {
   return new Promise((resolve) => {
     const started = process.hrtime.bigint();
-    const child = spawn(cmd[0], cmd.slice(1), {
-      cwd,
-      env,
-      stdio: ["ignore", "pipe", "pipe"],
-      detached: true, // own process group, so a safety stop reaches npx's children too
-    });
+    const child = spawn(cmd[0], cmd.slice(1), { cwd, env, stdio: ["ignore", "pipe", "pipe"], detached: true });
     const out = [],
       err = [];
     let timedOut = false;
     const peak = watchMemory(child.pid);
+    // A safety stop for a hung step, never a speed assertion.
     const timer = setTimeout(() => {
-      // A safety stop for a hung step, never a speed assertion.
       timedOut = true;
       killGroup(child, "SIGKILL");
     }, timeoutMs);
@@ -84,13 +91,12 @@ function run(cmd, { cwd = PROJECT, env = baseEnv, timeoutMs = 900_000 } = {}) {
     child.on("error", (e) => err.push(Buffer.from(String(e))));
     child.on("close", (code, signal) => {
       clearTimeout(timer);
-      const peakKiB = peak.stop();
       resolve({
         exitCode: code,
         signal,
         timedOut,
         durationMs: Number(process.hrtime.bigint() - started) / 1e6,
-        peakRssKiB: peakKiB,
+        peakRssKiB: peak.stop(),
         stdout: Buffer.concat(out).toString("utf8"),
         stderr: Buffer.concat(err).toString("utf8"),
       });
@@ -102,26 +108,24 @@ function run(cmd, { cwd = PROJECT, env = baseEnv, timeoutMs = 900_000 } = {}) {
 function watchMemory(rootPid) {
   let peak = 0;
   const sample = () => {
-    try {
-      const children = new Map();
-      for (const pid of readdirSync("/proc").filter((p) => /^\d+$/.test(p))) {
-        try {
-          const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
-          const ppid = Number(stat.slice(stat.lastIndexOf(")") + 2).split(" ")[1]);
-          if (!children.has(ppid)) children.set(ppid, []);
-          children.get(ppid).push(Number(pid));
-        } catch {}
-      }
-      const queue = [rootPid];
-      while (queue.length) {
-        const pid = queue.pop();
-        try {
-          const m = /VmHWM:\s+(\d+)/.exec(readFileSync(`/proc/${pid}/status`, "utf8"));
-          if (m) peak = Math.max(peak, Number(m[1]));
-        } catch {}
-        queue.push(...(children.get(pid) ?? []));
-      }
-    } catch {}
+    const children = new Map();
+    for (const pid of readdirSync("/proc").filter((p) => /^\d+$/.test(p))) {
+      try {
+        const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+        const ppid = Number(stat.slice(stat.lastIndexOf(")") + 2).split(" ")[1]);
+        if (!children.has(ppid)) children.set(ppid, []);
+        children.get(ppid).push(Number(pid));
+      } catch {}
+    }
+    const queue = [rootPid];
+    while (queue.length) {
+      const pid = queue.pop();
+      try {
+        const m = /VmHWM:\s+(\d+)/.exec(readFileSync(`/proc/${pid}/status`, "utf8"));
+        if (m) peak = Math.max(peak, Number(m[1]));
+      } catch {}
+      queue.push(...(children.get(pid) ?? []));
+    }
   };
   const timer = setInterval(sample, 200);
   sample();
@@ -133,64 +137,50 @@ function watchMemory(rootPid) {
   };
 }
 
-/** Signal a whole process group, as a terminal's Ctrl-C does (npx does not forward signals). */
-function killGroup(child, signal) {
-  try {
-    process.kill(-child.pid, signal);
-  } catch {
-    try {
-      child.kill(signal);
-    } catch {}
-  }
-}
-
 function resetTraces() {
   writeFileSync(SHIM_LOG, "");
   writeFileSync(SPAWN_LOG, "");
 }
+
+/** Every backend or toolchain process started during the step, from the PATH shims and the spawn trace. */
 function readTraces() {
-  const shims = readFileSync(SHIM_LOG, "utf8").split("\n").filter(Boolean);
-  const spawns = readFileSync(SPAWN_LOG, "utf8")
-    .split("\n")
-    .filter(Boolean)
-    .map((line) => {
-      try {
-        return JSON.parse(line);
-      } catch {
-        return null;
-      }
-    })
-    .filter(Boolean)
-    .filter(
-      (s) =>
-        FORBIDDEN_FILE.test(s.file.split("/").pop()) ||
-        s.args.some((a) => FORBIDDEN_ARG.test(a)),
-    )
-    .map((s) => {
-      const file = s.file.split("/").pop();
-      // Name the tool even when it is started as `node …/quint/dist/src/cli.js`.
-      const tool = FORBIDDEN_FILE.test(file)
-        ? file
-        : s.args.some((a) => /quint/.test(a))
+  const calls = [];
+  for (const line of readFileSync(SHIM_LOG, "utf8").split("\n").filter(Boolean))
+    calls.push({ tool: line.split(" ")[0], detail: `shim: ${line}` });
+  for (const line of readFileSync(SPAWN_LOG, "utf8").split("\n").filter(Boolean)) {
+    let s;
+    try {
+      s = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    const file = s.file.split("/").pop();
+    const args = s.args.join(" ");
+    const tool = BACKEND_PROGRAM.test(file) || TOOLCHAIN_PROGRAM.test(file)
+      ? file
+      : s.args.some((a) => BACKEND_ARGUMENT.test(a))
+        ? /quint/i.test(args)
           ? "quint"
-          : "tlc";
-      return `${tool} (${file} ${s.args.slice(0, 3).join(" ")})`.trim();
-    });
-  return [...new Set([...shims, ...spawns])];
+          : "java"
+        : null;
+    if (tool) calls.push({ tool, detail: `spawn: ${file} ${s.args.slice(0, 3).join(" ")}`.trim() });
+  }
+  return calls;
 }
 
-function wordingHits(text) {
-  const hits = new Set();
-  for (const line of text.split("\n")) {
-    WORDING.lastIndex = 0;
-    if (WORDING.test(line)) hits.add(line.trim().slice(0, 160));
-    if (hits.size >= 3) break;
-  }
-  return [...hits];
+/** Node's own process warnings on stderr, e.g. `(node:12) ExperimentalWarning: …`. */
+function nodeWarnings(stderr) {
+  return stderr.split("\n").filter((l) => /^\(node:\d+\) \w*Warning: /.test(l) || /^\(Use `node --trace-warnings/.test(l));
+}
+const SQLITE_WARNING = /^\(node:\d+\) ExperimentalWarning: SQLite is an experimental feature and might change at any time$/;
+const TRACE_HINT = /^\(Use `node --trace-warnings \.\.\.` to show where the warning was created\)$/;
+/** R1-H: exactly the SQLite warning, on exactly Node 24.0.x and 25.x, is the one known warning gap. */
+function isKnownSqliteWarning(lines) {
+  return /^v24\.0\.|^v25\./.test(NODE_VERSION) && lines.length > 0 && lines.every((l) => SQLITE_WARNING.test(l) || TRACE_HINT.test(l)) && lines.some((l) => SQLITE_WARNING.test(l));
 }
 
 function excerpt(text, max = 360) {
-  const t = text.replace(/\s+\n/g, "\n").trim();
+  const t = String(text).replace(/\s+\n/g, "\n").trim();
   return t.length <= max ? t : t.slice(0, max / 2) + " … " + t.slice(-max / 2);
 }
 
@@ -198,9 +188,8 @@ function parseJson(text) {
   try {
     return JSON.parse(text);
   } catch {
-    const last = text.trim().split("\n").pop();
     try {
-      return JSON.parse(last);
+      return JSON.parse(String(text).trim().split("\n").pop());
     } catch {
       return null;
     }
@@ -209,17 +198,8 @@ function parseJson(text) {
 
 // ---------------------------------------------------------------- recording
 
-const scenarioOptions = { observeOnly: false, forbidAll: true };
-const forbiddenSeen = [];
+const scenarioOptions = { reportOnly: false };
 
-/**
- * Classify one step. Statuses:
- *  pass          expectation met, no forbidden tool, no Java/Quint/TLC wording
- *  expected-fail the step must fail (a broken design) and failed usefully
- *  known-gap     every problem is attributed to a named chunk still in flight
- *  fail          anything else
- *  observed      report-only step (timings, sizes, node-version edges)
- */
 /** A note or fingerprint must never crash the run; a broken one reads as such. */
 function safe(fn, r) {
   if (!fn) return undefined;
@@ -230,51 +210,60 @@ function safe(fn, r) {
   }
 }
 
-function record(step, r) {
+/**
+ * Classify one step. Statuses:
+ *  pass          every expectation met; no backend or unrequested toolchain
+ *                process; no Java/Quint/TLC wording; no Node process warning
+ *  expected-fail the step must fail (a broken design) and failed exactly as specified
+ *  known-gap     the ONLY problem is the expectation failure, and the step's own
+ *                gap matcher recognises the exact output that chunk will change
+ *                (exact exit code and message); or the R1-H SQLite warning on
+ *                Node 24.0.x / 25.x and nothing else
+ *  fail          anything else, including a crash, an unexpected exit code or
+ *                an exception inside the harness
+ *  observed      report-only step (sizes, timings)
+ */
+function record(def, r) {
   const problems = [];
-  const gaps = new Set();
   const text = (r.stdout ?? "") + "\n" + (r.stderr ?? "");
-  const expectation = step.expect ? step.expect(r) : null;
-  if (expectation) {
-    const gap = (step.gaps ?? []).find((g) => g.when(r));
-    if (gap) gaps.add(gap.chunk);
-    problems.push({ reason: expectation, chunk: gap?.chunk ?? null });
+  if (r.harnessError) problems.push({ kind: "harness", reason: r.harnessError });
+  const expectation = def.expect ? safe(def.expect, r) : null;
+  if (expectation) problems.push({ kind: "expect", reason: expectation });
+  const words = def.skipWording ? [] : wordingHits(text);
+  if (words.length) problems.push({ kind: "wording", reason: `mentions Java/Quint/TLC: ${words[0]}` });
+  for (const call of r.calls ?? []) {
+    if (TOOLCHAIN_PROGRAM.test(call.tool) && def.allowToolchain) continue;
+    problems.push({ kind: "process", reason: `started ${call.tool} (${call.detail})` });
   }
-  const words = step.skipWording ? [] : wordingHits(text);
-  if (words.length)
-    problems.push({ reason: `mentions Java/Quint/TLC: ${words[0]}`, chunk: "R1-A" });
-  const forbidden = r.forbidden ?? [];
-  if (forbidden.length) {
-    forbiddenSeen.push({ step: step.id, calls: forbidden });
-    const onlyBackends = forbidden.every((c) => /^(java|quint|tlc)\b/.test(c));
-    const allowed = step.allowToolchain && forbidden.every((c) => /^(go|cargo|rustc)\b/.test(c));
-    if (!allowed)
-      problems.push({
-        reason: `started ${forbidden.join("; ")}`,
-        chunk: onlyBackends ? "R1-A" : null,
-      });
-  }
+  const warnings = def.skipWarnings ? [] : nodeWarnings(r.stderr ?? "");
+  if (warnings.length) problems.push({ kind: "node-warning", reason: `Node warning: ${warnings[0]}`, sqlite: isKnownSqliteWarning(warnings) });
+
   let status, reason, chunk;
-  if (step.observe || scenarioOptions.observeOnly) {
+  const gapOf = (p) => {
+    if (p.kind === "node-warning" && p.sqlite) return "R1-H";
+    if (p.kind === "expect" && def.gap && safe(def.gap.when, r) === true) return def.gap.chunk;
+    return null;
+  };
+  if (def.observe || (scenarioOptions.reportOnly && def.observe !== false)) {
     status = "observed";
-    reason = problems.length ? "would fail: " + problems.map((p) => p.reason).join(" | ") : safe(step.note, r) ?? "ok";
+    reason = problems.length ? "problems: " + problems.map((p) => p.reason).join(" | ") : safe(def.note, r) ?? "ok";
   } else if (!problems.length) {
-    status = step.expectFail ? "expected-fail" : "pass";
-    reason = safe(step.note, r) ?? (step.expectFail ? "failed as designed with a diagnostic" : "ok");
-  } else if (problems.every((p) => p.chunk)) {
+    status = def.expectFail ? "expected-fail" : "pass";
+    reason = safe(def.note, r) ?? (def.expectFail ? "failed exactly as specified" : "ok");
+  } else if (problems.every(gapOf)) {
     status = "known-gap";
-    chunk = [...new Set(problems.map((p) => p.chunk))].join(", ");
-    reason = problems.map((p) => p.reason).join(" | ");
+    chunk = [...new Set(problems.map(gapOf))].join(", ");
+    reason = problems.map((p) => (p.kind === "expect" && def.gap ? `${def.gap.reason} (${p.reason})` : p.reason)).join(" | ");
   } else {
     status = "fail";
     reason = problems.map((p) => p.reason).join(" | ");
   }
   const result = {
     scenario,
-    step: step.id,
-    command: step.display ?? (step.cmd ? step.cmd.join(" ") : step.id),
+    step: def.id,
+    command: def.display ?? (def.cmd ? def.cmd.join(" ") : def.id),
     network: phase === "install",
-    required: step.required !== false && !scenarioOptions.observeOnly && !step.observe,
+    required: !def.observe && def.required !== false,
     exitCode: r.exitCode ?? null,
     status,
     reason,
@@ -283,12 +272,13 @@ function record(step, r) {
     durationMs: r.durationMs === undefined ? null : Math.round(r.durationMs),
     ...(r.peakRssKiB ? { peakRssKiB: r.peakRssKiB } : {}),
     ...(r.timedOut ? { timedOut: true } : {}),
+    ...(r.calls?.length ? { processes: r.calls.map((c) => c.detail) } : {}),
     excerpt: excerpt(text),
-    ...(step.fingerprint ? { fingerprint: safe(step.fingerprint, r) } : {}),
-    ...(step.observation ? { observation: safe(step.observation, r) } : {}),
+    ...(def.fingerprint ? { fingerprint: safe(def.fingerprint, r) } : {}),
+    ...(def.observation ? { observation: safe(def.observation, r) } : {}),
   };
   appendFileSync(RESULTS, JSON.stringify(result) + "\n");
-  process.stdout.write(`${status.padEnd(13)} ${scenario}/${step.id}: ${reason.slice(0, 200)}\n`);
+  process.stdout.write(`${status.padEnd(13)} ${scenario}/${def.id}: ${reason.slice(0, 220)}\n`);
   return result;
 }
 
@@ -296,12 +286,14 @@ async function step(def) {
   resetTraces();
   let r;
   try {
-    r = def.run ? await def.run() : await run(def.cmd, { cwd: def.cwd, env: def.env });
+    r = def.run ? await def.run() : await run(def.cmd, { cwd: def.cwd });
   } catch (e) {
-    r = { exitCode: null, stdout: "", stderr: `harness error: ${e?.stack ?? e}` };
+    r = { exitCode: null, stdout: "", stderr: "", harnessError: `harness error: ${e?.stack ?? e}` };
   }
-  r.forbidden = readTraces();
-  r.json = r.json ?? parseJson(r.stdout ?? "");
+  r.stdout ??= "";
+  r.stderr ??= "";
+  r.calls = readTraces();
+  r.json = r.json ?? parseJson(r.stdout);
   return record(def, r);
 }
 
@@ -324,10 +316,24 @@ const all =
     }
     return null;
   };
-const has = (pattern, what) => (r) =>
-  pattern.test(r.stdout + "\n" + r.stderr) ? null : `output lacks ${what}`;
-const linkNames = (r, side) =>
-  (r.json?.data?.links ?? []).map((l) => `${l[side]?.name ?? l.targetName}:${l.certainty}`);
+const includes = (needle, what = JSON.stringify(needle)) => (r) =>
+  (r.stdout + "\n" + r.stderr).includes(needle) ? null : `output lacks ${what}`;
+const json = (check) => (r) => (r.json ? check(r.json) : "stdout is not JSON");
+const same = (actual, expected, what) =>
+  JSON.stringify(actual) === JSON.stringify(expected) ? null : `${what}: got ${JSON.stringify(actual)}, expected ${JSON.stringify(expected)}`;
+
+/** Exact callers: the set of (caller name, caller file, certainty) and the target name of every link. */
+function callers(symbol, expected) {
+  return all(exit(0), json((j) => {
+    if (j.status !== "ok") return `status ${j.status}`;
+    const links = j.data?.links ?? [];
+    const got = links.map((l) => `${l.source?.name}@${l.source?.file}:${l.certainty}`).sort();
+    const want = expected.map(([name, file]) => `${name}@${file}:definite`).sort();
+    const targets = [...new Set(links.map((l) => l.target?.name))];
+    return same(got, want, `callers of ${symbol}`) ?? same(targets, [symbol], "link targets");
+  }));
+}
+const linkSummary = (r) => (r.json?.data?.links ?? []).map((l) => `${l.source?.name}@${l.source?.file}:${l.certainty}`).join(", ");
 
 // ---------------------------------------------------------------- MCP client
 
@@ -400,26 +406,42 @@ class Mcp {
   }
 }
 
+/** True when some object nested in `value` satisfies `predicate`. */
+function hasDeep(value, predicate) {
+  if (!value || typeof value !== "object") return false;
+  if (!Array.isArray(value) && predicate(value)) return true;
+  return Object.values(value).some((v) => hasDeep(v, predicate));
+}
+
+/** The JSON content of a tools/call answer: structuredContent, else the first text block parsed. */
+function toolContent(response) {
+  const result = response?.result;
+  if (!result) return null;
+  if (result.structuredContent) return result.structuredContent;
+  const text = result.content?.find((c) => c.type === "text")?.text;
+  return text ? parseJson(text) : null;
+}
+
 async function mcpSteps(pym) {
   const mcp = new Mcp(pym(["mcp", PROJECT]), PROJECT);
   let tools = [];
-  const call = async (id, fn, def) =>
+  const call = (id, display, fn, def = {}) =>
     step({
       id,
-      display: def.display,
-      expect: def.expect,
-      gaps: def.gaps,
-      required: def.required,
+      display,
+      ...def,
       run: async () => {
         const value = await fn();
-        const io = mcp.take();
-        return { ...io, exitCode: null, json: value };
+        return { ...mcp.take(), exitCode: null, json: value };
       },
     });
-  const noError = (r) =>
-    r.json?.error ? `JSON-RPC error: ${r.json.error.message}` : r.json?.result ? null : "no result";
+  const rpcError = (r) => (r.json?.error ? `JSON-RPC error: ${r.json.error.message}` : null);
+  const toolError = (r) => rpcError(r) ?? (!r.json?.result ? "no result" : r.json.result.isError ? `tool returned isError: ${excerpt(JSON.stringify(r.json.result.content ?? ""), 200)}` : null);
+  const toolCall = (name, args) => mcp.request("tools/call", { name, arguments: args });
+
   await call(
     "mcp-initialize",
+    "pymtheg mcp PROJECT (stdio) → initialize",
     async () => {
       const response = await mcp.request("initialize", {
         protocolVersion: "2025-06-18",
@@ -429,107 +451,129 @@ async function mcpSteps(pym) {
       mcp.notify("notifications/initialized", {});
       return response;
     },
-    { display: "pymtheg mcp PROJECT (stdio) → initialize", expect: noError },
+    { expect: (r) => rpcError(r) ?? (r.json?.result?.serverInfo?.name ? null : "no serverInfo in initialize result") },
   );
   await call(
     "mcp-tools-list",
+    "tools/list (descriptions included in the wording check)",
     async () => {
       const response = await mcp.request("tools/list", {});
       tools = response.result?.tools ?? [];
-      // Tool descriptions are output too: keep them in the wording check.
-      mcp.stdout += "";
       return response;
     },
     {
-      display: "tools/list",
-      expect: all(noError, (r) =>
-        (r.json.result.tools ?? []).some((t) => t.name === "check_design") ? null : "no check_design tool",
-      ),
+      expect: (r) => {
+        const names = (r.json?.result?.tools ?? []).map((t) => t.name);
+        const missing = ["check_design", "read_run", "explore_behaviour", "project_info"].filter((n) => !names.includes(n));
+        return rpcError(r) ?? (missing.length ? `missing tools: ${missing.join(", ")}` : null);
+      },
+      note: (r) => `${r.json.result.tools.length} tools`,
     },
   );
-  const toolCall = (name, args) => mcp.request("tools/call", { name, arguments: args });
-  await call("mcp-check-design", () => toolCall("check_design", { file: "designs/order.pym" }), {
-    display: 'tools/call check_design {file:"designs/order.pym"}',
-    expect: all(noError, (r) => (r.json.result.isError ? "tool returned isError" : null)),
-  });
+  await call(
+    "mcp-check-design",
+    'tools/call check_design {file:"designs/order.pym"}',
+    () => toolCall("check_design", { file: "designs/order.pym" }),
+    {
+      expect: (r) => {
+        const s = toolContent(r.json);
+        return (
+          toolError(r) ??
+          (!s ? "no structured result" : same({ exitStatus: s.exitStatus, errors: s.findings?.errors, warnings: s.findings?.warnings }, { exitStatus: 0, errors: 0, warnings: 0 }, "valid design verdict"))
+        );
+      },
+    },
+  );
   await call(
     "mcp-check-broken",
+    'tools/call check_design {file:"designs/broken.pym"}, then read_run {section:"findings"}',
     async () => {
       const checked = await toolCall("check_design", { file: "designs/broken.pym" });
-      const runId = checked.result?.structuredContent?.runId;
-      if (!runId) return checked;
-      const findings = await toolCall("read_run", { runId, section: "findings" });
-      return { ...findings, checked: checked.result?.structuredContent };
+      const summary = toolContent(checked);
+      const findings = summary?.runId ? await toolCall("read_run", { runId: summary.runId, section: "findings" }) : null;
+      return { checked, summary, findings, findingsContent: toolContent(findings) };
     },
     {
-      display: 'tools/call check_design {file:"designs/broken.pym"} then read_run {section:"findings"}',
-      expect: all(noError, (r) =>
-        /\bcharge\b/.test(JSON.stringify(r.json.result)) ? null : "findings do not name the undeclared `charge`",
-      ),
+      expect: (r) => {
+        const { summary, findingsContent } = r.json;
+        if (!summary) return "check_design gave no structured result";
+        if (summary.exitStatus !== 1) return `exitStatus ${summary.exitStatus}, expected 1`;
+        if (!(summary.findings?.errors >= 1)) return `errors ${summary.findings?.errors}, expected at least 1`;
+        const items = findingsContent?.items ?? [];
+        const hit = items.find((i) => {
+          const s = JSON.stringify(i);
+          return s.includes("Unknown value or variant charge") && hasDeep(i, (o) => o.line === 7 && o.column === 27);
+        });
+        return hit ? null : `no finding at line 7, column 27 with "Unknown value or variant charge" (got ${excerpt(JSON.stringify(items), 200)})`;
+      },
     },
   );
-  // Behaviour exploration over MCP: an agent on a clean machine must get the
-  // same built-in verify/simulate as the CLI, not a missing-Java failure.
   for (const method of ["verify", "simulate"])
     await call(
       `mcp-explore-${method}`,
-      async () => {
-        const explored = await toolCall("explore_behaviour", { file: "designs/order.pym", entry: "Order", method, maxSteps: 6, maxSamples: 200 });
-        const runId = explored.result?.structuredContent?.runId;
-        // The summary carries no reason; the properties section does.
-        const properties = runId ? await toolCall("read_run", { runId, section: "properties" }) : null;
-        return { ...explored, properties: properties?.result?.structuredContent ?? properties?.result ?? null };
-      },
+      `tools/call explore_behaviour {entry:"Order", method:"${method}"}`,
+      () => toolCall("explore_behaviour", { file: "designs/order.pym", entry: "Order", method, maxSteps: 6, maxSamples: 200 }),
       {
-        display: `tools/call explore_behaviour {entry:"Order", method:"${method}"}`,
-        expect: all(noError, (r) => {
-          const summary = r.json.result.structuredContent ?? {};
-          return r.json.result.isError || summary.exitStatus !== 0
-            ? `exitStatus ${summary.exitStatus}${r.json.result.isError ? ", isError" : ""}: ${excerpt(JSON.stringify(r.json.properties ?? {}), 240)}`
-            : null;
-        }),
-        note: (r) => excerpt(JSON.stringify(r.json?.properties ?? {}), 200),
-        gaps: [{ chunk: "R1-A", when: (r) => /java|tlc|quint|tla/i.test(JSON.stringify(r.json?.properties ?? r.json?.result ?? {})) }],
+        expect: (r) => {
+          const s = toolContent(r.json);
+          if (toolError(r)) return toolError(r);
+          if (!s) return "no structured result";
+          return same(
+            { exitStatus: s.exitStatus, exhaustive: s.results?.exhaustive, counterexamples: s.results?.counterexamples, unresolved: s.results?.unresolved },
+            { exitStatus: 0, exhaustive: method === "verify", counterexamples: 0, unresolved: 0 },
+            `${method} verdict`,
+          );
+        },
       },
     );
-  const graphTool = () => tools.find((t) => /graph/i.test(t.name));
+  // R1-C (PR 40): the code-graph tool. Until it is in the build, the only
+  // accepted shortfall is its absence from tools/list.
   await call(
-    "mcp-graph-tool",
+    "mcp-code-graph",
+    'tools/call code_graph {action:"callers", query:"formatTotal"}',
     async () => {
-      const tool = graphTool();
-      if (!tool) return { result: { absent: true, tools: tools.map((t) => t.name) } };
-      const props = Object.keys(tool.inputSchema?.properties ?? {});
-      const args = props.includes("command") ? { command: "status" } : {};
-      return { tool: tool.name, ...(await toolCall(tool.name, args)) };
+      if (!tools.some((t) => t.name === "code_graph")) return { absent: true };
+      let answer = await toolCall("code_graph", { action: "callers", query: "formatTotal" });
+      let content = toolContent(answer);
+      if (content?.jobId && content?.state !== "complete" && !JSON.stringify(content).includes("renderBasket")) {
+        answer = await toolCall("graph_result", { jobId: content.jobId, wait: true });
+        content = toolContent(answer);
+      }
+      return { answer, content };
     },
     {
-      display: "tools/call <graph tool> (status)",
-      expect: (r) =>
-        r.json?.result?.absent
-          ? "no graph tool over MCP"
-          : r.json?.error
-            ? `JSON-RPC error: ${r.json.error.message}`
-            : r.json?.result?.isError
-              ? "graph tool returned isError"
-              : null,
-      gaps: [{ chunk: "R1-C", when: (r) => !!r.json?.result?.absent }],
+      expect: (r) => {
+        if (r.json.absent) return "tool code_graph is not in tools/list";
+        if (r.json.answer?.result?.isError || r.json.answer?.error) return `code_graph error: ${excerpt(JSON.stringify(r.json.answer), 200)}`;
+        const s = JSON.stringify(r.json.content ?? {});
+        return s.includes("renderBasket") && s.includes("definite") ? null : `callers of formatTotal lack definite renderBasket: ${excerpt(s, 200)}`;
+      },
+      gap: { chunk: "R1-C", reason: "tool `code_graph` not in the tool list", when: (r) => r.json?.absent === true },
     },
   );
+  // R1-D (PR 38) has no MCP tool yet. When one appears, this step fails until
+  // the harness exercises it: a present-but-untested tool never passes.
   await call(
     "mcp-requirement-links",
-    async () => ({ result: { tools: tools.map((t) => t.name) } }),
+    "tools/list has a requirement-to-symbol link tool",
+    async () => ({ names: tools.map((t) => t.name) }),
     {
-      display: "tools/list contains a requirement-to-symbol link tool",
-      expect: (r) =>
-        r.json.result.tools.some((n) => /link/i.test(n) && /(requirement|symbol|code)/i.test(n))
-          ? null
-          : "no requirement-to-symbol link tool over MCP",
-      gaps: [{ chunk: "R1-D", when: () => true }],
+      expect: (r) => {
+        const found = r.json.names.filter((n) => /code_link|requirement/.test(n));
+        return found.length
+          ? `requirement-link tool(s) ${found.join(", ")} present but not exercised by this harness: extend mcpSteps`
+          : "no tool named *code_link* or *requirement* in the tool list";
+      },
+      gap: {
+        chunk: "R1-D",
+        reason: "no tool named *code_link* or *requirement* in the tool list",
+        when: (r) => !r.json.names.some((n) => /code_link|requirement/.test(n)),
+      },
     },
   );
   await step({
     id: "mcp-shutdown",
-    display: "close stdin; server exits",
+    display: "close stdin; server exits 0",
     expect: exit(0),
     run: async () => ({ exitCode: await mcp.close(), ...mcp.take() }),
   });
@@ -538,12 +582,8 @@ async function mcpSteps(pym) {
 // ---------------------------------------------------------------- Studio
 
 async function studioSteps(pym) {
-  const child = spawn(pym(["studio", PROJECT, "--port", "0"])[0], pym(["studio", PROJECT, "--port", "0"]).slice(1), {
-    cwd: PROJECT,
-    env: baseEnv,
-    stdio: ["ignore", "pipe", "pipe"],
-    detached: true,
-  });
+  const cmd = pym(["studio", PROJECT, "--port", "0"]);
+  const child = spawn(cmd[0], cmd.slice(1), { cwd: PROJECT, env: baseEnv, stdio: ["ignore", "pipe", "pipe"], detached: true });
   let stdout = "",
     stderr = "";
   child.stderr.on("data", (d) => (stderr += d));
@@ -566,53 +606,56 @@ async function studioSteps(pym) {
     stderr = "";
     return io;
   };
+  const get = async (path, auth) => {
+    const response = await fetch(url.origin + path, {
+      headers: auth ? { authorization: "Bearer " + url.token } : {},
+      signal: AbortSignal.timeout(120_000),
+    });
+    return { http: response.status, type: response.headers.get("content-type") ?? "", body: await response.text() };
+  };
   await step({
     id: "studio-start",
     display: "pymtheg studio PROJECT --port 0 (prints session URL)",
     expect: () => (url ? null : "no session URL printed"),
     run: async () => ({ exitCode: null, ...take() }),
   });
-  const get = async (path, auth) => {
-    if (!url) return { exitCode: null, stdout: "", stderr: "studio did not start" };
-    const response = await fetch(url.origin + path, {
-      headers: auth ? { authorization: "Bearer " + url.token } : {},
-      signal: AbortSignal.timeout(120_000),
-    });
-    const body = await response.text();
-    return { exitCode: null, http: response.status, type: response.headers.get("content-type"), body, stdout: "", stderr: "" };
-  };
   await step({
     id: "studio-status",
     display: "GET /api/project (Bearer session token)",
-    expect: (r) => (r.http === 200 && /json/.test(r.type) && parseJson(r.body) ? null : `HTTP ${r.http ?? "none"}`),
-    note: (r) => "HTTP 200 " + excerpt(r.body, 120),
     run: async () => {
+      if (!url) return { exitCode: null, ...take(), harnessError: "studio did not start" };
       const r = await get("/api/project", true);
-      return { ...r, ...take(), stdout: r.body ?? "" };
+      const io = take();
+      return { exitCode: null, http: r.http, type: r.type, stdout: r.body + io.stdout, stderr: io.stderr, json: parseJson(r.body) };
     },
+    expect: (r) =>
+      r.http !== 200 || !/json/.test(r.type)
+        ? `HTTP ${r.http} ${r.type}`
+        : same(r.json?.workspace?.name, "Acceptance shop", "workspace name"),
   });
   await step({
     id: "studio-assets",
-    display: "GET / and its first script asset",
-    expect: (r) => (r.ok ? null : r.problem),
+    display: "GET / and every script and stylesheet it references",
+    skipWording: true, // minified web bundle bytes, not user-facing text
     run: async () => {
+      if (!url) return { exitCode: null, ...take(), harnessError: "studio did not start" };
       const index = await get("/", false);
-      if (index.http !== 200) return { ...index, ...take(), ok: false, problem: `GET / HTTP ${index.http}` };
-      const src = /<script[^>]+src="([^"]+)"/.exec(index.body)?.[1];
-      if (!src) return { ...take(), ok: false, problem: "index.html has no script asset" };
-      const asset = await get(src.startsWith("/") ? src : "/" + src, false);
-      return {
-        ...take(),
-        exitCode: null,
-        ok: asset.http === 200,
-        problem: `asset ${src} HTTP ${asset.http}`,
-      };
+      const assets = [...index.body.matchAll(/<(?:script|link)[^>]+(?:src|href)="(\/[^"]+)"/g)].map((m) => m[1]);
+      const statuses = [];
+      for (const a of assets) statuses.push([a, (await get(a, false)).http]);
+      return { exitCode: null, ...take(), http: index.http, statuses };
     },
-    skipWording: true, // the bundled web app is minified code, not user-facing text
+    expect: (r) =>
+      r.http !== 200
+        ? `GET / HTTP ${r.http}`
+        : !r.statuses.length
+          ? "index.html references no assets"
+          : r.statuses.filter(([, s]) => s !== 200).map(([a, s]) => `${a} HTTP ${s}`).join(", ") || null,
+    note: (r) => `${r.statuses.length} assets HTTP 200`,
   });
   await step({
     id: "studio-stop",
-    display: "SIGINT to studio",
+    display: "SIGINT to the studio process group (Ctrl-C)",
     expect: (r) => (r.exitCode === 0 || r.exitCode === 130 || r.signal === "SIGINT" ? null : `exit ${r.exitCode} ${r.signal ?? ""}`),
     run: async () => {
       killGroup(child, "SIGINT");
@@ -631,127 +674,181 @@ function graphFingerprint(r) {
   if (!j) return null;
   return {
     counts: j.counts,
-    links: [...linkNames(r, "source"), ...linkNames(r, "target")].sort(),
+    links: (j.data?.links ?? []).map((l) => `${l.source?.name}@${l.source?.file}->${l.target?.name}:${l.certainty}`).sort(),
     matches: (j.data?.matches ?? []).map((m) => m.name).sort(),
     found: j.data?.found,
   };
 }
 
-async function coreSteps(pym, { afterInit = [] } = {}) {
-  const P = (args) => pym(args);
+/** The steps every install shape must pass. */
+async function coreSteps(pym) {
+  const P = pym;
+  await step({ id: "help", cmd: P(["--help"]), expect: all(exit(0), includes("graph index"), includes("init [DIRECTORY]")) });
   await step({
-    id: "help",
-    cmd: P(["--help"]),
-    expect: all(exit(0), has(/graph index/, "the graph command"), has(/\binit\b/, "init")),
-  });
-  await step({ id: "version", cmd: P(["--version"]), expect: exit(0), required: false });
-  await step({
-    id: "cli-requirement-links",
-    display: "help lists a command to link requirements to code symbols",
-    cmd: P(["--help"]),
-    skipWording: true,
-    expect: (r) => (/^pymtheg (link|links|requirement)/m.test(r.stdout) ? null : "no requirement-link command in help"),
-    gaps: [{ chunk: "R1-D", when: () => true }],
+    id: "version",
+    cmd: P(["--version"]),
+    expect: all(exit(0), (r) => (/^\d+\.\d+\.\d+\n?$/.test(r.stdout) ? null : `version output ${JSON.stringify(r.stdout)}`)),
   });
   await step({
     id: "init",
     cmd: P(["init", PROJECT, "--name", "Acceptance shop"]),
-    expect: all(exit(0), () => (existsSync(join(PROJECT, ".pymtheg/project.json")) ? null : "no .pymtheg/project.json")),
+    expect: all(
+      exit(0),
+      includes("3 existing documents found"),
+      () => (existsSync(join(PROJECT, ".pymtheg/project.json")) ? null : "no .pymtheg/project.json"),
+    ),
   });
-  const identity = existsSync(join(PROJECT, ".pymtheg/project.json"))
-    ? readFileSync(join(PROJECT, ".pymtheg/project.json"), "utf8")
-    : null;
+  const snapshot = () =>
+    ["project.json", "settings.json"].map((f) => {
+      try {
+        return readFileSync(join(PROJECT, ".pymtheg", f), "utf8");
+      } catch {
+        return null;
+      }
+    });
+  const before = snapshot();
   await step({
     id: "init-repeat",
     cmd: P(["init", PROJECT]),
-    expect: all(exit(0), () =>
-      identity !== null && readFileSync(join(PROJECT, ".pymtheg/project.json"), "utf8") === identity
-        ? null
-        : "project identity changed on re-run",
-    ),
+    expect: all(exit(0), () => (before.includes(null) ? "no metadata after init" : same(snapshot(), before, "metadata bytes after re-init"))),
   });
-  for (const extra of afterInit) await step(extra);
-  await step({ id: "doctor", cmd: P(["doctor"]), expect: exit(0) });
-  await step({ id: "check-valid", cmd: P(["check", join(PROJECT, "designs/order.pym")]), expect: exit(0) });
+  for (const extra of coreSteps.afterInit ?? []) await step(extra);
+  await step({
+    id: "doctor",
+    cmd: P(["doctor", "--format", "json"]),
+    expect: all(exit(0), json((j) => {
+      const checks = j.checks ?? [];
+      const notReady = checks.filter((c) => c.status !== "ready").map((c) => `${c.name}: ${c.status}`);
+      return !checks.length ? "no checks" : notReady.length ? `not ready: ${notReady.join(", ")}` : null;
+    })),
+    note: (r) => r.json.checks.map((c) => c.name).join(", ") + ": ready",
+  });
+  await step({
+    id: "check-valid",
+    cmd: P(["check", DESIGN, "--format", "json"]),
+    expect: all(exit(0), json((j) => same((j.diagnostics ?? null)?.length, 0, "diagnostics"))),
+  });
+  const behaviour = (j) => (j.results ?? []).filter((p) => p.analysisKind === "behaviour");
   await step({
     id: "verify-valid",
-    cmd: P(["verify", join(PROJECT, "designs/order.pym"), "--entry", "Order"]),
-    expect: exit(0),
+    cmd: P(["verify", DESIGN, "--entry", "Order", "--format", "json"]),
+    expect: all(exit(0), json((j) =>
+      same(behaviour(j).map((p) => [p.propertyId.split("/").pop(), p.outcome, p.completion, p.exhaustive]).sort(), [
+        ["chargedOnce", "no_counterexample", "complete", true],
+        ["shippedOnlyWhenPaid", "no_counterexample", "complete", true],
+        ["state-domains", "no_counterexample", "complete", true],
+      ], "verify results"),
+    )),
   });
   await step({
     id: "simulate-valid",
-    cmd: P(["simulate", join(PROJECT, "designs/order.pym"), "--entry", "Order", "--seed", "42", "--max-steps", "6", "--max-samples", "200"]),
-    expect: exit(0),
+    cmd: P(["simulate", DESIGN, "--entry", "Order", "--seed", "42", "--max-steps", "6", "--max-samples", "200", "--format", "json"]),
+    expect: all(exit(0), json((j) =>
+      same(behaviour(j).map((p) => [p.propertyId.split("/").pop(), p.outcome, p.exhaustive]).sort(), [
+        ["chargedOnce", "no_counterexample", false],
+        ["shippedOnlyWhenPaid", "no_counterexample", false],
+        ["state-domains", "no_counterexample", false],
+      ], "simulate results"),
+    )),
   });
   await step({
     id: "check-broken",
     expectFail: true,
-    cmd: P(["check", join(PROJECT, "designs/broken.pym")]),
-    expect: all(exit(1), has(/broken\.pym/, "the file name"), has(/:7\b|line 7/, "line 7"), has(/\bcharge\b/, "the undeclared name")),
+    cmd: P(["check", BROKEN]),
+    expect: all(exit(1), includes(BROKEN_DIAGNOSTIC)),
   });
   await step({
     id: "verify-broken",
     expectFail: true,
-    cmd: P(["verify", join(PROJECT, "designs/broken.pym"), "--entry", "BrokenOrder"]),
-    expect: all(exit(1), has(/\bcharge\b/, "the undeclared name")),
+    cmd: P(["verify", BROKEN, "--entry", "BrokenOrder"]),
+    expect: all(exit(1), includes(BROKEN_DIAGNOSTIC)),
   });
   await step({
     id: "graph-index",
     cmd: P(["graph", "index", "--root", PROJECT, "--json"]),
-    expect: all(exit(0), (r) =>
-      !r.json
-        ? "no JSON"
-        : r.json.failedFiles?.length
-          ? `failed files: ${r.json.failedFiles.map((f) => f.path).join(", ")}`
-          : r.json.counts.files < 8
-            ? `only ${r.json.counts.files} files indexed`
-            : null,
-    ),
+    expect: all(exit(0), json((j) =>
+      j.status !== "ok"
+        ? `status ${j.status}`
+        : j.failedFiles?.length
+          ? `failed files: ${j.failedFiles.map((f) => f.path).join(", ")}`
+          : same(j.counts?.files, SAMPLE_SOURCE_FILES, "indexed files"),
+    )),
     note: (r) => `${r.json.counts.files} files, ${r.json.counts.symbols} symbols, ${r.json.counts.links} links`,
     fingerprint: graphFingerprint,
   });
   await step({
     id: "graph-status",
     cmd: P(["graph", "status", "--root", PROJECT, "--json"]),
-    expect: all(exit(0), (r) => (r.json?.staleFiles?.length ? "stale files right after index" : null)),
-    note: (r) => `status ${r.json.status}; modules ${(r.json.modules ?? []).map((m) => m.id).join(", ")}`,
+    expect: all(exit(0), json((j) =>
+      j.status !== "ok"
+        ? `status ${j.status}`
+        : j.staleFiles?.length
+          ? "stale files right after index"
+          : same((j.modules ?? []).map((m) => m.id).sort(), ["go", "rust", "typescript"], "modules"),
+    )),
   });
-  const callerQuery = (id, symbol, caller) => ({
-    id,
-    cmd: P(["graph", "callers", symbol, "--root", PROJECT, "--json"]),
-    expect: all(exit(0), (r) =>
-      linkNames(r, "source").some((n) => n.startsWith(caller + ":")) ? null : `no caller ${caller} (got ${linkNames(r, "source").join(", ") || "none"})`,
-    ),
-    note: (r) => linkNames(r, "source").join(", "),
-    fingerprint: graphFingerprint,
-  });
-  await step(callerQuery("graph-ts-callers", "formatTotal", "renderBasket"));
+  // Five cross-file calls and one same-file call; each must be exactly this
+  // caller, in this file, with definite certainty.
+  const q = (id, symbol, expected) =>
+    step({ id, cmd: P(["graph", "callers", symbol, "--root", PROJECT, "--json"]), expect: callers(symbol, expected), note: linkSummary, fingerprint: graphFingerprint });
+  await q("graph-ts-callers", "formatTotal", [["renderBasket", "web/src/main.ts"]]);
+  await q("graph-ts-callers-2", "roundCents", [["formatTotal", "web/src/format.ts"]]);
+  await q("graph-go-callers", "ComputeTotal", [["main", "service/main.go"]]);
+  await q("graph-go-same-package", "taxFor", [["ComputeTotal", "service/pricing/total.go"]]);
+  await q("graph-rust-callers", "apply_discount", [["main", "engine/src/main.rs"]]);
+  await q("graph-rust-same-file", "percent_of", [["apply_discount", "engine/src/discount.rs"]]);
   await step({
     id: "graph-ts-path",
     cmd: P(["graph", "path", "renderBasket", "roundCents", "--root", PROJECT, "--json"]),
-    expect: all(exit(0), (r) => (r.json?.data?.found ? null : "no call path renderBasket → roundCents")),
-    note: (r) => `found ${r.json.data.found} (${r.json.data.certainty})`,
+    expect: all(exit(0), json((j) => same([j.data?.found, j.data?.certainty], [true, "definite"], "path renderBasket → roundCents"))),
     fingerprint: graphFingerprint,
   });
-  await step(callerQuery("graph-go-callers", "ComputeTotal", "main"));
-  await step(callerQuery("graph-go-same-package", "taxFor", "ComputeTotal"));
-  await step(callerQuery("graph-rust-callers", "apply_discount", "main"));
-  await step(callerQuery("graph-rust-same-file", "percent_of", "apply_discount"));
   await step({
     id: "graph-search",
     cmd: P(["graph", "search", "Total", "--root", PROJECT, "--json"]),
-    expect: all(exit(0), (r) => {
-      const names = (r.json?.data?.matches ?? []).map((m) => m.name);
-      return ["formatTotal", "ComputeTotal"].every((n) => names.includes(n)) ? null : `matches: ${names.join(", ")}`;
-    }),
+    expect: all(exit(0), json((j) => same((j.data?.matches ?? []).map((m) => m.name).sort(), ["ComputeTotal", "formatTotal", "total.go"], "matches for Total (two symbols, one file)"))),
     fingerprint: graphFingerprint,
   });
-  await mcpSteps(pym);
-  await studioSteps(pym);
-  await legacyInit(pym);
+  await linkSteps(P);
+  await mcpSteps(P);
+  await studioSteps(P);
+  await legacyInit(P);
 }
 
-async function legacyInit(pym) {
+/**
+ * R1-D (PR 38): `pymtheg link`. Until it merges, the only accepted shortfall
+ * is today's exact unknown-command answer: exit 3, that message on stderr,
+ * nothing on stdout. Any other exit or message fails.
+ */
+const UNKNOWN_COMMAND = /^pymtheg: Unknown command or missing file\. Commands: [a-z, -]+\. See --help\.\n?$/;
+const linkGap = {
+  chunk: "R1-D",
+  reason: "`pymtheg link` is an unknown command (exit 3, the unknown-command message)",
+  when: (r) => r.exitCode === 3 && r.stdout === "" && UNKNOWN_COMMAND.test(r.stderr),
+};
+async function linkSteps(P) {
+  const root = ["--root", PROJECT, "--json"];
+  await step({
+    id: "link-requirement",
+    cmd: P(["link", "requirement", "R1", "--title", "An order is charged at most once", ...root]),
+    expect: exit(0),
+    gap: linkGap,
+  });
+  await step({
+    id: "link-add",
+    cmd: P(["link", "add", "R1", "ComputeTotal", ...root]),
+    expect: all(exit(0), json((j) => same(j.status, "created", "link status"))),
+    gap: linkGap,
+  });
+  await step({
+    id: "link-check",
+    cmd: P(["link", "check", ...root]),
+    expect: all(exit(0), includes('"ComputeTotal"', "the linked symbol")),
+    gap: linkGap,
+  });
+}
+
+async function legacyInit(P) {
   const legacy = join(HOME, "legacy");
   rmSync(legacy, { recursive: true, force: true });
   cpSync(PROJECT, legacy, { recursive: true, filter: (src) => !src.includes("/.pymtheg") && !src.includes("/.git") });
@@ -759,40 +856,31 @@ async function legacyInit(pym) {
   writeFileSync(join(legacy, ".pymtheg-studio", "old.json"), "{}");
   await step({
     id: "init-with-legacy-folder",
-    display: "pymtheg init (project that has an old .pymtheg-studio/ folder)",
-    cmd: pym(["init", legacy]),
+    display: "pymtheg init (project with an old .pymtheg-studio/ folder)",
+    cmd: P(["init", legacy]),
     cwd: legacy,
-    expect: exit(0),
-    gaps: [{ chunk: "R1-B", when: (r) => /Old Pymtheg storage layout/i.test(r.stdout + r.stderr) }],
-  });
-}
-
-async function npxAbsolute() {
-  await step({
-    id: "npx-absolute-path",
-    display: "npx --yes /acc/pkg/pymtheg-*.tgz --help (absolute path)",
-    cmd: ["npx", "--yes", TGZ, "--help"],
-    cwd: HOME,
-    observe: true,
-    skipWording: true,
-    note: (r) => (r.exitCode === 0 ? "works" : `exit ${r.exitCode}: ${excerpt(r.stdout + r.stderr, 120)}`),
+    expect: all(exit(0), includes(".pymtheg-studio", "a notice naming the old folder"), () =>
+      existsSync(join(legacy, ".pymtheg-studio", "old.json")) ? null : "old folder was changed",
+    ),
   });
 }
 
 async function networkOff() {
   await step({
     id: "network-off",
-    display: "fetch https://registry.npmjs.org/ must fail",
+    display: "fetch https://registry.npmjs.org/ and http://1.1.1.1/ must both fail",
     skipWording: true,
-    expect: (r) => (r.reached ? "the container can still reach the registry" : null),
     run: async () => {
-      try {
-        await fetch("https://registry.npmjs.org/", { signal: AbortSignal.timeout(15_000) });
-        return { reached: true, exitCode: null, stdout: "", stderr: "" };
-      } catch (e) {
-        return { reached: false, exitCode: null, stdout: "", stderr: String(e.cause?.code ?? e.message) };
+      const reached = [];
+      for (const target of ["https://registry.npmjs.org/", "http://1.1.1.1/"]) {
+        try {
+          await fetch(target, { signal: AbortSignal.timeout(15_000) });
+          reached.push(target);
+        } catch {}
       }
+      return { exitCode: null, reached };
     },
+    expect: (r) => (r.reached.length ? `still reachable: ${r.reached.join(", ")}` : null),
   });
   writeFileSync(join(OUT, ".marker"), "");
 }
@@ -800,13 +888,13 @@ async function networkOff() {
 async function writesOutside() {
   await step({
     id: "writes-outside-project",
-    display: "find / -xdev -newer marker (outside the project and harness)",
+    display: "files written since the install, outside the project and harness",
     observe: true,
     skipWording: true,
     cmd: [
       "sh",
       "-c",
-      `find / -xdev -newer ${OUT}/.marker -type f 2>/dev/null | grep -v -e '^/proc' -e '^/sys' -e '^/acc/' -e '^${HOME}/project/' -e '^${HOME}/legacy/' -e '^${HOME}/restic/' -e '^${HOME}/git-status' | sed -E 's#^(/[^/]+/[^/]+/[^/]+/[^/]+).*#\\1#' | sort | uniq -c | sort -rn | head -20`,
+      `find / -xdev -newer ${OUT}/.marker -type f 2>/dev/null | grep -v -e '^/proc' -e '^/sys' -e '^/acc/' -e '^${HOME}/project/' -e '^${HOME}/legacy/' -e '^${HOME}/restic/' | sed -E 's#^(/[^/]+/[^/]+/[^/]+/[^/]+).*#\\1#' | sort | uniq -c | sort -rn | head -20`,
     ],
     note: (r) => r.stdout.trim().split("\n").filter(Boolean).map((l) => l.trim()).join("; ") || "nothing",
   });
@@ -829,72 +917,6 @@ function sizeOf(path) {
   return total;
 }
 
-function installSize() {
-  return step({
-    id: "install-size",
-    observe: true,
-    skipWording: true,
-    run: async () => {
-      const roots = [join(HOME, ".npm/_npx"), join(HOME, ".npm/_cacache"), GLOBAL_PREFIX, join(APP, "node_modules")].filter(existsSync);
-      const sizes = roots.map((p) => `${p.replace(HOME, "~")} ${(sizeOf(p) / 1048576).toFixed(1)} MiB`);
-      const kinds = ["npx", "global", "local"].map(installedRoot).filter((p) => p && existsSync(p));
-      // The node_modules that holds pymtheg's dependencies: nested for a global install, hoisted otherwise.
-      const modules = kinds.length ? (existsSync(join(kinds[0], "node_modules")) ? join(kinds[0], "node_modules") : join(kinds[0], "..")) : null;
-      const packages = [];
-      if (modules)
-        for (const e of readdirSync(modules)) {
-          if (e.startsWith(".")) continue;
-          const names = e.startsWith("@") ? readdirSync(join(modules, e)).map((n) => `${e}/${n}`) : [e];
-          for (const n of names) packages.push([n, sizeOf(join(modules, n))]);
-        }
-      packages.sort((a, b) => b[1] - a[1]);
-      return {
-        exitCode: 0,
-        stdout: sizes.join("; "),
-        stderr: "",
-        largest: packages.slice(0, 10).map(([n, b]) => `${n} ${(b / 1048576).toFixed(1)} MiB`),
-        packageCount: packages.length,
-      };
-    },
-    note: (r) => `${r.stdout} (apparent file sizes)`,
-    observation: (r) => ({ packages: r.packageCount, largestPackages: r.largest }),
-  });
-}
-
-const npmWarnings = (r) => {
-  const lines = (r.stdout + "\n" + r.stderr).split("\n").filter((l) => /npm (warn|WARN|error|ERR)/.test(l));
-  return [...new Set(lines.map((l) => l.trim().slice(0, 200)))].slice(0, 12);
-};
-
-function installStep(id, cmd, cwd = HOME) {
-  return step({
-    id,
-    cmd,
-    cwd,
-    expect: exit(0),
-    note: (r) => `${(r.durationMs / 1000).toFixed(1)} s (observation); ${npmWarnings(r).length} npm warning lines`,
-    observation: (r) => ({ npmWarnings: npmWarnings(r) }),
-  });
-}
-
-// ---------------------------------------------------------------- scenarios
-
-// `npx /abs/path.tgz` runs the path as a command (exit 126); `./name.tgz` and
-// `file:/abs/path.tgz` are package specs. The install step uses the documented
-// relative form from the tarball's folder; later steps use the same tarball.
-const npx = (args) => ["npx", "--yes", "file:" + TGZ, ...args];
-const npxInstall = () =>
-  step({
-    id: "install-npx",
-    cmd: ["npx", "--yes", "./" + TGZ.split("/").pop(), "--help"],
-    cwd: join(ACC, "pkg"),
-    expect: exit(0),
-    note: (r) => `${(r.durationMs / 1000).toFixed(1)} s (observation); ${npmWarnings(r).length} npm warning lines`,
-    observation: (r) => ({ npmWarnings: npmWarnings(r) }),
-  });
-const globalBin = (args) => ["pymtheg", ...args];
-const localBin = (args) => ["npx", "--no-install", "pymtheg", ...args];
-
 function installedRoot(kind) {
   if (kind === "global") return join(GLOBAL_PREFIX, "lib/node_modules/pymtheg");
   if (kind === "local") return join(APP, "node_modules/pymtheg");
@@ -906,73 +928,127 @@ function installedRoot(kind) {
   return null;
 }
 
-async function goOptIn() {
-  const root = installedRoot("npx");
-  const config = root ? join(root, "dist/shared/config.js") : null;
-  const commands = root ? join(root, "dist/graph/commands.js") : null;
-  const supported =
-    config && existsSync(config) && /graphToolchains/.test(readFileSync(config, "utf8")) &&
-    existsSync(commands) && /graphToolchains|toolchain/.test(readFileSync(commands, "utf8"));
-  if (!supported) {
-    await step({
-      id: "go-toolchain-opt-in",
-      display: 'settings.json graph.toolchain.go = true, then graph callers ComputeTotal',
-      required: false,
-      expect: () => "Go toolchain opt-in is not in this build (PR 33 open; not wired into `pymtheg graph`)",
-      gaps: [{ chunk: "W3-L (PR 33)", when: () => true }],
-      run: async () => ({ exitCode: null, stdout: "", stderr: "" }),
-    });
-    return;
-  }
-  const settingsFile = join(PROJECT, ".pymtheg/settings.json");
-  const settings = JSON.parse(readFileSync(settingsFile, "utf8"));
-  settings.graph = { ...(settings.graph ?? {}), toolchain: { go: true } };
-  writeFileSync(settingsFile, JSON.stringify(settings, null, 2) + "\n");
-  await step({
-    id: "go-toolchain-index",
-    cmd: npx(["graph", "index", "--root", PROJECT, "--json"]),
-    allowToolchain: true,
-    required: false,
-    expect: exit(0),
-    note: (r) => `${r.json?.counts?.links} links; toolchain calls: ${r.forbidden.length}`,
-  });
-  await step({
-    id: "go-toolchain-callers",
-    cmd: npx(["graph", "callers", "ComputeTotal", "--root", PROJECT, "--json"]),
-    allowToolchain: true,
-    required: false,
-    expect: exit(0),
-    note: (r) => linkNames(r, "source").join(", "),
+function installSize() {
+  return step({
+    id: "install-size",
+    observe: true,
+    skipWording: true,
+    run: async () => {
+      const roots = [join(HOME, ".npm/_npx"), join(HOME, ".npm/_cacache"), GLOBAL_PREFIX, join(APP, "node_modules")].filter(existsSync);
+      const sizes = roots.map((p) => `${p.replace(HOME, "~")} ${(sizeOf(p) / 1048576).toFixed(1)} MiB`);
+      const pkg = ["npx", "global", "local"].map(installedRoot).find((p) => p && existsSync(p));
+      // Nested node_modules for a global install, hoisted otherwise.
+      const modules = pkg ? (existsSync(join(pkg, "node_modules")) ? join(pkg, "node_modules") : join(pkg, "..")) : null;
+      const packages = [];
+      if (modules)
+        for (const e of readdirSync(modules)) {
+          if (e.startsWith(".")) continue;
+          const names = e.startsWith("@") ? readdirSync(join(modules, e)).map((n) => `${e}/${n}`) : [e];
+          for (const n of names) packages.push([n, sizeOf(join(modules, n))]);
+        }
+      packages.sort((a, b) => b[1] - a[1]);
+      return { exitCode: 0, stdout: sizes.join("; "), largest: packages.slice(0, 10).map(([n, b]) => `${n} ${(b / 1048576).toFixed(1)} MiB`), packageCount: packages.length };
+    },
+    note: (r) => `${r.stdout} (apparent file sizes)`,
+    observation: (r) => ({ packages: r.packageCount, largestPackages: r.largest }),
   });
 }
 
-async function restic() {
+const npmWarnings = (r) => [...new Set((r.stdout + "\n" + r.stderr).split("\n").filter((l) => /npm (warn|WARN|error|ERR)/.test(l)).map((l) => l.trim().slice(0, 200)))].slice(0, 12);
+
+function installStep(id, cmd, cwd, extraExpect = () => null) {
+  return step({
+    id,
+    cmd,
+    cwd,
+    expect: all(exit(0), extraExpect),
+    skipWarnings: true, // npm's own install output; Node warnings are checked on every later step
+    note: (r) => `${(r.durationMs / 1000).toFixed(1)} s (observation); ${npmWarnings(r).length} npm warning lines`,
+    observation: (r) => ({ npmWarnings: npmWarnings(r) }),
+  });
+}
+
+async function npxAbsolute() {
+  await step({
+    id: "npx-absolute-path",
+    display: "npx --yes /acc/pkg/pymtheg-*.tgz --help (absolute path)",
+    cmd: ["npx", "--yes", TGZ, "--help"],
+    cwd: HOME,
+    observe: true,
+    skipWording: true,
+    note: (r) => (r.exitCode === 0 ? "works" : `exit ${r.exitCode}: ${excerpt(r.stdout + r.stderr, 120)}`),
+  });
+}
+
+// ---------------------------------------------------------------- Go toolchain opt-in
+
+/**
+ * With graph.toolchain.go on, the index must actually run `go` and report the
+ * route `used` with upgraded links. Until W3-L2 (PR 42) wires the setting into
+ * `pymtheg graph`, the only accepted shortfall is exactly that: exit 0, status
+ * ok, no `toolchain` field in the answer and no `go` process.
+ */
+async function goOptIn(pym) {
+  const settingsFile = join(PROJECT, ".pymtheg/settings.json");
+  const settings = JSON.parse(readFileSync(settingsFile, "utf8"));
+  writeFileSync(settingsFile, JSON.stringify({ ...settings, graph: { ...(settings.graph ?? {}), toolchain: { go: true } } }, null, 2) + "\n");
+  await step({
+    id: "go-toolchain-index",
+    display: 'graph.toolchain.go = true; graph index --json',
+    cmd: pym(["graph", "index", "--root", PROJECT, "--json"]),
+    allowToolchain: true,
+    expect: (r) => {
+      const go = r.json?.toolchain?.go;
+      const goCalls = r.calls.filter((c) => c.tool === "go").length;
+      return (
+        exit(0)(r) ??
+        (go?.state !== "used"
+          ? `toolchain state ${JSON.stringify(go?.state ?? r.json?.toolchain ?? "absent")}, expected "used"`
+          : !(go.upgradedLinks > 0)
+            ? `upgradedLinks ${go.upgradedLinks}, expected > 0`
+            : goCalls === 0
+              ? "reported used, but no go process ran"
+              : null)
+      );
+    },
+    gap: {
+      chunk: "W3-L2",
+      reason: "W3-L2 wiring not merged: the setting is ignored (no toolchain field, no go process)",
+      when: (r) => r.exitCode === 0 && r.json?.status === "ok" && r.json && !("toolchain" in r.json) && !r.calls.some((c) => c.tool === "go"),
+    },
+    note: (r) => `go ${r.json.toolchain.go.version ?? ""}; ${r.json.toolchain.go.upgradedLinks} links upgraded; ${r.calls.filter((c) => c.tool === "go").length} go processes`,
+  });
+  writeFileSync(settingsFile, JSON.stringify(settings, null, 2) + "\n");
+  await step({
+    id: "go-toolchain-off-again",
+    display: "setting removed; graph index --json runs no go",
+    cmd: pym(["graph", "index", "--root", PROJECT, "--json"]),
+    expect: all(exit(0), json((j) => (j.status === "ok" ? null : `status ${j.status}`))),
+  });
+}
+
+// ---------------------------------------------------------------- restic
+
+async function restic(pym) {
   const R = join(HOME, "restic");
   const q = (id, args) =>
     step({
       id,
-      cmd: npx([...args, "--root", R, "--json"]),
+      cmd: pym([...args, "--root", R, "--json"]),
       cwd: R,
-      expect: exit(0, 2),
+      expect: all(exit(0), json((j) => (["ok", "ambiguous"].includes(j.status) ? null : `status ${j.status}`))),
       note: (r) =>
-        `${(r.durationMs / 1000).toFixed(1)} s, peak RSS ≥ ${((r.peakRssKiB ?? 0) / 1024).toFixed(0)} MiB (observations); ` +
-        `${r.json?.resultCounts ? JSON.stringify(r.json.resultCounts) : r.json?.status}`,
+        `${r.json.status}; ${JSON.stringify(r.json.resultCounts)}; ${(r.durationMs / 1000).toFixed(1)} s, peak RSS ≥ ${((r.peakRssKiB ?? 0) / 1024).toFixed(0)} MiB (observations)`,
     });
-  await step({
-    id: "restic-init",
-    cmd: npx(["init", R]),
-    cwd: R,
-    expect: exit(0),
-    note: (r) => `${(r.durationMs / 1000).toFixed(1)} s (observation)`,
-  });
+  await step({ id: "restic-init", cmd: pym(["init", R]), cwd: R, expect: exit(0), note: (r) => `${(r.durationMs / 1000).toFixed(1)} s (observation)` });
   await step({
     id: "restic-graph-index",
-    cmd: npx(["graph", "index", "--root", R, "--json"]),
+    cmd: pym(["graph", "index", "--root", R, "--json"]),
     cwd: R,
-    expect: exit(0),
+    expect: all(exit(0), json((j) => (j.status !== "ok" ? `status ${j.status}` : j.failedFiles?.length ? `${j.failedFiles.length} failed files` : null))),
     note: (r) =>
-      `${r.json?.counts?.files} files, ${r.json?.counts?.symbols} symbols, ${r.json?.counts?.links} links, ` +
-      `${r.json?.failedFiles?.length} failed; ${(r.durationMs / 1000).toFixed(1)} s, peak RSS ≥ ${((r.peakRssKiB ?? 0) / 1024).toFixed(0)} MiB (observations)`,
+      `${r.json.counts.files} files, ${r.json.counts.symbols} symbols, ${r.json.counts.links} links, 0 failed; ` +
+      `${(r.durationMs / 1000).toFixed(1)} s, peak RSS ≥ ${((r.peakRssKiB ?? 0) / 1024).toFixed(0)} MiB (observations)`,
   });
   await q("restic-status", ["graph", "status"]);
   await q("restic-search", ["graph", "search", "Snapshot", "--limit", "20"]);
@@ -982,10 +1058,30 @@ async function restic() {
   await q("restic-path", ["graph", "path", "runBackup", "SaveBlob"]);
 }
 
+// ---------------------------------------------------------------- scenarios
+
+// `npx /abs/path.tgz` runs the path as a command (exit 126); `./name.tgz` and
+// `file:/abs/path.tgz` are package specs. The install step uses the documented
+// relative form from the tarball's folder; later steps use the same tarball.
+const npx = (args) => ["npx", "--yes", "file:" + TGZ, ...args];
+const npxInstall = () =>
+  installStep("install-npx", ["npx", "--yes", "./" + TGZ.split("/").pop(), "--help"], join(ACC, "pkg"), includes("graph index"));
+
+const gitSteps = [
+  {
+    id: "git-status-after-init",
+    cmd: ["git", "status", "--porcelain", "--untracked-files=all"],
+    skipWording: true,
+    expect: all(exit(0), (r) =>
+      same(r.stdout.split("\n").filter(Boolean).sort(), ["?? .pymtheg/.gitignore", "?? .pymtheg/project.json", "?? .pymtheg/settings.json"], "untracked after init"),
+    ),
+  },
+  { id: "git-tracked-unchanged", cmd: ["sh", "-c", "git diff --exit-code --stat && git diff --cached --exit-code --stat"], skipWording: true, expect: exit(0) },
+];
+
 const scenarios = {
-  // a. Node only.
   "a-node-only": {
-    install: () => npxInstall(),
+    install: npxInstall,
     run: async () => {
       await networkOff();
       await installSize();
@@ -994,55 +1090,25 @@ const scenarios = {
       await writesOutside();
     },
   },
-  // b. Node + git, project is a git repository.
   "b-node-git": {
-    install: () => npxInstall(),
+    install: npxInstall,
     run: async () => {
       await networkOff();
-      const git = (id, script, extra = {}) => ({
-        id,
-        cmd: ["sh", "-c", script],
+      await step({
+        id: "git-setup",
         skipWording: true,
-        ...extra,
+        cmd: ["sh", "-c", "git init -q -b main && git -c user.email=a@example.invalid -c user.name=acc add -A && git -c user.email=a@example.invalid -c user.name=acc commit -qm sample && git status --porcelain"],
+        expect: all(exit(0), (r) => (r.stdout.trim() ? "tree not clean after commit" : null)),
       });
-      await step(
-        git(
-          "git-setup",
-          "git init -q -b main && git -c user.email=a@example.invalid -c user.name=acc add -A && git -c user.email=a@example.invalid -c user.name=acc commit -qm sample && git status --porcelain",
-          { expect: all(exit(0), (r) => (r.stdout.trim() ? "tree not clean after commit" : null)) },
-        ),
-      );
-      await coreSteps(npx, {
-        afterInit: [
-          git("git-status-after-init", "git status --porcelain --untracked-files=all", {
-            expect: all(exit(0), (r) => {
-              const lines = r.stdout.split("\n").filter(Boolean);
-              const other = lines.filter((l) => !l.startsWith("?? .pymtheg/"));
-              return other.length ? `init changed: ${other.join(", ")}` : null;
-            }),
-            note: (r) => r.stdout.trim().split("\n").join("; ") || "clean",
-          }),
-          git("git-ignored-after-init", "git status --porcelain --ignored --untracked-files=all", {
-            observe: true,
-            note: (r) => r.stdout.trim().split("\n").join("; ") || "nothing",
-          }),
-          git("git-tracked-unchanged", "git diff --exit-code --stat && git diff --cached --exit-code --stat", {
-            expect: exit(0),
-          }),
-        ],
-      });
-      await step(
-        git("git-status-end", "git status --porcelain --untracked-files=all", {
-          observe: true,
-          note: (r) => r.stdout.trim().split("\n").join("; ") || "clean",
-        }),
-      );
+      coreSteps.afterInit = gitSteps;
+      await coreSteps(npx);
+      // After graph, MCP and Studio, only the same three files are visible.
+      await step({ ...gitSteps[0], id: "git-status-end" });
       await writesOutside();
     },
   },
-  // c. Node + Go and Rust toolchains present on PATH.
   "c-node-go-rust": {
-    install: () => npxInstall(),
+    install: npxInstall,
     run: async () => {
       await networkOff();
       await step({
@@ -1053,10 +1119,9 @@ const scenarios = {
         note: (r) => r.stdout.trim().split("\n").join("; "),
       });
       await coreSteps(npx);
-      await goOptIn();
+      await goOptIn(npx);
     },
   },
-  // d1. Global install.
   "d-global": {
     install: () => installStep("install-global", ["npm", "install", "--global", TGZ], HOME),
     run: async () => {
@@ -1065,17 +1130,12 @@ const scenarios = {
       await step({
         id: "bin-location",
         skipWording: true,
-        cmd: ["sh", "-c", "readlink -f \"$(command -v pymtheg)\""],
-        expect: all(exit(0), (r) =>
-          r.stdout.trim().startsWith(GLOBAL_PREFIX + "/lib/node_modules/pymtheg/") ? null : `resolves to ${r.stdout.trim()}`,
-        ),
-        note: (r) => r.stdout.trim(),
+        cmd: ["sh", "-c", 'readlink -f "$(command -v pymtheg)"'],
+        expect: all(exit(0), (r) => (r.stdout.trim() === GLOBAL_PREFIX + "/lib/node_modules/pymtheg/dist/cli/main.js" ? null : `resolves to ${r.stdout.trim()}`)),
       });
-      mkdirSync(ELSEWHERE, { recursive: true });
-      await coreSteps(globalBin);
+      await coreSteps((args) => ["pymtheg", ...args]);
     },
   },
-  // d2. Local install as a dependency of another package.
   "d-local": {
     install: async () => {
       mkdirSync(APP, { recursive: true });
@@ -1085,50 +1145,74 @@ const scenarios = {
     run: async () => {
       await networkOff();
       await installSize();
-      const local = (args) => ["sh", "-c", `cd ${APP} && exec npx --no-install pymtheg "$@"`, "pymtheg", ...args];
-      await coreSteps(local);
+      await coreSteps((args) => ["sh", "-c", `cd ${APP} && exec npx --no-install pymtheg "$@"`, "pymtheg", ...args]);
     },
   },
-  // f. A larger real project (restic, Go).
   "f-restic": {
-    install: () => npxInstall(),
+    install: npxInstall,
     run: async () => {
       await networkOff();
-      await restic();
+      await restic(npx);
     },
   },
 };
 
-// e. Node version edges: report only.
+// e. Node version edges. engines is ">=24": all three are supported, so
+// install, doctor and the core commands are required.
 for (const edge of ["e-node-24.0.0", "e-node-25", "e-node-26"])
   scenarios[edge] = {
-    install: () => {
-      scenarioOptions.observeOnly = true;
-      return npxInstall();
-    },
+    install: npxInstall,
     run: async () => {
-      scenarioOptions.observeOnly = true;
       await networkOff();
-      await step({ id: "node-version", cmd: ["node", "--version"], cwd: HOME, skipWording: true, note: (r) => r.stdout.trim() });
-      await step({ id: "help", cmd: npx(["--help"]), expect: exit(0) });
+      await step({ id: "node-version", cmd: ["node", "--version"], cwd: HOME, observe: true, skipWording: true, note: (r) => r.stdout.trim() });
+      await step({ id: "help", cmd: npx(["--help"]), expect: all(exit(0), includes("graph index")) });
       await step({ id: "init", cmd: npx(["init", PROJECT]), expect: exit(0) });
-      await step({ id: "doctor", cmd: npx(["doctor"]), expect: exit(0), note: (r) => excerpt(r.stdout, 160) });
-      await step({ id: "check-valid", cmd: npx(["check", "designs/order.pym"]), expect: exit(0) });
-      await step({ id: "verify-valid", cmd: npx(["verify", "designs/order.pym", "--entry", "Order"]), expect: exit(0) });
+      await step({
+        id: "doctor",
+        cmd: npx(["doctor", "--format", "json"]),
+        expect: all(exit(0), json((j) => {
+          const bad = (j.checks ?? []).filter((c) => c.status !== "ready").map((c) => `${c.name}: ${c.status}`);
+          return !j.checks?.length ? "no checks" : bad.length ? `not ready: ${bad.join(", ")}` : null;
+        })),
+      });
+      await step({ id: "check-valid", cmd: npx(["check", DESIGN, "--format", "json"]), expect: all(exit(0), json((j) => same(j.diagnostics?.length, 0, "diagnostics"))) });
+      await step({ id: "verify-valid", cmd: npx(["verify", DESIGN, "--entry", "Order"]), expect: exit(0) });
+      await step({ id: "simulate-valid", cmd: npx(["simulate", DESIGN, "--entry", "Order", "--seed", "42"]), expect: exit(0) });
+      await step({ id: "check-broken", expectFail: true, cmd: npx(["check", BROKEN]), expect: all(exit(1), includes(BROKEN_DIAGNOSTIC)) });
       await step({
         id: "graph-index",
         cmd: npx(["graph", "index", "--root", PROJECT, "--json"]),
-        expect: all(exit(0), (r) => (r.json?.failedFiles?.length ? "failed files" : null)),
+        expect: all(exit(0), json((j) => (j.failedFiles?.length ? "failed files" : same(j.counts?.files, SAMPLE_SOURCE_FILES, "indexed files")))),
       });
+      await step({ id: "graph-ts-callers", cmd: npx(["graph", "callers", "formatTotal", "--root", PROJECT, "--json"]), expect: callers("formatTotal", [["renderBasket", "web/src/main.ts"]]) });
     },
   };
 
-const chosen = scenarios[scenario.replace(/^e-node-24\.\d+\.\d+$/, "e-node-24.0.0")] ?? scenarios[scenario];
+const chosen = scenarios[scenario];
 if (!chosen || !["install", "run"].includes(phase)) {
   console.error(`usage: driver.mjs (${Object.keys(scenarios).join("|")}) install|run`);
   process.exit(64);
 }
 mkdirSync(OUT, { recursive: true });
 await chosen[phase]();
-if (phase === "run" && forbiddenSeen.length)
-  appendFileSync(join(OUT, "forbidden.json"), JSON.stringify(forbiddenSeen) + "\n");
+// Aggregate: every backend or toolchain process seen in any step of this phase.
+if (phase === "run") {
+  const rows = readFileSync(RESULTS, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
+  const seen = rows.filter((r) => r.processes?.length && !r.step.startsWith("go-toolchain-index"));
+  appendFileSync(
+    RESULTS,
+    JSON.stringify({
+      scenario,
+      step: "no-toolchain-processes",
+      command: "PATH shims + spawn trace: java, javac, quint, tlc, go, cargo, rustc, rustup",
+      network: false,
+      required: true,
+      exitCode: null,
+      status: seen.length ? "fail" : "pass",
+      reason: seen.length ? seen.map((r) => `${r.step}: ${r.processes.join("; ")}`).join(" | ") : "log empty in every step",
+      outputBytes: 0,
+      durationMs: null,
+      excerpt: "",
+    }) + "\n",
+  );
+}

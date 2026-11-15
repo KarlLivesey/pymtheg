@@ -5,12 +5,13 @@
 //   pymtheg-dev --name r1f-xxxx -- node scripts/acceptance/run.mjs [options]
 //
 // Options:
-//   --scenarios a-node-only,b-node-git,...   subset (default: all)
+//   --scenarios a-node-only,b-node-git,...   subset (default: all; an unknown name is an error)
 //   --tarball PATH                           reuse a packed tarball (skip build)
+//   --pack-only                              build the tarball, print `TARBALL=<path>`, stop
 //   --out DIR                                result directory (default evidence/r1-f)
 //   --commit SHA                             recorded in the result (the mirror has no .git)
 //   --restic DIR                             restic checkout (default ~/pymtheg-dev/corpora/restic)
-//   --keep-images                            do not remove images this run created or pulled
+//   --keep-images                            do not remove images this harness pulled
 //
 // It builds the tarball as a release would (npm ci, npm run build, npm pack)
 // in a throwaway node:24 container, then runs each scenario in a fresh
@@ -20,11 +21,21 @@
 //
 // Exit status: 0 every required step passes; 2 no failures but known gaps
 // remain (named chunks still in flight); 1 a required step fails; 3 harness
-// error. Durations, sizes and memory are observations, never assertions.
+// or usage error; 129/130/143 stopped by a signal (everything removed).
+// Durations, sizes and memory are observations, never assertions.
+//
+// Docker hygiene (the server is shared, and several runs may overlap):
+// every container is named pymtheg-acc-<scenario>-<run id> and labelled with
+// this harness, its owner and the run's pid; a container's own process is a
+// bounded `sleep`, so even a lost container removes itself (--rm). At start-up
+// the harness removes only its OWN owner's containers whose run has died.
+// Images present before any run are never removed; an image a run of this
+// harness pulled is removed by the last run to finish, once no container (of
+// any run) uses it. The list is shared in ~/.cache/pymtheg-acceptance.
 import { spawnSync, spawn } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, existsSync, copyFileSync, rmSync, statSync } from "node:fs";
 import { join, resolve, basename } from "node:path";
-import { homedir, tmpdir } from "node:os";
+import { homedir, hostname, tmpdir, userInfo } from "node:os";
 import { randomBytes } from "node:crypto";
 
 const argv = process.argv.slice(2);
@@ -38,28 +49,36 @@ const HERE = join(REPO, "scripts/acceptance");
 const OUT = resolve(opt("--out", join(REPO, "evidence/r1-f")));
 const SCRATCH = mkdtempSync(join(process.env.PYM_SCRATCH ?? tmpdir(), "acc-"));
 const RESTIC = resolve(opt("--restic", join(homedir(), "pymtheg-dev/corpora/restic")));
-const RUN_ID = randomBytes(3).toString("hex");
+const RUN_ID = randomBytes(4).toString("hex");
+const OWNER = `${userInfo().username}@${hostname()}`;
+const LABELS = ["--label", "pymtheg-acc=1", "--label", `pymtheg-acc.owner=${OWNER}`, "--label", `pymtheg-acc.run=${RUN_ID}`, "--label", `pymtheg-acc.pid=${process.pid}`];
+/** A container's main process: a bounded life, never `sleep infinity`. */
+const LIFETIME = ["sleep", "14400"];
 const BASE = "node:24-bookworm-slim";
 const BUILD_IMAGE = "node:24.21.0-bookworm-slim";
 
 const SCENARIOS = [
-  { id: "a-node-only", image: BASE, proves: "Node only: install from the tarball with npx, then init, doctor, check/verify/simulate, a broken design, graph (TypeScript, Go and Rust source-only), MCP over stdio and Studio over HTTP; no toolchain process and no Java/Quint/TLC wording." },
-  { id: "b-node-git", image: BASE, setup: "git", proves: "Same as (a) in a git repository (git installed with apt before the install step), plus what init does to git state." },
-  { id: "c-node-go-rust", image: BASE, setup: "toolchains", proves: "Same as (a) with Go and Rust toolchains (copied from the official golang and rust images) on PATH: the source-only graph is identical and nothing runs them by default; the Go opt-in when it is in the build." },
+  { id: "a-node-only", image: BASE, proves: "Node only: install from the tarball with npx, then init, doctor, check/verify/simulate, a broken design, graph (TypeScript, Go and Rust source-only), requirement links, MCP over stdio and Studio over HTTP; no backend or toolchain process and no Java/Quint/TLC wording." },
+  { id: "b-node-git", image: BASE, setup: "git", proves: "Same as (a) in a git repository (git installed with apt before the install step), plus exactly what init does to git state." },
+  { id: "c-node-go-rust", image: BASE, setup: "toolchains", proves: "Same as (a) with Go and Rust toolchains (copied from the official golang and rust images) on PATH: the source-only graph is identical and nothing runs them by default; with graph.toolchain.go on, `go` runs and links are upgraded." },
   { id: "d-global", image: BASE, proves: "npm install --global of the tarball: the binary resolves grammars, web assets and helpers from the installed location." },
   { id: "d-local", image: BASE, proves: "npm install of the tarball as a dependency of another package, then npx pymtheg." },
-  { id: "e-node-24.0.0", image: "node:24.0.0-bookworm-slim", observeOnly: true, proves: "Lowest Node 24 release the engines field allows (report only)." },
-  { id: "e-node-25", image: "node:25-bookworm-slim", observeOnly: true, proves: "Node 25, outside engines (report only)." },
-  { id: "e-node-26", image: "node:26-bookworm-slim", observeOnly: true, proves: "Node 26, outside engines (report only)." },
+  { id: "e-node-24.0.0", image: "node:24.0.0-bookworm-slim", proves: "Lowest Node release engines \">=24\" allows: install, doctor and the core commands." },
+  { id: "e-node-25", image: "node:25-bookworm-slim", proves: "Node 25 (supported by engines \">=24\"): install, doctor and the core commands." },
+  { id: "e-node-26", image: "node:26-bookworm-slim", proves: "Node 26 (supported by engines \">=24\"): install, doctor and the core commands." },
   { id: "f-restic", image: BASE, restic: true, proves: "restic (a larger real Go project): init, graph index and five queries; time and peak memory are observations." },
 ];
 
-const wanted = opt("--scenarios", null)?.split(",");
-const selected = SCENARIOS.filter((s) => !wanted || wanted.includes(s.id));
 const results = [];
 const containers = new Set();
-const createdImages = new Set();
-const log = (...a) => console.log(`[acceptance ${new Date().toISOString().slice(11, 19)}]`, ...a);
+const children = new Set();
+let outputBroken = false;
+const log = (...a) => {
+  if (outputBroken) return;
+  try {
+    console.log(`[acceptance ${new Date().toISOString().slice(11, 19)}]`, ...a);
+  } catch {}
+};
 
 function sh(cmd, args, { input, allowFail = true, quiet = false } = {}) {
   const r = spawnSync(cmd, args, { input, encoding: "utf8", maxBuffer: 256 * 1024 * 1024 });
@@ -68,17 +87,22 @@ function sh(cmd, args, { input, allowFail = true, quiet = false } = {}) {
   return r;
 }
 const docker = (...args) => sh("docker", args);
+const dockerQuiet = (...args) => sh("docker", args, { quiet: true });
 function dockerStream(args, prefix) {
   return new Promise((resolveExit) => {
     const child = spawn("docker", args, { stdio: ["ignore", "pipe", "pipe"] });
+    children.add(child);
     let out = "";
     const relay = (d) => {
       out += d;
-      for (const line of String(d).split("\n")) if (line.trim()) console.log(`  ${prefix} ${line}`);
+      for (const line of String(d).split("\n")) if (line.trim()) log(`  ${prefix} ${line}`);
     };
     child.stdout.on("data", relay);
     child.stderr.on("data", relay);
-    child.on("close", (code) => resolveExit({ code, out }));
+    child.on("close", (code) => {
+      children.delete(child);
+      resolveExit({ code, out });
+    });
   });
 }
 function add(scenario, step, fields) {
@@ -87,17 +111,123 @@ function add(scenario, step, fields) {
   log(`${r.status.padEnd(13)} ${scenario}/${step}: ${r.reason.slice(0, 200)}`);
   return r;
 }
-const imageExists = (image) => docker("image", "inspect", image).status === 0;
-const preexisting = new Set();
-function ensureImage(image) {
-  if (imageExists(image)) {
-    preexisting.add(image);
-    return true;
-  }
-  const pulled = docker("pull", "-q", image);
-  if (pulled.status === 0) createdImages.add(image);
-  return pulled.status === 0;
+
+// ------------------------------------------------------------------ containers and images
+
+function run(image, name, extra = []) {
+  const r = docker("run", "-d", "--rm", "--name", name, ...LABELS, ...extra, image, ...LIFETIME);
+  if (r.status === 0) containers.add(name);
+  return r;
 }
+function removeContainer(name) {
+  dockerQuiet("rm", "-f", name);
+  containers.delete(name);
+}
+
+/** Remove containers left by this owner's earlier runs whose harness process is gone. Never others'. */
+function reapOrphans() {
+  const rows = dockerQuiet("ps", "-a", "--filter", "label=pymtheg-acc=1", "--filter", `label=pymtheg-acc.owner=${OWNER}`, "--format", '{{.Names}} {{.Label "pymtheg-acc.pid"}}').stdout.trim().split("\n").filter(Boolean);
+  for (const row of rows) {
+    const [name, pid] = row.split(" ");
+    let alive = false;
+    try {
+      alive = readFileSync(`/proc/${pid}/cmdline`, "utf8").includes("scripts/acceptance/run.mjs");
+    } catch {}
+    if (!alive) {
+      log(`removing leftover ${name} (its run, pid ${pid}, has ended)`);
+      dockerQuiet("rm", "-f", name);
+    }
+  }
+}
+
+const imageSet = () => new Set(dockerQuiet("images", "--format", "{{.Repository}}:{{.Tag}}").stdout.trim().split("\n").filter(Boolean));
+/** Images on the server before this run that no run of this harness pulled: never removed. */
+const PRESENT_BEFORE = imageSet();
+/**
+ * Images pulled by any run of this harness (this owner), shared between
+ * overlapping runs in a small locked file, so whichever run finishes last
+ * removes an image once no container uses it.
+ */
+const STATE = join(homedir(), ".cache/pymtheg-acceptance");
+const PULLED_FILE = join(STATE, "pulled-images");
+function withLock(fn) {
+  mkdirSync(STATE, { recursive: true });
+  const lock = join(STATE, "lock");
+  for (let i = 0; i < 300; i++) {
+    try {
+      mkdirSync(lock);
+      try {
+        return fn();
+      } finally {
+        rmSync(lock, { recursive: true, force: true });
+      }
+    } catch (e) {
+      if (e.code !== "EEXIST") throw e;
+      // A lock older than ten minutes belongs to a dead run.
+      try {
+        if (Date.now() - statSync(lock).mtimeMs > 600_000) rmSync(lock, { recursive: true, force: true });
+      } catch {}
+      spawnSync("sleep", ["0.1"]);
+    }
+  }
+  throw Error("could not take " + lock);
+}
+const readPulled = () => (existsSync(PULLED_FILE) ? readFileSync(PULLED_FILE, "utf8").split("\n").filter(Boolean) : []);
+function ensureImage(image) {
+  if (dockerQuiet("image", "inspect", image).status === 0) return true;
+  const r = docker("pull", "-q", image);
+  if (r.status === 0 && !PRESENT_BEFORE.has(image))
+    withLock(() => {
+      if (!readPulled().includes(image)) writeFileSync(PULLED_FILE, [...readPulled(), image].join("\n") + "\n");
+    });
+  return r.status === 0;
+}
+function removeUnusedPulledImages() {
+  withLock(() => {
+    const keep = [];
+    for (const image of readPulled()) {
+      if (dockerQuiet("ps", "-a", "-q", "--filter", `ancestor=${image}`).stdout.trim()) {
+        log(`keeping ${image}: still used by a container`);
+        keep.push(image);
+      } else if (dockerQuiet("image", "inspect", image).status === 0 && dockerQuiet("image", "rm", image).status !== 0) keep.push(image);
+    }
+    writeFileSync(PULLED_FILE, keep.length ? keep.join("\n") + "\n" : "");
+  });
+}
+
+let cleaned = false;
+function cleanup() {
+  if (cleaned) return;
+  cleaned = true;
+  for (const child of children) {
+    try {
+      child.kill("SIGKILL");
+    } catch {}
+  }
+  for (const c of [...containers]) removeContainer(c);
+  if (!flag("--keep-images"))
+    try {
+      removeUnusedPulledImages();
+    } catch (e) {
+      log("image cleanup: " + e.message);
+    }
+  rmSync(SCRATCH, { recursive: true, force: true });
+}
+for (const [signal, code] of [["SIGINT", 130], ["SIGTERM", 143], ["SIGHUP", 129]])
+  process.on(signal, () => {
+    log(`${signal}: removing this run's containers and pulled images`);
+    cleanup();
+    process.exit(code);
+  });
+// Through pymtheg-dev (ssh, no tty) a dropped connection shows up as a broken pipe, not a signal.
+for (const stream of [process.stdout, process.stderr])
+  stream.on("error", (e) => {
+    outputBroken = true;
+    if (e.code === "EPIPE") {
+      cleanup();
+      process.exit(141);
+    }
+  });
 
 // ------------------------------------------------------------------ build
 
@@ -106,8 +236,7 @@ async function buildTarball() {
   if (given) return resolve(given);
   if (!ensureImage(BUILD_IMAGE)) throw Error("cannot pull " + BUILD_IMAGE);
   const name = `pymtheg-acc-build-${RUN_ID}`;
-  docker("run", "-d", "--rm", "--name", name, BUILD_IMAGE, "sleep", "infinity");
-  containers.add(name);
+  if (run(BUILD_IMAGE, name).status !== 0) throw Error("cannot start the build container");
   docker("exec", name, "mkdir", "-p", "/build");
   // Copy the source tree only: no node_modules, build output, evidence or research.
   const tar = spawnSync(
@@ -142,14 +271,13 @@ async function buildTarball() {
   mkdirSync(join(SCRATCH, "pkg"), { recursive: true });
   const local = join(SCRATCH, "pkg", pack.filename);
   docker("cp", `${name}:/build/${pack.filename}`, local);
+  removeContainer(name);
   // Keep a copy outside the per-run scratch so `--tarball` can reuse it.
-  const kept = join(process.env.PYM_SCRATCH ?? tmpdir(), "acceptance-tarball");
+  const kept = join(process.env.PYM_SCRATCH ?? tmpdir(), `acceptance-tarball-${RUN_ID}`);
   mkdirSync(kept, { recursive: true });
   copyFileSync(local, join(kept, pack.filename));
   log(`tarball kept at ${join(kept, pack.filename)} (reuse with --tarball)`);
-  docker("rm", "-f", name);
-  containers.delete(name);
-  return local;
+  return join(kept, pack.filename);
 }
 
 function inspectTarball(tgz) {
@@ -167,7 +295,10 @@ function inspectTarball(tgz) {
   }
   const needed = ["dist/cli/main.js", "dist-web/index.html", "grammars/go/tree-sitter-go.wasm", "grammars/rust/tree-sitter-rust.wasm", "package.json", "README.md", "pymtheg"];
   const missing = needed.filter((n) => !files.some((f) => f.path === n));
-  const unexpected = files.filter((f) => /^(test|evidence|research|src|web\/src)\//.test(f.path)).map((f) => f.path);
+  // TypeScript sources, tests, evidence and research must not ship. Helper
+  // sources the product runs (e.g. the Go toolchain helper under src/graph) may.
+  const unexpected = files.filter((f) => /^(test|evidence|research|web\/src)\//.test(f.path) || /^src\/.*\.tsx?$/.test(f.path)).map((f) => f.path);
+  const helpers = files.filter((f) => /^src\//.test(f.path) && !/\.tsx?$/.test(f.path)).map((f) => f.path);
   const summary = {
     file: basename(tgz),
     packedBytes: statSync(tgz).size,
@@ -175,12 +306,16 @@ function inspectTarball(tgz) {
     files: files.length,
     largestTopLevel: Object.entries(byTop).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, v]) => `${k} ${(v / 1048576).toFixed(2)} MiB`),
   };
-  const pkg = JSON.parse(sh("tar", ["-xzOf", tgz, "package/package.json"]).stdout);
+  const pkg = JSON.parse(sh("tar", ["-xzOf", tgz, "package/package.json"]).stdout || "{}");
   add("0-build", "tarball-contents", {
     command: "tar -tvzf " + basename(tgz),
-    status: missing.length ? "fail" : "pass",
-    reason: missing.length ? `missing ${missing.join(", ")}` : `${files.length} files, ${(summary.packedBytes / 1048576).toFixed(2)} MiB packed, ${(unpacked / 1048576).toFixed(2)} MiB unpacked; ${unexpected.length} source/test/evidence files`,
-    observation: summary,
+    status: missing.length || unexpected.length ? "fail" : "pass",
+    reason: missing.length
+      ? `missing ${missing.join(", ")}`
+      : unexpected.length
+        ? `unexpected source/test/evidence files: ${unexpected.slice(0, 5).join(", ")}`
+        : `${files.length} files, ${(summary.packedBytes / 1048576).toFixed(2)} MiB packed, ${(unpacked / 1048576).toFixed(2)} MiB unpacked`,
+    observation: { ...summary, helperSources: helpers },
   });
   add("0-build", "package-private", {
     command: "package.json private",
@@ -204,103 +339,87 @@ const TOOLCHAIN_ENV = ["-e", "PATH=/usr/local/go/bin:/usr/local/cargo/bin:/usr/l
 function setup(s, name) {
   if (s.setup === "git") {
     const r = docker("exec", "-u", "root", name, "sh", "-c", "apt-get update -qq && apt-get install -y -qq --no-install-recommends git ca-certificates >/dev/null && rm -rf /var/lib/apt/lists/* && git --version");
-    return r.status === 0 ? r.stdout.trim() : "apt-get install git failed: " + r.stderr.slice(-300);
+    return r.status === 0 ? { ok: true, note: r.stdout.trim() } : { ok: false, note: "apt-get install git failed: " + r.stderr.slice(-300) };
   }
   if (s.setup === "toolchains") {
     const copied = [];
     for (const [image, paths] of [["golang:1-bookworm", ["/usr/local/go"]], ["rust:1-slim-bookworm", ["/usr/local/cargo", "/usr/local/rustup"]]]) {
-      if (!ensureImage(image)) return `cannot pull ${image}`;
+      if (!ensureImage(image)) return { ok: false, note: `cannot pull ${image}` };
       const source = `pymtheg-acc-src-${image.split(":")[0]}-${RUN_ID}`;
-      docker("create", "--name", source, image);
+      if (docker("create", "--name", source, ...LABELS, image).status !== 0) return { ok: false, note: `cannot create ${source}` };
       containers.add(source);
       for (const path of paths) {
         const r = sh("sh", ["-c", `docker cp ${source}:${path} - | docker cp - ${name}:/usr/local`]);
-        if (r.status !== 0) return `copy ${path} failed`;
+        if (r.status !== 0) return { ok: false, note: `copy ${path} failed` };
       }
-      docker("rm", "-f", source);
-      containers.delete(source);
+      removeContainer(source);
       copied.push(image);
     }
     const v = docker("exec", ...TOOLCHAIN_ENV, name, "sh", "-c", "go version && cargo --version");
-    return v.status === 0 ? `${copied.join(", ")}: ${v.stdout.trim().split("\n").join("; ")}` : "toolchain check failed: " + v.stderr.slice(-300);
+    return v.status === 0 ? { ok: true, note: `${copied.join(", ")}: ${v.stdout.trim().split("\n").join("; ")}` } : { ok: false, note: "toolchain check failed: " + v.stderr.slice(-300) };
   }
-  return null;
+  return { ok: true, note: "" };
 }
 
 async function runScenario(s, tgz) {
   log(`scenario ${s.id} (${s.image})`);
-  const problem = ensureImage(s.image) ? null : `image ${s.image} is not available`;
-  if (problem) {
-    add(s.id, "image", { command: `docker pull/build ${s.image}`, required: !s.observeOnly, status: s.observeOnly ? "observed" : "fail", reason: problem });
+  if (!ensureImage(s.image)) {
+    add(s.id, "image", { command: `docker pull ${s.image}`, reason: `image ${s.image} is not available` });
     return;
   }
   const name = `pymtheg-acc-${s.id.replace(/[^a-z0-9-]/g, "")}-${RUN_ID}`;
-  const started = docker("run", "-d", "--rm", "--name", name, "--user", "node", "--memory", "16g", "--cpus", "8", "--pids-limit", "4096", s.image, "sleep", "infinity");
+  const started = run(s.image, name, ["--user", "node", "--memory", "16g", "--cpus", "8", "--pids-limit", "4096"]);
   if (started.status !== 0) {
-    add(s.id, "container", { status: "fail", reason: started.stderr.trim() });
+    add(s.id, "container", { reason: started.stderr.trim() });
     return;
   }
-  containers.add(name);
-  const root = (...cmd) => docker("exec", "-u", "root", name, ...cmd);
-  root("mkdir", "-p", "/acc/pkg", "/acc/shims", "/acc/out");
-  docker("cp", tgz, `${name}:/acc/pkg/`);
-  for (const f of ["driver.mjs", "spawn-trace.cjs", "shim.sh"]) docker("cp", join(HERE, f), `${name}:/acc/${f}`);
-  root("sh", "-c", "for n in java quint go cargo rustc rustup tlc; do cp /acc/shim.sh /acc/shims/$n; done; chmod 755 /acc/shims/*");
-  docker("cp", join(REPO, "test/fixtures/acceptance/sample"), `${name}:/home/node/project`);
-  if (s.restic) {
-    if (!existsSync(RESTIC)) add(s.id, "restic-copy", { status: "fail", reason: `no restic checkout at ${RESTIC}` });
-    else docker("cp", RESTIC, `${name}:/home/node/restic`);
-  }
-  // The pinned corpora are read-only on the server and docker cp keeps modes.
-  root("sh", "-c", "chown -R node:node /home/node /acc/out && chmod -R u+w /home/node");
-  const nodeVersion = docker("exec", name, "node", "--version").stdout.trim();
-  if (s.setup) {
-    const note = setup(s, name);
-    const ok = note && !/failed|cannot/.test(note);
-    add(s.id, "setup-" + s.setup, { command: s.setup === "git" ? "apt-get install git (root, network)" : "copy Go and Rust toolchains from official images", network: true, status: ok ? "pass" : "fail", reason: note ?? "nothing" });
-    if (!ok) {
-      docker("rm", "-f", name);
-      containers.delete(name);
-      return;
+  try {
+    const root = (...cmd) => docker("exec", "-u", "root", name, ...cmd);
+    root("mkdir", "-p", "/acc/pkg", "/acc/shims", "/acc/out");
+    docker("cp", tgz, `${name}:/acc/pkg/`);
+    for (const f of ["driver.mjs", "wording.mjs", "spawn-trace.cjs", "shim.sh"]) docker("cp", join(HERE, f), `${name}:/acc/${f}`);
+    root("sh", "-c", "for n in java javac quint tlc go cargo rustc rustup; do cp /acc/shim.sh /acc/shims/$n; done; chmod 755 /acc/shims/*");
+    docker("cp", join(REPO, "test/fixtures/acceptance/sample"), `${name}:/home/node/project`);
+    if (s.restic) {
+      if (!existsSync(RESTIC)) {
+        add(s.id, "restic-copy", { reason: `no restic checkout at ${RESTIC}` });
+        return;
+      }
+      docker("cp", RESTIC, `${name}:/home/node/restic`);
     }
+    // The pinned corpora are read-only on the server and docker cp keeps modes.
+    root("sh", "-c", "chown -R node:node /home/node /acc/out && chmod -R u+w /home/node");
+    const nodeVersion = docker("exec", name, "node", "--version").stdout.trim();
+    if (s.setup) {
+      const { ok, note } = setup(s, name);
+      add(s.id, "setup-" + s.setup, { command: s.setup === "git" ? "apt-get install git (root, network)" : "copy Go and Rust toolchains from official images", network: true, status: ok ? "pass" : "fail", reason: note });
+      if (!ok) return;
+    }
+    const env = s.setup === "toolchains" ? TOOLCHAIN_ENV : [];
+    const install = await dockerStream(["exec", ...env, "-u", "node", "-w", "/home/node", name, "node", "/acc/driver.mjs", s.id, "install"], `${s.id}|`);
+    // Cut every network before any step after the install.
+    const networks = JSON.parse(docker("inspect", "-f", "{{json .NetworkSettings.Networks}}", name).stdout || "{}");
+    for (const net of Object.keys(networks)) docker("network", "disconnect", "-f", net, name);
+    const runPhase = await dockerStream(["exec", ...env, "-u", "node", "-w", "/home/node/project", name, "node", "/acc/driver.mjs", s.id, "run"], `${s.id}|`);
+    const got = docker("exec", name, "cat", "/acc/out/results.jsonl");
+    const rows = got.stdout.trim().split("\n").filter(Boolean).map((l) => JSON.parse(l));
+    for (const row of rows) results.push({ ...row, image: s.image, node: nodeVersion });
+    if (install.code !== 0 || runPhase.code !== 0 || !rows.length)
+      add(s.id, "driver", { reason: `driver exited ${install.code}/${runPhase.code} with ${rows.length} results: ${runPhase.out.slice(-300)}` });
+  } finally {
+    removeContainer(name);
   }
-  const env = s.setup === "toolchains" ? TOOLCHAIN_ENV : [];
-  const install = await dockerStream(["exec", ...env, "-u", "node", "-w", "/home/node", name, "node", "/acc/driver.mjs", s.id, "install"], `${s.id}|`);
-  // Cut every network before any step after the install.
-  const networks = JSON.parse(docker("inspect", "-f", "{{json .NetworkSettings.Networks}}", name).stdout || "{}");
-  for (const net of Object.keys(networks)) docker("network", "disconnect", "-f", net, name);
-  const runPhase = await dockerStream(["exec", ...env, "-u", "node", "-w", "/home/node/project", name, "node", "/acc/driver.mjs", s.id, "run"], `${s.id}|`);
-  const got = docker("exec", name, "cat", "/acc/out/results.jsonl");
-  const rows = got.stdout.trim().split("\n").filter(Boolean).map((l) => JSON.parse(l));
-  for (const row of rows) results.push({ ...row, image: s.image, node: nodeVersion });
-  if (install.code !== 0 || runPhase.code !== 0)
-    add(s.id, "driver", { status: "fail", reason: `driver exited ${install.code}/${runPhase.code}: ${runPhase.out.slice(-300)}` });
-  // Aggregate: nothing tried to run go, cargo, rustc, java or quint.
-  const forbidden = docker("exec", name, "sh", "-c", "cat /acc/out/forbidden.json 2>/dev/null || true").stdout.trim();
-  const calls = forbidden ? forbidden.split("\n").flatMap((l) => JSON.parse(l)) : [];
-  const unexpected = calls.filter((c) => !(s.id === "c-node-go-rust" && c.step.startsWith("go-toolchain")));
-  const onlyBackends = unexpected.every((c) => c.calls.every((x) => /^(java|quint|tlc)\b/.test(x)));
-  add(s.id, "no-toolchain-processes", {
-    command: "PATH shims + spawn trace for java, quint, go, cargo, rustc, rustup, tlc",
-    required: !s.observeOnly,
-    status: s.observeOnly ? "observed" : !unexpected.length ? "pass" : onlyBackends ? "known-gap" : "fail",
-    ...(unexpected.length && onlyBackends && !s.observeOnly ? { chunk: "R1-A" } : {}),
-    reason: unexpected.length ? unexpected.map((c) => `${c.step}: ${c.calls.join("; ")}`).join(" | ") : "log empty",
-  });
-  docker("rm", "-f", name);
-  containers.delete(name);
 }
 
 function compareGraphs() {
   const a = results.filter((r) => r.scenario === "a-node-only" && r.fingerprint);
-  const c = results.filter((r) => r.scenario === "c-node-go-rust" && r.fingerprint);
+  const c = results.filter((r) => r.scenario === "c-node-go-rust" && r.fingerprint && !r.step.startsWith("go-toolchain"));
   if (!a.length || !c.length) return;
   const diffs = [];
   for (const row of a) {
     const other = c.find((r) => r.step === row.step);
-    const strip = (f) => JSON.stringify({ ...f, counts: f?.counts ? { ...f.counts } : null });
     if (!other) diffs.push(`${row.step} missing`);
-    else if (strip(row.fingerprint) !== strip(other.fingerprint)) diffs.push(row.step);
+    else if (JSON.stringify(row.fingerprint) !== JSON.stringify(other.fingerprint)) diffs.push(row.step);
   }
   add("c-node-go-rust", "graph-identical-to-node-only", {
     command: "compare graph results of (c) with (a)",
@@ -311,7 +430,7 @@ function compareGraphs() {
 
 // ------------------------------------------------------------------ report
 
-function report(tarball) {
+function report(tarball, selected) {
   const counts = {};
   for (const r of results) counts[r.status] = (counts[r.status] ?? 0) + 1;
   const requiredFails = results.filter((r) => r.required && r.status === "fail");
@@ -323,9 +442,9 @@ function report(tarball) {
     commit: opt("--commit", null),
     verdict,
     counts,
-    docker: docker("version", "-f", "{{.Server.Version}}").stdout.trim(),
+    docker: dockerQuiet("version", "-f", "{{.Server.Version}}").stdout.trim(),
     tarball,
-    scenarios: selected.map(({ id, image, proves, observeOnly }) => ({ id, image, proves, reportOnly: !!observeOnly })),
+    scenarios: selected.map(({ id, image, proves }) => ({ id, image, proves })),
     results: results.map(({ fingerprint, ...r }) => r),
   };
   mkdirSync(OUT, { recursive: true });
@@ -341,12 +460,16 @@ function report(tarball) {
     "Durations, sizes and memory are observations on the dev server, not limits.",
     "",
   ];
+  if (gaps.length) {
+    lines.push("## Known gaps", "", "| Scenario | Step | Chunk | Reason |", "|---|---|---|---|");
+    for (const r of gaps) lines.push(`| ${r.scenario} | ${cell(r.step)} | ${r.chunk} | ${cell(r.reason)} |`);
+    lines.push("");
+  }
   for (const s of [{ id: "0-build", proves: "Release build: npm ci, npm run build, npm pack in a node:24.21.0 container." }, ...doc.scenarios]) {
     const rows = results.filter((r) => r.scenario === s.id);
     if (!rows.length) continue;
-    lines.push(`## ${s.id}`, "", s.proves + (s.reportOnly ? " Report only." : ""), "", "| Step | Status | Exit | Req. | Reason |", "|---|---|---|---|---|");
-    for (const r of rows)
-      lines.push(`| ${cell(r.step)} | ${r.status}${r.chunk ? " (" + r.chunk + ")" : ""} | ${r.exitCode ?? "–"} | ${r.required ? "yes" : "no"} | ${cell(r.reason)} |`);
+    lines.push(`## ${s.id}`, "", s.proves, "", "| Step | Status | Exit | Req. | Reason |", "|---|---|---|---|---|");
+    for (const r of rows) lines.push(`| ${cell(r.step)} | ${r.status}${r.chunk ? " (" + r.chunk + ")" : ""} | ${r.exitCode ?? "–"} | ${r.required ? "yes" : "no"} | ${cell(r.reason)} |`);
     lines.push("");
   }
   writeFileSync(join(OUT, "latest.md"), lines.join("\n"));
@@ -354,31 +477,34 @@ function report(tarball) {
   return verdict;
 }
 
-function cleanup() {
-  for (const c of containers) docker("rm", "-f", c);
-  if (!flag("--keep-images")) for (const image of createdImages) if (!preexisting.has(image)) docker("image", "rm", "-f", image);
-  // Dangling build layers from our multi-stage builds.
-  rmSync(SCRATCH, { recursive: true, force: true });
-}
+// ------------------------------------------------------------------ main
 
 let code = 3;
-process.on("SIGINT", () => {
-  cleanup();
-  process.exit(130);
-});
 try {
+  const wanted = opt("--scenarios", null)?.split(",").filter(Boolean);
+  const unknown = (wanted ?? []).filter((w) => !SCENARIOS.some((s) => s.id === w));
+  if (unknown.length) throw Object.assign(Error(`unknown scenario(s): ${unknown.join(", ")}; known: ${SCENARIOS.map((s) => s.id).join(", ")}`), { usage: true });
+  if (wanted && !wanted.length) throw Object.assign(Error("--scenarios names no scenario"), { usage: true });
+  const selected = SCENARIOS.filter((s) => !wanted || wanted.includes(s.id));
+  reapOrphans();
   const tgz = await buildTarball();
-  const tarball = inspectTarball(tgz);
-  for (const s of selected) await runScenario(s, tgz);
-  compareGraphs();
-  const verdict = report(tarball);
-  code = verdict === "pass" ? 0 : verdict === "known-gaps" ? 2 : 1;
+  if (flag("--pack-only")) {
+    console.log(`TARBALL=${tgz}`);
+    code = 0;
+  } else {
+    const tarball = inspectTarball(tgz);
+    for (const s of selected) await runScenario(s, tgz);
+    compareGraphs();
+    const verdict = report(tarball, selected);
+    code = verdict === "pass" ? 0 : verdict === "known-gaps" ? 2 : 1;
+  }
 } catch (e) {
-  log("harness error: " + (e?.stack ?? e));
-  try {
-    report({ file: null, packedBytes: 0, unpackedBytes: 0, files: 0 });
-  } catch {}
-  code = results.some((r) => r.status === "fail") ? 1 : 3;
+  log((e.usage ? "usage error: " : "harness error: ") + (e.usage ? e.message : e?.stack ?? e));
+  if (!e.usage && results.length)
+    try {
+      report({ file: null, packedBytes: 0, unpackedBytes: 0, files: 0 }, SCENARIOS);
+    } catch {}
+  code = !e.usage && results.some((r) => r.status === "fail") ? 1 : 3;
 } finally {
   cleanup();
 }

@@ -7,5 +7,6 @@ import (
 )
 
 func main() {
-	fmt.Println(pricing.ComputeTotal([]int{250, 125}))
+	cart := pricing.NewCart().Add(250).Add(125)
+	fmt.Println(pricing.ComputeTotal(cart.Items()))
 }
