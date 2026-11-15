@@ -1,0 +1,8 @@
+// Acceptance fixture with a deliberate error: the invariant names an
+// undeclared state `charge` (the state is `charges`).
+machine BrokenOrder {
+  state paid: Bool = false;
+  state charges: Nat in 0..2 = 0;
+  event pay when !paid { paid = true; charges = charges + 1; }
+  invariant chargedOnce = charge <= 1;
+}
