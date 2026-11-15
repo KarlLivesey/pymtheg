@@ -137,11 +137,16 @@ helper. No T3 preview is enabled.
 
 ## Recovery and larger designs
 
-Studio stores unsaved drafts, selected context and the latest three frozen runs
-in `.pymtheg-studio/workspace.sqlite`. This project-local directory is private
-and ignores itself in Git. The database contains source text and trace values: it
-is local recovery, not encrypted storage. Keep it with the project when moving
-workstations. Stop Studio before deliberately deleting it to discard recovery.
+Studio stores unsaved drafts and selected context in
+`.pymtheg/shared/drafts.sqlite`, and the latest three frozen runs in
+`.pymtheg/rebuildable/runs.sqlite`. Both are private to the project and ignored
+by Git. The databases contain source text and trace values: they are local
+recovery, not encrypted storage. Unsaved drafts are authored data, so they sit
+under `shared/`; deleting `.pymtheg/rebuildable/` loses only the run cache, which
+can be rerun. Keep `.pymtheg/shared/` with the project when moving workstations.
+Stop Studio before deliberately deleting the drafts database to discard recovery.
+An unreadable run cache gives an empty run history and a warning naming
+`.pymtheg/rebuildable/runs.sqlite`; draft recovery stays available.
 Closing/reopening Studio restores drafts without changing original `.pym` files.
 The footer confirms acknowledged saves; a failed save remains visible. If another
 window writes first, “Review recovery and retry” shows that saved draft and allows
@@ -195,7 +200,7 @@ Competing draft writers receive a conflict and can download their local text.
 import that JSON bundle to move the snapshot. Other retained revisions remain in
 the local database; the snapshot export does not include the entire history.
 
-The database is `.pymtheg-architecture/architecture.sqlite`. Unchanged document
+The database is `.pymtheg/shared/architecture.sqlite`. Unchanged document
 content is shared between revisions. Limits are explicit: 64 MiB/import,
 16 MiB/document, 10,000 revisions and 512 MiB retained content/indexes, plus one
 16 MiB recovery draft. Quotas reject new writes; they do not evict old designs.
