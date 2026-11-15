@@ -1,7 +1,8 @@
 // W3-L round 1 review: each case fails without its fix. Fixtures under
 // test/fixtures/graph-go-toolchain/ are compiler-checked (Go 1.27.4):
-//   generics, anonstruct, outside, vendored, disagree, replace/app:
-//     `CGO_ENABLED=0 go build ./... && go vet ./...` pass; outside also
+//   generics, anonstruct, outside, vendored, disagree, replace/app,
+//     testanon: `CGO_ENABLED=0 go build ./... && go vet ./...` pass
+//     (testanon also `go test ./...`); outside also
 //     with GOOS=windows; disagree FAILS for GOOS=windows ("Helper already
 //     declared through dot-import"), by design: it is valid for linux only.
 // These tests need the user's `go`; without one on PATH they are skipped.
@@ -128,6 +129,20 @@ test(
       "a/a.go:(reader).Read",
       "a/a.go:ReadCloser.Read",
     ]);
+  },
+);
+
+test(
+  "an unnamed struct in a _test.go file withholds verification for its promoted methods",
+  needsGo,
+  async () => {
+    const off = await once("testanon", {});
+    const dump = await once("testanon");
+    const [set] = link(dump, "p/p.go", "x.C");
+    // Not verified: in the test binary x.C also reaches (c).C.
+    assert.equal(set.data.toolchain, undefined);
+    assert.deepEqual(set.candidates, link(off, "p/p.go", "x.C")[0].candidates);
+    assert.ok(set.candidates.includes("p/p.go:(c).C"), set.candidates.join());
   },
 );
 

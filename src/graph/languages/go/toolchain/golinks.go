@@ -767,6 +767,45 @@ func dispatch(pkgs []*pkg, checked map[string]*types.Package, dyn []ifaceCall) {
 			}
 		}
 	}
+	// The same in _test.go files: an unnamed struct with embedded fields
+	// written there (`Use(struct{ r; c }{})`) is a dynamic value only in the
+	// test binary, which the search above does not cover. Like a test-file
+	// named type, its promoted method names withhold verification.
+	for _, p := range pkgs {
+		if p.Module == nil || !p.Module.Main || (p.ForTest == "" && !strings.HasSuffix(p.ImportPath, "_test")) {
+			continue
+		}
+		info := infoOf[checked[p.ImportPath]]
+		if info == nil {
+			continue
+		}
+		for e, tv := range info.Types {
+			if !strings.HasSuffix(fset.Position(e.Pos()).Filename, "_test.go") {
+				continue
+			}
+			t := tv.Type
+			if pt, ok := t.(*types.Pointer); ok {
+				t = pt.Elem()
+			}
+			st, ok := t.(*types.Struct)
+			if !ok {
+				continue
+			}
+			embeds := false
+			for i := 0; i < st.NumFields(); i++ {
+				if st.Field(i).Embedded() {
+					embeds = true
+				}
+			}
+			if !embeds {
+				continue
+			}
+			ms := types.NewMethodSet(types.NewPointer(st))
+			for i := 0; i < ms.Len(); i++ {
+				genericMethods[ms.At(i).Obj().Name()] = true
+			}
+		}
+	}
 	memo := map[string]string{}
 	for _, d := range dyn {
 		tp, isTP := d.t.(*types.TypeParam)

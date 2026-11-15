@@ -114,12 +114,17 @@ link notes, and again in the real resolution.
     an embedded interface);
   - a main-module generic type has a method of that name (the search does not
     instantiate generics);
-  - a main-module `_test.go` type has a method of that name (the call also
-    runs in the test binary).
+  - a main-module `_test.go` type has a method of that name, or an unnamed
+    struct with embedded fields written in a `_test.go` file promotes one
+    (the call also runs in the test binary).
 - **The implementer search** covers every named, non-generic, non-interface
   type of the loaded plain packages, and every unnamed struct type with
-  embedded fields written in main-module code (`struct{ reader; closer }{}`:
-  its promoted methods are listed). Each instantiation of a generic interface
+  embedded fields written in a main-module NON-test file
+  (`struct{ reader; closer }{}`: its promoted methods are listed). An unnamed
+  struct with embedded fields written in a `_test.go` file is a dynamic value
+  only in the test binary, which the search does not cover: like a test-file
+  named type, the names of its promoted methods withhold verification (no
+  verified set is claimed for a call of those method names). Each instantiation of a generic interface
   (`Getter[int]`, `Getter[string]`) is searched on its own: answers are
   memoised only for an uninstantiated named type or a type parameter.
 - **References to an interface method** (method values) keep the source-only
@@ -177,7 +182,7 @@ The helper's output is kept in the rebuildable folder, keyed by:
   not capture (excluded directories, symlinks). Module-cache and GOROOT files
   are immutable for their version, which the report includes.
 
-The fingerprint runs on every index (one `go list`; 1.6 s on restic); a warm
+The fingerprint runs on every index (one `go list`; 1.6 s on restic, an observation on the round-1 workstation); a warm
 index never reuses facts whose inputs changed. **Any change re-runs the whole
 helper.** Whether a package's links are definite depends on its whole import
 closure, and implementer sets depend on every loaded package, so no smaller
@@ -206,7 +211,8 @@ re-run is sound. Warm == cold, byte for byte (tests; restic, evidence).
   - a verified implementer set that drops a same-count wrong-signature
     method;
   - two instantiations of a generic interface, each with its own set;
-  - an unnamed struct of embedded types in a verified set;
+  - an unnamed struct of embedded types in a verified set; one written in a
+    `_test.go` file withholds verification;
   - embedded promotion;
   - a type error: that package and its importers stay source-only, and there
     are no implementer sets;
@@ -230,8 +236,8 @@ re-run is sound. Warm == cold, byte for byte (tests; restic, evidence).
     `implements` (209 confirmed, 24 new);
   - `implements`: 58 refuted (both sides loaded), 9 kept source-only (6
     generic, 3 outside the configuration);
-  - 120 candidate sets are now verified sets, all EQUAL to the source-only
-    set (the change is the dropped `structural-match-unverified`); 4
+  - 87 candidate sets are now verified sets, all EQUAL to the source-only
+    set (the change is the dropped `structural-match-unverified`); 3
     unresolved calls gain a verified set;
   - 0 disagreements;
   - 30 sampled upgrades read and correct;
