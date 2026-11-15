@@ -177,6 +177,7 @@ export async function indexProject(
     )
     .sort(compare);
   const updates: GraphFile[] = [];
+  const cacheableFailures = new Set<string>();
   const changed = new Set<string>();
   for (const [path, module] of claims) {
     const source = captures.get(path)!;
@@ -186,7 +187,7 @@ export async function indexProject(
       old?.hash === source.hash &&
       old.module === module.id &&
       old.version === module.version &&
-      old.result.status !== "failed"
+      (old.result.status !== "failed" || (await store.isParseFailure?.(path)))
     ) {
       report.unchanged++;
       continue;
@@ -199,6 +200,8 @@ export async function indexProject(
       try {
         result = await module.parse({ path, text: source.text });
         validateResult(source.text, result);
+        if (result.status === "failed" && result.failureKind !== "transient")
+          cacheableFailures.add(path);
       } catch (error) {
         const detail = message(error);
         report.errors.push({ path, message: detail });
@@ -217,7 +220,7 @@ export async function indexProject(
   }
   await store.replaceContexts(contexts);
   for (const file of updates) {
-    await store.replaceFile(file);
+    await store.replaceFile(file, cacheableFailures.has(file.path));
     report.indexed++;
   }
   for (const file of oldFiles)
@@ -241,6 +244,7 @@ export async function indexProject(
         needsContext(module, file.path),
       );
       let results: readonly AnalyzedFile[];
+      let analysisFailed = false;
       try {
         if (ownContexts.some((file) => file.status === "failed"))
           throw Error("Project context could not be captured");
@@ -280,6 +284,7 @@ export async function indexProject(
           );
       } catch (error) {
         const detail = message(error);
+        analysisFailed = true;
         report.analysisErrors.push({ module: module.id, message: detail });
         results = files.map((file) => ({
           path: file.path,
@@ -289,7 +294,14 @@ export async function indexProject(
       for (const item of results) {
         const file = filesByPath.get(item.path)!;
         if (JSON.stringify(file.result) !== JSON.stringify(item.result))
-          await store.replaceFile({ ...file, result: item.result });
+          await store.replaceFile(
+            { ...file, result: item.result },
+            !analysisFailed &&
+              file.result.status === "failed" &&
+              item.result.status === "failed" &&
+              item.result.failureKind !== "transient" &&
+              (await store.isParseFailure?.(file.path)) === true,
+          );
         report.analyzed++;
       }
     }
@@ -319,10 +331,12 @@ export async function indexProject(
       const output =
         (await module.resolve?.({
           projectId: store.projectId,
-          files,
-          contextFiles: ownContexts,
-          symbols,
-          links: own,
+          ...structuredClone({
+            files,
+            contextFiles: ownContexts,
+            symbols,
+            links: own,
+          }),
         })) ?? [];
       result = Array.isArray(output)
         ? { resolutions: output, links: [] }

@@ -1,10 +1,29 @@
+import { within, processState } from "./process-safety.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
-import { captureImplementation } from "../dist/implementation/capture.js";
+import { captureImplementation as productionCapture } from "../dist/implementation/capture.js";
+
+function captureImplementation(root, paths, label, signal, execution) {
+  const controller = new AbortController();
+  const running = productionCapture(
+    root,
+    paths,
+    label,
+    AbortSignal.any([signal, controller.signal]),
+    execution,
+  );
+  return within(running, "capture completion or parser readiness", async () => {
+    controller.abort();
+    await within(
+      running.catch(() => {}),
+      "capture cancellation cleanup",
+    );
+  });
+}
 
 test("a native fatal child signal falls back without aborting its caller or changing source", async () => {
   const root = await mkdtemp(join(tmpdir(), "pym-native-capture-"));
@@ -80,90 +99,160 @@ test("capture cancellation waits for process cleanup after a ready handshake", a
 test("abrupt owner death reaps a busy parser and removes its private source transfer", async () => {
   const { spawn } = await import("node:child_process");
   const { readdir, access } = await import("node:fs/promises");
-  const { watch } = await import("node:fs");
+  const { createServer } = await import("node:net");
   const { once } = await import("node:events");
-  for (const signal of ["SIGKILL", "SIGHUP"]) {
-    const project = await mkdtemp(join(tmpdir(), "pym-owner-death-"));
-    let owner, busyPid, watcher, cleanupTimeout, transfer;
-    try {
-      await writeFile(
-        join(project, "a.ts"),
-        'export const secret = "private source";',
-      );
-      const parser = join(project, "busy.mjs");
-      await writeFile(
-        parser,
-        'import {writeFileSync} from "node:fs"; writeFileSync(' +
-          JSON.stringify(join(project, "pid")) +
-          ',String(process.pid)); process.stdout.write("ready\\n"); for(;;) {}',
-      );
-      const module = new URL(
-        "../dist/implementation/capture.js",
-        import.meta.url,
-      ).href;
-      const script = join(project, "owner.mjs");
-      await writeFile(
-        script,
-        `import {captureImplementation} from ${JSON.stringify(module)}; import {pathToFileURL} from 'node:url'; await captureImplementation(${JSON.stringify(project)},['a.ts'],'Private',new AbortController().signal,{runnerURL:pathToFileURL(${JSON.stringify(parser)}),onReady:()=>process.send({kind:'ready'})});`,
-      );
-      owner = spawn(process.execPath, [script], {
-        stdio: ["ignore", "ignore", "pipe", "ipc"],
-      });
-      await once(owner, "message");
-      const pid = Number(await readFile(join(project, "pid"), "utf8"));
-      busyPid = pid;
-
-      for (const name of await readdir(tmpdir())) {
-        if (!name.startsWith("pym-code-process-")) continue;
-        try {
-          const data = JSON.parse(
-            await readFile(join(tmpdir(), name, "owner.json"), "utf8"),
-          );
-          if (data.pid === owner.pid) transfer = join(tmpdir(), name);
-        } catch {}
-      }
-      assert.ok(transfer);
-      watcher = watch(transfer);
-      const removed = new Promise((resolve, reject) => {
-        cleanupTimeout = setTimeout(
-          () =>
-            reject(
-              Error(
-                "Capture cleanup did not finish within the test safety budget",
-              ),
-            ),
-          30000,
-        );
-        const inspect = () => {
-          access(transfer).catch((error) => {
-            if (error.code === "ENOENT") resolve();
-            else reject(error);
+  for (const competingReaper of [false, true]) {
+    for (const signal of ["SIGKILL", "SIGHUP"]) {
+      const project = await mkdtemp(join(tmpdir(), "pym-owner-death-"));
+      // Isolate supervisor-only transfers from other full-suite startup reapers.
+      const transfers = competingReaper ? tmpdir() : join(project, "transfers");
+      if (!competingReaper) await mkdir(transfers);
+      let owner, ownerClosed, busyPid, transfer, connection, supervisorPid;
+      const server = createServer();
+      const socketPath = join(project, "supervisor.sock");
+      let supervisorReady, supervisorStopped;
+      const connected = new Promise((resolve, reject) => {
+        server.once("error", reject);
+        server.once("connection", (socket) => {
+          connection = socket;
+          let text = "";
+          supervisorReady = new Promise((ready) => {
+            socket.on("data", (chunk) => {
+              text += chunk;
+              if (text.includes("\n")) ready(Number(text.split("\n")[0]));
+            });
           });
-        };
-        watcher.on("change", inspect);
-        watcher.on("error", reject);
-        inspect();
+          supervisorStopped = new Promise((stopped, fail) => {
+            socket.on("end", () => {
+              if (text.includes("STOPPED\n")) stopped();
+              else
+                fail(
+                  Error("Supervisor disconnected without cleanup completion"),
+                );
+            });
+            socket.on("error", fail);
+          });
+          void supervisorStopped.catch(() => {});
+          resolve();
+        });
       });
-      const exited = once(owner, "exit");
-      owner.kill(signal);
-      await exited;
-      await removed;
-      watcher.close();
-      assert.throws(
-        () => process.kill(pid, 0),
-        (error) => error.code === "ESRCH",
-      );
-    } finally {
-      if (cleanupTimeout) clearTimeout(cleanupTimeout);
-      watcher?.close();
-      owner?.kill("SIGKILL");
-      if (busyPid) {
-        try {
-          process.kill(busyPid, "SIGKILL");
-        } catch {}
+      server.listen(socketPath);
+      await within(once(server, "listening"), "supervisor observer listening");
+      try {
+        await writeFile(
+          join(project, "a.ts"),
+          'export const secret = "private source";',
+        );
+        const parser = join(project, "busy.mjs");
+        await writeFile(
+          parser,
+          'import {writeFileSync} from "node:fs"; writeFileSync(' +
+            JSON.stringify(join(project, "pid")) +
+            ',String(process.pid)); process.stdout.write("ready\\n"); for(;;) {}',
+        );
+        const module = new URL(
+          "../dist/implementation/capture.js",
+          import.meta.url,
+        ).href;
+        const script = join(project, "owner.mjs");
+        await writeFile(
+          script,
+          `import {captureImplementation} from ${JSON.stringify(module)}; import {pathToFileURL} from 'node:url'; await captureImplementation(${JSON.stringify(project)},['a.ts'],'Private',new AbortController().signal,{runnerURL:pathToFileURL(${JSON.stringify(parser)}),onReady:()=>process.send({kind:'ready'})});`,
+        );
+        owner = spawn(process.execPath, [script], {
+          stdio: ["ignore", "ignore", "pipe", "ipc"],
+          env: {
+            ...process.env,
+            TMPDIR: transfers,
+            PYM_TEST_SUPERVISOR_SOCKET: socketPath,
+            NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ""} --import=${new URL("./capture-supervisor-observer.mjs", import.meta.url).href}`,
+          },
+        });
+        ownerClosed = once(owner, "close");
+        void ownerClosed.catch(() => {});
+        await within(
+          Promise.all([once(owner, "message"), connected]),
+          "busy parser readiness and supervisor connection",
+        );
+        supervisorPid = await within(supervisorReady, "supervisor PID");
+        const pid = Number(await readFile(join(project, "pid"), "utf8"));
+        busyPid = pid;
+
+        for (const name of await readdir(transfers)) {
+          if (!name.startsWith("pym-code-process-")) continue;
+          try {
+            const data = JSON.parse(
+              await readFile(join(transfers, name, "owner.json"), "utf8"),
+            );
+            if (data.pid === owner.pid) transfer = join(transfers, name);
+          } catch {}
+        }
+        assert.ok(transfer);
+        if (competingReaper) {
+          // Force the ordering seen with concurrent captures: startup recovery can
+          // remove the dead owner's transfer before its supervisor is scheduled.
+          process.kill(supervisorPid, "SIGSTOP");
+          await processState(
+            supervisorPid,
+            ["T"],
+            "supervisor stopped at the cleanup gate",
+          );
+        }
+        const exited = once(owner, "exit");
+        owner.kill(signal);
+        await within(exited, `owner ${signal} exit`);
+        if (competingReaper) {
+          const { reapStaleCaptures } = await import(
+            "../dist/implementation/capture-lease.js"
+          );
+          await reapStaleCaptures();
+          await assert.rejects(access(transfer), { code: "ENOENT" });
+          // Removal alone is insufficient: the parser is demonstrably still alive.
+          process.kill(pid, 0);
+          process.kill(supervisorPid, "SIGCONT");
+        }
+        await within(
+          supervisorStopped,
+          "supervisor completion after parser reaping",
+        );
+        await assert.rejects(access(transfer), { code: "ENOENT" });
+        assert.throws(
+          () => process.kill(pid, 0),
+          (error) => error.code === "ESRCH",
+        );
+      } finally {
+        owner?.kill("SIGKILL");
+        if (supervisorPid) {
+          try {
+            process.kill(supervisorPid, "SIGCONT");
+          } catch {}
+        }
+        let cleanupError;
+        if (supervisorStopped) {
+          try {
+            await within(supervisorStopped, "supervisor cleanup in finally");
+          } catch (error) {
+            cleanupError = error;
+            try {
+              process.kill(supervisorPid, "SIGKILL");
+            } catch {}
+          }
+        }
+        connection?.destroy();
+        await within(
+          new Promise((resolve) => server.close(resolve)),
+          "observer socket closure",
+        );
+        if (ownerClosed) await within(ownerClosed, "owner pipe closure");
+        if (busyPid) {
+          try {
+            process.kill(busyPid, "SIGKILL");
+          } catch {}
+        }
+        if (transfer) await rm(transfer, { recursive: true, force: true });
+        await rm(project, { recursive: true, force: true });
+        if (cleanupError) throw cleanupError;
       }
-      if (transfer) await rm(transfer, { recursive: true, force: true });
-      await rm(project, { recursive: true, force: true });
     }
   }
 });
@@ -186,7 +275,9 @@ test("startup cleanup removes only marked transfers with a dead owner", async ()
       "this Linux cleanup test requires an observable owner scope",
     );
     const child = spawn(process.execPath, ["-e", ""], { stdio: "ignore" });
-    await once(child, "exit");
+    await within(once(child, "exit"), "startup cleanup fixture exit", () =>
+      child.kill("SIGKILL"),
+    );
     await writeFile(
       join(dead, "owner.json"),
       JSON.stringify({

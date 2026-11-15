@@ -176,7 +176,12 @@ test("failed and partial parses are recorded and reported, including unchanged p
         ...toy,
         parse(source) {
           if (source.path === "bad.toy")
-            throw Error("intentional parser failure");
+            return {
+              status: "failed",
+              diagnostics: [{ message: "intentional content failure" }],
+              symbols: [],
+              links: [],
+            };
           return toy.parse(source);
         },
       },
@@ -196,8 +201,8 @@ test("failed and partial parses are recorded and reported, including unchanged p
     const again = await indexProject(root, registry, store);
     assert.deepEqual(again.partial, ["partial.toy"]);
     assert.deepEqual(again.failed, ["bad.toy"]);
-    assert.equal(again.unchanged, 1);
-    assert.equal(again.indexed, 1);
+    assert.equal(again.unchanged, 2);
+    assert.equal(again.indexed, 0);
   });
 });
 
@@ -298,9 +303,29 @@ test("module revision invalidates cache, malformed facts fail explicitly, store 
     assert.deepEqual(report.failed, ["x.toy"]);
     assert.match(report.errors[0].message, /range/);
     assert.equal(store.findSymbols().length, 0);
+    const contentFailure = {
+      ...toy,
+      version: "4",
+      parse() {
+        return {
+          status: "failed",
+          diagnostics: [{ message: "content failure" }],
+          symbols: [],
+          links: [],
+        };
+      },
+    };
+    await indexProject(root, new LanguageRegistry([contentFailure]), store);
+    const sameVersion = await indexProject(
+      root,
+      new LanguageRegistry([{ ...toy, version: "4" }]),
+      store,
+    );
+    assert.equal(sameVersion.indexed, 0);
+    assert.deepEqual(sameVersion.failed, ["x.toy"]);
     const recovered = await indexProject(
       root,
-      new LanguageRegistry([{ ...toy, version: "3" }]),
+      new LanguageRegistry([{ ...toy, version: "5" }]),
       store,
     );
     assert.equal(recovered.indexed, 1);

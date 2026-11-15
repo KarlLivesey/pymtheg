@@ -51,6 +51,11 @@ export function validateResult(
 ): void {
   if (!["clean", "partial", "failed"].includes(result.status))
     throw Error("Invalid parse status");
+  if (
+    result.failureKind !== undefined &&
+    !["content", "transient"].includes(result.failureKind)
+  )
+    throw Error("Invalid parse failure kind");
   if (result.status !== "clean" && !result.diagnostics.length)
     throw Error("Incomplete parse needs a diagnostic");
   const range = (value: import("./types.js").SourceRange) => {

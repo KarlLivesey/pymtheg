@@ -196,10 +196,17 @@ export async function checkLanguageConformance(
         (link) => link.target === null && !link.candidates?.length,
       ).length,
     );
+    const retryCount = store
+      .files()
+      .filter(
+        (file) =>
+          file.result.status === "failed" && !store!.isParseFailure(file.path),
+      ).length;
     const repeat = await indexProject(root, registry, store);
+    assert.equal(repeat.indexed, retryCount);
     assert.equal(
-      repeat.indexed,
-      fixtures.filter((fixture) => fixture.status === "failed").length,
+      repeat.unchanged,
+      fixtures.filter((fixture) => !fixture.context).length - retryCount,
     );
     assert.deepEqual(store.findSymbols(), symbols);
     assert.deepEqual(store.links(), links);
