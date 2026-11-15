@@ -1083,11 +1083,12 @@ async function networkOff() {
  *    and npx write there on every invocation, not Pymtheg;
  *  - the temp dir (/tmp): Pymtheg's workers use it for transient files;
  *  - in scenario c only, Go's own build and module caches (~/.cache/go-build,
- *    ~/go), written by the `go` the project opted into;
+ *    ~/go) and its config folder (~/.config/go: Go's local telemetry
+ *    counters), written by the `go` the project opted into;
  *  - /acc, the harness's own files.
  */
 async function writesOutside({ go = false } = {}) {
-  const allowed = [`${PROJECT}/`, `${HOME}/legacy/`, `${GO_PROJECT}/`, `${HOME}/restic/`, `${APP}/`, `${HOME}/.npm/`, `${GLOBAL_PREFIX}/`, "/tmp/", "/acc/", ...(go ? [`${HOME}/.cache/go-build/`, `${HOME}/go/`] : [])];
+  const allowed = [`${PROJECT}/`, `${HOME}/legacy/`, `${GO_PROJECT}/`, `${HOME}/restic/`, `${APP}/`, `${HOME}/.npm/`, `${GLOBAL_PREFIX}/`, "/tmp/", "/acc/", ...(go ? [`${HOME}/.cache/go-build/`, `${HOME}/go/`, `${HOME}/.config/go/`] : [])];
   await step({
     id: "writes-outside-project",
     display: "no file created or modified outside the project, npm's own folders and /tmp",
