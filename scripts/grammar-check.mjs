@@ -26,8 +26,15 @@ const samples = [
   {
     package: "tree-sitter-rust",
     wasm: "tree-sitter-rust.wasm",
+    // The Rust module loads the vendored, patched build (grammars/rust, W2-V);
+    // the npm package still supplies the tags query checked against it.
+    vendored: new URL("../grammars/rust/tree-sitter-rust.wasm", import.meta.url)
+      .pathname,
     node: "function_item",
-    source: "fn greet() -> i32 { 42 }\n",
+    // Edition-2024 `unsafe extern` and `&raw` on a variable: only the vendored
+    // build reads them.
+    source:
+      'fn greet() -> i32 { 42 }\nunsafe extern "C" {\n    fn abs(x: i32) -> i32;\n}\nfn r(raw: u8) -> u8 { *&raw }\n',
   },
   {
     package: "@tree-sitter-grammars/tree-sitter-lua",
@@ -87,7 +94,7 @@ for (const sample of samples) {
       `${sample.package}: no definition of sample function`,
     );
     console.log(
-      `PASS ${sample.vendored ? `${sample.package} (vendored grammars/go; npm ${metadata.version} queries)` : `${sample.package}@${metadata.version}`}: ABI ${language.abiVersion}; ` +
+      `PASS ${sample.vendored ? `${sample.package} (vendored ${sample.vendored.split("/").slice(-3, -1).join("/")}; npm ${metadata.version} queries)` : `${sample.package}@${metadata.version}`}: ABI ${language.abiVersion}; ` +
         `no parse errors; named ${sample.node}; ` +
         `tags.scm definitions: ${definitions.map((capture) => capture.name).join(", ")}`,
     );

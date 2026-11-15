@@ -78,6 +78,14 @@ export async function findWorkspace(
   return workspace ? { root, workspace } : null;
 }
 async function createOnce(path: string, text: string): Promise<boolean> {
+  try {
+    const info = await lstat(path);
+    if (!info.isFile() || info.isSymbolicLink())
+      throw Error(`Project metadata must be a regular file: ${path}`);
+    return false;
+  } catch (error) {
+    if (!missing(error)) throw error;
+  }
   const staged = resolve(
     dirname(path),
     `.${basename(path)}.${randomUUID()}.tmp`,
@@ -117,13 +125,37 @@ async function protectLocalStorage(root: string): Promise<string[]> {
   if (
     await createOnce(
       resolve(storage, ".gitignore"),
-      "# Local databases and rebuildable state. Share exported history.\nshared/\nrebuildable/\n",
+      "# Local databases and rebuildable state. Share exported history.\nshared/\nrebuildable/\n*.tmp\n",
     )
   )
     filesCreated.push(".pymtheg/.gitignore");
   return filesCreated;
 }
 export async function initializeWorkspace(input: string, name?: string) {
+  try {
+    return await initialize(input, name);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (!["EACCES", "EPERM", "EROFS"].includes(code ?? "")) throw error;
+    const failed = (error as NodeJS.ErrnoException).path ?? resolve(input);
+    const path = basename(failed).endsWith(".tmp") ? dirname(failed) : failed;
+    throw Error(
+      `Cannot initialize project: ${path} is not writable. Choose a writable directory or grant your user write permission.`,
+    );
+  }
+}
+async function validateInitConfig(root: string) {
+  try {
+    await loadConfig(root);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code) throw error;
+    const message = error instanceof Error ? error.message : String(error);
+    throw Error(
+      `Invalid project settings at ${storagePath(root, "settings")}: ${message}. Repair invalid metadata without deleting your designs.`,
+    );
+  }
+}
+async function initialize(input: string, name?: string) {
   const requested = name?.trim();
   if (name !== undefined && (!requested || requested.length > 160))
     throw Error("Choose a project name of 1–160 characters");
@@ -137,21 +169,25 @@ export async function initializeWorkspace(input: string, name?: string) {
       );
     return { ...ancestor, created: false, filesCreated: [] };
   }
-  await loadConfig(root);
+  await validateInitConfig(root);
   const previous = await readWorkspace(root);
   if (previous) {
     if (requested && requested !== previous.name)
       throw Error(
         `Project is already initialized as “${previous.name}”. Its identity and name were preserved.`,
       );
-    return {
-      root,
-      workspace: previous,
-      created: false,
-      filesCreated: await protectLocalStorage(root),
-    };
+    const filesCreated = await protectLocalStorage(root);
+    if (
+      await createOnce(
+        storagePath(root, "settings", true),
+        json({ version: 1, scenarios: {} }),
+      )
+    )
+      filesCreated.push(identity.projectConfig);
+    await validateInitConfig(root);
+    return { root, workspace: previous, created: false, filesCreated };
   }
-  await loadConfig(root); // Validate existing configuration before creating metadata.
+  await validateInitConfig(root); // Validate existing configuration before creating metadata.
   const marker = await markerFile(root);
   await mkdir(dirname(marker), { recursive: true });
   const filesCreated: string[] = [];
@@ -163,7 +199,7 @@ export async function initializeWorkspace(input: string, name?: string) {
     )
   )
     filesCreated.push(identity.projectConfig);
-  await loadConfig(root); // A concurrent writer's configuration must also validate.
+  await validateInitConfig(root); // A concurrent writer's configuration must also validate.
   const workspace: WorkspaceIdentity = {
     schema: "pymtheg.workspace/v1",
     id: randomUUID(),

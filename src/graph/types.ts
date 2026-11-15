@@ -106,8 +106,31 @@ export interface ResolutionContext {
   /** Only this module's parsed links, presented unresolved. Derived links are rebuilt each invocation. */
   links: readonly GraphLink[];
 }
+/**
+ * The opt-in toolchain route for one module (`graph.toolchain.<module id>` in
+ * .pymtheg/settings.json, passed as IndexOptions.toolchains). Absent when the
+ * project has not opted in: running a toolchain is as trusted as building the
+ * project. The module may read the project from disk under `root` and run its
+ * language's own build chain; it must still return results for the supplied
+ * snapshot.
+ */
+export interface ToolchainRequest {
+  /** Absolute project root on disk. */
+  root: string;
+  /** The module's setting, as written (e.g. true, or an absolute tool path). */
+  setting: Json;
+  /** A rebuildable directory the module may use (built helpers, caches). */
+  workDir: string;
+  /** The caller's environment, for locating the user's own toolchain only. */
+  environment: Readonly<Record<string, string | undefined>>;
+  signal?: AbortSignal;
+  /** Adds a note to the index report (`toolchains`). */
+  note(note: Json): void;
+}
 export interface ProjectAnalysisContext {
   projectId: string;
+  /** Present only when the project opted in for this module's toolchain. */
+  toolchain?: ToolchainRequest;
   /** All this module's captured sources, including unchanged/reopened files. */
   files: readonly GraphFile[];
   /** All matching declared context files, including unchanged ones. Missing files are absent. */

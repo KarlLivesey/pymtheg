@@ -1,0 +1,44 @@
+✔ clean init and live commands: empty-git (5200.774252ms)
+✔ clean init and live commands: non-git (4913.758801ms)
+✔ clean init and live commands: mixed-code (6167.92645ms)
+✔ clean init and live commands: legacy-ignored (4949.475802ms)
+✔ clean init and live commands: legacy-untracked (5057.423284ms)
+✔ clean init and live commands: path with spaces (5014.253933ms)
+✔ nested folders and monorepo packages open their parent; a nested Git root is independent (791.794912ms)
+✔ init recovers from interrupted publication steps without changing existing metadata (2967.227342ms)
+✔ read-only and invalid metadata errors identify the path and corrective action (694.54175ms)
+✔ help and no-argument first run direct users to init (490.438067ms)
+✔ this repository initializes and serves commands with fake legacy data, without touching the original checkout (5536.363884ms)
+✔ initialization and all project stores use only .pymtheg (292.991917ms)
+✔ deleting rebuildable state preserves history, decisions, links, settings and unsaved drafts; the graph regenerates identically (500.594741ms)
+✔ old layout .pymtheg.json is ignored and preserved by project storage entry points (237.601774ms)
+✔ old layout .pymtheg-architecture is ignored and preserved by project storage entry points (215.72014ms)
+✔ old layout .pymtheg-studio is ignored and preserved by project storage entry points (320.902646ms)
+✔ path reads create nothing and reject symlink directories and database sidecars (7.495719ms)
+✔ SQLite connection constructors and runtime imports stay inside the storage boundary (92.963602ms)
+✔ file-scope check/verify/simulate leave new storage untouched; project-scope runs (2319.669358ms)
+✔ file-scope check/verify/simulate leave old storage untouched; project-scope runs (2256.981567ms)
+✔ graph cache creation without init installs its own Git ignore rule (316.266993ms)
+✔ runs cache creation without init installs its own Git ignore rule (35.055505ms)
+✔ Studio in an uninitialized Git repo keeps a completed run cache out of Git status (469.12003ms)
+✔ a garbage run cache leaves unsaved Studio drafts readable and writable (139.331492ms)
+✔ project discovery ignores stray old storage above new, Git and metadata-only roots (605.576245ms)
+✔ blank initialization is idempotent, portable and discoverable from a child directory (39.707538ms)
+✔ initialization preserves existing configuration and concurrent initializers publish one identity (73.469091ms)
+✔ invalid markers and metadata symlinks are refused without replacing data (20.411009ms)
+✔ MCP and Studio resolve an initialized project from a nested directory and expose the same identity (620.889087ms)
+✔ the CLI initializes an empty directory without generating example source (409.119683ms)
+✔ moving an initialized project preserves its identity without storing the old absolute root (18.468211ms)
+✔ reinitialization does not hide invalid configuration or replace the project identity (18.150098ms)
+✔ an already open MCP workspace sees initialization on its next fresh inventory (33.665963ms)
+✔ Studio project setup uses the same identity and imports documentation only after explicit request (543.141036ms)
+✔ Studio setup refuses to import documentation changed after its displayed preview (355.226204ms)
+✔ nested init reuses the parent identity and keeps SQLite out of Git (73.701163ms)
+ℹ tests 36
+ℹ suites 0
+ℹ pass 36
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 42117.185208

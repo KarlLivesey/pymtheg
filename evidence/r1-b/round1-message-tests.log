@@ -1,0 +1,12 @@
+Fresh mirror: no dist-web; java absent from PATH; PYM_TLC_JAR unset
+✔ name and ownership errors never suggest repairing valid metadata (1167.954743ms)
+✔ read-only metadata reports the directory rather than a staging file (364.520366ms)
+✔ printed next commands quote shell metacharacters literally (422.570518ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2293.327017

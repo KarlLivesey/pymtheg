@@ -11,7 +11,7 @@ const commands = [
   ],
   [
     "init [DIRECTORY] [--name NAME] [--import-docs] [--resolutions FILE] [--allow-broken-links] [--format text|json]",
-    "Create a project workspace without overwriting existing work.",
+    "Start here: create .pymtheg/ without overwriting existing work; old layouts are unused.",
   ],
   [
     "studio PATH [--port PORT] [--plugin TARGET=PATH]",
@@ -57,7 +57,7 @@ const commands = [
 export const commandNames = commands.map(([syntax]) => syntax.split(" ")[0]!);
 export function help() {
   return (
-    `${identity.cli}\nStart a project: ${identity.cli} init .\nOpen the workspace: ${identity.cli} studio .\n\n` +
+    `${identity.cli}\nStart here: ${identity.cli} init .\nThen: ${identity.cli} doctor; ${identity.cli} studio .; ${identity.cli} mcp .\n\n` +
     commands
       .map(([syntax, purpose]) => `${identity.cli} ${syntax}\n  ${purpose}`)
       .join("\n\n") +

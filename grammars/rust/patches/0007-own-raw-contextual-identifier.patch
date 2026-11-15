@@ -1,0 +1,135 @@
+diff --git a/grammar.js b/grammar.js
+index 8b44241..b118bc3 100644
+--- a/grammar.js
++++ b/grammar.js
+@@ -1057,7 +1057,11 @@ module.exports = grammar({
+     reference_expression: $ => prec(PREC.unary, seq(
+       '&',
+       choice(
+-        seq('raw', choice('const', $.mutable_specifier)),
++        // Pymtheg patch 0007 (not upstream): `raw` is not a keyword. The raw
++        // borrow marker is an identifier, shown as the anonymous node `raw`,
++        // and only where `const` or `mut` follows it; everywhere else `raw`
++        // is an ordinary identifier (types, patterns, items, `&raw` alone).
++        seq(alias($.identifier, 'raw'), choice('const', $.mutable_specifier)),
+         optional($.mutable_specifier),
+       ),
+       field('value', $._expression),
+@@ -1662,7 +1666,6 @@ module.exports = grammar({
+       'default',
+       'union',
+       'gen',
+-      'raw',
+     ), $.identifier),
+ 
+     _type_identifier: $ => alias($.identifier, $.type_identifier),
+diff --git a/test/corpus/pymtheg_raw.txt b/test/corpus/pymtheg_raw.txt
+new file mode 100644
+index 0000000..74cf15f
+--- /dev/null
++++ b/test/corpus/pymtheg_raw.txt
+@@ -0,0 +1,104 @@
++================================================================================
++Pymtheg patch 0007: & before a variable named raw is a plain borrow
++================================================================================
++
++fn f(raw: Vec<u8>) -> usize {
++    let a = &raw;
++    let b = &raw[0];
++    let c = &raw.len();
++    let p = &raw const raw;
++    a.len()
++}
++
++---
++
++(source_file
++  (function_item
++    name: (identifier)
++    parameters: (parameters
++      (parameter
++        pattern: (identifier)
++        type: (generic_type
++          type: (type_identifier)
++          type_arguments: (type_arguments
++            (primitive_type)))))
++    return_type: (primitive_type)
++    body: (block
++      (let_declaration
++        pattern: (identifier)
++        value: (reference_expression
++          value: (identifier)))
++      (let_declaration
++        pattern: (identifier)
++        value: (reference_expression
++          value: (index_expression
++            (identifier)
++            (integer_literal))))
++      (let_declaration
++        pattern: (identifier)
++        value: (reference_expression
++          value: (call_expression
++            function: (field_expression
++              value: (identifier)
++              field: (field_identifier))
++            arguments: (arguments))))
++      (let_declaration
++        pattern: (identifier)
++        value: (reference_expression
++          value: (identifier)))
++      (call_expression
++        function: (field_expression
++          value: (identifier)
++          field: (field_identifier))
++        arguments: (arguments)))))
++
++================================================================================
++Pymtheg patch 0007: raw as a type name, generic parameter and binding
++================================================================================
++
++struct raw(u8);
++fn f<T>(x: Option<raw>) -> u8 {
++    match 1 {
++        raw @ (1 | 2) => raw,
++        _ => 0,
++    }
++}
++
++---
++
++(source_file
++  (struct_item
++    name: (type_identifier)
++    body: (ordered_field_declaration_list
++      type: (primitive_type)))
++  (function_item
++    name: (identifier)
++    type_parameters: (type_parameters
++      (type_parameter
++        name: (type_identifier)))
++    parameters: (parameters
++      (parameter
++        pattern: (identifier)
++        type: (generic_type
++          type: (type_identifier)
++          type_arguments: (type_arguments
++            (type_identifier)))))
++    return_type: (primitive_type)
++    body: (block
++      (expression_statement
++        (match_expression
++          value: (integer_literal)
++          body: (match_block
++            (match_arm
++              pattern: (match_pattern
++                (captured_pattern
++                  (identifier)
++                  (tuple_pattern
++                    (or_pattern
++                      (integer_literal)
++                      (integer_literal)))))
++              value: (identifier))
++            (match_arm
++              pattern: (match_pattern)
++              value: (integer_literal))))))))
++
