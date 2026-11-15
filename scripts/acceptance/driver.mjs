@@ -1147,19 +1147,20 @@ async function networkOff() {
  * or modified (files newer than the marker written after the install):
  *  - the project folders the scenario works in (sample, legacy copy, Go
  *    project, restic, the local-install app);
- *  - npm's own cache, logs and npx store (~/.npm) and the global prefix: npm
- *    and npx write there on every invocation, not Pymtheg;
- *  - the temp dir (/tmp): Pymtheg's workers use it for transient files;
+ *  - npm's own cache, logs, npx store and update-notifier stamp
+ *    (~/.npm/_cacache, _logs, _npx, _update-notifier-last-checked): npm and
+ *    npx write there on every invocation, not Pymtheg;
  *  - in scenario c only, Go's own build and module caches (~/.cache/go-build,
  *    ~/go) and its config folder (~/.config/go: Go's local telemetry
  *    counters), written by the `go` the project opted into;
  *  - /acc, the harness's own files.
  */
 async function writesOutside({ go = false } = {}) {
-  const allowed = [`${PROJECT}/`, `${HOME}/legacy/`, `${GO_PROJECT}/`, `${HOME}/restic/`, `${APP}/`, `${HOME}/.npm/`, `${GLOBAL_PREFIX}/`, "/tmp/", "/acc/", ...(go ? [`${HOME}/.cache/go-build/`, `${HOME}/go/`, `${HOME}/.config/go/`] : [])];
+  const npmOwn = ["_cacache/", "_logs/", "_npx/", "_update-notifier-last-checked"].map((p) => `${HOME}/.npm/${p}`);
+  const allowed = [`${PROJECT}/`, `${HOME}/legacy/`, `${GO_PROJECT}/`, `${HOME}/restic/`, `${APP}/`, ...npmOwn, "/acc/", ...(go ? [`${HOME}/.cache/go-build/`, `${HOME}/go/`, `${HOME}/.config/go/`] : [])];
   await step({
     id: "writes-outside-project",
-    display: "no file created or modified outside the project, npm's own folders and /tmp",
+    display: "no file created or modified outside the project folders and npm's own cache folders (nothing in /tmp)",
     harnessOutput: true,
     cmd: ["sh", "-c", `find / -xdev \\( -path /proc -o -path /sys -o -path /dev \\) -prune -o -newer ${OUT}/.marker \\( -type f -o -type l \\) -print 2>/dev/null`],
     expect: (r) => {
@@ -1264,6 +1265,8 @@ async function npxAbsolute() {
  * route `used` with upgraded links; with it removed, no `go` runs and no
  * toolchain is reported.
  */
+const goAddLinks = (r) => (r.json?.data?.links ?? []).map((l) => `${l.source?.name}@${l.source?.file}:${l.line}->${l.target?.name ?? l.targetName}:${l.certainty}:${l.decidedBy ?? "source"}`).sort();
+const ADD_CALLERS_ON = [10, 10, 13, 15, 17].map((line) => `main@main.go:${line}->Add:definite:toolchain`);
 const REAL_GO = "/usr/local/go/bin/go";
 async function goOptIn(pym) {
   // The route needs go.mod at the project root, so the opt-in runs on the
@@ -1298,6 +1301,17 @@ async function goOptIn(pym) {
     },
     note: (r) => `${r.json.toolchain.go.upgradedLinks} links upgraded; ${r.calls.filter((c) => c.tool === "go").length} go processes`,
   });
+  await step({
+    id: "go-toolchain-callers",
+    display: "opted in: graph callers Add --json (the generic-result call at main.go:13 is decided by the toolchain)",
+    cmd: pym(["graph", "callers", "Add", "--root", GO_PROJECT, "--json"]),
+    cwd: GO_PROJECT,
+    allowToolchain: true,
+    // Exactly five definite calls of (*Cart).Add from main, each decided or
+    // confirmed by the toolchain, including line 13 (pricing.First(...).Add(5)).
+    expect: all(exit(0), (r) => same(goAddLinks(r), ADD_CALLERS_ON, "callers of Add, opted in")),
+    note: (r) => goAddLinks(r).join(", "),
+  });
   writeFileSync(settingsFile, JSON.stringify(settings, null, 2) + "\n");
   await step({
     id: "go-toolchain-off-again",
@@ -1305,6 +1319,15 @@ async function goOptIn(pym) {
     cmd: pym(["graph", "index", "--root", GO_PROJECT, "--json"]),
     cwd: GO_PROJECT,
     expect: all(exit(0), json((j) => (j.status !== "ok" ? `status ${j.status}` : "toolchain" in j ? `toolchain reported while off: ${JSON.stringify(j.toolchain)}` : null))),
+  });  await step({
+    id: "go-source-only-callers",
+    display: "setting off: graph callers Add --json (source-only: main.go:13 is not a definite caller)",
+    cmd: pym(["graph", "callers", "Add", "--root", GO_PROJECT, "--json"]),
+    cwd: GO_PROJECT,
+    // The same query without the toolchain: the generic-result call is not
+    // definite, so the opted-in answer above is the toolchain's doing.
+    expect: all(exit(0), (r) => same(goAddLinks(r), ADD_CALLERS_ON.filter((l) => !l.includes(":13->")).map((l) => l.replace(":toolchain", ":source")), "callers of Add, source-only")),
+    note: (r) => goAddLinks(r).join(", "),
   });
 }
 

@@ -139,6 +139,8 @@ const SABOTAGES = [
   // Round 4: requirement links over MCP.
   { id: "mcp-link-check-ok-after-edit", what: "MCP `requirement_links check` reports every link ok after a body edit", expect: ["mcp-requirement_links-check-after-edit"], apply: (d) => patch(d, "dist/mcp/links-view.js", "state: r.state,", 'state: "ok",') },
   { id: "link-add-stores-nothing", what: "`add` reports created but stores no link", expect: ["mcp-requirement_links-add-go", "link-add-go"], apply: (d) => patch(d, "dist/architecture/code-links.js", /store!?\.writeCodeLink\(key, value, true\)/, '({ id: "sabotaged-link", changed: true })') },
+  // Round 4: the Go opt-in must change the actual link, not only the counts.
+  { id: "go-facts-discarded", what: "Go toolchain facts counted but discarded at final resolution", scenarios: "c-node-go-rust", expect: ["go-toolchain-callers"], apply: (d) => patch(d, "dist/graph/languages/go/resolve.js", "decision = decided;", "void decided;") },
   { id: "code-graph-candidate", what: "MCP `code_graph` reports a definite caller as a candidate", expect: ["mcp-code_graph-callers-ts"], apply: (d) => patch(d, "dist/mcp/graph-view.js", "certainty: l.certainty,", 'certainty: l.certainty === "definite" ? "candidate-set" : l.certainty,') },
 ];
 

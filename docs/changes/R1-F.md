@@ -124,7 +124,7 @@ case-insensitive.
   checker.
 - `jdk`, `jre` and `openjdk` match as whole words.
 
-The self-test checks 32 fixed strings:
+The self-test checks every fixed string in `WORDING_CASES` (the count is in the results block below):
 
 | Must match | Must not match |
 |---|---|
@@ -137,10 +137,10 @@ The self-test checks 32 fixed strings:
 | 0-build | `npm ci`, `npm run build` and `npm pack` work from a clean checkout. The tarball has the CLI, web assets, both vendored grammars, README and the launcher. It ships no TypeScript sources, tests, evidence or research. The one helper source it runs (`src/graph/languages/go/toolchain/golinks.go`) is allowed and listed. |
 | a-node-only | The full list below, with Node only. |
 | b-node-git | Scenario (a) inside a git repository. After init, and again at the end, `git status` shows exactly the three `.pymtheg/` files, and tracked files are unchanged. The link edit is undone. |
-| c-node-go-rust | Scenario (a) with Go 1.27.4 and Cargo 1.100.0 on PATH: the graph answers are identical to (a), and with the setting off no `go` or `cargo` runs. With `graph.toolchain.go` set to the real `<GOROOT>/bin/go` on the sample's Go module, `go` must run and the route must report `used` with upgraded links > 0. Today that is 1 link and 2 `go` processes. With the setting removed again, no `toolchain` is reported. |
+| c-node-go-rust | Scenario (a) with Go 1.27.4 and Cargo 1.100.0 on PATH: the graph answers are identical to (a), and with the setting off no `go` or `cargo` runs. With `graph.toolchain.go` set to the real `<GOROOT>/bin/go` on the sample's Go module, `go` must run and the route must report `used` with upgraded links > 0. The actual links are then checked: `graph callers Add` must return exactly five definite calls from `main`, each `decidedBy: "toolchain"`, including the generic-result call at `main.go:13` (`pricing.First(...).Add(5)`). With the setting removed, no `toolchain` is reported, and the same query must return exactly the four other calls (source-decided) and not line 13. So the check proves the opt-in made the difference. |
 | d-global / d-local | `npm i -g` and `npm i` of the tarball. The binary resolves to the installed package and everything works from there. |
 | e-node-24.0.0 / 25 / 26 | Required, because engines is `">=24"`: install, help, init, doctor (all ready), check, verify, simulate, the broken design, graph index, callers, and no writes outside the project. |
-| f-restic | The pinned restic corpus (559 Go files): init, index with 0 failed files, status and five queries. Time and memory are observations. |
+| f-restic | The pinned restic corpus: init, index with 0 failed files, status and five queries. Time and memory are observations. |
 
 What scenario (a) runs, every step offline after the install:
 
@@ -168,8 +168,8 @@ What scenario (a) runs, every step offline after the install:
     (TypeScript ×2, Go ×2, Rust ×1) and one is same-file (`percent_of`).
   - The path query (definite) and the search query (exactly two symbols and one
     file).
-- **`pymtheg link`:**
-  - Requirement `plan:R1` is linked to `ComputeTotal` (Go), `apply_discount`
+- **`pymtheg link` (CLI):**
+  - Requirement `plan:R2` is linked to `ComputeTotal` (Go), `apply_discount`
     (Rust) and `formatTotal` (TypeScript).
   - `list` and `check` report all three `ok`, and `check` exits 0.
   - After an edit to the body of `apply_discount`, `check` exits 1, with exactly
@@ -177,7 +177,8 @@ What scenario (a) runs, every step offline after the install:
   - `refresh` makes it ok again, and `check` exits 0.
   - The edit is undone, refreshed and checked again.
 - **MCP:** initialize, `tools/list`, and then **every listed tool** with a
-  checked result (table below). `mcp-tool-coverage` fails if any listed tool was
+  checked result (table below). This includes requirement links using MCP calls
+  only. `mcp-tool-coverage` fails if any listed tool was
   not called, so a new tool fails the gate until the harness exercises it.
 - **Studio:** start, `GET /api/project` (the workspace name), `GET /` plus every
   asset it references, and a SIGINT stop.
@@ -201,7 +202,17 @@ What scenario (a) runs, every step offline after the install:
 | mcp-code_graph-index | `code_graph {action:"index"}` (+ `graph_result` if running) | complete, status ok, 0 failed files |
 | mcp-code_graph-search | `search Total` + symbols page | exactly `ComputeTotal@service/pricing/total.go`, `formatTotal@web/src/format.ts`, `total.go` |
 | mcp-code_graph-callers-ts/-go/-rust | `callers` (links page + symbols page) | exactly one link each: `renderBasket@web/src/main.ts`, `main@service/main.go`, `main@engine/src/main.rs` → target, `definite` |
-| mcp-read_architecture | `{section:"summary"}` | a store exists, with one revision (R1) |
+| mcp-requirement_links-requirement | `{action:"requirement", id:"R1"}` | status `created`; items `["plan:R1"]` |
+| mcp-requirement_links-add-go | `code_graph {action:"symbol", query:"taxFor"}`, then `add` with that `symbol:<hex>` ref | `created`; one link: `plan:R1` → `taxFor`, with the same ref |
+| mcp-requirement_links-add-rust / -ts | `add` `percent_of` / `roundCents` | `created`; one link each, with the exact record, name and path |
+| mcp-requirement_links-list | `{action:"list", record:"R1"}` | exactly `percent_of`, `roundCents`, `taxFor`, all `ok` |
+| mcp-requirement_links-check | `{action:"check"}` | all six links in the project (plan:R1 ×3 by MCP, plan:R2 ×3 by CLI) `ok`; `passed: true` |
+| mcp-requirement_links-check-after-edit | after editing `roundCents`'s body | exactly `plan:R1/roundCents` `changed`, with `differs: ["body"]`, the others `ok`; `passed: false` |
+| mcp-requirement_links-refresh, -check-after-refresh, -refresh-restored, -check-final | `refresh` that link; undo the edit; refresh again | `refreshed` (same link id); all six `ok`, `passed: true` |
+| mcp-requirement_links-requirements_for | `{symbol:"percent_of"}` | exactly `plan:R1`, `direct`, `percent_of` |
+| mcp-requirement_links-unlinked | `{symbols:true, section:"symbols"}` | lists `renderBasket`; lists none of the linked `formatTotal`, `roundCents`, `ComputeTotal` |
+| mcp-link_result-handle | `check` with `wait:false`, then `link_result {wait:true}` | handle `running` with a jobId; result `complete`, same jobId, `passed: true`, all six `ok` |
+| mcp-read_architecture | `{section:"summary"}` | a store exists, with two revisions (plan:R2 by CLI, plan:R1 by MCP) |
 | mcp-observe_implementation | `read_implementation` versions, then observe `web/src/main.ts` | a revision receipt |
 | mcp-link_implementation | planned `plan:R1` + observed `renderBasket`, `reviewed:true` | reviewed receipt; `plan:R1` has 1 link |
 | mcp-compare_implementation | the same pair | `source.equal` true, note retained |
@@ -218,91 +229,61 @@ below:
 
 - **The project folders the scenario works in:** the sample, the legacy copy,
   the Go project, restic and the local-install app.
-- **`~/.npm` and the global prefix:** npm and npx write their own cache, logs
-  and npx store there on every invocation.
-- **`/tmp`:** the temp dir that Pymtheg's workers may use. Nothing was written
-  there in today's run.
+- **npm's own folders:** `~/.npm/_cacache`, `_logs`, `_npx` and
+  `_update-notifier-last-checked`. npm and npx write there on every
+  invocation. Nothing else under `~/.npm` is allowed, and neither is the global
+  prefix after the install.
+- **Nothing in `/tmp`.** A temporary file left behind after the scenario fails
+  the step.
 - **In scenario c only:** Go's build cache (`~/.cache/go-build`), its module
   cache (`~/go`) and its config folder (`~/.config/go`, local telemetry
   counters). These are written by the `go` the project opted into.
 - **`/acc`:** the harness's own files.
 
-## Today's result (commit 12c7fa74: main with R1-A, R1-B, R1-C, R1-D, W3-L2 and PR 43 merged)
+What this check does not see:
 
-Verdict **known-gaps**, harness exit 2: **370 pass, 14 known-gap,
-22 expected-fail, 10 observed, 0 fail.**
+- files created and removed again within the scenario (transient temp files);
+- writes outside the container's root filesystem (none is mounted);
+- changes to directories or permissions alone (only files and symlinks are
+  compared).
 
-| Scenario | pass | known-gap | expected-fail | observed | fail |
-|---|---:|---:|---:|---:|---:|
-| 0-build | 4 | 0 | 0 | 2 | 0 |
-| a-node-only | 63 | 1 | 4 | 2 | 0 |
-| b-node-git | 68 | 1 | 4 | 0 | 0 |
-| c-node-go-rust | 68 | 1 | 4 | 1 | 0 |
-| d-global | 64 | 1 | 4 | 1 | 0 |
-| d-local | 63 | 1 | 4 | 1 | 0 |
-| e-node-24.0.0 | 4 | 9 | 0 | 1 | 0 |
-| e-node-25 | 12 | 0 | 1 | 1 | 0 |
-| e-node-26 | 12 | 0 | 1 | 1 | 0 |
-| f-restic | 12 | 0 | 0 | 0 | 0 |
+## Results
 
-### Every remaining known gap
+The block below is generated from `evidence/r1-f/latest.json` and
+`evidence/r1-f/selftest.json` by `node scripts/acceptance/summarise.mjs`. Every
+count in it comes from those files.
 
-| Chunk | Steps | Exact condition accepted | Turns green when |
-|---|---|---|---|
-| R1-C2 | `mcp-requirement-links` in a, b, c, d-global, d-local | `tools/list` succeeded and no listed tool's name contains `code_link`, `requirement` or `symbol_link` | When such a tool appears, the row **fails** (and so does `mcp-tool-coverage`) until `mcpSteps` creates, lists and checks a link through it. |
-| R1-H | 9 steps in e-node-24.0.0 | Node 24.0.x or 25.x; the only Node warning lines are exactly `(node:N) ExperimentalWarning: SQLite is an experimental feature and might change at any time` and its trace hint | The warning is gone. Node 25.9.0 already shows none. |
+<!-- acceptance-results:start -->
+<!-- acceptance-results:end -->
 
-The R1-C, R1-D and W3-L2 gaps are deleted, and their rows are real required
+### Known gaps
+
+The harness keeps one list, `KNOWN_WARNING_GAPS` in `driver.mjs`. An empty list
+is the normal state: the harness then exits 0 if nothing fails, and `latest.md`
+says "Known gaps: None". One entry remains:
+
+| Chunk | Exact condition accepted | Turns green when |
+|---|---|---|
+| R1-H (PR 45) | Node 24.0.x or 25.x, and the only Node warning lines are exactly `(node:N) ExperimentalWarning: SQLite is an experimental feature and might change at any time` and its trace hint | Delete the entry when PR 45 merges. Any other warning, on any version, fails. |
+
+The R1-C, R1-C2, R1-D and W3-L2 gaps are deleted, and their rows are required
 checks.
-
-Observations:
-
-- **Install:** `npx` installs in about 8 s. That is 85.2 MiB in `~/.npm/_npx`,
-  plus 69.6 MiB in `~/.npm/_cacache`.
-- **restic** (559 files): index took 92 s with at least 2.1 GiB peak RSS. It
-  found 7,356 symbols and 63,088 links, and no file failed.
 
 ## Self-test: the gate bites
 
-`scripts/acceptance/selftest.mjs` runs on commit 0ab4b8cb. The commit after it
-only adds `~/.config/go` to scenario (c)'s allowed places, which no self-test
-case uses.
+`scripts/acceptance/selftest.mjs`:
 
-1. It builds the tarball once.
-2. It makes 20 copies, each broken in one way. Each sabotage is first checked to
-   have actually applied: its anchor must be found exactly once, otherwise the
-   case reports NOT APPLIED.
-3. It runs the real harness on each copy and on an unmodified control, six at a
-   time.
-4. A case is caught only if the harness exits 1 and every named step is `fail`.
+1. Builds the tarball once.
+2. Makes one copy per sabotage, each broken in one way. Each sabotage is first
+   checked to have actually applied: its anchor must be found exactly once,
+   otherwise the case reports NOT APPLIED.
+3. Runs the real harness on each copy and on an unmodified control, six at a
+   time, in the scenario the case names.
+4. A sabotage counts as caught only if the harness exits 1 and every named step
+   is `fail`. The control must be clean: exit 0 with no gap, or exit 2 with only
+   R1-H gaps.
 
-Result (`evidence/r1-f/selftest.md`): **matcher 32/32, control clean, 20/20
-caught.**
-
-| Case | Break | Scenario | Named step(s), all `fail` | Exit |
-|---|---|---|---|---|
-| control | none | a | 0 failed; only R1-C2 | 2 |
-| check-exits-0 | `check` exits 0 on the broken design | a | check-broken | 1 |
-| grammar-removed | vendored Go grammar removed | a | tarball-contents, graph-index | 1 |
-| mcp-check-design-throws | MCP `check_design` throws | a | mcp-check_design | 1 |
-| callers-no-links | `graph callers` returns no links | a | graph-ts-callers | 1 |
-| caller-target-renamed | link target renamed | a | graph-ts-callers | 1 |
-| certainty-downgraded | certainty becomes `name-only` | a | graph-ts-callers | 1 |
-| prints-java | `--help` prints "java" | a | help | 1 |
-| index-runs-java | `graph index` runs `java -version` | a | graph-index, no-toolchain-processes | 1 |
-| mcp-wrong-verdict | MCP exitStatus 1 for the valid design | a | mcp-check_design | 1 |
-| link-crashes | `pymtheg link` exits 77 | a | link-requirement | 1 |
-| stack-trace-exit-0 | `--version` prints a TypeError stack and exits 0 | a | version | 1 |
-| wrong-diagnostic-message | N002 suggestion text changed | a | check-broken, mcp-check_design-broken | 1 |
-| listed-tool-throws | `design_recipe` throws | a | mcp-design_recipe | 1 |
-| deprecation-warning | `[DEP0005] DeprecationWarning` on Node 24.22 | a | help | 1 |
-| deprecation-warning-24.0.0 | the same, on Node 24.0.0 beside the R1-H warning | e-node-24.0.0 | help | 1 |
-| tools-list-error | `tools/list` answers a JSON-RPC error | a | mcp-tools-list, mcp-project_info, mcp-tool-coverage, mcp-requirement-links | 1 |
-| simulate-exhaustive-true | MCP simulate says `exhaustive: true` | a | mcp-explore_behaviour-simulate | 1 |
-| init-writes-root-file | `init` writes `PYMTHEG.md` in the project root | a | init | 1 |
-| engine-hides-violation | the built-in engine reports a violation as `no_counterexample` | a | verify-violation | 1 |
-| link-check-passes-changed | `link check` exits 0 with a changed link | a | link-check-after-edit | 1 |
-| code-graph-candidate | MCP `code_graph` reports a definite caller as `candidate-set` | a | mcp-code_graph-callers-ts | 1 |
+The cases and their results are in the generated block above.
 
 ## Cleanup and concurrent runs
 
@@ -329,8 +310,8 @@ containers and recorded images, never the host-wide image list. On 15 November
 - TERM exited 143, HUP 129 and PIPE 141. Each left 0 containers and no recorded
   image unused.
 - A real `pymtheg-dev` session killed mid-run (round 2) also left nothing.
-- After every run in this round, 0 `pymtheg-acc` containers remained, and the
-  recorded-image list was empty.
+- After every run, 0 `pymtheg-acc` containers remained, and the recorded-image
+  list was empty.
 
 ## Gap list: rough edges with no owning chunk
 
@@ -338,15 +319,16 @@ containers and recorded images, never the host-wide image list. On 15 November
    publish decision. `npx ./pymtheg-1.0.0.tgz` works today.
 2. **`npx /absolute/path.tgz`** exits 126, because npm runs an absolute path as a
    command. Docs should show `./name.tgz` or `file:/abs/path.tgz`.
-3. **Install size.** 85 MiB. Some runtime `dependencies` look unused at runtime
+3. **Install size** (see the install observation in the results block). Some runtime `dependencies` look unused at runtime
    (to be confirmed before changing anything):
    - the npm tree-sitter grammar packages, because the graph loads the vendored
      `.wasm` files;
    - React, react-markdown, remark-gfm, `@lezer/highlight` and most of
      CodeMirror, because they are bundled into `dist-web/`. Only
      `@codemirror/state` is imported by server code.
-4. **Install-script warnings.** `npm i -g` and `npm i` print 6
-   `npm warn install-scripts` lines for the tree-sitter packages. None of those
+4. **Install-script warnings.** `npm i -g` and `npm i` print
+   `npm warn install-scripts` lines for the tree-sitter packages (listed in the
+   `install-global` and `install-local` rows of `evidence/r1-f/latest.json`). None of those
    scripts is needed.
 5. **The Go opt-in needs `go.mod` at the project root.** A Go module in a
    subfolder reports `unavailable`. The opt-in also rightly refuses a `go` that
@@ -356,8 +338,8 @@ containers and recorded images, never the host-wide image list. On 15 November
    could set `GOTELEMETRY=off`, or document it.
 7. **Signalling only the `npx` PID** does not stop Studio or the MCP server, and
    `npx` may not exit either. Supervisors should signal the process group.
-8. **Each CLI call through `npx`** costs about 3 s and 165 MiB before doing any
-   work.
+8. **Each CLI call through `npx` has a start-up cost** before doing any work
+   (see each row's `durationMs` and `peakRssKiB` in `latest.json`).
 9. **`check_design` returns counts only.** An agent needs a second `read_run`
    call to see the finding text.
 
@@ -367,9 +349,8 @@ All on the dev server:
 
 - `npm test`: 2,771/2,771 pass, with 0 fail, cancelled or skipped.
 - `npm run format:check`: passes.
-- The harness exits 2, as above.
-- The self-test exits 0.
-- The cleanup test exits 0.
+- The harness, self-test and cleanup test exit codes are given with the results
+  above and in the PR description.
 
 ## Files
 
