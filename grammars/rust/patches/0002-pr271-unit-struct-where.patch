@@ -1,0 +1,45 @@
+diff --git a/grammar.js b/grammar.js
+index 4a0ff4b..6da4cba 100644
+--- a/grammar.js
++++ b/grammar.js
+@@ -310,7 +310,10 @@ module.exports = grammar({
+           optional($.where_clause),
+           ';',
+         ),
+-        ';',
++        seq(
++          optional($.where_clause),
++          ';',
++        ),
+       ),
+     ),
+ 
+diff --git a/test/corpus/declarations.txt b/test/corpus/declarations.txt
+index 7df0c0e..b2fd1ed 100644
+--- a/test/corpus/declarations.txt
++++ b/test/corpus/declarations.txt
+@@ -2257,6 +2257,8 @@ fn foo<A>() where A: B + As<f64>, f64: As<A> {}
+ 
+ impl<A> Default for B<A> where *mut A: C + D {}
+ 
++struct A where i32: Copy;
++
+ --------------------------------------------------------------------------------
+ 
+ (source_file
+@@ -2455,7 +2457,14 @@ impl<A> Default for B<A> where *mut A: C + D {}
+         bounds: (trait_bounds
+           (type_identifier)
+           (type_identifier))))
+-    body: (declaration_list)))
++    body: (declaration_list))
++  (struct_item
++    name: (type_identifier)
++    (where_clause
++      (where_predicate
++        left: (primitive_type)
++        bounds: (trait_bounds
++          (type_identifier))))))
+ 
+ ================================================================================
+ External Modules

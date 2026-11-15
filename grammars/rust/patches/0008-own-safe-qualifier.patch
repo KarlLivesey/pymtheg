@@ -1,0 +1,82 @@
+diff --git a/grammar.js b/grammar.js
+index b118bc3..314d60a 100644
+--- a/grammar.js
++++ b/grammar.js
+@@ -410,6 +410,8 @@ module.exports = grammar({
+ 
+     static_item: $ => seq(
+       optional($.visibility_modifier),
++      // Pymtheg patch 0008: `safe static` in an `unsafe extern` block.
++      optional(alias($.identifier, 'safe')),
+       'static',
+ 
+       // Not actual rust syntax, but made popular by the lazy_static crate.
+@@ -452,6 +454,11 @@ module.exports = grammar({
+ 
+     function_signature_item: $ => seq(
+       optional($.visibility_modifier),
++      // Pymtheg patch 0008 (not upstream): the edition-2024 `safe` qualifier
++      // of a foreign function in an `unsafe extern` block, as an identifier
++      // shown as the anonymous node `safe`; only directly before `fn` (or
++      // other function modifiers), so `safe` stays an ordinary identifier.
++      optional(alias($.identifier, 'safe')),
+       optional($.function_modifiers),
+       'fn',
+       field('name', choice($.identifier, $.metavariable)),
+diff --git a/test/corpus/pymtheg_safe.txt b/test/corpus/pymtheg_safe.txt
+new file mode 100644
+index 0000000..ecb7824
+--- /dev/null
++++ b/test/corpus/pymtheg_safe.txt
+@@ -0,0 +1,51 @@
++================================================================================
++Pymtheg patch 0008: safe qualifier in an unsafe extern block
++================================================================================
++
++unsafe extern "C" {
++    pub safe fn abs(x: i32) -> i32;
++    pub safe static errno: i32;
++}
++
++---
++
++(source_file
++  (foreign_mod_item
++    (extern_modifier
++      (string_literal
++        (string_content)))
++    body: (declaration_list
++      (function_signature_item
++        (visibility_modifier)
++        name: (identifier)
++        parameters: (parameters
++          (parameter
++            pattern: (identifier)
++            type: (primitive_type)))
++        return_type: (primitive_type))
++      (static_item
++        (visibility_modifier)
++        name: (identifier)
++        type: (primitive_type)))))
++
++================================================================================
++Pymtheg patch 0008: safe stays an ordinary identifier
++================================================================================
++
++fn f(safe: bool) -> bool {
++    safe
++}
++
++---
++
++(source_file
++  (function_item
++    name: (identifier)
++    parameters: (parameters
++      (parameter
++        pattern: (identifier)
++        type: (primitive_type)))
++    return_type: (primitive_type)
++    body: (block
++      (identifier))))
++

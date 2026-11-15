@@ -1,7 +1,8 @@
 import { implies, possible } from "./cfg.js";
 import { ecosystemMacroNames } from "./macro-catalog.js";
 import type { Node } from "web-tree-sitter";
-import { createTagsParser, tagsFromPackage } from "../../tree-sitter.js";
+import { fileURLToPath } from "node:url";
+import { createTagsParser } from "../../tree-sitter.js";
 import type { Json, ParseResult, SourceInput } from "../../types.js";
 
 const field = (n: Node, name: string) => n.childForFieldName(name);
@@ -268,11 +269,22 @@ function parser(): Promise<Helper> {
   });
   return sharedHelper;
 }
+/**
+ * The vendored, patched grammar (grammars/rust: upstream v0.24.2 + PRs #319,
+ * #271, #317, #312, #283, #281; see its manifest.json and docs/changes/W2-V.md).
+ * Resolved from this file so it works from dist/ and from the installed package.
+ */
+const GRAMMAR = fileURLToPath(
+  new URL("../../../../grammars/rust/tree-sitter-rust.wasm", import.meta.url),
+);
 async function createHelper(): Promise<Helper> {
   return createTagsParser({
-    ...(await tagsFromPackage("tree-sitter-rust", "tree-sitter-rust.wasm")),
-    // The bundled query emits function AND method at one start. The scoped AST
-    // pass below maps all definitions once, including definitions absent from tags.
+    wasmPath: GRAMMAR,
+    // No tags query: the scoped AST pass below maps every definition and
+    // reference itself, and nothing reads tags captures (definitions map to
+    // nothing and there is no reference mapper). A minimal query keeps the
+    // module independent of query files written for another grammar build.
+    query: "(source_file) @file",
     mapDefinition: () => undefined,
     secondPass({ tree, result }) {
       const { path, text } = pending!;
