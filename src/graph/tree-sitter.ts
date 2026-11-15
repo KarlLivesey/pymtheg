@@ -75,6 +75,7 @@ export async function createTagsParser(
       if (!tree)
         return {
           status: "failed",
+          failureKind: "transient",
           diagnostics: [{ message: "Tree-sitter returned no tree" }],
           symbols: [],
           links: [],
