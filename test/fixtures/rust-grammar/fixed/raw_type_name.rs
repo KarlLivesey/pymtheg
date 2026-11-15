@@ -1,4 +1,4 @@
-// edition 2024. Known regression from v0.24.x (read by npm 0.24.0, rejected now): `raw` as a type name (`Option<raw>`, `parse::<raw>()`; syn custom-keyword shape)
+// edition 2024. Read since patch 0007 (was a v0.24.x regression): `raw` as a type name (`Option<raw>`, `parse::<raw>()`; syn custom-keyword shape)
 #[allow(non_camel_case_types)]
 #[derive(Default)]
 pub struct raw;

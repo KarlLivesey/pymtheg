@@ -45,8 +45,17 @@ for (const language of languages) {
     assert.ok(recorded.upstream.tag);
     for (const patch of recorded.patches) {
       assert.ok(existsSync(join(root, language, patch.file)), patch.file);
-      assert.match(patch.headCommit, /^[0-9a-f]{40}$/);
-      assert.match(patch.pullRequest, /\/pull\/\d+$/);
+      // Upstream patches name their pull request and head commit; our own
+      // patches say so and describe what they change.
+      if (patch.origin === "pymtheg") {
+        assert.match(patch.author, /not upstream/);
+        assert.ok(patch.what.length > 20, patch.file);
+        assert.match(patch.file, /-own-/);
+      } else {
+        assert.ok([undefined, "upstream"].includes(patch.origin), patch.file);
+        assert.match(patch.headCommit, /^[0-9a-f]{40}$/);
+        assert.match(patch.pullRequest, /\/pull\/\d+$/);
+      }
     }
     for (const tool of ["tree-sitter-cli", "wasi-sdk", "binaryen"])
       assert.ok(recorded.tools[tool], tool);

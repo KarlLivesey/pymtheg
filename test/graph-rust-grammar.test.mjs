@@ -1,6 +1,6 @@
 // W2-V: Rust shapes the vendored grammar (tree-sitter-rust v0.24.2 + PRs
-// #319, #271, #317, #312, #283, #281) reads, the ones it still cannot read,
-// and the known regression of v0.24.x. Every fixture is valid Rust: checked
+// #319, #271, #317, #312, #283, #281 + our patches 0007 `raw` and 0008 `safe`)
+// reads, and the ones it still cannot read. Every fixture is valid Rust: checked
 // with rustc below when the toolchain is installed (edition from the
 // fixture's first line; output also in evidence/w2-v/fixtures-rustc.txt).
 import assert from "node:assert/strict";
@@ -81,7 +81,7 @@ test(
   () => {
     const out = mkdtempSync(join(tmpdir(), "pymtheg-rustc-"));
     try {
-      for (const dir of ["fixed", "remaining", "limits"])
+      for (const dir of ["fixed", "remaining"])
         for (const name of files(dir)) {
           const path = join(fixture, dir, name);
           const run = spawnSync(
@@ -190,9 +190,52 @@ test("unit struct where clause, ~ in macros, `as T <=`, \\u{4_e}, foreign types"
   assert.deepEqual(opaque.data.conditions, ["any()"]);
 });
 
+test("patch 0007: `raw` as a type name and in `raw @ pattern` is read again", async () => {
+  const typed = await index("fixed", "raw_type_name.rs");
+  assert.deepEqual(typed.report.failed, []);
+  assert.deepEqual(own(typed.symbols), [
+    "function:f",
+    "function:p",
+    "struct:raw",
+  ]);
+  // `Option<raw>` and `p::<raw>()` both reach the struct named raw.
+  assert.deepEqual(targets(typed.links, "types", "raw"), [
+    "struct:raw",
+    "struct:raw",
+  ]);
+  const bound = await index("fixed", "raw_at_binding.rs");
+  assert.deepEqual(bound.report.failed, []);
+  assert.deepEqual(own(bound.symbols), ["function:f"]);
+});
+
+test("patch 0008: `safe fn` / `safe static` in unsafe extern blocks; `safe` stays a name", async () => {
+  const { report, symbols, links } = await index("fixed", "safe_items.rs");
+  assert.deepEqual(report.failed, []);
+  assert.deepEqual(own(symbols), [
+    "function:abs",
+    "function:magnitude",
+    "function:safe",
+    "function:strlen",
+    "function:zone",
+    "macro:safe",
+    "static:timezone",
+    "struct:Options",
+  ]);
+  assert.deepEqual(targets(links, "calls", "abs"), ["function:abs"]);
+  assert.deepEqual(targets(links, "values", "timezone"), ["static:timezone"]);
+  assert.deepEqual(targets(links, "calls", "self::safe"), ["function:safe"]);
+  assert.deepEqual(targets(links, "macros", "safe"), ["macro:safe"]);
+  const minimal = await index("fixed", "safe_fn_in_extern.rs");
+  assert.deepEqual(minimal.report.failed, []);
+  assert.deepEqual(own(minimal.symbols), [
+    "function:abs",
+    "function:strlen",
+    "static:errno",
+  ]);
+});
+
 for (const [dir, label] of [
   ["remaining", "still rejected by the vendored grammar"],
-  ["limits", "known regression of v0.24.x (`raw` as a type name or `raw @`)"],
 ])
   for (const name of files(dir))
     test(`${dir}/${name}: ${label}; the file fails honestly`, async () => {

@@ -59,10 +59,27 @@ MIT; a GitHub release only, not on npm) plus, in order:
    `7d6fe656932a6f0f27bdc92ea80c075585a00943`: foreign `type X;` in extern
    blocks.
 
-v0.24.2 itself already reads `&raw` on a variable named `raw` and
-`unsafe extern` blocks. Not taken: PR #256, which makes `safe` a reserved
-word (29 registry files with a parameter, field or macro named `safe` break),
-and PR #297, which breaks `macro_rules` used as an identifier (W2-P). Built
-with the same tools as Go. The `--write` build here and W2-P's scratch build
-of the same inputs gave the same bytes, and `evidence/w2-v/build-verify.txt`
-records a third.
+Then two patches of our own (marked `"origin": "pymtheg"` in the manifest,
+not upstream):
+
+7. `0007-own-raw-contextual-identifier.patch`: `raw` is no longer a keyword.
+   The raw-borrow marker is an identifier aliased to the anonymous node `raw`,
+   and only directly after `&` and before `const`/`mut`. `raw` is also removed
+   from `_reserved_identifier`, where upstream's v0.24.1 fix put it; that made
+   the keyword valid at every expression start, so `raw` as a type name,
+   generic parameter, item name or `raw @ pattern` failed the file. Trees of
+   `&raw const x` / `&raw mut x` are unchanged, including the anonymous node.
+8. `0008-own-safe-qualifier.patch`: the edition-2024 `safe` qualifier
+   (`safe fn` / `safe static` in `unsafe extern` blocks), as an identifier
+   aliased to the anonymous node `safe`, only at the start of a body-less
+   function signature or a static item. `safe` stays an ordinary identifier
+   everywhere else, unlike upstream PR #256, which reserves it.
+
+Both patches carry their own `test/corpus` cases, which run with upstream's in
+the build. v0.24.2 itself already reads `&raw` on a variable named `raw` and
+`unsafe extern` blocks. Not taken: PR #256 (it makes `safe` a reserved word,
+and 29 registry files that use `safe` as a parameter, field or macro name
+break) and PR #297 (it breaks `macro_rules` used as an identifier; W2-P).
+Built with the same tools as Go. Three builds from these inputs gave the same
+bytes: the scratch build the corpus scans used, the `--write` build and the
+verify run in `evidence/w2-v/build-verify.txt`.

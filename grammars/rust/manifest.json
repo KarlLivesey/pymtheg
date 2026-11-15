@@ -17,7 +17,8 @@
       "paths": [
         "grammar.js",
         "test/corpus/attributes_on_struct_patterns.txt"
-      ]
+      ],
+      "origin": "upstream"
     },
     {
       "file": "patches/0002-pr271-unit-struct-where.patch",
@@ -28,7 +29,8 @@
       "paths": [
         "grammar.js",
         "test/corpus/declarations.txt"
-      ]
+      ],
+      "origin": "upstream"
     },
     {
       "file": "patches/0003-pr317-tilde-in-token-trees.patch",
@@ -39,7 +41,8 @@
       "paths": [
         "grammar.js",
         "test/corpus/macros.txt"
-      ]
+      ],
+      "origin": "upstream"
     },
     {
       "file": "patches/0004-pr312-le-after-cast.patch",
@@ -50,7 +53,8 @@
       "paths": [
         "grammar.js",
         "test/corpus/expressions.txt"
-      ]
+      ],
+      "origin": "upstream"
     },
     {
       "file": "patches/0005-pr283-unicode-escape-underscore.patch",
@@ -61,7 +65,8 @@
       "paths": [
         "grammar.js",
         "test/corpus/literals.txt"
-      ]
+      ],
+      "origin": "upstream"
     },
     {
       "file": "patches/0006-pr281-extern-types.patch",
@@ -72,6 +77,27 @@
       "paths": [
         "grammar.js",
         "test/corpus/declarations.txt"
+      ],
+      "origin": "upstream"
+    },
+    {
+      "file": "patches/0007-own-raw-contextual-identifier.patch",
+      "origin": "pymtheg",
+      "author": "Pymtheg W2-V (not upstream)",
+      "what": "`raw` is not a keyword: the raw-borrow marker is an identifier aliased to the anonymous node `raw`, only directly after `&` and before `const`/`mut`; `raw` is removed from `_reserved_identifier`. Fixes the v0.24.x regression where `raw` as a type name, generic parameter, item name or `raw @ pattern` failed the file; `&raw` on a variable stays a plain borrow and `&raw const`/`&raw mut` trees are unchanged",
+      "paths": [
+        "grammar.js",
+        "test/corpus/pymtheg_raw.txt"
+      ]
+    },
+    {
+      "file": "patches/0008-own-safe-qualifier.patch",
+      "origin": "pymtheg",
+      "author": "Pymtheg W2-V (not upstream)",
+      "what": "The edition-2024 `safe` qualifier (`safe fn` / `safe static` in `unsafe extern` blocks) as an identifier aliased to the anonymous node `safe`, only at the start of a body-less function signature or a static item; `safe` stays an ordinary identifier elsewhere (unlike upstream PR #256, which reserves it)",
+      "paths": [
+        "grammar.js",
+        "test/corpus/pymtheg_safe.txt"
       ]
     }
   ],
@@ -81,5 +107,5 @@
     "binaryen": "version_132"
   },
   "abi": 15,
-  "sha256": "ae20d895a6178dcba3051f8caa32f6f6d30e32e94e337d205880433becfed3ea"
+  "sha256": "66a1d3577d8e3242d31c6ff1a094307000c385524dd6f7a9afee369b207adac0"
 }

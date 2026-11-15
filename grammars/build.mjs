@@ -92,7 +92,9 @@ try {
       join(directory, patch.file),
     ]);
     console.log(
-      `applied ${patch.file} (${patch.pullRequest} @ ${patch.headCommit.slice(0, 12)})`,
+      patch.origin === "pymtheg"
+        ? `applied ${patch.file} (Pymtheg's own patch, not upstream)`
+        : `applied ${patch.file} (${patch.pullRequest} @ ${patch.headCommit.slice(0, 12)})`,
     );
   }
   run(treeSitter, ["generate"], { cwd: source });

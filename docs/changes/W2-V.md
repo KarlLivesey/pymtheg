@@ -2,12 +2,20 @@
 
 The Rust module now loads `grammars/rust/tree-sitter-rust.wasm`: upstream
 `tree-sitter-rust` v0.24.2 (`77a37472`, a GitHub release only) plus upstream
-PRs #319, #271, #317, #312, #283 and #281 (not #256, not #297). It is built by
-`grammars/build.mjs` (the W2-S route, unchanged) from the pinned commit and the
-committed patches with tree-sitter CLI 0.27.2, wasi-sdk 34.0 and binaryen
-version_132. sha256 `ae20d895…d3ea`; the `--write` build, the verify build
-(`evidence/w2-v/build-verify.txt`) and W2-P's scratch build of the same
-grammar changes gave the same bytes. Rust module version 23 → 24.
+PRs #319, #271, #317, #312, #283 and #281 (not #256, not #297), plus two
+patches of our own:
+
+- **0007** keeps `raw` an ordinary identifier;
+- **0008** reads the edition-2024 `safe` qualifier.
+
+Both are marked `"origin": "pymtheg"` in the manifest and are described in
+`grammars/README.md`. The grammar is built by `grammars/build.mjs` (the W2-S
+route; its only change is how it names our own patches) from the pinned
+commit and the committed patches, with tree-sitter CLI 0.27.2, wasi-sdk 34.0
+and binaryen version_132. The sha256 is `66a1d357…adac0`. Three builds gave
+the same bytes: the scratch build the corpus scans used, the `--write` build
+and the verify build (`evidence/w2-v/build-verify.txt`). Round 1 shipped
+`ae20d895…` without 0007 and 0008. Rust module version 23 → 24.
 
 ## What changes for users
 
@@ -25,15 +33,28 @@ tested (`test/graph-rust-grammar.test.mjs`, fixtures in
 - **`#[cfg]` on struct-pattern fields**: in `let`, in a match arm, on a
   `field: pattern` entry and in a function-parameter pattern. Vector: 2 files
   (`src/config/builder.rs`, `compiler.rs`).
+- **`raw` as an ordinary identifier everywhere else** (patch 0007): as a type
+  name, generic parameter or tuple-struct name (`Option<raw>`, `fn f<raw>`,
+  `struct raw(u8)`, `parse::<raw>()`) and as a binding with `raw @ pattern`.
+  Upstream's `&raw` fix in v0.24.1 had made these fail the file. `&raw const
+x` / `&raw mut x` stay raw borrows with exactly the old tree, anonymous
+  `raw` node included. `&raw` followed by anything else is a borrow of a
+  variable named `raw`.
+- **`safe fn` / `safe static` in `unsafe extern` blocks** (patch 0008,
+  edition-2024 FFI). Calls to a `safe fn` and uses of a `safe static`
+  resolve to them. `safe` stays an ordinary name (parameter, field, local,
+  function, macro).
 - A where clause on a unit struct (`struct X where u8: Send;`), `~` in macro
   token trees, `x as size_t <= y` (cast to a named type, then `<=`), `_` in
   unicode escapes (`"\u{4_e}"`), and foreign `type X;` in extern blocks
   (wasm-bindgen input). A foreign type keeps its block's `cfg`, like a
-  foreign function.
+  foreign function. Extern types are nightly-only, so the foreign-type
+  fixture passes rustc only because it sits under `#[cfg(any())]`, as
+  wasm-bindgen input would.
 
 ## Tree shapes and the Rust module
 
-Diffing upstream's node types (unpatched v0.24.2 against patched) gives three
+Diffing upstream's node types (unpatched v0.24.2 against patched) gives four
 changes. None of them needs a module change:
 
 - `field_pattern` may contain an `attribute_item`. The module reads field
@@ -46,6 +67,11 @@ changes. None of them needs a module change:
   the block's conditions.
 - A new anonymous `~` token inside token trees. The module reads only
   identifiers from token trees.
+- A new anonymous `safe` token (patch 0008), as the first child of a
+  `function_signature_item` or `static_item`. The module reads these items
+  through their fields and modifiers; their visibility and names come out as
+  before (tested). Patch 0007 changes no node type: the raw-borrow marker is
+  still the anonymous node `raw`.
 
 The grammar location in `parse.ts` changed. The module no longer reads
 `tree-sitter-rust`'s `tags.scm` from npm: nothing consumed its captures
@@ -57,7 +83,7 @@ reach.
 
 ## Gaps that remain (each a rustc-checked fixture that still fails the file honestly)
 
-`test/fixtures/rust-grammar/remaining/`, 24 files:
+`test/fixtures/rust-grammar/remaining/`, 23 files:
 
 - **Vector's last 3 failed files**:
   - two attributes stacked on one parameter (`lib/codecs/tests/avro.rs`,
@@ -65,10 +91,6 @@ reach.
   - turbofish on a function named like a primitive, `char::<_, E>(…)`
     (`lib/prometheus-parser/src/line.rs`);
   - `impl A + for<'a> B<'a>` (`lib/tracing-limit/src/lib.rs`).
-- **`safe fn` / `safe static` in `unsafe extern` blocks** (edition 2024). Only
-  PR #256 parses them, and it makes `safe` reserved, which breaks 29 registry
-  files that use `safe` as a parameter, field or macro name (W2-P). W2-P's
-  error-site repair (blank `safe`, then re-parse) is the proposed route.
 - An attribute on a closure parameter or on a later tuple element;
   `dyn A + for<'a> B<'a>`; turbofish on `u8::<T>()` / `str::<T>()`, inside a
   type, in a struct pattern, or empty (`f::<>()`); a leading `::` generic
@@ -82,12 +104,12 @@ reach.
 
 ## Known limits
 
-- **Regression of v0.24.x (upstream's `&raw` fix):** `raw` used as a type name
-  (`Option<raw>`, `p::<raw>()`, a syn custom-keyword shape) or bound with
-  `raw @ pattern` now fails the file (fixtures in `limits/`, tested). On the
-  W2-P crates.io scan: 7 files in 3 crates (syn 1.x, jni-macros,
-  zerocopy-derive), all proc-macro crates, out of about 63,700 files. Before,
-  those files were read and the `&raw` ones were not.
+- Patches 0007 and 0008 are ours, not upstream's, and the grammar accepts a
+  little invalid code because of them. The raw and safe markers are
+  identifiers whose text the grammar cannot check, so `&foo const x` reads as
+  a raw borrow and `foo fn f();` as a qualified foreign function. No valid
+  Rust has an identifier in those positions, so no valid file can read
+  differently.
 - `#[cfg]` on a pattern field is ignored by the module (see above); the
   binding counts as always present.
 
@@ -177,13 +199,33 @@ resolution).
   its imports (for example `use super::{… Config …}` →
   `src/config/mod.rs:155`, `crate::test_util::mock::basic_sink`, and
   `vector_lib::config::LegacyKey` → `vector_core`). All 32 are correct.
-- `fixtures-rustc.txt`: all 30 grammar fixtures pass rustc 1.98.1 in their
+- **Registry scan, round 2.** The local crates.io cache
+  (`registry-crates.txt`) now holds 1,720 crate versions, 58,586 `.rs` files;
+  it is a live cache (W2-P saw 1,884).
+  - `compare-registry-npm-vs-final.txt`, the npm `tree-sitter-rust` 0.24.0
+    that `main` uses against the final grammar: **1,693 files newly read,
+    0 newly broken, 0 clean files whose tree changes**, 188 rejected by both.
+    On Vector: 8 newly read, 0 broken, 0 changed.
+  - `compare-registry-round1-vs-final.txt`, this PR's round-1 grammar
+    against the final one: 7 files newly read, 0 broken, 0 changed trees.
+    Six are the `raw` regressions now read (zerocopy-derive 0.8.16 / 0.8.27 /
+    0.8.63 `repr.rs`, `raw @ …`; syn 1.0.109 `expr.rs`, `Option<raw>`;
+    jni-macros 0.22.4 `bind_java_type.rs` and `native_method.rs`,
+    `parse::<raw>()`). The seventh is getrandom 0.4.3
+    `backends/wasi_p2_3.rs` (`safe fn`). On Vector every file's tree is
+    identical between the two grammars.
+- **Vector after the round-2 patches and the merge of `origin/main`
+  `3614cec3`** (`round2-vector-rerun.txt`): all five dumps were redone. The
+  control, the full diff, the forced-failure comparison, the per-field
+  breakdown and the link sample are byte-identical to round 1, so every
+  Vector number above stands.
+- `fixtures-rustc.txt`: all 31 grammar fixtures pass rustc 1.98.1 in their
   editions.
 - `npm-pack.txt`, `clean-build.txt`: the package lists the Rust `.wasm`,
   manifest and licence. A clean `npm ci --ignore-scripts` and build work. The
   packed tarball, installed as a dependency of a scratch project, reads an
-  `unsafe extern` file with `#[link]` and a variadic declaration (status
-  clean, module version 24, installed `.wasm` sha256 `ae20d895…`).
+  `unsafe extern` file with `#[link]`, a variadic declaration and a `safe fn`
+  (status clean, module version 24, installed `.wasm` sha256 `66a1d357…`).
 - **Fetched over the network:** `github.com/tree-sitter/tree-sitter-rust`
   (the pinned commit, by `build.mjs`), the six PR heads once to cut the
   patch files, and Vector `515e87d9` (depth 1).
