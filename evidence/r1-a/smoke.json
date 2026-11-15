@@ -1278,7 +1278,7 @@
    {
     "name": "Node",
     "status": "ready",
-    "detail": "v24.21.0 (supported: 24 LTS)"
+    "detail": "v24.21.0 (supported: 24 or newer)"
    },
    {
     "name": "Verifier",
@@ -1296,14 +1296,19 @@
     "detail": "Built-in node:sqlite available"
    },
    {
-    "name": "Go grammar",
+    "name": "Go code graph",
     "status": "ready",
-    "detail": "<tree>/grammars/go/tree-sitter-go.wasm"
+    "detail": "Indexed a one-line probe.go (3 symbols)"
    },
    {
-    "name": "Rust grammar",
+    "name": "Rust code graph",
     "status": "ready",
-    "detail": "<tree>/node_modules/tree-sitter-rust/tree-sitter-rust.wasm"
+    "detail": "Indexed a one-line probe.rs (2 symbols)"
+   },
+   {
+    "name": "TypeScript code graph",
+    "status": "ready",
+    "detail": "Indexed a one-line probe.ts (2 symbols)"
    },
    {
     "name": "Studio",
