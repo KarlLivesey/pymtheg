@@ -28,6 +28,16 @@ export function formatGraph(response: GraphResponse): string {
     lines.push(
       `Indexed ${response.sync.report.indexed}; unchanged ${response.sync.report.unchanged}; removed ${response.sync.report.removed}`,
     );
+  // The opt-in toolchain route (absent when off).
+  const toolchain = response.toolchain?.go;
+  if (toolchain)
+    lines.push(
+      toolchain.state === "used"
+        ? `Toolchain go: used (${toolchain.version}; ${toolchain.configuration}); ${toolchain.upgradedLinks} links upgraded, ${toolchain.verifiedSets} verified sets, ${toolchain.confirmedLinks} confirmed, ${toolchain.disagreements} disagreements; ${toolchain.packages?.clean}/${toolchain.packages?.total} packages clean${toolchain.universeClean ? "" : " (implementer sets off: a loaded package has errors)"}`
+        : toolchain.state === "unavailable"
+          ? `Toolchain go: unavailable, source-only links: ${toolchain.reason}`
+          : "Toolchain go: on, not indexed yet",
+    );
   lines.push(`Failed files (${response.failedFiles.length}):`);
   for (const file of response.failedFiles)
     lines.push(
@@ -54,6 +64,7 @@ export function formatGraph(response: GraphResponse): string {
       source: DisplaySymbol | null;
       target: DisplaySymbol | null;
       certainty: string;
+      decidedBy?: string;
       line: number;
       column: number;
       endLine: number;
@@ -63,7 +74,7 @@ export function formatGraph(response: GraphResponse): string {
       })[];
     })[]) {
       lines.push(
-        `  ${link.certainty} ${link.kind}: ${link.source ? symbolText(link.source) : quote(link.file)} -> ${link.target ? symbolText(link.target) : link.resolution === "ambiguous" ? "one of [" + link.candidates.map((item) => (item.symbol ? symbolText(item.symbol) : item.id)).join("; ") + "]" : quote(link.targetName)} at ${locationText(link.file, link)}`,
+        `  ${link.certainty}${link.decidedBy === "toolchain" ? " (toolchain)" : ""} ${link.kind}: ${link.source ? symbolText(link.source) : quote(link.file)} -> ${link.target ? symbolText(link.target) : link.resolution === "ambiguous" ? "one of [" + link.candidates.map((item) => (item.symbol ? symbolText(item.symbol) : item.id)).join("; ") + "]" : quote(link.targetName)} at ${locationText(link.file, link)}`,
       );
       if (link.data !== undefined)
         lines.push(`    Stored details: ${quote(link.data)}`);

@@ -1,0 +1,225 @@
+[
+  {
+    "name": "project_info",
+    "args": {},
+    "bytes": 2996,
+    "isError": false
+  },
+  {
+    "name": "design_recipe",
+    "args": {
+      "action": "list"
+    },
+    "bytes": 6705,
+    "isError": false
+  },
+  {
+    "name": "read_source",
+    "args": {
+      "file": "counter.pym",
+      "startLine": 2,
+      "limit": 1
+    },
+    "bytes": 391,
+    "isError": false
+  },
+  {
+    "name": "check_design",
+    "args": {
+      "file": "counter.pym"
+    },
+    "bytes": 2834,
+    "isError": false
+  },
+  {
+    "name": "read_run",
+    "args": {
+      "runId": "c988809f-b0e9-4893-83b0-e45eedd1112c",
+      "section": "findings"
+    },
+    "bytes": 5983,
+    "isError": false
+  },
+  {
+    "name": "check_design",
+    "args": {
+      "file": "counter.pym"
+    },
+    "bytes": 2846,
+    "isError": false
+  },
+  {
+    "name": "try_inputs",
+    "args": {
+      "file": "counter.pym",
+      "entry": "next",
+      "inputs": {
+        "n": "41"
+      }
+    },
+    "bytes": 1318,
+    "isError": false
+  },
+  {
+    "name": "explore_behaviour",
+    "args": {
+      "file": "counter.pym",
+      "entry": "Counter",
+      "method": "verify"
+    },
+    "bytes": 1898,
+    "isError": false
+  },
+  {
+    "name": "read_run",
+    "args": {
+      "runId": "c2910e9e-27fd-405f-883a-cf885ecb0162",
+      "section": "properties"
+    },
+    "bytes": 7827,
+    "isError": false
+  },
+  {
+    "name": "explore_behaviour",
+    "args": {
+      "file": "counter.pym",
+      "entry": "Counter",
+      "method": "simulate",
+      "seed": "42",
+      "maxSteps": 4,
+      "maxSamples": 10
+    },
+    "bytes": 1906,
+    "isError": false
+  },
+  {
+    "name": "read_run",
+    "args": {
+      "runId": "6e3ef70d-41bc-4d82-8dd4-795edae44686",
+      "section": "properties"
+    },
+    "bytes": 7671,
+    "isError": false
+  },
+  {
+    "name": "design_interface",
+    "args": {
+      "action": "symbols",
+      "runId": "c2910e9e-27fd-405f-883a-cf885ecb0162",
+      "query": "next"
+    },
+    "bytes": 668,
+    "isError": false
+  },
+  {
+    "name": "emit_scaffold",
+    "args": {
+      "runId": "c2910e9e-27fd-405f-883a-cf885ecb0162",
+      "target": "typescript"
+    },
+    "bytes": 6244,
+    "isError": false
+  },
+  {
+    "name": "read_scaffold",
+    "args": {
+      "emissionId": "455474b4-f9e5-4050-82b7-55f495a2439d",
+      "section": "source",
+      "offset": 0,
+      "limit": 100
+    },
+    "bytes": 2404,
+    "isError": false
+  },
+  {
+    "name": "emit_implementation_check",
+    "args": {
+      "runId": "c2910e9e-27fd-405f-883a-cf885ecb0162",
+      "target": "go",
+      "implementationType": "*Worker"
+    },
+    "bytes": 1870,
+    "isError": false
+  },
+  {
+    "name": "code_graph",
+    "args": {
+      "action": "search",
+      "query": "greet",
+      "limit": 10
+    },
+    "bytes": 616,
+    "isError": false
+  },
+  {
+    "name": "graph_result",
+    "args": {
+      "jobId": "91b479ac-457d-49a9-bc94-cc5fd776fe24",
+      "wait": true
+    },
+    "bytes": 4688,
+    "isError": false
+  },
+  {
+    "name": "read_architecture",
+    "args": {
+      "section": "summary"
+    },
+    "bytes": 470,
+    "isError": false
+  },
+  {
+    "name": "read_implementation",
+    "args": {
+      "section": "versions"
+    },
+    "bytes": 923,
+    "isError": false
+  },
+  {
+    "name": "observe_implementation",
+    "args": {
+      "files": [
+        "app.ts"
+      ],
+      "label": "Documented observation",
+      "expectedRevision": null
+    },
+    "bytes": 1121,
+    "isError": false
+  },
+  {
+    "name": "link_implementation",
+    "args": {
+      "revision": "97edf8fee816ee72021e38094c52d350e13ca93053a78a5590bd4c65e04eb978",
+      "planId": "plan:R1",
+      "nodeId": "missing-node",
+      "planHash": "missing-hash",
+      "observationId": "missing-observation",
+      "reviewed": true
+    },
+    "bytes": 156,
+    "isError": true
+  },
+  {
+    "name": "compare_implementation",
+    "args": {
+      "planRevision": "97edf8fee816ee72021e38094c52d350e13ca93053a78a5590bd4c65e04eb978",
+      "codeRevision": "97edf8fee816ee72021e38094c52d350e13ca93053a78a5590bd4c65e04eb978",
+      "planId": "plan:R1",
+      "nodeId": "missing-node"
+    },
+    "bytes": 94,
+    "isError": true
+  },
+  {
+    "name": "unlink_implementation",
+    "args": {
+      "revision": "missing-revision",
+      "planId": "plan:R1",
+      "nodeId": "missing-node"
+    },
+    "bytes": 126,
+    "isError": true
+  }
+]

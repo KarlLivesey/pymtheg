@@ -1,0 +1,14 @@
+{
+  "sourceHashesMatch": {
+    "src/mcp/graph.ts": true,
+    "src/mcp/graph-wait.ts": true,
+    "src/mcp/graph-jobs.ts": true,
+    "src/mcp/graph-view.ts": true,
+    "src/mcp/graph-worker.ts": true,
+    "src/mcp/limits.ts": true,
+    "src/mcp/server.ts": true,
+    "src/mcp/workspace.ts": true,
+    "docs/mcp.md": true
+  },
+  "allMatch": true
+}

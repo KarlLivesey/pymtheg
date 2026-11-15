@@ -1,0 +1,832 @@
+[
+  {
+    "name": "check_design",
+    "args": {
+      "file": "counter.pym"
+    },
+    "bytes": 2879,
+    "body": {
+      "viewSchema": "pymtheg.agent/v1",
+      "runId": "fab3b4bc-a71a-42ec-a1cb-034ca7672989",
+      "file": "counter.pym",
+      "kind": "check",
+      "exitStatus": 1,
+      "session": {
+        "state": "Completed",
+        "requested": "check",
+        "staleFiles": []
+      },
+      "snapshotId": "45d7add4d4a773bde62633e1458131dac236856c0b6f8cde422c38ee919343de",
+      "consumers": {
+        "symbolCount": 0,
+        "incompleteFiles": [],
+        "errors": 0,
+        "findings": 0,
+        "meaning": "Related files include confirmed dependencies and unresolved references. They are separate from the selected file verdict. Read consumer_findings and consumer_properties."
+      },
+      "usedUnsavedBuffers": [],
+      "planImpact": {
+        "architectureRevision": null,
+        "scopedPlanCount": 0,
+        "outsideScopePlanCount": 0,
+        "affectedPlanCount": 0,
+        "complete": true,
+        "items": [],
+        "meaning": "Planning impact within the checked source scope, not a proof of requirement satisfaction.",
+        "total": 0,
+        "nextOffset": null
+      },
+      "findings": {
+        "errors": 1,
+        "warnings": 0
+      },
+      "results": {
+        "total": 2,
+        "exhaustive": null,
+        "complete": 1,
+        "unresolved": 1,
+        "counterexamples": 0,
+        "structuralFindings": 1
+      },
+      "meaning": "The model has problems to investigate. Read the findings and their related declarations.",
+      "next": "Read this run with section findings, properties, costs or trace. Complete means that check finished, not that the design is fully correct."
+    },
+    "isError": false
+  },
+  {
+    "name": "read_run",
+    "args": {
+      "runId": "fab3b4bc-a71a-42ec-a1cb-034ca7672989",
+      "section": "findings"
+    },
+    "bytes": 6030,
+    "body": {
+      "viewSchema": "pymtheg.agent/v1",
+      "summary": {
+        "runId": "fab3b4bc-a71a-42ec-a1cb-034ca7672989",
+        "file": "counter.pym",
+        "kind": "check",
+        "exitStatus": 1,
+        "session": {
+          "state": "Completed",
+          "requested": "check",
+          "staleFiles": []
+        },
+        "snapshotId": "45d7add4d4a773bde62633e1458131dac236856c0b6f8cde422c38ee919343de",
+        "consumers": {
+          "symbolCount": 0,
+          "incompleteFiles": [],
+          "errors": 0,
+          "findings": 0,
+          "meaning": "Related files include confirmed dependencies and unresolved references. They are separate from the selected file verdict. Read consumer_findings and consumer_properties."
+        },
+        "usedUnsavedBuffers": [],
+        "planImpact": {
+          "architectureRevision": null,
+          "scopedPlanCount": 0,
+          "outsideScopePlanCount": 0,
+          "affectedPlanCount": 0,
+          "complete": true,
+          "items": [],
+          "meaning": "Planning impact within the checked source scope, not a proof of requirement satisfaction.",
+          "total": 0,
+          "nextOffset": null
+        },
+        "findings": {
+          "errors": 1,
+          "warnings": 0
+        },
+        "results": {
+          "total": 2,
+          "exhaustive": null,
+          "complete": 1,
+          "unresolved": 1,
+          "counterexamples": 0,
+          "structuralFindings": 1
+        },
+        "meaning": "The model has problems to investigate. Read the findings and their related declarations.",
+        "next": "Read this run with section findings, properties, costs or trace. Complete means that check finished, not that the design is fully correct."
+      },
+      "total": 1,
+      "offset": 0,
+      "items": [
+        {
+          "code": "T002",
+          "message": "Expected Nat, got Int. Subtracting from a Nat gives an Int, because the result may be below zero. If the value can go below zero, change Nat to Int in its declaration. For machine state, keep a finite range, for example `state count: Int in 0..3 = 0;`.",
+          "span": {
+            "file": "counter.pym",
+            "start": 144,
+            "end": 149
+          },
+          "severity": "error",
+          "related": [
+            {
+              "file": "counter.pym",
+              "start": 131,
+              "end": 134
+            }
+          ],
+          "path": [],
+          "title": "Subtracting from a Nat can go below zero",
+          "why": "Nat has no negative values, so a subtraction result is typed Int. The checker cannot assume a guard keeps it at zero or above.",
+          "nextStep": "If the value can go below zero, change Nat to Int in its declaration; for machine state keep the same finite range. Keep Nat only where the value can never decrease.",
+          "location": {
+            "file": "counter.pym",
+            "start": 144,
+            "end": 149,
+            "line": 2,
+            "column": 35,
+            "excerpt": "flow next(n: Nat) -> Nat { return n - 1; }"
+          },
+          "relatedLocations": [
+            {
+              "file": "counter.pym",
+              "start": 131,
+              "end": 134,
+              "line": 2,
+              "column": 22,
+              "excerpt": "flow next(n: Nat) -> Nat { return n - 1; }"
+            }
+          ],
+          "evidenceNote": "Derived from the declared types and control flow. Related checks remain incomplete until their missing conditions are resolved."
+        }
+      ],
+      "nextOffset": null
+    },
+    "isError": false
+  },
+  {
+    "name": "try_inputs",
+    "args": {
+      "file": "counter.pym",
+      "entry": "next",
+      "inputs": {
+        "n": "1"
+      }
+    },
+    "bytes": 548,
+    "body": {
+      "viewSchema": "pymtheg.agent/v1",
+      "runId": "e151e9f6-3f66-424f-90d7-c94f4f079268",
+      "result": {
+        "completion": "incomplete",
+        "reason": "design-errors"
+      },
+      "next": "Read findings with read_run, fix the design, then try again."
+    },
+    "isError": false
+  },
+  {
+    "name": "check_design",
+    "args": {
+      "file": "counter.pym"
+    },
+    "bytes": 2891,
+    "body": {
+      "viewSchema": "pymtheg.agent/v1",
+      "runId": "03ec26bb-da33-4dc7-b75c-c5e589de0f13",
+      "file": "counter.pym",
+      "kind": "check",
+      "exitStatus": 0,
+      "session": {
+        "state": "Completed",
+        "requested": "check",
+        "staleFiles": []
+      },
+      "snapshotId": "9c8df61d2eebce9ced03f16c4a57a15dc2e604e68781d1ed65fcbab1ab83d861",
+      "consumers": {
+        "symbolCount": 0,
+        "incompleteFiles": [],
+        "errors": 0,
+        "findings": 0,
+        "meaning": "Related files include confirmed dependencies and unresolved references. They are separate from the selected file verdict. Read consumer_findings and consumer_properties."
+      },
+      "usedUnsavedBuffers": [],
+      "planImpact": {
+        "architectureRevision": null,
+        "scopedPlanCount": 0,
+        "outsideScopePlanCount": 0,
+        "affectedPlanCount": 0,
+        "complete": true,
+        "items": [],
+        "meaning": "Planning impact within the checked source scope, not a proof of requirement satisfaction.",
+        "total": 0,
+        "nextOffset": null
+      },
+      "findings": {
+        "errors": 0,
+        "warnings": 0
+      },
+      "results": {
+        "total": 2,
+        "exhaustive": null,
+        "complete": 2,
+        "unresolved": 0,
+        "counterexamples": 0,
+        "structuralFindings": 0
+      },
+      "meaning": "The requested checks completed without error findings. This is not proof of the whole program.",
+      "next": "Read this run with section findings, properties, costs or trace. Complete means that check finished, not that the design is fully correct."
+    },
+    "isError": false
+  },
+  {
+    "name": "try_inputs",
+    "args": {
+      "file": "counter.pym",
+      "entry": "next",
+      "inputs": {
+        "n": "41"
+      }
+    },
+    "bytes": 1318,
+    "body": {
+      "viewSchema": "pymtheg.agent/v1",
+      "runId": "b8a8a7d9-0723-4f7e-bbae-da2865519a60",
+      "result": {
+        "schema": "pymtheg.trial/v1",
+        "snapshotId": "9c8df61d2eebce9ced03f16c4a57a15dc2e604e68781d1ed65fcbab1ab83d861",
+        "completion": "complete",
+        "steps": 1,
+        "output": "42",
+        "message": "Returned value for these inputs.",
+        "assumptions": [
+          "One example execution with the chosen inputs; cancellation is not injected.",
+          "An example result does not establish a property for all inputs.",
+          "Sequential structured flow semantics; abstract operation outcomes are contract assumptions; safety only"
+        ]
+      }
+    },
+    "isError": false
+  },
+  {
+    "name": "try_inputs",
+    "args": {
+      "runId": "03ec26bb-da33-4dc7-b75c-c5e589de0f13",
+      "entry": "next",
+      "inputs": {
+        "n": "9"
+      }
+    },
+    "bytes": 1318,
+    "body": {
+      "viewSchema": "pymtheg.agent/v1",
+      "runId": "03ec26bb-da33-4dc7-b75c-c5e589de0f13",
+      "result": {
+        "schema": "pymtheg.trial/v1",
+        "snapshotId": "9c8df61d2eebce9ced03f16c4a57a15dc2e604e68781d1ed65fcbab1ab83d861",
+        "completion": "complete",
+        "steps": 1,
+        "output": "10",
+        "message": "Returned value for these inputs.",
+        "assumptions": [
+          "One example execution with the chosen inputs; cancellation is not injected.",
+          "An example result does not establish a property for all inputs.",
+          "Sequential structured flow semantics; abstract operation outcomes are contract assumptions; safety only"
+        ]
+      }
+    },
+    "isError": false
+  },
+  {
+    "name": "try_inputs",
+    "args": {
+      "file": "unsaved.pym",
+      "buffers": {
+        "unsaved.pym": "flow twice(n: Nat) -> Nat { return n + n; }"
+      },
+      "entry": "twice",
+      "inputs": {
+        "n": "3"
+      }
+    },
+    "bytes": 1316,
+    "body": {
+      "viewSchema": "pymtheg.agent/v1",
+      "runId": "f5e3ee8b-e8dc-408a-84fc-27ebb0e97234",
+      "result": {
+        "schema": "pymtheg.trial/v1",
+        "snapshotId": "0c14ea34975b5f52a47ba45402b5db70d042d0f8560e27d9e13758182db3fc05",
+        "completion": "complete",
+        "steps": 1,
+        "output": "6",
+        "message": "Returned value for these inputs.",
+        "assumptions": [
+          "One example execution with the chosen inputs; cancellation is not injected.",
+          "An example result does not establish a property for all inputs.",
+          "Sequential structured flow semantics; abstract operation outcomes are contract assumptions; safety only"
+        ]
+      }
+    },
+    "isError": false
+  },
+  {
+    "name": "try_inputs",
+    "args": {
+      "file": "contract.pym",
+      "entry": "pay",
+      "inputs": {
+        "n": "0"
+      }
+    },
+    "bytes": 1821,
+    "body": {
+      "viewSchema": "pymtheg.agent/v1",
+      "runId": "6f375c62-6010-40fe-a9b9-2a95f8324ca1",
+      "result": {
+        "schema": "pymtheg.trial/v1",
+        "snapshotId": "79ffb409075c34ea60ac1109134ee339748a68c0c21ce11d7e20a804c568c412",
+        "completion": "violated",
+        "steps": 1,
+        "output": null,
+        "message": "Call precondition failed",
+        "assumptions": [
+          "One example execution with the chosen inputs; cancellation is not injected.",
+          "An example result does not establish a property for all inputs.",
+          "Sequential structured flow semantics; abstract operation outcomes are contract assumptions; safety only"
+        ],
+        "violation": {
+          "code": "precondition",
+          "message": "Call precondition failed",
+          "span": {
+            "file": "contract.pym",
+            "start": 69,
+            "end": 84
+          },
+          "condition": {
+            "file": "contract.pym",
+            "start": 35,
+            "end": 40
+          }
+        }
+      }
+    },
+    "isError": false
+  },
+  {
+    "name": "explore_behaviour",
+    "args": {
+      "file": "counter.pym",
+      "entry": "Counter",
+      "method": "verify",
+      "maxSteps": 4,
+      "maxSamples": 10,
+      "seed": "42"
+    },
+    "bytes": 1943,
+    "body": {
+      "viewSchema": "pymtheg.agent/v1",
+      "runId": "146c5490-8954-4c70-ba64-df8b34da7694",
+      "file": "counter.pym",
+      "kind": "verify",
+      "exitStatus": 0,
+      "session": {
+        "state": "Completed",
+        "requested": "verify",
+        "staleFiles": []
+      },
+      "snapshotId": "9c8df61d2eebce9ced03f16c4a57a15dc2e604e68781d1ed65fcbab1ab83d861",
+      "consumers": null,
+      "usedUnsavedBuffers": [],
+      "planImpact": {
+        "complete": false,
+        "reason": "Planning impact was not checked for this run."
+      },
+      "findings": {
+        "errors": 0,
+        "warnings": 0
+      },
+      "results": {
+        "total": 4,
+        "exhaustive": true,
+        "complete": 4,
+        "unresolved": 0,
+        "counterexamples": 0,
+        "structuralFindings": 0
+      },
+      "meaning": "The requested checks completed without error findings. This is not proof of the whole program.",
+      "next": "Read this run with section findings, properties, costs or trace. Complete means that check finished, not that the design is fully correct."
+    },
+    "isError": false
+  },
+  {
+    "name": "read_run",
+    "args": {
+      "runId": "146c5490-8954-4c70-ba64-df8b34da7694",
+      "section": "properties"
+    },
+    "bytes": 10702,
+    "body": {
+      "viewSchema": "pymtheg.agent/v1",
+      "summary": {
+        "runId": "146c5490-8954-4c70-ba64-df8b34da7694",
+        "file": "counter.pym",
+        "kind": "verify",
+        "exitStatus": 0,
+        "session": {
+          "state": "Completed",
+          "requested": "verify",
+          "staleFiles": []
+        },
+        "snapshotId": "9c8df61d2eebce9ced03f16c4a57a15dc2e604e68781d1ed65fcbab1ab83d861",
+        "consumers": null,
+        "usedUnsavedBuffers": [],
+        "planImpact": {
+          "complete": false,
+          "reason": "Planning impact was not checked for this run."
+        },
+        "findings": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "results": {
+          "total": 4,
+          "exhaustive": true,
+          "complete": 4,
+          "unresolved": 0,
+          "counterexamples": 0,
+          "structuralFindings": 0
+        },
+        "meaning": "The requested checks completed without error findings. This is not proof of the whole program.",
+        "next": "Read this run with section findings, properties, costs or trace. Complete means that check finished, not that the design is fully correct."
+      },
+      "total": 4,
+      "offset": 0,
+      "items": [
+        {
+          "propertyId": "counter.pym#Counter/types-effects-outcomes",
+          "propertyHash": "63a03831d15734f1db46eb752357789dbebb52635a70eef003d9c6027a8dc7fd",
+          "analysisKind": "types-effects-outcomes",
+          "outcome": "established",
+          "method": "structural",
+          "completion": "complete",
+          "scope": {
+            "snapshotHash": "9c8df61d2eebce9ced03f16c4a57a15dc2e604e68781d1ed65fcbab1ab83d861",
+            "configurationHash": "54690a2e22bf1cc275b666026a87ee079a91d3c11ceef490b589d6c89f27ecd3"
+          },
+          "assumptions": [],
+          "outstandingObligations": [],
+          "witnessOrDerivation": null,
+          "witnessValidation": "not_applicable",
+          "diagnostics": [],
+          "toolVersions": {
+            "pymtheg": "1.0.0",
+            "node": "24.21.0"
+          },
+          "measurements": {}
+        },
+        {
+          "propertyId": "counter.pym#next/types-effects-outcomes",
+          "propertyHash": "f3a2762409d6863fd73b7cce6a374e86f4680eff53a361990ae91447cebaa3fe",
+          "analysisKind": "types-effects-outcomes",
+          "outcome": "established",
+          "method": "structural",
+          "completion": "complete",
+          "scope": {
+            "snapshotHash": "9c8df61d2eebce9ced03f16c4a57a15dc2e604e68781d1ed65fcbab1ab83d861",
+            "configurationHash": "54690a2e22bf1cc275b666026a87ee079a91d3c11ceef490b589d6c89f27ecd3"
+          },
+          "assumptions": [],
+          "outstandingObligations": [],
+          "witnessOrDerivation": null,
+          "witnessValidation": "not_applicable",
+          "diagnostics": [],
+          "toolVersions": {
+            "pymtheg": "1.0.0",
+            "node": "24.21.0"
+          },
+          "measurements": {}
+        },
+        {
+          "propertyId": "counter.pym#Counter/invariant/bounded",
+          "propertyHash": "b8aa1bcf38ec90330a53e466d766b40fb403e6014c872875b0745a7c250ec6f7",
+          "analysisKind": "behaviour",
+          "outcome": "no_counterexample",
+          "method": "finite_model_check",
+          "completion": "complete",
+          "scope": {
+            "snapshotHash": "9c8df61d2eebce9ced03f16c4a57a15dc2e604e68781d1ed65fcbab1ab83d861",
+            "configurationHash": "0191295d26dd6bff7e25959032ef6604bc5f5796b57c95c749ea8919358b8613",
+            "modelHash": "10aa882c93c7795583223fcba2507b7c450626be03b57d9f890203106de67827",
+            "bounds": {
+              "n": "0..2",
+              "stateBudget": "1000000"
+            }
+          },
+          "assumptions": [
+            "Events are atomic simultaneous updates; deadlock stutters; safety only; one finite machine instance"
+          ],
+          "outstandingObligations": [],
+          "witnessOrDerivation": {
+            "engine": "Built-in exhaustive breadth-first search",
+            "verdict": "passed",
+            "searchCompletion": "complete",
+            "distinctStates": 3
+          },
+          "witnessValidation": "not_applicable",
+          "diagnostics": [],
+          "toolVersions": {
+            "pymtheg": "1.0.0",
+            "engine": "builtin",
+            "node": "24.21.0"
+          },
+          "measurements": {
+            "backendMs": 78.09986600000002,
+            "statesVisited": 3,
+            "transitionsTaken": 3,
+            "depthReached": 2,
+            "samples": 0,
+            "distinctStates": 3
+          },
+          "exhaustive": true
+        },
+        {
+          "propertyId": "counter.pym#Counter/state-domains",
+          "propertyHash": "5e78bccdb09a9ec3771e2467b44be2b02dd50c1b70ac856253bb5c80837edae8",
+          "analysisKind": "behaviour",
+          "outcome": "no_counterexample",
+          "method": "finite_model_check",
+          "completion": "complete",
+          "scope": {
+            "snapshotHash": "9c8df61d2eebce9ced03f16c4a57a15dc2e604e68781d1ed65fcbab1ab83d861",
+            "configurationHash": "0191295d26dd6bff7e25959032ef6604bc5f5796b57c95c749ea8919358b8613",
+            "modelHash": "10aa882c93c7795583223fcba2507b7c450626be03b57d9f890203106de67827",
+            "bounds": {
+              "n": "0..2",
+              "stateBudget": "1000000"
+            }
+          },
+          "assumptions": [
+            "Events are atomic simultaneous updates; deadlock stutters; safety only; one finite machine instance"
+          ],
+          "outstandingObligations": [],
+          "witnessOrDerivation": {
+            "engine": "Built-in exhaustive breadth-first search",
+            "verdict": "passed",
+            "searchCompletion": "complete",
+            "distinctStates": 3
+          },
+          "witnessValidation": "not_applicable",
+          "diagnostics": [],
+          "toolVersions": {
+            "pymtheg": "1.0.0",
+            "engine": "builtin",
+            "node": "24.21.0"
+          },
+          "measurements": {
+            "backendMs": 78.09986600000002,
+            "statesVisited": 3,
+            "transitionsTaken": 3,
+            "depthReached": 2,
+            "samples": 0,
+            "distinctStates": 3
+          },
+          "exhaustive": true
+        }
+      ],
+      "nextOffset": null
+    },
+    "isError": false
+  },
+  {
+    "name": "explore_behaviour",
+    "args": {
+      "file": "counter.pym",
+      "entry": "Counter",
+      "method": "simulate",
+      "maxSteps": 4,
+      "maxSamples": 10,
+      "seed": "42"
+    },
+    "bytes": 2077,
+    "body": {
+      "viewSchema": "pymtheg.agent/v1",
+      "runId": "a844bb7d-6590-4981-9ebe-812ea6019bf8",
+      "file": "counter.pym",
+      "kind": "simulate",
+      "exitStatus": 0,
+      "session": {
+        "state": "Completed",
+        "requested": "simulate",
+        "staleFiles": []
+      },
+      "snapshotId": "9c8df61d2eebce9ced03f16c4a57a15dc2e604e68781d1ed65fcbab1ab83d861",
+      "consumers": null,
+      "usedUnsavedBuffers": [],
+      "planImpact": {
+        "complete": false,
+        "reason": "Planning impact was not checked for this run."
+      },
+      "findings": {
+        "errors": 0,
+        "warnings": 0
+      },
+      "results": {
+        "total": 4,
+        "exhaustive": false,
+        "complete": 4,
+        "unresolved": 0,
+        "counterexamples": 0,
+        "structuralFindings": 0
+      },
+      "meaning": "Sampling found no counterexample within its seed, step and sample limits. The run is not exhaustive (exhaustive: false); use verify for an exhaustive check.",
+      "next": "Read this run with section findings, properties, costs or trace. Complete means that check finished, not that the design is fully correct."
+    },
+    "isError": false
+  },
+  {
+    "name": "read_run",
+    "args": {
+      "runId": "a844bb7d-6590-4981-9ebe-812ea6019bf8",
+      "section": "properties"
+    },
+    "bytes": 11434,
+    "body": {
+      "viewSchema": "pymtheg.agent/v1",
+      "summary": {
+        "runId": "a844bb7d-6590-4981-9ebe-812ea6019bf8",
+        "file": "counter.pym",
+        "kind": "simulate",
+        "exitStatus": 0,
+        "session": {
+          "state": "Completed",
+          "requested": "simulate",
+          "staleFiles": []
+        },
+        "snapshotId": "9c8df61d2eebce9ced03f16c4a57a15dc2e604e68781d1ed65fcbab1ab83d861",
+        "consumers": null,
+        "usedUnsavedBuffers": [],
+        "planImpact": {
+          "complete": false,
+          "reason": "Planning impact was not checked for this run."
+        },
+        "findings": {
+          "errors": 0,
+          "warnings": 0
+        },
+        "results": {
+          "total": 4,
+          "exhaustive": false,
+          "complete": 4,
+          "unresolved": 0,
+          "counterexamples": 0,
+          "structuralFindings": 0
+        },
+        "meaning": "Sampling found no counterexample within its seed, step and sample limits. The run is not exhaustive (exhaustive: false); use verify for an exhaustive check.",
+        "next": "Read this run with section findings, properties, costs or trace. Complete means that check finished, not that the design is fully correct."
+      },
+      "total": 4,
+      "offset": 0,
+      "items": [
+        {
+          "propertyId": "counter.pym#Counter/types-effects-outcomes",
+          "propertyHash": "63a03831d15734f1db46eb752357789dbebb52635a70eef003d9c6027a8dc7fd",
+          "analysisKind": "types-effects-outcomes",
+          "outcome": "established",
+          "method": "structural",
+          "completion": "complete",
+          "scope": {
+            "snapshotHash": "9c8df61d2eebce9ced03f16c4a57a15dc2e604e68781d1ed65fcbab1ab83d861",
+            "configurationHash": "54690a2e22bf1cc275b666026a87ee079a91d3c11ceef490b589d6c89f27ecd3"
+          },
+          "assumptions": [],
+          "outstandingObligations": [],
+          "witnessOrDerivation": null,
+          "witnessValidation": "not_applicable",
+          "diagnostics": [],
+          "toolVersions": {
+            "pymtheg": "1.0.0",
+            "node": "24.21.0"
+          },
+          "measurements": {}
+        },
+        {
+          "propertyId": "counter.pym#next/types-effects-outcomes",
+          "propertyHash": "f3a2762409d6863fd73b7cce6a374e86f4680eff53a361990ae91447cebaa3fe",
+          "analysisKind": "types-effects-outcomes",
+          "outcome": "established",
+          "method": "structural",
+          "completion": "complete",
+          "scope": {
+            "snapshotHash": "9c8df61d2eebce9ced03f16c4a57a15dc2e604e68781d1ed65fcbab1ab83d861",
+            "configurationHash": "54690a2e22bf1cc275b666026a87ee079a91d3c11ceef490b589d6c89f27ecd3"
+          },
+          "assumptions": [],
+          "outstandingObligations": [],
+          "witnessOrDerivation": null,
+          "witnessValidation": "not_applicable",
+          "diagnostics": [],
+          "toolVersions": {
+            "pymtheg": "1.0.0",
+            "node": "24.21.0"
+          },
+          "measurements": {}
+        },
+        {
+          "propertyId": "counter.pym#Counter/invariant/bounded",
+          "propertyHash": "b8aa1bcf38ec90330a53e466d766b40fb403e6014c872875b0745a7c250ec6f7",
+          "analysisKind": "behaviour",
+          "outcome": "no_counterexample",
+          "method": "simulation",
+          "completion": "complete",
+          "scope": {
+            "snapshotHash": "9c8df61d2eebce9ced03f16c4a57a15dc2e604e68781d1ed65fcbab1ab83d861",
+            "configurationHash": "8cf54aab05122314d90c035568a7f2ecc63ed024d4b642ebca0533a4dfd1b872",
+            "modelHash": "10aa882c93c7795583223fcba2507b7c450626be03b57d9f890203106de67827",
+            "bounds": {
+              "n": "0..2",
+              "maxSteps": "4",
+              "maxSamples": "10"
+            },
+            "seed": "42"
+          },
+          "assumptions": [
+            "Events are atomic simultaneous updates; deadlock stutters; safety only; one finite machine instance"
+          ],
+          "outstandingObligations": [],
+          "witnessOrDerivation": {
+            "engine": "Built-in seeded sampler",
+            "verdict": "no_violation_found",
+            "searchCompletion": "complete",
+            "distinctStates": 3,
+            "sampling": {
+              "seed": "42",
+              "maxSteps": 4,
+              "maxSamples": 10,
+              "fingerprint": "1e1f32f1"
+            }
+          },
+          "witnessValidation": "not_applicable",
+          "diagnostics": [],
+          "toolVersions": {
+            "pymtheg": "1.0.0",
+            "engine": "builtin",
+            "node": "24.21.0"
+          },
+          "measurements": {
+            "backendMs": 66.25369499999988,
+            "statesVisited": 3,
+            "transitionsTaken": 40,
+            "depthReached": 4,
+            "samples": 10,
+            "distinctStates": 3
+          },
+          "exhaustive": false
+        },
+        {
+          "propertyId": "counter.pym#Counter/state-domains",
+          "propertyHash": "5e78bccdb09a9ec3771e2467b44be2b02dd50c1b70ac856253bb5c80837edae8",
+          "analysisKind": "behaviour",
+          "outcome": "no_counterexample",
+          "method": "simulation",
+          "completion": "complete",
+          "scope": {
+            "snapshotHash": "9c8df61d2eebce9ced03f16c4a57a15dc2e604e68781d1ed65fcbab1ab83d861",
+            "configurationHash": "8cf54aab05122314d90c035568a7f2ecc63ed024d4b642ebca0533a4dfd1b872",
+            "modelHash": "10aa882c93c7795583223fcba2507b7c450626be03b57d9f890203106de67827",
+            "bounds": {
+              "n": "0..2",
+              "maxSteps": "4",
+              "maxSamples": "10"
+            },
+            "seed": "42"
+          },
+          "assumptions": [
+            "Events are atomic simultaneous updates; deadlock stutters; safety only; one finite machine instance"
+          ],
+          "outstandingObligations": [],
+          "witnessOrDerivation": {
+            "engine": "Built-in seeded sampler",
+            "verdict": "no_violation_found",
+            "searchCompletion": "complete",
+            "distinctStates": 3,
+            "sampling": {
+              "seed": "42",
+              "maxSteps": 4,
+              "maxSamples": 10,
+              "fingerprint": "1e1f32f1"
+            }
+          },
+          "witnessValidation": "not_applicable",
+          "diagnostics": [],
+          "toolVersions": {
+            "pymtheg": "1.0.0",
+            "engine": "builtin",
+            "node": "24.21.0"
+          },
+          "measurements": {
+            "backendMs": 66.25369499999988,
+            "statesVisited": 3,
+            "transitionsTaken": 40,
+            "depthReached": 4,
+            "samples": 10,
+            "distinctStates": 3
+          },
+          "exhaustive": false
+        }
+      ],
+      "nextOffset": null
+    },
+    "isError": false
+  }
+]

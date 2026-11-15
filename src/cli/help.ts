@@ -5,6 +5,10 @@ const commands = [
     "Index and query Go, Rust and TypeScript/JavaScript code; queries sync by content, with explicit candidates, failed files and stale warnings.",
   ],
   [
+    "link requirement ID --title TITLE|add RECORD SELECTOR|remove LINK|refresh LINK|list|check|touched SELECTOR [--impact]|unlinked [--symbols]|history [--root DIRECTORY] [--json] [--no-sync]",
+    "Link requirements to Go, Rust and TypeScript symbols; check reports ok, changed, moved, missing and unverifiable links.",
+  ],
+  [
     "observe FILE.ts... [--root DIRECTORY] [--label VERSION] [--retain] [--out GRAPH.json] [--format text|json]",
     "observe --list [--root DIRECTORY] [--directory SUBFOLDER] [--format text|json]",
     "Capture an immutable graph of existing TypeScript/JavaScript code; does not execute it.",

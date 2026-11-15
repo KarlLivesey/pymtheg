@@ -1,0 +1,20 @@
+[
+  {
+    "name": "definition",
+    "file": "internal/restic/id.go",
+    "line": 21,
+    "excerpt": "// ParseID converts the given string to an ID.\nfunc ParseID(s string) (ID, error) {\n\tif len(s) != hex.EncodedLen(idSize) {\n\t\treturn ID{}, fmt.Errorf(\"invalid length for ID: %q\", s)"
+  },
+  {
+    "name": "caller",
+    "file": "internal/data/snapshot_find.go",
+    "line": 98,
+    "excerpt": "\t// no need to list snapshots if `s` is already a full id\n\tid, err := restic.ParseID(s)\n\tif err != nil {\n\t\t// find snapshot id with prefix"
+  },
+  {
+    "name": "callee",
+    "file": "internal/restic/id.go",
+    "line": 26,
+    "excerpt": "\n\tb, err := hex.DecodeString(s)\n\tif err != nil {\n\t\treturn ID{}, fmt.Errorf(\"invalid ID: %s\", err)"
+  }
+]
