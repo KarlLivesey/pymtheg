@@ -1,7 +1,7 @@
 # LIC-1: RPL-1.5 licence, output exception and plugin statement
 
-Part 1 of the licence work. New files and a README section only; no package,
-source, test or generated file changes.
+Part 1 of the licence work. New files, a README section and a decision ledger
+entry; no package, source, test or generated file changes.
 
 ## Added
 
@@ -18,8 +18,10 @@ source, test or generated file changes.
 - `LICENSE-EXCEPTIONS.md`: part 1, an additional permission for Pymtheg's
   output, the files `pymtheg init` writes (`.pymtheg/project.json`,
   `.pymtheg/settings.json`, `.pymtheg/.gitignore`) and the bundled examples,
-  recipes and templates used as starting points, excluding `examples/plugins/`;
-  part 2, the plugin statement.
+  recipes, templates and documentation examples used as starting points,
+  excluding `examples/plugins/` and copies or builds of Pymtheg's own code;
+  part 2, the Licensor's declaration that plugins and other code Pymtheg loads
+  to change its behaviour are deemed Extensions covered by RPL-1.5.
 - `CONTRIBUTING.md`: contributions under the same licence; the contributor
   confirms the right to submit.
 - README "Licence" section.
@@ -44,8 +46,12 @@ was needed.
    (Section 6.4(b)), for example the README and `LICENSE-EXCEPTIONS.md`.
 4. In scope for headers: `src/` (including the shipped
    `src/graph/languages/go/toolchain/golinks.go`), `web/src/`, `scripts/`,
-   `test/` (test code, not fixtures), `grammars/build.mjs`, and the root
-   `pymtheg` launcher. A test fails when a file in scope lacks the header.
+   `test/` (test code, not fixtures), `grammars/build.mjs`, `web/vite.config.ts`,
+   `web/index.html`, and the root `pymtheg` launcher. A test fails when a file
+   in scope lacks the header. To decide in LIC-2: the other tracked top-level
+   files outside those folders (`tsconfig.json`, `web/tsconfig.json`,
+   `assets/icon.svg`, the root `test.pym` starter design) and prose in `docs/`
+   (Section 1.16 counts "any associated text" as Source Code).
 5. Excluded from headers: vendored grammars and their patches (`grammars/go`,
    `grammars/rust`, upstream `LICENSE` files), third-party files and bundled
    third-party code, generated files (`dist/`, `dist-web/`, built `.wasm`,

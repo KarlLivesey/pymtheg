@@ -2454,11 +2454,11 @@ any external checker, runtime or download for behavioural checking; a compatibil
 path for the removed options or fields. **Known limits:** see
 [R1-A](changes/R1-A.md).
 
-### Pymtheg's own licence: RPL-1.5 with an output exception and a plugin statement (LIC-1)
+### Pymtheg's own licence: RPL-1.5 with an output exception and a plugin declaration (LIC-1)
 
 **Decided (Karl, 15 November 2026):** Pymtheg is licensed under the Reciprocal
 Public License 1.5 (SPDX `RPL-1.5`), copyright Karl Livesey, with an additional
-permission for output and project files and a plugin statement
+permission for output and project files and a plugin declaration
 ([LICENSE-EXCEPTIONS.md](../LICENSE-EXCEPTIONS.md)). His goals, in his words:
 "the main thing I want is code etc back and to be allowed to use that code on the
 project"; "I also want it to cover internal usage ie company x download it modify
@@ -2466,21 +2466,30 @@ it and distribute that internally"; output is not covered (his example: a
 Photoshop clone under RPL-1.5 protects the code, not the images made with it);
 "you can make plugins but must be source available for us to intergrate into the
 core", including in-house plugins: "maybe theres an extra feature they want and
-so they ad it using a plugin rather than modifying the code". **Why:** RPL-1.5
-makes internal use of a modified copy a "Deploy" (Section 1.2) that requires the
-source to be published (Section 6.1). GPL's source duty arises only when a
-modified copy is distributed; AGPL-3.0 §13 reaches a modified version only when it is
-offered to users over a network, and then only towards those users. Neither
-reaches purely internal modification or sends changes back to the owner.
+so they ad it using a plugin rather than modifying the code"; and, on the
+plugin wording: "we'll explicitly state plugins or code that changes pymtheg
+behaviour is deemed covered by RPL-1.5 to be clear". **Why:** RPL-1.5
+makes internal use of a modified copy, other than for Research or Personal Use,
+a "Deploy" (Section 1.2), and the source of Extensions that are Deployed must
+be published (Section 6.1). GPL and AGPL were considered: neither requires
+publishing internal modifications or sends changes back to the owner.
 GPLv2-only was also ruled out by Apache-2.0 runtime dependencies.
-**Rules out:** treating a plugin as a way round publishing changes; any duty on a
-user's own code, designs or Pymtheg's output. A plugin is code Pymtheg itself
-loads to change its behaviour; software that only runs Pymtheg, talks to it over
-MCP or uses its output is not one. **Known limits:** a plugin built from
-Pymtheg's code is covered by Section 1.10(ii); for an independently written
-plugin the statement is the Licensor's position and reading of Section
-1.10(iii), not an extra condition (Section 7.1); the text does not settle it,
-and a lawyer should read it before first publish. Per-file notices, the
+**Rules out:** treating a plugin as a way round publishing changes; any duty on
+Pymtheg's output, or on a user's own code or designs merely because Pymtheg
+read, checked or linked them. A plugin is code Pymtheg itself loads to change
+its behaviour; software that only runs Pymtheg, talks to it over MCP or uses
+its output is not one. `LICENSE-EXCEPTIONS.md` declares that a plugin, and
+any other code Pymtheg loads and runs to change or add to its behaviour, is
+deemed an Extension covered by RPL-1.5 on the same terms as a change to
+Pymtheg's own code, including use only inside one organisation, as a term on
+which Pymtheg is offered. **Known limits:** for code copied or derived from
+Pymtheg the licence's own definitions apply (Sections 1.10(ii), 1.3 and 1.5);
+for independently written code the Licensor relies on Sections 1.10(iii) and
+1.3. Open questions for a lawyer before first publish: whether an explicit
+added term makes this a modified licence that Section 7.1 says must be renamed
+(and so no longer plain SPDX `RPL-1.5`), whether the declaration binds code
+that would not otherwise be a Modification or Derivative Work, and how it fits
+Sections 13.5 and 13.9. Per-file notices, the
 package `license` field and `docs/licences.md` follow in LIC-2;
 `"private": true` and publishing remain the owner's decisions. See
 [LIC-1](changes/LIC-1.md).
