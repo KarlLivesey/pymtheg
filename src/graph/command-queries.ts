@@ -49,6 +49,13 @@ export function queryGraph(
           : link.resolution === "ambiguous"
             ? "candidate-set"
             : "unresolved",
+      // Where a toolchain decided the link (W3-L2): `decidedBy`, beside the
+      // certainty it has as stored (`origin` is the link's parse/analysis
+      // origin). Absent for source-only links.
+      ...((link.data as { toolchain?: { origin?: string } } | null)?.toolchain
+        ?.origin === "toolchain"
+        ? { decidedBy: "toolchain" as const }
+        : {}),
       source: link.sourceId ? symbol(link.sourceId) : null,
       target: link.targetId ? symbol(link.targetId) : null,
       candidates: link.candidates.map((item) => ({

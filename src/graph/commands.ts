@@ -20,6 +20,14 @@ import {
   type StaleFile,
 } from "./command-snapshot.js";
 import { queryGraph, type QueryCommand } from "./command-queries.js";
+import {
+  goToolchainKey,
+  toolchainState,
+  type ToolchainState,
+} from "./command-toolchain.js";
+import { loadConfig } from "../project/config.js";
+import { graphToolchains } from "../shared/config.js";
+import { dirname, join } from "node:path";
 
 export type GraphCommand = "index" | "status" | QueryCommand;
 export interface GraphProgress {
@@ -85,6 +93,11 @@ export interface GraphResponse {
     observedLinks: number;
   };
   data: Record<string, unknown> | null;
+  /**
+   * The opt-in toolchain route (`graph.toolchain` in .pymtheg/settings.json):
+   * absent when the project has not opted in (off).
+   */
+  toolchain?: ToolchainState;
 }
 export interface GraphExecutionOptions {
   signal?: AbortSignal;
@@ -149,9 +162,19 @@ export async function executeGraph(
     const retryable = metadata.files.some(
       (file) => file.status === "failed" && !file.cacheable,
     );
+    // The opt-in toolchain route (W3-L2). No settings file is off; an
+    // unreadable one is off too, with a warning.
+    let toolchains: Record<string, boolean | string> = {};
+    let settingsError: string | null = null;
+    try {
+      toolchains = graphToolchains((await loadConfig(root)).config);
+    } catch (error) {
+      settingsError = error instanceof Error ? error.message : String(error);
+    }
+    const toolchainOn = Object.keys(toolchains).length > 0;
     const settings = {
       excludes: [".git", "node_modules", ".codegraph", ".pymtheg"],
-      toolchains: "disabled",
+      toolchains: toolchainOn ? toolchains : "disabled",
     };
     const configuration = registry.modules.map((m) => ({
       id: m.id,
@@ -170,11 +193,36 @@ export async function executeGraph(
         metadata,
       );
     const complete = previousState?.fingerprint === currentFingerprint();
-    const shouldIndex =
+    const toolchainDirectory = join(
+      dirname(storagePath(root, "graph")),
+      "toolchain",
+    );
+    const wouldIndex =
       request.command === "index" ||
       (request.command !== "status" &&
         !request.noSync &&
         (!exists || stale.length > 0 || retryable || !complete));
+    // The toolchain's inputs (Go version, go.sum, local replace targets, Go
+    // files the index does not capture) are outside the inventory: a query
+    // that would otherwise be answered unchanged recomputes the Go route's
+    // key (its fingerprint pass) and syncs unless it equals the recorded one.
+    const recordedKey = (previousState as { toolchain?: ToolchainState } | null)
+      ?.toolchain?.go.key;
+    const toolchainCurrent =
+      wouldIndex ||
+      !toolchainOn ||
+      request.command === "status" ||
+      request.noSync
+        ? true
+        : recordedKey !== undefined &&
+          (await goToolchainKey(
+            root,
+            toolchains.go!,
+            inventory,
+            toolchainDirectory,
+            signal,
+          )) === recordedKey;
+    const shouldIndex = wouldIndex || !toolchainCurrent;
     let report: IndexReport | null = null;
     let durationMs: number | null = null;
     if (shouldIndex) {
@@ -290,6 +338,13 @@ export async function executeGraph(
       options.progress?.({ phase: "inventory", done: 0, total });
       report = await indexProject(root, tracked, adapter, {
         excludeDirectories: [".pymtheg"],
+        ...(toolchainOn
+          ? {
+              toolchains,
+              toolchainDirectory,
+              signal,
+            }
+          : {}),
       });
       signal.throwIfAborted();
       durationMs = performance.now() - started;
@@ -317,6 +372,9 @@ export async function executeGraph(
             inventory,
             ...metadata,
             fingerprint: currentFingerprint(),
+            ...(toolchainOn
+              ? { toolchain: toolchainState(toolchains, report.toolchains) }
+              : {}),
           },
           dataVersion,
         );
@@ -407,6 +465,20 @@ export async function executeGraph(
         },
         data: null,
       };
+      if (toolchainOn)
+        response.toolchain = report
+          ? toolchainState(toolchains, report.toolchains)
+          : ((finalState as { toolchain?: ToolchainState } | null)
+              ?.toolchain ?? {
+              setting: toolchains,
+              go: { state: "not-indexed" },
+            });
+      if (settingsError)
+        response.warnings.push({
+          code: "settings-unreadable",
+          message: `.pymtheg/settings.json could not be read, so toolchain-backed links are off: ${settingsError}`,
+          files: [],
+        });
       if (failed.size)
         response.warnings.push({
           code: "failed-files",
