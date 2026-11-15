@@ -9,11 +9,11 @@ Do not edit by hand. This is an inventory, not legal advice.
 
 ## Summary
 
-100 third-party components are shipped: 10 installed npm dependencies (direct and transitive, production only; 0 optional), 88 packages bundled into `dist-web/`, and 2 vendored grammars. Dev-only packages are not shipped and are listed separately at the end.
+101 third-party components are shipped: 10 installed npm dependencies (direct and transitive, production only; 0 optional), 86 packages bundled into `dist-web/`, 3 sources of code the build tools write into `dist-web/` themselves, and 2 vendored grammars. Dev-only packages are not shipped and are listed separately at the end.
 
 | Licence (as declared) | Components | What it asks of a redistributor |
 |---|---:|---|
-| MIT | 95 | keep the copyright notice and licence text with copies |
+| MIT | 96 | keep the copyright notice and licence text with copies |
 | Apache-2.0 | 3 | keep the licence text and any NOTICE file; mark files you changed; includes a patent licence that ends for anyone who sues over patents in the work |
 | BSD-3-Clause | 1 | keep the copyright notice, conditions and disclaimer; do not use the authors' names to endorse |
 | ISC | 1 | keep the copyright notice and licence text with copies |
@@ -33,6 +33,18 @@ Do not edit by hand. This is an inventory, not legal advice.
 |---|---|---|---|
 | @modelcontextprotocol/core@2.4.0 | dependency | licence file reads as MIT but Apache-2.0 is declared | same LICENSE as @modelcontextprotocol/server: MIT-to-Apache-2.0 transition, both texts apply |
 | @modelcontextprotocol/server@2.4.0 | dependency | licence file reads as MIT but Apache-2.0 is declared | LICENSE explains a licensing transition from MIT to Apache-2.0: code from authors who have not consented to relicensing stays MIT. The file carries both texts; treat the package as Apache-2.0 and MIT together |
+
+## Code written by the build tools
+
+Besides the npm packages it bundles, the build writes some code of its own into `dist-web/`.
+Each origin is found from the bundler's virtual modules; `test/licences.test.mjs` also checks the
+built bundle's source maps independently, so emitted code from an unlisted origin fails the test.
+
+| Origin | Version | Licence | What it writes | Licence text from |
+|---|---|---|---|---|
+| @rollup/plugin-commonjs | 28.0.6 | MIT | CommonJS interop helpers and module wrappers: <package file>?commonjs-es-import, <package file>?commonjs-exports, <package file>?commonjs-module, commonjsHelpers.js | vite/LICENSE.md (section "@rollup/plugin-alias, @rollup/plugin-commonjs, @rollup/plugin-dynamic-import-vars, @rollup/pluginutils") |
+| rollup | 4.68.0 | MIT | import/export statements linking the bundle's chunks | LICENSE.md |
+| vite | 7.2.2 | MIT | module preload code: vite/modulepreload-polyfill.js | LICENSE.md |
 
 ## Vendored code
 
@@ -75,6 +87,7 @@ Do not edit by hand. This is an inventory, not legal advice.
 | @lezer/common | 1.5.5 | bundled in dist-web | MIT | Copyright (C) 2018 by Marijn Haverbeke <marijn@haverbeke.berlin> and others | https://code.haverbeke.berlin/lezer/common |
 | @lezer/highlight | 1.2.5 | bundled in dist-web | MIT | Copyright (C) 2018 by Marijn Haverbeke <marijn@haverbeke.berlin> and others | https://code.haverbeke.berlin/lezer/highlight |
 | @marijn/find-cluster-break | 1.0.4 | bundled in dist-web | MIT | Copyright (C) 2024 by Marijn Haverbeke <marijn@haverbeke.berlin> | https://code.haverbeke.berlin/marijn/find-cluster-break |
+| @rollup/plugin-commonjs | 28.0.6 | build-tool code in dist-web | MIT | Copyright (c) 2019 RollupJS Plugin Contributors (https://github.com/rollup/plugins/graphs/contributors) | https://github.com/rollup/plugins |
 | ajv | 8.17.1 | dependency (direct) | MIT | Copyright (c) 2015-2021 Evgeny Poberezkin | https://github.com/ajv-validator/ajv |
 | bail | 2.0.2 | bundled in dist-web | MIT | Copyright (c) 2015 Titus Wormer <tituswormer@gmail.com> | https://github.com/wooorm/bail |
 | ccount | 2.0.1 | bundled in dist-web | MIT | Copyright (c) 2015 Titus Wormer <tituswormer@gmail.com> | https://github.com/wooorm/ccount |
@@ -126,7 +139,6 @@ Do not edit by hand. This is an inventory, not legal advice.
 | micromark-util-decode-numeric-character-reference | 2.0.2 | bundled in dist-web | MIT | Copyright (c) Titus Wormer <tituswormer@gmail.com> | https://github.com/micromark/micromark/tree/main/packages/micromark-util-decode-numeric-character-reference |
 | micromark-util-decode-string | 2.0.1 | bundled in dist-web | MIT | Copyright (c) Titus Wormer <tituswormer@gmail.com> | https://github.com/micromark/micromark/tree/main/packages/micromark-util-decode-string |
 | micromark-util-edit-map | 1.0.0 | bundled in dist-web | MIT | Copyright (c) Titus Wormer <tituswormer@gmail.com> | https://github.com/micromark/micromark/tree/main/packages/micromark-util-edit-map |
-| micromark-util-encode | 2.0.1 | bundled in dist-web | MIT | Copyright (c) Titus Wormer <tituswormer@gmail.com> | https://github.com/micromark/micromark/tree/main/packages/micromark-util-encode |
 | micromark-util-html-tag-name | 2.0.1 | bundled in dist-web | MIT | Copyright (c) Titus Wormer <tituswormer@gmail.com> | https://github.com/micromark/micromark/tree/main/packages/micromark-util-html-tag-name |
 | micromark-util-normalize-identifier | 2.0.1 | bundled in dist-web | MIT | Copyright (c) Titus Wormer <tituswormer@gmail.com> | https://github.com/micromark/micromark/tree/main/packages/micromark-util-normalize-identifier |
 | micromark-util-resolve-all | 2.0.1 | bundled in dist-web | MIT | Copyright (c) Titus Wormer <tituswormer@gmail.com> | https://github.com/micromark/micromark/tree/main/packages/micromark-util-resolve-all |
@@ -140,6 +152,7 @@ Do not edit by hand. This is an inventory, not legal advice.
 | remark-parse | 11.0.0 | bundled in dist-web | MIT | Copyright (c) 2014 Titus Wormer <tituswormer@gmail.com> | https://github.com/remarkjs/remark/tree/main/packages/remark-parse |
 | remark-rehype | 11.1.2 | bundled in dist-web | MIT | Copyright (c) Titus Wormer <tituswormer@gmail.com> | https://github.com/remarkjs/remark-rehype |
 | require-from-string | 2.0.2 | dependency | MIT | Copyright (c) Vsevolod Strukchinsky <floatdrop@gmail.com> (github.com/floatdrop) | https://github.com/floatdrop/require-from-string |
+| rollup | 4.68.0 | build-tool code in dist-web | MIT | Copyright (c) 2017 [these people](https://github.com/rollup/rollup/graphs/contributors) | https://github.com/rollup/rollup |
 | scheduler | 0.27.0 | bundled in dist-web | MIT | Copyright (c) Meta Platforms, Inc. and affiliates. | https://github.com/facebook/react |
 | space-separated-tokens | 2.0.2 | bundled in dist-web | MIT | Copyright (c) 2016 Titus Wormer <tituswormer@gmail.com> | https://github.com/wooorm/space-separated-tokens |
 | style-mod | 4.1.4 | bundled in dist-web | MIT | Copyright (C) 2018 by Marijn Haverbeke <marijn@haverbeke.berlin> and others | https://code.haverbeke.berlin/marijn/style-mod |
@@ -156,7 +169,7 @@ Do not edit by hand. This is an inventory, not legal advice.
 | unist-util-visit-parents | 6.1.0 | bundled in dist-web | MIT | Copyright (c) Titus Wormer <tituswormer@gmail.com> | https://github.com/syntax-tree/unist-util-visit-parents |
 | vfile | 6.0.3 | bundled in dist-web | MIT | Copyright (c) 2015 Titus Wormer <tituswormer@gmail.com> | https://github.com/vfile/vfile |
 | vfile-message | 4.0.4 | bundled in dist-web | MIT | Copyright (c) Titus Wormer <tituswormer@gmail.com> | https://github.com/vfile/vfile-message |
-| vite | 7.2.2 | bundled in dist-web | MIT | Copyright (c) 2019-present, VoidZero Inc. and Vite contributors | https://github.com/vitejs/vite |
+| vite | 7.2.2 | build-tool code in dist-web | MIT | Copyright (c) 2019-present, VoidZero Inc. and Vite contributors | https://github.com/vitejs/vite |
 | w3c-keyname | 2.2.8 | bundled in dist-web | MIT | Copyright (C) 2016 by Marijn Haverbeke <marijn@haverbeke.berlin> and others | https://github.com/marijnh/w3c-keyname |
 | web-tree-sitter | 0.27.2 | dependency (direct) | MIT | Copyright (c) 2018 Max Brunsfeld | https://github.com/tree-sitter/tree-sitter |
 | zod | 4.2.0 | dependency (direct) | MIT | Copyright (c) 2025 Colin McDonnell | https://github.com/colinhacks/zod |

@@ -12,6 +12,10 @@ import {
   allowed,
   root,
 } from "../scripts/licences/inventory.mjs";
+import {
+  bundleOrigins,
+  explainUnmapped,
+} from "../scripts/licences/bundle-origins.mjs";
 
 const generated = generate();
 
@@ -85,5 +89,77 @@ test("the allow-list check reads SPDX expressions and licence texts", () => {
       "Redistribution and use in source and binary forms ... The names of any contributors may not be used to endorse",
     ),
     ["BSD-3-Clause"],
+  );
+});
+
+test("every origin of code in the built bundle is in the inventory, judged from source maps", async () => {
+  const { data } = await generated;
+  const { origins, unmapped } = await bundleOrigins();
+  const listed = new Set(
+    data.components
+      .filter((c) => /^(bundled|build-tool)/.test(c.shipped))
+      .map((c) => c.name),
+  );
+  assert.deepEqual(
+    data.components.filter((c) => c.unattributed).map((c) => c.name),
+    [],
+    "build-tool code with no known origin",
+  );
+  assert.deepEqual(
+    [...origins.keys()].filter((o) => o.startsWith("other:")),
+    [],
+    "mapped code from a source that is neither ours nor an npm package",
+  );
+  const mappedPackages = [...origins.keys()]
+    .filter((o) => o.startsWith("package:"))
+    .map((o) => o.slice("package:".length));
+  for (const name of mappedPackages)
+    assert.ok(
+      listed.has(name),
+      `bundled code from ${name} is not in the inventory`,
+    );
+  for (const c of data.components.filter(
+    (c) => c.shipped === "bundled in dist-web",
+  ))
+    assert.ok(
+      mappedPackages.includes(c.name),
+      `${c.name} is listed as bundled but no emitted code maps to it`,
+    );
+  assert.ok(
+    unmapped.length > 0,
+    "the build is expected to write some code of its own",
+  );
+  for (const piece of unmapped) {
+    const { origins: found, unexplained } = explainUnmapped(piece.text);
+    assert.equal(
+      unexplained,
+      null,
+      `${piece.file}:${piece.line}:${piece.column}: emitted code with no source and no known origin`,
+    );
+    for (const origin of found)
+      assert.ok(
+        listed.has(origin),
+        `${origin} writes code into the bundle but is not in the inventory`,
+      );
+  }
+});
+test("unmapped build-tool code is recognised by shape, and anything else is reported", () => {
+  const helper =
+    'function Xg(u){return u&&u.__esModule&&Object.prototype.hasOwnProperty.call(u,"default")?u.default:u}var ro={exports:{}},ri={};var $m;function Gg(){if($m)return ri;$m=1;';
+  assert.deepEqual(explainUnmapped(helper), {
+    origins: new Set(["@rollup/plugin-commonjs"]),
+    unexplained: null,
+  });
+  const linked =
+    'import{r as f,j as t}from"./react-C9.js";import{T as td}from"./editor-3I.js";';
+  assert.deepEqual([...explainUnmapped(linked).origins], ["rollup"]);
+  const polyfill =
+    '(function(){const n=document.createElement("link").relList;if(n&&n.supports&&n.supports("modulepreload"))return;function i(o){if(o.ep)return;o.ep=!0;const r=s(o);fetch(o.href,r)}})();';
+  assert.deepEqual([...explainUnmapped(polyfill).origins], ["vite"]);
+  assert.match(
+    explainUnmapped(
+      "var __defProp=Object.defineProperty;var __publicField=(o,k,v)=>__defProp(o,k,v);",
+    ).unexplained,
+    /__defProp/,
   );
 });

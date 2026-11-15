@@ -241,7 +241,68 @@ async function dependencies() {
   return out;
 }
 
-/** Packages Vite actually puts into dist-web, from the bundle's module graph. */
+/**
+ * Code a build tool writes into dist-web itself, by the virtual module id the
+ * bundler gives it ("\0" prefix stripped). Each rule names the project the
+ * code comes from and, when that project is vendored inside another package,
+ * the host whose LICENSE.md carries its licence. A virtual module matching no
+ * rule is reported as unattributed and fails the licence test.
+ */
+export const injectedOrigins = [
+  {
+    test: (id) => id === "commonjsHelpers.js" || /\?commonjs-[a-z-]+$/.test(id),
+    origin: "@rollup/plugin-commonjs",
+    host: "vite",
+    what: "CommonJS interop helpers and module wrappers",
+  },
+  {
+    test: (id) =>
+      /^vite\/(modulepreload-polyfill|preload-helper)(\.js)?$/.test(id),
+    origin: "vite",
+    what: "module preload code",
+  },
+];
+/** A package's own licence: the part of LICENSE.md before its bundled-dependency notices. */
+async function ownLicence(directory) {
+  const { files, texts } = await licenceFiles(directory);
+  return {
+    files,
+    texts: texts.map(
+      (t) => t.split(/\n#+ Licenses of bundled dependencies/i)[0],
+    ),
+  };
+}
+/** A project vendored inside `host`, from the host's LICENSE.md bundled-dependency section. */
+async function vendoredInside(host, name) {
+  const directory = join(root, "node_modules", host);
+  const hostPkg = JSON.parse(
+    await readFile(join(directory, "package.json"), "utf8"),
+  );
+  const text = await readFile(join(directory, "LICENSE.md"), "utf8");
+  const section = text.split(/\n-{5,}\n/).find((part) => {
+    const heading = /^## (.+)$/m.exec(part)?.[1] ?? "";
+    return heading.split(/,\s*/).includes(name);
+  });
+  if (!section) throw Error(`${host}/LICENSE.md has no section for ${name}`);
+  const licence = section
+    .split("\n")
+    .filter((l) => l.startsWith(">"))
+    .map((l) => l.replace(/^> ?/, ""))
+    .join("\n");
+  return {
+    name,
+    version:
+      hostPkg.devDependencies?.[name] ??
+      hostPkg.dependencies?.[name] ??
+      `bundled in ${host}`,
+    declared: /^License: (.+)$/m.exec(section)?.[1] ?? null,
+    files: [`${host}/LICENSE.md (section "${/^## (.+)$/m.exec(section)[1]}")`],
+    texts: [licence],
+    source: /^Repository: (.+)$/m.exec(section)?.[1] ?? null,
+    location: `node_modules/${host} (vendored inside ${host}@${hostPkg.version})`,
+  };
+}
+/** Packages and build-tool code Vite actually puts into dist-web, from the bundle's module graph. */
 async function bundled() {
   const { build } = await import("vite");
   const modules = new Set();
@@ -250,7 +311,8 @@ async function bundled() {
     generateBundle(_options, bundle) {
       for (const chunk of Object.values(bundle))
         if (chunk.type === "chunk")
-          for (const id of Object.keys(chunk.modules)) modules.add(id);
+          for (const [id, info] of Object.entries(chunk.modules))
+            if (info.renderedLength > 0) modules.add(id);
     },
   };
   const outDir = await mkdtemp(join(tmpdir(), "pymtheg-licence-bundle-"));
@@ -266,14 +328,24 @@ async function bundled() {
     await rm(outDir, { recursive: true, force: true });
   }
   const packages = new Map();
-  const virtual = new Set();
+  const injected = new Map();
+  const unattributed = new Set();
   for (const raw of modules) {
-    // "\0" marks a plugin's virtual module. A CommonJS proxy wraps a real
-    // package file (counted as that package); the rest are Vite's own helpers.
     const id = raw.startsWith("\0") ? raw.slice(1) : raw;
-    if (raw.startsWith("\0") && !id.includes("node_modules")) {
-      virtual.add(id.split("?")[0]);
-      continue;
+    if (raw.startsWith("\0") || /\?commonjs-[a-z-]+$/.test(id)) {
+      // A virtual module is build-tool code, even when it wraps a package file.
+      const rule = injectedOrigins.find((r) =>
+        r.test(id.includes("node_modules") ? "x?" + id.split("?").pop() : id),
+      );
+      const shown = id.includes("node_modules")
+        ? `<package file>?${id.split("?").pop()}`
+        : id;
+      if (rule) {
+        if (!injected.has(rule.origin))
+          injected.set(rule.origin, { rule, ids: new Set() });
+        injected.get(rule.origin).ids.add(shown);
+      } else unattributed.add(shown);
+      if (!id.includes("node_modules")) continue;
     }
     if (!id.includes(`node_modules${sep}`) && !id.includes("node_modules/"))
       continue;
@@ -305,30 +377,51 @@ async function bundled() {
       location: relative(root, directory),
     });
   }
-  // Helpers Vite injects into the bundle (module preload, CommonJS interop).
-  if (virtual.size) {
-    const directory = join(root, "node_modules/vite");
+  const tool = async (name) => {
+    const directory = join(root, "node_modules", name);
     const pkg = JSON.parse(
       await readFile(join(directory, "package.json"), "utf8"),
     );
-    const { files, texts } = await licenceFiles(directory);
-    out.push({
-      name: "vite",
+    return {
+      name,
       version: pkg.version,
-      shipped: "bundled in dist-web",
-      direct: false,
       declared: declaredLicence(pkg),
-      files,
-      // Vite's LICENSE.md also carries the licences of everything Vite itself
-      // bundles; only Vite's own (first) section applies to the injected helpers.
-      texts: texts.map(
-        (t) => t.split(/\n#+ Licenses of bundled dependencies/i)[0],
-      ),
+      ...(await ownLicence(directory)),
       source: sourceUrl(pkg),
-      location: "node_modules/vite",
-      note: `injected helper modules: ${[...virtual].sort().join(", ")}`,
+      location: `node_modules/${name}`,
+    };
+  };
+  for (const [origin, { rule, ids }] of injected) {
+    const base = rule.host
+      ? await vendoredInside(rule.host, origin)
+      : await tool(origin);
+    out.push({
+      ...base,
+      shipped: "build-tool code in dist-web",
+      direct: false,
+      note: `${rule.what}: ${[...ids].sort().join(", ")}`,
     });
   }
+  // Rollup writes the import/export statements that link the chunks.
+  out.push({
+    ...(await tool("rollup")),
+    shipped: "build-tool code in dist-web",
+    direct: false,
+    note: "import/export statements linking the bundle's chunks",
+  });
+  for (const id of unattributed)
+    out.push({
+      name: `unattributed build-tool module ${id}`,
+      version: "-",
+      shipped: "build-tool code in dist-web",
+      direct: false,
+      declared: null,
+      files: [],
+      texts: [],
+      source: null,
+      location: "-",
+      unattributed: true,
+    });
   return out;
 }
 
@@ -442,6 +535,8 @@ export async function collect() {
     ]);
     const declared = spdxIds(c.declared);
     c.problems = [];
+    if (c.unattributed)
+      c.problems.push("build-tool code in the bundle with no known origin");
     if (!c.files.some((f) => !noticeFile.test(f)))
       c.problems.push("no licence text in the package");
     if (!c.declared) c.problems.push("no declared licence");
@@ -506,7 +601,8 @@ export async function render(data) {
     "",
     `${components.length} third-party components are shipped: ${by("dependency")} installed npm dependencies` +
       ` (direct and transitive, production only; ${by("optional")} optional), ${by("bundled")} packages bundled into \`dist-web/\`,` +
-      ` and ${by("vendored")} vendored grammars. Dev-only packages are not shipped and are listed separately at the end.`,
+      ` ${by("build-tool")} sources of code the build tools write into \`dist-web/\` themselves, and ${by("vendored")} vendored grammars.` +
+      ` Dev-only packages are not shipped and are listed separately at the end.`,
     "",
     "| Licence (as declared) | Components | What it asks of a redistributor |",
     "|---|---:|---|",
@@ -564,7 +660,21 @@ export async function render(data) {
       );
     md.push("");
   }
-  md.push("## Vendored code", "");
+  md.push(
+    "## Code written by the build tools",
+    "",
+    "Besides the npm packages it bundles, the build writes some code of its own into `dist-web/`.",
+    "Each origin is found from the bundler's virtual modules; `test/licences.test.mjs` also checks the",
+    "built bundle's source maps independently, so emitted code from an unlisted origin fails the test.",
+    "",
+    "| Origin | Version | Licence | What it writes | Licence text from |",
+    "|---|---|---|---|---|",
+  );
+  for (const c of components.filter((c) => c.shipped.startsWith("build-tool")))
+    md.push(
+      `| ${c.name} | ${c.version} | ${c.declared ?? "unknown"} | ${(c.note ?? "").replace(/\|/g, "\\|")} | ${c.files.join(", ") || "none"} |`,
+    );
+  md.push("", "## Vendored code", "");
   for (const c of components.filter((c) => c.shipped.startsWith("vendored"))) {
     md.push(
       `### ${c.name}`,
@@ -681,7 +791,9 @@ if (
         stale = true;
       }
     const blocking = data.components.filter((c) =>
-      c.problems.some((p) => /allow-list|no licence text/.test(p)),
+      c.problems.some((p) =>
+        /allow-list|no licence text|no known origin/.test(p),
+      ),
     );
     for (const c of blocking)
       console.error(`${c.name}@${c.version}: ${c.problems.join("; ")}`);

@@ -82,27 +82,67 @@ for (const mode of ["studio", "mcp"])
     test(`${mode} stops cleanly on ${signal} with nothing left running`, () =>
       stopsCleanly(mode, signal));
 
-test("only the node:sqlite and glob ExperimentalWarnings are filtered", () => {
+test("only Node's exact SQLite and glob ExperimentalWarnings are filtered, on every emitWarning overload", () => {
+  const sqlite =
+    "SQLite is an experimental feature and might change at any time";
+  const glob = "glob is an experimental feature and might change at any time";
   const script = `
     await import(${JSON.stringify(resolve("dist/cli/quiet-warnings.js"))});
-    process.emitWarning("SQLite is an experimental feature and might change at any time", "ExperimentalWarning");
-    process.emitWarning("SQLite is an experimental feature", { type: "ExperimentalWarning" });
-    process.emitWarning("glob is an experimental feature and might change at any time", "ExperimentalWarning");
-    process.emitWarning("another experiment", "ExperimentalWarning");
-    process.emitWarning("SQLite is an experimental feature", "DeprecationWarning");
-    process.emitWarning("plain warning");`;
+    const sqlite = ${JSON.stringify(sqlite)}, glob = ${JSON.stringify(glob)};
+    const error = (name, message) => Object.assign(new Error(message), { name });
+    // Suppressed: Node's own form, a string with the type as string or options.
+    process.emitWarning(sqlite, "ExperimentalWarning");
+    process.emitWarning(sqlite, { type: "ExperimentalWarning" });
+    process.emitWarning(glob, "ExperimentalWarning");
+    process.emitWarning(glob, { type: "ExperimentalWarning", code: "X" });
+    // Printed: an Error uses its own name; Node ignores the other arguments.
+    process.emitWarning(error("DeprecationWarning", sqlite), "ExperimentalWarning");
+    process.emitWarning(error("DeprecationWarning", glob), { type: "ExperimentalWarning" });
+    process.emitWarning(error("ExperimentalWarning", sqlite));
+    process.emitWarning(error("Error", "plain error warning"));
+    // Printed: deprecations in every form.
+    process.emitWarning("string deprecation", "DeprecationWarning", "DEP_TEST_1");
+    process.emitWarning("options deprecation", { type: "DeprecationWarning", code: "DEP_TEST_2" });
+    process.emitWarning(sqlite, "DeprecationWarning");
+    process.emitWarning(sqlite, { type: "DeprecationWarning" });
+    // Printed: other experimental warnings and near misses.
+    process.emitWarning("fetch is an experimental feature and might change at any time", "ExperimentalWarning");
+    process.emitWarning("SQLite is an experimental feature", "ExperimentalWarning");
+    process.emitWarning(sqlite + ".", { type: "ExperimentalWarning" });
+    process.emitWarning(sqlite);
+    process.emitWarning(sqlite, { code: "NO_TYPE" });
+    // Printed: custom warnings.
+    process.emitWarning("custom warning", "MyWarning");
+    process.emitWarning("custom options warning", { type: "MyWarning", detail: "d" });
+    process.emitWarning("default type warning");`;
   const r = spawnSync(process.execPath, ["--input-type=module", "-e", script], {
     encoding: "utf8",
   });
   assert.equal(r.status, 0, r.stderr);
-  assert.doesNotMatch(r.stderr, /ExperimentalWarning: SQLite/);
-  assert.doesNotMatch(r.stderr, /ExperimentalWarning: glob/);
-  assert.match(r.stderr, /ExperimentalWarning: another experiment/);
-  assert.match(
-    r.stderr,
-    /DeprecationWarning: SQLite is an experimental feature/,
-  );
-  assert.match(r.stderr, /Warning: plain warning/);
+  const lines = r.stderr
+    .split("\n")
+    .map((l) => l.replace(/^\(node:\d+\) (\[\w+\] )?/, ""))
+    .filter((l) => /^\w+: /.test(l) && !l.startsWith("(Use"));
+  const count = (line) => lines.filter((l) => l === line).length;
+  assert.equal(count(`ExperimentalWarning: ${glob}`), 0, r.stderr);
+  // Only the Error-object form of the exact SQLite text prints as experimental.
+  assert.equal(count(`ExperimentalWarning: ${sqlite}`), 1, r.stderr);
+  assert.equal(count(`DeprecationWarning: ${sqlite}`), 3, r.stderr);
+  assert.equal(count(`DeprecationWarning: ${glob}`), 1, r.stderr);
+  for (const line of [
+    "Error: plain error warning",
+    "DeprecationWarning: string deprecation",
+    "DeprecationWarning: options deprecation",
+    "ExperimentalWarning: fetch is an experimental feature and might change at any time",
+    "ExperimentalWarning: SQLite is an experimental feature",
+    `ExperimentalWarning: ${sqlite}.`,
+    "MyWarning: custom warning",
+    "MyWarning: custom options warning",
+    "Warning: default type warning",
+  ])
+    assert.equal(count(line), 1, `${line}\n${r.stderr}`);
+  assert.equal(count(`Warning: ${sqlite}`), 2, r.stderr);
+  assert.equal(lines.length, 16, r.stderr);
 });
 test("node:sqlite is loaded lazily, never by a static import in src", async () => {
   const offenders = [];

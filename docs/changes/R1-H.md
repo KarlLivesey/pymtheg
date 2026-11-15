@@ -11,10 +11,16 @@ published tarball installs or contains:
 - the production npm tree, direct and transitive, from `package-lock.json`
   (entries not marked `dev`; optional ones are labelled), with each installed
   package's `package.json` and licence files;
-- every npm package Vite puts into `dist-web/`, read from the bundle's real
-  module graph (an in-memory `vite build` with a capture plugin; nothing
-  written), plus Vite's own injected helpers (`commonjsHelpers.js`,
-  `vite/modulepreload-polyfill.js`);
+- every npm package Vite puts into `dist-web/` with rendered code, read from
+  the bundle's real module graph (an in-memory `vite build` with a capture
+  plugin; nothing written);
+- the code the build tools write into `dist-web/` themselves, attributed by
+  the bundler's virtual module ids (`injectedOrigins`): `@rollup/plugin-commonjs`
+  (CommonJS interop helper and module wrappers; vendored inside Vite, so its
+  licence text is taken from its section of `vite/LICENSE.md` and its version
+  from Vite's pinned `devDependencies`), Vite (module preload polyfill) and
+  Rollup (the import/export statements linking chunks). A virtual module with
+  no known origin is a blocking problem;
 - the vendored grammars from `grammars/*/manifest.json` and their checked-in
   LICENSE files, with every patch and its origin;
 - the Go helper `golinks.go` (its imports are parsed: standard library only);
@@ -35,12 +41,14 @@ own licence is not yet chosen.
 
 ### Summary (after the dependency moves in B.5)
 
-100 shipped third-party components: 10 installed npm packages, 88 packages
-bundled into `dist-web/`, 2 vendored grammars.
+101 shipped third-party components: 10 installed npm packages, 86 packages
+bundled into `dist-web/`, 3 origins of code the build tools write into
+`dist-web/` themselves (`@rollup/plugin-commonjs` 28.0.6, Rollup 4.68.0, Vite
+7.2.2; all MIT), 2 vendored grammars.
 
 | Licence (as declared) | Components | Which |
 |---|---:|---|
-| MIT | 95 | everything not listed below, incl. both vendored grammars, React, CodeMirror, unified/remark, ajv, zod, web-tree-sitter |
+| MIT | 96 | everything not listed below, incl. both vendored grammars, the three build-tool origins, React, CodeMirror, unified/remark, ajv, zod, web-tree-sitter |
 | Apache-2.0 | 3 | `typescript` (also ships `ThirdPartyNoticeText.txt`, included), `@modelcontextprotocol/server`, `@modelcontextprotocol/core` |
 | BSD-3-Clause | 1 | `fast-uri` (via ajv) |
 | ISC | 1 | `@ungap/structured-clone` (bundled) |
@@ -148,12 +156,22 @@ loads a builtin while linking the ESM graph, before any module body runs, and
   (`process.getBuiltinModule`); it is the only module that loads it.
 - `src/cli/quiet-warnings.ts`, the first import of the CLI entry
   (`src/cli/main.ts`) and of the analysis worker (`src/cli/worker.ts`, which has
-  its own `process`), drops only warnings whose type is `ExperimentalWarning`
-  and whose message starts "SQLite is an experimental feature" or "glob is an
-  experimental feature". Every other warning, including every other
-  ExperimentalWarning, still prints. No `NODE_OPTIONS` or flag is needed.
-- `test/r1h-packaging.test.mjs` checks the filter's exact scope and that no
-  `src` file imports `node:sqlite` as a value statically.
+  its own `process`), drops only Node's own two warnings: a string warning
+  whose type is `ExperimentalWarning` and whose message is exactly "SQLite is an
+  experimental feature and might change at any time" or "glob is an
+  experimental feature and might change at any time". It follows
+  `process.emitWarning`'s overloads: the type comes from a string second
+  argument or from `options.type` (default `Warning`), and an `Error` is never
+  filtered, because Node ignores the other arguments for an Error and uses its
+  own name (round 1 fixed a version that read the type from the options even
+  for an Error, which hid a real `DeprecationWarning`). Every other warning,
+  including other ExperimentalWarnings and near-miss texts, still prints. No
+  `NODE_OPTIONS` or flag is needed.
+- `test/r1h-packaging.test.mjs` emits warnings through every overload (string
+  with type, string with options, Error; deprecations with codes, other
+  experimental warnings, near misses, custom types, default type) and checks
+  exactly which print; it also checks that no `src` file imports `node:sqlite`
+  as a value statically.
 
 The full suite passes on official Node 24.0.0, 24.21.0, 25.2.1, 25.9.0 and
 26.13.1 (2,784 tests; one existing environment skip on 26.13.1).
@@ -197,6 +215,13 @@ installed binary.
 
 ## Known limits
 
+- The build-tool signatures match the minified shapes Vite 7.2 and Rollup 4.68
+  emit today. A tool upgrade that changes them makes the licence test fail,
+  which is intended, and needs a recogniser update after review. Helper code a
+  transform inserts inside a module whose source map points at that module (for
+  example a CommonJS wrapper's later lines, or an esbuild helper) is attributed
+  to that module, not to the tool; the virtual-module attribution covers the
+  CommonJS wrappers, and no esbuild helper is present in today's bundle.
 - The licence-file reader recognises common licences by wording; an unusual
   text is flagged "not recognised", not guessed.
 - The bundle inventory is computed by running Vite, so the test needs dev
@@ -205,3 +230,29 @@ installed binary.
   never loaded at run time (only the web bundle uses that module), so an
   installed package without dev dependencies is unaffected.
 - The `npx` signal case is documented, not fixed (see 8).
+
+## Round 1 review (Sol): fixes
+
+1. **Missing licence attribution for build-tool code.** The inventory kept only
+   Vite's own section of `vite/LICENSE.md` and so dropped the licence of
+   `@rollup/plugin-commonjs`, whose helper code ships in the React chunk.
+   Fixed at the cause: build-tool code is attributed per origin from the
+   bundler's virtual module ids, a project vendored inside another package gets
+   its licence from the host's bundled-dependency section, Rollup is listed for
+   the chunk linkage, and an unknown virtual module blocks. Completeness is
+   checked independently of that module list: `scripts/licences/bundle-origins.mjs`
+   builds the bundle with source maps into a temporary directory, reads from the
+   maps alone which source every piece of emitted JavaScript comes from, and
+   finds every stretch of emitted code that maps to no source. In today's build
+   there are two: the index chunk's chunk imports plus Vite's module preload
+   polyfill, and the React chunk's `getDefaultExportFromCjs` helper plus a
+   CommonJS module wrapper. Each such stretch must be fully explained by a
+   structural signature (`injectedSignatures`) whose origin is in the inventory;
+   any other emitted code with no source fails `test/licences.test.mjs`, as does
+   a mapped npm package missing from the inventory or an inventory package with
+   no mapped code. `micromark-util-encode` left the list (tree-shaking removes
+   all of its code; the maps confirm it), and Vite moved from "bundled" to
+   "build-tool code".
+2. **Warning filter hid a real deprecation** when an `Error` was passed with a
+   type in the second argument. Fixed as described in section 7; tested for
+   each overload on Node 24.21.0, 24.0.0 and 25.2.1.
