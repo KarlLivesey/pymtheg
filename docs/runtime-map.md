@@ -35,10 +35,16 @@ The language is a bounded design tool, not a universal proof engine.
 | Call contracts `src/analysis/contracts.ts` | typed calls + pre/post contracts -> discharged/violated/pending | signed scalar/affine facts, conservative Boolean joins, located infeasible assertions; typed abstract results and supported guarantees retain assumption provenance at consumers; unsupported proof visible |
 | Feasibility `src/analysis/feasibility.ts` | entry constraints -> interval/Bool witness or contradiction | only supported conjunctive scalar fragment; all other logic unsupported; postconditions remain obligations |
 | Lowering/reference semantics `src/behaviour/model.ts` | `lower(ir,entry): supported(model) / unsupported / incomplete`; `step`, `replay` | finite machine or source-flow graph; generated Q/TLA strings + source event map; hash validation before mapping |
-| Adapter `src/backends/adapter.ts` | typed IR + BackendOptions + AbortSignal -> property results | owns temporary workspace; pinned version/digest checks, runtime validation of external JSON/ITF; finally cleanup; retains partial results if cleanup fails |
+| Adapter `src/backends/adapter.ts` | typed IR + BackendOptions + AbortSignal -> property results | default `builtin` backend calls the explore runner (`method` exhaustive or sample); for TLC/Quint owns temporary workspace; pinned version/digest checks, runtime validation of external JSON/ITF; finally cleanup; retains partial results if cleanup fails |
 | Process runner `src/backends/process.ts` | executable + argument array + deadline/cancel/output cap -> discriminated ProcessResult | detached POSIX process group; TERM then KILL; leader reaped; kills group even when leader exited retaining child pipes |
 | Reporting `src/reporting/report.ts`, `publish.ts` | AnalysisResult[] -> same Report -> text/JSON; atomicWrite | no independent renderer verdict; JSON v1 schema; same-directory stage, fsync, rename, finally unlink |
 | Shared semantics `src/shared/` | identity, scalar operators, evidence/purity/hoist policies | pure CLI name/extension values in identity-values.ts, re-exported by identity.ts (+ package bin/wrapper); no global current project/cache |
+| Built-in engines `src/behaviour/explore.ts`, `explore-worker.ts`, `explore-runner.ts` | `GeneratedModel` (+ `ProjectIR` for flow replay) -> `ExploreResult` (per-property verdicts, `state-domains`, measurements) | exhaustive BFS (`stateBudget`, default 1,000,000) or seeded sampler; runs in an owned worker with a readiness handshake, signal and timeout; the runner awaits worker termination on every exit; uses the existing `initial`/`step`/`replay` semantics, never reparses |
+| Storage boundary `src/storage/local.ts`, `layout.ts`, `graph.ts` | `storagePath(root, item, create?)`, `openDatabase`, `findProjectRoot`, `openProjectGraph` | only module that chooses project paths and opens SQLite; refuses old layouts and symlinked storage; creates `.pymtheg/rebuildable/.gitignore`; feature stores keep their schemas and transactions |
+| Recorded history `src/storage/recorded-history.ts`, `writer.ts`, `paths.ts` | checkpoint/acknowledgement/withdrawal/draft transactions -> UUID registrations + receipts; `exportRecordedHistory()` | additive tables in the planning database, written inside the feature transaction; writer identity in `.pymtheg/local/writer.json`; order `(sequence, machine, actor, change UUID)` |
+| Graph core `src/graph/` (`indexer.ts`, `store.ts`, `registry.ts`, `analysis.ts`, `identity.ts`, `tree-sitter.ts`, `conformance.ts`) | `indexProject(root, registry, store)` -> `IndexReport`; queries `findSymbols`, `outgoing`, `incoming`, `links`, `unresolved`, `ambiguous`, `neighbourhood` | language-neutral; strict UTF-8 capture; per-file atomic replacement; validates every module result before writing; SQLite schema 3; not wired to any command yet |
+| Language modules `src/graph/languages/{go,rust,typescript}/` | default-exported `LanguageModule`: claims, context files, `parse`/`analyze`/`resolve` | discovered from the folder, no core list; Go and Rust parse with tree-sitter WASM grammars, TypeScript with the compiler over the captured snapshot; none runs a toolchain or project code |
+| Vendored grammars `grammars/<lang>/` | `manifest.json`, patches, built `.wasm`, licence; `grammars/build.mjs` | Go only so far; the module loads the `.wasm` relative to its compiled file; `test/grammar-vendored.test.mjs` checks sha256, ABI and licence; rebuilding is a maintainer step |
 
 `ProjectIR` contains the immutable snapshot, AST declarations, resolved symbols,
 types/ExprInfo keyed by source span, labelled dependencies, holes, and transitive
@@ -126,6 +132,11 @@ probabilities, amortisation and precise peak live memory are outside v0.
   report, not that all analyses passed. Results carry failures independently.
 - Worker: created -> running -> terminal/terminated -> joined before handoff.
   Cancellation terminates CPU work; completed partial results remain available.
+- Built-in engine worker: created -> ready (handshake; `onReady` before start) ->
+  searching -> result, or cancelled/timed out -> terminated and awaited. An
+  interrupted worker supplies no counts or witnesses; every unviolated property is
+  incomplete. The timer starts before readiness, so a worker that never becomes
+  ready still times out.
 - External checker: prepared -> spawned -> exited, or TERM -> 100ms -> KILL.
   Group cleanup also runs after normal leader exit. The leader is reaped by Node;
   orphan descendant reaping is the OS's job. Descendants deliberately escaping a
@@ -216,8 +227,10 @@ correctness; optional literal empty bodies may fail return checking.
 JSON remains available. `shared/config.ts` and behavioural preflight still validate
 the resulting scope. Named scenarios use a configuration hash and atomic publication.
 
-`studio/recovery.ts` owns a private SQLite database in `.pymtheg-studio/`. Studio
-initializes it lazily; MCP does not. Draft transactions compare a revision inside
+`studio/recovery.ts` owns two private SQLite databases, opened through the
+storage boundary (`src/storage/`): unsaved drafts in `.pymtheg/shared/drafts.sqlite`
+and the three-run cache in `.pymtheg/rebuildable/runs.sqlite`. Studio
+initializes them lazily; MCP does not. Draft transactions compare a revision inside
 `BEGIN IMMEDIATE`; a competing writer yields a conflict, never last-writer-wins.
 Recovery stores base hashes and editor context separately from source. The GUI
 reviews competing data before explicit retry, can download it, and can save a
@@ -456,7 +469,11 @@ Both read ProjectIR; no second parser or write side effect exists. The API respo
 carries snapshot/type/source identities before a loaded definition may enter a form.
 
 Linked-title review compares current names to only the linked rows retained from
-linkReviewRevision (or the original proposal revision). Evidence revision checks
+one earlier revision per link, chosen by `linkComparisonBase`
+(`src/architecture/schema.ts`): the link's baseline (`linkBaselines`, set by the
+server when the link is added) if it has one, else `linkReviewRevision` (set only
+by explicit acknowledgement), else the proposal's `originRevision`. See
+[W2-H](changes/W2-H.md). Evidence revision checks
 remain separate. Acknowledging names does not assert correctness or refresh evidence.
 
 ## Continuing authoring after the sixth review
@@ -1421,3 +1438,58 @@ resolution changes. All 38 reported wrong targets are withheld, and
 established acceptance checks pass. Exact deltas and checks are in
 evidence/product-audit/review-36-follow-up/validation.json. Independent
 sign-off is pending; unchanged reviewed areas carry review36 evidence.
+
+## Rebuild components (merged through W2-C2)
+
+The mega-plan rebuild adds parts that the CLI, MCP and Studio mostly do not use
+yet. Only the built-in engines (CLI `verify`/`simulate`) and the storage
+boundary (every command that touches project state) are on a command path.
+
+**Engines.** `adapter.ts` treats an omitted backend as `builtin`. It lowers the
+model as before, calls `runExplore`, and maps each `PropertyVerdict` to a report
+result: `violated` -> counterexample after source replay; `passed` ->
+`no_counterexample (finite_model_check)`; `no_violation_found` ->
+`no_counterexample (simulation)`; `incomplete` -> inconclusive with the limit
+named. MCP (`src/mcp/workspace.ts`) and Studio (`src/studio/service.ts`) still pass
+`tlc`/`quint` explicitly.
+
+**Storage.** `src/storage/layout.ts` is the dependency-free path catalogue
+(`marker`, `settings`, `planning`, `drafts`, `graph`, `runs`). `storagePath()`
+checks the layout before every path it returns, so old-layout refusal happens at
+the first managed-state access. Read paths create nothing. `findProjectRoot()`
+stops at the nearest `.pymtheg/` or `.git`. The planning store
+(`src/architecture/store.ts`) opens the shared database through the boundary and
+calls `RecordedHistory` inside its existing transactions; a failed feature
+transaction rolls back its receipts. Studio's recovery store opens drafts and the
+run cache separately, so a damaged run cache cannot disable draft recovery.
+
+**Graph indexing.** `indexProject` walks the root (skipping `.git`,
+`node_modules`, `.codegraph` and supplied exclusions; symlinks are not
+followed), captures bytes and strict UTF-8 text, assigns each path to one module
+by claim specificity, then per module: `parse` for changed files and for failed
+files without a stored content-failure marker (`graph_parse_failures`, keyed by
+hash, module and version), `analyze` over the whole snapshot on every run, and
+`resolve` over a deep copy (`structuredClone`) of all symbols, files, context
+files and this module's parsed links. `failedFiles()` reads the failed source
+files back; derived links are compared and written per row. Results are validated before any write;
+module exceptions are reported in `errors`, `analysisErrors` or
+`resolutionErrors` and leave earlier valid facts in place; storage failures
+propagate. Symbol IDs hash project, module, path, kind, scoped identity and
+ordinal, never positions. Native compiler or tree-sitter state is never persisted.
+
+**Language modules.** Go (`extract.ts`, `resolve.ts`, `gomod.ts`, `failure.ts`)
+reads `go.mod`/`go.work` as context and resolves Go's scoping, import and
+selector rules over the snapshot. Rust (`parse.ts`, `resolve.ts`, `cargo.ts`,
+`toml.ts`, `cfg.ts`) reads `Cargo.toml` as context with its own TOML reader and
+resolves modules, imports, paths and first-step inherent dot calls. TypeScript
+(`project.ts`, `extract.ts`, `symbols.ts`, `rename.ts`, `taint.ts`, `judge.ts`) is
+analyze-only: one compiler program per owning config over a snapshot-only host;
+`rename.ts` renames locally bound `require`/`module`/`exports` before the compiler
+sees them; `taint.ts` and `judge.ts` decide which links depend on a failed file.
+All three apply the whole-file rule. Support levels are in
+[support.md](support.md#code-graph).
+
+**Grammars.** The Go module loads `grammars/go/tree-sitter-go.wasm`; Rust loads
+the npm `tree-sitter-rust` grammar through `tagsFromPackage`. One parser instance
+per process per grammar is kept alive; trees are deleted after each extraction.
+

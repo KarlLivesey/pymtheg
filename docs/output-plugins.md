@@ -144,7 +144,7 @@ progress notes. Resolving a body-only open question does not produce signature
 drift; interface effects, passing modes, preconditions and bounds still do.
 
 The richer regression fixtures compile recursive records, tagged results and
-arbitrary-precision fields with a real Rust dependency: num-bigint 0.4.6 and the
+arbitrary-precision fields with a real Rust dependency: num-bigint 0.4.8 and the
 transitive versions/checksums in `test/fixtures/rust-rich/Cargo.lock`. Its licence
 is MIT OR Apache-2.0. The integration test uses Cargo offline (set PYM_CARGO_HOME
 to a populated cache); missing dependencies remain unresolved evidence. No

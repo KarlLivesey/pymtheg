@@ -17,7 +17,9 @@ Sharing uses explicit history archives. It is not live team synchronization.
 ## Contract for the first slice
 
 - `pymtheg init [DIRECTORY] [--name NAME] [--format text|json]` creates a local
-  workspace identity and a default `.pymtheg.json` only when that config is absent.
+  workspace identity and a default `.pymtheg/settings.json` only when that config is
+  absent. Everything Pymtheg stores for the project is under `.pymtheg/` (see
+  [Local state and sharing](#local-state-and-sharing)).
   No sample program, requirement or decision is invented.
 - `.pymtheg/project.json` stores a versioned UUID/name, not an absolute path.
   Re-running initialization preserves identity, configuration and design content.
@@ -109,10 +111,36 @@ filesystem primitive, which has its own real concurrent-initializer regression.
 
 Running init from a subfolder opens the nearest initialized project; it does not
 create a second identity inside it. Initialization creates
-`.pymtheg-architecture/.gitignore` to exclude the local database, journals and
-recovery data. No database is created by initialization or a document preview.
-Commit `.pymtheg/project.json`, `.pymtheg.json`, `.pym` files and ordinary design
-documents with the project.
+`.pymtheg/project.json`, `.pymtheg/settings.json` and `.pymtheg/.gitignore`. That
+ignore file excludes `.pymtheg/shared/` and `.pymtheg/rebuildable/`. No database
+is created by initialization or a document preview.
+
+| Path | Holds | Kind |
+|---|---|---|
+| `.pymtheg/project.json` | Stable workspace identity | Commit |
+| `.pymtheg/settings.json` | Project configuration and scenarios | Commit |
+| `.pymtheg/shared/architecture.sqlite` | Requirements, links, decisions, retained observations, checkpoint history, recorded-change ledger, architecture drafts | Shared data, local database; share it by exported history |
+| `.pymtheg/shared/drafts.sqlite` | Unsaved Studio buffers and form/context drafts | Authored, local |
+| `.pymtheg/local/writer.json` | This installation's writer identity and author label | Local only; ignores itself; never copy to another machine |
+| `.pymtheg/rebuildable/graph.sqlite` | Code graph cache | Rebuildable; ignores itself |
+| `.pymtheg/rebuildable/runs.sqlite` | The three most recent Studio runs | Rebuildable; ignores itself |
+
+Deleting `.pymtheg/rebuildable/` loses nothing that cannot be regenerated.
+Commit `.pymtheg/project.json`, `.pymtheg/settings.json`, `.pym` files and ordinary
+design documents with the project.
+
+Old layouts (`.pymtheg.json`, `.pymtheg-architecture/`, `.pymtheg-studio/`,
+`.pymtheg-implementation-links.json`, `.pymtheg-observed-code.json`,
+`.pymtheg-heading-identities.json` or `.pymtheg-source-contracts.json` in the
+project root) are not migrated or read. A command that reads or writes managed
+project state refuses such a root with "Old Pymtheg storage layout … No migration
+is provided" and changes nothing: `init`, `studio`, `mcp`, `import-architecture`
+(including previews), `scaffold`, `observe` captures, `check --check-scope
+related|project`, and any analysis command given `--scenario`. File-scope
+`check`, `verify`, `simulate` and `emit` without `--scenario`, and `observe --list`,
+`fmt`, `doctor`, help and version, still work in such a folder. Preserve or export
+the old data with the previous version, then initialize a new project. Upward
+discovery stops at the nearest `.pymtheg/` or Git root.
 
 To share planning records and their revisions, choose **Architecture → Export
 all history**, then put the resulting `pymtheg-architecture-history.json` in your

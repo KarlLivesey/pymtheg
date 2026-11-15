@@ -34,6 +34,9 @@ export interface LinkDraft {
 }
 export interface ParseResult {
   status: ParseStatus;
+  /** Returned failures describe content by default. Operational failures must opt out
+   * of content caching here, or throw (including cancellation/time/budget errors). */
+  failureKind?: "content" | "transient";
   diagnostics: Diagnostic[];
   symbols: SymbolDraft[];
   links: LinkDraft[];
@@ -152,13 +155,24 @@ export interface Neighbourhood {
   links: GraphLink[];
 }
 export type StorageResult<T> = T | Promise<T>;
+/** First diagnostic and its optional half-open UTF-16 range in a failed source. */
+export interface FailedFile {
+  path: string;
+  language: string;
+  reason: string;
+  range?: SourceRange;
+}
 export interface GraphStorage {
   readonly projectId: string;
   files(): StorageResult<GraphFile[]>;
   getFile(path: string): StorageResult<GraphFile | undefined>;
   contexts(): StorageResult<ContextFile[]>;
   replaceContexts(files: readonly ContextFile[]): StorageResult<void>;
-  replaceFile(file: GraphFile): StorageResult<void>;
+  /** Optional capability for backends predating failed-parse caching. */
+  isParseFailure?(path: string): StorageResult<boolean>;
+  failedFiles?(): StorageResult<FailedFile[]>;
+  /** parseFailure distinguishes cacheable parser failures from retryable project failures. */
+  replaceFile(file: GraphFile, parseFailure?: boolean): StorageResult<void>;
   removeFile(path: string): StorageResult<void>;
   findSymbols(query?: SymbolQuery): StorageResult<GraphSymbol[]>;
   links(): StorageResult<GraphLink[]>;
