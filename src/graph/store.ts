@@ -101,6 +101,21 @@ export class SqliteGraphStore implements GraphStorage {
                 `ALTER TABLE graph_parse_failures ADD COLUMN ${name} TEXT`,
               );
         });
+      // Completion belongs to this database and is invalidated even by other API writers.
+      for (const table of [
+        "graph_files",
+        "graph_contexts",
+        "graph_symbols",
+        "graph_links",
+        "graph_candidates",
+        "graph_parse_failures",
+      ])
+        for (const event of ["INSERT", "UPDATE", "DELETE"])
+          this.db
+            .exec(`CREATE TRIGGER IF NOT EXISTS graph_command_dirty_${table}_${event}
+            AFTER ${event} ON ${table}
+            WHEN EXISTS(SELECT 1 FROM graph_meta WHERE key='command-complete') BEGIN
+              DELETE FROM graph_meta WHERE key='command-complete'; END;`);
       this.db
         .prepare("INSERT OR IGNORE INTO graph_meta VALUES ('project',?)")
         .run(projectId ?? randomUUID());
@@ -309,7 +324,11 @@ export class SqliteGraphStore implements GraphStorage {
       .all(...values)
       .map((row) => JSON.parse(row.body as string) as GraphSymbol);
   }
-  private selectLinks(where = "", values: string[] = []): GraphLink[] {
+  private selectLinks(
+    where = "",
+    values: string[] = [],
+    limit?: number,
+  ): GraphLink[] {
     return this.db
       .prepare(
         `SELECT l.body,l.target,f.status AS sourceStatus,tf.status AS targetStatus,
@@ -319,7 +338,7 @@ export class SqliteGraphStore implements GraphStorage {
          WHERE c.link=l.id ORDER BY c.symbol)) AS candidates
       FROM graph_links l JOIN graph_files f ON f.path=l.file
       LEFT JOIN graph_symbols ts ON ts.id=l.target LEFT JOIN graph_files tf ON tf.path=ts.file
-      ${where ? `WHERE ${where}` : ""} ORDER BY l.id`,
+      ${where ? `WHERE ${where}` : ""} ORDER BY l.id${limit === undefined ? "" : ` LIMIT ${limit}`}`,
       )
       .all(...values)
       .map((row) => {
@@ -484,6 +503,177 @@ export class SqliteGraphStore implements GraphStorage {
         ),
       links: [...links.values()].sort((a, b) => compare(a.id, b.id)),
     };
+  }
+  readCommandSnapshot<T>(read: () => T): T {
+    this.db.exec("BEGIN");
+    try {
+      const result = read();
+      this.db.exec("COMMIT");
+      return result;
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+  graphCommandState(): unknown {
+    try {
+      const row = this.db
+        .prepare("SELECT value FROM graph_meta WHERE key='command-complete'")
+        .get();
+      return row ? JSON.parse(row.value as string) : null;
+    } catch {
+      return null;
+    }
+  }
+  invalidateGraphCommandState(): void {
+    this.db
+      .prepare("DELETE FROM graph_meta WHERE key='command-complete'")
+      .run();
+  }
+  commandDataVersion(): number {
+    return Number(this.db.prepare("PRAGMA data_version").get()!.data_version);
+  }
+  completeGraphCommandState(state: unknown, expectedVersion?: number): boolean {
+    let written = false;
+    // Lock publication so another connection cannot commit between validation and publication.
+    this.transaction(() => {
+      if (
+        expectedVersion !== undefined &&
+        this.commandDataVersion() !== expectedVersion
+      )
+        return;
+      this.db
+        .prepare(
+          "INSERT INTO graph_meta VALUES ('command-complete',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+        )
+        .run(JSON.stringify(state));
+      written = true;
+    });
+    return written;
+  }
+  /** Command preflight reads metadata without returning source text or parse facts. */
+  fileInventory(path?: string) {
+    return this.db
+      .prepare(
+        `SELECT path,status,json_extract(body,'$.hash') AS hash,
+      json_extract(body,'$.module') AS module,json_extract(body,'$.version') AS version,
+      json_extract(body,'$.result.failureKind') AS failureKind,
+      json_extract(body,'$.result.diagnostics[0]') AS diagnostic
+      FROM graph_files ${path === undefined ? "" : "WHERE path=?"} ORDER BY path`,
+      )
+      .all(...(path === undefined ? [] : [path]))
+      .map((row) => ({
+        path: row.path as string,
+        hash: row.hash as string,
+        module: row.module as string,
+        version: row.version as string,
+        status: row.status as GraphFile["result"]["status"],
+        failureKind: row.failureKind as string | null,
+        diagnostic:
+          row.diagnostic === null
+            ? null
+            : (JSON.parse(
+                row.diagnostic as string,
+              ) as GraphFile["result"]["diagnostics"][number]),
+        cacheable:
+          row.status === "failed" && this.isParseFailure(row.path as string),
+      }));
+  }
+  contextInventory() {
+    return this.db
+      .prepare(
+        `SELECT path,json_extract(body,'$.hash') AS hash,
+      json_extract(body,'$.status') AS status,json_extract(body,'$.diagnostics[0]') AS diagnostic
+      FROM graph_contexts ORDER BY path`,
+      )
+      .all()
+      .map((row) => ({
+        path: row.path as string,
+        hash: row.hash as string,
+        status: row.status as ContextFile["status"],
+        diagnostic:
+          row.diagnostic === null
+            ? null
+            : (JSON.parse(
+                row.diagnostic as string,
+              ) as ContextFile["diagnostics"][number]),
+      }));
+  }
+  counts() {
+    const count = (table: string, where = "") =>
+      Number(
+        this.db.prepare(`SELECT count(*) AS n FROM ${table} ${where}`).get()!.n,
+      );
+    return {
+      files: count("graph_files"),
+      symbols: count("graph_symbols"),
+      links: count("graph_links"),
+      failed: count("graph_files", "WHERE status='failed'"),
+      partial: count("graph_files", "WHERE status='partial'"),
+      unresolved: count("graph_links", "WHERE resolution='unresolved'"),
+      ambiguous: count("graph_links", "WHERE resolution='ambiguous'"),
+    };
+  }
+  getSymbol(id: string): GraphSymbol | undefined {
+    const row = this.db
+      .prepare("SELECT body FROM graph_symbols WHERE id=?")
+      .get(id);
+    return row ? (JSON.parse(row.body as string) as GraphSymbol) : undefined;
+  }
+  searchSymbols(text: string, limit: number): GraphSymbol[] {
+    if (!Number.isInteger(limit) || limit < 1 || limit > 10001)
+      throw Error("Invalid symbol search limit");
+    return this.db
+      .prepare(
+        `SELECT body FROM graph_symbols WHERE instr(name,?)>0 OR instr(json_extract(body,'$.identity'),?)>0 ORDER BY name,id LIMIT ?`,
+      )
+      .all(text, text, limit)
+      .map((row) => JSON.parse(row.body as string) as GraphSymbol);
+  }
+  hasFile(path: string): boolean {
+    return !!this.db
+      .prepare("SELECT path FROM graph_files WHERE path=?")
+      .get(path);
+  }
+  namedSymbols(name: string, limit: number): GraphSymbol[] {
+    this.queryLimit(limit);
+    return this.db
+      .prepare(
+        "SELECT body FROM graph_symbols WHERE name=? ORDER BY id LIMIT ?",
+      )
+      .all(name, limit)
+      .map((row) => JSON.parse(row.body as string) as GraphSymbol);
+  }
+  symbolsForFile(path: string, limit: number): GraphSymbol[] {
+    this.queryLimit(limit);
+    return this.db
+      .prepare(
+        "SELECT body FROM graph_symbols WHERE file=? ORDER BY id LIMIT ?",
+      )
+      .all(path, limit)
+      .map((row) => JSON.parse(row.body as string) as GraphSymbol);
+  }
+  private queryLimit(limit: number): void {
+    if (!Number.isInteger(limit) || limit < 1 || limit > 10001)
+      throw Error("Invalid graph query limit");
+  }
+  linksForFile(path: string, limit?: number): GraphLink[] {
+    if (limit !== undefined) this.queryLimit(limit);
+    return this.selectLinks("l.file=?", [path], limit);
+  }
+  callLinks(
+    id: string,
+    direction: "incoming" | "outgoing",
+    limit: number,
+  ): GraphLink[] {
+    this.queryLimit(limit);
+    return direction === "outgoing"
+      ? this.selectLinks("l.source=? AND l.kind='calls'", [id], limit)
+      : this.selectLinks(
+          "l.id IN (SELECT id FROM graph_links WHERE target=? AND kind='calls' UNION SELECT link FROM graph_candidates WHERE symbol=? AND kind='calls')",
+          [id, id],
+          limit,
+        );
   }
   close(): void {
     this.db.close();

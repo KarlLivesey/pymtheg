@@ -74,6 +74,10 @@ process.on("SIGTERM", onSignal);
 try {
   if (args.includes("--help")) {
     process.stdout.write(help());
+  } else if (args[0] === "graph") {
+    process.exitCode = await (
+      await import("./graph.js")
+    ).graphCommand(args.slice(1), cancel.signal);
   } else if (args[0] === "observe") {
     process.exitCode = await (
       await import("../implementation/cli.js")
