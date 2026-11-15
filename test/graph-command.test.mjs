@@ -6,6 +6,7 @@ import {
   rm,
   writeFile,
   readFile,
+  readdir,
   mkdir,
   stat,
 } from "node:fs/promises";
@@ -261,7 +262,7 @@ test("warm queries use no full graph snapshot APIs, do not parse, and preserve i
   });
 });
 
-test("missing index is read-only for status/no-sync; legacy state and invalid CLI invocations are explicit JSON errors", async () => {
+test("missing index is read-only for status/no-sync; legacy state is ignored and invalid CLI invocations are explicit JSON errors", async () => {
   await project(async (root) => {
     const status = await executeGraph({ command: "status", root });
     assert.equal(status.indexExists, false);
@@ -281,12 +282,12 @@ test("missing index is read-only for status/no-sync; legacy state and invalid CL
     );
     await mkdir(join(root, ".pymtheg-architecture"));
     const result = cli(root, "index", "--json");
-    assert.equal(result.status, 3);
-    assert.match(
-      JSON.parse(result.stdout).error.message,
-      /Old Pymtheg storage layout/,
-    );
-    await assert.rejects(stat(join(root, ".pymtheg")), { code: "ENOENT" });
+    assert.equal(result.status, 2); // Deliberately malformed mixed fixture, not a legacy refusal.
+    const indexed = JSON.parse(result.stdout);
+    assert.equal(indexed.status, "incomplete");
+    assert.equal(indexed.indexExists, true);
+    broken(indexed);
+    assert.deepEqual(await readdir(join(root, ".pymtheg-architecture")), []);
   });
 });
 

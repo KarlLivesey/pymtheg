@@ -96,7 +96,6 @@ async function body(
 export async function startStudio(options: {
   path: string;
   port?: number;
-  tlcJar?: string | null;
   assets?: string;
   outputRegistry?: OutputRegistry;
 }): Promise<{
@@ -111,7 +110,6 @@ export async function startStudio(options: {
     ((await stat(input)).isDirectory() ? input : resolve(input, ".."));
   const service = new StudioService(
       root,
-      options.tlcJar ?? null,
       (await stat(input)).isFile() ? relative(root, input) : null,
       options.outputRegistry ?? OutputRegistry.empty(),
     ),

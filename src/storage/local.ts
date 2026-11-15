@@ -6,30 +6,6 @@ import { DatabaseSync, type DatabaseSyncOptions } from "node:sqlite";
 
 import { layout, type StorageItem } from "./layout.js";
 export { layout, type StorageItem } from "./layout.js";
-const legacy = [
-  ".pymtheg.json",
-  ".pymtheg-architecture",
-  ".pymtheg-studio",
-  ".pymtheg-implementation-links.json",
-  ".pymtheg-observed-code.json",
-  ".pymtheg-heading-identities.json",
-  ".pymtheg-source-contracts.json",
-];
-export function assertCurrentLayout(root: string): void {
-  const found = legacy.filter((name) => {
-    try {
-      lstatSync(resolve(root, name));
-      return true;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
-      throw error;
-    }
-  });
-  if (found.length)
-    throw Error(
-      `Old Pymtheg storage layout at ${root}: ${found.join(", ")}. No migration is provided. Preserve/export this data with the old version before creating a new project; nothing was changed.`,
-    );
-}
 /** Discover a project without interpreting unrelated ancestors' legacy state. */
 export function findProjectRoot(start: string): string {
   const initial = resolve(start);
@@ -50,7 +26,6 @@ export function storagePath(
   item: StorageItem,
   create = false,
 ): string {
-  assertCurrentLayout(root);
   let directory = resolve(root);
   const parts = layout[item].split("/");
   for (const part of parts.slice(0, -1)) {

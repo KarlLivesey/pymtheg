@@ -100,52 +100,34 @@ test("executionSafe flows that call an operation keep the execution assumption",
   );
 });
 
-const jar = process.env.PYM_TLC_JAR;
-const java = spawnSync("java", ["-version"]).status === 0;
 for (const [file, entry] of [
   [fixture, "stampOnce"],
   [discovery, "selectSourceTree"],
 ]) {
-  test(
-    `${file.split("/").at(-1)}#${entry}: verify --backend tlc reports no B106`,
-    {
-      skip:
-        jar && existsSync(jar) && java
-          ? false
-          : "needs PYM_TLC_JAR and java (unresolved, not a pass)",
-    },
-    () => {
-      const p = spawnSync(
-        process.execPath,
-        [
-          join(root, "dist/cli/main.js"),
-          "verify",
-          file,
-          "--entry",
-          entry,
-          "--format",
-          "json",
-          "--timeout",
-          "120s",
-          "--backend",
-          "tlc",
-          "--tlc-jar",
-          jar,
-        ],
-        { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
-      );
-      const report = JSON.parse(p.stdout);
-      const codes = JSON.stringify(report).match(/"B106"/g) ?? [];
-      assert.deepEqual(codes, [], p.stdout.slice(0, 2000));
-      const result = report.results.find((r) => r.analysisKind === "behaviour");
-      assert.ok(result, p.stdout.slice(0, 2000));
-      assert.equal(
-        result.propertyId,
-        `${file}#${entry}/invariant/executionSafe`,
-      );
-      assert.equal(result.outcome, "no_counterexample");
-      assert.equal(result.completion, "complete");
-      assert.equal(p.status, 0, p.stdout.slice(0, 2000));
-    },
-  );
+  test(`${file.split("/").at(-1)}#${entry}: verify reports no B106 and the baseline verdict`, () => {
+    const p = spawnSync(
+      process.execPath,
+      [
+        join(root, "dist/cli/main.js"),
+        "verify",
+        file,
+        "--entry",
+        entry,
+        "--format",
+        "json",
+        "--timeout",
+        "120s",
+      ],
+      { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
+    );
+    const report = JSON.parse(p.stdout);
+    const codes = JSON.stringify(report).match(/"B106"/g) ?? [];
+    assert.deepEqual(codes, [], p.stdout.slice(0, 2000));
+    const result = report.results.find((r) => r.analysisKind === "behaviour");
+    assert.ok(result, p.stdout.slice(0, 2000));
+    assert.equal(result.propertyId, `${file}#${entry}/invariant/executionSafe`);
+    assert.equal(result.outcome, "no_counterexample");
+    assert.equal(result.completion, "complete");
+    assert.equal(p.status, 0, p.stdout.slice(0, 2000));
+  });
 }

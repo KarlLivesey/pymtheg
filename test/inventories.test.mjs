@@ -11,7 +11,6 @@ const project = (count = 250) => ({
     loaded: true,
   })),
   inventoryWarnings: [],
-  tools: { quint: false, tlc: false },
   config: { version: 1, scenarios: {} },
   configHash: null,
 });

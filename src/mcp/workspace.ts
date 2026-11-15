@@ -10,7 +10,7 @@ import { relative } from "node:path";
 import { randomUUID } from "node:crypto";
 import { StudioService } from "../studio/service.js";
 import { analyseInWorker } from "../cli/coordinator.js";
-import { runBackend, defaultQuint } from "../backends/adapter.js";
+import { runBackend } from "../backends/adapter.js";
 import { staleSourcesAsync } from "../language/project.js";
 import { type Report, exitStatus } from "../reporting/report.js";
 import type { ProjectIR } from "../semantic/core.js";
@@ -48,22 +48,20 @@ export class AgentWorkspace {
   private busy = false;
   constructor(
     readonly root: string,
-    readonly tlcJar: string | null = null,
     private analyse: typeof analyseInWorker = analyseInWorker,
     readonly outputs: OutputRegistry = OutputRegistry.empty(),
   ) {
-    this.access = new StudioService(root, tlcJar);
+    this.access = new StudioService(root);
   }
   static async open(
     path: string,
-    tlcJar: string | null = null,
     outputs: OutputRegistry = OutputRegistry.empty(),
   ) {
     const input = await realpath(path);
     const root = (await findWorkspace(input))?.root ?? input;
     if (!(await stat(root)).isDirectory())
       throw Error("MCP requires a project directory");
-    return new AgentWorkspace(root, tlcJar, analyseInWorker, outputs);
+    return new AgentWorkspace(root, analyseInWorker, outputs);
   }
   async project(
     options: InventoryQuery & { inventoryId?: string | undefined } = {},
@@ -182,13 +180,11 @@ export class AgentWorkspace {
         ir,
         {
           entry: request.entry ?? "",
-          backend: kind === "verify" ? "tlc" : "quint",
+          method: kind === "verify" ? "exhaustive" : "sample",
           seed: request.seed ?? "42",
           maxSteps: request.maxSteps ?? 12,
           maxSamples: request.maxSamples ?? 1000,
           timeoutMs: request.timeoutMs ?? 45000,
-          quint: defaultQuint,
-          tlcJar: this.tlcJar,
           scopeFile: null,
           scope: request.scope ?? {},
         },
@@ -309,6 +305,16 @@ export class AgentWorkspace {
       },
       results: {
         total: r.results.length,
+        /**
+         * true when every behaviour result came from a completed exhaustive
+         * search; false when any was sampled or stopped early; null without
+         * behaviour results. A sampled no-counterexample run is not a proof.
+         */
+        exhaustive: r.results.some((p) => p.analysisKind === "behaviour")
+          ? r.results
+              .filter((p) => p.analysisKind === "behaviour")
+              .every((p) => p.exhaustive === true)
+          : null,
         complete: r.results.filter((p) => p.completion === "complete").length,
         unresolved: r.results.filter((p) => p.completion !== "complete").length,
         counterexamples: r.results.filter(
@@ -327,7 +333,9 @@ export class AgentWorkspace {
       meaning: r.session.staleFiles.length
         ? "These findings describe the captured source; files on disk have since changed."
         : exitStatus(r) === 0
-          ? "The requested checks completed without error findings. This is not proof of the whole program."
+          ? run.kind === "simulate"
+            ? "Sampling found no counterexample within its seed, step and sample limits. The run is not exhaustive (exhaustive: false); use verify for an exhaustive check."
+            : "The requested checks completed without error findings. This is not proof of the whole program."
           : exitStatus(r) === 1
             ? "The model has problems to investigate. Read the findings and their related declarations."
             : exitStatus(r) === 2

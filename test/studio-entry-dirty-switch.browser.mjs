@@ -15,10 +15,7 @@ try {
   await cp("examples", join(root, "examples"), { recursive: true });
   await mkdir(join(root, ".pymtheg"), { recursive: true });
   await cp(".pymtheg/settings.json", join(root, ".pymtheg/settings.json"));
-  app = await startStudio({
-    path: root,
-    tlcJar: "/tmp/spec-language-research/tla2tools.jar",
-  });
+  app = await startStudio({ path: root });
   browser = await browserType().launch({
     headless: true,
     executablePath: browserExecutable(),

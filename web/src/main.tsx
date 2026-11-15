@@ -2129,11 +2129,7 @@ function App() {
                       !entries.some((s) => s.name === entry) ||
                       !connected
                     }
-                    title={
-                      project?.tools.tlc
-                        ? "Exhaustive finite-state checking"
-                        : "TLC is not configured. The result will explain the missing prerequisite."
-                    }
+                    title="Exhaustive finite-state checking"
                   >
                     Verify
                   </button>
@@ -4023,13 +4019,6 @@ function App() {
                 Download scenario.json
               </button>
             </details>
-            <p>
-              Quint: {project?.tools.quint ? "available" : "not installed"} ·
-              TLC:{" "}
-              {project?.tools.tlc
-                ? "configured"
-                : "set PYM_TLC_JAR before starting Studio"}
-            </p>
             {settingsError && (
               <p role="alert" className="settings-error">
                 {settingsError}

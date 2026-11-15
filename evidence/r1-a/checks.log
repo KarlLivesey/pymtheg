@@ -1,0 +1,40 @@
+== ci (under evidence/r1-a/no-java.sh)
+no-java: java resolves to $PYM_SCRATCH/r1a-shim/java; PYM_TLC_JAR=unset
+added 182 packages, and audited 183 packages in 3s
+no-java: shim log ($PYM_SCRATCH/r1a-java-calls.log) has 0 line(s)
+== test (under evidence/r1-a/no-java.sh)
+no-java: java resolves to $PYM_SCRATCH/r1a-shim/java; PYM_TLC_JAR=unset
+ℹ tests 2672
+ℹ suites 0
+ℹ pass 2672
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+no-java: shim log ($PYM_SCRATCH/r1a-java-calls.log) has 0 line(s)
+== backend (under evidence/r1-a/no-java.sh)
+no-java: java resolves to $PYM_SCRATCH/r1a-shim/java; PYM_TLC_JAR=unset
+✓ built in 5.24s
+﹣ rust: real rich contracts compile with recursive records, outcomes and arbitrary precision integers (96.608389ms) # crate num-bigint is not in the offline cargo registry index; no conformance claim
+ℹ tests 97
+ℹ suites 0
+ℹ pass 96
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+no-java: shim log ($PYM_SCRATCH/r1a-java-calls.log) has 0 line(s)
+== build (under evidence/r1-a/no-java.sh)
+no-java: java resolves to $PYM_SCRATCH/r1a-shim/java; PYM_TLC_JAR=unset
+✓ built in 5.84s
+no-java: shim log ($PYM_SCRATCH/r1a-java-calls.log) has 0 line(s)
+== format (under evidence/r1-a/no-java.sh)
+no-java: java resolves to $PYM_SCRATCH/r1a-shim/java; PYM_TLC_JAR=unset
+All matched files use Prettier code style!
+no-java: shim log ($PYM_SCRATCH/r1a-java-calls.log) has 0 line(s)
+== npm ls @informalsystems/quint
+
+== npm pack --dry-run
+npm notice package size: 2.3 MB
+npm notice unpacked size: 10.2 MB
+npm notice total files: 882

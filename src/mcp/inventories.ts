@@ -33,7 +33,6 @@ interface Inventory {
   files: File[];
   warnings: string[];
   names: string[];
-  tools: ProjectView["tools"];
   configuration: string;
   scenarioText: string;
   configurationHash: string;
@@ -89,7 +88,6 @@ export class ProjectInventories {
       | "workspace"
       | "files"
       | "inventoryWarnings"
-      | "tools"
       | "config"
       | "configHash"
     >,
@@ -132,7 +130,6 @@ export class ProjectInventories {
       files,
       warnings,
       names,
-      tools: { ...project.tools },
       configuration,
       scenarioText,
       configurationHash: hash(configuration),
@@ -224,7 +221,6 @@ export class ProjectInventories {
       names = page(inventory.names.map(preview), 0, 20, 32 * 1024);
     return {
       ...fileInfo,
-      tools: { ...inventory.tools },
       inventoryWarnings: warnings.items,
       warningPreviewsTruncated: inventory.warnings
         .slice(0, warnings.items.length)

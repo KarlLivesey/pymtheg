@@ -142,25 +142,19 @@ for (const old of [
   ".pymtheg-architecture",
   ".pymtheg-studio",
 ]) {
-  test(`old layout ${old} is reported and preserved by project storage entry points`, () =>
+  test(`old layout ${old} is ignored and preserved by project storage entry points`, () =>
     fixture(async (root) => {
       await writeFile(join(root, old), "important old bytes");
-      for (const action of [
-        () => initializeWorkspace(root),
-        () => loadConfig(root),
-        () => ArchitectureStore.open(root),
-        () => RecoveryStore.openOrCreate(root),
-        async () => openProjectGraph(root, "id"),
-      ])
-        await assert.rejects(
-          action,
-          /Old Pymtheg storage layout.*No migration/,
-        );
+      await initializeWorkspace(root);
+      await loadConfig(root);
+      (await ArchitectureStore.open(root)).close();
+      (await RecoveryStore.openOrCreate(root)).close();
+      openProjectGraph(root, "id").close();
       assert.equal(
         await readFile(join(root, old), "utf8"),
         "important old bytes",
       );
-      assert.deepEqual(await readdir(root), [old]);
+      assert.deepEqual((await readdir(root)).sort(), [".pymtheg", old].sort());
     }));
 }
 

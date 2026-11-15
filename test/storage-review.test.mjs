@@ -59,7 +59,7 @@ async function contents(root) {
 const machine =
   "machine Bit { state flag: Bool = false; event flip when !flag { flag = true; } invariant safe = true; }";
 for (const old of [false, true]) {
-  test(`file-scope check/verify/simulate leave ${old ? "old" : "new"} storage untouched; project-scope ${old ? "refuses" : "runs"}`, () =>
+  test(`file-scope check/verify/simulate leave ${old ? "old" : "new"} storage untouched; project-scope runs`, () =>
     fixture(async (root) => {
       await writeFile(join(root, "main.pym"), machine);
       if (old) {
@@ -96,12 +96,7 @@ for (const old of [false, true]) {
         "--format",
         "json",
       );
-      assert.equal(
-        project.status,
-        old ? 3 : 0,
-        project.stdout + project.stderr,
-      );
-      if (old) assert.match(project.stdout, /Old Pymtheg storage layout/);
+      assert.equal(project.status, 0, project.stdout + project.stderr);
       assert.deepEqual(await contents(root), before);
     }));
 }
