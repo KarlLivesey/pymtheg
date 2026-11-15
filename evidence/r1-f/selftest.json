@@ -1,0 +1,315 @@
+{
+  "schema": "pymtheg.acceptance-selftest/v1",
+  "generatedAt": "2026-11-15T20:22:57.300Z",
+  "commit": "43bee54d",
+  "passed": true,
+  "matcher": {
+    "cases": 22,
+    "failures": []
+  },
+  "outcomes": [
+    {
+      "id": "control",
+      "what": "unmodified tarball",
+      "expect": [],
+      "exitCode": 2,
+      "verdict": "clean",
+      "detail": "exit 2; 0 failed steps; link-requirement (R1-D), link-add (R1-D), link-check (R1-D), mcp-code-graph (R1-C), mcp-requirement-links (R1-D)",
+      "failingSteps": []
+    },
+    {
+      "id": "check-exits-0",
+      "what": "`check` exits 0 on the broken design",
+      "expect": [
+        "check-broken"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; check-broken: fail; failing steps: check-broken",
+      "failingSteps": [
+        {
+          "step": "check-broken",
+          "reason": "exit 0, expected 1"
+        }
+      ]
+    },
+    {
+      "id": "grammar-removed",
+      "what": "the vendored Go grammar is missing from the tarball",
+      "expect": [
+        "tarball-contents",
+        "graph-index"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; tarball-contents: fail; graph-index: fail; failing steps: tarball-contents, doctor, graph-index, graph-status, graph-ts-callers, graph-ts-callers-2, graph-go-callers, graph-go-same-package, graph-rust-callers, graph-rust-same-file, graph-ts-path, graph-search",
+      "failingSteps": [
+        {
+          "step": "tarball-contents",
+          "reason": "missing grammars/go/tree-sitter-go.wasm"
+        },
+        {
+          "step": "doctor",
+          "reason": "exit 3, expected 0"
+        },
+        {
+          "step": "graph-index",
+          "reason": "exit 2, expected 0"
+        },
+        {
+          "step": "graph-status",
+          "reason": "exit 2, expected 0"
+        },
+        {
+          "step": "graph-ts-callers",
+          "reason": "exit 2, expected 0"
+        },
+        {
+          "step": "graph-ts-callers-2",
+          "reason": "exit 2, expected 0"
+        },
+        {
+          "step": "graph-go-callers",
+          "reason": "exit 2, expected 0"
+        },
+        {
+          "step": "graph-go-same-package",
+          "reason": "exit 2, expected 0"
+        },
+        {
+          "step": "graph-rust-callers",
+          "reason": "exit 2, expected 0"
+        },
+        {
+          "step": "graph-rust-same-file",
+          "reason": "exit 2, expected 0"
+        },
+        {
+          "step": "graph-ts-path",
+          "reason": "exit 2, expected 0"
+        },
+        {
+          "step": "graph-search",
+          "reason": "exit 2, expected 0"
+        }
+      ]
+    },
+    {
+      "id": "mcp-check-design-throws",
+      "what": "MCP `check_design` throws",
+      "expect": [
+        "mcp-check-design"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; mcp-check-design: fail; failing steps: mcp-check-design, mcp-check-broken",
+      "failingSteps": [
+        {
+          "step": "mcp-check-design",
+          "reason": "tool returned isError: [{\"type\":\"text\",\"text\":\"sabotaged check_design\"}]"
+        },
+        {
+          "step": "mcp-check-broken",
+          "reason": "check_design gave no structured result"
+        }
+      ]
+    },
+    {
+      "id": "callers-no-links",
+      "what": "`graph callers` returns no links",
+      "expect": [
+        "graph-ts-callers"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; graph-ts-callers: fail; failing steps: graph-ts-callers, graph-ts-callers-2, graph-go-callers, graph-go-same-package, graph-rust-callers, graph-rust-same-file",
+      "failingSteps": [
+        {
+          "step": "graph-ts-callers",
+          "reason": "callers of formatTotal: got [], expected [\"renderBasket@web/src/main.ts:definite\"]"
+        },
+        {
+          "step": "graph-ts-callers-2",
+          "reason": "callers of roundCents: got [], expected [\"formatTotal@web/src/format.ts:definite\"]"
+        },
+        {
+          "step": "graph-go-callers",
+          "reason": "callers of ComputeTotal: got [], expected [\"main@service/main.go:definite\"]"
+        },
+        {
+          "step": "graph-go-same-package",
+          "reason": "callers of taxFor: got [], expected [\"ComputeTotal@service/pricing/total.go:definite\"]"
+        },
+        {
+          "step": "graph-rust-callers",
+          "reason": "callers of apply_discount: got [], expected [\"main@engine/src/main.rs:definite\"]"
+        },
+        {
+          "step": "graph-rust-same-file",
+          "reason": "callers of percent_of: got [], expected [\"apply_discount@engine/src/discount.rs:definite\"]"
+        }
+      ]
+    },
+    {
+      "id": "caller-target-renamed",
+      "what": "a caller link's target is renamed",
+      "expect": [
+        "graph-ts-callers"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; graph-ts-callers: fail; failing steps: graph-ts-callers, graph-ts-callers-2, graph-go-callers, graph-go-same-package, graph-rust-callers, graph-rust-same-file",
+      "failingSteps": [
+        {
+          "step": "graph-ts-callers",
+          "reason": "link targets: got [\"formatTotal_renamed\"], expected [\"formatTotal\"]"
+        },
+        {
+          "step": "graph-ts-callers-2",
+          "reason": "link targets: got [\"roundCents_renamed\"], expected [\"roundCents\"]"
+        },
+        {
+          "step": "graph-go-callers",
+          "reason": "link targets: got [\"ComputeTotal_renamed\"], expected [\"ComputeTotal\"]"
+        },
+        {
+          "step": "graph-go-same-package",
+          "reason": "link targets: got [\"taxFor_renamed\"], expected [\"taxFor\"]"
+        },
+        {
+          "step": "graph-rust-callers",
+          "reason": "link targets: got [\"apply_discount_renamed\"], expected [\"apply_discount\"]"
+        },
+        {
+          "step": "graph-rust-same-file",
+          "reason": "link targets: got [\"percent_of_renamed\"], expected [\"percent_of\"]"
+        }
+      ]
+    },
+    {
+      "id": "certainty-downgraded",
+      "what": "caller certainty downgraded to name-only",
+      "expect": [
+        "graph-ts-callers"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; graph-ts-callers: fail; failing steps: graph-ts-callers, graph-ts-callers-2, graph-go-callers, graph-go-same-package, graph-rust-callers, graph-rust-same-file",
+      "failingSteps": [
+        {
+          "step": "graph-ts-callers",
+          "reason": "callers of formatTotal: got [\"renderBasket@web/src/main.ts:name-only\"], expected [\"renderBasket@web/src/main.ts:definite\"]"
+        },
+        {
+          "step": "graph-ts-callers-2",
+          "reason": "callers of roundCents: got [\"formatTotal@web/src/format.ts:name-only\"], expected [\"formatTotal@web/src/format.ts:definite\"]"
+        },
+        {
+          "step": "graph-go-callers",
+          "reason": "callers of ComputeTotal: got [\"main@service/main.go:name-only\"], expected [\"main@service/main.go:definite\"]"
+        },
+        {
+          "step": "graph-go-same-package",
+          "reason": "callers of taxFor: got [\"ComputeTotal@service/pricing/total.go:name-only\"], expected [\"ComputeTotal@service/pricing/total.go:definite\"]"
+        },
+        {
+          "step": "graph-rust-callers",
+          "reason": "callers of apply_discount: got [\"main@engine/src/main.rs:name-only\"], expected [\"main@engine/src/main.rs:definite\"]"
+        },
+        {
+          "step": "graph-rust-same-file",
+          "reason": "callers of percent_of: got [\"apply_discount@engine/src/discount.rs:name-only\"], expected [\"apply_discount@engine/src/discount.rs:definite\"]"
+        }
+      ]
+    },
+    {
+      "id": "prints-java",
+      "what": "a command prints \"java\"",
+      "expect": [
+        "help"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; help: fail; failing steps: install-npx, help",
+      "failingSteps": [
+        {
+          "step": "install-npx",
+          "reason": "mentions Java/Quint/TLC: Optional backend: java (not installed)."
+        },
+        {
+          "step": "help",
+          "reason": "mentions Java/Quint/TLC: Optional backend: java (not installed)."
+        }
+      ]
+    },
+    {
+      "id": "index-runs-java",
+      "what": "`graph index` silently runs `java -version`",
+      "expect": [
+        "graph-index",
+        "no-toolchain-processes"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; graph-index: fail; no-toolchain-processes: fail; failing steps: graph-index, no-toolchain-processes",
+      "failingSteps": [
+        {
+          "step": "graph-index",
+          "reason": "started java (shim: java -version) | started java (spawn: java -version)"
+        },
+        {
+          "step": "no-toolchain-processes",
+          "reason": "graph-index: shim: java -version; spawn: java -version"
+        }
+      ]
+    },
+    {
+      "id": "mcp-wrong-verdict",
+      "what": "MCP reports a failing verdict for the valid design",
+      "expect": [
+        "mcp-check-design"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; mcp-check-design: fail; failing steps: mcp-check-design, mcp-explore-verify, mcp-explore-simulate",
+      "failingSteps": [
+        {
+          "step": "mcp-check-design",
+          "reason": "valid design verdict: got {\"exitStatus\":1,\"errors\":0,\"warnings\":0}, expected {\"exitStatus\":0,\"errors\":0,\"warnings\":0}"
+        },
+        {
+          "step": "mcp-explore-verify",
+          "reason": "verify verdict: got {\"exitStatus\":1,\"exhaustive\":true,\"counterexamples\":0,\"unresolved\":0}, expected {\"exitStatus\":0,\"exhaustive\":true,\"counterexamples\":0,\"unresolved\":0}"
+        },
+        {
+          "step": "mcp-explore-simulate",
+          "reason": "simulate verdict: got {\"exitStatus\":1,\"exhaustive\":false,\"counterexamples\":0,\"unresolved\":0}, expected {\"exitStatus\":0,\"exhaustive\":false,\"counterexamples\":0,\"unresolved\":0}"
+        }
+      ]
+    },
+    {
+      "id": "link-crashes",
+      "what": "`pymtheg link` crashes (exit 77) instead of today's unknown-command answer",
+      "expect": [
+        "link-requirement"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; link-requirement: fail; failing steps: link-requirement, link-add, link-check",
+      "failingSteps": [
+        {
+          "step": "link-requirement",
+          "reason": "exit 77, expected 0"
+        },
+        {
+          "step": "link-add",
+          "reason": "exit 77, expected 0"
+        },
+        {
+          "step": "link-check",
+          "reason": "exit 77, expected 0"
+        }
+      ]
+    }
+  ]
+}

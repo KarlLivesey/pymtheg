@@ -2,267 +2,304 @@
 
 Release 1 item 1 (D19, `docs/build-plan.md`; mega-plan 8.2): `npx pymtheg`
 runs on a clean machine with no Java or Quint. This chunk adds a repeatable
-harness that shows what a new user gets from the packed tarball, and records
-everything that fails today. It changes no product code. Run it again after each
-R1 merge and as the release gate.
+harness that shows what a new user gets from the packed tarball, plus a
+self-test that proves the gate catches real breakage. It changes no product
+code. Run it after each R1 merge and as the release gate (exit 0).
 
 ## Run it
 
 On the dev server (it needs Docker), from the repository root:
 
 ```sh
-pymtheg-dev --name r1f-xxxx -- node scripts/acceptance/run.mjs --commit "$(git rev-parse --short HEAD)"
-pymtheg-dev --name r1f-xxxx --no-sync -- sh -c 'cat evidence/r1-f/latest.json' > evidence/r1-f/latest.json   # copy back
-pymtheg-dev --name r1f-xxxx --no-sync -- sh -c 'cat evidence/r1-f/latest.md'   > evidence/r1-f/latest.md
+pymtheg-dev --name r1f-xxxx -- node scripts/acceptance/run.mjs --commit "$(git rev-parse --short HEAD)" --out '$PYM_SCRATCH/acc'
+pymtheg-dev --name r1f-xxxx --no-sync -- sh -c 'cat $PYM_SCRATCH/acc/latest.json' > evidence/r1-f/latest.json
+pymtheg-dev --name r1f-xxxx --no-sync -- sh -c 'cat $PYM_SCRATCH/acc/latest.md'   > evidence/r1-f/latest.md
+pymtheg-dev --name r1f-xxxx -- node scripts/acceptance/selftest.mjs --commit "$(git rev-parse --short HEAD)"   # optional: prove the gate bites
 pymtheg-dev --name r1f-xxxx --clean
 ```
 
-`npm run acceptance` runs the same script. Options: `--scenarios a-node-only,f-restic`
-runs a subset; `--tarball PATH` reuses a packed tarball (each build keeps one in
-`$PYM_SCRATCH/acceptance-tarball/`); `--out DIR`; `--restic DIR`; `--keep-images`.
-A full run takes about 10 minutes on the dev server. The time is an observation
-only: nothing is asserted on time.
+`npm run acceptance` runs the same script. Options:
 
-Exit status: **0** every required step passes. **2** nothing fails, but known
-gaps remain. **1** a required step fails. **3** harness error. The release gate
-is exit 0.
+- `--scenarios a-node-only,f-restic` runs a subset. An unknown name is a usage
+  error (exit 3), never "ran nothing".
+- `--tarball PATH` reuses a packed tarball (each build keeps one in
+  `$PYM_SCRATCH/acceptance-tarball-<run>/`).
+- `--pack-only` only builds.
+- `--out DIR`, `--restic DIR`, `--keep-images`.
+
+A full run takes about 20 minutes on the dev server, and the self-test about 6.
+These times are observations only: nothing is asserted on time.
+
+Exit status:
+
+| Exit | Meaning |
+|---|---|
+| **0** | Every required step passes. This is the release gate. |
+| **2** | Nothing fails, but known gaps remain. |
+| **1** | A required step fails. |
+| **3** | Harness or usage error. |
+| **129, 130, 141, 143** | Stopped by HUP, INT, a broken pipe or TERM, after removing everything the run created. |
 
 ## How it works
 
-- `scripts/acceptance/run.mjs` (host side) copies the source tree, without
-  `node_modules`, build output, evidence or research, into a throwaway
+- **Build.** `scripts/acceptance/run.mjs` (host side) copies the source tree,
+  without `node_modules`, build output, evidence or research, into a throwaway
   `node:24.21.0-bookworm-slim` container. There it runs `npm ci`,
-  `npm run build` and `npm pack`, as a release would, then checks what the
-  tarball contains.
-- Every scenario then gets a fresh container started from an official
-  `node:*-bookworm-slim` image. The only things copied in are the tarball, the
-  sample project (`test/fixtures/acceptance/sample`) and the harness's own
-  files. Steps run as the unprivileged `node` user. **Only the install step has
-  network.** After it, the container is disconnected from every Docker network,
-  and the first offline step (`network-off`) proves the registry can no longer
-  be reached.
-- `scripts/acceptance/driver.mjs` (in the container, Node built-ins only) runs the
-  steps. It drives MCP over stdio with a small JSON-RPC client, and checks Studio
-  with plain HTTP requests (session token from the printed URL; no browser).
-- Two independent detectors watch for toolchain processes:
-  - `shim.sh` is installed first on `PATH` as `java`, `quint`, `go`, `cargo`,
-    `rustc`, `rustup` and `tlc`. It logs each call, then runs the real program if
-    one exists.
-  - `spawn-trace.cjs`, preloaded with `NODE_OPTIONS=--require`, logs every child
-    process any Node process starts. It catches Quint, which is started by
-    absolute path as `node …/quint/dist/src/cli.js`, where a `PATH` shim cannot
-    see it.
-- Every output (stdout, stderr, MCP JSON, HTTP bodies) is scanned for
-  Java/Quint/TLC wording.
-- Statuses:
-  - `pass`
-  - `expected-fail`: the broken design fails with a useful diagnostic.
-  - `known-gap`: every problem in the step is attributed to a named chunk:
-    - R1-A: Java/Quint/TLC wording or processes, or a missing-backend failure
-    - R1-B: the legacy-folder refusal
-    - R1-C: no MCP graph tool
-    - R1-D: no requirement-to-symbol link
-    - W3-L (PR 33): Go toolchain opt-in
-  - `fail`
-  - `observed`: report-only steps (sizes, timings, Node version edges).
-- A failure that a gap does not explain is a `fail`, never a pass. When a chunk
-  merges, its rows turn `pass` without any harness change. Two exceptions need a
-  harness change: R1-C and R1-D. The harness can only detect a tool or command
-  whose name contains `graph`, or `link` plus `requirement`/`symbol`/`code`.
-  Once their interfaces exist, extend `mcpSteps`/`coreSteps` to create and list a
-  link.
-- Output: `evidence/r1-f/latest.json` (schema `pymtheg.acceptance/v1`: per step
-  the scenario, command, exit code, status, chunk, reason, output bytes, duration
-  and an output excerpt) and `evidence/r1-f/latest.md` (tables).
+  `npm run build` and `npm pack` as a release would, and checks the tarball
+  contents.
+- **Scenario containers.** Each scenario gets a fresh container from an
+  official `node:*-bookworm-slim` image. Only the tarball, the sample project
+  (`test/fixtures/acceptance/sample`) and the harness files are copied in.
+  Steps run as the unprivileged `node` user.
+- **Network.** Only the install step has network. After it, the container is
+  disconnected from every network. The first offline step (`network-off`)
+  proves that neither the registry nor a direct IP (`http://1.1.1.1/`) can be
+  reached.
+- **Driver.** `scripts/acceptance/driver.mjs` runs the steps in the container,
+  using Node built-ins only. It drives MCP over stdio with a small JSON-RPC
+  client, and checks Studio with plain HTTP requests (no browser).
+- **Two process detectors.**
+  - `shim.sh` sits first on `PATH` as `java`, `javac`, `quint`, `tlc`, `go`,
+    `cargo`, `rustc` and `rustup`. It uses shell built-ins only, a fixed log
+    path and a fixed fallback search path, so a call made from a stripped
+    environment is still logged and still reaches the real program.
+  - `spawn-trace.cjs`, preloaded through `NODE_OPTIONS`, logs every child
+    process any Node process starts, including programs started by absolute
+    path.
+- **Wording.** `wording.mjs` is the one matcher for Java/Quint/TLC wording. It
+  matches whole words or exact tokens (`\bjava\b`, `\bjavac\b`, `\bquint\b`,
+  `\btlc\b`, `tla2tools`, `\bTLA+`). The self-test checks it against 22 fixed
+  strings, including `JavaScript`, `quintessential` and `TLAs`, which must not
+  match.
+
+### How a step is judged
+
+| Status | When |
+|---|---|
+| `pass` | Every exact expectation is met. No backend or unrequested toolchain process ran, there is no Java/Quint/TLC wording in any output, and there is no Node process warning. |
+| `expected-fail` | The broken design failed exactly as specified (exit 1 and the exact diagnostic line). |
+| `known-gap` | Only in the cases below. |
+| `fail` | Everything else, including a crash, an unexpected exit code, a harness exception, any `java`/`javac`/`quint`/`tlc` process, or any such wording. |
+| `observed` | Report-only rows: sizes, timings, the absolute-path `npx` form, writes outside the project. |
+
+A step is `known-gap` only when the step's sole problem is its expectation
+failure, and that step's own gap matcher recognises the exact output the named
+chunk will change. There is one exception: the SQLite `ExperimentalWarning`,
+on Node 24.0.x or 25.x only, and nothing else.
 
 ## What each scenario proves
 
 | Scenario | Proves |
 |---|---|
-| 0-build | `npm ci && npm run build && npm pack` work from a clean checkout. The tarball has the CLI, the web assets, both vendored grammars, README and the `pymtheg` launcher, and no `src/`, `test/`, `evidence/` or `research/`. |
-| a-node-only | Node only. `npx ./pymtheg-1.0.0.tgz --help` (network), then offline: help, version, init and re-init (identity unchanged), doctor. check/verify/simulate on `designs/order.pym`. `designs/broken.pym` gives `broken.pym:7:27 error N002: Unknown value or variant charge; did you mean charges?` and exit 1. Graph: index, status, TS callers and path, Go cross-package and same-package callers, Rust cross-module and same-file callers, search. MCP: initialize, tools/list, check_design (valid and broken, then read_run findings), explore_behaviour verify and simulate, graph tool, requirement-link tool, clean shutdown. Studio: start, `GET /api/project`, `GET /` plus a script asset, SIGINT stop. Init in a folder with an old `.pymtheg-studio/`. Writes outside the project. No toolchain process anywhere. |
-| b-node-git | (a) inside a git repository (git installed with apt before the install step). Init adds only `.pymtheg/.gitignore`, `.pymtheg/project.json` and `.pymtheg/settings.json` as untracked files. Tracked files are unchanged. After graph, MCP and Studio, the caches are still ignored. |
-| c-node-go-rust | (a) with Go 1.27.4 and Cargo 1.100.0 on PATH (copied from the official `golang` and `rust` images). The graph results are identical to (a) (`graph-identical-to-node-only`), and nothing runs `go` or `cargo` by default. The Go toolchain opt-in is pending (PR 33 is not merged, and the opt-in is not wired into `pymtheg graph`). |
-| d-global | `npm install --global ./tarball`. The binary resolves to the installed package, and grammars, web assets and MCP all work from there (the repository is not in the container at all). |
-| d-local | `npm install ./tarball` into another package, then `npx --no-install pymtheg`. Same coverage. |
-| e-node-24.0.0 / 25 / 26 | Report only: the lowest Node that `engines` allows, and the current Node 25 and 26 images. |
-| f-restic | The pinned restic corpus (559 Go files): init, graph index, status and five queries. Time and memory are observations. |
+| 0-build | `npm ci`, `npm run build` and `npm pack` work from a clean checkout. The tarball has the CLI, web assets, both vendored grammars, README and the launcher. It ships no TypeScript sources, tests, evidence or research; a helper source the product runs is allowed and listed (`src/graph/languages/go/toolchain/golinks.go`). |
+| a-node-only | See the table below. |
+| b-node-git | (a) inside a git repository. After init, `git status` shows exactly `?? .pymtheg/.gitignore`, `?? .pymtheg/project.json` and `?? .pymtheg/settings.json`, and tracked files are unchanged. After graph, MCP and Studio, the same three files and nothing else are visible. |
+| c-node-go-rust | (a) with Go 1.27.4 and Cargo 1.100.0 on `PATH`. The graph answers are identical to (a), and nothing runs `go` or `cargo` while the setting is off. With `graph.toolchain.go` naming the real `go` (on the sample's Go module as its own project), `go` must run and the answer must report the route `used` with upgraded links > 0. With the setting removed again, no `toolchain` is reported. |
+| d-global / d-local | `npm i -g` and `npm i` of the tarball. The binary resolves to the installed package, and everything works from there (the repository is not in the container). |
+| e-node-24.0.0 / 25 / 26 | engines is `">=24"`, so all three are **required**: install, help, init, doctor (all ready), check, verify, simulate, the broken design, graph index and callers. |
+| f-restic | The pinned restic corpus (559 Go files): init, index with 0 failed files, status and five queries. Time and memory are observations. |
 
-## Today's result (commit 84606915, 15 November 2026)
+Scenario (a), Node only, runs:
 
-Verdict **known-gaps**, harness exit 2: 138 pass, 60 known-gap, 10 expected-fail,
-41 observed, **0 fail**. Per scenario:
+- **Install:** `npx ./pymtheg-1.0.0.tgz --help`, with network.
+- **Basics (offline):** help, version and init. Init must report
+  "3 existing documents found". Re-init must leave the metadata bytes
+  identical.
+- **doctor --format json:** every check must be `ready`.
+- **Checking the valid design:**
+  - `check` gives 0 diagnostics.
+  - `verify`: each of the three properties is `no_counterexample`, complete
+    and `exhaustive: true`.
+  - `simulate`: each is `no_counterexample` and `exhaustive: false`.
+- **The broken design:** `check` and `verify` exit 1 with the exact line
+  `…/broken.pym:7:27 error N002: Unknown value or variant charge; did you mean charges?`.
+- **Graph:**
+  - index (9 files, 0 failed) and status (modules go, rust, typescript).
+  - Callers, each exactly one caller symbol, in one file, with `definite`
+    certainty and the queried target. Five calls cross files (TypeScript ×2,
+    Go ×2, Rust ×1) and one stays in its file (`percent_of`).
+  - The TypeScript path `renderBasket` → `roundCents` (definite).
+  - `search Total`, which gives exactly two symbols and one file.
+- **Requirement links:** `link requirement`, `link add` and `link check`.
+- **MCP:**
+  - `check_design` on the valid design gives exitStatus 0 with 0 errors and 0
+    warnings.
+  - On the broken design it gives exitStatus 1. After `read_run`, the
+    findings include one at line 7, column 27 with "Unknown value or variant
+    charge".
+  - `explore_behaviour`: verify gives 0 counterexamples with
+    `exhaustive: true`; simulate gives 0 counterexamples with
+    `exhaustive: false`.
+  - `code_graph` callers, a requirement-link tool, and a clean shutdown
+    (exit 0).
+- **Studio:** start, `GET /api/project` (the workspace name), `GET /` plus
+  every asset it references, and a SIGINT stop.
+- **Legacy folder:** init in a folder that has `.pymtheg-studio/`. It must
+  exit 0, name the folder in a notice and leave it untouched.
+- **Processes:** a `no-toolchain-processes` summary row, plus the writes made
+  outside the project.
+
+## Today's result (commit 43bee54d, merged main with R1-A, R1-B and PR 33)
+
+Verdict **known-gaps**, harness exit 2: **215 pass, 35 known-gap,
+12 expected-fail, 12 observed, 0 fail.**
 
 | Scenario | pass | known-gap | expected-fail | observed | fail |
 |---|---:|---:|---:|---:|---:|
 | 0-build | 4 | 0 | 0 | 2 | 0 |
-| a-node-only | 23 | 12 | 2 | 3 | 0 |
-| b-node-git | 27 | 12 | 2 | 3 | 0 |
-| c-node-go-rust | 25 | 13 | 2 | 1 | 0 |
-| d-global | 25 | 11 | 2 | 1 | 0 |
-| d-local | 24 | 11 | 2 | 1 | 0 |
-| e-node-24.0.0 / 25 / 26 | – | – | – | 10 each | – |
-| f-restic | 10 | 1 | 0 | 0 | 0 |
+| a-node-only | 33 | 5 | 2 | 3 | 0 |
+| b-node-git | 38 | 5 | 2 | 1 | 0 |
+| c-node-go-rust | 37 | 6 | 2 | 1 | 0 |
+| d-global | 34 | 5 | 2 | 1 | 0 |
+| d-local | 33 | 5 | 2 | 1 | 0 |
+| e-node-24.0.0 | 3 | 9 | 0 | 1 | 0 |
+| e-node-25 | 11 | 0 | 1 | 1 | 0 |
+| e-node-26 | 11 | 0 | 1 | 1 | 0 |
+| f-restic | 11 | 0 | 0 | 0 | 0 |
 
-Two observations from this run, taken on the dev server:
+There are no R1-A or R1-B gaps left. Every scenario's process log is empty
+(apart from the Go opt-in step, which must run `go`), and no output contains
+Java/Quint/TLC wording.
 
-- **restic** (559 files): graph index took 92 s, with at least 2.1 GiB peak RSS
-  (sampled from `/proc`, so a lower bound). It found 7,356 symbols and 63,088
-  links, and no file failed. Each query took about 3 s. That 3 s is mostly `npx`
-  start-up: every CLI call costs about 3 s, 165 MiB.
-- **Install:** `npx` first run took about 10 s and installed 211 packages. That
-  is 112 MiB in `~/.npm/_npx`, plus 94.5 MiB in `~/.npm/_cacache`. A global or
-  local install is the same size.
+Observations from this run on the dev server:
 
-The d-global "largest packages" row in this run measured the wrong folder (the
-global prefix, not the package's nested `node_modules`). This is fixed in the
-harness after the run, and only that observation row is affected.
+- **Install:** `npx` installs in about 8 s. That is 133 packages and 84.9 MiB
+  in `~/.npm/_npx`, plus 69.5 MiB in `~/.npm/_cacache`.
+- **restic** (559 files): index took 108 s with at least 2.1 GiB peak RSS. It
+  found 7,356 symbols and 63,088 links, and no file failed.
 
-## Gap list
+### Every remaining known gap
 
-Known gaps being fixed by other chunks (the harness turns these rows green as
-they merge):
+| Chunk | Steps | Exact condition that is accepted | Turns green when |
+|---|---|---|---|
+| R1-C (PR 40) | `mcp-code-graph` in a, b, c, d-global, d-local | tool `code_graph` is not in `tools/list` | The tool exists and `code_graph {action:"callers", query:"formatTotal"}` (with `graph_result` if it is still running) answers definite `renderBasket`. |
+| R1-D (PR 38) | `link-requirement`, `link-add`, `link-check` in a, b, c, d-global, d-local | exit 3, empty stdout, and stderr exactly `pymtheg: Unknown command or missing file. Commands: …. See --help.` | `link requirement R1` exits 0, `link add R1 ComputeTotal` reports `created`, and `link check` exits 0 naming `ComputeTotal`. |
+| R1-D | `mcp-requirement-links` in the same five | no tool whose name contains `code_link` or `requirement` | When such a tool appears, this row **fails** until the harness is extended to exercise it, because a tool the harness has not tested never passes. |
+| W3-L2 (PR 42) | `go-toolchain-index` in c | exit 0, status ok, no `toolchain` field in the answer, and no `go` process | The route is `used`, upgraded links > 0, and a `go` process ran. Verified before merge: on PR 42's branch this row passes, with 1 link upgraded and 2 `go` processes (the other failures on that branch predate R1-A). |
+| R1-H | 9 steps in e-node-24.0.0 | Node 24.0.x or 25.x, and stderr's only Node warning is exactly `(node:N) ExperimentalWarning: SQLite is an experimental feature and might change at any time` plus its trace hint | The warning is gone. Node 25.9.0 already shows no warning. |
 
-1. **R1-A: Java/Quint/TLC still present.**
-   - `pymtheg --help` mentions `--backend quint`, "TLC requires --tlc-jar" and
-     "Explicit Quint/TLC backends" (`src/cli/help.ts:26`, `:30`, `:33`, `:64`).
-   - `pymtheg doctor` runs `java -version` and `node …/@informalsystems/quint/dist/src/cli.js --version`,
-     then prints `Quint: ready — 0.33.1`, `Java: incompatible — java: not installed…`
-     and `TLC: missing — Set PYM_TLC_JAR…` (`src/project/doctor.ts:24-80`).
-   - The MCP tool descriptions mention Quint/TLC. `explore_behaviour` says "Run the
-     real Quint simulator or TLC verifier" (`src/mcp/server.ts:415`).
-   - **MCP `explore_behaviour` with `method:"verify"` fails on a clean machine**
-     (exitStatus 3, isError; the properties name TLC), because MCP and Studio use
-     `backend: kind === "verify" ? "tlc" : "quint"` (`src/mcp/workspace.ts:185`,
-     `src/studio/service.ts:3445`). The CLI's `verify` works (built-in).
-   - `method:"simulate"` "works" only by running Quint, which `npx` installs as an
-     optional dependency (`package.json:40`).
-   - Studio `GET /api/project` reports `"quint": true` (`src/studio/service.ts:3260`).
+A gap applies to its own step and exact output only. A command that is missing,
+crashes, prints something else or exits with another code is a `fail`. The
+self-test shows this: `link-crashes` makes `pymtheg link` exit 77, and those rows
+fail instead of becoming R1-D gaps.
 
-   These cover every `no-toolchain-processes` row and most known-gap rows.
-2. **R1-B: legacy-folder refusal.** `pymtheg init` in a folder with
-   `.pymtheg-studio/` gives exit 3: "Old Pymtheg storage layout at …: .pymtheg-studio.
-   No migration is provided…" (`src/storage/local.ts:30`). PR 35 removes this
-   refusal.
-3. **R1-C: no graph tools over MCP.** tools/list has no graph tool
-   (`mcp-graph-tool`).
-4. **R1-D: no requirement-to-symbol links**, in CLI help or over MCP
-   (`cli-requirement-links`, `mcp-requirement-links`).
-5. **W3-L (PR 33): Go toolchain opt-in** is not on main, and it is not wired into
-   `pymtheg graph` yet (the W3-G backlog in `docs/build-plan.md`). The step is
-   non-required and pending.
+## Self-test: the gate bites
 
-Rough edges with no owning chunk (owner's decision, or a new chunk):
+`scripts/acceptance/selftest.mjs` builds the tarball once. It makes ten copies,
+each broken in one way, and runs the real harness (scenario a-node-only) on each
+copy and on an unmodified control, five runs at a time; this also exercises
+overlapping runs on one Docker host. Before a run, each sabotage is checked to
+have actually applied: its anchor must be found exactly once. Result on commit
+43bee54d (`evidence/r1-f/selftest.md`): **matcher 22/22, control clean, 10/10
+sabotages caught.**
 
-6. **`"private": true`** (`package.json:4`). npm refuses to publish the package,
-   so `npx pymtheg` from the registry cannot work until it is published. Today
-   only `npx ./pymtheg-1.0.0.tgz` works. Publishing is the owner's decision; this
-   chunk changed nothing.
-7. **`npx /absolute/path/pymtheg-1.0.0.tgz` fails** with `sh: 1: …tgz: Permission denied`
-   (exit 126). npm treats an absolute path as a command. Only `./name.tgz`,
-   `file:/abs/path.tgz` or `--package=…` work. Any doc that shows the tarball
-   form should use `./`.
-8. **Node pin.**
-   - `engines` is `">=24 <25"` (`package.json:7`). Mega-plan 8.1 wants
-     "24 or newer".
-   - On Node 25.9.0 and 26.13.1, install prints `npm warn EBADENGINE`, and then
-     help, init, check, verify and graph index all work.
-   - `doctor` reports `Node: incompatible — … (supported: 24 LTS)` and exits 3
-     (`src/project/doctor.ts:19`, `src/cli/main.ts:674`).
-   - There is no clean refusal: it simply works with a warning.
-9. **Node 24.0.0** works, but every command prints
-   `ExperimentalWarning: SQLite is an experimental feature…` on stderr. That is
-   noise for users, and confusing for an agent that reads stderr. Raising the
-   `engines` minimum to the first 24.x where `node:sqlite` is stable would remove
-   it.
-10. **Install size and contents:** 112 MiB in 211 packages. The largest are:
+| Case | Break | Harness exit | Named step(s) |
+|---|---|---|---|
+| control | none | 2 | 0 failed; the 5 R1-C/R1-D gaps only |
+| check-exits-0 | `check` exits 0 on the broken design | 1 | check-broken: fail |
+| grammar-removed | vendored Go grammar removed | 1 | tarball-contents, graph-index (and every graph step, doctor): fail |
+| mcp-check-design-throws | MCP `check_design` throws | 1 | mcp-check-design: fail |
+| callers-no-links | `callers` returns no links | 1 | graph-ts-callers (and the other five callers): fail |
+| caller-target-renamed | a caller link's target renamed | 1 | graph-ts-callers (and the other five): fail |
+| certainty-downgraded | certainty becomes `name-only` | 1 | graph-ts-callers (and the other five): fail |
+| prints-java | `--help` prints "java" | 1 | help (and install-npx): fail |
+| index-runs-java | `graph index` runs `java -version` | 1 | graph-index, no-toolchain-processes: fail |
+| mcp-wrong-verdict | MCP reports exitStatus 1 for the valid design | 1 | mcp-check-design (and both explore steps): fail |
+| link-crashes | `pymtheg link` exits 77 | 1 | link-requirement, link-add, link-check: fail (not R1-D gaps) |
 
-    | Package | Size |
-    |---|---:|
-    | typescript | 22.5 MiB |
-    | tree-sitter-rust | 14.4 MiB |
-    | pymtheg | 9.6 MiB |
-    | react-dom | 7.0 MiB |
-    | @modelcontextprotocol/server | 6.7 MiB |
-    | web-tree-sitter | 4.5 MiB |
-    | @octokit/openapi-types | 4.3 MiB |
-    | zod | 4.0 MiB |
-    | tree-sitter-go | 3.7 MiB |
-    | @informalsystems/quint | 3.4 MiB |
+## Cleanup and concurrent runs
 
-    Several runtime `dependencies` are not used at runtime:
-    - `tree-sitter-go`, `tree-sitter-rust` and `@tree-sitter-grammars/tree-sitter-lua`
-      (`package.json:51`, `:57-58`). The graph loads the vendored
-      `grammars/*/tree-sitter-*.wasm` (`src/graph/languages/go/index.ts:28`,
-      `src/graph/languages/rust/parse.ts:278`), and nothing under `src/` imports
-      the npm grammar packages. These are also the source of the install-script
-      warnings in item 11.
-    - `react`, `react-dom`, `react-markdown`, `remark-gfm`, `@lezer/highlight` and
-      most `@codemirror/*` (`package.json:43-56`) are bundled into `dist-web/` at
-      build time. Only `@codemirror/state` is imported by server code
-      (`src/studio/completion-position.ts:1`).
-    - `@octokit/openapi-types` and `protobufjs` arrive through the Quint optional
-      dependency.
+- **Labels and bounded life.** Every container is named
+  `pymtheg-acc-<scenario>-<run id>` and labelled `pymtheg-acc=1`,
+  `pymtheg-acc.owner=<user@host>`, `pymtheg-acc.run` and `pymtheg-acc.pid`. Its
+  own process is `sleep 14400`, so a lost container removes itself (`--rm`)
+  within four hours.
+- **Leftovers.** At start-up the harness removes only containers with its own
+  owner label whose recorded run process has ended. It never touches another
+  owner's containers or a live run's.
+- **Images.** Images present before any run of this harness are never removed.
+  An image a run pulls is recorded in `~/.cache/pymtheg-acceptance/pulled-images`
+  (a locked file shared by overlapping runs). Whichever run finishes last
+  removes it, once no container of any run uses it. The harness uses no
+  `docker build` and never prunes.
+- **Stopping.** SIGINT, SIGTERM and SIGHUP remove this run's containers and
+  pulled images. So does a broken pipe, which is what a dropped `pymtheg-dev`
+  ssh session (no tty) produces.
 
-    Moving the build-only packages to `devDependencies` and dropping the unused
-    grammar packages would cut the install substantially. Item 10 is the
-    harness's best reading and should be confirmed before changing it.
-11. **Install-script warnings.** `npm install -g` and `npm install` of the tarball
-    (npm 11.19, Node 24.22.3) print 7 `npm warn install-scripts` lines. These name
-    `tree-sitter-lua`, `tree-sitter-go` and `tree-sitter-rust` (`node-gyp-build`)
-    and `protobufjs` (postinstall), and suggest `--allow-scripts`. None of the
-    scripts is needed: everything works with them blocked, and no compiler is
-    present. On Node 24.0.0 (npm 11.3) the hooks run and fall back to prebuilds
-    without error. For a first-time user, the warning reads like something they
-    must act on.
-12. **Writes outside the project:** only npm's own `~/.npm/_npx`, `~/.npm/_cacache`
-    and `~/.npm/_logs`. The Quint simulate run used a temporary
-    `/tmp/pymtheg-*` folder and removed it. Nothing else was written.
-13. **Signals through `npx`.** A single SIGINT sent to the `npx` process ends
-    `npx`, but leaves `sh -c pymtheg … studio` and the Studio server running. A
-    terminal's Ctrl-C signals the whole process group, so interactive users are
-    unaffected. A supervisor or agent that stops `npx pymtheg studio`/`mcp` by
-    PID will orphan the server. The harness signals the process group.
-14. **Every CLI call through `npx` costs about 3 s and 165 MiB** before doing any
-    work (measured on the dev server; an observation). Agents that shell out
-    repeatedly should be pointed at MCP, or at a global install.
-15. **MCP `check_design` on a broken design** returns only counts. The finding text
-    (`charge`, `did you mean charges?`) needs a second `read_run` call. This is as
-    documented in `docs/mcp.md`; it is noted here because an agent that reads only
-    the first answer sees no reason.
+`scripts/acceptance/cleanup-test.sh` stops a real run midway with TERM, then
+with HUP, then by closing its output pipe. On 15 November 2026 all three
+modes exited with their code (143, 129, 141) and left 0 containers and 0 added
+images. A real `pymtheg-dev` session was also killed mid-scenario: the remote
+run stopped and left 0 containers and 0 images. The self-test's 11 overlapping
+runs also left nothing behind.
 
-Confirmed working, and worth keeping green:
+## Gap list: rough edges with no owning chunk
 
-- The tarball has everything needed.
-- `init` is idempotent, offers the `docs/` preview ("3 existing documents found")
-  and leaves git state clean.
-- CLI check/verify/simulate are fully built-in: no process started, no Java.
-- The broken design gives a precise `file:line:col` diagnostic and exit 1.
-- The TypeScript, Go and Rust graph resolves all six sample cross-file calls as
-  `definite`, without toolchains, identically with toolchains present.
-- Global and local installs resolve grammars and web assets from the installed
-  location.
-- Studio serves its API and assets.
-- MCP starts, answers and shuts down cleanly with exit 0.
+1. **`"private": true`** (`package.json:4`). npm refuses to publish the package,
+   so `npx pymtheg` from the registry cannot work until it is published.
+   `npx ./pymtheg-1.0.0.tgz` works today. Publishing is the owner's decision.
+2. **`npx /absolute/path/pymtheg-1.0.0.tgz`** exits 126 (`sh: 1: …tgz: Permission denied`),
+   because npm runs an absolute path as a command. `./name.tgz` and
+   `file:/abs/path.tgz` work. Docs should show the `./` form.
+3. **Install size.** 84.9 MiB in 133 packages. Some runtime `dependencies`
+   look unused at runtime and should be confirmed before changing anything:
+   - `tree-sitter-go`, `tree-sitter-rust` and `@tree-sitter-grammars/tree-sitter-lua`
+     (`package.json`). The graph loads the vendored `grammars/*/tree-sitter-*.wasm`.
+   - `react`, `react-dom`, `react-markdown`, `remark-gfm`, `@lezer/highlight`
+     and most `@codemirror/*` are bundled into `dist-web/`. Only
+     `@codemirror/state` is imported by server code
+     (`src/studio/completion-position.ts:1`).
+4. **Install-script warnings.** `npm i -g` and `npm i` print 6
+   `npm warn install-scripts` lines for the three tree-sitter packages
+   (`node-gyp-build`), suggesting `--allow-scripts`. None is needed. `npx`
+   prints none.
+5. **The Go toolchain opt-in needs `go.mod` at the project root.** In a mixed
+   repository with the Go module in a subfolder (the sample's `service/`), the
+   route reports `unavailable: no go.mod at the project root`. It also
+   rightly refuses any `go` that is not `<GOROOT>/bin/go`, such as a wrapper
+   on PATH ("/acc/shims/go is not <GOROOT>/bin/go"), so a version-manager shim
+   needs the setting to name the real binary.
+6. **Stopping through `npx` by PID.** A SIGINT sent only to the `npx` process
+   does not stop Studio or the MCP server: `sh -c pymtheg …` and the server
+   keep running, and `npx` itself may not exit either. A terminal's Ctrl-C
+   signals the whole process group, so interactive use is fine. A supervisor
+   or agent that stops `npx pymtheg studio` or `npx pymtheg mcp` by PID should
+   signal the group.
+7. **Every CLI call through `npx` costs about 3 s and 165 MiB** before doing
+   any work (an observation). Agents should use MCP or a global install.
+8. **MCP `check_design` on a broken design** returns counts only. The finding
+   text needs a second `read_run` call, as documented in `docs/mcp.md`.
+9. **Writes outside the project:** only npm's own `~/.npm/_npx`,
+   `~/.npm/_cacache` and `~/.npm/_logs`.
+
+Resolved since round 1 (on main now): Java, Quint and TLC are gone from help,
+doctor, MCP, Studio and processes (R1-A). The legacy-folder refusal is gone
+(R1-B). engines is `">=24"`, and Node 25 and 26 pass with doctor fully ready.
+
+## Validation
+
+All on the dev server:
+
+- `npm test`: 2,737/2,737 pass, with 0 fail, cancelled or skipped.
+- `npm run format:check`: passes.
+- One earlier `npm test` run hit a 180 s timeout in
+  `project-init-clean.test.mjs:420`, while three harness runs shared the
+  server. Run alone, it passed.
+- The harness: exit 2, as above.
+- The self-test: exit 0.
+- The cleanup test: exit 0.
 
 ## Files
 
-- `scripts/acceptance/run.mjs`, `driver.mjs`, `spawn-trace.cjs`, `shim.sh`: the
-  harness.
-- `test/fixtures/acceptance/sample/`: the sample project:
-  - TypeScript `web/`, Go module `service/` and Rust crate `engine/`, each with
-    cross-file calls
-  - `docs/`
-  - `designs/order.pym` (valid) and `designs/broken.pym` (deliberate undeclared
-    name)
-- `package.json`: an `acceptance` script entry.
-- `evidence/r1-f/latest.json`, `latest.md`: today's run.
-
-Validation on the dev server: `npm test` 2,630/2,630 pass (0 fail, skip or
-cancelled); `npm run format:check` passes.
-
-Docker hygiene: every container and image name starts with `pymtheg-acc-`. The
-harness removes every image it pulled that was not already present (the Node
-images and the `golang` and `rust` images it copies toolchains from), and every
-container. It uses no `docker build`, so it leaves no build cache, and it never
-prunes.
+- `scripts/acceptance/run.mjs`: the host orchestrator.
+- `scripts/acceptance/driver.mjs`: in-container steps.
+- `scripts/acceptance/wording.mjs`: the matcher and its fixed cases.
+- `scripts/acceptance/spawn-trace.cjs` and `scripts/acceptance/shim.sh`: the
+  process detectors.
+- `scripts/acceptance/selftest.mjs` and `scripts/acceptance/cleanup-test.sh`.
+- `test/fixtures/acceptance/sample/`: TypeScript `web/`, Go module `service/`
+  (including receivers that only the toolchain can type: a generic result, a
+  type assertion and a multi-value return), Rust crate `engine/`, `docs/`, and
+  `designs/order.pym` and `designs/broken.pym`.
+- `package.json`: the `acceptance` script.
+- `evidence/r1-f/latest.{json,md}` and `evidence/r1-f/selftest.{json,md}`.
