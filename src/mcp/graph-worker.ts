@@ -1,3 +1,4 @@
+import { operationError } from "./operation-errors.js";
 import { parentPort, workerData } from "node:worker_threads";
 import { executeGraph, type GraphRequest } from "../graph/commands.js";
 import { GraphView } from "./graph-view.js";
@@ -16,6 +17,6 @@ try {
 } catch (error) {
   parentPort!.postMessage({
     kind: "error",
-    message: error instanceof Error ? error.message : String(error),
+    error: operationError(error, "GRAPH_REQUEST_FAILED"),
   });
 }

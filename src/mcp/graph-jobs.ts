@@ -1,3 +1,4 @@
+import type { operationError } from "./operation-errors.js";
 import { findProjectRoot } from "../storage/local.js";
 import { Worker } from "node:worker_threads";
 import { randomUUID } from "node:crypto";
@@ -12,7 +13,7 @@ export interface GraphJob {
   worker: Worker;
   done: Promise<void>;
   view?: GraphView;
-  error?: string;
+  error?: string | ReturnType<typeof operationError>;
   listeners: Set<(p: GraphProgress) => void>;
 }
 export class GraphJobs {
@@ -63,6 +64,7 @@ export class GraphJobs {
         progress?: GraphProgress;
         view?: GraphView;
         message?: string;
+        error?: ReturnType<typeof operationError>;
       }) => {
         if (job.state !== "running") return;
         if (m.kind === "progress") {
@@ -72,7 +74,7 @@ export class GraphJobs {
           job.view = Object.assign(Object.create(GraphView.prototype), m.view);
           job.state = "complete";
         } else {
-          job.error = m.message ?? "Graph worker failed";
+          job.error = m.error ?? m.message ?? "Graph worker failed";
           job.state = "error";
         }
       },

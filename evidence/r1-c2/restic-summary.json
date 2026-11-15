@@ -1,0 +1,321 @@
+{
+  "pin": "c734245fd3ae9bcac8ab3aaafb4482d4b5d0ae92",
+  "cleanBefore": true,
+  "links": [
+    {
+      "id": "56d4a918-c38e-41e2-8ecc-27216de0332e",
+      "record": "plan:C2-ID",
+      "symbol": {
+        "ref": "symbol:9d29e147233bbb3579c1c306c02adefda2092d18e18b117709e7bc2eea152487",
+        "language": "go",
+        "path": "internal/restic/id.go",
+        "kind": "function",
+        "identity": "ParseID",
+        "name": "ParseID",
+        "line": 21
+      },
+      "removed": false
+    },
+    {
+      "id": "364de76f-7fda-4232-b657-085f3ee28eaf",
+      "record": "plan:C2-INDEX",
+      "symbol": {
+        "ref": "symbol:b1c8d0912eaee0e5dd437a58601013b46ec8d6fcd4f887f2b7a5a5058fc7ced7",
+        "language": "go",
+        "path": "internal/repository/repository.go",
+        "kind": "method",
+        "identity": "(*Repository).LoadIndex",
+        "name": "LoadIndex",
+        "line": 717
+      },
+      "removed": false
+    },
+    {
+      "id": "4ffedf3b-808c-47b5-9708-2024c3560c52",
+      "record": "plan:C2-PACK",
+      "symbol": {
+        "ref": "symbol:07aa1e9eb2c86ad71672a732099d54ec5fcf98ea889b8e809bcdd2738d89a4a0",
+        "language": "go",
+        "path": "internal/repository/packer_manager.go",
+        "kind": "method",
+        "identity": "(*packerManager).SaveBlob",
+        "name": "SaveBlob",
+        "line": 116
+      },
+      "removed": false
+    }
+  ],
+  "checksBefore": {
+    "action": "check",
+    "status": "ok",
+    "counts": {
+      "ok": 3,
+      "changed": 0,
+      "moved": 0,
+      "missing": 0,
+      "unverifiable": 0
+    },
+    "passed": true,
+    "libraryPassed": true,
+    "allowMoved": false,
+    "failingCount": 0,
+    "orphanedCount": 0,
+    "verificationComplete": true,
+    "graph": {
+      "complete": true,
+      "syncMode": "unchanged",
+      "failedFileCount": 0,
+      "staleFiles": [],
+      "staleFileCount": 0,
+      "warnings": []
+    },
+    "impactIncomplete": false,
+    "impactNotes": [],
+    "notFollowedCount": 0,
+    "sourceTruncated": false,
+    "message": "",
+    "publicRule": null,
+    "textClipped": false,
+    "totals": {
+      "items": 3,
+      "matches": 0,
+      "failed_files": 0,
+      "not_followed": 0,
+      "symbols": 0
+    }
+  },
+  "checkAfter": {
+    "action": "check",
+    "status": "needs-attention",
+    "counts": {
+      "ok": 2,
+      "changed": 1,
+      "moved": 0,
+      "missing": 0,
+      "unverifiable": 0
+    },
+    "passed": false,
+    "libraryPassed": false,
+    "allowMoved": false,
+    "failingCount": 1,
+    "orphanedCount": 0,
+    "verificationComplete": true,
+    "graph": {
+      "complete": true,
+      "syncMode": "updated",
+      "failedFileCount": 0,
+      "staleFiles": [],
+      "staleFileCount": 0,
+      "warnings": []
+    },
+    "impactIncomplete": false,
+    "impactNotes": [],
+    "notFollowedCount": 0,
+    "sourceTruncated": false,
+    "message": "",
+    "publicRule": null,
+    "textClipped": false,
+    "totals": {
+      "items": 3,
+      "matches": 0,
+      "failed_files": 0,
+      "not_followed": 0,
+      "symbols": 0
+    }
+  },
+  "changed": {
+    "id": "4ffedf3b-808c-47b5-9708-2024c3560c52",
+    "record": "plan:C2-PACK",
+    "symbol": {
+      "ref": "symbol:07aa1e9eb2c86ad71672a732099d54ec5fcf98ea889b8e809bcdd2738d89a4a0",
+      "language": "go",
+      "path": "internal/repository/packer_manager.go",
+      "kind": "method",
+      "identity": "(*packerManager).SaveBlob",
+      "name": "SaveBlob",
+      "line": 116
+    },
+    "removed": false,
+    "state": "changed",
+    "recordPresent": true,
+    "current": {
+      "ref": "symbol:07aa1e9eb2c86ad71672a732099d54ec5fcf98ea889b8e809bcdd2738d89a4a0",
+      "language": "go",
+      "path": "internal/repository/packer_manager.go",
+      "kind": "method",
+      "identity": "(*packerManager).SaveBlob",
+      "name": "SaveBlob",
+      "line": 116
+    },
+    "differs": [
+      "body"
+    ],
+    "suggestions": [],
+    "suggestionsBound": 20,
+    "unverifiableFile": null,
+    "mayBeHiddenBy": [],
+    "hiddenFileCount": 0,
+    "message": "Symbol (*packerManager).SaveBlob changed (body) since it was linked.",
+    "next": "Review current code, then explicitly refresh this link if accepted."
+  },
+  "impact": {
+    "action": "requirements_for",
+    "status": "complete",
+    "counts": null,
+    "passed": null,
+    "libraryPassed": null,
+    "allowMoved": false,
+    "failingCount": 0,
+    "orphanedCount": 0,
+    "verificationComplete": true,
+    "graph": {
+      "complete": true,
+      "syncMode": "unchanged",
+      "failedFileCount": 0,
+      "staleFiles": [],
+      "staleFileCount": 0,
+      "warnings": []
+    },
+    "impactIncomplete": true,
+    "impactNotes": [
+      "Unresolved links may hide additional callers or paths; returned routes are observations, not a completeness proof.",
+      "Result reached a reported depth or result/node bound; omitted facts may exist."
+    ],
+    "notFollowedCount": 4,
+    "sourceTruncated": false,
+    "message": "",
+    "publicRule": null,
+    "textClipped": false,
+    "totals": {
+      "items": 1,
+      "matches": 0,
+      "failed_files": 0,
+      "not_followed": 4,
+      "symbols": 0
+    }
+  },
+  "notFollowed": [
+    {
+      "ref": "symbol:d2127f0a9ec84b293ea78e1662f1484224b1b72b9465b952cbc1006344fec1e1",
+      "path": "internal/fuse/snapshots_dirstruct.go",
+      "identity": "(*SnapshotsDirStructure).updateSnapshots",
+      "name": "",
+      "line": 294,
+      "certainty": "candidate"
+    },
+    {
+      "ref": "symbol:0e715e2fa975342cc3c691f9537b8dec7740ceebaba0dd0340a83c107c7bcc15",
+      "path": "cmd/restic/cmd_list.go",
+      "identity": "packfileList",
+      "name": "",
+      "line": 99,
+      "certainty": "candidate"
+    },
+    {
+      "ref": "symbol:c4fc6eb21e6cbf3d4cc85b5a8f7a9e563393f5980d69fa67df7eb1c51c9fa0dd",
+      "path": "internal/fuse/snapshots_dirstruct.go",
+      "identity": "(*SnapshotsDirStructure).UpdatePrefix",
+      "name": "",
+      "line": 346,
+      "certainty": "candidate"
+    },
+    {
+      "ref": "symbol:732e30b6d5c0c44c9cd7e8a79b31b3a05118d93fd6a7f8059c5add8d9696f084",
+      "path": "cmd/restic/cmd_list.go",
+      "identity": "runList",
+      "name": "",
+      "line": 50,
+      "certainty": "candidate"
+    }
+  ],
+  "calls": 17,
+  "bytes": [
+    {
+      "name": "code_graph",
+      "bytes": 616
+    },
+    {
+      "name": "graph_result",
+      "bytes": 3440
+    },
+    {
+      "name": "code_graph",
+      "bytes": 4756
+    },
+    {
+      "name": "requirement_links",
+      "bytes": 2280
+    },
+    {
+      "name": "requirement_links",
+      "bytes": 2828
+    },
+    {
+      "name": "code_graph",
+      "bytes": 4944
+    },
+    {
+      "name": "requirement_links",
+      "bytes": 2296
+    },
+    {
+      "name": "requirement_links",
+      "bytes": 2950
+    },
+    {
+      "name": "code_graph",
+      "bytes": 4972
+    },
+    {
+      "name": "requirement_links",
+      "bytes": 2310
+    },
+    {
+      "name": "requirement_links",
+      "bytes": 2968
+    },
+    {
+      "name": "requirement_links",
+      "bytes": 7090
+    },
+    {
+      "name": "requirement_links",
+      "bytes": 712
+    },
+    {
+      "name": "link_result",
+      "bytes": 7276
+    },
+    {
+      "name": "requirement_links",
+      "bytes": 734
+    },
+    {
+      "name": "link_result",
+      "bytes": 3342
+    },
+    {
+      "name": "link_result",
+      "bytes": 4262
+    }
+  ],
+  "maximumBytes": 7276,
+  "sourceHashes": {
+    "src/architecture/code-links.ts": "453f7df8c98980a56d743847f78dd96897d92ce185db8d89f079915f5409617c",
+    "src/mcp/links.ts": "07e49a8fcebcb790c4c0f79fb8e0f18f71b08cc3ed7af63d2fa6f64de0f2c876",
+    "src/mcp/links-worker.ts": "56cd06a4b5d3e9a71b69ee11173a186f11cfdbc1fe2d05199004beae9b14e4b0",
+    "src/mcp/links-jobs.ts": "6adf54fb97b6fcac90397b494467db68ef5ab33c80ea61904960adf8e722013b",
+    "src/mcp/links-view.ts": "f08f66cebed21b444578c330e07d7662ef906d34d9e4a433021c250f2ca2b012",
+    "src/mcp/graph-view.ts": "38746c27d55e242fb1edcce43353a9bc198926a67044ea8f93e0e3c592ede6fe",
+    "src/mcp/graph.ts": "7969e85338acb34af5a00f206da84d014def4ca3357de57dc8ef97ea18213c08",
+    "src/mcp/graph-jobs.ts": "e562be7f107d651946510de8fa3d14aaeae57d66ecdf648e6877ef2258ef066f",
+    "src/mcp/graph-worker.ts": "e39cdc4a7037a117f8118d084b3cc15b9a63d5d78b261f461063615530b970da",
+    "src/mcp/operation-errors.ts": "bac074790f05bdaf1477c6fe541ddc3e9ec429cf49d80b2378240e4d927f3710",
+    "src/mcp/check-findings.ts": "1791ab468afca3d17a1837fcd6a8de5398f3d24ffc8aba4731091208e91051d3",
+    "src/mcp/server.ts": "2bd0d305ed242cfc2898ca0c9f7db01397231149300b1903e71597b6e1eb4e9e",
+    "src/mcp/workspace.ts": "63f405843fbd3ce201e46429ec05fb73f14310971c697d3753b3a82a65ce1b32",
+    "src/mcp/limits.ts": "2b30e74bff77ea7870230b7b57c3dc6ff390324dcc93be7f5eb906d7caaecb72",
+    "docs/mcp.md": "536ac01adb3ba9159992df25a9bc17da975ab1aaec57239de2d37221b3f81aeb"
+  },
+  "trackedDiff": "internal/repository/packer_manager.go | 1 +\n 1 file changed, 1 insertion(+)"
+}
