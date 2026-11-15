@@ -1,0 +1,139 @@
+# R1-D real run on a fresh copy of the pinned restic corpus (dev server, 2026-11-15, round 2).
+# Script: evidence/r1-d/restic-run.sh. Includes the first graph index of the copy. Author label = local OS user. Verbatim output.
+
+$ pymtheg link requirement R-PACK --title Blobs are packed before upload --text Saving a blob adds it to an open pack file.
+Created requirement plan:R-PACK “Blobs are packed before upload” in architecture/plan.json (checkpoint ff75758d7c54).
+[exit 0]
+
+$ pymtheg link requirement R-INDEX --title Repository index loads on open
+Created requirement plan:R-INDEX “Repository index loads on open” in architecture/plan.json (checkpoint b87693234645).
+[exit 0]
+
+$ pymtheg link requirement R-FORGET --title Forget applies the retention policy
+Created requirement plan:R-FORGET “Forget applies the retention policy” in architecture/plan.json (checkpoint 6c8aea0817a0).
+[exit 0]
+
+$ pymtheg link add R-INDEX LoadIndex
+Selector “LoadIndex” matches 3 symbols; choose one (a symbol: ID or path:line). Nothing was linked.
+  match: method (*Checker).LoadIndex at internal/repository/checker.go:108 symbol:aea2f0b3ec3257ebfcba5b7e4050ca3add352cb00b12cb0b54335d016ed98cb5
+  match: method (*Repository).LoadIndex at internal/repository/repository.go:717 symbol:2b0800b63468d07e357ecaaa2776c728c64763728c6a245efd1b2d862c82b0ac
+  match: method Repository.LoadIndex at internal/restic/repository.go:22 symbol:5af3a5d77f5a153077971e9224089c63d2c54a4d35a257a2de844749eeab78af
+[exit 1]
+
+$ pymtheg link add R-INDEX (*Repository).LoadIndex
+Linked plan:R-INDEX to go method (*Repository).LoadIndex in internal/repository/repository.go.
+Link ID: 0f4bb376-37b6-4999-a8b7-5d41996b5668
+[exit 0]
+
+$ pymtheg link add R-PACK internal/repository/packer_manager.go:116
+Linked plan:R-PACK to go method (*packerManager).SaveBlob in internal/repository/packer_manager.go.
+Link ID: 61426789-b911-44aa-89a4-7de4f415d12e
+[exit 0]
+
+$ pymtheg link add R-FORGET runForget
+Linked plan:R-FORGET to go function runForget in cmd/restic/cmd_forget.go.
+Link ID: acac3383-c80a-418c-b110-a484d889385e
+[exit 0]
+
+$ pymtheg link check
+3 code links: 3 ok, 0 changed, 0 moved, 0 missing, 0 unverifiable
+OK           0f4bb376 plan:R-INDEX -> go method (*Repository).LoadIndex internal/repository/repository.go
+OK           61426789 plan:R-PACK -> go method (*packerManager).SaveBlob internal/repository/packer_manager.go
+OK           acac3383 plan:R-FORGET -> go function runForget cmd/restic/cmd_forget.go
+Check passed.
+[exit 0]
+
+# edit: add a statement to the body of (*packerManager).SaveBlob
+func (r *packerManager) SaveBlob(ctx context.Context, t restic.BlobType, id restic.ID, ciphertext []byte, uncompressedLength int) (int, error) {
+	r.pm.Lock()
+	defer r.pm.Unlock()
+
+	packer, err := r.pickPacker(len(ciphertext))
+	_ = 0 // r1-d edit
+	if err != nil {
+
+$ pymtheg link check
+3 code links: 2 ok, 1 changed, 0 moved, 0 missing, 0 unverifiable
+OK           0f4bb376 plan:R-INDEX -> go method (*Repository).LoadIndex internal/repository/repository.go
+CHANGED      61426789 plan:R-PACK -> go method (*packerManager).SaveBlob internal/repository/packer_manager.go
+  Symbol (*packerManager).SaveBlob changed (body) since it was linked.
+  now: (*packerManager).SaveBlob at internal/repository/packer_manager.go:116
+OK           acac3383 plan:R-FORGET -> go function runForget cmd/restic/cmd_forget.go
+Check failed: 1 link needs attention.
+[exit 1]
+
+$ pymtheg link touched (*Repository).LoadIndex --impact --depth 2
+2 planning records touched: plan:R-INDEX, plan:R-FORGET
+  plan:R-INDEX “Repository index loads on open” via direct: (*Repository).LoadIndex [ok] link 0f4bb376
+  plan:R-FORGET “Forget applies the retention policy” via caller (distance 2): runForget [ok] link acac3383
+Impact may be incomplete (bounds, candidate or unresolved calls). Unresolved links may hide additional callers or paths; returned routes are observations, not a completeness proof. Result reached a reported depth or result/node bound; omitted facts may exist.
+Callers not followed (4):
+  candidate (*SnapshotsDirStructure).updateSnapshots at internal/fuse/snapshots_dirstruct.go:294
+  candidate packfileList at cmd/restic/cmd_list.go:99
+  candidate (*SnapshotsDirStructure).UpdatePrefix at internal/fuse/snapshots_dirstruct.go:346
+  candidate runList at cmd/restic/cmd_list.go:50
+[exit 0]
+
+$ pymtheg link unlinked
+Requirements with no code link (0):
+[exit 0]
+
+# round-1 review case: rename splitPath (internal/filter) and PruneOptions (internal/repository);
+# each has a same-named symbol in cmd/restic, which must not become the link target.
+$ pymtheg link requirement R-FILTER --title Exclude patterns split paths into components
+Created requirement plan:R-FILTER “Exclude patterns split paths into components” in architecture/plan.json (checkpoint 755648a0fafd).
+[exit 0]
+
+$ pymtheg link requirement R-PRUNEOPT --title Prune options are validated
+Created requirement plan:R-PRUNEOPT “Prune options are validated” in architecture/plan.json (checkpoint 0e8d060ad39e).
+[exit 0]
+
+$ pymtheg link add R-FILTER splitPath
+Selector “splitPath” matches 2 symbols; choose one (a symbol: ID or path:line). Nothing was linked.
+  match: function splitPath at cmd/restic/cmd_dump.go:75 symbol:561d833e8c6f4c76edfe4aac1abaa40746e3910f020142e530e0666a89a6abff
+  match: function splitPath at internal/filter/filter.go:61 symbol:fe70fa2460d1af8f29b3227f80d731f6a4d514f3856ab757f7a39b2cade40f93
+[exit 1]
+
+$ pymtheg link add R-FILTER symbol:fe70fa2460d1af8f29b3227f80d731f6a4d514f3856ab757f7a39b2cade40f93
+Linked plan:R-FILTER to go function splitPath in internal/filter/filter.go.
+Link ID: 5f62c0a4-a3b5-4540-9e9f-e0bb5149861a
+[exit 0]
+
+$ pymtheg link add R-PRUNEOPT symbol:6c9ac66b6da364ae4ded3075563b4708e574021357826156c256785a01c3e1e9
+Linked plan:R-PRUNEOPT to go struct PruneOptions in internal/repository/prune.go.
+Link ID: bea9c2fe-98a0-4a93-80c1-306695a5b18f
+[exit 0]
+
+# edit: rename splitPath -> splitPathRenamed in internal/filter/filter.go; PruneOptions -> PruneOptionsRenamed in internal/repository/prune.go
+
+$ pymtheg link check
+5 code links: 2 ok, 1 changed, 0 moved, 2 missing, 0 unverifiable
+OK           0f4bb376 plan:R-INDEX -> go method (*Repository).LoadIndex internal/repository/repository.go
+CHANGED      61426789 plan:R-PACK -> go method (*packerManager).SaveBlob internal/repository/packer_manager.go
+  Symbol (*packerManager).SaveBlob changed (body) since it was linked.
+  now: (*packerManager).SaveBlob at internal/repository/packer_manager.go:116
+OK           acac3383 plan:R-FORGET -> go function runForget cmd/restic/cmd_forget.go
+MISSING      5f62c0a4 plan:R-FILTER -> go function splitPath internal/filter/filter.go
+  Symbol splitPath (function) was not found in internal/filter/filter.go. Suggestions are listed; relink explicitly if one is right.
+  suggestion: function splitPathRenamed at internal/filter/filter.go:61 symbol:a30254b4199c63171e7edc668cfc3572c793ae02f20b4e6d0ae1f6ded65e79a4 (same kind and identical body in the linked file (renamed?))
+  suggestion: function splitPath at cmd/restic/cmd_dump.go:75 symbol:561d833e8c6f4c76edfe4aac1abaa40746e3910f020142e530e0666a89a6abff (a different symbol with the same name already existed here when the link was made)
+MISSING      bea9c2fe plan:R-PRUNEOPT -> go struct PruneOptions internal/repository/prune.go
+  Symbol PruneOptions (struct) was not found in internal/repository/prune.go. Suggestions are listed; relink explicitly if one is right.
+  suggestion: struct PruneOptionsRenamed at internal/repository/prune.go:23 symbol:68061830bd8eb247e682a225ef8bb3820d928097c867737e238d8a33181f67ad (same kind and identical body in the linked file (renamed?))
+  suggestion: struct PruneOptions at cmd/restic/cmd_prune.go:54 symbol:87cad2a925429387c7eddbbc3d0dbeaf13168fe492d397ed8898973a10db1eee (a different symbol with the same name already existed here when the link was made)
+Check failed: 3 links need attention.
+[exit 1]
+
+$ pymtheg link refresh 5f62c0a4-a3b5-4540-9e9f-e0bb5149861a
+Link 5f62c0a4-a3b5-4540-9e9f-e0bb5149861a is missing; only ok, changed or moved links can be refreshed. Symbol splitPath (function) was not found in internal/filter/filter.go. Suggestions are listed; relink explicitly if one is right.
+[exit 1]
+
+$ pymtheg link history
+5 recorded code-link changes:
+  #4 2026-11-15T17:53:19.650Z karllivesey: added 0f4bb376 plan:R-INDEX -> (*Repository).LoadIndex internal/repository/repository.go
+  #5 2026-11-15T17:53:21.387Z karllivesey: added 61426789 plan:R-PACK -> (*packerManager).SaveBlob internal/repository/packer_manager.go
+  #6 2026-11-15T17:53:22.991Z karllivesey: added acac3383 plan:R-FORGET -> runForget cmd/restic/cmd_forget.go
+  #9 2026-11-15T17:54:15.760Z karllivesey: added 5f62c0a4 plan:R-FILTER -> splitPath internal/filter/filter.go
+  #10 2026-11-15T17:54:18.630Z karllivesey: added bea9c2fe plan:R-PRUNEOPT -> PruneOptions internal/repository/prune.go
+[exit 0]
+

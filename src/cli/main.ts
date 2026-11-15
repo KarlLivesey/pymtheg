@@ -75,6 +75,10 @@ try {
     process.exitCode = await (
       await import("./graph.js")
     ).graphCommand(args.slice(1), cancel.signal);
+  } else if (args[0] === "link") {
+    process.exitCode = await (
+      await import("./link.js")
+    ).linkCommand(args.slice(1), cancel.signal);
   } else if (args[0] === "observe") {
     process.exitCode = await (
       await import("../implementation/cli.js")

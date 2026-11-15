@@ -1,0 +1,7 @@
+Explicit cold index
+1. Where is ParseID declared?
+2. Who calls ParseID?
+3. What does ParseID call?
+4. Are there possible callers of SaverUnpacked.SaveUnpacked?
+5. What could a ParseID change affect within two call levels?
+Five questions and three source checks passed

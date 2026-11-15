@@ -35,7 +35,7 @@ import {
  * facts; resolve maps those facts to symbol IDs. See docs/changes/W2-D.md.
  */
 // Bump the leading number whenever extraction or resolution semantics change.
-const MODULE_VERSION = `16+typescript-${ts.version}`;
+const MODULE_VERSION = `17+typescript-${ts.version}`;
 
 /** Observation counters for tests (programs built, files extracted). Not a correctness input. */
 export const statistics = {
@@ -525,9 +525,9 @@ const module: LanguageModule = {
     const files = context.files.filter(readable);
     // Unchanged snapshot: stored facts came from a complete analysis of these
     // exact sources and contexts by this module version, so they are reused
-    // without building a program. The core always hands back a file that
-    // failed before as changed (its stored result replaced); if every changed
-    // file is such a failed file with the same content as recorded in
+    // without building a program. The core retries a failed file whose content
+    // marker is absent; if every changed file is such a failed file with the
+    // same content as recorded in
     // `failedFiles`, nothing else can differ: only it is parsed again, for
     // its diagnostics.
     const changed = new Set(context.changedFiles);
@@ -559,7 +559,10 @@ const module: LanguageModule = {
           ...kept.map((file) => ({ path: file.path, result: file.result })),
           ...again.map(([file, failure]) => ({
             path: file.path,
-            result: invalidResult(failure!, recorded),
+            result: {
+              ...invalidResult(failure!, recorded),
+              failureKind: "content" as const,
+            },
           })),
         ];
       }
@@ -849,6 +852,29 @@ const module: LanguageModule = {
         if (data?.analyzer === MODULE_VERSION)
           item.result = { ...item.result, data: { ...data, failedFiles } };
       }
+    // Only failures reproduced from this file alone may outlive a project
+    // analysis. Config/ownership failures, compiler/checker limits, internal
+    // exceptions and diagnostics added by a Program remain retryable. Compare
+    // the whole diagnostic set: a local syntax error must not hide another,
+    // context-dependent failure. Tied configs may order diagnostics differently.
+    const diagnosticSet = (diagnostics: readonly Diagnostic[]) =>
+      JSON.stringify(diagnostics.map((item) => JSON.stringify(item)).sort());
+    const byPath = new Map(files.map((file) => [file.path, file]));
+    for (const item of results) {
+      if (
+        item.result.status !== "failed" ||
+        item.result.failureKind === "transient"
+      )
+        continue;
+      const file = byPath.get(item.path)!;
+      const local = syntaxFailure(file.path, file.text);
+      if (
+        local &&
+        diagnosticSet(local.diagnostics) ===
+          diagnosticSet(item.result.diagnostics)
+      )
+        item.result = { ...item.result, failureKind: "content" };
+    }
     return results;
   },
   resolve({ symbols, links }) {

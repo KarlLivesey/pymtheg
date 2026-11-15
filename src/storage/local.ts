@@ -72,6 +72,11 @@ function validateDatabaseFiles(file: string): void {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     }
 }
+/** Bounded wait for another connection's lock (SQLite busy timeout), applied to
+ * every project database unless a caller sets its own. Concurrent CLI, MCP and
+ * Studio writers wait for each other; a lock held longer is reported as
+ * "database is locked", never waited on forever. */
+export const writerWaitMs = 30_000;
 /** Explicit paths support temporary immutable snapshots and the graph's existing
  * public constructor. Production project callers obtain paths via storagePath. */
 export function openDatabase(
@@ -80,7 +85,7 @@ export function openDatabase(
 ): DatabaseSync {
   if (file !== ":memory:" && !file.startsWith("file:"))
     validateDatabaseFiles(file);
-  return new DatabaseSync(file, options ?? {});
+  return new DatabaseSync(file, { timeout: writerWaitMs, ...options });
 }
 export function storageDirectory(
   root: string,

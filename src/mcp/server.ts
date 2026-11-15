@@ -1,3 +1,4 @@
+import { registerGraphTools } from "./graph.js";
 import {
   describeOperationContract,
   rewriteOperationContract,
@@ -163,6 +164,7 @@ export function createAgentServer(workspace: AgentWorkspace) {
   };
   registerArchitectureTools(server, workspace, output);
   registerImplementationTools(server, workspace, output);
+  registerGraphTools(server, workspace);
   server.registerResource(
     "language-syntax",
     "pymtheg://language/syntax",
@@ -304,18 +306,41 @@ export function createAgentServer(workspace: AgentWorkspace) {
     "try_inputs",
     {
       description:
-        "Evaluate one deterministic input example from a checked structured flow. Preserves arbitrary precision values and refuses to guess nondeterministic outcomes. Not a universal proof.",
+        "Evaluate one deterministic input example. Supply file (and optional buffers) to check and try in one call, or runId to use a retained checked structured flow. Preserves arbitrary precision values and refuses to guess nondeterministic outcomes. Not a universal proof.",
       annotations,
       inputSchema: z
         .object({
-          runId: z.string(),
+          runId: z.string().min(1).optional(),
+          file: path.optional(),
+          buffers,
           entry: z.string(),
           inputs: z.record(z.string(), z.unknown()),
         })
-        .strict(),
+        .strict()
+        .refine(
+          (a) => !!a.runId !== !!a.file && (!a.buffers || !!a.file),
+          "Supply either runId or file; buffers require file",
+        ),
     },
     async (a, ctx) => {
-      const run = await workspace.get(a.runId, ctx.mcpReq.signal);
+      const run = a.runId
+        ? await workspace.get(a.runId, ctx.mcpReq.signal)
+        : await workspace.run(
+            { file: a.file!, buffers: a.buffers ?? {} },
+            ctx.mcpReq.signal,
+            progress(ctx),
+          );
+      // Replayed contract violations are report findings, not ill-typed IR.
+      // Preserve run-ID replay; only the new file form needs a type-check gate.
+      if (
+        !a.runId &&
+        (!run.ir || run.ir.diagnostics.some((d) => d.severity === "error"))
+      )
+        return output({
+          runId: run.id,
+          result: { completion: "incomplete", reason: "design-errors" },
+          next: "Read findings with read_run, fix the design, then try again.",
+        });
       if (!run.ir)
         throw Error("Check the source again to retain its typed model");
       const trial = await tryFlowInWorker(
@@ -328,6 +353,7 @@ export function createAgentServer(workspace: AgentWorkspace) {
         ctx.mcpReq.signal,
       );
       return output({
+        runId: run.id,
         result: {
           ...trial,
           ...(trial.violation

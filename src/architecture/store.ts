@@ -235,6 +235,10 @@ export class ArchitectureStore {
             );
           }
         initializeRecordedHistory(db);
+        // R1-D: additive shared table for planning-record → code-symbol links.
+        db.exec(
+          "CREATE TABLE IF NOT EXISTS code_links (id TEXT PRIMARY KEY,key TEXT NOT NULL,body TEXT NOT NULL,removed INTEGER NOT NULL DEFAULT 0);",
+        );
         db.exec("PRAGMA user_version=7; COMMIT");
       } catch (error) {
         db.exec("ROLLBACK");
@@ -968,6 +972,79 @@ export class ArchitectureStore {
   }
   exportRecordedHistory() {
     return exportRecordedHistory(this.db);
+  }
+  /** Stored code links (R1-D). Older or read-only stores without the table have none. */
+  codeLinkRows(): {
+    id: string;
+    key: string;
+    body: string;
+    removed: boolean;
+  }[] {
+    if (
+      !this.db
+        .prepare("SELECT name FROM sqlite_master WHERE name='code_links'")
+        .get()
+    )
+      return [];
+    return this.db
+      .prepare("SELECT id,key,body,removed FROM code_links ORDER BY rowid")
+      .all()
+      .map((row) => ({
+        id: String(row.id),
+        key: String(row.key),
+        body: String(row.body),
+        removed: Number(row.removed) === 1,
+      }));
+  }
+  /** Adds, updates (value) or removes (null) the active code link under `key`, with a
+   * recorded change in the same transaction. Re-adding a removed key gets a new
+   * UUID with a `previous` reference (recorded-history rule). `onlyIfAbsent`
+   * returns the existing active link instead of updating it. */
+  writeCodeLink(
+    key: string,
+    value: Record<string, unknown> | null,
+    onlyIfAbsent = false,
+  ): { id: string; changed: boolean } {
+    if (this.readOnly)
+      throw new ArchitectureConflict("This architecture is open read-only.");
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const active = this.db
+        .prepare("SELECT id,body FROM code_links WHERE key=? AND removed=0")
+        .get(key);
+      if (value === null && !active) throw Error("No active code link " + key);
+      if (
+        active &&
+        (onlyIfAbsent || (value && JSON.stringify(value) === active.body))
+      ) {
+        this.db.exec("COMMIT");
+        return { id: String(active.id), changed: false };
+      }
+      this.recorded!.record("code-link", key, value, this.activeRevisionId());
+      let id: string;
+      if (value === null) {
+        id = String(active!.id);
+        this.db.prepare("UPDATE code_links SET removed=1 WHERE id=?").run(id);
+      } else {
+        id = String(
+          this.db
+            .prepare(
+              "SELECT id FROM shared_record_ids WHERE kind='code-link' AND key=?",
+            )
+            .get(key)!.id,
+        );
+        this.db
+          .prepare(
+            "INSERT INTO code_links(id,key,body) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET body=excluded.body,removed=0",
+          )
+          .run(id, key, JSON.stringify(value));
+      }
+      this.db.exec("COMMIT");
+      return { id, changed: true };
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
   }
   exportHistory() {
     const snapshots = this.db
