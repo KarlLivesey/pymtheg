@@ -51,19 +51,25 @@ changing that copy is not.
 ## 2. Plugin statement
 
 This part is not an extra term and not a relaxation of the licence. It states
-how the Licensor reads and applies the licence to plugins.
+the Licensor's position and how the Licensor applies the licence to plugins.
 
 Plugins are welcome. A plugin is any software written to extend or change what
 Pymtheg does, whether through its plugin interface (for example a language
 emitter loaded with `--plugin`; see [docs/output-plugins.md](docs/output-plugins.md))
-or any other way. The Licensor treats a plugin as an Extension in the same way
-as a change to Pymtheg's own code: a file that alters the original
-functionality of the Licensed Software at runtime is a Modification under
-Section 1.10(iii), and a plugin that copies any part of Pymtheg, including the
-examples in `examples/plugins/`, is one under Section 1.10(ii).
+or any other way.
 
-So anyone who Deploys a plugin, which means any use other than for Research or
-Personal Use, including use only inside their own business or organisation,
-must make its Source Code available under the licence as Section 6 requires,
-so that it can be integrated into Pymtheg's core. Writing a feature as a plugin
-rather than as a change to Pymtheg's code does not avoid this.
+- A plugin that copies or is derived from any part of Pymtheg, including the
+  example plugins in `examples/plugins/`, is covered by the licence: a file
+  that contains any part of Pymtheg is a Modification (Section 1.10(ii)), and a
+  Derivative Work is an Extension (Sections 1.3 and 1.5).
+- For a plugin written independently, without Pymtheg's code, the Licensor
+  treats it as covered in the same way as a change to Pymtheg's own code (as a
+  file that alters Pymtheg's functionality at runtime, Section 1.10(iii)). The
+  licence text does not settle this case for every such plugin.
+
+The Licensor expects anyone who Deploys a plugin, meaning any use other than
+for Research or Personal Use and including use only inside their own business
+or organisation, to make its Source Code available under the licence as
+Section 6 describes, so that it can be integrated into Pymtheg's core. The
+Licensor does not accept writing a feature as a plugin, rather than as a change
+to Pymtheg's code, as a way round publishing it.

@@ -234,7 +234,9 @@ Copyright (C) 2026 Karl Livesey. Pymtheg is licensed under the Reciprocal Public
 License 1.5 ([LICENSE](LICENSE)) with an additional permission and a plugin
 statement ([LICENSE-EXCEPTIONS.md](LICENSE-EXCEPTIONS.md)); contributions are
 accepted under the same terms ([CONTRIBUTING.md](CONTRIBUTING.md)).
-In plain terms: if you change Pymtheg or write a plugin for it and use it beyond
-personal use or research, even only inside your own organisation, you must
-publish the source under the same licence. What you make with Pymtheg, such as
-reports, graphs, links, generated code and your own designs, is yours.
+In plain terms: if you change Pymtheg and use it beyond personal use or
+research, even only inside your own organisation, you must publish the source
+under the same licence; the same applies to plugins built from Pymtheg's code,
+and the owner expects all other plugins, in-house ones included, to be
+published too. What you make with Pymtheg, such as reports, graphs, links,
+generated code and your own designs, is yours.
