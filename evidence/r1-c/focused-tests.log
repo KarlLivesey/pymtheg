@@ -1,0 +1,15 @@
+✔ MCP-only design loop: ordinary source edits, diagnostic/hint, check, try without runId, verify and simulate (5410.552454ms)
+✔ every documented MCP call executes as written, including explicit legacy refusals (6725.270676ms)
+✔ graph lifecycle uses controlled readiness: busy rejection, cancellation, retention and close join (409.676489ms)
+✔ stdio mixed init-free graph: every action, certainty classes, failures, paging and auto-sync (9353.88656ms)
+✔ MCP graph jobs are nonblocking, cancellable, bounded, session-owned and confined (3166.682633ms)
+✔ graph MCP confines uninitialized subdirectories rather than indexing their parent (544.385096ms)
+✔ oversized names are explicitly clipped, exact details page, and wire responses stay bounded (2636.115394ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 16036.41197

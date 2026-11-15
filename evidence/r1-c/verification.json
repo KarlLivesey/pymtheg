@@ -1,0 +1,29 @@
+{
+  "node": "v24.21.0",
+  "sourceHashesMatch": true,
+  "maximumGraphResponseBytes": 37288,
+  "documentedToolNames": [
+    "check_design",
+    "code_graph",
+    "compare_implementation",
+    "design_interface",
+    "design_recipe",
+    "emit_implementation_check",
+    "emit_scaffold",
+    "explore_behaviour",
+    "graph_result",
+    "link_implementation",
+    "observe_implementation",
+    "project_info",
+    "read_architecture",
+    "read_implementation",
+    "read_run",
+    "read_scaffold",
+    "read_source",
+    "try_inputs",
+    "unlink_implementation"
+  ],
+  "corpusCommit": "c734245fd3ae9bcac8ab3aaafb4482d4b5d0ae92",
+  "sourceChecks": 3,
+  "corpusCopyCleaned": true
+}
