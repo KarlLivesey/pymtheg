@@ -1,0 +1,43 @@
+== npm test (under evidence/r1-a/no-java.sh)
+no-java: java resolves to $PYM_SCRATCH/r1a-shim/java; PYM_TLC_JAR=unset
+> pymtheg@1.0.0 test
+> npm run build:core && node --test --test-concurrency=4 test/*.test.mjs
+> pymtheg@1.0.0 build:core
+ℹ tests 2566
+ℹ suites 0
+ℹ pass 2566
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+no-java: shim log ($PYM_SCRATCH/r1a-java-calls.log) has 0 line(s)
+== npm backend (under evidence/r1-a/no-java.sh)
+no-java: java resolves to $PYM_SCRATCH/r1a-shim/java; PYM_TLC_JAR=unset
+> pymtheg@1.0.0 test:backend
+> npm run build && node --test --test-concurrency=1 test/*.integration.mjs
+> pymtheg@1.0.0 build
+✓ built in 5.09s
+﹣ rust: real rich contracts compile with recursive records, outcomes and arbitrary precision integers (99.100622ms) # crate num-bigint is not in the offline cargo registry index; no conformance claim
+ℹ tests 97
+ℹ suites 0
+ℹ pass 96
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+no-java: shim log ($PYM_SCRATCH/r1a-java-calls.log) has 0 line(s)
+== npm build (under evidence/r1-a/no-java.sh)
+no-java: java resolves to $PYM_SCRATCH/r1a-shim/java; PYM_TLC_JAR=unset
+> pymtheg@1.0.0 build
+✓ built in 4.55s
+no-java: shim log ($PYM_SCRATCH/r1a-java-calls.log) has 0 line(s)
+== npm format (under evidence/r1-a/no-java.sh)
+no-java: java resolves to $PYM_SCRATCH/r1a-shim/java; PYM_TLC_JAR=unset
+> pymtheg@1.0.0 format:check
+> prettier --check "src/**/*.ts" "test/*.mjs" "web/src/**/*.{ts,tsx,css}" package.json tsconfig.json docs/report.schema.json
+All matched files use Prettier code style!
+no-java: shim log ($PYM_SCRATCH/r1a-java-calls.log) has 0 line(s)
+== npm pack --dry-run
+npm notice package size: 2.0 MB
+npm notice unpacked size: 8.6 MB
+npm notice total files: 843

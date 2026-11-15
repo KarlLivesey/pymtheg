@@ -1,0 +1,1348 @@
+{
+ "files": [
+  {
+   "file": "examples/mvp/algorithm.pym",
+   "check": 0,
+   "entries": [
+    {
+     "entry": "nestedScan",
+     "verify": {
+      "exit": 2,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     },
+     "simulate": {
+      "exit": 2,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "file": "examples/mvp/checkout-double-charge.pym",
+   "check": 0,
+   "entries": [
+    {
+     "entry": "Checkout",
+     "verify": {
+      "exit": 1,
+      "outcomes": {
+       "no_counterexample/complete": 3,
+       "counterexample/complete": 1
+      },
+      "codes": [
+       "B010"
+      ]
+     },
+     "simulate": {
+      "exit": 1,
+      "outcomes": {
+       "no_counterexample/complete": 3,
+       "counterexample/complete": 1
+      },
+      "codes": [
+       "B010"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "file": "examples/mvp/checkout-fixed.pym",
+   "check": 0,
+   "entries": [
+    {
+     "entry": "Checkout",
+     "verify": {
+      "exit": 0,
+      "outcomes": {
+       "no_counterexample/complete": 4
+      },
+      "codes": []
+     },
+     "simulate": {
+      "exit": 0,
+      "outcomes": {
+       "no_counterexample/complete": 4
+      },
+      "codes": []
+     }
+    }
+   ]
+  },
+  {
+   "file": "examples/mvp/checkout-late.pym",
+   "check": 0,
+   "entries": [
+    {
+     "entry": "Reconciliation",
+     "verify": {
+      "exit": 0,
+      "outcomes": {
+       "no_counterexample/complete": 2
+      },
+      "codes": []
+     },
+     "simulate": {
+      "exit": 0,
+      "outcomes": {
+       "no_counterexample/complete": 2
+      },
+      "codes": []
+     }
+    }
+   ]
+  },
+  {
+   "file": "examples/mvp/checkout-missing-refund.pym",
+   "check": 0,
+   "entries": [
+    {
+     "entry": "Checkout",
+     "verify": {
+      "exit": 1,
+      "outcomes": {
+       "counterexample/complete": 1,
+       "no_counterexample/complete": 3
+      },
+      "codes": [
+       "B010"
+      ]
+     },
+     "simulate": {
+      "exit": 1,
+      "outcomes": {
+       "counterexample/complete": 1,
+       "no_counterexample/complete": 3
+      },
+      "codes": [
+       "B010"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "file": "examples/mvp/checkout-stock-leak.pym",
+   "check": 0,
+   "entries": [
+    {
+     "entry": "Checkout",
+     "verify": {
+      "exit": 1,
+      "outcomes": {
+       "no_counterexample/complete": 3,
+       "counterexample/complete": 1
+      },
+      "codes": [
+       "B010"
+      ]
+     },
+     "simulate": {
+      "exit": 1,
+      "outcomes": {
+       "no_counterexample/complete": 3,
+       "counterexample/complete": 1
+      },
+      "codes": [
+       "B010"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "file": "examples/mvp/checkout.pym",
+   "check": 1,
+   "entries": [
+    {
+     "entry": "quote",
+     "verify": {
+      "exit": 1,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     },
+     "simulate": {
+      "exit": 1,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     }
+    },
+    {
+     "entry": "payment",
+     "verify": {
+      "exit": 1,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     },
+     "simulate": {
+      "exit": 1,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "file": "examples/mvp/files-buggy.pym",
+   "check": 1,
+   "entries": [
+    {
+     "entry": "process",
+     "verify": {
+      "exit": 1,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     },
+     "simulate": {
+      "exit": 1,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "file": "examples/mvp/files-fixed.pym",
+   "check": 0,
+   "entries": [
+    {
+     "entry": "process",
+     "verify": {
+      "exit": 2,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     },
+     "simulate": {
+      "exit": 2,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "file": "examples/mvp/flow-assertion.pym",
+   "check": 2,
+   "entries": [
+    {
+     "entry": "decision",
+     "verify": {
+      "exit": 1,
+      "outcomes": {
+       "counterexample/complete": 1,
+       "no_counterexample/complete": 1
+      },
+      "codes": [
+       "B010"
+      ]
+     },
+     "simulate": {
+      "exit": 1,
+      "outcomes": {
+       "counterexample/complete": 1,
+       "no_counterexample/complete": 1
+      },
+      "codes": [
+       "B010"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "file": "examples/mvp/library.pym",
+   "check": 0,
+   "entries": [
+    {
+     "entry": "lend",
+     "verify": {
+      "exit": 2,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     },
+     "simulate": {
+      "exit": 2,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "file": "examples/mvp/task-buggy.pym",
+   "check": 0,
+   "entries": [
+    {
+     "entry": "TaskRunner",
+     "verify": {
+      "exit": 1,
+      "outcomes": {
+       "counterexample/complete": 1,
+       "no_counterexample/complete": 1
+      },
+      "codes": [
+       "B010"
+      ]
+     },
+     "simulate": {
+      "exit": 1,
+      "outcomes": {
+       "counterexample/complete": 1,
+       "no_counterexample/complete": 1
+      },
+      "codes": [
+       "B010"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "file": "examples/mvp/task-fixed.pym",
+   "check": 0,
+   "entries": [
+    {
+     "entry": "TaskRunner",
+     "verify": {
+      "exit": 0,
+      "outcomes": {
+       "no_counterexample/complete": 2
+      },
+      "codes": []
+     },
+     "simulate": {
+      "exit": 0,
+      "outcomes": {
+       "no_counterexample/complete": 2
+      },
+      "codes": []
+     }
+    }
+   ]
+  },
+  {
+   "file": "examples/mvp/task-local.pym",
+   "check": 1,
+   "entries": [
+    {
+     "entry": "blindRetry",
+     "verify": {
+      "exit": 1,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     },
+     "simulate": {
+      "exit": 1,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     }
+    },
+    {
+     "entry": "reconcileFirst",
+     "verify": {
+      "exit": 1,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     },
+     "simulate": {
+      "exit": 1,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "file": "examples/mvp/task-protocol.pym",
+   "check": 0,
+   "entries": [
+    {
+     "entry": "Queue",
+     "verify": {
+      "exit": 1,
+      "outcomes": {
+       "counterexample/complete": 1,
+       "no_counterexample/complete": 1
+      },
+      "codes": [
+       "B010"
+      ]
+     },
+     "simulate": {
+      "exit": 1,
+      "outcomes": {
+       "counterexample/complete": 1,
+       "no_counterexample/complete": 1
+      },
+      "codes": [
+       "B010"
+      ]
+     }
+    },
+    {
+     "entry": "retryJob",
+     "verify": {
+      "exit": 1,
+      "outcomes": {
+       "counterexample/complete": 1,
+       "no_counterexample/complete": 1
+      },
+      "codes": [
+       "B010"
+      ]
+     },
+     "simulate": {
+      "exit": 0,
+      "outcomes": {
+       "no_counterexample/complete": 2
+      },
+      "codes": []
+     }
+    },
+    {
+     "entry": "cautiousJob",
+     "verify": {
+      "exit": 0,
+      "outcomes": {
+       "no_counterexample/complete": 2
+      },
+      "codes": []
+     },
+     "simulate": {
+      "exit": 0,
+      "outcomes": {
+       "no_counterexample/complete": 2
+      },
+      "codes": []
+     }
+    }
+   ]
+  },
+  {
+   "file": "examples/self/architecture-storage.pym",
+   "check": 1,
+   "entries": [
+    {
+     "entry": "copyWholeRevision",
+     "verify": {
+      "exit": 1,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     },
+     "simulate": {
+      "exit": 1,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     }
+    },
+    {
+     "entry": "reuseUnchangedContent",
+     "verify": {
+      "exit": 1,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     },
+     "simulate": {
+      "exit": 1,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "file": "examples/self/authoring.pym",
+   "check": 0,
+   "entries": [
+    {
+     "entry": "repeatedShapes",
+     "verify": {
+      "exit": 2,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     },
+     "simulate": {
+      "exit": 2,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     }
+    },
+    {
+     "entry": "sharedShapes",
+     "verify": {
+      "exit": 2,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     },
+     "simulate": {
+      "exit": 2,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     }
+    },
+    {
+     "entry": "metadataChunk",
+     "verify": {
+      "exit": 2,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     },
+     "simulate": {
+      "exit": 2,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     }
+    },
+    {
+     "entry": "AuthoringSession",
+     "verify": {
+      "exit": 0,
+      "outcomes": {
+       "no_counterexample/complete": 2
+      },
+      "codes": []
+     },
+     "simulate": {
+      "exit": 0,
+      "outcomes": {
+       "no_counterexample/complete": 2
+      },
+      "codes": []
+     }
+    }
+   ]
+  },
+  {
+   "file": "examples/self/contract-authoring.pym",
+   "check": 0,
+   "entries": [
+    {
+     "entry": "PrematureRulePublication",
+     "verify": {
+      "exit": 1,
+      "outcomes": {
+       "counterexample/complete": 1,
+       "no_counterexample/complete": 1
+      },
+      "codes": [
+       "B010"
+      ]
+     },
+     "simulate": {
+      "exit": 1,
+      "outcomes": {
+       "counterexample/complete": 1,
+       "no_counterexample/complete": 1
+      },
+      "codes": [
+       "B010"
+      ]
+     }
+    },
+    {
+     "entry": "CheckedRulePublication",
+     "verify": {
+      "exit": 0,
+      "outcomes": {
+       "no_counterexample/complete": 2
+      },
+      "codes": []
+     },
+     "simulate": {
+      "exit": 0,
+      "outcomes": {
+       "no_counterexample/complete": 2
+      },
+      "codes": []
+     }
+    }
+   ]
+  },
+  {
+   "file": "examples/self/discovery.pym",
+   "check": 0,
+   "entries": [
+    {
+     "entry": "includeGeneratedTree",
+     "verify": {
+      "exit": 2,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     },
+     "simulate": {
+      "exit": 2,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     }
+    },
+    {
+     "entry": "selectSourceTree",
+     "verify": {
+      "exit": 0,
+      "outcomes": {
+       "no_counterexample/complete": 2
+      },
+      "codes": []
+     },
+     "simulate": {
+      "exit": 0,
+      "outcomes": {
+       "no_counterexample/complete": 2
+      },
+      "codes": []
+     }
+    }
+   ]
+  },
+  {
+   "file": "examples/self/initialization.pym",
+   "check": 0,
+   "entries": [
+    {
+     "entry": "AtomicInitialization",
+     "verify": {
+      "exit": 0,
+      "outcomes": {
+       "no_counterexample/complete": 2
+      },
+      "codes": []
+     },
+     "simulate": {
+      "exit": 0,
+      "outcomes": {
+       "no_counterexample/complete": 2
+      },
+      "codes": []
+     }
+    },
+    {
+     "entry": "OverwritingInitialization",
+     "verify": {
+      "exit": 1,
+      "outcomes": {
+       "counterexample/complete": 1,
+       "no_counterexample/complete": 1
+      },
+      "codes": [
+       "B010"
+      ]
+     },
+     "simulate": {
+      "exit": 1,
+      "outcomes": {
+       "counterexample/complete": 1,
+       "no_counterexample/complete": 1
+      },
+      "codes": [
+       "B010"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "file": "examples/self/output.pym",
+   "check": 0,
+   "entries": [
+    {
+     "entry": "output",
+     "verify": {
+      "exit": 2,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     },
+     "simulate": {
+      "exit": 2,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "file": "examples/self/pipeline.pym",
+   "check": 0,
+   "entries": [
+    {
+     "entry": "repeatedLoading",
+     "verify": {
+      "exit": 2,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     },
+     "simulate": {
+      "exit": 2,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     }
+    },
+    {
+     "entry": "sharedSnapshot",
+     "verify": {
+      "exit": 2,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     },
+     "simulate": {
+      "exit": 2,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     }
+    },
+    {
+     "entry": "ownSession",
+     "verify": {
+      "exit": 0,
+      "outcomes": {
+       "no_counterexample/complete": 2
+      },
+      "codes": []
+     },
+     "simulate": {
+      "exit": 0,
+      "outcomes": {
+       "no_counterexample/complete": 2
+      },
+      "codes": []
+     }
+    }
+   ]
+  },
+  {
+   "file": "examples/self/publication.pym",
+   "check": 0,
+   "entries": [
+    {
+     "entry": "Publication",
+     "verify": {
+      "exit": 0,
+      "outcomes": {
+       "no_counterexample/complete": 2
+      },
+      "codes": []
+     },
+     "simulate": {
+      "exit": 0,
+      "outcomes": {
+       "no_counterexample/complete": 2
+      },
+      "codes": []
+     }
+    }
+   ]
+  },
+  {
+   "file": "examples/self/source-reviews.pym",
+   "check": 0,
+   "entries": [
+    {
+     "entry": "IndependentSourceReviews",
+     "verify": {
+      "exit": 0,
+      "outcomes": {
+       "no_counterexample/complete": 3
+      },
+      "codes": []
+     },
+     "simulate": {
+      "exit": 0,
+      "outcomes": {
+       "no_counterexample/complete": 3
+      },
+      "codes": []
+     }
+    },
+    {
+     "entry": "SharedSourceReviewBug",
+     "verify": {
+      "exit": 1,
+      "outcomes": {
+       "counterexample/complete": 1,
+       "no_counterexample/complete": 1
+      },
+      "codes": [
+       "B010"
+      ]
+     },
+     "simulate": {
+      "exit": 1,
+      "outcomes": {
+       "counterexample/complete": 1,
+       "no_counterexample/complete": 1
+      },
+      "codes": [
+       "B010"
+      ]
+     }
+    },
+    {
+     "entry": "OverwrittenSourceBytesBug",
+     "verify": {
+      "exit": 1,
+      "outcomes": {
+       "counterexample/complete": 1,
+       "no_counterexample/complete": 1
+      },
+      "codes": [
+       "B010"
+      ]
+     },
+     "simulate": {
+      "exit": 1,
+      "outcomes": {
+       "counterexample/complete": 1,
+       "no_counterexample/complete": 1
+      },
+      "codes": [
+       "B010"
+      ]
+     }
+    },
+    {
+     "entry": "RevalidatedSourceSelection",
+     "verify": {
+      "exit": 0,
+      "outcomes": {
+       "no_counterexample/complete": 2
+      },
+      "codes": []
+     },
+     "simulate": {
+      "exit": 0,
+      "outcomes": {
+       "no_counterexample/complete": 2
+      },
+      "codes": []
+     }
+    },
+    {
+     "entry": "StaleSourceSelectionBug",
+     "verify": {
+      "exit": 1,
+      "outcomes": {
+       "counterexample/complete": 1,
+       "no_counterexample/complete": 1
+      },
+      "codes": [
+       "B010"
+      ]
+     },
+     "simulate": {
+      "exit": 1,
+      "outcomes": {
+       "counterexample/complete": 1,
+       "no_counterexample/complete": 1
+      },
+      "codes": [
+       "B010"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "file": "examples/self/studio.pym",
+   "check": 0,
+   "entries": [
+    {
+     "entry": "checkBuffer",
+     "verify": {
+      "exit": 0,
+      "outcomes": {
+       "no_counterexample/complete": 2
+      },
+      "codes": []
+     },
+     "simulate": {
+      "exit": 0,
+      "outcomes": {
+       "no_counterexample/complete": 2
+      },
+      "codes": []
+     }
+    },
+    {
+     "entry": "SnapshotGate",
+     "verify": {
+      "exit": 0,
+      "outcomes": {
+       "no_counterexample/complete": 2
+      },
+      "codes": []
+     },
+     "simulate": {
+      "exit": 0,
+      "outcomes": {
+       "no_counterexample/complete": 2
+      },
+      "codes": []
+     }
+    }
+   ]
+  },
+  {
+   "file": "examples/self/type-discovery.pym",
+   "check": 0,
+   "entries": [
+    {
+     "entry": "PrematureLimitStop",
+     "verify": {
+      "exit": 1,
+      "outcomes": {
+       "counterexample/complete": 1,
+       "no_counterexample/complete": 1
+      },
+      "codes": [
+       "B010"
+      ]
+     },
+     "simulate": {
+      "exit": 1,
+      "outcomes": {
+       "counterexample/complete": 1,
+       "no_counterexample/complete": 1
+      },
+      "codes": [
+       "B010"
+      ]
+     }
+    },
+    {
+     "entry": "InspectBeyondLimit",
+     "verify": {
+      "exit": 0,
+      "outcomes": {
+       "no_counterexample/complete": 2
+      },
+      "codes": []
+     },
+     "simulate": {
+      "exit": 0,
+      "outcomes": {
+       "no_counterexample/complete": 2
+      },
+      "codes": []
+     }
+    }
+   ]
+  },
+  {
+   "file": "examples/workbench/billing.pym",
+   "check": 2,
+   "entries": [
+    {
+     "entry": "pay",
+     "verify": {
+      "exit": 2,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     },
+     "simulate": {
+      "exit": 2,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "file": "examples/workbench/catalogue.pym",
+   "check": 0,
+   "entries": []
+  },
+  {
+   "file": "examples/workbench/domain.pym",
+   "check": 0,
+   "entries": []
+  },
+  {
+   "file": "examples/workbench/fulfilment.pym",
+   "check": 0,
+   "entries": [
+    {
+     "entry": "prepare",
+     "verify": {
+      "exit": 0,
+      "outcomes": {
+       "no_counterexample/complete": 2
+      },
+      "codes": []
+     },
+     "simulate": {
+      "exit": 0,
+      "outcomes": {
+       "no_counterexample/complete": 2
+      },
+      "codes": []
+     }
+    }
+   ]
+  },
+  {
+   "file": "examples/workbench/policy.pym",
+   "check": 0,
+   "entries": []
+  },
+  {
+   "file": "examples/workbench/quote.pym",
+   "check": 0,
+   "entries": [
+    {
+     "entry": "quote",
+     "verify": {
+      "exit": 2,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     },
+     "simulate": {
+      "exit": 2,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "file": "examples/workbench/system.pym",
+   "check": 2,
+   "entries": [
+    {
+     "entry": "pay",
+     "verify": {
+      "exit": 2,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     },
+     "simulate": {
+      "exit": 2,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     }
+    },
+    {
+     "entry": "prepare",
+     "verify": {
+      "exit": 2,
+      "outcomes": {
+       "no_counterexample/complete": 2
+      },
+      "codes": []
+     },
+     "simulate": {
+      "exit": 2,
+      "outcomes": {
+       "no_counterexample/complete": 2
+      },
+      "codes": []
+     }
+    },
+    {
+     "entry": "quote",
+     "verify": {
+      "exit": 2,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     },
+     "simulate": {
+      "exit": 2,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     }
+    },
+    {
+     "entry": "checkout",
+     "verify": {
+      "exit": 2,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     },
+     "simulate": {
+      "exit": 2,
+      "outcomes": {
+       "inconclusive/incomplete": 1
+      },
+      "codes": [
+       "B001"
+      ]
+     }
+    }
+   ]
+  }
+ ],
+ "totals": {
+  "verify:exit2": 16,
+  "simulate:exit2": 16,
+  "check:exit0": 26,
+  "verify:exit1": 20,
+  "simulate:exit1": 19,
+  "verify:exit0": 16,
+  "simulate:exit0": 17,
+  "check:exit1": 4,
+  "check:exit2": 3
+ },
+ "emit": {
+  "examples/mvp/task-buggy.pym#TaskRunner": {
+   "exit": 0,
+   "schema": "pymtheg.model/v1",
+   "events": 4,
+   "flowSourceStates": null
+  },
+  "examples/mvp/task-protocol.pym#retryJob": {
+   "exit": 0,
+   "schema": "pymtheg.model/v1",
+   "events": 38,
+   "flowSourceStates": 30
+  },
+  "removedQuintTarget": {
+   "exit": 3,
+   "stderr": "pymtheg: emit requires --target json --out PATH"
+  }
+ },
+ "doctor": {
+  "exit": 0,
+  "checks": [
+   {
+    "name": "Node",
+    "status": "ready",
+    "detail": "v24.21.0 (supported: 24 LTS)"
+   },
+   {
+    "name": "Verifier",
+    "status": "ready",
+    "detail": "Built-in breadth-first search gave the probe's known verdicts"
+   },
+   {
+    "name": "Simulator",
+    "status": "ready",
+    "detail": "Built-in seeded sampler found the probe's known counterexample"
+   },
+   {
+    "name": "Storage",
+    "status": "ready",
+    "detail": "Built-in node:sqlite available"
+   },
+   {
+    "name": "Go grammar",
+    "status": "ready",
+    "detail": "<tree>/grammars/go/tree-sitter-go.wasm"
+   },
+   {
+    "name": "Rust grammar",
+    "status": "ready",
+    "detail": "<tree>/node_modules/tree-sitter-rust/tree-sitter-rust.wasm"
+   },
+   {
+    "name": "Studio",
+    "status": "ready",
+    "detail": "Built GUI available"
+   }
+  ]
+ },
+ "studio": {
+  "httpStatus": 200,
+  "servesApp": true,
+  "exit": 0
+ },
+ "mcp": {
+  "tools": 17,
+  "toolNames": [
+   "check_design",
+   "compare_implementation",
+   "design_interface",
+   "design_recipe",
+   "emit_implementation_check",
+   "emit_scaffold",
+   "explore_behaviour",
+   "link_implementation",
+   "observe_implementation",
+   "project_info",
+   "read_architecture",
+   "read_implementation",
+   "read_run",
+   "read_scaffold",
+   "read_source",
+   "try_inputs",
+   "unlink_implementation"
+  ],
+  "projectInfoHasTools": false,
+  "verify": {
+   "isError": false,
+   "exitStatus": 1
+  },
+  "explainText": "Run the built-in seeded simulator or exhaustive verifier on a supported entry. Requires explicit finite scope where needed. Unknowns, budget limits and timeouts never count as a passed check."
+ }
+}

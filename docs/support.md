@@ -11,7 +11,7 @@ are never started by local checks.
 | Imports, duplicate/ambiguous names, cycles | implemented; cycles diagnosed unsupported | deterministic single parse/file | selected explicit machine only |
 | Pure typed rules/calls | implemented; rule recursion rejected | exact alpha copies, effects, explicit cost overhead | flow evaluation with pre/postconditions; machine expressions exclude calls |
 | Abstract op signatures/effects/cost/settles/stable | implemented | contracts are visible assumptions | finite contract results or linked explicit provider protocol |
-| Structured flow call/let/if/match/return/propagate/assert | implemented | types, effects, costs, ownership | finite source graph; CLI built-in search/sampler (TLC/Quint optional); replay |
+| Structured flow call/let/if/match/return/propagate/assert | implemented | types, effects, costs, ownership | finite source graph; built-in search/sampler; replay |
 | Cardinality and List iteration, bounded retry | implemented | work upper bounds; loop-local ownership | bounded loops/retry execute; initial attempt included |
 | Single-owner resources/take/read borrow | implemented | states, moves, local exits, explicit cancellation | creation, transfer, terminal exits, cancellation |
 | Fresh direct/Result resource return | implemented via creates result | per-outcome ownership through match | supported; owned collections/shared mutation unsupported |
@@ -19,15 +19,15 @@ are never started by local checks.
 | Scalar conjunctive entry constraints | implemented | integer interval/Bool witness or contradiction | machine initial state explicit |
 | Call preconditions | implemented | branch-sensitive scalar/affine facts; supported abstract returns carry assumptions to consumers; other calls retain obligations | evaluated in finite flow execution |
 | Concrete postconditions | parsed/typed | scalar/affine fragment; unsupported reasoning stays pending | evaluated on finite flow returns |
-| Explicit finite machine/event/invariant | implemented | type checks; initial domain preflight | CLI: built-in exhaustive search and seeded sampler; optional Quint simulation and direct TLC finite safety |
+| Explicit finite machine/event/invariant | implemented | type checks; initial domain preflight | built-in exhaustive search and seeded sampler (CLI, Studio, MCP) |
 | Machine recursion/parallel calls/records/strings | outside behavioural expression subset | local supported constructs remain usable | preflight rejects |
 | Near-duplicate rule suggestions | deferred | exact copies only | not applicable |
 | Latency/peak live memory | reserved metric names rejected | no additive-work pretence | unsupported |
 | SMT/proof, liveness/fairness, code extraction/conformance, LSP, caches | deferred | no claims | no claims |
-| Agent-facing MCP | implemented local stdio | same worker, root-confined reads, paged explanations/evidence | TLC (verify) and Quint (simulate), source-mapped trace steps |
+| Agent-facing MCP | implemented local stdio | same worker, root-confined reads, paged explanations/evidence | built-in search (verify) and sampler (simulate), source-mapped trace steps |
 | TypeScript / Rust / Go scaffolds | one normalized contract document from checked IR | fail-fast stubs by default; optional empty bodies; arbitrary precision, explicit dependencies/omissions | no runtime implementation or conformance claim |
 | Language emitter plugins | explicitly registered local module; versioned API | bounded process, validated output/identities; JavaScript example | trusted executable code; registered launch targets work in CLI/MCP/GUI; no automatic discovery |
-| Local Studio | implemented | real compiler workers, typed scenario forms, source/durable-draft conflict saves | TLC (verify) and Quint (simulate), same scopes; replay player; three cached runs |
+| Local Studio | implemented | real compiler workers, typed scenario forms, source/durable-draft conflict saves | built-in search (verify) and sampler (simulate), same scopes; replay player; three cached runs |
 
 The [grammar](grammar.md) is normative for accepted source syntax. Historical
 `checkout.s15` remains an aspirational, incomplete sketch and is not accepted input.
@@ -68,13 +68,13 @@ summaries/invariants. Resource-returning calls require explicit creates provenan
 
 Machine events are nondeterministically selected enabled atomic actions. All
 assignments use the old state; omitted variables stay unchanged. Deadlock stutters.
-Integer domains are author-supplied and remain in the report. Backend preflight
+Integer domains are author-supplied and remain in the report. Behavioural preflight
 rejects literal/domain magnitudes outside +/-9007199254740991; local bigint
 analysis retains larger integers. No source population or loop is silently reduced.
 An optional scope JSON must exactly match source domains, e.g.
 `{"domains":{"count":"0..2"},"assumptions":[]}`. It never silently narrows them.
-The built-in search and TLC exhaust reachable states of this finite machine; the
-built-in sampler and Quint sample traces up to the selected steps/samples. None of them proves unmodelled populations or production code.
+The built-in search exhausts reachable states of this finite machine; the
+built-in sampler samples traces up to the selected steps/samples. Neither proves unmodelled populations or production code.
 
 Correctness tests do not use benchmark thresholds or startup sleeps. Deadline
 classification uses controlled process boundaries; real process teardown starts
@@ -103,21 +103,25 @@ current.
 
 ### Built-in behaviour engines (CLI)
 
-| Command | Default engine | Result |
+| Command | Engine | Result |
 |---|---|---|
-| `verify FILE --entry NAME` | Built-in exhaustive breadth-first search (`--backend builtin`) | One result per invariant plus `state-domains`; a violation has a shortest, source-replayed trace; `no_counterexample (finite_model_check, complete)` otherwise |
-| `simulate FILE --entry NAME` | Built-in seeded sampler | `no_counterexample (simulation, complete)` at best, never an exhaustive pass; traces are replayed but need not be shortest; same seed and limits give the same result |
+| `verify FILE --entry NAME [--state-budget N]` | Built-in exhaustive breadth-first search | One result per invariant plus `state-domains`; a violation has a shortest, source-replayed trace; `no_counterexample (finite_model_check, complete)` otherwise |
+| `simulate FILE --entry NAME [--seed --max-steps --max-samples]` | Built-in seeded sampler | `no_counterexample` at best (text output: `simulation, sampled, not exhaustive`), never an exhaustive pass; traces are replayed but need not be shortest; same seed and limits give the same result |
+| `emit FILE --entry NAME --target json --out MODEL.json` | none (lowering only) | The lowered model the engines check: machine, source mapping, bounds, assumptions and, for flows, the finite source-state graph |
 
-Neither needs Java, a TLC JAR or Quint. `--state-budget N` (positive safe
-integer, default 1,000,000 distinct states) bounds `verify`. Exhausting it, a
-timeout, cancellation, a domain boundary or a worker/engine error leaves every
+These are the only behavioural engines; the CLI, Studio and MCP all use them and
+no external program, runtime or download is needed. TLC, Quint and every Java
+dependency were removed in [R1-A](changes/R1-A.md) (decision D2). `--state-budget N`
+(positive safe integer, default 1,000,000 distinct states) bounds `verify`.
+Exhausting it, a timeout, cancellation or a domain boundary leaves every
 unviolated property inconclusive and incomplete with the limit named
-(`stateBudget=…`, `timeoutMs=…`); already replayed violations survive a budget or
-domain boundary. A worker or engine error currently gives the same exit status
-(2) as a budget-limited run. `--backend tlc --tlc-jar PATH` and `--backend quint`
-still select the external engines. **MCP and Studio still select TLC for verify
-and Quint for simulate**; their switch, and removal of TLC and Quint, are later
-work. Engine contract: [W1-B](changes/W1-B.md), wiring: [W2-A](changes/W2-A.md).
+(`stateBudget=…`, `timeoutMs=…`, exit 2); already replayed violations survive a
+budget or domain boundary. A worker or engine error is a failure (`B104`,
+completion `failed`, exit 3), never a verdict. Options that belong to another
+command (`--state-budget` outside `verify`; `--seed`, `--max-steps`,
+`--max-samples` outside `simulate`, unless supplied by a scenario; `--target`
+outside `emit`) are rejected. Engine contract: [W1-B](changes/W1-B.md), wiring:
+[W2-A](changes/W2-A.md), removal of the external engines: [R1-A](changes/R1-A.md).
 
 ### `check` notices
 

@@ -118,9 +118,6 @@ export function project(value: unknown): ProjectView {
         (f.loaded === undefined || typeof f.loaded === "boolean"),
     ) ||
     !Array.isArray(value.runs) ||
-    !record(value.tools) ||
-    typeof value.tools.quint !== "boolean" ||
-    typeof value.tools.tlc !== "boolean" ||
     !record(value.agentConnection) ||
     typeof value.agentConnection.command !== "string" ||
     !Array.isArray(value.agentConnection.args) ||

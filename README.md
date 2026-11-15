@@ -106,51 +106,36 @@ different exit statuses; a warning about duplicate rules alone doesn't fail.
 
 You write Pymtheg designs; you do not need to learn a backend language.
 `check` runs local analyses and works offline once built. For behavioural
-exploration from the CLI, `verify` runs a built-in exhaustive breadth-first search
-and `simulate` a built-in seeded sampler; neither needs Java, a TLC JAR or Quint,
-and findings map back to your source. Each invariant gets its own result.
+exploration, `verify` runs a built-in exhaustive breadth-first search and
+`simulate` a built-in seeded sampler. Both run in Node worker threads inside
+Pymtheg: no other program, runtime or download is needed, and the CLI, Studio and
+MCP use the same engines. Findings map back to your source and each invariant
+gets its own result, plus one `state-domains` result for declared ranges.
 `--state-budget N` (default 1,000,000 distinct states) bounds `verify`; running out
-leaves the unviolated properties inconclusive (exit 2), never passed.
-`--backend tlc --tlc-jar PATH` and `--backend quint` still select the external
-engines from the CLI, and Studio and MCP still use TLC for verify and Quint for
-simulate. Quint is an optional dependency: `npm ci --ignore-scripts --omit=optional` can build/use local
-and built-in CLI checking without it. Requested missing tooling is an integration error.
+leaves the unviolated properties inconclusive (exit 2), never passed. An engine
+or worker error is a failure (exit 3, `B104`), never a verdict.
 
 ```sh
-./pymtheg emit examples/mvp/task-buggy.pym --target quint --entry TaskRunner --out /tmp/task.qnt
 ./pymtheg simulate examples/mvp/task-buggy.pym --entry TaskRunner --seed 42 --max-steps 12 --max-samples 1000
 ./pymtheg simulate examples/mvp/task-fixed.pym --entry TaskRunner --seed 42 --max-steps 12 --max-samples 1000
 ./pymtheg simulate examples/mvp/checkout-fixed.pym --entry Checkout --seed 42 --max-steps 12 --max-samples 1000
-```
-
-When selected, Quint **0.33.1**, TypeScript engine, is version-checked. Generated models and their
-source maps come from the typed project, not fixture names. Counterexamples are
-replayed against the source event semantics. A corrected sampled run reports
-`no_counterexample (simulation)`, never an unqualified verified result.
-
-```sh
 ./pymtheg verify examples/mvp/checkout-fixed.pym --entry Checkout
+./pymtheg emit examples/mvp/task-buggy.pym --entry TaskRunner --target json --out /tmp/task-model.json
 ```
 
-To check with TLC instead (Studio and MCP `verify` use it), provide the official
-TLA+ v1.7.4 `tla2tools.jar`
-([release download](https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar)):
-
-```sh
-./pymtheg verify examples/mvp/checkout-fixed.pym --entry Checkout --backend tlc --tlc-jar /path/to/tla2tools.jar --timeout 45s
-```
-
-The adapter validates SHA-256
-`936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88`, uses TLC 2.19,
-one worker and a 512 MiB heap. It translates the finite machine directly to TLA+;
-it does **not** invoke Quint's Apalache-dependent TLC bridge. Java must be installed
-and the execution context must permit TLC's local management socket. A requested
-missing/blocked checker never becomes a skipped success. No implicit download/server. Set `PYM_TLC_JAR` for Studio or supply `--tlc-jar` for the CLI.
+Models and their source maps come from the typed project, not fixture names.
+Counterexamples are replayed against the source event semantics before they are
+reported. A corrected sampled run reports
+`no_counterexample (simulation, sampled, not exhaustive)`, never an unqualified
+verified result. `emit --target json` writes the lowered model the engines check
+(machine, source mapping, bounds, assumptions and, for flows, the finite
+source-state graph) so you can inspect it.
 
 Source domains define finite scope. Optional `--scope scope.json` must contain
 `{"domains":{"phase":"0..4", ...},"assumptions":[]}` with **all** domain entries
-exactly matching the source. No automatic scope reduction. `--quint PATH` selects
-a local executable; `--timeout 500ms` or `45s` bounds backend work (max 120s).
+exactly matching the source. No automatic scope reduction. `--timeout 500ms` or
+`45s` bounds checking work (max 120s). `--seed`, `--max-steps` and `--max-samples`
+belong to `simulate`; `--state-budget` to `verify`.
 `--out report.json` on check/simulate/verify atomically publishes a report while
 retaining stdout findings. `--format json` is versioned, log-free stdout;
 `--verbose` phase messages go to stderr. Bounds are decimal strings in JSON.
@@ -187,7 +172,7 @@ lifecycle decisions without reimplementing the compiler.
 
 ```sh
 npm test                    # fast source/CLI, schema, lifecycle and cancellation suite
-npm run test:backend        # bounded real Quint + TLC integration suite
+npm run test:backend        # behavioural, Rust/Go compiler and MCP integration suite
 npm run bench               # instrumented 1,000 / 10,000-rule measurements
 npm run capture             # schema-validated reports, bounded real runs
 npm run format:check
@@ -195,12 +180,9 @@ npm run format:check
 ./pymtheg doctor --format json
 ```
 
-Set `PYM_TLC_JAR=/path/to/tla2tools.jar` for backend tests/capture. This environment
-currently has the original research JAR at `/tmp/spec-language-research/tla2tools.jar`;
-it is not bundled or assumed portable. Backend tests explicitly report a skip
-when that external JAR is absent or a configured checker budget expires. Neither
-is a passed correctness assertion. Set `PYM_TEST_BACKEND_TIMEOUT=45s` to choose a
-larger explicit integration budget. Current captured evidence exercised both engines.
+Behavioural integration tests explicitly report a skip when a configured checker
+time budget expires; that is never a passed correctness assertion. Set
+`PYM_TEST_BACKEND_TIMEOUT=45s` to choose a larger explicit integration budget.
 Correctness tests use readiness events, controlled clocks and deterministic counts;
 benchmark timings are informational only.
 
@@ -219,10 +201,11 @@ under `evidence/`; it does not retroactively upgrade the research spike.
 `examples/checkout.s15` is an aspirational incomplete sketch, **not accepted input**.
 
 The original experiments sampled 1,000 corrected Quint traces of six transitions
-and exhausted eight states of a manually aligned TLA+ model. The new generated
-checkout separates submission, provider effect and delivery, and TLC exhausts
-17 states in its corrected finite case. Neither experiment proves translation
-correctness in general or conformance of a production implementation.
+and exhausted eight states of a manually aligned TLA+ model, using external tools
+that Pymtheg no longer uses or needs (decision D2). The generated checkout
+separates submission, provider effect and delivery; the built-in search exhausts
+its corrected finite case. Neither proves translation correctness in general or
+conformance of a production implementation.
 
 Public naming values live in `src/shared/identity-values.ts`, re-exported by
 `src/shared/identity.ts`. The CLI, source discovery, scenarios, generated source

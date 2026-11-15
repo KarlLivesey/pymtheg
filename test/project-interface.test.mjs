@@ -75,7 +75,7 @@ test("project snapshot finds reverse callers once, including new buffers; an unc
 test("Studio and agent checks expose external callers before and after an interface edit", () =>
   fixture(async (root) => {
     const agent = await AgentWorkspace.open(root);
-    const studio = new StudioService(root, null);
+    const studio = new StudioService(root);
     try {
       const run = await agent.run(
         { file: "pay.pym" },

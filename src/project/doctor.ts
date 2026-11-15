@@ -1,18 +1,148 @@
-import { createHash } from "node:crypto";
-import { readFile, stat } from "node:fs/promises";
+import { stat } from "node:fs/promises";
+import { createRequire } from "node:module";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { identity } from "../shared/identity.js";
-import { defaultQuint, quintVersion, tlcHash } from "../backends/adapter.js";
-import { runProcess } from "../backends/process.js";
-export async function doctor(
-  signal: AbortSignal,
-  jar: string | null = process.env.PYM_TLC_JAR ?? null,
-) {
-  const checks: {
-    name: string;
-    status: "ready" | "missing" | "incompatible";
-    detail: string;
-  }[] = [];
+import { analyseFile } from "../analysis/index.js";
+import { runBackend, type BackendOptions } from "../backends/adapter.js";
+import { openDatabase } from "../storage/local.js";
+type Check = {
+  name: string;
+  status: "ready" | "missing" | "incompatible" | "failed";
+  detail: string;
+};
+const require = createRequire(import.meta.url);
+/** A machine with one failing and one holding invariant; never written to disk. */
+const probe = `machine DoctorProbe {
+  state n: Nat in 0..2 = 0;
+  event advance when n < 2 { n = n + 1; }
+  invariant small = n < 2;
+  invariant bounded = n <= 2;
+}
+`;
+/** Runs the real built-in engines (lowering and search workers) on the probe. */
+async function engines(signal: AbortSignal): Promise<Check[]> {
+  const file = join(tmpdir(), `pymtheg-doctor-probe${identity.extension}`);
+  let ir;
+  try {
+    ir = analyseFile(file, () => {}, { buffers: { [file]: probe } }).ir;
+  } catch (e) {
+    const detail = "Probe analysis failed: " + String(e);
+    return [
+      { name: "Verifier", status: "failed", detail },
+      { name: "Simulator", status: "failed", detail },
+    ];
+  }
+  const options: BackendOptions = {
+    entry: "DoctorProbe",
+    seed: "42",
+    maxSteps: 6,
+    maxSamples: 20,
+    timeoutMs: 30000,
+    scopeFile: null,
+  };
+  const run = async (
+    name: string,
+    method: "exhaustive" | "sample",
+  ): Promise<Check> => {
+    try {
+      const records = await runBackend(ir, { ...options, method }, signal);
+      const outcome = (property: string) =>
+        records.find((r) => r.propertyId.endsWith("/invariant/" + property))
+          ?.outcome;
+      const expected =
+        outcome("small") === "counterexample" &&
+        (method === "sample" || outcome("bounded") === "no_counterexample");
+      return expected
+        ? {
+            name,
+            status: "ready",
+            detail:
+              method === "sample"
+                ? "Built-in seeded sampler found the probe's known counterexample"
+                : "Built-in breadth-first search gave the probe's known verdicts",
+          }
+        : {
+            name,
+            status: "failed",
+            detail:
+              "Probe verdicts were wrong: " +
+              records
+                .map((r) => `${r.propertyId}=${r.outcome}/${r.completion}`)
+                .join(", "),
+          };
+    } catch (e) {
+      return { name, status: "failed", detail: String(e) };
+    }
+  };
+  return [
+    await run("Verifier", "exhaustive"),
+    await run("Simulator", "sample"),
+  ];
+}
+async function storage(): Promise<Check> {
+  try {
+    const db = openDatabase(":memory:");
+    try {
+      db.exec("CREATE TABLE probe (x INTEGER); INSERT INTO probe VALUES (1);");
+      const row = db.prepare("SELECT x FROM probe").get() as { x: number };
+      if (row.x !== 1) throw Error("SQLite round trip returned wrong value");
+    } finally {
+      db.close();
+    }
+    return {
+      name: "Storage",
+      status: "ready",
+      detail: "Built-in node:sqlite available",
+    };
+  } catch (e) {
+    return { name: "Storage", status: "missing", detail: String(e) };
+  }
+}
+/** The Tree-sitter grammars the code graph loads (TypeScript uses its compiler). */
+async function grammars(): Promise<Check[]> {
+  const files: [string, () => string][] = [
+    [
+      "Go grammar",
+      () =>
+        fileURLToPath(
+          new URL("../../grammars/go/tree-sitter-go.wasm", import.meta.url),
+        ),
+    ],
+    [
+      "Rust grammar",
+      () => require.resolve("tree-sitter-rust/tree-sitter-rust.wasm"),
+    ],
+  ];
+  let Language: typeof import("web-tree-sitter").Language;
+  try {
+    const sitter = await import("web-tree-sitter");
+    await sitter.Parser.init({
+      locateFile: () => require.resolve("web-tree-sitter/web-tree-sitter.wasm"),
+    });
+    Language = sitter.Language;
+  } catch (e) {
+    return files.map(([name]) => ({
+      name,
+      status: "missing",
+      detail: "Tree-sitter runtime unavailable: " + String(e),
+    }));
+  }
+  const checks: Check[] = [];
+  for (const [name, locate] of files) {
+    try {
+      const path = locate();
+      await Language.load(path);
+      checks.push({ name, status: "ready", detail: path });
+    } catch (e) {
+      checks.push({ name, status: "missing", detail: String(e) });
+    }
+  }
+  return checks;
+}
+export async function doctor(signal: AbortSignal) {
+  const checks: Check[] = [];
   checks.push({
     name: "Node",
     status:
@@ -21,70 +151,9 @@ export async function doctor(
         : "incompatible",
     detail: process.version + " (supported: 24 LTS)",
   });
-  try {
-    const p = await runProcess(defaultQuint, ["--version"], {
-      cwd: process.cwd(),
-      timeoutMs: 5000,
-      signal,
-      maxBytes: 8192,
-    });
-    checks.push({
-      name: "Quint",
-      status:
-        p.kind === "spawn_failed"
-          ? "missing"
-          : p.kind === "exited" &&
-              p.code === 0 &&
-              p.stdout.includes(quintVersion)
-            ? "ready"
-            : "incompatible",
-      detail: p.kind === "exited" ? p.stdout.trim() : p.kind,
-    });
-  } catch (e) {
-    checks.push({ name: "Quint", status: "missing", detail: String(e) });
-  }
-  const java = await runProcess("java", ["-version"], {
-    cwd: process.cwd(),
-    timeoutMs: 5000,
-    signal,
-    maxBytes: 8192,
-  });
-  checks.push({
-    name: "Java",
-    status:
-      java.kind === "spawn_failed"
-        ? "missing"
-        : java.kind === "exited" && java.code === 0
-          ? "ready"
-          : "incompatible",
-    detail:
-      java.kind === "exited"
-        ? ((java.stderr || java.stdout).split("\n")[0] ?? "Available")
-        : java.kind,
-  });
-  if (jar) {
-    try {
-      const digest = createHash("sha256")
-        .update(await readFile(jar))
-        .digest("hex");
-      checks.push({
-        name: "TLC",
-        status: digest === tlcHash ? "ready" : "incompatible",
-        detail:
-          digest === tlcHash
-            ? "Pinned TLC JAR available"
-            : "JAR checksum does not match pinned release",
-      });
-    } catch (e) {
-      checks.push({ name: "TLC", status: "missing", detail: String(e) });
-    }
-  } else
-    checks.push({
-      name: "TLC",
-      status: "missing",
-      detail:
-        "Set PYM_TLC_JAR to the official v1.7.4 JAR. Local checking does not require it.",
-    });
+  checks.push(...(await engines(signal)));
+  checks.push(await storage());
+  checks.push(...(await grammars()));
   try {
     await stat(
       fileURLToPath(new URL("../../dist-web/index.html", import.meta.url)),

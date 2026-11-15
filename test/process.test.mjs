@@ -8,7 +8,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runProcess as productionRunProcess } from "../dist/backends/process.js";
 import { atomicWrite } from "../dist/reporting/publish.js";
-import { parseItf } from "../dist/backends/adapter.js";
 const opts = { cwd: process.cwd(), timeoutMs: 2000 };
 function runProcess(command, args, options) {
   const clock = options.clock ?? manualClock();
@@ -136,14 +135,6 @@ test("atomic publication preserves previous file on cancellation/failure", async
     await rm(dir, { recursive: true, force: true });
   }
 });
-test("external JSON is validated before use", () =>
-  assert.throws(() =>
-    parseItf(
-      { vars: [], states: [{}] },
-      { variables: [{ generated: "v0" }], events: [] },
-    ),
-  ));
-
 test("subprocess Unicode remains exact across bounded stream chunks", async () => {
   const value = "界🌍".repeat(100000);
   const result = await runProcess(

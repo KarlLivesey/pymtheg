@@ -248,7 +248,7 @@ test("MCP cancellation reaches the production CPU-worker coordinator", async () 
   let observed = false;
   let resolveObserved;
   const cancelled = new Promise((r) => (resolveObserved = r));
-  const workspace = new AgentWorkspace(root, null, (options) => {
+  const workspace = new AgentWorkspace(root, (options) => {
     options.signal.addEventListener(
       "abort",
       () => {
@@ -294,26 +294,33 @@ test("MCP cancellation reaches the production CPU-worker coordinator", async () 
     await rm(root, { recursive: true, force: true });
   }
 });
-test("MCP distinguishes missing integration from an unsupported design slice", async () =>
+test("MCP verify needs no installed integration and still reports an unsupported design slice", async () =>
   fixture(async (client) => {
     const source = "flow main() -> Unit { assert true; }";
-    const missing = await client.callTool({
-      name: "explore_behaviour",
-      arguments: {
-        file: "main.pym",
-        buffers: { "main.pym": source },
-        entry: "main",
-        method: "verify",
-      },
+    const verified = await call(client, "explore_behaviour", {
+      file: "main.pym",
+      buffers: { "main.pym": source },
+      entry: "main",
+      method: "verify",
     });
-    assert.equal(missing.isError, true);
-    assert.equal(missing.structuredContent.exitStatus, 3);
-    assert.ok(missing.structuredContent.runId);
+    assert.equal(verified.exitStatus, 0);
     const retained = await call(client, "read_run", {
-      runId: missing.structuredContent.runId,
+      runId: verified.runId,
       section: "properties",
     });
-    assert.ok(retained.items.some((p) => p.completion === "failed"));
+    const behaviour = retained.items.filter(
+      (p) => p.analysisKind === "behaviour",
+    );
+    assert.ok(behaviour.length > 0);
+    assert.ok(
+      behaviour.every(
+        (p) =>
+          p.completion === "complete" &&
+          p.outcome === "no_counterexample" &&
+          p.method === "finite_model_check",
+      ),
+      JSON.stringify(retained.items),
+    );
     const unsupported = await call(client, "explore_behaviour", {
       file: "main.pym",
       buffers: {

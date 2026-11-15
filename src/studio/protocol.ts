@@ -54,13 +54,11 @@ export interface ProjectView {
   agentConnection: {
     command: string;
     args: string[];
-    env?: Record<string, string>;
   };
   root: string;
   architectureAvailable?: boolean;
   files: StudioFile[];
   runs: StudioRun[];
-  tools: { quint: boolean; tlc: boolean };
   defaultFile: string | null;
   config: import("../shared/config.js").ProjectConfig;
   configHash: string | null;

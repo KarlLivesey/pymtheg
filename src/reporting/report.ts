@@ -231,7 +231,7 @@ export function renderText(r: Report, snapshot: Snapshot): string {
   for (const x of r.results) {
     const detail = derivation(x);
     lines.push(
-      `${x.propertyId.split("#").at(-1)}: ${x.outcome === "counterexample" && x.analysisKind !== "behaviour" ? "finding" : x.outcome} (${x.method}, ${x.completion})${detail ? "\n  " + detail : ""}${
+      `${x.propertyId.split("#").at(-1)}: ${x.outcome === "counterexample" && x.analysisKind !== "behaviour" ? "finding" : x.outcome} (${x.method}, ${x.method === "simulation" && x.outcome === "no_counterexample" && x.completion === "complete" ? "sampled, not exhaustive" : x.completion})${detail ? "\n  " + detail : ""}${
         x.scope.bounds
           ? "\n  scope: " +
             Object.entries(x.scope.bounds)

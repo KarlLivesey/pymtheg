@@ -4,8 +4,8 @@ Build with `npm ci --ignore-scripts --no-audit --no-fund && npm run build` on
 Node 24 LTS, then run `./pymtheg studio .` or `./pymtheg studio design.pym`.
 Open the printed private session URL in Firefox. Studio binds only to loopback;
 keep the token private. Ctrl-C closes the server and owned checkers. No account,
-cloud service or production adapters are required. `./pymtheg doctor` explains
-local tool availability. Set `PYM_TLC_JAR` before launch to enable real TLC runs.
+cloud service or production adapters are required. `./pymtheg doctor` checks
+that the built-in checking engines, storage, grammars and the Studio build work.
 
 ## First modelling session
 
@@ -26,8 +26,9 @@ local tool availability. Set `PYM_TLC_JAR` before launch to enable real TLC runs
    completion, method and remaining obligations. Costs count declared metrics,
    not elapsed time.
 5. Choose a flow or machine and open Scenario. Select a saved scenario or specify
-   finite inputs/results, seed, steps and sample count. Simulate uses Quint;
-   Verify uses TLC and the same source-derived model. Explore a counterexample
+   finite inputs/results, seed, steps and sample count. Simulate uses the built-in
+   seeded sampler; Verify uses the built-in exhaustive search on the same
+   source-derived model. Explore a counterexample
    in Trace. A sampled no-counterexample result does not become an exhaustive one.
 
 The interface preserves unsaved edits across file switches. A run freezes all
