@@ -52,12 +52,13 @@ try {
   );
   const packageRoot = join(installation, "node_modules", "pymtheg"),
     entry = join(packageRoot, "dist", "cli", "main.js");
+  // One set of notices for everything shipped, bundled code included.
   const notices = await readFile(
-    join(packageRoot, "dist-web", "third-party-notices.txt"),
+    join(packageRoot, "THIRD-PARTY-NOTICES"),
     "utf8",
   );
-  assert.match(notices, /react@19\.2\.0/);
-  assert.match(notices, /react-markdown@10\.1\.0/);
+  assert.match(notices, /^react 19\.2\.0$/m);
+  assert.match(notices, /^react-markdown 10\.1\.0$/m);
   const report = JSON.parse(
     command(
       process.execPath,

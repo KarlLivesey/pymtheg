@@ -342,3 +342,48 @@ range, each suffix, `devserver`, in text and in code strings, URLs and comments)
 and that loopback, documentation and public addresses, version strings,
 ordinary words and real member accesses do not. Sol's reproduction (appending
 `192.168.88.47` or `private-box.internal` to README.md) now fails the test.
+
+## Round 2 review (Opus) and small items
+
+1. **Notices embedded in bundled source files.** vfile's `lib/minpath.browser.js`
+   (bundled into `dist-web/`) is derived from path-browserify (MIT, Copyright (c)
+   2013 James Halliday) and Node.js `lib/path.js` (MIT, Copyright Joyent, Inc.
+   and other Node contributors); the notices were only in that file's header,
+   which minification removes, and vfile's own licence file names neither.
+   Both are now inventory components ("embedded in a bundled package") with
+   their notice texts in `docs/licences.md` and `THIRD-PARTY-NOTICES`. A new
+   check scans every bundled module with rendered code for comments carrying a
+   copyright line or derivative-work wording ("derivative work", "which is
+   licensed", "ported/adapted/copied from", "code/file/portions … derived/taken
+   from"). A comment is covered when it is not a derivative-work notice and
+   every copyright holder it names appears in the package's own licence files
+   (React's `@license React` headers are covered this way). Anything else
+   blocks unless a pinned review entry (`embeddedNotices`) covers it: either
+   origins (split into one notice per origin, each pinned to its copyright line)
+   or a provenance note. The check found three provenance notes and they are
+   reviewed and listed in a new "Provenance notes in bundled code" section for
+   the owner: `micromark-util-html-tag-name` (two lists of HTML tag names copied
+   from the CommonMark specification, published under a Creative Commons
+   Attribution-ShareAlike licence) and `zod` `v4/core/regexes.js` (a regular
+   expression adapted from a Stack Overflow answer, also CC BY-SA). The
+   compatibility paragraph says so instead of claiming every origin's notice is
+   kept. Sabotage-style tests: a bundled module with someone else's copyright
+   notice blocks; a derivative-work notice blocks; a changed vfile header or
+   provenance note blocks; React's headers and documentation prose ("derived
+   from the old state") do not.
+2. **Reviewed MCP explanation scoped.** It now allows only CC-BY-4.0 and only
+   for the exact LICENSE text it was written for (sha256 pinned). The MCP
+   LICENSE replaced with GPL text, or GPL appended, now blocks (tested).
+3. **One notices file.** The Vite plugin that wrote `dist-web/third-party-notices.txt`
+   (`scripts/license-notices.mjs`) is removed; `THIRD-PARTY-NOTICES` at the package
+   root is the only notices file. `scripts/package-current-smoke.mjs` reads it.
+4. **"ProjectB" only as the project name** in `test/package-contents.test.mjs`
+   (capitalised, word-bounded; the ordinary word "tiered" passes, tested). No
+   shipped document uses the word.
+5. Stale header comment in `test/licences.test.mjs` updated. The CommonJS
+   wrapper signature also matches `var xi,Ua;function Ed(){if(Ua)return xi;Ua=1;`.
+
+Counts after round 2: 103 shipped components (10 installed npm packages, 86
+bundled packages, 3 build-tool origins, 2 origins embedded in a bundled
+package, 2 vendored grammars): 98 MIT, 3 Apache-2.0, 1 BSD-3-Clause, 1 ISC;
+plus 3 reviewed provenance notes.

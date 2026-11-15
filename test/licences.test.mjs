@@ -1,7 +1,6 @@
 // R1-H: the checked-in licence inventory and notices match what the package
-// ships, and nothing shipped carries a licence outside the allow-list or lacks
-// its licence text. Pymtheg's own licence is the owner's choice: no `license`
-// field, LICENSE file or change to `private` is required here.
+// ships, nothing shipped carries a licence outside the allow-list or lacks its
+// licence text, and Pymtheg's own MIT licence is declared and stated.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -13,6 +12,8 @@ import {
   root,
   assess,
   blocking,
+  uncoveredNotices,
+  reviewEmbedded,
 } from "../scripts/licences/inventory.mjs";
 import {
   bundleOrigins,
@@ -157,6 +158,14 @@ test("unmapped build-tool code is recognised by shape, and anything else is repo
     origins: new Set(["@rollup/plugin-commonjs"]),
     unexplained: null,
   });
+  // The wrapper form that declares several names before its guard.
+  assert.deepEqual(
+    [
+      ...explainUnmapped("var xi,Ua;function Ed(){if(Ua)return xi;Ua=1;")
+        .origins,
+    ],
+    ["@rollup/plugin-commonjs"],
+  );
   const linked =
     'import{r as f,j as t}from"./react-C9.js";import{T as td}from"./editor-3I.js";';
   assert.deepEqual([...explainUnmapped(linked).origins], ["rollup"]);
@@ -198,18 +207,137 @@ test("a licence file outside the allow-list blocks even when the declared licenc
   });
   assert.deepEqual(blocking(notice), []);
   assert.ok(notice.embedded.includes("GPL"));
-  // Only a reviewed explanation entry lets a disallowed licence file pass.
-  const explained = assess({
-    name: "@modelcontextprotocol/server",
-    version: "0",
-    declared: "Apache-2.0",
-    files: ["LICENSE"],
-    texts: [
-      "Apache License, Version 2.0 ... Documentation contributions are licensed under CC-BY-4.0.",
-    ],
-  });
+  // A reviewed explanation lets only the licence it names pass, and only for
+  // the exact licence text it was written for.
+  const mcp = readFileSync(
+    "node_modules/@modelcontextprotocol/server/LICENSE",
+    "utf8",
+  );
+  const server = (text) =>
+    assess({
+      name: "@modelcontextprotocol/server",
+      version: "2.4.0",
+      declared: "Apache-2.0",
+      files: ["LICENSE"],
+      texts: [text],
+    });
+  const explained = server(mcp);
   assert.ok(
     explained.problems.some((p) => /CC-BY-4.0, outside the allow-list/.test(p)),
   );
   assert.deepEqual(blocking(explained), []);
+  // The round 2 review's sabotage: the MCP LICENSE replaced by GPL text.
+  assert.ok(blocking(server(gpl)).length > 0);
+  // GPL added to the reviewed text: a different text, and GPL is not allowed.
+  const added = blocking(server(mcp + "\n" + gpl));
+  assert.ok(added.some((p) => /different licence text/.test(p)));
+  assert.ok(added.some((p) => /GPL/.test(p)));
+});
+test("notices inside bundled source files must be covered by the package licence or reviewed", () => {
+  const licence = [
+    "MIT License\n\nCopyright (c) Meta Platforms, Inc. and affiliates.\n\nPermission is hereby granted, free of charge, to any person obtaining a copy",
+  ];
+  // React's @license headers name the holder in React's own LICENSE: covered.
+  const react =
+    "/**\n * @license React\n * react.production.js\n *\n * Copyright (c) Meta Platforms, Inc. and affiliates.\n *\n * This source code is licensed under the MIT license found in the\n * LICENSE file in the root directory of this source tree.\n */\nexport {};";
+  assert.deepEqual(uncoveredNotices(react, licence), []);
+  // "(c)" in an example is not a copyright line.
+  assert.deepEqual(
+    uncoveredNotices("/**\n * Examples\n * (c)\n * 'a'\n */", licence),
+    [],
+  );
+  // Sabotage: a bundled module carrying someone else's notice fails.
+  const foreign =
+    "// Copyright (c) 2019 Someone Else\n// Permission is hereby granted, free of charge, to any person obtaining a copy\nexport const x = 1;";
+  const [notice] = uncoveredNotices(foreign, licence);
+  assert.ok(notice);
+  const host = {
+    name: "react",
+    version: "19.2.0",
+    location: "node_modules/react",
+  };
+  const { problem } = reviewEmbedded("react/cjs/extra.js", notice, host);
+  assert.match(problem, /not covered by its licence file/);
+  const sabotaged = assess({
+    name: "react",
+    version: "19.2.0",
+    declared: "MIT",
+    files: ["LICENSE"],
+    texts: licence,
+    preProblems: [problem],
+  });
+  assert.deepEqual(blocking(sabotaged), [problem]);
+  // Documentation prose about deriving state is not a notice.
+  assert.deepEqual(
+    uncoveredNotices(
+      "/** Use it when the new state isn't\n * derived from the old state. */",
+      licence,
+    ),
+    [],
+  );
+  // A derivative-work notice is never covered by the host's licence alone.
+  assert.equal(
+    uncoveredNotices("// A derivative work based on: x.\nexport {};", licence)
+      .length,
+    1,
+  );
+});
+test("the reviewed vfile notice yields both embedded origins and blocks if the header changes", () => {
+  const source = readFileSync(
+    "node_modules/vfile/lib/minpath.browser.js",
+    "utf8",
+  );
+  const licence = [readFileSync("node_modules/vfile/license", "utf8")];
+  const [notice] = uncoveredNotices(source, licence);
+  const host = {
+    name: "vfile",
+    version: "6.0.3",
+    location: "node_modules/vfile",
+  };
+  const { components } = reviewEmbedded(
+    "vfile/lib/minpath.browser.js",
+    notice,
+    host,
+  );
+  assert.deepEqual(
+    components.map((c) => [c.name, c.declared]),
+    [
+      ["path-browserify (embedded in vfile@6.0.3)", "MIT"],
+      ["Node.js lib/path.js (embedded in vfile@6.0.3)", "MIT"],
+    ],
+  );
+  assert.match(components[0].texts[0], /Copyright \(c\) 2013 James Halliday/);
+  assert.match(
+    components[1].texts[0],
+    /Copyright Joyent, Inc\. and other Node contributors\./,
+  );
+  const changed = {
+    ...notice,
+    text: notice.text.replace("James Halliday", "Someone Else"),
+  };
+  assert.match(
+    reviewEmbedded("vfile/lib/minpath.browser.js", changed, host).problem,
+    /no longer matches its review/,
+  );
+});
+test("provenance notes in bundled files are reviewed, and a changed note blocks", () => {
+  const host = { name: "zod", version: "4.2.0", location: "node_modules/zod" };
+  const zod = readFileSync("node_modules/zod/v4/core/regexes.js", "utf8");
+  const licence = [readFileSync("node_modules/zod/LICENSE", "utf8")];
+  const notices = uncoveredNotices(zod, licence);
+  assert.equal(notices.length, 1);
+  const { provenance } = reviewEmbedded(
+    "zod/v4/core/regexes.js",
+    notices[0],
+    host,
+  );
+  assert.match(provenance.from, /stackoverflow\.com\/a\/3143231/);
+  const changed = {
+    ...notices[0],
+    text: "Adapted from https://example.com/other",
+  };
+  assert.match(
+    reviewEmbedded("zod/v4/core/regexes.js", changed, host).problem,
+    /no longer matches its review/,
+  );
 });

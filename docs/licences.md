@@ -13,15 +13,15 @@ vendored code is fixed inside the tarball.
 
 **Pymtheg is MIT licensed;** see `LICENSE`.
 
-All shipped third-party components are declared under MIT, Apache-2.0, BSD-3-Clause or ISC. These licences permit redistribution inside an MIT-licensed package provided their notices are kept, which `THIRD-PARTY-NOTICES` does. Licences embedded inside some of those packages are listed below and travel in `THIRD-PARTY-NOTICES` with their packages' notices.
+All shipped third-party components are declared under MIT, Apache-2.0, BSD-3-Clause or ISC. These licences permit redistribution inside an MIT-licensed package provided their notices are kept, which `THIRD-PARTY-NOTICES` does. Licences embedded inside some of those packages are listed below and travel in `THIRD-PARTY-NOTICES` with their packages' notices. Separately, 3 comments in bundled source files say that some material was copied or adapted from public sources that publish under other licences, without carrying a notice to reproduce; they are listed under "Provenance notes in bundled code" for review.
 
 ## Summary
 
-101 third-party components are shipped: 10 installed npm dependencies (direct and transitive, production only; 0 optional), 86 packages bundled into `dist-web/`, 3 sources of code the build tools write into `dist-web/` themselves, and 2 vendored grammars. Dev-only packages are not shipped and are listed separately at the end.
+103 third-party components are shipped: 10 installed npm dependencies (direct and transitive, production only; 0 optional), 86 packages bundled into `dist-web/`, 3 sources of code the build tools write into `dist-web/` themselves, 2 origins of code embedded inside bundled packages (their notices are in source-file headers that minification removes), and 2 vendored grammars. Dev-only packages are not shipped and are listed separately at the end.
 
 | Licence (as declared) | Components | What it asks of a redistributor |
 |---|---:|---|
-| MIT | 96 | keep the copyright notice and licence text with copies |
+| MIT | 98 | keep the copyright notice and licence text with copies |
 | Apache-2.0 | 3 | keep the licence text and any NOTICE file; mark files you changed; includes a patent licence that ends for anyone who sues over patents in the work |
 | BSD-3-Clause | 1 | keep the copyright notice, conditions and disclaimer; do not use the authors' names to endorse |
 | ISC | 1 | keep the copyright notice and licence text with copies |
@@ -53,6 +53,19 @@ cover parts of the package, such as code or data it took from other projects or 
 |---|---|---|---|
 | @modelcontextprotocol/core@2.4.0 | dependency | licence file reads as MIT, CC-BY-4.0 but Apache-2.0 is declared; licence file reads as CC-BY-4.0, outside the allow-list | same LICENSE as @modelcontextprotocol/server: MIT-to-Apache-2.0 transition, both texts apply; documentation CC-BY-4.0 |
 | @modelcontextprotocol/server@2.4.0 | dependency | licence file reads as MIT, CC-BY-4.0 but Apache-2.0 is declared; licence file reads as CC-BY-4.0, outside the allow-list | LICENSE explains a licensing transition from MIT to Apache-2.0: code from authors who have not consented to relicensing stays MIT. The file carries both texts; treat the package as Apache-2.0 and MIT together. It also says the project's documentation (not specifications) is CC-BY-4.0; the npm package ships code, a README and the LICENSE |
+
+## Provenance notes in bundled code
+
+Comments in bundled source files that say material was copied or adapted from a public source,
+where the comment carries no licence notice of its own. They are reviewed and pinned in
+`scripts/licences/inventory.mjs` (`embeddedNotices`), listed here for the owner's attention; this
+inventory does not judge whether they need anything further.
+
+| Component | File | What | From | Licence of the source |
+|---|---|---|---|---|
+| micromark-util-html-tag-name@2.0.1 | micromark-util-html-tag-name/index.js | the list of HTML block tag names | the CommonMark specification (spec.commonmark.org) | the specification is published under a Creative Commons Attribution-ShareAlike licence |
+| micromark-util-html-tag-name@2.0.1 | micromark-util-html-tag-name/index.js | the list of HTML raw tag names | the CommonMark specification (spec.commonmark.org) | the specification is published under a Creative Commons Attribution-ShareAlike licence |
+| zod@4.2.0 | zod/v4/core/regexes.js | a regular expression | a Stack Overflow answer (https://stackoverflow.com/a/3143231) | Stack Overflow content is published under a Creative Commons Attribution-ShareAlike licence |
 
 ## Code written by the build tools
 
@@ -108,6 +121,7 @@ built bundle's source maps independently, so emitted code from an unlisted origi
 | @lezer/highlight | 1.2.5 | bundled in dist-web | MIT | Copyright (C) 2018 by Marijn Haverbeke <marijn@haverbeke.berlin> and others | https://code.haverbeke.berlin/lezer/highlight |
 | @marijn/find-cluster-break | 1.0.4 | bundled in dist-web | MIT | Copyright (C) 2024 by Marijn Haverbeke <marijn@haverbeke.berlin> | https://code.haverbeke.berlin/marijn/find-cluster-break |
 | @rollup/plugin-commonjs | 28.0.6 | build-tool code in dist-web | MIT | Copyright (c) 2019 RollupJS Plugin Contributors (https://github.com/rollup/plugins/graphs/contributors) | https://github.com/rollup/plugins |
+| Node.js lib/path.js (embedded in vfile@6.0.3) | - | embedded in a bundled package | MIT | Copyright Joyent, Inc. and other Node contributors. | https://github.com/nodejs/node/blob/main/lib/path.js |
 | ajv | 8.17.1 | dependency (direct) | MIT | Copyright (c) 2015-2021 Evgeny Poberezkin | https://github.com/ajv-validator/ajv |
 | bail | 2.0.2 | bundled in dist-web | MIT | Copyright (c) 2015 Titus Wormer <tituswormer@gmail.com> | https://github.com/wooorm/bail |
 | ccount | 2.0.1 | bundled in dist-web | MIT | Copyright (c) 2015 Titus Wormer <tituswormer@gmail.com> | https://github.com/wooorm/ccount |
@@ -164,6 +178,7 @@ built bundle's source maps independently, so emitted code from an unlisted origi
 | micromark-util-resolve-all | 2.0.1 | bundled in dist-web | MIT | Copyright (c) Titus Wormer <tituswormer@gmail.com> | https://github.com/micromark/micromark/tree/main/packages/micromark-util-resolve-all |
 | micromark-util-sanitize-uri | 2.0.1 | bundled in dist-web | MIT | Copyright (c) Titus Wormer <tituswormer@gmail.com> | https://github.com/micromark/micromark/tree/main/packages/micromark-util-sanitize-uri |
 | micromark-util-subtokenize | 2.1.0 | bundled in dist-web | MIT | Copyright (c) Titus Wormer <tituswormer@gmail.com> | https://github.com/micromark/micromark/tree/main/packages/micromark-util-subtokenize |
+| path-browserify (embedded in vfile@6.0.3) | - | embedded in a bundled package | MIT | Copyright (c) 2013 James Halliday | https://github.com/browserify/path-browserify |
 | property-information | 7.2.0 | bundled in dist-web | MIT | Copyright (c) Titus Wormer <mailto:tituswormer@gmail.com> | https://github.com/wooorm/property-information |
 | react | 19.2.0 | bundled in dist-web | MIT | Copyright (c) Meta Platforms, Inc. and affiliates. | https://github.com/facebook/react |
 | react-dom | 19.2.0 | bundled in dist-web | MIT | Copyright (c) Meta Platforms, Inc. and affiliates. | https://github.com/facebook/react |

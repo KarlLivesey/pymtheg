@@ -1,8 +1,6 @@
 import { defineConfig } from "vite";
-import { bundledLicenseNotices } from "../scripts/license-notices.mjs";
 export default defineConfig({
   root: "web",
-  plugins: [bundledLicenseNotices()],
   resolve: { dedupe: ["react", "react-dom"] },
   build: {
     outDir: "../dist-web",

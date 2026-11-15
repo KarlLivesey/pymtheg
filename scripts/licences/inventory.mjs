@@ -11,6 +11,7 @@
 // the real Vite build in memory, written nowhere).
 import { readFile, readdir, mkdtemp, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { dirname, join, relative, resolve, parse, sep } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -57,12 +58,196 @@ const noticeFile = /^(NOTICE|ThirdPartyNotice|CopyrightNotice)/i;
  * Reviewed explanations for flagged components (shown, never used to hide a
  * problem): keyed by package name, applied to every version.
  */
+const mcpLicence =
+  "0382b0057770ca05e9c350a50aa3b1c1fea84da0bc81d723bf00b9aa841be58a";
+/**
+ * Each reviewed explanation names the licences outside the allow-list that it
+ * accepts (`allows`) and pins the exact licence text it was written for
+ * (`sha256` of the package's licence files, in order). A changed licence file,
+ * or any other licence found in it, is not covered and blocks again.
+ */
 const explanations = {
-  "@modelcontextprotocol/server":
-    "LICENSE explains a licensing transition from MIT to Apache-2.0: code from authors who have not consented to relicensing stays MIT. The file carries both texts; treat the package as Apache-2.0 and MIT together. It also says the project's documentation (not specifications) is CC-BY-4.0; the npm package ships code, a README and the LICENSE",
-  "@modelcontextprotocol/core":
-    "same LICENSE as @modelcontextprotocol/server: MIT-to-Apache-2.0 transition, both texts apply; documentation CC-BY-4.0",
+  "@modelcontextprotocol/server": {
+    text: "LICENSE explains a licensing transition from MIT to Apache-2.0: code from authors who have not consented to relicensing stays MIT. The file carries both texts; treat the package as Apache-2.0 and MIT together. It also says the project's documentation (not specifications) is CC-BY-4.0; the npm package ships code, a README and the LICENSE",
+    allows: ["CC-BY-4.0"],
+    sha256: mcpLicence,
+  },
+  "@modelcontextprotocol/core": {
+    text: "same LICENSE as @modelcontextprotocol/server: MIT-to-Apache-2.0 transition, both texts apply; documentation CC-BY-4.0",
+    allows: ["CC-BY-4.0"],
+    sha256: mcpLicence,
+  },
 };
+
+/**
+ * Notices inside bundled source files that the package's own licence files do
+ * not cover, reviewed. Keyed by the file's path inside node_modules; each file
+ * lists one review per notice comment in it.
+ * - `origins`: the comment carries other projects' licence notices. It is split
+ *   into one notice per origin (at `split`), each pinned to the copyright line
+ *   it must contain; each origin becomes an inventory component with that text.
+ * - `provenance`: the comment says material was copied or adapted from a
+ *   public source but carries no notice to reproduce. Pinned by `match`;
+ *   recorded in docs/licences.md for the owner's attention.
+ * A notice that matches no review blocks until reviewed.
+ */
+export const embeddedNotices = {
+  "vfile/lib/minpath.browser.js": [
+    {
+      split: /^A derivative work based on:/m,
+      origins: [
+        {
+          name: "path-browserify",
+          declared: "MIT",
+          copyright: "Copyright (c) 2013 James Halliday",
+          source: "https://github.com/browserify/path-browserify",
+        },
+        {
+          name: "Node.js lib/path.js",
+          declared: "MIT",
+          copyright: "Copyright Joyent, Inc. and other Node contributors.",
+          source: "https://github.com/nodejs/node/blob/main/lib/path.js",
+        },
+      ],
+    },
+  ],
+  "micromark-util-html-tag-name/index.js": [
+    {
+      provenance: {
+        match: "This is copied from:\n<https://spec.commonmark.org",
+        what: "the list of HTML block tag names",
+        from: "the CommonMark specification (spec.commonmark.org)",
+        publishedUnder:
+          "the specification is published under a Creative Commons Attribution-ShareAlike licence",
+      },
+    },
+    {
+      provenance: {
+        match: "This module is copied from:\n<https://spec.commonmark.org",
+        what: "the list of HTML raw tag names",
+        from: "the CommonMark specification (spec.commonmark.org)",
+        publishedUnder:
+          "the specification is published under a Creative Commons Attribution-ShareAlike licence",
+      },
+    },
+  ],
+  "zod/v4/core/regexes.js": [
+    {
+      provenance: {
+        match: "Adapted from https://stackoverflow.com/a/3143231",
+        what: "a regular expression",
+        from: "a Stack Overflow answer (https://stackoverflow.com/a/3143231)",
+        publishedUnder:
+          "Stack Overflow content is published under a Creative Commons Attribution-ShareAlike licence",
+      },
+    },
+  ],
+};
+// Wording that says code came from elsewhere ("derived from the old state" in
+// ordinary documentation prose must not count).
+const derivativeWords =
+  /derivative work|which is licensed|\b(?:ported|adapted|copied) from\b|\b(?:code|file|implementation|portions?|parts?) (?:is |are |was |were )?(?:derived|taken|copied|adapted) from\b/i;
+const noticeTrigger = new RegExp(
+  `copyright\\b|\\(c\\)\\s|©|@license|${derivativeWords.source}`,
+  "i",
+);
+/** Comments in a source file that look like copyright or licence notices. */
+export function sourceNotices(source) {
+  const out = [];
+  for (const m of source.matchAll(
+    /\/\*[\s\S]*?\*\/|(?:^[ \t]*\/\/.*(?:\r?\n|$))+/gm,
+  )) {
+    if (!noticeTrigger.test(m[0])) continue;
+    const text = m[0]
+      .split("\n")
+      .map((l) =>
+        l
+          .replace(/^\s*(\/\*+|\*\/|\*|\/\/)?\s?/, "")
+          .replace(/\s*\*\/\s*$/, ""),
+      )
+      .join("\n")
+      .trim();
+    const holders = text
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => /^(copyright\b|\(c\)\s|©)/i.test(l))
+      .map(holder)
+      .filter((h) => h.length >= 3);
+    const derivative = derivativeWords.test(text);
+    if (holders.length || derivative) out.push({ text, holders, derivative });
+  }
+  return out;
+}
+/** The holder named on a copyright line, normalised for comparison. */
+function holder(line) {
+  return line
+    .replace(/copyright|\(c\)|©|all rights reserved/gi, " ")
+    .replace(/\b\d{4}(\s*-\s*(\d{4}|present))?\b/gi, " ")
+    .replace(/[^a-z0-9]+/gi, " ")
+    .trim()
+    .toLowerCase();
+}
+/**
+ * Notices in one bundled file that its package's licence files do not cover:
+ * a derivative-work notice, or a copyright holder the licence files never name.
+ */
+export function uncoveredNotices(source, licenceTexts) {
+  const known = licenceTexts
+    .join("\n")
+    .replace(/[^a-z0-9]+/gi, " ")
+    .toLowerCase();
+  return sourceNotices(source).filter(
+    (n) => n.derivative || n.holders.some((h) => !known.includes(h)),
+  );
+}
+/**
+ * The reviewed reading of one notice comment in a bundled file: components for
+ * embedded origins, a provenance record, or the reason it needs review.
+ */
+export function reviewEmbedded(key, notice, host) {
+  const reviews = embeddedNotices[key];
+  if (!reviews)
+    return {
+      problem: `bundled module ${key} has a notice not covered by its licence file`,
+    };
+  for (const review of reviews) {
+    if (review.provenance) {
+      if (notice.text.includes(review.provenance.match))
+        return {
+          provenance: {
+            component: `${host.name}@${host.version}`,
+            file: key,
+            ...review.provenance,
+            note: notice.text,
+          },
+        };
+      continue;
+    }
+    const parts = notice.text
+      .split(review.split)
+      .map((p) => p.trim())
+      .filter(Boolean);
+    if (
+      parts.length === review.origins.length &&
+      review.origins.every((o, i) => parts[i].includes(o.copyright))
+    )
+      return {
+        components: review.origins.map((o, i) => ({
+          name: `${o.name} (embedded in ${host.name}@${host.version})`,
+          version: "-",
+          shipped: "embedded in a bundled package",
+          direct: false,
+          declared: o.declared,
+          files: [`${key} (header)`],
+          texts: [parts[i]],
+          source: o.source,
+          location: host.location,
+          note: `code in ${key} derived from ${o.name}; its notice is in that file's header, which minification removes from dist-web`,
+        })),
+      };
+  }
+  return { problem: `embedded notice no longer matches its review: ${key}` };
+}
 
 /** Recognise a licence text by its distinctive wording. */
 export function classify(text) {
@@ -318,6 +503,7 @@ async function vendoredInside(host, name) {
 }
 /** Packages and build-tool code Vite actually puts into dist-web, from the bundle's module graph. */
 async function bundled() {
+  const provenance = [];
   const { build } = await import("vite");
   const modules = new Set();
   const capture = {
@@ -369,7 +555,10 @@ async function bundled() {
       if (existsSync(file)) {
         const pkg = JSON.parse(await readFile(file, "utf8"));
         if (typeof pkg.name === "string" && typeof pkg.version === "string") {
-          packages.set(`${pkg.name}@${pkg.version}`, { directory, pkg });
+          const key = `${pkg.name}@${pkg.version}`;
+          if (!packages.has(key))
+            packages.set(key, { directory, pkg, modules: new Set() });
+          packages.get(key).modules.add(id.split("?")[0]);
           break;
         }
       }
@@ -377,9 +566,9 @@ async function bundled() {
     }
   }
   const out = [];
-  for (const { directory, pkg } of packages.values()) {
+  for (const { directory, pkg, modules: files_ } of packages.values()) {
     const { files, texts } = await licenceFiles(directory);
-    out.push({
+    const component = {
       name: pkg.name,
       version: pkg.version,
       shipped: "bundled in dist-web",
@@ -389,7 +578,23 @@ async function bundled() {
       texts,
       source: sourceUrl(pkg),
       location: relative(root, directory),
-    });
+      preProblems: [],
+    };
+    out.push(component);
+    // Notices inside the bundled files that this package's licence files do not cover.
+    for (const file of [...files_].sort()) {
+      if (!existsSync(file)) continue;
+      const key = file.replaceAll("\\", "/").split("node_modules/").pop();
+      for (const notice of uncoveredNotices(
+        await readFile(file, "utf8"),
+        texts,
+      )) {
+        const reviewed = reviewEmbedded(key, notice, component);
+        if (reviewed.problem) component.preProblems.push(reviewed.problem);
+        else if (reviewed.provenance) provenance.push(reviewed.provenance);
+        else out.push(...reviewed.components);
+      }
+    }
   }
   const tool = async (name) => {
     const directory = join(root, "node_modules", name);
@@ -436,7 +641,7 @@ async function bundled() {
       location: "-",
       unattributed: true,
     });
-  return out;
+  return { components: out, provenance };
 }
 
 /** Code checked into this repository from other projects and shipped. */
@@ -540,7 +745,7 @@ export function assess(c) {
   // Only the licence files' own copyright lines (a notice quotes other projects').
   c.copyright = copyrights(grant);
   const declared = spdxIds(c.declared);
-  c.problems = [];
+  c.problems = [...(c.preProblems ?? [])];
   if (c.unattributed)
     c.problems.push("build-tool code in the bundle with no known origin");
   if (!c.files.some((f) => !noticeFile.test(f)))
@@ -560,7 +765,18 @@ export function assess(c) {
     );
   if (c.files.length && !c.found.length)
     c.problems.push("licence file text not recognised");
-  c.explanation = c.problems.length ? explanations[c.name] : undefined;
+  const reviewed = explanations[c.name];
+  const grantHash = createHash("sha256").update(grant.join("")).digest("hex");
+  c.explanation = undefined;
+  if (c.problems.length && reviewed) {
+    if (reviewed.sha256 !== grantHash)
+      c.problems.push(
+        "the reviewed explanation was written for a different licence text; review it again",
+      );
+    else c.explanation = reviewed.text;
+  }
+  c.allowedByReview =
+    reviewed && reviewed.sha256 === grantHash ? reviewed.allows : [];
   return c;
 }
 /**
@@ -574,14 +790,21 @@ export function blocking(c) {
       /no licence text|no known origin|no declared licence|^declared .* outside the allow-list/.test(
         p,
       ) ||
-      (/^licence file reads as .*, outside the allow-list$/.test(p) &&
-        !c.explanation),
+      /reviewed explanation was written for a different licence text|not covered by its licence file|embedded notice no longer matches/.test(
+        p,
+      ) ||
+      (/^licence file reads as (.*), outside the allow-list$/.test(p) &&
+        /^licence file reads as (.*), outside the allow-list$/
+          .exec(p)[1]
+          .split(", ")
+          .some((id) => !(c.allowedByReview ?? []).includes(id))),
   );
 }
 export async function collect() {
+  const bundle = await bundled();
   const components = [
     ...(await dependencies()),
-    ...(await bundled()),
+    ...bundle.components,
     ...(await vendored()),
   ];
   for (const c of components) assess(c);
@@ -594,7 +817,15 @@ export async function collect() {
         ? -1
         : 1,
   );
-  return { components, go: await goHelper(), assets: await assets() };
+  const provenance = bundle.provenance.sort((a, b) =>
+    a.file === b.file ? (a.what < b.what ? -1 : 1) : a.file < b.file ? -1 : 1,
+  );
+  return {
+    components,
+    provenance,
+    go: await goHelper(),
+    assets: await assets(),
+  };
 }
 
 /** The licence a component is grouped under: its declared expression. */
@@ -603,7 +834,7 @@ const pkgJson = async () =>
   JSON.parse(await readFile(join(root, "package.json"), "utf8"));
 
 export async function render(data) {
-  const { components, go, assets } = data;
+  const { components, provenance = [], go, assets } = data;
   const pkg = await pkgJson();
   const groups = new Map();
   for (const c of components) {
@@ -653,7 +884,12 @@ export async function render(data) {
             ` These licences permit redistribution inside ${/^(MIT|[AEIOU])/.test(pkg.license) ? "an" : "a"} ${pkg.license}-licensed package provided` +
             " their notices are kept, which `THIRD-PARTY-NOTICES` does. Licences embedded inside some of" +
             " those packages are listed below and travel in `THIRD-PARTY-NOTICES` with their packages'" +
-            " notices.",
+            " notices." +
+            (provenance.length
+              ? ` Separately, ${provenance.length} comments in bundled source files say that some material was` +
+                " copied or adapted from public sources that publish under other licences, without carrying a" +
+                ' notice to reproduce; they are listed under "Provenance notes in bundled code" for review.'
+              : ""),
         ]
       : [
           `**Pymtheg's own licence is not yet chosen.** \`package.json\` has no \`license\` field or the repository has no LICENSE file.`,
@@ -663,7 +899,9 @@ export async function render(data) {
     "",
     `${components.length} third-party components are shipped: ${by("dependency")} installed npm dependencies` +
       ` (direct and transitive, production only; ${by("optional")} optional), ${by("bundled")} packages bundled into \`dist-web/\`,` +
-      ` ${by("build-tool")} sources of code the build tools write into \`dist-web/\` themselves, and ${by("vendored")} vendored grammars.` +
+      ` ${by("build-tool")} sources of code the build tools write into \`dist-web/\` themselves,` +
+      ` ${by("embedded")} origins of code embedded inside bundled packages (their notices are in source-file headers that minification removes),` +
+      ` and ${by("vendored")} vendored grammars.` +
       ` Dev-only packages are not shipped and are listed separately at the end.`,
     "",
     "| Licence (as declared) | Components | What it asks of a redistributor |",
@@ -756,6 +994,26 @@ export async function render(data) {
       );
     md.push("");
   }
+  md.push(
+    "## Provenance notes in bundled code",
+    "",
+    "Comments in bundled source files that say material was copied or adapted from a public source,",
+    "where the comment carries no licence notice of its own. They are reviewed and pinned in",
+    "`scripts/licences/inventory.mjs` (`embeddedNotices`), listed here for the owner's attention; this",
+    "inventory does not judge whether they need anything further.",
+    "",
+  );
+  if (provenance.length) {
+    md.push(
+      "| Component | File | What | From | Licence of the source |",
+      "|---|---|---|---|---|",
+    );
+    for (const p of provenance)
+      md.push(
+        `| ${p.component} | ${p.file} | ${p.what} | ${p.from} | ${p.publishedUnder} |`,
+      );
+  } else md.push("None.");
+  md.push("");
   md.push(
     "## Code written by the build tools",
     "",

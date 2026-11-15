@@ -80,7 +80,7 @@ export const injectedSignatures = [
     origin: "@rollup/plugin-commonjs",
     what: "CommonJS module wrapper",
     pattern: new RegExp(
-      `var ${id}=\\{exports:\\{\\}\\}(,${id}=\\{\\})?;|var ${id};function ${id}\\(\\)\\{if\\(${id}\\)return ${id};${id}=1;`,
+      `var ${id}=\\{exports:\\{\\}\\}(,${id}=\\{\\})?;|var ${id}(?:,${id})*;function ${id}\\(\\)\\{if\\(${id}\\)return ${id};${id}=1;`,
       "g",
     ),
   },

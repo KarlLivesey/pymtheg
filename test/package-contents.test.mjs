@@ -82,6 +82,20 @@ const hostSuffix = `${label}(?:\\.${label})*\\.(?:internal|local|lan)(?![\\w-])`
 const textHost = new RegExp(`(?<![\\w.-])${hostSuffix}`, "i");
 const codeHost = new RegExp(`(?<=["'\`@]|//)${hostSuffix}`, "i");
 const devserver = /(?<![\w-])devserver(?![\w-])/i;
+/** The owner's private projects; "ProjectB" only as the capitalised name. */
+const privateProjectName =
+  /\b(?:[Gg]wead|PROJECT-A|[Pp]ost[Gg]oose|PROJECT-C|ProjectB)\b/;
+test("the private project rule matches the names, not the ordinary word tiered", () => {
+  for (const text of [
+    "the ProjectA engine",
+    "ProjectC schema",
+    "ProjectB planning",
+    "project-c",
+  ])
+    assert.match(text, privateProjectName, text);
+  for (const text of ["tiered pricing", "a three-tiered cache", "untiered"])
+    assert.doesNotMatch(text, privateProjectName, text);
+});
 function networkFindings(path, text) {
   const code = /\.(m?js|d\.ts|css)$/.test(path);
   const found = [];
@@ -168,7 +182,7 @@ test("no shipped file carries a personal path, the owner's name or a private pro
     ].includes(path);
     const rules = [
       ["personal path", /\/home\/[a-z_][a-z0-9_.-]*\//i],
-      ["private project name", /\b(project-a|project-c)\b|\bTiered\b/i],
+      ["private project name", privateProjectName],
       ...(licenceText ? [] : [["owner's name", /\bKarl\b/]]),
     ];
     for (const [what, pattern] of rules) {
