@@ -2,9 +2,10 @@
 
 Build-plan Rule 5. Documentation only: no source, test, build-plan, mega-plan or
 per-chunk change note was edited. Base: `origin/main` at `8e63a009`, then
-`origin/main` at `93ffca8e` merged in round 1. Folded: the merged chunks in the
-build-plan ledger (W0-2, W1-A–F, W2-A–L, W2-B2, W2-C2, W2-K2, W2-P, W2-Q, W2-S,
-W2-U). Open pull requests (W2-M #23, W2-T #27) are not described as done.
+`origin/main` at `93ffca8e` merged in round 1 and at `27a4de90` in round 2.
+Folded: the merged chunks in the build-plan ledger (W0-2, W1-A–F, W2-A–L, W2-B2,
+W2-C2, W2-K2, W2-M, W2-P, W2-Q, W2-S, W2-T, W2-U). Chunks still open (W2-C3, W2-V)
+are not described.
 
 Every added claim was checked against the code on this base or by running the
 built tool (`npm ci --ignore-scripts && npm run build`). Probe outputs are in
@@ -117,6 +118,11 @@ built tool (`npm ci --ignore-scripts && npm run build`). Probe outputs are in
 
 ## Superseded statements in per-chunk notes (left as written)
 
+- `W1-C.md:277`: "failed parses are retried" is superseded by W2-M's content-failure
+  cache: a returned content failure from `parse` is stored and not re-parsed while
+  hash, module and version match (operational failures are still retried).
+- `W2-I.md:93`: "existing failed-file retries … remain mandatory" is superseded the
+  same way (W2-M).
 - `W1-C.md`: partial files whose recovered symbols are legal targets, and
   "partials can be cached"; superseded for the three production modules by the
   whole-file rule (Go and Rust have no `partial`; TypeScript `partial` means
@@ -167,16 +173,11 @@ built tool (`npm ci --ignore-scripts && npm run build`). Probe outputs are in
 
 ## Will be stale again when open pull requests merge
 
-- **W2-M (#23), graph core robustness:** `support.md` "Failed files are parsed
-  again on every index" and "Links into a file that failed internally …"; the
-  runtime-map "Graph indexing" paragraph (parse for "previously failed files"); a `failedFiles()` / broken-file report API
-  and failure caching (with `failureKind: "transient"` honoured) will need adding.
 - **W2-C3, W2-V** (started per the ledger, no PR described here): any further
   Rust or other module change makes the module versions and the Rust "Macros"
   bullet stale.
-- **W2-T (#27), deterministic process tests:** `support.md`'s "Correctness tests
-  do not use benchmark thresholds or startup sleeps" paragraph is the rule those
-  tests are being brought into line with; note the fix there if wording changes.
+- A later fix for links into a file that failed internally (W2-U further work)
+  makes the `support.md` "unresolved with no reason" sentence stale.
 - The TLC/Quint removal chunk (Wave 3) will make the engine rows, README TLC
   section, `runtime-map.md` adapter and lifecycle text, and the D2 entry stale.
 
@@ -228,13 +229,47 @@ Reviewer findings (PR 30 round 1), each re-verified by my own run:
 7. **Merged `origin/main`** (`93ffca8e`, normal merge). Newly merged since the
    first base: W2-C2 (PR 22). Folded, verified by
    `evidence/w2-z/round1-rust-macro-probe.txt` and the code: Rust module version
-   23 (`src/graph/languages/rust/index.ts:12`); `println!` no longer withholds the
-   links in its function while an unknown macro (`tracing::info!`) still does;
+   23 (`src/graph/languages/rust/index.ts:12`); a `println!` statement no longer
+   withholds links while an unknown macro statement (`tracing::info!`) does
+   (corrected in round 2: only in its enclosing block, and only in statement
+   position);
    a child file resolves a macro from its parent's `#[macro_use] mod macros;`;
    macro arguments get no links. The twenty standard macro names and the extended
    E4 known limit are from `docs/changes/W2-C2.md` (names) and its tests
    (`test/graph-rust-macro-recall*.test.mjs`). The E4 decision entry's "open pull
    request" parenthesis is removed. PRs 28 and 29 were already covered.
+
+## Round 2 review fixes
+
+1. **Unknown macros** (`support.md` Rust "Macros"; this note's round-1 item 7):
+   "a function body that invokes an unknown macro withholds the links in it"
+   overstated it. An unknown macro invoked as a statement withholds the links in
+   its enclosing block (`opaque-item-may-shadow-name`); one used as an expression
+   withholds nothing. Run: `evidence/w2-z/round2-macro-position-probe.txt`
+   (inner-block statement: the two calls outside the inner block resolve, the one
+   inside is withheld; `let _x = m!();` and `helper() + m!()`: all calls resolve).
+2. **Chunk boundary** (`support.md` Go): "first" dropped. Run: an identifier
+   straddling the second boundary (offset 10,237) also fails the file
+   (appended to `round1-go-chunk-boundary-probe.txt`).
+3. **Merged `origin/main`** (`27a4de90`, normal merge): W2-M (PR 23) and W2-T
+   (PR 27) folded.
+   - W2-M, verified by `evidence/w2-z/round2-failure-cache-probe.txt` (each broken
+     fixture indexed twice with the store reopened: Go and Rust `indexed 0` on the
+     second run, TypeScript `indexed 1`; `failedFiles()` output) and the code:
+     `src/graph/indexer.ts:185-205` (cache check, `cacheableFailures` only from
+     `parse`), `:296-303` (analysis failures never marked), `:334`
+     (`structuredClone` for `resolve`); `src/graph/store.ts:54`
+     (`graph_parse_failures`), `:180-191` (`isParseFailure` joins hash, module,
+     version and content kind), `:193-210` (`failedFiles()`), `:424,430` (per-link
+     comparison). Added to `support.md` (failure caching and the broken-file
+     report), `runtime-map.md` (graph indexing) and `decisions.md` (a ruling under
+     the whole-file entry); "Failed files are parsed again on every index" removed.
+   - W2-T, verified against `test/process-safety.mjs` (60-second `within` budget
+     reporting unresolved evidence; `/proc/<pid>/stat`),
+     `test/implementation-process.test.mjs:168` and
+     `test/capture-supervisor-observer.mjs` (preload and Unix socket). Added to
+     the `support.md` correctness-tests paragraph. No production behaviour
+     changed, so nothing else was folded.
 
 ## Checks
 

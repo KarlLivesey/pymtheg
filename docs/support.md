@@ -78,7 +78,13 @@ built-in sampler and Quint sample traces up to the selected steps/samples. None 
 
 Correctness tests do not use benchmark thresholds or startup sleeps. Deadline
 classification uses controlled process boundaries; real process teardown starts
-after readiness. Backend integration timeout is an explicit unresolved/skip,
+after readiness. The process-ownership tests (`test/process.test.mjs`,
+`test/implementation-process.test.mjs`) wait for readiness and completion
+handshakes and fire deadlines and grace periods explicitly. Their named 60-second
+outer safety budgets only turn missing evidence into an unresolved failure; they
+establish no timing property. They observe descendants through Linux `/proc` and
+use a test-only preload and Unix socket to observe the supervisor's completion.
+Source: [W2-T](changes/W2-T.md). Backend integration timeout is an explicit unresolved/skip,
 not a successful assertion of the source property.
 
 Flow lowering materialises at most 5,000 source states by default (explicit
@@ -206,8 +212,26 @@ link from a valid file that depends on it is failed with the cause recorded, and
 file's package, crate or program may contain unseen declarations, so lookups that
 such declarations could change are not definite: they become open sets or
 unresolved (Go, Rust) or are flagged unverified (TypeScript, below).
-Failed files are parsed again on every index. Grammar gaps (below) make some
-valid files fail.
+Grammar gaps (below) make some valid files fail.
+
+**Failure caching and the broken-file report.** A content failure returned by a
+module's `parse` (a syntax error) is stored and reused: while the file's
+original-byte hash, module ID and module version are unchanged it is not parsed
+again, and it stays failed with its diagnostics. Editing the file or bumping the
+module version invalidates it. Go and Rust failures are cached this way.
+TypeScript content failures are never cached by the core, because that module is
+analyze-only and its failures come from project analysis; such a file is read
+again on every index. Failures marked `failureKind: "transient"`, thrown parser
+exceptions (crash, timeout, cancellation, resource budget), malformed parser
+output, unreadable captures and project-analysis failures are never cached; they
+are retried. `SqliteGraphStore.failedFiles()` lists the failed source files, ordered
+by path, as `{path, language, reason, range?}` (reason and range from the first
+diagnostic). Partial files are not in it. Derived links are compared and stored
+one row at a time, so no single string holds a whole module's analysis; this
+does not make an arbitrarily large snapshot fit in memory. Each module's
+`resolve` receives its own deep copy of files, symbols, links and context files,
+so a module that mutates its input cannot affect later modules or stored facts.
+Source: [W2-M](changes/W2-M.md).
 
 **Internal errors are not invalid code.** An exception inside the TypeScript
 module while reading one file, and the TypeScript compiler's stack limits, fail
@@ -256,7 +280,7 @@ The manifest records the upstream commit, patches, tool versions and sha256, and
 maintainer step (`node grammars/build.mjs go`) that install and tests never run.
 Still failing a valid file: an empty statement followed by another statement on
 the same line (`{; G() }`), and a non-BMP character in an identifier that
-straddles the parser runtime's first 5,119-unit input chunk boundary (the same
+straddles one of the parser runtime's 5,119-unit input chunk boundaries (the same
 character in a comment or string there is read). Sources: [W2-B](changes/W2-B.md),
 [W2-B2](changes/W2-B2.md), [W2-S](changes/W2-S.md), `grammars/README.md`.
 
@@ -288,8 +312,10 @@ manifest unknown). Private items are ordinary symbols.
   would-be target), and so are `use` and `mod` declarations under one. Links
   written **inside** such an item (for example the body of a `#[tokio::main]`
   function) are resolved as written.
-- **Macros:** a function body that invokes an unknown macro (for example
-  `tracing::info!`) withholds the links in it (`opaque-item-may-shadow-name`). The
+- **Macros:** an unknown macro (for example `tracing::info!`) invoked as a
+  **statement** withholds the links in its enclosing block
+  (`opaque-item-may-shadow-name`); links outside that block are unaffected. One
+  used as an **expression** (`let x = m!();`, an operand) withholds nothing. The
   twenty standard statement macros (`print`, `println`, `eprint`, `eprintln`,
   `assert`, `assert_eq`, `assert_ne`, the three `debug_assert` forms, `vec`,
   `format`, `write`, `writeln`, `panic`, `todo`, `unreachable`, `unimplemented`,

@@ -2266,6 +2266,15 @@ Further rulings under this rule, each the manager's:
 - **Internal errors** (W2-U, cut by the manager from the W2-M review): an
   internal error in a module (a defect in Pymtheg or a resource limit) is reported
   as such and retried, never as invalid code.
+- **Content failures are stored, operational failures retried** (W2-M, cut by the
+  manager from the W2-B round 14 backlog): a syntax failure returned by a module's
+  `parse` is cached against the file's content hash, module ID and module version
+  and not parsed again until one changes; anything a module marks
+  `failureKind: "transient"`, any thrown parser exception and any project-analysis
+  failure is retried. The core never classifies a failure by its wording. **Why:**
+  a project with one broken file was never an all-unchanged re-index, yet a crash
+  must not be remembered as invalid code. **Rules out:** caching a failure that
+  depends on the environment rather than the file's text.
 
 ### Candidate sets must be honest about completeness
 

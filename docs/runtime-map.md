@@ -1466,9 +1466,12 @@ run cache separately, so a damaged run cache cannot disable draft recovery.
 **Graph indexing.** `indexProject` walks the root (skipping `.git`,
 `node_modules`, `.codegraph` and supplied exclusions; symlinks are not
 followed), captures bytes and strict UTF-8 text, assigns each path to one module
-by claim specificity, then per module: `parse` for changed or previously failed
-files, `analyze` over the whole snapshot on every run, and `resolve` over all
-symbols and this module's parsed links. Results are validated before any write;
+by claim specificity, then per module: `parse` for changed files and for failed
+files without a stored content-failure marker (`graph_parse_failures`, keyed by
+hash, module and version), `analyze` over the whole snapshot on every run, and
+`resolve` over a deep copy (`structuredClone`) of all symbols, files, context
+files and this module's parsed links. `failedFiles()` reads the failed source
+files back; derived links are compared and written per row. Results are validated before any write;
 module exceptions are reported in `errors`, `analysisErrors` or
 `resolutionErrors` and leave earlier valid facts in place; storage failures
 propagate. Symbol IDs hash project, module, path, kind, scoped identity and
