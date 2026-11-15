@@ -2374,18 +2374,40 @@ rewriting of source except sound error-site repairs. Done for Go (v0.25.0 + #202
 
 ### Code links store identity, never a resolved target
 
-**Decided (R1-D, 15 November 2026, under D19):** a requirement ↔ code-symbol link
-is shared planning data. It stores the graph's position-independent identity
-(language, project-relative path, kind, scoped identity, ordinal) and a
-whitespace-normalised fingerprint of the symbol's source at link time. It does
-not store a graph row, and the graph's symbol ID is kept only as a hint. State is
-recomputed against the current graph each time. A link is never dropped or
-retargeted by resolution. `moved` is reported only when exactly one same-identity
-symbol exists elsewhere and no failed file of that language could hide another.
-Otherwise the link is `missing`, with suggestions. Only an explicit refresh
-re-records a link's target. A link into a failed file is `unverifiable`, and a
-new link into a file that did not parse cleanly is refused. **Why:** the graph is
-rebuildable and can be deleted at any time; mega-plan stage 5 says "a suggested
-match … is not a link until confirmed"; and decision "Unreadable code is failed"
-applies. **Rules out:** auto-relinking renamed or moved symbols; keeping links in
-`.pymtheg/rebuildable/`.
+**Decided (R1-D, 15 November 2026, under D19; revised after review round 1):**
+a requirement ↔ code-symbol link is shared planning data. It stores the graph's
+position-independent identity (language, project-relative path, kind, scoped
+identity, ordinal), a fingerprint of the symbol's source at link time, and the
+same-identity symbols that existed in other files at that time (`twins`).
+**Fingerprint rule:** CRLF is read as LF and trailing spaces/tabs at line ends
+are dropped; every other character counts. A formatter run therefore reads as
+`changed` (cleared by refresh), and a change inside a literal is never `ok`. The
+link does not store a graph row; the graph's symbol ID is a hint only. State is
+recomputed against the current graph each time.
+
+A link is never dropped or retargeted by resolution. `moved` requires
+established continuity, all of the following:
+
+- the recorded file is gone;
+- exactly one same-identity symbol has identical text at a path that held no
+  twin;
+- no same-text twin has left its path;
+- no failed file could hide another candidate.
+
+Anything else is `missing`, with suggestions. `link check` fails on `moved`
+unless `--allow-moved` is given, because a move is unconfirmed until refreshed.
+Only an explicit refresh re-records a link's target. A link into a failed file
+is `unverifiable`, and a new link into a file that did not parse cleanly is
+refused.
+
+**Why:** the graph is rebuildable and can be deleted at any time. Mega-plan
+stage 5 says "a suggested match … is not a link until confirmed", and decision
+"Unreadable code is failed" applies. Go and TypeScript identities carry no
+package or file, so a shared name is not continuity: in review, restic's
+`splitPath` and `PruneOptions` renames were reported as moves to unrelated
+`cmd/restic` symbols. **Rules out:**
+
+- auto-relinking renamed or moved symbols;
+- treating a same-name symbol as the same symbol;
+- token-aware or whitespace-insensitive fingerprints in this chunk;
+- keeping links in `.pymtheg/rebuildable/`.

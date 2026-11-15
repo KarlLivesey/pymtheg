@@ -2,6 +2,7 @@
  * src/architecture/code-links.ts. */
 import {
   checkCodeLinks,
+  CodeLinkError,
   codeLinkHistory,
   codeLinkSchema,
   createCodeLink,
@@ -23,12 +24,13 @@ export const linkUsage = `pymtheg link SUBCOMMAND [--root DIRECTORY] [--json] [-
   remove LINK_ID                         LINK_ID or a unique prefix of 8+ characters
   refresh LINK_ID                        accept the current symbol of a changed/moved link
   list [--record RECORD] [--symbol SELECTOR] [--file PATH]
-  check                                  exit 1 if any link is missing, changed or unverifiable
+  check [--allow-moved]                  exit 1 if any link is missing, changed, unverifiable or moved
   touched SELECTOR | --file PATH [--impact] [--depth 5]
   unlinked [--symbols] [--limit 200]
   history
 `;
 const quote = (v: unknown) => JSON.stringify(v);
+const usage = (message: string) => new CodeLinkError("invalid-input", message);
 const where = (s: SymbolSummary) =>
   `${s.path}${s.line === null ? "" : ":" + s.line}`;
 function graphLines(graph: GraphSummary | null): string[] {
@@ -86,15 +88,23 @@ export async function linkCommand(
     ];
     for (let i = 1; i < args.length; i++) {
       const arg = args[i]!;
-      if (["--json", "--no-sync", "--impact", "--symbols"].includes(arg)) {
-        if (flags.has(arg)) throw Error("Duplicate " + arg);
+      if (
+        [
+          "--json",
+          "--no-sync",
+          "--impact",
+          "--symbols",
+          "--allow-moved",
+        ].includes(arg)
+      ) {
+        if (flags.has(arg)) throw usage("Duplicate " + arg);
         flags.add(arg);
       } else if (valueOptions.includes(arg)) {
         if (values.has(arg) || args[i + 1] === undefined)
-          throw Error("Missing or duplicate " + arg);
+          throw usage("Missing or duplicate " + arg);
         values.set(arg, args[++i]!);
       } else if (arg.startsWith("--"))
-        throw Error("Unknown link option " + arg);
+        throw usage("Unknown link option " + arg);
       else positional.push(arg);
     }
     const common = {
@@ -104,18 +114,18 @@ export async function linkCommand(
     };
     const arity = (n: number) => {
       if (positional.length !== n)
-        throw Error(`link ${sub} takes ${n} argument${n === 1 ? "" : "s"}`);
+        throw usage(`link ${sub} takes ${n} argument${n === 1 ? "" : "s"}`);
     };
     const number = (name: string) => {
       if (!values.has(name)) return undefined;
       const v = Number(values.get(name));
-      if (!Number.isInteger(v)) throw Error(name + " must be an integer");
+      if (!Number.isInteger(v)) throw usage(name + " must be an integer");
       return v;
     };
     let out: { exitCode: number; text: string[]; data: object };
     if (sub === "requirement") {
       arity(1);
-      if (!values.get("--title")?.trim()) throw Error("--title is required");
+      if (!values.get("--title")?.trim()) throw usage("--title is required");
       const kind = values.get("--kind") as
         | "requirement"
         | "decision"
@@ -156,7 +166,7 @@ export async function linkCommand(
         text.push(`  record: ${r.id} “${r.title}”`);
       text.push(...graphLines(result.graph));
       out = {
-        exitCode: ["created", "exists"].includes(result.status) ? 0 : 1,
+        exitCode: ["created", "already-linked"].includes(result.status) ? 0 : 1,
         data: result,
         text,
       };
@@ -182,7 +192,10 @@ export async function linkCommand(
       arity(0);
       const result =
         sub === "check"
-          ? await checkCodeLinks(common)
+          ? await checkCodeLinks({
+              ...common,
+              allowMoved: flags.has("--allow-moved"),
+            })
           : await listCodeLinks({
               ...common,
               ...(values.has("--record")
@@ -199,7 +212,9 @@ export async function linkCommand(
         ...result.links.flatMap(linkLines),
         ...graphLines(result.graph),
       ];
-      const failing = result.links.filter(failsCheck).length;
+      const failing = result.links.filter((r) =>
+        failsCheck(r, flags.has("--allow-moved")),
+      ).length;
       if (sub === "check")
         text.push(
           failing
@@ -216,7 +231,7 @@ export async function linkCommand(
         positional.length > 1 ||
         (positional.length === 1) === values.has("--file")
       )
-        throw Error("link touched takes one SELECTOR or --file PATH");
+        throw usage("link touched takes one SELECTOR or --file PATH");
       const depth = number("--depth");
       const result = await requirementsFor({
         ...common,
@@ -233,11 +248,22 @@ export async function linkCommand(
             `  ${t.record}${t.title ? ` “${t.title}”` : ""} via ${t.via}${t.via === "caller" ? ` (distance ${t.distance})` : ""}: ${t.symbol.identity} [${t.state}] link ${t.link.slice(0, 8)}`,
         ),
       ];
-      if (result.impactIncomplete)
+      if (result.impactIncomplete) {
         text.push(
-          "Impact may be incomplete (bounds, candidate or unresolved calls): " +
-            (result.impactNotes.join(" ") || "candidate callers not followed."),
+          "Impact may be incomplete (bounds, candidate or unresolved calls)." +
+            (result.impactNotes.length
+              ? " " + result.impactNotes.join(" ")
+              : ""),
         );
+        if (result.notFollowedCount)
+          text.push(
+            `Callers not followed (${result.notFollowedCount}${result.notFollowedCount > result.notFollowed.length ? `, first ${result.notFollowed.length} shown` : ""}):`,
+            ...result.notFollowed.map(
+              (c) =>
+                `  ${c.certainty} ${c.identity} at ${c.path}${c.line === null ? "" : ":" + c.line}`,
+            ),
+          );
+      }
       text.push(...graphLines(result.graph));
       out = { exitCode: 0, data: result, text };
     } else if (sub === "unlinked") {
@@ -277,7 +303,7 @@ export async function linkCommand(
           ),
         ],
       };
-    } else throw Error(`Unknown link subcommand ${quote(sub)}.\n${linkUsage}`);
+    } else throw usage(`Unknown link subcommand ${quote(sub)}.\n${linkUsage}`);
     process.stdout.write(
       json
         ? JSON.stringify({
@@ -290,6 +316,12 @@ export async function linkCommand(
     return out.exitCode;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    const code =
+      error instanceof CodeLinkError
+        ? error.code
+        : signal.aborted
+          ? "cancelled"
+          : "error";
     const exitCode = signal.aborted ? 130 : 3;
     if (json)
       process.stdout.write(
@@ -298,10 +330,10 @@ export async function linkCommand(
           command: sub || null,
           status: "error",
           exitCode,
-          error: { message },
+          error: { code, message },
         }) + "\n",
       );
-    else process.stderr.write(`Link error: ${message}\n`);
+    else process.stderr.write(`Link error [${code}]: ${message}\n`);
     return exitCode;
   }
 }

@@ -18,6 +18,7 @@ import { SqliteGraphStore } from "../graph/store.js";
 import type { GraphSymbol } from "../graph/types.js";
 import { findProjectRoot, storagePath } from "../storage/local.js";
 import type { HistoryWriter } from "../storage/recorded-history.js";
+import { ArchitectureConflict } from "./import-merge.js";
 import { newPlanItem } from "./planning.js";
 import type { ArchitectureEntity } from "./schema.js";
 import { ArchitectureStore } from "./store.js";
@@ -53,6 +54,9 @@ export interface StoredCodeLink {
   fingerprint: CodeFingerprint;
   /** Hints only; never used for identity. */
   hint: { line: number; graphId: string };
+  /** Same-identity symbols in other files at link/refresh time (never move
+   * targets). `null`: not recorded or over the bound, so `moved` is never claimed. */
+  twins: { path: string; fingerprint: CodeFingerprint }[] | null;
   created: string;
   refreshed: string | null;
   note: string;
@@ -110,19 +114,61 @@ export interface CodeLinkOptions {
 }
 
 const sha = (text: string) => createHash("sha256").update(text).digest("hex");
+/** Exact rule: CRLF becomes LF and spaces/tabs at the end of each line are
+ * dropped; every other character is significant (reformatting reads as
+ * `changed`; a whitespace change inside a literal is never `ok`). The
+ * signature/body split is at the first `{` of that text. */
 export function fingerprintText(text: string): CodeFingerprint {
-  const normal = text.replace(/\s+/g, " ").trim();
+  const normal = text.replace(/\r\n/g, "\n").replace(/[ \t]+$/gm, "");
   const brace = normal.indexOf("{");
   return {
-    signature: sha(brace < 0 ? normal : normal.slice(0, brace).trim()),
+    signature: sha(brace < 0 ? normal : normal.slice(0, brace)),
     body: brace < 0 ? "" : sha(normal.slice(brace)),
   };
+}
+
+/** Machine-readable failure codes for wrappers (`error.code`). */
+export type CodeLinkErrorCode =
+  | "invalid-input"
+  | "link-not-found"
+  | "link-ambiguous"
+  | "ambiguous-selector"
+  | "selector-not-found"
+  | "locked"
+  | "graph-changed"
+  | "record-conflict";
+export class CodeLinkError extends Error {
+  constructor(
+    readonly code: CodeLinkErrorCode,
+    message: string,
+  ) {
+    super(message);
+    this.name = "CodeLinkError";
+  }
+}
+/** SQLite busy/locked after the store's bounded writer wait → `locked`. */
+function lockError(error: unknown): unknown {
+  const e = error as { errcode?: number; message?: string };
+  if (
+    e &&
+    (e.errcode === 5 ||
+      e.errcode === 6 ||
+      /database is locked|SQLITE_BUSY/i.test(String(e.message)))
+  )
+    return new CodeLinkError(
+      "locked",
+      `A database stayed locked by another writer beyond the bounded wait; nothing was changed. Retry. (${String(e.message)})`,
+    );
+  return error;
 }
 
 async function projectRoot(input = "."): Promise<string> {
   const path = await realpath(input);
   if (!(await lstat(path)).isDirectory())
-    throw Error("Project root must be a directory");
+    throw new CodeLinkError(
+      "invalid-input",
+      "Project root must be a directory",
+    );
   return findProjectRoot(path);
 }
 async function planningExists(root: string) {
@@ -140,12 +186,19 @@ async function withStore<T>(
   use: (store: ArchitectureStore | null) => Promise<T> | T,
 ): Promise<T> {
   if (!write && !(await planningExists(root))) return use(null);
-  const store = await ArchitectureStore.open(root, {
-    readOnly: !write,
-    ...(writer ? { writer } : {}),
-  });
+  let store: ArchitectureStore;
+  try {
+    store = await ArchitectureStore.open(root, {
+      readOnly: !write,
+      ...(writer ? { writer } : {}),
+    });
+  } catch (error) {
+    throw lockError(error);
+  }
   try {
     return await use(store);
+  } catch (error) {
+    throw lockError(error);
   } finally {
     store.close();
   }
@@ -185,7 +238,8 @@ function findLink(links: StoredCodeLink[], input: string): StoredCodeLink {
     (l) => l.id === value || (value.length >= 8 && l.id.startsWith(value)),
   );
   if (found.length !== 1)
-    throw Error(
+    throw new CodeLinkError(
+      found.length ? "link-ambiguous" : "link-not-found",
       found.length
         ? `Link ID prefix “${value}” matches ${found.length} links; give more characters.`
         : `No active code link “${value}”. List links with “link list”.`,
@@ -337,42 +391,23 @@ function resolveOne(
       unverifiableFile: { path: ref.path, reason: status.reason },
       message: `File ${ref.path} parsed only partially (${status.reason}) and the symbol was not found in it; the link cannot be checked.`,
     };
-  // Not at its path: look for the same identity elsewhere (same language).
+  // Not at its recorded path. Continuity must be established, never assumed
+  // from a shared name: Go/TypeScript identities carry no package or file.
   const hidden = failed
     .filter((f) => f.language === ref.language || f.language === null)
     .map((f) => f.path);
-  const elsewhere = view
-    .named(ref.identity)
-    .filter((s) => sameIdentity(s, ref) && s.file !== ref.path);
+  const named = view.named(ref.identity).filter((s) => sameIdentity(s, ref));
+  const elsewhere = named.filter((s) => s.file !== ref.path);
   const partialHiding = [
     ...new Set(
-      view
-        .named(ref.identity)
+      named
         .map((s) => s.file)
         .filter((p) => view.fileStatus(p)?.status === "partial"),
     ),
   ];
   const mayBeHiddenBy = [...new Set([...hidden, ...partialHiding])].sort();
-  if (elsewhere.length === 1 && !mayBeHiddenBy.length) {
-    const moved = elsewhere[0]!;
-    const differs = ["path" as const, ...compare(moved)];
-    return {
-      ...base,
-      state: "moved",
-      current: view.summarize(moved),
-      differs,
-      message: `Symbol ${ref.identity} is now in ${moved.file}${differs.length > 1 ? ` and its ${differs.slice(1).join(", ")} changed` : ""}.`,
-    };
-  }
-  const suggestions: SymbolSummary[] = elsewhere.map((s) =>
-    view.summarize(
-      s,
-      elsewhere.length > 1
-        ? "same identity in another file (several; not chosen)"
-        : "same identity in another file (failed files could hide another)",
-    ),
-  );
-  // Renamed in place: same kind, same body text in the original file.
+  const suggestions: SymbolSummary[] = [];
+  // Rename in place: same kind, identical body text in the linked file.
   if (link.fingerprint.body)
     for (const s of view.inFile(ref.path))
       if (
@@ -386,6 +421,52 @@ function resolveOne(
             "same kind and identical body in the linked file (renamed?)",
           ),
         );
+  const twins = link.twins ?? null;
+  const twinPaths = new Set(twins?.map((t) => t.path) ?? []);
+  const equalText = (s: GraphSymbol) => compare(s).length === 0;
+  const fresh = elsewhere.filter((s) => !twinPaths.has(s.file));
+  const sameText = fresh.filter(equalText);
+  // A recorded twin with the same text that left its own path could equally be
+  // the source of a same-text symbol at a new path: not provable.
+  const twinLeft = (twins ?? []).some(
+    (t) =>
+      t.fingerprint.signature === link.fingerprint.signature &&
+      t.fingerprint.body === link.fingerprint.body &&
+      !elsewhere.some((s) => s.file === t.path),
+  );
+  const recordedFileGone = status === null;
+  if (
+    twins !== null &&
+    recordedFileGone &&
+    sameText.length === 1 &&
+    !twinLeft &&
+    !mayBeHiddenBy.length
+  ) {
+    const moved = sameText[0]!;
+    return {
+      ...base,
+      state: "moved",
+      current: view.summarize(moved),
+      differs: ["path"],
+      suggestions,
+      message: `Symbol ${ref.identity} is now in ${moved.file} with identical text (${ref.path} no longer exists). Not verified until refreshed.`,
+    };
+  }
+  for (const s of elsewhere)
+    suggestions.push(
+      view.summarize(
+        s,
+        twinPaths.has(s.file)
+          ? "a different symbol with the same name already existed here when the link was made"
+          : !equalText(s)
+            ? "same name in another file, different text"
+            : !recordedFileGone
+              ? "identical text at another path, but the linked file still exists (rename or copy?)"
+              : twins === null
+                ? "identical text at another path; this link has no record of same-name symbols at link time"
+                : "identical text at another path; not unique or could be another symbol's move",
+      ),
+    );
   return {
     ...base,
     state: "missing",
@@ -393,6 +474,27 @@ function resolveOne(
     mayBeHiddenBy,
     message: `Symbol ${ref.identity} (${ref.kind}) was not found${status ? ` in ${ref.path}` : `; ${ref.path} is no longer indexed`}.${suggestions.length ? " Suggestions are listed; relink explicitly if one is right." : ""}${mayBeHiddenBy.length ? ` Failed or partial files may hide it: ${mayBeHiddenBy.join(", ")}.` : ""}`,
   };
+}
+
+/** Same-identity symbols in other files when a link is made or refreshed:
+ * they can never become its move target. `null` when over the bound. */
+function recordTwins(
+  view: GraphView,
+  symbol: GraphSymbol,
+): StoredCodeLink["twins"] {
+  const twins = view
+    .named(symbol.identity)
+    .filter(
+      (s) =>
+        s.module === symbol.module &&
+        s.kind === symbol.kind &&
+        s.identity === symbol.identity &&
+        s.file !== symbol.file,
+    );
+  if (twins.length > 1000) return null;
+  return twins
+    .map((s) => ({ path: s.file, fingerprint: view.fingerprint(s) }))
+    .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
 }
 
 async function resolveAll(
@@ -474,12 +576,21 @@ export async function createRequirement(
       detail: input.text ?? "",
       owner: input.owner ?? "unassigned",
     };
-    const saved = (await service.savePlanItem(
-      head,
-      item,
-      `Add ${item.kind} ${item.id}`,
-      input.signal ?? new AbortController().signal,
-    )) as { id: string };
+    let saved: { id: string };
+    try {
+      saved = (await service.savePlanItem(
+        head,
+        item,
+        `Add ${item.kind} ${item.id}`,
+        input.signal ?? new AbortController().signal,
+      )) as { id: string };
+    } catch (error) {
+      const mapped = lockError(error);
+      if (mapped !== error) throw mapped;
+      if (error instanceof ArchitectureConflict)
+        throw new CodeLinkError("record-conflict", (error as Error).message);
+      throw error;
+    }
     return {
       schema: codeLinkSchema,
       status: "created",
@@ -507,15 +618,16 @@ export interface CreateCodeLinkInput extends CodeLinkOptions {
 }
 export interface CreateCodeLinkResult {
   schema: typeof codeLinkSchema;
-  /** `created`; `exists` (same link already active, unchanged); otherwise nothing was written. */
+  /** Machine-readable outcome. `created`; `already-linked` (same link active,
+   * nothing changed); every other value means nothing was written. */
   status:
     | "created"
-    | "exists"
-    | "ambiguous"
-    | "not-found"
+    | "already-linked"
+    | "ambiguous-selector"
+    | "selector-not-found"
     | "record-not-found"
     | "record-ambiguous"
-    | "unreadable";
+    | "failed-file";
   link: StoredCodeLink | null;
   /** Ambiguous/not-found selector: the graph's matches (nothing created). */
   matches: SymbolSummary[];
@@ -581,7 +693,7 @@ export async function createCodeLink(
         schema: codeLinkSchema,
         ...empty,
         graph,
-        status: matches.length ? "ambiguous" : "not-found",
+        status: matches.length ? "ambiguous-selector" : "selector-not-found",
         matches,
         message: matches.length
           ? `Selector “${input.selector}” matches ${matches.length} symbols; choose one (a symbol: ID or path:line). Nothing was linked.`
@@ -590,21 +702,28 @@ export async function createCodeLink(
     }
     const symbol = data.symbol;
     const graphStore = openGraph(root)!;
-    let fingerprint: CodeFingerprint, fileState: string, reason: string;
+    let fingerprint: CodeFingerprint,
+      fileState: string,
+      reason: string,
+      twins: StoredCodeLink["twins"];
     try {
-      ({ fingerprint, fileState, reason } = graphStore.readCommandSnapshot(
-        () => {
+      ({ fingerprint, fileState, reason, twins } =
+        graphStore.readCommandSnapshot(() => {
           const view = graphView(graphStore, response.failedFiles);
           const current = graphStore.getSymbol(symbol.id);
-          if (!current) throw Error("Graph changed while linking; retry.");
+          if (!current)
+            throw new CodeLinkError(
+              "graph-changed",
+              "Graph changed while linking; retry.",
+            );
           const state = view.fileStatus(symbol.file);
           return {
             fingerprint: view.fingerprint(current),
+            twins: recordTwins(view, current),
             fileState: state?.status ?? "missing",
             reason: state?.reason ?? "",
           };
-        },
-      ));
+        }));
     } finally {
       graphStore.close();
     }
@@ -613,7 +732,7 @@ export async function createCodeLink(
         schema: codeLinkSchema,
         ...empty,
         graph,
-        status: "unreadable",
+        status: "failed-file",
         message: `File ${symbol.file} is ${fileState}${reason ? ` (${reason})` : ""}; links into code that did not parse cleanly are refused. Nothing was linked.`,
       };
     const ref: CodeSymbolRef = {
@@ -629,6 +748,7 @@ export async function createCodeLink(
       symbol: ref,
       fingerprint,
       hint: { line: symbol.line ?? 0, graphId: symbol.id },
+      twins,
       created: new Date().toISOString(),
       refreshed: null,
       note: input.note ?? "",
@@ -655,7 +775,7 @@ export async function createCodeLink(
       schema: codeLinkSchema,
       ...empty,
       graph,
-      status: written.changed ? "created" : "exists",
+      status: written.changed ? "created" : "already-linked",
       link,
       message: written.changed
         ? `Linked ${chosen.record.id} to ${ref.language} ${ref.kind} ${ref.identity} in ${ref.path}.`
@@ -733,12 +853,23 @@ export async function refreshCodeLink(
         message: "Link is already up to date.",
       };
     const graph = openGraph(root)!;
-    let fingerprint: CodeFingerprint, symbol: GraphSymbol;
+    let fingerprint: CodeFingerprint,
+      symbol: GraphSymbol,
+      twins: StoredCodeLink["twins"];
     try {
-      ({ fingerprint, symbol } = graph.readCommandSnapshot(() => {
+      ({ fingerprint, symbol, twins } = graph.readCommandSnapshot(() => {
         const s = graph.getSymbol(before.current!.graphId);
-        if (!s) throw Error("Graph changed while refreshing; retry.");
-        return { symbol: s, fingerprint: graphView(graph, []).fingerprint(s) };
+        if (!s)
+          throw new CodeLinkError(
+            "graph-changed",
+            "Graph changed while refreshing; retry.",
+          );
+        const view = graphView(graph, []);
+        return {
+          symbol: s,
+          fingerprint: view.fingerprint(s),
+          twins: recordTwins(view, s),
+        };
       }));
     } finally {
       graph.close();
@@ -758,6 +889,7 @@ export async function refreshCodeLink(
         ordinal: symbol.ordinal,
       },
       fingerprint,
+      twins,
       hint: { line: before.current.line ?? 0, graphId: symbol.id },
       refreshed: input.writer ? input.writer.now() : new Date().toISOString(),
     });
@@ -825,7 +957,10 @@ export async function listCodeLinks(
       );
       const symbol = (response.data as { symbol?: GraphSymbol } | null)?.symbol;
       if (!symbol)
-        throw Error(
+        throw new CodeLinkError(
+          response.status === "ambiguous"
+            ? "ambiguous-selector"
+            : "selector-not-found",
           `Selector “${input.symbol}” does not select exactly one symbol (${response.status}). Use “graph symbol” to choose.`,
         );
       selected = symbol.id;
@@ -852,27 +987,36 @@ export async function listCodeLinks(
   });
 }
 
+export interface CheckCodeLinksInput extends CodeLinkOptions {
+  /** Let `moved` links pass. Default false: a move is unconfirmed until refreshed. */
+  allowMoved?: boolean;
+}
 export interface CheckCodeLinksResult extends ListCodeLinksResult {
-  /** True when no link is missing, changed, unverifiable, or moved with changed content. */
+  /** True when no link is missing, changed or unverifiable, nor moved (unless `allowMoved`). */
   passed: boolean;
+  allowMoved: boolean;
   /** Links that fail the check (also included in `links`). */
   failing: string[];
   /** Links whose planning record no longer exists (reported; not a failure). */
   orphaned: string[];
 }
-export const failsCheck = (r: ResolvedCodeLink) =>
+export const failsCheck = (r: ResolvedCodeLink, allowMoved = false) =>
   r.state === "missing" ||
   r.state === "changed" ||
   r.state === "unverifiable" ||
-  (r.state === "moved" && r.differs.some((d) => d !== "path"));
+  (r.state === "moved" && !allowMoved);
 export async function checkCodeLinks(
-  input: CodeLinkOptions = {},
+  input: CheckCodeLinksInput = {},
 ): Promise<CheckCodeLinksResult> {
-  const listed = await listCodeLinks(input);
-  const failing = listed.links.filter(failsCheck).map((r) => r.link.id);
+  const { allowMoved = false, ...options } = input;
+  const listed = await listCodeLinks(options);
+  const failing = listed.links
+    .filter((r) => failsCheck(r, allowMoved))
+    .map((r) => r.link.id);
   return {
     ...listed,
     passed: failing.length === 0,
+    allowMoved,
     failing,
     orphaned: listed.links
       .filter((r) => !r.recordPresent)
@@ -903,6 +1047,14 @@ export interface RequirementTouch {
   via: "direct" | "caller";
   distance: number;
 }
+export interface NotFollowedCaller {
+  graphId: string;
+  identity: string;
+  path: string;
+  line: number | null;
+  /** `candidate`: one of several possible targets; `possible`: an unresolved call that may reach it. */
+  certainty: "candidate" | "possible";
+}
 export interface RequirementsForResult {
   schema: typeof codeLinkSchema;
   touched: RequirementTouch[];
@@ -911,13 +1063,19 @@ export interface RequirementsForResult {
   /** Impact traversal hit a bound, or unresolved/candidate calls exist (callers may be missing). */
   impactIncomplete: boolean;
   impactNotes: string[];
+  /** Candidate-set or possible (unresolved) callers not followed; first 20. */
+  notFollowed: NotFollowedCaller[];
+  notFollowedCount: number;
   graph: GraphSummary;
 }
 export async function requirementsFor(
   input: RequirementsForInput,
 ): Promise<RequirementsForResult> {
   if ((input.symbol === undefined) === (input.file === undefined))
-    throw Error("Give exactly one of a symbol selector or a file path");
+    throw new CodeLinkError(
+      "invalid-input",
+      "Give exactly one of a symbol selector or a file path",
+    );
   const root = await projectRoot(input.root);
   return withStore(root, false, input.writer, async (store) => {
     const records = planningRecords(store);
@@ -936,7 +1094,10 @@ export async function requirementsFor(
       );
       const symbol = (response.data as { symbol?: GraphSymbol } | null)?.symbol;
       if (!symbol)
-        throw Error(
+        throw new CodeLinkError(
+          response.status === "ambiguous"
+            ? "ambiguous-selector"
+            : "selector-not-found",
           `Selector “${input.symbol}” does not select exactly one symbol (${response.status}). Use “graph symbol” to choose.`,
         );
       starts.push(symbol.id);
@@ -957,6 +1118,22 @@ export async function requirementsFor(
     const distance = new Map<string, number>(starts.map((id) => [id, 0]));
     let impactIncomplete = false;
     const impactNotes: string[] = [];
+    // Callers the traversal saw but did not follow as definite.
+    const skipped = new Map<string, NotFollowedCaller>();
+    const skip = (
+      symbol: GraphSymbol & { line?: number },
+      certainty: NotFollowedCaller["certainty"],
+    ) => {
+      const key = symbol.id + ":" + certainty;
+      if (!skipped.has(key) && !distance.has(symbol.id))
+        skipped.set(key, {
+          graphId: symbol.id,
+          identity: symbol.identity,
+          path: symbol.file,
+          line: typeof symbol.line === "number" ? symbol.line : null,
+          certainty,
+        });
+    };
     if (input.impact)
       for (const id of starts) {
         const response = await executeGraph(
@@ -988,8 +1165,24 @@ export async function requirementsFor(
                 caller.distance,
               ),
             );
-          else impactIncomplete = true;
+          else {
+            impactIncomplete = true;
+            skip(
+              caller.symbol,
+              caller.certainty === "candidate" ? "candidate" : "possible",
+            );
+          }
+        for (const report of (response.data?.possibleCallers ?? []) as {
+          links?: { source?: (GraphSymbol & { line?: number }) | null }[];
+        }[])
+          for (const possible of report.links ?? [])
+            if (possible.source) {
+              impactIncomplete = true;
+              skip(possible.source, "possible");
+            }
       }
+    for (const key of [...skipped.keys()])
+      if (distance.has(skipped.get(key)!.graphId)) skipped.delete(key);
     const touched: RequirementTouch[] = [];
     for (const r of resolved) {
       const id = r.current?.graphId ?? null;
@@ -1020,6 +1213,8 @@ export async function requirementsFor(
       records: [...new Set(touched.map((t) => t.record))],
       impactIncomplete,
       impactNotes,
+      notFollowed: [...skipped.values()].slice(0, 20),
+      notFollowedCount: skipped.size,
       graph,
     };
   });
@@ -1058,7 +1253,10 @@ export async function unlinkedWork(
   const root = await projectRoot(input.root);
   const limit = input.limit ?? 200;
   if (!Number.isInteger(limit) || limit < 1 || limit > 10000)
-    throw Error("Limit must be an integer from 1 to 10000");
+    throw new CodeLinkError(
+      "invalid-input",
+      "Limit must be an integer from 1 to 10000",
+    );
   return withStore(root, false, input.writer, async (store) => {
     const records = planningRecords(store);
     const links = readLinks(store);
@@ -1069,7 +1267,7 @@ export async function unlinkedWork(
       )
       .map((r) => ({ id: r.id, title: r.name }));
     const publicRule =
-      "Go: name starts with an upper-case letter; Rust: recorded visibility starts with `pub`; TypeScript/JavaScript: declaration text starts with `export`. Kinds: " +
+      "Go: name starts with an upper-case letter (methods included); Rust: recorded visibility starts with `pub` (methods in `impl` blocks included); TypeScript/JavaScript: declaration text starts with `export`, plus methods of such an exported class in the same file whose text does not start with `private`, `protected` or `#`. Kinds: " +
       [...publicKinds].join(", ") +
       ". Test files and symbols in failed files are not listed.";
     if (!input.symbols)
@@ -1111,7 +1309,21 @@ export async function unlinkedWork(
             else if (s.module === "typescript") {
               if (!texts.has(s.file))
                 texts.set(s.file, store2.fileSnapshot(s.file)?.text ?? "");
-              isPublic = texts.get(s.file)!.startsWith("export", s.range.start);
+              const text = texts.get(s.file)!;
+              const exported = (symbol: GraphSymbol) =>
+                text.startsWith("export", symbol.range.start);
+              isPublic = exported(s);
+              const dot = s.identity.lastIndexOf(".");
+              if (!isPublic && s.kind === "method" && dot > 0) {
+                const owner = s.identity.slice(0, dot);
+                isPublic =
+                  !/^(private|protected)\b|^#/.test(
+                    text.slice(s.range.start, s.range.start + 10),
+                  ) &&
+                  store2
+                    .findSymbols({ file: s.file, kind: "class" })
+                    .some((c) => c.identity === owner && exported(c));
+              }
             }
             if (!isPublic) continue;
             if (symbols.length >= limit) {

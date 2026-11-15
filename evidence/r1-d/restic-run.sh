@@ -4,6 +4,8 @@
 set -u
 P="node $PWD/dist/cli/main.js"
 R=$PYM_SCRATCH/restic
+# Fresh copy each run, so the script replays from the pinned corpus.
+rm -rf "$R";
 [ -d "$R/.pymtheg" ] || { rm -rf "$R"; cp -r ~/pymtheg-dev/corpora/restic "$R"; chmod -R u+w "$R"; (cd "$R" && $P init . --format json >/dev/null); }
 cd "$R"
 run() { echo "\$ pymtheg $*"; $P "$@"; echo "[exit $?]"; echo; }
@@ -22,4 +24,20 @@ echo
 run link check
 run link touched "(*Repository).LoadIndex" --impact --depth 2
 run link unlinked
+echo "# round-1 review case: rename splitPath (internal/filter) and PruneOptions (internal/repository);"
+echo "# each has a same-named symbol in cmd/restic, which must not become the link target."
+run link requirement R-FILTER --title "Exclude patterns split paths into components"
+run link requirement R-PRUNEOPT --title "Prune options are validated"
+pick() { $P link add "$1" "$2" --json | node -e 'const r=JSON.parse(require("fs").readFileSync(0));const m=r.matches.find(m=>m.path.startsWith(process.argv[1]));process.stdout.write(m?m.graphId:"none")' "$3"; }
+run link add R-FILTER splitPath
+run link add R-FILTER "$(pick R-FILTER splitPath internal/filter)"
+run link add R-PRUNEOPT "$(pick R-PRUNEOPT PruneOptions internal/repository)"
+F=$(grep -l "^func splitPath" internal/filter/*.go | head -1)
+G=$(grep -l "^type PruneOptions" internal/repository/*.go | head -1)
+echo "# edit: rename splitPath -> splitPathRenamed in $F; PruneOptions -> PruneOptionsRenamed in $G"
+sed -i 's/\bsplitPath\b/splitPathRenamed/g' "$F"
+sed -i 's/\bPruneOptions\b/PruneOptionsRenamed/g' "$G"
+echo
+run link check
+run link refresh "$($P link list --record R-FILTER --json | node -e 'const r=JSON.parse(require("fs").readFileSync(0));process.stdout.write(r.links[0].link.id)')"
 run link history

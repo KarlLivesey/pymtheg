@@ -103,7 +103,7 @@ test("requirement ↔ Go/Rust/TypeScript links: states, rebuild, removal and his
       record: "R1",
       selector: "Index",
     });
-    assert.equal(ambiguous.status, "ambiguous");
+    assert.equal(ambiguous.status, "ambiguous-selector");
     assert.equal(ambiguous.link, null);
     assert.deepEqual(ambiguous.matches.map((m) => m.language).sort(), [
       "rust",
@@ -144,7 +144,7 @@ test("requirement ↔ Go/Rust/TypeScript links: states, rebuild, removal and his
     assert.equal(
       (await createCodeLink({ ...options, record: "R1", selector: "Save" }))
         .status,
-      "exists",
+      "already-linked",
     );
     let listed = await listCodeLinks(options);
     assert.deepEqual(
@@ -319,7 +319,7 @@ test("link CLI: text and JSON shapes, exit codes, nothing created on ambiguity",
     out = await pym(root, "link", "add", "R1", "Index", "--json");
     assert.equal(out.code, 1);
     const ambiguous = JSON.parse(out.stdout);
-    assert.equal(ambiguous.status, "ambiguous");
+    assert.equal(ambiguous.status, "ambiguous-selector");
     assert.equal(ambiguous.matches.length, 2);
     out = await pym(root, "link", "add", "R1", "rs/src/lib.rs:3");
     assert.equal(out.code, 0, out.stdout + out.stderr);
@@ -350,6 +350,339 @@ test("link CLI: text and JSON shapes, exit codes, nothing created on ambiguity",
     assert.ok(
       (await readFile(join(root, ".pymtheg", "shared", "architecture.sqlite")))
         .length > 0,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+// ---- round 1 review: continuity, fingerprints, concurrency, codes ----
+
+async function goProject(files) {
+  const root = await mkdtemp(join(tmpdir(), "pym-code-links-go-"));
+  await writeFile(join(root, "go.mod"), "module example.com/m\n\ngo 1.22\n");
+  for (const [path, text] of Object.entries(files)) {
+    await mkdir(join(root, path, ".."), { recursive: true });
+    await writeFile(join(root, path), text);
+  }
+  const init = await pym(root, "init", ".", "--format", "json");
+  assert.equal(init.code, 0, init.stdout + init.stderr);
+  await createRequirement({ root, id: "R1", title: "First" });
+  return root;
+}
+const goSave = (pkg, body = "return x + 1") =>
+  `package ${pkg}\n\nfunc Save(x int) int {\n\t${body}\n}\n`;
+const only = async (root, allowMoved = false) => {
+  const check = await checkCodeLinks({ root, writer, allowMoved });
+  assert.equal(check.links.length, 1);
+  return { check, link: check.links[0] };
+};
+
+test("rename in place with a same-named symbol in another package is missing, never moved", async () => {
+  const root = await goProject({
+    "one/a.go": goSave("one"),
+    "two/b.go": goSave("two", "return x * 9"),
+  });
+  try {
+    const made = await createCodeLink({
+      root,
+      writer,
+      record: "R1",
+      selector: "one/a.go:3",
+    });
+    assert.equal(made.status, "created");
+    assert.deepEqual(
+      made.link.twins.map((t) => t.path),
+      ["two/b.go"],
+    );
+    await writeFile(
+      join(root, "one", "a.go"),
+      goSave("one").replace("Save", "Store"),
+    );
+    const { check, link } = await only(root);
+    assert.equal(link.state, "missing");
+    assert.equal(check.passed, false);
+    const reasons = Object.fromEntries(
+      link.suggestions.map((s) => [s.path + ":" + s.identity, s.reason]),
+    );
+    assert.match(reasons["one/a.go:Store"], /renamed/);
+    assert.match(reasons["two/b.go:Save"], /already existed/);
+    const refreshed = await refreshCodeLink({
+      root,
+      writer,
+      link: made.link.id,
+    });
+    assert.equal(refreshed.status, "refused");
+    // Same text moved into another file while the linked file still exists:
+    // a rename-or-copy, not a proven move.
+    await writeFile(join(root, "one", "a.go"), "package one\n");
+    await writeFile(join(root, "one", "c.go"), goSave("one"));
+    const again = await only(root);
+    assert.equal(again.link.state, "missing");
+    assert.match(
+      again.link.suggestions.find((s) => s.path === "one/c.go").reason,
+      /linked file still exists/,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("deleting the linked file with an identical twin elsewhere is missing and fails the check", async () => {
+  const root = await goProject({
+    "one/a.go": goSave("one"),
+    "two/a.go": goSave("two"),
+  });
+  try {
+    await createCodeLink({
+      root,
+      writer,
+      record: "R1",
+      selector: "one/a.go:3",
+    });
+    await rm(join(root, "one"), { recursive: true });
+    const { check, link } = await only(root);
+    assert.equal(link.state, "missing");
+    assert.equal(check.passed, false);
+    assert.deepEqual(
+      link.suggestions.map((s) => s.path),
+      ["two/a.go"],
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a genuine file move is moved; check fails until refreshed unless --allow-moved", async () => {
+  const root = await goProject({ "one/a.go": goSave("one") });
+  try {
+    const made = await createCodeLink({
+      root,
+      writer,
+      record: "R1",
+      selector: "Save",
+    });
+    await mkdir(join(root, "three"));
+    await writeFile(join(root, "three", "c.go"), goSave("three"));
+    await rm(join(root, "one"), { recursive: true });
+    let { check, link } = await only(root);
+    assert.equal(link.state, "moved");
+    assert.equal(link.current.path, "three/c.go");
+    assert.equal(check.passed, false);
+    assert.equal((await only(root, true)).check.passed, true);
+    const out = await pym(root, "link", "check");
+    assert.equal(out.code, 1, out.stdout);
+    assert.equal((await pym(root, "link", "check", "--allow-moved")).code, 0);
+    assert.equal(
+      (await refreshCodeLink({ root, writer, link: made.link.id })).status,
+      "refreshed",
+    );
+    ({ check, link } = await only(root));
+    assert.equal(link.state, "ok");
+    assert.equal(link.link.id, made.link.id);
+    assert.equal(link.link.symbol.path, "three/c.go");
+    // Same name but different text at the only new path: never moved.
+    await rm(join(root, "three"), { recursive: true });
+    await mkdir(join(root, "four"));
+    await writeFile(join(root, "four", "d.go"), goSave("four", "return 0"));
+    ({ link } = await only(root));
+    assert.equal(link.state, "missing");
+    assert.match(link.suggestions[0].reason, /different text/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a move when a twin pre-exists: moved only if the twin stayed where it was", async () => {
+  // Chosen rule: a recorded twin still at its recorded path is excluded, so the
+  // single new same-text symbol is the linked one. If a same-text twin also left
+  // its path, either could be the source: missing, both suggested.
+  const root = await goProject({
+    "one/a.go": goSave("one"),
+    "two/a.go": goSave("two"),
+  });
+  try {
+    await createCodeLink({
+      root,
+      writer,
+      record: "R1",
+      selector: "one/a.go:3",
+    });
+    await mkdir(join(root, "three"));
+    await writeFile(join(root, "three", "a.go"), goSave("three"));
+    await rm(join(root, "one"), { recursive: true });
+    let { link } = await only(root);
+    assert.equal(link.state, "moved");
+    assert.equal(link.current.path, "three/a.go");
+    await mkdir(join(root, "four"));
+    await writeFile(join(root, "four", "a.go"), goSave("four"));
+    await rm(join(root, "two"), { recursive: true });
+    ({ link } = await only(root));
+    assert.equal(link.state, "missing");
+    assert.deepEqual(link.suggestions.map((s) => s.path).sort(), [
+      "four/a.go",
+      "three/a.go",
+    ]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("fingerprint: only line endings and trailing spaces are ignored", async () => {
+  const root = await goProject({
+    "one/a.go": 'package one\n\nfunc Name() string {\n\treturn "a b"\n}\n',
+  });
+  try {
+    await createCodeLink({ root, writer, record: "R1", selector: "Name" });
+    await writeFile(
+      join(root, "one", "a.go"),
+      'package one\r\n\r\nfunc Name() string {   \r\n\treturn "a b"\t\r\n}\r\n',
+    );
+    assert.equal((await only(root)).link.state, "ok");
+    await writeFile(
+      join(root, "one", "a.go"),
+      'package one\n\nfunc Name() string {\n\treturn "a  b"\n}\n',
+    );
+    let { link } = await only(root);
+    assert.equal(link.state, "changed");
+    assert.deepEqual(link.differs, ["body"]);
+    await writeFile(
+      join(root, "one", "a.go"),
+      'package one\n\nfunc Name() string {\n    return "a b"\n}\n',
+    );
+    ({ link } = await only(root));
+    assert.equal(link.state, "changed"); // reformatting is a change (refresh it)
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("two link writers wait for a held planning lock and both succeed", async () => {
+  const root = await goProject({
+    "one/a.go": goSave("one") + "\nfunc Load() int { return Save(1) }\n",
+  });
+  const { spawn } = await import("node:child_process");
+  const { readdir, readlink } = await import("node:fs/promises");
+  try {
+    await listCodeLinks({ root, writer }); // graph synced before the race
+    const database = join(root, ".pymtheg", "shared", "architecture.sqlite");
+    const holder = spawn(
+      process.execPath,
+      [
+        "-e",
+        `const {DatabaseSync}=require("node:sqlite");const d=new DatabaseSync(process.argv[1]);d.exec("BEGIN EXCLUSIVE");process.stdout.write("ready\\n");process.stdin.once("data",()=>{d.exec("COMMIT");d.close();process.exit(0)});`,
+        database,
+      ],
+      { stdio: ["pipe", "pipe", "inherit"] },
+    );
+    await new Promise((done) => holder.stdout.once("data", done));
+    const adds = ["Save", "Load"].map((selector) => {
+      const child = spawn(
+        process.execPath,
+        [cli, "link", "add", "R1", selector, "--json"],
+        { cwd: root, stdio: ["ignore", "pipe", "pipe"] },
+      );
+      let out = "";
+      child.stdout.on("data", (d) => (out += d));
+      return {
+        child,
+        done: new Promise((resolve) =>
+          child.on("exit", (code) => resolve({ code, out })),
+        ),
+      };
+    });
+    // Readiness: both writers have the locked database open.
+    const opened = async (pid) => {
+      try {
+        for (const fd of await readdir(`/proc/${pid}/fd`))
+          if (
+            (await readlink(`/proc/${pid}/fd/${fd}`).catch(() => "")) ===
+            database
+          )
+            return true;
+      } catch {
+        return true; // exited already (reported by its result below)
+      }
+      return false;
+    };
+    for (const { child } of adds)
+      while (!(await opened(child.pid)))
+        await new Promise((next) => setImmediate(next));
+    holder.stdin.write("go\n");
+    const results = await Promise.all(adds.map((a) => a.done));
+    for (const { code, out } of results) {
+      assert.equal(code, 0, out);
+      assert.equal(JSON.parse(out).status, "created");
+    }
+    assert.equal((await listCodeLinks({ root, writer })).links.length, 2);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("unlinked --symbols lists public methods of exported TypeScript classes", async () => {
+  const root = await project();
+  try {
+    await writeFile(
+      join(root, "ts", "repo.ts"),
+      "export class Repo {\n  load() { return 1; }\n  private hidden() { return 2; }\n}\nclass Inner {\n  run() {}\n}\n",
+    );
+    const result = await unlinkedWork({ root, writer, symbols: true });
+    const names = result.symbols.map((s) => s.identity);
+    assert.ok(names.includes("Repo.load"), names.join());
+    assert.ok(!names.includes("Repo.hidden"));
+    assert.ok(!names.includes("Inner.run"));
+    assert.ok(names.includes("(*Repo).Load")); // Go exported method
+    assert.ok(names.includes("impl Index::lookup")); // Rust pub fn in impl
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("errors carry machine-readable codes; impact names callers it did not follow", async () => {
+  const root = await goProject({
+    "one/a.go": `package one
+
+type Putter interface{ Put() }
+type A struct{}
+
+func (A) Put() {}
+
+type B struct{}
+
+func (B) Put() {}
+
+func Use(p Putter) { p.Put() }
+`,
+  });
+  try {
+    await assert.rejects(
+      removeCodeLink({ root, writer, link: "00000000-nope" }),
+      (e) => e.code === "link-not-found",
+    );
+    await assert.rejects(
+      requirementsFor({ root, writer }),
+      (e) => e.code === "invalid-input",
+    );
+    const out = await pym(root, "link", "remove", "deadbeef-x", "--json");
+    assert.equal(out.code, 3);
+    assert.equal(JSON.parse(out.stdout).error.code, "link-not-found");
+    await assert.rejects(
+      createRequirement({ root, id: "R1", title: "Again" }),
+      (e) => e.code === "record-conflict",
+    );
+    await createCodeLink({ root, writer, record: "R1", selector: "Use" });
+    const impact = await requirementsFor({
+      root,
+      writer,
+      symbol: "(A).Put",
+      impact: true,
+    });
+    assert.equal(impact.impactIncomplete, true);
+    assert.ok(impact.notFollowedCount >= 1, JSON.stringify(impact));
+    assert.ok(
+      impact.notFollowed.some((c) => c.identity === "Use"),
+      JSON.stringify(impact.notFollowed),
     );
   } finally {
     await rm(root, { recursive: true, force: true });

@@ -401,13 +401,18 @@ Implemented: `pymtheg link` creates planning records and links them to Go, Rust
 and TypeScript/JavaScript graph symbols. A link stores the symbol's language,
 project-relative path, kind, scoped identity, ordinal and a source fingerprint in
 shared planning data, and records history. States are computed against the synced
-graph: `ok`, `changed`, `moved` (unambiguous only), `missing` (with suggestions,
-never applied) and `unverifiable` (failed file named). `link check` exits 1 on
-`missing`, `changed` or `unverifiable`. Also built: requirements touched by a
+graph: `ok`, `changed`, `moved` (only with established continuity: the
+recorded file gone, and identical text at a single new path that held no
+same-name symbol before), `missing` (with suggestions, never applied) and
+`unverifiable` (failed file named). `link check` exits 1 on `missing`,
+`changed`, `unverifiable` and `moved` (unless `--allow-moved`). Fingerprints
+ignore only line endings and trailing spaces. Project databases wait up to 30 s
+for another writer's lock. Also built: requirements touched by a
 symbol or file (optionally through definite callers), and unlinked requirements
 and public symbols. Not yet built: `.pym` declaration links, MCP tools (the data
-functions are exported), Studio display, carrying links in archive bundles, and
-comment-insensitive fingerprints. Source: [R1-D](changes/R1-D.md).
+functions are exported), Studio display, carrying links in archive bundles,
+comment- or format-insensitive fingerprints, and safe concurrent first-time graph
+indexing. Source: [R1-D](changes/R1-D.md).
 
 ## Architecture and interactive authoring
 
