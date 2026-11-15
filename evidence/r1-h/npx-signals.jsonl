@@ -1,0 +1,4 @@
+{"case":"npx-default-studio","mode":"studio","signal":"SIGINT","npx":{"code":0,"sig":null},"layers":["npm exec ./pymtheg-1.0.0.tgz","node …/pymtheg studio"],"survivors":[]}
+{"case":"npx-default-mcp","mode":"mcp","signal":"SIGINT","npx":{"code":0,"sig":null},"layers":["npm exec ./pymtheg-1.0.0.tgz","node …/pymtheg mcp"],"survivors":[]}
+{"case":"npx-noexec-studio","mode":"studio","signal":"SIGINT","npx":{"stillRunningAfterSafetyBudget":true},"layers":["npm exec ./pymtheg-1.0.0.tgz","/bin/bash …/noexec-sh -c","node …/pymtheg studio"],"survivors":["npm exec ./pymtheg-1.0.0.tgz","/bin/bash …/noexec-sh -c","node …/pymtheg studio"]}
+{"case":"npx-noexec-mcp","mode":"mcp","signal":"SIGINT","npx":{"stillRunningAfterSafetyBudget":true},"layers":["npm exec ./pymtheg-1.0.0.tgz","/bin/bash …/noexec-sh -c","node …/pymtheg mcp"],"survivors":["npm exec ./pymtheg-1.0.0.tgz","/bin/bash …/noexec-sh -c","node …/pymtheg mcp"]}

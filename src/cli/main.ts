@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// First: silence only the node:sqlite ExperimentalWarning before anything loads it.
+// First: drop only the node:sqlite and glob ExperimentalWarnings (early Node 24/25).
 import "./quiet-warnings.js";
 import { FormatSyntaxError } from "../language/format.js";
 import { scopeIssueResult } from "../reporting/scope-issues.js";

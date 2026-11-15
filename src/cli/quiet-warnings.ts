@@ -1,14 +1,14 @@
 /**
- * Drops exactly one Node warning: the ExperimentalWarning that some supported
- * Node releases (24.0.0 to 24.x before node:sqlite was marked stable, and
- * 25.x before 25.9) print when `node:sqlite` loads. Pymtheg relies on
- * node:sqlite on every supported Node, so the warning is noise on stderr for
- * users and agents. Every other warning still prints. This module has no
- * imports and is the CLI entry's first import, so it runs before anything can
- * load node:sqlite.
+ * Drops exactly two Node warnings: the ExperimentalWarning that early supported
+ * releases (Node 24.0.0, 25.2.1; not 24.21+, 25.9+ or 26) print when
+ * `node:sqlite` loads or `path.matchesGlob` is first used. Pymtheg relies on
+ * both on every supported Node, so the warnings are noise on stderr for users
+ * and agents. Every other warning, including every other ExperimentalWarning,
+ * still prints. This module has no imports and is the CLI entry's first import;
+ * node:sqlite is loaded lazily (src/storage/local.ts) so it loads after this.
  */
 const original = process.emitWarning.bind(process);
-export function isSqliteExperimentalWarning(
+export function isReliedOnExperimentalWarning(
   warning: string | Error,
   typeOrOptions?: unknown,
 ): boolean {
@@ -26,13 +26,13 @@ export function isSqliteExperimentalWarning(
           : warning.name;
   return (
     type === "ExperimentalWarning" &&
-    /^SQLite is an experimental feature/.test(message)
+    /^(SQLite|glob) is an experimental feature/.test(message)
   );
 }
 process.emitWarning = function emitWarning(
   warning: string | Error,
   ...rest: unknown[]
 ): void {
-  if (isSqliteExperimentalWarning(warning, rest[0])) return;
+  if (isReliedOnExperimentalWarning(warning, rest[0])) return;
   (original as (...args: unknown[]) => void)(warning, ...rest);
 } as typeof process.emitWarning;

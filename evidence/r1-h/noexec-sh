@@ -1,0 +1,7 @@
+#!/bin/bash
+# Stand-in for a `sh -c` that stays the parent of its command instead of
+# replacing itself with it (R1-F's Debian-based image). Used as npm's
+# script-shell: npm_config_script_shell=evidence/r1-h/noexec-sh
+eval "$2"
+status=$?
+exit $status

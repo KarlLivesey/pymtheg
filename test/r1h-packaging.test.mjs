@@ -82,11 +82,12 @@ for (const mode of ["studio", "mcp"])
     test(`${mode} stops cleanly on ${signal} with nothing left running`, () =>
       stopsCleanly(mode, signal));
 
-test("only node:sqlite's ExperimentalWarning is filtered", () => {
+test("only the node:sqlite and glob ExperimentalWarnings are filtered", () => {
   const script = `
     await import(${JSON.stringify(resolve("dist/cli/quiet-warnings.js"))});
     process.emitWarning("SQLite is an experimental feature and might change at any time", "ExperimentalWarning");
     process.emitWarning("SQLite is an experimental feature", { type: "ExperimentalWarning" });
+    process.emitWarning("glob is an experimental feature and might change at any time", "ExperimentalWarning");
     process.emitWarning("another experiment", "ExperimentalWarning");
     process.emitWarning("SQLite is an experimental feature", "DeprecationWarning");
     process.emitWarning("plain warning");`;
@@ -95,6 +96,7 @@ test("only node:sqlite's ExperimentalWarning is filtered", () => {
   });
   assert.equal(r.status, 0, r.stderr);
   assert.doesNotMatch(r.stderr, /ExperimentalWarning: SQLite/);
+  assert.doesNotMatch(r.stderr, /ExperimentalWarning: glob/);
   assert.match(r.stderr, /ExperimentalWarning: another experiment/);
   assert.match(
     r.stderr,
