@@ -442,6 +442,7 @@ async function createHelper(): Promise<Helper> {
         }
       }
       type Meta = {
+        start: number;
         name: string;
         value?: Node | undefined;
         args?: Node | undefined;
@@ -453,6 +454,7 @@ async function createHelper(): Promise<Helper> {
           ),
           i = end < 0 ? ns.length : end;
         return {
+          start: ns[0]?.startIndex ?? 0,
           name: compact(
             ns
               .slice(0, i)
@@ -626,6 +628,59 @@ async function createHelper(): Promise<Helper> {
       function effectiveAttributes(n: Node) {
         return attributesOn(n).flatMap((a) => applications(meta(a), n));
       }
+      /** Parenthesized/bracketed final macros are expressions; braces can still emit items. */
+      function tailMacro(n: Node): boolean {
+        return (
+          n.type === "macro_invocation" &&
+          !n.namedChildren.some(
+            (c) => c.type === "token_tree" && c.text.startsWith("{"),
+          ) &&
+          n.parent?.type === "block" &&
+          n.parent.children
+            .filter(
+              (c) => c.startIndex >= n.endIndex && !c.type.endsWith("comment"),
+            )
+            .every((c) => c.type === "}")
+        );
+      }
+      function deriveHelper(
+        m: Meta,
+        n: Node,
+        guards: string[],
+      ): { helper: true; nested: boolean } | null {
+        if (
+          !/^[_\p{ID_Start}][_\p{ID_Continue}]*$/u.test(m.name) ||
+          attributeRules.has(m.name)
+        )
+          return null;
+        const adts = ["struct_item", "enum_item", "union_item"];
+        if (
+          !adts.includes(n.type) &&
+          !["field_declaration", "enum_variant"].includes(n.type) &&
+          n.parent?.type !== "ordered_field_declaration_list"
+        )
+          return null;
+        let owner: Node | null = n;
+        while (owner && !adts.includes(owner.type)) {
+          if (
+            ["block", "function_item", "impl_item", "mod_item"].includes(
+              owner.type,
+            )
+          )
+            return null;
+          owner = owner.parent;
+        }
+        if (!owner) return null;
+        const derived = effectiveAttributes(owner).some(
+          (a) =>
+            a.meta.name === "derive" &&
+            a.meta.start < m.start &&
+            !!a.meta.args &&
+            payloads(a.meta.args).length > 0 &&
+            a.guards.every((c) => implies(guards, c)),
+        );
+        return derived ? { helper: true, nested: owner.id !== n.id } : null;
+      }
       function macroUseConditions(n: Node): string[][] {
         return effectiveAttributes(n)
           .filter((a) => a.meta.name === "macro_use")
@@ -661,6 +716,7 @@ async function createHelper(): Promise<Helper> {
           names: Set<string>;
           unknown: boolean;
           macroUse: boolean;
+          helperUnknown: boolean;
           macroUseImports: MacroUseImport[];
         }
       >();
@@ -725,18 +781,32 @@ async function createHelper(): Promise<Helper> {
         const scope = bindingContainer(n),
           unknown =
             n.type === "macro_invocation" &&
+            !tailMacro(n) &&
             [
               "source_file",
               "declaration_list",
               "block",
               "expression_statement",
             ].includes(n.parent?.type ?? "");
-        if (names.some((n) => n !== "*" && n !== "_") || unknown || macroUse) {
+        const helperUnknown =
+          lexicalItemContainer(n.parent) &&
+          effectiveAttributes(n).some(
+            (a) =>
+              a.meta.name === "derive" ||
+              !knownAttributeName(a.meta.name, false),
+          );
+        if (
+          names.some((n) => n !== "*" && n !== "_") ||
+          unknown ||
+          macroUse ||
+          helperUnknown
+        ) {
           const v = attributeBindings.get(scope.id) ?? {
             node: scope,
             names: new Set<string>(),
             unknown: false,
             macroUse: false,
+            helperUnknown: false,
             macroUseImports: [],
           };
           for (const name of names)
@@ -748,6 +818,7 @@ async function createHelper(): Promise<Helper> {
                     macroNames.has(name))))
             )
               v.names.add(name);
+          v.helperUnknown ||= helperUnknown;
           v.unknown ||= unknown;
           v.macroUse ||= macroUse;
           v.macroUseImports.push(...macroUseImports);
@@ -830,18 +901,25 @@ async function createHelper(): Promise<Helper> {
       }
       const shadowableCache = new Map<
         number,
-        { name: string; scope: string }[]
+        { name: string; scope: string; helper?: true; nested?: boolean }[]
       >();
-      function shadowableOn(n: Node): { name: string; scope: string }[] {
+      function shadowableOn(
+        n: Node,
+      ): { name: string; scope: string; helper?: true; nested?: boolean }[] {
         const cached = shadowableCache.get(n.id);
         if (cached) return cached;
-        function from(m: Meta): { name: string; scope: string }[] {
-          return applications(m, n).flatMap(({ meta: m }) => {
+        function from(
+          m: Meta,
+        ): { name: string; scope: string; helper?: true; nested?: boolean }[] {
+          return applications(m, n).flatMap(({ meta: m, guards }) => {
+            const helper = deriveHelper(m, n, guards);
             const rule = attributeRules.get(m.name.split("::")[0]!);
-            return rule && rule.category !== "builtin" && !shadowed(m.name, n)
+            return helper ||
+              (rule && rule.category !== "builtin" && !shadowed(m.name, n))
               ? [
                   {
                     name: m.name,
+                    ...(helper ?? {}),
                     scope:
                       lexicalScopes.get(
                         (n.type === "source_file" ? n : bindingContainer(n)).id,
@@ -867,7 +945,12 @@ async function createHelper(): Promise<Helper> {
       }
       const attributeContexts: {
         sourceConditions: string[];
-        shadowable: { name: string; scope: string }[];
+        shadowable: {
+          name: string;
+          scope: string;
+          helper?: true;
+          nested?: boolean;
+        }[];
         implicit: {
           name: string;
           scope: string;
@@ -901,7 +984,9 @@ async function createHelper(): Promise<Helper> {
       function opaquePresence(meta: Meta, n: Node): string[] {
         return applications(meta, n)
           .filter(
-            (a) => !knownAttributeName(a.meta.name, shadowed(a.meta.name, n)),
+            (a) =>
+              !knownAttributeName(a.meta.name, shadowed(a.meta.name, n)) &&
+              !deriveHelper(a.meta, n, a.guards),
           )
           .map((a) => a.meta.name || "?attribute");
       }
@@ -1151,6 +1236,7 @@ async function createHelper(): Promise<Helper> {
               const wildcard =
                 imported.includes("*") ||
                 (n.type === "macro_invocation" &&
+                  !tailMacro(n) &&
                   (conservative || !neutralMacro(n))) ||
                 (n.type === "expression_statement" &&
                   n.namedChildren.some(
@@ -1808,6 +1894,7 @@ async function createHelper(): Promise<Helper> {
           const m = field(n, "macro");
           if (m) link(m, owner, scope, "macros", compact(m.text));
           if (
+            !tailMacro(n) &&
             lexicalItemContainer(
               n.parent?.type === "expression_statement"
                 ? n.parent.parent
@@ -2025,6 +2112,8 @@ async function createHelper(): Promise<Helper> {
         name: string;
         module: string;
         conditions: string[];
+        helper?: true;
+        nested?: boolean;
       }[] = [];
       function attributes(n: Node): void {
         if (["attribute_item", "inner_attribute_item"].includes(n.type)) {
@@ -2047,6 +2136,7 @@ async function createHelper(): Promise<Helper> {
               opaqueAttributes.push({
                 scope: lexicalScopes.get(item.id) ?? "",
                 name: app.meta.name,
+                ...(deriveHelper(app.meta, item, app.guards) ?? {}),
                 raw: `#[${app.meta.name}${app.meta.args?.text ?? (app.meta.value ? "=" + app.meta.value.text : "")}]`,
                 conditions: app.guards,
                 module:
@@ -2067,6 +2157,7 @@ async function createHelper(): Promise<Helper> {
           scope: lexicalScopes.get(b.node.id) ?? "",
           names: [...b.names].sort(),
           unknown: b.unknown,
+          helperUnknown: b.helperUnknown,
           macroUse: b.macroUse,
           macroUseImports: b.macroUseImports,
         })),
