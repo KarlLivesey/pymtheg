@@ -102,7 +102,7 @@ async function graph(
 const lib = (text) => ({ "src/lib.rs": text });
 
 const broken =
-  "pub fn g()->u8{let raw=1u8;let r=&raw;*r} #[derive(Default,Debug)]pub struct A;";
+  "pub fn g()->u8{fn gap()->u8{1}gap::<>()} #[derive(Default,Debug)]pub struct A;";
 const own = "#[derive(Default,Debug)]pub struct A;impl A{pub fn new()->A{A}}";
 const calls = "pub fn f()->A{A::default()}pub fn n()->A{A::new()}";
 function noCause(g, name, kind = "calls") {
@@ -139,7 +139,7 @@ for (const variant of ["local", "explicit", "child"]) {
     );
     const fixed = await graph({
       ...inputs,
-      "src/broken.rs": broken.replaceAll("raw", "renamed"),
+      "src/broken.rs": broken.replaceAll("gap::<>()", "gap()"),
     });
     fixed.one("A::new", "impl A::new");
     fixed.unknown("A::default");

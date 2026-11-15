@@ -1,0 +1,73 @@
+diff --git a/grammar.js b/grammar.js
+index 4a0ff4b..8c518bf 100644
+--- a/grammar.js
++++ b/grammar.js
+@@ -1059,13 +1059,16 @@ module.exports = grammar({
+     )),
+ 
+     binary_expression: $ => {
++      // Generic type arguments give `<` lexical precedence 1 so that nested
++      // generics win over shifts. `<=` must outrank that generic opener.
++      const lessThanOrEqual = token(prec(2, '<='));
+       const table = [
+         [PREC.and, '&&'],
+         [PREC.or, '||'],
+         [PREC.bitand, '&'],
+         [PREC.bitor, '|'],
+         [PREC.bitxor, '^'],
+-        [PREC.comparative, choice('==', '!=', '<', '<=', '>', '>=')],
++        [PREC.comparative, choice('==', '!=', '<', lessThanOrEqual, '>', '>=')],
+         [PREC.shift, choice('<<', '>>')],
+         [PREC.additive, choice('+', '-')],
+         [PREC.multiplicative, choice('*', '/', '%')],
+diff --git a/test/corpus/expressions.txt b/test/corpus/expressions.txt
+index 998d590..2018a9a 100644
+--- a/test/corpus/expressions.txt
++++ b/test/corpus/expressions.txt
+@@ -330,6 +330,46 @@ let size: f64 = 1.0 + -len(values) as f64 + 1.0;
+           type: (primitive_type)))
+       right: (float_literal))))
+ 
++================================================================================
++Comparisons after type cast expressions
++================================================================================
++
++i as LuaNumber <= f;
++i as lua::Number <= f;
++(i as LuaNumber) < f;
++i as f64 <= f;
++
++--------------------------------------------------------------------------------
++
++(source_file
++  (expression_statement
++    (binary_expression
++      left: (type_cast_expression
++        value: (identifier)
++        type: (type_identifier))
++      right: (identifier)))
++  (expression_statement
++    (binary_expression
++      left: (type_cast_expression
++        value: (identifier)
++        type: (scoped_type_identifier
++          path: (identifier)
++          name: (type_identifier)))
++      right: (identifier)))
++  (expression_statement
++    (binary_expression
++      left: (parenthesized_expression
++        (type_cast_expression
++          value: (identifier)
++          type: (type_identifier)))
++      right: (identifier)))
++  (expression_statement
++    (binary_expression
++      left: (type_cast_expression
++        value: (identifier)
++        type: (primitive_type))
++      right: (identifier))))
++
+ ================================================================================
+ Call expressions
+ ================================================================================

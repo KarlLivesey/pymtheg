@@ -105,7 +105,7 @@ const pkg = (name) =>
   `[package]\nname="${name}"\nedition="2024"\nversion="0.1.0"\n`;
 
 const broken =
-  "pub fn g()->u8{let raw=1u8;let r=&raw;*r}macro_rules! m{()=>{2u16}}";
+  "pub fn g()->u8{fn gap()->u8{1}gap::<>()}macro_rules! m{()=>{2u16}}";
 function failedText(g) {
   g.unverified("m", "m", "macros");
   const calls = g.links.filter(
@@ -120,7 +120,8 @@ function failedText(g) {
   assert.ok(g.files.some((f) => f.result.status === "failed"));
 }
 test("f1: failed macro_use module adds an unseen textual entry", async () => {
-  // rustc accepts the &raw grammar gap: m! returns 2, broken::g returns 1.
+  // rustc accepts the empty-turbofish grammar gap (`gap::<>()`, still rejected
+  // by the vendored grammar, W2-V): m! returns 2, broken::g returns 1.
   const g = await graph({
     "src/main.rs":
       "macro_rules! m{()=>{1u8}}#[macro_use]mod broken;pub fn run()->u16{let v=m!();v as u16}fn main(){run();broken::g();}",
@@ -199,7 +200,7 @@ test("failed parent erases child ancestry: no invented inherited macro or cause"
   const g = await graph({
     "src/main.rs": "mod parent;fn main(){parent::child::run();}",
     "src/parent.rs":
-      "pub fn g()->u8{let raw=1u8;let r=&raw;*r}macro_rules! m{()=>{2u16}}pub mod child;",
+      "pub fn g()->u8{fn gap()->u8{1}gap::<>()}macro_rules! m{()=>{2u16}}pub mod child;",
     "src/parent/child.rs": "pub fn run()->u16{m!()}",
   });
   g.unknown("m", "macros");

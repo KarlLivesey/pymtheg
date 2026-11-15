@@ -48,7 +48,7 @@
       "src/main.rs": "mod a;fn main(){print!(\"{}\",a::E::A as usize);}",
       "src/a.rs": "pub enum E{A={mod inl{#[path=\"y.rs\"]pub mod m;}use inl::m::f;f() as isize}}",
       "src/inl/y.rs": "pub const fn f()->u16{16}",
-      "src/a/inl/y.rs": "pub fn f()->u8{let raw=8u8;let r=&raw;*r}"
+      "src/a/inl/y.rs": "pub fn f()->u8{fn gap()->u8{8}gap::<>()}"
     },
     "target": "src/inl/y.rs",
     "definite": false,
