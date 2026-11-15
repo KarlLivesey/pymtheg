@@ -11,7 +11,9 @@ within each package's version ranges, so a later install can receive newer versi
 possibly different licences) than this inventory lists. The bundled, build-tool and
 vendored code is fixed inside the tarball.
 
-**Pymtheg's own licence is not yet chosen.** `package.json` has no `license` field and `"private": true`, and the repository has no LICENSE file for Pymtheg itself. That choice is the owner's.
+**Pymtheg is MIT licensed;** see `LICENSE`.
+
+All shipped third-party components are declared under MIT, Apache-2.0, BSD-3-Clause or ISC. These licences permit redistribution inside an MIT-licensed package provided their notices are kept, which `THIRD-PARTY-NOTICES` does. Licences embedded inside some of those packages are listed below and travel in `THIRD-PARTY-NOTICES` with their packages' notices.
 
 ## Summary
 

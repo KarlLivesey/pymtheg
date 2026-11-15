@@ -3,7 +3,7 @@
 Decision D19 (initial release) and the owner's publishing plan in
 `docs/build-plan.md`; gap list from R1-F (PR 41). Evidence: [evidence/r1-h/](../../evidence/r1-h/README.md).
 
-## A. Licence inventory (the owner's decision input)
+## A. Licence inventory (input to the owner's licence decision, since made: MIT)
 
 `scripts/licences/inventory.mjs` (no new dependency) records exactly what the
 published tarball installs or contains:
@@ -35,9 +35,12 @@ they are stale or a policy problem exists. `test/licences.test.mjs` regenerates
 and compares, enforces the allow-list (MIT, ISC, BSD-2-Clause, BSD-3-Clause,
 Apache-2.0, 0BSD, BlueOak-1.0.0, CC0-1.0, Unlicense) and licence text for every
 shipped component, checks `golinks.go` stays standard-library only, and tests
-the SPDX and licence-text readers. It does not need a `license` field, a LICENSE
-file or a change to `"private": true`; `docs/licences.md` states that Pymtheg's
-own licence is not yet chosen.
+the SPDX and licence-text readers. Pymtheg itself is MIT licensed (`LICENSE`,
+added by PR 46; `"license": "MIT"` added to `package.json` here, `"private": true`
+unchanged); `docs/licences.md` states that, and that every shipped third-party
+component is declared under MIT, Apache-2.0, BSD-3-Clause or ISC, which permit
+redistribution inside an MIT-licensed package provided their notices are kept,
+which `THIRD-PARTY-NOTICES` does.
 
 ### Summary (after the dependency moves in B.5)
 

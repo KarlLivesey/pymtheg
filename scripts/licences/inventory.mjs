@@ -618,6 +618,17 @@ export async function render(data) {
     components.filter((c) => c.shipped.startsWith(kind)).length;
   const problems = components.filter((c) => c.problems.length);
   const ids = new Set(components.flatMap((c) => spdxIds(c.declared)));
+  /** "A, B, C or D", most-used licence first. */
+  const listing = (set) => {
+    const uses = (id) =>
+      components.filter((c) => spdxIds(c.declared).includes(id)).length;
+    const sorted = [...set].sort(
+      (a, b) => uses(b) - uses(a) || (a < b ? -1 : 1),
+    );
+    return sorted.length > 1
+      ? `${sorted.slice(0, -1).join(", ")} or ${sorted.at(-1)}`
+      : sorted.join("");
+  };
   const unusual = [...ids].filter((id) => !allowed.has(id));
   const md = [];
   md.push(
@@ -634,7 +645,19 @@ export async function render(data) {
     "possibly different licences) than this inventory lists. The bundled, build-tool and",
     "vendored code is fixed inside the tarball.",
     "",
-    `**Pymtheg's own licence is not yet chosen.** \`package.json\` has ${pkg.license ? `\`license: ${pkg.license}\`` : "no `license` field"}${pkg.private ? ' and `"private": true`' : ""}, and the repository has no LICENSE file for Pymtheg itself. That choice is the owner's.`,
+    ...(pkg.license && existsSync(join(root, "LICENSE"))
+      ? [
+          `**Pymtheg is ${pkg.license} licensed;** see \`LICENSE\`.`,
+          "",
+          `All shipped third-party components are declared under ${listing(ids)}.` +
+            ` These licences permit redistribution inside ${/^(MIT|[AEIOU])/.test(pkg.license) ? "an" : "a"} ${pkg.license}-licensed package provided` +
+            " their notices are kept, which `THIRD-PARTY-NOTICES` does. Licences embedded inside some of" +
+            " those packages are listed below and travel in `THIRD-PARTY-NOTICES` with their packages'" +
+            " notices.",
+        ]
+      : [
+          `**Pymtheg's own licence is not yet chosen.** \`package.json\` has no \`license\` field or the repository has no LICENSE file.`,
+        ]),
     "",
     "## Summary",
     "",

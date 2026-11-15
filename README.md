@@ -266,5 +266,6 @@ purpose. Neither comparison nor compilation proves the implementation's behaviou
 ## Licence
 
 Pymtheg is licensed under the MIT License; see [LICENSE](LICENSE).
-Third-party components and their licences will be listed in `docs/licences.md`
-and `THIRD-PARTY-NOTICES` once the licence inventory work lands.
+Third-party components and their licences are listed in
+[docs/licences.md](docs/licences.md), and their full notices and licence texts are
+in [THIRD-PARTY-NOTICES](THIRD-PARTY-NOTICES).

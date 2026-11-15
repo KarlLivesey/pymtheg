@@ -65,12 +65,16 @@ test("every shipped component has an allowed licence and its licence text", asyn
     "golinks.go must use the Go standard library only",
   );
 });
-test("the tarball carries the notices and the inventory does not presume Pymtheg's own licence", () => {
+test("the tarball carries the notices and the inventory states Pymtheg's own licence", () => {
   const pkg = JSON.parse(readFileSync("package.json", "utf8"));
   assert.ok(pkg.files.includes("THIRD-PARTY-NOTICES"));
+  assert.equal(pkg.license, "MIT");
+  assert.match(readFileSync("LICENSE", "utf8"), /^MIT License/);
+  const doc = readFileSync("docs/licences.md", "utf8");
+  assert.match(doc, /\*\*Pymtheg is MIT licensed;\*\* see `LICENSE`\./);
   assert.match(
-    readFileSync("docs/licences.md", "utf8"),
-    /Pymtheg's own licence is not yet chosen/,
+    doc,
+    /All shipped third-party components are declared under MIT, Apache-2\.0, (BSD-3-Clause or ISC|ISC or BSD-3-Clause)\./,
   );
 });
 test("the allow-list check reads SPDX expressions and licence texts", () => {

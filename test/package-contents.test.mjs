@@ -48,6 +48,8 @@ test("the package ships only user documentation from docs/", () => {
     !files().some((f) => f.startsWith("docs/changes/")),
     "docs/changes must not ship",
   );
+  // Pymtheg's own licence ships (npm always packs LICENSE).
+  assert.ok(files().includes("LICENSE"), "LICENSE must ship");
   // The product reads these at run time.
   for (const needed of [
     "docs/agent-workflow.md",
@@ -61,8 +63,11 @@ test("no shipped file carries a personal path, the owner's name or a private pro
   for (const path of files()) {
     if (/\.(wasm|png|ico)$/.test(path) || !existsSync(path)) continue;
     const text = readFileSync(path, "utf8");
-    const licenceText =
-      path === "THIRD-PARTY-NOTICES" || path === "docs/licences.md";
+    const licenceText = [
+      "LICENSE",
+      "THIRD-PARTY-NOTICES",
+      "docs/licences.md",
+    ].includes(path);
     const rules = [
       ["personal path", /\/home\/[a-z_][a-z0-9_.-]*\//i],
       ["private project name", /\b(project-a|project-c)\b|\bTiered\b/i],
