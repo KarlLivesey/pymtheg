@@ -106,10 +106,15 @@ different exit statuses; a warning about duplicate rules alone doesn't fail.
 
 You write Pymtheg designs; you do not need to learn a backend language.
 `check` runs local analyses and works offline once built. For behavioural
-exploration, Pymtheg translates the checked design to an optional engine (Quint
-for simulation, TLC for exhaustive finite checking) and maps findings back to
-your source. Quint is an optional dependency: `npm ci --ignore-scripts --omit=optional` can build/use local
-checking without it. Requested missing tooling is an integration error.
+exploration from the CLI, `verify` runs a built-in exhaustive breadth-first search
+and `simulate` a built-in seeded sampler; neither needs Java, a TLC JAR or Quint,
+and findings map back to your source. Each invariant gets its own result.
+`--state-budget N` (default 1,000,000 distinct states) bounds `verify`; running out
+leaves the unviolated properties inconclusive (exit 2), never passed.
+`--backend tlc --tlc-jar PATH` and `--backend quint` still select the external
+engines from the CLI, and Studio and MCP still use TLC for verify and Quint for
+simulate. Quint is an optional dependency: `npm ci --ignore-scripts --omit=optional` can build/use local
+and built-in CLI checking without it. Requested missing tooling is an integration error.
 
 ```sh
 ./pymtheg emit examples/mvp/task-buggy.pym --target quint --entry TaskRunner --out /tmp/task.qnt
@@ -118,12 +123,17 @@ checking without it. Requested missing tooling is an integration error.
 ./pymtheg simulate examples/mvp/checkout-fixed.pym --entry Checkout --seed 42 --max-steps 12 --max-samples 1000
 ```
 
-Quint **0.33.1**, TypeScript engine, is version-checked. Generated models and their
+When selected, Quint **0.33.1**, TypeScript engine, is version-checked. Generated models and their
 source maps come from the typed project, not fixture names. Counterexamples are
 replayed against the source event semantics. A corrected sampled run reports
 `no_counterexample (simulation)`, never an unqualified verified result.
 
-For finite exhaustive checking, provide the official TLA+ v1.7.4 `tla2tools.jar`
+```sh
+./pymtheg verify examples/mvp/checkout-fixed.pym --entry Checkout
+```
+
+To check with TLC instead (Studio and MCP `verify` use it), provide the official
+TLA+ v1.7.4 `tla2tools.jar`
 ([release download](https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar)):
 
 ```sh
