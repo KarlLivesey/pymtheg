@@ -11,7 +11,7 @@ test("a new MCP check waits for cancelled work cleanup instead of reporting a sp
   const cleaning = new Promise((r) => (release = r)),
     ready = new Promise((r) => (started = r));
   let calls = 0;
-  const workspace = new AgentWorkspace(root, null, async (options) => {
+  const workspace = new AgentWorkspace(root, async (options) => {
     calls++;
     if (calls === 1) {
       started();

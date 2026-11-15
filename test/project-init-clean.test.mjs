@@ -162,7 +162,9 @@ async function diagnosis(root, id, old) {
   assert.ok(Array.isArray(report.checks));
   for (const check of report.checks) {
     assert.equal(typeof check.name, "string");
-    assert.ok(["ready", "missing", "incompatible"].includes(check.status));
+    assert.ok(
+      ["ready", "missing", "incompatible", "failed"].includes(check.status),
+    );
     if (/project|metadata|storage/i.test(check.name))
       assert.equal(check.status, "ready", JSON.stringify(check));
   }

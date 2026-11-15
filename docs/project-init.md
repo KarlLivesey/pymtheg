@@ -102,9 +102,10 @@ page reload or replacing source buffers. The control remains available in narrow
 layouts. API behavior and the rendered setup/conflict journeys are now tested. The
 earlier pending status is retained in the chronological evidence above.
 
-`examples/self/initialization.pym` records why publication is create-only. TLC
-found no violation in its finite atomic-publication model and replayed an identity
-overwrite in the deliberately unsafe alternative. This does not prove the host
+`examples/self/initialization.pym` records why publication is create-only. The
+built-in exhaustive search finds no violation in its finite atomic-publication
+model and replays an identity overwrite in the deliberately unsafe alternative
+(first shown with TLC, since removed). This does not prove the host
 filesystem primitive, which has its own real concurrent-initializer regression.
 
 ## Local state and sharing

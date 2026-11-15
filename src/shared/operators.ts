@@ -40,16 +40,17 @@ export function binary(op: string, a: Scalar, b: Scalar): Scalar {
   }
   throw Error(`Invalid operands for ${op}`);
 }
-export const backendOperator: Record<string, { quint: string; tlc: string }> = {
-  "+": { quint: "+", tlc: "+" },
-  "-": { quint: "-", tlc: "-" },
-  "*": { quint: "*", tlc: "*" },
-  "==": { quint: "==", tlc: "=" },
-  "!=": { quint: "!=", tlc: "#" },
-  "<": { quint: "<", tlc: "<" },
-  "<=": { quint: "<=", tlc: "<=" },
-  ">": { quint: ">", tlc: ">" },
-  ">=": { quint: ">=", tlc: ">=" },
-  "&&": { quint: "and", tlc: "/\\" },
-  "||": { quint: "or", tlc: "\\/" },
-};
+/** Binary operators the shared scalar evaluator (and so the built-in engine) accepts. */
+export const scalarBinaryOperators: ReadonlySet<string> = new Set([
+  "+",
+  "-",
+  "*",
+  "==",
+  "!=",
+  "<",
+  "<=",
+  ">",
+  ">=",
+  "&&",
+  "||",
+]);

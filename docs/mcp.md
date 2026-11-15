@@ -32,10 +32,19 @@ only; errors go to stderr. The client owns the process lifetime. Cancellation
 and closing the connection stop owned analysis work. Root access is fixed at
 launch; requests cannot escape to other projects.
 
-For TLC verification, pass `PYM_TLC_JAR` in the configured process environment.
-It must point to the pinned official JAR described in README.md. Simulation uses
-the locally installed pinned Quint. A missing requested backend is a tool
-failure with a retained run record, never a successful design check.
+`explore_behaviour` runs the built-in engines: `method: "verify"` is the
+exhaustive search (default state budget 1,000,000 distinct states) and
+`method: "simulate"` the seeded sampler. Nothing else needs to be installed or
+configured. A budget limit, timeout or engine error is retained in the run record
+as an unresolved or failed result, never a successful design check.
+
+Every behaviour property in `read_run` carries `exhaustive`. It is `true` only
+when the search covered every reachable state (a completed verify) and `false`
+for every simulate property and any search that stopped early. A sampled run can
+report `no_counterexample` with `completion: "complete"`; that means the sampling
+finished, not that the property holds. The run summary's `results.exhaustive` is
+`true` only when every behaviour result is exhaustive (`null` without behaviour
+results), and a clean simulate summary says it is not exhaustive.
 
 ## A useful agent workflow
 

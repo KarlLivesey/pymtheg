@@ -155,7 +155,7 @@ import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { analyseInWorker } from "../cli/coordinator.js";
-import { runBackend, defaultQuint } from "../backends/adapter.js";
+import { runBackend } from "../backends/adapter.js";
 import { staleSourcesAsync, sourceFileByteLimit } from "../language/project.js";
 import { hash, identity, json } from "../shared/identity.js";
 import { atomicWrite } from "../reporting/publish.js";
@@ -2934,7 +2934,6 @@ export class StudioService {
   private startQueue: Promise<unknown> = Promise.resolve();
   constructor(
     readonly root: string,
-    readonly tlcJar: string | null = null,
     readonly initialFile: string | null = null,
     readonly outputRegistry: OutputRegistry = OutputRegistry.empty(),
   ) {}
@@ -3252,14 +3251,9 @@ export class StudioService {
           this.root,
           ...this.outputRegistry.launchArguments(),
         ],
-        ...(this.tlcJar ? { env: { PYM_TLC_JAR: this.tlcJar } } : {}),
       },
       files: inventory.files,
       runs: this.runs,
-      tools: {
-        quint: existsSync(defaultQuint),
-        tlc: !!this.tlcJar && existsSync(this.tlcJar),
-      },
       config,
       configHash,
       recovery: this.recovery,
@@ -3442,13 +3436,11 @@ export class StudioService {
             ir,
             {
               entry: run.request.entry,
-              backend: run.request.kind === "verify" ? "tlc" : "quint",
+              method: run.request.kind === "verify" ? "exhaustive" : "sample",
               seed: run.request.seed,
               maxSteps: run.request.maxSteps,
               maxSamples: run.request.maxSamples,
               timeoutMs: run.request.timeoutMs ?? 45000,
-              quint: defaultQuint,
-              tlcJar: this.tlcJar,
               scopeFile: null,
               scope: run.request.scope,
             },

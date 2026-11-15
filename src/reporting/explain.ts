@@ -242,45 +242,21 @@ const guidance: Record<
   },
   B101: {
     title: "The checker could not be prepared",
-    why: "An integration prerequisite or temporary workspace failed.",
+    why: "The scope file could not be read or parsed.",
     nextStep:
-      "Inspect the reported path or prerequisite and run doctor before retrying.",
-  },
-  B102: {
-    title: "The checker process could not run",
-    why: "The executable failed to start or finish under its requested settings.",
-    nextStep:
-      "Check the executable path and reported process error; this is no verdict about the design.",
-  },
-  B103: {
-    title: "The checker version does not match",
-    why: "The adapter relies on a pinned tool version and validated distribution.",
-    nextStep:
-      "Install the documented local version or point to the matching executable or JAR.",
+      "Inspect the reported scope file path and its JSON before retrying.",
   },
   B104: {
     title: "The checker failed during execution",
-    why: "A crash or unexpected exit does not establish a model violation.",
+    why: "A built-in engine or worker error does not establish a model violation, and no property was checked.",
     nextStep:
-      "Inspect the process details, verify the installation and retry with an explicit supported configuration.",
-  },
-  B105: {
-    title: "The checker output could not be validated",
-    why: "Unrecognised output cannot be used as trustworthy evidence.",
-    nextStep:
-      "Preserve the failure details and check the pinned adapter/tool versions. Do not interpret this run as successful.",
+      "Inspect the reported engine error and run doctor; report it if it repeats. Do not interpret this run as successful.",
   },
   B106: {
     title: "The trace does not match its source model",
     why: "A mapping or replay check rejected the witness.",
     nextStep:
       "Use the frozen source from this run and investigate the translation mismatch before trusting the trace.",
-  },
-  B107: {
-    title: "Checker cleanup did not finish cleanly",
-    why: "The analysis evidence and cleanup failure are separate facts.",
-    nextStep:
-      "Inspect the reported remaining resources and stop any identified owned checker before retrying.",
   },
   B124: {
     title: "The checker exhausted its time budget",

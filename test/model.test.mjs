@@ -47,8 +47,7 @@ test("simultaneous source updates, valid replay and corrupt witness rejection", 
       sourceMappingValid({ ...m, snapshotId: "changed" }, ir),
       false,
     );
-    assert.equal(sourceMappingValid({ ...m, quint: "changed" }, ir), false);
-    assert.equal(sourceMappingValid({ ...m, config: "changed" }, ir), false);
+    assert.equal(sourceMappingValid({ ...m, hash: "changed" }, ir), false);
     const wrongSpan = {
       ...m,
       events: m.events.map((e) => ({
