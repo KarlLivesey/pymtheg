@@ -1,12 +1,13 @@
 // Inspected releases anchor the semver-family assumption. See W2-C3.md.
 export const ecosystemMacros = new Map<
   string,
-  { version: string; names: Set<string> }
+  { version: string; minimum: string; names: Set<string> }
 >([
   [
     "tracing",
     {
       version: "0.1.44",
+      minimum: "0.1.0",
       names: new Set(["trace", "debug", "info", "warn", "error", "event"]),
     },
   ],
@@ -14,18 +15,30 @@ export const ecosystemMacros = new Map<
     "log",
     {
       version: "0.4.35",
+      minimum: "0.4.4",
       names: new Set(["trace", "debug", "info", "warn", "error"]),
     },
   ],
   [
     "metrics",
-    { version: "0.24.6", names: new Set(["counter", "gauge", "histogram"]) },
+    {
+      version: "0.24.6",
+      minimum: "0.24.0",
+      names: new Set(["counter", "gauge", "histogram"]),
+    },
   ],
   [
     "anyhow",
-    { version: "1.0.104", names: new Set(["ensure", "bail", "anyhow"]) },
+    {
+      version: "1.0.104",
+      minimum: "1.0.0",
+      names: new Set(["ensure", "bail", "anyhow"]),
+    },
   ],
-  ["tokio", { version: "1.54.1", names: new Set(["select"]) }],
+  [
+    "tokio",
+    { version: "1.54.1", minimum: "1.0.0", names: new Set(["select"]) },
+  ],
 ]);
 export const ecosystemMacroNames = new Set(
   [...ecosystemMacros.values()].flatMap((c) => [...c.names]),
@@ -38,18 +51,21 @@ const versionTuple = (s: string): Version | undefined => {
   const ns = s.split(".").map(Number);
   return ns.every(Number.isSafeInteger) ? (ns as Version) : undefined;
 };
-function family(audited: string): { low: Version; high: Version } {
+function family(
+  audited: string,
+  minimum: string,
+): { low: Version; high: Version } {
   const [major, minor] = versionTuple(audited)!;
-  return major
-    ? { low: [major, 0, 0], high: [major + 1, 0, 0] }
-    : { low: [0, minor, 0], high: [0, minor + 1, 0] };
+  const low = versionTuple(minimum)!;
+  return { low, high: major ? [major + 1, 0, 0] : [0, minor + 1, 0] };
 }
 export function compatibleRelease(
   audited: string,
   version: string | undefined,
+  minimum: string,
 ): boolean {
   const v = version && versionTuple(version);
-  const { low, high } = family(audited);
+  const { low, high } = family(audited, minimum);
   return !!v && compare(v, low) >= 0 && compare(v, high) < 0;
 }
 /** Stable-release intervals for ordinary Cargo requirements. Unknown stays unproved. */
@@ -110,10 +126,11 @@ function requirementRange(
 export function compatibleRequirement(
   audited: string,
   requirement: string | undefined,
+  minimum: string,
 ): boolean {
   const r =
     requirement === undefined ? undefined : requirementRange(requirement);
-  const { low, high } = family(audited);
+  const { low, high } = family(audited, minimum);
   return !!r && compare(r.low, low) >= 0 && compare(r.high, high) <= 0;
 }
 export function auditedMacro(
@@ -126,8 +143,8 @@ export function auditedMacro(
   return (
     !!entry &&
     (version === undefined
-      ? compatibleRequirement(entry.version, requirement)
-      : compatibleRelease(entry.version, version)) &&
+      ? compatibleRequirement(entry.version, requirement, entry.minimum)
+      : compatibleRelease(entry.version, version, entry.minimum)) &&
     entry.names.has(name)
   );
 }

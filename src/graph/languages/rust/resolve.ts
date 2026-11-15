@@ -2821,8 +2821,16 @@ export function resolveRust(
             return (
               !!contract &&
               (e.registryVersion === undefined
-                ? compatibleRequirement(contract.version, e.registryRequirement)
-                : compatibleRelease(contract.version, e.registryVersion)) &&
+                ? compatibleRequirement(
+                    contract.version,
+                    e.registryRequirement,
+                    contract.minimum,
+                  )
+                : compatibleRelease(
+                    contract.version,
+                    e.registryVersion,
+                    contract.minimum,
+                  )) &&
               !contract.names.has(entry.name)
             );
           })
