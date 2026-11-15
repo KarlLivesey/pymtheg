@@ -1,0 +1,10 @@
+{
+  "mergedMain": "7e5b4cc5e685a5419ec6297b00d1e2452942a428",
+  "previousHead": "b5d5cd701cd286e405fe6bd163f04a62ca73fe2d",
+  "sourceHashes": {
+    "src/mcp/workspace.ts": "10f422cf6b7428cbfbe932a836dfb4056844f2a85ba6885ffe75d497c9cc4d8f",
+    "src/mcp/server.ts": "c4287016607c1e8c121365a7da70c652f55c48a21dd2539217071404769cb842",
+    "docs/mcp.md": "bd39ef760e011ef87924f287260f950be65b03e180f1b865db03221af9297741",
+    "test/mcp-design-loop.test.mjs": "d2e2ca5af8717b6ecc14e98ae97ebb8361d81a4db7f8590bae3ad024f7993ca2"
+  }
+}

@@ -1,0 +1,8 @@
+src/mcp/graph-jobs.ts 127ms
+src/mcp/graph.ts 58ms (unchanged)
+src/mcp/graph-view.ts 102ms
+src/mcp/graph-worker.ts 6ms (unchanged)
+src/mcp/server.ts 147ms
+test/mcp-graph-jobs.test.mjs 53ms
+test/mcp-graph.test.mjs 44ms (unchanged)
+test/mcp-design-loop.test.mjs 21ms

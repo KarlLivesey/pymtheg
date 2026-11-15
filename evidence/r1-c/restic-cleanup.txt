@@ -1,0 +1,1 @@
+MCP client/server closed; copied pinned corpus, graph database and unique scratch removed in finally.

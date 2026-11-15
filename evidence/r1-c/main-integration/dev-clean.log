@@ -1,0 +1,2 @@
+pymtheg-dev --name r1cm-a71 --clean
+Exit status: 0; fresh mirror and per-name scratch removed.
