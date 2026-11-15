@@ -1,3 +1,4 @@
+import { operationError } from "./operation-errors.js";
 import { agentLimits } from "./limits.js";
 import { parentPort, workerData } from "node:worker_threads";
 import * as library from "../architecture/code-links.js";
@@ -19,7 +20,7 @@ try {
   const result = await (
     functions[action as keyof typeof functions] as (input: any) => Promise<any>
   )(input);
-  const view = makeLinkView(action, result);
+  const view = makeLinkView(action, result, input);
   // A mutation may already have committed: size errors must never claim rollback.
   if (Buffer.byteLength(JSON.stringify(view)) > agentLimits.linkResultBytes)
     throw Error(
@@ -27,15 +28,6 @@ try {
     );
   parentPort!.postMessage({ kind: "result", view });
 } catch (error) {
-  const e = error as { code?: string; errcode?: number; message?: string };
-  parentPort!.postMessage({
-    kind: "error",
-    error: {
-      code: e.errcode === 5 || e.errcode === 6 ? "locked" : (e.code ?? "error"),
-      message: e.message ?? String(error),
-      action:
-        "Correct the input or retry after releasing the named lock. For interrupted mutations inspect list/history before retrying; commits are not undone.",
-    },
-  });
+  parentPort!.postMessage({ kind: "error", error: operationError(error) });
 }
 parentPort!.close();

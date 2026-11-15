@@ -1093,9 +1093,12 @@ export async function refreshCodeLink(
         message: "Link is already up to date.",
       };
     const row = store!.codeLinkRows().find((r) => r.id === link.id)!;
-    const { id: _id, removed: _removed, ...stored } = link;
-    void _id;
-    void _removed;
+    // Pair a receipt hash with its actual body, not the link selected before
+    // the asynchronous graph sync (another writer may have refreshed it).
+    const stored = JSON.parse(row.body) as Omit<
+      StoredCodeLink,
+      "id" | "removed"
+    >;
     store!.writeCodeLink(row.key, {
       ...stored,
       pathHistory: { ...stored.pathHistory, [sha(row.body)]: stored.symbol },

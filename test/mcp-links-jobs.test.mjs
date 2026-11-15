@@ -108,8 +108,36 @@ test("link pages stay within the wire cap, expose clipping/counts, and keep inco
     assert.ok(body.items.length < 100);
     assert.ok(body.nextOffset > 0);
     assert.match(body.items[0].title, /truncated/);
+    assert.equal(body.items[0].title.isWellFormed(), true);
   } finally {
     await client.close();
     await server.close();
   }
+});
+
+test("database collision errors have structured retry guidance instead of raw SQLite text", async () => {
+  const { operationError } = await import("../dist/mcp/operation-errors.js");
+  for (const message of [
+    "database is locked",
+    "UNIQUE constraint failed: graph_links.id",
+    "FOREIGN KEY constraint failed",
+    "Invalid or duplicate added link origin/key",
+  ]) {
+    const reply = operationError(Error(message), "GRAPH_REQUEST_FAILED");
+    assert.equal(reply.retryable, true);
+    assert.match(reply.action, /retry/i);
+    assert.doesNotMatch(reply.message, /SQLITE|constraint failed|origin\/key/);
+    assert.deepEqual(operationError(reply), reply);
+  }
+  const library = operationError(
+    Object.assign(Error("Planning ID exists"), { code: "record-conflict" }),
+  );
+  assert.equal(library.code, "record-conflict");
+  const named = operationError(
+    Object.assign(Error("Record SQLITE_BUSY already exists"), {
+      code: "record-conflict",
+    }),
+  );
+  assert.equal(named.code, "record-conflict");
+  assert.equal(named.retryable, false);
 });

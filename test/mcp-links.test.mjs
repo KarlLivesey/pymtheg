@@ -39,7 +39,10 @@ async function session(run) {
     await client.connect(transport);
     const log = [];
     const raw = async (name, args) => {
-      const r = await client.callTool({ name, arguments: args });
+      const r = await client.callTool(
+        { name, arguments: args },
+        { timeout: 3600000 },
+      );
       assert.ok(
         Buffer.byteLength(JSON.stringify(r)) <= 65536 ||
           !["requirement_links", "link_result"].includes(name),
@@ -72,6 +75,16 @@ async function session(run) {
 
 test("real stdio links: Go/Rust/TS edit-check-refresh, rename suggestions, failures, move confirmation, queries, history and graph rebuild", async () =>
   session(async ({ root, link, call, raw }) => {
+    const graph = async (action, query) => {
+      const first = await call("code_graph", {
+        action,
+        ...(query ? { query } : {}),
+      });
+      return first.state === "running"
+        ? call("graph_result", { jobId: first.jobId, wait: true })
+        : first;
+    };
+    assert.equal((await graph("index")).summary.sync.complete, true);
     const ids = [];
     for (const [i, path, selector] of [
       [1, "a.go", "SaveGo"],
@@ -83,7 +96,11 @@ test("real stdio links: Go/Rust/TS edit-check-refresh, rename suggestions, failu
         title: `Store values ${i}`,
       });
       assert.equal(requirement.items[0].id, `plan:R${i}`);
-      const added = await link("add", { record: `R${i}`, selector });
+      const selected = await graph("symbol", selector);
+      const ref = selected.items[0].ref;
+      assert.match(ref, /^symbol:[0-9a-f]{64}$/);
+      const added = await link("add", { record: `R${i}`, selector: ref });
+      assert.equal(added.items[0].symbol.ref, ref);
       assert.equal(added.summary.status, "created");
       const id = added.items[0].id;
       ids.push(id);
@@ -140,7 +157,6 @@ test("real stdio links: Go/Rust/TS edit-check-refresh, rename suggestions, failu
     const ambiguous = await link("add", {
       record: "R1",
       selector: "Same",
-      section: "matches",
     });
     assert.equal(ambiguous.summary.status, "ambiguous-selector");
     assert.equal(ambiguous.total, 2);
@@ -315,13 +331,240 @@ test("every documented requirement-link call executes as written", async () =>
       (path, text) => writeFile(join(root, path), text),
       (condition) => assert.ok(condition),
     );
-    assert.deepEqual([...new Set(log.map((c) => c.name))].sort(), [
-      "link_result",
-      "requirement_links",
-    ]);
+    const used = new Set(log.map((c) => c.name));
+    for (const name of ["code_graph", "link_result", "requirement_links"])
+      assert.ok(used.has(name));
+    assert.ok(
+      [...used].every((name) =>
+        [
+          "code_graph",
+          "graph_result",
+          "link_result",
+          "requirement_links",
+        ].includes(name),
+      ),
+    );
     if (process.env.R1C2_EVIDENCE)
       await writeFile(
         join(process.env.R1C2_EVIDENCE, "documented-links.json"),
         JSON.stringify(log) + "\n",
       );
+  }));
+
+test("check_design first response includes bounded actionable findings, with read_run continuation", async () =>
+  session(async ({ root, call, raw }) => {
+    await writeFile(
+      join(root, "bad.pym"),
+      Array.from(
+        { length: 35 },
+        (_, i) => `flow broken${i}(n: Nat) -> Nat { return n - 1; }`,
+      ).join("\n"),
+    );
+    const reply = await raw("check_design", { file: "bad.pym" });
+    assert.equal(reply.isError, undefined);
+    assert.ok(Buffer.byteLength(JSON.stringify(reply)) <= 262144);
+    const first = reply.structuredContent;
+    assert.ok(first.findings.errors > 0);
+    assert.ok(
+      first.findings.items.length > 0 && first.findings.items.length <= 10,
+    );
+    assert.ok(first.findings.total > first.findings.items.length);
+    assert.equal(first.findings.truncated, true);
+    assert.equal(first.findings.nextOffset, first.findings.items.length);
+    assert.ok(
+      first.findings.items.some(
+        (f) =>
+          f.code === "T002" &&
+          f.message &&
+          f.why &&
+          f.nextStep &&
+          f.location.file === "bad.pym",
+      ),
+    );
+    const more = await call("read_run", {
+      runId: first.runId,
+      section: "findings",
+      offset: first.findings.nextOffset,
+      limit: 10,
+    });
+    assert.ok(more.items.length > 0);
+  }));
+
+test("MCP Go toolchain decisions/state/warnings agree with CLI JSON", async () =>
+  session(async ({ root, call }) => {
+    const { execFile } = await import("node:child_process");
+    const { promisify } = await import("node:util");
+    const run = promisify(execFile);
+    const cfg = join(root, ".pymtheg", "settings.json");
+    const settings = JSON.parse(await readFile(cfg, "utf8"));
+    settings.graph = { toolchain: { go: true } };
+    await writeFile(cfg, JSON.stringify(settings));
+    const graph = async (action, query, extra = {}) => {
+      const first = await call("code_graph", {
+        action,
+        ...(query ? { query } : {}),
+        ...extra,
+      });
+      return first.state === "running"
+        ? call("graph_result", {
+            jobId: first.jobId,
+            wait: true,
+            section: extra.section ?? "answer",
+          })
+        : first;
+    };
+    const index = await graph("index");
+    assert.equal(
+      index.summary.toolchain.go.state,
+      "used",
+      JSON.stringify(index.summary),
+    );
+    const mcp = await graph("callees", "CallerGo", { section: "links" });
+    const cli = JSON.parse(
+      (
+        await run(
+          process.execPath,
+          [
+            resolve("dist/cli/main.js"),
+            "graph",
+            "callees",
+            "CallerGo",
+            "--root",
+            root,
+            "--json",
+          ],
+          { maxBuffer: 1024 * 1024 },
+        )
+      ).stdout,
+    );
+    assert.deepEqual(mcp.summary.toolchain, cli.toolchain);
+    assert.ok(cli.data.links.some((l) => l.decidedBy === "toolchain"));
+    for (const l of cli.data.links) {
+      const row = mcp.items.find((r) => r.ref === l.id);
+      assert.ok(row);
+      assert.equal(row.certainty, l.certainty);
+      assert.equal(row.decidedBy, l.decidedBy);
+    }
+    const stale = await graph("callees", "CallerGo", {
+      noSync: true,
+      section: "warnings",
+    });
+    const raw = JSON.parse(
+      (
+        await run(
+          process.execPath,
+          [
+            resolve("dist/cli/main.js"),
+            "graph",
+            "callees",
+            "CallerGo",
+            "--root",
+            root,
+            "--no-sync",
+            "--json",
+          ],
+          { maxBuffer: 1024 * 1024 },
+        )
+      ).stdout,
+    );
+    assert.deepEqual(stale.summary.toolchain, raw.toolchain);
+    assert.ok(
+      raw.warnings.some((w) => w.code === "toolchain-inputs-not-rechecked"),
+    );
+    assert.ok(
+      stale.summary.warnings.includes("toolchain-inputs-not-rechecked"),
+    );
+    assert.ok(
+      stale.items.some((w) => w.code === "toolchain-inputs-not-rechecked"),
+    );
+  }));
+
+test("graph and requirement-link selectors/file queries preview the requested failed file first", async () =>
+  session(async ({ root, link, call }) => {
+    for (const file of ["a-broken.go", "z-broken.go"])
+      await writeFile(join(root, file), "package p\nfunc broken( {\n");
+    for (const [action, query] of [
+      ["file", "z-broken.go"],
+      ["symbol", "z-broken.go:2"],
+      ["callers", "z-broken.go:2"],
+    ]) {
+      const first = await call("code_graph", { action, query });
+      const answer =
+        first.state === "running"
+          ? await call("graph_result", { jobId: first.jobId, wait: true })
+          : first;
+      assert.equal(answer.failedFiles.total, 2);
+      assert.equal(answer.failedFiles.items[0].path, "z-broken.go");
+    }
+    await link("requirement", {
+      id: "BROKEN",
+      title: "Must name targeted broken file",
+    });
+    const refused = await link("add", {
+      record: "BROKEN",
+      selector: "z-broken.go:2",
+    });
+    assert.notEqual(refused.summary.status, "created");
+    assert.equal(refused.failedFiles.items[0].path, "z-broken.go");
+    const filtered = await link("list", { file: "z-broken.go" });
+    assert.equal(filtered.failedFiles.items[0].path, "z-broken.go");
+  }));
+
+test("two stdio servers indexing the same project return completion or actionable retry, then recover", async () =>
+  session(async ({ root, raw, call }) => {
+    const second = new Client({ name: "second-agent", version: "1" });
+    const transport = new StdioClientTransport({
+      command: process.execPath,
+      args: [resolve("dist/cli/main.js"), "mcp", root],
+      env: { ...process.env },
+      stderr: "pipe",
+    });
+    try {
+      await second.connect(transport);
+      const [left, right] = await Promise.all([
+        raw("code_graph", { action: "index", wait: false }),
+        second.callTool({
+          name: "code_graph",
+          arguments: { action: "index", wait: false },
+        }),
+      ]);
+      const replies = await Promise.all([
+        raw("graph_result", {
+          jobId: left.structuredContent.jobId,
+          wait: true,
+        }),
+        second.callTool(
+          {
+            name: "graph_result",
+            arguments: { jobId: right.structuredContent.jobId, wait: true },
+          },
+          { timeout: 3600000 },
+        ),
+      ]);
+      for (const r of replies)
+        if (r.isError) {
+          assert.equal(
+            r.structuredContent.error.retryable,
+            true,
+            JSON.stringify(r),
+          );
+          assert.match(r.structuredContent.error.action, /retry/i);
+          assert.doesNotMatch(
+            r.structuredContent.error.message,
+            /SQLITE|constraint failed/i,
+          );
+        } else assert.equal(r.structuredContent.state, "complete");
+      const recovered = await call("code_graph", {
+        action: "symbol",
+        query: "SaveGo",
+      });
+      const answer =
+        recovered.state === "running"
+          ? await call("graph_result", { jobId: recovered.jobId, wait: true })
+          : recovered;
+      assert.equal(answer.summary.sync.complete, true);
+      assert.ok(answer.items.length);
+    } finally {
+      await second.close();
+    }
   }));

@@ -71,6 +71,7 @@ export class GraphView {
           ref: l.id,
           kind: l.kind,
           certainty: l.certainty,
+          ...(l.decidedBy ? { decidedBy: l.decidedBy } : {}),
           sourceStatus: l.sourceStatus,
           targetStatus: l.targetStatus,
           source: symbol(l.source),
@@ -156,7 +157,26 @@ export class GraphView {
       ...this.symbols.get(String(row.ref)),
       ...row,
     }));
-    this.tables.failed_files = response.failedFiles.map((f, i) => ({
+    const requested = [
+      data.path,
+      record(data.symbol).file,
+      record(data.from).file,
+      record(data.to).file,
+      ...list(data.inputs).map((i) => i.input),
+    ].filter((v): v is string => typeof v === "string");
+    const priority = (path: string) => {
+      const index = requested.findIndex(
+        (input) =>
+          input === path ||
+          (input.startsWith(path + ":") &&
+            /^\d+(?::\d+)?$/.test(input.slice(path.length + 1))),
+      );
+      return index < 0 ? Infinity : index;
+    };
+    const failedFiles = [...response.failedFiles].sort(
+      (a, b) => priority(a.path) - priority(b.path),
+    );
+    this.tables.failed_files = failedFiles.map((f, i) => ({
       path: f.path,
       language: f.language,
       reasons: this.reasons({ reason: f.reason }),
@@ -203,8 +223,24 @@ export class GraphView {
         symbols: list(record(data.possiblePath).symbols).map(symbol),
         links: list(record(data.possiblePath).links).map((l) => record(l).id),
       };
+    const toolchain = response.toolchain;
+    const toolchainClipped =
+      toolchain && Buffer.byteLength(JSON.stringify(toolchain)) > 4096;
+    const toolchainView = toolchainClipped
+      ? {
+          setting: toolchain.setting,
+          go: {
+            state: toolchain.go.state,
+            reason: clip(toolchain.go.reason, 400),
+            errorCount: toolchain.go.errors?.length ?? 0,
+          },
+          detailRef: this.detail("toolchain", toolchain),
+        }
+      : (toolchain ?? null);
     this.summary = {
       command: response.command,
+      toolchain: toolchainView,
+      toolchainTruncated: !!toolchainClipped,
       status: response.status,
       exitCode: response.exitCode,
       indexExists: response.indexExists,

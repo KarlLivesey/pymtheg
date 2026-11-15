@@ -1,3 +1,4 @@
+import { operationError } from "./operation-errors.js";
 import { agentLimits } from "./limits.js";
 import { z } from "zod";
 import type {
@@ -53,23 +54,15 @@ const state = (j: LinkJob) => ({
     ? "Use link_result for immutable result pages; new reads capture current state."
     : "Call link_result with this jobId; wait:true waits with progress. Other MCP tools remain available.",
 });
-const failure = (e: unknown, id?: string) => {
-  const v = e as { code?: string; message?: string; action?: string };
-  return output(
+const failure = (error: unknown, jobId?: string) =>
+  output(
     {
-      jobId: id ?? null,
+      jobId: jobId ?? null,
       state: "error",
-      error: {
-        code: v.code ?? "invalid-input",
-        message: v.message ?? String(e),
-        action:
-          v.action ??
-          "Correct the input; list/history reconcile any interrupted mutation before retrying.",
-      },
+      error: operationError(error, "invalid-input"),
     },
     true,
   );
-};
 async function wait(
   job: LinkJob,
   ctx: ServerContext,
@@ -256,6 +249,13 @@ export function registerLinkTools(
           );
         if (a.action === "unlinked") input.limit = a.symbolLimit;
         ctx.mcpReq.signal.throwIfAborted();
+        if (workspace.graph?.activeId())
+          throw Object.assign(
+            Error(
+              "A graph job is running; await graph_result before a link operation.",
+            ),
+            { code: "busy" },
+          );
         const job = workspace.links.start(a.action, input);
         if (a.wait)
           await wait(job, ctx, () => workspace.links.cancel(job.id), true);

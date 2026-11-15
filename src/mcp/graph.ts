@@ -1,3 +1,4 @@
+import { operationError } from "./operation-errors.js";
 import {
   graphDeadline,
   waitForGraph,
@@ -61,15 +62,7 @@ const failure = (error: unknown, jobId?: string) =>
     {
       state: "error",
       jobId: jobId ?? null,
-      error: {
-        code: "GRAPH_REQUEST_FAILED",
-        message: (error instanceof Error ? error.message : String(error)).slice(
-          0,
-          2048,
-        ),
-        action:
-          "Use code_graph status, read/cancel an active job, or narrow the query. Start a new job if the handle expired. No complete answer is claimed.",
-      },
+      error: operationError(error, "GRAPH_REQUEST_FAILED"),
     },
     true,
   );
@@ -202,6 +195,10 @@ export function registerGraphTools(
             "index/status take no query; other actions require query; only path requires to.",
           );
         ctx.mcpReq.signal.throwIfAborted();
+        if (workspace.links?.activeId())
+          throw Error(
+            "A requirement-link job is running; await link_result before starting graph work.",
+          );
         const job = workspace.graph.start({
           command: a.action,
           args: needs ? [a.query!, ...(a.to !== undefined ? [a.to] : [])] : [],

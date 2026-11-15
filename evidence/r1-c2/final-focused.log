@@ -1,0 +1,48 @@
+✔ requirement ↔ Go/Rust/TypeScript links: states, rebuild, removal and history (4828.892602ms)
+✔ link CLI: text and JSON shapes, exit codes, nothing created on ambiguity (6529.702969ms)
+✔ rename in place with a same-named symbol in another package is missing, never moved (904.635673ms)
+✔ deleting the linked file with an identical twin elsewhere is missing and fails the check (797.623579ms)
+✔ a genuine file move is moved; check fails until refreshed unless --allow-moved (2283.491599ms)
+✔ identical-text twins on record: moved is never claimed (swap case from review) (871.245331ms)
+✔ a genuine move with only different-text twins on record is moved (787.488628ms)
+✔ defined behaviour: an identical twin moved onto the recorded path is the linked symbol (ok) (760.817563ms)
+✔ fingerprint: only line endings and trailing spaces are ignored (794.150434ms)
+✔ two link writers wait for a held planning lock and both succeed (1490.372385ms)
+✔ unlinked --symbols lists public methods of exported TypeScript classes (562.120578ms)
+✔ errors carry machine-readable codes; impact names callers it did not follow (1350.458635ms)
+✔ attributes above a symbol are fingerprinted (Rust #[...], Go //go:), doc comments are not (1721.521733ms)
+✔ move continuity is unknown if failed or partial files existed at link/refresh time (943.507609ms)
+✔ history retains paths of repeated moves, body refresh and removal (1071.992086ms)
+✔ Rust raw identifiers do not hide outer attributes across blank lines; Go directives span blank lines (1048.309311ms)
+✔ partial files suppress twins at creation and refresh even when the chosen file is clean (897.932546ms)
+✔ legacy intermediate history is explicitly unavailable, never today's path (787.843752ms)
+✔ refresh journals the actual preceding receipt when another writer updates during graph sync (832.793778ms)
+✔ MCP-only design loop: ordinary source edits, diagnostic/hint, check, try without runId, verify and simulate (2928.519361ms)
+✔ every documented MCP call executes as written, including explicit legacy refusals (10931.175163ms)
+✔ inline completion wins a controlled deadline and is exactly the graph_result first page (152.537016ms)
+✔ controlled deadline expiry returns a progress handle; later result is unchanged (60.158168ms)
+✔ wait:false never starts a deadline and cancellation of an inline wait joins the worker (129.370156ms)
+✔ graph lifecycle uses controlled readiness: busy rejection, cancellation, retention and close join (412.030776ms)
+✔ stdio mixed init-free graph: every action, certainty classes, failures, paging and auto-sync (9148.501542ms)
+✔ MCP graph jobs are nonblocking, cancellable, bounded, session-owned and confined (2699.910619ms)
+✔ graph MCP confines uninitialized subdirectories rather than indexing their parent (512.417224ms)
+✔ oversized names are explicitly clipped, exact details page, and wire responses stay bounded (2365.638196ms)
+✔ owned link workers: busy, cancellation, disconnect cleanup and session retention use explicit readiness (282.448527ms)
+✔ link pages stay within the wire cap, expose clipping/counts, and keep incomplete checks false (122.832641ms)
+✔ database collision errors have structured retry guidance instead of raw SQLite text (2.379244ms)
+✔ real stdio links: Go/Rust/TS edit-check-refresh, rename suggestions, failures, move confirmation, queries, history and graph rebuild (38106.510734ms)
+✔ MCP impact names candidate callers it did not follow, and does not promote them (3219.973639ms)
+✔ SQLite lock waits stay in an owned worker: MCP discovery remains responsive until a readiness-controlled release (2106.643642ms)
+✔ every documented requirement-link call executes as written (6442.082928ms)
+✔ check_design first response includes bounded actionable findings, with read_run continuation (773.076744ms)
+✔ MCP Go toolchain decisions/state/warnings agree with CLI JSON (13001.956219ms)
+✔ graph and requirement-link selectors/file queries preview the requested failed file first (4350.932431ms)
+✔ two stdio servers indexing the same project return completion or actionable retry, then recover (3007.145683ms)
+ℹ tests 40
+ℹ suites 0
+ℹ pass 40
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 71375.134727

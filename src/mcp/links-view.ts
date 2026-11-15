@@ -12,13 +12,23 @@ export interface LinkView {
   summary: Row;
   tables: Record<LinkSection, Row[]>;
 }
-export function makeLinkView(action: string, result: Row): LinkView {
+export function makeLinkView(
+  action: string,
+  result: Row,
+  input: Row = {},
+): LinkView {
   let clippedText = false;
   const preview = (value: unknown, max = 1200) => {
     const s = String(value ?? "");
     if (s.length > max) {
       clippedText = true;
-      return s.slice(0, max - 16) + "… [truncated]";
+      let end = max - 16;
+      if (
+        /[\uD800-\uDBFF]/.test(s[end - 1] ?? "") &&
+        /[\uDC00-\uDFFF]/.test(s[end] ?? "")
+      )
+        end--;
+      return s.slice(0, end) + "… [truncated]";
     }
     return s;
   };
@@ -123,6 +133,19 @@ export function makeLinkView(action: string, result: Row): LinkView {
     ...f,
     reason: preview(f.reason),
   }));
+  const selectedInputs = [input.file, input.selector, input.symbol].filter(
+    (v): v is string => typeof v === "string",
+  );
+  const isSelected = (path: string) =>
+    selectedInputs.some(
+      (value) =>
+        value === path ||
+        (value.startsWith(path + ":") &&
+          /^\d+(?::\d+)?$/.test(value.slice(path.length + 1))),
+    );
+  tables.failed_files.sort(
+    (a, b) => Number(isSelected(b.path)) - Number(isSelected(a.path)),
+  );
   if (result.links)
     tables.items = [...result.links]
       .sort(
@@ -171,6 +194,17 @@ export function makeLinkView(action: string, result: Row): LinkView {
     ...symbol(s),
     certainty: s.certainty,
   }));
+  if (!tables.items.length && tables.matches.length) {
+    tables.items = tables.matches.map((row) => ({
+      ...row,
+      type: row.ref ? "selector-match" : "record-match",
+    }));
+  }
+  if (action === "unlinked" && result.symbols) {
+    tables.items.push(
+      ...tables.symbols.map((row) => ({ ...row, type: "public-symbol" })),
+    );
+  }
   summary.textClipped = clippedText;
   summary.sourceTruncated ||=
     (result.notFollowedCount ?? 0) > tables.not_followed.length ||

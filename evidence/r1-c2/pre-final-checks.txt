@@ -1,0 +1,1 @@
+Before the receipt race regression: 2,787 full-suite tests and 39 focused tests passed, zero failures/cancellations/skips. The controlled history-negative.log then reproduced the stale-path race. Final authoritative logs are final-*.log on the receipt-body fix, including the new test.

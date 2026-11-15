@@ -1131,3 +1131,64 @@ test("legacy intermediate history is explicitly unavailable, never today's path"
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("refresh journals the actual preceding receipt when another writer updates during graph sync", async () => {
+  const { ArchitectureStore } = await import("../dist/architecture/store.js");
+  const { createHash } = await import("node:crypto");
+  const root = await project();
+  let other;
+  try {
+    await createRequirement({
+      root,
+      id: "RACEPATH",
+      title: "Actual receipt path",
+    });
+    const added = await createCodeLink({
+      root,
+      record: "RACEPATH",
+      selector: "Save",
+      writer,
+    });
+    other = await ArchitectureStore.open(root, { writer });
+    const row = other.codeLinkRows().find((r) => r.id === added.link.id);
+    const prior = JSON.parse(row.body);
+    await writeFile(
+      join(root, "gopkg", "store.go"),
+      goSource.replace("x + 1", "x + 2"),
+    );
+    let injected = false;
+    const signal = new AbortController().signal;
+    Object.defineProperty(signal, "throwIfAborted", {
+      value() {
+        if (injected) return;
+        injected = true;
+        other.writeCodeLink(row.key, {
+          ...prior,
+          pathHistory: {
+            [createHash("sha256").update(row.body).digest("hex")]: prior.symbol,
+          },
+          symbol: { ...prior.symbol, path: "intermediate.go" },
+        });
+      },
+    });
+    const refreshed = await refreshCodeLink({
+      root,
+      link: added.link.id,
+      writer,
+      signal,
+    });
+    assert.equal(refreshed.status, "refreshed");
+    assert.equal(injected, true);
+    const history = (await codeLinkHistory({ root })).entries.filter(
+      (e) => e.link === added.link.id,
+    );
+    assert.deepEqual(
+      history.map((e) => e.symbol.path),
+      ["gopkg/store.go", "intermediate.go", "gopkg/store.go"],
+    );
+    assert.ok(history.every((e) => e.pathKnown));
+  } finally {
+    other?.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
