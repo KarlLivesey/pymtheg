@@ -10,6 +10,7 @@ export interface Dependency {
   conditions: string[];
   packageName?: string;
   registryVersion?: string | undefined;
+  registryRequirement?: string;
 }
 export interface Crate {
   root: string;
@@ -96,29 +97,26 @@ export function crates(
       .filter((c) => p.basename(c.path) === "Cargo.lock")
       .map((c) => [c.path, c.status === "clean" ? readToml(c.text) : null]),
   );
-  function registryVersion(
+  function registrySelection(
     manifest: string,
     workspace: string | undefined,
     owner: string,
     name: string,
     requirement: string | undefined,
-  ): string | undefined {
-    if (!requirement) return undefined;
+  ): Pick<Dependency, "registryVersion" | "registryRequirement"> {
+    if (!requirement) return {};
     const lockPath = p.join(p.dirname(workspace ?? manifest), "Cargo.lock");
-    // Without a lock, only a literal exact release can establish this fact.
-    if (!locks.has(lockPath))
-      return /^=\d+\.\d+\.\d+$/.test(requirement)
-        ? requirement.slice(1)
-        : undefined;
+    // Without a lock, retain the requirement for the semver-family proof.
+    if (!locks.has(lockPath)) return { registryRequirement: requirement };
     const packages = locks.get(lockPath)?.package;
-    if (!Array.isArray(packages)) return undefined;
+    if (!Array.isArray(packages)) return {};
     const rows = packages.map(table).filter((t): t is TomlTable => !!t);
     const owners = rows.filter(
       (t) => t.name === owner && t.source === undefined,
     );
-    if (owners.length !== 1) return undefined;
+    if (owners.length !== 1) return {};
     const deps = strings(owners[0]!.dependencies);
-    if (!deps) return undefined;
+    if (!deps) return {};
     const descriptors = deps.filter((d) => d.split(" ")[0] === name);
     const candidates = rows.filter(
       (t) =>
@@ -132,8 +130,8 @@ export function crates(
       candidates[0]!.source !==
         "registry+https://github.com/rust-lang/crates.io-index"
     )
-      return undefined;
-    return string(candidates[0]!.version);
+      return {};
+    return { registryVersion: string(candidates[0]!.version) };
   }
   function workspaceFor(doc: (typeof docs)[number]): {
     doc?: typeof doc | undefined;
@@ -431,7 +429,7 @@ export function crates(
               (k) => fields?.[k] !== undefined,
             )
               ? {
-                  registryVersion: registryVersion(
+                  ...registrySelection(
                     doc.path,
                     workspace.doc?.path,
                     name!,

@@ -1,5 +1,10 @@
 import { implies as cfgImplies, possible as cfgPossible } from "./cfg.js";
-import { auditedMacro, ecosystemMacros } from "./macro-catalog.js";
+import {
+  auditedMacro,
+  ecosystemMacros,
+  compatibleRelease,
+  compatibleRequirement,
+} from "./macro-catalog.js";
 import {
   scopeNeutralStandardMacros,
   standardMacroName,
@@ -2676,7 +2681,12 @@ export function resolveRust(
         e.conditions.every((c) => implies(loc.conditions ?? [], c)),
       ) &&
       edges.every((e) =>
-        auditedMacro(e.packageName ?? "", e.registryVersion, name),
+        auditedMacro(
+          e.packageName ?? "",
+          e.registryVersion,
+          name,
+          e.registryRequirement,
+        ),
       )
     );
   }
@@ -2810,7 +2820,9 @@ export function resolveRust(
             const contract = ecosystemMacros.get(e.packageName ?? "");
             return (
               !!contract &&
-              contract.version === e.registryVersion &&
+              (e.registryVersion === undefined
+                ? compatibleRequirement(contract.version, e.registryRequirement)
+                : compatibleRelease(contract.version, e.registryVersion)) &&
               !contract.names.has(entry.name)
             );
           })

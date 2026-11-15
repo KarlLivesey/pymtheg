@@ -62,7 +62,7 @@ test("Rust ecosystem macro identity: captured lock changes re-resolve cached sou
     await mkdir(join(root, "src"));
     await writeFile(
       join(root, "Cargo.toml"),
-      '[package]\nname="app"\nversion="0.0.0"\nedition="2024"\n[dependencies]\ntracing="0.1"\n',
+      '[package]\nname="app"\nversion="0.0.0"\nedition="2024"\n[dependencies]\ntracing=">=0.1"\n',
     );
     await writeFile(
       join(root, "src/lib.rs"),
@@ -72,7 +72,7 @@ test("Rust ecosystem macro identity: captured lock changes re-resolve cached sou
       join(root, "src/child.rs"),
       '#![cfg(feature="x")] pub fn f(){}',
     );
-    for (const version of ["0.1.44", "0.1.41", "0.1.44"]) {
+    for (const version of ["0.1.44", "0.2.0", "0.1.41"]) {
       await writeFile(join(root, "Cargo.lock"), lock(version));
       let r = await indexProject(root, registry, warm);
       assert.deepEqual(
@@ -83,7 +83,7 @@ test("Rust ecosystem macro identity: captured lock changes re-resolve cached sou
         .links()
         .filter((l) => l.kind === "calls" && l.targetName === "helper");
       assert.equal(helper.length, 1);
-      assert.equal(!!helper[0].targetId, version === "0.1.44");
+      assert.equal(!!helper[0].targetId, version !== "0.2.0");
       const once = snapshot(warm),
         before = parsed;
       r = await indexProject(root, registry, warm);
