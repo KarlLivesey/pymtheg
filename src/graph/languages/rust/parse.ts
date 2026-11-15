@@ -1,8 +1,9 @@
 import { implies, possible } from "./cfg.js";
+import { ecosystemMacroNames } from "./macro-catalog.js";
 import type { Node } from "web-tree-sitter";
 import { fileURLToPath } from "node:url";
 import { createTagsParser } from "../../tree-sitter.js";
-import type { ParseResult, SourceInput } from "../../types.js";
+import type { Json, ParseResult, SourceInput } from "../../types.js";
 
 const field = (n: Node, name: string) => n.childForFieldName(name);
 const span = (n: Node) => ({ start: n.startIndex, end: n.endIndex });
@@ -323,9 +324,16 @@ async function createHelper(): Promise<Helper> {
         scope: string;
         start: number;
       }[] = [];
+      const potentialMacroAliases = new Set<string>();
       const neutralMacro = (n: Node): boolean =>
         n.type === "macro_invocation" &&
-        standardMacroName(compact(field(n, "macro")?.text ?? "")) !== null;
+        (standardMacroName(compact(field(n, "macro")?.text ?? "")) !== null ||
+          ecosystemMacroNames.has(
+            compact(field(n, "macro")?.text ?? "")
+              .split("::")
+              .at(-1)!,
+          ) ||
+          potentialMacroAliases.has(compact(field(n, "macro")?.text ?? "")));
       // Macro expansion can shadow bare names only in a lexical item container.
       // Fields/variants and associated items do not introduce lexical bindings.
       const lexicalItemContainer = (n: Node | null): boolean =>
@@ -350,7 +358,7 @@ async function createHelper(): Promise<Helper> {
         scope: string,
         kind: string,
         targetName: string,
-        extra: Record<string, string | boolean | number | string[]> = {},
+        extra: Record<string, Json> = {},
       ) => {
         if (!["contains", "modules", "imports"].includes(kind)) {
           const position = referencePosition(n);
@@ -677,6 +685,8 @@ async function createHelper(): Promise<Helper> {
         if (n.type === "use_declaration") {
           const argument = field(n, "argument");
           if (argument) imports(argument, "", "", "", "", [], names);
+          for (const name of names)
+            if (name !== "*") potentialMacroAliases.add(name);
         } else if (
           [
             "mod_item",
@@ -910,6 +920,9 @@ async function createHelper(): Promise<Helper> {
       const fileMacroUse = macroUseConditions(tree.rootNode);
       const fileModulePath = modulePath(tree.rootNode);
       result.symbols[0]!.data = {
+        noStdConditions: effectiveAttributes(tree.rootNode)
+          .filter((a) => a.meta.name === "no_std")
+          .map((a) => a.guards),
         ...(fileMacroUse.length ? { macroUseConditions: fileMacroUse } : {}),
         ...(fileModulePath.paths.length || fileModulePath.pathOpaque
           ? { innerModulePath: fileModulePath }
@@ -1758,6 +1771,14 @@ async function createHelper(): Promise<Helper> {
             link(name, owner, scope, "imports", compact(name.text), {
               alias: field(n, "alias")?.text ?? name.text,
               externCrate: true,
+              macroUseRequests: effectiveAttributes(n)
+                .filter((a) => a.meta.name === "macro_use")
+                .map((a) => ({
+                  conditions: a.guards,
+                  names: a.meta.args
+                    ? payloads(a.meta.args).map((x) => x.name)
+                    : null,
+                })),
               visibility:
                 n.namedChildren.find((c) => c.type === "visibility_modifier")
                   ?.text ?? "private",
