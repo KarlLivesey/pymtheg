@@ -3,6 +3,21 @@ import type { SqliteGraphStore } from "./store.js";
 import { GraphLocations, type Located } from "./command-locations.js";
 import type { GraphLink, GraphSymbol } from "./types.js";
 
+/**
+ * Whether the Go toolchain route decided a link: a parsed link it upgraded,
+ * confirmed or verified records `data.toolchain.origin`; an `implements`
+ * pair it added records `data.origin` (W3-L).
+ */
+const decidedByToolchain = (link: GraphLink): boolean => {
+  const data = link.data as {
+    origin?: string;
+    toolchain?: { origin?: string };
+  } | null;
+  return (
+    data?.toolchain?.origin === "toolchain" || data?.origin === "toolchain"
+  );
+};
+
 export type QueryCommand =
   | "search"
   | "symbol"
@@ -52,10 +67,7 @@ export function queryGraph(
       // Where a toolchain decided the link (W3-L2): `decidedBy`, beside the
       // certainty it has as stored (`origin` is the link's parse/analysis
       // origin). Absent for source-only links.
-      ...((link.data as { toolchain?: { origin?: string } } | null)?.toolchain
-        ?.origin === "toolchain"
-        ? { decidedBy: "toolchain" as const }
-        : {}),
+      ...(decidedByToolchain(link) ? { decidedBy: "toolchain" as const } : {}),
       source: link.sourceId ? symbol(link.sourceId) : null,
       target: link.targetId ? symbol(link.targetId) : null,
       candidates: link.candidates.map((item) => ({

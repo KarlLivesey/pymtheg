@@ -473,6 +473,16 @@ export async function executeGraph(
               setting: toolchains,
               go: { state: "not-indexed" },
             });
+      // status and --no-sync never run the toolchain: whatever its inputs did
+      // since the last sync (Go version, go.sum, a local replace target, Go
+      // files the index does not capture) is not seen. Say so.
+      if (toolchainOn && (request.command === "status" || request.noSync))
+        response.warnings.push({
+          code: "toolchain-inputs-not-rechecked",
+          message:
+            "Toolchain-backed facts are as recorded at the last sync; the toolchain's inputs (Go version, go.mod/go.sum, local replace targets, Go files outside the index) were not re-checked. Sync (a query without --no-sync, or graph index) to re-check them.",
+          files: [],
+        });
       if (settingsError)
         response.warnings.push({
           code: "settings-unreadable",

@@ -10,6 +10,7 @@ import { delimiter, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { executeGraph } from "../dist/graph/commands.js";
+import { formatGraph } from "../dist/cli/graph.js";
 import { LanguageRegistry } from "../dist/graph/registry.js";
 import { SqliteGraphStore } from "../dist/graph/store.js";
 import go from "../dist/graph/languages/go/index.js";
@@ -114,6 +115,15 @@ test("off: no settings file, no graph setting, or go: false give the same answer
       assert.equal(index.toolchain, undefined);
       const callers = await run(root, "callers", ["(*File).Write"]);
       assert.equal(callers.toolchain, undefined);
+      for (const answer of [
+        await run(root, "status"),
+        await run(root, "callers", ["(*File).Write"], { noSync: true }),
+      ])
+        assert.ok(
+          !answer.warnings.some(
+            (w) => w.code === "toolchain-inputs-not-rechecked",
+          ),
+        );
       assert.doesNotMatch(JSON.stringify(callers), /decidedBy|"toolchain"/);
       answers.push(withoutTimes(callers));
       graphs.push(stored(root));
@@ -222,22 +232,45 @@ test(
       });
       const root = join(dir, "replace", "app");
       await settings(root, true);
-      const implementsA = async () => {
-        const answer = await run(root, "file", ["use/use.go"]);
-        return answer.data.links.some(
+      const pairOf = (answer) =>
+        answer.data.links.some(
           (link) =>
             link.kind === "implements" &&
             link.certainty === "definite" &&
-            link.decidedBy === undefined &&
+            link.decidedBy === "toolchain" &&
             link.target?.identity === "I",
         );
-      };
+      const implementsA = async (extra = {}) =>
+        pairOf(await run(root, "file", ["use/use.go"], extra));
       assert.equal(await implementsA(), true);
+      // A synced query re-checked the inputs: no warning.
+      const synced = await run(root, "file", ["use/use.go"]);
+      assert.ok(
+        !synced.warnings.some(
+          (w) => w.code === "toolchain-inputs-not-rechecked",
+        ),
+      );
       // dep is outside the project: the inventory does not change.
       await writeFile(
         join(dir, "replace", "dep", "dep.go"),
         "package dep\n\ntype Marker interface {\n\tMark()\n\tClose() error\n}\n",
       );
+      // status and --no-sync do not run go: they answer as recorded, and say so.
+      const status = await run(root, "status");
+      const noSync = await run(root, "file", ["use/use.go"], { noSync: true });
+      assert.equal(pairOf(noSync), true);
+      for (const answer of [status, noSync]) {
+        const warning = answer.warnings.find(
+          (w) => w.code === "toolchain-inputs-not-rechecked",
+        );
+        assert.ok(warning, answer.command);
+        assert.match(warning.message, /as recorded at the last sync/);
+        assert.match(
+          formatGraph(answer),
+          /Warning \[toolchain-inputs-not-rechecked\]: Toolchain-backed facts are as recorded/,
+        );
+      }
+      // A synced query re-checks them and sees the edit.
       assert.equal(await implementsA(), false);
     } finally {
       await rm(dir, { recursive: true, force: true });
