@@ -160,7 +160,7 @@ test("an internal exception is reported as the module's fault, transient, distin
     // A syntax error is the file's content: no failureKind (content).
     const broken = first.results.get("broken.ts");
     assert.equal(broken.status, "failed");
-    assert.equal(broken.failureKind, undefined);
+    assert.equal(broken.failureKind, "content");
     assert.match(broken.diagnostics[0].message, /^Syntax error at line 1/);
     // The other files are unaffected.
     assert.equal(first.results.get("ok.ts").status, "clean");

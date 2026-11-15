@@ -329,10 +329,13 @@ export async function indexProject(
           await store.replaceFile(
             { ...file, result: item.result },
             !analysisFailed &&
-              file.result.status === "failed" &&
               item.result.status === "failed" &&
               item.result.failureKind !== "transient" &&
-              (await store.isParseFailure?.(file.path)) === true,
+              // Analyze-only modules may explicitly certify a file-local content
+              // failure. Unclassified analysis failures are never cached.
+              (item.result.failureKind === "content" ||
+                (file.result.status === "failed" &&
+                  (await store.isParseFailure?.(file.path)) === true)),
           );
         report.analyzed++;
       }
