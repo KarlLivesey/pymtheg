@@ -838,7 +838,8 @@ function installSize() {
       const roots = [join(HOME, ".npm/_npx"), join(HOME, ".npm/_cacache"), GLOBAL_PREFIX, join(APP, "node_modules")].filter(existsSync);
       const sizes = roots.map((p) => `${p.replace(HOME, "~")} ${(sizeOf(p) / 1048576).toFixed(1)} MiB`);
       const kinds = ["npx", "global", "local"].map(installedRoot).filter((p) => p && existsSync(p));
-      const modules = kinds.length ? join(kinds[0], "..") : null; // node_modules that holds pymtheg and its dependencies
+      // The node_modules that holds pymtheg's dependencies: nested for a global install, hoisted otherwise.
+      const modules = kinds.length ? (existsSync(join(kinds[0], "node_modules")) ? join(kinds[0], "node_modules") : join(kinds[0], "..")) : null;
       const packages = [];
       if (modules)
         for (const e of readdirSync(modules)) {
