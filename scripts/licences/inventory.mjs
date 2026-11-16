@@ -274,6 +274,18 @@ export const embeddedNotices = {
       },
     },
   ],
+  // zod 4.6.x: the credit-card format's Luhn checksum.
+  "zod/v4/core/schemas.js": [
+    {
+      provenance: {
+        match:
+          "Luhn checksum on a digit-only string. Adapted from valibot (MIT).",
+        from: "valibot's `_isLuhnAlgo` (Luhn checksum)",
+        licence:
+          'MIT, as the comment says; valibot\'s npm package declares MIT and its LICENSE reads "Copyright (c) Fabian Hiller"',
+      },
+    },
+  ],
 };
 // Wording that says code came from elsewhere ("derived from the old state" in
 // ordinary documentation prose must not count).
