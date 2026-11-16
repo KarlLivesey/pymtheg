@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import ts from "typescript";
 import { fromVirtual, toVirtual } from "./project.js";
 import { bindingSpecifier } from "./symbols.js";

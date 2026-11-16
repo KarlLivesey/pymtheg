@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // In-container acceptance driver. Runs inside a fresh node:*-bookworm-slim
 // container as the unprivileged `node` user, with only the packed tarball, the
 // sample project and these harness files copied in. The host orchestrator

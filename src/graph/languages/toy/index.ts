@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { LanguageModule, LinkDraft, ParseResult } from "../../types.js";
 
 /** A deliberately tiny fixture language. It is not a production language support claim. */

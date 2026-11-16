@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { architectureLimits } from "./limits.js";
 import { z } from "zod";
 import { planItemSchema } from "./schema.js";

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { Scaffold } from "./scaffold.js";
 import { isNotContractMaterial } from "./document.js";
 import { z } from "zod";

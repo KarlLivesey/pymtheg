@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { LinkJobs } from "./links-jobs.js";
 import { GraphJobs } from "./graph-jobs.js";
 import { findWorkspace } from "../project/workspace.js";

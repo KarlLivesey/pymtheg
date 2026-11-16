@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { useLayoutEffect, useRef } from "react";
 import type { OperationContract } from "../../src/studio/operation-data";
 export function ContractLimitsEditor({

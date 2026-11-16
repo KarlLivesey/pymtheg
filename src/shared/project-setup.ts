@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { z } from "zod";
 import { workspaceSchema } from "./workspace.js";
 import { importPreviewSchema } from "../architecture/schema.js";

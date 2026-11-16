@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { TypeDecl } from "../language/ast.js";
 import { blockedSymbols, type ProjectIR } from "../semantic/core.js";
 import type { Span } from "../shared/identity.js";

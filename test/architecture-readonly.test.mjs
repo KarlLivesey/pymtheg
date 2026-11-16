@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { architectureIndexVersion } from "../dist/architecture/schema.js";
 import test from "node:test";
 import assert from "node:assert/strict";

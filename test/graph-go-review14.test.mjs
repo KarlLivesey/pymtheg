@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Regressions for the fourteenth W2-B review: a failure caused by a failed file
 // propagates to every link that depends on it; one lookup path for every scope;
 // over-inclusion where the module answers "could this type have this method?"

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { ProjectIR } from "../semantic/core.js";
 import { hash, type Span } from "../shared/identity.js";
 import { authoringExpression } from "./authoring-expression.js";

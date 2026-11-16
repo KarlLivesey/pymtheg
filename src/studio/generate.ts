@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { sourceFileName } from "../shared/identity-values.js";
 import type { InterfaceContext } from "./interface-builder.js";
 import { formatSource } from "../language/format.js";

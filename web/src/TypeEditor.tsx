@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { useDraftState, type DraftEdit } from "./useDraftUpdate";
 import { useState } from "react";
 import { api } from "./api";

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Regressions for the fifteenth W2-B review: a link about to be emitted as not
 // resolved fails (`invalid-code`) when any type its source mentions needs a
 // failed file, however resolution reached it (the backstop).

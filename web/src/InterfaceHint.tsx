@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { SymbolView } from "../../src/studio/protocol";
 import { describeShape } from "../../src/studio/shape-description";
 export { describeShape } from "../../src/studio/shape-description";

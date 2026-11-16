@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { Node } from "web-tree-sitter";
 import type { Diagnostic } from "../../types.js";
 

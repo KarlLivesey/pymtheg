@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { operationError } from "./operation-errors.js";
 import { parentPort, workerData } from "node:worker_threads";
 import { executeGraph, type GraphRequest } from "../graph/commands.js";

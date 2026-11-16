@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Independent witness of what code is in the browser bundle: build it with
 // source maps into a temporary directory and read, from the maps alone, which
 // source file every piece of emitted JavaScript comes from. Code that maps to

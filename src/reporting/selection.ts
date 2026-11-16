@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { ProjectIR } from "../semantic/core.js";
 import { diagnosticsBySymbol } from "../semantic/core.js";
 import type { Report, AnalysisResult } from "./report.js";

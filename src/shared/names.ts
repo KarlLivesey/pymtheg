@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { identity } from "./identity-values.js";
 const reserved = new Set(
   "true false unit Bool Int Nat String Unit List Result flow rule op type resource machine import if else for in retry on cancel return call let match assert unknown own transition move take borrow effects requires ensures bound budget overhead cost states initial terminal state event invariant when stable atomic protocol submit outcome creates settles".split(

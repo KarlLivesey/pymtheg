@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 export const observationSource = "Code observation";
 export const implementationLinkSource = "Implementation link";
 export const implementationUnlinkSource = "Implementation link removed";

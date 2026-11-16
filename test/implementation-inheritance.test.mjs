@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { runInNewContext } from "node:vm";
 import test from "node:test";
 import assert from "node:assert/strict";

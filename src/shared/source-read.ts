@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { constants, openSync, closeSync, fstatSync, readSync } from "node:fs";
 import { open } from "node:fs/promises";
 import { sourceFileByteLimit } from "./source-limits.js";

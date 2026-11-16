@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Regressions for the fourth W2-B review: the exact meaning of OPEN and CLOSED.
 // Every set lists every possible project target; "open" excuses only targets
 // outside the project; a closed set is provably complete with only provable members.

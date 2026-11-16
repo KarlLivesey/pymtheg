@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { callable, blockedSymbols, type ProjectIR } from "../semantic/core.js";
 import {
   nodeKey,

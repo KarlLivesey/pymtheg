@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { browserExecutable, browserType } from "./browser-launch.mjs";
 import { waitForRecovery } from "./recovery-ack.mjs";
 // Run via pc-tools headless after independent review releases the browser slot.

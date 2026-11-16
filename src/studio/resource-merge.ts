@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { ResourceDefinition } from "./declaration-data.js";
 import { validateResourceDefinition } from "./resource-definition.js";
 import { compareText } from "../shared/order.js";

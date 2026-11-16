@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import test from "node:test";
 import assert from "node:assert/strict";
 import { queryImplementation } from "../dist/implementation/query-runner.js";

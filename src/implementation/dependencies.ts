@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { hash, json } from "../shared/identity.js";
 import { compareText } from "../shared/order.js";
 import type { ObservedGraph } from "./schema.js";

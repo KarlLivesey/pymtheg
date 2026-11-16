@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { realpath } from "node:fs/promises";
 import { relative, isAbsolute } from "node:path";
 import type { ProjectIR } from "../semantic/core.js";

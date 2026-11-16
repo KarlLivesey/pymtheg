@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { recursiveLayout } from "./layout.js";
 import type { ScaffoldBodyMode } from "../shared/outputs.js";
 import type { ContractDocument, ContractType } from "./document.js";

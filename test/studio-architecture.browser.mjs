@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { browserExecutable, browserType } from "./browser-launch.mjs";
 import { browserEvidence } from "./browser-evidence.mjs";
 // Browser readiness and intercepted request completion determine ordering; no startup sleeps.

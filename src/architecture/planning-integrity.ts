@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { ArchitectureIndex } from "./schema.js";
 /** Imported conflicts remain inspectable; native editing may not introduce new ones. */
 export function planningIntegrityRegression(

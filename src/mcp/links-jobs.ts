@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { agentLimits } from "./limits.js";
 import { Worker } from "node:worker_threads";
 import { randomUUID } from "node:crypto";

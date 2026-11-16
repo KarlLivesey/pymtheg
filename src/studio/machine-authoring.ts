@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { authoringExpression as expression } from "./authoring-expression.js";
 import { validateNumericRange } from "./numeric-range.js";
 import { checkSourceName } from "./signature-source.js";

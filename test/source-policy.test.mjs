@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import test from "node:test";
 import assert from "node:assert/strict";
 import { directoryMayContainSource } from "../dist/shared/source-policy.js";

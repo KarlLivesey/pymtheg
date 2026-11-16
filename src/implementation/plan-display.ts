@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /** A readable view of native planning fields; original JSON remains available. */
 export function planDisplay(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value))

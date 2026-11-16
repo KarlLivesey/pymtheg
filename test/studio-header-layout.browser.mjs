@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { browserExecutable } from "./browser-launch.mjs";
 import {
   chromium,

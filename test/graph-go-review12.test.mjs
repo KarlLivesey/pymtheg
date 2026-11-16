@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Regressions for the twelfth W2-B review: a directory whose package membership
 // cannot be proven makes its packages lossy (like a failed file); replace
 // precedence. (Two clauses in one file now fail the file: see failed-files.)

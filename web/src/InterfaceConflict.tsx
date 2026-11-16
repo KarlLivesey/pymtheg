@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { mergeInterfaceEdits } from "../../src/studio/interface-merge";
 import { useState } from "react";
 import type {

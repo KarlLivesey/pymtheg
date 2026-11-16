@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { createHash } from "node:crypto";
 import type { GraphFile, GraphLink, GraphSymbol } from "./types.js";
 export const contentHash = (text: string | Uint8Array): string =>

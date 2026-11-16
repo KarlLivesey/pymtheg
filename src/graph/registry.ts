@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { readdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { basename, extname } from "node:path";

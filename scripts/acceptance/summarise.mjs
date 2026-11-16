@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: MIT
 // Writes the result section of docs/changes/R1-F.md from the evidence files,
 // so no count in the note is restated by hand:
 //

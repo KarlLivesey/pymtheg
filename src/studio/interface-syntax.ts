@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { InterfaceType } from "./interface-builder.js";
 /** Shared type spelling for new-interface generation and edits to checked interfaces. */
 export function interfaceTypeSource(

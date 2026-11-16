@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { SqliteGraphStore } from "../graph/store.js";
 import { storagePath } from "./local.js";
 

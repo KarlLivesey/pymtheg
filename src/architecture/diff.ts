@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 export interface FieldChange {
   path: string;
   before: string;

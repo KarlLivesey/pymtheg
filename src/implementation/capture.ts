@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { realpath, stat } from "node:fs/promises";
 import { resolve, relative, isAbsolute } from "node:path";
 import { sourceFileByteLimit } from "../shared/source-limits.js";

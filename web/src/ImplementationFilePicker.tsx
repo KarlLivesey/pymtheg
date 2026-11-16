@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { implementationFilesPageSchema } from "../../src/implementation/protocol";

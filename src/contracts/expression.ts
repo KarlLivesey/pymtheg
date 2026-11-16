@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { Expr } from "../language/ast.js";
 import { assertNever } from "../shared/identity.js";
 

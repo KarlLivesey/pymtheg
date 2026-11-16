@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { layout } from "../storage/layout.js";
 /** Provisional public names are shared by Node and the browser without runtime dependencies.
  * Storage and protocol IDs are separate compatibility identities; keep them stable

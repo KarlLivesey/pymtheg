@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { GraphLink, GraphSymbol } from "./types.js";
 import type { SqliteGraphStore } from "./store.js";
 

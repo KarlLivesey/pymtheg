@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /**
  * The helper's records (toolchain/golinks.go) joined to the Go module's own
  * link drafts (W3-L). Joins, as in the W2-L comparison

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /** Presentation of operational failures shared by owned MCP workers. Never retries writes. */
 export function operationError(error: unknown, fallback = "error") {
   const e = error as {

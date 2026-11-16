@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /** A buffer's save precondition belongs to that buffer, not the latest disk list. */
 export class SourceBufferBases {
   private readonly hashes = new Map<string, string | null>();

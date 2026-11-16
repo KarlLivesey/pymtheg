@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import type { ProjectView } from "../../src/studio/protocol";

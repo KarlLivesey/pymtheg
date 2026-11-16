@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { evaluateScalar } from "../shared/scalar-expression.js";
 import { hash } from "../shared/identity.js";
 import { describeShape } from "./shape-description.js";

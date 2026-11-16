@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { readdir, readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { compare, contentHash, validateResult } from "./identity.js";

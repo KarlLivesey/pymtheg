@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { Report } from "../reporting/report.js";
 import type { Span } from "../shared/identity.js";
 export interface StudioFile {

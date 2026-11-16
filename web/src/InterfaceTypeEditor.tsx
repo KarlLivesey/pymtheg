@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { ProjectTypeContext, ProjectTypeSearch } from "./ProjectTypeSearch";
 import { typeChoices } from "../../src/studio/type-choices";
 import { useDraftUpdate, type DraftUpdate } from "./useDraftUpdate";

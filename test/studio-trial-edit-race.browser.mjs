@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { browserExecutable, browserType } from "./browser-launch.mjs";
 // Copy to test/ before running through pc-tools headless. No sleeps or timing assertions.
 import { chromium, expect as baseExpect } from "@playwright/test";

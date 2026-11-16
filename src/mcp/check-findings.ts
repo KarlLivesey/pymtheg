@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { Report } from "../reporting/report.js";
 import { findingPresenter } from "../reporting/explain.js";
 import { interfaceOutput } from "./identities.js";

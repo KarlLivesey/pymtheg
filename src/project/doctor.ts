@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { printLegacyNotice } from "../storage/legacy.js";
 import { findProjectRoot, openDatabase } from "../storage/local.js";
 import { mkdtemp, rm, stat, writeFile } from "node:fs/promises";

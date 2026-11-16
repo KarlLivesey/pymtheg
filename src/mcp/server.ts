@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { firstFindings } from "./check-findings.js";
 import { registerGraphTools } from "./graph.js";
 import {

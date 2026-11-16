@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { browserExecutable, browserType } from "./browser-launch.mjs";
 import { expect as baseExpect } from "@playwright/test";
 import { mkdtemp, readFile, rm } from "node:fs/promises";

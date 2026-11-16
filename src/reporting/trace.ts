@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { AnalysisResult } from "./report.js";
 import type { Span } from "../shared/identity.js";
 const object = (v: unknown): v is Record<string, unknown> =>

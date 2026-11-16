@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { Expr } from "../language/ast.js";
 import { unary, binary, type Scalar } from "./operators.js";
 

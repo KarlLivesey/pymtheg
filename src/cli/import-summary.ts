@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { SkippedDocuments } from "../architecture/import-policy.js";
 interface ImportSummary {
   committed: boolean;

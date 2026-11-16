@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // R1-H: Studio and MCP stop cleanly on SIGINT/SIGTERM and leave no process
 // behind; only node:sqlite's ExperimentalWarning is filtered, every other
 // warning still prints; node:sqlite is never loaded by a static import.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 const folders = new Set([
   "docs",
   "doc",

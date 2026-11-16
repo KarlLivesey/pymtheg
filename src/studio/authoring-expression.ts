@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { sourceFileName } from "../shared/identity-values.js";
 import { parse } from "../language/parser.js";
 

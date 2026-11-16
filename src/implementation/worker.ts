@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { parentPort, workerData } from "node:worker_threads";
 import { observeTypescript } from "./typescript.js";
 try {

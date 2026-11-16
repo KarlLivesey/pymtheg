@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { useDraftState, type DraftEdit } from "./useDraftUpdate";
 import { ProjectTypeContext } from "./ProjectTypeSearch";
 import { declarationTypeReferences } from "../../src/studio/declaration-references";

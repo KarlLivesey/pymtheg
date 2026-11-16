@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // W3-L round 1 review: each case fails without its fix. Fixtures under
 // test/fixtures/graph-go-toolchain/ are compiler-checked (Go 1.27.4):
 //   generics, anonstruct, outside, vendored, disagree, replace/app,

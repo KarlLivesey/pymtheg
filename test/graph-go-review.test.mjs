@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Regressions for the first W2-B review: each case was a confidently wrong link
 // or a candidate set missing the true target. Item numbers follow the review.
 import assert from "node:assert/strict";

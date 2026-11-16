@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 export const textPageCharacters = 16384;
 /** The offset is UTF-16, but a returned page always ends on a Unicode character boundary. */
 export function textPage(text: string, offset: number, limit: number) {

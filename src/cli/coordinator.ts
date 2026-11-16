@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { Worker } from "node:worker_threads";
 import type { Snapshot } from "../language/project.js";
 import type { ProjectIR } from "../semantic/core.js";
