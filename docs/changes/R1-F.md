@@ -42,8 +42,14 @@ pymtheg-dev --name r1f-xxxx --clean
 | `--restic DIR` | Use this restic checkout (default `~/pymtheg-dev/corpora/restic`). |
 | `--keep-images` | Do not remove images at the end. |
 
-Every step's duration and peak memory are recorded in `latest.json` as
-observations. Nothing is asserted on time.
+Timings and memory are observations, and nothing is asserted on them.
+`latest.json` records them only for some kinds of step:
+
+| Kind of step | `durationMs` | `peakRssKiB` |
+|---|---|---|
+| Each step that runs one command as a process in the container (for example the CLI commands, `git`, `find`, `node --version` and the npm installs) | yes | yes: the peak resident memory of that process tree, sampled from `/proc`, so a lower bound |
+| The three build steps (`npm ci`, `npm run build`, `npm pack`) | yes | no |
+| MCP calls, Studio requests, and the harness's own checks (network probe, install size and snapshot, setup, comparisons, the tarball inspection, summary rows) | no (`null`) | no (absent) |
 
 Exit status:
 
@@ -307,7 +313,8 @@ Earlier rounds allowed `~/.config/go` because of that harness call; the
 allowance is gone.
 
 `install-unchanged` is a separate check. After the install it records every
-file of the installed package tree: its path, size and SHA-256. The tree is the
+file of the installed package tree: its path, size and SHA-256 (a symlink is
+recorded by its path only). The tree is the
 whole npx store, the global `pymtheg` folder with its nested dependencies, or
 the local `node_modules`. At the end of the scenario the tree must be unchanged.
 
