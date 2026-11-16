@@ -3106,19 +3106,51 @@ export function resolveRust(
       !importedStandardName(site.file, scope, n)
     );
   }
+  // R1-K round 3: every name the workspace defines or imports as anything
+  // that could be a macro: `macro_rules!` (any scope, any crate), proc
+  // macros, every `use` or `extern crate` alias, `#[macro_use(…)]` lists, and
+  // every name a `use` inside a transcriber binds. A bare standard macro name
+  // in this set is never treated as the standard macro.
+  const workspaceMacroBindings = new Set<string>();
+  for (const sym of symbols) {
+    if (sym.kind === "macro" || data(sym).semanticKind === "macro")
+      workspaceMacroBindings.add(sym.name);
+    if (data(sym).exportedMacroName)
+      workspaceMacroBindings.add(str(data(sym).exportedMacroName));
+    for (const n of (data(sym).exportedMacroNames ?? []) as string[])
+      workspaceMacroBindings.add(n);
+    for (const n of profileOf(sym)?.useNames ?? [])
+      workspaceMacroBindings.add(n);
+  }
+  for (const l of ctx.links)
+    if (l.kind === "imports" && !data(l).glob)
+      workspaceMacroBindings.add(compact(str(data(l).alias)));
+  for (const f of ctx.files)
+    for (const b of (data(f.result).attributeBindings ?? []) as {
+      macroUseImports?: MacroUseImport[];
+    }[])
+      for (const r of b.macroUseImports ?? [])
+        for (const n of r.names ?? []) workspaceMacroBindings.add(n);
+  /** `name` is the standard (or builtin) macro: nothing in the workspace can
+   * bind a macro of that name, and the existing site checks pass. */
   const standardSafe = (
     name: string,
     site: GraphLink,
     loc: Place,
     scope: string,
   ): boolean =>
-    standardMacroName(name)
+    (name.includes("::") ||
+      !workspaceMacroBindings.has(name.replace(/^::/, ""))) &&
+    (standardMacroName(name)
       ? !standardUnsafe(
           { name, scope, start: site.range.start },
           site.file,
           loc,
         )
-      : builtinSafe(name, site, scope);
+      : builtinSafe(name, site, scope));
+  /** A macro name whose head an enclosing expansion's `use` may rebind. */
+  const rebound = (name: string, uses: ReadonlySet<string>): boolean =>
+    uses.has("*") || uses.has(name.replace(/^::/, "").split("::")[0]!);
   /**
    * Invoked inside another macro's expansion, `name` can neither define an
    * item, rebind a name in the group it lands in, nor remove code: a safe
@@ -3130,39 +3162,36 @@ export function resolveRust(
     site: GraphLink,
     loc: Place,
     scope: string,
-    from?: GraphSymbol,
-    seen = new Set<string>(),
+    from: GraphSymbol | undefined,
+    seen: Set<string>,
+    uses: ReadonlySet<string>,
   ): boolean {
+    if (rebound(name, uses)) return false;
     if (standardSafe(name, site, loc, scope)) return true;
     const s = definiteMacro(name, site, loc, scope, from);
     if (!s || seen.has(s.id) || seen.size > 16) return false;
     const profile = profileOf(s)!;
-    const next = new Set([...seen, s.id]);
-    return (
-      profile.neutral &&
-      profile.clean &&
-      profile.bodyMacros.every((m) =>
-        harmless(m.name, site, loc, scope, s, next),
-      )
-    );
+    return profile.neutral && expansionProved(s, site, loc, scope, seen, uses);
   }
   /** The expansion of `s` itself is clean and every macro it invokes is harmless. */
-  const expansionProved = (
+  function expansionProved(
     s: GraphSymbol,
     site: GraphLink,
     loc: Place,
     scope: string,
     seen: Set<string>,
-  ): boolean => {
+    uses: ReadonlySet<string>,
+  ): boolean {
     const profile = profileOf(s)!;
     const next = new Set([...seen, s.id]);
+    const inner = new Set([...uses, ...profile.useNames]);
     return (
       profile.clean &&
       profile.bodyMacros.every((m) =>
-        harmless(m.name, site, loc, scope, s, next),
+        harmless(m.name, site, loc, scope, s, next, inner),
       )
     );
-  };
+  }
   /**
    * Names that may shadow call-site names in tokens forwarded through `name`
    * into a standard format macro; null when the forwarding is unproved.
@@ -3174,7 +3203,9 @@ export function resolveRust(
     scope: string,
     from?: GraphSymbol,
     seen = new Set<string>(),
+    uses: ReadonlySet<string> = new Set(),
   ): Set<string> | null {
+    if (rebound(name, uses)) return null;
     const std = standardFormatName(name);
     if (
       std &&
@@ -3185,23 +3216,26 @@ export function resolveRust(
     const s = definiteMacro(name, site, loc, scope, from);
     if (!s || seen.has(s.id) || seen.size > 16) return null;
     const profile = profileOf(s)!;
-    if (!profile.forwards || !expansionProved(s, site, loc, scope, seen))
+    if (!profile.forwards || !expansionProved(s, site, loc, scope, seen, uses))
       return null;
     const shadow = new Set(profile.forwardShadow);
+    const inner = new Set([...uses, ...profile.useNames]);
     for (const target of profile.forwards) {
-      const inner = forwardShadow(
+      const found = forwardShadow(
         target,
         site,
         loc,
         scope,
         s,
         new Set([...seen, s.id]),
+        inner,
       );
-      if (!inner) return null;
-      for (const x of inner) shadow.add(x);
+      if (!found) return null;
+      for (const x of found) shadow.add(x);
     }
     return shadow;
   }
+
   // Compute provenance before adding prospective macro-opacity scopes. An
   // exemption cannot use the opacity it is deciding as its own premise.
   const ecosystemSafe = new Set<string>();
@@ -3991,6 +4025,9 @@ export function resolveRust(
       if (!inner) return false;
       for (const x of inner) shadow.add(x);
     }
+    // A standard macro nested in the arguments is looked up inside the
+    // expansion too: a `use` there may rebind it.
+    if (names.slice(1).some((n) => rebound(n, shadow))) return false;
     const head = compact(l.targetName)
       .replace(/^::/, "")
       .split(d.method ? /[.([?]/ : /::/)[0]!;
@@ -4355,19 +4392,28 @@ export function resolveRust(
       if (!first) continue;
       const generics = str(d.genericBindings).split(",").filter(Boolean);
       let index = 0;
+      // Every property is one of the whole path from the invocation down to
+      // the call, carried through each nested macro: arms proven, expansion
+      // proved (clean, nested macros harmless), not under a repetition, no
+      // function-local definition on the way, `use` names in force.
       const visit = (
         m: GraphSymbol,
         shadow: string[],
         armsKnown: boolean,
         seen: Set<string>,
         expansionKnown: boolean,
+        pathRepeated: boolean,
+        pathLocal: boolean,
+        uses: ReadonlySet<string>,
       ) => {
         const profile = profileOf(m)!;
         const single = armsKnown && profile.arms === 1;
+        const local = pathLocal || profile.blockLocal;
+        const inner = new Set([...uses, ...profile.useNames]);
         // An attribute, an item other than `use`, or a nested macro that is
         // not provably harmless can remove the call or rebind its name.
         const proved =
-          expansionKnown && expansionProved(m, site, loc, scope, seen);
+          expansionKnown && expansionProved(m, site, loc, scope, seen, uses);
         for (const call of profile.calls) {
           let path = call.path,
             at = loc,
@@ -4399,7 +4445,22 @@ export function resolveRust(
             reasons.push("macro-body-name-unverified");
           if (!single) reasons.push("macro-arm-unverified");
           if (!proved) reasons.push("macro-expansion-unverified");
-          if (call.repeated) reasons.push("macro-repetition-unverified");
+          if (call.repeated || pathRepeated)
+            reasons.push("macro-repetition-unverified");
+          // Read as an argument of a standard-looking macro: only if it is
+          // the standard macro there, and no enclosing `use` rebinds it.
+          if (
+            call.within.some(
+              (n) => rebound(n, inner) || !standardSafe(n, site, loc, scope),
+            )
+          )
+            reasons.push("macro-argument-unverified");
+          if (
+            local &&
+            !call.path.includes("::") &&
+            !reasons.includes("macro-body-name-unverified")
+          )
+            reasons.push("macro-body-name-unverified");
           const base = {
             key: `macro-body:${site.range.start}:${index++}`,
             file: site.file,
@@ -4449,6 +4510,8 @@ export function resolveRust(
             });
         }
         for (const nested of profile.bodyMacros) {
+          // A name an enclosing `use` may rebind is not followed at all.
+          if (rebound(nested.name, inner)) continue;
           const next = definiteMacro(nested.name, site, loc, scope, m);
           if (!next || seen.has(next.id) || seen.size > 8) continue;
           visit(
@@ -4457,10 +4520,22 @@ export function resolveRust(
             single,
             new Set([...seen, next.id]),
             proved,
+            pathRepeated || nested.repeated,
+            local,
+            inner,
           );
         }
       };
-      visit(first, [], true, new Set([first.id]), true);
+      visit(
+        first,
+        [],
+        true,
+        new Set([first.id]),
+        true,
+        false,
+        false,
+        new Set(),
+      );
     }
   }
 }

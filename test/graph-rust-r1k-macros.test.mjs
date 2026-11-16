@@ -743,3 +743,163 @@ fn main() { trace!(); println!("end"); }`,
   assert.equal(ls[0].targetId, undefined);
   assert.match(ls[0].data.uncertainty, /macro-expansion-unverified/);
 });
+
+// --- Round 3: path properties through nested macros ------------------------
+// Programs and rustc output: evidence/r1-k/controls3/.
+
+const notDefiniteDerived = (g, name) => {
+  const ls = g.derivedTo(name);
+  assert.ok(ls.length, `${name}: derived link exists`);
+  for (const l of ls) assert.equal(l.targetId, undefined, name);
+};
+
+test("a use in the expansion rebinding a nested macro name: argument (prints 2)", async () => {
+  const g = await main(`fn helper()->u8 {1}
+#[macro_export] macro_rules! other {
+    ($($t:tt)*)=>{{fn helper()->u8 {2} std::println!($($t)*);}}
+}
+macro_rules! m {
+    ($($t:tt)*)=>{{use crate::other as println; println!($($t)*);}}
+}
+fn main(){m!("{}",helper());}`);
+  g.notDefinite("helper");
+});
+
+test("a use in the expansion rebinding a nested macro name: body call (prints 2)", async () => {
+  const g = await main(`fn helper()->u8 {1}
+#[macro_export] macro_rules! other {
+    ($($t:tt)*)=>{{fn helper()->u8 {2} std::println!($($t)*);}}
+}
+macro_rules! m { ()=>{{use crate::other as println; println!("{}",helper());}} }
+fn main(){m!();}`);
+  notDefiniteDerived(g, "helper");
+});
+
+test("twin: a use that binds no macro name the expansion invokes (prints 1)", async () => {
+  const g = await main(`fn helper()->u8 {1}
+macro_rules! m { ($($t:tt)*)=>{{use std::fmt::Write as _W; println!($($t)*);}} }
+fn main(){m!("{}",helper());}`);
+  g.one("helper", "helper");
+});
+
+test("a project println! is not the standard one: body call (prints end)", async () => {
+  const g = await main(`fn helper()->u8 {println!("CALLED");1}
+macro_rules! println {($($t:tt)*)=>{}}
+macro_rules! m {()=>{{println!("{}",helper());}}}
+fn main(){m!();std::println!("end");}`);
+  notDefiniteDerived(g, "helper");
+});
+
+test("a project println! is not the standard one: forwarding (prints end)", async () => {
+  const g = await main(`fn helper()->u8 {std::println!("CALLED");1}
+macro_rules! println {($($t:tt)*)=>{}}
+macro_rules! m {($($t:tt)*)=>{{println!($($t)*);}}}
+fn main(){m!("{}",helper());std::println!("end");}`);
+  g.notDefinite("helper");
+});
+
+test("twin: the standard println! in a body is read (prints CALLED 1 end)", async () => {
+  const g = await main(`fn helper()->u8 {println!("CALLED");1}
+macro_rules! m {()=>{{println!("{}",helper());}}}
+fn main(){m!();println!("end");}`);
+  assert.deepEqual(derivedState(g, "helper"), ["helper"]);
+});
+
+test("repetition propagates through a nested macro (prints end)", async () => {
+  const g = await main(`fn helper(x:u8){println!("{x}")}
+macro_rules! n {($x:expr)=>{helper($x);}}
+macro_rules! m {($($x:expr),*)=>{$(n!($x);)*}}
+fn main(){m!();println!("end");}`);
+  notDefiniteDerived(g, "helper");
+});
+
+test("twin: the same nesting without a repetition is definite (prints 1 end)", async () => {
+  const g = await main(`fn helper(x:u8){println!("{x}")}
+macro_rules! n {($x:expr)=>{helper($x);}}
+macro_rules! m {($x:expr)=>{n!($x);}}
+fn main(){m!(1);println!("end");}`);
+  assert.deepEqual(derivedState(g, "helper"), ["helper"]);
+});
+
+test("an attribute propagates through a nested macro (prints end)", async () => {
+  const g = await main(`fn helper(){println!("called")}
+macro_rules! n {()=>{helper();}}
+macro_rules! m {()=>{{ #[cfg(any())] n!(); }}}
+fn main(){m!();println!("end");}`);
+  notDefiniteDerived(g, "helper");
+});
+
+test("twin: the same nesting without the attribute is definite (prints called end)", async () => {
+  const g = await main(`fn helper(){println!("called")}
+macro_rules! n {()=>{helper();}}
+macro_rules! m {()=>{{ n!(); }}}
+fn main(){m!();println!("end");}`);
+  assert.deepEqual(derivedState(g, "helper"), ["helper"]);
+});
+
+test("a nested macro invoked inside a generated definition is not followed (prints end)", async () => {
+  const g = await main(`fn helper(){println!("called")}
+macro_rules! n {()=>{helper();}}
+macro_rules! m {()=>{ macro_rules! g { () => { n!(); } } }}
+m!();
+fn main(){println!("end");}`);
+  assert.equal(g.derivedTo("helper").length, 0);
+});
+
+test("a function-local nested macro's body name is not definite (prints 2)", async () => {
+  const g = await main(`fn helper()->u8 {1}
+macro_rules! m {()=>{ println!("{}", n!()) }}
+fn main(){
+    let helper = || 2u8;
+    macro_rules! n {()=>{ helper() }}
+    m!();
+}`);
+  notDefiniteDerived(g, "helper");
+});
+
+test("a function-local outer macro is carried down the path (conservative; rustc prints 1)", async () => {
+  const g = await main(`fn helper()->u8 {1}
+macro_rules! n {()=>{ helper() }}
+fn main(){
+    let helper = || 2u8; let _ = helper();
+    macro_rules! m {()=>{ println!("{}", n!()) }}
+    m!();
+}`);
+  notDefiniteDerived(g, "helper");
+});
+
+test("an unproven arm propagates through a nested macro (prints end)", async () => {
+  const g = await main(`fn helper(){println!("called")}
+macro_rules! n {()=>{helper();}}
+macro_rules! m {()=>{ n!(); }; (x)=>{}}
+fn main(){m!(x);println!("end");}`);
+  for (const l of g.derivedTo("helper")) assert.equal(l.targetId, undefined);
+});
+
+test("a use propagates into a nested macro's forwarding (prints 2)", async () => {
+  const g = await main(`fn helper()->u8 {1}
+mod alt { #[macro_export] macro_rules! alt_print { ($($t:tt)*) => {{ fn helper()->u8 {2} std::println!($($t)*); }} } }
+macro_rules! n {($($t:tt)*)=>{ println!($($t)*); }}
+macro_rules! m {($($t:tt)*)=>{{ use crate::alt_print as println; n!($($t)*); }}}
+fn main(){m!("{}",helper());}`);
+  g.notDefinite("helper");
+});
+
+test("a block in format arguments that invokes an item-defining macro is not read (prints 2, ok, 2)", async () => {
+  for (const body of [
+    'println!("{}", { def!(); helper() });',
+    'assert!({ def!(); helper() } == 2); println!("ok");',
+    'println!("{}", if true { def!(); helper() } else { 0 });',
+  ]) {
+    const g = await main(`fn helper()->i32{1}
+macro_rules! def{()=>{fn helper()->i32{2}}}
+fn main(){ ${body} }`);
+    g.none("helper");
+  }
+});
+
+test("twin: a block in format arguments without a macro is read (prints 1 1)", async () => {
+  const g = await main(`fn helper()->i32{1}
+fn main(){ println!("{}", { helper() }); println!("{}", if true { helper() } else { 0 }); }`);
+  g.one("helper", "helper");
+});

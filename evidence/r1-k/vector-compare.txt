@@ -1,53 +1,53 @@
 module { id: 'rust', version: '26' } -> { id: 'rust', version: '27' }
-seconds 710.6 -> 757.4
+seconds 626.7 -> 587
 all links before { unresolved: 292061, resolved: 78624, candidates: 100 } 370785
-all links after  { unresolved: 312210, resolved: 80157, candidates: 100 } 392467
+all links after  { unresolved: 312989, resolved: 79034, candidates: 100 } 392123
 written (non-contains) before { unresolved: 292061, resolved: 44445, candidates: 100 }
-written (non-contains) after  { unresolved: 311758, resolved: 45978, candidates: 100 }
-  of which new macro-argument calls { unresolved: 19792, resolved: 1438 }
+written (non-contains) after  { unresolved: 312537, resolved: 44855, candidates: 100 }
+  of which new macro-argument calls { unresolved: 20571, resolved: 315 }
 derived macro-body calls { unresolved: 452 }
 
 unresolved written links by kind|reason: before -> after
-    38270 ->   43644  calls|receiver-type-unverified; failed-file-unseen-declarations
+    38270 ->   40604  calls|receiver-type-unverified; failed-file-unseen-declarations
     25022 ->   25022  values|failed-file-unseen-declarations
-    18656 ->   21296  calls|receiver-type-unverified
+    18656 ->   19930  calls|receiver-type-unverified
     18555 ->   18555  types|opaque-item-may-shadow-name; failed-file-unseen-declarations
     17328 ->   17254  types|opaque-item-may-shadow-name
     15818 ->   15822  values|(none)
     11852 ->   11834  imports|opaque-item-may-shadow-name
     10807 ->   10807  macros|macro-use-exports-unverified; conditional-name-may-be-absent; failed-file-unseen-declarations
-     9742 ->   11331  calls|receiver-type-unverified; failed-file-unseen-declarations; too-many-targets
-     7314 ->    7898  calls|path-type-unverified; opaque-item-may-shadow-name; failed-file-unseen-declarations
-     7292 ->    7918  calls|path-type-unverified; opaque-item-may-shadow-name; failed-file-unseen-declarations; too-many-targets
-     6662 ->    7638  calls|opaque-item-may-shadow-name
-     6379 ->    7468  calls|opaque-item-may-shadow-name; failed-file-unseen-declarations
+     9742 ->   10317  calls|receiver-type-unverified; failed-file-unseen-declarations; too-many-targets
+     7314 ->    7398  calls|path-type-unverified; opaque-item-may-shadow-name; failed-file-unseen-declarations
+     7292 ->    7344  calls|path-type-unverified; opaque-item-may-shadow-name; failed-file-unseen-declarations; too-many-targets
+     6662 ->    6865  calls|opaque-item-may-shadow-name
+     6379 ->    6419  calls|opaque-item-may-shadow-name; failed-file-unseen-declarations
      6159 ->    6159  imports|opaque-item-may-shadow-name; failed-file-unseen-declarations
      4944 ->    4944  values|opaque-item-may-shadow-name; failed-file-unseen-declarations
-     4119 ->    4720  calls|receiver-type-unverified; too-many-targets
      4307 ->    4356  types|(none)
+     4119 ->    4300  calls|receiver-type-unverified; too-many-targets
      4044 ->    4044  types|failed-file-unseen-declarations
      3728 ->    3716  values|opaque-item-may-shadow-name
      3664 ->    3664  macros|(none)
      3556 ->    3556  patterns|opaque-item-may-shadow-name; failed-file-unseen-declarations
-     3117 ->    3418  calls|path-type-unverified; opaque-item-may-shadow-name; too-many-targets
+     3117 ->    3174  calls|path-type-unverified; opaque-item-may-shadow-name; too-many-targets
      3043 ->    3043  macros|namespace-binding-unverified; macro-use-exports-unverified; conditional-name-may-be-absent; failed-file-unseen-declarations
      2945 ->    2945  types|item-under-opaque-attribute; opaque-item-may-shadow-name
-     2704 ->    3107  calls|path-type-unverified; opaque-item-may-shadow-name
-     2314 ->    2816  calls|(none)
+     2704 ->    2752  calls|path-type-unverified; opaque-item-may-shadow-name
+     2314 ->    2787  calls|(none)
      2260 ->    2250  patterns|opaque-item-may-shadow-name
+        0 ->    4308  calls|receiver-type-unverified; failed-file-unseen-declarations; macro-argument-unverified
      1881 ->    1881  macros|macro-use-exports-unverified
-     1821 ->    1910  calls|receiver-type-unverified; opaque-item-may-shadow-name; failed-file-unseen-declarations
+     1821 ->    1865  calls|receiver-type-unverified; opaque-item-may-shadow-name; failed-file-unseen-declarations
      1632 ->    1633  types|item-under-opaque-attribute; opaque-item-may-shadow-name; opaque-item-may-shadow-name
      1564 ->    1586  types|namespace-binding-unverified
      1405 ->    1405  implements|opaque-item-may-shadow-name
      1307 ->    1317  imports|(none)
      1249 ->    1249  imports|failed-file-unseen-declarations
-     1072 ->    1153  calls|receiver-type-unverified; opaque-item-may-shadow-name
      1111 ->    1111  macros|namespace-binding-unverified
+     1072 ->    1085  calls|receiver-type-unverified; opaque-item-may-shadow-name
      1053 ->    1053  imports|item-under-opaque-attribute; opaque-item-may-shadow-name; opaque-item-may-shadow-name
       988 ->     988  types|item-under-opaque-attribute; opaque-item-may-shadow-name; opaque-item-may-shadow-name; opaque-item-may-shadow-name
-      889 ->     901  calls|inherent-applicability-unverified; failed-file-unseen-declarations; too-many-targets
-      893 ->     893  imports|item-under-opaque-attribute; opaque-item-may-shadow-name; opaque-item-may-shadow-name; opaque-item-may-shadow-name; namespace-binding-unverified
+        0 ->    1858  calls|receiver-type-unverified; macro-argument-unverified
 
 unresolved written links by target class: before {
   'std-path': 4909,
@@ -60,11 +60,11 @@ unresolved written links by target class: before {
 }
 unresolved written links by target class: after  {
   'std-path': 4925,
-  'no-workspace-symbol-named-so': 57400,
-  'workspace-name-exists': 60735,
-  'external-path': 19028,
-  'workspace-would-be-targets': 123958,
-  'local-binding': 45665,
+  'no-workspace-symbol-named-so': 57387,
+  'workspace-name-exists': 60560,
+  'external-path': 19024,
+  'workspace-would-be-targets': 124931,
+  'local-binding': 45663,
   'failed-file': 47
 }
 
@@ -75,145 +75,100 @@ links present in both runs, outcome change {
   'unresolved -> resolved': 95
 }
 unresolved -> definite 95 | definite -> other 0
-new definite links (argument calls + derived) 1438
+new definite links (argument calls + derived) 315
 
-SAMPLE unresolved -> definite (seed 5521)
-  1. src/enrichment_tables/geoip.rs:241 calls lookup_value
-       -> src/enrichment_tables/geoip.rs|lookup_value|function
-       | let (data, network) = lookup_value::<ConnectionType>(&self.dbreader, ip).ok()??;
-  2. lib/vector-buffers/src/variants/disk_v2/tests/size_limits.rs:49 calls create_buffer_v2_with_max_record_size_and_usage
-       -> lib/vector-buffers/src/variants/disk_v2/tests/mod.rs|create_buffer_v2_with_max_record_size_and_usage|function
-       | create_buffer_v2_with_max_record_size_and_usage(data_dir, max_record_size).await;
-  3. src/sinks/util/adaptive_concurrency/service.rs:246 values TestError::Deferral
-       -> src/sinks/util/adaptive_concurrency/service.rs|tests::TestError::Deferral|variant
-       | self.response.send_error(TestError::Deferral);
-  4. lib/vector-buffers/src/variants/disk_v2/tests/invariants.rs:577 calls create_buffer_v2_with_max_data_file_size
-       -> lib/vector-buffers/src/variants/disk_v2/tests/mod.rs|create_buffer_v2_with_max_data_file_size|function
-       | create_buffer_v2_with_max_data_file_size(data_dir, 256).await;
-  5. lib/vector-buffers/benches/sized_records.rs:197 values BoundBy::NumberEvents
-       -> lib/vector-buffers/benches/sized_records.rs|BoundBy::NumberEvents|variant
-       | let f = |a, b| create_in_memory_variant(BoundBy::NumberEvents, a, b);
-  6. src/sinks/splunk_hec/common/util.rs:448 calls spawn_blackhole_http_server
-       -> src/test_util/http.rs|spawn_blackhole_http_server|function
-       | let address = spawn_blackhole_http_server(|_| async {
-  7. vdev/src/testing/integration.rs:15 imports super::runner::RunnerState
-       -> vdev/src/testing/runner.rs|RunnerState|enum
-       | ContainerTestRunner as _, IntegrationTestRunner, RunnerState, TARGET_PATH, TestRunner as _,
-  8. lib/vector-buffers/src/variants/disk_v2/tests/known_errors.rs:390 calls corrupt_record_checksum
-       -> lib/vector-buffers/src/variants/disk_v2/tests/known_errors.rs|corrupt_record_checksum|function
-       | corrupt_record_checksum(&reader_boundary_path, 0, corrupt_bytes).await;
-  9. vdev/src/commands/test.rs:6 imports crate::testing::runner::TestRunner
-       -> vdev/src/testing/runner.rs|TestRunner|trait
-       | testing::runner::{LocalTestRunner, TestRunner as _},
- 10. lib/vector-buffers/src/variants/disk_v2/tests/known_errors.rs:393 calls create_buffer_v2_with_max_data_file_size
-       -> lib/vector-buffers/src/variants/disk_v2/tests/mod.rs|create_buffer_v2_with_max_data_file_size|function
-       | create_buffer_v2_with_max_data_file_size(data_dir, 172).await;
- 11. lib/vector-buffers/src/variants/disk_v2/tests/known_errors.rs:1730 types ScrambledTestSetup
-       -> lib/vector-buffers/src/variants/disk_v2/tests/known_errors.rs|ScrambledTestSetup|struct
-       | ScrambledTestSetup {
- 12. lib/vector-buffers/src/variants/disk_v2/tests/known_errors.rs:183 calls create_buffer_v2_with_max_data_file_size
-       -> lib/vector-buffers/src/variants/disk_v2/tests/mod.rs|create_buffer_v2_with_max_data_file_size|function
-       | create_buffer_v2_with_max_data_file_size(data_dir.clone(), 172).await;
- 13. lib/vector-buffers/src/variants/disk_v2/tests/known_errors.rs:825 calls create_default_buffer_v2
-       -> lib/vector-buffers/src/variants/disk_v2/tests/mod.rs|create_default_buffer_v2|function
-       | let (mut writer, _, ledger) = create_default_buffer_v2(data_dir.clone()).await;
- 14. lib/vector-buffers/src/variants/disk_v2/tests/size_limits.rs:410 calls read_next_some
-       -> lib/vector-buffers/src/variants/disk_v2/tests/mod.rs|read_next_some|function
-       | let first_record_read = read_next_some(&mut reader).await;
- 15. src/gcp.rs:377 calls build_auth
-       -> src/gcp.rs|tests::build_auth|function
-       | let error = build_auth("").await.expect_err("build failed to error");
+SAMPLE unresolved -> definite (seed 8803)
 
-SAMPLE new definite (seed 5521)
-  1. lib/vector-buffers/src/variants/disk_v2/ledger.rs:937 calls offset_file_id [macro argument]
-       -> lib/vector-buffers/src/variants/disk_v2/ledger.rs|offset_file_id|function
-       | assert_eq!(offset_file_id(0, 1), 1);
-  2. src/sources/datadog_agent/tests.rs:2936 calls super::metrics::decode_v3_metric_data [macro argument]
-       -> src/sources/datadog_agent/metrics/v3.rs|decode_v3_metric_data|function
-       | assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
-  3. src/sinks/datadog/metrics/encoder.rs:1476 calls get_simple_sketch [macro argument]
-       -> src/sinks/datadog/metrics/encoder.rs|tests::get_simple_sketch|function
-       | get_simple_sketch(),
-  4. src/sources/nats/integration_tests.rs:395 calls random_string [macro argument]
-       -> src/test_util/mod.rs|random_string|function
-       | let subject = format!("test-{}", random_string(10));
-  5. src/sinks/azure_common/shared_key_policy.rs:374 calls content_length_field [macro argument]
-       -> src/sinks/azure_common/shared_key_policy.rs|tests::content_length_field|function
-       | assert_eq!(content_length_field(&mut request), "");
-  6. src/sinks/elasticsearch/tests.rs:273 calls process_log [macro argument]
-       -> src/sinks/elasticsearch/sink.rs|process_log|function
-       | vec![process_log(log, &es.mode, None, &config.encoding).unwrap()],
-  7. src/sinks/humio/logs.rs:568 calls humio_address [macro argument]
-       -> src/sinks/humio/logs.rs|integration_tests::humio_address|function
-       | humio_address()
-  8. src/sinks/datadog/metrics/sink.rs:341 calls create_gauge [macro argument]
-       -> src/sinks/datadog/metrics/sink.rs|tests::create_gauge|function
-       | create_gauge("basic", gauge_value),
-  9. src/sources/nats/integration_tests.rs:243 calls random_string [macro argument]
-       -> src/test_util/mod.rs|random_string|function
-       | let subject = format!("test-{}", random_string(10));
- 10. src/sinks/datadog/metrics/request_builder.rs:783 calls counter_metric [macro argument]
-       -> src/sinks/datadog/metrics/request_builder.rs|tests::counter_metric|function
-       | counter_metric(),
- 11. lib/vector-vrl/web-playground/src/lib.rs:239 calls to_pretty_json [macro argument]
-       -> lib/vector-vrl/web-playground/src/lib.rs|to_pretty_json|function
-       | to_pretty_json(&Value::from(3_728_699_739_546_630_719_i64)).unwrap(),
- 12. src/sources/mqtt/integration_tests.rs:72 calls random_string [macro argument]
-       -> src/test_util/mod.rs|random_string|function
-       | let client_id = format!("sourceTest{}", random_string(6));
- 13. src/sources/datadog_agent/tests.rs:2913 calls super::metrics::decode_v3_metric_data [macro argument]
-       -> src/sources/datadog_agent/metrics/v3.rs|decode_v3_metric_data|function
-       | assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
- 14. src/sinks/datadog/metrics/sink.rs:369 calls create_counter [macro argument]
-       -> src/sinks/datadog/metrics/sink.rs|tests::create_counter|function
-       | create_counter("basic", counter_value),
- 15. src/config/unit_test/unit_test_components.rs:275 calls events_to_string [macro argument]
-       -> src/config/unit_test/unit_test_components.rs|events_to_string|function
-       | events_to_string(&output_events)
- 16. lib/vector-config-macros/src/ast/mod.rs:96 calls LazyCustomAttribute::kv [macro argument]
-       -> lib/vector-config-macros/src/ast/mod.rs|impl LazyCustomAttribute::kv|method
-       | LazyCustomAttribute::kv(constants::DOCS_META_ENUM_TAG_FIELD, tag),
- 17. vdev/src/commands/release/workflow.rs:963 calls release_file_allowed [macro argument]
-       -> vdev/src/commands/release/workflow.rs|release_file_allowed|function
-       | assert!(release_file_allowed(
- 18. src/transforms/aggregate/tests.rs:1122 calls make_metric_with_timestamp [macro argument]
-       -> src/transforms/aggregate/tests.rs|make_metric_with_timestamp|function
-       | agg.record(make_metric_with_timestamp(
- 19. src/sinks/kafka/tests.rs:203 calls random_string [macro argument]
-       -> src/test_util/mod.rs|random_string|function
-       | let topic = format!("test-{}", random_string(10));
- 20. src/config/loading/tests/compatibility.rs:330 calls ConfigPath::File [macro argument]
-       -> src/config/mod.rs|ConfigPath::File|variant
-       | ConfigPath::File(first.to_owned(), Some(Format::Yaml)),
- 21. src/sources/journald.rs:1411 calls timestamp [macro argument]
-       -> src/sources/journald.rs|tests::timestamp|function
-       | timestamp(&received[0]),
- 22. lib/fakedata/src/logs.rs:161 calls username [macro argument]
-       -> lib/fakedata/src/logs.rs|username|function
-       | username(),
- 23. src/sinks/postgres/config.rs:134 calls redact_endpoint [macro argument]
-       -> src/sinks/postgres/config.rs|redact_endpoint|function
-       | redact_endpoint(endpoint),
- 24. src/sinks/datadog/metrics/sink.rs:424 calls create_gauge [macro argument]
-       -> src/sinks/datadog/metrics/sink.rs|tests::create_gauge|function
-       | create_gauge("aaa", 1.0),
- 25. src/sources/opentelemetry/request_control.rs:587 calls active_requests [macro argument]
-       -> src/sources/opentelemetry/request_control.rs|tests::active_requests|function
-       | assert_eq!(active_requests(), 1.0);
- 26. src/sinks/statsd/normalizer.rs:135 calls get_distribution [macro argument]
-       -> src/test_util/metrics.rs|get_distribution|function
-       | get_distribution(samples2, MetricKind::Incremental),
- 27. src/sinks/datadog/traces/apm_stats/integration_tests.rs:417 calls trace_agent_to_vector_url [macro argument]
-       -> src/sinks/datadog/traces/apm_stats/integration_tests.rs|trace_agent_to_vector_url|function
-       | let urls = vec![trace_agent_only_url(), trace_agent_to_vector_url()];
- 28. src/sinks/datadog/traces/apm_stats/integration_tests.rs:214 calls send_trace [macro argument]
-       -> src/sinks/datadog/traces/apm_stats/integration_tests.rs|send_agent_traces::send_trace|function
-       | send_trace(urls, start, duration, span_id).await,
- 29. lib/vector-config-macros/src/ast/container.rs:566 calls literals_to_idents [macro argument]
-       -> lib/vector-config-macros/src/ast/container.rs|tests::literals_to_idents|function
-       | assert_eq!(literals_to_idents(&["String"]), idents);
- 30. lib/file-source-common/src/checkpointer.rs:565 calls FileFingerprint::DevInode [macro argument]
-       -> lib/file-source-common/src/fingerprinter.rs|FileFingerprint::DevInode|variant
-       | FileFingerprint::DevInode(1, 2),
+SAMPLE new definite (seed 8803)
+  1. src/graph.rs:175 calls node_attributes_to_string [macro argument]
+       -> src/graph.rs|node_attributes_to_string|function
+       | node_attributes_to_string(&source.graph.node_attributes, "trapezium")
+  2. src/dns.rs:72 calls resolve [macro argument]
+       -> src/dns.rs|tests::resolve|function
+       | assert!(resolve("example.com").await);
+  3. lib/codecs/src/decoding/framing/chunked_gelf.rs:1186 calls downcast_framing_error [macro argument]
+       -> lib/codecs/src/decoding/framing/chunked_gelf.rs|tests::downcast_framing_error|function
+       | downcast_framing_error(&error),
+  4. lib/vector-core/src/tls/settings.rs:1053 calls settings_from_config [macro argument]
+       -> lib/vector-core/src/tls/settings.rs|test::settings_from_config|function
+       | assert!(settings_from_config(None, false, false, false).is_raw());
+  5. src/transforms/aggregate/tests.rs:1732 calls make_metric [macro argument]
+       -> src/transforms/aggregate/tests.rs|make_metric|function
+       | agg.record(make_metric(
+  6. src/transforms/remap.rs:1068 calls transform_one [macro argument]
+       -> src/transforms/remap.rs|tests::transform_one|function
+       | assert!(transform_one(&mut tform, event).is_none());
+  7. src/graph.rs:197 calls node_attributes_to_string [macro argument]
+       -> src/graph.rs|node_attributes_to_string|function
+       | node_attributes_to_string(&sink.graph.node_attributes, "invtrapezium")
+  8. lib/codecs/src/decoding/framing/chunked_gelf.rs:1341 calls downcast_framing_error [macro argument]
+       -> lib/codecs/src/decoding/framing/chunked_gelf.rs|tests::downcast_framing_error|function
+       | downcast_framing_error(&error),
+  9. src/transforms/log_to_metric.rs:2075 calls do_transform [macro argument]
+       -> src/transforms/log_to_metric.rs|tests::do_transform|function
+       | do_transform(config, log).await.is_none(),
+ 10. lib/vector-vrl/dnstap-parser/src/parser.rs:1470 calls test_one_timestamp_parse [macro argument]
+       -> lib/vector-vrl/dnstap-parser/src/parser.rs|tests::test_parse_dnstap_data_with_invalid_timestamp::test_one_timestamp_parse|function
+       | assert!(test_one_timestamp_parse(1337, Some(42)).is_ok());
+ 11. vdev/src/commands/status.rs:13 calls git::current_branch [macro argument]
+       -> vdev/src/utils/git.rs|current_branch|function
+       | println!("Branch: {}", git::current_branch()?);
+ 12. lib/vector-core/src/event/test/serialization.rs:919 calls check_value_nesting_cost [macro argument]
+       -> lib/vector-core/src/event/ser.rs|check_value_nesting_cost|function
+       | assert!(check_value_nesting_cost(&value, 0, 7).is_ok());
+ 13. src/sources/nats/integration_tests.rs:696 calls self.drain_until [macro argument]
+       -> src/sources/nats/integration_tests.rs|impl JetStreamTestHarness::drain_until|method
+       | self.drain_until(payload, 5).await,
+ 14. src/dns.rs:82 calls resolve [macro argument]
+       -> src/dns.rs|tests::resolve|function
+       | assert!(resolve("10.0.4.0").await);
+ 15. src/sinks/loki/config.rs:403 calls valid_label_name [macro argument]
+       -> src/sinks/loki/config.rs|valid_label_name|function
+       | assert!(valid_label_name(&"{{field}}".try_into().unwrap()));
+ 16. src/sources/host_metrics/filesystem.rs:206 calls all_gauges [macro argument]
+       -> src/sources/host_metrics/mod.rs|tests::all_gauges|function
+       | assert!(all_gauges(&metrics));
+ 17. src/http/transport_tests.rs:759 calls has_proxy_authorization [macro argument]
+       -> src/http/transport_tests.rs|has_proxy_authorization|function
+       | assert!(has_proxy_authorization(&proxy_observations[0].headers));
+ 18. src/sources/opentelemetry/tests/decoding.rs:114 calls parse [macro argument]
+       -> src/sources/opentelemetry/tests/decoding.rs|parse|function
+       | assert!(parse(json!({"decoding": decoding})).is_err());
+ 19. vdev/src/utils/deprecation.rs:406 calls read_deprecation_fragments [macro argument]
+       -> vdev/src/utils/deprecation.rs|read_deprecation_fragments|function
+       | assert!(read_deprecation_fragments(tmp.path()).is_err());
+ 20. lib/vector-core/src/event/test/serialization.rs:904 calls check_value_nesting_cost [macro argument]
+       -> lib/vector-core/src/event/ser.rs|check_value_nesting_cost|function
+       | assert!(check_value_nesting_cost(&value, 0, 14).is_err());
+ 21. src/sinks/util/sink.rs:729 calls Request::encoded [macro argument]
+       -> src/sinks/util/sink.rs|tests::impl Request::encoded|method
+       | sink.start_send_unpin(Request::encoded(item, &ack_counter)),
+ 22. src/sinks/http/tests.rs:148 calls validate_headers [macro argument]
+       -> src/sinks/http/config.rs|validate_headers|function
+       | assert!(validate_headers(&config.request.headers, false).is_ok());
+ 23. lib/vector-core/src/event/test/serialization.rs:514 calls create_nested_array [macro argument]
+       -> lib/vector-core/src/event/test/serialization.rs|create_nested_array|function
+       | roundtrip_metadata(create_nested_array(MAX_ARRAY_DEPTH_VALUE)),
+ 24. vdev/src/utils/semver.rs:63 calls v [macro argument]
+       -> vdev/src/utils/semver.rs|tests::v|function
+       | assert!(ensure_newer(&v("0.59.0"), &current, "chart").is_ok());
+ 25. src/sinks/splunk_hec/logs/integration_tests.rs:341 calls find_entries [macro argument]
+       -> src/sinks/splunk_hec/logs/integration_tests.rs|find_entries|function
+       | assert!(find_entries(messages.as_slice()).await);
+ 26. lib/vector-core/src/event/test/serialization.rs:856 calls check_value_nesting_cost [macro argument]
+       -> lib/vector-core/src/event/ser.rs|check_value_nesting_cost|function
+       | assert!(check_value_nesting_cost(&ts, 0, TIMESTAMP_FRAME_COST).is_ok());
+ 27. vdev/src/utils/semver.rs:66 calls v [macro argument]
+       -> vdev/src/utils/semver.rs|tests::v|function
+       | assert!(ensure_newer(&v("0.57.9"), &current, "chart").is_err());
+ 28. vdev/src/utils/semver.rs:63 calls ensure_newer [macro argument]
+       -> vdev/src/utils/semver.rs|ensure_newer|function
+       | assert!(ensure_newer(&v("0.59.0"), &current, "chart").is_ok());
+ 29. src/http/transport_tests.rs:641 calls mtls_client_tls [macro argument]
+       -> src/http/transport_tests.rs|mtls_client_tls|function
+       | assert!(!handle.reload(mtls_client_tls()).unwrap());
+ 30. src/http/transport_tests.rs:818 calls has_proxy_authorization [macro argument]
+       -> src/http/transport_tests.rs|has_proxy_authorization|function
+       | assert!(has_proxy_authorization(&proxy_observations[0].headers));
 
-SAMPLE derived macro-body calls (seed 5521)
+SAMPLE derived macro-body calls (seed 8803)

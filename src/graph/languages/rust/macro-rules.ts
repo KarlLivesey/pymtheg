@@ -220,10 +220,19 @@ export type MacroProfile = {
     local: boolean;
     /** Inside a `$( … )` repetition: may be emitted zero times. */
     repeated: boolean;
+    /** Standard-looking macros whose arguments hold the call, outermost
+     * first: each must be the standard macro where the expansion lands. */
+    within: string[];
   }[];
   /** Every macro invoked in code positions of the transcribers, standard
    * ones included. Each must be harmless where the macro is invoked. */
-  bodyMacros: { name: string; shadow: string[] }[];
+  bodyMacros: { name: string; shadow: string[]; repeated: boolean }[];
+  /** Names that a `use` anywhere in the transcribers binds (`*`: unknown).
+   * A macro invoked inside this expansion, at any depth, whose name starts
+   * with one of them may be the imported one, not the one it looks like. */
+  useNames: string[];
+  /** First segment of every macro name the transcribers invoke. */
+  macroHeads: string[];
 };
 
 /** Names an item statement in `seq` binds, `*` when not readable. */
@@ -324,7 +333,9 @@ export function macroProfile(definition: Node): MacroProfile {
     forwardTargets = new Set<string>(),
     forwardShadow = new Set<string>(),
     calls: MacroProfile["calls"] = [],
-    bodyMacros: MacroProfile["bodyMacros"] = [];
+    bodyMacros: MacroProfile["bodyMacros"] = [],
+    useNames = new Set<string>(),
+    macroHeads = new Set<string>();
   let forwards = true,
     clean = true;
   let blockLocal = false;
@@ -398,8 +409,11 @@ export function macroProfile(definition: Node): MacroProfile {
       shadow: string[],
       arms: boolean,
       repeated = false,
+      within: string[] = [],
     ) => {
-      const here = [...shadow, ...itemNames(seq)];
+      const bound = itemNames(seq);
+      for (const x of bound) useNames.add(x);
+      const here = [...shadow, ...bound];
       const mask = patternMask(seq, arms);
       const skipped = new Set<number>();
       // Attributes (cfg and others) and items other than `use` make the
@@ -419,6 +433,7 @@ export function macroProfile(definition: Node): MacroProfile {
         ({ call }) => !skipped.has(seq.indexOf(call.group)),
       );
       for (const { at, call } of calls) {
+        macroHeads.add(call.name.replace(/^::/, "").split("::")[0]!);
         const groupIndex = seq.indexOf(call.group);
         skipped.add(groupIndex);
         const contents = inner(call.group);
@@ -437,8 +452,10 @@ export function macroProfile(definition: Node): MacroProfile {
           const plain =
             separator.length === 5 &&
             ["*", "+"].includes(separator.at(-1)!.type);
+          // A forward site inside a repetition may be emitted zero times.
           if (
             plain &&
+            !repeated &&
             (!before || before.type === ",") &&
             forwardIndex === contents.length - 1
           ) {
@@ -462,19 +479,20 @@ export function macroProfile(definition: Node): MacroProfile {
             here,
             false,
             repeated,
+            [...within, call.name],
           );
         if (
           call.name.split("::").some((x) => x.startsWith("$") && x !== "$crate")
         )
           clean = false;
-        else armMacros.push({ name: call.name, shadow: here });
+        else armMacros.push({ name: call.name, shadow: here, repeated });
         void at;
       }
       for (let i = 0; i < seq.length; i++) {
         const n = seq[i]!;
         if (isGroup(n)) {
           if (!skipped.has(i))
-            visitSeq(inner(n), here, matchArmsGroup(seq, i), repeated);
+            visitSeq(inner(n), here, matchArmsGroup(seq, i), repeated, within);
           if (opens(n, "(") && !mask[i] && !skipped.has(i)) {
             const path = pathEndingAt(seq, i - 1);
             const before = path ? seq[path.start - 1] : undefined;
@@ -487,6 +505,7 @@ export function macroProfile(definition: Node): MacroProfile {
             )
               armCalls.push({
                 repeated,
+                within,
                 local:
                   (bindsLocals || blockLocal) && path.segments.length === 1,
                 path: path.segments.join("::"),
@@ -496,7 +515,7 @@ export function macroProfile(definition: Node): MacroProfile {
               });
           }
         } else if (n.type === "token_repetition" && !skipped.has(i))
-          visitSeq(inner(n), here, false, true);
+          visitSeq(inner(n), here, false, true, within);
         else if (whole && n.type === "metavariable" && n.text === whole)
           strayUse = true;
       }
@@ -511,6 +530,10 @@ export function macroProfile(definition: Node): MacroProfile {
     bodyMacros.push(...armMacros);
   }
   if (!readable) neutral = false;
+  // A `use` in the expansion that could rebind a macro name the expansion
+  // invokes (or any name, for a glob) leaves the expansion unclean.
+  if (useNames.has("*") || [...useNames].some((x) => macroHeads.has(x)))
+    clean = false;
   return {
     readable,
     neutral,
@@ -520,6 +543,8 @@ export function macroProfile(definition: Node): MacroProfile {
     arms: rules.length,
     clean: readable && clean,
     blockLocal,
+    useNames: [...useNames].sort(),
+    macroHeads: [...macroHeads].sort(),
     calls,
     bodyMacros,
   };
@@ -612,6 +637,9 @@ export function argumentCalls(invocation: {
     for (let i = 0; i < seq.length; i++) {
       const n = seq[i]!;
       if (!isGroup(n) || nestedGroups.has(n.id)) continue;
+      // A block in the arguments that invokes any macro directly may have
+      // items defined in it by that macro: its names are not read (R1-K).
+      if (opens(n, "{") && invocations(inner(n)).length) continue;
       scan(inner(n), macros, macroNames);
       if (!opens(n, "(")) continue;
       const path = pathEndingAt(seq, i - 1);

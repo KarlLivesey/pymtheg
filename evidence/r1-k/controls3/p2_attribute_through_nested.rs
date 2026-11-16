@@ -1,0 +1,4 @@
+fn helper(){println!("called")}
+macro_rules! n {()=>{helper();}}
+macro_rules! m {()=>{{ #[cfg(any())] n!(); }}}
+fn main(){m!();println!("end");}

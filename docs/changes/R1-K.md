@@ -195,105 +195,125 @@ Otherwise it is unresolved with would-be targets (`macro-arm-unverified`,
 `macro-expansion-unverified`, `macro-repetition-unverified`,
 `macro-body-name-unverified`), which `callers` reports as possible callers.
 Calls with no workspace target, sysroot paths, `Self::` paths and method
-calls in bodies are not derived. So `callers set_errored` returns `search` at
-`main.rs:131` (definite), while the calls inside test generators such as
+calls in bodies are not derived. So `callers set_errored` reports `search`
+at `main.rs:131` as a possible caller. In round 2 that link was definite;
+under the round-3 name rule it is not, because of ripgrep's own `write!` and
+`writeln!` macros (see Results). The calls inside test generators such as
 ripgrep's `rgtest!` (a `#[test] fn` per invocation) are unresolved: the
 expansion defines items under an attribute.
 
 `rust.resolve` returns `{ resolutions, links }` when there are derived links
 and the plain list otherwise; the Rust test harnesses accept both.
 
+## The rule for macro links (round 3), in one paragraph
+
+A call read from a macro is definite only if every property below holds for
+the **whole path** from the invocation the user wrote down to the call,
+through every nested macro invocation on the way. Each property is carried
+transitively, never checked only at the outermost macro.
+
+- **Readable.** Every macro on the path names exactly one readable workspace
+  `macro_rules!` definition at that point, or is a standard or builtin macro
+  (see the name rule below).
+- **One arm.** Every such macro has a single arm (no arm selection to prove).
+- **No local capture.** For a one-segment call name, no macro on the path is
+  defined inside a function body (whose locals could capture it), and no arm
+  on the path binds locals.
+- **Clean.** Its emitted code is clean: no attribute anywhere and no item
+  other than a `use`. Every macro the code invokes is harmless (neutral and
+  clean, recursively; anything unreadable fails).
+- **Not repeated.** No macro on the path sits inside a `$( … )` repetition.
+- **Not inside a definition.** No macro on the path sits inside a nested
+  `macro_rules!` definition.
+- **No rebinding `use`.** No `use` in force on the path binds a name that
+  heads a macro name invoked below it, or the call's head. A glob `use`
+  binds every name.
+- **The name rule.** A macro name counts as the standard (or builtin) macro
+  only when no `macro_rules!`, proc macro, `use`/`extern crate` alias,
+  `#[macro_use(…)]` entry or transcriber `use` *anywhere in the workspace*
+  binds that name, and the existing per-site checks also pass.
+
+Anything else is unresolved with its would-be targets. Calls in arguments
+need, in addition, that every macro on the path forwards its whole input
+unchanged as the tail of an argument list.
+
 ## Results
 
-Final runs (round 2), this branch (Rust module at version 27) against `origin/main`
-(Rust module at version 26), on the dev server, both sides run in parallel
+Round 3 runs on the merged tree (this branch with `origin/main` 379b6018)
+against `origin/main`, both on the dev server in parallel
 (`evidence/r1-k/*-summary.json`, `*-compare.txt`):
 
 | | ripgrep before | ripgrep after | Vector before | Vector after |
 |---|---|---|---|---|
-| links (all) | 34,780 | 39,089 | 370,785 | 392,467 |
-| definite | 12,121 | **13,719** | 78,624 | **80,157** |
+| links (all) | 34,780 | 39,086 | 370,785 | 392,123 |
+| definite | 12,121 | **13,689** | 78,624 | **79,034** |
 | candidate sets | 12 | 12 | 100 | 100 |
-| unresolved | 22,647 | 25,358 | 292,061 | 312,210 |
+| unresolved | 22,647 | 25,385 | 292,061 | 312,989 |
 | links on main that went unresolved → definite | | 620 | | 95 |
 | links on main that went definite → anything else | | **0** | | **0** |
-| new calls in macro arguments: definite / unresolved | | 962 / 2,074 | | 1,438 / 19,792 |
-| new derived macro-body calls: definite / unresolved | | 16 / 1,257 | | 0 / 452 |
-| cold index, seconds (observation) | 49.7 | 52.5 | 710.6 | 757.4 |
+| new calls in macro arguments: definite / unresolved | | 948 / 2,085 | | 315 / 20,571 |
+| new derived macro-body calls: definite / unresolved | | 0 / 1,273 | | 0 / 452 |
+| cold index, seconds (observation) | 42.6 | 43.1 | 626.7 | 587.0 |
 
-Against round 1, the review fixes removed 666 definite body-call links on
-ripgrep (the `rgtest!` test generator's `crate::util::setup*` calls; its
-expansion defines a `#[test] fn`) and all 30 on Vector (including the 7 wrong
-`verbosity` links from the `define_display_macro!` factory, which are no
-longer derived at all). Argument calls and the 620/95 gains are unchanged.
+**What the workspace-wide name rule costs:**
 
-Unresolved goes *up* because calls inside macro arguments are now links at
-all; the ones that cannot be proved (most in Vector are inside
-`tracing`/`similar_asserts`/`serde_json` macros) are honest unresolved links
-with would-be targets, where before there was no link. On the links that
-existed on main, unresolved fell (ripgrep 22,647 → 22,027) and nothing
-definite was lost.
+- **ripgrep.** It defines its own `macro_rules! write` (`crates/core/flags/doc/help.rs:19`,
+  `man.rs:14`) and `macro_rules! writeln` (`man.rs:21`), wrappers that call
+  `std::write!`/`std::writeln!` and unwrap. So `write` and `writeln` are no
+  longer the standard macros anywhere in ripgrep. `eprintln_locked!` invokes
+  both, which means it is not harmless and its forwarding into `writeln!` is
+  unproved. Therefore `message!`, `err_message!` and `ignore_message!` are
+  unproved too. As a result:
+  - the `err_message!` argument calls are no longer proved forwarded;
+  - the derived calls to `set_errored`, `messages` and `ignore_messages` are
+    unresolved (with the would-be target kept);
+  - definite body-call links fall from 16 to 0.
+
+  Those wrappers are not in textual scope at any of those call sites (they
+  live in `flags/doc` modules without `#[macro_use]`).
+- **Vector.** Definite argument calls fall from 1,438 to 315, because these
+  names are imported somewhere in the workspace:
+  - `format`: `use super::{…, format, …}`, a workspace module;
+  - `write`: `use nix::unistd::{…, write}`, a function;
+  - `panic`, `vec`: `use std::{…, panic, …}` and `use std::vec`, std modules;
+  - `assert_eq`: `use similar_asserts::assert_eq`, a real external macro, in
+    60 files.
+
+  Only the last can actually rebind the macro.
+
+The other trial links stay definite: `eprint_nothing_searched()` and
+`print_stats(…)` (`main.rs:144`, `:148`), the `Match` import and
+`Match::new`, and `grep::searcher::SearcherBuilder::new()`.
 
 Reasons on ripgrep (written links, before → after): `opaque-item-may-shadow-name`
 on calls 849 → 227, on types 1,484 → 148, on imports 479 → 69, on patterns
 271 → 30.
 
-The trial's specific links, ripgrep after:
-
-| Link | Before | After |
-|---|---|---|
-| `main.rs:131` `err_message!` → body call `crate::messages::set_errored` (from `search`) | none | definite |
-| `main.rs:131` → transitive body call `crate::messages::messages` | none | definite |
-| `main.rs:131` argument `haystack.path()` | none | unresolved, `receiver-type-unverified` (`haystack` has no written type); the macro forwarding itself is proved |
-| `main.rs:144` `eprint_nothing_searched()` | unresolved (opaque) | definite |
-| `main.rs:148` `print_stats(…)` | unresolved (opaque) | definite |
-| `lines.rs:7` `use grep_matcher::{…, Match}` | unresolved (opaque) | definite |
-| `lines.rs:81`, `:146` `Match::new` | unresolved (`too-many-targets`) | definite |
-| `lines.rs:137…` `range.start()` / `range.end()` on `range: Match` | unresolved | unresolved, `later-probe-step` (see shape 3) |
-| `hiargs.rs:719` `grep::searcher::SearcherBuilder::new()` | unresolved | definite |
-
-None of the trial cases was lost in round 2.
-
-Index time rises by about 6% on ripgrep and 7% on Vector in this paired run
-(round 1 saw 12% and 13–24% under different load); the extra work is reading
-argument tokens and proving macros per invocation. These are observations on
-a shared machine, not limits.
-
 ## Correctness sample
 
-Round 2, fresh seeds (ripgrep 4409, Vector 5521), weighted to macro links,
-each read against the source on the dev server
-(`evidence/r1-k/sample-review.md`):
+Round 3 (seeds ripgrep 7717, Vector 8803; `evidence/r1-k/sample-review.md`):
+60 definite argument calls (30 per corpus), each read against the source:
+**60 / 60 right.** There are no definite body-call links left in either
+corpus to read. Round 2 (seeds 4409, 5521) read 105 links, all right; round 1
+(seeds 1117, 2203) read 90, all right, but drew no Vector body-call links,
+where the reviewers then found wrong ones.
 
-| | unresolved → definite | new argument calls | body calls | distinct links | right |
-|---|---|---|---|---|---|
-| ripgrep | 15 | 29 | 16 | 60 | 60 / 60 |
-| Vector | 15 | 30 | 0 | 45 | 45 / 45 |
-| **Total** | **30** | **59** | **16** | **105** | **105 / 105** |
+Faults found and fixed so far:
 
-(ripgrep's "new definite" draw of 30 included one body call, `ignore_messages`
-at `hiargs.rs:882`, also in the body-call draw; it is counted once.)
+- **Round 1, before review.** Found by the before/after diff: a module-level
+  macro switched on the conservative binding facts for its whole file.
+- **Round 1 review.** A nested item-defining macro; a definition-site local;
+  `#[cfg]` in a body; a macro factory; a generated `mod`; and a false
+  statement about derives.
+- **Round 2 review.**
+  - A `use … as println` in an expansion rebinding a nested macro name.
+  - A project `println!` read as the standard one.
+  - A repetition lost through a nested macro.
+  - (Opus, rated exotic) An item-defining macro in a block inside format
+    arguments. A brace block in macro arguments that invokes any macro
+    directly is no longer read.
 
-There are only 16 definite body-call links in both corpora together (all in
-ripgrep, all from `err_message!`, `message!` and `ignore_message!`), so all
-16 were read; 30 cannot be drawn. Vector has none. No wrong link was found.
-Round 1's sample (90 links, seeds 1117 and 2203, all right) drew no body-call
-links from Vector; the reviewers found the wrong ones there, which is why
-round 2 samples body calls on purpose.
-
-Faults found and fixed:
-
-- Round 1, before review, by the before/after diff: 5 definite Vector links
-  were lost because a module-level macro switched on the conservative binding
-  facts for its whole file. The fallback now applies only below a block
-  statement (test: "an unproved module-level macro does not unsettle locals
-  in functions").
-- Round 1 review (Sol, Opus): wrong definite links from a nested
-  item-defining macro, a definition-site local, `#[cfg]` in a body or around
-  forwarding, a macro factory (Vector `vdev/src/utils/macros.rs`), a
-  generated `mod` with `self::`/`super::` paths, and a false statement about
-  derives. Each is now a fixture with its rustc output, with a positive twin;
-  the rules above are the fix.
+  These led to the path rule above, rather than to more case fixes.
 
 ## Compiler controls
 
@@ -326,6 +346,26 @@ ways an expansion can change a binding or a call's existence:
 | `crate::` vs `$crate::` across crates | `crate:app dollar:a` | resolved the same way |
 | derive controls (d1–d3) | `7 X`; E0658; E0658 | see shape 3 |
 
+Round 3 adds `evidence/r1-k/controls3/` (rustc output in `output.txt`):
+
+| Program | rustc prints | Pymtheg |
+|---|---|---|
+| `use crate::other as println` in the expansion: argument, body | `2`, `2` | unresolved |
+| twin: a `use` binding no invoked macro name | `1` | definite |
+| project `println!`: body, forwarding | `end`, `end` | unresolved |
+| twin: standard `println!` in a body | `CALLED 1 end` | definite |
+| repetition through a nested macro | `end` | unresolved |
+| twin: no repetition | `1 end` | definite |
+| attribute through a nested macro | `end` | unresolved |
+| twin: no attribute | `called end` | definite |
+| nested macro inside a generated definition | `end` | no link |
+| function-local inner macro | `2` | unresolved |
+| function-local outer macro (carried; conservative) | `1` | unresolved |
+| unproven arm through a nested macro | `end` | unresolved |
+| `use` in the outer expansion rebinding the inner macro's `println!` | `2` | unresolved |
+| `def!()` in a block in `println!`/`assert!` arguments, and in an `if` block there | `2`, `ok`, `2` | no link |
+| twin: the same blocks without a macro | `1 1` | definite |
+
 ## Tests
 
 `test/graph-rust-r1k-macros.test.mjs`: each shape, positive and negative —
@@ -352,6 +392,8 @@ above), each with the expectation rustc gave and, for each review finding, a
 positive twin that must still resolve (harmless nested macro, call-site
 local, no `cfg`, forwarding through a closure or loop, duplicated
 forwarding).
+
+Round 3 adds 17 fixture tests covering every program above.
 
 Changed expectations: `recall-4.json` "brace tail is still statement-capable"
 used `macro_rules! m{()=>{{}}}`, which expands to an empty block and is now

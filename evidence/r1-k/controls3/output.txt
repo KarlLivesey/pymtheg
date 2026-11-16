@@ -1,0 +1,20 @@
+rustc 1.98.1 (48a229cea 2026-09-01)
+o4_block_in_args.rs          prints: 2 
+o4_block_in_assert.rs        prints: ok 
+o4_if_block_in_args.rs       prints: 2 
+o4_twin_block_without_macro.rs prints: 1 1 
+p2_attribute_through_nested.rs prints: end 
+p2_twin_no_attribute.rs      prints: called end 
+p3_definition_through_nested.rs prints: end 
+p4_function_local_inner.rs   prints: 2 
+p4_function_local_outer.rs   prints: 1 
+p5_arm_through_nested.rs     prints: end 
+p6_use_through_nested.rs     prints: 2 
+r1_twin_use_unrelated.rs     prints: 1 
+r1_use_rebinds_nested_arg.rs prints: 2 
+r1_use_rebinds_nested_body.rs prints: 2 
+r2_project_println_body.rs   prints: end 
+r2_project_println_forward.rs prints: end 
+r2_twin_std_println.rs       prints: CALLED 1 end 
+r3_repetition_through_nested.rs prints: end 
+r3_twin_no_repetition.rs     prints: 1 end 

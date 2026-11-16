@@ -6,7 +6,29 @@ reading the call site and the target's definition, and, where the target is
 reached through an import, alias, `cfg` variant, module path or macro body,
 that route, in the pinned sources on the dev server.
 
-## Round 2 (current; seeds ripgrep 4409, Vector 5521)
+## Round 3 (current; seeds ripgrep 7717, Vector 8803)
+
+60 definite argument calls, 30 per corpus, each read against the source:
+60 / 60 right. No definite body-call links exist in either corpus under the
+round-3 rule (see `docs/changes/R1-K.md`, Results), so none could be read.
+
+Routes checked beyond same-file test helpers:
+
+- ripgrep `is_hidden_path`, `file_name` (`ignore/src/pathutil.rs` tests:
+  `use super::{file_name, is_hidden_path}`); `escape` in `globset` (inside
+  the test fn `escape` with `use super::escape`) and in `cli/src/escape.rs`
+  tests; `HyperlinkFormat::empty` (associated fn in the same file);
+  `self.multi_line()` (`&self` method of `StandardImpl`, called from a
+  `&self` method).
+- Vector `test_one_timestamp_parse`: a fn nested in the test fn that calls
+  it. `git::current_branch`: `use crate::utils::git;`.
+  `check_value_nesting_cost`: imported from `event/ser.rs`. `all_gauges`:
+  `use super::{super::{…, tests::{all_gauges, …}}}`. `validate_headers`:
+  imported from `config`. `Request::encoded`: `impl Request` in the same
+  `tests` module. `self.drain_until(…)`: called on `self: &mut Self` from
+  `publish_and_expect(&mut self)`, with `drain_until(&mut self)`.
+
+## Round 2 (seeds ripgrep 4409, Vector 5521)
 
 | Corpus | Unresolved → definite | New argument calls | Body calls | Distinct links | Right |
 |---|---|---|---|---|---|

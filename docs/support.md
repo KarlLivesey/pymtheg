@@ -360,14 +360,23 @@ manifest unknown). Private items are ordinary symbols.
   macro no captured binding rebinds, or a readable workspace macro that is
   neutral and clean and invokes only harmless macros. An unreadable nested
   macro is not harmless. Tokens inside a nested `macro_rules!` definition (a
-  macro factory) are never read as calls.
+  macro factory) are never read as calls. A `use` in the emitted code that
+  binds a name heading a macro the expansion invokes (or a glob `use`) makes
+  it unclean, and a nested macro whose name such a `use` in force could
+  rebind is not followed. A name counts as a standard (or builtin) macro only
+  when no `macro_rules!`, proc macro, `use`/`extern crate` alias,
+  `#[macro_use(…)]` entry or transcriber `use` anywhere in the workspace
+  binds that name (and the per-site checks pass). For example, a project's
+  own `write!`, or `use similar_asserts::assert_eq`, makes every `write!` or
+  `assert_eq!` in the workspace non-standard for these rules.
 - **Calls in macro arguments:** calls written in an invocation's argument
   tokens are links, read as a format-style list: pieces separated by `,`
   (and `;` for `vec!`), each an expression or `name = expression`; only the
   first piece of `matches!`. A piece containing a closure, `let`, `match`,
   `for`, `while`, `loop`, an item keyword, `=>`, a label or a metavariable is
   not read (no links), nor are tokens inside a non-standard macro nested in
-  the arguments. Such a link resolves by the ordinary rules for a call at that
+  the arguments, nor a brace block in the arguments that invokes any macro
+  directly (it could define items there). Such a link resolves by the ordinary rules for a call at that
   place only when the invocation provably evaluates the tokens as expressions
   at the call site: a standard format macro (`print`… `writeln`, `format`,
   `format_args`, `panic`, `todo`, `unreachable`, `unimplemented`, the
@@ -392,7 +401,10 @@ manifest unknown). Private items are ordinary symbols.
   invoked. It is resolved as at the invocation (items at the call site,
   `$crate::` in the defining crate). It is definite only when every macro on
   the way has one arm and a clean, proved expansion, the call is not inside
-  a `$( … )` repetition, and nothing can rebind the head name: a `use` in an
+  a `$( … )` repetition (each of these is a property of the whole path,
+  carried through every nested macro), it is not read inside the arguments
+  of a standard-looking macro that is not the standard one there, and
+  nothing can rebind the head name: a `use` in an
   enclosing transcriber group, a generic parameter at the call site, or, for
   a one-segment name, a local the arm binds or a local in scope where the
   macro is defined (a macro defined inside a function body). Otherwise it is
