@@ -370,7 +370,7 @@ function setup(s, name) {
       removeContainer(source);
       copied.push(image);
     }
-    const v = docker("exec", ...TOOLCHAIN_ENV, name, "sh", "-c", "go version && cargo --version");
+    const v = docker("exec", ...TOOLCHAIN_ENV, name, "sh", "-c", "env -u HOME -u XDG_CONFIG_HOME go version && cargo --version");
     return v.status === 0 ? { ok: true, note: `${copied.join(", ")}: ${v.stdout.trim().split("\n").join("; ")}` } : { ok: false, note: "toolchain check failed: " + v.stderr.slice(-300) };
   }
   return { ok: true, note: "" };

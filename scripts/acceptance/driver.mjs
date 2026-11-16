@@ -1187,14 +1187,14 @@ async function networkOff() {
  *    npx write there on every invocation, not Pymtheg;
  *  - /tmp/node-compile-cache: Node's module compile cache, which the npm CLI
  *    enables for itself (Pymtheg's source never calls enableCompileCache);
- *  - in scenario c only, Go's own build and module caches (~/.cache/go-build,
- *    ~/go) and its config folder (~/.config/go: Go's local telemetry
- *    counters), written by the `go` the project opted into;
+ *  (Nothing for Go: the product runs go in a closed environment without HOME,
+ *  so go writes nothing to ~/.config/go or ~/.cache; the harness's own
+ *  `go version` also runs without HOME.)
  *  - /acc, the harness's own files.
  */
-async function writesOutside({ go = false } = {}) {
+async function writesOutside() {
   const npmOwn = ["_cacache/", "_logs/", "_npx/", "_update-notifier-last-checked"].map((p) => `${HOME}/.npm/${p}`);
-  const allowed = [`${PROJECT}/`, `${HOME}/legacy/`, `${GO_PROJECT}/`, `${HOME}/restic/`, `${APP}/`, ...npmOwn, "/tmp/node-compile-cache/", "/acc/", ...(go ? [`${HOME}/.cache/go-build/`, `${HOME}/go/`, `${HOME}/.config/go/`] : [])];
+  const allowed = [`${PROJECT}/`, `${HOME}/legacy/`, `${GO_PROJECT}/`, `${HOME}/restic/`, `${APP}/`, ...npmOwn, "/tmp/node-compile-cache/", "/acc/"];
   await step({
     id: "writes-outside-project",
     display: "no file created or modified outside the project folders and npm's own folders; nothing inside the installed package",
@@ -1498,12 +1498,16 @@ const scenarios = {
         id: "toolchains-present",
         observe: true,
         harnessOutput: true,
-        cmd: ["sh", "-c", "PATH=$(echo $PATH | sed 's#/acc/shims:##'); go version && cargo --version && rustc --version"],
+        // Without HOME: Go 1.27's `go version` otherwise writes telemetry
+        // counters to ~/.config/go even with GOTELEMETRY=off in the environment
+        // (probed); without a home folder it writes nothing. The product's own
+        // go runs use a closed environment that has no HOME either.
+        cmd: ["sh", "-c", "PATH=$(echo $PATH | sed 's#/acc/shims:##'); env -u HOME -u XDG_CONFIG_HOME go version && cargo --version && rustc --version"],
         note: (r) => r.stdout.trim().split("\n").join("; "),
       });
       await coreSteps(npx);
       await goOptIn(npx);
-      await writesOutside({ go: true });
+      await writesOutside();
     },
   },
   "d-global": {
