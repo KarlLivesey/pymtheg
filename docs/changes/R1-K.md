@@ -382,8 +382,8 @@ module versus a bare `macro_use extern crate`, two glob-imported `Match`
 types, an inner import shadowing an outer one, and a facade
 `pub extern crate … as …` path.
 
-Checks on the dev server after merging `origin/main` (60552338): `npm run
-build`, full `npm test` 2,872 pass / 0 fail, `npm run format:check` clean,
+Checks on the dev server after merging `origin/main` (379b6018): `npm run
+build`, full `npm test` 2,902 pass / 0 fail, `npm run format:check` clean,
 `node scripts/spdx-tags.mjs --check` clean; the new source files carry the
 SPDX tag.
 
