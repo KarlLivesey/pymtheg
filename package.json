@@ -63,6 +63,7 @@
     "src/graph/languages/go/toolchain/golinks.go",
     "dist-web/",
     "docs/agent-workflow.md",
+    "docs/code-guide.md",
     "docs/grammar.md",
     "docs/journeys.md",
     "docs/licences.md",

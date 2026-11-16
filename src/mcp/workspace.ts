@@ -8,7 +8,8 @@ import { traceSteps } from "../reporting/trace.js";
 import { OutputRegistry } from "../contracts/registry.js";
 import { outputTargetIds } from "../shared/outputs.js";
 import { realpath, stat } from "node:fs/promises";
-import { relative } from "node:path";
+import { extname, relative } from "node:path";
+import { identity } from "../shared/identity.js";
 import { randomUUID } from "node:crypto";
 import { StudioService } from "../studio/service.js";
 import { analyseInWorker } from "../cli/coordinator.js";
@@ -56,6 +57,7 @@ export class AgentWorkspace {
     readonly outputs: OutputRegistry = OutputRegistry.empty(),
   ) {
     this.access = new StudioService(root);
+    this.access.initializeOnFirstWrite = true;
     this.links = new LinkJobs(root);
     this.graph = new GraphJobs(root);
   }
@@ -79,8 +81,16 @@ export class AgentWorkspace {
     const inventoryId =
       options.inventoryId ??
       this.inventories.capture(await this.access.project());
+    const page = this.inventories.read(inventoryId, options);
     return {
-      ...this.inventories.read(inventoryId, options),
+      ...page,
+      initialised: page.workspace !== null,
+      ...(page.workspace === null
+        ? {
+            initialisation:
+              "This project is not initialised: it has no .pymtheg/project.json. The first planning write (requirement_links requirement or add, observe_implementation, link_implementation) initialises it exactly as pymtheg init would; or run pymtheg init in the project first.",
+          }
+        : {}),
       runIds: [...this.runs.keys()],
       limits: {
         retainedRuns: 10,
@@ -103,6 +113,10 @@ export class AgentWorkspace {
     limit = 100,
     signal: AbortSignal = new AbortController().signal,
   ) {
+    if (extname(file) !== identity.extension)
+      throw Error(
+        `read_source reads Pymtheg design files (${identity.extension}) only, and ${file} is not one. Read code and other files with your own file tools; ask code_graph about Go, Rust and TypeScript/JavaScript code.`,
+      );
     const source = await this.access.sourceFile(file, signal);
     const lines = source.text.split("\n");
     return {

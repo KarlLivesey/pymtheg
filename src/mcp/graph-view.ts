@@ -102,7 +102,7 @@ export class GraphView {
       answer.push({ type: "match", ref: symbol(s) });
     for (const s of list(data.symbols))
       answer.push({ type: "symbol", ref: symbol(s) });
-    for (const input of list(data.inputs))
+    for (const input of list(data.inputs)) {
       for (const s of list(input.matches))
         answer.push({
           type: "selection",
@@ -111,6 +111,14 @@ export class GraphView {
           ambiguous: list(input.matches).length !== 1 || !!input.truncated,
           truncated: input.truncated,
         });
+      // Suggestions for a selector that selected nothing; never selected.
+      for (const s of list(input.nearMatches))
+        answer.push({
+          type: "near-match",
+          input: clip(input.input),
+          ref: symbol(s),
+        });
+    }
     const regular = new Set<string>();
     for (const l of [
       ...list(data.links),
@@ -197,6 +205,7 @@ export class GraphView {
       "hasPossibleCallers",
       "classCounts",
       "countsTruncated",
+      "countBound",
       "depth",
       "maxNodes",
       "maxEdges",
@@ -216,6 +225,15 @@ export class GraphView {
         matches: list(input.matches).length,
         truncated: input.truncated,
         totalAtLeast: input.totalAtLeast,
+        ...(list(input.nearMatches).length
+          ? {
+              nearMatches: list(input.nearMatches).map((s) =>
+                clip(record(s).identity),
+              ),
+              nearMatchMeaning:
+                "Nothing was selected. These symbols have a similar name; select one by its qualifiedName or ref.",
+            }
+          : {}),
       }));
     if (data.possiblePath)
       query.possiblePath = {

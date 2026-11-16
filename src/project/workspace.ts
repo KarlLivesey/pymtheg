@@ -216,3 +216,14 @@ async function initialize(input: string, name?: string) {
     );
   return { root, workspace: actual, created, filesCreated };
 }
+/**
+ * Initialise `root` exactly as `pymtheg init` with no options would, unless it
+ * already has a project marker. Used before the first planning write that an
+ * agent or link command makes, so that write never leaves a half-made
+ * `.pymtheg/` (no project.json, settings or .gitignore). Null when the
+ * project was already initialised.
+ */
+export async function initializeBeforeWrite(root: string) {
+  if (await readWorkspace(root)) return null;
+  return initializeWorkspace(root);
+}

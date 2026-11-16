@@ -46,12 +46,30 @@ It can check proposed source without saving, explain findings, retrieve real
 counterexamples and generate TypeScript, Rust or Go types/functions with fail-fast stubs.
 See [MCP setup and workflow](docs/mcp.md), or choose **Connect agent** in Studio.
 `./pymtheg scaffold examples/mvp/library.pym --target rust` prints a scaffold to inspect.
+
+The same server answers questions about existing Go, Rust and TypeScript/JavaScript
+code and links requirements to it (MCP `code_graph` and `requirement_links`; the
+resource `pymtheg://code/guide` is a worked session, also in
+[docs/code-guide.md](docs/code-guide.md)). From the command line:
+
+```sh
+./pymtheg graph index --root /path/to/project
+./pymtheg graph callers '(*Store).Put' --root /path/to/project
+./pymtheg link requirement R1 --title "Restocking records the amount" --root /path/to/project
+./pymtheg link add R1 '(*Store).Put' --root /path/to/project
+./pymtheg link check --root /path/to/project
+```
+
+Graph answers say how certain each call is (definite, candidate set or
+unresolved) and never run project code; Go links can optionally be checked with
+the project's own `go` ([support matrix](docs/support.md)).
 [Language emitter plugins](docs/output-plugins.md) add other targets without compiler changes.
 Every generated function fails with “Not implemented” until implemented. Use
 `--body empty` for literal empty bodies, which may not compile. Neither mode
 implements business logic or proves conformance.
 
-The first existing-code reader is available for TypeScript and JavaScript:
+The older existing-code reader, for TypeScript and JavaScript, captures
+versioned observations for the Architecture view:
 
 ```sh
 ./pymtheg observe --list --root .

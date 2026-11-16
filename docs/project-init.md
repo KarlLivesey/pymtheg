@@ -149,7 +149,14 @@ missing metadata while preserving existing settings and identity. Unpublished
 with its path and repair guidance; permission errors ask for a writable directory.
 After initialization, run `pymtheg doctor`, `pymtheg studio .`, and `pymtheg mcp`.
 Planning databases and rebuildable caches are created only when a feature needs
-them, rather than by `init` itself.
+them, rather than by `init` itself. The first planning write in a folder that
+was never initialised — a `pymtheg link` write (`requirement`, `add`, `remove`,
+`refresh`), or over MCP `requirement_links` with those actions,
+`observe_implementation` or `link_implementation` — first initialises it exactly as `pymtheg init` with no
+options would (the folder's name becomes the project name; documentation is not
+imported), so `.pymtheg/.gitignore` is in place before any database is written.
+MCP `project_info` reports `initialised: false` until then. A graph index alone
+does not initialise a project; its cache ignores itself.
 
 To share planning records and their revisions, choose **Architecture → Export
 all history**, then put the resulting `pymtheg-architecture-history.json` in your

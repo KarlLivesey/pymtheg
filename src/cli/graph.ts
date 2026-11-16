@@ -85,9 +85,14 @@ export function formatGraph(response: GraphResponse): string {
       for (const input of data.inputs as {
         input: string;
         matches: DisplaySymbol[];
+        nearMatches?: DisplaySymbol[];
       }[]) {
         lines.push(`Matches for ${quote(input.input)}:`);
         showSymbols(input.matches);
+        if (input.nearMatches?.length) {
+          lines.push("  None. Near matches (not selected):");
+          showSymbols(input.nearMatches);
+        }
       }
     if (data.symbol) showSymbols([data.symbol]);
     showSymbols(data.matches);
@@ -98,7 +103,11 @@ export function formatGraph(response: GraphResponse): string {
         `Possible callers (unresolved): ${data.hasPossibleCallers ? "present; suggestions only, not candidate sets or definite calls" : "none matched within reported bounds"}`,
       );
       if (data.classCounts)
-        lines.push(`Call classes (returned): ${quote(data.classCounts)}`);
+        lines.push(
+          data.countBound === undefined
+            ? `Call classes (returned): ${quote(data.classCounts)}`
+            : `Call classes (totals${data.countsTruncated ? `, at least; counting stops at ${String(data.countBound)}` : ""}): ${quote(data.classCounts)}`,
+        );
       for (const item of (data.possibleCallers ?? []) as {
         symbol?: DisplaySymbol;
         links?: unknown[];

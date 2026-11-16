@@ -18,6 +18,9 @@ const decidedByToolchain = (link: GraphLink): boolean => {
   );
 };
 
+/** Callers' class counts are exact up to this many links (the CLI's default limit). */
+export const CALLER_COUNT_BOUND = 1000;
+
 export type QueryCommand =
   | "search"
   | "symbol"
@@ -153,6 +156,40 @@ export function queryGraph(
       .slice(0, limit + 1)
       .map(located);
   };
+  /** Suggestions for a selector that selected nothing, never a selection:
+   * symbols whose identity, written without `impl`, generic arguments, a
+   * trait-for prefix, receiver punctuation or spaces, ends with the input
+   * written the same way; else symbols with the input's last name. At most 5. */
+  const nearMatches = (input: string): (GraphSymbol & Located)[] => {
+    if (/^symbol:/.test(input) || /:\d+(?::\d+)?$/.test(input)) return [];
+    const parts = (value: string) => {
+      let text = value.trim();
+      for (let before = ""; before !== text; ) {
+        before = text;
+        text = text.replace(/<[^<>]*>|\[[^[\]]*\]/g, "");
+      }
+      return text
+        .replace(/^impl\s+/, "")
+        .replace(/^.*\s+for\s+/, "")
+        .replace(/[()*&\s]/g, "")
+        .split(/::|\./)
+        .filter(Boolean);
+    };
+    const wanted = parts(input);
+    const name = wanted.at(-1);
+    if (!name) return [];
+    const named = store.namedSymbols(name, 1000);
+    const tail = named.filter((s) => {
+      const have = parts(s.identity);
+      return (
+        have.length >= wanted.length &&
+        wanted.every(
+          (part, i) => have[have.length - wanted.length + i] === part,
+        )
+      );
+    });
+    return (tail.length ? tail : named).slice(0, 5).map(located);
+  };
   const result = (
     data: Record<string, unknown>,
     truncated = false,
@@ -201,6 +238,7 @@ export function queryGraph(
       matches: found.slice(0, limit),
       truncated: found.length > limit,
       totalAtLeast: found.length,
+      ...(found.length ? {} : { nearMatches: nearMatches(input) }),
     };
   });
   if (inputs.some((item) => item.matches.length !== 1 || item.truncated))
@@ -235,13 +273,18 @@ export function queryGraph(
     return { items, count, truncated: found.length > items.length };
   };
   if (command === "callers" || command === "callees") {
+    // Callers' class counts are totals, counted up to countBound (at least
+    // the CLI's default limit) whatever the item limit, so a small page still
+    // reports how many exist; countsTruncated means a total reached the bound.
+    const countBound =
+      command === "callers" ? Math.max(limit, CALLER_COUNT_BOUND) : limit;
     const found = store.callLinks(
       start.id,
       command === "callers" ? "incoming" : "outgoing",
-      limit + 1,
+      countBound + 1,
     );
     const possible =
-      command === "callers" ? possibleCalls(store, start, limit + 1) : [];
+      command === "callers" ? possibleCalls(store, start, countBound + 1) : [];
     return result(
       {
         symbol: start,
@@ -252,10 +295,12 @@ export function queryGraph(
               possibleCallers: displayPossible(possible.slice(0, limit)),
               hasPossibleCallers: possible.length > 0,
               classCounts: classCounts(
-                found.slice(0, limit),
-                Math.min(possible.length, limit),
+                found.slice(0, countBound),
+                Math.min(possible.length, countBound),
               ),
-              countsTruncated: found.length > limit || possible.length > limit,
+              countsTruncated:
+                found.length > countBound || possible.length > countBound,
+              countBound,
             }
           : {}),
       },

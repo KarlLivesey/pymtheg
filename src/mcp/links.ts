@@ -172,7 +172,7 @@ export function registerLinkTools(
     "requirement_links",
     {
       description:
-        "Connect planning requirements to Go/Rust/TS code. requirement creates a record; add links record+selector (exact/qualified name, path:line[:column], or unchanged symbol: ref); remove/refresh require link ID. list filters record/symbol/file; check reports non-ok links with differences and suggestions (moved is unconfirmed unless allowMoved); requirements_for selects symbol OR file with optional definite-caller impact; unlinked finds records and optionally public symbols; history reads receipts. Suggestions are NEVER applied. No application source is written. Queries sync the graph unless noSync. Waits up to 5s by default, returning the first bounded page or a progress handle; wait:false opts out. Finish graph indexing before link work on a cold project.",
+        "Connect planning requirements to Go/Rust/TS code. requirement creates a record; add links record+selector (exact/qualified name, path:line[:column], or unchanged symbol: ref); remove/refresh require link ID. list filters record/symbol/file; check reports non-ok links with differences and suggestions (moved is unconfirmed unless allowMoved); requirements_for selects symbol OR file with optional definite-caller impact; unlinked finds records and optionally public symbols; history reads receipts. Suggestions are NEVER applied. No application source is written. Queries sync the graph unless noSync. Waits up to 5s by default, returning the first bounded page or a progress handle; wait:false opts out. Finish graph indexing before link work on a cold project. Arguments by action (others are refused; wait, section, limit and noSync apply to all): requirement id, title, text, owner; add record, selector, note; remove link; refresh link; list record, symbol, file; check allowMoved; requirements_for symbol or file, impact, depth; unlinked symbols, symbolLimit; history none. The first planning write in a project that was never initialised initialises it first, as pymtheg init would.",
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -237,7 +237,9 @@ export function registerLinkTools(
         for (const [key, value] of Object.entries(a))
           if (!common.has(key) && value !== undefined) {
             if (!allowed[a.action]!.includes(key))
-              throw Error(`${key} is not accepted by ${a.action}`);
+              throw Error(
+                `${key} is not accepted by ${a.action}. ${a.action} accepts ${allowed[a.action]!.length ? allowed[a.action]!.join(", ") : "no action-specific arguments"}, plus wait, section, limit and noSync.`,
+              );
             input[key] = value;
           }
         if (

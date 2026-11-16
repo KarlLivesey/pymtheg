@@ -21,6 +21,7 @@ const files = () => {
 };
 const userDocs = [
   "docs/agent-workflow.md",
+  "docs/code-guide.md",
   "docs/grammar.md",
   "docs/journeys.md",
   "docs/licences.md",
@@ -54,6 +55,7 @@ test("the package ships only user documentation from docs/", () => {
   // The product reads these at run time.
   for (const needed of [
     "docs/agent-workflow.md",
+    "docs/code-guide.md",
     "docs/grammar.md",
     "docs/report.schema.json",
   ])

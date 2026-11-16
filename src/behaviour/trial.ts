@@ -47,7 +47,19 @@ export function tryFlow(
       !declaration ||
       declaration.kind !== "flow"
     )
-      return result("unsupported", 0, null, "Choose a unique structured flow.");
+      return result(
+        "unsupported",
+        0,
+        null,
+        declarations.length > 1
+          ? `Several flows are named “${entry}”; give the flow's symbol ID to choose one.`
+          : ir.declarations.some(
+                (d) =>
+                  (d.name === entry || d.id === entry) && d.kind === "machine",
+              )
+            ? `“${entry}” is a machine. try_inputs runs one structured flow (a flow declaration) with its inputs; explore machines with explore_behaviour (simulate or verify).`
+            : `No flow is named “${entry}”. try_inputs needs the name or symbol ID of one structured flow (a flow declaration) in the checked design.`,
+      );
     const names = new Set(declaration.params.map((p) => p.name));
     if (
       Object.keys(inputs).some((name) => !names.has(name)) ||

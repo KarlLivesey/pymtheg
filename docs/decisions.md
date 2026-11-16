@@ -2475,3 +2475,32 @@ out:** the RPL-1.5 output exception and plugin statement (removed with
 `LICENSE-EXCEPTIONS.md`). The package `license` field, the own-licence line in
 `docs/licences.md` and per-file SPDX tags follow in LIC-2; `"private": true` and
 publishing remain the owner's decisions. See [LIC-1](changes/LIC-1.md).
+
+### The first planning write initialises an uninitialised project (R1-J)
+
+**Decided (R1-J, 16 November 2026):** a planning write — `pymtheg link`
+`requirement`, `add`, `remove` or `refresh`, MCP `requirement_links` with those
+actions, `observe_implementation` or `link_implementation` — in a folder with no
+`.pymtheg/project.json` first runs the same routine as `pymtheg init` with no
+options (`initializeWorkspace`: identity named after the folder, default
+settings, `.pymtheg/.gitignore`; documentation is not imported). **Why:** the
+R1-G trials found these writes leaving `.pymtheg/shared/architecture.sqlite`
+and `.pymtheg/local/writer.json` in a project with no identity, settings or
+ignore file, so Git saw the database and `project_info` reported no workspace.
+Init needs no choice an agent must make (its only options, the name and the
+documentation import, have defaults), so refusing would only add a step. The
+CLI link commands had the same fault through the same library and now behave
+identically. **Rules out:** planning databases in an uninitialised folder; a
+separate MCP init tool for this chunk. Graph indexing alone still initialises
+nothing; its rebuildable cache ignores itself. Old-layout folders still refuse
+nothing.
+
+### Callers' class counts are totals (R1-J)
+
+**Decided (R1-J):** `callers` reports `classCounts` as totals counted up to
+1,000 links (or the query limit, if larger), independent of the item limit;
+`countsTruncated` now means a total reached that bound, and `countBound` gives
+it. Items stay bounded by the limit. **Why:** MCP's limit is at most 100, so it
+reported `unresolved: 100, countsTruncated: true` where the CLI (default limit
+1,000) reported the real 441. **Rules out:** counts that depend on the page
+size. Impact's per-frontier counts are unchanged (still capped at the limit).
