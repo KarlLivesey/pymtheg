@@ -135,7 +135,7 @@ export const embeddedNotices = {
         match:
           "Source: <https://github.com/github/cmark-gfm/blob/ef1cfcb/extensions/autolink.c#L318>",
         from: "GitHub's cmark-gfm autolink extension (reference implementation)",
-        licence: "licence not stated",
+        licence: "not checked",
       },
     },
     {
@@ -143,7 +143,7 @@ export const embeddedNotices = {
         match:
           "Source: <https://github.com/github/cmark-gfm/blob/ef1cfcb/extensions/autolink.c#L332>",
         from: "GitHub's cmark-gfm autolink extension (reference implementation)",
-        licence: "licence not stated",
+        licence: "not checked",
       },
     },
     {
@@ -151,7 +151,7 @@ export const embeddedNotices = {
         match:
           "Source: <https://github.com/github/cmark-gfm/blob/ef1cfcb/extensions/autolink.c#L12>",
         from: "GitHub's cmark-gfm autolink extension (reference implementation)",
-        licence: "licence not stated",
+        licence: "not checked",
       },
     },
     {
@@ -159,7 +159,7 @@ export const embeddedNotices = {
         match:
           "Source: <https://github.com/github/cmark-gfm/blob/ef1cfcb/extensions/autolink.c#L307>",
         from: "GitHub's cmark-gfm autolink extension (reference implementation)",
-        licence: "licence not stated",
+        licence: "not checked",
       },
     },
   ],
@@ -168,7 +168,7 @@ export const embeddedNotices = {
       provenance: {
         match: "Port of `edit_map.rs` from `markdown-rs`.",
         from: "markdown-rs `edit_map.rs` (same author)",
-        licence: "licence not stated",
+        licence: "not checked",
       },
     },
   ],
@@ -178,7 +178,7 @@ export const embeddedNotices = {
         match:
           "Port of `edit_map.rs` from `markdown-rs`:\n<https://github.com/wooorm/markdown-rs/blob/1506572f/src/util/edit_map.rs>",
         from: "markdown-rs `edit_map.rs` (same author)",
-        licence: "licence not stated",
+        licence: "not checked",
       },
     },
   ],
@@ -188,7 +188,7 @@ export const embeddedNotices = {
         match:
           "http://www.w3.org/TR/CSS21/grammar.html\nhttps://github.com/visionmedia/css-parse/pull/49",
         from: "the CSS 2.1 grammar (W3C) and a css-parse pull request",
-        licence: "licence not stated",
+        licence: "not checked",
       },
     },
   ],
@@ -228,7 +228,7 @@ export const embeddedNotices = {
         match:
           "Source: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input/email",
         from: "MDN Web Docs (HTML email input validation)",
-        licence: "licence not stated",
+        licence: "not checked",
       },
     },
     {
@@ -236,7 +236,7 @@ export const embeddedNotices = {
         match:
           "from https://thekevinscott.com/emojis-in-javascript/#writing-a-regular-expression",
         from: "a blog post by Kevin Scott (emoji regular expression)",
-        licence: "licence not stated",
+        licence: "not checked",
       },
     },
     {
@@ -262,7 +262,7 @@ export const embeddedNotices = {
         match:
           "https://blog.stevenlevithan.com/archives/validate-phone-number#r4-3",
         from: "a blog post by Steven Levithan (E.164 phone number regular expression)",
-        licence: "licence not stated",
+        licence: "not checked",
       },
     },
     {
@@ -1190,19 +1190,22 @@ export async function render(data) {
     "A wording scan of the comments in every bundled source file with code in `dist-web/` found the",
     "comments below, which say that material was copied, ported, adapted or taken from another source",
     "without carrying a licence notice of their own. The scan looks for derivative-work wording",
-    '("derivative work", "copied from", "port of", "ported from", "adapted from"), a provenance phrase',
+    '("derivative work", "which is licensed", "copied from", "port of", "ported from", "adapted from",',
+    '"code/file/implementation/portions/parts … derived/taken/copied/adapted from"), a provenance phrase',
     '("based on", "adapted from", "taken from", "copied from", "derived from", "from", "Source:")',
     "directly followed by a URL, a comment that begins with a URL other than an issue, pull-request or",
     "bug link, and `@license` banners that name no copyright holder. It lists what it found; it cannot",
     "prove that nothing else was copied. Each entry is reviewed and pinned in",
     "`scripts/licences/inventory.mjs` (`embeddedNotices`); a new or changed comment of these kinds",
     "fails `test/licences.test.mjs` until reviewed. Whether the code after a comment ships is read",
-    "from the bundle's source map. This inventory does not judge whether any of them needs more.",
+    'from the bundle\'s source map. "Not checked" in the licence column means this inventory did not',
+    "check the source's licence; it does not mean the source has none. This inventory does not judge",
+    "whether any of them needs more.",
     "",
   );
   if (provenance.length) {
     md.push(
-      "| Component | File:line | The comment says | Code after it ships | Source | Licence of the source |",
+      "| Component | File:line (the comment's last line) | The comment says | Code after it ships | Source | Licence of the source |",
       "|---|---|---|---|---|---|",
     );
     for (const p of provenance) {

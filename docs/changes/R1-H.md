@@ -404,8 +404,9 @@ plus 3 reviewed provenance notes (18 after round 3).
    and is not used. The scan found 18 provenance notes, now all reviewed and
    pinned; `docs/licences.md` lists each with the component, file and line, the
    comment, whether the code after it ships (read from the bundle's source
-   map), the source and the source's licence ("licence not stated" where it is
-   not). New: vfile `minproc.browser.js` (node-process, MIT) and
+   map), the source and the source's licence ("not checked" where this
+   inventory did not check it; round 4 renamed it from "licence not stated").
+   The line given is the comment's last line. New: vfile `minproc.browser.js` (node-process, MIT) and
    `minurl.shared.js` (Node.js `lib/internal/url.js`, MIT); zod `regexes.js`
    lines 27 (MDN; does not ship), 35 (emoji regex blog post; ships), 48 (Stack
    Overflow, base64; ships), 52 (Stack Overflow, host name; does not ship), 55
@@ -457,3 +458,9 @@ known `data.local` doc comments (two comments in the Go extractor, compiled into
 added: `const quotes = /"/; console.log("ssh build.lan");`, a template after a
 regex with a quote, `"Connect to `data.local` for logs"` in a string, and the
 same in a template; Sol's earlier six shapes stay.
+
+Round 4 wording (Opus, text only; no figure changed): the provenance table's
+line column says it is the comment's last line; "licence not stated" is now
+"not checked", with a sentence saying it does not mean the source has no
+licence; the section's wording list also names "which is licensed" and
+"code/file/implementation/portions/parts … derived/taken/copied/adapted from".
