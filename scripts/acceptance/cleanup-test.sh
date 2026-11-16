@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: MIT
 # Stops a real acceptance run midway three ways and checks that it leaves
 # nothing behind. Run on the dev server from the repository root:
 #

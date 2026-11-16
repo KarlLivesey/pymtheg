@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { resourceDefinitionSchema } from "./declaration-data.js";
 import { checkSourceName } from "./signature-source.js";
 

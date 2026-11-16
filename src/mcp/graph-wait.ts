@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { GraphJob } from "./graph-jobs.js";
 export interface GraphDeadline {
   expired: Promise<void>;

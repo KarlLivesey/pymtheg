@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { implies, possible } from "./cfg.js";
 import { ecosystemMacroNames } from "./macro-catalog.js";
 import type { Node } from "web-tree-sitter";

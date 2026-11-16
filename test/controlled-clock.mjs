@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import assert from "node:assert/strict";
 /** A test owns every deadline; the host's scheduling speed cannot expire it. */
 export function controlledClock() {

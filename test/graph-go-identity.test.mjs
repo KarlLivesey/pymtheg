@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Go type identity in signatures (spec, "Type identity"): one canonical form,
 // applied at every depth. Since version 16 (no-toolchain fallback) identity only
 // ANNOTATES: `implements` is never definite, and "different" never removes a

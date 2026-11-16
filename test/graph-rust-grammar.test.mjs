@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // W2-V: Rust shapes the vendored grammar (tree-sitter-rust v0.24.2 + PRs
 // #319, #271, #317, #312, #283, #281 + our patches 0007 `raw` and 0008 `safe`)
 // reads, and the ones it still cannot read. Every fixture is valid Rust: checked

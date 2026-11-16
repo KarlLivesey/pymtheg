@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /** Bounded propositional implication of captured cfg syntax, never feature evaluation.
  * Unknown atoms remain distinct; quoted contents are preserved. */
 type Clause = Map<string, boolean>;

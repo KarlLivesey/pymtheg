@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import test from "node:test";
 import assert from "node:assert/strict";
 import { scenario, projectConfig } from "../dist/shared/config.js";

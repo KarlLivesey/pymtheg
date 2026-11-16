@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { hash } from "../shared/identity.js";
 import { z } from "zod";
 import { deflateRawSync, inflateRawSync } from "node:zlib";

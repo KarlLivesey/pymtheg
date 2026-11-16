@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: MIT
 // First: drop only the node:sqlite and glob ExperimentalWarnings (early Node 24/25).
 import "./quiet-warnings.js";
 import { FormatSyntaxError } from "../language/format.js";

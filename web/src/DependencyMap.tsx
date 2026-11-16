@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { useMemo } from "react";
 import type { SymbolView } from "../../src/studio/protocol";
 import type { Report } from "../../src/reporting/report";

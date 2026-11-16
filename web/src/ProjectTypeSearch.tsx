@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import {

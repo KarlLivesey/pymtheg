@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { createHash } from "node:crypto";
 export { identity } from "./identity-values.js";
 export const hash = (s: string): string =>

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Regressions for the third W2-B review: candidate sets are honest about whether
 // they are complete. Item numbers follow the review.
 import assert from "node:assert/strict";

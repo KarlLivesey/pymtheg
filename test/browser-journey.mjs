@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Diagnostics only: this entire controller must run inside pc-tools headless.
 import { chromium, firefox, webkit } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";

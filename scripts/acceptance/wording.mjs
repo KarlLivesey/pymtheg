@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // What must never appear on a clean machine since R1-A: Java (including its
 // runtime/kit names and JAVA_HOME), javac, Quint, TLC, TLA+ and the TLA+ tools
 // JAR. Whole words or exact tokens only, so "JavaScript", "javascript:",

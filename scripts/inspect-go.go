@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 // Parser-only validation: empty result bodies are deliberately unfinished.
 package main
 import("encoding/json";"go/ast";"go/parser";"go/token";"os")

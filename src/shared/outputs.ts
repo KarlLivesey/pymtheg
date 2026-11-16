@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /** Public built-in targets; external emitters identify themselves through the plugin API. */
 export const outputTargetIds = ["typescript", "rust", "go"] as const;
 export type BuiltinTarget = (typeof outputTargetIds)[number];

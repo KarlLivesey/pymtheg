@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { posix as p } from "node:path";
 import type { ContextFile } from "../../types.js";
 import { readToml, table, type TomlTable, type TomlValue } from "./toml.js";

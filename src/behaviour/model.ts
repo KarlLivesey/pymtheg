@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { evaluateScalar as evaluate } from "../shared/scalar-expression.js";
 export { evaluateScalar as evaluate } from "../shared/scalar-expression.js";
 import { machineScope } from "../shared/config.js";

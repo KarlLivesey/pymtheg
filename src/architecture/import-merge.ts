@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { headingRegistryPath } from "./headings.js";
 import { isObservationPart } from "./limits.js";
 import { z } from "zod";

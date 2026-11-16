@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import ts from "typescript";
 
 /** The lexical instance owns this; nested ordinary functions and static members do not. */

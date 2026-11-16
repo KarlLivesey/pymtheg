@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { basename } from "node:path";
 import type { Node } from "web-tree-sitter";
 import type {

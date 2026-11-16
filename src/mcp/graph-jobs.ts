@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { operationError } from "./operation-errors.js";
 import { findProjectRoot } from "../storage/local.js";
 import { Worker } from "node:worker_threads";

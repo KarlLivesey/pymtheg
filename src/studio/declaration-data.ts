@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { z } from "zod";
 import { machineDefinitionSchema } from "./machine-data.js";
 import { readSignatureEdit, type SignatureEdit } from "./interface-data.js";

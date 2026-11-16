@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { randomUUID } from "node:crypto";
 import { hash, json } from "../shared/identity.js";
 import { agentLimits } from "./limits.js";

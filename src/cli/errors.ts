@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { identity } from "../shared/identity.js";
 import type { Report } from "../reporting/report.js";
 export function invocationMessage(value: unknown): string {

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { browserExecutable } from "../test/browser-launch.mjs";
 import { spawnSync } from "node:child_process";
 import {

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { useEffect, useState } from "react";
 import { withdrawalPageSchema } from "../../src/architecture/acknowledgements";
 import type { z } from "zod";

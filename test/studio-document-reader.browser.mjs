@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { browserExecutable, browserType } from "./browser-launch.mjs";
 // Run only after the independent review releases the shared browser resource.
 import { browserEvidence } from "./browser-evidence.mjs";

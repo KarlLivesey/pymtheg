@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Regressions for the fifth W2-B review: one reachability rule for closed dispatch
 // sets, inherited hidden methods, local/anonymous implementers, shadowed names in
 // call positions. Item numbers follow the review.

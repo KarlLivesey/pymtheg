@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // First: the same narrow warning filter as the CLI entry (a worker has its own process).
 import "./quiet-warnings.js";
 import { parentPort, workerData } from "node:worker_threads";

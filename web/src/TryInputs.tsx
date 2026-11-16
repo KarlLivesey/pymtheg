@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { useEffect, useRef, useState } from "react";
 import type { SymbolView } from "../../src/studio/protocol";
 import {

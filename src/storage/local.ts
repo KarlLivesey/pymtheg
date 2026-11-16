@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /** Local storage boundary. Feature stores own schemas, transactions and queries;
  * only this module chooses project locations and opens SQLite connections. */
 import { lstatSync, mkdirSync, writeFileSync } from "node:fs";

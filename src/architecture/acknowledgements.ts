@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { compareText } from "../shared/order.js";
 import { z } from "zod";
 const metadata = z

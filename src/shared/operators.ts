@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 export type Scalar = bigint | boolean | string | null;
 export function unary(op: string, v: Scalar): Scalar {
   if (op === "!" && typeof v === "boolean") return !v;

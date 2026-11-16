@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { Span } from "../shared/identity.js";
 import type { ProjectIR } from "../semantic/core.js";
 import { compileFlow, initialFlowStates, flowSuccessors } from "./flow.js";

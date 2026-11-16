@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { identity } from "../shared/identity-values.js";
 import { matchesGlob } from "node:path";
 import type { SourcePolicy } from "../shared/source-policy.js";

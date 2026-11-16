@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { useDraftState } from "./useDraftUpdate";
 import { searchInterfaces } from "../../src/studio/interface-search";
 import { useState, useEffect, useMemo, useRef } from "react";

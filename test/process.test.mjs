@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { randomUUID } from "node:crypto";
 import { within, processState, killFixtureGroups } from "./process-safety.mjs";
 import { controlledClock as manualClock } from "./controlled-clock.mjs";

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { possibleCalls, type PossibleCall } from "./command-possible.js";
 import type { SqliteGraphStore } from "./store.js";
 import { GraphLocations, type Located } from "./command-locations.js";

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // W3-L: the opt-in Go toolchain route. Fixtures under
 // test/fixtures/graph-go-toolchain/ are compiler-checked (Go 1.27.4):
 //   basic, config: `go build ./... && go vet ./...` pass (config also with

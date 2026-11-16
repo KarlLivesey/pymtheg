@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /** Shared authoring validation; the canonical checker still owns state semantics. */
 export function validateNumericRange(
   minimum: string,

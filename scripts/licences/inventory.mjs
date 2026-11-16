@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Licence inventory of exactly what the published Pymtheg tarball installs or
 // contains. No dependencies beyond Node and the project's own dev tools (Vite
 // is used only to read the browser bundle's real module graph).

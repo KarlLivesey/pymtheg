@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { readFileSync, readdirSync } from "node:fs";
 /** This bound reports missing evidence; it never establishes correctness. */
 export async function within(promise, waitingFor, cleanup = () => {}) {

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { identity as publicIdentity } from "../../src/shared/identity-values";
 import type { ImplementationDraft } from "../../src/studio/implementation-draft";
 import { BranchWithdrawals } from "./BranchWithdrawals";

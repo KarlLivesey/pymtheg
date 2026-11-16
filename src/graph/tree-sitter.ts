@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { createRequire } from "node:module";
 import { readFile } from "node:fs/promises";
 import {

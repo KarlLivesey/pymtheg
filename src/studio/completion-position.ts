@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { ChangeSet, Text } from "@codemirror/state";
 import type { SymbolView } from "./protocol.js";
 

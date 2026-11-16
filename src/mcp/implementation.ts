@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { implementationComparisonQuerySchema } from "../implementation/comparison-protocol.js";
 import { z } from "zod";
 import type { McpServer, CallToolResult } from "@modelcontextprotocol/server";

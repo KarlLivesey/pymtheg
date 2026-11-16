@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 /** Route only test artifacts; fixtures and application paths are unchanged. */

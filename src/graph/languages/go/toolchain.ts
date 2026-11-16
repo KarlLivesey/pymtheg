@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /**
  * The opt-in Go toolchain route (W3-L): locate the user's `go`, build the
  * standard-library helper (toolchain/golinks.go) into the rebuildable folder,

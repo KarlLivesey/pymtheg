@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { ProcessClock } from "../backends/process.js";
 import { readFile, realpath, stat } from "node:fs/promises";
 import { resolve } from "node:path";

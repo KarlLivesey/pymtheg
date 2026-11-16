@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { api } from "./api";
 import { graphPageSchema } from "../../src/implementation/protocol";

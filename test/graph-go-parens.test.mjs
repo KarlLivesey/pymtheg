@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Redundant parentheses around a type or an expression mean nothing in Go:
 // the graph must be the same with and without them (W2-B2, post-merge review
 // items 1 and 2). Every case, in both forms, passes `go build ./...` (Go

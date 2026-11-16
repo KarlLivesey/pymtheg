@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { revisionSchema } from "../architecture/schema.js";
 import { branchReview } from "../architecture/branches.js";
 import { json } from "../shared/identity.js";

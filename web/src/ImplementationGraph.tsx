@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { ImplementationReview } from "./ImplementationReview";
 import { VersionPicker } from "./VersionPicker";
 import type { ImplementationDraft } from "../../src/studio/implementation-draft";

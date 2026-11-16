@@ -2476,6 +2476,11 @@ out:** the RPL-1.5 output exception and plugin statement (removed with
 `docs/licences.md` and per-file SPDX tags follow in LIC-2; `"private": true` and
 publishing remain the owner's decisions. See [LIC-1](changes/LIC-1.md).
 
+**LIC-2 (16 November 2026):** the per-file tag is the single line
+`SPDX-License-Identifier: MIT` on first-party source files; fixtures,
+generated files, vendored grammars and `examples/` are not tagged. See
+[LIC-2](changes/LIC-2.md).
+
 ### The first planning write initialises an uninitialised project (R1-J)
 
 **Decided (R1-J, 16 November 2026):** a planning write — `pymtheg link`

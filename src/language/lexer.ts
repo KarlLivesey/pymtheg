@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { finding, type Finding, type Span } from "../shared/identity.js";
 export interface Token {
   text: string;

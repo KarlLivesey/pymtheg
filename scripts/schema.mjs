@@ -1,2 +1,3 @@
+// SPDX-License-Identifier: MIT
 import Ajv from 'ajv';import standalone from 'ajv/dist/standalone/index.js';import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
 const schema=JSON.parse(readFileSync('docs/report.schema.json','utf8'));const ajv=new Ajv({allErrors:true,code:{source:true,esm:true}});const validate=ajv.compile(schema);mkdirSync('web/src/generated',{recursive:true});writeFileSync('web/src/generated/report.js',standalone(ajv,validate));

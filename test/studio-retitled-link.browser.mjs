@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { browserExecutable, browserType } from "./browser-launch.mjs";
 // Run through the bounded headless helper once independent review releases browser use.
 import { chromium, expect as baseExpect } from "@playwright/test";

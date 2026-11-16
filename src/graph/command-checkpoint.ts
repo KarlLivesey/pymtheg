@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { createHash } from "node:crypto";
 import type { SqliteGraphStore } from "./store.js";
 import type { CapturedPath } from "./command-snapshot.js";

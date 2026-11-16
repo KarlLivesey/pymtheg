@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /** Project-relative POSIX paths. Ranges are half-open UTF-16 code-unit offsets, never bytes. */
 export interface SourceRange {
   start: number;

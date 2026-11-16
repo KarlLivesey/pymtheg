@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // R1-H: the checked-in licence inventory and notices match what the package
 // ships, nothing shipped carries a licence outside the allow-list or lacks its
 // licence text, and Pymtheg's own MIT licence is declared and stated.

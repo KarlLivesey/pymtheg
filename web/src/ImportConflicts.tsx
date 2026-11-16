@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { useState } from "react";
 import type { z } from "zod";
 import type {
