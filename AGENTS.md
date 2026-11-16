@@ -29,6 +29,13 @@
   edit). Use `$PYM_SCRATCH` for scratch, and `pymtheg-dev --name <name>
   --clean` when finished. Editing, git and `gh` stay local.
 - No package publishing or deployment without Karl's request.
+- Assume everything put into Git will be public (Karl, 16 November 2026): no
+  private project names or findings, personal details, home paths, machine
+  addresses or credentials in files, file names, branch names, commit messages
+  or pull requests. Private material that must sit in a checkout goes under
+  the ignored `/private/` or in an ignored local file, checked untracked with
+  `git status`; the ignore rule and its comment must not spell the secret.
+  Tests read private values from an ignored file and report only file and line.
 - Keep agent preview/browser access disabled. CLI/compiler checks need no browser.
   Follow Karl's pc-tools restrictions for any separately authorised browser work.
 - Use CodeGraph first if a .codegraph directory exists; do not create an index.
