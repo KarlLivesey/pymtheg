@@ -191,7 +191,7 @@ const SABOTAGES = [
     id: "unlinked-ignores-rust-links",
     what: "`unlinked` ignores links to Rust symbols (lists the linked `apply_discount`)",
     expect: ["mcp-requirement_links-unlinked"],
-    apply: (d) => patch(d, "dist/architecture/code-links.js", "linkedIds.has(s.id)) continue;", '(linkedIds.has(s.id) && s.module !== "rust")) continue;'),
+    apply: (d) => patch(d, "dist/architecture/code-links.js", /linkedIds\.has\(s\.id\)\)\s*continue;/, '(linkedIds.has(s.id) && s.module !== "rust")) continue;'),
   },
   { id: "code-graph-candidate", what: "MCP `code_graph` reports a definite caller as a candidate", expect: ["mcp-code_graph-callers-ts"], apply: (d) => patch(d, "dist/mcp/graph-view.js", "certainty: l.certainty,", 'certainty: l.certainty === "definite" ? "candidate-set" : l.certainty,') },
 ];
