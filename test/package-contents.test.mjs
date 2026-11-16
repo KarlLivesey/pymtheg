@@ -62,15 +62,20 @@ test("the package ships only user documentation from docs/", () => {
  * Private network details: RFC 1918 IPv4 addresses (10/8, 172.16/12,
  * 192.168/16) and host names ending .internal, .local or .lan, or the bare
  * name devserver. Loopback, 0.0.0.0 and documentation ranges (192.0.2.x,
- * 198.51.100.x, 203.0.113.x) are allowed. In compiled code a member access
- * such as `this.local` has the same shape as a host name, so in .js, .mjs,
- * .d.ts and .css files the host-suffix rule applies only where a host name
- * would be written: inside a string or URL (after a quote, backtick, `//` or
- * `@`) and on comment lines, where backtick code spans (code references such
- * as `data.local`) are skipped. Markdown and other text files get the full
- * rule, code spans included. The address and devserver rules apply to every
- * shipped file, first- and third-party alike; nothing in the real package
- * needed to be exempted.
+ * 198.51.100.x, 203.0.113.x) are allowed. The address and devserver rules
+ * apply to every line of every shipped file. The host-suffix rule:
+ * - text files (Markdown, JSON, HTML, LICENSE, notices): every line;
+ * - first-party compiled output (`dist/`, not minified): the whole content of
+ *   every string literal, template literal and comment, trailing comments
+ *   included; `${...}` interpolations are code and are blanked, and one
+ *   precise exception skips the code span `data.local` (a symbol field named
+ *   in the Go extractor's doc comments);
+ * - the minified third-party bundle (`dist-web/assets/`): only right after a
+ *   quote, backtick, `//` or `@`, or on a comment line (with backtick code
+ *   spans skipped), because member accesses such as `this.local` and
+ *   `data.local` code spans have the same shape as host names; an "anywhere in
+ *   a string" rule gives about eight false hits there.
+ * No shipped file is exempted.
  */
 const octet = "(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)";
 // A whole dotted quad: not part of a longer number or version string.
@@ -96,18 +101,40 @@ test("the private project rule matches the names, not the ordinary word tiered",
   for (const text of ["tiered pricing", "a three-tiered cache", "untiered"])
     assert.doesNotMatch(text, privateProjectName, text);
 });
+/** String literals, template literals and comments (trailing ones included). */
+const literalOrComment =
+  /"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`|\/\/[^\n]*|\/\*[\s\S]*?\*\//g;
 function networkFindings(path, text) {
   const code = /\.(m?js|d\.ts|css)$/.test(path);
   const found = [];
+  // First-party compiled output (dist/, not minified): the whole content of
+  // every string, template literal and comment is checked as text. A template
+  // literal's `${...}` interpolations are code, not text, and are blanked.
+  // One precise exception: the code span `data.local` in the Go extractor's doc
+  // comments names the symbol field `data.local`, not a host.
+  const firstParty = code && path.startsWith("dist/");
+  if (firstParty)
+    for (const m of text.matchAll(literalOrComment)) {
+      const content = m[0]
+        .replace(/^`[\s\S]*`$/, (t) => t.replace(/\$\{[^}]*\}/g, " "))
+        .replaceAll("`data.local`", " ")
+        .slice(1);
+      if (textHost.test(content))
+        found.push(
+          `${path}:${text.slice(0, m.index).split("\n").length}: private host name`,
+        );
+    }
   text.split("\n").forEach((line, i) => {
     const comment = /^\s*(\/\/|\/?\*)/.test(line);
     if (privateIPv4.test(line))
       found.push(`${path}:${i + 1}: private IPv4 address`);
-    const host = code
-      ? comment
-        ? textHost.test(line.replace(/`[^`]*`/g, " "))
-        : codeHost.test(line)
-      : textHost.test(line);
+    const host = firstParty
+      ? false
+      : code
+        ? comment
+          ? textHost.test(line.replace(/`[^`]*`/g, " "))
+          : codeHost.test(line)
+        : textHost.test(line);
     if (host) found.push(`${path}:${i + 1}: private host name`);
     if (devserver.test(line))
       found.push(`${path}:${i + 1}: devserver host name`);
@@ -147,7 +174,7 @@ test("the private network rules fire on each private form and allow public, loop
     "// see private-box.internal for logs",
     " * reachable at nas.local only",
   ])
-    assert.ok(fires("dist/x.js", text), text);
+    assert.ok(fires("dist-web/assets/x.js", text), text);
   for (const text of [
     "listen on 127.0.0.1 or 0.0.0.0",
     "example 192.0.2.10, 198.51.100.7 and 203.0.113.5",
@@ -160,6 +187,22 @@ test("the private network rules fire on each private form and allow public, loop
     "the local cache",
   ])
     assert.ok(!fires("README.md", text), text);
+  // Sol round 3: ordinary help/error strings and trailing comments in first-party dist/.
+  for (const text of [
+    'throw Error("Connect to private-box.internal for logs");',
+    'const hint = "ssh build.lan";',
+    'log("Contact nas.local");',
+    "throw Error(`Cannot reach ${user} on box.internal`);",
+    'help("use the NAS (nas.local) for logs");',
+    "connect(); // was nas.local",
+  ])
+    assert.ok(fires("dist/cli/x.js", text), text);
+  // In first-party dist/, interpolations and the `data.local` code span are code.
+  for (const text of [
+    "const key = `${place.file}|${place.local}`;",
+    "/** symbol's name and identity, `data.local`); package-level types */",
+  ])
+    assert.ok(!fires("dist/graph/x.js", text), text);
   for (const text of [
     "this.local = initial;",
     "const found = this.local(name);",
@@ -168,7 +211,7 @@ test("the private network rules fire on each private form and allow public, loop
     "if(e.local)return",
     " * symbol's name and identity, `data.local`); package-level types",
   ])
-    assert.ok(!fires("dist/x.js", text), text);
+    assert.ok(!fires("dist-web/assets/x.js", text), text);
 });
 test("no shipped file carries a personal path, the owner's name or a private project name", () => {
   const offences = [];

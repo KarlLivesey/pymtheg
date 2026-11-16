@@ -5,7 +5,11 @@
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
-import { root } from "./inventory.mjs";
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+// Computed here, not imported from inventory.mjs, which imports this module.
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 function decode(segment) {
@@ -25,6 +29,25 @@ function decode(segment) {
     }
   }
   return out;
+}
+/**
+ * Original 0-based source lines that emitted code maps to, per source index:
+ * a line whose code was tree-shaken away has no segment pointing at it.
+ */
+export function mappedOriginalLines(mappings) {
+  const lines = new Map();
+  let source = 0,
+    line = 0;
+  for (const generated of mappings.split(";"))
+    for (const s of generated.split(",").filter(Boolean)) {
+      const f = decode(s);
+      if (f.length < 4) continue;
+      source += f[1];
+      line += f[2];
+      if (!lines.has(source)) lines.set(source, new Set());
+      lines.get(source).add(line);
+    }
+  return lines;
 }
 /** For each generated line: [[startColumn, sourceIndex | -1], ...]. */
 function segments(mappings) {

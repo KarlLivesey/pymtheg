@@ -13,7 +13,7 @@ vendored code is fixed inside the tarball.
 
 **Pymtheg is MIT licensed;** see `LICENSE`.
 
-All shipped third-party components are declared under MIT, Apache-2.0, BSD-3-Clause or ISC. These licences permit redistribution inside an MIT-licensed package provided their notices are kept, which `THIRD-PARTY-NOTICES` does. Licences embedded inside some of those packages are listed below and travel in `THIRD-PARTY-NOTICES` with their packages' notices. Separately, 3 comments in bundled source files say that some material was copied or adapted from public sources that publish under other licences, without carrying a notice to reproduce; they are listed under "Provenance notes in bundled code" for review.
+All shipped third-party components are declared under MIT, Apache-2.0, BSD-3-Clause or ISC. These licences permit redistribution inside an MIT-licensed package provided their notices are kept, which `THIRD-PARTY-NOTICES` does. Licences embedded inside some of those packages are listed below and travel in `THIRD-PARTY-NOTICES` with their packages' notices. Separately, a wording scan of the bundled source files found 18 comments saying that some material was copied, ported, adapted or taken from other sources, without a notice to reproduce; they are listed under "Provenance notes in bundled code". The scan cannot prove that nothing else was copied.
 
 ## Summary
 
@@ -56,16 +56,38 @@ cover parts of the package, such as code or data it took from other projects or 
 
 ## Provenance notes in bundled code
 
-Comments in bundled source files that say material was copied or adapted from a public source,
-where the comment carries no licence notice of its own. They are reviewed and pinned in
-`scripts/licences/inventory.mjs` (`embeddedNotices`), listed here for the owner's attention; this
-inventory does not judge whether they need anything further.
+A wording scan of the comments in every bundled source file with code in `dist-web/` found the
+comments below, which say that material was copied, ported, adapted or taken from another source
+without carrying a licence notice of their own. The scan looks for derivative-work wording
+("derivative work", "copied from", "port of", "ported from", "adapted from"), a provenance phrase
+("based on", "adapted from", "taken from", "copied from", "derived from", "from", "Source:")
+directly followed by a URL, a comment that begins with a URL other than an issue, pull-request or
+bug link, and `@license` banners that name no copyright holder. It lists what it found; it cannot
+prove that nothing else was copied. Each entry is reviewed and pinned in
+`scripts/licences/inventory.mjs` (`embeddedNotices`); a new or changed comment of these kinds
+fails `test/licences.test.mjs` until reviewed. Whether the code after a comment ships is read
+from the bundle's source map. This inventory does not judge whether any of them needs more.
 
-| Component | File | What | From | Licence of the source |
-|---|---|---|---|---|
-| micromark-util-html-tag-name@2.0.1 | micromark-util-html-tag-name/index.js | the list of HTML block tag names | the CommonMark specification (spec.commonmark.org) | the specification is published under a Creative Commons Attribution-ShareAlike licence |
-| micromark-util-html-tag-name@2.0.1 | micromark-util-html-tag-name/index.js | the list of HTML raw tag names | the CommonMark specification (spec.commonmark.org) | the specification is published under a Creative Commons Attribution-ShareAlike licence |
-| zod@4.2.0 | zod/v4/core/regexes.js | a regular expression | a Stack Overflow answer (https://stackoverflow.com/a/3143231) | Stack Overflow content is published under a Creative Commons Attribution-ShareAlike licence |
+| Component | File:line | The comment says | Code after it ships | Source | Licence of the source |
+|---|---|---|---|---|---|
+| @marijn/find-cluster-break@1.0.4 | @marijn/find-cluster-break/src/index.js:11 | Compressed representation of the Grapheme_Cluster_Break=Extend information from http://www.unicode.org/Public/17.0.0/ucd/auxiliary/GraphemeBreakProperty.txt. Each pair of elements represents a range, as an offet from … | yes | Unicode Character Database data (GraphemeBreakProperty.txt) | Unicode data files are published under the Unicode licence |
+| inline-style-parser@0.2.9 | inline-style-parser/esm/index.mjs:2 | http://www.w3.org/TR/CSS21/grammar.html https://github.com/visionmedia/css-parse/pull/49#issuecomment-30088027 | yes | the CSS 2.1 grammar (W3C) and a css-parse pull request | licence not stated |
+| micromark-extension-gfm-autolink-literal@2.1.0 | micromark-extension-gfm-autolink-literal/lib/syntax.js:156 | In email domain. The reference code is a bit overly complex as it handles the `@`, of which there may be just one. Source: <https://github.com/github/cmark-gfm/blob/ef1cfcb/extensions/autolink.c#L318> ```markdown > \|… | yes | GitHub's cmark-gfm autolink extension (reference implementation) | licence not stated |
+| micromark-extension-gfm-autolink-literal@2.1.0 | micromark-extension-gfm-autolink-literal/lib/syntax.js:207 | Domain must not be empty, must include a dot, and must end in alphabetical. Source: <https://github.com/github/cmark-gfm/blob/ef1cfcb/extensions/autolink.c#L332>. | yes | GitHub's cmark-gfm autolink extension (reference implementation) | licence not stated |
+| micromark-extension-gfm-autolink-literal@2.1.0 | micromark-extension-gfm-autolink-literal/lib/syntax.js:488 | GH documents that only alphanumerics (other than `-`, `.`, and `_`) can occur, which sounds like ASCII only, but they also support `www.點看.com`, so that’s Unicode. Instead of some new production for Unicode alphanumer… | yes | GitHub's cmark-gfm autolink extension (reference implementation) | licence not stated |
+| micromark-extension-gfm-autolink-literal@2.1.0 | micromark-extension-gfm-autolink-literal/lib/syntax.js:815 | Do not allow a slash “inside” atext. The reference code is a bit weird, but that’s what it results in. Source: <https://github.com/github/cmark-gfm/blob/ef1cfcb/extensions/autolink.c#L307>. Other than slash, every pre… | yes | GitHub's cmark-gfm autolink extension (reference implementation) | licence not stated |
+| micromark-extension-gfm-table@2.1.2 | micromark-extension-gfm-table/lib/edit-map.js:6 | Port of `edit_map.rs` from `markdown-rs`. This should move to `markdown-js` later. | yes | markdown-rs `edit_map.rs` (same author) | licence not stated |
+| micromark-util-edit-map@1.0.0 | micromark-util-edit-map/index.js:25 | Tracks a bunch of edits. Port of `edit_map.rs` from `markdown-rs`: <https://github.com/wooorm/markdown-rs/blob/1506572f/src/util/edit_map.rs>. Deal with several changes in events, batching them together. Preferably, c… | yes | markdown-rs `edit_map.rs` (same author) | licence not stated |
+| micromark-util-html-tag-name@2.0.1 | micromark-util-html-tag-name/index.js:15 | List of lowercase HTML “block” tag names. The list, when parsing HTML (flow), results in more relaxed rules (condition 6). Because they are known blocks, the HTML-like syntax doesn’t have to be strictly parsed. For ta… | yes | the CommonMark specification | the CommonMark specification is published under a Creative Commons Attribution-ShareAlike licence |
+| micromark-util-html-tag-name@2.0.1 | micromark-util-html-tag-name/index.js:92 | List of lowercase HTML “raw” tag names. The list, when parsing HTML (flow), results in HTML that can include lines without exiting, until a closing tag also in this list is found (condition 1). This module is copied f… | yes | the CommonMark specification | the CommonMark specification is published under a Creative Commons Attribution-ShareAlike licence |
+| vfile@6.0.3 | vfile/lib/minproc.browser.js:3 | Somewhat based on: <https://github.com/defunctzombie/node-process/blob/master/browser.js>. But I don’t think one tiny line of code can be copyrighted. 😅 | yes | node-process `browser.js` | MIT |
+| vfile@6.0.3 | vfile/lib/minurl.shared.js:19 | From: <https://github.com/nodejs/node/blob/6a3403c/lib/internal/url.js#L720> | yes | Node.js `lib/internal/url.js` | MIT (Node.js licence) |
+| zod@4.2.0 | zod/v4/core/regexes.js:27 | Equivalent to the HTML5 input[type=email] validation implemented by browsers. Source: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input/email | no | MDN Web Docs (HTML email input validation) | licence not stated |
+| zod@4.2.0 | zod/v4/core/regexes.js:35 | from https://thekevinscott.com/emojis-in-javascript/#writing-a-regular-expression | yes | a blog post by Kevin Scott (emoji regular expression) | licence not stated |
+| zod@4.2.0 | zod/v4/core/regexes.js:48 | https://stackoverflow.com/questions/7860392/determine-if-string-is-in-base64-using-javascript | yes | a Stack Overflow question (base64 regular expression) | Stack Overflow content is published under a Creative Commons Attribution-ShareAlike licence |
+| zod@4.2.0 | zod/v4/core/regexes.js:52 | based on https://stackoverflow.com/questions/106179/regular-expression-to-match-dns-hostname-or-ip-address export const hostname: RegExp = /^([a-zA-Z0-9-]+\.)*[a-zA-Z0-9-]+$/; | no | a Stack Overflow question (host name regular expression) | Stack Overflow content is published under a Creative Commons Attribution-ShareAlike licence |
+| zod@4.2.0 | zod/v4/core/regexes.js:55 | https://blog.stevenlevithan.com/archives/validate-phone-number#r4-3 (regex sans spaces) | yes | a blog post by Steven Levithan (E.164 phone number regular expression) | licence not stated |
+| zod@4.2.0 | zod/v4/core/regexes.js:74 | Adapted from https://stackoverflow.com/a/3143231 | yes | a Stack Overflow answer | Stack Overflow content is published under a Creative Commons Attribution-ShareAlike licence |
 
 ## Code written by the build tools
 

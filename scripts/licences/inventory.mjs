@@ -115,29 +115,161 @@ export const embeddedNotices = {
     {
       provenance: {
         match: "This is copied from:\n<https://spec.commonmark.org",
-        what: "the list of HTML block tag names",
-        from: "the CommonMark specification (spec.commonmark.org)",
-        publishedUnder:
-          "the specification is published under a Creative Commons Attribution-ShareAlike licence",
+        from: "the CommonMark specification",
+        licence:
+          "the CommonMark specification is published under a Creative Commons Attribution-ShareAlike licence",
       },
     },
     {
       provenance: {
         match: "This module is copied from:\n<https://spec.commonmark.org",
-        what: "the list of HTML raw tag names",
-        from: "the CommonMark specification (spec.commonmark.org)",
-        publishedUnder:
-          "the specification is published under a Creative Commons Attribution-ShareAlike licence",
+        from: "the CommonMark specification",
+        licence:
+          "the CommonMark specification is published under a Creative Commons Attribution-ShareAlike licence",
+      },
+    },
+  ],
+  "micromark-extension-gfm-autolink-literal/lib/syntax.js": [
+    {
+      provenance: {
+        match:
+          "Source: <https://github.com/github/cmark-gfm/blob/ef1cfcb/extensions/autolink.c#L318>",
+        from: "GitHub's cmark-gfm autolink extension (reference implementation)",
+        licence: "licence not stated",
+      },
+    },
+    {
+      provenance: {
+        match:
+          "Source: <https://github.com/github/cmark-gfm/blob/ef1cfcb/extensions/autolink.c#L332>",
+        from: "GitHub's cmark-gfm autolink extension (reference implementation)",
+        licence: "licence not stated",
+      },
+    },
+    {
+      provenance: {
+        match:
+          "Source: <https://github.com/github/cmark-gfm/blob/ef1cfcb/extensions/autolink.c#L12>",
+        from: "GitHub's cmark-gfm autolink extension (reference implementation)",
+        licence: "licence not stated",
+      },
+    },
+    {
+      provenance: {
+        match:
+          "Source: <https://github.com/github/cmark-gfm/blob/ef1cfcb/extensions/autolink.c#L307>",
+        from: "GitHub's cmark-gfm autolink extension (reference implementation)",
+        licence: "licence not stated",
+      },
+    },
+  ],
+  "micromark-extension-gfm-table/lib/edit-map.js": [
+    {
+      provenance: {
+        match: "Port of `edit_map.rs` from `markdown-rs`.",
+        from: "markdown-rs `edit_map.rs` (same author)",
+        licence: "licence not stated",
+      },
+    },
+  ],
+  "micromark-util-edit-map/index.js": [
+    {
+      provenance: {
+        match:
+          "Port of `edit_map.rs` from `markdown-rs`:\n<https://github.com/wooorm/markdown-rs/blob/1506572f/src/util/edit_map.rs>",
+        from: "markdown-rs `edit_map.rs` (same author)",
+        licence: "licence not stated",
+      },
+    },
+  ],
+  "inline-style-parser/esm/index.mjs": [
+    {
+      provenance: {
+        match:
+          "http://www.w3.org/TR/CSS21/grammar.html\nhttps://github.com/visionmedia/css-parse/pull/49",
+        from: "the CSS 2.1 grammar (W3C) and a css-parse pull request",
+        licence: "licence not stated",
+      },
+    },
+  ],
+  "@marijn/find-cluster-break/src/index.js": [
+    {
+      provenance: {
+        match:
+          "information from\nhttp://www.unicode.org/Public/17.0.0/ucd/auxiliary/GraphemeBreakProperty.txt",
+        from: "Unicode Character Database data (GraphemeBreakProperty.txt)",
+        licence: "Unicode data files are published under the Unicode licence",
+      },
+    },
+  ],
+  "vfile/lib/minproc.browser.js": [
+    {
+      provenance: {
+        match:
+          "Somewhat based on:\n<https://github.com/defunctzombie/node-process/blob/master/browser.js>",
+        from: "node-process `browser.js`",
+        licence: "MIT",
+      },
+    },
+  ],
+  "vfile/lib/minurl.shared.js": [
+    {
+      provenance: {
+        match:
+          "From: <https://github.com/nodejs/node/blob/6a3403c/lib/internal/url.js#L720>",
+        from: "Node.js `lib/internal/url.js`",
+        licence: "MIT (Node.js licence)",
       },
     },
   ],
   "zod/v4/core/regexes.js": [
     {
       provenance: {
+        match:
+          "Source: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input/email",
+        from: "MDN Web Docs (HTML email input validation)",
+        licence: "licence not stated",
+      },
+    },
+    {
+      provenance: {
+        match:
+          "from https://thekevinscott.com/emojis-in-javascript/#writing-a-regular-expression",
+        from: "a blog post by Kevin Scott (emoji regular expression)",
+        licence: "licence not stated",
+      },
+    },
+    {
+      provenance: {
+        match:
+          "https://stackoverflow.com/questions/7860392/determine-if-string-is-in-base64-using-javascript",
+        from: "a Stack Overflow question (base64 regular expression)",
+        licence:
+          "Stack Overflow content is published under a Creative Commons Attribution-ShareAlike licence",
+      },
+    },
+    {
+      provenance: {
+        match:
+          "based on https://stackoverflow.com/questions/106179/regular-expression-to-match-dns-hostname-or-ip-address",
+        from: "a Stack Overflow question (host name regular expression)",
+        licence:
+          "Stack Overflow content is published under a Creative Commons Attribution-ShareAlike licence",
+      },
+    },
+    {
+      provenance: {
+        match:
+          "https://blog.stevenlevithan.com/archives/validate-phone-number#r4-3",
+        from: "a blog post by Steven Levithan (E.164 phone number regular expression)",
+        licence: "licence not stated",
+      },
+    },
+    {
+      provenance: {
         match: "Adapted from https://stackoverflow.com/a/3143231",
-        what: "a regular expression",
-        from: "a Stack Overflow answer (https://stackoverflow.com/a/3143231)",
-        publishedUnder:
+        from: "a Stack Overflow answer",
+        licence:
           "Stack Overflow content is published under a Creative Commons Attribution-ShareAlike licence",
       },
     },
@@ -145,13 +277,36 @@ export const embeddedNotices = {
 };
 // Wording that says code came from elsewhere ("derived from the old state" in
 // ordinary documentation prose must not count).
+/**
+ * What the notice scan looks for in the comments of bundled source files (a
+ * wording scan; it cannot prove that nothing else was copied):
+ * - a copyright line naming a holder;
+ * - an `@license` banner that names no copyright holder;
+ * - derivative-work wording: "derivative work", "which is licensed",
+ *   "copied from", "port of", "ported from", "adapted from", or
+ *   "code/file/implementation/portions/parts … derived/taken/copied/adapted from";
+ * - a provenance phrase directly followed by a URL (optionally after a colon or
+ *   a line break): "based on", "adapted from", "taken from", "copied from",
+ *   "derived from", "from" or "Source:";
+ * - a comment that begins with a URL, unless it is an issue, pull request or
+ *   bug link (`/issues/`, `/pull/`, `/pulls/`, `/bug/`, `/bugs/`).
+ * Ordinary prose such as "based on the current stack" or "derived from the old
+ * state" does not match.
+ */
 const derivativeWords =
-  /derivative work|which is licensed|\b(?:ported|adapted|copied) from\b|\b(?:code|file|implementation|portions?|parts?) (?:is |are |was |were )?(?:derived|taken|copied|adapted) from\b/i;
+  /derivative work|which is licensed|\b(?:copied|ported|adapted) from\b|\bport of\b|\b(?:code|file|implementation|portions?|parts?) (?:is |are |was |were )?(?:derived|taken|copied|adapted) from\b/i;
+const sourceReference =
+  /\b(?:based on|adapted from|taken from|copied from|derived from|from|source)\s*:?\s*<?https?:\/\//i;
+const leadingUrl =
+  /^<?https?:\/\/(?![^\s>]*\/(?:issues|pull|pulls|bugs?)\/)[^\s>]+/i;
 const noticeTrigger = new RegExp(
-  `copyright\\b|\\(c\\)\\s|©|@license|${derivativeWords.source}`,
+  `copyright\\b|\\(c\\)\\s|©|@license|https?:\\/\\/|${derivativeWords.source}`,
   "i",
 );
-/** Comments in a source file that look like copyright or licence notices. */
+/**
+ * Comments in a source file that look like copyright, licence or provenance
+ * notices, with the 1-based line of their last line.
+ */
 export function sourceNotices(source) {
   const out = [];
   for (const m of source.matchAll(
@@ -173,8 +328,16 @@ export function sourceNotices(source) {
       .filter((l) => /^(copyright\b|\(c\)\s|©)/i.test(l))
       .map(holder)
       .filter((h) => h.length >= 3);
-    const derivative = derivativeWords.test(text);
-    if (holders.length || derivative) out.push({ text, holders, derivative });
+    const derivative =
+      derivativeWords.test(text) ||
+      sourceReference.test(text) ||
+      leadingUrl.test(text) ||
+      (/@license/i.test(text) && !holders.length);
+    const line = source
+      .slice(0, m.index + m[0].trimEnd().length)
+      .split("\n").length;
+    if (holders.length || derivative)
+      out.push({ text, holders, derivative, line });
   }
   return out;
 }
@@ -217,6 +380,7 @@ export function reviewEmbedded(key, notice, host) {
           provenance: {
             component: `${host.name}@${host.version}`,
             file: key,
+            line: notice.line,
             ...review.provenance,
             note: notice.text,
           },
@@ -506,13 +670,26 @@ async function bundled() {
   const provenance = [];
   const { build } = await import("vite");
   const modules = new Set();
+  const { mappedOriginalLines } = await import("./bundle-origins.mjs");
+  // Original source lines (0-based) that emitted code maps to, per absolute file.
+  const shipped = new Map();
   const capture = {
     name: "pymtheg-licence-inventory",
-    generateBundle(_options, bundle) {
+    generateBundle(options, bundle) {
       for (const chunk of Object.values(bundle))
-        if (chunk.type === "chunk")
+        if (chunk.type === "chunk") {
           for (const [id, info] of Object.entries(chunk.modules))
             if (info.renderedLength > 0) modules.add(id);
+          if (!chunk.map) continue;
+          const base = join(options.dir, dirname(chunk.fileName));
+          for (const [index, lines] of mappedOriginalLines(
+            chunk.map.mappings,
+          )) {
+            const file = resolve(base, chunk.map.sources[index]);
+            if (!shipped.has(file)) shipped.set(file, new Set());
+            for (const l of lines) shipped.get(file).add(l);
+          }
+        }
     },
   };
   const outDir = await mkdtemp(join(tmpdir(), "pymtheg-licence-bundle-"));
@@ -522,7 +699,7 @@ async function bundled() {
       configLoader: "runner",
       logLevel: "silent",
       plugins: [capture],
-      build: { write: false, outDir, emptyOutDir: false },
+      build: { write: false, outDir, emptyOutDir: false, sourcemap: true },
     });
   } finally {
     await rm(outDir, { recursive: true, force: true });
@@ -591,8 +768,20 @@ async function bundled() {
       )) {
         const reviewed = reviewEmbedded(key, notice, component);
         if (reviewed.problem) component.preProblems.push(reviewed.problem);
-        else if (reviewed.provenance) provenance.push(reviewed.provenance);
-        else out.push(...reviewed.components);
+        else if (reviewed.provenance) {
+          // Does the code right after the comment reach the bundle?
+          const lines = (await readFile(file, "utf8")).split("\n");
+          let code = reviewed.provenance.line;
+          while (
+            code < lines.length &&
+            (!lines[code].trim() || /^\s*(\/\/|\/\*|\*)/.test(lines[code]))
+          )
+            code++;
+          provenance.push({
+            ...reviewed.provenance,
+            ships: shipped.get(resolve(file))?.has(code) ? "yes" : "no",
+          });
+        } else out.push(...reviewed.components);
       }
     }
   }
@@ -818,7 +1007,7 @@ export async function collect() {
         : 1,
   );
   const provenance = bundle.provenance.sort((a, b) =>
-    a.file === b.file ? (a.what < b.what ? -1 : 1) : a.file < b.file ? -1 : 1,
+    a.file === b.file ? a.line - b.line : a.file < b.file ? -1 : 1,
   );
   return {
     components,
@@ -886,9 +1075,10 @@ export async function render(data) {
             " those packages are listed below and travel in `THIRD-PARTY-NOTICES` with their packages'" +
             " notices." +
             (provenance.length
-              ? ` Separately, ${provenance.length} comments in bundled source files say that some material was` +
-                " copied or adapted from public sources that publish under other licences, without carrying a" +
-                ' notice to reproduce; they are listed under "Provenance notes in bundled code" for review.'
+              ? ` Separately, a wording scan of the bundled source files found ${provenance.length} comments saying that` +
+                " some material was copied, ported, adapted or taken from other sources, without a notice to" +
+                ' reproduce; they are listed under "Provenance notes in bundled code". The scan cannot prove' +
+                " that nothing else was copied."
               : ""),
         ]
       : [
@@ -997,21 +1187,30 @@ export async function render(data) {
   md.push(
     "## Provenance notes in bundled code",
     "",
-    "Comments in bundled source files that say material was copied or adapted from a public source,",
-    "where the comment carries no licence notice of its own. They are reviewed and pinned in",
-    "`scripts/licences/inventory.mjs` (`embeddedNotices`), listed here for the owner's attention; this",
-    "inventory does not judge whether they need anything further.",
+    "A wording scan of the comments in every bundled source file with code in `dist-web/` found the",
+    "comments below, which say that material was copied, ported, adapted or taken from another source",
+    "without carrying a licence notice of their own. The scan looks for derivative-work wording",
+    '("derivative work", "copied from", "port of", "ported from", "adapted from"), a provenance phrase',
+    '("based on", "adapted from", "taken from", "copied from", "derived from", "from", "Source:")',
+    "directly followed by a URL, a comment that begins with a URL other than an issue, pull-request or",
+    "bug link, and `@license` banners that name no copyright holder. It lists what it found; it cannot",
+    "prove that nothing else was copied. Each entry is reviewed and pinned in",
+    "`scripts/licences/inventory.mjs` (`embeddedNotices`); a new or changed comment of these kinds",
+    "fails `test/licences.test.mjs` until reviewed. Whether the code after a comment ships is read",
+    "from the bundle's source map. This inventory does not judge whether any of them needs more.",
     "",
   );
   if (provenance.length) {
     md.push(
-      "| Component | File | What | From | Licence of the source |",
-      "|---|---|---|---|---|",
+      "| Component | File:line | The comment says | Code after it ships | Source | Licence of the source |",
+      "|---|---|---|---|---|---|",
     );
-    for (const p of provenance)
+    for (const p of provenance) {
+      const said = p.note.replace(/\s+/g, " ").replace(/\|/g, "\\|");
       md.push(
-        `| ${p.component} | ${p.file} | ${p.what} | ${p.from} | ${p.publishedUnder} |`,
+        `| ${p.component} | ${p.file}:${p.line} | ${said.length > 220 ? said.slice(0, 217) + "…" : said} | ${p.ships} | ${p.from.replace(/\|/g, "\\|")} | ${p.licence} |`,
       );
+    }
   } else md.push("None.");
   md.push("");
   md.push(

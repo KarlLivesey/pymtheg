@@ -325,13 +325,17 @@ test("provenance notes in bundled files are reviewed, and a changed note blocks"
   const zod = readFileSync("node_modules/zod/v4/core/regexes.js", "utf8");
   const licence = [readFileSync("node_modules/zod/LICENSE", "utf8")];
   const notices = uncoveredNotices(zod, licence);
-  assert.equal(notices.length, 1);
-  const { provenance } = reviewEmbedded(
-    "zod/v4/core/regexes.js",
-    notices[0],
-    host,
+  assert.equal(notices.length, 6);
+  const reviewed = notices.map(
+    (n) => reviewEmbedded("zod/v4/core/regexes.js", n, host).provenance,
   );
-  assert.match(provenance.from, /stackoverflow\.com\/a\/3143231/);
+  assert.ok(reviewed.every(Boolean));
+  assert.ok(
+    reviewed.some(
+      (p) =>
+        /3143231/.test(p.match) && /Attribution-ShareAlike/.test(p.licence),
+    ),
+  );
   const changed = {
     ...notices[0],
     text: "Adapted from https://example.com/other",
@@ -340,4 +344,35 @@ test("provenance notes in bundled files are reviewed, and a changed note blocks"
     reviewEmbedded("zod/v4/core/regexes.js", changed, host).problem,
     /no longer matches its review/,
   );
+});
+test("the notice scan's wording rules: what counts as a provenance note", () => {
+  const found = (comment) =>
+    uncoveredNotices(comment + "\nexport {};", []).length;
+  for (const comment of [
+    "// Somewhat based on:\n// <https://github.com/x/y/blob/main/a.js>.",
+    "// based on https://stackoverflow.com/questions/1/x",
+    "// from https://example.com/post#regex",
+    "/** Equivalent to X. Source: https://developer.mozilla.org/x */",
+    "// https://stackoverflow.com/questions/2/y",
+    "// https://blog.example.com/archives/p#r4 (regex sans spaces)",
+    "// Port of `x.rs` from `y`.",
+    "/*! @license MIT */",
+    "// A derivative work based on: x",
+  ])
+    assert.equal(found(comment), 1, comment);
+  for (const comment of [
+    "/** Check if a pattern is in scope based on the current stack. */",
+    "/** Reset when the new state isn't derived from the old state. */",
+    "// The tree that this fragment is based on.",
+    "// https://github.com/x/y/issues/414",
+    "// See https://github.com/codemirror/dev/issues/414",
+    "// Note: <https://github.com/github/cmark-gfm/issues/279>",
+    "/** @license React\n * Copyright (c) Someone */",
+  ])
+    assert.equal(
+      uncoveredNotices(comment + "\nexport {};", ["Copyright (c) Someone"])
+        .length,
+      0,
+      comment,
+    );
 });

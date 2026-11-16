@@ -44,14 +44,16 @@ which `THIRD-PARTY-NOTICES` does.
 
 ### Summary (after the dependency moves in B.5)
 
-101 shipped third-party components: 10 installed npm packages, 86 packages
+103 shipped third-party components: 10 installed npm packages, 86 packages
 bundled into `dist-web/`, 3 origins of code the build tools write into
 `dist-web/` themselves (`@rollup/plugin-commonjs` 28.0.6, Rollup 4.68.0, Vite
-7.2.2; all MIT), 2 vendored grammars.
+7.2.2; all MIT), 2 origins embedded inside a bundled package (path-browserify
+and Node.js `lib/path.js` in vfile; both MIT), 2 vendored grammars. In addition
+a wording scan of the bundled sources lists 18 reviewed provenance notes (round 3).
 
 | Licence (as declared) | Components | Which |
 |---|---:|---|
-| MIT | 96 | everything not listed below, incl. both vendored grammars, the three build-tool origins, React, CodeMirror, unified/remark, ajv, zod, web-tree-sitter |
+| MIT | 98 | everything not listed below, incl. both vendored grammars, the three build-tool origins, the two origins embedded in vfile, React, CodeMirror, unified/remark, ajv, zod, web-tree-sitter |
 | Apache-2.0 | 3 | `typescript` (also ships `ThirdPartyNoticeText.txt`, included), `@modelcontextprotocol/server`, `@modelcontextprotocol/core` |
 | BSD-3-Clause | 1 | `fast-uri` (via ajv) |
 | ISC | 1 | `@ungap/structured-clone` (bundled) |
@@ -360,7 +362,8 @@ ordinary words and real member accesses do not. Sol's reproduction (appending
    (React's `@license React` headers are covered this way). Anything else
    blocks unless a pinned review entry (`embeddedNotices`) covers it: either
    origins (split into one notice per origin, each pinned to its copyright line)
-   or a provenance note. The check found three provenance notes and they are
+   or a provenance note. In round 2 the check found three provenance notes (round 3
+   widened the wording and found 18 in all; see below), and they are
    reviewed and listed in a new "Provenance notes in bundled code" section for
    the owner: `micromark-util-html-tag-name` (two lists of HTML tag names copied
    from the CommonMark specification, published under a Creative Commons
@@ -386,4 +389,51 @@ ordinary words and real member accesses do not. Sol's reproduction (appending
 Counts after round 2: 103 shipped components (10 installed npm packages, 86
 bundled packages, 3 build-tool origins, 2 origins embedded in a bundled
 package, 2 vendored grammars): 98 MIT, 3 Apache-2.0, 1 BSD-3-Clause, 1 ISC;
-plus 3 reviewed provenance notes.
+plus 3 reviewed provenance notes (18 after round 3).
+
+## Round 3 review (Opus, Sol): provenance wording, figures, first-party host names
+
+1. **Wider provenance scan** (Opus). The notice scan of bundled source files
+   now also matches a provenance phrase directly followed by a URL (optionally
+   after a colon or line break: "based on", "adapted from", "taken from",
+   "copied from", "derived from", "from", "Source:"), "port of" anywhere, a
+   comment that begins with a URL other than an issue, pull-request or bug link
+   (`/issues/`, `/pull/`, `/pulls/`, `/bug/`, `/bugs/`), and `@license` banners
+   that name no copyright holder. Plain "based on" anywhere matched ordinary
+   prose ("based on the current stack", "the tree this fragment is based on")
+   and is not used. The scan found 18 provenance notes, now all reviewed and
+   pinned; `docs/licences.md` lists each with the component, file and line, the
+   comment, whether the code after it ships (read from the bundle's source
+   map), the source and the source's licence ("licence not stated" where it is
+   not). New: vfile `minproc.browser.js` (node-process, MIT) and
+   `minurl.shared.js` (Node.js `lib/internal/url.js`, MIT); zod `regexes.js`
+   lines 27 (MDN; does not ship), 35 (emoji regex blog post; ships), 48 (Stack
+   Overflow, base64; ships), 52 (Stack Overflow, host name; does not ship), 55
+   (Steven Levithan's blog, E.164; ships); four comments in
+   `micromark-extension-gfm-autolink-literal` citing GitHub's cmark-gfm as the
+   reference implementation; two micromark ports of `markdown-rs` `edit_map.rs`
+   (same author); `inline-style-parser` (CSS 2.1 grammar and a css-parse pull
+   request); `@marijn/find-cluster-break` (Unicode Character Database data,
+   Unicode licence). The section and the compatibility paragraph now say this
+   is a wording scan that lists what it found and cannot prove that nothing
+   else was copied, and say exactly what it looks for. Tests cover each wording
+   rule firing and the prose and issue-link shapes not firing.
+2. **Stale figures** (Sol A). The summary above and the PR description state
+   103 components and 98 MIT (earlier rounds said 101 and 96).
+3. **Host names in first-party compiled code** (Sol B). In `dist/` (first-party,
+   not minified) the host-suffix rule now checks the whole content of every
+   string literal, template literal and comment, trailing comments included;
+   `${...}` interpolations are code and are blanked, and one precise exception
+   skips the code span `data.local` (a symbol field named in the Go extractor's
+   doc comments, two comments compiled into two files each). Real hits before
+   the exception and the interpolation blanking: those four comments and four
+   template literals in `dist/graph/languages/rust/resolve.js` building keys
+   from `place.local`/`loc.local`; none was a host name. The minified
+   third-party bundle (`dist-web/assets/`) keeps the narrow rule (only right
+   after a quote, backtick, `//` or `@`, or on a comment line, with backtick
+   code spans skipped), because an "anywhere in a string" rule gives about
+   eight false hits there on member accesses and `data.local` code spans. Sol's
+   six shapes are regression cases: `"Connect to private-box.internal for
+   logs"`, `"ssh build.lan"`, `"Contact nas.local"`, `` `Cannot reach ${user} on
+   box.internal` ``, `"use the NAS (nas.local) for logs"`, `connect(); // was
+   nas.local`.
