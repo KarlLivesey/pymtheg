@@ -144,7 +144,7 @@ start, page and script asset over HTTP, SIGINT stop: all pass before and after.
 
 | Production install | Before (main) | After |
 |---|---|---|
-| `node_modules` bytes | 88,964,435 | 52,960,811 (51,337,201 after round 1 trimmed `docs/`) |
+| `node_modules` bytes | 88,964,435 | 52,960,811 (51,241,824 at round 3, after `docs/` was trimmed) |
 | Packages (incl. pymtheg) | 134 | 11 |
 | `npm warn` lines | 6 | 0 |
 
