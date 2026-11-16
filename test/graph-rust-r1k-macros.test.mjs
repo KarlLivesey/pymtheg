@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // R1-K: project macros (statement neutrality, argument calls, body calls),
 // derive opacity under `#[macro_use] mod`, and import shapes from the ripgrep
 // trial. Each case has a negative twin that must stay unresolved.

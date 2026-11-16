@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Token-level facts about `macro_rules!` definitions and macro invocation
 // arguments. Nothing here expands a macro: it reads the token trees the one
 // parse already produced and records what is provable from them. The resolver

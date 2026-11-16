@@ -267,6 +267,10 @@ module versus a bare `macro_use extern crate`, two glob-imported `Match`
 types, an inner import shadowing an outer one, and a facade
 `pub extern crate … as …` path.
 
+Checks on the dev server after merging `origin/main` (LIC-2): `npm run
+build`, full `npm test` 2,848 pass / 0 fail, `npm run format:check` clean;
+the new source files carry the SPDX tag.
+
 Changed expectations: `recall-4.json` "brace tail is still statement-capable"
 used `macro_rules! m{()=>{{}}}`, which expands to an empty block and is now
 proved harmless; the case now uses an item-defining body so it still tests a
