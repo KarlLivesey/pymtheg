@@ -505,7 +505,9 @@ Re-checked for this round, against the merged tree and this run's evidence:
 ## Validation
 
 These ran on the dev server, on commit dec50ae1, which contains main 27674435.
-Later commits change only this note and the evidence.
+Later commits change only this note, the evidence, and
+`scripts/acceptance/summarise.mjs`, which generates the results block and is
+not run by the harness.
 
 - `npm test`: 2,814/2,814 pass, with 0 fail, cancelled or skipped.
 - `npm run format:check`: passes. It does not cover `scripts/`; that is
