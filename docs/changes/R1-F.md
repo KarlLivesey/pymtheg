@@ -264,6 +264,65 @@ The block below is generated from `evidence/r1-f/latest.json` and
 count in it comes from those files.
 
 <!-- acceptance-results:start -->
+Harness run on commit 69256e51 (2026-11-16): verdict **known-gaps**, **458 pass**, **9 known-gap**, **22 expected-fail**, **10 observed**, **0 fail** (499 rows; `evidence/r1-f/latest.json`).
+
+| Scenario | pass | known-gap | expected-fail | observed | fail |
+|---|---:|---:|---:|---:|---:|
+| 0-build | 4 | 0 | 0 | 2 | 0 |
+| a-node-only | 79 | 0 | 4 | 2 | 0 |
+| b-node-git | 84 | 0 | 4 | 0 | 0 |
+| c-node-go-rust | 86 | 0 | 4 | 1 | 0 |
+| d-global | 79 | 0 | 4 | 1 | 0 |
+| d-local | 78 | 0 | 4 | 1 | 0 |
+| e-node-24.0.0 | 6 | 9 | 0 | 1 | 0 |
+| e-node-25 | 14 | 0 | 1 | 1 | 0 |
+| e-node-26 | 14 | 0 | 1 | 1 | 0 |
+| f-restic | 14 | 0 | 0 | 0 | 0 |
+
+Known gaps in this run:
+
+| Chunk | Rows | Steps |
+|---|---:|---|
+| R1-H | 9 | e-node-24.0.0/help, e-node-24.0.0/init, e-node-24.0.0/doctor, e-node-24.0.0/check-valid, e-node-24.0.0/verify-valid, e-node-24.0.0/simulate-valid, e-node-24.0.0/check-broken, e-node-24.0.0/graph-index, e-node-24.0.0/graph-ts-callers |
+
+Observations quoted from the same run (timings and sizes are observations, not limits):
+
+- Install (a, `npx`): 8.2 s (observation); 0 npm warning lines; ~/.npm/_npx 170.5 MiB; ~/.npm/_cacache 69.6 MiB (apparent file sizes).
+- Go opt-in (c): index 1 links upgraded; processes: sh -c, go env, go build, golinks-b78189ed4ced0505 -go, golinks-b78189ed4ced0505 -go; callers of Add opted in: main@main.go:10->Add:definite:toolchain, main@main.go:10->Add:definite:toolchain, main@main.go:13->Add:definite:toolchain, main@main.go:15->Add:definite:toolchain, main@main.go:17->Add:definite:toolchain; with the setting off: main@main.go:10->Add:definite:source, main@main.go:10->Add:definite:source, main@main.go:15->Add:definite:source, main@main.go:17->Add:definite:source.
+- restic (f): 559 files, 7356 symbols, 63088 links, 0 failed; 192.5 s, peak RSS ≥ 1896 MiB (observations).
+
+Self-test on commit 69256e51 (2026-11-15): **passed**. Wording matcher 39/39; control clean (exit 0); **27/27 sabotages caught** (`evidence/r1-f/selftest.json`).
+
+| Case | Break | Scenario | Named step(s), each must be `fail` | Exit | Verdict |
+|---|---|---|---|---|---|
+| control | unmodified tarball | a-node-only | – | 0 | clean |
+| check-exits-0 | `check` exits 0 on the broken design | a-node-only | check-broken | 1 | caught |
+| grammar-removed | the vendored Go grammar is missing from the tarball | a-node-only | tarball-contents, graph-index | 1 | caught |
+| mcp-check-design-throws | MCP `check_design` throws | a-node-only | mcp-check_design | 1 | caught |
+| callers-no-links | `graph callers` returns no links | a-node-only | graph-ts-callers | 1 | caught |
+| caller-target-renamed | a caller link's target is renamed | a-node-only | graph-ts-callers | 1 | caught |
+| certainty-downgraded | caller certainty downgraded to name-only | a-node-only | graph-ts-callers | 1 | caught |
+| prints-java | a command prints "java" | a-node-only | help | 1 | caught |
+| index-runs-java | `graph index` silently runs `java -version` | a-node-only | graph-index, no-toolchain-processes | 1 | caught |
+| mcp-wrong-verdict | MCP reports a failing verdict for the valid design | a-node-only | mcp-check_design | 1 | caught |
+| link-crashes | `pymtheg link` crashes (exit 77) | a-node-only | link-requirement | 1 | caught |
+| stack-trace-exit-0 | `--version` prints an internal-error stack trace and exits 0 | a-node-only | version | 1 | caught |
+| wrong-diagnostic-message | the N002 suggestion text changes | a-node-only | check-broken, mcp-check_design-broken | 1 | caught |
+| listed-tool-throws | a listed MCP tool (`design_recipe`) throws | a-node-only | mcp-design_recipe | 1 | caught |
+| deprecation-warning | a coded DeprecationWarning (DEP0005) on Node 24.22 | a-node-only | help | 1 | caught |
+| deprecation-warning-24.0.0 | the same DeprecationWarning on Node 24.0.0 (beside the R1-H SQLite warning) | e-node-24.0.0 | help | 1 | caught |
+| tools-list-error | `tools/list` answers with a JSON-RPC error | a-node-only | mcp-tools-list, mcp-project_info, mcp-tool-coverage, mcp-requirement_links-requirement | 1 | caught |
+| simulate-exhaustive-true | MCP simulate reports `exhaustive: true` | a-node-only | mcp-explore_behaviour-simulate | 1 | caught |
+| init-writes-root-file | `init` writes a file in the project root | a-node-only | init | 1 | caught |
+| engine-hides-violation | the built-in engine turns a violation into no_counterexample | a-node-only | verify-violation | 1 | caught |
+| link-check-passes-changed | `link check` exits 0 with a changed link | a-node-only | link-check-after-edit | 1 | caught |
+| mcp-link-check-ok-after-edit | MCP `requirement_links check` reports every link ok after a body edit | a-node-only | mcp-requirement_links-check-after-edit | 1 | caught |
+| link-add-stores-nothing | `add` reports created but stores no link | a-node-only | mcp-requirement_links-add-go, link-add-go | 1 | caught |
+| go-facts-discarded | Go toolchain facts counted but discarded at final resolution | c-node-go-rust | go-toolchain-callers | 1 | caught |
+| stack-in-mcp-json | `project_info` carries a TypeError stack in a `debug` field (structuredContent and text) | a-node-only | mcp-project_info | 1 | caught |
+| stack-in-graph-json | `graph status --json` carries a TypeError stack in a `debug` field | a-node-only | graph-status | 1 | caught |
+| writes-into-install | `graph index` writes a cache file inside the installed package (next to import.meta.url) | a-node-only | install-unchanged, writes-outside-project | 1 | caught |
+| code-graph-candidate | MCP `code_graph` reports a definite caller as a candidate | a-node-only | mcp-code_graph-callers-ts | 1 | caught |
 <!-- acceptance-results:end -->
 
 ### Known gaps
@@ -357,10 +416,14 @@ containers and recorded images, never the host-wide image list. On 15 November
 
 All on the dev server:
 
-- `npm test`: 2,771/2,771 pass, with 0 fail, cancelled or skipped.
+- `npm test`: 2,788/2,788 pass, with 0 fail, cancelled or skipped.
 - `npm run format:check`: passes.
-- The harness, self-test and cleanup test exit codes are given with the results
-  above and in the PR description.
+- On commit 69256e51 (the code in this head; later commits change only this
+  note and the evidence):
+  - the harness exits 2 (the R1-H rows only; see the results above);
+  - the self-test exits 0;
+  - the cleanup test exits 0 (TERM 143, HUP 129, PIPE 141, each with 0
+    containers left and no recorded image left unused).
 
 ## Files
 
