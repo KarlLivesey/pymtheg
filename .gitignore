@@ -12,3 +12,6 @@ dist-web/
 /evidence/project-fit/
 __pycache__/
 *.pyc
+
+# Owner-only list of private project names checked by test/package-contents.test.mjs.
+/private-names.local

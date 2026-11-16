@@ -1,11 +1,21 @@
 // SPDX-License-Identifier: MIT
 // R1-H: the npm package ships user documentation only, and no shipped file
-// carries a personal home path, the owner's name or a private project name.
+// carries a personal home path, the owner's name or a private project name
+// (the names come from the owner's git-ignored private-names.local).
 // Reads the real pack list (`npm pack --dry-run --json`); nothing is written.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFileSync, existsSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
 const pack = spawnSync(
@@ -93,19 +103,131 @@ const hostSuffix = `${label}(?:\\.${label})*\\.(?:internal|local|lan)(?![\\w-])`
 const textHost = new RegExp(`(?<![\\w.-])${hostSuffix}`, "i");
 const codeHost = new RegExp(`(?<=["'\`@]|//)${hostSuffix}`, "i");
 const devserver = /(?<![\w-])devserver(?![\w-])/i;
-/** The owner's private projects; "ProjectB" only as the capitalised name. */
-const privateProjectName =
-  /\b(?:[Gg]wead|PROJECT-A|[Pp]ost[Gg]oose|PROJECT-C|ProjectB)\b/;
-test("the private project rule matches the names, not the ordinary word tiered", () => {
-  for (const text of [
-    "the ProjectA engine",
-    "ProjectC schema",
-    "ProjectB planning",
-    "project-c",
-  ])
-    assert.match(text, privateProjectName, text);
-  for (const text of ["tiered pricing", "a three-tiered cache", "untiered"])
-    assert.doesNotMatch(text, privateProjectName, text);
+/**
+ * The owner's private project names are not written in this repository. On
+ * the owner's machine they live in `private-names.local` at the repository
+ * root (git-ignored): one JavaScript regular expression source per line,
+ * optionally followed by `/flags` (so a literal slash in a pattern is written
+ * `\\/`); blank lines and lines starting with `#` are ignored. When the file
+ * is absent this rule has no patterns and the other rules still run. A file
+ * that exists but cannot be read, or holds an invalid pattern, throws.
+ * Findings name the pattern by its line number in the file, never the text.
+ */
+const privateNamesFile = fileURLToPath(
+  new URL("../private-names.local", import.meta.url),
+);
+function loadPrivatePatterns(patternFile) {
+  let text;
+  try {
+    text = readFileSync(patternFile, "utf8");
+  } catch (error) {
+    if (error?.code === "ENOENT") return [];
+    throw new Error(
+      `${basename(patternFile)} exists but cannot be read (${error?.code ?? "error"})`,
+    );
+  }
+  const patterns = [];
+  text.split("\n").forEach((raw, i) => {
+    const line = raw.trim();
+    if (line === "" || line.startsWith("#")) return;
+    const withFlags = /^(.*)\/([a-zA-Z]*)$/.exec(line);
+    const [source, flags] = withFlags
+      ? [withFlags[1], withFlags[2]]
+      : [line, ""];
+    try {
+      if (source === "") throw new Error("empty");
+      patterns.push({ line: i + 1, pattern: new RegExp(source, flags) });
+    } catch {
+      // The engine's message repeats the pattern text, so it is not shown.
+      throw new Error(
+        `${basename(patternFile)} line ${i + 1} is not a valid regular expression with valid flags`,
+      );
+    }
+  });
+  return patterns;
+}
+/** One offence per file and pattern: the first matching line, as below. */
+function privateNameFindings(patternFile, shipped) {
+  const patterns = loadPrivatePatterns(patternFile);
+  const found = [];
+  for (const { path, text } of shipped) {
+    const lines = text.split("\n");
+    for (const { line: n, pattern } of patterns) {
+      const hit = lines.findIndex((l) => {
+        pattern.lastIndex = 0;
+        return pattern.test(l);
+      });
+      if (hit >= 0)
+        found.push(
+          `${path}:${hit + 1}: private name (${basename(patternFile)} line ${n})`,
+        );
+    }
+  }
+  return found;
+}
+test("the private-name patterns load from a file given by path and fire as written", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pym-private-names-"));
+  try {
+    const file = join(dir, "names.local");
+    writeFileSync(
+      file,
+      [
+        "# made-up names for this test",
+        "",
+        "\\bZorblat\\b",
+        "   ",
+        "quuxfold/i",
+        "# \\bplain\\b would match every file if it were not a comment",
+      ].join("\n"),
+    );
+    const scan = (text) =>
+      privateNameFindings(file, [{ path: "README.md", text }]);
+    // A hit fails and names the file, its line and the pattern's line only.
+    assert.deepEqual(scan("intro\nthe Zorblat engine\n"), [
+      "README.md:2: private name (names.local line 3)",
+    ]);
+    assert.deepEqual(scan("a QuuxFold schema"), [
+      "README.md:1: private name (names.local line 5)",
+    ]);
+    for (const offence of scan("Zorblat and quuxfold"))
+      assert.doesNotMatch(offence, /Zorblat|quuxfold/i);
+    // A miss passes; the capitalised, word-bounded pattern ignores the
+    // ordinary lower-case word and longer words.
+    assert.deepEqual(scan("nothing private here"), []);
+    assert.deepEqual(scan("a zorblat pricing plan, unZorblated"), []);
+    // Comments and blank lines are not patterns.
+    assert.deepEqual(scan("a plain word"), []);
+    assert.deepEqual(
+      loadPrivatePatterns(file).map((p) => p.line),
+      [3, 5],
+    );
+    // An invalid pattern or flag fails loudly, naming the line, not the text.
+    writeFileSync(file, "# ok\n\\bZorblat\\b\n(quuxfold\n");
+    assert.throws(
+      () => scan("x"),
+      /^Error: names\.local line 3 is not a valid/,
+    );
+    writeFileSync(file, "quuxfold/q\n");
+    assert.throws(
+      () => scan("x"),
+      (error) =>
+        /names\.local line 1 is not a valid/.test(error.message) &&
+        !/quuxfold/.test(error.message),
+    );
+    // An unreadable file fails loudly; only a missing file means no patterns.
+    assert.throws(
+      () => privateNameFindings(dir, [{ path: "README.md", text: "x" }]),
+      /cannot be read/,
+    );
+    assert.deepEqual(
+      privateNameFindings(join(dir, "absent.local"), [
+        { path: "README.md", text: "Zorblat" },
+      ]),
+      [],
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 /** String literals, template literals and comments (trailing ones included). */
 /**
@@ -272,9 +394,11 @@ test("the private network rules fire on each private form and allow public, loop
 });
 test("no shipped file carries a personal path, the owner's name or a private project name", () => {
   const offences = [];
+  const shipped = [];
   for (const path of files()) {
     if (/\.(wasm|png|ico)$/.test(path) || !existsSync(path)) continue;
     const text = readFileSync(path, "utf8");
+    shipped.push({ path, text });
     const licenceText = [
       "LICENSE",
       "THIRD-PARTY-NOTICES",
@@ -282,7 +406,6 @@ test("no shipped file carries a personal path, the owner's name or a private pro
     ].includes(path);
     const rules = [
       ["personal path", /\/home\/[a-z_][a-z0-9_.-]*\//i],
-      ["private project name", privateProjectName],
       ...(licenceText ? [] : [["owner's name", /\bKarl\b/]]),
     ];
     for (const [what, pattern] of rules) {
@@ -290,5 +413,6 @@ test("no shipped file carries a personal path, the owner's name or a private pro
       if (line >= 0) offences.push(`${path}:${line + 1}: ${what}`);
     }
   }
+  offences.push(...privateNameFindings(privateNamesFile, shipped));
   assert.deepEqual(offences, []);
 });
