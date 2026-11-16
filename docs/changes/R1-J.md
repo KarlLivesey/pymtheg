@@ -204,3 +204,15 @@ for code files. **Tested.** `test/mcp-honesty.test.mjs` (D and H).
 - `target-hint` labels from name-chosen Rust would-be targets: R1-K.
 - Studio's "Connect agent" text and Studio's own implementation-check message
   were not changed (not MCP).
+
+## Checks run (dev server, commit f45e57bc plus evidence)
+
+- `npm test`: 2,827 tests, 2,827 pass, 0 fail (main: 2,814; 13 added).
+- `npm run format:check` and `node scripts/licences/inventory.mjs --check`: pass.
+- `npm pack`: 832 files, 1.9 MB, ships `docs/code-guide.md`; the production
+  install smoke (`evidence/r1-h/tarball-smoke.mjs`): `ok: true`, 11 packages.
+- Acceptance gate: verdict pass, 466 pass, 10 observed, 23 expected-fail, the
+  same counts as R1-F on main; no gate expectation needed changing
+  (`evidence/r1-j/acceptance-latest.md`). Self-test: every sabotage caught;
+  cleanup test ok, no containers left (`evidence/r1-j/acceptance-selftest.md`).
+- `evidence/r1-j/repro.mjs` output after the change: `evidence/r1-j/repro-after.jsonl`.
