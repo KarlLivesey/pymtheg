@@ -2453,3 +2453,25 @@ the W2-A differential found no conclusive disagreement with TLC. **Rules out:**
 any external checker, runtime or download for behavioural checking; a compatibility
 path for the removed options or fields. **Known limits:** see
 [R1-A](changes/R1-A.md).
+
+### Pymtheg's own licence: MIT (LIC-1)
+
+**Decided (Karl, 15 November 2026):** Pymtheg is licensed under the MIT License,
+copyright Karl Livesey. **History:** the owner first asked about GPLv2-only,
+which was ruled out because of Apache-2.0 runtime dependencies (`typescript`,
+the MCP SDK). He then chose the Reciprocal Public License 1.5 for share-back,
+including internal use and plugins; his goals then, in his words: "the main
+thing I want is code etc back and to be allowed to use that code on the
+project"; "I also want it to cover internal usage ie company x download it
+modify it and distribute that internally"; "you can make plugins but must be
+source available for us to intergrate into the core". The review of the RPL-1.5
+text (PR 46, rounds 1 and 2) showed that the plugin rule could not be made
+certain without a modified, renamed licence, and that the licence carries
+duties for users and the owner and a default US (Colorado) arbitration clause.
+The owner then chose MIT: "ah fuck it we'll just go MIT". **What MIT means:**
+anyone may use, change and redistribute Pymtheg, including in closed products,
+keeping the copyright and licence notice; there is no share-back duty. **Rules
+out:** the RPL-1.5 output exception and plugin statement (removed with
+`LICENSE-EXCEPTIONS.md`). The package `license` field, the own-licence line in
+`docs/licences.md` and per-file SPDX tags follow in LIC-2; `"private": true` and
+publishing remain the owner's decisions. See [LIC-1](changes/LIC-1.md).
