@@ -437,3 +437,23 @@ plus 3 reviewed provenance notes (18 after round 3).
    logs"`, `"ssh build.lan"`, `"Contact nas.local"`, `` `Cannot reach ${user} on
    box.internal` ``, `"use the NAS (nas.local) for logs"`, `connect(); // was
    nas.local`.
+
+## Round 4 review (Sol): read first-party literals with the TypeScript parser
+
+The hand-written literal detection for first-party `dist/` files could be
+thrown off by a quote inside a regular-expression literal (for the rest of the
+file), and the `data.local` exception applied inside strings too. Both are fixed
+at the cause: for `dist/` JavaScript and declaration files the scan now reads,
+with the TypeScript compiler's own parser (`ts.createSourceFile`), the text of
+every string literal, template piece (no-substitution, head, middle, tail) and
+every comment (leading and trailing trivia of every token), and applies the
+host-name rule to exactly those texts. Template interpolations are code, not
+part of any piece's text, so no blanking is needed; regular-expression literals
+are their own tokens. The `data.local` exception now applies to comments only.
+On the real package the parser reads 512 files, 20,562 string and template
+pieces and 2,379 comments; without the exception the only hits are the four
+known `data.local` doc comments (two comments in the Go extractor, compiled into
+`extract.js` and `extract.d.ts`), so no new real hit appeared. Regression cases
+added: `const quotes = /"/; console.log("ssh build.lan");`, a template after a
+regex with a quote, `"Connect to `data.local` for logs"` in a string, and the
+same in a template; Sol's earlier six shapes stay.

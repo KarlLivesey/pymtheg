@@ -5,6 +5,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { readFileSync, existsSync } from "node:fs";
+import ts from "typescript";
 
 const pack = spawnSync(
   "npm",
@@ -65,11 +66,13 @@ test("the package ships only user documentation from docs/", () => {
  * 198.51.100.x, 203.0.113.x) are allowed. The address and devserver rules
  * apply to every line of every shipped file. The host-suffix rule:
  * - text files (Markdown, JSON, HTML, LICENSE, notices): every line;
- * - first-party compiled output (`dist/`, not minified): the whole content of
- *   every string literal, template literal and comment, trailing comments
- *   included; `${...}` interpolations are code and are blanked, and one
- *   precise exception skips the code span `data.local` (a symbol field named
- *   in the Go extractor's doc comments);
+ * - first-party compiled output (`dist/`, not minified): the whole text of
+ *   every string literal, template piece (no-substitution, head, middle,
+ *   tail) and comment (leading and trailing), read with the TypeScript
+ *   compiler's parser, so `${...}` interpolations are not text and a quote in
+ *   a regular-expression literal cannot throw the reading off; one precise
+ *   exception, in comments only, skips the code span `data.local` (a symbol
+ *   field named in the Go extractor's doc comments);
  * - the minified third-party bundle (`dist-web/assets/`): only right after a
  *   quote, backtick, `//` or `@`, or on a comment line (with backtick code
  *   spans skipped), because member accesses such as `this.local` and
@@ -102,27 +105,72 @@ test("the private project rule matches the names, not the ordinary word tiered",
     assert.doesNotMatch(text, privateProjectName, text);
 });
 /** String literals, template literals and comments (trailing ones included). */
-const literalOrComment =
-  /"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`|\/\/[^\n]*|\/\*[\s\S]*?\*\//g;
+/**
+ * The text of every string literal, template piece (no-substitution, head,
+ * middle, tail) and comment (leading and trailing trivia of every token) in a
+ * JavaScript or declaration file, read with the TypeScript compiler's own
+ * parser, so regular-expression literals, nested templates and quotes inside
+ * them cannot throw the reading off. Template interpolations are code and are
+ * not part of any piece's text.
+ */
+function textsOf(path, text) {
+  const source = ts.createSourceFile(
+    path,
+    text,
+    ts.ScriptTarget.Latest,
+    true,
+    path.endsWith(".d.ts") ? ts.ScriptKind.TS : ts.ScriptKind.JS,
+  );
+  const out = [];
+  const seen = new Set();
+  const comments = (ranges) => {
+    for (const r of ranges ?? [])
+      if (!seen.has(r.pos)) {
+        seen.add(r.pos);
+        out.push({ pos: r.pos, text: text.slice(r.pos, r.end), comment: true });
+      }
+  };
+  const literal = new Set([
+    ts.SyntaxKind.StringLiteral,
+    ts.SyntaxKind.NoSubstitutionTemplateLiteral,
+    ts.SyntaxKind.TemplateHead,
+    ts.SyntaxKind.TemplateMiddle,
+    ts.SyntaxKind.TemplateTail,
+  ]);
+  const visit = (node) => {
+    if (literal.has(node.kind))
+      out.push({ pos: node.getStart(source), text: node.text, comment: false });
+    if (
+      node.kind < ts.SyntaxKind.FirstNode ||
+      node.getChildCount(source) === 0
+    ) {
+      comments(ts.getLeadingCommentRanges(text, node.pos));
+      comments(ts.getTrailingCommentRanges(text, node.end));
+    }
+    for (const child of node.getChildren(source)) visit(child);
+  };
+  visit(source);
+  comments(ts.getLeadingCommentRanges(text, source.endOfFileToken.pos));
+  return out.map((t) => ({
+    ...t,
+    line: source.getLineAndCharacterOfPosition(t.pos).line + 1,
+  }));
+}
 function networkFindings(path, text) {
   const code = /\.(m?js|d\.ts|css)$/.test(path);
   const found = [];
-  // First-party compiled output (dist/, not minified): the whole content of
-  // every string, template literal and comment is checked as text. A template
-  // literal's `${...}` interpolations are code, not text, and are blanked.
-  // One precise exception: the code span `data.local` in the Go extractor's doc
-  // comments names the symbol field `data.local`, not a host.
-  const firstParty = code && path.startsWith("dist/");
+  // First-party compiled output (dist/, not minified): the whole text of every
+  // string literal, template piece and comment, read by the TypeScript parser.
+  // One precise exception, in comments only: the code span `data.local` in the
+  // Go extractor's doc comments names the symbol field `data.local`, not a host.
+  const firstParty = /\.(m?js|d\.ts)$/.test(path) && path.startsWith("dist/");
   if (firstParty)
-    for (const m of text.matchAll(literalOrComment)) {
-      const content = m[0]
-        .replace(/^`[\s\S]*`$/, (t) => t.replace(/\$\{[^}]*\}/g, " "))
-        .replaceAll("`data.local`", " ")
-        .slice(1);
+    for (const t of textsOf(path, text)) {
+      const content = t.comment
+        ? t.text.replaceAll("`data.local`", " ")
+        : t.text;
       if (textHost.test(content))
-        found.push(
-          `${path}:${text.slice(0, m.index).split("\n").length}: private host name`,
-        );
+        found.push(`${path}:${t.line}: private host name`);
     }
   text.split("\n").forEach((line, i) => {
     const comment = /^\s*(\/\/|\/?\*)/.test(line);
@@ -195,6 +243,12 @@ test("the private network rules fire on each private form and allow public, loop
     "throw Error(`Cannot reach ${user} on box.internal`);",
     'help("use the NAS (nas.local) for logs");',
     "connect(); // was nas.local",
+    // Sol round 4: a quote inside a regex literal must not throw the reading off.
+    'const quotes = /"/; console.log("ssh build.lan");',
+    "const q = /'`/g; const msg = `Contact nas.local`;",
+    // Sol round 4: the data.local exception is for comments only.
+    'log("Connect to `data.local` for logs");',
+    "const s = `Reach ${host} or \\`data.local\\` directly`;",
   ])
     assert.ok(fires("dist/cli/x.js", text), text);
   // In first-party dist/, interpolations and the `data.local` code span are code.
