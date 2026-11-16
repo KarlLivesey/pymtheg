@@ -57,7 +57,7 @@ checked with rustc 1.98.1 (`evidence/r1-k/controls2/d1–d3`): on stable Rust a
 proc-macro crates (imported by `use`, named by path, or brought in by
 `#[macro_use] extern crate`) or the standard prelude. A `macro_rules!` macro
 is function-like on stable: a `macro_rules!` derive or attribute (`derive()`
-or `attr()` arms) is rejected with E0658 (issue 143549), and a bang
+or `attr()` arms) is rejected with E0658, and a bang
 `macro_rules! Debug` in scope coexists with `#[derive(Debug)]` without
 changing it (prints `7 X`). `#[macro_use] mod m;` carries only `macro_rules!`
 macros, so it cannot change what a derive means. The existing checks on
@@ -195,10 +195,10 @@ Otherwise it is unresolved with would-be targets (`macro-arm-unverified`,
 `macro-expansion-unverified`, `macro-repetition-unverified`,
 `macro-body-name-unverified`), which `callers` reports as possible callers.
 Calls with no workspace target, sysroot paths, `Self::` paths and method
-calls in bodies are not derived. So `callers set_errored` reports `search`
-at `main.rs:131` as a possible caller. In round 2 that link was definite;
-under the round-3 name rule it is not, because of ripgrep's own `write!` and
-`writeln!` macros (see Results). The calls inside test generators such as
+calls in bodies are not derived. So `callers set_errored` returns `search`
+at `main.rs:131` as a definite caller (see Results). Round 3's workspace-wide
+name rule had made it only possible, because of ripgrep's own `write!` and
+`writeln!` macros; round 4's per-site rule restored it. The calls inside test generators such as
 ripgrep's `rgtest!` (a `#[test] fn` per invocation) are unresolved: the
 expansion defines items under an attribute.
 
@@ -289,7 +289,8 @@ resolves explicit imports the same way (point 5).
 
 Round 5 runs on this branch (its merge with `origin/main` c2edd086 adds only a ledger line)
 against `origin/main`, both on the dev server in parallel
-(`evidence/r1-k/*-summary.json`, `*-compare.txt`):
+(`evidence/r1-k/*-summary.json`, `*-compare.txt`; `node evidence/r1-k/figures.mjs`
+prints these corpus figures, the reasons below and the before-classes above):
 
 | | ripgrep before | ripgrep after | Vector before | Vector after |
 |---|---|---|---|---|
@@ -323,8 +324,8 @@ rule fails closed at most Vector sites for one reason:
   the root of the main crate and of `vector-core`, `vector-common`,
   `vector-buffers`, `vector-stream` and `vector-tap` (point 4). Those crates
   are outside the workspace, so whether they export a macro named `vec` or
-  `format` cannot be read. A temporary trace on one re-resolution confirmed
-  it is the failing check for every standard name there.
+  `format` cannot be read. A one-off trace on one re-resolution (not
+  committed) showed it is the failing check for every standard name there.
 - Elsewhere `use similar_asserts::assert_eq` correctly fails point 5, and
   unseen textual entries from Vector's three unparsed files fail point 3.
 
@@ -338,8 +339,10 @@ on calls 849 → 229, on types 1,484 → 148, on imports 479 → 69, on patterns
 
 ## Correctness sample
 
-Round 4, fresh seeds (`evidence/r1-k/sample-review.md`), each read against
-the source:
+Round 4, fresh seeds, each read against the source. The counts come from the
+draws in `evidence/r1-k/ripgrep-compare.txt`, `vector-compare.txt` and
+`vector-std-named-sample.txt` (whose header gives the 93 files and 61 links),
+and the review in `sample-review.md`:
 
 | | Links | Right |
 |---|---|---|
@@ -460,7 +463,8 @@ module versus a bare `macro_use extern crate`, two glob-imported `Match`
 types, an inner import shadowing an outer one, and a facade
 `pub extern crate … as …` path.
 
-Checks on the dev server after merging `origin/main` (c2edd086): `npm run
+Checks on the dev server after merging `origin/main` (c2edd086), as run
+(reproducible with the commands, not recorded in `evidence/`): `npm run
 build`, full `npm test` 2,921 pass / 0 fail, `npm run format:check` clean,
 `node scripts/spdx-tags.mjs --check` clean; the new source files carry the
 SPDX tag.
@@ -485,7 +489,7 @@ an exporting crate `m` and an app, rustc output in `output.txt`):
 
 Round 5 adds 4 fixture tests, one per program. `node --test
 test/graph-rust-r1k-macros.test.mjs` runs 90 tests: 30, 24, 17, 15 and 4
-added in rounds 1 to 5.
+added in rounds 1 to 5 (a test run, not an `evidence/` file).
 
 Changed expectations: `recall-4.json` "brace tail is still statement-capable"
 used `macro_rules! m{()=>{{}}}`, which expands to an empty block and is now
@@ -512,7 +516,8 @@ of `local_macro!` at its invocation in `run`, unresolved there because
   remaining `opaque-item-may-shadow-name` comes from non-standard derives,
   `#[test]`/`#[tokio::test]`, attribute macros such as
   `#[configurable_component]`, and external statement macros. In particular,
-  60 files import `similar_asserts::assert_eq`, an unaudited external macro.
+  58 files (60 import lines) import `similar_asserts::assert_eq`, an
+  unaudited external macro.
   Auditing `similar_asserts`, `pretty_assertions`, and the macro export lists
   of `tracing`, `derivative` and `cfg_if` in the ecosystem catalogue is the
   cheap next step. (Round 1 quoted per-cause scope counts from a one-off

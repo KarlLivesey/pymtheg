@@ -383,9 +383,10 @@ manifest unknown). Private items are ordinary symbols.
   Globs are not consulted: one that brings in a std-named macro is an
   ambiguity error (E0659) in rustc. A crate that does `#[macro_use] extern
   crate tracing;` therefore gets no proven standard names, so its argument
-  and body calls through format macros stay unresolved (ruling E4, under
-  Assumption E4 below, governs only whether a statement macro withholds its
-  sibling names, not these proofs). A macro exported with
+  and body calls through format macros stay unresolved. For standard-named
+  macros, ruling E4 (Assumption E4 below) governs only whether a statement
+  macro withholds its sibling names, not these proofs; E4 also covers
+  `derive` and `global_allocator`, as stated there. A macro exported with
   `#[macro_export(local_inner_macros)]` that invokes any macro by a bare name
   proves nothing: rustc resolves those names at its own crate root.
 - **Calls in macro arguments:** calls written in an invocation's argument
@@ -438,8 +439,8 @@ manifest unknown). Private items are ordinary symbols.
   macros only, and those come from proc-macro crates (imported by `use`,
   named by path, or brought in by `#[macro_use] extern crate`) or from the
   standard prelude. A `macro_rules!` macro is function-like on stable:
-  `macro_rules!` derives and attributes are unstable (rustc 1.98.1: E0658,
-  issue 143549), and a bang `macro_rules! Debug` in scope coexists with
+  `macro_rules!` derives and attributes are unstable (rustc 1.98.1: E0658),
+  and a bang `macro_rules! Debug` in scope coexists with
   `#[derive(Debug)]` without changing it. So a standard derive is opaque only
   when a `#[macro_use] extern crate` could bring a derive of that name into
   the crate (bare: any name; a list: the listed names), besides the existing
