@@ -1,11 +1,11 @@
 module { id: 'rust', version: '26' } -> { id: 'rust', version: '27' }
-seconds 48.9 -> 54.8
+seconds 49.7 -> 52.5
 all links before { resolved: 12121, unresolved: 22647, candidates: 12 } 34780
-all links after  { resolved: 14385, unresolved: 24692, candidates: 12 } 39089
+all links after  { resolved: 13719, unresolved: 25358, candidates: 12 } 39089
 written (non-contains) before { resolved: 7831, unresolved: 22647, candidates: 12 }
 written (non-contains) after  { resolved: 9413, unresolved: 24101, candidates: 12 }
   of which new macro-argument calls { unresolved: 2074, resolved: 962 }
-derived macro-body calls { resolved: 682, unresolved: 591 }
+derived macro-body calls { resolved: 16, unresolved: 1257 }
 
 unresolved written links by kind|reason: before -> after
      7101 ->    8492  calls|receiver-type-unverified
@@ -73,143 +73,193 @@ links present in both runs, outcome change {
   'candidates -> candidates': 12
 }
 unresolved -> definite 620 | definite -> other 0
-new definite links (argument calls + derived) 1644
+new definite links (argument calls + derived) 978
 
-SAMPLE unresolved -> definite (seed 1117)
-  1. crates/searcher/src/searcher/core.rs:611 calls range.end
-       -> crates/matcher/src/lib.rs|impl Match::end|method
-       | self.last_line_visited = range.end();
-  2. crates/searcher/src/sink.rs:3 imports grep_matcher::LineTerminator
-       -> crates/matcher/src/lib.rs|LineTerminator|struct
-       | use grep_matcher::LineTerminator;
-  3. crates/searcher/src/searcher/core.rs:259 calls Range::new
-       -> crates/matcher/src/lib.rs|impl Match::new|method
-       | let range = Range::new(before_context_start, range.end());
-  4. crates/printer/src/standard.rs:23 imports crate::stats::Stats
-       -> crates/printer/src/stats.rs|Stats|struct
-       | stats::Stats,
-  5. crates/printer/src/summary.rs:797 imports super::Summary
-       -> crates/printer/src/summary.rs|Summary|struct
-       | use super::{Summary, SummaryBuilder, SummaryKind};
-  6. crates/printer/src/summary.rs:11 imports grep_searcher::SinkFinish
-       -> crates/searcher/src/sink.rs|SinkFinish|struct
-       | grep_searcher::{Searcher, Sink, SinkError, SinkFinish, SinkMatch},
-  7. crates/printer/src/standard.rs:1523 types Match
-       -> crates/matcher/src/lib.rs|Match|struct
-       | fn trim_line_terminator(&self, buf: &[u8], line: &mut Match) {
-  8. crates/printer/src/util.rs:14 types Matcher
-       -> crates/matcher/src/lib.rs|Matcher|trait
-       | pub(crate) struct Replacer<M: Matcher> {
-  9. crates/printer/src/standard.rs:768 types Searcher
-       -> crates/searcher/src/searcher/mod.rs|Searcher|struct
-       | searcher: &Searcher,
- 10. crates/core/flags/hiargs.rs:713 calls grep::matcher::LineTerminator::crlf
-       -> crates/matcher/src/lib.rs|impl LineTerminator::crlf|method
-       | grep::matcher::LineTerminator::crlf()
- 11. crates/core/flags/hiargs.rs:831 types grep::cli::StandardStream
-       -> crates/cli/src/wtr.rs|StandardStream|struct
-       | pub(crate) fn stdout(&self) -> grep::cli::StandardStream {
- 12. crates/searcher/src/searcher/core.rs:39 types Matcher
-       -> crates/matcher/src/lib.rs|Matcher|trait
-       | impl<'s, M: Matcher, S: Sink> Core<'s, M, S> {
- 13. crates/searcher/src/searcher/core.rs:625 calls range.start
-       -> crates/matcher/src/lib.rs|impl Match::start|method
-       | self.count_lines(buf, range.start());
- 14. crates/searcher/src/searcher/core.rs:495 calls Range::zero
-       -> crates/matcher/src/lib.rs|impl Match::zero|method
-       | Range::zero(i).offset(pos),
- 15. crates/searcher/src/searcher/core.rs:10 imports crate::sink::SinkContext
-       -> crates/searcher/src/sink.rs|SinkContext|struct
-       | Sink, SinkContext, SinkContextKind, SinkError, SinkFinish, SinkMatch,
- 16. crates/printer/src/standard.rs:1751 imports super::Standard
-       -> crates/printer/src/standard.rs|Standard|struct
-       | use super::{ColorSpecs, Standard, StandardBuilder};
- 17. crates/printer/src/standard.rs:1044 calls LineStep::new
-       -> crates/searcher/src/lines.rs|impl LineStep::new|method
-       | let mut stepper = LineStep::new(line_term, 0, bytes.len());
- 18. crates/printer/src/standard.rs:782 calls mat.lines
+SAMPLE unresolved -> definite (seed 4409)
+  1. crates/core/flags/hiargs.rs:875 calls ignore::WalkBuilder::new
+       -> crates/ignore/src/walk.rs|impl WalkBuilder::new|method
+       | let mut builder = ignore::WalkBuilder::new(&self.paths.paths[0]);
+  2. crates/searcher/src/searcher/glue.rs:1496 imports crate::sinks
+       -> crates/searcher/src/sink.rs|sinks|module
+       | use crate::sinks;
+  3. crates/printer/src/json.rs:737 calls mat.lines
        -> crates/searcher/src/sink.rs|impl<'b> SinkMatch<'b>::lines|method
-       | stats.add_matched_lines(mat.lines().count() as u64);
- 19. crates/searcher/src/searcher/glue.rs:4 imports crate::line_buffer::LineBufferReader
-       -> crates/searcher/src/line_buffer.rs|LineBufferReader|struct
-       | line_buffer::{DEFAULT_BUFFER_CAPACITY, LineBufferReader},
- 20. crates/printer/src/standard.rs:25 imports crate::util::Replacer
-       -> crates/printer/src/util.rs|Replacer|struct
-       | DecimalFormatter, PrinterPath, Replacer, Sunk,
- 21. crates/core/flags/hiargs.rs:22 imports crate::haystack::HaystackBuilder
-       -> crates/core/haystack.rs|HaystackBuilder|struct
-       | haystack::{Haystack, HaystackBuilder},
- 22. crates/printer/src/lib.rs:76 imports crate::json::JSON
-       -> crates/printer/src/json.rs|JSON|struct
-       | pub use crate::json::{JSON, JSONBuilder, JSONSink};
- 23. crates/searcher/src/testutil.rs:559 calls LineTerminator::byte
+       | self.stats.add_matched_lines(mat.lines().count() as u64);
+  4. crates/searcher/src/searcher/core.rs:3 imports grep_matcher::LineMatchKind
+       -> crates/matcher/src/lib.rs|LineMatchKind|enum
+       | use grep_matcher::{LineMatchKind, Matcher};
+  5. crates/core/flags/hiargs.rs:23 imports crate::search::PatternMatcher
+       -> crates/core/search.rs|PatternMatcher|enum
+       | search::{PatternMatcher, Printer, SearchWorker, SearchWorkerBuilder},
+  6. crates/core/flags/hiargs.rs:581 values SummaryKind::Count
+       -> crates/printer/src/summary.rs|SummaryKind::Count|variant
+       | SearchMode::Count => SummaryKind::Count,
+  7. crates/printer/src/summary.rs:630 types Sink
+       -> crates/searcher/src/sink.rs|Sink|trait
+       | impl<'p, 's, M: Matcher, W: WriteColor> Sink for SummarySink<'p, 's, M, W> {
+  8. crates/searcher/src/searcher/glue.rs:357 imports crate::testutil::RegexMatcher
+       -> crates/searcher/src/testutil.rs|RegexMatcher|struct
+       | testutil::{KitchenSink, RegexMatcher, SearcherTester},
+  9. crates/printer/src/lib.rs:64 imports crate::color::ColorError
+       -> crates/printer/src/color.rs|ColorError|enum
+       | color::{ColorError, ColorSpecs, UserColorSpec, default_color_specs},
+ 10. crates/printer/src/util.rs:456 types Match
+       -> crates/matcher/src/lib.rs|Match|struct
+       | ) -> Match {
+ 11. crates/core/flags/hiargs.rs:715 calls grep::matcher::LineTerminator::byte
        -> crates/matcher/src/lib.rs|impl LineTerminator::byte|method
-       | matcher.set_line_term(Some(LineTerminator::byte(b'\n')));
- 24. crates/printer/src/json.rs:818 types SinkFinish
-       -> crates/searcher/src/sink.rs|SinkFinish|struct
-       | finish: &SinkFinish,
- 25. crates/printer/src/util.rs:238 types Match
-       -> crates/matcher/src/lib.rs|Match|struct
-       | pub(crate) fn matches(&self) -> &'a [Match] {
- 26. crates/core/flags/hiargs.rs:232 calls grep::searcher::MmapChoice::auto
-       -> crates/searcher/src/searcher/mmap.rs|impl MmapChoice::auto|method
-       | let maybe = unsafe { grep::searcher::MmapChoice::auto() };
- 27. crates/searcher/src/testutil.rs:101 calls LineMatchKind::Candidate
-       -> crates/matcher/src/lib.rs|LineMatchKind::Candidate|variant
-       | Ok(Some(LineMatchKind::Candidate(i)))
- 28. crates/searcher/src/searcher/glue.rs:7 imports crate::sink::SinkError
-       -> crates/searcher/src/sink.rs|SinkError|trait
-       | sink::{Sink, SinkError},
- 29. crates/printer/src/standard.rs:483 types Match
-       -> crates/matcher/src/lib.rs|Match|struct
-       | matches: Vec<Match>,
- 30. crates/printer/src/lib.rs:72 imports crate::summary::SummaryKind
-       -> crates/printer/src/summary.rs|SummaryKind|enum
-       | summary::{Summary, SummaryBuilder, SummaryKind, SummarySink},
+       | grep::matcher::LineTerminator::byte(b'\x00')
+ 12. crates/printer/src/lib.rs:66 imports crate::hyperlink::HyperlinkEnvironment
+       -> crates/printer/src/hyperlink/mod.rs|HyperlinkEnvironment|struct
+       | HyperlinkAlias, HyperlinkConfig, HyperlinkEnvironment,
+ 13. crates/printer/src/json.rs:764 calls ctx.bytes
+       -> crates/searcher/src/sink.rs|impl<'b> SinkContext<'b>::bytes|method
+       | self.record_matches(searcher, ctx.bytes(), 0..ctx.bytes().len())?;
+ 14. crates/printer/src/util.rs:27 types Matcher
+       -> crates/matcher/src/lib.rs|Matcher|trait
+       | impl<M: Matcher> fmt::Debug for Replacer<M> {
+ 15. crates/searcher/src/searcher/glue.rs:338 calls range.end
+       -> crates/matcher/src/lib.rs|impl Match::end|method
+       | self.core.set_pos(range.end());
 
-SAMPLE new definite (seed 1117)
-  1. crates/regex/src/literal.rs:939 calls I [macro argument]
+SAMPLE new definite (seed 4409)
+  1. crates/globset/src/lib.rs:1322 calls escape [macro argument]
+       -> crates/globset/src/lib.rs|escape|function
+       | assert_eq!("[[][]]", escape("[]"));
+  2. crates/regex/src/literal.rs:810 calls I [macro argument]
        -> crates/regex/src/literal.rs|tests::I|function
-       | assert_eq!(seq([I("123")]), e(r"[A-Z]+123"));
-  2. tests/feature.rs:166 calls crate::util::setup_pcre2 [derived]
-       -> tests/util.rs|setup_pcre2|function
-       | rgtest!(f45_precedence_with_others, |dir: Dir, mut cmd: TestCommand| {
-  3. tests/regression.rs:171 calls crate::util::setup [derived]
-       -> tests/util.rs|setup|function
-       | rgtest!(r128, |dir: Dir, mut cmd: TestCommand| {
-  4. tests/binary.rs:355 calls crate::util::setup_pcre2 [derived]
-       -> tests/util.rs|setup_pcre2|function
-       | rgtest!(before_match1_implicit, |dir: Dir, mut cmd: TestCommand| {
-  5. tests/regression.rs:1179 calls crate::util::setup [derived]
-       -> tests/util.rs|setup|function
-       | rgtest!(r1739_replacement_lineterm_match, |dir: Dir, mut cmd: TestCommand| {
-  6. crates/searcher/src/lines.rs:370 calls prev [macro argument]
-       -> crates/searcher/src/lines.rs|tests::prev|function
-       | assert_eq!(0, prev(t, lines[0].end, 2));
-  7. crates/regex/src/literal.rs:686 calls seq [macro argument]
-       -> crates/regex/src/literal.rs|tests::seq|function
-       | assert_eq!(e(r"[a-z]([a-z]foo)([a-z]foo)[a-z]"), seq([I("foo")]));
-  8. crates/matcher/tests/test_matcher.rs:92 calls m [macro argument]
-       -> crates/matcher/tests/test_matcher.rs|m|function
-       | assert_eq!(caps.get(1), Some(m(1, 6)));
-  9. crates/ignore/src/incremental.rs:889 calls matchedf [macro argument]
-       -> crates/ignore/src/incremental.rs|tests::matchedf|function
-       | assert!(matchedf(&mut m, "a/b/ignored").is_ignore());
- 10. tests/regression.rs:1252 calls crate::util::setup [derived]
-       -> tests/util.rs|setup|function
-       | rgtest!(r1868_context_passthru_override, |dir: Dir, _: TestCommand| {
- 11. crates/ignore/src/incremental.rs:1051 calls matchedf [macro argument]
-       -> crates/ignore/src/incremental.rs|tests::matchedf|function
-       | assert!(matchedf(&mut m, root.join("file")).is_none());
- 12. tests/misc.rs:544 calls crate::util::setup [derived]
-       -> tests/util.rs|setup|function
-       | rgtest!(max_filesize_parse_k_suffix, |dir: Dir, mut cmd: TestCommand| {
- 13. tests/binary.rs:175 calls crate::util::setup [derived]
-       -> tests/util.rs|setup|function
-       | rgtest!(after_match1_explicit, |dir: Dir, mut cmd: TestCommand| {
- 14. crates/ignore/benches/workloads.rs:195 calls walk [macro argument]
-       -> crates/ignore/benches/workloads.rs|walk|function
-       | b.iter(|| assert_eq!(walk(black_box(&builder), 12), expected));
- 15. crates/regex/src/literal.rs:859 calls exact [macro argument]
+       | assert_eq!(inexact([I("a"), I("b"), E("c")]), e(r"a*b*c"));
+  3. crates/regex/src/literal.rs:747 calls exact [macro argument]
        -> crates/regex/src/literal.rs|tests::exact|function
-       | assert_eq!(exact(["abc", "MN", "xyz"]), e(r"abc|M[a&&b]*N|xyz"));
+       | assert_eq!(exact(["Δ", "Ε", "δ", "ε", "ϵ"]), e(r"(?i)[εδ]"));
+  4. crates/regex/src/literal.rs:944 calls E [macro argument]
+       -> crates/regex/src/literal.rs|tests::E|function
+       | assert_eq!(seq([E("1"), I("2"), E("3")]), e(r"1|[A-Z]2|3"),);
+  5. crates/regex/src/literal.rs:946 calls e [macro argument]
+       -> crates/regex/src/literal.rs|tests::e|function
+       | assert_eq!(seq([I("2")]), e(r"(?:|1)[A-Z]2"));
+  6. crates/core/flags/defs.rs:7550 calls v.unwrap_switch [macro argument]
+       -> crates/core/flags/mod.rs|impl FlagValue::unwrap_switch|method
+       | assert!(v.unwrap_switch(), "--word-regexp has no negation");
+  7. crates/searcher/src/lines.rs:409 calls prev [macro argument]
+       -> crates/searcher/src/lines.rs|tests::prev|function
+       | assert_eq!(lines[0].start, prev(t, lines[5].start, 5));
+  8. crates/regex/src/literal.rs:765 calls exact [macro argument]
+       -> crates/regex/src/literal.rs|tests::exact|function
+       | assert_eq!(exact(["ab"]), e(r"\bab"));
+  9. crates/searcher/src/line_buffer.rs:587 calls replace_str [macro argument]
+       -> crates/searcher/src/line_buffer.rs|tests::replace_str|function
+       | assert_eq!(replace_str("a", b'b', b'z'), (s("a"), None));
+ 10. crates/ignore/benches/workloads.rs:241 calls walk [macro argument]
+       -> crates/ignore/benches/workloads.rs|walk|function
+       | b.iter(|| assert_eq!(walk(black_box(&builder), 0), expected));
+ 11. crates/core/flags/defs.rs:7202 calls Mode::Search [macro argument]
+       -> crates/core/flags/lowargs.rs|Mode::Search|variant
+       | assert_eq!(Mode::Search(SearchMode::Standard), args.mode);
+ 12. crates/regex/src/non_matching.rs:130 calls sparse [macro argument]
+       -> crates/regex/src/non_matching.rs|tests::sparse|function
+       | sparse(&extract("(?s).")),
+ 13. crates/regex/src/non_matching.rs:145 calls sparse [macro argument]
+       -> crates/regex/src/non_matching.rs|tests::sparse|function
+       | assert_eq!(sparse(&extract(r"(?-u)\xFF")), sparse_except(&[0xFF]));
+ 14. tests/util.rs:402 calls dir_list [macro argument]
+       -> tests/util.rs|dir_list|function
+       | dir_list(&self.dir.dir),
+ 15. crates/cli/src/escape.rs:110 calls b [macro argument]
+       -> crates/cli/src/escape.rs|tests::b|function
+       | assert_eq!(b(b"\n"), unescape(r"\n"));
+ 16. crates/regex/src/literal.rs:744 calls exact [macro argument]
+       -> crates/regex/src/literal.rs|tests::exact|function
+       | assert_eq!(exact(["a", "b", "c"]), e("[abc]"));
+ 17. crates/regex/src/literal.rs:848 calls exact [macro argument]
+       -> crates/regex/src/literal.rs|tests::exact|function
+       | assert_eq!(exact(["abcxyz"]), e(r"abc[a&&b]*xyz"));
+ 18. crates/regex/src/literal.rs:772 calls e [macro argument]
+       -> crates/regex/src/literal.rs|tests::e|function
+       | assert_eq!(exact(["ab"]), e(r"ab(?m:^)"));
+ 19. crates/regex/src/literal.rs:761 calls e [macro argument]
+       -> crates/regex/src/literal.rs|tests::e|function
+       | assert_eq!(exact(["ab"]), e(r"^ab"));
+ 20. crates/searcher/src/lines.rs:378 calls prev [macro argument]
+       -> crates/searcher/src/lines.rs|tests::prev|function
+       | assert_eq!(lines[4].start, prev(t, lines[5].end, 1));
+ 21. crates/searcher/src/lines.rs:308 calls m [macro argument]
+       -> crates/searcher/src/lines.rs|tests::m|function
+       | assert_eq!(loc("a\nb\nc", 5, 5), m(4, 5));
+ 22. crates/core/flags/hiargs.rs:882 calls crate::messages::ignore_messages [derived]
+       -> crates/core/messages.rs|ignore_messages|function
+       | ignore_message!("{err}");
+ 23. crates/cli/src/escape.rs:92 calls escape [macro argument]
+       -> crates/cli/src/escape.rs|escape|function
+       | assert_eq!(r"", escape(b""));
+ 24. crates/ignore/src/incremental.rs:899 calls matchedf [macro argument]
+       -> crates/ignore/src/incremental.rs|tests::matchedf|function
+       | assert!(matchedf(&mut m, "a/b/.///allowed").is_none());
+ 25. crates/ignore/src/incremental.rs:1088 calls matchedf [macro argument]
+       -> crates/ignore/src/incremental.rs|tests::matchedf|function
+       | assert!(matchedf(&mut ms[2], "drop.log").is_ignore());
+ 26. crates/cli/src/escape.rs:150 calls unescape [macro argument]
+       -> crates/cli/src/escape.rs|unescape|function
+       | assert_eq!(b(b"\\xzz"), unescape(r"\\xzz"));
+ 27. crates/ignore/src/incremental.rs:685 calls matchedf [macro argument]
+       -> crates/ignore/src/incremental.rs|tests::matchedf|function
+       | assert!(matchedf(&mut m, "src/keep.tmp").is_whitelist());
+ 28. crates/cli/src/escape.rs:128 calls unescape [macro argument]
+       -> crates/cli/src/escape.rs|unescape|function
+       | assert_eq!(b(b"\\a"), unescape(r"\a"));
+ 29. crates/core/flags/defs.rs:1358 calls v.unwrap_switch [macro argument]
+       -> crates/core/flags/mod.rs|impl FlagValue::unwrap_switch|method
+       | assert!(v.unwrap_switch(), "--count-matches can only be enabled");
+ 30. crates/printer/src/standard.rs:1344 calls self.wtr [macro argument]
+       -> crates/printer/src/standard.rs|impl<'a,M:Matcher,W:WriteColor> StandardImpl<'a,M,W>::wtr|method
+       | self.wtr().borrow_mut(),
+
+SAMPLE derived macro-body calls (seed 4409)
+  1. crates/core/haystack.rs:38 calls crate::messages::set_errored [derived]
+       -> crates/core/messages.rs|set_errored|function
+       | err_message!("{err}");
+  2. crates/core/haystack.rs:38 calls crate::messages::messages [derived]
+       -> crates/core/messages.rs|messages|function
+       | err_message!("{err}");
+  3. crates/core/main.rs:415 calls crate::messages::set_errored [derived]
+       -> crates/core/messages.rs|set_errored|function
+       | err_message!(
+  4. crates/core/haystack.rs:52 calls crate::messages::messages [derived]
+       -> crates/core/messages.rs|messages|function
+       | ignore_message!("{err}");
+  5. crates/core/haystack.rs:52 calls crate::messages::ignore_messages [derived]
+       -> crates/core/messages.rs|ignore_messages|function
+       | ignore_message!("{err}");
+  6. crates/core/flags/hiargs.rs:882 calls crate::messages::ignore_messages [derived]
+       -> crates/core/messages.rs|ignore_messages|function
+       | ignore_message!("{err}");
+  7. crates/core/main.rs:210 calls crate::messages::messages [derived]
+       -> crates/core/messages.rs|messages|function
+       | err_message!("{}: {}", haystack.path().display(), err);
+  8. crates/core/main.rs:193 calls crate::messages::set_errored [derived]
+       -> crates/core/messages.rs|set_errored|function
+       | err_message!("{}: {}", haystack.path().display(), err);
+  9. crates/core/main.rs:131 calls crate::messages::set_errored [derived]
+       -> crates/core/messages.rs|set_errored|function
+       | err_message!("{}: {}", haystack.path().display(), err);
+ 10. crates/core/main.rs:131 calls crate::messages::messages [derived]
+       -> crates/core/messages.rs|messages|function
+       | err_message!("{}: {}", haystack.path().display(), err);
+ 11. crates/core/flags/hiargs.rs:882 calls crate::messages::messages [derived]
+       -> crates/core/messages.rs|messages|function
+       | ignore_message!("{err}");
+ 12. crates/core/main.rs:210 calls crate::messages::set_errored [derived]
+       -> crates/core/messages.rs|set_errored|function
+       | err_message!("{}: {}", haystack.path().display(), err);
+ 13. crates/core/flags/config.rs:44 calls crate::messages::messages [derived]
+       -> crates/core/messages.rs|messages|function
+       | message!("{}:{}", config_path.display(), err);
+ 14. crates/core/main.rs:193 calls crate::messages::messages [derived]
+       -> crates/core/messages.rs|messages|function
+       | err_message!("{}: {}", haystack.path().display(), err);
+ 15. crates/core/flags/config.rs:35 calls crate::messages::messages [derived]
+       -> crates/core/messages.rs|messages|function
+       | message!(
+ 16. crates/core/main.rs:415 calls crate::messages::messages [derived]
+       -> crates/core/messages.rs|messages|function
+       | err_message!(

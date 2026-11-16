@@ -15,6 +15,7 @@ import {
   type MacroUseImport,
 } from "./parse.js";
 import {
+  consumingBuiltins,
   formatStandardMacros,
   standardFormatName,
   type MacroProfile,
@@ -2572,11 +2573,13 @@ export function resolveRust(
     "PartialOrd",
     "Hash",
   ]);
-  // Only `#[macro_use] extern crate` can bring a derive macro into scope.
-  // `#[macro_use] mod m;` carries `macro_rules!` macros, which cannot be used
-  // as a derive: one named like a standard derive at a derive site is a
-  // compile error, so it never retargets code that builds. A named import list
-  // risks only the names it lists; a bare one risks every name (strict).
+  // On stable Rust a derive name resolves among derive macros only, which
+  // come from proc-macro crates (use, path, `#[macro_use] extern crate`) or
+  // the standard prelude. `macro_rules!` macros are function-like on stable
+  // (`macro_rules!` derives are unstable, E0658), and a bang `macro_rules!
+  // Debug` coexists with `#[derive(Debug)]` (R1-K controls2/d1, d2), so
+  // `#[macro_use] mod m;` cannot change a derive. A named extern-crate import
+  // list risks only the names it lists; a bare one risks every name (strict).
   const macroUseCrates = new Map<string, Set<string> | null>();
   for (const f of ctx.files)
     for (const b of (data(f.result).attributeBindings ?? []) as {
@@ -3091,6 +3094,75 @@ export function resolveRust(
       )
     );
   }
+  /** `format_args!` and the token-consuming builtins (`stringify!`,
+   * `concat!`, `cfg!`, …) when no captured macro or import can rebind them. */
+  function builtinSafe(name: string, site: GraphLink, scope: string): boolean {
+    const n = name.replace(/^(?:::)?(?:std|core|alloc)::/, "");
+    return (
+      !n.includes("::") &&
+      (consumingBuiltins.has(n) || n === "format_args") &&
+      !textualMacroNames.has(n) &&
+      !visibleMacroNames.has(n) &&
+      !importedStandardName(site.file, scope, n)
+    );
+  }
+  const standardSafe = (
+    name: string,
+    site: GraphLink,
+    loc: Place,
+    scope: string,
+  ): boolean =>
+    standardMacroName(name)
+      ? !standardUnsafe(
+          { name, scope, start: site.range.start },
+          site.file,
+          loc,
+        )
+      : builtinSafe(name, site, scope);
+  /**
+   * Invoked inside another macro's expansion, `name` can neither define an
+   * item, rebind a name in the group it lands in, nor remove code: a safe
+   * standard or builtin macro, or a readable workspace macro that is neutral
+   * and clean and invokes only harmless macros. Unreadable: not harmless.
+   */
+  function harmless(
+    name: string,
+    site: GraphLink,
+    loc: Place,
+    scope: string,
+    from?: GraphSymbol,
+    seen = new Set<string>(),
+  ): boolean {
+    if (standardSafe(name, site, loc, scope)) return true;
+    const s = definiteMacro(name, site, loc, scope, from);
+    if (!s || seen.has(s.id) || seen.size > 16) return false;
+    const profile = profileOf(s)!;
+    const next = new Set([...seen, s.id]);
+    return (
+      profile.neutral &&
+      profile.clean &&
+      profile.bodyMacros.every((m) =>
+        harmless(m.name, site, loc, scope, s, next),
+      )
+    );
+  }
+  /** The expansion of `s` itself is clean and every macro it invokes is harmless. */
+  const expansionProved = (
+    s: GraphSymbol,
+    site: GraphLink,
+    loc: Place,
+    scope: string,
+    seen: Set<string>,
+  ): boolean => {
+    const profile = profileOf(s)!;
+    const next = new Set([...seen, s.id]);
+    return (
+      profile.clean &&
+      profile.bodyMacros.every((m) =>
+        harmless(m.name, site, loc, scope, s, next),
+      )
+    );
+  };
   /**
    * Names that may shadow call-site names in tokens forwarded through `name`
    * into a standard format macro; null when the forwarding is unproved.
@@ -3107,13 +3179,14 @@ export function resolveRust(
     if (
       std &&
       formatStandardMacros.has(std) &&
-      !standardUnsafe({ name, scope, start: site.range.start }, site.file, loc)
+      standardSafe(name, site, loc, scope)
     )
       return new Set();
     const s = definiteMacro(name, site, loc, scope, from);
     if (!s || seen.has(s.id) || seen.size > 16) return null;
     const profile = profileOf(s)!;
-    if (!profile.forwards) return null;
+    if (!profile.forwards || !expansionProved(s, site, loc, scope, seen))
+      return null;
     const shadow = new Set(profile.forwardShadow);
     for (const target of profile.forwards) {
       const inner = forwardShadow(
@@ -4287,9 +4360,14 @@ export function resolveRust(
         shadow: string[],
         armsKnown: boolean,
         seen: Set<string>,
+        expansionKnown: boolean,
       ) => {
         const profile = profileOf(m)!;
         const single = armsKnown && profile.arms === 1;
+        // An attribute, an item other than `use`, or a nested macro that is
+        // not provably harmless can remove the call or rebind its name.
+        const proved =
+          expansionKnown && expansionProved(m, site, loc, scope, seen);
         for (const call of profile.calls) {
           let path = call.path,
             at = loc,
@@ -4320,6 +4398,8 @@ export function resolveRust(
           )
             reasons.push("macro-body-name-unverified");
           if (!single) reasons.push("macro-arm-unverified");
+          if (!proved) reasons.push("macro-expansion-unverified");
+          if (call.repeated) reasons.push("macro-repetition-unverified");
           const base = {
             key: `macro-body:${site.range.start}:${index++}`,
             file: site.file,
@@ -4376,10 +4456,11 @@ export function resolveRust(
             [...shadow, ...nested.shadow],
             single,
             new Set([...seen, next.id]),
+            proved,
           );
         }
       };
-      visit(first, [], true, new Set([first.id]));
+      visit(first, [], true, new Set([first.id]), true);
     }
   }
 }

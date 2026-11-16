@@ -1,15 +1,16 @@
 // R1-K before/after comparison of two measure.mjs runs on one corpus.
 // Usage: node evidence/r1-k/compare.mjs <out-dir> <before-label> <after-label>
-//          <source-root> <seed> <changed-sample> <new-sample>
+//          <source-root> <seed> <changed-sample> <new-sample> [<body-sample>]
 // Prints outcome tables (written links and derived links apart), the reason
 // table for unresolved written links, and two seeded random samples with the
 // source line of each link, for reading by hand:
 //  - written links present in both runs that went unresolved -> definite;
-//  - new definite links (macro-argument calls and derived macro-body calls).
+//  - new definite links (macro-argument calls and derived macro-body calls);
+//  - optionally <body-sample> derived macro-body calls only (all if fewer).
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-const [dir, beforeLabel, afterLabel, source, seedText, changedN, newN] =
+const [dir, beforeLabel, afterLabel, source, seedText, changedN, newN, bodyN] =
   process.argv.slice(2);
 const load = (label) =>
   readFileSync(join(dir, `${label}-links.jsonl`), "utf8")
@@ -131,3 +132,12 @@ const show = (title, rows) => {
 const rnd = random(seed);
 show("SAMPLE unresolved -> definite", sample(gained, Number(changedN), rnd));
 show("SAMPLE new definite", sample(fresh, Number(newN), rnd));
+if (bodyN)
+  show(
+    "SAMPLE derived macro-body calls",
+    sample(
+      fresh.filter((r) => r.derived),
+      Number(bodyN),
+      rnd,
+    ),
+  );

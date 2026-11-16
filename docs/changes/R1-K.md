@@ -50,11 +50,24 @@ module opaque, so every name lookup that passes through that module is
 withheld. ripgrep's `searcher` and `printer` crates have
 `#[macro_use] mod macros;`, and its binary has `#[macro_use] mod messages;`.
 
-**The change.** Only `#[macro_use] extern crate` can bring a derive into
-scope (a bare one: any name; a list: the listed names). `#[macro_use] mod m;`
-carries `macro_rules!` macros only, and a `macro_rules!` macro cannot be used
-as a derive: one named like a standard derive in scope at a derive site is a
-compile error, so it never retargets code that builds.
+**The change.** Only `#[macro_use] extern crate` can make a standard derive
+opaque (a bare one: any name; a list: the listed names). The exact reason,
+checked with rustc 1.98.1 (`evidence/r1-k/controls2/d1–d3`): on stable Rust a
+`#[derive(Name)]` resolves among derive macros only, and those come from
+proc-macro crates (imported by `use`, named by path, or brought in by
+`#[macro_use] extern crate`) or the standard prelude. A `macro_rules!` macro
+is function-like on stable: a `macro_rules!` derive or attribute (`derive()`
+or `attr()` arms) is rejected with E0658 (issue 143549), and a bang
+`macro_rules! Debug` in scope coexists with `#[derive(Debug)]` without
+changing it (prints `7 X`). `#[macro_use] mod m;` carries only `macro_rules!`
+macros, so it cannot change what a derive means. The existing checks on
+`use` imports and globs of derive names are unchanged. Known limit: a nightly
+crate that enables `macro_rules!` derives is not modelled.
+
+Round 1 of this note said a same-named `macro_rules!` at a derive site does
+not compile. That was false (review, Sol); the two reviewers had checked
+different programs (a bang macro, which compiles; a declarative derive, which
+is unstable). The statement above is the true one.
 
 **The other two parts of shape 3 needed nothing else.** With the module no
 longer opaque, `Match::new` resolves, and so does the facade path
@@ -149,41 +162,70 @@ existing dot-call rule; `haystack.path()` stays unresolved because
 
 **Body calls: the change (attribution, not just recording).** For each
 invocation that names one readable workspace definition, each path call
-written in the transcriber (outside nested non-format macro calls and
-pattern positions), and transitively in the workspace macros it invokes,
-becomes a derived `calls` link from the invoking item at the invocation's
-position (origin `analysis`, `data.macroBody`, `data.macro` naming the
-definition). It is resolved as at the invocation: call-site names, and
-`$crate::` in the defining crate. It is definite only when every macro on the
-way has one arm and nothing in the expansion can rebind the head name (an
-item in an enclosing transcriber group, a generic parameter at the call site,
-or a local the arm binds for one-segment names); `crate::` and `::` paths
-cannot be rebound. Otherwise it is unresolved with would-be targets
-(`macro-arm-unverified`, `macro-body-name-unverified`), which `callers`
-reports as possible callers. Calls with no workspace target, sysroot paths,
-`Self::` paths and method calls in bodies are not derived. So
-`callers set_errored` now returns `search` at `main.rs:131` (definite), and
-`requirements_for … impact` can follow it.
+written in the transcriber (outside pattern positions, nested non-format
+macro calls and nested `macro_rules!` definitions), and transitively in the
+workspace macros it invokes, becomes a derived `calls` link at the
+invocation's position (origin `analysis`, `data.macroBody`, `data.macro`
+naming the definition). **The caller is the invocation site's enclosing
+symbol, not an item the macro generates:** a call inside a `fn` the macro
+defines is attributed to the module or function where the macro is invoked.
+It is resolved as at the invocation: items at the call site, `$crate::` in
+the defining crate (rustc agrees: `crate::f()` in an exported macro binds the
+caller's `f`, `$crate::f()` the definer's; control `cross-crate`).
+
+It is definite only when all of these hold:
+
+- every macro on the way has one arm;
+- every macro on the way has a *clean* expansion: no attribute anywhere (so
+  no `#[cfg]` can remove the call) and no item other than a readable `use`
+  (no `fn`, `mod`, `impl`, `const`, `static`, `macro_rules!`, …);
+- every macro the expansion invokes is *harmless* where the outer macro is
+  invoked: a standard or builtin macro no captured binding rebinds, or a
+  readable workspace macro that is neutral and clean and invokes only
+  harmless macros (transitive; anything unreadable fails closed);
+- the call is not inside a `$( … )` repetition (it may be emitted zero
+  times);
+- nothing can rebind the head name: a `use` in an enclosing transcriber group
+  (a glob withholds every name), a generic parameter at the call site, or,
+  for a one-segment name, a local the arm binds or a local in scope where the
+  macro is *defined* (a macro defined inside a function body: mixed-site
+  hygiene resolves body locals at the definition).
+
+Otherwise it is unresolved with would-be targets (`macro-arm-unverified`,
+`macro-expansion-unverified`, `macro-repetition-unverified`,
+`macro-body-name-unverified`), which `callers` reports as possible callers.
+Calls with no workspace target, sysroot paths, `Self::` paths and method
+calls in bodies are not derived. So `callers set_errored` returns `search` at
+`main.rs:131` (definite), while the calls inside test generators such as
+ripgrep's `rgtest!` (a `#[test] fn` per invocation) are unresolved: the
+expansion defines items under an attribute.
 
 `rust.resolve` returns `{ resolutions, links }` when there are derived links
 and the plain list otherwise; the Rust test harnesses accept both.
 
 ## Results
 
-Final runs, this branch (module version 27) against main, same machine
+Final runs (round 2), this branch (module version 27) against `origin/main`
+(Rust module version 26), on the dev server, both sides run in parallel
 (`evidence/r1-k/*-summary.json`, `*-compare.txt`):
 
 | | ripgrep before | ripgrep after | Vector before | Vector after |
 |---|---|---|---|---|
-| links (all) | 34,780 | 39,089 | 370,785 | 392,474 |
-| definite | 12,121 | **14,385** | 78,624 | **80,187** |
+| links (all) | 34,780 | 39,089 | 370,785 | 392,467 |
+| definite | 12,121 | **13,719** | 78,624 | **80,157** |
 | candidate sets | 12 | 12 | 100 | 100 |
-| unresolved | 22,647 | 24,692 | 292,061 | 312,187 |
+| unresolved | 22,647 | 25,358 | 292,061 | 312,210 |
 | links on main that went unresolved → definite | | 620 | | 95 |
 | links on main that went definite → anything else | | **0** | | **0** |
 | new calls in macro arguments: definite / unresolved | | 962 / 2,074 | | 1,438 / 19,792 |
-| new derived macro-body calls: definite / unresolved | | 682 / 591 | | 30 / 429 |
-| cold index, seconds (observation) | 48.9 | 54.8 | 622.1, 679.9 | 771.2 |
+| new derived macro-body calls: definite / unresolved | | 16 / 1,257 | | 0 / 452 |
+| cold index, seconds (observation) | 49.7 | 52.5 | 710.6 | 757.4 |
+
+Against round 1, the review fixes removed 666 definite body-call links on
+ripgrep (the `rgtest!` test generator's `crate::util::setup*` calls; its
+expansion defines a `#[test] fn`) and all 30 on Vector (including the 7 wrong
+`verbosity` links from the `define_display_macro!` factory, which are no
+longer derived at all). Argument calls and the 620/95 gains are unchanged.
 
 Unresolved goes *up* because calls inside macro arguments are now links at
 all; the ones that cannot be proved (most in Vector are inside
@@ -192,9 +234,9 @@ with would-be targets, where before there was no link. On the links that
 existed on main, unresolved fell (ripgrep 22,647 → 22,027) and nothing
 definite was lost.
 
-Reasons on ripgrep (written links, before → after, from
-`ripgrep-compare.txt`): `opaque-item-may-shadow-name` on calls 849 → 227, on
-types 1,484 → 148, on imports 479 → 69, on patterns 271 → 30.
+Reasons on ripgrep (written links, before → after): `opaque-item-may-shadow-name`
+on calls 849 → 227, on types 1,484 → 148, on imports 479 → 69, on patterns
+271 → 30.
 
 The trial's specific links, ripgrep after:
 
@@ -210,46 +252,79 @@ The trial's specific links, ripgrep after:
 | `lines.rs:137…` `range.start()` / `range.end()` on `range: Match` | unresolved | unresolved, `later-probe-step` (see shape 3) |
 | `hiargs.rs:719` `grep::searcher::SearcherBuilder::new()` | unresolved | definite |
 
-Index time rises by about 12% on ripgrep and 13–24% on Vector (main was
-measured twice there, 622 s and 680 s, under different load); the extra work
-is reading argument tokens and proving macros per invocation. These are
-observations on a shared machine, not limits.
+None of the trial cases was lost in round 2.
+
+Index time rises by about 6% on ripgrep and 7% on Vector in this paired run
+(round 1 saw 12% and 13–24% under different load); the extra work is reading
+argument tokens and proving macros per invocation. These are observations on
+a shared machine, not limits.
 
 ## Correctness sample
 
-At least 60 links that went from unresolved to definite, plus new definite
-links, drawn at random (`compare.mjs`, mulberry32, ripgrep seed 1117, Vector
-seed 2203) and each read against the source on the dev server
+Round 2, fresh seeds (ripgrep 4409, Vector 5521), weighted to macro links,
+each read against the source on the dev server
 (`evidence/r1-k/sample-review.md`):
 
-| | unresolved → definite | new definite (arguments, body calls) | right |
-|---|---|---|---|
-| ripgrep | 30 | 15 | 45 / 45 |
-| Vector | 30 | 15 | 45 / 45 |
+| | unresolved → definite | new argument calls | body calls | distinct links | right |
+|---|---|---|---|---|---|
+| ripgrep | 15 | 29 | 16 | 60 | 60 / 60 |
+| Vector | 15 | 30 | 0 | 45 | 45 / 45 |
+| **Total** | **30** | **59** | **16** | **105** | **105 / 105** |
 
-All 90 are right, including routes through a type alias (`type Range =
-Match`), the `grep` facade, a `#[cfg(test)]` constant with a non-test twin,
-and imports from `super` and `crate::…::tests`.
+(ripgrep's "new definite" draw of 30 included one body call, `ignore_messages`
+at `hiargs.rs:882`, also in the body-call draw; it is counted once.)
 
-One fault was found and fixed before this sample, by the before/after diff
-rather than the sample: an earlier version lost 5 definite Vector links
-(`config.type_name()` in `vector-config`'s `schema/helpers.rs`, and test
-calls to `merge` in `transforms/reduce/merge_strategy.rs`). A module-level
-macro that could not be proved neutral switched on the conservative binding
-facts for every link in its file, although a module-level macro cannot bind
-a function's locals. The binding fallback now applies only below a block
-statement (regression test: "an unproved module-level macro does not
-unsettle locals in functions"). The final runs above lose no definite link.
+There are only 16 definite body-call links in both corpora together (all in
+ripgrep, all from `err_message!`, `message!` and `ignore_message!`), so all
+16 were read; 30 cannot be drawn. Vector has none. No wrong link was found.
+Round 1's sample (90 links, seeds 1117 and 2203, all right) drew no body-call
+links from Vector; the reviewers found the wrong ones there, which is why
+round 2 samples body calls on purpose.
+
+Faults found and fixed:
+
+- Round 1, before review, by the before/after diff: 5 definite Vector links
+  were lost because a module-level macro switched on the conservative binding
+  facts for its whole file. The fallback now applies only below a block
+  statement (test: "an unproved module-level macro does not unsettle locals
+  in functions").
+- Round 1 review (Sol, Opus): wrong definite links from a nested
+  item-defining macro, a definition-site local, `#[cfg]` in a body or around
+  forwarding, a macro factory (Vector `vdev/src/utils/macros.rs`), a
+  generated `mod` with `self::`/`super::` paths, and a false statement about
+  derives. Each is now a fixture with its rustc output, with a positive twin;
+  the rules above are the fix.
 
 ## Compiler controls
 
-`evidence/r1-k/controls/` holds a program for each kind of fixture case
-(`run.sh`, output in `output.txt`, rustc 1.98.1 on the dev server). All
-compile. The two negative ones show the danger the rules avoid: with an
-item-defining macro in the block, `helper()` calls the macro's `helper` (the
-program prints 2), and a forwarding macro that defines `helper` around its
-arguments makes the forwarded `helper()` call that one (prints 2). Both stay
-unresolved here.
+`evidence/r1-k/controls/` (round 1) and `evidence/r1-k/controls2/` (round 2;
+`run.sh`, output in `output.txt`, rustc 1.98.1 on the dev server) hold one
+program per fixture case. Round 2 adds every review case and the further
+ways an expansion can change a binding or a call's existence:
+
+| Program | rustc prints | Pymtheg |
+|---|---|---|
+| nested `bind!()` defining `helper` (s1) | `2 2` | argument and body call unresolved |
+| twin: nested harmless `note!()` | `note 1 1` | both definite |
+| local at a function-local macro's definition (s2) | `2` | body call unresolved |
+| twin: call-site local, module-level macro | `1` | body call definite |
+| `#[cfg(any())]` on a body call (s3) / around forwarding | `end` / `end` | unresolved |
+| twin: no cfg | `called` | definite |
+| macro factory (s4) | `before verbosity` | no link at the factory invocation |
+| generated `mod` with `super::`/`self::` (Opus a) | `43` | unresolved |
+| `#[cfg(feature = "trace")]` in a body (Opus b) | `end` | unresolved |
+| `let helper` in the body, forwarded `helper()` (h1) | `1` | definite (hygiene) |
+| `let helper` in the body, body `helper()` | `2` | unresolved |
+| `fn helper` in the body (h2), `const fn helper` (h5) | `2`, `3` | unresolved / no link |
+| forwarding inside a closure and a `for helper` loop (h4) | `1 1` | definite |
+| duplicated forwarding (h6) | `called 1 called 1` | definite |
+| `stringify!`/`concat!` consuming tokens (h7) | `helper() x` | unresolved / no link |
+| arm chosen by pattern (h8) | `2 1` | unresolved |
+| recursive tt-muncher (h9) | `no call` | unresolved |
+| `#[cfg(any())]` on the invoking statement (h10) | `end` | not definite |
+| glob / named `use` in the body (h11, h12) | `2`, `2` | unresolved |
+| `crate::` vs `$crate::` across crates | `crate:app dollar:a` | resolved the same way |
+| derive controls (d1–d3) | `7 X`; E0658; E0658 | see shape 3 |
 
 ## Tests
 
@@ -270,6 +345,12 @@ types, an inner import shadowing an outer one, and a facade
 Checks on the dev server after merging `origin/main` (LIC-2): `npm run
 build`, full `npm test` 2,848 pass / 0 fail, `npm run format:check` clean;
 the new source files carry the SPDX tag.
+
+Round 2 adds 24 fixture tests covering every control in `controls2/` (the table
+above), each with the expectation rustc gave and, for each review finding, a
+positive twin that must still resolve (harmless nested macro, call-site
+local, no `cfg`, forwarding through a closure or loop, duplicated
+forwarding).
 
 Changed expectations: `recall-4.json` "brace tail is still statement-capable"
 used `macro_rules! m{()=>{{}}}`, which expands to an empty block and is now
@@ -312,8 +393,9 @@ The ledger is outside this chunk's files (R1-J is editing docs); proposed
 entries for the manager:
 
 - **Derives and `macro_use` on modules (R1-K):** only `#[macro_use] extern
-  crate` can make a standard derive opaque. Why: `macro_rules!` cannot serve
-  as a derive; a same-named one at a derive site does not compile.
+  crate` can make a standard derive opaque. Why: `macro_rules!` macros are
+  function-like, and a derive position resolves among derive macros only, so
+  a same-named `macro_rules!` never competes with a derive.
 - **Statement macros proved neutral (R1-K):** a readable workspace
   `macro_rules!` macro whose arms emit no item, statement `let`, attribute or
   statement-position `tt`/`item`/`stmt` at the top level, and call only

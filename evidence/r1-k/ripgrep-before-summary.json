@@ -4,8 +4,8 @@
     "id": "rust",
     "version": "26"
   },
-  "source": "/home/user/pymtheg-dev/runs/r1k-v8n3k/scratch/../../r1k-q7m2x/scratch/ripgrep",
-  "seconds": 48.9,
+  "source": "/home/user/pymtheg-dev/runs/r1k-main/scratch/ripgrep",
+  "seconds": 49.7,
   "files": 102,
   "failed": [],
   "links": 34780,

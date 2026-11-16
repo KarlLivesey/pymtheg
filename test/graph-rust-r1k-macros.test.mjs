@@ -497,3 +497,249 @@ test("a path through a facade's pub extern crate alias resolves", async () => {
   );
   g.one("grep::matcher::Match::new", "impl Match::new");
 });
+
+// --- Round 2: expansions that change bindings or remove calls --------------
+// Every program below is in evidence/r1-k/controls2/ with the rustc output it
+// was checked against (rustc 1.98.1): `prints 2` means the macro-introduced
+// helper() was the one called, so a definite link to the outer one is wrong.
+
+const main = (source) => graph({ "src/main.rs": source });
+const derivedState = (g, name) =>
+  g.derivedTo(name).map((l) => (l.targetId ? l.target.identity : null));
+
+test("a nested item-defining macro rebinds forwarded and body names (prints 2 2)", async () => {
+  const g = await main(`fn helper()->u8 { 1 }
+macro_rules! bind {()=>{fn helper()->u8 { 2 }}}
+macro_rules! m {($($t:tt)*)=>{{
+    bind!(); println!($($t)*); println!("{}",helper());
+}}}
+fn main(){m!("{}",helper());}`);
+  g.unresolved("helper", "calls", /macro-argument-unverified/);
+  const body = g.derivedTo("helper");
+  assert.equal(body.length, 1);
+  assert.equal(body[0].targetId, undefined);
+  assert.match(body[0].data.uncertainty, /macro-expansion-unverified/);
+});
+
+test("twin: a harmless nested macro keeps both definite (prints 1 1)", async () => {
+  const g = await main(`fn helper()->u8 { 1 }
+macro_rules! note {()=>{ eprintln!("note"); }}
+macro_rules! m {($($t:tt)*)=>{{
+    note!(); println!($($t)*); println!("{}",helper());
+}}}
+fn main(){m!("{}",helper());}`);
+  g.one("helper", "helper");
+  assert.deepEqual(derivedState(g, "helper"), ["helper"]);
+});
+
+test("an unreadable nested macro in the body fails closed", async () => {
+  const g = await main(`fn helper()->u8 { 1 }
+macro_rules! m {($($t:tt)*)=>{{
+    some_crate::anything!(); println!($($t)*); println!("{}",helper());
+}}}
+fn main(){m!("{}",helper());}`);
+  g.unresolved("helper", "calls", /macro-argument-unverified/);
+  assert.deepEqual(derivedState(g, "helper"), [null]);
+});
+
+test("a local at a function-local macro's definition captures body names (prints 2)", async () => {
+  const g = await main(`fn helper()->u8 { 1 }
+fn main() {
+    let helper=||2;
+    macro_rules! m {()=>{println!("{}",helper());}}
+    m!();
+}`);
+  const body = g.derivedTo("helper");
+  assert.equal(body.length, 1);
+  assert.equal(body[0].targetId, undefined);
+  assert.match(body[0].data.uncertainty, /macro-body-name-unverified/);
+});
+
+test("twin: a call-site local does not capture a module-level macro's body name (prints 1)", async () => {
+  const g = await main(`fn helper()->u8 { 1 }
+macro_rules! m {()=>{println!("{}",helper());}}
+fn main() { let helper=||2; let _ = helper(); m!(); }`);
+  assert.deepEqual(derivedState(g, "helper"), ["helper"]);
+});
+
+test("a cfg-removed body call is not definite (prints end)", async () => {
+  const g = await main(`fn helper() { println!("called"); }
+macro_rules! m {()=>{{#[cfg(any())] helper();}}}
+fn main(){m!(); println!("end");}`);
+  assert.deepEqual(derivedState(g, "helper"), [null]);
+});
+
+test("a cfg-guarded forwarding is not definite (prints end)", async () => {
+  const g = await main(`fn helper()->u8 { println!("called"); 1 }
+macro_rules! m {($($t:tt)*)=>{{ #[cfg(any())] println!($($t)*); }}}
+fn main(){m!("{}",helper()); println!("end");}`);
+  g.unresolved("helper", "calls", /macro-argument-unverified/);
+});
+
+test("twin: the same body call without cfg is definite (prints called)", async () => {
+  const g = await main(`fn helper() { println!("called"); }
+macro_rules! m {()=>{{ helper(); }}}
+fn main(){m!();}`);
+  assert.deepEqual(derivedState(g, "helper"), ["helper"]);
+});
+
+test("a macro factory's generated definition is not a call site (prints before verbosity)", async () => {
+  const g = await main(`fn verbosity()->u8 { println!("verbosity"); 1 }
+macro_rules! define { ($n:ident) => { macro_rules! $n { () => { verbosity() } } } }
+define!(v);
+fn main(){ println!("before"); let _ = v!(); }`);
+  assert.equal(g.derivedTo("verbosity").length, 0);
+});
+
+test("a let in the body does not capture forwarded tokens (prints 1)", async () => {
+  const g = await main(`fn helper()->u8 { 1 }
+macro_rules! m {($($t:tt)*)=>{{ let helper = || 2u8; let _ = helper(); println!($($t)*); }}}
+fn main(){ m!("{}", helper()); }`);
+  g.one("helper", "helper");
+});
+
+test("a let in the body captures the body's own name (prints 2)", async () => {
+  const g = await main(`fn helper()->u8 { 1 }
+macro_rules! m {()=>{{ let helper = || 2u8; println!("{}", helper()); }}}
+fn main(){ m!(); }`);
+  assert.deepEqual(derivedState(g, "helper"), [null]);
+});
+
+test("a fn in the body rebinds forwarded tokens (prints 2)", async () => {
+  const g = await main(`fn helper()->u8 { 1 }
+macro_rules! m {($($t:tt)*)=>{{ fn helper()->u8 { 2 } println!($($t)*); }}}
+fn main(){ m!("{}", helper()); }`);
+  g.unresolved("helper", "calls", /macro-argument-unverified/);
+});
+
+test("forwarded tokens inside a closure or a loop with its own binding stay call-site (prints 1 1)", async () => {
+  const g = await main(`fn helper()->u8 { 1 }
+macro_rules! c {($($t:tt)*)=>{{ let f = || println!($($t)*); f(); }}}
+macro_rules! l {($($t:tt)*)=>{{ for helper in 0..1u8 { let _ = helper; println!($($t)*); } }}}
+fn main(){ c!("{}", helper()); l!("{}", helper()); }`);
+  g.one("helper", "helper");
+});
+
+test("an expr argument placed after a const fn of the same name gets no definite link (prints 3)", async () => {
+  const g = await main(`fn helper()->u8 { 1 }
+macro_rules! k {($e:expr)=>{{ const fn helper()->u8 { 3 } const X: u8 = $e; X }}}
+fn main(){ println!("{}", k!(helper())); }`);
+  // Inside a non-standard macro nested in println!'s arguments: no link.
+  g.none("helper");
+});
+
+test("duplicated forwarding is still the same call (prints called 1 called 1)", async () => {
+  const g = await main(`fn helper()->u8 { println!("called"); 1 }
+macro_rules! d {($($t:tt)*)=>{{ println!($($t)*); println!($($t)*); }}}
+fn main(){ d!("{}", helper()); }`);
+  g.one("helper", "helper");
+});
+
+test("tokens consumed by stringify!/concat! are not calls (prints helper() x)", async () => {
+  const direct = await main(`fn helper()->u8 { 1 }
+macro_rules! s {($($t:tt)*)=>{ stringify!($($t)*) }}
+fn main(){ let _ = s!(helper()); }`);
+  direct.unresolved("helper", "calls", /macro-argument-unverified/);
+  const g = await main(`fn helper()->u8 { println!("called"); 1 }
+macro_rules! s {($($t:tt)*)=>{ stringify!($($t)*) }}
+macro_rules! c {($($t:tt)*)=>{ concat!("x") }}
+fn main(){ println!("{} {}", s!(helper()), c!(helper())); }`);
+  g.none("helper");
+});
+
+test("an arm chosen by pattern leaves forwarding and body calls unproved (prints 2 1)", async () => {
+  const g = await main(`fn helper()->u8 { 1 }
+fn other()->u8 { 2 }
+macro_rules! m { (x) => { println!("{}", other()) }; ($($t:tt)*) => { println!($($t)*) } }
+fn main(){ m!(x); m!("{}", helper()); }`);
+  g.unresolved("helper", "calls", /macro-argument-unverified/);
+  for (const state of derivedState(g, "other")) assert.equal(state, null);
+});
+
+test("a recursive tt-muncher's arguments are not definite (prints no call)", async () => {
+  const g = await main(`fn helper()->u8 { 1 }
+macro_rules! r { () => {}; ($h:tt $($t:tt)*) => { r!($($t)*) } }
+fn main(){ r!(helper()); println!("no call"); }`);
+  g.unresolved("helper", "calls", /macro-argument-unverified/);
+});
+
+test("a cfg on the invoking statement removes its argument calls (prints end)", async () => {
+  const g = await main(`fn helper()->u8 { println!("called"); 1 }
+fn main(){ #[cfg(any())] println!("{}", helper()); println!("end"); }`);
+  g.notDefinite("helper");
+});
+
+test("a glob or named use in the body rebinds forwarded tokens (prints 2)", async () => {
+  for (const use of ["use crate::other::*;", "use crate::other::helper;"]) {
+    const g = await main(`mod other { pub fn helper()->u8 { 2 } }
+fn helper()->u8 { 1 }
+macro_rules! m {($($t:tt)*)=>{{ ${use} println!($($t)*); }}}
+fn main(){ m!("{}", helper()); }`);
+    g.unresolved("helper", "calls", /macro-argument-unverified/);
+  }
+});
+
+test("a body call in a repetition may not happen at all", async () => {
+  const g = await main(`fn helper(_: u8) {}
+macro_rules! each { ($($x:expr),*) => { $( helper($x); )* } }
+fn main(){ each!(); }`);
+  assert.deepEqual(derivedState(g, "helper"), [null]);
+});
+
+test("crate:: in an exported macro body resolves at the call site, $crate:: at the definition (prints crate:app dollar:a)", async () => {
+  const g = await graph(
+    {
+      "src/main.rs":
+        'fn f() -> &\'static str { "app" }\nfn main(){ other::m!(); }',
+      "other/src/lib.rs":
+        'pub fn f() -> &\'static str { "a" }\n#[macro_export] macro_rules! m { () => { println!("crate:{} dollar:{}", crate::f(), $crate::f()); } }',
+    },
+    {
+      "Cargo.toml":
+        app +
+        '[workspace]\nmembers=["other"]\n[dependencies]\nother={path="other"}\n',
+      "other/Cargo.toml": '[package]\nname="other"\nedition="2021"\n',
+    },
+  );
+  const files = g
+    .derivedTo("crate::f")
+    .map((l) => l.target?.file)
+    .sort();
+  assert.deepEqual(files, ["other/src/lib.rs", "src/main.rs"]);
+});
+
+test("self::/super:: inside a module the macro generates are not resolved one module out (prints 43)", async () => {
+  const g = await main(`mod outer {
+    pub fn helper() -> i32 { 1 }
+    fn local() -> i32 { 2 }
+    macro_rules! gen { () => { mod g { pub fn run() -> i32 { super::helper() * 10 + self::local() } fn local() -> i32 { 3 } } } }
+    pub mod site {
+        pub fn helper() -> i32 { 4 }
+        fn local() -> i32 { 5 }
+        gen!();
+        pub fn go() -> i32 { let _ = local(); g::run() }
+    }
+    pub fn x() -> i32 { local() + helper() }
+}
+fn main() { println!("{}", outer::site::go()); }`);
+  for (const name of ["super::helper", "self::local"])
+    for (const l of g.derivedTo(name)) {
+      assert.equal(l.targetId, undefined, name);
+      assert.match(l.data.uncertainty, /macro-expansion-unverified/);
+    }
+});
+
+test("a cfg on a call in a macro body leaves the derived call unproved (prints end)", async () => {
+  const g = await graph(
+    {
+      "src/main.rs": `pub fn emit(s: &str) { println!("emit {s}"); }
+macro_rules! trace { () => { #[cfg(feature = "trace")] $crate::emit("x"); } }
+fn main() { trace!(); println!("end"); }`,
+    },
+    { "Cargo.toml": app + "[features]\ntrace=[]\n" },
+  );
+  const ls = g.derivedTo("crate::emit");
+  assert.equal(ls.length, 1);
+  assert.equal(ls[0].targetId, undefined);
+  assert.match(ls[0].data.uncertainty, /macro-expansion-unverified/);
+});
