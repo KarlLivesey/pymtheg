@@ -12,8 +12,10 @@ Each first-party source file starts with one line,
 TypeScript, JavaScript and Go, `/* */` for CSS, `<!-- -->` for HTML and `#` for
 shell. After a shebang it is the second line; in `web/index.html` it follows
 `<!doctype html>` (the one-line file is split after the doctype). In Go files
-a blank line follows the tag so it is not part of the package doc comment, and
-`//go:build ignore` in `golinks.go` stays in the file header, where Go reads it.
+a blank line follows the tag so it is not part of the package doc comment. In
+`golinks.go` the tag comes before `//go:build ignore`. Go accepts a build
+constraint after other line comments at the top of the file, and the blank
+line before `package` that Go requires after a constraint is unchanged.
 No copyright line, no licence text.
 
 Scope, by rule: every file of a source kind under `src/`, `web/src/`,
@@ -67,8 +69,17 @@ sources outside the exclusions.
   (shebang, tag, comment, import) and still inside that window.
 - `golinks.go`: the helper binary is cached under a key from its source hash,
   so the tag changes the key and an existing installation rebuilds the helper
-  once on its next Go index. `go build golinks.go` names the file, so
-  `//go:build ignore` is still honoured as before.
+  once on its next Go index. Pymtheg builds the helper with
+  `go build -trimpath -o … golinks.go`. A build that names the file ignores
+  build constraints, so `//go:build ignore` has never applied to that build,
+  before or after the tag. The constraint only keeps the file out of package
+  builds (`go build .`, `go list`, `go vet ./...`). Checked on the dev server
+  with Go 1.27.4: building the tagged `golinks.go` by name succeeds, and a
+  probe file with only `//go:build ignore` also builds by name. In a package
+  directory, `go list` still reports that the constraint excludes the tagged
+  file, so Go still reads the constraint after the tag. It does so with or
+  without the blank line after the tag; that blank line is only there to keep
+  the tag out of the package doc comment.
 - No first-line pragmas (`// @ts-check`, `@jsx`, `"use strict"`) exist in the
   tagged files; `web/src/generated/report.js` (which starts with
   `"use strict"`) is excluded anyway.
@@ -87,8 +98,16 @@ sources outside the exclusions.
   tags later is one revert of this change.
 - `test/licence-tags.test.mjs` walks the scope by the same rules (its own
   copy, with the exclusions in one list, one reason each) and fails for any
-  untagged in-scope file, and for a tag in `web/src/generated/`,
-  `test/fixtures/` or the vendored grammars. A second case builds a small tree
-  in a temporary directory and checks that the audit reports an untagged file,
-  a tag below the first line, an untagged shebang script and a tagged fixture.
+  untagged in-scope file. It also fails when a file in `web/src/generated/`,
+  `test/fixtures/` or the vendored grammars (patches included) has our tag
+  line anywhere in it. That means any of the four comment styles the script
+  writes, with an optional leading `+`, `-` or space for patch lines. No
+  excluded file contains `SPDX` text today, so the test's list of allowed
+  files is empty. A second case builds a small tree in a temporary directory.
+  It checks that the audit reports an untagged file, a tag below the first
+  line and an untagged shebang script. It also checks that the audit reports
+  our tag in a fixture on line 1, a fixture on line 2 (after
+  `// Fixture input`), a CSS fixture, mid-file in a generated file and as an
+  added line in a grammar patch. A vendored file's own Apache-2.0 SPDX line
+  is not reported.
 - `CONTRIBUTING.md` asks for the tag on new source files.

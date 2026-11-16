@@ -71,6 +71,14 @@ const EXCLUDED = [
     why: "example and scaffold material users copy; out of LIC-2's scope",
   },
 ];
+/** Our tag, in any of the comment styles scripts/spdx-tags.mjs writes, on any
+ * line; an optional leading `+`, `-` or space also catches it inside a patch. */
+const OURS =
+  /^[+\- ]?[ \t]*(?:\/\/|\/\*|<!--|#)[ \t]*SPDX-License-Identifier: MIT\b/m;
+/** Files under an `untagged: true` exclusion that may contain that line, one
+ * reason each. Empty: no generated, fixture or vendored file contains any
+ * `SPDX` text today. */
+const ALLOWED = [];
 
 /** Where the tag must sit: the line after a shebang or doctype, else line 1. */
 function lineFor(path, text) {
@@ -132,9 +140,9 @@ function audit(root) {
     const files = [];
     walk(root, x.path.replace(/\/$/, ""), files);
     for (const f of files) {
+      if (ALLOWED.some((a) => a.path === f)) continue;
       const text = readFileSync(join(root, f), "utf8");
-      const at = lineFor(f, text);
-      if (at && at.rest.startsWith(at.line)) misplaced.push(`${f} (${x.why})`);
+      if (OURS.test(text)) misplaced.push(`${f} (${x.why})`);
     }
   }
   return { missing, misplaced, checked };
@@ -173,7 +181,19 @@ test("the audit catches a missing tag and a tagged excluded file", () => {
     put("grammars/build.mjs", `// ${TAG}\n`);
     put("web/vite.config.ts", `// ${TAG}\n`);
     put("test/fixtures/sample/main.ts", `// ${TAG}\nexport {};\n`);
-    put("grammars/go/patches/0001.patch", "diff\n");
+    put("test/fixtures/sample/second.ts", `// Fixture input\n// ${TAG}\n`);
+    put("test/fixtures/sample/style.css", `a {}\n/* ${TAG} */\n`);
+    put("test/fixtures/sample/clean.ts", "export {};\n");
+    put("web/src/generated/late.js", `export {};\n\n// ${TAG}\n`);
+    put(
+      "grammars/go/patches/0001.patch",
+      `--- a/x.js\n+++ b/x.js\n+// ${TAG}\n`,
+    );
+    put("grammars/go/patches/0002.patch", "diff\n");
+    put(
+      "grammars/rust/src/upstream.c",
+      "// SPDX-License-Identifier: Apache-2.0\n",
+    );
     put("node_modules/x/index.js", "untagged third party\n");
     put("src/dist/out.js", "build output\n");
     const { missing, misplaced } = audit(root);
@@ -182,10 +202,13 @@ test("the audit catches a missing tag and a tagged excluded file", () => {
       "src/bad.ts",
       "src/tag-not-first.ts",
     ]);
-    assert.deepEqual(
-      misplaced.map((m) => m.split(" ")[0]),
-      ["test/fixtures/sample/main.ts"],
-    );
+    assert.deepEqual(misplaced.map((m) => m.split(" ")[0]).sort(), [
+      "grammars/go/patches/0001.patch",
+      "test/fixtures/sample/main.ts",
+      "test/fixtures/sample/second.ts",
+      "test/fixtures/sample/style.css",
+      "web/src/generated/late.js",
+    ]);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
