@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // R1-J: honest MCP surfaces. Each test drives the built product over real
 // stdio MCP (and the CLI where the CLI shares the behaviour).
 import test from "node:test";

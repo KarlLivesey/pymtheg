@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // R1-J: the MCP resource pymtheg://code/guide (docs/code-guide.md) is a worked
 // session. Every `// verified-mcp` block runs here, in order, over real stdio
 // MCP, in a folder that was never initialised; every tool and action the guide

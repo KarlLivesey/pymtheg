@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // R1-J: shipped documentation must not name an MCP tool or a CLI command the
 // product does not have. Reads the package's real doc list and tools/list.
 import test from "node:test";
