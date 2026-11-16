@@ -1,7 +1,7 @@
 # First-class project initialization
 
-Karl requested a CodeGraph-like `pymtheg init` entry point, with Studio and MCP
-aware of the same project. Most projects begin empty. Existing documentation may
+`pymtheg init` is a CodeGraph-like entry point, with Studio and MCP aware of
+the same project. Most projects begin empty. Existing documentation may
 be brought in, but it is not required and never becomes verified by import.
 
 ## Current capability and acceptance boundary
@@ -10,7 +10,7 @@ Initialization, nearest-project discovery, optional document previews, explicit
 imports, conflict review and portable project identity are implemented. Current
 validation includes real CLI/MCP and Studio journeys, concurrent initialization,
 relocation and native-plan continuity. See the
-[current completion audit](current-completion-audit.md) for the exact final
+[current completion audit](https://github.com/KarlLivesey/pymtheg/blob/main/docs/current-completion-audit.md) for the exact final
 validation records; the chronological counts below describe earlier checkpoints.
 Sharing uses explicit history archives. It is not live team synchronization.
 
