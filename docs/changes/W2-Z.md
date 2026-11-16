@@ -113,7 +113,7 @@ built tool (`npm ci --ignore-scripts && npm run build`). Probe outputs are in
 | (round 0, superseded by W2-C2) E4 on `main` was `derive`/`global_allocator` only                                                                                                                           | `src/graph/languages/rust/parse.ts:186`; `grep -n println src/graph/languages/rust/*.ts` (no match); known-limit test file `test/graph-rust-round12.test.mjs` |
 | Walker skips `.codegraph`                                                                                                                                                                                  | `src/graph/indexer.ts:88`                                                                                                                                     |
 | num-bigint 0.4.8                                                                                                                                                                                           | `test/fixtures/rust-rich/Cargo.toml:6`, `Cargo.lock`                                                                                                          |
-| Decisions D16, D17, D18, whole-file rule, candidate-set rule, E4 + extension, grammar route, stable-ID ruling, compile-correctness ruling                                                                  | `docs/build-plan.md` section 10 notes (quoted); `docs/mega-plan.md` section 2                                                                                 |
+| Decisions D16, D17, D18, whole-file rule, candidate-set rule, E4 + extension, grammar route, stable-ID ruling, compile-correctness ruling                                                                  | `docs/build-plan.md` section 10 notes (quoted); the mega plan (kept privately), section 2                                                                                |
 | Per-module definite/candidate/limit lists not exercised by the probe                                                                                                                                       | the module's change note (`W2-B.md`, `W2-B2.md`, `W2-C.md`, `W2-D.md`, `W2-S.md`, `W2-U.md`), cited at the end of each subsection                             |
 
 ## Superseded statements in per-chunk notes (left as written)
@@ -142,19 +142,19 @@ built tool (`npm ci --ignore-scripts && npm run build`). Probe outputs are in
 - `W2-E.md`: "All of 3.3 remains deferred" is partly superseded by W2-E2.
   Its listed old wording in `src/reporting/explain.ts:54` is already fixed on
   `main` (it names `.pymtheg/settings.json`).
-- `docs/mega-plan.md` Stage 4 "Libraries (… installed through npm, nothing to
+- The mega plan's (since kept privately) Stage 4 "Libraries (… installed through npm, nothing to
   compile)" is no longer true for Go (vendored, built by Pymtheg; still nothing to
   compile at install). The mega-plan line on rust-analyzer is superseded by D16
   (recorded in `decisions.md`).
 
 ## Found false outside my owned paths (not edited)
 
-- `docs/architecture-workspace-plan.md:74`: "The local `.pymtheg-architecture/`
+- The architecture workspace plan (since kept privately): "The local `.pymtheg-architecture/`
   database"; now `.pymtheg/shared/architecture.sqlite`.
 - `docs/seventh-review-work.md:12`: "`.pymtheg.json` accepts `sources.include`";
   now `.pymtheg/settings.json`. Both are historical documents; a one-line
   "superseded" note would do.
-- `docs/mega-plan.md` Stage 4 libraries line (above).
+- The mega plan's Stage 4 libraries line (above).
 - `pymtheg doctor` still reports Quint, Java and TLC readiness and says "Set
   PYM_TLC_JAR", which is accurate for MCP and Studio but reads as required; it
   changes with the TLC/Quint removal chunk.

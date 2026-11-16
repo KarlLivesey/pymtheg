@@ -186,7 +186,7 @@ superseded ledger entries, marked as superseded.
   `examples/checkout.qnt`, `examples/Checkout.tla` and `examples/*.cfg` stay in
   the repository as preserved research and are not packed.
 - Historical documents under `docs/` (`1.0-status.md`, review briefs and audits,
-  `operation-contract-authoring-map.md`) and `docs/mega-plan.md`/`docs/build-plan.md`
+  `operation-contract-authoring-map.md`), the mega plan (since kept privately) and `docs/build-plan.md`
   were not rewritten; they describe their own time.
 - `src/backends/process.ts` stays: output plugins and `observe` (git) still run
   child processes through it.

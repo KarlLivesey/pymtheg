@@ -10,8 +10,8 @@ Done-when ("restic indexes; direct calls and imports resolve across files"): see
 `evidence/w2-b/restic.md`. Every restic-internal import resolves, and direct
 calls resolve across files and packages.
 
-**This module is the no-toolchain fallback** (decision D16 in
-`docs/mega-plan.md`). Precise Go links will come from a later chunk that asks the
+**This module is the no-toolchain fallback** (decision D16, recorded in
+`docs/decisions.md`). Precise Go links will come from a later chunk that asks the
 `go` toolchain's own type checker. Here:
 
 - **Definite:** imports, package-qualified references, direct function calls,
