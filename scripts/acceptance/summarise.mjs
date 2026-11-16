@@ -56,6 +56,11 @@ lines.push(
   `- Install (a, \`npx\`): ${quote("a-node-only", "install-npx")}; ${quote("a-node-only", "install-size")}.`,
   `- Go opt-in (c): index ${quote("c-node-go-rust", "go-toolchain-index")}; callers of Add opted in: ${quote("c-node-go-rust", "go-toolchain-callers")}; with the setting off: ${quote("c-node-go-rust", "go-source-only-callers")}.`,
   `- restic (f): ${quote("f-restic", "restic-graph-index")}.`,
+  (() => {
+    const v = run.results.find((r) => r.scenario === "a-node-only" && r.step === "version");
+    return `- One CLI call through \`npx\` (a, \`--version\`): ${v?.durationMs ?? "?"} ms, peak RSS ≥ ${v?.peakRssKiB ? Math.round(v.peakRssKiB / 1024) : "?"} MiB.`;
+  })(),
+  `- Absolute-path \`npx\` (a): ${quote("a-node-only", "npx-absolute-path")}.`,
 );
 const outcomes = self.outcomes;
 const sabotages = outcomes.filter((o) => o.id !== "control");

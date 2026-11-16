@@ -1,8 +1,8 @@
 # Clean-machine acceptance — latest run
 
-Generated 2026-11-16T02:00:24.031Z from commit 0857f2f2 by `scripts/acceptance/run.mjs`. Verdict: **pass**.
+Generated 2026-11-16T03:37:36.734Z from commit dec50ae1 by `scripts/acceptance/run.mjs`. Verdict: **pass**.
 
-Counts: pass 466, observed 10, expected-fail 23. Tarball pymtheg-1.0.0.tgz: 1.75 MiB packed, 8.60 MiB unpacked, 831 files.
+Counts: pass 466, observed 10, expected-fail 23. Tarball pymtheg-1.0.0.tgz: 1.75 MiB packed, 8.63 MiB unpacked, 831 files.
 
 Durations, sizes and memory are observations on the dev server, not limits.
 
@@ -16,10 +16,10 @@ Release build: npm ci, npm run build, npm pack in a node:24.21.0 container.
 
 | Step | Status | Exit | Req. | Reason |
 |---|---|---|---|---|
-| npm-ci | pass | 0 | yes | 4.5 s (observation); 7 npm warning lines |
-| npm-run-build | pass | 0 | yes | 25.5 s (observation); 0 npm warning lines |
+| npm-ci | pass | 0 | yes | 4.2 s (observation); 7 npm warning lines |
+| npm-run-build | pass | 0 | yes | 25.7 s (observation); 0 npm warning lines |
 | npm-pack | pass | 0 | yes | 2.5 s (observation); 0 npm warning lines |
-| tarball-contents | pass | – | yes | 831 files, 1.75 MiB packed, 8.60 MiB unpacked |
+| tarball-contents | pass | – | yes | 831 files, 1.75 MiB packed, 8.63 MiB unpacked |
 | package-private | observed | – | no | "private": true — npm refuses to publish it, so `npx pymtheg` from the registry cannot work until the owner decides to publish; `npx ./pymtheg-*.tgz` works without publishing |
 | package-engines | observed | – | no | engines.node ">=24"; optionalDependencies {} |
 
@@ -32,7 +32,7 @@ Node only: install from the tarball with npx, then init, doctor, check/verify/si
 | install-npx | pass | 0 | yes | 3.9 s (observation); 0 npm warning lines |
 | install-npx-file-spec | pass | 0 | yes | 3.1 s (observation); 0 npm warning lines |
 | network-off | pass | – | yes | ok |
-| install-size | observed | 0 | no | ~/.npm/_npx 97.7 MiB; ~/.npm/_cacache 30.5 MiB (apparent file sizes) |
+| install-size | observed | 0 | no | ~/.npm/_npx 101.5 MiB; ~/.npm/_cacache 31.0 MiB (apparent file sizes) |
 | npx-absolute-path | observed | 126 | no | exit 126: sh: 1: /acc/pkg/pymtheg-1.0.0.tgz: Permission denied |
 | help | pass | 0 | yes | ok |
 | version | pass | 0 | yes | ok |
@@ -112,7 +112,7 @@ Node only: install from the tarball with npx, then init, doctor, check/verify/si
 | studio-stop | pass | – | yes | ok |
 | init-with-legacy-folder | pass | 0 | yes | ok |
 | writes-outside-project | pass | 1 | yes | all inside allowed places: ~/project/ 13; ~/.npm/_logs/ 11; ~/.npm/_cacache/ 2; ~/.npm/_npx/ 2; ~/legacy/ 22; /acc/ 3 |
-| install-unchanged | pass | – | yes | 4726 files under ~/.npm/_npx unchanged |
+| install-unchanged | pass | – | yes | 5044 files under ~/.npm/_npx unchanged |
 | no-toolchain-processes | pass | – | yes | log empty in every step |
 
 ## b-node-git
@@ -123,7 +123,7 @@ Same as (a) in a git repository (git installed with apt before the install step)
 |---|---|---|---|---|
 | setup-git | pass | – | yes | git version 2.39.5 |
 | install-npx | pass | 0 | yes | 3.9 s (observation); 0 npm warning lines |
-| install-npx-file-spec | pass | 0 | yes | 3.3 s (observation); 0 npm warning lines |
+| install-npx-file-spec | pass | 0 | yes | 3.4 s (observation); 0 npm warning lines |
 | network-off | pass | – | yes | ok |
 | git-setup | pass | 0 | yes | ok |
 | help | pass | 0 | yes | ok |
@@ -207,7 +207,7 @@ Same as (a) in a git repository (git installed with apt before the install step)
 | init-with-legacy-folder | pass | 0 | yes | ok |
 | git-status-end | pass | 0 | yes | ok |
 | writes-outside-project | pass | 1 | yes | all inside allowed places: ~/project/ 63; ~/.npm/_logs/ 11; ~/.npm/_cacache/ 2; ~/.npm/_npx/ 2; ~/legacy/ 22; /acc/ 3 |
-| install-unchanged | pass | – | yes | 4726 files under ~/.npm/_npx unchanged |
+| install-unchanged | pass | – | yes | 5044 files under ~/.npm/_npx unchanged |
 | no-toolchain-processes | pass | – | yes | log empty in every step |
 
 ## c-node-go-rust
@@ -218,7 +218,7 @@ Same as (a) with Go and Rust toolchains (copied from the official golang and rus
 |---|---|---|---|---|
 | setup-toolchains | pass | – | yes | golang:1-bookworm, rust:1-slim-bookworm: go version go1.27.4 linux/amd64; cargo 1.100.0 (3acc79c0c 2026-11-05) |
 | install-npx | pass | 0 | yes | 4.1 s (observation); 0 npm warning lines |
-| install-npx-file-spec | pass | 0 | yes | 3.3 s (observation); 0 npm warning lines |
+| install-npx-file-spec | pass | 0 | yes | 3.2 s (observation); 0 npm warning lines |
 | network-off | pass | – | yes | ok |
 | toolchains-present | observed | 0 | no | go version go1.27.4 linux/amd64; cargo 1.100.0 (3acc79c0c 2026-11-05); rustc 1.100.0 (0ef1bc386 2026-11-09) |
 | help | pass | 0 | yes | ok |
@@ -303,8 +303,8 @@ Same as (a) with Go and Rust toolchains (copied from the official golang and rus
 | go-toolchain-callers | pass | 0 | yes | main@main.go:10->Add:definite:toolchain, main@main.go:10->Add:definite:toolchain, main@main.go:13->Add:definite:toolchain, main@main.go:15->Add:definite:toolchain, main@main.go:17->Add:definite:toolchain |
 | go-toolchain-off-again | pass | 0 | yes | ok |
 | go-source-only-callers | pass | 0 | yes | main@main.go:10->Add:definite:source, main@main.go:10->Add:definite:source, main@main.go:15->Add:definite:source, main@main.go:17->Add:definite:source |
-| writes-outside-project | pass | 1 | yes | all inside allowed places: ~/project/ 13; ~/.config/go/ 1; ~/.npm/_logs/ 11; ~/.npm/_cacache/ 2; ~/.npm/_npx/ 2; ~/legacy/ 22; ~/goproject/ 12; /acc/ 3 |
-| install-unchanged | pass | – | yes | 4726 files under ~/.npm/_npx unchanged |
+| writes-outside-project | pass | 1 | yes | all inside allowed places: ~/project/ 13; ~/.npm/_logs/ 11; ~/.npm/_cacache/ 2; ~/.npm/_npx/ 2; ~/legacy/ 22; ~/goproject/ 12; /acc/ 3 |
+| install-unchanged | pass | – | yes | 5044 files under ~/.npm/_npx unchanged |
 | no-toolchain-processes | pass | – | yes | log empty in every step |
 | graph-identical-to-node-only | pass | – | yes | 9 graph results identical |
 
@@ -314,9 +314,9 @@ npm install --global of the tarball: the binary resolves grammars, web assets an
 
 | Step | Status | Exit | Req. | Reason |
 |---|---|---|---|---|
-| install-global | pass | 0 | yes | 3.6 s (observation); 0 npm warning lines |
+| install-global | pass | 0 | yes | 3.3 s (observation); 0 npm warning lines |
 | network-off | pass | – | yes | ok |
-| install-size | observed | 0 | no | ~/.npm/_cacache 30.5 MiB; ~/.npm-global 48.9 MiB (apparent file sizes) |
+| install-size | observed | 0 | no | ~/.npm/_cacache 31.0 MiB; ~/.npm-global 50.7 MiB (apparent file sizes) |
 | bin-location | pass | 0 | yes | ok |
 | help | pass | 0 | yes | ok |
 | version | pass | 0 | yes | ok |
@@ -396,7 +396,7 @@ npm install --global of the tarball: the binary resolves grammars, web assets an
 | studio-stop | pass | 0 | yes | ok |
 | init-with-legacy-folder | pass | 0 | yes | ok |
 | writes-outside-project | pass | 1 | yes | all inside allowed places: ~/project/ 13; ~/legacy/ 22; /acc/ 3 |
-| install-unchanged | pass | – | yes | 2359 files under ~/.npm-global/lib/node_modules/pymtheg unchanged |
+| install-unchanged | pass | – | yes | 2518 files under ~/.npm-global/lib/node_modules/pymtheg unchanged |
 | no-toolchain-processes | pass | – | yes | log empty in every step |
 
 ## d-local
@@ -405,9 +405,9 @@ npm install of the tarball as a dependency of another package, then npx pymtheg.
 
 | Step | Status | Exit | Req. | Reason |
 |---|---|---|---|---|
-| install-local | pass | 0 | yes | 3.4 s (observation); 0 npm warning lines |
+| install-local | pass | 0 | yes | 3.3 s (observation); 0 npm warning lines |
 | network-off | pass | – | yes | ok |
-| install-size | observed | 0 | no | ~/.npm/_cacache 30.5 MiB; ~/app/node_modules 48.9 MiB (apparent file sizes) |
+| install-size | observed | 0 | no | ~/.npm/_cacache 31.0 MiB; ~/app/node_modules 50.8 MiB (apparent file sizes) |
 | help | pass | 0 | yes | ok |
 | version | pass | 0 | yes | ok |
 | init | pass | 0 | yes | ok |
@@ -486,7 +486,7 @@ npm install of the tarball as a dependency of another package, then npx pymtheg.
 | studio-stop | pass | – | yes | ok |
 | init-with-legacy-folder | pass | 0 | yes | ok |
 | writes-outside-project | pass | 1 | yes | all inside allowed places: ~/project/ 13; ~/.npm/_logs/ 11; ~/legacy/ 22; /tmp/node-compile-cache/ 11; /acc/ 3 |
-| install-unchanged | pass | – | yes | 2361 files under ~/app/node_modules unchanged |
+| install-unchanged | pass | – | yes | 2520 files under ~/app/node_modules unchanged |
 | no-toolchain-processes | pass | – | yes | log empty in every step |
 
 ## e-node-24.0.0
@@ -495,8 +495,8 @@ Lowest Node release engines ">=24" allows: install, doctor and the core commands
 
 | Step | Status | Exit | Req. | Reason |
 |---|---|---|---|---|
-| install-npx | pass | 0 | yes | 3.7 s (observation); 0 npm warning lines |
-| install-npx-file-spec | pass | 0 | yes | 2.9 s (observation); 0 npm warning lines |
+| install-npx | pass | 0 | yes | 3.5 s (observation); 0 npm warning lines |
+| install-npx-file-spec | pass | 0 | yes | 2.7 s (observation); 0 npm warning lines |
 | network-off | pass | – | yes | ok |
 | node-version | observed | 0 | no | v24.0.0 |
 | help | pass | 0 | yes | ok |
@@ -509,7 +509,7 @@ Lowest Node release engines ">=24" allows: install, doctor and the core commands
 | graph-index | pass | 0 | yes | ok |
 | graph-ts-callers | pass | 0 | yes | ok |
 | writes-outside-project | pass | 1 | yes | all inside allowed places: ~/project/ 5; ~/.npm/_logs/ 9; ~/.npm/_cacache/ 2; ~/.npm/_npx/ 2; /acc/ 3 |
-| install-unchanged | pass | – | yes | 4726 files under ~/.npm/_npx unchanged |
+| install-unchanged | pass | – | yes | 5044 files under ~/.npm/_npx unchanged |
 | no-toolchain-processes | pass | – | yes | log empty in every step |
 
 ## e-node-25
@@ -532,7 +532,7 @@ Node 25 (supported by engines ">=24"): install, doctor and the core commands.
 | graph-index | pass | 0 | yes | ok |
 | graph-ts-callers | pass | 0 | yes | ok |
 | writes-outside-project | pass | 1 | yes | all inside allowed places: ~/project/ 5; ~/.npm/_logs/ 9; ~/.npm/_cacache/ 2; ~/.npm/_npx/ 2; /acc/ 3 |
-| install-unchanged | pass | – | yes | 4726 files under ~/.npm/_npx unchanged |
+| install-unchanged | pass | – | yes | 5044 files under ~/.npm/_npx unchanged |
 | no-toolchain-processes | pass | – | yes | log empty in every step |
 
 ## e-node-26
@@ -541,7 +541,7 @@ Node 26 (supported by engines ">=24"): install, doctor and the core commands.
 
 | Step | Status | Exit | Req. | Reason |
 |---|---|---|---|---|
-| install-npx | pass | 0 | yes | 3.8 s (observation); 0 npm warning lines |
+| install-npx | pass | 0 | yes | 3.9 s (observation); 0 npm warning lines |
 | install-npx-file-spec | pass | 0 | yes | 3.3 s (observation); 0 npm warning lines |
 | network-off | pass | – | yes | ok |
 | node-version | observed | 0 | no | v26.13.1 |
@@ -555,7 +555,7 @@ Node 26 (supported by engines ">=24"): install, doctor and the core commands.
 | graph-index | pass | 0 | yes | ok |
 | graph-ts-callers | pass | 0 | yes | ok |
 | writes-outside-project | pass | 1 | yes | all inside allowed places: ~/project/ 5; ~/.npm/_logs/ 9; ~/.npm/_cacache/ 2; ~/.npm/_npx/ 2; /acc/ 3 |
-| install-unchanged | pass | – | yes | 4726 files under ~/.npm/_npx unchanged |
+| install-unchanged | pass | – | yes | 5044 files under ~/.npm/_npx unchanged |
 | no-toolchain-processes | pass | – | yes | log empty in every step |
 
 ## f-restic
@@ -564,17 +564,17 @@ restic (a larger real Go project): init, graph index and five queries; time and 
 
 | Step | Status | Exit | Req. | Reason |
 |---|---|---|---|---|
-| install-npx | pass | 0 | yes | 3.8 s (observation); 0 npm warning lines |
-| install-npx-file-spec | pass | 0 | yes | 3.5 s (observation); 0 npm warning lines |
+| install-npx | pass | 0 | yes | 4.1 s (observation); 0 npm warning lines |
+| install-npx-file-spec | pass | 0 | yes | 3.3 s (observation); 0 npm warning lines |
 | network-off | pass | – | yes | ok |
 | restic-init | pass | 0 | yes | 2.8 s (observation) |
-| restic-graph-index | pass | 0 | yes | 559 files, 7356 symbols, 63088 links, 0 failed; 86.6 s, peak RSS ≥ 2074 MiB (observations) |
-| restic-status | pass | 0 | yes | ok; {"matches":0,"symbols":0,"links":0,"callers":0,"observedLinks":0}; 2.7 s, peak RSS ≥ 167 MiB (observations) |
-| restic-search | pass | 0 | yes | ok; {"matches":20,"symbols":0,"links":0,"callers":0,"observedLinks":0}; 2.9 s, peak RSS ≥ 159 MiB (observations) |
-| restic-callers | pass | 0 | yes | ambiguous; {"matches":6,"symbols":0,"links":0,"callers":0,"observedLinks":0}; 2.8 s, peak RSS ≥ 161 MiB (observations) |
-| restic-callees | pass | 0 | yes | ok; {"matches":0,"symbols":1,"links":57,"callers":0,"observedLinks":0}; 2.8 s, peak RSS ≥ 161 MiB (observations) |
-| restic-impact | pass | 0 | yes | ambiguous; {"matches":3,"symbols":0,"links":0,"callers":0,"observedLinks":0}; 2.9 s, peak RSS ≥ 169 MiB (observations) |
-| restic-path | pass | 0 | yes | ambiguous; {"matches":7,"symbols":0,"links":0,"callers":0,"observedLinks":0}; 3.1 s, peak RSS ≥ 159 MiB (observations) |
+| restic-graph-index | pass | 0 | yes | 559 files, 7356 symbols, 63088 links, 0 failed; 85.7 s, peak RSS ≥ 1905 MiB (observations) |
+| restic-status | pass | 0 | yes | ok; {"matches":0,"symbols":0,"links":0,"callers":0,"observedLinks":0}; 2.7 s, peak RSS ≥ 151 MiB (observations) |
+| restic-search | pass | 0 | yes | ok; {"matches":20,"symbols":0,"links":0,"callers":0,"observedLinks":0}; 2.7 s, peak RSS ≥ 151 MiB (observations) |
+| restic-callers | pass | 0 | yes | ambiguous; {"matches":6,"symbols":0,"links":0,"callers":0,"observedLinks":0}; 3.0 s, peak RSS ≥ 152 MiB (observations) |
+| restic-callees | pass | 0 | yes | ok; {"matches":0,"symbols":1,"links":57,"callers":0,"observedLinks":0}; 2.8 s, peak RSS ≥ 150 MiB (observations) |
+| restic-impact | pass | 0 | yes | ambiguous; {"matches":3,"symbols":0,"links":0,"callers":0,"observedLinks":0}; 5.2 s, peak RSS ≥ 149 MiB (observations) |
+| restic-path | pass | 0 | yes | ambiguous; {"matches":7,"symbols":0,"links":0,"callers":0,"observedLinks":0}; 2.9 s, peak RSS ≥ 151 MiB (observations) |
 | writes-outside-project | pass | 1 | yes | all inside allowed places: ~/restic/ 5; ~/.npm/_logs/ 8; ~/.npm/_cacache/ 2; ~/.npm/_npx/ 2; /acc/ 3 |
-| install-unchanged | pass | – | yes | 4726 files under ~/.npm/_npx unchanged |
+| install-unchanged | pass | – | yes | 5044 files under ~/.npm/_npx unchanged |
 | no-toolchain-processes | pass | – | yes | log empty in every step |

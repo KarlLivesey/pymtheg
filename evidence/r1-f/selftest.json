@@ -1,7 +1,7 @@
 {
   "schema": "pymtheg.acceptance-selftest/v1",
-  "generatedAt": "2026-11-16T02:30:24.445Z",
-  "commit": "437bb2e5",
+  "generatedAt": "2026-11-16T03:52:06.511Z",
+  "commit": "dec50ae1",
   "passed": true,
   "matcher": {
     "cases": 39,
@@ -879,7 +879,7 @@
         },
         {
           "step": "mcp-requirement_links-add-go",
-          "reason": "link to taxFor: got [\"created\",0,null,null,null,\"undefined\"], expected [\"created\",1,\"plan:R1\",\"taxFor\",\"symbol:c2e000dd641db6e7c555f78313a67106ed9fdf42532552e368925498a9fbd51a\",\"string\"]"
+          "reason": "link to taxFor: got [\"created\",0,null,null,null,\"undefined\"], expected [\"created\",1,\"plan:R1\",\"taxFor\",\"symbol:087675b4bc43be4be24e99d27c583f510668ca996e4e288a329382a509045e48\",\"string\"]"
         },
         {
           "step": "mcp-requirement_links-add-rust",

@@ -1,6 +1,6 @@
 # Acceptance self-test — latest run
 
-Generated 2026-11-16T02:30:24.447Z from commit 437bb2e5. Result: **every sabotage caught**.
+Generated 2026-11-16T03:52:06.512Z from commit dec50ae1. Result: **every sabotage caught**.
 
 Wording matcher: 39/39 fixed cases correct.
 
