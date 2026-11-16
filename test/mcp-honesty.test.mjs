@@ -227,6 +227,55 @@ test("F: callers report the true possible-caller total over MCP, as the CLI does
   );
 });
 
+test("F: callers count definite and candidate-set totals each in full", async () => {
+  const each = 600;
+  const source = [
+    "export class A { m(): number { return 1; } }",
+    "export class B { m(): number { return 2; } }",
+    ...Array.from(
+      { length: each },
+      (_, i) => `export function d${i}(x: A) { return x.m(); }`,
+    ),
+    ...Array.from(
+      { length: each },
+      (_, i) => `export function c${i}(x: A | B) { return x.m(); }`,
+    ),
+    "",
+  ].join("\n");
+  await project({ "a.ts": source }, async (s, root) => {
+    const first = await s.call("code_graph", {
+      action: "callers",
+      query: "a.ts:1:18",
+      limit: 20,
+    });
+    const answer =
+      first.state === "running"
+        ? await s.call("graph_result", { jobId: first.jobId, wait: true })
+        : first;
+    assert.deepEqual(answer.summary.query.classCounts, {
+      definite: each,
+      candidateSet: each,
+      unresolved: 0,
+    });
+    assert.equal(answer.summary.query.countsTruncated, false);
+    const text = cli(
+      root,
+      "graph",
+      "callers",
+      "a.ts:1:18",
+      "--limit",
+      "1",
+      "--json",
+    );
+    assert.equal(text.status, 0, text.stderr);
+    assert.deepEqual(JSON.parse(text.stdout).data.classCounts, {
+      definite: each,
+      candidateSet: each,
+      unresolved: 0,
+    });
+  });
+});
+
 test("near matches: a selector that selects nothing suggests, never selects", async () =>
   project(
     {

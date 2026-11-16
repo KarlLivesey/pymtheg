@@ -68,7 +68,15 @@ await write("src/lib.rs", [
   "",
   "pub fn feed<S: Sink>(s: &mut S) { s.sink(1); }",
   "",
+  "mod inner {",
+  "    pub struct Deep;",
+  "    impl Deep { pub fn go_deep(&self) {} }",
+  "}",
+  "",
+  "mod outer;",
+  "",
 ].join("\n"));
+await write("src/outer.rs", "pub struct Shallow;\n\nimpl Shallow { pub fn go_shallow(&self) {} }\n");
 const info = await call("project_info", {});
 expect(info.initialised === false && info.workspace === null);
 // => initialised: false, initialisation: "This project is not initialised: …"
@@ -94,8 +102,11 @@ async function graph(args) {
 }
 const indexed = await graph({ action: "index" });
 expect(indexed.state === "complete" && indexed.summary.sync.complete === true);
-expect(indexed.summary.counts.files === 2 && indexed.summary.counts.failed === 0);
-// => summary.counts: { files: 2, failed: 0, … } (symbols, links, unresolved, …)
+expect(indexed.summary.counts.files === 3 && indexed.summary.counts.failed === 0);
+const modules = await graph({ action: "search", query: "go_" });
+expect(modules.items.map((s) => s.qualifiedName).join() === "inner::impl Deep::go_deep,impl Shallow::go_shallow");
+// => an inline module prefixes its path (inner::); a file module (mod outer; in src/outer.rs) adds none.
+// => summary.counts: { files: 3, failed: 0, … } (symbols, links, unresolved, …)
 const status = await graph({ action: "status" });
 expect(status.summary.indexExists === true && status.summary.failedFileCount === 0);
 ```
@@ -135,9 +146,12 @@ are written as follows (all measured on this project):
 | Rust     | method in a generic impl            | `impl<T:Clone> Wrap<T>::get`   |
 | Rust     | trait method declaration            | `Sink::sink`                   |
 | Rust     | trait method implementation         | `impl Sink for Counter::sink`  |
+| Rust     | method in an inline `mod inner { … }` | `inner::impl Deep::go_deep`  |
+| Rust     | method in a file module (`mod outer;`) | `impl Shallow::go_shallow`  |
 | Any      | a declaration's line                | `store.go:7`, `src/lib.rs:4:12` |
 
-Go qualified names carry no package name. Rust generic parameters are written
+Go qualified names carry no package name. A Rust inline module prefixes its
+path (`inner::`); a file module adds no prefix. Rust generic parameters are written
 exactly as recorded, with no spaces (`impl<T:Clone>`, not `impl<T: Clone>`).
 A plain `Type::method` is not a Rust selector: it selects nothing, and the reply
 lists *near matches* instead (never selected for you):
@@ -151,7 +165,7 @@ expect(near.items[0].type === "near-match" && near.items[0].qualifiedName === "i
 // => summary.query.inputs[0].nearMatches: ["impl SearcherBuilder::new"]
 const spaced = await graph({ action: "symbol", query: "impl<T: Clone> Wrap<T>::get" });
 expect(spaced.items[0].type === "near-match" && spaced.items[0].qualifiedName === "impl<T:Clone> Wrap<T>::get");
-for (const selector of ["impl SearcherBuilder::new", "impl<T:Clone> Wrap<T>::get", "Sink::sink", "impl Sink for Counter::sink", "(*Store).Put", "(Box).Get", "Getter.Get", "store.go:7"]) {
+for (const selector of ["impl SearcherBuilder::new", "impl<T:Clone> Wrap<T>::get", "Sink::sink", "impl Sink for Counter::sink", "inner::impl Deep::go_deep", "impl Shallow::go_shallow", "(*Store).Put", "(Box).Get", "Getter.Get", "store.go:7"]) {
   const one = await graph({ action: "symbol", query: selector });
   expect(one.summary.status === "ok" && one.items.length === 1 && one.items[0].type === "selected");
 }
@@ -206,10 +220,11 @@ const out = await call("graph_result", { jobId: callees.jobId, section: "links" 
 expect(out.items.some((l) => l.certainty === "definite" && l.targetName === "s.Put"));
 ```
 
-`classCounts` are totals: `definite` and `candidateSet` count stored calls and
-`unresolved` counts possible callers, exactly up to 1,000 each whatever the
-item `limit`; past that, `countsTruncated: true` says the figure is a lower
-bound. Section `legend` expands reason codes such as `r1` in `reasons`;
+`classCounts` are totals whatever the item `limit`: `definite` and
+`candidateSet` are exact counts of the stored calls; `unresolved` counts
+possible callers exactly up to 1,000 (or the `limit`, if larger), and when it
+reaches that bound `countsTruncated: true` says `unresolved` is a lower bound
+(`countBound` gives the bound). Section `legend` expands reason codes such as `r1` in `reasons`;
 section `detail` with a `ref` returns the exact stored JSON.
 
 ## Limits and how to raise them

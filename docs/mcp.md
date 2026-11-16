@@ -192,9 +192,10 @@ preview. Sections `stale_files`, `warnings`, `modules` are independently paged.
 - **unresolved/possible:** a suggestion or unknown call, never a definite target.
   Section `possible_callers` is separate from ordinary links; hasPossibleCallers and
   classCounts prevent an empty definite list reading as “nobody calls this”.
-  For `callers`, classCounts are totals counted up to 1,000 (or the limit, if
-  larger) whatever the item limit; `countsTruncated:true` means a total reached
-  that bound and is a lower bound.
+  For `callers`, classCounts are totals whatever the item limit: definite and
+  candidateSet are exact; unresolved is counted up to 1,000 (or the limit, if
+  larger), and `countsTruncated:true` means it reached that bound and is a
+  lower bound.
   Match basis is target-hint, receiver-qualified or name-only; name-only includes
   other types/packages. Impact reports frontier hints and follows them only with
   `includePossible:true`; path's `possiblePath` remains separate from found paths.

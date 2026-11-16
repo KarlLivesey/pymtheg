@@ -2502,10 +2502,12 @@ nothing.
 
 ### Callers' class counts are totals (R1-J)
 
-**Decided (R1-J):** `callers` reports `classCounts` as totals counted up to
-1,000 links (or the query limit, if larger), independent of the item limit;
-`countsTruncated` now means a total reached that bound, and `countBound` gives
-it. Items stay bounded by the limit. **Why:** MCP's limit is at most 100, so it
+**Decided (R1-J):** `callers` reports `classCounts` as totals independent of
+the item limit: `definite` and `candidateSet` are exact (one indexed count
+query); `unresolved` possible callers, which must be classified one by one, are
+counted up to 1,000 (or the query limit, if larger). `countsTruncated` now means
+that possible-caller count reached the bound, and `countBound` gives it. Items
+stay bounded by the limit. **Why:** MCP's limit is at most 100, so it
 reported `unresolved: 100, countsTruncated: true` where the CLI (default limit
 1,000) reported the real 441. **Rules out:** counts that depend on the page
 size. Impact's per-frontier counts are unchanged (still capped at the limit).

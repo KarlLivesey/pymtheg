@@ -197,7 +197,9 @@ Nothing runs a language toolchain unless the project opts in to the Go
 toolchain route (below); nothing reads or writes `.codegraph/`. Language
 modules are discovered from `src/graph/languages/*/`;
 production discovery offers `go`, `rust` and `typescript` (the `toy` fixture is
-test-only). Interface: [W1-C](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W1-C.md), [W2-I](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-I.md).
+test-only). Each module's current version, and the versions the index was built
+with, are in every graph answer (`modules`: `id`, `version`, `indexedVersions`;
+MCP section `modules`); a changed module version makes the next query sync the index. Interface: [W1-C](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W1-C.md), [W2-I](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-I.md).
 
 Link outcomes:
 
@@ -223,9 +225,11 @@ module's `parse` (a syntax error) is stored and reused: while the file's
 original-byte hash, module ID and module version are unchanged it is not parsed
 again, and it stays failed with its diagnostics. Editing the file or bumping the
 module version invalidates it. Go and Rust failures are cached this way.
-TypeScript content failures are never cached by the core, because that module is
-analyze-only and its failures come from project analysis; such a file is read
-again on every index. Failures marked `failureKind: "transient"`, thrown parser
+TypeScript is analyze-only: its failures come from project analysis, and one
+the module certifies as a content failure (`failureKind: "content"`, which a
+syntax error is) is cached the same way, so an unchanged broken file is counted
+`unchanged` on the next index and stays failed; other analysis failures are not
+cached. Failures marked `failureKind: "transient"`, thrown parser
 exceptions (crash, timeout, cancellation, resource budget), malformed parser
 output, unreadable captures and project-analysis failures are never cached; they
 are retried. `SqliteGraphStore.failedFiles()` lists the failed source files, ordered
@@ -247,7 +251,7 @@ failed internally are unresolved with no reason. In Go and Rust a thrown parser
 exception is a parser error in the index report, not a syntax failure, and cannot
 become an `invalid-code` cause. Source: [W2-U](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-U.md).
 
-#### Go (module version 23)
+#### Go
 
 Source-only by default: nothing runs `go` unless the project opts in to the
 toolchain route below. Claims `*.go`; context `go.mod` and
@@ -263,8 +267,10 @@ file (its ID can change when files are added or removed).
   are not evaluated); several equally shallow promotion paths; interface dispatch
   (the interface method plus every project type whose method set matches by name
   and parameter/result counts; always open, `structural-match-unverified`);
-  calls on a receiver with no evident type (name-only, open); reassigned
-  function-valued locals.
+  calls on a receiver whose type the source does not show (name-only, open,
+  `receiver-type-unknown`; with only one project method of that name it stays
+  unresolved, and a receiver of a standard-library or third-party type is
+  unresolved); reassigned function-valued locals.
 - **Never definite:** `implements` links (unresolved, interface kept in
   `data.interfaceId`, `structural-match-unverified`; computed type identity is an
   annotation only).
@@ -289,7 +295,7 @@ straddles one of the parser runtime's 5,119-unit input chunk boundaries (the sam
 character in a comment or string there is read). Sources: [W2-B](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-B.md),
 [W2-B2](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-B2.md), [W2-S](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-S.md), `grammars/README.md`.
 
-#### Rust (module version 23)
+#### Rust
 
 No-toolchain module; nothing runs `cargo` or `rustc`, and macros are not expanded.
 Claims `*.rs`; context `Cargo.toml`, read by a snapshot-only TOML reader (an
@@ -335,8 +341,10 @@ manifest unknown). Private items are ordinary symbols.
   `dbg`, `matches`) no longer do, unless a captured binding of that name could
   compete. A child module file inherits its parent's textual macros at its
   `mod child;` declaration, so `#[macro_use] mod macros;` macros used in later
-  child files resolve. Macro arguments get no links. Cross-crate `#[macro_export]`
-  macros are unresolved. Standard-library and external items are unresolved.
+  child files resolve. Macro arguments get no links. A `#[macro_export]` macro of
+  another crate in the project resolves (by path, `use` or `#[macro_use] extern
+  crate`); macros of crates outside the project are unresolved.
+  Standard-library and external items are unresolved.
 - Cargo features and target platforms are not evaluated; `cfg` conditions are
   compared structurally.
 - **Assumption E4:** unseen code (a bare `#[macro_use] extern crate`, opaque macro
@@ -348,15 +356,18 @@ manifest unknown). Private items are ordinary symbols.
   `macros.rs` that defines its own `println!` emitting an item); both are pinned
   as known limits (`test/graph-rust-round12.test.mjs`, the macro-recall tests).
 
-Grammar: npm `tree-sitter-rust` 0.24.0, unpatched. It rejects some valid Rust,
-which fails the whole file (11 files of Vector): `&raw` where `raw` is a variable,
-`unsafe extern "C" { … }` (edition 2024), `#[cfg]` on a struct-pattern field, two
-or more attributes on one parameter or an attribute on a closure parameter (a
-single attribute on a function or method parameter parses), a turbofish on a function named like a
-primitive (`char::<_, E>(…)`), and `impl A + for<'a> B<'a>`. Sources:
-[W2-C](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-C.md), [W2-P](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-P.md).
+Grammar: the module loads `grammars/rust/tree-sitter-rust.wasm`, built by
+Pymtheg from upstream `tree-sitter-rust` v0.24.2 plus six upstream pull requests
+and two patches of its own (`grammars/README.md`). It reads `&raw` borrows and a
+variable named `raw`, `unsafe extern "C" { … }` with `safe fn`, and `#[cfg]` on
+a struct-pattern field. It still rejects some valid Rust, which fails the whole
+file (3 files of Vector): two or more attributes on one parameter or an
+attribute on a closure parameter (a single attribute on a function or method
+parameter parses), a turbofish on a function named like a primitive
+(`char::<_, E>(…)`), and `impl A + for<'a> B<'a>`. Sources:
+[W2-C](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-C.md), [W2-P](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-P.md), [W2-V](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-V.md).
 
-#### TypeScript and JavaScript (module version 16)
+#### TypeScript and JavaScript
 
 Uses the TypeScript compiler over the captured snapshot. The only other input
 is the installed compiler's standard-library declarations; `node_modules` is not
@@ -402,9 +413,10 @@ the index with the files by content (`--no-sync`/`noSync` answers from the index
 as it is, with stale-file warnings); `status` never indexes. A selector is a
 `symbol:` ref, an exact name, a recorded qualified name or `path:line[:column]`;
 a selector that selects nothing returns up to five near matches, never selected.
-Callers' class counts (`definite`, `candidateSet`, `unresolved` possible callers)
-are totals counted up to 1,000 or the limit, whichever is larger;
-`countsTruncated` marks a total that reached that bound. The MCP form, its
+Callers' class counts are totals whatever the limit: `definite` and
+`candidateSet` are exact; `unresolved` (possible callers) is counted up to 1,000
+or the limit, whichever is larger, and `countsTruncated` marks that it reached
+that bound and is a lower bound. The MCP form, its
 selector forms per language and its limits are in [the code guide](code-guide.md).
 
 **Go toolchain route (opt-in, decision D17).** With `"graph": {"toolchain": {"go": true}}`
@@ -424,7 +436,7 @@ No MCP tool changes this setting; edit the file. Sources:
 Toolchain-backed Rust links (`cargo`/`rustc`; investigation
 [W2-L](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-L.md)), `go.work` workspaces in the Go
 toolchain route, the join with model declarations, the explore query, a Studio
-screen for the graph, Lua, and a vendored Rust grammar.
+screen for the graph, and Lua.
 
 #### Requirement ↔ code-symbol links (R1-D)
 

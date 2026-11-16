@@ -19,7 +19,7 @@ const decidedByToolchain = (link: GraphLink): boolean => {
   );
 };
 
-/** Callers' class counts are exact up to this many links (the CLI's default limit). */
+/** Callers' possible-caller count is exact up to this many (the CLI's default limit). */
 export const CALLER_COUNT_BOUND = 1000;
 
 export type QueryCommand =
@@ -274,16 +274,17 @@ export function queryGraph(
     return { items, count, truncated: found.length > items.length };
   };
   if (command === "callers" || command === "callees") {
-    // Callers' class counts are totals, counted up to countBound (at least
-    // the CLI's default limit) whatever the item limit, so a small page still
-    // reports how many exist; countsTruncated means a total reached the bound.
-    const countBound =
-      command === "callers" ? Math.max(limit, CALLER_COUNT_BOUND) : limit;
     const found = store.callLinks(
       start.id,
       command === "callers" ? "incoming" : "outgoing",
-      countBound + 1,
+      limit + 1,
     );
+    // Callers' class counts are totals whatever the item limit: definite and
+    // candidate-set calls are counted exactly (one indexed count query);
+    // possible callers, which must be classified one by one, are counted up to
+    // countBound (at least the CLI's default limit). countsTruncated means the
+    // possible-caller count reached that bound.
+    const countBound = Math.max(limit, CALLER_COUNT_BOUND);
     const possible =
       command === "callers" ? possibleCalls(store, start, countBound + 1) : [];
     return result(
@@ -295,12 +296,11 @@ export function queryGraph(
           ? {
               possibleCallers: displayPossible(possible.slice(0, limit)),
               hasPossibleCallers: possible.length > 0,
-              classCounts: classCounts(
-                found.slice(0, countBound),
-                Math.min(possible.length, countBound),
-              ),
-              countsTruncated:
-                found.length > countBound || possible.length > countBound,
+              classCounts: {
+                ...store.incomingCallCounts(start.id),
+                unresolved: Math.min(possible.length, countBound),
+              },
+              countsTruncated: possible.length > countBound,
               countBound,
             }
           : {}),

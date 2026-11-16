@@ -196,7 +196,13 @@ export function registerLinkTools(
           depth: z.number().int().min(0).max(100).optional(),
           allowMoved: z.boolean().optional(),
           symbols: z.boolean().optional(),
-          symbolLimit: z.number().int().min(1).max(1000).default(200),
+          symbolLimit: z
+            .number()
+            .int()
+            .min(1)
+            .max(1000)
+            .optional()
+            .describe("unlinked only; default 200"),
           noSync: z.boolean().default(false),
           wait: z.boolean().default(true),
           section: page.section,
@@ -232,7 +238,6 @@ export function registerLinkTools(
           "section",
           "limit",
           "noSync",
-          "symbolLimit",
         ]);
         const input: Record<string, unknown> = { noSync: a.noSync };
         for (const [key, value] of Object.entries(a))
@@ -250,7 +255,10 @@ export function registerLinkTools(
           throw Error(
             "requirements_for requires exactly one of symbol or file",
           );
-        if (a.action === "unlinked") input.limit = a.symbolLimit;
+        if (a.action === "unlinked") {
+          delete input.symbolLimit;
+          input.limit = a.symbolLimit ?? 200;
+        }
         ctx.mcpReq.signal.throwIfAborted();
         if (workspace.graph?.activeId())
           throw Object.assign(

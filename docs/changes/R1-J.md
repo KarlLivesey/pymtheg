@@ -27,8 +27,7 @@ row for the code graph and requirement links and a section "Graph commands and
 the Go toolchain route" (the CLI syntax, sync, selectors, near matches, class
 counts, and the opt-in with its real setting and states); "Not built yet" now
 lists only what is not built (Rust toolchain links, `go.work` in the Go route,
-the model join, the explore query, a Studio graph screen, Lua, a vendored Rust
-grammar). The README describes `pymtheg graph`, `pymtheg link` and the code
+the model join, the explore query, a Studio graph screen, Lua). The README describes `pymtheg graph`, `pymtheg link` and the code
 guide. `docs/project-init.md` describes the first-write initialisation (E).
 All ten shipped docs and the README were read against the product; the
 other statements checked (commands, flags, example files, test names, limits)
@@ -37,12 +36,20 @@ as dated history.
 
 **Tested.** `test/shipped-docs-names.test.mjs` reads the package's real doc
 list and the server's `tools/list`. It fails when a shipped doc names a tool
-that does not exist: `call("x")`, `**x**`, `` `x` tool``, "MCP `x`", and, in the
-three agent guides, any backticked snake_case word that is not a tool, an
-action value, a schema property, or a section value in a sentence that says
-"section". It also proves it catches the original `source_contract` sentence.
-A second test fails when a shipped doc names a `pymtheg` command, a
-`pymtheg graph` action or a `pymtheg link` subcommand the CLI does not have.
+that does not exist, found by these patterns only: `call("x")` and
+`refuse("x")`; `**x_y**`; `` `x_y` tool(s)``; "the x_y tool" with or without
+backticks; backticked snake_case words after "MCP" or "tool(s)"; in any shipped
+doc, a backticked snake_case word that shares its first or last word with a
+tool name (`graph_results`, `read_sources`) unless it is a value the tool
+schemas take (a property name or enum value); and, in the three agent guides
+(`agent-workflow.md`, `code-guide.md`, `mcp.md`), every backticked snake_case
+word that is not a tool, an action value or a schema property, or a section
+value in a sentence that says "section". It checks itself on the original
+`source_contract` sentence and on `graph_results` / "the requirement_link
+tool". A tool named in prose without backticks and without the word "tool"
+is not caught. A second test fails when a shipped doc names a `pymtheg`
+command, a `pymtheg graph` action (read from the CLI's own help text) or a
+`pymtheg link` subcommand (read from its usage text) the CLI does not have.
 
 ## B. MCP resources said nothing about code
 
@@ -85,6 +92,10 @@ links; the test accepts `used` or `unavailable` so it does not depend on the
 machine having Go. `test/mcp-honesty.test.mjs` checks near matches over MCP and
 in CLI text.
 
+The selector table also gives a Rust inline module's prefix
+(`inner::impl Deep::go_deep`) and a file module's absence of one
+(`impl Shallow::go_shallow`), both run in the guide (review round 1).
+
 ## C. `read_source`
 
 **True before.** It reads only `.pym` files; its description said "source
@@ -108,7 +119,10 @@ Go, Rust and TypeScript/JavaScript code." Not extended to code files.
 arguments, and a refusal names what the action accepts, for example "note is not
 accepted by refresh. refresh accepts link, plus wait, section, limit and
 noSync." `note` on refresh was not accepted: the link's note would be replaced
-by a refresh, which is a new meaning, not a slip.
+by a refresh, which is a new meaning, not a slip. Review round 1: `symbolLimit`
+had a default and was silently accepted by every action, so the description's
+"others are refused" was false; it now has no schema default, is refused by
+every action but `unlinked` (where it defaults to 200), and its schema says so.
 
 **Tested.** `test/mcp-honesty.test.mjs` (D and H) and the guide.
 
@@ -150,16 +164,22 @@ guide test checks `git status` shows exactly `.pymtheg/.gitignore`,
 CLI (default limit 1,000) reported 441 in the trial. Reproduced on a fixture
 with 150 possible callers: MCP at limit 20 reported `unresolved: 20`.
 
-**Changed.** `callers` counts `definite`, `candidateSet` and `unresolved`
-totals up to 1,000 or the limit, whichever is larger (`CALLER_COUNT_BOUND`),
-whatever the item limit; `countsTruncated` means a total reached that bound;
-`countBound` reports it. Items stay bounded by `limit` (`summary.truncated`
+**Changed.** `callers` reports class totals whatever the item limit:
+`definite` and `candidateSet` are exact, from one indexed count query
+(`SqliteGraphStore.incomingCallCounts`, the same rows as the callers list);
+`unresolved` is counted up to 1,000 or the limit, whichever is larger
+(`CALLER_COUNT_BOUND`); `countsTruncated` means that count reached the bound;
+`countBound` reports it. (Round 1 of review found the first version counted
+definite and candidate-set calls together against one bound of 1,000: 600 + 600
+callers reported 499 + 501. Reproduced, then fixed as above.) Items stay bounded by `limit` (`summary.truncated`
 unchanged). CLI text now reads "Call classes (totals)". Impact's per-frontier
 counts are unchanged.
 
 **Tested.** `test/mcp-honesty.test.mjs` (F): MCP at limit 20 reports
 `unresolved: 150`, `countsTruncated: false`, a 20-item page; the CLI's JSON
-reports the same 150. Existing `test/graph-command-review.test.mjs` counts
+reports the same 150. A TypeScript fixture with 600 definite and 600
+candidate-set callers reports 600 and 600, `countsTruncated: false`, over MCP
+and the CLI. Existing `test/graph-command-review.test.mjs` counts
 still pass.
 
 ## G. Misleading messages
@@ -196,6 +216,37 @@ for code files. **Tested.** `test/mcp-honesty.test.mjs` (D and H).
   `test/package-contents.test.mjs` lists it.
 - `docs/decisions.md`: the first-write initialisation and callers' totals.
 
+## Review round 1: `docs/support.md` code-graph audit
+
+Both reviewers found further stale `support.md` sentences by running the
+installed package (module version numbers; an unpatched Rust grammar and an
+unbuilt vendored one; cross-crate exported macros unresolved; TypeScript syntax
+failures never cached). After fixing those, every factual claim of the code
+graph part of `support.md` was checked once more, section by section, either by
+a run of `evidence/r1-j/support-audit.mjs` (the built CLI's `graph … --json` on
+small projects; 62 claims, all passing after the corrections below; output in
+`evidence/r1-j/support-audit.jsonl`) or by pointing at code or tests.
+
+| Section | How checked | Result |
+| --- | --- | --- |
+| Code graph (consumers, store, `.codegraph/`, discovery) | run: `general/*` (modules discovered are go, rust, typescript; `.codegraph/` not claimed); store schema 3 and refusal: `src/graph/store.ts` (schema check on open) | true. Module version numbers removed from the headings: every graph answer reports them (`modules`), so the doc no longer states numbers that go stale (Go was 23 in the doc, 25 in code; Rust 23/26; TypeScript 16/17). `test/shipped-docs-names.test.mjs` fails if a shipped doc states `module version N` |
+| Link outcomes table | run: open Go sets carry `data.open` reasons; failed links carry `reason: "invalid-code"`, `cause.files`; Rust `uncertainty`; the 16 would-be targets: `TARGET_HINT_LIMIT` in `src/graph/languages/rust/index.ts` | true |
+| Unreadable code is failed | run: a broken Go file is listed failed with no symbols; a call into its package is `invalid-code` with the file as cause | true |
+| Failure caching | run: a broken Go file and a broken TypeScript file each index twice, `indexed` then `unchanged`, still failed; code: `src/graph/indexer.ts` (analyze-only results cached when `failureKind: "content"`) | **corrected**: TypeScript content failures are cached; other analysis failures are not |
+| Internal errors | code and tests: `test/graph-typescript-crash.test.mjs`, `test/graph-core-robustness*.test.mjs` | true |
+| Go | run: package-qualified call, concrete receiver, promotion, in-module import (definite); interface dispatch, reassigned function local, build variants (candidate sets, open); `implements` unresolved with `interfaceId`; builtins, standard library, unexported names of another package, generic-method instantiation, cgo `import "C"` (unresolved); locals not symbols; package symbol; `{; G() }` fails the file | **corrected**: a name-only set needs two or more project methods of the name and an unknown receiver type; a receiver of a standard-library type is unresolved. The rest is true. Not run: elements of function containers, `new(variable).M()`, `go.work`, `vendor/` (code: `src/graph/languages/go/resolve.ts`) |
+| Go grammar | run (`{; G() }` fails); manifest and `test/grammar-vendored.test.mjs` | true |
+| Rust | run: associated call, path call, re-export, `mod`, `impl Trait for`, owned and `&self` dot calls on parameters (definite); annotated `let` + `&self` (later probe step), unannotated `let` (receiver unverified), opaque attribute, standard library (unresolved); statement macro withholds, `crate::` still resolves, expression macro and `println!` withhold nothing | **corrected**: a `#[macro_export]` macro of another project crate resolves by path, `use` and `#[macro_use] extern crate` (run); only macros of crates outside the project are unresolved (run: `serde_json::json!`). One sentence changed; Rust rows otherwise untouched (R1-K edits them) |
+| Rust grammar | run: nine constructs, each in its own file; `grammars/rust/manifest.json`, `grammars/README.md`, `docs/changes/W2-V.md` | **corrected**: patched v0.24.2 (six upstream PRs, two own patches); `&raw`, `unsafe extern` with `safe fn`, `#[cfg]` in patterns read; stacked parameter attributes, closure-parameter attributes, primitive-named turbofish and `impl A + for<'a> B<'a>` still fail (run) |
+| TypeScript and JavaScript | run: eleven files of all eight extensions claimed, none failed; barrel `export *`, rename, default export, heritage, `new`, JSX, literal `require` (definite); computed `require`, standard library (`external`), `node_modules` import (`external-package`) (unresolved); duplicate JavaScript functions (candidate set); uncaptured `extends` (partial, `incomplete-config`); a failed file adds `assumes: ["no-unseen-declarations"]`; `let let = 1` in `.js` stays clean | true. Not run: pnpm workspaces, AMD, module augmentation, compiler stack limits (code and W2-D tests) |
+| Graph commands and Go toolchain route | code: `src/graph/commands.ts` (depth default 5, max 100; limit default 1,000, max 10,000; `status` read-only); run: `status` does not index; route off with no setting; `unavailable` for no `go.mod`, `go.work` and a missing `go`; `used` with Go 1.27.4 (guide run) | true |
+| Not built yet | code: no Rust toolchain route, no Studio graph screen | **corrected**: the vendored Rust grammar is built and was removed from the list |
+| Requirement links | tests: `test/code-links.test.mjs`, `test/link-baseline*.test.mjs`, `test/graph-link-index.test.mjs`, `test/mcp-links.test.mjs`; the 30 s writer wait: `writerWaitMs` in `src/storage/local.ts` | true |
+
+Callers' class counts (Opus round 1): the first version counted definite and
+candidate-set callers together against one bound (600 + 600 reported as 499 +
+501, reproduced); now exact per class (see F).
+
 ## Left, and why
 
 - `read_source` for code files, `note` on refresh, an MCP tool that changes
@@ -216,3 +267,9 @@ for code files. **Tested.** `test/mcp-honesty.test.mjs` (D and H).
   (`evidence/r1-j/acceptance-latest.md`). Self-test: every sabotage caught;
   cleanup test ok, no containers left (`evidence/r1-j/acceptance-selftest.md`).
 - `evidence/r1-j/repro.mjs` output after the change: `evidence/r1-j/repro-after.jsonl`.
+
+Review round 1 fixes, on a normal merge of main (LIC-2): `npm test` 2,831
+tests, 2,831 pass, 0 fail; format check, `node scripts/spdx-tags.mjs --check`
+and the licence inventory check pass; `npm pack` 832 files, 1.9 MB. The
+acceptance gate was not re-run for these fixes (its MCP and CLI caller
+assertions compare caller sets, not class counts).

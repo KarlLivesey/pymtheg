@@ -107,7 +107,7 @@ export function formatGraph(response: GraphResponse): string {
         lines.push(
           data.countBound === undefined
             ? `Call classes (returned): ${quote(data.classCounts)}`
-            : `Call classes (totals${data.countsTruncated ? `, at least; counting stops at ${String(data.countBound)}` : ""}): ${quote(data.classCounts)}`,
+            : `Call classes (totals${data.countsTruncated ? `; possible callers counted up to ${String(data.countBound)}, so unresolved is at least that` : ""}): ${quote(data.classCounts)}`,
         );
       for (const item of (data.possibleCallers ?? []) as {
         symbol?: DisplaySymbol;
