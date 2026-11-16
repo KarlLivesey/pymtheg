@@ -1,0 +1,27 @@
+rustc 1.98.1 (48a229cea 2026-09-01)
+d1_bang_debug_coexists.rs    prints: 7 X 
+d2_declarative_derive.rs     does not compile: error[E0658]: `macro_rules!` derives are unstable
+d3_attribute_macro_rules.rs  does not compile: error[E0658]: `macro_rules!` attributes are unstable
+h10_cfg_at_call_site.rs      prints: end 
+h11_glob_use_in_body.rs      prints: 2 
+h12_use_named_in_body.rs     prints: 2 
+h1_let_before_body.rs        prints: 2 
+h1_let_before_forward.rs     prints: 1 
+h2_body_fn.rs                prints: 2 
+h4_closure_loop.rs           prints: 1 1 
+h5_const_init.rs             prints: 3 
+h6_duplicated.rs             prints: called 1 called 1 
+h7_consumed.rs               prints: helper() x 
+h8_arm_selection.rs          prints: 2 1 
+h9_recursion.rs              prints: no call 
+o_a_generated_mod.rs         prints: 43 
+o_b_cfg_feature.rs           prints: end 
+s1_nested_bind.rs            prints: 2 2 
+s1_twin_harmless_nested.rs   prints: note 1 1 
+s2_def_site_local.rs         prints: 2 
+s2_twin_call_site_local.rs   prints: 1 
+s3_cfg_body.rs               prints: end 
+s3_cfg_forward.rs            prints: end 
+s3_twin_no_cfg.rs            prints: called 
+s4_factory.rs                prints: before verbosity 
+cross-crate                  prints: crate:app dollar:a

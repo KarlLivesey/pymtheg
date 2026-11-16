@@ -1,0 +1,11 @@
+rustc 1.98.1 (48a229cea 2026-09-01)
+ext_g7_external_crate_glob.rs    does not compile: error[E0659]: `vec` is ambiguous
+g10_external_glob_in_child.rs    does not compile: error[E0659]: `vec` is ambiguous
+g1_module_glob_vec.rs            does not compile: error[E0659]: `vec` is ambiguous
+g2_block_glob_format.rs          does not compile: error[E0659]: `format` is ambiguous
+g3_reexport_chain_glob.rs        prints: passed 
+g4_glob_of_super.rs              prints: 
+g5_glob_builtin_concat.rs        does not compile: error[E0659]: `concat` is ambiguous
+g6_explicit_use_wins.rs          prints: 0 
+g8_glob_in_child_module.rs       does not compile: error[E0659]: `println` is ambiguous
+g9_glob_in_block_child.rs        does not compile: error[E0659]: `write` is ambiguous

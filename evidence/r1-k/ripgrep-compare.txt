@@ -1,0 +1,265 @@
+module { id: 'rust', version: '26' } -> { id: 'rust', version: '27' }
+seconds 42.7 -> 45.7
+all links before { resolved: 12121, unresolved: 22647, candidates: 12 } 34780
+all links after  { resolved: 13719, unresolved: 25355, candidates: 12 } 39086
+written (non-contains) before { resolved: 7831, unresolved: 22647, candidates: 12 }
+written (non-contains) after  { resolved: 9413, unresolved: 24098, candidates: 12 }
+  of which new macro-argument calls { unresolved: 2071, resolved: 962 }
+derived macro-body calls { resolved: 16, unresolved: 1257 }
+
+unresolved written links by kind|reason: before -> after
+     7101 ->    8492  calls|receiver-type-unverified
+     3997 ->    4127  values|(none)
+     2631 ->    2631  macros|(none)
+     1526 ->    2349  types|(none)
+      386 ->    1443  calls|(none)
+     1484 ->     148  types|opaque-item-may-shadow-name
+      430 ->     754  types|namespace-binding-unverified
+      849 ->     229  calls|opaque-item-may-shadow-name
+      456 ->     464  calls|receiver-type-unverified; too-many-targets
+      275 ->     514  patterns|(none)
+      434 ->     315  calls|path-type-unverified; opaque-item-may-shadow-name; too-many-targets
+      290 ->     450  imports|(none)
+      479 ->      69  imports|opaque-item-may-shadow-name
+      138 ->     320  calls|path-type-unverified; namespace-binding-unverified
+      260 ->     105  values|opaque-item-may-shadow-name
+      135 ->     200  calls|path-type-unverified; namespace-binding-unverified; too-many-targets
+      281 ->      42  calls|receiver-type-unverified; opaque-item-may-shadow-name
+      271 ->      30  patterns|opaque-item-may-shadow-name
+       93 ->     198  calls|path-type-unverified
+      222 ->      28  calls|path-type-unverified; opaque-item-may-shadow-name
+      104 ->     131  calls|later-probe-step
+      104 ->     105  patterns|namespace-binding-unverified
+       86 ->     102  calls|inherent-applicability-unverified
+       76 ->      76  calls|path-type-unverified; opaque-item-may-shadow-name; namespace-binding-unverified; too-many-targets
+       62 ->      88  calls|receiver-type-unverified; namespace-binding-unverified
+       51 ->      92  implements|(none)
+       53 ->      75  values|namespace-binding-unverified
+       51 ->      73  calls|trait-dispatch
+       46 ->      63  calls|path-type-unverified; too-many-targets
+       66 ->      12  implements|opaque-item-may-shadow-name
+        0 ->      69  calls|macro-argument-unverified
+       31 ->      31  types|namespace-binding-unverified; opaque-item-may-shadow-name
+       30 ->      30  values|associated-member-lookup-unverified
+        0 ->      55  calls|opaque-item-may-shadow-name; macro-argument-unverified
+       27 ->      27  calls|receiver-type-unverified; namespace-binding-unverified; opaque-item-may-shadow-name
+        0 ->      47  calls|receiver-type-unverified; macro-argument-unverified
+       22 ->       8  calls|opaque-item-may-shadow-name; path-type-unverified; opaque-item-may-shadow-name
+        9 ->      19  calls|namespace-binding-unverified
+       14 ->      14  calls|trait-dispatch; too-many-targets
+       10 ->      10  types|dependency-presence-unverified
+
+unresolved written links by target class: before {
+  'workspace-name-exists': 2957,
+  'std-path': 592,
+  'local-binding': 4561,
+  'workspace-would-be-targets': 6836,
+  'no-workspace-symbol-named-so': 6745,
+  'external-path': 956
+}
+unresolved written links by target class: after  {
+  'workspace-name-exists': 3166,
+  'std-path': 594,
+  'local-binding': 4803,
+  'workspace-would-be-targets': 7541,
+  'no-workspace-symbol-named-so': 7017,
+  'external-path': 977
+}
+
+links present in both runs, outcome change {
+  'resolved -> resolved': 12121,
+  'unresolved -> unresolved': 22027,
+  'unresolved -> resolved': 620,
+  'candidates -> candidates': 12
+}
+unresolved -> definite 620 | definite -> other 0
+new definite links (argument calls + derived) 978
+
+SAMPLE unresolved -> definite (seed 9931)
+  1. crates/searcher/src/searcher/glue.rs:121 calls Range::new
+       -> crates/matcher/src/lib.rs|impl Match::new|method
+       | let binary_range = Range::new(0, binary_upto);
+  2. crates/printer/src/standard.rs:852 types SinkFinish
+       -> crates/searcher/src/sink.rs|SinkFinish|struct
+       | finish: &SinkFinish,
+  3. crates/searcher/src/searcher/mod.rs:16 imports crate::line_buffer::DEFAULT_BUFFER_CAPACITY
+       -> crates/searcher/src/line_buffer.rs|DEFAULT_BUFFER_CAPACITY|const
+       | self, BufferAllocation, DEFAULT_BUFFER_CAPACITY, LineBuffer,
+  4. crates/printer/src/json.rs:719 types Matcher
+       -> crates/matcher/src/lib.rs|Matcher|trait
+       | impl<'p, 's, M: Matcher, W: io::Write> Sink for JSONSink<'p, 's, M, W> {
+  5. crates/core/flags/lowargs.rs:46 types UserColorSpec
+       -> crates/printer/src/color.rs|UserColorSpec|struct
+       | pub(crate) colors: Vec<UserColorSpec>,
+  6. crates/searcher/src/lines.rs:7 imports grep_matcher::Match
+       -> crates/matcher/src/lib.rs|Match|struct
+       | grep_matcher::{LineTerminator, Match},
+  7. crates/core/flags/hiargs.rs:874 types ignore::WalkBuilder
+       -> crates/ignore/src/walk.rs|WalkBuilder|struct
+       | pub(crate) fn walk_builder(&self) -> anyhow::Result<ignore::WalkBuilder> {
+  8. crates/core/flags/hiargs.rs:1267 calls ColorSpecs::new
+       -> crates/printer/src/color.rs|impl ColorSpecs::new|method
+       | ColorSpecs::new(&specs)
+  9. crates/searcher/src/searcher/core.rs:259 calls Range::new
+       -> crates/matcher/src/lib.rs|impl Match::new|method
+       | let range = Range::new(before_context_start, range.end());
+ 10. crates/printer/src/json.rs:9 imports grep_matcher::Matcher
+       -> crates/matcher/src/lib.rs|Matcher|trait
+       | grep_matcher::{Match, Matcher},
+ 11. crates/printer/src/util.rs:173 types SinkContextKind
+       -> crates/searcher/src/sink.rs|SinkContextKind|enum
+       | context_kind: Option<&'a SinkContextKind>,
+ 12. crates/core/flags/hiargs.rs:92 types ignore::overrides::Override
+       -> crates/ignore/src/overrides.rs|Override|struct
+       | pre_globs: ignore::overrides::Override,
+ 13. crates/core/flags/hiargs.rs:655 calls grep::printer::SummaryBuilder::new
+       -> crates/printer/src/summary.rs|impl SummaryBuilder::new|method
+       | grep::printer::SummaryBuilder::new()
+ 14. crates/printer/src/util.rs:198 calls sunk.bytes
+       -> crates/searcher/src/sink.rs|impl<'b> SinkMatch<'b>::bytes|method
+       | replacement.unwrap_or_else(|| (sunk.bytes(), original_matches));
+ 15. crates/printer/src/standard.rs:1046 calls Match::new
+       -> crates/matcher/src/lib.rs|impl Match::new|method
+       | let mut line = Match::new(start, end);
+
+SAMPLE new definite (seed 9931)
+  1. crates/searcher/src/lines.rs:304 calls m [macro argument]
+       -> crates/searcher/src/lines.rs|tests::m|function
+       | assert_eq!(loc("a\nb\nc", 1, 2), m(0, 2));
+  2. crates/ignore/src/walk.rs:2291 calls mkpaths [macro argument]
+       -> crates/ignore/src/walk.rs|tests::mkpaths|function
+       | assert_eq!(got, mkpaths(expected), "single threaded");
+  3. crates/core/flags/defs.rs:2048 calls PatternSource::File [macro argument]
+       -> crates/core/flags/lowargs.rs|PatternSource::File|variant
+       | assert_eq!(vec![PatternSource::File(PathBuf::from("foo"))], args.patterns);
+  4. crates/searcher/src/testutil.rs:768 calls m [macro argument]
+       -> crates/searcher/src/testutil.rs|tests::m|function
+       | assert_eq!(matcher.find_at(haystack, 2), Ok(Some(m(2, 2))));
+  5. crates/ignore/benches/workloads.rs:483 calls walk [macro argument]
+       -> crates/ignore/benches/workloads.rs|walk|function
+       | b.iter(|| assert_eq!(walk(black_box(&builder), 12), ws.python_files));
+  6. crates/regex/src/literal.rs:942 calls E [macro argument]
+       -> crates/regex/src/literal.rs|tests::E|function
+       | assert_eq!(seq([E("1"), I("2"), E("3")]), e(r"1|2[A-Z]|3"),);
+  7. crates/regex/src/literal.rs:692 calls e [macro argument]
+       -> crates/regex/src/literal.rs|tests::e|function
+       | e(r"[a-z]([a-z]foo){3}(bar[a-z]){3}[a-z]"),
+  8. crates/ignore/src/incremental.rs:1286 calls matchedf [macro argument]
+       -> crates/ignore/src/incremental.rs|tests::matchedf|function
+       | assert!(matchedf(&mut m, ".hidden-file").is_whitelist());
+  9. crates/searcher/src/lines.rs:319 calls lines [macro argument]
+       -> crates/searcher/src/lines.rs|tests::lines|function
+       | assert_eq!(lines("abc\n\n"), vec!["abc\n", "\n"]);
+ 10. crates/searcher/src/lines.rs:325 calls lines [macro argument]
+       -> crates/searcher/src/lines.rs|tests::lines|function
+       | assert_eq!(lines("\n"), vec!["\n"]);
+ 11. crates/regex/src/literal.rs:858 calls e [macro argument]
+       -> crates/regex/src/literal.rs|tests::e|function
+       | assert_eq!(exact(["abc", "xyz"]), e(r"abc|M[a&&b]N|xyz"));
+ 12. crates/regex/src/non_matching.rs:143 calls sparse_except [macro argument]
+       -> crates/regex/src/non_matching.rs|tests::sparse_except|function
+       | assert_eq!(sparse(&extract("☃")), sparse_except(&[0xE2, 0x98, 0x83]));
+ 13. crates/ignore/benches/workloads.rs:205 calls walk [macro argument]
+       -> crates/ignore/benches/workloads.rs|walk|function
+       | b.iter(|| assert_eq!(walk(black_box(&builder), 12), ws.python_files));
+ 14. crates/regex/src/strip.rs:161 calls roundtrip_err [macro argument]
+       -> crates/regex/src/strip.rs|tests::roundtrip_err|function
+       | assert!(roundtrip_err(r"abc\n", b'\n').is_err());
+ 15. crates/searcher/src/lines.rs:463 calls prev [macro argument]
+       -> crates/searcher/src/lines.rs|tests::prev|function
+       | assert_eq!(lines[0].start, prev(t, lines[5].end, 5));
+ 16. crates/searcher/src/lines.rs:390 calls prev [macro argument]
+       -> crates/searcher/src/lines.rs|tests::prev|function
+       | assert_eq!(lines[3].start, prev(t, lines[5].end, 2));
+ 17. crates/core/flags/defs.rs:2485 calls Mode::Generate [macro argument]
+       -> crates/core/flags/lowargs.rs|Mode::Generate|variant
+       | assert_eq!(Mode::Generate(GenerateMode::CompletePowerShell), args.mode);
+ 18. crates/searcher/src/line_buffer.rs:590 calls s [macro argument]
+       -> crates/searcher/src/line_buffer.rs|tests::s|function
+       | assert_eq!(replace_str("aba", b'a', b'z'), (s("zbz"), Some(0)));
+ 19. crates/searcher/src/testutil.rs:766 calls m [macro argument]
+       -> crates/searcher/src/testutil.rs|tests::m|function
+       | assert_eq!(matcher.find_at(haystack, 0), Ok(Some(m(2, 2))));
+ 20. crates/globset/src/lib.rs:1324 calls escape [macro argument]
+       -> crates/globset/src/lib.rs|escape|function
+       | assert_eq!("src/[*][*]/[*].rs", escape("src/**/*.rs"));
+ 21. crates/regex/src/ban.rs:72 calls check [macro argument]
+       -> crates/regex/src/ban.rs|tests::check|function
+       | assert!(check(r"\x00|ab", 0));
+ 22. crates/regex/src/literal.rs:866 calls e [macro argument]
+       -> crates/regex/src/literal.rs|tests::e|function
+       | assert_eq!(inexact([E("a"), I("b")]), e(r"a|b+"));
+ 23. crates/cli/src/escape.rs:91 calls unescape [macro argument]
+       -> crates/cli/src/escape.rs|unescape|function
+       | assert_eq!(b(b""), unescape(r""));
+ 24. crates/regex/src/literal.rs:903 calls exact [macro argument]
+       -> crates/regex/src/literal.rs|tests::exact|function
+       | assert_eq!(exact(["a", "b"]), e(r"a|[a&&b]|b"));
+ 25. crates/searcher/src/lines.rs:408 calls prev [macro argument]
+       -> crates/searcher/src/lines.rs|tests::prev|function
+       | assert_eq!(lines[0].start, prev(t, lines[5].start, 4));
+ 26. crates/regex/src/literal.rs:822 calls e [macro argument]
+       -> crates/regex/src/literal.rs|tests::e|function
+       | assert_eq!(inexact([I("ab")]), e(r"ab+c"));
+ 27. crates/regex/src/literal.rs:846 calls e [macro argument]
+       -> crates/regex/src/literal.rs|tests::e|function
+       | assert_eq!(exact(["abcmnoxyz"]), e(r"abc()mno()xyz"));
+ 28. crates/ignore/src/gitignore.rs:844 calls super::parse_excludes_file [macro argument]
+       -> crates/ignore/src/gitignore.rs|parse_excludes_file|function
+       | assert!(super::parse_excludes_file(&data).is_none());
+ 29. crates/core/flags/defs.rs:2493 calls Mode::Search [macro argument]
+       -> crates/core/flags/lowargs.rs|Mode::Search|variant
+       | assert_eq!(Mode::Search(SearchMode::FilesWithMatches), args.mode);
+ 30. crates/regex/src/literal.rs:945 calls e [macro argument]
+       -> crates/regex/src/literal.rs|tests::e|function
+       | assert_eq!(seq([E("1"), I("2"), E("4")]), e(r"1|2[A-Z]3|4"),);
+
+SAMPLE derived macro-body calls (seed 9931)
+  1. crates/core/haystack.rs:52 calls crate::messages::messages [derived]
+       -> crates/core/messages.rs|messages|function
+       | ignore_message!("{err}");
+  2. crates/core/main.rs:131 calls crate::messages::messages [derived]
+       -> crates/core/messages.rs|messages|function
+       | err_message!("{}: {}", haystack.path().display(), err);
+  3. crates/core/main.rs:210 calls crate::messages::set_errored [derived]
+       -> crates/core/messages.rs|set_errored|function
+       | err_message!("{}: {}", haystack.path().display(), err);
+  4. crates/core/haystack.rs:38 calls crate::messages::set_errored [derived]
+       -> crates/core/messages.rs|set_errored|function
+       | err_message!("{err}");
+  5. crates/core/flags/config.rs:35 calls crate::messages::messages [derived]
+       -> crates/core/messages.rs|messages|function
+       | message!(
+  6. crates/core/main.rs:210 calls crate::messages::messages [derived]
+       -> crates/core/messages.rs|messages|function
+       | err_message!("{}: {}", haystack.path().display(), err);
+  7. crates/core/main.rs:415 calls crate::messages::set_errored [derived]
+       -> crates/core/messages.rs|set_errored|function
+       | err_message!(
+  8. crates/core/main.rs:193 calls crate::messages::set_errored [derived]
+       -> crates/core/messages.rs|set_errored|function
+       | err_message!("{}: {}", haystack.path().display(), err);
+  9. crates/core/flags/hiargs.rs:882 calls crate::messages::messages [derived]
+       -> crates/core/messages.rs|messages|function
+       | ignore_message!("{err}");
+ 10. crates/core/main.rs:193 calls crate::messages::messages [derived]
+       -> crates/core/messages.rs|messages|function
+       | err_message!("{}: {}", haystack.path().display(), err);
+ 11. crates/core/haystack.rs:52 calls crate::messages::ignore_messages [derived]
+       -> crates/core/messages.rs|ignore_messages|function
+       | ignore_message!("{err}");
+ 12. crates/core/main.rs:415 calls crate::messages::messages [derived]
+       -> crates/core/messages.rs|messages|function
+       | err_message!(
+ 13. crates/core/main.rs:131 calls crate::messages::set_errored [derived]
+       -> crates/core/messages.rs|set_errored|function
+       | err_message!("{}: {}", haystack.path().display(), err);
+ 14. crates/core/flags/hiargs.rs:882 calls crate::messages::ignore_messages [derived]
+       -> crates/core/messages.rs|ignore_messages|function
+       | ignore_message!("{err}");
+ 15. crates/core/haystack.rs:38 calls crate::messages::messages [derived]
+       -> crates/core/messages.rs|messages|function
+       | err_message!("{err}");
+ 16. crates/core/flags/config.rs:44 calls crate::messages::messages [derived]
+       -> crates/core/messages.rs|messages|function
+       | message!("{}:{}", config_path.display(), err);

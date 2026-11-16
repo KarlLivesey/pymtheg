@@ -1,0 +1,174 @@
+module { id: 'rust', version: '26' } -> { id: 'rust', version: '27' }
+seconds 631.6 -> 659.6
+all links before { unresolved: 292061, resolved: 78624, candidates: 100 } 370785
+all links after  { unresolved: 312941, resolved: 79082, candidates: 100 } 392123
+written (non-contains) before { unresolved: 292061, resolved: 44445, candidates: 100 }
+written (non-contains) after  { unresolved: 312489, resolved: 44903, candidates: 100 }
+  of which new macro-argument calls { unresolved: 20523, resolved: 363 }
+derived macro-body calls { unresolved: 452 }
+
+unresolved written links by kind|reason: before -> after
+    38270 ->   38434  calls|receiver-type-unverified; failed-file-unseen-declarations
+    25022 ->   25022  values|failed-file-unseen-declarations
+    18656 ->   20475  calls|receiver-type-unverified
+    18555 ->   18555  types|opaque-item-may-shadow-name; failed-file-unseen-declarations
+    17328 ->   17254  types|opaque-item-may-shadow-name
+    15818 ->   15822  values|(none)
+    11852 ->   11834  imports|opaque-item-may-shadow-name
+    10807 ->   10807  macros|macro-use-exports-unverified; conditional-name-may-be-absent; failed-file-unseen-declarations
+     9742 ->    9810  calls|receiver-type-unverified; failed-file-unseen-declarations; too-many-targets
+     7314 ->    7320  calls|path-type-unverified; opaque-item-may-shadow-name; failed-file-unseen-declarations
+     7292 ->    7303  calls|path-type-unverified; opaque-item-may-shadow-name; failed-file-unseen-declarations; too-many-targets
+     6662 ->    6936  calls|opaque-item-may-shadow-name
+     6379 ->    6404  calls|opaque-item-may-shadow-name; failed-file-unseen-declarations
+     6159 ->    6159  imports|opaque-item-may-shadow-name; failed-file-unseen-declarations
+     4944 ->    4944  values|opaque-item-may-shadow-name; failed-file-unseen-declarations
+     4307 ->    4356  types|(none)
+     4119 ->    4500  calls|receiver-type-unverified; too-many-targets
+     4044 ->    4044  types|failed-file-unseen-declarations
+     3728 ->    3716  values|opaque-item-may-shadow-name
+     3664 ->    3664  macros|(none)
+     3556 ->    3556  patterns|opaque-item-may-shadow-name; failed-file-unseen-declarations
+        0 ->    6478  calls|receiver-type-unverified; failed-file-unseen-declarations; macro-argument-unverified
+     3117 ->    3271  calls|path-type-unverified; opaque-item-may-shadow-name; too-many-targets
+     3043 ->    3043  macros|namespace-binding-unverified; macro-use-exports-unverified; conditional-name-may-be-absent; failed-file-unseen-declarations
+     2945 ->    2945  types|item-under-opaque-attribute; opaque-item-may-shadow-name
+     2704 ->    2958  calls|path-type-unverified; opaque-item-may-shadow-name
+     2314 ->    2809  calls|(none)
+     2260 ->    2250  patterns|opaque-item-may-shadow-name
+     1881 ->    1881  macros|macro-use-exports-unverified
+     1821 ->    1824  calls|receiver-type-unverified; opaque-item-may-shadow-name; failed-file-unseen-declarations
+     1632 ->    1633  types|item-under-opaque-attribute; opaque-item-may-shadow-name; opaque-item-may-shadow-name
+     1564 ->    1586  types|namespace-binding-unverified
+     1405 ->    1405  implements|opaque-item-may-shadow-name
+     1307 ->    1317  imports|(none)
+     1249 ->    1249  imports|failed-file-unseen-declarations
+     1111 ->    1111  macros|namespace-binding-unverified
+     1072 ->    1127  calls|receiver-type-unverified; opaque-item-may-shadow-name
+     1053 ->    1053  imports|item-under-opaque-attribute; opaque-item-may-shadow-name; opaque-item-may-shadow-name
+      988 ->     988  types|item-under-opaque-attribute; opaque-item-may-shadow-name; opaque-item-may-shadow-name; opaque-item-may-shadow-name
+        0 ->    1845  calls|receiver-type-unverified; failed-file-unseen-declarations; macro-argument-unverified; too-many-targets
+
+unresolved written links by target class: before {
+  'std-path': 4909,
+  'no-workspace-symbol-named-so': 53480,
+  'workspace-name-exists': 57423,
+  'external-path': 18469,
+  'workspace-would-be-targets': 112236,
+  'local-binding': 45497,
+  'failed-file': 47
+}
+unresolved written links by target class: after  {
+  'std-path': 4925,
+  'no-workspace-symbol-named-so': 57387,
+  'workspace-name-exists': 60560,
+  'external-path': 19024,
+  'workspace-would-be-targets': 124883,
+  'local-binding': 45663,
+  'failed-file': 47
+}
+
+links present in both runs, outcome change {
+  'unresolved -> unresolved': 291966,
+  'resolved -> resolved': 78624,
+  'candidates -> candidates': 100,
+  'unresolved -> resolved': 95
+}
+unresolved -> definite 95 | definite -> other 0
+new definite links (argument calls + derived) 363
+
+SAMPLE unresolved -> definite (seed 6247)
+  1. lib/vector-buffers/src/variants/disk_v2/tests/invariants.rs:168 calls create_buffer_v2_with_max_data_file_size
+       -> lib/vector-buffers/src/variants/disk_v2/tests/mod.rs|create_buffer_v2_with_max_data_file_size|function
+       | create_buffer_v2_with_max_data_file_size(data_dir, max_data_file_size).await;
+  2. vdev/src/testing/integration.rs:15 imports super::runner::TARGET_PATH
+       -> vdev/src/testing/runner.rs|TARGET_PATH|const
+       | ContainerTestRunner as _, IntegrationTestRunner, RunnerState, TARGET_PATH, TestRunner as _,
+  3. lib/vector-buffers/src/variants/disk_v2/tests/size_limits.rs:417 calls read_next_some
+       -> lib/vector-buffers/src/variants/disk_v2/tests/mod.rs|read_next_some|function
+       | let second_record_read = read_next_some(&mut reader).await;
+  4. lib/vector-buffers/src/variants/disk_v2/tests/known_errors.rs:326 calls corrupt_record_checksum
+       -> lib/vector-buffers/src/variants/disk_v2/tests/known_errors.rs|corrupt_record_checksum|function
+       | corrupt_record_checksum(
+  5. lib/vector-buffers/src/variants/disk_v2/tests/known_errors.rs:952 calls create_default_buffer_v2
+       -> lib/vector-buffers/src/variants/disk_v2/tests/mod.rs|create_default_buffer_v2|function
+       | let (mut writer, _, ledger) = create_default_buffer_v2(data_dir.clone()).await;
+  6. lib/vector-buffers/src/variants/disk_v2/tests/invariants.rs:222 calls read_next
+       -> lib/vector-buffers/src/variants/disk_v2/tests/mod.rs|read_next|function
+       | let final_read = read_next(&mut reader).await;
+  7. lib/vector-buffers/src/variants/disk_v2/tests/known_errors.rs:1791 calls create_default_buffer_v2
+       -> lib/vector-buffers/src/variants/disk_v2/tests/mod.rs|create_default_buffer_v2|function
+       | create_default_buffer_v2::<_, SizedRecord>(data_dir).await;
+  8. lib/vector-buffers/src/variants/disk_v2/tests/invariants.rs:372 calls get_corrected_max_record_size
+       -> lib/vector-buffers/src/variants/disk_v2/tests/mod.rs|get_corrected_max_record_size|function
+       | let corrected_record_size = get_corrected_max_record_size(&record);
+  9. src/enrichment_tables/geoip.rs:247 calls lookup_value
+       -> src/enrichment_tables/geoip.rs|lookup_value|function
+       | let (data, network) = lookup_value::<AnonymousIp>(&self.dbreader, ip).ok()??;
+ 10. lib/vector-buffers/benches/sized_records.rs:207 calls create_in_memory_variant
+       -> lib/vector-buffers/benches/sized_records.rs|create_in_memory_variant|function
+       | let f = |a, b| create_in_memory_variant(BoundBy::Bytes, a, b);
+ 11. lib/vector-buffers/src/variants/disk_v2/tests/basic.rs:108 calls create_default_buffer_v2
+       -> lib/vector-buffers/src/variants/disk_v2/tests/mod.rs|create_default_buffer_v2|function
+       | let (mut writer, mut reader, ledger) = create_default_buffer_v2(data_dir).await;
+ 12. lib/vector-buffers/src/variants/disk_v2/tests/size_limits.rs:357 calls get_minimum_data_file_size_for_record_payload
+       -> lib/vector-buffers/src/variants/disk_v2/tests/mod.rs|get_minimum_data_file_size_for_record_payload|function
+       | let max_data_file_size = get_minimum_data_file_size_for_record_payload(&second_record);
+ 13. vdev/src/commands/compose_tests/test.rs:8 imports crate::testing::runner::local_coverage_output_dir
+       -> vdev/src/testing/runner.rs|local_coverage_output_dir|function
+       | runner::{coverage_filename, local_coverage_output_dir},
+ 14. lib/vector-buffers/src/variants/disk_v2/tests/size_limits.rs:278 calls get_minimum_data_file_size_for_record_payload
+       -> lib/vector-buffers/src/variants/disk_v2/tests/mod.rs|get_minimum_data_file_size_for_record_payload|function
+       | let max_data_file_size = get_minimum_data_file_size_for_record_payload(&second_record);
+ 15. lib/vector-buffers/src/variants/disk_v2/tests/size_limits.rs:424 calls read_next
+       -> lib/vector-buffers/src/variants/disk_v2/tests/mod.rs|read_next|function
+       | let final_empty_read = read_next(&mut reader).await;
+
+SAMPLE new definite (seed 6247)
+  1. vdev/src/utils/semver.rs:57 calls parse [macro argument]
+       -> vdev/src/utils/semver.rs|parse|function
+       | assert!(parse("").is_err());
+  2. lib/fakedata/src/logs.rs:125 calls priority [macro argument]
+       -> lib/fakedata/src/logs.rs|priority|function
+       | priority(),
+  3. lib/fakedata/src/logs.rs:111 calls timestamp_apache_error [macro argument]
+       -> lib/fakedata/src/logs.rs|timestamp_apache_error|function
+       | timestamp_apache_error(),
+  4. vdev/src/testing/runner.rs:415 calls RustToolchainConfig::rust_version [macro argument]
+       -> vdev/src/testing/config.rs|impl RustToolchainConfig::rust_version|method
+       | format!("vector-test-runner-{}", RustToolchainConfig::rust_version())
+  5. lib/vendored/datadog-agent-metrics-v3/src/types.rs:150 calls PointKind::for_value [macro argument]
+       -> lib/vendored/datadog-agent-metrics-v3/src/types.rs|impl PointKind::for_value|method
+       | assert_eq!(PointKind::for_value(100.0), PointKind::Int24);
+  6. lib/codecs/src/decoding/format/gelf.rs:399 calls deserialize_gelf_input [macro argument]
+       -> lib/codecs/src/decoding/format/gelf.rs|tests::deserialize_gelf_input|function
+       | assert!(deserialize_gelf_input(input, GelfDeserializerOptions::default()).is_err());
+  7. lib/dnsmsg-parser/src/dns_message_parser.rs:451 calls escape_string_for_text_representation [macro argument]
+       -> lib/dnsmsg-parser/src/dns_message_parser.rs|escape_string_for_text_representation|function
+       | escape_string_for_text_representation(&address),
+  8. lib/vector-config-macros/src/ast/container.rs:579 calls literals_to_idents [macro argument]
+       -> lib/vector-config-macros/src/ast/container.rs|tests::literals_to_idents|function
+       | assert_eq!(literals_to_idents(&["T"]), idents);
+  9. lib/codecs/src/encoding/format/parquet.rs:688 calls parquet_row_count [macro argument]
+       -> lib/codecs/src/encoding/format/parquet.rs|tests::parquet_row_count|function
+       | parquet_row_count(&data),
+ 10. vdev/src/utils/semver.rs:49 calls v [macro argument]
+       -> vdev/src/utils/semver.rs|tests::v|function
+       | assert_eq!(v("0.59.0-rc.1").pre.as_str(), "rc.1");
+ 11. vdev/tests/release_workflow.rs:236 calls check [macro argument]
+       -> vdev/tests/release_workflow.rs|check|function
+       | assert!(check(repo, &base, false).contains("unexpected release preparation file: src/lib.rs"));
+ 12. vdev/src/utils/paths.rs:166 calls resolve_repo_relative_path [macro argument]
+       -> vdev/src/utils/paths.rs|resolve_repo_relative_path|function
+       | resolve_repo_relative_path(&repo_root, path, "Example output directory").is_err()
+ 13. lib/file-source-common/src/checkpointer.rs:364 calls FileFingerprint::DevInode [macro argument]
+       -> lib/file-source-common/src/fingerprinter.rs|FileFingerprint::DevInode|variant
+       | FileFingerprint::DevInode(1, 2),
+ 14. lib/fakedata/src/logs.rs:146 calls random_in_range [macro argument]
+       -> lib/fakedata/src/logs.rs|random_in_range|function
+       | random_in_range(1, 999),
+ 15. vdev/src/utils/paths.rs:194 calls resolve_repo_relative_path [macro argument]
+       -> vdev/src/utils/paths.rs|resolve_repo_relative_path|function
+       | resolve_repo_relative_path(
+
+SAMPLE derived macro-body calls (seed 6247)

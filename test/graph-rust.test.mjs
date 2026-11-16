@@ -137,10 +137,12 @@ test("Rust sample: module layouts, private sibling calls, imports, distinct impl
       calls(store, "private").filter((l) => l.resolution === "resolved").length,
       0,
     );
+    // Two written calls, plus the call in local_macro!'s body derived at its
+    // invocation in run() (unresolved there: external_macro! is opaque).
     assert.equal(
       calls(store, "private").filter((l) => l.resolution === "unresolved")
         .length,
-      2,
+      3,
     );
     assert.equal(
       store.findSymbols({ name: "local" })[0].data.visibility,

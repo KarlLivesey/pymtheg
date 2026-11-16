@@ -44,13 +44,14 @@ async function graph(
   const facts = files.map((f) => fileFacts("review", f));
   const symbols = facts.flatMap((f) => f.symbols);
   const links = facts.flatMap((f) => f.links);
-  const decisions = await rust.resolve({
+  const resolved = await rust.resolve({
     projectId: "review",
     files,
     contextFiles,
     symbols,
     links,
   });
+  const decisions = Array.isArray(resolved) ? resolved : resolved.resolutions;
   const byId = new Map(symbols.map((s) => [s.id, s]));
   const byLink = new Map(decisions.map((d) => [d.linkId, d]));
   function targets(name, kind = "calls") {

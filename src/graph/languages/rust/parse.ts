@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 import { implies, possible } from "./cfg.js";
-import { ecosystemMacroNames } from "./macro-catalog.js";
+import { argumentCalls, macroProfile } from "./macro-rules.js";
 import type { Node } from "web-tree-sitter";
 import { fileURLToPath } from "node:url";
 import { createTagsParser } from "../../tree-sitter.js";
@@ -324,17 +324,15 @@ async function createHelper(): Promise<Helper> {
         name: string;
         scope: string;
         start: number;
+        block?: true;
       }[] = [];
-      const potentialMacroAliases = new Set<string>();
-      const neutralMacro = (n: Node): boolean =>
-        n.type === "macro_invocation" &&
-        (standardMacroName(compact(field(n, "macro")?.text ?? "")) !== null ||
-          ecosystemMacroNames.has(
-            compact(field(n, "macro")?.text ?? "")
-              .split("::")
-              .at(-1)!,
-          ) ||
-          potentialMacroAliases.has(compact(field(n, "macro")?.text ?? "")));
+      // Every statement-level invocation is a candidate: the non-conservative
+      // binding pass treats it as scope-neutral, the conservative pass does
+      // not, and the resolver applies the conservative facts (stdFallback*)
+      // and opacity unless it proves the macro neutral where it is invoked:
+      // a standard statement macro, an audited ecosystem macro, or a readable
+      // workspace `macro_rules!` macro whose arms emit no item or `let` (R1-K).
+      const neutralMacro = (n: Node): boolean => n.type === "macro_invocation";
       // Macro expansion can shadow bare names only in a lexical item container.
       // Fields/variants and associated items do not introduce lexical bindings.
       const lexicalItemContainer = (n: Node | null): boolean =>
@@ -360,8 +358,12 @@ async function createHelper(): Promise<Helper> {
         kind: string,
         targetName: string,
         extra: Record<string, Json> = {},
+        range?: { start: number; end: number },
       ) => {
-        if (!["contains", "modules", "imports"].includes(kind)) {
+        if (
+          !["contains", "modules", "imports"].includes(kind) &&
+          !extra.macroArguments
+        ) {
           const position = referencePosition(n);
           if (!position) extra = { ...extra, namespaceUnknown: true };
           else if (["types", "patterns", "values"].includes(kind)) {
@@ -389,7 +391,7 @@ async function createHelper(): Promise<Helper> {
             sourceKey: owner,
             kind,
             targetName,
-            range: span(n),
+            range: range ?? span(n),
             data: {
               scope,
               conditions: activeConditions,
@@ -742,8 +744,6 @@ async function createHelper(): Promise<Helper> {
         if (n.type === "use_declaration") {
           const argument = field(n, "argument");
           if (argument) imports(argument, "", "", "", "", [], names);
-          for (const name of names)
-            if (name !== "*") potentialMacroAliases.add(name);
         } else if (
           [
             "mod_item",
@@ -1582,6 +1582,122 @@ async function createHelper(): Promise<Helper> {
         }
         return false;
       }
+      /**
+       * A call written in a macro invocation's argument tokens. The link data
+       * mirrors a `call_expression` at the same place; `macroArguments` names
+       * the invocations whose expansion must be proved to evaluate these
+       * tokens as an expression, else the resolver leaves it unverified.
+       */
+      function tokenCall(
+        call: ReturnType<typeof argumentCalls>[number],
+        owner: string,
+        scope: string,
+        fn: Node | null,
+        implType: string,
+        implNode: Node | null,
+        implScope: string,
+      ) {
+        const anchor = call.anchor;
+        const empty = {
+          blocked: new Set<string>(),
+          types: new Map<string, ReceiverType>(),
+          invalidated: false,
+          conditional: new Set<string>(),
+        };
+        const macroData = {
+          macroArguments: call.macros,
+          macroArgumentNames: call.macroNames,
+        };
+        const range = { start: call.start, end: call.end };
+        const targetName = text
+          .slice(call.start, call.end)
+          .replace(/\br#/g, "");
+        if (call.method) {
+          const receiver = call.receiver;
+          const name = receiver ? compact(receiver.text) : "";
+          const b = fn && receiver ? bindings(fn, receiver, name) : empty;
+          const old = fn && receiver ? bindings(fn, receiver, name, true) : b;
+          const self = name === "self";
+          const receiverType = !receiver
+            ? ""
+            : self
+              ? b.invalidated
+                ? ""
+                : implType
+              : (b.types.get(name)?.name ?? "");
+          link(
+            anchor,
+            owner,
+            scope,
+            "calls",
+            targetName,
+            {
+              genericBindings: genericBindings(fn ?? anchor),
+              argumentCount: call.argumentCount,
+              argumentMinimum: call.argumentCount,
+              method: call.method,
+              ...(!!receiverType &&
+              (self ? old.invalidated : !old.types.has(name))
+                ? { stdFallbackReceiverUnknown: true }
+                : {}),
+              receiverType,
+              receiverArgumentSyntax: self
+                ? argumentSyntax(implNode && field(implNode, "type"))
+                : (b.types.get(name)?.argumentSyntax ?? "[]"),
+              receiverBorrow: self
+                ? receiverInfo(fn).borrow
+                : (b.types.get(name)?.borrow ?? "owned"),
+              receiverMutable: self
+                ? receiverInfo(fn).mutable
+                : (b.types.get(name)?.mutable ?? false),
+              implKey: implNode ? `item:${implNode.startIndex}` : "",
+              typeScope: self ? implScope : (b.types.get(name)?.scope ?? scope),
+              implType,
+              implScope,
+              blocked:
+                !receiverType ||
+                genericShadow(anchor, receiverType.split("::")[0]!),
+              ...macroData,
+            },
+            range,
+          );
+          return;
+        }
+        const path = call.path!.join("::");
+        const head = compact(call.path![0]!);
+        const b = fn ? bindings(fn, anchor, head) : empty;
+        const old = fn ? bindings(fn, anchor, head, true) : b;
+        link(
+          anchor,
+          owner,
+          scope,
+          "calls",
+          path,
+          {
+            ...(old.blocked.has(head) && !b.blocked.has(head)
+              ? { stdFallbackBlocked: true }
+              : {}),
+            ...(old.conditional.has(head) && !b.conditional.has(head)
+              ? { stdFallbackConditional: true }
+              : {}),
+            pathSyntax: path,
+            pathArgumentSyntax: "[]",
+            implArgumentSyntax: argumentSyntax(
+              implNode && field(implNode, "type"),
+            ),
+            genericBindings: genericBindings(fn ?? anchor),
+            argumentCount: call.argumentCount,
+            argumentMinimum: call.argumentCount,
+            ...(b.conditional.has(head) ? { conditionalBinding: true } : {}),
+            blocked: b.blocked.has(head) || genericShadow(anchor, head),
+            implType,
+            implScope,
+            implKey: implNode ? `item:${implNode.startIndex}` : "",
+            ...macroData,
+          },
+          range,
+        );
+      }
       function visit(
         n: Node,
         owner: string,
@@ -1721,9 +1837,21 @@ async function createHelper(): Promise<Helper> {
                 ...(actualKind === "macro"
                   ? {
                       macroRules: true,
+                      macroProfile: macroProfile(n) as unknown as Json,
                       macroExportConditions: effectiveAttributes(n)
                         .filter((a) => a.meta.name === "macro_export")
                         .map((a) => a.guards),
+                      // `#[macro_export(local_inner_macros)]`: every bare
+                      // macro name in the transcriber means `$crate::name`.
+                      ...(effectiveAttributes(n).some(
+                        (a) =>
+                          a.meta.name === "macro_export" &&
+                          /\blocal_inner_macros\b/.test(
+                            a.meta.args?.text ?? "",
+                          ),
+                      )
+                        ? { localInnerMacros: true }
+                        : {}),
                     }
                   : {}),
                 visibility:
@@ -1893,7 +2021,18 @@ async function createHelper(): Promise<Helper> {
         if (n.type === "macro_definition") return;
         if (n.type === "macro_invocation") {
           const m = field(n, "macro");
-          if (m) link(m, owner, scope, "macros", compact(m.text));
+          if (m)
+            link(m, owner, scope, "macros", compact(m.text), {
+              genericBindings: genericBindings(fn ?? n),
+            });
+          const group = n.namedChildren.find((c) => c.type === "token_tree");
+          if (m && group)
+            for (const call of argumentCalls({
+              name: compact(m.text),
+              nameNode: m,
+              group,
+            }))
+              tokenCall(call, owner, scope, fn, implType, implNode, implScope);
           if (
             !tailMacro(n) &&
             lexicalItemContainer(
@@ -1907,6 +2046,14 @@ async function createHelper(): Promise<Helper> {
                 name: compact(m!.text),
                 scope,
                 start: m!.startIndex,
+                // Only a block statement can bind locals that the
+                // conservative binding facts (stdFallback*) describe.
+                ...((n.parent?.type === "expression_statement"
+                  ? n.parent.parent
+                  : n.parent
+                )?.type === "block"
+                  ? { block: true }
+                  : {}),
               });
             else opaqueItemScopes.add(scope);
           return;
