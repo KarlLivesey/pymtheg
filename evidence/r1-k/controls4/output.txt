@@ -1,0 +1,15 @@
+rustc 1.98.1 (48a229cea 2026-09-01)
+c1_transcriber_name_def_site_textual.rs  prints: [x] 
+c2_transcriber_name_call_site_textual.rs prints: [] 
+c3_dollar_crate_path.rs                  prints: ROOT 
+n1_project_write_in_scope.rs             prints: end [] 
+n2_sibling_module_not_in_scope.rs        prints: [1] 
+n3_use_exported_name.rs                  prints: end 
+n3_use_glob.rs                           does not compile: error[E0659]: `println` is ambiguous
+n3_use_rename.rs                         prints: end 
+n4_macro_use_parent.rs                   prints: end 
+n6_defined_later.rs                      prints: 1 
+n7_inside_other_function.rs              prints: 1 
+n7_inside_this_function.rs               prints: end 
+n8_imports_that_bind_no_macro.rs         prints: [1] [1] 1 
+n5_macro_use_extern_crate.rs             prints: end 

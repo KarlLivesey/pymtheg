@@ -1,0 +1,76 @@
+files 93, definite argument calls in them 61, seed 5113
+  1. lib/vector-vrl/dnstap-parser/src/parser.rs:1473 test_one_timestamp_parse
+       -> lib/vector-vrl/dnstap-parser/src/parser.rs|tests::test_parse_dnstap_data_with_invalid_timestamp::test_one_timestamp_parse|function
+       | assert!(test_one_timestamp_parse(u64::MAX, None).is_err());
+  2. lib/vector-vrl/dnstap-parser/src/parser.rs:1476 test_one_timestamp_parse
+       -> lib/vector-vrl/dnstap-parser/src/parser.rs|tests::test_parse_dnstap_data_with_invalid_timestamp::test_one_timestamp_parse|function
+       | assert!(test_one_timestamp_parse(i64::MAX as u64, None).is_err());
+  3. lib/codecs/src/decoding/framing/chunked_gelf.rs:1203 downcast_framing_error
+       -> lib/codecs/src/decoding/framing/chunked_gelf.rs|tests::downcast_framing_error|function
+       | downcast_framing_error(&error),
+  4. lib/opentelemetry-proto/src/typed_trace/legacy/tests.rs:110 scope_spans_value
+       -> lib/opentelemetry-proto/src/typed_trace/legacy/tests.rs|scope_spans_value|function
+       | envelope(vec![resource_spans_value(vec![scope_spans_value(spans)])])
+  5. lib/file-source-common/src/checkpointer.rs:509 FileFingerprint::FirstLinesChecksum
+       -> lib/file-source-common/src/fingerprinter.rs|FileFingerprint::FirstLinesChecksum|variant
+       | FileFingerprint::FirstLinesChecksum(78910),
+  6. lib/vector-vrl/dnstap-parser/src/parser.rs:1472 test_one_timestamp_parse
+       -> lib/vector-vrl/dnstap-parser/src/parser.rs|tests::test_parse_dnstap_data_with_invalid_timestamp::test_one_timestamp_parse|function
+       | assert!(test_one_timestamp_parse(u64::MAX, Some(42)).is_err());
+  7. lib/codecs/src/encoding/format/parquet.rs:662 create_event
+       -> lib/codecs/src/encoding/format/parquet.rs|tests::create_event|function
+       | let events = vec![create_event(vec![("msg", "hello world")])];
+  8. lib/opentelemetry-proto/src/typed_trace/legacy/tests.rs:58 typed_event_with_metadata
+       -> lib/opentelemetry-proto/src/typed_trace/test_support.rs|typed_event_with_metadata|function
+       | vec![typed_event_with_metadata(1, vec![span], &metadata)]
+  9. lib/vector-vrl/web-playground/src/lib.rs:239 to_pretty_json
+       -> lib/vector-vrl/web-playground/src/lib.rs|to_pretty_json|function
+       | to_pretty_json(&Value::from(3_728_699_739_546_630_719_i64)).unwrap(),
+ 10. lib/codecs/src/decoding/framing/chunked_gelf.rs:1606 downcast_framing_error
+       -> lib/codecs/src/decoding/framing/chunked_gelf.rs|tests::downcast_framing_error|function
+       | downcast_framing_error(&error),
+ 11. lib/codecs/src/encoding/format/parquet.rs:914 parquet_row_count
+       -> lib/codecs/src/encoding/format/parquet.rs|tests::parquet_row_count|function
+       | assert_eq!(parquet_row_count(&data), 1);
+ 12. lib/vector-vrl/dnstap-parser/src/parser.rs:1536 to_socket_protocol_name
+       -> lib/vector-vrl/dnstap-parser/src/parser.rs|to_socket_protocol_name|function
+       | assert_eq!("DOT", to_socket_protocol_name(3).unwrap());
+ 13. lib/vector-vrl/dnstap-parser/src/parser.rs:1537 to_socket_protocol_name
+       -> lib/vector-vrl/dnstap-parser/src/parser.rs|to_socket_protocol_name|function
+       | assert_eq!("DOH", to_socket_protocol_name(4).unwrap());
+ 14. lib/vector-vrl/dnstap-parser/src/parser.rs:1528 to_socket_family_name
+       -> lib/vector-vrl/dnstap-parser/src/parser.rs|to_socket_family_name|function
+       | assert_eq!("INET6", to_socket_family_name(2).unwrap());
+ 15. lib/vector-vrl/dnstap-parser/src/parser.rs:1475 test_one_timestamp_parse
+       -> lib/vector-vrl/dnstap-parser/src/parser.rs|tests::test_parse_dnstap_data_with_invalid_timestamp::test_one_timestamp_parse|function
+       | assert!(test_one_timestamp_parse(i64::MAX as u64, Some(42)).is_err());
+ 16. lib/codecs/src/encoding/format/parquet.rs:747 create_event
+       -> lib/codecs/src/encoding/format/parquet.rs|tests::create_event|function
+       | create_event(vec![("msg", "hello")]),
+ 17. lib/codecs/src/encoding/format/parquet.rs:758 parquet_row_count
+       -> lib/codecs/src/encoding/format/parquet.rs|tests::parquet_row_count|function
+       | assert_eq!(parquet_row_count(&buffer), 2);
+ 18. lib/vector-vrl/dnstap-parser/src/parser.rs:1540 to_socket_protocol_name
+       -> lib/vector-vrl/dnstap-parser/src/parser.rs|to_socket_protocol_name|function
+       | assert_eq!("DOQ", to_socket_protocol_name(7).unwrap());
+ 19. lib/vector-vrl/dnstap-parser/src/parser.rs:1514 test_one_input
+       -> lib/vector-vrl/dnstap-parser/src/parser.rs|tests::test_parse_dnstap_message_socket_family_bad_addr::test_one_input|function
+       | assert!(test_one_input(1, &message).is_err());
+ 20. lib/codecs/src/decoding/framing/chunked_gelf.rs:1186 downcast_framing_error
+       -> lib/codecs/src/decoding/framing/chunked_gelf.rs|tests::downcast_framing_error|function
+       | downcast_framing_error(&error),
+ 21. lib/codecs/src/encoding/format/parquet.rs:788 parquet_row_count
+       -> lib/codecs/src/encoding/format/parquet.rs|tests::parquet_row_count|function
+       | assert_eq!(parquet_row_count(&data), 1);
+ 22. lib/codecs/src/encoding/format/parquet.rs:688 parquet_row_count
+       -> lib/codecs/src/encoding/format/parquet.rs|tests::parquet_row_count|function
+       | parquet_row_count(&data),
+ 23. lib/codecs/src/decoding/decompression.rs:228 zlib_compress
+       -> lib/codecs/src/decoding/decompression.rs|tests::zlib_compress|function
+       | decompressor.decompress(&zlib_compress(payload)).unwrap(),
+ 24. lib/vector-vrl/dnstap-parser/src/parser.rs:1541 to_socket_protocol_name
+       -> lib/vector-vrl/dnstap-parser/src/parser.rs|to_socket_protocol_name|function
+       | assert!(to_socket_protocol_name(8).is_err());
+ 25. lib/file-source-common/src/checkpointer.rs:566 FileFingerprint::FirstLinesChecksum
+       -> lib/file-source-common/src/fingerprinter.rs|FileFingerprint::FirstLinesChecksum|variant
+       | FileFingerprint::FirstLinesChecksum(1234),

@@ -2808,10 +2808,21 @@ export function resolveRust(
     name: string,
   ): boolean {
     return ownerPlace(file, scope).some((loc) => {
-      let local = scope;
+      let local = scope,
+        resolved = false;
       while (true) {
-        if (importsByScope.get(`${file}|${local}`)?.explicit.has(name))
-          return true;
+        // R1-K: an explicit import binds the macro name unless it resolves
+        // to std's own macro path or, completely, to no macro (a function,
+        // a module). The nearest explicit import decides.
+        const explicit = importsByScope
+          .get(`${file}|${local}`)
+          ?.explicit.get(name);
+        if (explicit?.length) {
+          if (!explicit.every((l) => importBindsNoMacro(l, name, loc, local)))
+            return true;
+          resolved = true;
+          break;
+        }
         if (!local || local === loc.local) break;
         local = local.includes("::")
           ? local.slice(0, local.lastIndexOf("::"))
@@ -2819,7 +2830,8 @@ export function resolveRust(
       }
       const found = find(name, loc, scope, "macro");
       return (
-        !!found.symbols.length || !!found.possibleImportNames?.includes(name)
+        !!found.symbols.length ||
+        (!resolved && !!found.possibleImportNames?.includes(name))
       );
     });
   }
@@ -3094,60 +3106,140 @@ export function resolveRust(
       )
     );
   }
-  /** `format_args!` and the token-consuming builtins (`stringify!`,
-   * `concat!`, `cfg!`, …) when no captured macro or import can rebind them. */
-  function builtinSafe(name: string, site: GraphLink, scope: string): boolean {
-    const n = name.replace(/^(?:::)?(?:std|core|alloc)::/, "");
-    return (
-      !n.includes("::") &&
-      (consumingBuiltins.has(n) || n === "format_args") &&
-      !textualMacroNames.has(n) &&
-      !visibleMacroNames.has(n) &&
-      !importedStandardName(site.file, scope, n)
-    );
+  /**
+   * R1-K round 4, the name rule: at one invocation point, `n` (a bare name)
+   * is the standard or builtin macro only if nothing else can be bound to it
+   * there under macro name lookup, and everything that could matter is read.
+   * Fails closed on anything unseen or unenumerable.
+   */
+  function standardAt(
+    n: string,
+    site: GraphLink,
+    loc: Place,
+    scope: string,
+  ): boolean {
+    const file = site.file,
+      at = { ...loc, file };
+    // Availability (no_std, no_implicit_prelude).
+    if (
+      standardMacroName(n) &&
+      !standardAvailable({ name: n, scope, start: site.range.start }, at)
+    )
+      return false;
+    if (ownerPlace(file, scope).some((p) => p.noImplicitPrelude)) return false;
+    // Proc macros and named or readable `#[macro_use]` imports, anywhere.
+    if (visibleMacroNames.has(n)) return false;
+    // (a) Textual scope: earlier `macro_rules!` here and in enclosing scopes
+    // (functions included), inherited from parent files, carried by
+    // `#[macro_use] mod`. An unseen entry (failed file) fails closed.
+    const textual = textualMacro(n, site, at, scope);
+    if (textual && (textual.symbols.length || !textual.complete)) return false;
+    // `#[macro_use] extern crate`: outside the workspace fails closed; a
+    // workspace crate binds the names it exports.
+    for (const l of externCratesByFile.get(loc.crate.root) ?? [])
+      for (const r of (data(l).macroUseRequests ?? []) as {
+        names: string[] | null;
+        conditions: string[];
+      }[]) {
+        if (r.names && !r.names.includes(n)) continue;
+        if (!possible([...(loc.conditions ?? []), ...r.conditions])) continue;
+        if (canonicalSysrootImport(l, loc.crate)) continue;
+        const manifest = loc.crate.deps.get(l.targetName);
+        if (
+          !manifest ||
+          !packages.some((c) => c.kind === "lib" && c.manifest === manifest)
+        )
+          return false;
+        if (
+          readableMacroUseBinds(n, loc.crate.root, "", [
+            { crate: l.targetName, names: r.names },
+          ])
+        )
+          return false;
+      }
+    // (b) Path-based scope: explicit `use` items in this block, function and
+    // module and each enclosing one, resolved in the macro namespace. Globs
+    // are not consulted: a glob that brings in a macro named like a standard
+    // prelude macro is an ambiguity error (E0659) wherever it is (crate root,
+    // child module, block; workspace, builtin or external target), so in
+    // code that compiles a glob never rebinds one (controls4/glob).
+    let local = scope;
+    for (;;) {
+      const uses = importsByScope.get(`${file}|${local}`);
+      for (const l of uses?.explicit.get(n) ?? [])
+        if (!importBindsNoMacro(l, n, loc, local)) return false;
+      if (!local || local === loc.local) break;
+      local = local.includes("::")
+        ? local.slice(0, local.lastIndexOf("::"))
+        : "";
+    }
+    // Items of the module itself (a crate-root `#[macro_export]` macro, a
+    // `pub(crate) use` re-export) found by the ordinary path lookup. The
+    // imports themselves were resolved above.
+    const found = find(n, loc, scope, "macro");
+    return !found.symbols.length && !found.failedFiles?.length;
   }
-  // R1-K round 3: every name the workspace defines or imports as anything
-  // that could be a macro: `macro_rules!` (any scope, any crate), proc
-  // macros, every `use` or `extern crate` alias, `#[macro_use(…)]` lists, and
-  // every name a `use` inside a transcriber binds. A bare standard macro name
-  // in this set is never treated as the standard macro.
-  const workspaceMacroBindings = new Set<string>();
-  for (const sym of symbols) {
-    if (sym.kind === "macro" || data(sym).semanticKind === "macro")
-      workspaceMacroBindings.add(sym.name);
-    if (data(sym).exportedMacroName)
-      workspaceMacroBindings.add(str(data(sym).exportedMacroName));
-    for (const n of (data(sym).exportedMacroNames ?? []) as string[])
-      workspaceMacroBindings.add(n);
-    for (const n of profileOf(sym)?.useNames ?? [])
-      workspaceMacroBindings.add(n);
+  /** A path starting at a dependency outside the workspace: its contents are
+   * not captured, so "resolves to nothing" proves nothing there. */
+  const outsideWorkspace = (path: string, loc: Place): boolean => {
+    const head = path.replace(/^::/, "").split("::")[0]!;
+    if (["crate", "self", "super"].includes(head)) return false;
+    const manifest = loc.crate.deps.get(head);
+    if (manifest)
+      return !packages.some((c) => c.kind === "lib" && c.manifest === manifest);
+    // A registry, git or other dependency with no captured workspace crate.
+    return (loc.crate.dependencies ?? []).some((e) => e.name === head);
+  };
+  /** `use path as n;` binds no macro: the standard macro's own path, or a
+   * workspace path that resolves completely, in the macro namespace, to
+   * nothing. A path into a crate outside the workspace fails closed. */
+  function importBindsNoMacro(
+    l: GraphLink,
+    n: string,
+    loc: Place,
+    local: string,
+  ): boolean {
+    if (!possible([...(loc.conditions ?? []), ...conditionsFor(l)]))
+      return true;
+    const target = compact(l.targetName).replace(/^::/, "");
+    if (data(l).externCrate) return false;
+    // `use std::vec;` names std's own `vec` (module and the same macro).
+    if (
+      new RegExp(`^(?:std|core|alloc)::${n}$`).test(target) &&
+      !visiblePrefixes.has(target.split("::")[0]!)
+    )
+      return true;
+    if (outsideWorkspace(target, loc)) return false;
+    const r = findUsePath(target, loc, local, "macro");
+    return r.complete && !r.symbols.length && !r.failedFiles?.length;
   }
-  for (const l of ctx.links)
-    if (l.kind === "imports" && !data(l).glob)
-      workspaceMacroBindings.add(compact(str(data(l).alias)));
-  for (const f of ctx.files)
-    for (const b of (data(f.result).attributeBindings ?? []) as {
-      macroUseImports?: MacroUseImport[];
-    }[])
-      for (const r of b.macroUseImports ?? [])
-        for (const n of r.names ?? []) workspaceMacroBindings.add(n);
-  /** `name` is the standard (or builtin) macro: nothing in the workspace can
-   * bind a macro of that name, and the existing site checks pass. */
+  /** Is `name`, written at this point, the standard (or builtin) macro? */
   const standardSafe = (
     name: string,
     site: GraphLink,
     loc: Place,
     scope: string,
-  ): boolean =>
-    (name.includes("::") ||
-      !workspaceMacroBindings.has(name.replace(/^::/, ""))) &&
-    (standardMacroName(name)
-      ? !standardUnsafe(
-          { name, scope, start: site.range.start },
-          site.file,
-          loc,
-        )
-      : builtinSafe(name, site, scope));
+  ): boolean => {
+    const bare = name.replace(/^::/, "");
+    if (bare.includes("::")) {
+      // `std::name!`: only the path's first segment can be rebound.
+      const head = bare.split("::")[0]!,
+        last = bare.split("::").at(-1)!;
+      return (
+        sysrootNames.has(head) &&
+        !visiblePrefixes.has(head) &&
+        (!!standardMacroName(bare) ||
+          consumingBuiltins.has(last) ||
+          last === "format_args")
+      );
+    }
+    return (
+      (!!standardMacroName(bare) ||
+        consumingBuiltins.has(bare) ||
+        bare === "format_args") &&
+      standardAt(bare, site, loc, scope)
+    );
+  };
   /** A macro name whose head an enclosing expansion's `use` may rebind. */
   const rebound = (name: string, uses: ReadonlySet<string>): boolean =>
     uses.has("*") || uses.has(name.replace(/^::/, "").split("::")[0]!);

@@ -205,85 +205,125 @@ expansion defines items under an attribute.
 `rust.resolve` returns `{ resolutions, links }` when there are derived links
 and the plain list otherwise; the Rust test harnesses accept both.
 
-## The rule for macro links (round 3), in one paragraph
+## The rule for macro links (round 4)
 
-A call read from a macro is definite only if every property below holds for
-the **whole path** from the invocation the user wrote down to the call,
-through every nested macro invocation on the way. Each property is carried
-transitively, never checked only at the outermost macro.
+**Path properties.** A call read from a macro is definite only if every one
+of these holds for the whole path, from the invocation the user wrote down to
+the call, through every nested macro on the way. Each is carried
+transitively.
 
 - **Readable.** Every macro on the path names exactly one readable workspace
-  `macro_rules!` definition at that point, or is a standard or builtin macro
-  (see the name rule below).
-- **One arm.** Every such macro has a single arm (no arm selection to prove).
-- **No local capture.** For a one-segment call name, no macro on the path is
-  defined inside a function body (whose locals could capture it), and no arm
-  on the path binds locals.
-- **Clean.** Its emitted code is clean: no attribute anywhere and no item
-  other than a `use`. Every macro the code invokes is harmless (neutral and
-  clean, recursively; anything unreadable fails).
-- **Not repeated.** No macro on the path sits inside a `$( … )` repetition.
-- **Not inside a definition.** No macro on the path sits inside a nested
+  `macro_rules!` at that point, or is the standard (or builtin) macro under
+  the name rule below.
+- **One arm.** Every macro on the path has a single arm.
+- **Clean.** Its emitted code has no attribute and no item other than a
+  `use`. Every macro it invokes is harmless (neutral and clean,
+  recursively); anything unreadable fails.
+- **Not repeated.** Nothing on the path sits inside a `$( … )` repetition.
+- **Not inside a definition.** Nothing on the path sits inside a nested
   `macro_rules!` definition.
+- **No local capture.** For a one-segment name, no macro on the path is
+  defined inside a function body or binds locals.
 - **No rebinding `use`.** No `use` in force on the path binds a name that
-  heads a macro name invoked below it, or the call's head. A glob `use`
-  binds every name.
-- **The name rule.** A macro name counts as the standard (or builtin) macro
-  only when no `macro_rules!`, proc macro, `use`/`extern crate` alias,
-  `#[macro_use(…)]` entry or transcriber `use` *anywhere in the workspace*
-  binds that name, and the existing per-site checks also pass.
+  heads a macro invoked below it, or the call's head.
+- **Arguments.** Argument calls also need every macro on the path to pass
+  its whole input on unchanged. A brace block in the arguments that invokes
+  any macro is not read.
 
-Anything else is unresolved with its would-be targets. Calls in arguments
-need, in addition, that every macro on the path forwards its whole input
-unchanged as the tail of an argument list.
+**The name rule.** A bare name `n` written at a point P (a transcriber name
+counts as written at the invocation site: rustc looks it up there, controls
+`c1`–`c3`) is the standard or builtin macro only if all of these hold:
+
+1. **Availability.** The standard macro is available at P (no `no_std`
+   without std, no `#![no_implicit_prelude]`).
+2. **No proc macro or named import.** No proc macro and no
+   `#[macro_use(n)]` entry anywhere in the project is named `n`.
+3. **Textual scope (fails closed on unseen).** No `macro_rules! n` is in
+   textual scope at P, and no textual-scope entry is unseen.
+   - In scope means earlier in the file in P's module, block or function or
+     an enclosing one, inherited by a child module file at its `mod`
+     declaration, or carried by `#[macro_use] mod`.
+   - Unseen means a failed file in a `#[macro_use]` chain.
+4. **`#[macro_use] extern crate`.** In P's crate, no `#[macro_use] extern
+   crate` covers `n`.
+   - One for a crate outside the workspace fails closed.
+   - One for a workspace crate fails if that crate exports `n`.
+   - `#[macro_use] extern crate std/core/alloc` is std's own.
+5. **Explicit `use` items.** No explicit `use … n` or `use … as n` in P's
+   block, function or module, or an enclosing one, binds a macro. Each is
+   resolved in the macro namespace:
+   - `use std::n` (or `core`, `alloc`) is std's own and does not rebind;
+   - a workspace path that resolves completely to no macro does not rebind
+     (a function, a module: `use nix::…::write` is external, see below;
+     `use super::format` is a module);
+   - a path into a crate outside the workspace fails closed;
+   - anything unresolved fails closed.
+6. **No item of the module.** No item of P's module is a macro named `n`,
+   for example a crate-root `#[macro_export] macro_rules! n` or a
+   `pub(crate) use … as n` re-export. Ordinary path lookup decides.
+7. **Globs are not consulted.** A glob that would bring in a macro named
+   like a standard prelude macro is an ambiguity error (E0659) in every
+   shape tried: crate root, child module, block, workspace, builtin and
+   external target (`controls4/glob`, g1–g10). So in code that compiles a
+   glob never rebinds one. The two shapes that do compile are already
+   covered: a crate-root `#[macro_export]` item (point 6) and a textual
+   `macro_rules!` (point 3). **This departs from the brief's "fail closed
+   on a glob whose target you cannot enumerate"** on the strength of those
+   controls.
+
+`std::n!` paths are std's own unless `std` itself is rebound.
+
+**Where the earlier E4 ruling still applies.** The statement-opacity
+exemption (does `println!();` hide sibling names?) keeps that ruling: unseen
+code is assumed not to define a standard-named macro. Its import check now
+resolves explicit imports the same way (point 5).
 
 ## Results
 
-Round 3 runs on the merged tree (this branch with `origin/main` 379b6018)
+Round 4 runs on the merged tree (this branch with `origin/main` 379b6018)
 against `origin/main`, both on the dev server in parallel
 (`evidence/r1-k/*-summary.json`, `*-compare.txt`):
 
 | | ripgrep before | ripgrep after | Vector before | Vector after |
 |---|---|---|---|---|
 | links (all) | 34,780 | 39,086 | 370,785 | 392,123 |
-| definite | 12,121 | **13,689** | 78,624 | **79,034** |
+| definite | 12,121 | **13,719** | 78,624 | **79,082** |
 | candidate sets | 12 | 12 | 100 | 100 |
-| unresolved | 22,647 | 25,385 | 292,061 | 312,989 |
+| unresolved | 22,647 | 25,355 | 292,061 | 312,941 |
 | links on main that went unresolved → definite | | 620 | | 95 |
 | links on main that went definite → anything else | | **0** | | **0** |
-| new calls in macro arguments: definite / unresolved | | 948 / 2,085 | | 315 / 20,571 |
-| new derived macro-body calls: definite / unresolved | | 0 / 1,273 | | 0 / 452 |
-| cold index, seconds (observation) | 42.6 | 43.1 | 626.7 | 587.0 |
+| new calls in macro arguments: definite / unresolved | | 962 / 2,071 | | 363 / 20,523 |
+| new derived macro-body calls: definite / unresolved | | 16 / 1,257 | | 0 / 452 |
+| cold index, seconds (observation) | 41.5 | 43.6 | 608.2 | 587.7 |
 
-**What the workspace-wide name rule costs:**
+**The trial links on ripgrep all resolve:**
 
-- **ripgrep.** It defines its own `macro_rules! write` (`crates/core/flags/doc/help.rs:19`,
-  `man.rs:14`) and `macro_rules! writeln` (`man.rs:21`), wrappers that call
-  `std::write!`/`std::writeln!` and unwrap. So `write` and `writeln` are no
-  longer the standard macros anywhere in ripgrep. `eprintln_locked!` invokes
-  both, which means it is not harmless and its forwarding into `writeln!` is
-  unproved. Therefore `message!`, `err_message!` and `ignore_message!` are
-  unproved too. As a result:
-  - the `err_message!` argument calls are no longer proved forwarded;
-  - the derived calls to `set_errored`, `messages` and `ignore_messages` are
-    unresolved (with the would-be target kept);
-  - definite body-call links fall from 16 to 0.
+- `crate::messages::set_errored` and `messages`: definite callers at
+  `main.rs:131`, `193`, `210`, `415` and `haystack.rs:38`.
+- `ignore_messages`: definite callers at `haystack.rs:52` and `hiargs.rs:882`.
+- `err_message!` arguments: proved forwarded. `haystack.path()` stays
+  unresolved only for `receiver-type-unverified`.
+- `eprint_nothing_searched()`, `print_stats(…)`, the `Match` import and
+  `Match::new`, `grep::searcher::SearcherBuilder::new()`: definite.
 
-  Those wrappers are not in textual scope at any of those call sites (they
-  live in `flags/doc` modules without `#[macro_use]`).
-- **Vector.** Definite argument calls fall from 1,438 to 315, because these
-  names are imported somewhere in the workspace:
-  - `format`: `use super::{…, format, …}`, a workspace module;
-  - `write`: `use nix::unistd::{…, write}`, a function;
-  - `panic`, `vec`: `use std::{…, panic, …}` and `use std::vec`, std modules;
-  - `assert_eq`: `use similar_asserts::assert_eq`, a real external macro, in
-    60 files.
+ripgrep's own `write!`/`writeln!` (`flags/doc`) are not in textual scope at
+those sites, and nothing imports them there, so std's are proved.
 
-  Only the last can actually rebind the macro.
+**Why Vector gains little from argument calls (363 definite).** The name
+rule fails closed at most Vector sites for one reason:
 
-The other trial links stay definite: `eprint_nothing_searched()` and
-`print_stats(…)` (`main.rs:144`, `:148`), the `Match` import and
-`Match::new`, and `grep::searcher::SearcherBuilder::new()`.
+- `#[macro_use] extern crate tracing;` (with `derivative` and `cfg_if`) at
+  the root of the main crate and of `vector-core`, `vector-common`,
+  `vector-buffers`, `vector-stream` and `vector-tap` (point 4). Those crates
+  are outside the workspace, so whether they export a macro named `vec` or
+  `format` cannot be read. A temporary trace on one re-resolution confirmed
+  it is the failing check for every standard name there.
+- Elsewhere `use similar_asserts::assert_eq` correctly fails point 5, and
+  unseen textual entries from Vector's three unparsed files fail point 3.
+
+Recovering these sites would need audited export lists for those three
+crates, as the existing catalogue does for `tracing`'s statement macros.
+That is backlog, not done here.
 
 Reasons on ripgrep (written links, before → after): `opaque-item-may-shadow-name`
 on calls 849 → 227, on types 1,484 → 148, on imports 479 → 69, on patterns
@@ -291,29 +331,41 @@ on calls 849 → 227, on types 1,484 → 148, on imports 479 → 69, on patterns
 
 ## Correctness sample
 
-Round 3 (seeds ripgrep 7717, Vector 8803; `evidence/r1-k/sample-review.md`):
-60 definite argument calls (30 per corpus), each read against the source:
-**60 / 60 right.** There are no definite body-call links left in either
-corpus to read. Round 2 (seeds 4409, 5521) read 105 links, all right; round 1
-(seeds 1117, 2203) read 90, all right, but drew no Vector body-call links,
-where the reviewers then found wrong ones.
+Round 4, fresh seeds (`evidence/r1-k/sample-review.md`), each read against
+the source:
 
-Faults found and fixed so far:
+| | Links | Right |
+|---|---|---|
+| ripgrep, unresolved → definite (seed 9931) | 15 | 15 |
+| ripgrep, new argument calls (seed 9931) | 30 | 30 |
+| ripgrep, body calls: all 16 that exist | 16 | 16 |
+| Vector, unresolved → definite (seed 6247) | 15 | 15 |
+| Vector, new argument calls (seed 6247) | 15 | 15 |
+| Vector, argument calls in the 93 files that define or import a std-named macro, or import `similar_asserts::assert_eq` (seed 5113, of 61) | 25 | 25 |
+| **Total (115 distinct: one Vector link drawn twice)** | **116** | **116** |
 
-- **Round 1, before review.** Found by the before/after diff: a module-level
-  macro switched on the conservative binding facts for its whole file.
+That is 70 argument calls, 25 of them from the std-named-macro files.
+
+The std-named files include `use std::{…, vec}` (dnstap parser),
+`use similar_asserts::assert_eq` (the opentelemetry legacy tests,
+`checkpointer.rs`), and `flate2::write::…` or `…::format::…` path segments
+that bind nothing of that name. Every sampled call there sits in a macro
+that is std's own at that site (`vec!`, std `assert!`/`assert_eq!` in files
+without the `similar_asserts` import). Earlier rounds' samples (rounds 1–3:
+90, 105 and 60 links, all right) are kept in `sample-review.md`.
+
+Faults found and fixed across rounds:
+
+- **Round 1, before review.** A module-level macro switched on the
+  conservative binding facts for its whole file.
 - **Round 1 review.** A nested item-defining macro; a definition-site local;
-  `#[cfg]` in a body; a macro factory; a generated `mod`; and a false
-  statement about derives.
-- **Round 2 review.**
-  - A `use … as println` in an expansion rebinding a nested macro name.
-  - A project `println!` read as the standard one.
-  - A repetition lost through a nested macro.
-  - (Opus, rated exotic) An item-defining macro in a block inside format
-    arguments. A brace block in macro arguments that invokes any macro
-    directly is no longer read.
-
-  These led to the path rule above, rather than to more case fixes.
+  `#[cfg]` in a body; a macro factory; a generated `mod`; a false statement
+  about derives.
+- **Round 2 review.** A `use … as println` in an expansion; a project
+  `println!`; a repetition lost through nesting; a macro in a block inside
+  format arguments.
+- **Round 3 decision.** The workspace-wide name rule was too blunt. Round 4
+  replaced it with the per-site rule above.
 
 ## Compiler controls
 
@@ -366,6 +418,25 @@ Round 3 adds `evidence/r1-k/controls3/` (rustc output in `output.txt`):
 | `def!()` in a block in `println!`/`assert!` arguments, and in an `if` block there | `2`, `ok`, `2` | no link |
 | twin: the same blocks without a macro | `1 1` | definite |
 
+Round 4 adds `evidence/r1-k/controls4/` (rustc output in `output.txt` and
+`glob/output.txt`):
+
+| Program | rustc prints | Pymtheg |
+|---|---|---|
+| c1: project `writeln!` in scope only where the macro is defined | `[x]` (std's) | body call definite |
+| c2: project `writeln!` in scope where the macro is invoked | `[]` (project's) | not definite |
+| c3: `$crate::inner!` | `ROOT` | defining crate's root |
+| n1: project `write!` in textual scope at the site | `end []` | not definite |
+| n2: project `write!` in a sibling module, not in scope (ripgrep's shape) | `[1]` | definite |
+| n3: `use … as println`; `use crate::println` | `end`; `end` | not definite |
+| n4: `#[macro_use]` on a parent module | `end` | not definite |
+| n5: `#[macro_use] extern crate` of a workspace crate exporting `println` | `end` | not definite |
+| n6: defined later in the file | `1` | definite |
+| n7: defined earlier in the same function / in another function | `end` / `1` | not definite / definite |
+| n8: `use` of a workspace fn and module, `use std::vec`, `use std::panic` | `[1] [1] 1` | definite |
+| g1–g10: globs bringing in std-named macros | E0659 each (g3: crate-root item, g4: textual) | globs not consulted |
+| outside the workspace: `#[macro_use] extern crate`, `use ext::write` | not compiled (no such crate here) | not definite (fail closed) |
+
 ## Tests
 
 `test/graph-rust-r1k-macros.test.mjs`: each shape, positive and negative —
@@ -383,7 +454,7 @@ types, an inner import shadowing an outer one, and a facade
 `pub extern crate … as …` path.
 
 Checks on the dev server after merging `origin/main` (379b6018): `npm run
-build`, full `npm test` 2,902 pass / 0 fail, `npm run format:check` clean,
+build`, full `npm test` 2,917 pass / 0 fail, `npm run format:check` clean,
 `node scripts/spdx-tags.mjs --check` clean; the new source files carry the
 SPDX tag.
 
@@ -393,7 +464,7 @@ positive twin that must still resolve (harmless nested macro, call-site
 local, no `cfg`, forwarding through a closure or loop, duplicated
 forwarding).
 
-Round 3 adds 17 fixture tests covering every program above.
+Round 3 adds 17 fixture tests covering every program above. Round 4 adds 15 for the name rule, covering each control above (both outcomes of n7, the glob statement and the external fail-closed cases).
 
 Changed expectations: `recall-4.json` "brace tail is still statement-capable"
 used `macro_rules! m{()=>{{}}}`, which expands to an empty block and is now

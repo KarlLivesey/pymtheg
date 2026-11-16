@@ -13,7 +13,7 @@ Scripts (run from a built checkout on the dev server):
   line of each link, for reading by hand: written links that went from
   unresolved to definite, new definite links (calls in macro arguments and
   derived macro-body calls), and optionally derived macro-body calls only.
-- `controls/`, `controls2/`, `controls3/` (rounds 1–3): rustc programs, one per
+- `controls/`, `controls2/`, `controls3/`, `controls4/` (rounds 1–4): rustc programs, one per
   fixture shape, with `run.sh` and the printed `output.txt` (rustc 1.98.1,
   dev server; evidence only, never in the index path).
 
@@ -27,15 +27,15 @@ and `no-workspace-symbol-named-so`.
 Corpora: ripgrep at 178cc027e283 (cloned to the dev server's scratch) and
 the pinned Vector at 515e87d9 (`~/pymtheg-dev/corpora/vector`, read-only,
 copied by `measure.mjs`). `before` is origin/main (Rust module version 26;
-round 3 used 379b6018); `after` is this branch (version 27). Both sides of
-round 3 ran in parallel on the same machine.
+round 4 used 379b6018); `after` is this branch (version 27). Both sides of
+round 4 ran in parallel on the same machine. `std-named-files.sh` and `sample-files.mjs` make the targeted Vector sample.
 
 Files here:
 
 - `ripgrep-before-summary.json`, `ripgrep-after-summary.json`,
   `vector-before-summary.json`, `vector-after-summary.json`: the summaries.
 - `ripgrep-compare.txt`, `vector-compare.txt`: `compare.mjs` output,
-  including the round 3 samples (seeds 7717 and 8803; earlier rounds used 4409, 5521, 1117
+  including the round 4 samples (seeds 9931, 6247 and, for `vector-std-named-sample.txt`, 5113; earlier rounds used 7717, 8803, 4409, 5521, 1117
   and 2203).
 - `sample-review.md`: the hand review of every sampled link.
 

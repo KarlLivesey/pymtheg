@@ -903,3 +903,172 @@ test("twin: a block in format arguments without a macro is read (prints 1 1)", a
 fn main(){ println!("{}", { helper() }); println!("{}", if true { helper() } else { 0 }); }`);
   g.one("helper", "helper");
 });
+
+// --- Round 4: the per-site name rule ---------------------------------------
+// Programs and rustc output: evidence/r1-k/controls4/.
+
+test("a project write! in textual scope at the site is not the standard one (prints end [])", async () => {
+  const g = await main(`use std::fmt::Write as _;
+fn helper() -> u8 { println!("CALLED"); 1 }
+macro_rules! write { ($($t:tt)*) => { Ok::<(), std::fmt::Error>(()) } }
+fn main() { let mut s = String::new(); let _ = write!(s, "{}", helper()); println!("end [{}]", s); }`);
+  g.notDefinite("helper");
+});
+
+test("a project write! in a sibling module, not in scope at the site, leaves std's (prints [1])", async () => {
+  const g = await main(`use std::fmt::Write as _;
+fn helper() -> u8 { 1 }
+mod doc { macro_rules! write { ($($t:tt)*) => { Ok::<(), std::fmt::Error>(()) } } pub fn f() { let _ = write!(String::new(), "x"); } }
+fn main() { let mut s = String::new(); let _ = write!(s, "{}", helper()); doc::f(); println!("[{}]", s); }`);
+  g.one("helper", "helper");
+});
+
+for (const [name, source] of [
+  [
+    "use … as println (prints end)",
+    `fn helper() -> u8 { println!("CALLED"); 1 }
+mod m { #[macro_export] macro_rules! quiet { ($($t:tt)*) => {} } }
+use crate::quiet as println;
+fn main() { println!("{}", helper()); std::println!("end"); }`,
+  ],
+  [
+    "use of an exported println (prints end)",
+    `fn helper() -> u8 { std::println!("CALLED"); 1 }
+mod m { #[macro_export] macro_rules! println { ($($t:tt)*) => {} } }
+mod site { use crate::println; pub fn go() { println!("{}", super::helper()); } }
+fn main() { site::go(); std::println!("end"); }`,
+  ],
+  [
+    "#[macro_use] on a parent module (prints end)",
+    `fn helper() -> u8 { std::println!("CALLED"); 1 }
+#[macro_use] mod macros { macro_rules! println { ($($t:tt)*) => {} } }
+mod site { pub fn go() { println!("{}", super::helper()); } }
+fn main() { site::go(); std::println!("end"); }`,
+  ],
+  [
+    "a println defined earlier in the same function (prints end)",
+    `fn helper() -> u8 { std::println!("CALLED"); 1 }
+fn main() { macro_rules! println { ($($t:tt)*) => {} } println!("{}", helper()); std::println!("end"); }`,
+  ],
+  [
+    "#[macro_use] extern crate outside the workspace (fails closed; not compiled)",
+    `#[macro_use] extern crate some_external_crate;
+fn helper() -> u8 { 1 }
+fn main() { println!("{}", helper()); }`,
+  ],
+])
+  test(`name rule: ${name} is not definite`, async () => {
+    const g = await main(source);
+    g.notDefinite(
+      source.includes("super::helper()") ? "super::helper" : "helper",
+    );
+  });
+
+test("name rule: #[macro_use] extern crate of a workspace crate exporting println (prints end)", async () => {
+  const g = await graph(
+    {
+      "src/main.rs": `#[macro_use] extern crate m;
+fn helper() -> u8 { std::println!("CALLED"); 1 }
+fn main() { println!("{}", helper()); std::println!("end"); }`,
+      "m/src/lib.rs":
+        "#[macro_export] macro_rules! println { ($($t:tt)*) => {} }",
+    },
+    {
+      "Cargo.toml":
+        app + '[workspace]\nmembers=["m"]\n[dependencies]\nm={path="m"}\n',
+      "m/Cargo.toml": '[package]\nname="m"\nedition="2021"\n',
+    },
+  );
+  g.notDefinite("helper");
+});
+
+for (const [name, source] of [
+  [
+    "a println defined later in the file (prints 1)",
+    `fn helper() -> u8 { 1 }
+fn main() { println!("{}", helper()); }
+macro_rules! println { ($($t:tt)*) => {} }`,
+  ],
+  [
+    "a println defined inside another function (prints 1)",
+    `fn helper() -> u8 { 1 }
+fn other() { macro_rules! println { ($($t:tt)*) => {} } println!("x"); }
+fn main() { other(); println!("{}", helper()); }`,
+  ],
+])
+  test(`name rule: ${name} leaves std's, definite`, async () => {
+    const g = await main(source);
+    g.one("helper", "helper");
+  });
+
+test("name rule: imports of a fn, a module and std modules named like std macros bind no macro (prints [1] [1] 1)", async () => {
+  const g = await main(`mod util { pub fn write() -> u8 { 9 } }
+mod formatting { pub fn f() {} }
+mod site {
+    use crate::util::write;
+    use crate::formatting as format;
+    use std::vec;
+    use std::panic;
+    fn helper() -> u8 { 1 }
+    pub fn go() {
+        use std::fmt::Write as _;
+        let mut s = String::new(); let _ = write!(s, "{}", helper());
+        let v = vec![helper()]; let f = format!("{}", helper());
+        if v.is_empty() { panic!("{}", helper()); }
+        format::f(); let _ = write(); let _ = panic::catch_unwind(|| ());
+        println!("[{}] {:?} {}", s, v, f);
+    }
+}
+fn main() { site::go(); }`);
+  g.one("helper", "site::helper");
+});
+
+test("name rule: globs are not consulted (a glob bringing a std-named macro is E0659 in rustc)", async () => {
+  // Compiling code cannot have such a glob (controls4/glob, g1-g10); a glob
+  // of a module or crate whose contents are unknown leaves the std macro.
+  const g = await graph(
+    {
+      "src/main.rs": `mod helpers { pub fn helper() -> u8 { 1 } }
+use helpers::*;
+use some_external_crate::prelude::*;
+fn main() { println!("{}", crate::helpers::helper()); }`,
+    },
+    { "Cargo.toml": app + '[dependencies]\nsome_external_crate="1"\n' },
+  );
+  g.one("crate::helpers::helper", "helpers::helper");
+});
+
+test("name rule: an import of an external path named like a std macro fails closed", async () => {
+  const g = await graph(
+    {
+      "src/main.rs": `fn helper() -> u8 { 1 }
+use some_external_crate::write;
+fn main() { use std::fmt::Write as _; let mut s = String::new(); let _ = write!(s, "{}", helper()); }`,
+    },
+    { "Cargo.toml": app + '[dependencies]\nsome_external_crate="1"\n' },
+  );
+  g.notDefinite("helper");
+});
+
+test("transcriber names are looked up at the call site: def-site project writeln! is not used (prints [x])", async () => {
+  const g = await main(`use std::fmt::Write;
+fn helper() -> u8 { 1 }
+mod a {
+    macro_rules! writeln { ($($t:tt)*) => { Ok::<(), std::fmt::Error>(()) } }
+    #[macro_export] macro_rules! outer { () => { { let mut s = String::new(); let _ = writeln!(s, "{}", crate::helper()); s } } }
+}
+fn main() { let s = crate::outer!(); println!("[{}]", s.trim()); }`);
+  assert.deepEqual(derivedState(g, "crate::helper"), ["helper"]);
+});
+
+test("transcriber names are looked up at the call site: call-site project writeln! is used (prints [])", async () => {
+  const g = await main(`use std::fmt::Write;
+fn helper() -> u8 { 1 }
+macro_rules! outer { () => { { let mut s = String::new(); let _ = writeln!(s, "{}", crate::helper()); s } } }
+mod b {
+    macro_rules! writeln { ($($t:tt)*) => { Ok::<(), std::fmt::Error>(()) } }
+    pub fn go() -> String { outer!() }
+}
+fn main() { println!("[{}]", b::go().trim()); }`);
+  assert.deepEqual(derivedState(g, "crate::helper"), [null]);
+});

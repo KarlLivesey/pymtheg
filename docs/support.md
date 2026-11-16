@@ -363,12 +363,27 @@ manifest unknown). Private items are ordinary symbols.
   macro factory) are never read as calls. A `use` in the emitted code that
   binds a name heading a macro the expansion invokes (or a glob `use`) makes
   it unclean, and a nested macro whose name such a `use` in force could
-  rebind is not followed. A name counts as a standard (or builtin) macro only
-  when no `macro_rules!`, proc macro, `use`/`extern crate` alias,
-  `#[macro_use(…)]` entry or transcriber `use` anywhere in the workspace
-  binds that name (and the per-site checks pass). For example, a project's
-  own `write!`, or `use similar_asserts::assert_eq`, makes every `write!` or
-  `assert_eq!` in the workspace non-standard for these rules.
+  rebind is not followed. A bare name counts as the standard (or builtin)
+  macro at a point (for a name in a transcriber: the invocation site, where
+  rustc looks it up) only if, there:
+  - the standard macro is available (no `no_std` without std, no
+    `#![no_implicit_prelude]`);
+  - no proc macro and no `#[macro_use(name)]` entry in the project has that
+    name;
+  - no `macro_rules!` of that name is in textual scope, and no unseen
+    (failed) file is in that textual chain;
+  - no `#[macro_use] extern crate` covers it (one for a crate outside the
+    workspace fails closed);
+  - no explicit `use` in scope binds a macro of that name. Each import is
+    resolved: `use std::vec` and a workspace function or module do not; a
+    path into a crate outside the workspace fails closed;
+  - no item of the module is a macro of that name (for example a crate-root
+    `#[macro_export]`).
+
+  Globs are not consulted: one that brings in a std-named macro is an
+  ambiguity error (E0659) in rustc. A crate that does `#[macro_use] extern
+  crate tracing;` therefore gets no proven standard names, so its argument
+  and body calls through format macros stay unresolved.
 - **Calls in macro arguments:** calls written in an invocation's argument
   tokens are links, read as a format-style list: pieces separated by `,`
   (and `;` for `vec!`), each an expression or `name = expression`; only the
