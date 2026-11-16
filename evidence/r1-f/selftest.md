@@ -1,6 +1,6 @@
 # Acceptance self-test — latest run
 
-Generated 2026-11-15T23:46:02.730Z from commit 69256e51. Result: **every sabotage caught**.
+Generated 2026-11-16T02:30:24.447Z from commit 437bb2e5. Result: **every sabotage caught**.
 
 Wording matcher: 39/39 fixed cases correct.
 
@@ -23,7 +23,7 @@ Each row runs the real harness on a tarball broken in one way. A case passes onl
 | wrong-diagnostic-message | the N002 suggestion text changes | a-node-only | check-broken, mcp-check_design-broken | 1 | caught | exit 1; check-broken: fail; mcp-check_design-broken: fail; all failing: check-broken, verify-broken, mcp-check_design-broken |
 | listed-tool-throws | a listed MCP tool (`design_recipe`) throws | a-node-only | mcp-design_recipe | 1 | caught | exit 1; mcp-design_recipe: fail; all failing: mcp-design_recipe |
 | deprecation-warning | a coded DeprecationWarning (DEP0005) on Node 24.22 | a-node-only | help | 1 | caught | exit 1; help: fail; all failing: help |
-| deprecation-warning-24.0.0 | the same DeprecationWarning on Node 24.0.0 (beside the R1-H SQLite warning) | e-node-24.0.0 | help | 1 | caught | exit 1; help: fail; all failing: help |
+| deprecation-warning-24.0.0 | the same DeprecationWarning on Node 24.0.0 | e-node-24.0.0 | help | 1 | caught | exit 1; help: fail; all failing: help |
 | tools-list-error | `tools/list` answers with a JSON-RPC error | a-node-only | mcp-tools-list, mcp-project_info, mcp-tool-coverage, mcp-requirement_links-requirement | 1 | caught | exit 1; mcp-tools-list: fail; mcp-project_info: fail; mcp-tool-coverage: fail; mcp-requirement_links-requirement: fail; all failing: mcp-tools-list, mcp-project_info, mcp-design_recipe, mcp-read_source, mcp-check_design, mcp-check_design-broken, mcp-explore_be |
 | simulate-exhaustive-true | MCP simulate reports `exhaustive: true` | a-node-only | mcp-explore_behaviour-simulate | 1 | caught | exit 1; mcp-explore_behaviour-simulate: fail; all failing: mcp-explore_behaviour-simulate |
 | init-writes-root-file | `init` writes a file in the project root | a-node-only | init | 1 | caught | exit 1; init: fail; all failing: init |
@@ -35,4 +35,7 @@ Each row runs the real harness on a tarball broken in one way. A case passes onl
 | stack-in-mcp-json | `project_info` carries a TypeError stack in a `debug` field (structuredContent and text) | a-node-only | mcp-project_info | 1 | caught | exit 1; mcp-project_info: fail; all failing: mcp-project_info |
 | stack-in-graph-json | `graph status --json` carries a TypeError stack in a `debug` field | a-node-only | graph-status | 1 | caught | exit 1; graph-status: fail; all failing: graph-status |
 | writes-into-install | `graph index` writes a cache file inside the installed package (next to import.meta.url) | a-node-only | install-unchanged, writes-outside-project | 1 | caught | exit 1; install-unchanged: fail; writes-outside-project: fail; all failing: writes-outside-project, install-unchanged |
+| stack-in-mcp-text-only | `project_info` carries a TypeError stack in its text content only (structuredContent untouched) | a-node-only | mcp-project_info | 1 | caught | exit 1; mcp-project_info: fail; all failing: mcp-project_info |
+| unlinked-includes-linked | MCP `unlinked` also lists the already-linked `apply_discount` | a-node-only | mcp-requirement_links-unlinked | 1 | caught | exit 1; mcp-requirement_links-unlinked: fail; all failing: mcp-requirement_links-unlinked |
+| unlinked-ignores-rust-links | `unlinked` ignores links to Rust symbols (lists the linked `apply_discount`) | a-node-only | mcp-requirement_links-unlinked | 1 | caught | exit 1; mcp-requirement_links-unlinked: fail; all failing: mcp-requirement_links-unlinked |
 | code-graph-candidate | MCP `code_graph` reports a definite caller as a candidate | a-node-only | mcp-code_graph-callers-ts | 1 | caught | exit 1; mcp-code_graph-callers-ts: fail; all failing: mcp-code_graph-callers-ts, mcp-code_graph-callers-go, mcp-code_graph-callers-rust |

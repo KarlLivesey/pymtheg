@@ -1,7 +1,7 @@
 {
   "schema": "pymtheg.acceptance-selftest/v1",
-  "generatedAt": "2026-11-15T23:46:02.729Z",
-  "commit": "69256e51",
+  "generatedAt": "2026-11-16T02:30:24.445Z",
+  "commit": "437bb2e5",
   "passed": true,
   "matcher": {
     "cases": 39,
@@ -45,7 +45,7 @@
       ],
       "exitCode": 1,
       "verdict": "caught",
-      "detail": "exit 1; tarball-contents: fail; graph-index: fail; all failing: tarball-contents, doctor, graph-index, graph-status, graph-ts-callers, graph-ts-callers-2, graph-go-callers, graph-go-same-package, graph-rust-callers, graph-rust-same-file, graph-ts-path, graph-search, link-add-go, link-list, link-check, link-check-after-edit, link-check-after-refresh, link-check-final, mcp-code_graph-index, mcp-code_graph-search, mcp-code_graph-callers-go, mcp-requirement_links-add-go, mcp-requirement_links-list, mcp-requirement_links-check, mcp-requirement_links-check-after-edit, mcp-requirement_links-check-after-refresh, mcp-requirement_links-check-final, mcp-link_result-handle",
+      "detail": "exit 1; tarball-contents: fail; graph-index: fail; all failing: tarball-contents, doctor, graph-index, graph-status, graph-ts-callers, graph-ts-callers-2, graph-go-callers, graph-go-same-package, graph-rust-callers, graph-rust-same-file, graph-ts-path, graph-search, link-add-go, link-list, link-check, link-check-after-edit, link-check-after-refresh, link-check-final, mcp-code_graph-index, mcp-code_graph-search, mcp-code_graph-callers-go, mcp-requirement_links-add-go, mcp-requirement_links-list, mcp-requirement_links-check, mcp-requirement_links-check-after-edit, mcp-requirement_links-check-after-refresh, mcp-requirement_links-check-final, mcp-requirement_links-unlinked, mcp-link_result-handle",
       "failingSteps": [
         {
           "step": "tarball-contents",
@@ -154,6 +154,10 @@
         {
           "step": "mcp-requirement_links-check-final",
           "reason": "check: got [[\"plan:R1/percent_of:ok\",\"plan:R1/roundCents:ok\",\"plan:R2/apply_discount:ok\",\"plan:R2/formatTotal:ok\"],false], expected [[\"plan:R1/percent_of:ok\",\"plan:R1/roundCents:ok\",\"plan:R1/taxFor:ok"
+        },
+        {
+          "step": "mcp-requirement_links-unlinked",
+          "reason": "unlinked public symbols: got [\"renderBasket@web/src/main.ts\"], expected [\"Add@service/pricing/cart.go\",\"Cart@service/pricing/cart.go\",\"First@service/pricing/cart.go\",\"Items@service/pricing/cart.go\",\"L"
         },
         {
           "step": "mcp-link_result-handle",
@@ -454,7 +458,7 @@
         },
         {
           "step": "mcp-requirement_links-unlinked",
-          "reason": "linked symbol listed as unlinked: apply_discount, Cart, NewCart, Add, Items, First, Load, ComputeTotal, formatTotal, renderBasket"
+          "reason": "unlinked public symbols: got [\"Add@service/pricing/cart.go\",\"Cart@service/pricing/cart.go\",\"ComputeTotal@service/pricing/total.go\",\"First@service/pricing/cart.go\",\"Items@service/pricing/cart.go\",\"Load"
         },
         {
           "step": "mcp-link_result-handle",
@@ -543,13 +547,13 @@
       "failingSteps": [
         {
           "step": "help",
-          "reason": "Node warning: (node:236) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. / (Use `node --trace-deprecation ...` to show where the warning was created)"
+          "reason": "Node warning: (node:139) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. / (Use `node --trace-deprecation ...` to show where the warning was created)"
         }
       ]
     },
     {
       "id": "deprecation-warning-24.0.0",
-      "what": "the same DeprecationWarning on Node 24.0.0 (beside the R1-H SQLite warning)",
+      "what": "the same DeprecationWarning on Node 24.0.0",
       "scenarios": "e-node-24.0.0",
       "expect": [
         "help"
@@ -560,7 +564,7 @@
       "failingSteps": [
         {
           "step": "help",
-          "reason": "Node warning: (node:231) ExperimentalWarning: SQLite is an experimental feature and might change at any time / (Use `node --trace-warnings ...` to show where the warning was created) / (node:231) [DEP"
+          "reason": "Node warning: (node:134) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. / (Use `node --trace-deprecation ...` to show where the warning was created)"
         }
       ]
     },
@@ -875,7 +879,7 @@
         },
         {
           "step": "mcp-requirement_links-add-go",
-          "reason": "link to taxFor: got [\"created\",0,null,null,null,\"undefined\"], expected [\"created\",1,\"plan:R1\",\"taxFor\",\"symbol:c378976a0c2476c437f3a04bd0e9d517a7ce7c5e77797556d579e041f35a5165\",\"string\"]"
+          "reason": "link to taxFor: got [\"created\",0,null,null,null,\"undefined\"], expected [\"created\",1,\"plan:R1\",\"taxFor\",\"symbol:c2e000dd641db6e7c555f78313a67106ed9fdf42532552e368925498a9fbd51a\",\"string\"]"
         },
         {
           "step": "mcp-requirement_links-add-rust",
@@ -919,7 +923,7 @@
         },
         {
           "step": "mcp-requirement_links-unlinked",
-          "reason": "linked symbol listed as unlinked: apply_discount, Cart, NewCart, Add, Items, First, Load, ComputeTotal, formatTotal, renderBasket, roundCents"
+          "reason": "unlinked public symbols: got [\"Add@service/pricing/cart.go\",\"Cart@service/pricing/cart.go\",\"ComputeTotal@service/pricing/total.go\",\"First@service/pricing/cart.go\",\"Items@service/pricing/cart.go\",\"Load"
         },
         {
           "step": "mcp-link_result-handle",
@@ -957,7 +961,7 @@
       "failingSteps": [
         {
           "step": "mcp-project_info",
-          "reason": "internal error output: error line: TypeError: Cannot read properties of undefined (reading 'x'); stack frame: at info (file:///opt/pymtheg/dist/mcp/server.js:10:5)"
+          "reason": "internal error output: error line: TypeError: Cannot read properties of undefined (reading 'x'); stack frame: at info (file:///opt/pymtheg/dist/mcp/server.js:10:5); error line: TypeError: Cannot read "
         }
       ]
     },
@@ -974,7 +978,7 @@
       "failingSteps": [
         {
           "step": "graph-status",
-          "reason": "internal error output: error line: TypeError: Cannot read properties of undefined (reading 'x'); stack frame: at status (file:///opt/pymtheg/dist/cli/graph.js:1:2)"
+          "reason": "internal error output: error line: TypeError: Cannot read properties of undefined (reading 'x'); stack frame: at status (file:///opt/pymtheg/dist/cli/graph.js:1:2); error line: TypeError: Cannot read "
         }
       ]
     },
@@ -997,6 +1001,57 @@
         {
           "step": "install-unchanged",
           "reason": "changed in /home/node/.npm/_npx: 441bfdaa83333b3c/node_modules/pymtheg/.index-cache/state.json (added)"
+        }
+      ]
+    },
+    {
+      "id": "stack-in-mcp-text-only",
+      "what": "`project_info` carries a TypeError stack in its text content only (structuredContent untouched)",
+      "scenarios": "a-node-only",
+      "expect": [
+        "mcp-project_info"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; mcp-project_info: fail; all failing: mcp-project_info",
+      "failingSteps": [
+        {
+          "step": "mcp-project_info",
+          "reason": "internal error output: error line: TypeError: Cannot read properties of undefined (reading 'x'); stack frame: at info (file:///opt/pymtheg/dist/mcp/server.js:10:5)"
+        }
+      ]
+    },
+    {
+      "id": "unlinked-includes-linked",
+      "what": "MCP `unlinked` also lists the already-linked `apply_discount`",
+      "scenarios": "a-node-only",
+      "expect": [
+        "mcp-requirement_links-unlinked"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; mcp-requirement_links-unlinked: fail; all failing: mcp-requirement_links-unlinked",
+      "failingSteps": [
+        {
+          "step": "mcp-requirement_links-unlinked",
+          "reason": "unlinked public symbols: got [\"Add@service/pricing/cart.go\",\"Cart@service/pricing/cart.go\",\"First@service/pricing/cart.go\",\"Items@service/pricing/cart.go\",\"Load@service/pricing/cart.go\",\"NewCart@servi"
+        }
+      ]
+    },
+    {
+      "id": "unlinked-ignores-rust-links",
+      "what": "`unlinked` ignores links to Rust symbols (lists the linked `apply_discount`)",
+      "scenarios": "a-node-only",
+      "expect": [
+        "mcp-requirement_links-unlinked"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; mcp-requirement_links-unlinked: fail; all failing: mcp-requirement_links-unlinked",
+      "failingSteps": [
+        {
+          "step": "mcp-requirement_links-unlinked",
+          "reason": "unlinked public symbols: got [\"Add@service/pricing/cart.go\",\"Cart@service/pricing/cart.go\",\"First@service/pricing/cart.go\",\"Items@service/pricing/cart.go\",\"Load@service/pricing/cart.go\",\"NewCart@servi"
         }
       ]
     },

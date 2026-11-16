@@ -1,24 +1,14 @@
 # Clean-machine acceptance — latest run
 
-Generated 2026-11-16T00:06:20.122Z from commit 69256e51 by `scripts/acceptance/run.mjs`. Verdict: **known-gaps**.
+Generated 2026-11-16T02:00:24.031Z from commit 0857f2f2 by `scripts/acceptance/run.mjs`. Verdict: **pass**.
 
-Counts: pass 458, observed 10, expected-fail 22, known-gap 9. Tarball pymtheg-1.0.0.tgz: 2.25 MiB packed, 10.11 MiB unpacked, 931 files.
+Counts: pass 466, observed 10, expected-fail 23. Tarball pymtheg-1.0.0.tgz: 1.75 MiB packed, 8.60 MiB unpacked, 831 files.
 
 Durations, sizes and memory are observations on the dev server, not limits.
 
 ## Known gaps
 
-| Scenario | Step | Chunk | Reason |
-|---|---|---|---|
-| e-node-24.0.0 | help | R1-H | Node warning: (node:231) ExperimentalWarning: SQLite is an experimental feature and might change at any time / (Use `node --trace-warnings ...` to show where the warning was created) |
-| e-node-24.0.0 | init | R1-H | Node warning: (node:254) ExperimentalWarning: SQLite is an experimental feature and might change at any time / (Use `node --trace-warnings ...` to show where the warning was created) |
-| e-node-24.0.0 | doctor | R1-H | Node warning: (node:278) ExperimentalWarning: SQLite is an experimental feature and might change at any time / (Use `node --trace-warnings ...` to show where the warning was created) |
-| e-node-24.0.0 | check-valid | R1-H | Node warning: (node:305) ExperimentalWarning: SQLite is an experimental feature and might change at any time / (Use `node --trace-warnings ...` to show where the warning was created) |
-| e-node-24.0.0 | verify-valid | R1-H | Node warning: (node:329) ExperimentalWarning: SQLite is an experimental feature and might change at any time / (Use `node --trace-warnings ...` to show where the warning was created) |
-| e-node-24.0.0 | simulate-valid | R1-H | Node warning: (node:355) ExperimentalWarning: SQLite is an experimental feature and might change at any time / (Use `node --trace-warnings ...` to show where the warning was created) |
-| e-node-24.0.0 | check-broken | R1-H | Node warning: (node:381) ExperimentalWarning: SQLite is an experimental feature and might change at any time / (Use `node --trace-warnings ...` to show where the warning was created) |
-| e-node-24.0.0 | graph-index | R1-H | Node warning: (node:405) ExperimentalWarning: SQLite is an experimental feature and might change at any time / (Use `node --trace-warnings ...` to show where the warning was created) |
-| e-node-24.0.0 | graph-ts-callers | R1-H | Node warning: (node:428) ExperimentalWarning: SQLite is an experimental feature and might change at any time / (Use `node --trace-warnings ...` to show where the warning was created) |
+None.
 
 ## 0-build
 
@@ -26,10 +16,10 @@ Release build: npm ci, npm run build, npm pack in a node:24.21.0 container.
 
 | Step | Status | Exit | Req. | Reason |
 |---|---|---|---|---|
-| npm-ci | pass | 0 | yes | 4.4 s (observation); 7 npm warning lines |
-| npm-run-build | pass | 0 | yes | 26.3 s (observation); 0 npm warning lines |
-| npm-pack | pass | 0 | yes | 2.7 s (observation); 0 npm warning lines |
-| tarball-contents | pass | – | yes | 931 files, 2.25 MiB packed, 10.11 MiB unpacked |
+| npm-ci | pass | 0 | yes | 4.5 s (observation); 7 npm warning lines |
+| npm-run-build | pass | 0 | yes | 25.5 s (observation); 0 npm warning lines |
+| npm-pack | pass | 0 | yes | 2.5 s (observation); 0 npm warning lines |
+| tarball-contents | pass | – | yes | 831 files, 1.75 MiB packed, 8.60 MiB unpacked |
 | package-private | observed | – | no | "private": true — npm refuses to publish it, so `npx pymtheg` from the registry cannot work until the owner decides to publish; `npx ./pymtheg-*.tgz` works without publishing |
 | package-engines | observed | – | no | engines.node ">=24"; optionalDependencies {} |
 
@@ -39,10 +29,10 @@ Node only: install from the tarball with npx, then init, doctor, check/verify/si
 
 | Step | Status | Exit | Req. | Reason |
 |---|---|---|---|---|
-| install-npx | pass | 0 | yes | 8.2 s (observation); 0 npm warning lines |
-| install-npx-file-spec | pass | 0 | yes | 5.7 s (observation); 0 npm warning lines |
+| install-npx | pass | 0 | yes | 3.9 s (observation); 0 npm warning lines |
+| install-npx-file-spec | pass | 0 | yes | 3.1 s (observation); 0 npm warning lines |
 | network-off | pass | – | yes | ok |
-| install-size | observed | 0 | no | ~/.npm/_npx 170.5 MiB; ~/.npm/_cacache 69.6 MiB (apparent file sizes) |
+| install-size | observed | 0 | no | ~/.npm/_npx 97.7 MiB; ~/.npm/_cacache 30.5 MiB (apparent file sizes) |
 | npx-absolute-path | observed | 126 | no | exit 126: sh: 1: /acc/pkg/pymtheg-1.0.0.tgz: Permission denied |
 | help | pass | 0 | yes | ok |
 | version | pass | 0 | yes | ok |
@@ -122,7 +112,7 @@ Node only: install from the tarball with npx, then init, doctor, check/verify/si
 | studio-stop | pass | – | yes | ok |
 | init-with-legacy-folder | pass | 0 | yes | ok |
 | writes-outside-project | pass | 1 | yes | all inside allowed places: ~/project/ 13; ~/.npm/_logs/ 11; ~/.npm/_cacache/ 2; ~/.npm/_npx/ 2; ~/legacy/ 22; /acc/ 3 |
-| install-unchanged | pass | – | yes | 8256 files under ~/.npm/_npx unchanged |
+| install-unchanged | pass | – | yes | 4726 files under ~/.npm/_npx unchanged |
 | no-toolchain-processes | pass | – | yes | log empty in every step |
 
 ## b-node-git
@@ -132,8 +122,8 @@ Same as (a) in a git repository (git installed with apt before the install step)
 | Step | Status | Exit | Req. | Reason |
 |---|---|---|---|---|
 | setup-git | pass | – | yes | git version 2.39.5 |
-| install-npx | pass | 0 | yes | 7.8 s (observation); 0 npm warning lines |
-| install-npx-file-spec | pass | 0 | yes | 5.4 s (observation); 0 npm warning lines |
+| install-npx | pass | 0 | yes | 3.9 s (observation); 0 npm warning lines |
+| install-npx-file-spec | pass | 0 | yes | 3.3 s (observation); 0 npm warning lines |
 | network-off | pass | – | yes | ok |
 | git-setup | pass | 0 | yes | ok |
 | help | pass | 0 | yes | ok |
@@ -217,7 +207,7 @@ Same as (a) in a git repository (git installed with apt before the install step)
 | init-with-legacy-folder | pass | 0 | yes | ok |
 | git-status-end | pass | 0 | yes | ok |
 | writes-outside-project | pass | 1 | yes | all inside allowed places: ~/project/ 63; ~/.npm/_logs/ 11; ~/.npm/_cacache/ 2; ~/.npm/_npx/ 2; ~/legacy/ 22; /acc/ 3 |
-| install-unchanged | pass | – | yes | 8256 files under ~/.npm/_npx unchanged |
+| install-unchanged | pass | – | yes | 4726 files under ~/.npm/_npx unchanged |
 | no-toolchain-processes | pass | – | yes | log empty in every step |
 
 ## c-node-go-rust
@@ -227,8 +217,8 @@ Same as (a) with Go and Rust toolchains (copied from the official golang and rus
 | Step | Status | Exit | Req. | Reason |
 |---|---|---|---|---|
 | setup-toolchains | pass | – | yes | golang:1-bookworm, rust:1-slim-bookworm: go version go1.27.4 linux/amd64; cargo 1.100.0 (3acc79c0c 2026-11-05) |
-| install-npx | pass | 0 | yes | 8.4 s (observation); 0 npm warning lines |
-| install-npx-file-spec | pass | 0 | yes | 6.9 s (observation); 0 npm warning lines |
+| install-npx | pass | 0 | yes | 4.1 s (observation); 0 npm warning lines |
+| install-npx-file-spec | pass | 0 | yes | 3.3 s (observation); 0 npm warning lines |
 | network-off | pass | – | yes | ok |
 | toolchains-present | observed | 0 | no | go version go1.27.4 linux/amd64; cargo 1.100.0 (3acc79c0c 2026-11-05); rustc 1.100.0 (0ef1bc386 2026-11-09) |
 | help | pass | 0 | yes | ok |
@@ -314,7 +304,7 @@ Same as (a) with Go and Rust toolchains (copied from the official golang and rus
 | go-toolchain-off-again | pass | 0 | yes | ok |
 | go-source-only-callers | pass | 0 | yes | main@main.go:10->Add:definite:source, main@main.go:10->Add:definite:source, main@main.go:15->Add:definite:source, main@main.go:17->Add:definite:source |
 | writes-outside-project | pass | 1 | yes | all inside allowed places: ~/project/ 13; ~/.config/go/ 1; ~/.npm/_logs/ 11; ~/.npm/_cacache/ 2; ~/.npm/_npx/ 2; ~/legacy/ 22; ~/goproject/ 12; /acc/ 3 |
-| install-unchanged | pass | – | yes | 8256 files under ~/.npm/_npx unchanged |
+| install-unchanged | pass | – | yes | 4726 files under ~/.npm/_npx unchanged |
 | no-toolchain-processes | pass | – | yes | log empty in every step |
 | graph-identical-to-node-only | pass | – | yes | 9 graph results identical |
 
@@ -324,9 +314,9 @@ npm install --global of the tarball: the binary resolves grammars, web assets an
 
 | Step | Status | Exit | Req. | Reason |
 |---|---|---|---|---|
-| install-global | pass | 0 | yes | 6.9 s (observation); 6 npm warning lines |
+| install-global | pass | 0 | yes | 3.6 s (observation); 0 npm warning lines |
 | network-off | pass | – | yes | ok |
-| install-size | observed | 0 | no | ~/.npm/_cacache 69.6 MiB; ~/.npm-global 85.1 MiB (apparent file sizes) |
+| install-size | observed | 0 | no | ~/.npm/_cacache 30.5 MiB; ~/.npm-global 48.9 MiB (apparent file sizes) |
 | bin-location | pass | 0 | yes | ok |
 | help | pass | 0 | yes | ok |
 | version | pass | 0 | yes | ok |
@@ -406,7 +396,7 @@ npm install --global of the tarball: the binary resolves grammars, web assets an
 | studio-stop | pass | 0 | yes | ok |
 | init-with-legacy-folder | pass | 0 | yes | ok |
 | writes-outside-project | pass | 1 | yes | all inside allowed places: ~/project/ 13; ~/legacy/ 22; /acc/ 3 |
-| install-unchanged | pass | – | yes | 4124 files under ~/.npm-global/lib/node_modules/pymtheg unchanged |
+| install-unchanged | pass | – | yes | 2359 files under ~/.npm-global/lib/node_modules/pymtheg unchanged |
 | no-toolchain-processes | pass | – | yes | log empty in every step |
 
 ## d-local
@@ -415,9 +405,9 @@ npm install of the tarball as a dependency of another package, then npx pymtheg.
 
 | Step | Status | Exit | Req. | Reason |
 |---|---|---|---|---|
-| install-local | pass | 0 | yes | 6.9 s (observation); 6 npm warning lines |
+| install-local | pass | 0 | yes | 3.4 s (observation); 0 npm warning lines |
 | network-off | pass | – | yes | ok |
-| install-size | observed | 0 | no | ~/.npm/_cacache 69.6 MiB; ~/app/node_modules 85.2 MiB (apparent file sizes) |
+| install-size | observed | 0 | no | ~/.npm/_cacache 30.5 MiB; ~/app/node_modules 48.9 MiB (apparent file sizes) |
 | help | pass | 0 | yes | ok |
 | version | pass | 0 | yes | ok |
 | init | pass | 0 | yes | ok |
@@ -496,7 +486,7 @@ npm install of the tarball as a dependency of another package, then npx pymtheg.
 | studio-stop | pass | – | yes | ok |
 | init-with-legacy-folder | pass | 0 | yes | ok |
 | writes-outside-project | pass | 1 | yes | all inside allowed places: ~/project/ 13; ~/.npm/_logs/ 11; ~/legacy/ 22; /tmp/node-compile-cache/ 11; /acc/ 3 |
-| install-unchanged | pass | – | yes | 4126 files under ~/app/node_modules unchanged |
+| install-unchanged | pass | – | yes | 2361 files under ~/app/node_modules unchanged |
 | no-toolchain-processes | pass | – | yes | log empty in every step |
 
 ## e-node-24.0.0
@@ -505,21 +495,21 @@ Lowest Node release engines ">=24" allows: install, doctor and the core commands
 
 | Step | Status | Exit | Req. | Reason |
 |---|---|---|---|---|
-| install-npx | pass | 0 | yes | 9.3 s (observation); 0 npm warning lines |
-| install-npx-file-spec | pass | 0 | yes | 7.4 s (observation); 0 npm warning lines |
+| install-npx | pass | 0 | yes | 3.7 s (observation); 0 npm warning lines |
+| install-npx-file-spec | pass | 0 | yes | 2.9 s (observation); 0 npm warning lines |
 | network-off | pass | – | yes | ok |
 | node-version | observed | 0 | no | v24.0.0 |
-| help | known-gap (R1-H) | 0 | yes | Node warning: (node:231) ExperimentalWarning: SQLite is an experimental feature and might change at any time / (Use `node --trace-warnings ...` to show where the warning was created) |
-| init | known-gap (R1-H) | 0 | yes | Node warning: (node:254) ExperimentalWarning: SQLite is an experimental feature and might change at any time / (Use `node --trace-warnings ...` to show where the warning was created) |
-| doctor | known-gap (R1-H) | 0 | yes | Node warning: (node:278) ExperimentalWarning: SQLite is an experimental feature and might change at any time / (Use `node --trace-warnings ...` to show where the warning was created) |
-| check-valid | known-gap (R1-H) | 0 | yes | Node warning: (node:305) ExperimentalWarning: SQLite is an experimental feature and might change at any time / (Use `node --trace-warnings ...` to show where the warning was created) |
-| verify-valid | known-gap (R1-H) | 0 | yes | Node warning: (node:329) ExperimentalWarning: SQLite is an experimental feature and might change at any time / (Use `node --trace-warnings ...` to show where the warning was created) |
-| simulate-valid | known-gap (R1-H) | 0 | yes | Node warning: (node:355) ExperimentalWarning: SQLite is an experimental feature and might change at any time / (Use `node --trace-warnings ...` to show where the warning was created) |
-| check-broken | known-gap (R1-H) | 1 | yes | Node warning: (node:381) ExperimentalWarning: SQLite is an experimental feature and might change at any time / (Use `node --trace-warnings ...` to show where the warning was created) |
-| graph-index | known-gap (R1-H) | 0 | yes | Node warning: (node:405) ExperimentalWarning: SQLite is an experimental feature and might change at any time / (Use `node --trace-warnings ...` to show where the warning was created) |
-| graph-ts-callers | known-gap (R1-H) | 0 | yes | Node warning: (node:428) ExperimentalWarning: SQLite is an experimental feature and might change at any time / (Use `node --trace-warnings ...` to show where the warning was created) |
+| help | pass | 0 | yes | ok |
+| init | pass | 0 | yes | ok |
+| doctor | pass | 0 | yes | ok |
+| check-valid | pass | 0 | yes | ok |
+| verify-valid | pass | 0 | yes | ok |
+| simulate-valid | pass | 0 | yes | ok |
+| check-broken | expected-fail | 1 | yes | failed exactly as specified |
+| graph-index | pass | 0 | yes | ok |
+| graph-ts-callers | pass | 0 | yes | ok |
 | writes-outside-project | pass | 1 | yes | all inside allowed places: ~/project/ 5; ~/.npm/_logs/ 9; ~/.npm/_cacache/ 2; ~/.npm/_npx/ 2; /acc/ 3 |
-| install-unchanged | pass | – | yes | 8256 files under ~/.npm/_npx unchanged |
+| install-unchanged | pass | – | yes | 4726 files under ~/.npm/_npx unchanged |
 | no-toolchain-processes | pass | – | yes | log empty in every step |
 
 ## e-node-25
@@ -528,8 +518,8 @@ Node 25 (supported by engines ">=24"): install, doctor and the core commands.
 
 | Step | Status | Exit | Req. | Reason |
 |---|---|---|---|---|
-| install-npx | pass | 0 | yes | 9.0 s (observation); 0 npm warning lines |
-| install-npx-file-spec | pass | 0 | yes | 6.4 s (observation); 0 npm warning lines |
+| install-npx | pass | 0 | yes | 4.1 s (observation); 0 npm warning lines |
+| install-npx-file-spec | pass | 0 | yes | 3.2 s (observation); 0 npm warning lines |
 | network-off | pass | – | yes | ok |
 | node-version | observed | 0 | no | v25.9.0 |
 | help | pass | 0 | yes | ok |
@@ -542,7 +532,7 @@ Node 25 (supported by engines ">=24"): install, doctor and the core commands.
 | graph-index | pass | 0 | yes | ok |
 | graph-ts-callers | pass | 0 | yes | ok |
 | writes-outside-project | pass | 1 | yes | all inside allowed places: ~/project/ 5; ~/.npm/_logs/ 9; ~/.npm/_cacache/ 2; ~/.npm/_npx/ 2; /acc/ 3 |
-| install-unchanged | pass | – | yes | 8256 files under ~/.npm/_npx unchanged |
+| install-unchanged | pass | – | yes | 4726 files under ~/.npm/_npx unchanged |
 | no-toolchain-processes | pass | – | yes | log empty in every step |
 
 ## e-node-26
@@ -551,8 +541,8 @@ Node 26 (supported by engines ">=24"): install, doctor and the core commands.
 
 | Step | Status | Exit | Req. | Reason |
 |---|---|---|---|---|
-| install-npx | pass | 0 | yes | 9.1 s (observation); 0 npm warning lines |
-| install-npx-file-spec | pass | 0 | yes | 7.5 s (observation); 0 npm warning lines |
+| install-npx | pass | 0 | yes | 3.8 s (observation); 0 npm warning lines |
+| install-npx-file-spec | pass | 0 | yes | 3.3 s (observation); 0 npm warning lines |
 | network-off | pass | – | yes | ok |
 | node-version | observed | 0 | no | v26.13.1 |
 | help | pass | 0 | yes | ok |
@@ -565,7 +555,7 @@ Node 26 (supported by engines ">=24"): install, doctor and the core commands.
 | graph-index | pass | 0 | yes | ok |
 | graph-ts-callers | pass | 0 | yes | ok |
 | writes-outside-project | pass | 1 | yes | all inside allowed places: ~/project/ 5; ~/.npm/_logs/ 9; ~/.npm/_cacache/ 2; ~/.npm/_npx/ 2; /acc/ 3 |
-| install-unchanged | pass | – | yes | 8256 files under ~/.npm/_npx unchanged |
+| install-unchanged | pass | – | yes | 4726 files under ~/.npm/_npx unchanged |
 | no-toolchain-processes | pass | – | yes | log empty in every step |
 
 ## f-restic
@@ -574,17 +564,17 @@ restic (a larger real Go project): init, graph index and five queries; time and 
 
 | Step | Status | Exit | Req. | Reason |
 |---|---|---|---|---|
-| install-npx | pass | 0 | yes | 15.7 s (observation); 0 npm warning lines |
-| install-npx-file-spec | pass | 0 | yes | 10.1 s (observation); 0 npm warning lines |
+| install-npx | pass | 0 | yes | 3.8 s (observation); 0 npm warning lines |
+| install-npx-file-spec | pass | 0 | yes | 3.5 s (observation); 0 npm warning lines |
 | network-off | pass | – | yes | ok |
-| restic-init | pass | 0 | yes | 3.8 s (observation) |
-| restic-graph-index | pass | 0 | yes | 559 files, 7356 symbols, 63088 links, 0 failed; 192.5 s, peak RSS ≥ 1896 MiB (observations) |
-| restic-status | pass | 0 | yes | ok; {"matches":0,"symbols":0,"links":0,"callers":0,"observedLinks":0}; 3.3 s, peak RSS ≥ 156 MiB (observations) |
-| restic-search | pass | 0 | yes | ok; {"matches":20,"symbols":0,"links":0,"callers":0,"observedLinks":0}; 3.4 s, peak RSS ≥ 160 MiB (observations) |
-| restic-callers | pass | 0 | yes | ambiguous; {"matches":6,"symbols":0,"links":0,"callers":0,"observedLinks":0}; 3.3 s, peak RSS ≥ 162 MiB (observations) |
-| restic-callees | pass | 0 | yes | ok; {"matches":0,"symbols":1,"links":57,"callers":0,"observedLinks":0}; 3.4 s, peak RSS ≥ 162 MiB (observations) |
-| restic-impact | pass | 0 | yes | ambiguous; {"matches":3,"symbols":0,"links":0,"callers":0,"observedLinks":0}; 3.3 s, peak RSS ≥ 161 MiB (observations) |
-| restic-path | pass | 0 | yes | ambiguous; {"matches":7,"symbols":0,"links":0,"callers":0,"observedLinks":0}; 3.5 s, peak RSS ≥ 166 MiB (observations) |
+| restic-init | pass | 0 | yes | 2.8 s (observation) |
+| restic-graph-index | pass | 0 | yes | 559 files, 7356 symbols, 63088 links, 0 failed; 86.6 s, peak RSS ≥ 2074 MiB (observations) |
+| restic-status | pass | 0 | yes | ok; {"matches":0,"symbols":0,"links":0,"callers":0,"observedLinks":0}; 2.7 s, peak RSS ≥ 167 MiB (observations) |
+| restic-search | pass | 0 | yes | ok; {"matches":20,"symbols":0,"links":0,"callers":0,"observedLinks":0}; 2.9 s, peak RSS ≥ 159 MiB (observations) |
+| restic-callers | pass | 0 | yes | ambiguous; {"matches":6,"symbols":0,"links":0,"callers":0,"observedLinks":0}; 2.8 s, peak RSS ≥ 161 MiB (observations) |
+| restic-callees | pass | 0 | yes | ok; {"matches":0,"symbols":1,"links":57,"callers":0,"observedLinks":0}; 2.8 s, peak RSS ≥ 161 MiB (observations) |
+| restic-impact | pass | 0 | yes | ambiguous; {"matches":3,"symbols":0,"links":0,"callers":0,"observedLinks":0}; 2.9 s, peak RSS ≥ 169 MiB (observations) |
+| restic-path | pass | 0 | yes | ambiguous; {"matches":7,"symbols":0,"links":0,"callers":0,"observedLinks":0}; 3.1 s, peak RSS ≥ 159 MiB (observations) |
 | writes-outside-project | pass | 1 | yes | all inside allowed places: ~/restic/ 5; ~/.npm/_logs/ 8; ~/.npm/_cacache/ 2; ~/.npm/_npx/ 2; /acc/ 3 |
-| install-unchanged | pass | – | yes | 8256 files under ~/.npm/_npx unchanged |
+| install-unchanged | pass | – | yes | 4726 files under ~/.npm/_npx unchanged |
 | no-toolchain-processes | pass | – | yes | log empty in every step |

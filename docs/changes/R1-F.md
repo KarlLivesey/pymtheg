@@ -266,7 +266,7 @@ The block below is generated from `evidence/r1-f/latest.json` and
 count in it comes from those files.
 
 <!-- acceptance-results:start -->
-Harness run on commit 69256e51 (2026-11-16): verdict **known-gaps**, **458 pass**, **9 known-gap**, **22 expected-fail**, **10 observed**, **0 fail** (499 rows; `evidence/r1-f/latest.json`).
+Harness run on commit 0857f2f2 (2026-11-16): verdict **pass**, **466 pass**, **0 known-gap**, **23 expected-fail**, **10 observed**, **0 fail** (499 rows; `evidence/r1-f/latest.json`).
 
 | Scenario | pass | known-gap | expected-fail | observed | fail |
 |---|---:|---:|---:|---:|---:|
@@ -276,24 +276,22 @@ Harness run on commit 69256e51 (2026-11-16): verdict **known-gaps**, **458 pass*
 | c-node-go-rust | 86 | 0 | 4 | 1 | 0 |
 | d-global | 79 | 0 | 4 | 1 | 0 |
 | d-local | 78 | 0 | 4 | 1 | 0 |
-| e-node-24.0.0 | 6 | 9 | 0 | 1 | 0 |
+| e-node-24.0.0 | 14 | 0 | 1 | 1 | 0 |
 | e-node-25 | 14 | 0 | 1 | 1 | 0 |
 | e-node-26 | 14 | 0 | 1 | 1 | 0 |
 | f-restic | 14 | 0 | 0 | 0 | 0 |
 
 Known gaps in this run:
 
-| Chunk | Rows | Steps |
-|---|---:|---|
-| R1-H | 9 | e-node-24.0.0/help, e-node-24.0.0/init, e-node-24.0.0/doctor, e-node-24.0.0/check-valid, e-node-24.0.0/verify-valid, e-node-24.0.0/simulate-valid, e-node-24.0.0/check-broken, e-node-24.0.0/graph-index, e-node-24.0.0/graph-ts-callers |
+None.
 
 Observations quoted from the same run (timings and sizes are observations, not limits):
 
-- Install (a, `npx`): 8.2 s (observation); 0 npm warning lines; ~/.npm/_npx 170.5 MiB; ~/.npm/_cacache 69.6 MiB (apparent file sizes).
+- Install (a, `npx`): 3.9 s (observation); 0 npm warning lines; ~/.npm/_npx 97.7 MiB; ~/.npm/_cacache 30.5 MiB (apparent file sizes).
 - Go opt-in (c): index 1 links upgraded; processes: sh -c, go env, go build, golinks-b78189ed4ced0505 -go, golinks-b78189ed4ced0505 -go; callers of Add opted in: main@main.go:10->Add:definite:toolchain, main@main.go:10->Add:definite:toolchain, main@main.go:13->Add:definite:toolchain, main@main.go:15->Add:definite:toolchain, main@main.go:17->Add:definite:toolchain; with the setting off: main@main.go:10->Add:definite:source, main@main.go:10->Add:definite:source, main@main.go:15->Add:definite:source, main@main.go:17->Add:definite:source.
-- restic (f): 559 files, 7356 symbols, 63088 links, 0 failed; 192.5 s, peak RSS ≥ 1896 MiB (observations).
+- restic (f): 559 files, 7356 symbols, 63088 links, 0 failed; 86.6 s, peak RSS ≥ 2074 MiB (observations).
 
-Self-test on commit 69256e51 (2026-11-15): **passed**. Wording matcher 39/39; control clean (exit 0); **27/27 sabotages caught** (`evidence/r1-f/selftest.json`).
+Self-test on commit 437bb2e5 (2026-11-16): **passed**. Wording matcher 39/39; control clean (exit 0); **30/30 sabotages caught** (`evidence/r1-f/selftest.json`).
 
 | Case | Break | Scenario | Named step(s), each must be `fail` | Exit | Verdict |
 |---|---|---|---|---|---|
@@ -312,7 +310,7 @@ Self-test on commit 69256e51 (2026-11-15): **passed**. Wording matcher 39/39; co
 | wrong-diagnostic-message | the N002 suggestion text changes | a-node-only | check-broken, mcp-check_design-broken | 1 | caught |
 | listed-tool-throws | a listed MCP tool (`design_recipe`) throws | a-node-only | mcp-design_recipe | 1 | caught |
 | deprecation-warning | a coded DeprecationWarning (DEP0005) on Node 24.22 | a-node-only | help | 1 | caught |
-| deprecation-warning-24.0.0 | the same DeprecationWarning on Node 24.0.0 (beside the R1-H SQLite warning) | e-node-24.0.0 | help | 1 | caught |
+| deprecation-warning-24.0.0 | the same DeprecationWarning on Node 24.0.0 | e-node-24.0.0 | help | 1 | caught |
 | tools-list-error | `tools/list` answers with a JSON-RPC error | a-node-only | mcp-tools-list, mcp-project_info, mcp-tool-coverage, mcp-requirement_links-requirement | 1 | caught |
 | simulate-exhaustive-true | MCP simulate reports `exhaustive: true` | a-node-only | mcp-explore_behaviour-simulate | 1 | caught |
 | init-writes-root-file | `init` writes a file in the project root | a-node-only | init | 1 | caught |
@@ -324,6 +322,9 @@ Self-test on commit 69256e51 (2026-11-15): **passed**. Wording matcher 39/39; co
 | stack-in-mcp-json | `project_info` carries a TypeError stack in a `debug` field (structuredContent and text) | a-node-only | mcp-project_info | 1 | caught |
 | stack-in-graph-json | `graph status --json` carries a TypeError stack in a `debug` field | a-node-only | graph-status | 1 | caught |
 | writes-into-install | `graph index` writes a cache file inside the installed package (next to import.meta.url) | a-node-only | install-unchanged, writes-outside-project | 1 | caught |
+| stack-in-mcp-text-only | `project_info` carries a TypeError stack in its text content only (structuredContent untouched) | a-node-only | mcp-project_info | 1 | caught |
+| unlinked-includes-linked | MCP `unlinked` also lists the already-linked `apply_discount` | a-node-only | mcp-requirement_links-unlinked | 1 | caught |
+| unlinked-ignores-rust-links | `unlinked` ignores links to Rust symbols (lists the linked `apply_discount`) | a-node-only | mcp-requirement_links-unlinked | 1 | caught |
 | code-graph-candidate | MCP `code_graph` reports a definite caller as a candidate | a-node-only | mcp-code_graph-callers-ts | 1 | caught |
 <!-- acceptance-results:end -->
 
@@ -431,14 +432,15 @@ code, message and location, paged, with `read_run` for the full text.
 
 All on the dev server:
 
-- `npm test`: 2,788/2,788 pass, with 0 fail, cancelled or skipped.
+- `npm test`: 2,813/2,813 pass, with 0 fail, cancelled or skipped.
 - `npm run format:check`: passes.
-- On commit 69256e51 (the code in this head; later commits change only this
-  note and the evidence):
-  - the harness exits 2 (the R1-H rows only; see the results above);
-  - the self-test exits 0;
+- The harness and the cleanup test ran on commit 0857f2f2:
+  - the harness exits 0: verdict pass, with no known gap;
   - the cleanup test exits 0 (TERM 143, HUP 129, PIPE 141, each with 0
     containers left and no recorded image left unused).
+- The self-test ran on commit 437bb2e5 and exits 0. That commit only changes one
+  self-test anchor.
+- Later commits change only this note and the evidence.
 
 ## Files
 
