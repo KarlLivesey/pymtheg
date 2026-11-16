@@ -261,7 +261,11 @@ export async function bindImplementation(
       "The planned record changed since it was reviewed. Refresh it and use the current planHash before linking.",
     );
   const graph = state.graph;
-  if (!graph || graph.snapshotId !== request.observationId)
+  if (!graph)
+    throw new ArchitectureConflict(
+      "No code observation is retained in this project yet. Capture code with observe_implementation, then choose a declaration from read_implementation before linking.",
+    );
+  if (graph.snapshotId !== request.observationId)
     throw new ArchitectureConflict(
       "Code observation changed. Review the selected declaration before linking.",
     );
@@ -343,7 +347,7 @@ export async function unlinkImplementation(
   );
   if (bindings.length === state.bindings.length)
     throw new ArchitectureConflict(
-      "That implementation link is no longer present.",
+      `No implementation link joins ${request.planId} to ${request.nodeId} in the current revision; nothing was removed. List current links with read_implementation.`,
     );
   return commit(
     store,

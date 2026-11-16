@@ -1,8 +1,8 @@
 # Current support matrix and semantics
 
 `check` requests local analysis only. The requested analyses may each complete,
-fail, or remain incomplete; there is no global verified badge. Optional backends
-are never started by local checks.
+fail, or remain incomplete; there is no global verified badge. No external
+backend exists; `check` starts no other program.
 
 | Construct | Parsing/typing | Local analysis | Behaviour |
 |---|---|---|---|
@@ -25,6 +25,7 @@ are never started by local checks.
 | Latency/peak live memory | reserved metric names rejected | no additive-work pretence | unsupported |
 | SMT/proof, liveness/fairness, code extraction/conformance, LSP, caches | deferred | no claims | no claims |
 | Agent-facing MCP | implemented local stdio | same worker, root-confined reads, paged explanations/evidence | built-in search (verify) and sampler (simulate), source-mapped trace steps |
+| Code graph and requirement links (Go, Rust, TypeScript/JavaScript) | `pymtheg graph`, `pymtheg link`; MCP `code_graph`, `graph_result`, `requirement_links`, `link_result` | definite, candidate-set and unresolved links with possible callers; source-only unless the Go toolchain route is turned on | not applicable; links record reviewed intent, never proof |
 | TypeScript / Rust / Go scaffolds | one normalized contract document from checked IR | fail-fast stubs by default; optional empty bodies; arbitrary precision, explicit dependencies/omissions | no runtime implementation or conformance claim |
 | Language emitter plugins | explicitly registered local module; versioned API | bounded process, validated output/identities; JavaScript example | trusted executable code; registered launch targets work in CLI/MCP/GUI; no automatic discovery |
 | Local Studio | implemented | real compiler workers, typed scenario forms, source/durable-draft conflict saves | built-in search (verify) and sampler (simulate), same scopes; replay player; three cached runs |
@@ -149,15 +150,12 @@ the recent-run cache, and deleting it loses nothing that cannot be regenerated.
 All features open their SQLite databases through one storage boundary
 (`src/storage/`). Local storage only; no synchronization.
 
-Old layouts are refused, never migrated or read. A command that reads or writes
-managed project state refuses a root holding `.pymtheg.json`,
-`.pymtheg-architecture/`, `.pymtheg-studio/` or one of the old top-level
-`.pymtheg-*.json` files: `init`, `studio`, `mcp`, `import-architecture` (including
-previews), `scaffold`, `observe` captures, `check --check-scope related|project`
-and any analysis given `--scenario`. File-scope `check`, `verify`, `simulate` and
-`emit` without `--scenario`, and `observe --list`, `fmt`, `doctor`, help and
-version still work there and write no project state. Symbolic-link storage
-directories, databases and SQLite sidecars are refused. Source: [W2-E](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-E.md).
+Old layouts (`.pymtheg.json`, `.pymtheg-architecture/`, `.pymtheg-studio/` and
+the old top-level `.pymtheg-*.json` files) are unused dead data: never read,
+migrated or deleted, and their presence refuses no command. `init` and `doctor`
+print one notice naming them (see [project initialization](project-init.md#local-state-and-sharing)).
+Symbolic-link storage directories, databases and SQLite sidecars are refused.
+Source: [W2-E](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-E.md).
 
 **Stable global IDs and recorded history (first slice of 3.3).** Each checkpoint
 registers its documents, projected entities (including requirements and
@@ -189,15 +187,19 @@ are **not yet exposed** by the CLI, MCP or Studio. Source: [W1-D](https://github
 
 ### Code graph
 
-The graph store, indexer and three production language modules exist as a
-library (`src/graph/`). **No command, MCP tool or Studio screen uses them yet**;
-`observe` still uses the older TypeScript/JavaScript reader. Project callers open
-the store at `.pymtheg/rebuildable/graph.sqlite` (`openProjectGraph`). The store
-is schema 3; an older graph database is refused with a rebuild message. Nothing
-runs a language toolchain or project code, and nothing reads or writes
-`.codegraph/`. Language modules are discovered from `src/graph/languages/*/`;
+The graph store, indexer and three production language modules (`src/graph/`)
+answer the CLI command `pymtheg graph` (below), the MCP tools `code_graph` and
+`graph_result`, and requirement links (`pymtheg link`, MCP `requirement_links`).
+No Studio screen uses them; `observe` still uses the older TypeScript/JavaScript
+reader. The store is `.pymtheg/rebuildable/graph.sqlite`, schema 3; an older
+graph database is refused with a rebuild message. Nothing runs project code.
+Nothing runs a language toolchain unless the project opts in to the Go
+toolchain route (below); nothing reads or writes `.codegraph/`. Language
+modules are discovered from `src/graph/languages/*/`;
 production discovery offers `go`, `rust` and `typescript` (the `toy` fixture is
-test-only). Interface: [W1-C](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W1-C.md), [W2-I](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-I.md).
+test-only). Each module's current version, and the versions the index was built
+with, are in every graph answer (`modules`: `id`, `version`, `indexedVersions`;
+MCP section `modules`); a changed module version makes the next query sync the index. Interface: [W1-C](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W1-C.md), [W2-I](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-I.md).
 
 Link outcomes:
 
@@ -223,9 +225,11 @@ module's `parse` (a syntax error) is stored and reused: while the file's
 original-byte hash, module ID and module version are unchanged it is not parsed
 again, and it stays failed with its diagnostics. Editing the file or bumping the
 module version invalidates it. Go and Rust failures are cached this way.
-TypeScript content failures are never cached by the core, because that module is
-analyze-only and its failures come from project analysis; such a file is read
-again on every index. Failures marked `failureKind: "transient"`, thrown parser
+TypeScript is analyze-only: its failures come from project analysis, and one
+the module certifies as a content failure (`failureKind: "content"`, which a
+syntax error is) is cached the same way, so an unchanged broken file is counted
+`unchanged` on the next index and stays failed; other analysis failures are not
+cached. Failures marked `failureKind: "transient"`, thrown parser
 exceptions (crash, timeout, cancellation, resource budget), malformed parser
 output, unreadable captures and project-analysis failures are never cached; they
 are retried. `SqliteGraphStore.failedFiles()` lists the failed source files, ordered
@@ -247,9 +251,10 @@ failed internally are unresolved with no reason. In Go and Rust a thrown parser
 exception is a parser error in the index report, not a syntax failure, and cannot
 become an `invalid-code` cause. Source: [W2-U](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-U.md).
 
-#### Go (module version 23)
+#### Go
 
-No-toolchain module; nothing runs `go`. Claims `*.go`; context `go.mod` and
+Source-only by default: nothing runs `go` unless the project opts in to the
+toolchain route below. Claims `*.go`; context `go.mod` and
 `go.work`. One `package` symbol per directory and package clause, hosted in one
 file (its ID can change when files are added or removed).
 
@@ -262,8 +267,10 @@ file (its ID can change when files are added or removed).
   are not evaluated); several equally shallow promotion paths; interface dispatch
   (the interface method plus every project type whose method set matches by name
   and parameter/result counts; always open, `structural-match-unverified`);
-  calls on a receiver with no evident type (name-only, open); reassigned
-  function-valued locals.
+  calls on a receiver whose type the source does not show (name-only, open,
+  `receiver-type-unknown`; with only one project method of that name it stays
+  unresolved, and a receiver of a standard-library or third-party type is
+  unresolved); reassigned function-valued locals.
 - **Never definite:** `implements` links (unresolved, interface kept in
   `data.interfaceId`, `structural-match-unverified`; computed type identity is an
   annotation only).
@@ -288,7 +295,7 @@ straddles one of the parser runtime's 5,119-unit input chunk boundaries (the sam
 character in a comment or string there is read). Sources: [W2-B](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-B.md),
 [W2-B2](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-B2.md), [W2-S](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-S.md), `grammars/README.md`.
 
-#### Rust (module version 27)
+#### Rust
 
 No-toolchain module; nothing runs `cargo` or `rustc`, and macros are not expanded.
 Claims `*.rs`; context `Cargo.toml`, read by a snapshot-only TOML reader (an
@@ -341,8 +348,10 @@ manifest unknown). Private items are ordinary symbols.
   a brace group of the transcriber are in their own block and do not count.
   A child module file inherits its parent's textual macros at its `mod child;`
   declaration, so `#[macro_use] mod macros;` macros used in later child files
-  resolve. Cross-crate `#[macro_export]` macros are unresolved. Standard-library
-  and external items are unresolved.
+  resolve. A `#[macro_export]` macro of another crate in the project resolves
+  (by path, `use` or `#[macro_use] extern crate`); macros of crates outside
+  the project are unresolved. Standard-library and external items are
+  unresolved.
 - **Clean expansion (both rules below).** A workspace `macro_rules!` arm is
   clean when the code it emits has no attribute anywhere (so no `#[cfg]` can
   remove a call) and no item other than a readable `use` (no `fn`, `mod`,
@@ -417,15 +426,18 @@ manifest unknown). Private items are ordinary symbols.
   `macros.rs` that defines its own `println!` emitting an item); both are pinned
   as known limits (`test/graph-rust-round12.test.mjs`, the macro-recall tests).
 
-Grammar: npm `tree-sitter-rust` 0.24.0, unpatched. It rejects some valid Rust,
-which fails the whole file (11 files of Vector): `&raw` where `raw` is a variable,
-`unsafe extern "C" { … }` (edition 2024), `#[cfg]` on a struct-pattern field, two
-or more attributes on one parameter or an attribute on a closure parameter (a
-single attribute on a function or method parameter parses), a turbofish on a function named like a
-primitive (`char::<_, E>(…)`), and `impl A + for<'a> B<'a>`. Sources:
-[W2-C](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-C.md), [W2-P](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-P.md).
+Grammar: the module loads `grammars/rust/tree-sitter-rust.wasm`, built by
+Pymtheg from upstream `tree-sitter-rust` v0.24.2 plus six upstream pull requests
+and two patches of its own (`grammars/README.md`). It reads `&raw` borrows and a
+variable named `raw`, `unsafe extern "C" { … }` with `safe fn`, and `#[cfg]` on
+a struct-pattern field. It still rejects some valid Rust, which fails the whole
+file (3 files of Vector): two or more attributes on one parameter or an
+attribute on a closure parameter (a single attribute on a function or method
+parameter parses), a turbofish on a function named like a primitive
+(`char::<_, E>(…)`), and `impl A + for<'a> B<'a>`. Sources:
+[W2-C](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-C.md), [W2-P](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-P.md), [W2-V](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-V.md).
 
-#### TypeScript and JavaScript (module version 16)
+#### TypeScript and JavaScript
 
 Uses the TypeScript compiler over the captured snapshot. The only other input
 is the installed compiler's standard-library declarations; `node_modules` is not
@@ -461,13 +473,44 @@ answer.
   augmented module into candidate sets. Sources: [W2-D](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-D.md),
   [W2-U](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-U.md).
 
+#### Graph commands and the Go toolchain route
+
+`pymtheg graph index|status|search TEXT|symbol SELECTOR|callers SELECTOR|callees SELECTOR|path FROM TO|impact SELECTOR|file PATH`
+(`--root`, `--json`, `--no-sync`, `--case-sensitive`, `--include-possible`,
+`--depth` default 5, `--limit` default 1,000 and at most 10,000) and the MCP
+tools `code_graph`/`graph_result` run the same commands. Every query first syncs
+the index with the files by content (`--no-sync`/`noSync` answers from the index
+as it is, with stale-file warnings); `status` never indexes. A selector is a
+`symbol:` ref, an exact name, a recorded qualified name or `path:line[:column]`;
+a selector that selects nothing returns up to five near matches, never selected.
+Callers' class counts are totals whatever the limit: `definite` and
+`candidateSet` are exact; `unresolved` (possible callers) is counted up to 1,000
+or the limit, whichever is larger; `countsTruncated` marks that there are more
+than that bound, so `unresolved` is a lower bound. The MCP form, its
+selector forms per language and its limits are in [the code guide](code-guide.md).
+
+**Go toolchain route (opt-in, decision D17).** With the key
+`"graph": {"toolchain": {"go": true}}` added to the existing
+`.pymtheg/settings.json` (which must keep its `version: 1` and `scenarios`; a
+file holding only the `graph` key is unreadable and the route stays off with a
+`settings-unreadable` warning; full example in the
+[code guide](code-guide.md#the-go-toolchain-route)), or an absolute path to the
+`go` to trust instead of `true`, indexing also runs that `go` (`go list` and a `go/types` helper) in a
+closed environment with network, cgo and telemetry off, and merges its facts:
+it can upgrade unresolved or candidate links to definite, confirm source-only
+links or verify candidate sets; such links carry `decidedBy: "toolchain"`.
+Every answer reports `toolchain.go.state` (`used` with counts, `unavailable` with
+the reason, such as no `go.mod` at the project root, `go.work`, no `go`, or Go
+older than 1.22; `not-indexed`). Turning it on or off makes the next query sync.
+No MCP tool changes this setting; edit the file. Sources:
+[W3-L](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W3-L.md), [W3-L2](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W3-L2.md).
+
 #### Not built yet
 
-Toolchain-backed exact links (Go through `go list` and `go/types`; Rust through
-`cargo`/`rustc`) are a later, explicit per-project opt-in (decision D17); the
-investigations are [W2-K](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-K.md) and [W2-L](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-L.md). Also
-later: automatic sync, the join with model declarations, the explore query,
-MCP/Studio surfaces for the graph, Lua, and a vendored Rust grammar.
+Toolchain-backed Rust links (`cargo`/`rustc`; investigation
+[W2-L](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-L.md)), `go.work` workspaces in the Go
+toolchain route, the join with model declarations, the explore query, a Studio
+screen for the graph, and Lua.
 
 #### Requirement ↔ code-symbol links (R1-D)
 
@@ -489,8 +532,10 @@ qualified name + kind and verifies it by the text fingerprint. Identical text
 with that identity at the recorded path is the linked symbol (`ok`), whatever
 file it came from. Also built: requirements touched by a
 symbol or file (optionally through definite callers), and unlinked requirements
-and public symbols. Not yet built: `.pym` declaration links, MCP tools (the data
-functions are exported), Studio display, carrying links in archive bundles,
+and public symbols. The MCP tool `requirement_links` runs the same functions; the
+first planning write (CLI or MCP) in a project that was never initialised
+initialises it as `pymtheg init` would (R1-J). Not yet built: `.pym` declaration
+links, Studio display, carrying links in archive bundles,
 comment- or format-insensitive fingerprints, and safe concurrent first-time graph
 indexing. Source: [R1-D](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/R1-D.md).
 

@@ -125,8 +125,9 @@ assumptions and trace values remain in source-free exports; review them before
 sharing. Imported reports are labelled historical/imported; they have not been
 rerun or authenticated by this workspace. Invalid report schemas are rejected.
 A completed session means that the tool finished, not that every design property
-was proved. Missing backends, unsupported features, cancellation and timeouts
-remain explicit in Evidence. The GUI and CLI use the same compiler and backend.
+was proved. Engine failures, unsupported features, cancellation and timeouts
+remain explicit in Evidence. The GUI and CLI use the same compiler and built-in
+engines.
 
 Local limits: 2,048 selected source files, 2 MiB/file, 8 MiB/request, ten runs.
 The browser lists up to 10,000 paths, preloads at most 8 MiB and loads other files

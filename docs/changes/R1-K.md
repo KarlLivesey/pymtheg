@@ -4,7 +4,7 @@ A user trial through MCP on ripgrep (178cc027e283, 102 Rust files) found that
 every definite link was right, but 65% of links (22,647 of 34,780) were
 unresolved and ordinary shapes were missing. This chunk measured why, then
 fixed the three reported shapes and one cause the measurement found, each
-only as far as it is sound. Rust module version 26 → 27 (stored results
+only as far as it is sound. The Rust module's version goes from 26 to 27 (stored results
 change). Nothing runs `cargo` or `rustc`; macros are still not expanded.
 
 Evidence, scripts and samples: `evidence/r1-k/` (see its README).
@@ -13,7 +13,7 @@ Evidence, scripts and samples: `evidence/r1-k/` (see its README).
 
 `evidence/r1-k/measure.mjs` cold-indexes a project and classifies every
 unresolved link by reason and by a rough target class. On main (module
-version 26):
+version 26 of the Rust module):
 
 | | ripgrep | Vector |
 |---|---|---|
@@ -205,8 +205,8 @@ and the plain list otherwise; the Rust test harnesses accept both.
 
 ## Results
 
-Final runs (round 2), this branch (module version 27) against `origin/main`
-(Rust module version 26), on the dev server, both sides run in parallel
+Final runs (round 2), this branch (Rust module at version 27) against `origin/main`
+(Rust module at version 26), on the dev server, both sides run in parallel
 (`evidence/r1-k/*-summary.json`, `*-compare.txt`):
 
 | | ripgrep before | ripgrep after | Vector before | Vector after |
