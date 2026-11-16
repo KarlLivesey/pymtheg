@@ -26,7 +26,7 @@ that starts with a shebang counts as shell.
 
 | Kind | Files |
 |---|---:|
-| `.mjs` | 483 |
+| `.mjs` | 484 |
 | `.ts` | 263 |
 | `.tsx` | 37 |
 | `.go` | 2 |
@@ -35,10 +35,11 @@ that starts with a shebang counts as shell.
 | `.css` | 1 |
 | `.html` | 1 |
 | shebang, no extension (`pymtheg`) | 1 |
-| **Total** | **791** |
+| **Total** | **792** |
 
 These include the two new files, `scripts/spdx-tags.mjs` and
-`test/licence-tags.test.mjs`. There are no `.mts`, `.js` or `.rs` first-party
+`test/licence-tags.test.mjs`, and `test/graph-link-index.test.mjs`, which
+arrived from `main` (PR 47) when it was merged into this branch. There are no `.mts`, `.js` or `.rs` first-party
 sources outside the exclusions.
 
 ## Excluded, and why
