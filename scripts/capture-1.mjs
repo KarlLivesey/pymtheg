@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import {spawnSync} from 'node:child_process';
 import {readFileSync,mkdirSync,writeFileSync} from 'node:fs';
 import {Ajv} from 'ajv';

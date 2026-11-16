@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { Finding, Span } from "../shared/identity.js";
 import type { Report } from "./report.js";
 import type { ProjectIR } from "../semantic/core.js";

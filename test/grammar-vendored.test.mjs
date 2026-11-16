@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // W2-S: the vendored grammar files are the ones the manifests record, are
 // complete (patches, licence) and load in the installed web-tree-sitter.
 import assert from "node:assert/strict";

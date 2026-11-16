@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /**
  * Plain JSON facts shared by the Go extraction and resolution phases. Every value
  * here survives persistence; no Tree-sitter object is ever stored.

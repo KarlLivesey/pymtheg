@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { browserExecutable, browserType } from "./browser-launch.mjs";
 import { browserEvidence } from "./browser-evidence.mjs";
 // Run with pc-tools headless after the independent review completes its browser work.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /** Bounded display diff; original sources and hashes remain authoritative. */
 export interface CodeDifferenceLimits {
   maxCharacters?: number;

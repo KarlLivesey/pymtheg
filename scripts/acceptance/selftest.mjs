@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: MIT
 // Proves the acceptance gate bites. Run on the dev server from the repository
 // root:
 //

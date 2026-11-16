@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { addedLinkId, compare, validateResult } from "./identity.js";
 import type {
   GraphFile,

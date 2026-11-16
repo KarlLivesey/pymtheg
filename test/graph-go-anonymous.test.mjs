@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // W2-B2 post-merge review item 3: a value of anonymous struct type, reached
 // by any route, keeps the round-16 guard. A named field follows only its own
 // type, and the embedded types are followed only for a member that is not a

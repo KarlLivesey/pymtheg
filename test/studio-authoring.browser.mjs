@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import assert from "node:assert/strict";
 import { browserExecutable, browserType } from "./browser-launch.mjs";
 // Entire controller must run through pc-tools headless.

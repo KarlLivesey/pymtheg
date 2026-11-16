@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /** Saved parent links describe lineage; they do not prove two versions are compatible. */
 export function branchReview<
   T extends {

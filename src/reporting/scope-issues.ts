@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { ProjectIR } from "../semantic/core.js";
 import type { GeneratedModel } from "../behaviour/model.js";
 import { finding, hash, json } from "../shared/identity.js";

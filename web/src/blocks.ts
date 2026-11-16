@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /** Insertable syntax, not an alternate source interpreter. Placeholders remain editable. */
 export const blocks = [
   {

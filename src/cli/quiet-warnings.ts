@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /**
  * Drops exactly two Node warnings: the ExperimentalWarning that early supported
  * releases (Node 24.0.0, 25.2.1; not 24.21+, 25.9+ or 26) print when

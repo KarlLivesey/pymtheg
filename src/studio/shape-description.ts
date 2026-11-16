@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { ValueShape } from "./shapes.js";
 export function describeShape(shape: ValueShape): string {
   switch (shape.kind) {

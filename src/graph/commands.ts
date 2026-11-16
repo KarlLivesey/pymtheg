@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { lstat, realpath } from "node:fs/promises";
 import {
   checkpointSchema,

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /** Project-relative storage names, safe to share with browser clients. */
 export const layout = {
   marker: ".pymtheg/project.json",

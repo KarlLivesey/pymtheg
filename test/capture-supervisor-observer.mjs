@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Test-only preload: observe completion without relying on transfer deletion.
 // The production supervisor disconnects only after reaping and removing sources.
 import { connect } from "node:net";

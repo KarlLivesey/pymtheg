@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // R1-A: options for another command are refused, engine errors exit 3, sampled
 // runs say they are not exhaustive (text and JSON), and doctor probes what the
 // product actually loads.

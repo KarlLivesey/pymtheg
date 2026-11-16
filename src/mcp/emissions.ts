@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { textPage } from "./text-pages.js";
 import { agentLimits } from "./limits.js";
 import { randomUUID } from "node:crypto";

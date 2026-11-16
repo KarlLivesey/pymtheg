@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import test from "node:test";
 import assert from "node:assert/strict";
 // Review 27: new escape/alias shapes for reader v11. Expectation "none" means the runtime target can differ, so a confident target is wrong.

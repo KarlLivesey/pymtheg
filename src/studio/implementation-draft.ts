@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { z } from "zod";
 
 // Recovery is authoring state, never an acknowledgement of source correctness.

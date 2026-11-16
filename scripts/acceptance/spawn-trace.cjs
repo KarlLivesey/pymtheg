@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Preloaded into every Node process of an acceptance scenario through
 // NODE_OPTIONS=--require. It appends one JSON line per child process to
 // $ACC_SPAWN_LOG, so the harness can see whether Pymtheg starts java, quint,

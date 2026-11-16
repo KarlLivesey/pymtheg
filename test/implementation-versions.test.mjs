@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import test from "node:test";
 import assert from "node:assert/strict";
 test("version search filters complete metadata before paging and preserves checkpoint order", async () => {

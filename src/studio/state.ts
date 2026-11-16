@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { StudioRun } from "./protocol.js";
 export function mergeRun(
   records: StudioRun[],

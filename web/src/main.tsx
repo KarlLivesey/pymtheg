@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { SourceBufferBases } from "../../src/studio/buffer-base";
 import {
   identity as publicIdentity,

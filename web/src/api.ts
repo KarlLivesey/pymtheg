@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { workspaceSchema } from "../../src/shared/workspace";
 import { readRecipeFormDraft } from "../../src/studio/recipes";
 import { readInterfaceDraft } from "../../src/studio/interface-data";

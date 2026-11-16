@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /**
  * The bundler assumption's neutral text (see docs/changes/W2-D.md,
  * "Differential analysis"): a free `require`/`module` in an ES module is read

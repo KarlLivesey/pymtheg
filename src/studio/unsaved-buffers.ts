@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /** Cached source is not an edit. Share this distinction across checks, recovery and imports. */
 export function unsavedBuffers(
   buffers: Readonly<Record<string, string>>,

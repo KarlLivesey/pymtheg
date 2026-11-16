@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { lstatSync } from "node:fs";
 import { resolve } from "node:path";
 /** Names only: legacy data is never opened, migrated, followed or removed. */

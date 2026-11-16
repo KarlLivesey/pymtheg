@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { useLayoutEffect, useRef } from "react";
 type Rules = {
   requires?: string[] | undefined;

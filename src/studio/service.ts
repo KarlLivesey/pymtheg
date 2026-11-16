@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { sharedSourceLabel, sharedProjectPath } from "../storage/paths.js";
 import { storagePath } from "../storage/local.js";
 import { errorMessage } from "../shared/error-message.js";

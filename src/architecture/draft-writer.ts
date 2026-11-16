@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { ArchitectureDraft } from "./draft.js";
 export interface DraftSnapshot {
   version: number;

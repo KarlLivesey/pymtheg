@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { sourceFileName } from "../shared/identity-values.js";
 import { readSignatureEdit } from "./interface-data.js";
 import {

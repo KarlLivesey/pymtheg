@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // W3-L2: the Go toolchain opt-in through `pymtheg graph` (commands.ts).
 // Fixtures: test/fixtures/graph-go-toolchain/ (compiler-checked, see
 // test/graph-go-toolchain.test.mjs). These tests need the user's `go`; without

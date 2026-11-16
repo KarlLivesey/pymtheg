@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { acknowledgementSchema } from "./acknowledgements.js";
 import {
   architectureLimits,

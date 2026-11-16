@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { Report, AnalysisResult } from "./report.js";
 export function exitStatus(r: Report): number {
   if (

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { browserExecutable, browserType } from "./browser-launch.mjs";
 import assert from "node:assert/strict";
 import { browserEvidence } from "./browser-evidence.mjs";

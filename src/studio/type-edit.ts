@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { ProjectIR } from "../semantic/core.js";
 import { validateInterfaceType } from "./interface-builder.js";
 import { describeTypeDefinition } from "./signature.js";

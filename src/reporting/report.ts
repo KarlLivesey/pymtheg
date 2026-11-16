@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { Snapshot } from "../language/project.js";
 import type { ProjectIR } from "../semantic/core.js";
 import {

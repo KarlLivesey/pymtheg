@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { partitionSelection } from "../reporting/selection.js";
 import { loadProject, type SourceOptions } from "../language/project.js";
 import { typecheck } from "../semantic/core.js";

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { lex, type Token } from "./lexer.js";
 import { finding, type Span, type Finding } from "../shared/identity.js";
 import type {

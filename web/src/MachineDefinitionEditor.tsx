@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { useLayoutEffect, useRef } from "react";
 import type { MachineDefinition } from "../../src/studio/machine-data";
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { evaluateScalar } from "../shared/scalar-expression.js";
 import { nearbyName } from "../shared/names.js";
 import { effectCovered, outcomeHandled } from "../shared/judgements.js";

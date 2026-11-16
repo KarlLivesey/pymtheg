@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { DatabaseSync } from "node:sqlite";
 import { openDatabase } from "../storage/local.js";
 import { randomUUID } from "node:crypto";

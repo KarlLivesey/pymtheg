@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /** `pymtheg link …`: requirement ↔ code-symbol links. Formatting only; logic is in
  * src/architecture/code-links.ts. */
 import {

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { sourceFileName } from "../../src/shared/identity-values";
 import { useEffect, useState, useRef, useCallback } from "react";
 import type { z } from "zod";

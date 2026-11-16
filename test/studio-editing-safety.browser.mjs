@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { browserExecutable, browserType } from "./browser-launch.mjs";
 // Readiness and actual content determine correctness, never machine speed.
 import { chromium, expect as baseExpect } from "@playwright/test";

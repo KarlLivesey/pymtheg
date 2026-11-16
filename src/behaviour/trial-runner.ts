@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { Worker } from "node:worker_threads";
 import type { ProjectIR } from "../semantic/core.js";
 import { trialSchema, type TrialResult } from "./trial.js";

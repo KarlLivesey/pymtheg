@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { readArchitectureFolder } from "../architecture/store.js";
 import { StudioService } from "../studio/service.js";
 import type { WorkspaceIdentity } from "../shared/workspace.js";

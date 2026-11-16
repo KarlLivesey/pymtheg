@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { json } from "../dist/shared/identity.js";
 import test from "node:test";
 import assert from "node:assert/strict";

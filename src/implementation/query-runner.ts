@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { declarationTypeInventorySchema } from "../studio/declaration-type-protocol.js";
 import type { DeclarationTypeInput } from "../studio/declaration-type-inventory.js";
 import { Worker } from "node:worker_threads";

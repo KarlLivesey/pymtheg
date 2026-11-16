@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { createHash } from "node:crypto";
 import type { GraphResponse } from "../graph/commands.js";
 import { textPage } from "./text-pages.js";

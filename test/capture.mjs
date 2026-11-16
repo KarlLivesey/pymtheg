@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Bounded explicit evidence capture; never overwrites historical research logs.
 import { spawnSync } from "node:child_process";
 import { writeFileSync, existsSync } from "node:fs";

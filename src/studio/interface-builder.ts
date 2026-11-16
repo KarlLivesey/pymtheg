@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { SignatureInput } from "./interface-data.js";
 import { interfaceTypeSource } from "./interface-syntax.js";
 import { identifierProblem } from "../shared/names.js";

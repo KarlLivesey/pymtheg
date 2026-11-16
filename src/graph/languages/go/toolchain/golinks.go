@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 //go:build ignore
 
 // golinks: the Go module's toolchain helper (W3-L). Standard library only. It

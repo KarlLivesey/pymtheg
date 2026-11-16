@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Run under pc-tools headless. Observation probe; no elapsed-time assertions.
 import {chromium,expect as baseExpect} from '@playwright/test';
 import {mkdtemp,rm,writeFile} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join} from 'node:path';

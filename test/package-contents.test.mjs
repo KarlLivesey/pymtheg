@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // R1-H: the npm package ships user documentation only, and no shipped file
 // carries a personal home path, the owner's name or a private project name.
 // Reads the real pack list (`npm pack --dry-run --json`); nothing is written.

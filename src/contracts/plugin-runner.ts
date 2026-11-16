@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { decodeUtf8 } from "../shared/text.js";
 import { pathToFileURL } from "node:url";
 // The coordinator owns the deadline, including unresolved module initialisation.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { hash } from "../shared/identity.js";
 import {
   readObservedGraph,

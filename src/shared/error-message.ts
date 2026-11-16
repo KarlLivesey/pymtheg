@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { ZodError } from "zod";
 /** Keep validation locations and guidance, never dump validator internals. */
 export function errorMessage(error: unknown): string {

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { useRef, useState, type SetStateAction } from "react";
 
 export type DraftEdit<T> = (current: T) => T;

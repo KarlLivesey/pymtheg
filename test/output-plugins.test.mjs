@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { controlledClock } from "./controlled-clock.mjs";
 import { watch } from "node:fs";
 import { readFile } from "node:fs/promises";

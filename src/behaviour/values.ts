@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { binary, unary, type Scalar } from "../shared/operators.js";
 import { nodeKey, type Expr } from "../language/ast.js";
 import type { ProjectIR } from "../semantic/core.js";

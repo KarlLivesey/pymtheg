@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { useState } from "react";
 import { compareCost, compareReports } from "../../src/reporting/compare";
 import type { StudioRun } from "../../src/studio/protocol";

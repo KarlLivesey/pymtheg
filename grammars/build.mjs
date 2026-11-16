@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Build a vendored tree-sitter grammar from a pinned upstream commit plus the
 // committed patch files, as recorded in grammars/<language>/manifest.json.
 //

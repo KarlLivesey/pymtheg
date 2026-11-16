@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { browserExecutable, browserType } from "./browser-launch.mjs";
 import { formatSource } from "../dist/language/format.js";
 import { chromium, expect as baseExpect } from "@playwright/test";

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { lex } from "./lexer.js";
 import { parse } from "./parser.js";
 export class FormatSyntaxError extends Error {}

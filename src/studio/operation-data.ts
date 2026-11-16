@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { z } from "zod";
 const originList = z
   .array(z.number().int().nonnegative().max(19).nullable())

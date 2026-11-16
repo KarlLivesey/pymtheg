@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // A file that cannot be read is not valid code: it has failed, and nothing in it
 // is a target (W2-B.md, "Failed files"). Links that need code in a failed file
 // fail too (`invalid-code`), naming the failed files as the cause. The failed

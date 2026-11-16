@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { storagePath, findProjectRoot } from "../storage/local.js";
 import { readFile, realpath, stat } from "node:fs/promises";
 import { relative, sep } from "node:path";

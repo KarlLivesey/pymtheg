@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { resourceDefinitionSource } from "./resource-authoring.js";
 import { machineDefinitionSource } from "./machine-authoring.js";
 import {

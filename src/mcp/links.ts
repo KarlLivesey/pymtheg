@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { operationError } from "./operation-errors.js";
 import { agentLimits } from "./limits.js";
 import { z } from "zod";

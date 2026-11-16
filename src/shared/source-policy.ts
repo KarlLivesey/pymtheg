@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { identity } from "./identity-values.js";
 export interface SourcePolicy {
   include?: string[];
