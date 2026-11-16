@@ -758,6 +758,22 @@ export class SqliteGraphStore implements GraphStorage {
           limit,
         );
   }
+  /** Exact counts of a symbol's incoming calls by class, the same rows as
+   * callLinks(id, "incoming"): definite (a target) and candidate set (no
+   * target, with candidates). Counting only; no link bodies are decoded. */
+  incomingCallCounts(id: string): { definite: number; candidateSet: number } {
+    const row = this.db
+      .prepare(
+        `SELECT COUNT(CASE WHEN l.target IS NOT NULL THEN 1 END) AS definite,
+          COUNT(CASE WHEN l.target IS NULL AND EXISTS(SELECT 1 FROM graph_candidates c WHERE c.link=l.id) THEN 1 END) AS candidateSet
+        FROM graph_links l WHERE l.id IN (SELECT id FROM graph_links WHERE target=? AND kind='calls' UNION SELECT link FROM graph_candidates WHERE symbol=? AND kind='calls')`,
+      )
+      .get(id, id)!;
+    return {
+      definite: Number(row.definite),
+      candidateSet: Number(row.candidateSet),
+    };
+  }
   /** Stream only unresolved call rows with a relevant spelling or explicit target hint.
    * SQL is a broad prefilter; the caller must classify the stored evidence. */
   *unresolvedCallHints(target: GraphSymbol): Generator<GraphLink> {

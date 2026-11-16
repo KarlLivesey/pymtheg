@@ -18,6 +18,7 @@ import { GraphLocations } from "../graph/command-locations.js";
 import { SqliteGraphStore } from "../graph/store.js";
 import type { GraphSymbol } from "../graph/types.js";
 import { findProjectRoot, storagePath } from "../storage/local.js";
+import { initializeBeforeWrite } from "../project/workspace.js";
 import type { HistoryWriter } from "../storage/recorded-history.js";
 import { ArchitectureConflict } from "./import-merge.js";
 import { newPlanItem } from "./planning.js";
@@ -380,6 +381,7 @@ async function withStore<T>(
   use: (store: ArchitectureStore | null) => Promise<T> | T,
 ): Promise<T> {
   if (!write && !(await planningExists(root))) return use(null);
+  if (write) await initializeBeforeWrite(root);
   let store: ArchitectureStore;
   try {
     store = await ArchitectureStore.open(root, {
@@ -783,6 +785,7 @@ export async function createRequirement(
   const root = await projectRoot(input.root);
   const { StudioService } = await import("../studio/service.js");
   const service = new StudioService(root);
+  service.initializeOnFirstWrite = true;
   try {
     const head = (await service.architectureOverview())?.index?.id ?? "";
     const item = {
@@ -898,10 +901,14 @@ export async function createCodeLink(
     };
     const data = (response.data ?? {}) as {
       symbol?: GraphSymbol & { line?: number };
-      inputs?: { matches: (GraphSymbol & { line?: number })[] }[];
+      inputs?: {
+        matches: (GraphSymbol & { line?: number })[];
+        nearMatches?: (GraphSymbol & { line?: number })[];
+      }[];
     };
     if (!data.symbol) {
       const matches = (data.inputs?.[0]?.matches ?? []).map(summarizeLocated);
+      const near = data.inputs?.[0]?.nearMatches ?? [];
       const failedNote = response.failedFiles.length
         ? ` Failed files may hide it: ${response.failedFiles.map((f) => f.path).join(", ")}.`
         : "";
@@ -913,7 +920,7 @@ export async function createCodeLink(
         matches,
         message: matches.length
           ? `Selector “${input.selector}” matches ${matches.length} symbols; choose one (a symbol: ID or path:line). Nothing was linked.`
-          : `No symbol matches “${input.selector}”.${failedNote} Nothing was linked.`,
+          : `No symbol matches “${input.selector}”.${failedNote}${near.length ? ` Near matches (not selected): ${near.map((s) => `“${s.identity}” at ${s.file}${typeof s.line === "number" ? ":" + s.line : ""}`).join("; ")}.` : ""} Nothing was linked.`,
       };
     }
     const symbol = data.symbol;

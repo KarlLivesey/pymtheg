@@ -31,7 +31,7 @@ import {
 } from "../implementation/versions.js";
 import { versionCatalogQuerySchema } from "../implementation/protocol.js";
 import { updateSourceBaselines } from "../architecture/source-baselines.js";
-import { readWorkspace } from "../project/workspace.js";
+import { initializeBeforeWrite, readWorkspace } from "../project/workspace.js";
 import { captureImplementation } from "../implementation/capture.js";
 import { ImplementationFileCatalog } from "../implementation/files.js";
 import { implementationComparisonQuerySchema } from "../implementation/comparison-protocol.js";
@@ -193,6 +193,9 @@ export class StudioError extends Error {
   }
 }
 export class StudioService {
+  /** MCP and link commands: initialise an uninitialised project (as
+   * `pymtheg init` would) before the first architecture write. */
+  initializeOnFirstWrite = false;
   private sourceCatalogues = new Map<string, SourceCatalogue>();
   private sourceCatalogueFiles = new Map<
     string,
@@ -926,8 +929,11 @@ export class StudioService {
 
   private async architecture(create = false) {
     if (this.closed) throw new StudioError(503, "Studio is closing");
-    if (create)
+    if (create) {
+      if (!this.architectureStore && this.initializeOnFirstWrite)
+        await initializeBeforeWrite(this.root);
       return (this.architectureStore ??= ArchitectureStore.open(this.root));
+    }
     if (this.architectureStore) return this.architectureStore;
     if (!existsSync(storagePath(this.root, "planning"))) return null;
     if (this.architectureReader) {
