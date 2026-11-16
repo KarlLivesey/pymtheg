@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /** Decode retained text without replacing bytes. Preserve a UTF-8 BOM in the
  * stored original; parsers may ignore it when interpreting the document. */
 export function decodeUtf8(

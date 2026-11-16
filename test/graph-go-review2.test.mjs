@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Regressions for the second W2-B review: corner cases found by combining
 // features. Item numbers follow the review.
 import assert from "node:assert/strict";

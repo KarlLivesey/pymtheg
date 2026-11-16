@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { browserExecutable, browserType } from "./browser-launch.mjs";
 import { browserEvidence } from "./browser-evidence.mjs";
 import { waitForRecovery } from "./recovery-ack.mjs";

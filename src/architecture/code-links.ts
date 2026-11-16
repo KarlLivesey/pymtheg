@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /** R1-D: links from planning records (requirements) to code symbols.
  *
  * Links are shared planning data: they live in the planning database

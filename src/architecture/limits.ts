@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /** Shared representation budgets. Counts and byte limits do not depend on machine speed. */
 export const architectureLimits = Object.freeze({
   documentBytes: 16 * 1024 * 1024,

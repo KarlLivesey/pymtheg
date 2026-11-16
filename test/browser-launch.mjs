@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { chromium, firefox, webkit } from "@playwright/test";
 import { existsSync } from "node:fs";
 

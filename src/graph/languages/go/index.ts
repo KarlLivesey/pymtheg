@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { realpath } from "node:fs/promises";
 import { posix, resolve } from "node:path";
 import { fileURLToPath } from "node:url";

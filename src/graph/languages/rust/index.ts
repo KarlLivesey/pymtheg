@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { LanguageModule } from "../../types.js";
 import { crates } from "./cargo.js";
 import type { AddedLink, Json } from "../../types.js";

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Regressions for the seventh W2-B review: package-unique local type identities
 // everywhere a local type is compared or keyed, and a defined type's own methods
 // staying known when its underlying type is not.

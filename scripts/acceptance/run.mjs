@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: MIT
 // Clean-machine acceptance harness (R1-F). Run on the dev server from the
 // repository root (it needs Docker):
 //

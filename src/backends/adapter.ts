@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { scopeIssueResult } from "../reporting/scope-issues.js";
 import { readFile, stat } from "node:fs/promises";
 import { hash, finding, json, identity } from "../shared/identity.js";

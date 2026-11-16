@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { linkedTextChange } from "../../src/architecture/text-change";
 import { relationshipText } from "../../src/architecture/relationship-text";
 import { useEffect, useState } from "react";

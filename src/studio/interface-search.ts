@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { compareText } from "../shared/order.js";
 export function relativeSource(root: string, file: string): string {
   return file.startsWith(root + "/") ? file.slice(root.length + 1) : file;

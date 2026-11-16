@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { identity } from "../shared/identity-values.js";
 import { relativeSource } from "../studio/interface-search.js";
 import type { AgentWorkspace } from "./workspace.js";

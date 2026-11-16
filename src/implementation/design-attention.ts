@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { authoredDocuments } from "../architecture/work.js";
 import { architectureDetail } from "../architecture/model.js";
 import { planItemSchema } from "../architecture/schema.js";

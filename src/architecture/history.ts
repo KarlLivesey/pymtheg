@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { errorMessage } from "../shared/error-message.js";
 import { withdrawalEvents } from "./acknowledgements.js";
 import { documentSetHash } from "./manifest.js";

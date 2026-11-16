@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { sourceIncluded } from "./source-selection.js";
 import {
   sourceDirectoryExcluded,

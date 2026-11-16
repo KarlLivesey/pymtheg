@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { ContractDocument, ContractType } from "./document.js";
 
 /** Only output coordinates are rebased; model text and canonical IR stay intact. */

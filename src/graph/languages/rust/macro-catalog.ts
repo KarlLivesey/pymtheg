@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Inspected releases anchor the semver-family assumption. See W2-C3.md.
 export const ecosystemMacros = new Map<
   string,

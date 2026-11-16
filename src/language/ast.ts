@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { Span } from "../shared/identity.js";
 export interface Located {
   span: Span;

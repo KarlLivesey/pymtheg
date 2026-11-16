@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { SqliteGraphStore } from "./store.js";
 import type { SourceRange } from "./types.js";
 export interface Located {

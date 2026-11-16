@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /** Bounded presentation only: all resolution and mutation stays in code-links. */
 export const linkSections = [
   "items",

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { posix } from "node:path";
 import ts from "typescript";
 import type {

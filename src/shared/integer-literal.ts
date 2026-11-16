@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { Expr } from "../language/ast.js";
 
 /** The parser represents negative integers as unary expressions. Keep exact bounds. */

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { within, processState } from "./process-safety.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";

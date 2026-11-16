@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /** Resolve a rendered link only within retained documents or explicit safe URLs. */
 export type DocumentLink =
   | { kind: "document"; path: string; fragment: string }

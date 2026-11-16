@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /** Additive shared identities and immutable change receipts. No archive migration or sync. */
 import { randomUUID, createHash } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { ProjectIR, Type } from "../semantic/core.js";
 import { callable } from "../semantic/core.js";
 import { nodeKey } from "../language/ast.js";

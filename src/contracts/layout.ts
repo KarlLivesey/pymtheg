@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { ContractDocument, ContractType } from "./document.js";
 
 /** Inline storage cycles need indirection in value-layout target languages.

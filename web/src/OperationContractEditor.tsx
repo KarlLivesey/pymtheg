@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { ContractLimitsEditor } from "./ContractLimitsEditor";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { api } from "./api";

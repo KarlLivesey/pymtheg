@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { AnalysisResult } from "../reporting/report.js";
 export const mayReportEstablished = (
   r: Pick<AnalysisResult, "completion" | "outstandingObligations" | "method">,

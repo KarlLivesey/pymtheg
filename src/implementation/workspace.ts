@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { dependencyHashes } from "./dependencies.js";
 import type { DesignAttention } from "./design-attention.js";
 import { planDisplay } from "./plan-display.js";

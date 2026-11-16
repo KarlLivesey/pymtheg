@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { sourceFileName } from "../../src/shared/identity-values";
 import type { TypeChoice } from "../../src/studio/type-choices";
 import { InterfaceTypeEditor } from "./InterfaceTypeEditor";

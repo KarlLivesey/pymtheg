@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { implies as cfgImplies, possible as cfgPossible } from "./cfg.js";
 import {
   auditedMacro,

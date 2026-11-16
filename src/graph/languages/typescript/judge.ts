@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import ts from "typescript";
 import { aliasChain, causesOfSymbol, type Taint } from "./taint.js";
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { sharedSourceLabel, sharedProjectPath } from "../storage/paths.js";
 import {
   RecordedHistory,

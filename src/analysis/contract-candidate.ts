@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { Expr } from "../language/ast.js";
 import { exprChildren } from "../language/ast.js";
 import type { ProjectIR } from "../semantic/core.js";

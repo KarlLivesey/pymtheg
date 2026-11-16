@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { AnalysisResult, Report } from "./report.js";
 const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === "object" && !Array.isArray(v);

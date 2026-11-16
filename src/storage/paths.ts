@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { isAbsolute, relative, sep, win32 } from "node:path";
 /** Only machine-generated provenance labels are normalized; authored document text is never rewritten. */
 export function sharedSourceLabel(root: string, source: string): string {

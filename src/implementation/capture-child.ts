@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { createReadStream } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { createInterface } from "node:readline";

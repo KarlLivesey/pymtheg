@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /** Traverse bounded authoring data, never parse or resolve source in the browser. */
 export function declarationTypeReferences(value: unknown): Set<string> {
   const pending = [value],

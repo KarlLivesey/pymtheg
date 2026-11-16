@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { identity } from "../shared/identity.js";
 const commands = [
   [

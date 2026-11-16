@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { isAbsolute, relative, resolve } from "node:path";
 import { realpathSync } from "node:fs";
 import { parse } from "../language/parser.js";

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { Cost } from "./cost.js";
 export const budgetLimits = {
   operations: 100000,

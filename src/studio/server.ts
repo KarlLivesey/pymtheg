@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { errorMessage } from "../shared/error-message.js";
 import { ObservationInputError } from "../implementation/capture.js";
 import { ZodError } from "zod";

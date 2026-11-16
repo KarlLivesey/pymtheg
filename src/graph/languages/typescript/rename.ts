@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import ts from "typescript";
 import { rootDeclaration } from "./symbols.js";
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { compareText } from "../shared/order.js";
 import { hash } from "../shared/identity.js";
 import type { ArchitectureDocument } from "./schema.js";

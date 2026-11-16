@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { browserExecutable, browserType } from "./browser-launch.mjs";
 // Run with pc-tools headless after the independent review completes its browser work.
 import { chromium, expect as baseExpect } from "@playwright/test";

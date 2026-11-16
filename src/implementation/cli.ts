@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { realpath } from "node:fs/promises";
 import { resolve } from "node:path";
 import { captureImplementation } from "./capture.js";

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { parentPort, workerData } from "node:worker_threads";
 import { explore, sample } from "./explore.js";
 import type { ExploreRequest } from "./explore-runner.js";

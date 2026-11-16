@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { z } from "zod";
 import type { BlockDocument, DesignBlock } from "./block-document.js";
 import { validateNumericRange } from "./numeric-range.js";

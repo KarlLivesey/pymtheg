@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { Expr, Callable, Stmt } from "../language/ast.js";
 import { nodeKey, exprChildren } from "../language/ast.js";
 import { callable, blockedSymbols, type ProjectIR } from "../semantic/core.js";

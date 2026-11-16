@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import test from "node:test";
 import { execFileSync } from "node:child_process";
 import assert from "node:assert/strict";

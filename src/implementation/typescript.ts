@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import ts from "typescript";
 import { qualifyObservation } from "./partitions.js";
 import { codeMutations, instanceClassForThis } from "./mutations.js";

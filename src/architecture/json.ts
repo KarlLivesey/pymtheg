@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /** Retained foreign JSON is data. Keep numbers that JS cannot represent exactly
  * as explicit literal records for display; never silently round them. */
 export function parseArchitectureJson(text: string): {

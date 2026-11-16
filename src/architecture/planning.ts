@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { ArchitectureEntity, PlanItem } from "./schema.js";
 export function newPlanItem(id: string): PlanItem {
   return {

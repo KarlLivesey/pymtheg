@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { SignatureEdit } from "./interface-data.js";
 export interface InterfaceConflictField {
   key: string;

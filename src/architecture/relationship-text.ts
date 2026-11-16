@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /** Advisory Markdown relationship comparison. Exact evidence hashes remain byte-sensitive. */
 export function relationshipText(text: string): string {
   const lines = text.replace(/\r\n?/g, "\n").split("\n"),

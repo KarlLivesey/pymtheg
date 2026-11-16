@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { createHash } from "node:crypto";
 import { localHistoryWriter } from "../dist/storage/writer.js";
 import { sharedProjectPath } from "../dist/storage/paths.js";

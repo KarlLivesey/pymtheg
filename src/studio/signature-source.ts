@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { identifierProblem } from "../shared/names.js";
 import type { InterfaceType } from "./interface-builder.js";
 import type { SignatureEdit } from "./interface-data.js";

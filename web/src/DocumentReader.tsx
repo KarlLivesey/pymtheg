@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { useEffect, useMemo, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";

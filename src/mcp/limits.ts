@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { textPageCharacters } from "../shared/text-pages.js";
 /** Session transport/retention bounds; they are not semantic source-domain bounds. */
 export const agentLimits = {

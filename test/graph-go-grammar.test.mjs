@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // W2-S: Go shapes the vendored grammar (tree-sitter-go v0.25.0 + PRs #202,
 // #198) reads, and the ones that still cannot be read. Every fixture is a real
 // Go module checked by `go vet` (test below, when the toolchain is installed;

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /** A bounded line replacement, not an all-pairs diff. Unchanged prefix/suffix are omitted. */
 export function textChange(before: string, after: string, limit = 12000) {
   const previous = before.slice(0, limit).split("\n"),

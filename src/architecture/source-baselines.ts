@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { PlanItem } from "./schema.js";
 import type { SourceCatalogue } from "../shared/source-contracts.js";
 import { sourceExpectationSets } from "./source-contracts.js";

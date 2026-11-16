@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: MIT
 # Installed as java, javac, quint, tlc, go, cargo, rustc and rustup in a
 # directory put first on PATH. Every invocation is logged; the real program
 # (if the scenario installed one) then runs unchanged, otherwise the shim

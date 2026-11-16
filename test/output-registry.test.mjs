@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { controlledClock } from "./controlled-clock.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";

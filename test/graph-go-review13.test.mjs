@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Regressions for the thirteenth W2-B review: channel types read by the spec's
 // rule (not tree-sitter's nesting); the spelling forms the type term trusts the
 // tree for; a predeclared name shadowed by a same-package `_test.go` file;

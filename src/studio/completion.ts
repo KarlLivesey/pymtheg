@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import type { SymbolView } from "./protocol.js";
 /** Suggest only unambiguous in-scope value inputs; all other placeholders remain explicit holes. */
 export function callableSnippet(

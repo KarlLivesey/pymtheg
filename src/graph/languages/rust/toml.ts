@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /** Snapshot-only TOML reader. Unsupported or invalid syntax rejects the whole
  * document: callers must never mistake unread keys for absent keys. No recovery.
  * Keys/tables are parsed structurally, not extracted with Cargo-specific regexes.

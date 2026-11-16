@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import { relative, isAbsolute } from "node:path";
 import { setImmediate as yieldToCoordinator } from "node:timers/promises";
 import { hash } from "../shared/identity.js";

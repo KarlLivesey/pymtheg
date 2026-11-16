@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Regressions for the sixth W2-B review: one structure function (`view`) for every
 // kind of type, used by every consumer. Item numbers follow the review.
 import assert from "node:assert/strict";
