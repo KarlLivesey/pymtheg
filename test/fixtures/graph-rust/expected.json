@@ -1950,6 +1950,21 @@
     {
       "file": "app/src/lib.rs",
       "kind": "calls",
+      "targetName": "private",
+      "source": {
+        "name": "run",
+        "kind": "function"
+      },
+      "target": null,
+      "at": "local_macro",
+      "range": {
+        "start": 975,
+        "end": 986
+      }
+    },
+    {
+      "file": "app/src/lib.rs",
+      "kind": "calls",
       "targetName": "unknown.speak",
       "source": {
         "name": "run",

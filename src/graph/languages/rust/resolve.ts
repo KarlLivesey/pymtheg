@@ -13,8 +13,14 @@ import {
   attributeBindingShadows,
   type MacroUseImport,
 } from "./parse.js";
+import {
+  formatStandardMacros,
+  standardFormatName,
+  type MacroProfile,
+} from "./macro-rules.js";
 import { posix as p } from "node:path";
 import type {
+  AddedLink,
   GraphSymbol,
   GraphLink,
   Json,
@@ -133,6 +139,8 @@ export function resolveRust(
     conditions: string[],
   ) => void,
   markConditions?: (link: GraphLink, conditions: string[]) => void,
+  /** Derived links (R1-K: calls written in macro bodies, at each invocation). */
+  derived?: (link: AddedLink) => void,
 ): LinkResolution[] {
   // Cache only unproved import namespaces, never targets or positive proofs.
   // Facts are immutable for this run; caller conditions and placement are in
@@ -2563,15 +2571,32 @@ export function resolveRust(
     "PartialOrd",
     "Hash",
   ]);
-  const macroUseCrates = new Set<string>();
+  // Only `#[macro_use] extern crate` can bring a derive macro into scope.
+  // `#[macro_use] mod m;` carries `macro_rules!` macros, which cannot be used
+  // as a derive: one named like a standard derive at a derive site is a
+  // compile error, so it never retargets code that builds. A named import list
+  // risks only the names it lists; a bare one risks every name (strict).
+  const macroUseCrates = new Map<string, Set<string> | null>();
   for (const f of ctx.files)
-    if (
-      ((data(f.result).opaqueAttributes ?? []) as { name: string }[]).some(
-        (e) => e.name === "macro_use",
-      )
-    )
-      for (const loc of ownerPlace(f.path, ""))
-        macroUseCrates.add(loc.crate.root);
+    for (const b of (data(f.result).attributeBindings ?? []) as {
+      macroUseImports?: MacroUseImport[];
+    }[])
+      for (const request of b.macroUseImports ?? [])
+        for (const loc of ownerPlace(f.path, "")) {
+          const known = macroUseCrates.get(loc.crate.root);
+          if (known === null) continue;
+          macroUseCrates.set(
+            loc.crate.root,
+            request.names
+              ? new Set([...(known ?? []), ...request.names])
+              : null,
+          );
+        }
+  const macroUseDerive = (root: string, name: string): boolean => {
+    if (!macroUseCrates.has(root)) return false;
+    const names = macroUseCrates.get(root);
+    return names === null || !!names?.has(name);
+  };
   function opaqueAttribute(
     raw: string,
     loc: Place,
@@ -2617,8 +2642,9 @@ export function resolveRust(
       .map((s) => s.trim())
       .filter(Boolean);
     if (
-      macroUseCrates.has(loc.crate.root) ||
-      names.some((n) => !standardDerives.has(n))
+      names.some(
+        (n) => !standardDerives.has(n) || macroUseDerive(loc.crate.root, n),
+      )
     )
       return true;
     let local = scope;
@@ -2709,11 +2735,35 @@ export function resolveRust(
       (["vec", "format"].includes(name) && imported("alloc", true))
     );
   }
-  const visibleMacroNames = new Set(
+  // A captured `macro_rules!` definition binds a bare name only where it is
+  // in textual scope, or through a path or import (checked by
+  // importedStandardName). Other macro bindings stay project-wide (R1-K).
+  const textualMacroNames = new Set(
     symbols
-      .filter((s) => s.kind === "macro" || data(s).semanticKind === "macro")
+      .filter((s) => s.kind === "macro" && data(s).macroRules)
       .map((s) => s.name),
   );
+  const visibleMacroNames = new Set(
+    symbols
+      .filter(
+        (s) =>
+          (s.kind === "macro" && !data(s).macroRules) ||
+          data(s).semanticKind === "macro",
+      )
+      .map((s) => s.name),
+  );
+  function textualStandardBinding(
+    name: string,
+    entry: { scope: string; start?: number },
+    file: string,
+    loc: Place,
+  ): boolean {
+    if (!textualMacroNames.has(name)) return false;
+    const site = macroSites.get(`${file}|${entry.start}`);
+    if (!site) return true;
+    const textual = textualMacro(name, site, { ...loc, file }, entry.scope);
+    return !!textual?.symbols.length;
+  }
 
   for (const f of ctx.files)
     for (const b of (data(f.result).attributeBindings ?? []) as {
@@ -2950,6 +3000,134 @@ export function resolveRust(
     }
     return guaranteed;
   }
+  /** The standard-macro exemption's checks, for one name at one site. */
+  function standardUnsafe(
+    entry: { name: string; scope: string; start?: number },
+    file: string,
+    loc: Place,
+  ): boolean {
+    return (
+      !standardAvailable(entry, { ...loc, file }) ||
+      (entry.name.includes("::")
+        ? visiblePrefixes.has(entry.name.replace(/^::/, "").split("::")[0]!)
+        : visibleMacroNames.has(standardMacroName(entry.name)!) ||
+          textualStandardBinding(
+            standardMacroName(entry.name)!,
+            entry,
+            file,
+            loc,
+          ) ||
+          importedStandardName(file, entry.scope, entry.name)) ||
+      ownerPlace(file, entry.scope).some((p) => p.noImplicitPrelude)
+    );
+  }
+  const profileOf = (s: GraphSymbol) =>
+    data(s).macroProfile as unknown as MacroProfile | undefined;
+  /**
+   * The one readable workspace `macro_rules!` definition that `name` names at
+   * an invocation site, or null. Names in a transcriber resolve at the call
+   * site, except `$crate::` paths, which resolve in the defining crate.
+   */
+  function definiteMacro(
+    name: string,
+    site: GraphLink,
+    loc: Place,
+    scope: string,
+    from?: GraphSymbol,
+  ): GraphSymbol | null {
+    if (name.startsWith("$crate::")) {
+      const home = from && ownerPlace(from.file, "")[0];
+      if (!home) return null;
+      return definiteMacro(
+        "crate::" + name.slice(8),
+        site,
+        { ...home, conditions: loc.conditions ?? [] },
+        "",
+      );
+    }
+    if (name.includes("$")) return null;
+    const found = macroLookup(name, site, loc, scope);
+    const targets = unique(found.symbols);
+    if (!found.complete || found.failedFiles?.length || targets.length !== 1)
+      return null;
+    const s = targets[0]!;
+    if (
+      s.kind !== "macro" ||
+      !data(s).macroRules ||
+      itemPresence(s).length ||
+      !profileOf(s)?.readable ||
+      conditionsFor(s).some((c) => !implies(loc.conditions ?? [], c))
+    )
+      return null;
+    return s;
+  }
+  const siteLoc = (site: GraphLink, loc: Place): Place => ({
+    ...loc,
+    conditions: [...(loc.conditions ?? []), ...conditionsFor(site)],
+  });
+  /** A statement-position invocation cannot add items or `let` bindings. */
+  function projectNeutral(
+    name: string,
+    site: GraphLink,
+    loc: Place,
+    scope: string,
+    from?: GraphSymbol,
+    seen = new Set<string>(),
+  ): boolean {
+    if (
+      standardMacroName(name) &&
+      !standardUnsafe({ name, scope, start: site.range.start }, site.file, loc)
+    )
+      return true;
+    // A standard name that a workspace macro rebinds is judged as that macro.
+    const s = definiteMacro(name, site, loc, scope, from);
+    if (!s || seen.has(s.id) || seen.size > 16) return false;
+    const profile = profileOf(s)!;
+    return (
+      profile.neutral &&
+      profile.nested.every((n) =>
+        projectNeutral(n, site, loc, scope, s, new Set([...seen, s.id])),
+      )
+    );
+  }
+  /**
+   * Names that may shadow call-site names in tokens forwarded through `name`
+   * into a standard format macro; null when the forwarding is unproved.
+   */
+  function forwardShadow(
+    name: string,
+    site: GraphLink,
+    loc: Place,
+    scope: string,
+    from?: GraphSymbol,
+    seen = new Set<string>(),
+  ): Set<string> | null {
+    const std = standardFormatName(name);
+    if (
+      std &&
+      formatStandardMacros.has(std) &&
+      !standardUnsafe({ name, scope, start: site.range.start }, site.file, loc)
+    )
+      return new Set();
+    const s = definiteMacro(name, site, loc, scope, from);
+    if (!s || seen.has(s.id) || seen.size > 16) return null;
+    const profile = profileOf(s)!;
+    if (!profile.forwards) return null;
+    const shadow = new Set(profile.forwardShadow);
+    for (const target of profile.forwards) {
+      const inner = forwardShadow(
+        target,
+        site,
+        loc,
+        scope,
+        s,
+        new Set([...seen, s.id]),
+      );
+      if (!inner) return null;
+      for (const x of inner) shadow.add(x);
+    }
+    return shadow;
+  }
   // Compute provenance before adding prospective macro-opacity scopes. An
   // exemption cannot use the opacity it is deciding as its own premise.
   const ecosystemSafe = new Set<string>();
@@ -2960,10 +3138,23 @@ export function resolveRust(
       start?: number;
     }[])
       if (
-        !standardMacroName(entry.name) &&
-        ownerPlace(f.path, entry.scope).every((loc) =>
-          ecosystemProven(entry, loc),
-        )
+        ownerPlace(f.path, entry.scope).every((loc) => {
+          if (standardMacroName(entry.name)) {
+            // Only a standard name rebound by a workspace macro is decided here.
+            const site = macroSites.get(`${f.path}|${entry.start}`);
+            return (
+              !!site &&
+              standardUnsafe(entry, f.path, loc) &&
+              projectNeutral(entry.name, site, siteLoc(site, loc), entry.scope)
+            );
+          }
+          if (ecosystemProven(entry, loc)) return true;
+          const site = macroSites.get(`${f.path}|${entry.start}`);
+          return (
+            !!site &&
+            projectNeutral(entry.name, site, siteLoc(site, loc), entry.scope)
+          );
+        })
       )
         ecosystemSafe.add(`${f.path}|${entry.start}`);
   memo.clear();
@@ -2975,21 +3166,18 @@ export function resolveRust(
         name: string;
         scope: string;
         start?: number;
+        block?: true;
       }[])
         if (
           !standardMacroName(entry.name)
             ? !ecosystemSafe.has(`${f.path}|${entry.start}`)
-            : !standardAvailable(entry, { ...loc, file: f.path }) ||
-              (entry.name.includes("::")
-                ? visiblePrefixes.has(
-                    entry.name.replace(/^::/, "").split("::")[0]!,
-                  )
-                : visibleMacroNames.has(standardMacroName(entry.name)!) ||
-                  importedStandardName(f.path, entry.scope, entry.name)) ||
-              ownerPlace(f.path, entry.scope).some((p) => p.noImplicitPrelude)
+            : standardUnsafe(entry, f.path, loc) &&
+              !ecosystemSafe.has(`${f.path}|${entry.start}`)
         ) {
           opaqueScopes.add(`${loc.crate.root}|${qualified(loc, entry.scope)}`);
-          unsafeStandardScopes.add(`${f.path}|${entry.scope}`);
+          // A module-level macro cannot bind a function's locals; the
+          // binding fallback applies only below a block statement (R1-K).
+          if (entry.block) unsafeStandardScopes.add(`${f.path}|${entry.scope}`);
         }
       for (const scope of (data(f.result).opaqueItemScopes ?? []) as string[])
         opaqueScopes.add(`${loc.crate.root}|${qualified(loc, scope)}`);
@@ -3699,6 +3887,41 @@ export function resolveRust(
       inherent.length ? "inherent-applicability-unverified" : "trait-dispatch",
     );
   }
+  /**
+   * Calls read from a macro invocation's argument tokens count only when the
+   * invocation provably evaluates them as expressions at the call site: a
+   * standard format macro, or a workspace macro that forwards its whole input
+   * into one. Names its expansion binds around them must not be the head.
+   */
+  function argumentsProven(l: GraphLink, d: Data, loc: Place): boolean {
+    const starts = (d.macroArguments ?? []) as number[],
+      names = (d.macroArgumentNames ?? []) as string[];
+    const site = macroSites.get(`${l.file}|${starts[0]}`);
+    if (!site || !names.length || names.length !== starts.length) return false;
+    const scope = str(d.scope),
+      at = siteLoc(site, loc),
+      shadow = new Set<string>();
+    for (let i = 0; i < names.length; i++) {
+      const name = names[i]!;
+      const here =
+        i === 0
+          ? site
+          : { ...site, range: { start: starts[i]!, end: starts[i]! } };
+      if (standardFormatName(name) === "matches") {
+        if (standardUnsafe({ name, scope, start: starts[i]! }, l.file, at))
+          return false;
+        continue;
+      }
+      if (i > 0 && !standardFormatName(name)) return false;
+      const inner = forwardShadow(name, here, at, scope);
+      if (!inner) return false;
+      for (const x of inner) shadow.add(x);
+    }
+    const head = compact(l.targetName)
+      .replace(/^::/, "")
+      .split(d.method ? /[.([?]/ : /::/)[0]!;
+    return !shadow.has("*") && !shadow.has(head);
+  }
   const resolutions: LinkResolution[] = [];
   for (const l of ctx.links) {
     let d = data(l);
@@ -3758,22 +3981,41 @@ export function resolveRust(
           const scope = selfPath ? str(d.implScope) : str(d.scope);
           if (selfPath && d.implType)
             name = base(str(d.implType)) + name.slice(4);
+          const guard = (r: Found): Found =>
+            !d.macroArguments ||
+            r.failedFiles?.length ||
+            argumentsProven(l, d, loc)
+              ? r
+              : {
+                  ...r,
+                  complete: false,
+                  reason: [
+                    ...new Set(
+                      [
+                        ...(r.reason?.split(/;\s*/) ?? []),
+                        "macro-argument-unverified",
+                      ].filter(Boolean),
+                    ),
+                  ].join("; "),
+                };
           if (d.method)
-            return methods(
-              str(d.receiverType),
-              str(d.method),
-              loc,
-              str(d.typeScope),
-              true,
-              str(d.receiverBorrow),
-              d.receiverMutable === true,
-              Number(d.argumentCount),
-              compact(l.targetName).startsWith("self.")
-                ? `${l.file}|${str(d.implKey)}`
-                : "",
-              Number(d.argumentMinimum ?? d.argumentCount),
-              str(d.genericBindings),
-              str(d.receiverArgumentSyntax),
+            return guard(
+              methods(
+                str(d.receiverType),
+                str(d.method),
+                loc,
+                str(d.typeScope),
+                true,
+                str(d.receiverBorrow),
+                d.receiverMutable === true,
+                Number(d.argumentCount),
+                compact(l.targetName).startsWith("self.")
+                  ? `${l.file}|${str(d.implKey)}`
+                  : "",
+                Number(d.argumentMinimum ?? d.argumentCount),
+                str(d.genericBindings),
+                str(d.receiverArgumentSyntax),
+              ),
             );
           const ns: Namespace = ["calls", "values"].includes(l.kind)
             ? "value"
@@ -3860,7 +4102,7 @@ export function resolveRust(
                   (s.kind === "variant" && data(s).constructorForm === "tuple"),
               ),
             };
-          return result;
+          return guard(result);
         }),
       );
     }
@@ -3956,5 +4198,187 @@ export function resolveRust(
     else if (targets.length === 1)
       resolutions.push({ linkId: l.id, targetId: targets[0]!.id });
   }
+  if (derived) macroBodyCalls(derived);
   return resolutions;
+
+  /** Resolve a path call written in a macro body, as at a call site. */
+  function bodyCall(
+    path: string,
+    argumentCount: number,
+    loc: Place,
+    scope: string,
+  ): Found {
+    let result = find(path, loc, scope, "value");
+    const callable = result.symbols.some((s) =>
+      ["function", "method", "struct", "variant"].includes(s.kind),
+    );
+    if (
+      (!callable || !result.complete) &&
+      !result.failedFiles?.length &&
+      path.includes("::")
+    ) {
+      const split = path.lastIndexOf("::");
+      const associated = methods(
+        path.slice(0, split),
+        path.slice(split + 2),
+        loc,
+        scope,
+        false,
+        "owned",
+        true,
+        argumentCount,
+        "",
+        argumentCount,
+        "",
+        "[]",
+      );
+      result = callable ? merge([result, associated]) : associated;
+    }
+    result = {
+      ...result,
+      symbols: result.symbols.filter(
+        (s) =>
+          s.kind === "function" ||
+          s.kind === "method" ||
+          (s.kind === "struct" && data(s).constructorForm !== "named") ||
+          (s.kind === "variant" && data(s).constructorForm === "tuple"),
+      ),
+    };
+    if (result.complete && result.symbols.some((s) => itemPresence(s).length))
+      result = {
+        ...result,
+        complete: false,
+        reason: "item-under-opaque-attribute",
+      };
+    return result;
+  }
+  /**
+   * R1-K: a call written in a workspace `macro_rules!` body happens wherever
+   * the macro is invoked. For each invocation that names one readable
+   * definition, derive a call link from the invoking item, resolved at the
+   * invocation (call-site names; `$crate::` in the defining crate). It is
+   * definite only when the macro has one arm and nothing in the expansion
+   * could rebind the name; otherwise it is unresolved with the would-be
+   * targets. Calls with no workspace target are not derived.
+   */
+  function macroBodyCalls(emit: (link: AddedLink) => void): void {
+    for (const site of ctx.links) {
+      if (site.kind !== "macros") continue;
+      const d = data(site),
+        scope = str(d.scope);
+      const places = ownerPlace(site.file, scope);
+      if (places.length !== 1) continue;
+      const loc: Place = {
+        ...places[0]!,
+        conditions: [
+          ...(places[0]!.conditions ?? []),
+          ...((d.conditions ?? []) as string[]),
+        ],
+      };
+      if (((d.conditions ?? []) as string[]).some((c) => c.includes("?")))
+        continue;
+      const first = definiteMacro(compact(site.targetName), site, loc, scope);
+      if (!first) continue;
+      const generics = str(d.genericBindings).split(",").filter(Boolean);
+      let index = 0;
+      const visit = (
+        m: GraphSymbol,
+        shadow: string[],
+        armsKnown: boolean,
+        seen: Set<string>,
+      ) => {
+        const profile = profileOf(m)!;
+        const single = armsKnown && profile.arms === 1;
+        for (const call of profile.calls) {
+          let path = call.path,
+            at = loc,
+            from = scope;
+          if (path.startsWith("$crate::")) {
+            const home = ownerPlace(m.file, "")[0];
+            if (!home) continue;
+            path = "crate::" + path.slice(8);
+            at = { ...home, conditions: loc.conditions ?? [] };
+            from = "";
+          } else if (/(^|::)Self(::|$)|\$/.test(path)) continue;
+          const head = path.replace(/^::/, "").split("::")[0]!;
+          // Sysroot paths have no workspace target; dropping a derived link
+          // loses nothing a caller query could use.
+          if (["std", "core", "alloc"].includes(head)) continue;
+          const found = bodyCall(path, call.argumentCount, at, from);
+          const targets = unique(found.symbols);
+          const reasons: string[] = [];
+          if (!found.complete)
+            reasons.push(...(found.reason ?? "unverified").split(/;\s*/));
+          const names = [...shadow, ...call.shadow];
+          // `crate::` and `::` paths start at a root no item can shadow.
+          const rooted = head === "crate" || path.startsWith("::");
+          if (
+            (!rooted && (names.includes("*") || names.includes(head))) ||
+            (!path.startsWith("crate::") && generics.includes(head)) ||
+            call.local
+          )
+            reasons.push("macro-body-name-unverified");
+          if (!single) reasons.push("macro-arm-unverified");
+          const base = {
+            key: `macro-body:${site.range.start}:${index++}`,
+            file: site.file,
+            sourceId: site.sourceId,
+            kind: "calls",
+            targetName: path,
+            range: site.range,
+          };
+          const facts = {
+            scope,
+            macroBody: true,
+            macro: `${m.file}|${m.identity}`,
+            conditions: (d.conditions ?? []) as string[],
+          };
+          if (found.failedFiles?.length) {
+            emit({
+              ...base,
+              data: {
+                ...facts,
+                cause: { files: [...new Set(found.failedFiles)].sort() },
+                uncertainty: "invalid-code",
+              },
+            });
+            continue;
+          }
+          if (!targets.length) continue;
+          if (!reasons.length)
+            emit(
+              targets.length === 1
+                ? { ...base, data: facts, targetId: targets[0]!.id }
+                : {
+                    ...base,
+                    data: facts,
+                    candidateIds: targets.map((t) => t.id),
+                  },
+            );
+          else
+            emit({
+              ...base,
+              data: {
+                ...facts,
+                ...(targets.length > 16
+                  ? { targetCount: targets.length }
+                  : { targets: targets.map((t) => t.id).sort() }),
+                uncertainty: [...new Set(reasons)].join("; "),
+              },
+            });
+        }
+        for (const nested of profile.bodyMacros) {
+          const next = definiteMacro(nested.name, site, loc, scope, m);
+          if (!next || seen.has(next.id) || seen.size > 8) continue;
+          visit(
+            next,
+            [...shadow, ...nested.shadow],
+            single,
+            new Set([...seen, next.id]),
+          );
+        }
+      };
+      visit(first, [], true, new Set([first.id]));
+    }
+  }
 }

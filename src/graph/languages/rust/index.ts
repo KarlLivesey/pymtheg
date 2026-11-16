@@ -1,6 +1,6 @@
 import type { LanguageModule } from "../../types.js";
 import { crates } from "./cargo.js";
-import type { Json } from "../../types.js";
+import type { AddedLink, Json } from "../../types.js";
 import { parseRust } from "./parse.js";
 import { fileFacts } from "../../identity.js";
 import { resolveRust } from "./resolve.js";
@@ -9,7 +9,7 @@ const TARGET_HINT_LIMIT = 16;
 
 const rust: LanguageModule = {
   id: "rust",
-  version: "26",
+  version: "27",
   extensions: [".rs"],
   contextFiles: ["Cargo.toml", "Cargo.lock"],
   parse: parseRust,
@@ -187,6 +187,14 @@ const rust: LanguageModule = {
     }
     return analyzed;
   },
-  resolve: resolveRust,
+  // Derived links (calls in macro bodies) are returned only when present, so
+  // a project without them keeps the plain resolution list.
+  resolve(ctx) {
+    const links: AddedLink[] = [];
+    const resolutions = resolveRust(ctx, undefined, undefined, undefined, (l) =>
+      links.push(l),
+    );
+    return links.length ? { resolutions, links } : resolutions;
+  },
 };
 export default rust;

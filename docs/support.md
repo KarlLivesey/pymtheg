@@ -288,7 +288,7 @@ straddles one of the parser runtime's 5,119-unit input chunk boundaries (the sam
 character in a comment or string there is read). Sources: [W2-B](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-B.md),
 [W2-B2](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-B2.md), [W2-S](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-S.md), `grammars/README.md`.
 
-#### Rust (module version 23)
+#### Rust (module version 27)
 
 No-toolchain module; nothing runs `cargo` or `rustc`, and macros are not expanded.
 Claims `*.rs`; context `Cargo.toml`, read by a snapshot-only TOML reader (an
@@ -316,26 +316,68 @@ manifest unknown). Private items are ordinary symbols.
   would-be target), and so are `use` and `mod` declarations under one. Links
   written **inside** such an item (for example the body of a `#[tokio::main]`
   function) are resolved as written.
-- **Macros:** an unknown macro (for example `tracing::info!`) that is a direct
-  child of a block, either as a statement (`m!();`, `m! { x }`) or as the
-  block's tail (`{ helper(); m!() }`, `if c { bail!("x") }`, a function ending in
-  `json!({…})`), withholds links in that block, including nested blocks and
-  closures inside it (`opaque-item-may-shadow-name`); links outside that block
-  are unaffected. Only lookups that an item defined by the macro could shadow are
-  withheld (`helper()`, `A::new()`); paths anchored with `crate::`, `self::`,
-  `super::` or `Self::` still resolve. A macro nested inside a larger expression
-  (`let x = m!();`, `helper() + m!()`, `Some(m!())`, a match arm value) withholds
-  nothing. The tail case is conservative: rustc treats a tail macro as an
-  expression, which cannot define an item, so links there are lost, never
-  wrong. The
-  twenty standard statement macros (`print`, `println`, `eprint`, `eprintln`,
-  `assert`, `assert_eq`, `assert_ne`, the three `debug_assert` forms, `vec`,
-  `format`, `write`, `writeln`, `panic`, `todo`, `unreachable`, `unimplemented`,
-  `dbg`, `matches`) no longer do, unless a captured binding of that name could
-  compete. A child module file inherits its parent's textual macros at its
-  `mod child;` declaration, so `#[macro_use] mod macros;` macros used in later
-  child files resolve. Macro arguments get no links. Cross-crate `#[macro_export]`
-  macros are unresolved. Standard-library and external items are unresolved.
+- **Macros:** a macro invoked as a statement of a block, or as the block's
+  tail, withholds links in that block, including nested blocks and closures
+  inside it (`opaque-item-may-shadow-name`), unless it is proved unable to
+  define an item there; links outside that block are unaffected. Only lookups
+  that an item defined by the macro could shadow are withheld (`helper()`,
+  `A::new()`); paths anchored with `crate::`, `self::`, `super::` or `Self::`
+  still resolve. A macro nested inside a larger expression (`let x = m!();`,
+  `helper() + m!()`, `Some(m!())`, a match arm value) withholds nothing. The
+  tail case is conservative: rustc treats a tail macro as an expression, which
+  cannot define an item, so links there are lost, never wrong. Proved unable:
+  the twenty standard statement macros (`print`, `println`, `eprint`,
+  `eprintln`, `assert`, `assert_eq`, `assert_ne`, the three `debug_assert`
+  forms, `vec`, `format`, `write`, `writeln`, `panic`, `todo`, `unreachable`,
+  `unimplemented`, `dbg`, `matches`) unless a captured binding of that name
+  could compete there (a captured `macro_rules!` of that name competes only
+  where it is in textual scope, or through a path or import); audited
+  ecosystem macros; and a workspace `macro_rules!` macro that the invocation
+  names definitely and whose every arm is readable and emits, at its top
+  level, no item keyword, `let`, attribute, `tt`/`item`/`stmt` fragment or
+  metavariable used as a macro name, and invokes there only macros that are
+  themselves proved unable at the same site (macro names in a transcriber
+  resolve at the call site; `$crate::` in the defining crate). Tokens inside
+  a brace group of the transcriber are in their own block and do not count.
+  A child module file inherits its parent's textual macros at its `mod child;`
+  declaration, so `#[macro_use] mod macros;` macros used in later child files
+  resolve. Cross-crate `#[macro_export]` macros are unresolved. Standard-library
+  and external items are unresolved.
+- **Calls in macro arguments:** calls written in an invocation's argument
+  tokens are links, read as a format-style list: pieces separated by `,`
+  (and `;` for `vec!`), each an expression or `name = expression`; only the
+  first piece of `matches!`. A piece containing a closure, `let`, `match`,
+  `for`, `while`, `loop`, an item keyword, `=>`, a label or a metavariable is
+  not read (no links). Such a link resolves by the ordinary rules for a call
+  at that place only when the invocation provably evaluates the tokens as
+  expressions at the call site: a standard format macro (`print`… `writeln`,
+  `format`, `format_args`, `panic`, `todo`, `unreachable`, `unimplemented`,
+  the `assert` forms, `dbg`, `vec`) that passes the checks above, or a
+  workspace `macro_rules!` macro whose every arm matches `$($x:tt)*` (or
+  nothing) and passes all of it, unchanged, as the tail of the argument list
+  of a standard format macro or of another such workspace macro. A name bound
+  by an item in a transcriber group around that forwarding is not resolved
+  (`use std::io::Write;` there withholds `Write`). Every other link of this
+  kind is unresolved with its would-be targets (`macro-argument-unverified`),
+  for example calls inside `tracing::info!` or `serde_json::json!`.
+- **Calls in macro bodies:** for each invocation that names one readable
+  workspace `macro_rules!` definition, each path call written in its
+  transcriber (outside nested non-format macro calls and pattern positions),
+  and transitively in workspace macros invoked there, becomes a derived
+  `calls` link from the invoking item at the invocation's position (link
+  origin `analysis`, `data.macroBody`). It is resolved as at the invocation:
+  call-site names, `$crate::` in the defining crate. It is definite only when
+  the macro (and every macro on the way) has one arm and no item in the
+  transcriber, generic parameter at the call site, or local the arm binds
+  could rebind the head name; otherwise it is unresolved with would-be targets
+  (`macro-arm-unverified`, `macro-body-name-unverified`). Body calls with no
+  workspace target, sysroot paths, `Self::` paths and method calls are not
+  derived.
+- **Derives:** a standard derive (`Debug`, `Clone`, …) is opaque only when a
+  `#[macro_use] extern crate` could bring a derive of that name into the crate
+  (bare: any name; a list: the listed names). `#[macro_use] mod m;` cannot:
+  it carries `macro_rules!` macros, and one named like a derive at a derive
+  site does not compile.
 - Cargo features and target platforms are not evaluated; `cfg` conditions are
   compared structurally.
 - **Assumption E4:** unseen code (a bare `#[macro_use] extern crate`, opaque macro

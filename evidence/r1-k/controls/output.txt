@@ -1,0 +1,9 @@
+rustc 1.98.1 (48a229cea 2026-09-01)
+format_args.rs compiles; prints: 1 1 ; exit 0
+forward.rs compiles; prints: 1 ; exit 0
+if_let.rs compiles; prints: x ; exit 0
+item_defining.rs compiles; prints: 2 ; exit 0
+neutral_chain.rs compiles; prints: 1 ; exit 0
+out_of_scope.rs compiles; prints: ; exit 0
+shadow_forward.rs compiles; prints: 2 ; exit 0
+std_rebind.rs compiles; prints: ; exit 0

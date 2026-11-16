@@ -1,0 +1,217 @@
+module { id: 'rust', version: '26' } -> { id: 'rust', version: '27' }
+seconds 622.1 -> 771.2
+all links before { unresolved: 292061, resolved: 78624, candidates: 100 } 370785
+all links after  { unresolved: 312187, resolved: 80187, candidates: 100 } 392474
+written (non-contains) before { unresolved: 292061, resolved: 44445, candidates: 100 }
+written (non-contains) after  { unresolved: 311758, resolved: 45978, candidates: 100 }
+  of which new macro-argument calls { unresolved: 19792, resolved: 1438 }
+derived macro-body calls { unresolved: 429, resolved: 30 }
+
+unresolved written links by kind|reason: before -> after
+    38270 ->   43644  calls|receiver-type-unverified; failed-file-unseen-declarations
+    25022 ->   25022  values|failed-file-unseen-declarations
+    18656 ->   21296  calls|receiver-type-unverified
+    18555 ->   18555  types|opaque-item-may-shadow-name; failed-file-unseen-declarations
+    17328 ->   17254  types|opaque-item-may-shadow-name
+    15818 ->   15822  values|(none)
+    11852 ->   11834  imports|opaque-item-may-shadow-name
+    10807 ->   10807  macros|macro-use-exports-unverified; conditional-name-may-be-absent; failed-file-unseen-declarations
+     9742 ->   11331  calls|receiver-type-unverified; failed-file-unseen-declarations; too-many-targets
+     7314 ->    7898  calls|path-type-unverified; opaque-item-may-shadow-name; failed-file-unseen-declarations
+     7292 ->    7918  calls|path-type-unverified; opaque-item-may-shadow-name; failed-file-unseen-declarations; too-many-targets
+     6662 ->    7638  calls|opaque-item-may-shadow-name
+     6379 ->    7468  calls|opaque-item-may-shadow-name; failed-file-unseen-declarations
+     6159 ->    6159  imports|opaque-item-may-shadow-name; failed-file-unseen-declarations
+     4944 ->    4944  values|opaque-item-may-shadow-name; failed-file-unseen-declarations
+     4119 ->    4720  calls|receiver-type-unverified; too-many-targets
+     4307 ->    4356  types|(none)
+     4044 ->    4044  types|failed-file-unseen-declarations
+     3728 ->    3716  values|opaque-item-may-shadow-name
+     3664 ->    3664  macros|(none)
+     3556 ->    3556  patterns|opaque-item-may-shadow-name; failed-file-unseen-declarations
+     3117 ->    3418  calls|path-type-unverified; opaque-item-may-shadow-name; too-many-targets
+     3043 ->    3043  macros|namespace-binding-unverified; macro-use-exports-unverified; conditional-name-may-be-absent; failed-file-unseen-declarations
+     2945 ->    2945  types|item-under-opaque-attribute; opaque-item-may-shadow-name
+     2704 ->    3107  calls|path-type-unverified; opaque-item-may-shadow-name
+     2314 ->    2816  calls|(none)
+     2260 ->    2250  patterns|opaque-item-may-shadow-name
+     1881 ->    1881  macros|macro-use-exports-unverified
+     1821 ->    1910  calls|receiver-type-unverified; opaque-item-may-shadow-name; failed-file-unseen-declarations
+     1632 ->    1633  types|item-under-opaque-attribute; opaque-item-may-shadow-name; opaque-item-may-shadow-name
+     1564 ->    1586  types|namespace-binding-unverified
+     1405 ->    1405  implements|opaque-item-may-shadow-name
+     1307 ->    1317  imports|(none)
+     1249 ->    1249  imports|failed-file-unseen-declarations
+     1072 ->    1153  calls|receiver-type-unverified; opaque-item-may-shadow-name
+     1111 ->    1111  macros|namespace-binding-unverified
+     1053 ->    1053  imports|item-under-opaque-attribute; opaque-item-may-shadow-name; opaque-item-may-shadow-name
+      988 ->     988  types|item-under-opaque-attribute; opaque-item-may-shadow-name; opaque-item-may-shadow-name; opaque-item-may-shadow-name
+      889 ->     901  calls|inherent-applicability-unverified; failed-file-unseen-declarations; too-many-targets
+      893 ->     893  imports|item-under-opaque-attribute; opaque-item-may-shadow-name; opaque-item-may-shadow-name; opaque-item-may-shadow-name; namespace-binding-unverified
+
+unresolved written links by target class: before {
+  'std-path': 4909,
+  'no-workspace-symbol-named-so': 53480,
+  'workspace-name-exists': 57423,
+  'external-path': 18469,
+  'workspace-would-be-targets': 112236,
+  'local-binding': 45497,
+  'failed-file': 47
+}
+unresolved written links by target class: after  {
+  'std-path': 4925,
+  'no-workspace-symbol-named-so': 57400,
+  'workspace-name-exists': 60735,
+  'external-path': 19028,
+  'workspace-would-be-targets': 123958,
+  'local-binding': 45665,
+  'failed-file': 47
+}
+
+links present in both runs, outcome change {
+  'unresolved -> unresolved': 291966,
+  'resolved -> resolved': 78624,
+  'candidates -> candidates': 100,
+  'unresolved -> resolved': 95
+}
+unresolved -> definite 95 | definite -> other 0
+new definite links (argument calls + derived) 1468
+
+SAMPLE unresolved -> definite (seed 2203)
+  1. lib/vector-buffers/src/variants/disk_v2/tests/size_limits.rs:388 calls create_buffer_v2_with_max_data_file_size
+       -> lib/vector-buffers/src/variants/disk_v2/tests/mod.rs|create_buffer_v2_with_max_data_file_size|function
+       | create_buffer_v2_with_max_data_file_size(data_dir, max_data_file_size);
+  2. lib/vector-buffers/benches/sized_records.rs:175 values BoundBy::Bytes
+       -> lib/vector-buffers/benches/sized_records.rs|BoundBy::Bytes|variant
+       | let f = |a, b| create_in_memory_variant(BoundBy::Bytes, a, b);
+  3. lib/vector-buffers/src/variants/disk_v2/tests/known_errors.rs:1026 calls create_default_buffer_v2
+       -> lib/vector-buffers/src/variants/disk_v2/tests/mod.rs|create_default_buffer_v2|function
+       | create_default_buffer_v2::<_, SizedRecord>(data_dir).await;
+  4. lib/vector-buffers/src/variants/disk_v2/tests/invariants.rs:222 calls read_next
+       -> lib/vector-buffers/src/variants/disk_v2/tests/mod.rs|read_next|function
+       | let final_read = read_next(&mut reader).await;
+  5. lib/vector-buffers/src/variants/disk_v2/tests/known_errors.rs:1752 calls write_two_records_and_read_all_then_drop
+       -> lib/vector-buffers/src/variants/disk_v2/tests/known_errors.rs|write_two_records_and_read_all_then_drop|function
+       | } = write_two_records_and_read_all_then_drop(data_dir.clone(), &assertion_registry)
+  6. lib/vector-buffers/src/variants/disk_v2/tests/known_errors.rs:1690 calls create_default_buffer_v2
+       -> lib/vector-buffers/src/variants/disk_v2/tests/mod.rs|create_default_buffer_v2|function
+       | let (mut writer, mut reader, ledger) = create_default_buffer_v2(data_dir.clone()).await;
+  7. lib/vector-buffers/src/variants/disk_v2/tests/known_errors.rs:354 calls create_buffer_v2_with_max_data_file_size
+       -> lib/vector-buffers/src/variants/disk_v2/tests/mod.rs|create_buffer_v2_with_max_data_file_size|function
+       | create_buffer_v2_with_max_data_file_size(data_dir.clone(), 172).await;
+  8. lib/vector-buffers/src/variants/disk_v2/tests/invariants.rs:193 calls read_next_some
+       -> lib/vector-buffers/src/variants/disk_v2/tests/mod.rs|read_next_some|function
+       | let record_read = read_next_some(&mut reader).await;
+  9. vdev/src/commands/compose_tests/test.rs:8 imports crate::testing::runner::coverage_filename
+       -> vdev/src/testing/runner.rs|coverage_filename|function
+       | runner::{coverage_filename, local_coverage_output_dir},
+ 10. lib/vector-buffers/src/variants/disk_v2/tests/size_limits.rs:487 calls get_minimum_data_file_size_for_record_payload
+       -> lib/vector-buffers/src/variants/disk_v2/tests/mod.rs|get_minimum_data_file_size_for_record_payload|function
+       | let max_data_file_size = get_minimum_data_file_size_for_record_payload(&second_record);
+ 11. vdev/src/commands/test.rs:6 imports crate::testing::runner::TestRunner
+       -> vdev/src/testing/runner.rs|TestRunner|trait
+       | testing::runner::{LocalTestRunner, TestRunner as _},
+ 12. lib/vector-buffers/src/variants/disk_v2/tests/invariants.rs:163 calls get_minimum_data_file_size_for_record_payload
+       -> lib/vector-buffers/src/variants/disk_v2/tests/mod.rs|get_minimum_data_file_size_for_record_payload|function
+       | let max_data_file_size = get_minimum_data_file_size_for_record_payload(&record);
+ 13. lib/vector-buffers/src/variants/disk_v2/tests/known_errors.rs:885 calls create_default_buffer_v2
+       -> lib/vector-buffers/src/variants/disk_v2/tests/mod.rs|create_default_buffer_v2|function
+       | create_default_buffer_v2::<_, SizedRecord>(data_dir).await;
+ 14. lib/vector-buffers/src/variants/disk_v2/tests/size_limits.rs:410 calls read_next_some
+       -> lib/vector-buffers/src/variants/disk_v2/tests/mod.rs|read_next_some|function
+       | let first_record_read = read_next_some(&mut reader).await;
+ 15. src/enrichment_tables/geoip.rs:247 calls lookup_value
+       -> src/enrichment_tables/geoip.rs|lookup_value|function
+       | let (data, network) = lookup_value::<AnonymousIp>(&self.dbreader, ip).ok()??;
+ 16. src/sinks/splunk_hec/common/util.rs:455 calls build_healthcheck
+       -> src/sinks/splunk_hec/common/util.rs|build_healthcheck|function
+       | let healthcheck = build_healthcheck(address.to_string(), get_token().await, client);
+ 17. lib/vector-buffers/src/variants/disk_v2/tests/size_limits.rs:278 calls get_minimum_data_file_size_for_record_payload
+       -> lib/vector-buffers/src/variants/disk_v2/tests/mod.rs|get_minimum_data_file_size_for_record_payload|function
+       | let max_data_file_size = get_minimum_data_file_size_for_record_payload(&second_record);
+ 18. lib/vector-buffers/src/variants/disk_v2/tests/known_errors.rs:952 calls create_default_buffer_v2
+       -> lib/vector-buffers/src/variants/disk_v2/tests/mod.rs|create_default_buffer_v2|function
+       | let (mut writer, _, ledger) = create_default_buffer_v2(data_dir.clone()).await;
+ 19. lib/vector-buffers/src/variants/disk_v2/tests/known_errors.rs:1002 types BackedArchive
+       -> lib/vector-buffers/src/variants/disk_v2/backed_archive.rs|BackedArchive|struct
+       | let mut backed_record = BackedArchive::<_, Record>::from_backing(record_mmap)
+ 20. lib/vector-buffers/src/variants/disk_v2/tests/invariants.rs:689 calls create_default_buffer_v2
+       -> lib/vector-buffers/src/variants/disk_v2/tests/mod.rs|create_default_buffer_v2|function
+       | create_default_buffer_v2::<_, SizedRecord>(data_dir.clone()).await;
+ 21. lib/vector-buffers/src/variants/disk_v2/tests/size_limits.rs:35 calls align16
+       -> lib/vector-buffers/src/variants/disk_v2/common.rs|align16|function
+       | let second_write_size = align16((first_write_size + 1).try_into().unwrap())
+ 22. lib/vector-buffers/src/variants/disk_v2/tests/invariants.rs:388 values MAX_FILE_ID
+       -> lib/vector-buffers/src/variants/disk_v2/common.rs|MAX_FILE_ID|const
+       | let target_writer_file_id = MAX_FILE_ID - 1;
+ 23. src/sinks/splunk_hec/common/util.rs:455 calls get_token
+       -> src/sinks/splunk_hec/common/util.rs|integration_test_helpers::get_token|function
+       | let healthcheck = build_healthcheck(address.to_string(), get_token().await, client);
+ 24. lib/vector-buffers/src/variants/disk_v2/tests/invariants.rs:176 values MAX_FILE_ID
+       -> lib/vector-buffers/src/variants/disk_v2/common.rs|MAX_FILE_ID|const
+       | let file_id_upper = MAX_FILE_ID;
+ 25. lib/vector-buffers/src/variants/disk_v2/tests/known_errors.rs:326 calls corrupt_record_checksum
+       -> lib/vector-buffers/src/variants/disk_v2/tests/known_errors.rs|corrupt_record_checksum|function
+       | corrupt_record_checksum(
+ 26. src/gcp.rs:377 calls build_auth
+       -> src/gcp.rs|tests::build_auth|function
+       | let error = build_auth("").await.expect_err("build failed to error");
+ 27. vdev/src/testing/integration.rs:15 imports super::runner::TestRunner
+       -> vdev/src/testing/runner.rs|TestRunner|trait
+       | ContainerTestRunner as _, IntegrationTestRunner, RunnerState, TARGET_PATH, TestRunner as _,
+ 28. lib/vector-buffers/src/variants/disk_v2/tests/known_errors.rs:183 calls create_buffer_v2_with_max_data_file_size
+       -> lib/vector-buffers/src/variants/disk_v2/tests/mod.rs|create_buffer_v2_with_max_data_file_size|function
+       | create_buffer_v2_with_max_data_file_size(data_dir.clone(), 172).await;
+ 29. lib/vector-buffers/src/variants/disk_v2/tests/known_errors.rs:1746 patterns ScrambledTestSetup
+       -> lib/vector-buffers/src/variants/disk_v2/tests/known_errors.rs|ScrambledTestSetup|struct
+       | let ScrambledTestSetup {
+ 30. lib/vector-buffers/src/variants/disk_v2/tests/invariants.rs:504 calls create_buffer_v2_with_write_buffer_size
+       -> lib/vector-buffers/src/variants/disk_v2/tests/mod.rs|create_buffer_v2_with_write_buffer_size|function
+       | create_buffer_v2_with_write_buffer_size(data_dir.clone(), 128).await;
+
+SAMPLE new definite (seed 2203)
+  1. src/sources/util/grpc/decompression.rs:930 calls decode_error [macro argument]
+       -> src/sources/util/grpc/decompression.rs|tests::decode_error|function
+       | decode_error(None, grpc_header(false, identity_limit + 1)),
+  2. src/sources/opentelemetry/request_control.rs:596 calls counter_value [macro argument]
+       -> src/sources/opentelemetry/request_control.rs|tests::counter_value|function
+       | counter_value(CounterName::ComponentLoadShedRequestsTotal, "grpc"),
+  3. src/sources/mqtt/integration_tests.rs:195 calls emqx_api_url [macro argument]
+       -> src/sources/mqtt/integration_tests.rs|emqx_api_url|function
+       | http.get(format!("{}/clients/{client_id}", emqx_api_url()))
+  4. src/sinks/datadog/metrics/normalizer.rs:201 calls get_sketch [macro argument]
+       -> src/sinks/datadog/metrics/normalizer.rs|tests::get_sketch|function
+       | Some(get_sketch(
+  5. src/sources/http_client/integration_tests.rs:72 calls dufs_address [macro argument]
+       -> src/sources/http_client/integration_tests.rs|dufs_address|function
+       | endpoint: format!("{}/logs/bytes", dufs_address()),
+  6. src/sinks/loki/integration_tests.rs:329 calls loki_address [macro argument]
+       -> src/sinks/loki/integration_tests.rs|loki_address|function
+       | let config = format!("endpoint = \"{}\"", loki_address())
+  7. src/transforms/remap.rs:977 calls get_field_string [macro argument]
+       -> src/transforms/remap.rs|tests::get_field_string|function
+       | assert_eq!(get_field_string(&result, "bar"), "baz");
+  8. src/sinks/datadog/metrics/normalizer.rs:219 calls get_aggregated_histogram [macro argument]
+       -> src/test_util/metrics.rs|get_aggregated_histogram|function
+       | get_aggregated_histogram(samples2, MetricKind::Absolute),
+  9. src/http/transport_tests.rs:759 calls has_proxy_authorization [macro argument]
+       -> src/http/transport_tests.rs|has_proxy_authorization|function
+       | assert!(has_proxy_authorization(&proxy_observations[0].headers));
+ 10. src/sinks/datadog/metrics/normalizer.rs:126 calls get_sketch [macro argument]
+       -> src/sinks/datadog/metrics/normalizer.rs|tests::get_sketch|function
+       | Some(get_sketch(
+ 11. src/sources/host_metrics/network.rs:124 calls all_counters [macro argument]
+       -> src/sources/host_metrics/mod.rs|tests::all_counters|function
+       | assert!(all_counters(&metrics));
+ 12. src/sinks/datadog/metrics/sink.rs:343 calls create_gauge [macro argument]
+       -> src/sinks/datadog/metrics/sink.rs|tests::create_gauge|function
+       | create_gauge("basic", gauge_value),
+ 13. src/sources/aws_s3/notification/tests.rs:234 calls custom_body [macro argument]
+       -> src/sources/aws_s3/notification/tests.rs|custom_body|function
+       | let fixture = Fixture::new(vec![custom_body(&["literal%2F+one.gz", "two.gz"], None)]).await;
+ 14. src/sinks/datadog/metrics/sink.rs:417 calls create_gauge [macro argument]
+       -> src/sinks/datadog/metrics/sink.rs|tests::create_gauge|function
+       | create_gauge("aaa", 1.0),
+ 15. lib/vector-core/src/event/test/serialization.rs:485 calls create_nested_value [macro argument]
+       -> lib/vector-core/src/event/test/serialization.rs|create_nested_value|function
+       | !roundtrip_value(create_nested_value(MAX_OBJECT_DEPTH_VALUE + 1)),

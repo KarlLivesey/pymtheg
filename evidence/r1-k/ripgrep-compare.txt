@@ -1,0 +1,215 @@
+module { id: 'rust', version: '26' } -> { id: 'rust', version: '27' }
+seconds 48.9 -> 54.8
+all links before { resolved: 12121, unresolved: 22647, candidates: 12 } 34780
+all links after  { resolved: 14385, unresolved: 24692, candidates: 12 } 39089
+written (non-contains) before { resolved: 7831, unresolved: 22647, candidates: 12 }
+written (non-contains) after  { resolved: 9413, unresolved: 24101, candidates: 12 }
+  of which new macro-argument calls { unresolved: 2074, resolved: 962 }
+derived macro-body calls { resolved: 682, unresolved: 591 }
+
+unresolved written links by kind|reason: before -> after
+     7101 ->    8492  calls|receiver-type-unverified
+     3997 ->    4127  values|(none)
+     2631 ->    2631  macros|(none)
+     1526 ->    2349  types|(none)
+      386 ->    1443  calls|(none)
+     1484 ->     148  types|opaque-item-may-shadow-name
+      430 ->     754  types|namespace-binding-unverified
+      849 ->     229  calls|opaque-item-may-shadow-name
+      456 ->     464  calls|receiver-type-unverified; too-many-targets
+      275 ->     514  patterns|(none)
+      434 ->     315  calls|path-type-unverified; opaque-item-may-shadow-name; too-many-targets
+      290 ->     450  imports|(none)
+      479 ->      69  imports|opaque-item-may-shadow-name
+      138 ->     320  calls|path-type-unverified; namespace-binding-unverified
+      260 ->     105  values|opaque-item-may-shadow-name
+      135 ->     200  calls|path-type-unverified; namespace-binding-unverified; too-many-targets
+      281 ->      42  calls|receiver-type-unverified; opaque-item-may-shadow-name
+      271 ->      30  patterns|opaque-item-may-shadow-name
+       93 ->     198  calls|path-type-unverified
+      222 ->      28  calls|path-type-unverified; opaque-item-may-shadow-name
+      104 ->     131  calls|later-probe-step
+      104 ->     105  patterns|namespace-binding-unverified
+       86 ->     102  calls|inherent-applicability-unverified
+       76 ->      76  calls|path-type-unverified; opaque-item-may-shadow-name; namespace-binding-unverified; too-many-targets
+       62 ->      88  calls|receiver-type-unverified; namespace-binding-unverified
+       51 ->      92  implements|(none)
+       53 ->      75  values|namespace-binding-unverified
+       51 ->      73  calls|trait-dispatch
+       46 ->      63  calls|path-type-unverified; too-many-targets
+       66 ->      12  implements|opaque-item-may-shadow-name
+        0 ->      69  calls|macro-argument-unverified
+       31 ->      31  types|namespace-binding-unverified; opaque-item-may-shadow-name
+       30 ->      30  values|associated-member-lookup-unverified
+        0 ->      55  calls|opaque-item-may-shadow-name; macro-argument-unverified
+       27 ->      27  calls|receiver-type-unverified; namespace-binding-unverified; opaque-item-may-shadow-name
+        0 ->      50  calls|receiver-type-unverified; macro-argument-unverified
+       22 ->       8  calls|opaque-item-may-shadow-name; path-type-unverified; opaque-item-may-shadow-name
+        9 ->      19  calls|namespace-binding-unverified
+       14 ->      14  calls|trait-dispatch; too-many-targets
+       10 ->      10  types|dependency-presence-unverified
+
+unresolved written links by target class: before {
+  'workspace-name-exists': 2957,
+  'std-path': 592,
+  'local-binding': 4561,
+  'workspace-would-be-targets': 6836,
+  'no-workspace-symbol-named-so': 6745,
+  'external-path': 956
+}
+unresolved written links by target class: after  {
+  'workspace-name-exists': 3166,
+  'std-path': 594,
+  'local-binding': 4803,
+  'workspace-would-be-targets': 7541,
+  'no-workspace-symbol-named-so': 7020,
+  'external-path': 977
+}
+
+links present in both runs, outcome change {
+  'resolved -> resolved': 12121,
+  'unresolved -> unresolved': 22027,
+  'unresolved -> resolved': 620,
+  'candidates -> candidates': 12
+}
+unresolved -> definite 620 | definite -> other 0
+new definite links (argument calls + derived) 1644
+
+SAMPLE unresolved -> definite (seed 1117)
+  1. crates/searcher/src/searcher/core.rs:611 calls range.end
+       -> crates/matcher/src/lib.rs|impl Match::end|method
+       | self.last_line_visited = range.end();
+  2. crates/searcher/src/sink.rs:3 imports grep_matcher::LineTerminator
+       -> crates/matcher/src/lib.rs|LineTerminator|struct
+       | use grep_matcher::LineTerminator;
+  3. crates/searcher/src/searcher/core.rs:259 calls Range::new
+       -> crates/matcher/src/lib.rs|impl Match::new|method
+       | let range = Range::new(before_context_start, range.end());
+  4. crates/printer/src/standard.rs:23 imports crate::stats::Stats
+       -> crates/printer/src/stats.rs|Stats|struct
+       | stats::Stats,
+  5. crates/printer/src/summary.rs:797 imports super::Summary
+       -> crates/printer/src/summary.rs|Summary|struct
+       | use super::{Summary, SummaryBuilder, SummaryKind};
+  6. crates/printer/src/summary.rs:11 imports grep_searcher::SinkFinish
+       -> crates/searcher/src/sink.rs|SinkFinish|struct
+       | grep_searcher::{Searcher, Sink, SinkError, SinkFinish, SinkMatch},
+  7. crates/printer/src/standard.rs:1523 types Match
+       -> crates/matcher/src/lib.rs|Match|struct
+       | fn trim_line_terminator(&self, buf: &[u8], line: &mut Match) {
+  8. crates/printer/src/util.rs:14 types Matcher
+       -> crates/matcher/src/lib.rs|Matcher|trait
+       | pub(crate) struct Replacer<M: Matcher> {
+  9. crates/printer/src/standard.rs:768 types Searcher
+       -> crates/searcher/src/searcher/mod.rs|Searcher|struct
+       | searcher: &Searcher,
+ 10. crates/core/flags/hiargs.rs:713 calls grep::matcher::LineTerminator::crlf
+       -> crates/matcher/src/lib.rs|impl LineTerminator::crlf|method
+       | grep::matcher::LineTerminator::crlf()
+ 11. crates/core/flags/hiargs.rs:831 types grep::cli::StandardStream
+       -> crates/cli/src/wtr.rs|StandardStream|struct
+       | pub(crate) fn stdout(&self) -> grep::cli::StandardStream {
+ 12. crates/searcher/src/searcher/core.rs:39 types Matcher
+       -> crates/matcher/src/lib.rs|Matcher|trait
+       | impl<'s, M: Matcher, S: Sink> Core<'s, M, S> {
+ 13. crates/searcher/src/searcher/core.rs:625 calls range.start
+       -> crates/matcher/src/lib.rs|impl Match::start|method
+       | self.count_lines(buf, range.start());
+ 14. crates/searcher/src/searcher/core.rs:495 calls Range::zero
+       -> crates/matcher/src/lib.rs|impl Match::zero|method
+       | Range::zero(i).offset(pos),
+ 15. crates/searcher/src/searcher/core.rs:10 imports crate::sink::SinkContext
+       -> crates/searcher/src/sink.rs|SinkContext|struct
+       | Sink, SinkContext, SinkContextKind, SinkError, SinkFinish, SinkMatch,
+ 16. crates/printer/src/standard.rs:1751 imports super::Standard
+       -> crates/printer/src/standard.rs|Standard|struct
+       | use super::{ColorSpecs, Standard, StandardBuilder};
+ 17. crates/printer/src/standard.rs:1044 calls LineStep::new
+       -> crates/searcher/src/lines.rs|impl LineStep::new|method
+       | let mut stepper = LineStep::new(line_term, 0, bytes.len());
+ 18. crates/printer/src/standard.rs:782 calls mat.lines
+       -> crates/searcher/src/sink.rs|impl<'b> SinkMatch<'b>::lines|method
+       | stats.add_matched_lines(mat.lines().count() as u64);
+ 19. crates/searcher/src/searcher/glue.rs:4 imports crate::line_buffer::LineBufferReader
+       -> crates/searcher/src/line_buffer.rs|LineBufferReader|struct
+       | line_buffer::{DEFAULT_BUFFER_CAPACITY, LineBufferReader},
+ 20. crates/printer/src/standard.rs:25 imports crate::util::Replacer
+       -> crates/printer/src/util.rs|Replacer|struct
+       | DecimalFormatter, PrinterPath, Replacer, Sunk,
+ 21. crates/core/flags/hiargs.rs:22 imports crate::haystack::HaystackBuilder
+       -> crates/core/haystack.rs|HaystackBuilder|struct
+       | haystack::{Haystack, HaystackBuilder},
+ 22. crates/printer/src/lib.rs:76 imports crate::json::JSON
+       -> crates/printer/src/json.rs|JSON|struct
+       | pub use crate::json::{JSON, JSONBuilder, JSONSink};
+ 23. crates/searcher/src/testutil.rs:559 calls LineTerminator::byte
+       -> crates/matcher/src/lib.rs|impl LineTerminator::byte|method
+       | matcher.set_line_term(Some(LineTerminator::byte(b'\n')));
+ 24. crates/printer/src/json.rs:818 types SinkFinish
+       -> crates/searcher/src/sink.rs|SinkFinish|struct
+       | finish: &SinkFinish,
+ 25. crates/printer/src/util.rs:238 types Match
+       -> crates/matcher/src/lib.rs|Match|struct
+       | pub(crate) fn matches(&self) -> &'a [Match] {
+ 26. crates/core/flags/hiargs.rs:232 calls grep::searcher::MmapChoice::auto
+       -> crates/searcher/src/searcher/mmap.rs|impl MmapChoice::auto|method
+       | let maybe = unsafe { grep::searcher::MmapChoice::auto() };
+ 27. crates/searcher/src/testutil.rs:101 calls LineMatchKind::Candidate
+       -> crates/matcher/src/lib.rs|LineMatchKind::Candidate|variant
+       | Ok(Some(LineMatchKind::Candidate(i)))
+ 28. crates/searcher/src/searcher/glue.rs:7 imports crate::sink::SinkError
+       -> crates/searcher/src/sink.rs|SinkError|trait
+       | sink::{Sink, SinkError},
+ 29. crates/printer/src/standard.rs:483 types Match
+       -> crates/matcher/src/lib.rs|Match|struct
+       | matches: Vec<Match>,
+ 30. crates/printer/src/lib.rs:72 imports crate::summary::SummaryKind
+       -> crates/printer/src/summary.rs|SummaryKind|enum
+       | summary::{Summary, SummaryBuilder, SummaryKind, SummarySink},
+
+SAMPLE new definite (seed 1117)
+  1. crates/regex/src/literal.rs:939 calls I [macro argument]
+       -> crates/regex/src/literal.rs|tests::I|function
+       | assert_eq!(seq([I("123")]), e(r"[A-Z]+123"));
+  2. tests/feature.rs:166 calls crate::util::setup_pcre2 [derived]
+       -> tests/util.rs|setup_pcre2|function
+       | rgtest!(f45_precedence_with_others, |dir: Dir, mut cmd: TestCommand| {
+  3. tests/regression.rs:171 calls crate::util::setup [derived]
+       -> tests/util.rs|setup|function
+       | rgtest!(r128, |dir: Dir, mut cmd: TestCommand| {
+  4. tests/binary.rs:355 calls crate::util::setup_pcre2 [derived]
+       -> tests/util.rs|setup_pcre2|function
+       | rgtest!(before_match1_implicit, |dir: Dir, mut cmd: TestCommand| {
+  5. tests/regression.rs:1179 calls crate::util::setup [derived]
+       -> tests/util.rs|setup|function
+       | rgtest!(r1739_replacement_lineterm_match, |dir: Dir, mut cmd: TestCommand| {
+  6. crates/searcher/src/lines.rs:370 calls prev [macro argument]
+       -> crates/searcher/src/lines.rs|tests::prev|function
+       | assert_eq!(0, prev(t, lines[0].end, 2));
+  7. crates/regex/src/literal.rs:686 calls seq [macro argument]
+       -> crates/regex/src/literal.rs|tests::seq|function
+       | assert_eq!(e(r"[a-z]([a-z]foo)([a-z]foo)[a-z]"), seq([I("foo")]));
+  8. crates/matcher/tests/test_matcher.rs:92 calls m [macro argument]
+       -> crates/matcher/tests/test_matcher.rs|m|function
+       | assert_eq!(caps.get(1), Some(m(1, 6)));
+  9. crates/ignore/src/incremental.rs:889 calls matchedf [macro argument]
+       -> crates/ignore/src/incremental.rs|tests::matchedf|function
+       | assert!(matchedf(&mut m, "a/b/ignored").is_ignore());
+ 10. tests/regression.rs:1252 calls crate::util::setup [derived]
+       -> tests/util.rs|setup|function
+       | rgtest!(r1868_context_passthru_override, |dir: Dir, _: TestCommand| {
+ 11. crates/ignore/src/incremental.rs:1051 calls matchedf [macro argument]
+       -> crates/ignore/src/incremental.rs|tests::matchedf|function
+       | assert!(matchedf(&mut m, root.join("file")).is_none());
+ 12. tests/misc.rs:544 calls crate::util::setup [derived]
+       -> tests/util.rs|setup|function
+       | rgtest!(max_filesize_parse_k_suffix, |dir: Dir, mut cmd: TestCommand| {
+ 13. tests/binary.rs:175 calls crate::util::setup [derived]
+       -> tests/util.rs|setup|function
+       | rgtest!(after_match1_explicit, |dir: Dir, mut cmd: TestCommand| {
+ 14. crates/ignore/benches/workloads.rs:195 calls walk [macro argument]
+       -> crates/ignore/benches/workloads.rs|walk|function
+       | b.iter(|| assert_eq!(walk(black_box(&builder), 12), expected));
+ 15. crates/regex/src/literal.rs:859 calls exact [macro argument]
+       -> crates/regex/src/literal.rs|tests::exact|function
+       | assert_eq!(exact(["abc", "MN", "xyz"]), e(r"abc|M[a&&b]*N|xyz"));

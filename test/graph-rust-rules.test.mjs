@@ -23,7 +23,7 @@ async function graph(
   const facts = files.map((file) => fileFacts("rust-rules", file));
   const symbols = facts.flatMap((f) => f.symbols);
   const links = facts.flatMap((f) => f.links);
-  const decisions = await rust.resolve({
+  const resolved = await rust.resolve({
     projectId: "rust-rules",
     files,
     symbols,
@@ -36,6 +36,7 @@ async function graph(
       diagnostics: [],
     })),
   });
+  const decisions = Array.isArray(resolved) ? resolved : resolved.resolutions;
   const byId = new Map(symbols.map((s) => [s.id, s]));
   const resolutions = new Map(decisions.map((d) => [d.linkId, d]));
   function target(name, kind = "calls") {

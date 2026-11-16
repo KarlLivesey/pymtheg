@@ -92,7 +92,7 @@
   {
     "name": "brace tail is still statement-capable",
     "files": {
-      "src/lib.rs": "macro_rules! m{()=>{{}}}pub fn helper(){}pub fn run(){helper(); m!{}}"
+      "src/lib.rs": "macro_rules! m{()=>{fn helper(){}}}pub fn helper(){}pub fn run(){helper(); m!{}}"
     },
     "manifests": {
       "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n"
