@@ -98,9 +98,10 @@ A step passes only if all of these hold:
    broken-design diagnostic reads `…/broken.pym:7:27 error N002: …` and is
    asserted whole.
 6. No Node process warning (`^\(node:\d+\) (?:\[[A-Z0-9_]+\] )?\w*Warning: `,
-   with or without a code) appears. There is one exception, the R1-H gap: the
-   exact SQLite `ExperimentalWarning` and its trace hint, on Node 24.0.x or 25.x
-   only. Any extra warning still fails.
+   with or without a code) appears. No warning is excepted: the
+   `KNOWN_WARNING_GAPS` list is empty. Node 24.0.0's SQLite
+   `ExperimentalWarning` was the last exception (R1-H); PR 45 removed the
+   warning, and the entry has been deleted.
 
 Statuses:
 
@@ -328,16 +329,13 @@ Self-test on commit 69256e51 (2026-11-15): **passed**. Wording matcher 39/39; co
 
 ### Known gaps
 
-The harness keeps one list, `KNOWN_WARNING_GAPS` in `driver.mjs`. An empty list
-is the normal state: the harness then exits 0 if nothing fails, and `latest.md`
-says "Known gaps: None". One entry remains:
+**None.** The harness keeps one list, `KNOWN_WARNING_GAPS` in `driver.mjs`, and
+it is now empty. That is the normal state: the harness exits 0 when nothing
+fails, and `latest.md` says "Known gaps: None". A chunk still in flight would add
+one entry, matched to its exact warning and Node versions.
 
-| Chunk | Exact condition accepted | Turns green when |
-|---|---|---|
-| R1-H (PR 45) | Node 24.0.x or 25.x, and the only Node warning lines are exactly `(node:N) ExperimentalWarning: SQLite is an experimental feature and might change at any time` and its trace hint | Delete the entry when PR 45 merges. Any other warning, on any version, fails. |
-
-The R1-C, R1-C2, R1-D and W3-L2 gaps are deleted, and their rows are required
-checks.
+Every earlier gap is deleted and its rows are required checks: R1-A, R1-B,
+R1-C, R1-C2, R1-D, W3-L2 and, since PR 45, R1-H.
 
 ## Self-test: the gate bites
 
@@ -350,8 +348,8 @@ checks.
 3. Runs the real harness on each copy and on an unmodified control, six at a
    time, in the scenario the case names.
 4. A sabotage counts as caught only if the harness exits 1 and every named step
-   is `fail`. The control must be clean: exit 0 with no gap, or exit 2 with only
-   R1-H gaps.
+   is `fail`. The control must be clean: exit 0, with no failed step and no
+   gap.
 
 The cases and their results are in the generated block above.
 

@@ -169,11 +169,12 @@ const NODE_WARNING = /^\(node:\d+\) (?:\[[A-Z0-9_]+\] )?\w*Warning: /;
 const TRACE_HINT = /^\(Use `node --trace-(?:warnings|deprecation) \.\.\.` to show where the warning was created\)$/;
 const SQLITE_WARNING = /^\(node:\d+\) ExperimentalWarning: SQLite is an experimental feature and might change at any time$/;
 /**
- * The known warning gaps, one entry per chunk still in flight. An empty list is
- * the normal state: then any Node warning fails, and with no other gap the
- * harness exits 0. Delete R1-H's entry when PR 45 merges.
+ * The known warning gaps, one entry per chunk still in flight, e.g.
+ * `{ chunk: "R1-H", versions: /^v24\.0\./, warning: SQLITE_WARNING }`. Empty is
+ * the normal state: any Node warning then fails, and with no other gap the
+ * harness exits 0. (R1-H's entry was deleted when PR 45 merged.)
  */
-const KNOWN_WARNING_GAPS = [{ chunk: "R1-H", versions: /^v24\.0\.|^v25\./, warning: SQLITE_WARNING }];
+const KNOWN_WARNING_GAPS = [];
 const STACK_LINE = /^\s+at .+:\d+:\d+\)?$/;
 const ERROR_LINE = /^\s*\w*Error: /;
 const UNHANDLED = /\bunhandled\b|\buncaught\b/i;
@@ -263,7 +264,7 @@ function safe(fn, r) {
  *                failed exactly as specified
  *  known-gap     the ONLY problem is the expectation failure, and the step's own
  *                gap matcher recognises the exact output that chunk will change;
- *                or the R1-H SQLite warning on Node 24.0.x / 25.x and nothing else
+ *                or a warning listed in KNOWN_WARNING_GAPS (empty today) and nothing else
  *  fail          anything else, including a crash, an unexpected exit code or
  *                an exception inside the harness
  *  observed      report-only step (sizes, timings)

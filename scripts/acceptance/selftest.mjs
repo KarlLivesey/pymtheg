@@ -10,8 +10,7 @@
 // 3. Makes sabotaged copies, each breaking one thing a release must not ship,
 //    and runs the real harness on each (scenario a-node-only unless a case
 //    names another), several at once, which also exercises overlapping runs.
-// 4. Requires: the unmodified control exits 0 with no failed step and no gap
-//    (or 2 with only the R1-H warning gap); every sabotaged tarball exits 1 with the named step(s) reported
+// 4. Requires: the unmodified control exits 0 with no failed step and no gap; every sabotaged tarball exits 1 with the named step(s) reported
 //    `fail`, never `pass`, `expected-fail` or `known-gap`.
 // A sabotage whose anchor is not found exactly once is reported NOT APPLIED
 // (a failure): a break that did not happen proves nothing.
@@ -121,7 +120,7 @@ const SABOTAGES = [
   { id: "wrong-diagnostic-message", what: "the N002 suggestion text changes", expect: ["check-broken", "mcp-check_design-broken"], apply: (d) => patch(d, "dist/semantic/core.js", /did you mean \$\{match\}\?/, "did you mean ${match} instead?") },
   { id: "listed-tool-throws", what: "a listed MCP tool (`design_recipe`) throws", expect: ["mcp-design_recipe"], apply: (d) => toolThrows(d, "design_recipe") },
   { id: "deprecation-warning", what: "a coded DeprecationWarning (DEP0005) on Node 24.22", expect: ["help"], apply: (d) => prelude(d, DEPRECATION) },
-  { id: "deprecation-warning-24.0.0", what: "the same DeprecationWarning on Node 24.0.0 (beside the R1-H SQLite warning)", scenarios: "e-node-24.0.0", expect: ["help"], apply: (d) => prelude(d, DEPRECATION) },
+  { id: "deprecation-warning-24.0.0", what: "the same DeprecationWarning on Node 24.0.0", scenarios: "e-node-24.0.0", expect: ["help"], apply: (d) => prelude(d, DEPRECATION) },
   {
     id: "tools-list-error",
     what: "`tools/list` answers with a JSON-RPC error",
@@ -235,9 +234,9 @@ async function runCase(c) {
   const statusOf = (step) => rows.filter((x) => x.step === step).map((x) => x.status);
   let ok, detail;
   if (c.id === "control") {
-    // Clean: exit 0 with no gap, or exit 2 whose only gaps are the R1-H warning.
+    // Clean: exit 0, no failed step and no known gap.
     const gaps = rows.filter((x) => x.status === "known-gap");
-    ok = !fails.length && rows.length > 0 && ((r.code === 0 && !gaps.length) || (r.code === 2 && gaps.length > 0 && gaps.every((x) => x.chunk === "R1-H")));
+    ok = !fails.length && rows.length > 0 && r.code === 0 && !gaps.length;
     detail = `exit ${r.code}; ${fails.length} failed steps; gaps: ${rows
       .filter((x) => x.status === "known-gap")
       .map((x) => `${x.step} (${x.chunk})`)
