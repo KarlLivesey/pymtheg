@@ -173,39 +173,12 @@ export class SqliteGraphStore implements GraphStorage {
     }
   }
   private transaction(action: () => void): void {
-    if (this.db.isTransaction) {
-      // Inside writeBatch: each store call stays atomic as a savepoint.
-      this.db.exec("SAVEPOINT graph_write");
-      try {
-        action();
-        this.db.exec("RELEASE graph_write");
-      } catch (error) {
-        this.db.exec("ROLLBACK TO graph_write");
-        this.db.exec("RELEASE graph_write");
-        throw error;
-      }
-      return;
-    }
     this.db.exec("BEGIN IMMEDIATE");
     try {
       action();
       this.db.exec("COMMIT");
     } catch (error) {
       this.db.exec("ROLLBACK");
-      throw error;
-    }
-  }
-  /** Run a sequence of store writes as one transaction: one commit instead of
-   * one per call. If write rejects, nothing it wrote is kept. */
-  async writeBatch<T>(write: () => Promise<T>): Promise<T> {
-    if (this.db.isTransaction) throw Error("Graph write batches do not nest");
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
-      const result = await write();
-      this.db.exec("COMMIT");
-      return result;
-    } catch (error) {
-      if (this.db.isTransaction) this.db.exec("ROLLBACK");
       throw error;
     }
   }

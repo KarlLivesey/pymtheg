@@ -15,12 +15,18 @@ const load = loadavg()[0];
 const ru0 = process.resourceUsage();
 const started = performance.now();
 const store = new g.SqliteGraphStore(db, "w3p1");
-const report = await g.indexProject(corpus, new g.LanguageRegistry([mod]), store);
+const report = await g.indexProject(
+  corpus,
+  new g.LanguageRegistry([mod]),
+  store,
+);
 const wallMs = Math.round(performance.now() - started);
 const ru = process.resourceUsage();
 const symbols = store.findSymbols();
 // Deterministic sample of symbols for the per-symbol queries.
-const sample = symbols.filter((_, i) => i % Math.max(1, Math.floor(symbols.length / 300)) === 0);
+const sample = symbols.filter(
+  (_, i) => i % Math.max(1, Math.floor(symbols.length / 300)) === 0,
+);
 const api = {
   files: hash(store.files()),
   symbols: hash(symbols),
@@ -52,7 +58,9 @@ for (const [table, order] of [
   ["graph_links", "id"],
   ["graph_candidates", "link,symbol"],
 ])
-  tables[table] = hash(raw.prepare(`SELECT * FROM ${table} ORDER BY ${order}`).all());
+  tables[table] = hash(
+    raw.prepare(`SELECT * FROM ${table} ORDER BY ${order}`).all(),
+  );
 raw.close();
 console.log(
   JSON.stringify({
@@ -64,7 +72,9 @@ console.log(
     loadStart: load,
     sampledSymbols: sample.length,
     report: hash(report),
-    reportCounts: Object.fromEntries(Object.entries(report).filter(([, v]) => typeof v === "number")),
+    reportCounts: Object.fromEntries(
+      Object.entries(report).filter(([, v]) => typeof v === "number"),
+    ),
     tables,
     api,
   }),

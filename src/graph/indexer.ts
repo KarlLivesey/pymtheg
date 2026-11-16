@@ -234,23 +234,17 @@ export async function indexProject(
     });
     changed.add(path);
   }
-  // One commit per write phase instead of one per file. A failure part-way
-  // keeps none of the phase's writes; the next run redoes them.
-  const batch = (write: () => Promise<void>) =>
-    store.writeBatch ? store.writeBatch(write) : write();
-  await batch(async () => {
-    await store.replaceContexts(contexts);
-    for (const file of updates) {
-      await store.replaceFile(file, cacheableFailures.has(file.path));
-      report.indexed++;
+  await store.replaceContexts(contexts);
+  for (const file of updates) {
+    await store.replaceFile(file, cacheableFailures.has(file.path));
+    report.indexed++;
+  }
+  for (const file of oldFiles)
+    if (!claims.has(file.path)) {
+      await store.removeFile(file.path);
+      changed.add(file.path);
+      report.removed++;
     }
-    for (const file of oldFiles)
-      if (!claims.has(file.path)) {
-        await store.removeFile(file.path);
-        changed.add(file.path);
-        report.removed++;
-      }
-  });
   for (const module of registry.modules)
     if (module.analyze) {
       const files = (await store.files()).filter(
@@ -329,24 +323,22 @@ export async function indexProject(
           result: failure(detail),
         }));
       }
-      await batch(async () => {
-        for (const item of results) {
-          const file = filesByPath.get(item.path)!;
-          if (JSON.stringify(file.result) !== JSON.stringify(item.result))
-            await store.replaceFile(
-              { ...file, result: item.result },
-              !analysisFailed &&
-                item.result.status === "failed" &&
-                item.result.failureKind !== "transient" &&
-                // Analyze-only modules may explicitly certify a file-local content
-                // failure. Unclassified analysis failures are never cached.
-                (item.result.failureKind === "content" ||
-                  (file.result.status === "failed" &&
-                    (await store.isParseFailure?.(file.path)) === true)),
-            );
-          report.analyzed++;
-        }
-      });
+      for (const item of results) {
+        const file = filesByPath.get(item.path)!;
+        if (JSON.stringify(file.result) !== JSON.stringify(item.result))
+          await store.replaceFile(
+            { ...file, result: item.result },
+            !analysisFailed &&
+              item.result.status === "failed" &&
+              item.result.failureKind !== "transient" &&
+              // Analyze-only modules may explicitly certify a file-local content
+              // failure. Unclassified analysis failures are never cached.
+              (item.result.failureKind === "content" ||
+                (file.result.status === "failed" &&
+                  (await store.isParseFailure?.(file.path)) === true)),
+          );
+        report.analyzed++;
+      }
     }
   const files = await store.files();
   const symbols = await store.findSymbols();

@@ -5,9 +5,11 @@
 # Main's build was prepared locally with
 #   git archive <main> src scripts tsconfig.json package.json | tar -x -C w3p1-main.tmp
 # then on the server: cd w3p1-main.tmp && ln -s ../node_modules ../grammars . && npx tsc
-# (main at b9fc09e2; later main commits do not touch src/graph/).
+# (round 1: main at b9fc09e2, results round1-*.jsonl; round 2: main at
+# 1eddce6a, results restic.jsonl/vector.jsonl — same src/graph/ in both).
 set -euo pipefail
 tree=$(pwd); O=${PYM_SCRATCH:?}/w3p1; mkdir -p "$O"
+[ -f "$tree/w3p1-main.tmp/dist/graph/index.js" ] || (cd "$tree/w3p1-main.tmp" && ln -sfn ../node_modules node_modules && ln -sfn ../grammars grammars && npx tsc)
 cd "$PYM_SCRATCH"
 for c in vector restic; do
   [ -d "$c" ] || { cp -r ~/pymtheg-dev/corpora/$c "$c" 2>/dev/null || true; chmod -R u+w "$c"; }
