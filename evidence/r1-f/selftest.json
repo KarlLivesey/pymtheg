@@ -1,0 +1,1084 @@
+{
+  "schema": "pymtheg.acceptance-selftest/v1",
+  "generatedAt": "2026-11-16T03:52:06.511Z",
+  "commit": "dec50ae1",
+  "passed": true,
+  "matcher": {
+    "cases": 39,
+    "failures": []
+  },
+  "outcomes": [
+    {
+      "id": "control",
+      "what": "unmodified tarball",
+      "scenarios": "a-node-only",
+      "expect": [],
+      "exitCode": 0,
+      "verdict": "clean",
+      "detail": "exit 0; 0 failed steps; gaps: ",
+      "failingSteps": []
+    },
+    {
+      "id": "check-exits-0",
+      "what": "`check` exits 0 on the broken design",
+      "scenarios": "a-node-only",
+      "expect": [
+        "check-broken"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; check-broken: fail; all failing: check-broken",
+      "failingSteps": [
+        {
+          "step": "check-broken",
+          "reason": "exit 0, expected 1"
+        }
+      ]
+    },
+    {
+      "id": "grammar-removed",
+      "what": "the vendored Go grammar is missing from the tarball",
+      "scenarios": "a-node-only",
+      "expect": [
+        "tarball-contents",
+        "graph-index"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; tarball-contents: fail; graph-index: fail; all failing: tarball-contents, doctor, graph-index, graph-status, graph-ts-callers, graph-ts-callers-2, graph-go-callers, graph-go-same-package, graph-rust-callers, graph-rust-same-file, graph-ts-path, graph-search, link-add-go, link-list, link-check, link-check-after-edit, link-check-after-refresh, link-check-final, mcp-code_graph-index, mcp-code_graph-search, mcp-code_graph-callers-go, mcp-requirement_links-add-go, mcp-requirement_links-list, mcp-requirement_links-check, mcp-requirement_links-check-after-edit, mcp-requirement_links-check-after-refresh, mcp-requirement_links-check-final, mcp-requirement_links-unlinked, mcp-link_result-handle",
+      "failingSteps": [
+        {
+          "step": "tarball-contents",
+          "reason": "missing grammars/go/tree-sitter-go.wasm"
+        },
+        {
+          "step": "doctor",
+          "reason": "exit 3, expected 0"
+        },
+        {
+          "step": "graph-index",
+          "reason": "exit 2, expected 0"
+        },
+        {
+          "step": "graph-status",
+          "reason": "exit 2, expected 0"
+        },
+        {
+          "step": "graph-ts-callers",
+          "reason": "exit 2, expected 0"
+        },
+        {
+          "step": "graph-ts-callers-2",
+          "reason": "exit 2, expected 0"
+        },
+        {
+          "step": "graph-go-callers",
+          "reason": "exit 2, expected 0"
+        },
+        {
+          "step": "graph-go-same-package",
+          "reason": "exit 2, expected 0"
+        },
+        {
+          "step": "graph-rust-callers",
+          "reason": "exit 2, expected 0"
+        },
+        {
+          "step": "graph-rust-same-file",
+          "reason": "exit 2, expected 0"
+        },
+        {
+          "step": "graph-ts-path",
+          "reason": "exit 2, expected 0"
+        },
+        {
+          "step": "graph-search",
+          "reason": "exit 2, expected 0"
+        },
+        {
+          "step": "link-add-go",
+          "reason": "exit 1, expected 0"
+        },
+        {
+          "step": "link-list",
+          "reason": "links of R2: got [\"apply_discount:ok\",\"formatTotal:ok\"], expected [\"ComputeTotal:ok\",\"apply_discount:ok\",\"formatTotal:ok\"]"
+        },
+        {
+          "step": "link-check",
+          "reason": "link states: got [\"apply_discount:ok\",\"formatTotal:ok\"], expected [\"ComputeTotal:ok\",\"apply_discount:ok\",\"formatTotal:ok\"]"
+        },
+        {
+          "step": "link-check-after-edit",
+          "reason": "link states: got [\"apply_discount:changed\",\"formatTotal:ok\"], expected [\"ComputeTotal:ok\",\"apply_discount:changed\",\"formatTotal:ok\"]"
+        },
+        {
+          "step": "link-check-after-refresh",
+          "reason": "link states: got [\"apply_discount:ok\",\"formatTotal:ok\"], expected [\"ComputeTotal:ok\",\"apply_discount:ok\",\"formatTotal:ok\"]"
+        },
+        {
+          "step": "link-check-final",
+          "reason": "link states: got [\"apply_discount:ok\",\"formatTotal:ok\"], expected [\"ComputeTotal:ok\",\"apply_discount:ok\",\"formatTotal:ok\"]"
+        },
+        {
+          "step": "mcp-code_graph-index",
+          "reason": "index job: got [\"complete\",\"incomplete\",4], expected [\"complete\",\"ok\",0]"
+        },
+        {
+          "step": "mcp-code_graph-search",
+          "reason": "search matches: got [\"formatTotal@web/src/format.ts\"], expected [\"ComputeTotal@service/pricing/total.go\",\"formatTotal@web/src/format.ts\",\"total.go@service/pricing/total.go\"]"
+        },
+        {
+          "step": "mcp-code_graph-callers-go",
+          "reason": "MCP callers of ComputeTotal: got [], expected [\"main@service/main.go->ComputeTotal:definite\"]"
+        },
+        {
+          "step": "mcp-requirement_links-add-go",
+          "reason": "requirement_links: tool returned isError: {\"viewSchema\":\"pymtheg.agent/v1\",\"linkSchema\":\"pymtheg.mcp-links/v1\",\"jobId\":null,\"state\":\"error\",\"e … narrow the query. Reconcile interrupted mutations befor"
+        },
+        {
+          "step": "mcp-requirement_links-list",
+          "reason": "links of plan:R1: got [\"plan:R1/percent_of:ok\",\"plan:R1/roundCents:ok\"], expected [\"plan:R1/percent_of:ok\",\"plan:R1/roundCents:ok\",\"plan:R1/taxFor:ok\"]"
+        },
+        {
+          "step": "mcp-requirement_links-check",
+          "reason": "check: got [[\"plan:R1/percent_of:ok\",\"plan:R1/roundCents:ok\",\"plan:R2/apply_discount:ok\",\"plan:R2/formatTotal:ok\"],false], expected [[\"plan:R1/percent_of:ok\",\"plan:R1/roundCents:ok\",\"plan:R1/taxFor:ok"
+        },
+        {
+          "step": "mcp-requirement_links-check-after-edit",
+          "reason": "check: got [[\"plan:R1/percent_of:ok\",\"plan:R1/roundCents:changed\",\"plan:R2/apply_discount:ok\",\"plan:R2/formatTotal:ok\"],false], expected [[\"plan:R1/percent_of:ok\",\"plan:R1/roundCents:changed\",\"plan:R1"
+        },
+        {
+          "step": "mcp-requirement_links-check-after-refresh",
+          "reason": "check: got [[\"plan:R1/percent_of:ok\",\"plan:R1/roundCents:ok\",\"plan:R2/apply_discount:ok\",\"plan:R2/formatTotal:ok\"],false], expected [[\"plan:R1/percent_of:ok\",\"plan:R1/roundCents:ok\",\"plan:R1/taxFor:ok"
+        },
+        {
+          "step": "mcp-requirement_links-check-final",
+          "reason": "check: got [[\"plan:R1/percent_of:ok\",\"plan:R1/roundCents:ok\",\"plan:R2/apply_discount:ok\",\"plan:R2/formatTotal:ok\"],false], expected [[\"plan:R1/percent_of:ok\",\"plan:R1/roundCents:ok\",\"plan:R1/taxFor:ok"
+        },
+        {
+          "step": "mcp-requirement_links-unlinked",
+          "reason": "unlinked public symbols: got [\"renderBasket@web/src/main.ts\"], expected [\"Add@service/pricing/cart.go\",\"Cart@service/pricing/cart.go\",\"First@service/pricing/cart.go\",\"Items@service/pricing/cart.go\",\"L"
+        },
+        {
+          "step": "mcp-link_result-handle",
+          "reason": "handle → result: got [\"running\",\"string\",\"complete\",true,false,[\"plan:R1/percent_of:ok\",\"plan:R1/roundCents:ok\",\"plan:R2/apply_discount:ok\",\"plan:R2/formatTotal:ok\"]], expected [\"running\",\"string\",\"co"
+        }
+      ]
+    },
+    {
+      "id": "mcp-check-design-throws",
+      "what": "MCP `check_design` throws",
+      "scenarios": "a-node-only",
+      "expect": [
+        "mcp-check_design"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; mcp-check_design: fail; all failing: mcp-check_design, mcp-check_design-broken, mcp-design_interface, mcp-emit_scaffold, mcp-read_scaffold, mcp-emit_implementation_check",
+      "failingSteps": [
+        {
+          "step": "mcp-check_design",
+          "reason": "check_design: tool returned isError: sabotaged check_design"
+        },
+        {
+          "step": "mcp-check_design-broken",
+          "reason": "check_design: tool returned isError: sabotaged check_design"
+        },
+        {
+          "step": "mcp-design_interface",
+          "reason": "check_design: tool returned isError: sabotaged check_design"
+        },
+        {
+          "step": "mcp-emit_scaffold",
+          "reason": "emit_scaffold: tool returned isError: Input validation error: Invalid arguments for tool emit_scaffold: runId: Invalid input: expected string, received undefined"
+        },
+        {
+          "step": "mcp-read_scaffold",
+          "reason": "read_scaffold: tool returned isError: Input validation error: Invalid arguments for tool read_scaffold: emissionId: Invalid input: expected string, received undefined"
+        },
+        {
+          "step": "mcp-emit_implementation_check",
+          "reason": "emit_implementation_check: tool returned isError: Input validation error: Invalid arguments for tool emit_implementation_check: runId: Invalid input: expected string, received undefined"
+        }
+      ]
+    },
+    {
+      "id": "callers-no-links",
+      "what": "`graph callers` returns no links",
+      "scenarios": "a-node-only",
+      "expect": [
+        "graph-ts-callers"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; graph-ts-callers: fail; all failing: graph-ts-callers, graph-ts-callers-2, graph-go-callers, graph-go-same-package, graph-rust-callers, graph-rust-same-file",
+      "failingSteps": [
+        {
+          "step": "graph-ts-callers",
+          "reason": "callers of formatTotal: got [], expected [\"renderBasket@web/src/main.ts:definite\"]"
+        },
+        {
+          "step": "graph-ts-callers-2",
+          "reason": "callers of roundCents: got [], expected [\"formatTotal@web/src/format.ts:definite\"]"
+        },
+        {
+          "step": "graph-go-callers",
+          "reason": "callers of ComputeTotal: got [], expected [\"main@service/main.go:definite\"]"
+        },
+        {
+          "step": "graph-go-same-package",
+          "reason": "callers of taxFor: got [], expected [\"ComputeTotal@service/pricing/total.go:definite\"]"
+        },
+        {
+          "step": "graph-rust-callers",
+          "reason": "callers of apply_discount: got [], expected [\"main@engine/src/main.rs:definite\"]"
+        },
+        {
+          "step": "graph-rust-same-file",
+          "reason": "callers of percent_of: got [], expected [\"apply_discount@engine/src/discount.rs:definite\"]"
+        }
+      ]
+    },
+    {
+      "id": "caller-target-renamed",
+      "what": "a caller link's target is renamed",
+      "scenarios": "a-node-only",
+      "expect": [
+        "graph-ts-callers"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; graph-ts-callers: fail; all failing: graph-ts-callers, graph-ts-callers-2, graph-go-callers, graph-go-same-package, graph-rust-callers, graph-rust-same-file",
+      "failingSteps": [
+        {
+          "step": "graph-ts-callers",
+          "reason": "link targets: got [\"formatTotal_renamed\"], expected [\"formatTotal\"]"
+        },
+        {
+          "step": "graph-ts-callers-2",
+          "reason": "link targets: got [\"roundCents_renamed\"], expected [\"roundCents\"]"
+        },
+        {
+          "step": "graph-go-callers",
+          "reason": "link targets: got [\"ComputeTotal_renamed\"], expected [\"ComputeTotal\"]"
+        },
+        {
+          "step": "graph-go-same-package",
+          "reason": "link targets: got [\"taxFor_renamed\"], expected [\"taxFor\"]"
+        },
+        {
+          "step": "graph-rust-callers",
+          "reason": "link targets: got [\"apply_discount_renamed\"], expected [\"apply_discount\"]"
+        },
+        {
+          "step": "graph-rust-same-file",
+          "reason": "link targets: got [\"percent_of_renamed\"], expected [\"percent_of\"]"
+        }
+      ]
+    },
+    {
+      "id": "certainty-downgraded",
+      "what": "caller certainty downgraded to name-only",
+      "scenarios": "a-node-only",
+      "expect": [
+        "graph-ts-callers"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; graph-ts-callers: fail; all failing: graph-ts-callers, graph-ts-callers-2, graph-go-callers, graph-go-same-package, graph-rust-callers, graph-rust-same-file",
+      "failingSteps": [
+        {
+          "step": "graph-ts-callers",
+          "reason": "callers of formatTotal: got [\"renderBasket@web/src/main.ts:name-only\"], expected [\"renderBasket@web/src/main.ts:definite\"]"
+        },
+        {
+          "step": "graph-ts-callers-2",
+          "reason": "callers of roundCents: got [\"formatTotal@web/src/format.ts:name-only\"], expected [\"formatTotal@web/src/format.ts:definite\"]"
+        },
+        {
+          "step": "graph-go-callers",
+          "reason": "callers of ComputeTotal: got [\"main@service/main.go:name-only\"], expected [\"main@service/main.go:definite\"]"
+        },
+        {
+          "step": "graph-go-same-package",
+          "reason": "callers of taxFor: got [\"ComputeTotal@service/pricing/total.go:name-only\"], expected [\"ComputeTotal@service/pricing/total.go:definite\"]"
+        },
+        {
+          "step": "graph-rust-callers",
+          "reason": "callers of apply_discount: got [\"main@engine/src/main.rs:name-only\"], expected [\"main@engine/src/main.rs:definite\"]"
+        },
+        {
+          "step": "graph-rust-same-file",
+          "reason": "callers of percent_of: got [\"apply_discount@engine/src/discount.rs:name-only\"], expected [\"apply_discount@engine/src/discount.rs:definite\"]"
+        }
+      ]
+    },
+    {
+      "id": "prints-java",
+      "what": "a command prints \"java\"",
+      "scenarios": "a-node-only",
+      "expect": [
+        "help"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; help: fail; all failing: install-npx, help",
+      "failingSteps": [
+        {
+          "step": "install-npx",
+          "reason": "mentions Java/Quint/TLC: Optional backend: java (not installed)."
+        },
+        {
+          "step": "help",
+          "reason": "mentions Java/Quint/TLC: Optional backend: java (not installed)."
+        }
+      ]
+    },
+    {
+      "id": "index-runs-java",
+      "what": "`graph index` silently runs `java -version`",
+      "scenarios": "a-node-only",
+      "expect": [
+        "graph-index",
+        "no-toolchain-processes"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; graph-index: fail; no-toolchain-processes: fail; all failing: graph-index, no-toolchain-processes",
+      "failingSteps": [
+        {
+          "step": "graph-index",
+          "reason": "started java (shim: java -version) | started java (spawn: java -version)"
+        },
+        {
+          "step": "no-toolchain-processes",
+          "reason": "graph-index: shim: java -version; spawn: java -version"
+        }
+      ]
+    },
+    {
+      "id": "mcp-wrong-verdict",
+      "what": "MCP reports a failing verdict for the valid design",
+      "scenarios": "a-node-only",
+      "expect": [
+        "mcp-check_design"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; mcp-check_design: fail; all failing: mcp-check_design, mcp-explore_behaviour-verify, mcp-explore_behaviour-simulate, mcp-design_interface",
+      "failingSteps": [
+        {
+          "step": "mcp-check_design",
+          "reason": "valid design verdict: got {\"exitStatus\":1,\"errors\":0,\"warnings\":0}, expected {\"exitStatus\":0,\"errors\":0,\"warnings\":0}"
+        },
+        {
+          "step": "mcp-explore_behaviour-verify",
+          "reason": "verify summary: got {\"exitStatus\":1,\"exhaustive\":true,\"counterexamples\":0,\"unresolved\":0}, expected {\"exitStatus\":0,\"exhaustive\":true,\"counterexamples\":0,\"unresolved\":0}"
+        },
+        {
+          "step": "mcp-explore_behaviour-simulate",
+          "reason": "simulate summary: got {\"exitStatus\":1,\"exhaustive\":false,\"counterexamples\":0,\"unresolved\":0}, expected {\"exitStatus\":0,\"exhaustive\":false,\"counterexamples\":0,\"unresolved\":0}"
+        },
+        {
+          "step": "mcp-design_interface",
+          "reason": "flow check exitStatus 1"
+        }
+      ]
+    },
+    {
+      "id": "link-crashes",
+      "what": "`pymtheg link` crashes (exit 77)",
+      "scenarios": "a-node-only",
+      "expect": [
+        "link-requirement"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; link-requirement: fail; all failing: link-requirement, link-add-go, link-add-rust, link-add-ts, link-list, link-check, link-check-after-edit, link-refresh, link-check-after-refresh, link-refresh-restored, link-check-final, mcp-requirement_links-check, mcp-requirement_links-check-after-edit, mcp-requirement_links-check-after-refresh, mcp-requirement_links-check-final, mcp-requirement_links-unlinked, mcp-link_result-handle, mcp-read_architecture",
+      "failingSteps": [
+        {
+          "step": "link-requirement",
+          "reason": "exit 77, expected 0"
+        },
+        {
+          "step": "link-add-go",
+          "reason": "exit 77, expected 0"
+        },
+        {
+          "step": "link-add-rust",
+          "reason": "exit 77, expected 0"
+        },
+        {
+          "step": "link-add-ts",
+          "reason": "exit 77, expected 0"
+        },
+        {
+          "step": "link-list",
+          "reason": "exit 77, expected 0"
+        },
+        {
+          "step": "link-check",
+          "reason": "exit 77, expected 0"
+        },
+        {
+          "step": "link-check-after-edit",
+          "reason": "exit 77, expected 1"
+        },
+        {
+          "step": "link-refresh",
+          "reason": "exit 77, expected 0"
+        },
+        {
+          "step": "link-check-after-refresh",
+          "reason": "exit 77, expected 0"
+        },
+        {
+          "step": "link-refresh-restored",
+          "reason": "exit 77, expected 0"
+        },
+        {
+          "step": "link-check-final",
+          "reason": "exit 77, expected 0"
+        },
+        {
+          "step": "mcp-requirement_links-check",
+          "reason": "check: got [[\"plan:R1/percent_of:ok\",\"plan:R1/roundCents:ok\",\"plan:R1/taxFor:ok\"],true], expected [[\"plan:R1/percent_of:ok\",\"plan:R1/roundCents:ok\",\"plan:R1/taxFor:ok\",\"plan:R2/ComputeTotal:ok\",\"plan:"
+        },
+        {
+          "step": "mcp-requirement_links-check-after-edit",
+          "reason": "check: got [[\"plan:R1/percent_of:ok\",\"plan:R1/roundCents:changed\",\"plan:R1/taxFor:ok\"],false], expected [[\"plan:R1/percent_of:ok\",\"plan:R1/roundCents:changed\",\"plan:R1/taxFor:ok\",\"plan:R2/ComputeTotal"
+        },
+        {
+          "step": "mcp-requirement_links-check-after-refresh",
+          "reason": "check: got [[\"plan:R1/percent_of:ok\",\"plan:R1/roundCents:ok\",\"plan:R1/taxFor:ok\"],true], expected [[\"plan:R1/percent_of:ok\",\"plan:R1/roundCents:ok\",\"plan:R1/taxFor:ok\",\"plan:R2/ComputeTotal:ok\",\"plan:"
+        },
+        {
+          "step": "mcp-requirement_links-check-final",
+          "reason": "check: got [[\"plan:R1/percent_of:ok\",\"plan:R1/roundCents:ok\",\"plan:R1/taxFor:ok\"],true], expected [[\"plan:R1/percent_of:ok\",\"plan:R1/roundCents:ok\",\"plan:R1/taxFor:ok\",\"plan:R2/ComputeTotal:ok\",\"plan:"
+        },
+        {
+          "step": "mcp-requirement_links-unlinked",
+          "reason": "unlinked public symbols: got [\"Add@service/pricing/cart.go\",\"Cart@service/pricing/cart.go\",\"ComputeTotal@service/pricing/total.go\",\"First@service/pricing/cart.go\",\"Items@service/pricing/cart.go\",\"Load"
+        },
+        {
+          "step": "mcp-link_result-handle",
+          "reason": "handle → result: got [\"running\",\"string\",\"complete\",true,true,[\"plan:R1/percent_of:ok\",\"plan:R1/roundCents:ok\",\"plan:R1/taxFor:ok\"]], expected [\"running\",\"string\",\"complete\",true,true,[\"plan:R1/percen"
+        },
+        {
+          "step": "mcp-read_architecture",
+          "reason": "architecture summary (available; two revisions: plan:R2 by CLI, plan:R1 by MCP): got [null,1], expected [null,2]"
+        }
+      ]
+    },
+    {
+      "id": "stack-trace-exit-0",
+      "what": "`--version` prints an internal-error stack trace and exits 0",
+      "scenarios": "a-node-only",
+      "expect": [
+        "version"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; version: fail; all failing: install-npx-file-spec, version",
+      "failingSteps": [
+        {
+          "step": "install-npx-file-spec",
+          "reason": "internal error output: error line: TypeError: Cannot read properties of undefined (reading 'x'); stack frame: at main (file:///usr/lib/node_modules/pymtheg/dist/cli/main.js:12:5)"
+        },
+        {
+          "step": "version",
+          "reason": "internal error output: error line: TypeError: Cannot read properties of undefined (reading 'x'); stack frame: at main (file:///usr/lib/node_modules/pymtheg/dist/cli/main.js:12:5)"
+        }
+      ]
+    },
+    {
+      "id": "wrong-diagnostic-message",
+      "what": "the N002 suggestion text changes",
+      "scenarios": "a-node-only",
+      "expect": [
+        "check-broken",
+        "mcp-check_design-broken"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; check-broken: fail; mcp-check_design-broken: fail; all failing: check-broken, verify-broken, mcp-check_design-broken",
+      "failingSteps": [
+        {
+          "step": "check-broken",
+          "reason": "no output line equal to \"/home/node/project/designs/broken.pym:7:27 error N002: Unknown value or variant charge; did you mean charges?\""
+        },
+        {
+          "step": "verify-broken",
+          "reason": "no output line equal to \"/home/node/project/designs/broken.pym:7:27 error N002: Unknown value or variant charge; did you mean charges?\""
+        },
+        {
+          "step": "mcp-check_design-broken",
+          "reason": "broken-design findings: got [{\"code\":\"N002\",\"message\":\"Unknown value or variant charge; did you mean charges instead?\",\"file\":\"designs/broken.pym\",\"line\":7,\"column\":27,\"severity\":\"error\"}], expected ["
+        }
+      ]
+    },
+    {
+      "id": "listed-tool-throws",
+      "what": "a listed MCP tool (`design_recipe`) throws",
+      "scenarios": "a-node-only",
+      "expect": [
+        "mcp-design_recipe"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; mcp-design_recipe: fail; all failing: mcp-design_recipe",
+      "failingSteps": [
+        {
+          "step": "mcp-design_recipe",
+          "reason": "design_recipe: tool returned isError: sabotaged design_recipe"
+        }
+      ]
+    },
+    {
+      "id": "deprecation-warning",
+      "what": "a coded DeprecationWarning (DEP0005) on Node 24.22",
+      "scenarios": "a-node-only",
+      "expect": [
+        "help"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; help: fail; all failing: help",
+      "failingSteps": [
+        {
+          "step": "help",
+          "reason": "Node warning: (node:139) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. / (Use `node --trace-deprecation ...` to show where the warning was created)"
+        }
+      ]
+    },
+    {
+      "id": "deprecation-warning-24.0.0",
+      "what": "the same DeprecationWarning on Node 24.0.0",
+      "scenarios": "e-node-24.0.0",
+      "expect": [
+        "help"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; help: fail; all failing: help",
+      "failingSteps": [
+        {
+          "step": "help",
+          "reason": "Node warning: (node:134) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. / (Use `node --trace-deprecation ...` to show where the warning was created)"
+        }
+      ]
+    },
+    {
+      "id": "tools-list-error",
+      "what": "`tools/list` answers with a JSON-RPC error",
+      "scenarios": "a-node-only",
+      "expect": [
+        "mcp-tools-list",
+        "mcp-project_info",
+        "mcp-tool-coverage",
+        "mcp-requirement_links-requirement"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; mcp-tools-list: fail; mcp-project_info: fail; mcp-tool-coverage: fail; mcp-requirement_links-requirement: fail; all failing: mcp-tools-list, mcp-project_info, mcp-design_recipe, mcp-read_source, mcp-check_design, mcp-check_design-broken, mcp-explore_behaviour-verify, mcp-explore_behaviour-simulate, mcp-try_inputs, mcp-design_interface, mcp-emit_scaffold, mcp-read_scaffold, mcp-emit_implementation_check, mcp-code_graph-index, mcp-code_graph-search, mcp-code_graph-callers-ts, mcp-code_graph-callers-go, mcp-code_graph-callers-rust, mcp-requirement_links-requirement, mcp-requirement_links-add-go, mcp-requirement_links-add-rust, mcp-requirement_links-add-ts, mcp-requirement_links-list, mcp-requirement_links-check, mcp-requirement_links-check-after-edit, mcp-requirement_links-refresh, mcp-requirement_links-check-after-refresh, mcp-requirement_links-refresh-restored, mcp-requirement_links-check-final, mcp-requirement_links-requirements_for, mcp-requirement_links-unlinked, mcp-link_result-handle, mcp-read_architecture, mcp-observe_implementation, mcp-link_implementation, mcp-compare_implementation, mcp-unlink_implementation, mcp-tool-coverage",
+      "failingSteps": [
+        {
+          "step": "mcp-tools-list",
+          "reason": "JSON-RPC error: sabotaged tools/list"
+        },
+        {
+          "step": "mcp-project_info",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-design_recipe",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-read_source",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-check_design",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-check_design-broken",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-explore_behaviour-verify",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-explore_behaviour-simulate",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-try_inputs",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-design_interface",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-emit_scaffold",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-read_scaffold",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-emit_implementation_check",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-code_graph-index",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-code_graph-search",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-code_graph-callers-ts",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-code_graph-callers-go",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-code_graph-callers-rust",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-requirement_links-requirement",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-requirement_links-add-go",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-requirement_links-add-rust",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-requirement_links-add-ts",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-requirement_links-list",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-requirement_links-check",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-requirement_links-check-after-edit",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-requirement_links-refresh",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-requirement_links-check-after-refresh",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-requirement_links-refresh-restored",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-requirement_links-check-final",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-requirement_links-requirements_for",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-requirement_links-unlinked",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-link_result-handle",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-read_architecture",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-observe_implementation",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-link_implementation",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-compare_implementation",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-unlink_implementation",
+          "reason": "tools/list did not succeed"
+        },
+        {
+          "step": "mcp-tool-coverage",
+          "reason": "tools/list did not succeed"
+        }
+      ]
+    },
+    {
+      "id": "simulate-exhaustive-true",
+      "what": "MCP simulate reports `exhaustive: true`",
+      "scenarios": "a-node-only",
+      "expect": [
+        "mcp-explore_behaviour-simulate"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; mcp-explore_behaviour-simulate: fail; all failing: mcp-explore_behaviour-simulate",
+      "failingSteps": [
+        {
+          "step": "mcp-explore_behaviour-simulate",
+          "reason": "simulate summary: got {\"exitStatus\":0,\"exhaustive\":true,\"counterexamples\":0,\"unresolved\":0}, expected {\"exitStatus\":0,\"exhaustive\":false,\"counterexamples\":0,\"unresolved\":0}"
+        }
+      ]
+    },
+    {
+      "id": "init-writes-root-file",
+      "what": "`init` writes a file in the project root",
+      "scenarios": "a-node-only",
+      "expect": [
+        "init"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; init: fail; all failing: init",
+      "failingSteps": [
+        {
+          "step": "init",
+          "reason": "output lacks \"3 existing documents found\""
+        }
+      ]
+    },
+    {
+      "id": "engine-hides-violation",
+      "what": "the built-in engine turns a violation into no_counterexample",
+      "scenarios": "a-node-only",
+      "expect": [
+        "verify-violation"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; verify-violation: fail; all failing: doctor, verify-violation",
+      "failingSteps": [
+        {
+          "step": "doctor",
+          "reason": "exit 3, expected 0"
+        },
+        {
+          "step": "verify-violation",
+          "reason": "verify results on the violating design: got [[\"chargedOnce\",\"no_counterexample\",\"complete\"],[\"state-domains\",\"no_counterexample\",\"complete\"]], expected [[\"chargedOnce\",\"counterexample\",\"complete\"],[\"s"
+        }
+      ]
+    },
+    {
+      "id": "link-check-passes-changed",
+      "what": "`link check` exits 0 with a changed link",
+      "scenarios": "a-node-only",
+      "expect": [
+        "link-check-after-edit"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; link-check-after-edit: fail; all failing: link-check-after-edit",
+      "failingSteps": [
+        {
+          "step": "link-check-after-edit",
+          "reason": "exit 0, expected 1"
+        }
+      ]
+    },
+    {
+      "id": "mcp-link-check-ok-after-edit",
+      "what": "MCP `requirement_links check` reports every link ok after a body edit",
+      "scenarios": "a-node-only",
+      "expect": [
+        "mcp-requirement_links-check-after-edit"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; mcp-requirement_links-check-after-edit: fail; all failing: mcp-requirement_links-check-after-edit",
+      "failingSteps": [
+        {
+          "step": "mcp-requirement_links-check-after-edit",
+          "reason": "check: got [[\"plan:R1/percent_of:ok\",\"plan:R1/roundCents:ok\",\"plan:R1/taxFor:ok\",\"plan:R2/ComputeTotal:ok\",\"plan:R2/apply_discount:ok\",\"plan:R2/formatTotal:ok\"],false], expected [[\"plan:R1/percent_of:"
+        }
+      ]
+    },
+    {
+      "id": "link-add-stores-nothing",
+      "what": "`add` reports created but stores no link",
+      "scenarios": "a-node-only",
+      "expect": [
+        "mcp-requirement_links-add-go",
+        "link-add-go"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; mcp-requirement_links-add-go: fail; link-add-go: fail; all failing: link-add-go, link-add-rust, link-add-ts, link-list, link-check, link-check-after-edit, link-refresh, link-check-after-refresh, link-refresh-restored, link-check-final, mcp-requirement_links-add-go, mcp-requirement_links-add-rust, mcp-requirement_links-add-ts, mcp-requirement_links-list, mcp-requirement_links-check, mcp-requirement_links-check-after-edit, mcp-requirement_links-refresh, mcp-requirement_links-check-after-refresh, mcp-requirement_links-refresh-restored, mcp-requirement_links-check-final, mcp-requirement_links-requirements_for, mcp-requirement_links-unlinked, mcp-link_result-handle",
+      "failingSteps": [
+        {
+          "step": "link-add-go",
+          "reason": "link to ComputeTotal: got [\"created\",\"undefined\"], expected [\"created\",\"string\"]"
+        },
+        {
+          "step": "link-add-rust",
+          "reason": "link to apply_discount: got [\"created\",\"undefined\"], expected [\"created\",\"string\"]"
+        },
+        {
+          "step": "link-add-ts",
+          "reason": "link to formatTotal: got [\"created\",\"undefined\"], expected [\"created\",\"string\"]"
+        },
+        {
+          "step": "link-list",
+          "reason": "links of R2: got [], expected [\"ComputeTotal:ok\",\"apply_discount:ok\",\"formatTotal:ok\"]"
+        },
+        {
+          "step": "link-check",
+          "reason": "link states: got [], expected [\"ComputeTotal:ok\",\"apply_discount:ok\",\"formatTotal:ok\"]"
+        },
+        {
+          "step": "link-check-after-edit",
+          "reason": "exit 0, expected 1"
+        },
+        {
+          "step": "link-refresh",
+          "reason": "exit 3, expected 0"
+        },
+        {
+          "step": "link-check-after-refresh",
+          "reason": "link states: got [], expected [\"ComputeTotal:ok\",\"apply_discount:ok\",\"formatTotal:ok\"]"
+        },
+        {
+          "step": "link-refresh-restored",
+          "reason": "exit 3, expected 0"
+        },
+        {
+          "step": "link-check-final",
+          "reason": "link states: got [], expected [\"ComputeTotal:ok\",\"apply_discount:ok\",\"formatTotal:ok\"]"
+        },
+        {
+          "step": "mcp-requirement_links-add-go",
+          "reason": "link to taxFor: got [\"created\",0,null,null,null,\"undefined\"], expected [\"created\",1,\"plan:R1\",\"taxFor\",\"symbol:087675b4bc43be4be24e99d27c583f510668ca996e4e288a329382a509045e48\",\"string\"]"
+        },
+        {
+          "step": "mcp-requirement_links-add-rust",
+          "reason": "link to percent_of: got [\"created\",0,null,null,null,\"undefined\"], expected [\"created\",1,\"plan:R1\",\"percent_of\",\"engine/src/discount.rs\",\"string\"]"
+        },
+        {
+          "step": "mcp-requirement_links-add-ts",
+          "reason": "link to roundCents: got [\"created\",0,null,null,null,\"undefined\"], expected [\"created\",1,\"plan:R1\",\"roundCents\",\"web/src/money.ts\",\"string\"]"
+        },
+        {
+          "step": "mcp-requirement_links-list",
+          "reason": "links of plan:R1: got [], expected [\"plan:R1/percent_of:ok\",\"plan:R1/roundCents:ok\",\"plan:R1/taxFor:ok\"]"
+        },
+        {
+          "step": "mcp-requirement_links-check",
+          "reason": "check: got [[],true], expected [[\"plan:R1/percent_of:ok\",\"plan:R1/roundCents:ok\",\"plan:R1/taxFor:ok\",\"plan:R2/ComputeTotal:ok\",\"plan:R2/apply_discount:ok\",\"plan:R2/formatTotal:ok\"],true]"
+        },
+        {
+          "step": "mcp-requirement_links-check-after-edit",
+          "reason": "check: got [[],true], expected [[\"plan:R1/percent_of:ok\",\"plan:R1/roundCents:changed\",\"plan:R1/taxFor:ok\",\"plan:R2/ComputeTotal:ok\",\"plan:R2/apply_discount:ok\",\"plan:R2/formatTotal:ok\"],false]"
+        },
+        {
+          "step": "mcp-requirement_links-refresh",
+          "reason": "requirement_links: tool returned isError: {\"viewSchema\":\"pymtheg.agent/v1\",\"linkSchema\":\"pymtheg.mcp-links/v1\",\"jobId\":null,\"state\":\"error\",\"e … narrow the query. Reconcile interrupted mutations befor"
+        },
+        {
+          "step": "mcp-requirement_links-check-after-refresh",
+          "reason": "check: got [[],true], expected [[\"plan:R1/percent_of:ok\",\"plan:R1/roundCents:ok\",\"plan:R1/taxFor:ok\",\"plan:R2/ComputeTotal:ok\",\"plan:R2/apply_discount:ok\",\"plan:R2/formatTotal:ok\"],true]"
+        },
+        {
+          "step": "mcp-requirement_links-refresh-restored",
+          "reason": "requirement_links: tool returned isError: {\"viewSchema\":\"pymtheg.agent/v1\",\"linkSchema\":\"pymtheg.mcp-links/v1\",\"jobId\":null,\"state\":\"error\",\"e … narrow the query. Reconcile interrupted mutations befor"
+        },
+        {
+          "step": "mcp-requirement_links-check-final",
+          "reason": "check: got [[],true], expected [[\"plan:R1/percent_of:ok\",\"plan:R1/roundCents:ok\",\"plan:R1/taxFor:ok\",\"plan:R2/ComputeTotal:ok\",\"plan:R2/apply_discount:ok\",\"plan:R2/formatTotal:ok\"],true]"
+        },
+        {
+          "step": "mcp-requirement_links-requirements_for",
+          "reason": "requirements for percent_of: got [], expected [\"plan:R1:direct:percent_of\"]"
+        },
+        {
+          "step": "mcp-requirement_links-unlinked",
+          "reason": "unlinked public symbols: got [\"Add@service/pricing/cart.go\",\"Cart@service/pricing/cart.go\",\"ComputeTotal@service/pricing/total.go\",\"First@service/pricing/cart.go\",\"Items@service/pricing/cart.go\",\"Load"
+        },
+        {
+          "step": "mcp-link_result-handle",
+          "reason": "handle → result: got [\"running\",\"string\",\"complete\",true,true,[]], expected [\"running\",\"string\",\"complete\",true,true,[\"plan:R1/percent_of:ok\",\"plan:R1/roundCents:ok\",\"plan:R1/taxFor:ok\",\"plan:R2/Compu"
+        }
+      ]
+    },
+    {
+      "id": "go-facts-discarded",
+      "what": "Go toolchain facts counted but discarded at final resolution",
+      "scenarios": "c-node-go-rust",
+      "expect": [
+        "go-toolchain-callers"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; go-toolchain-callers: fail; all failing: go-toolchain-callers",
+      "failingSteps": [
+        {
+          "step": "go-toolchain-callers",
+          "reason": "callers of Add, opted in: got [\"main@main.go:10->Add:definite:toolchain\",\"main@main.go:10->Add:definite:toolchain\",\"main@main.go:15->Add:definite:toolchain\",\"main@main.go:17->Add:definite:toolchain\"],"
+        }
+      ]
+    },
+    {
+      "id": "stack-in-mcp-json",
+      "what": "`project_info` carries a TypeError stack in a `debug` field (structuredContent and text)",
+      "scenarios": "a-node-only",
+      "expect": [
+        "mcp-project_info"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; mcp-project_info: fail; all failing: mcp-project_info",
+      "failingSteps": [
+        {
+          "step": "mcp-project_info",
+          "reason": "internal error output: error line: TypeError: Cannot read properties of undefined (reading 'x'); stack frame: at info (file:///opt/pymtheg/dist/mcp/server.js:10:5); error line: TypeError: Cannot read "
+        }
+      ]
+    },
+    {
+      "id": "stack-in-graph-json",
+      "what": "`graph status --json` carries a TypeError stack in a `debug` field",
+      "scenarios": "a-node-only",
+      "expect": [
+        "graph-status"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; graph-status: fail; all failing: graph-status",
+      "failingSteps": [
+        {
+          "step": "graph-status",
+          "reason": "internal error output: error line: TypeError: Cannot read properties of undefined (reading 'x'); stack frame: at status (file:///opt/pymtheg/dist/cli/graph.js:1:2); error line: TypeError: Cannot read "
+        }
+      ]
+    },
+    {
+      "id": "writes-into-install",
+      "what": "`graph index` writes a cache file inside the installed package (next to import.meta.url)",
+      "scenarios": "a-node-only",
+      "expect": [
+        "install-unchanged",
+        "writes-outside-project"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; install-unchanged: fail; writes-outside-project: fail; all failing: writes-outside-project, install-unchanged",
+      "failingSteps": [
+        {
+          "step": "writes-outside-project",
+          "reason": "written outside the allowed places: /home/node/.npm/_npx/441bfdaa83333b3c/node_modules/pymtheg/.index-cache/state.json"
+        },
+        {
+          "step": "install-unchanged",
+          "reason": "changed in /home/node/.npm/_npx: 441bfdaa83333b3c/node_modules/pymtheg/.index-cache/state.json (added)"
+        }
+      ]
+    },
+    {
+      "id": "stack-in-mcp-text-only",
+      "what": "`project_info` carries a TypeError stack in its text content only (structuredContent untouched)",
+      "scenarios": "a-node-only",
+      "expect": [
+        "mcp-project_info"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; mcp-project_info: fail; all failing: mcp-project_info",
+      "failingSteps": [
+        {
+          "step": "mcp-project_info",
+          "reason": "internal error output: error line: TypeError: Cannot read properties of undefined (reading 'x'); stack frame: at info (file:///opt/pymtheg/dist/mcp/server.js:10:5)"
+        }
+      ]
+    },
+    {
+      "id": "unlinked-includes-linked",
+      "what": "MCP `unlinked` also lists the already-linked `apply_discount`",
+      "scenarios": "a-node-only",
+      "expect": [
+        "mcp-requirement_links-unlinked"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; mcp-requirement_links-unlinked: fail; all failing: mcp-requirement_links-unlinked",
+      "failingSteps": [
+        {
+          "step": "mcp-requirement_links-unlinked",
+          "reason": "unlinked public symbols: got [\"Add@service/pricing/cart.go\",\"Cart@service/pricing/cart.go\",\"First@service/pricing/cart.go\",\"Items@service/pricing/cart.go\",\"Load@service/pricing/cart.go\",\"NewCart@servi"
+        }
+      ]
+    },
+    {
+      "id": "unlinked-ignores-rust-links",
+      "what": "`unlinked` ignores links to Rust symbols (lists the linked `apply_discount`)",
+      "scenarios": "a-node-only",
+      "expect": [
+        "mcp-requirement_links-unlinked"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; mcp-requirement_links-unlinked: fail; all failing: mcp-requirement_links-unlinked",
+      "failingSteps": [
+        {
+          "step": "mcp-requirement_links-unlinked",
+          "reason": "unlinked public symbols: got [\"Add@service/pricing/cart.go\",\"Cart@service/pricing/cart.go\",\"First@service/pricing/cart.go\",\"Items@service/pricing/cart.go\",\"Load@service/pricing/cart.go\",\"NewCart@servi"
+        }
+      ]
+    },
+    {
+      "id": "code-graph-candidate",
+      "what": "MCP `code_graph` reports a definite caller as a candidate",
+      "scenarios": "a-node-only",
+      "expect": [
+        "mcp-code_graph-callers-ts"
+      ],
+      "exitCode": 1,
+      "verdict": "caught",
+      "detail": "exit 1; mcp-code_graph-callers-ts: fail; all failing: mcp-code_graph-callers-ts, mcp-code_graph-callers-go, mcp-code_graph-callers-rust",
+      "failingSteps": [
+        {
+          "step": "mcp-code_graph-callers-ts",
+          "reason": "MCP callers of formatTotal: got [\"renderBasket@web/src/main.ts->formatTotal:candidate-set\"], expected [\"renderBasket@web/src/main.ts->formatTotal:definite\"]"
+        },
+        {
+          "step": "mcp-code_graph-callers-go",
+          "reason": "MCP callers of ComputeTotal: got [\"main@service/main.go->ComputeTotal:candidate-set\"], expected [\"main@service/main.go->ComputeTotal:definite\"]"
+        },
+        {
+          "step": "mcp-code_graph-callers-rust",
+          "reason": "MCP callers of apply_discount: got [\"main@engine/src/main.rs->apply_discount:candidate-set\"], expected [\"main@engine/src/main.rs->apply_discount:definite\"]"
+        }
+      ]
+    }
+  ]
+}

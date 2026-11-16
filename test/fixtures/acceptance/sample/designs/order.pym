@@ -1,0 +1,10 @@
+// Acceptance fixture: an order is charged at most once and ships only when paid.
+machine Order {
+  state paid: Bool = false;
+  state shipped: Bool = false;
+  state charges: Nat in 0..2 = 0;
+  event pay when !paid { paid = true; charges = charges + 1; }
+  event ship when paid && !shipped { shipped = true; }
+  invariant chargedOnce = charges <= 1;
+  invariant shippedOnlyWhenPaid = paid || !shipped;
+}

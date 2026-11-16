@@ -22,7 +22,8 @@
     "build:core": "tsc",
     "studio": "node dist/cli/main.js studio",
     "pack:local": "npm run build && npm pack --ignore-scripts --pack-destination /tmp",
-    "test:gui": "node scripts/gui-check.mjs"
+    "test:gui": "node scripts/gui-check.mjs",
+    "acceptance": "node scripts/acceptance/run.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.11.0",
