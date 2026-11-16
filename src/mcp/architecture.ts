@@ -1,6 +1,7 @@
 import { revisionSchema } from "../architecture/schema.js";
 import { branchReview } from "../architecture/branches.js";
 import { json } from "../shared/identity.js";
+import { sourceTargetsSchema } from "../shared/source-contracts.js";
 import { z } from "zod";
 import type { McpServer, CallToolResult } from "@modelcontextprotocol/server";
 import type { AgentWorkspace } from "./workspace.js";
@@ -52,10 +53,7 @@ export function registerArchitectureTools(
             .describe(
               "Planning record ID, such as plan:R1. Selects that plan's recorded source expectations for source_contract comparisons; omit only when no per-plan comparison is needed.",
             ),
-          sourceTargets: z
-            .array(z.string().startsWith("source:").max(8192))
-            .max(500)
-            .optional(),
+          sourceTargets: sourceTargetsSchema.optional(),
           previous: z.string().optional(),
           id: z.string().optional(),
           path: z.string().optional(),

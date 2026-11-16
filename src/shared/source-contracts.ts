@@ -1,6 +1,13 @@
 import { z } from "zod";
 export const sourceTargetsSchema = z
-  .array(z.string().startsWith("source:").max(8192))
+  .array(
+    z
+      .string()
+      .regex(/^source:/, {
+        message: 'Invalid string: must start with "source:"',
+      })
+      .max(8192),
+  )
   .max(500);
 export const sourceContractsPath = ".pymtheg-source-contracts.json";
 export const sourceSelectionSchema = z
