@@ -25,6 +25,21 @@ export class SqliteGraphStore implements GraphStorage {
   >();
   private readonly fileBodies = new Map<string, string>();
   private readonly decodedContexts = new Map<string, ContextFile>();
+  /** " INDEXED BY graph_file_status" when that covering index exists, else "".
+   * Link reads join graph_files only for status, which is stored after the whole
+   * file body; without the covering index SQLite walks every body's overflow pages.
+   * The planner does not choose the index on its own, so link reads name it.
+   * Read-only opens of a graph written before the index existed keep the plain plan. */
+  private fileStatusIndex = "";
+  private findFileStatusIndex(): void {
+    this.fileStatusIndex = this.db
+      .prepare(
+        "SELECT 1 FROM sqlite_master WHERE type='index' AND name='graph_file_status'",
+      )
+      .get()
+      ? " INDEXED BY graph_file_status"
+      : "";
+  }
   private decodeFile(body: string): GraphFile {
     const parsed = this.decodedFiles.get(body);
     if (parsed) return structuredClone(parsed.file);
@@ -61,6 +76,7 @@ export class SqliteGraphStore implements GraphStorage {
             "Graph belongs to a different project or has no identity",
           );
         this.projectId = saved;
+        this.findFileStatusIndex();
         return;
       }
       this.db.exec(`PRAGMA foreign_keys=ON;
@@ -107,7 +123,9 @@ export class SqliteGraphStore implements GraphStorage {
             WHEN EXISTS(SELECT 1 FROM graph_candidates WHERE link=OLD.link) THEN 'ambiguous' ELSE 'unresolved' END;
         END;
         CREATE INDEX IF NOT EXISTS graph_link_source ON graph_links(source,kind);
-        CREATE INDEX IF NOT EXISTS graph_link_target ON graph_links(target,kind);`);
+        CREATE INDEX IF NOT EXISTS graph_link_target ON graph_links(target,kind);
+        CREATE INDEX IF NOT EXISTS graph_file_status ON graph_files(path,status);`);
+      this.findFileStatusIndex();
       // Path-only markers from early W2-M builds have unknown provenance. Adding
       // nullable columns makes them cache misses until a successful parse stamps them.
       const markerColumns = new Set(
@@ -359,10 +377,10 @@ export class SqliteGraphStore implements GraphStorage {
         `SELECT l.body,l.target,f.status AS sourceStatus,tf.status AS targetStatus,
       (SELECT json_group_array(json_object('id',id,'status',status)) FROM
         (SELECT c.symbol AS id,cf.status AS status FROM graph_candidates c
-         JOIN graph_symbols cs ON cs.id=c.symbol JOIN graph_files cf ON cf.path=cs.file
+         JOIN graph_symbols cs ON cs.id=c.symbol JOIN graph_files cf${this.fileStatusIndex} ON cf.path=cs.file
          WHERE c.link=l.id ORDER BY c.symbol)) AS candidates
-      FROM graph_links l JOIN graph_files f ON f.path=l.file
-      LEFT JOIN graph_symbols ts ON ts.id=l.target LEFT JOIN graph_files tf ON tf.path=ts.file
+      FROM graph_links l JOIN graph_files f${this.fileStatusIndex} ON f.path=l.file
+      LEFT JOIN graph_symbols ts ON ts.id=l.target LEFT JOIN graph_files tf${this.fileStatusIndex} ON tf.path=ts.file
       ${where ? `WHERE ${where}` : ""} ORDER BY l.id${limit === undefined ? "" : ` LIMIT ${limit}`}`,
       )
       .all(...values)
