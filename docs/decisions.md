@@ -1559,9 +1559,7 @@ for exact submitted run IDs and includes coordinator-event-controlled cancellati
 
 ## Project-fit follow-up: complete search and qualified source witnesses
 
-The ProjectA, ProjectB and ProjectC assessments and their complete evidence are retained
-under `evidence/project-fit/2026-11-09/`. They recommend additive pilots and identify
-requirements for metadata, evidence portability and native code readers. No live
+Assessments of private trial projects are kept outside the repository. No live
 project is migrated by this follow-up.
 
 Architecture index v17 indexes the complete supported record text rather than a
@@ -2160,7 +2158,7 @@ sign-off is pending; unchanged reviewed areas carry review36 evidence.
 
 ## Rebuild plan decisions (10–13 November 2026)
 
-Decisions made for the [mega plan](mega-plan.md) while building it, as recorded in
+Decisions made for the mega plan (kept privately) while building it, as recorded in
 the [build plan](build-plan.md) (sections 9–10). IDs D1–D18 follow the mega plan's
 table; D16 and D17 are also in that table. Each entry says who decided (Karl, the
 owner; or the manager), what was decided, why, and what it rules out. Text in

@@ -62,7 +62,7 @@ are observations, not tight timing correctness assertions. Correctness tests use
 
 | Requirement | Status | Evidence |
 |---|---|---|
-| Retain whole imported architecture and unknown fields | implemented for text-document import | `architecture.test.mjs`; ProjectC import manifest and GUI probe |
+| Retain whole imported architecture and unknown fields | implemented for text-document import | `architecture.test.mjs` |
 | Native requirements, decisions, risks, owners, criteria and evidence notes | implemented | `studio-architecture.test.mjs`, `studio-architecture.browser.mjs` |
 | Stable revision comparison and dependency impact | implemented structural subset | ID rename/deletion tests; GUI revision comparison |
 | Large rolling revisions without copying unchanged documents | implemented with explicit quota | 100-revision content-dedup test; v1 storage migration regression |

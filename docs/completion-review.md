@@ -3,7 +3,7 @@
 > boundaries. Earlier scores below remain withdrawn; historical evidence retains
 > its original scope.
 
-> Reopened for a whole-product usability audit at Karl’s request. The scores below describe the previous self-review and are not the conclusion of the current audit. First-use gaps were reproduced; see [first-use-audit.md](first-use-audit.md).
+> Reopened for a whole-product usability audit at Karl’s request. The scores below describe the previous self-review and are not the conclusion of the current audit. First-use gaps were reproduced.
 
 # Historical completion review: reopened
 
@@ -12,13 +12,12 @@ usability audit and the architecture-holder requirement. They are withdrawn for
 the current product. TypeScript, Rust, Go and extensible language output were
 part of that earlier checkpoint. This is an evidence-backed
 engineering **self-review**, not an independent usability certification or a
-universal verification claim. Current acceptance work is tracked in first-use-audit.md and
-architecture-workspace-plan.md. The table below is preserved as history, not a
+universal verification claim. The table below is preserved as history, not a
 current readiness claim.
 
 ## Separate area gates
 
-Each area was assessed independently against `completion-goal.md`. There is no
+Each area was assessed independently against the completion goal of the time. There is no
 weighted average that can compensate for a missing feature. Design and delivered
 workflow scores are both 9.5/10 for the bounded release. The remaining deductions
 below describe limitations of breadth and polish, not hidden unfinished gates.

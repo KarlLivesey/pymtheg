@@ -15,3 +15,5 @@ __pycache__/
 
 # Owner-only list of private project names checked by test/package-contents.test.mjs.
 /private-names.local
+# The owner's private notes, kept outside git.
+/private/

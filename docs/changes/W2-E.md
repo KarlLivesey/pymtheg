@@ -188,9 +188,9 @@ See `evidence/w2-e/backend-tests.log`. No check is left running.
 - `docs/support.md:192`: configuration support wording; fold in via the doc owner.
 - `docs/decisions.md:192,257`: superseded settings/recovery decisions; annotate
   the current contract without erasing historical decisions.
-- `docs/architecture-workspace-plan.md:74` and `docs/seventh-review-work.md:12`:
+- The architecture workspace plan (since kept privately) and `docs/seventh-review-work.md:12`:
   old planning/storage descriptions; distinguish historical intent from current use.
-- `docs/mega-plan.md:107`: S27's historical scattered-layout problem statement;
+- The mega plan (since kept privately), S27's historical scattered-layout problem statement;
   preserve it as historical context, not current setup advice.
 
 ### Further work explicitly outside round 1

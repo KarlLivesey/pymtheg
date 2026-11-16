@@ -51,7 +51,6 @@ test("the package ships only user documentation from docs/", () => {
   for (const internal of [
     "docs/build-plan.md",
     "docs/decisions.md",
-    "docs/mega-plan.md",
     "docs/trial-start.md",
     "docs/progress.md",
     "docs/runtime-map.md",

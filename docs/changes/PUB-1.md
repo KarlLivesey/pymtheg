@@ -23,3 +23,20 @@ A new test drives the mechanism with made-up names in a temporary pattern
 file passed by path: a hit, a miss, a capitalised word-bounded pattern that
 ignores the lower-case word, ignored comments and blank lines, an invalid
 pattern, an unreadable file and a missing file.
+
+## Internal documents about private trial projects
+
+Internal documents about the owner's private trial projects are no longer in
+the repository; the owner keeps private copies outside git. Removed: the mega
+plan, the architecture workspace plan, the first-use and readiness audits, the
+completion goal, the architecture review resolution, the post-ninth self-audit,
+the ninth, tenth, thirteenth, sixteenth and twenty-fourth review briefs, the
+project-fit design update and the private workspace audit script.
+
+Live documents that named the private projects or their findings
+(`docs/progress.md`, `docs/requirements.md`, `docs/decisions.md`,
+`docs/changes/R1-H.md`) had only those lines reworded or the clause dropped.
+References to the removed files were reworded so they stay true without a
+link (for example "the mega plan (kept privately)"); history in
+`docs/build-plan.md` and `docs/changes/` is otherwise unchanged. `.gitignore`
+also ignores `/private/`, which holds the owner's private notes.

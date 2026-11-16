@@ -1,7 +1,7 @@
 # Pymtheg build plan
 
 Written 10 November 2026. This says **how** the work in
-[`mega-plan.md`](mega-plan.md) gets built. It is the manager's working reference.
+the mega plan (kept privately) gets built. It is the manager's working reference.
 Building has not started and does not start until Karl says so.
 
 ## 1. Roles
@@ -127,7 +127,7 @@ Adding CI is optional and would be its own small chunk.
 Settled with Karl on 10 November 2026:
 
 1. `AGENTS.md` no longer restricts pushes or delegation. Those restrictions were not Karl's and have been replaced by a pointer to this plan.
-2. The planning documents (`docs/mega-plan.md`, this file, and the TLC baseline under `evidence/builtin-checker/`) are committed to `main`, so every worktree starts with them.
+2. The planning documents (the mega plan, since kept privately; this file; and the TLC baseline under `evidence/builtin-checker/`) are committed to `main`, so every worktree starts with them.
 3. Pull requests are merged on GitHub with a normal merge, not a squash.
 
 4. At most four builders at once, as a ceiling and not a target.
@@ -441,7 +441,7 @@ Backlog from W2-U (PR 29), TypeScript: links into a file whose extraction failed
 
 Backlog from W2-C2 (PR 22) final round, Rust: in a `#![no_std]` crate the bare names `println`/`print`/`eprint`/`eprintln`/`vec`/`format`/`dbg` can never be std's own macros, so (a) an uncaptured glob (`use dep::*;`) or (b) a grammar-failed glob-imported module that re-exports a binding macro under such a name can give a wrong link — drop the exemption for those names in `#![no_std]` crates unless a std `macro_use` is visible (small, sound; for the next Rust recall chunk since embedded/kernel-style code is in scope for filesystem work). Cross-crate `#[macro_export]` resolution still deferred. The "block-local glob" fixture case does not exercise the new import check.
 
-From W2-Z (found false outside its paths; for later chunks): `docs/architecture-workspace-plan.md:74` and `docs/seventh-review-work.md:12` still name old paths; the mega plan's Stage 4 libraries line is out of date for Go; `pymtheg doctor` still presents TLC and Java as needed (Wave 3 removal chunk). Observation: `init` git-ignores `.pymtheg/shared/` as well as `rebuildable/`, so the planning database is not committed and is shared only by exporting history (no syncing is built, D6/D7) — owner informed.
+From W2-Z (found false outside its paths; for later chunks): the architecture workspace plan (since kept privately) and `docs/seventh-review-work.md:12` still name old paths; the mega plan's Stage 4 libraries line is out of date for Go; `pymtheg doctor` still presents TLC and Java as needed (Wave 3 removal chunk). Observation: `init` git-ignores `.pymtheg/shared/` as well as `rebuildable/`, so the planning database is not committed and is shared only by exporting history (no syncing is built, D6/D7) — owner informed.
 
 Known limit accepted under D18 (from the W2-Z review, Rust): calls written inside an item under a non-builtin attribute macro (`#[tokio::main]`, `#[async_trait]`, `#[instrument]`) are reported as written (definite); a macro that rewrites or drops the body could make them wrong. Mainstream attribute macros wrap the body without changing what it calls.
 

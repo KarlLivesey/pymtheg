@@ -106,7 +106,7 @@ or are derived from other projects:
 | `examples/checkout.qnt`, `examples/Checkout.tla`, `examples/double-charge.cfg`, `fixed.cfg`, `missing-refund.cfg`, `stock-leak.cfg` | Hand-written Quint/TLA+ research baseline. Written for this project, in the languages of Quint (Apache-2.0) and TLA+; no third-party text found. Not packed. |
 | `evidence/w2-c/**` and other evidence with `"text": "…"` fields (58 files, mostly `evidence/w2-c`, `evidence/w2-c2`, `evidence/w3-g`) | Verbatim excerpts of **Vector** source code (MPL-2.0) and file paths and identifiers from Vector and **restic** (BSD-2-Clause), from graph-accuracy runs on the pinned corpora. MPL-2.0 is file-level copyleft: excerpts of Vector files stay under MPL-2.0. |
 | `evidence/w2-b/*restic*`, `evidence/w1-e/restic-*` | Identifiers and summaries from restic; `restic-contracts.go`/`restic-backup_check.go` are Pymtheg-generated, not copied. |
-| `evidence/w2-a/comparison.json`, `evidence/builtin-checker/trials-builtin.json`, `evidence/product-audit/**`, `design/project-fit-update.md`, `docs/mega-plan.md`, `docs/decisions.md` | Names of the owner's trial projects (ProjectA, ProjectB, ProjectC) and their model file/entry names with verdict summaries. The private material itself is in the git-ignored `evidence/project-fit/` (`git ls-files evidence/project-fit` is empty; not read). |
+| `evidence/w2-a/comparison.json`, `evidence/builtin-checker/trials-builtin.json`, `evidence/product-audit/**`, planning documents since removed (kept privately), `docs/decisions.md` | Names of the owner's private trial projects and their model file/entry names with verdict summaries. The private material itself is kept outside git (not read). |
 | `evidence/1.0/pymtheg-1.0.0.tgz` (357 KB) | An old private Pymtheg tarball, which contains an older browser bundle (third-party code) and its notices. |
 
 Things to review before the repository is public:
@@ -115,9 +115,9 @@ Things to review before the repository is public:
 |---|---|
 | Credentials, tokens, keys | None found (patterns for GitHub, OpenAI-style, AWS, Slack tokens, private keys and `password=`/`token=` assignments). `test/implementation-process.test.mjs:144` has a fixture string `secret = "private source"`, not a credential. |
 | Private IP addresses and hostnames | None tracked. The dev server's address appears only in the untracked `pymtheg-dev` wrapper. `AGENTS.md` names `pymtheg-dev` and `~/pymtheg-dev/corpora/…` (no host). |
-| Personal paths `/home/<owner>/…` | 1,468 tracked files: almost all under `evidence/` (1,205 in `evidence/w2-c`); outside it: `design/implementation-prompt-core.md` (also names `~/Scripts/pc-tools`), `docs/trial-start.md` and `docs/changes/W2-E.md` (in the repository only: since round 1 the npm package no longer ships them, see e.), `research/results/tlc-*.txt`, `scripts/first-use-audit.mjs`, `scripts/gui-check.mjs`, `scripts/project-c-workspace-audit.mjs` (default helper/browser paths). |
+| Personal paths `/home/<owner>/…` | 1,468 tracked files: almost all under `evidence/` (1,205 in `evidence/w2-c`); outside it: `design/implementation-prompt-core.md` (also names `~/Scripts/pc-tools`), `docs/trial-start.md` and `docs/changes/W2-E.md` (in the repository only: since round 1 the npm package no longer ships them, see e.), `research/results/tlc-*.txt`, `scripts/first-use-audit.mjs`, `scripts/gui-check.mjs` and a since-removed private audit script (default helper/browser paths). |
 | Email addresses | Third-party authors' addresses inside `research/sources/` captures and package metadata quotes; `vector@example.com` in evidence. No personal address of the owner found. |
-| Owner's name | "Karl" appears in 82 tracked files (decision ledgers, plans, working rules), 33 of them in `docs/` (for example `build-plan.md`, `decisions.md`, `mega-plan.md`, `progress.md`, `requirements.md`, `roadmap-1.0.md`, review and audit documents, 7 files in `docs/changes/`). Since round 1 none of these ships in the npm package; the shipped files are checked by `test/package-contents.test.mjs`. |
+| Owner's name | "Karl" appears in 82 tracked files (decision ledgers, plans, working rules), 33 of them in `docs/` (for example `build-plan.md`, `decisions.md`, the mega plan (since kept privately), `progress.md`, `requirements.md`, `roadmap-1.0.md`, review and audit documents, 7 files in `docs/changes/`). Since round 1 none of these ships in the npm package; the shipped files are checked by `test/package-contents.test.mjs`. |
 | Large files | 354 MB tracked in 5,766 files; 48 files over 1 MB (218 MB), 7 over 10 MB, the largest `evidence/w2-c/d16-movement-withdrawals.json` (33.6 MB); 18 compressed archives (`*.tar.gz`, `*.json.gz`, 3.9 MB) under `evidence/`; Studio screenshots (`evidence/{recovery,rework,studio}/*.png`). Git history also holds them. |
 | Third-party material without a licence | The `research/sources/` captures; the Vector excerpts in evidence (MPL-2.0 applies to them). |
 
@@ -296,7 +296,7 @@ e. **The package ships user documentation only** (owner: "yeah better fix
    | all of `docs/`: 74 top-level files and 40 under `docs/changes/` (114) | `agent-workflow.md`, `grammar.md`, `report.schema.json` (all three read by the product at run time), `mcp.md`, `output-plugins.md` (named in a CLI message), `studio.md`, `support.md`, `project-init.md`, `journeys.md`, `licences.md` (10) |
 
    Not shipped any more, though still in the repository: the plans, ledgers
-   and history (`build-plan.md`, `decisions.md`, `mega-plan.md`,
+   and history (`build-plan.md`, `decisions.md`, the mega plan (since kept privately),
    `trial-start.md`, `progress.md`, `runtime-map.md`, `requirements.md`,
    roadmap, review briefs, audits, remediation notes, authoring maps and
    `docs/changes/**`). Before, the shipped `docs/` carried personal paths in 3
@@ -313,7 +313,7 @@ e. **The package ships user documentation only** (owner: "yeah better fix
    pack list (`npm pack --dry-run --json`) and fails if `docs/` ships anything
    but the ten, if an internal file ships, or if any shipped file (apart from
    the licence texts) contains a personal path (`/home/<user>/`), the owner's
-   name or a private project name (ProjectA, ProjectB, ProjectC). A scan of all 813
+   name or a private project name. A scan of all 813
    shipped files found no hostname or IP address other than `127.0.0.1` (the
    Studio loopback).
 
@@ -380,9 +380,9 @@ ordinary words and real member accesses do not. Sol's reproduction (appending
 3. **One notices file.** The Vite plugin that wrote `dist-web/third-party-notices.txt`
    (`scripts/license-notices.mjs`) is removed; `THIRD-PARTY-NOTICES` at the package
    root is the only notices file. `scripts/package-current-smoke.mjs` reads it.
-4. **"ProjectB" only as the project name** in `test/package-contents.test.mjs`
-   (capitalised, word-bounded; the ordinary word "tiered" passes, tested). No
-   shipped document uses the word.
+4. **A private project name that is also an ordinary English word** is matched
+   only capitalised and word-bounded in `test/package-contents.test.mjs`, so the
+   ordinary word passes (tested). No shipped document uses the name.
 5. Stale header comment in `test/licences.test.mjs` updated. The CommonJS
    wrapper signature also matches `var xi,Ua;function Ed(){if(Ua)return xi;Ua=1;`.
 
