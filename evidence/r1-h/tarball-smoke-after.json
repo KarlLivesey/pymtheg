@@ -1,0 +1,61 @@
+{
+ "tarball": "pymtheg-1.0.0.tgz",
+ "steps": {
+  "help": {
+   "status": 0,
+   "ok": true
+  },
+  "check": {
+   "status": 0,
+   "ok": true
+  },
+  "verify": {
+   "status": 1,
+   "ok": true
+  },
+  "simulate": {
+   "status": 0,
+   "ok": true
+  },
+  "doctor": {
+   "status": 0,
+   "ok": true
+  },
+  "graph-index": {
+   "status": 0,
+   "ok": true
+  },
+  "graph-callers-ts": {
+   "status": 0,
+   "ok": true
+  },
+  "graph-callers-go": {
+   "status": 0,
+   "ok": true
+  },
+  "graph-callers-rust": {
+   "status": 0,
+   "ok": true
+  },
+  "mcp": {
+   "ok": true,
+   "tools": 19,
+   "exit": 0
+  },
+  "studio": {
+   "ok": true,
+   "http": 200,
+   "asset": 200,
+   "exit": 0,
+   "signal": null
+  }
+ },
+ "install": {
+  "status": 0,
+  "nodeModulesBytes": 52960811,
+  "packages": 11,
+  "warnings": [],
+  "installScriptWarnings": []
+ },
+ "ok": true
+}

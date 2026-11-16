@@ -2,7 +2,11 @@
  * only this module chooses project locations and opens SQLite connections. */
 import { lstatSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { DatabaseSync, type DatabaseSyncOptions } from "node:sqlite";
+import type { DatabaseSync, DatabaseSyncOptions } from "node:sqlite";
+/** Loaded at first use, after the CLI has filtered node:sqlite's ExperimentalWarning
+ * (src/cli/quiet-warnings.ts); a static import would load it before any code runs. */
+const sqlite = (): typeof import("node:sqlite") =>
+  process.getBuiltinModule("node:sqlite");
 
 import { layout, type StorageItem } from "./layout.js";
 export { layout, type StorageItem } from "./layout.js";
@@ -85,7 +89,10 @@ export function openDatabase(
 ): DatabaseSync {
   if (file !== ":memory:" && !file.startsWith("file:"))
     validateDatabaseFiles(file);
-  return new DatabaseSync(file, { timeout: writerWaitMs, ...options });
+  return new (sqlite().DatabaseSync)(file, {
+    timeout: writerWaitMs,
+    ...options,
+  });
 }
 export function storageDirectory(
   root: string,

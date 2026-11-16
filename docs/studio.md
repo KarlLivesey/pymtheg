@@ -65,7 +65,7 @@ Undo works across Text and Blocks. Edits stay unsaved until Save, and the same
 draft recovery applies. Exact source remains accessible on each card. Rich data
 type/event-machine cards now edit existing field/payload types, state values,
 event conditions/updates and invariants. Structural additions/removals and finite
-state bounds still use Text. The [block-editor scope](block-editor-map.md) lists current limits.
+state bounds still use Text. The [block-editor scope](https://github.com/KarlLivesey/pymtheg/blob/main/docs/block-editor-map.md) lists current limits.
 
 ## Compare planned and existing systems
 
@@ -78,7 +78,7 @@ one declaration can be linked; removing one keeps the others.
 “Body present” means code was found, not that it satisfies the plan. Unlinked
 work, stubs, changed code/design and unknown coverage remain distinct. No code
 is executed during observation. Additional native language readers are pending;
-see the [implementation-gap scope](implementation-gap-map.md).
+see the [implementation-gap scope](https://github.com/KarlLivesey/pymtheg/blob/main/docs/implementation-gap-map.md).
 
 ## Scenarios and reproducibility
 
@@ -134,8 +134,8 @@ on demand. Checks include the selected file, imports and discovered reverse
 callers. Unrelated files do not contribute errors. Flow graph
 budgets are deterministic state/edge counts. Backend deadlines are resource
 budgets; exhaustion is unresolved evidence. Browser acceptance uses observable
-UI states, and the entire controller runs within Karl's bounded `pc-tools`
-helper. No T3 preview is enabled.
+UI states, and the entire controller runs within a bounded local helper
+process. No T3 preview is enabled.
 
 ## Recovery and larger designs
 
