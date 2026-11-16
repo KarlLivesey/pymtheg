@@ -188,6 +188,18 @@ function knownWarningGap(lines) {
 }
 
 /** Internal-error signs: stack frames, `XError: ` lines not expected by the step, unhandled/uncaught rejections. */
+/** Each stdout line that is a JSON document (e.g. every raw MCP JSON-RPC answer, with its text and structured content). */
+function stdoutJsonLines(stdout) {
+  const out = [];
+  for (const line of stdout.split("\n")) {
+    if (!/^\s*[{[]/.test(line)) continue;
+    try {
+      out.push(JSON.parse(line));
+    } catch {}
+  }
+  return out;
+}
+
 /** Every string value nested in a parsed JSON value; strings that are themselves JSON are expanded too. */
 function jsonStrings(value, out = [], depth = 0) {
   if (depth > 40 || value === null || value === undefined) return out;
@@ -264,7 +276,7 @@ function record(def, r) {
   // JSON keeps a stack trace on one line with escaped newlines: check every
   // string value of the parsed output (CLI --json, MCP structuredContent and
   // text content) as text too.
-  const scanned = text + "\n" + jsonStrings(r.json).join("\n");
+  const scanned = [text, ...jsonStrings(r.json), ...stdoutJsonLines(r.stdout ?? "").flatMap((v) => jsonStrings(v))].join("\n");
   if (r.harnessError) problems.push({ kind: "harness", reason: r.harnessError });
   const expectation = def.expect ? safe(def.expect, r) : null;
   if (expectation) problems.push({ kind: "expect", reason: expectation });
@@ -763,7 +775,8 @@ async function mcpSteps(pym) {
   );
   await linkCall("mcp-requirement_links-unlinked", 'requirement_links {action:"unlinked", symbols:true, section:"symbols"}', () => links("unlinked", { symbols: true, section: "symbols" }), (j) => {
     const names = (j.items ?? []).map((x) => x.name);
-    return names.includes("renderBasket") ? (["formatTotal", "roundCents", "ComputeTotal"].find((n) => names.includes(n)) ? `linked symbol listed as unlinked: ${names.join(", ")}` : null) : `renderBasket missing from unlinked symbols: ${names.join(", ")}`;
+    // The complete set, on one page: nothing more, nothing less.
+    return same([j.nextOffset ?? null, j.total], [null, names.length], "unlinked page (complete)") ?? same(names.map((n, i) => `${n}@${j.items[i].path}`).sort(), UNLINKED_PUBLIC, "unlinked public symbols");
   });
   // A handle followed from running to finished.
   await linkCall("mcp-link_result-handle", 'requirement_links {action:"check", wait:false}, then link_result {jobId, wait:true}', async () => {
@@ -1312,6 +1325,13 @@ async function npxAbsolute() {
  * toolchain is reported.
  */
 const goAddLinks = (r) => (r.json?.data?.links ?? []).map((l) => `${l.source?.name}@${l.source?.file}:${l.line}->${l.target?.name ?? l.targetName}:${l.certainty}:${l.decidedBy ?? "source"}`).sort();
+/**
+ * Public symbols of the sample with no requirement link once plan:R1 and
+ * plan:R2 are linked (exact): Go's exported Cart API and TypeScript's
+ * renderBasket. Linked ones (ComputeTotal, apply_discount, formatTotal,
+ * roundCents) and private ones (taxFor, percent_of, main) must be absent.
+ */
+const UNLINKED_PUBLIC = ["Add", "Cart", "First", "Items", "Load", "NewCart"].map((n) => `${n}@service/pricing/cart.go`).concat(["renderBasket@web/src/main.ts"]);
 const ADD_CALLERS_ON = [10, 10, 13, 15, 17].map((line) => `main@main.go:${line}->Add:definite:toolchain`);
 const REAL_GO = "/usr/local/go/bin/go";
 async function goOptIn(pym) {
@@ -1337,6 +1357,7 @@ async function goOptIn(pym) {
       // helper built from golinks.go must run from the project's rebuildable
       // toolchain folder (it loads and type-checks the packages).
       const goEnv = r.spawns.some((s) => s.path.split("/").pop() === "go" && s.args[0] === "env");
+      const goBuild = r.spawns.some((s) => s.path.split("/").pop() === "go" && s.args[0] === "build" && s.args.includes("golinks.go"));
       const helper = r.spawns.filter((s) => s.path.startsWith(`${GO_PROJECT}/.pymtheg/rebuildable/toolchain/`));
       return (
         exit(0)(r) ??
@@ -1346,6 +1367,8 @@ async function goOptIn(pym) {
             ? `upgradedLinks ${go.upgradedLinks}, expected > 0`
             : !goEnv
               ? "reported used, but `go env` never ran"
+              : !goBuild
+                ? "reported used, but `go build … golinks.go` never ran"
               : !helper.length
                 ? `reported used, but the resolving helper never ran (spawns: ${r.spawns.map((s) => s.path.split("/").pop()).join(", ")})`
                 : null)

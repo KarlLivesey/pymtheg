@@ -180,7 +180,8 @@ What scenario (a) runs, every step offline after the install:
   - The edit is undone, refreshed and checked again.
 - **MCP:** initialize, `tools/list`, and then **every listed tool** with a
   checked result (table below). This includes requirement links using MCP calls
-  only. `mcp-tool-coverage` fails if any listed tool was
+  only. Every MCP answer is scanned in both its forms: `structuredContent` and
+  every text content block. `mcp-tool-coverage` fails if any listed tool was
   not called, so a new tool fails the gate until the harness exercises it.
 - **Studio:** start, `GET /api/project` (the workspace name), `GET /` plus every
   asset it references, and a SIGINT stop.
@@ -212,7 +213,7 @@ What scenario (a) runs, every step offline after the install:
 | mcp-requirement_links-check-after-edit | after editing `roundCents`'s body | exactly `plan:R1/roundCents` `changed`, with `differs: ["body"]`, the others `ok`; `passed: false` |
 | mcp-requirement_links-refresh, -check-after-refresh, -refresh-restored, -check-final | `refresh` that link; undo the edit; refresh again | `refreshed` (same link id); all six `ok`, `passed: true` |
 | mcp-requirement_links-requirements_for | `{symbol:"percent_of"}` | exactly `plan:R1`, `direct`, `percent_of` |
-| mcp-requirement_links-unlinked | `{symbols:true, section:"symbols"}` | lists `renderBasket`; lists none of the linked `formatTotal`, `roundCents`, `ComputeTotal` |
+| mcp-requirement_links-unlinked | `{symbols:true, section:"symbols"}` | one complete page, exactly: Go `Add`, `Cart`, `First`, `Items`, `Load`, `NewCart` (`service/pricing/cart.go`) and TypeScript `renderBasket`. No linked symbol and no private one |
 | mcp-link_result-handle | `check` with `wait:false`, then `link_result {wait:true}` | handle `running` with a jobId; result `complete`, same jobId, `passed: true`, all six `ok` |
 | mcp-read_architecture | `{section:"summary"}` | a store exists, with two revisions (plan:R2 by CLI, plan:R1 by MCP) |
 | mcp-observe_implementation | `read_implementation` versions, then observe `web/src/main.ts` | a revision receipt |
@@ -388,8 +389,9 @@ containers and recorded images, never the host-wide image list. On 15 November
    publish decision. `npx ./pymtheg-1.0.0.tgz` works today.
 2. **`npx /absolute/path.tgz`** exits 126, because npm runs an absolute path as a
    command. Docs should show `./name.tgz` or `file:/abs/path.tgz`.
-3. **Install size** (see the install observation in the results block). Some runtime `dependencies` look unused at runtime
-   (to be confirmed before changing anything):
+3. **Install size** (see the install observation in the results block). Some
+   runtime `dependencies` look unused at runtime (to be confirmed before
+   changing anything):
    - the npm tree-sitter grammar packages, because the graph loads the vendored
      `.wasm` files;
    - React, react-markdown, remark-gfm, `@lezer/highlight` and most of
@@ -409,8 +411,23 @@ containers and recorded images, never the host-wide image list. On 15 November
    `npx` may not exit either. Supervisors should signal the process group.
 8. **Each CLI call through `npx` has a start-up cost** before doing any work
    (see each row's `durationMs` and `peakRssKiB` in `latest.json`).
-9. **`check_design` returns counts only.** An agent needs a second `read_run`
-   call to see the finding text.
+
+Re-checked against main at the time of this run (merge of 1eddce6a):
+
+- Items 1, 3 and 4: `package.json` still has `"private": true`, the tree-sitter
+  and React/CodeMirror dependencies, and only `@codemirror/state` is imported
+  under `src/`. The install-script warning lines are in this run's evidence.
+- Item 2: this run's `npx-absolute-path` row shows the exit 126.
+- Item 5: `src/graph/languages/go/index.ts` still returns `unavailable` with
+  "no go.mod at the project root".
+- Item 6: the telemetry file appears in this run's (c) `writes-outside-project`
+  note.
+- Item 7: observed in round 1, when the harness first signalled only the `npx`
+  PID. The harness now signals the process group, so it does not retest this.
+
+Removed as stale: "`check_design` returns counts only". On current main,
+`check_design` returns the findings themselves (`src/mcp/check-findings.ts`):
+code, message and location, paged, with `read_run` for the full text.
 
 ## Validation
 

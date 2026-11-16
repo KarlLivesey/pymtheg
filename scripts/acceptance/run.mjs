@@ -12,6 +12,14 @@
 //   --commit SHA                             recorded in the result (the mirror has no .git)
 //   --restic DIR                             restic checkout (default ~/pymtheg-dev/corpora/restic)
 //   --keep-images                            do not remove images this harness pulled
+//   --list-images                            print every image the selected scenarios need, one per line, and stop
+//
+// Images: the harness pulls a missing image itself (network needed) and
+// removes the images it pulled when it ends. Images that were already on the
+// server are never removed, so a reviewer who may not pull during a run can
+// fetch them first and keep them:
+//   pymtheg-dev --name X -- sh -c 'node scripts/acceptance/run.mjs --list-images | xargs -n1 docker pull -q'
+// and remove them afterwards with the same list and `docker image rm`.
 //
 // It builds the tarball as a release would (npm ci, npm run build, npm pack)
 // in a throwaway node:24 container, then runs each scenario in a fresh
@@ -57,6 +65,11 @@ const LABELS = ["--label", "pymtheg-acc=1", "--label", `pymtheg-acc.owner=${OWNE
 const LIFETIME = ["sleep", "14400"];
 const BASE = "node:24-bookworm-slim";
 const BUILD_IMAGE = "node:24.21.0-bookworm-slim";
+/** Official images the Go and Rust toolchains are copied from (scenario c). */
+const TOOLCHAIN_SOURCES = [
+  ["golang:1-bookworm", ["/usr/local/go"]],
+  ["rust:1-slim-bookworm", ["/usr/local/cargo", "/usr/local/rustup"]],
+];
 
 const SCENARIOS = [
   { id: "a-node-only", image: BASE, proves: "Node only: install from the tarball with npx, then init, doctor, check/verify/simulate, a broken design, graph (TypeScript, Go and Rust source-only), requirement links, MCP over stdio and Studio over HTTP; no backend or toolchain process and no Java/Quint/TLC wording." },
@@ -345,7 +358,7 @@ function setup(s, name) {
   }
   if (s.setup === "toolchains") {
     const copied = [];
-    for (const [image, paths] of [["golang:1-bookworm", ["/usr/local/go"]], ["rust:1-slim-bookworm", ["/usr/local/cargo", "/usr/local/rustup"]]]) {
+    for (const [image, paths] of TOOLCHAIN_SOURCES) {
       if (!ensureImage(image)) return { ok: false, note: `cannot pull ${image}` };
       const source = `pymtheg-acc-src-${image.split(":")[0]}-${RUN_ID}`;
       if (docker("create", "--pull", "never", "--name", source, ...LABELS, image).status !== 0) return { ok: false, note: `cannot create ${source}` };
@@ -490,6 +503,12 @@ try {
   if (unknown.length) throw Object.assign(Error(`unknown scenario(s): ${unknown.join(", ")}; known: ${SCENARIOS.map((s) => s.id).join(", ")}`), { usage: true });
   if (wanted && !wanted.length) throw Object.assign(Error("--scenarios names no scenario"), { usage: true });
   const selected = SCENARIOS.filter((s) => !wanted || wanted.includes(s.id));
+  if (flag("--list-images")) {
+    const images = new Set([...(opt("--tarball", null) ? [] : [BUILD_IMAGE]), ...selected.map((s) => s.image), ...selected.filter((s) => s.setup === "toolchains").flatMap(() => TOOLCHAIN_SOURCES.map(([image]) => image))]);
+    console.log([...images].join("\n"));
+    rmSync(SCRATCH, { recursive: true, force: true });
+    process.exit(0);
+  }
   reapOrphans();
   const tgz = await buildTarball();
   if (flag("--pack-only")) {

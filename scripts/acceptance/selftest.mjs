@@ -170,6 +170,24 @@ const SABOTAGES = [
     apply: (d) =>
       prelude(d, 'if (process.argv[2] === "graph" && process.argv[3] === "index") { const fs = await import("node:fs"); const dir = new URL("../../.index-cache/", import.meta.url); fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(new URL("state.json", dir), "{}\\n"); }'),
   },
+  // Round 5: a stack trace in MCP text content only; an unlinked list that includes a linked symbol.
+  {
+    id: "stack-in-mcp-text-only",
+    what: "`project_info` carries a TypeError stack in its text content only (structuredContent untouched)",
+    expect: ["mcp-project_info"],
+    apply: (d) =>
+      prelude(
+        d,
+        'if (process.argv[2] === "mcp") { const STACK = "TypeError: Cannot read properties of undefined (reading \'x\')\\n    at info (file:///opt/pymtheg/dist/mcp/server.js:10:5)"; const write = process.stdout.write.bind(process.stdout); process.stdout.write = (chunk, ...rest) => { const s = String(chunk); if (s.includes("\\"capabilities\\"")) { try { const m = JSON.parse(s); const r = m.result; if (r?.structuredContent?.capabilities) { for (const c of r.content ?? []) if (c.type === "text") { const t = JSON.parse(c.text); t.debug = STACK; c.text = JSON.stringify(t, null, 2); } chunk = JSON.stringify(m) + "\\n"; } } catch {} } return write(chunk, ...rest); }; }',
+      ),
+  },
+  {
+    id: "unlinked-includes-linked",
+    what: "MCP `unlinked` also lists the already-linked `apply_discount`",
+    expect: ["mcp-requirement_links-unlinked"],
+    apply: (d) =>
+      patch(d, "dist/mcp/links-view.js", /tables\.symbols = \(result\.symbols \?\? \[\]\)\.map\(\(s\) => symbol\(s\)\);/, 'tables.symbols = (result.symbols ?? []).map((s) => symbol(s)).concat([{ ref: null, language: "rust", path: "engine/src/discount.rs", kind: "function", identity: "apply_discount", name: "apply_discount", line: 1 }]);'),
+  },
   { id: "code-graph-candidate", what: "MCP `code_graph` reports a definite caller as a candidate", expect: ["mcp-code_graph-callers-ts"], apply: (d) => patch(d, "dist/mcp/graph-view.js", "certainty: l.certainty,", 'certainty: l.certainty === "definite" ? "candidate-set" : l.certainty,') },
 ];
 
