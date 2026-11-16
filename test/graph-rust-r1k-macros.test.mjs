@@ -1072,3 +1072,63 @@ mod b {
 fn main() { println!("[{}]", b::go().trim()); }`);
   assert.deepEqual(derivedState(g, "crate::helper"), [null]);
 });
+
+// --- Round 5: #[macro_export(local_inner_macros)] --------------------------
+// Programs and rustc output: evidence/r1-k/controls5/.
+
+const withM = (lib, app) =>
+  graph(
+    { "src/main.rs": app, "m/src/lib.rs": lib },
+    {
+      "Cargo.toml":
+        '[package]\nname="app"\nedition="2021"\n[workspace]\nmembers=["m"]\n[dependencies]\nm={path="m"}\n',
+      "m/Cargo.toml": '[package]\nname="m"\nedition="2021"\n',
+    },
+  );
+
+test("local_inner_macros: a body call through the exporting crate's inner! is not definite (prints END)", async () => {
+  const g = await withM(
+    `#[macro_export] macro_rules! inner { () => {{}} }
+#[macro_export(local_inner_macros)]
+macro_rules! outer { () => { inner!(); } }`,
+    `macro_rules! inner { () => { helper(); } }
+fn helper() { std::println!("HELPER"); }
+fn main() { m::outer!(); std::println!("END"); }`,
+  );
+  for (const l of g.derivedTo("helper")) assert.equal(l.targetId, undefined);
+});
+
+test("local_inner_macros: forwarded arguments are not definite (prints END)", async () => {
+  const g = await withM(
+    `#[macro_export] macro_rules! quiet { ($($t:tt)*) => {} }
+#[macro_export(local_inner_macros)]
+macro_rules! outer { ($($t:tt)*) => { quiet!($($t)*); } }`,
+    `macro_rules! quiet { ($($t:tt)*) => { std::println!($($t)*); } }
+fn helper() -> u8 { std::println!("HELPER"); 1 }
+fn main() { m::outer!("{}", helper()); std::println!("END"); }`,
+  );
+  g.notDefinite("helper");
+});
+
+test("local_inner_macros: a bare println! there is $crate::println!, not std's (prints END)", async () => {
+  const g = await withM(
+    `#[macro_export] macro_rules! println { ($($t:tt)*) => {} }
+#[macro_export(local_inner_macros)]
+macro_rules! outer { ($($t:tt)*) => { println!($($t)*); } }`,
+    `fn helper() -> u8 { std::println!("HELPER"); 1 }
+fn main() { m::outer!("{}", helper()); std::println!("END"); }`,
+  );
+  g.notDefinite("helper");
+});
+
+test("twin: without local_inner_macros the bare inner! is the call site's (prints HELPER END)", async () => {
+  const g = await withM(
+    `#[macro_export] macro_rules! inner { () => {{}} }
+#[macro_export]
+macro_rules! outer { () => { inner!(); } }`,
+    `macro_rules! inner { () => { helper(); } }
+fn helper() { std::println!("HELPER"); }
+fn main() { m::outer!(); std::println!("END"); }`,
+  );
+  assert.deepEqual(derivedState(g, "helper"), ["helper"]);
+});

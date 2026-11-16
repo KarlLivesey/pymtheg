@@ -1,5 +1,5 @@
 module { id: 'rust', version: '26' } -> { id: 'rust', version: '27' }
-seconds 608.2 -> 587.7
+seconds 631.6 -> 659.6
 all links before { unresolved: 292061, resolved: 78624, candidates: 100 } 370785
 all links after  { unresolved: 312941, resolved: 79082, candidates: 100 } 392123
 written (non-contains) before { unresolved: 292061, resolved: 44445, candidates: 100 }

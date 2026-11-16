@@ -32,7 +32,7 @@ that opacity came from (a temporary hook on the resolver's opaque-scope set)
 gave one cause behind most of it, below, and the macro shapes the trial
 reported. In Vector the same classes are much larger and two further causes
 dominate: its three files the grammar cannot read (`failed-file-unseen-declarations`
-on about 52,000 workspace links) and attribute and external-macro opacity
+in the reason of 85,203 unresolved workspace links) and attribute and external-macro opacity
 (listed under backlog).
 
 ## Shape 3 first: one cause behind most of it
@@ -273,6 +273,13 @@ counts as written at the invocation site: rustc looks it up there, controls
 
 `std::n!` paths are std's own unless `std` itself is rebound.
 
+**`#[macro_export(local_inner_macros)]` (round 5).** In such a macro rustc
+reads every bare macro name in the transcriber as `$crate::name`, standard-
+looking names included. Rather than model that, a macro exported this way
+that invokes any macro by a bare name proves nothing: it is not neutral, not
+clean, not forwarding, and its nested macros are not followed. Neither
+ripgrep nor Vector uses `local_inner_macros`.
+
 **Where the earlier E4 ruling still applies.** The statement-opacity
 exemption (does `println!();` hide sibling names?) keeps that ruling: unseen
 code is assumed not to define a standard-named macro. Its import check now
@@ -280,7 +287,7 @@ resolves explicit imports the same way (point 5).
 
 ## Results
 
-Round 4 runs on the merged tree (this branch with `origin/main` 379b6018)
+Round 5 runs on this branch (its merge with `origin/main` c2edd086 adds only a ledger line)
 against `origin/main`, both on the dev server in parallel
 (`evidence/r1-k/*-summary.json`, `*-compare.txt`):
 
@@ -294,7 +301,7 @@ against `origin/main`, both on the dev server in parallel
 | links on main that went definite → anything else | | **0** | | **0** |
 | new calls in macro arguments: definite / unresolved | | 962 / 2,071 | | 363 / 20,523 |
 | new derived macro-body calls: definite / unresolved | | 16 / 1,257 | | 0 / 452 |
-| cold index, seconds (observation) | 41.5 | 43.6 | 608.2 | 587.7 |
+| cold index, seconds (observation) | 42.7 | 45.7 | 631.6 | 659.6 |
 
 **The trial links on ripgrep all resolve:**
 
@@ -326,7 +333,7 @@ crates, as the existing catalogue does for `tracing`'s statement macros.
 That is backlog, not done here.
 
 Reasons on ripgrep (written links, before → after): `opaque-item-may-shadow-name`
-on calls 849 → 227, on types 1,484 → 148, on imports 479 → 69, on patterns
+on calls 849 → 229, on types 1,484 → 148, on imports 479 → 69, on patterns
 271 → 30.
 
 ## Correctness sample
@@ -466,6 +473,20 @@ forwarding).
 
 Round 3 adds 17 fixture tests covering every program above. Round 4 adds 15 for the name rule, covering each control above (both outcomes of n7, the glob statement and the external fail-closed cases).
 
+Round 5 adds `evidence/r1-k/controls5/` (`#[macro_export(local_inner_macros)]`,
+an exporting crate `m` and an app, rustc output in `output.txt`):
+
+| Program | rustc prints | Pymtheg |
+|---|---|---|
+| l1: bare `inner!` in the exported macro; app has its own `inner!` calling `helper` | `END` (m's `inner!`) | body call not definite |
+| l2: forwarded arguments into a bare `quiet!` | `END` | argument not definite |
+| l3: a bare `println!` there is `$crate::println!` | `END` | argument not definite |
+| l4 twin: the same macro without `local_inner_macros` | `HELPER END` | body call definite |
+
+Round 5 adds 4 fixture tests, one per program. `node --test
+test/graph-rust-r1k-macros.test.mjs` runs 90 tests: 30, 24, 17, 15 and 4
+added in rounds 1 to 5.
+
 Changed expectations: `recall-4.json` "brace tail is still statement-capable"
 used `macro_rules! m{()=>{{}}}`, which expands to an empty block and is now
 proved harmless; the case now uses an item-defining body so it still tests a
@@ -484,18 +505,18 @@ of `local_macro!` at its invocation in `run`, unresolved there because
   external crates'.
 - **Vector's failed files.** Three files the grammar cannot read
   (`lib/codecs/tests/avro.rs`, `lib/prometheus-parser/src/line.rs`,
-  `lib/tracing-limit/src/lib.rs`) make about 52,000 workspace links
-  `failed-file-unseen-declarations`; a grammar fix (W2-P/W2-V line of work)
+  `lib/tracing-limit/src/lib.rs`) put `failed-file-unseen-declarations` in
+  the reason of 85,203 unresolved workspace links on main (94,389 after); a grammar fix (W2-P/W2-V line of work)
   would recover most of them.
-- **Opaque scopes in Vector by cause** (one re-resolution with a temporary
-  hook; counts are scopes, not links): `assert_eq` 685 (60 files import
-  `similar_asserts::assert_eq`, an unaudited external macro; auditing
-  `similar_asserts` and `pretty_assertions` in the ecosystem catalogue, as
-  was done for `tracing`, is the cheap fix), non-standard `derive` 647,
-  `#[test]` 411 and `#[tokio::test]` 179, `tracing` `error`/`debug`/`info`/
-  `warn`/`trace` about 930 (why these are not proved by the existing
-  ecosystem audit in Vector is not yet known; worth one investigation),
-  `#[configurable_component]` 169, `impl_generate_config_from_default!` 72.
+- **Opaque scopes in Vector.** Outside this chunk's macro work, Vector's
+  remaining `opaque-item-may-shadow-name` comes from non-standard derives,
+  `#[test]`/`#[tokio::test]`, attribute macros such as
+  `#[configurable_component]`, and external statement macros. In particular,
+  60 files import `similar_asserts::assert_eq`, an unaudited external macro.
+  Auditing `similar_asserts`, `pretty_assertions`, and the macro export lists
+  of `tracing`, `derivative` and `cfg_if` in the ecosystem catalogue is the
+  cheap next step. (Round 1 quoted per-cause scope counts from a one-off
+  trace; they are not in the committed evidence and are no longer stated.)
 - **Workspace macros with `$x:expr` matchers.** Their argument calls stay
   `macro-argument-unverified`; reading them needs a `macro_rules!` matcher.
 - **MCP `symbol grep::searcher::SearcherBuilder`.** The link resolves; finding

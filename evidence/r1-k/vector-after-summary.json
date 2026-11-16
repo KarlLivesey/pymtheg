@@ -5,7 +5,7 @@
     "version": "27"
   },
   "source": "/home/user/pymtheg-dev/corpora/vector",
-  "seconds": 587.7,
+  "seconds": 659.6,
   "files": 1563,
   "failed": [
     "lib/codecs/tests/avro.rs",

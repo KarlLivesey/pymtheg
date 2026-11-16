@@ -3037,8 +3037,29 @@ export function resolveRust(
       ownerPlace(file, entry.scope).some((p) => p.noImplicitPrelude)
     );
   }
-  const profileOf = (s: GraphSymbol) =>
-    data(s).macroProfile as unknown as MacroProfile | undefined;
+  /**
+   * A macro exported with `local_inner_macros` resolves every bare nested
+   * macro name at its own crate root (`$crate::name`), standard-looking names
+   * included. Rather than model that, every proof through such a macro is
+   * withheld when it invokes any macro by a bare name: not neutral, not
+   * clean, not forwarding (R1-K round 5).
+   */
+  const profileOf = (s: GraphSymbol): MacroProfile | undefined => {
+    const profile = data(s).macroProfile as unknown as MacroProfile | undefined;
+    if (
+      profile &&
+      data(s).localInnerMacros &&
+      profile.macroHeads.some((h) => h !== "$crate" && h !== "")
+    )
+      return {
+        ...profile,
+        neutral: false,
+        clean: false,
+        forwards: null,
+        bodyMacros: [],
+      };
+    return profile;
+  };
   /**
    * The one readable workspace `macro_rules!` definition that `name` names at
    * an invocation site, or null. Names in a transcriber resolve at the call

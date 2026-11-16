@@ -383,7 +383,11 @@ manifest unknown). Private items are ordinary symbols.
   Globs are not consulted: one that brings in a std-named macro is an
   ambiguity error (E0659) in rustc. A crate that does `#[macro_use] extern
   crate tracing;` therefore gets no proven standard names, so its argument
-  and body calls through format macros stay unresolved.
+  and body calls through format macros stay unresolved (ruling E4, under
+  Assumption E4 below, governs only whether a statement macro withholds its
+  sibling names, not these proofs). A macro exported with
+  `#[macro_export(local_inner_macros)]` that invokes any macro by a bare name
+  proves nothing: rustc resolves those names at its own crate root.
 - **Calls in macro arguments:** calls written in an invocation's argument
   tokens are links, read as a format-style list: pieces separated by `,`
   (and `;` for `vec!`), each an expression or `name = expression`; only the

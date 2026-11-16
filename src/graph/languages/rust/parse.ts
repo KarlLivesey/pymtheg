@@ -1841,6 +1841,17 @@ async function createHelper(): Promise<Helper> {
                       macroExportConditions: effectiveAttributes(n)
                         .filter((a) => a.meta.name === "macro_export")
                         .map((a) => a.guards),
+                      // `#[macro_export(local_inner_macros)]`: every bare
+                      // macro name in the transcriber means `$crate::name`.
+                      ...(effectiveAttributes(n).some(
+                        (a) =>
+                          a.meta.name === "macro_export" &&
+                          /\blocal_inner_macros\b/.test(
+                            a.meta.args?.text ?? "",
+                          ),
+                      )
+                        ? { localInnerMacros: true }
+                        : {}),
                     }
                   : {}),
                 visibility:
