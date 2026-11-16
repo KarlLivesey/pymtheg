@@ -1384,7 +1384,9 @@ async function goOptIn(pym) {
     allowToolchain: ["go"],
     // Exactly five definite calls of (*Cart).Add from main, each decided or
     // confirmed by the toolchain, including line 13 (pricing.First(...).Add(5)).
-    expect: all(exit(0), (r) => same(goAddLinks(r), ADD_CALLERS_ON, "callers of Add, opted in")),
+    // Self-contained: this answer itself must report the route used, not rely
+    // on the index step having run go.
+    expect: all(exit(0), json((j) => same(j.toolchain?.go?.state, "used", "toolchain state in this answer")), (r) => same(goAddLinks(r), ADD_CALLERS_ON, "callers of Add, opted in")),
     note: (r) => goAddLinks(r).join(", "),
   });
   writeFileSync(settingsFile, JSON.stringify(settings, null, 2) + "\n");
@@ -1394,7 +1396,8 @@ async function goOptIn(pym) {
     cmd: pym(["graph", "index", "--root", GO_PROJECT, "--json"]),
     cwd: GO_PROJECT,
     expect: all(exit(0), json((j) => (j.status !== "ok" ? `status ${j.status}` : "toolchain" in j ? `toolchain reported while off: ${JSON.stringify(j.toolchain)}` : null))),
-  });  await step({
+  });
+  await step({
     id: "go-source-only-callers",
     display: "setting off: graph callers Add --json (source-only: main.go:13 is not a definite caller)",
     cmd: pym(["graph", "callers", "Add", "--root", GO_PROJECT, "--json"]),
