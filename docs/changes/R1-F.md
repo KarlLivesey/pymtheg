@@ -10,8 +10,9 @@ runs on a clean machine with no Java or Quint. This chunk adds three tools:
 It changes no product code. Run the harness after each R1 merge, and as the
 release gate (exit 0).
 
-Every statement below was checked against the code at the commit named in the
-results block, which merges main 27674435, and against that run's evidence.
+Every statement below was checked against the code at commit dec50ae1 and
+against that commit's run evidence. dec50ae1's parent is merge 7ad08350, which
+merged main at 27674435.
 
 ## Run it
 
@@ -79,9 +80,10 @@ the tarball contents.
   (`test/fixtures/acceptance/sample`) and the harness files. Scenario f also
   gets the restic checkout. Scenario c also gets the Go and Rust toolchains,
   copied out of the official `golang` and `rust` images.
-- **Root setup first.** File ownership, and in b an `apt-get install git`, run
-  as root before the scenario. Every scenario step runs as the unprivileged
-  `node` user.
+- **Root setup first.** Before the scenario, the harness works as root. It
+  creates `/acc` (`pkg`, `shims`, `out`), installs the shims, sets file
+  ownership, and in b runs `apt-get install git`. Every scenario step then runs
+  as the unprivileged `node` user.
 - **Network.** The container has network only until its install steps finish;
   b's `apt-get` comes before them. Then it is disconnected from every network.
   `network-off` proves that neither `https://registry.npmjs.org/` nor
@@ -134,8 +136,13 @@ A step passes only if all of these hold:
 
 Some rules are skipped in three places:
 
-- Rules 4, 5 and 6 are skipped for steps whose output is the harness's own (git,
-  find, sizes, the network probe, `node --version`).
+- Rules 4, 5 and 6 are skipped for steps whose output is the harness's own:
+  - `network-off` and `install-size`;
+  - `npx-absolute-path`;
+  - `install-unchanged` and `writes-outside-project`;
+  - `node-version`, `toolchains-present` and `bin-location`;
+  - the git steps (`git-setup`, `git-status-after-init`, `git-status-end`,
+    `git-tracked-unchanged`).
 - Rules 4 and 5 are skipped for the minified web bundle fetched by
   `studio-assets`; rule 6 still applies there.
 - Rule 6 is skipped for the npm install steps. Rules 4 and 5 still apply to
@@ -149,7 +156,7 @@ Statuses:
 | expected-fail | The step was designed to fail (the broken design, the violating design, a changed requirement link) and failed exactly as specified. |
 | known-gap | The step's only problem is its expectation, and that step's own gap matcher recognises the exact output a named chunk will change. Or its only problem is a warning listed in `KNOWN_WARNING_GAPS`. No gap is defined today. |
 | fail | Anything else. |
-| observed | Report-only steps: sizes, the absolute-path `npx` form, the toolchain versions in c, `node --version` in e. |
+| observed | Report-only steps: `install-size`, `npx-absolute-path`, `toolchains-present` in c, `node-version` in e, and 0-build's `package-private` and `package-engines`. |
 
 ### Wording matcher choices
 
@@ -249,7 +256,7 @@ The MCP steps:
 | MCP step | Call | Exact check |
 |---|---|---|
 | mcp-initialize | `initialize` | a `serverInfo` name |
-| mcp-tools-list | `tools/list` | a non-empty list containing `check_design`, `read_run`, `explore_behaviour`, `project_info` |
+| mcp-tools-list | `tools/list` | no JSON-RPC error, and a non-empty tool array. Each later step fails if a tool it uses is not in that list. |
 | mcp-project_info | `project_info {}` | `totalFiles` 3 |
 | mcp-design_recipe | `{action:"list"}` | includes recipe `decision` |
 | mcp-read_source | `designs/order.pym` line 2 | `["machine Order {"]` |
@@ -428,8 +435,10 @@ The cases and their results are in the results block.
 ## Cleanup and concurrent runs
 
 - **Containers.**
-  - Scenario and build containers are named `pymtheg-acc-<scenario or
-    "build">-<run id>`. They carry the labels `pymtheg-acc=1`,
+  - Scenario containers are named `pymtheg-acc-<scenario id>-<run id>`. Any
+    character other than `a-z`, `0-9` and `-` is removed from the scenario
+    id, so e-node-24.0.0 becomes `pymtheg-acc-e-node-2400-<run id>`. The build
+    container is `pymtheg-acc-build-<run id>`. They carry the labels `pymtheg-acc=1`,
     `pymtheg-acc.owner`, `pymtheg-acc.run` and `pymtheg-acc.pid`.
   - They run `sleep 14400` with `--rm` and `--pull never`, so a lost container
     removes itself within four hours.
