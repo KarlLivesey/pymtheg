@@ -415,13 +415,17 @@ as it is, with stale-file warnings); `status` never indexes. A selector is a
 a selector that selects nothing returns up to five near matches, never selected.
 Callers' class counts are totals whatever the limit: `definite` and
 `candidateSet` are exact; `unresolved` (possible callers) is counted up to 1,000
-or the limit, whichever is larger, and `countsTruncated` marks that it reached
-that bound and is a lower bound. The MCP form, its
+or the limit, whichever is larger; `countsTruncated` marks that there are more
+than that bound, so `unresolved` is a lower bound. The MCP form, its
 selector forms per language and its limits are in [the code guide](code-guide.md).
 
-**Go toolchain route (opt-in, decision D17).** With `"graph": {"toolchain": {"go": true}}`
-in `.pymtheg/settings.json` (or an absolute path to the `go` to trust instead
-of `true`), indexing also runs that `go` (`go list` and a `go/types` helper) in a
+**Go toolchain route (opt-in, decision D17).** With the key
+`"graph": {"toolchain": {"go": true}}` added to the existing
+`.pymtheg/settings.json` (which must keep its `version: 1` and `scenarios`; a
+file holding only the `graph` key is unreadable and the route stays off with a
+`settings-unreadable` warning; full example in the
+[code guide](code-guide.md#the-go-toolchain-route)), or an absolute path to the
+`go` to trust instead of `true`, indexing also runs that `go` (`go list` and a `go/types` helper) in a
 closed environment with network, cgo and telemetry off, and merges its facts:
 it can upgrade unresolved or candidate links to definite, confirm source-only
 links or verify candidate sets; such links carry `decidedBy: "toolchain"`.

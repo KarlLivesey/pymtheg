@@ -168,7 +168,8 @@ with 150 possible callers: MCP at limit 20 reported `unresolved: 20`.
 `definite` and `candidateSet` are exact, from one indexed count query
 (`SqliteGraphStore.incomingCallCounts`, the same rows as the callers list);
 `unresolved` is counted up to 1,000 or the limit, whichever is larger
-(`CALLER_COUNT_BOUND`); `countsTruncated` means that count reached the bound;
+(`CALLER_COUNT_BOUND`); `countsTruncated` means there are more possible callers
+than the bound (exactly 1,000 gives `unresolved: 1000`, `countsTruncated: false`);
 `countBound` reports it. (Round 1 of review found the first version counted
 definite and candidate-set calls together against one bound of 1,000: 600 + 600
 callers reported 499 + 501. Reproduced, then fixed as above.) Items stay bounded by `limit` (`summary.truncated`
@@ -273,3 +274,10 @@ tests, 2,831 pass, 0 fail; format check, `node scripts/spdx-tags.mjs --check`
 and the licence inventory check pass; `npm pack` 832 files, 1.9 MB. The
 acceptance gate was not re-run for these fixes (its MCP and CLI caller
 assertions compare caller sets, not class counts).
+
+Review round 2 (docs only, no code or test changes): `countsTruncated` is
+described as "more possible callers than the bound" in the guide, `support.md`,
+`mcp.md`, `decisions.md` and this note (exactly 1,000 report
+`countsTruncated: false`); `support.md` says the Go toolchain setting is a key
+added to the existing `settings.json` (a file with only that key is
+`settings-unreadable`) and links the guide's full example.

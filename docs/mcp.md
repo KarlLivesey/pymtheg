@@ -194,8 +194,8 @@ preview. Sections `stale_files`, `warnings`, `modules` are independently paged.
   classCounts prevent an empty definite list reading as “nobody calls this”.
   For `callers`, classCounts are totals whatever the item limit: definite and
   candidateSet are exact; unresolved is counted up to 1,000 (or the limit, if
-  larger), and `countsTruncated:true` means it reached that bound and is a
-  lower bound.
+  larger), and `countsTruncated:true` means there are more than that bound,
+  so unresolved is a lower bound.
   Match basis is target-hint, receiver-qualified or name-only; name-only includes
   other types/packages. Impact reports frontier hints and follows them only with
   `includePossible:true`; path's `possiblePath` remains separate from found paths.

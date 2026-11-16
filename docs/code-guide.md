@@ -222,9 +222,11 @@ expect(out.items.some((l) => l.certainty === "definite" && l.targetName === "s.P
 
 `classCounts` are totals whatever the item `limit`: `definite` and
 `candidateSet` are exact counts of the stored calls; `unresolved` counts
-possible callers exactly up to 1,000 (or the `limit`, if larger), and when it
-reaches that bound `countsTruncated: true` says `unresolved` is a lower bound
-(`countBound` gives the bound). Section `legend` expands reason codes such as `r1` in `reasons`;
+possible callers exactly up to 1,000 (or the `limit`, if larger); when there
+are more than that bound, `unresolved` shows the bound and
+`countsTruncated: true` says it is a lower bound (`countBound` gives the
+bound). Exactly 1,000 possible callers report `unresolved: 1000` with
+`countsTruncated: false`. Section `legend` expands reason codes such as `r1` in `reasons`;
 section `detail` with a `ref` returns the exact stored JSON.
 
 ## Limits and how to raise them

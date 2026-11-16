@@ -2506,7 +2506,7 @@ nothing.
 the item limit: `definite` and `candidateSet` are exact (one indexed count
 query); `unresolved` possible callers, which must be classified one by one, are
 counted up to 1,000 (or the query limit, if larger). `countsTruncated` now means
-that possible-caller count reached the bound, and `countBound` gives it. Items
+there are more possible callers than that bound, and `countBound` gives it. Items
 stay bounded by the limit. **Why:** MCP's limit is at most 100, so it
 reported `unresolved: 100, countsTruncated: true` where the CLI (default limit
 1,000) reported the real 441. **Rules out:** counts that depend on the page
