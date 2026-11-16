@@ -801,7 +801,7 @@ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
 USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ==============================================================================
-ajv 8.17.1
+ajv 8.18.0
 Shipped as: dependency
 Licence: MIT
 Source: https://github.com/ajv-validator/ajv
@@ -3591,7 +3591,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ==============================================================================
-zod 4.2.0
+zod 4.6.6
 Shipped as: dependency
 Licence: MIT
 Source: https://github.com/colinhacks/zod
@@ -3620,7 +3620,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ==============================================================================
-zod 4.2.0
+zod 4.6.6
 Shipped as: bundled in dist-web
 Licence: MIT
 Source: https://github.com/colinhacks/zod

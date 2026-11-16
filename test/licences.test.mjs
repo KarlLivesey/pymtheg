@@ -321,7 +321,7 @@ test("the reviewed vfile notice yields both embedded origins and blocks if the h
   );
 });
 test("provenance notes in bundled files are reviewed, and a changed note blocks", () => {
-  const host = { name: "zod", version: "4.2.0", location: "node_modules/zod" };
+  const host = { name: "zod", version: "4.6.6", location: "node_modules/zod" };
   const zod = readFileSync("node_modules/zod/v4/core/regexes.js", "utf8");
   const licence = [readFileSync("node_modules/zod/LICENSE", "utf8")];
   const notices = uncoveredNotices(zod, licence);

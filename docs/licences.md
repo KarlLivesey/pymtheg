@@ -13,7 +13,7 @@ vendored code is fixed inside the tarball.
 
 **Pymtheg is MIT licensed;** see `LICENSE`.
 
-All shipped third-party components are declared under MIT, Apache-2.0, BSD-3-Clause or ISC. These licences permit redistribution inside an MIT-licensed package provided their notices are kept, which `THIRD-PARTY-NOTICES` does. Licences embedded inside some of those packages are listed below and travel in `THIRD-PARTY-NOTICES` with their packages' notices. Separately, a wording scan of the bundled source files found 18 comments saying that some material was copied, ported, adapted or taken from other sources, without a notice to reproduce; they are listed under "Provenance notes in bundled code". The scan cannot prove that nothing else was copied.
+All shipped third-party components are declared under MIT, Apache-2.0, BSD-3-Clause or ISC. These licences permit redistribution inside an MIT-licensed package provided their notices are kept, which `THIRD-PARTY-NOTICES` does. Licences embedded inside some of those packages are listed below and travel in `THIRD-PARTY-NOTICES` with their packages' notices. Separately, a wording scan of the bundled source files found 19 comments saying that some material was copied, ported, adapted or taken from other sources, without a notice to reproduce; they are listed under "Provenance notes in bundled code". The scan cannot prove that nothing else was copied.
 
 ## Summary
 
@@ -85,12 +85,13 @@ whether any of them needs more.
 | micromark-util-html-tag-name@2.0.1 | micromark-util-html-tag-name/index.js:92 | List of lowercase HTML “raw” tag names. The list, when parsing HTML (flow), results in HTML that can include lines without exiting, until a closing tag also in this list is found (condition 1). This module is copied f… | yes | the CommonMark specification | the CommonMark specification is published under a Creative Commons Attribution-ShareAlike licence |
 | vfile@6.0.3 | vfile/lib/minproc.browser.js:3 | Somewhat based on: <https://github.com/defunctzombie/node-process/blob/master/browser.js>. But I don’t think one tiny line of code can be copyrighted. 😅 | yes | node-process `browser.js` | MIT |
 | vfile@6.0.3 | vfile/lib/minurl.shared.js:19 | From: <https://github.com/nodejs/node/blob/6a3403c/lib/internal/url.js#L720> | yes | Node.js `lib/internal/url.js` | MIT (Node.js licence) |
-| zod@4.2.0 | zod/v4/core/regexes.js:27 | Equivalent to the HTML5 input[type=email] validation implemented by browsers. Source: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input/email | no | MDN Web Docs (HTML email input validation) | not checked |
-| zod@4.2.0 | zod/v4/core/regexes.js:35 | from https://thekevinscott.com/emojis-in-javascript/#writing-a-regular-expression | yes | a blog post by Kevin Scott (emoji regular expression) | not checked |
-| zod@4.2.0 | zod/v4/core/regexes.js:48 | https://stackoverflow.com/questions/7860392/determine-if-string-is-in-base64-using-javascript | yes | a Stack Overflow question (base64 regular expression) | Stack Overflow content is published under a Creative Commons Attribution-ShareAlike licence |
-| zod@4.2.0 | zod/v4/core/regexes.js:52 | based on https://stackoverflow.com/questions/106179/regular-expression-to-match-dns-hostname-or-ip-address export const hostname: RegExp = /^([a-zA-Z0-9-]+\.)*[a-zA-Z0-9-]+$/; | no | a Stack Overflow question (host name regular expression) | Stack Overflow content is published under a Creative Commons Attribution-ShareAlike licence |
-| zod@4.2.0 | zod/v4/core/regexes.js:55 | https://blog.stevenlevithan.com/archives/validate-phone-number#r4-3 (regex sans spaces) | yes | a blog post by Steven Levithan (E.164 phone number regular expression) | not checked |
-| zod@4.2.0 | zod/v4/core/regexes.js:74 | Adapted from https://stackoverflow.com/a/3143231 | yes | a Stack Overflow answer | Stack Overflow content is published under a Creative Commons Attribution-ShareAlike licence |
+| zod@4.6.6 | zod/v4/core/regexes.js:35 | Equivalent to the HTML5 input[type=email] validation implemented by browsers. Source: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input/email | no | MDN Web Docs (HTML email input validation) | not checked |
+| zod@4.6.6 | zod/v4/core/regexes.js:44 | from https://thekevinscott.com/emojis-in-javascript/#writing-a-regular-expression Single character class, not an alternation: the two properties overlap (U+1F9B0-U+1F9B3), so `(A\|B)+` backtracks exponentially on a fa… | yes | a blog post by Kevin Scott (emoji regular expression) | not checked |
+| zod@4.6.6 | zod/v4/core/regexes.js:57 | https://stackoverflow.com/questions/7860392/determine-if-string-is-in-base64-using-javascript | yes | a Stack Overflow question (base64 regular expression) | Stack Overflow content is published under a Creative Commons Attribution-ShareAlike licence |
+| zod@4.6.6 | zod/v4/core/regexes.js:61 | based on https://stackoverflow.com/questions/106179/regular-expression-to-match-dns-hostname-or-ip-address export const hostname: RegExp = /^([a-zA-Z0-9-]+\.)*[a-zA-Z0-9-]+$/; | no | a Stack Overflow question (host name regular expression) | Stack Overflow content is published under a Creative Commons Attribution-ShareAlike licence |
+| zod@4.6.6 | zod/v4/core/regexes.js:65 | https://blog.stevenlevithan.com/archives/validate-phone-number#r4-3 (regex sans spaces) E.164: leading digit must be 1-9; total digits (excluding '+') between 7-15 | yes | a blog post by Steven Levithan (E.164 phone number regular expression) | not checked |
+| zod@4.6.6 | zod/v4/core/regexes.js:97 | Adapted from https://stackoverflow.com/a/3143231 | yes | a Stack Overflow answer | Stack Overflow content is published under a Creative Commons Attribution-ShareAlike licence |
+| zod@4.6.6 | zod/v4/core/schemas.js:512 | Luhn checksum on a digit-only string. Adapted from valibot (MIT). | no | valibot's `_isLuhnAlgo` (Luhn checksum) | MIT, as the comment says; valibot's npm package declares MIT and its LICENSE reads "Copyright (c) Fabian Hiller" |
 
 ## Code written by the build tools
 
@@ -147,7 +148,7 @@ built bundle's source maps independently, so emitted code from an unlisted origi
 | @marijn/find-cluster-break | 1.0.4 | bundled in dist-web | MIT | Copyright (C) 2024 by Marijn Haverbeke <marijn@haverbeke.berlin> | https://code.haverbeke.berlin/marijn/find-cluster-break |
 | @rollup/plugin-commonjs | 28.0.6 | build-tool code in dist-web | MIT | Copyright (c) 2019 RollupJS Plugin Contributors (https://github.com/rollup/plugins/graphs/contributors) | https://github.com/rollup/plugins |
 | Node.js lib/path.js (embedded in vfile@6.0.3) | - | embedded in a bundled package | MIT | Copyright Joyent, Inc. and other Node contributors. | https://github.com/nodejs/node/blob/main/lib/path.js |
-| ajv | 8.17.1 | dependency (direct) | MIT | Copyright (c) 2015-2021 Evgeny Poberezkin | https://github.com/ajv-validator/ajv |
+| ajv | 8.18.0 | dependency (direct) | MIT | Copyright (c) 2015-2021 Evgeny Poberezkin | https://github.com/ajv-validator/ajv |
 | bail | 2.0.2 | bundled in dist-web | MIT | Copyright (c) 2015 Titus Wormer <tituswormer@gmail.com> | https://github.com/wooorm/bail |
 | ccount | 2.0.1 | bundled in dist-web | MIT | Copyright (c) 2015 Titus Wormer <tituswormer@gmail.com> | https://github.com/wooorm/ccount |
 | comma-separated-tokens | 2.0.3 | bundled in dist-web | MIT | Copyright (c) 2016 Titus Wormer <tituswormer@gmail.com> | https://github.com/wooorm/comma-separated-tokens |
@@ -232,8 +233,8 @@ built bundle's source maps independently, so emitted code from an unlisted origi
 | vite | 7.2.2 | build-tool code in dist-web | MIT | Copyright (c) 2019-present, VoidZero Inc. and Vite contributors | https://github.com/vitejs/vite |
 | w3c-keyname | 2.2.8 | bundled in dist-web | MIT | Copyright (C) 2016 by Marijn Haverbeke <marijn@haverbeke.berlin> and others | https://github.com/marijnh/w3c-keyname |
 | web-tree-sitter | 0.27.2 | dependency (direct) | MIT | Copyright (c) 2018 Max Brunsfeld | https://github.com/tree-sitter/tree-sitter |
-| zod | 4.2.0 | dependency (direct) | MIT | Copyright (c) 2025 Colin McDonnell | https://github.com/colinhacks/zod |
-| zod | 4.2.0 | bundled in dist-web | MIT | Copyright (c) 2025 Colin McDonnell | https://github.com/colinhacks/zod |
+| zod | 4.6.6 | dependency (direct) | MIT | Copyright (c) 2025 Colin McDonnell | https://github.com/colinhacks/zod |
+| zod | 4.6.6 | bundled in dist-web | MIT | Copyright (c) 2025 Colin McDonnell | https://github.com/colinhacks/zod |
 
 ## Apache-2.0
 
