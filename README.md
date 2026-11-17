@@ -2,288 +2,224 @@
 
 # Pymtheg
 
-A local architecture, planning and specification workspace. Keep complete design
-documents, requirements, decisions, contracts and their revision history together.
-Build `.pym` designs with Blocks or Text before implementing adapters. Inspect
-missing outcomes, effects, resource cleanup, multiplied work and copied rules.
-Explore bounded behaviour and follow counterexamples back to the design.
+Pymtheg is a local tool for planning and checking software designs and for
+answering questions about existing code. You write a design in small `.pym`
+files and Pymtheg checks it before any code exists. For TypeScript, Go and Rust
+code it builds a call graph and keeps track of which requirement each piece of
+code serves. A coding agent can drive all of it over MCP.
 
-Pymtheg is a provisional name. This integrates established specification ideas;
-it is not a universal proof engine or a proof that production code follows a model.
-The package is private. CLI checking needs no server or browser; Studio runs locally.
+What it does today:
 
-## Open the design workspace
+- **Designs and design documents.** Keep requirements, decisions and design
+  documents with their revision history. Write `.pym` designs and check them for
+  missing outcomes, resources that are never cleaned up, multiplied work and
+  copied rules. Explore behaviour with a built-in exhaustive search (`verify`) or
+  a seeded sampler (`simulate`), and follow each counterexample back to the design.
+- **Code graph** for TypeScript/JavaScript, Go and Rust: search, callers, callees,
+  paths between two symbols, and the impact of a change. Every call says how
+  certain it is.
+- **Requirement links** between requirements and code symbols. `link check`
+  reports which links are still `ok` and which code has changed, moved or gone.
+- **MCP server** (`pymtheg mcp`) so a coding agent can check designs, read
+  findings and counterexamples, query the graph and manage requirement links.
+- **Studio**, a local web workspace for designs, documents and requirements.
+- **Scaffolds**: TypeScript, Rust or Go types and signatures from a checked
+  design, with stubs that fail until you write the body.
+
+## Why it exists
+
+Someone changing code, person or agent, needs answers before the edit: what
+calls this, what does a change here affect, and which requirement does this
+code serve? Reading files by hand gives partial answers and no warning when
+they are incomplete. Pymtheg answers from a graph of the whole project and says
+which answers are certain.
+
+A design is cheaper to fix than code. Pymtheg checks a design for the faults
+that are expensive later: an error path that leaks a file, a retry that charges
+a customer twice, a loop that makes 600 remote calls against a budget of 500.
+The intended loop is short: write or generate a design, check it, read the
+finding, correct it, check again, then write the code.
+
+Requirement links keep the "why" next to the code. When the linked code
+changes, moves or disappears, `link check` says so instead of the link silently
+going stale.
+
+## Who it is for
+
+- Developers working on TypeScript/JavaScript, Go or Rust code who want to
+  plan, check and trace their work locally.
+- Coding agents (through MCP) that need reliable answers about a codebase and a
+  way to check a design before writing code.
+
+It is not for you if you need:
+
+- other languages (Python, Java, C#, Lua and others are not supported);
+- a proof that production code does what a design says (Pymtheg does not
+  check that);
+- a hosted or team-synchronised service (everything is local; teams share by
+  committing files and exporting history).
+
+## When to use it, and when not to
+
+Use it before a change, to see callers and impact; when planning a feature, to
+check the design first; and to keep requirements tied to the code that serves them.
+
+Read the answers with their limits:
+
+- **Definite, candidate, failed.** A definite call has exactly one target. A
+  candidate set lists every possible target and never picks one. An unresolved
+  call has no target. A failed link depends on a file that could not be read;
+  Pymtheg never guesses its target.
+- Graph answers come from reading source. Pymtheg never runs your code. Only Go
+  can optionally use the project's own `go` toolchain for more definite answers.
+- A sampled `simulate` run that finds nothing is not a proof. Only a completed
+  `verify` covers every reachable state, and only of the finite design you wrote.
+- A design check is not a proof that production code follows the design.
+- Not built yet: toolchain-backed Rust links, a Studio screen for the graph,
+  links from `.pym` declarations to code, live team synchronisation.
+
+The full support matrix is in [docs/support.md](docs/support.md).
+
+## Where it runs and where things live
+
+- Runs on your machine. Requires **Node 24 or newer**. No Java, no account and
+  no cloud service.
+- After install it needs no network. The release acceptance gate installs the
+  package, cuts the network, then runs `init`, `doctor`, design checks, `verify`,
+  `simulate`, graph indexing and queries, requirement links, the MCP server and
+  Studio.
+- `pymtheg init` creates `.pymtheg/project.json`, `.pymtheg/settings.json` and
+  `.pymtheg/.gitignore` in the project folder, and nothing else. Commit those
+  three. Databases are created later, only when a feature needs them, under
+  `.pymtheg/shared/` (requirements, decisions, history) and
+  `.pymtheg/rebuildable/` (graph cache), which the generated `.gitignore`
+  excludes. Details: [docs/project-init.md](docs/project-init.md#local-state-and-sharing).
+- The acceptance gate checks that a whole session creates or changes no file
+  outside the project folders, npm's own cache and Node's compile cache, and
+  nothing inside the installed package.
+- Optional toolchains: with `go` (1.22 or newer) installed and the Go toolchain
+  route turned on in `.pymtheg/settings.json`, indexing also asks `go` for type
+  facts, which can make more Go calls definite. It runs with network off. Rust
+  is source-only: `cargo` and `rustc` are not used.
+
+## Quick start
+
+Create the project files, then check the setup:
 
 ```sh
-npm ci --ignore-scripts --no-audit --no-fund
+cd /path/to/my-project
+npx pymtheg init . --name "My project"
+npx pymtheg doctor
+```
+
+`init` works in an empty folder too. It never invents source or plans. If the
+folder has documentation, it offers a preview; `--import-docs` keeps it.
+
+Index the code and ask a question:
+
+```sh
+npx pymtheg graph index --root .
+npx pymtheg graph callers total --root .
+npx pymtheg graph impact total --root .
+```
+
+Link a requirement to the code that serves it, and check the link later:
+
+```sh
+npx pymtheg link requirement R1 --title "The basket shows its total" --root .
+npx pymtheg link add R1 render --root .
+npx pymtheg link check --root .
+```
+
+Connect a coding agent. The server speaks MCP over stdio and finds the project
+from any subfolder. For an agent, install once so the server starts quickly:
+
+```sh
+npm install --global pymtheg
+```
+
+Then add it to your agent's MCP configuration (formats vary by client):
+
+```json
+{
+  "mcpServers": {
+    "pymtheg": { "command": "pymtheg", "args": ["mcp", "/absolute/path/to/my-project"] }
+  }
+}
+```
+
+Studio's **Connect agent** button prints the exact configuration for your
+installation. Agents start with [docs/agent-workflow.md](docs/agent-workflow.md)
+and [docs/code-guide.md](docs/code-guide.md); both are also served as MCP resources.
+
+Open Studio, then open the printed private session URL in Firefox:
+
+```sh
+npx pymtheg studio .
+```
+
+### From source
+
+For contributors, from a clone of this repository:
+
+```sh
+npm ci --ignore-scripts
 npm run build
+./pymtheg doctor
+./pymtheg check examples/mvp/files-buggy.pym
 ./pymtheg init /path/to/my-project --name "My project"
 ./pymtheg studio /path/to/my-project
 ```
 
-`init` works in an empty folder: it creates project identity/configuration without
-inventing source or plans. If documentation exists, it offers a preview; use
-`pymtheg init /path/to/my-project --import-docs` to retain those documents explicitly.
-Studio and MCP discover the initialized project from its subfolders. Existing
-configuration and design files are preserved. See [project setup](docs/project-init.md).
+`files-buggy.pym` is a deliberately faulty example and exits 1. The examples
+are walked through in [docs/journeys.md](docs/journeys.md).
 
-Open the printed session URL in **Firefox**. Studio includes a source editor,
-a Text/Blocks editor sharing one source buffer and undo history,
-create-only forms for components, operations, data shapes, resource lifecycles
-and finite event models, plus project-type selection and recoverable lifecycle and operation-contract edits,
-real checks on unsaved buffers, source-linked findings, work and lifecycle views,
-change impact, bounded simulation/verification, a trace player and run history.
-Use **Architecture** to import or author the wider design, search its documents,
-connect requirements to contracts and compare named revisions. Planning drafts
-can be recovered after restart. Imported claims remain explicitly unverified.
-See [the Studio guide](docs/studio.md) and [five modelling journeys](docs/journeys.md).
-No account or cloud service is needed. `./pymtheg doctor` checks local prerequisites.
+## Documentation
 
-## Coding-agent connection and scaffolds
+- [docs/code-guide.md](docs/code-guide.md): a worked MCP session with the code graph and requirement links.
+- [docs/mcp.md](docs/mcp.md): starting the MCP server, and every tool with a tested example.
+- [docs/agent-workflow.md](docs/agent-workflow.md): how a coding agent works on a design.
+- [docs/project-init.md](docs/project-init.md): `init`, importing documents, local state and sharing.
+- [docs/studio.md](docs/studio.md): the Studio workspace.
+- [docs/grammar.md](docs/grammar.md): the `.pym` language.
+- [docs/journeys.md](docs/journeys.md): five worked design examples.
+- [docs/output-plugins.md](docs/output-plugins.md): scaffolds, contracts and adding output languages.
+- [docs/support.md](docs/support.md): what is supported, and the exact meaning of each result.
+- [docs/licences.md](docs/licences.md): licences of everything the package ships.
 
-`./pymtheg mcp /path/to/project` exposes a local MCP server for coding agents.
-It can check proposed source without saving, explain findings, retrieve real
-counterexamples and generate TypeScript, Rust or Go types/functions with fail-fast stubs.
-See [MCP setup and workflow](docs/mcp.md), or choose **Connect agent** in Studio.
-`./pymtheg scaffold examples/mvp/library.pym --target rust` prints a scaffold to inspect.
+## More detail
 
-The same server answers questions about existing Go, Rust and TypeScript/JavaScript
-code and links requirements to it (MCP `code_graph` and `requirement_links`; the
-resource `pymtheg://code/guide` is a worked session, also in
-[docs/code-guide.md](docs/code-guide.md)). From the command line:
+**Exit codes** for `check`, `verify` and `simulate`: **0** the requested
+checks completed without errors; **1** design errors or a counterexample;
+**2** incomplete, unsupported, timed out or stale; **3** invocation, file,
+integration or internal failure; **130** cancelled. `verify` stops at
+`--state-budget` distinct states (default 1,000,000); properties it has not
+violated by then are inconclusive (exit 2), never passed. `--format json` gives
+versioned output; every behaviour result carries `exhaustive`, which is `true`
+only for a search that covered every reachable state.
 
-```sh
-./pymtheg graph index --root /path/to/project
-./pymtheg graph callers '(*Store).Put' --root /path/to/project
-./pymtheg link requirement R1 --title "Restocking records the amount" --root /path/to/project
-./pymtheg link add R1 '(*Store).Put' --root /path/to/project
-./pymtheg link check --root /path/to/project
-```
+**Running under `npx`.** Each `npx` call costs a few seconds and some memory
+before any work, so prefer the MCP server (one long-running process) or a global
+install for agents. `pymtheg studio` and `pymtheg mcp` stop cleanly on SIGINT
+and SIGTERM. Under `npx`, npm passes a signal only to its own child shell; where
+that shell stays as the parent (as in some Debian-based images) the signal never
+reaches Pymtheg. A terminal's Ctrl-C is not affected. A supervisor that stops
+the server by PID should signal the process group (`kill -INT -- -PGID`) or run
+the installed `pymtheg` binary directly.
 
-Graph answers say how certain each call is (definite, candidate set or
-unresolved) and never run project code; Go links can optionally be checked with
-the project's own `go` ([support matrix](docs/support.md)).
-[Language emitter plugins](docs/output-plugins.md) add other targets without compiler changes.
-Every generated function fails with “Not implemented” until implemented. Use
-`--body empty` for literal empty bodies, which may not compile. Neither mode
-implements business logic or proves conformance.
+**Installing from a local tarball.** After `npm run build`, `npm pack
+--ignore-scripts` writes a tarball. Write it as `./name.tgz` (for example
+`npx ./pymtheg-<version>.tgz --help`): npm treats a bare absolute path as a
+command and fails with exit 126.
 
-The older existing-code reader, for TypeScript and JavaScript, captures
-versioned observations for the Architecture view:
+## Status, contributing and licence
 
-```sh
-./pymtheg observe --list --root .
-./pymtheg observe src/service.ts src/main.ts --label "Current implementation" --retain --out implementation.json
-```
+Version 0.1.0 is the first public release. It is early: commands, MCP tools
+and file formats may change before 1.0.
 
-It captures source hashes, declarations, body categories and relationships using
-the TypeScript parser, without executing the project. Unresolved relationships
-remain explicit. In Architecture, choose **Plan & code graphs** to inspect
-retained versions, connect a plan to an observed declaration, and see unlinked work,
-stubs and changes. Plan and code checkpoints can be selected independently. Review exact linked-code
-changes and observed call-site differences, then explicitly accept one link’s
-current version without clearing other warnings.
-Linked-code review also flags changes to observed constants and resolved transitive
-callees, with retained dependency comparisons. Dynamic and uncaptured dependencies
-remain unknown. Capturing code is explicit; it is not continuous background indexing.
-These are initial working slices with open scope: see [the implementation-gap map](https://github.com/KarlLivesey/pymtheg/blob/main/docs/implementation-gap-map.md)
-and [block-editor contract](https://github.com/KarlLivesey/pymtheg/blob/main/docs/block-editor-map.md).
+Contributions are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). Tests run
+with `npm test`.
 
-See the [current completion audit](https://github.com/KarlLivesey/pymtheg/blob/main/docs/current-completion-audit.md) for remaining
-gaps and exact validation boundaries. The [previous withdrawn review](https://github.com/KarlLivesey/pymtheg/blob/main/docs/1.0-status.md)
-is preserved as history. Pymtheg does not claim universal proofs or production conformance.
-
-Review-36 repairs pass the established acceptance checks: 1,100 local tests,
-96 real integrations and 111 journeys in each browser engine. The review/polish
-cycle has stopped to proceed with the functional trial; independent sign-off
-remains unsigned. [Run the trial](https://github.com/KarlLivesey/pymtheg/blob/main/docs/trial-start.md).
-[Repair evidence](https://github.com/KarlLivesey/pymtheg/blob/main/evidence/product-audit/review-36-follow-up/README.md).
-
-## Run locally
-
-Requires **Node 24 or newer** (tested on 24.21.0). Dependencies and tool versions
-are pinned. `./pymtheg doctor` reports an older Node as not supported.
-
-```sh
-npm ci --ignore-scripts --no-audit --no-fund
-npm run build
-./pymtheg check examples/mvp/algorithm.pym
-./pymtheg check examples/mvp/files-buggy.pym --format json
-./pymtheg check examples/mvp/files-fixed.pym
-./pymtheg check examples/mvp/task-local.pym
-./pymtheg check examples/mvp/checkout.pym
-```
-
-### Install from a package tarball
-
-The package is not published yet, so install it from a tarball made with
-`npm pack` (after `npm run build`):
-
-```sh
-npm pack --ignore-scripts                     # writes pymtheg-1.0.0.tgz
-npx ./pymtheg-1.0.0.tgz --help                # one-off run; note the ./
-npm install --global ./pymtheg-1.0.0.tgz      # or a global install
-pymtheg doctor
-```
-
-Write the tarball as `./name.tgz` (or `file:/absolute/path/name.tgz`): npm treats
-a bare absolute path such as `npx /tmp/pymtheg-1.0.0.tgz` as a command and fails
-with exit 126. The installed package has five runtime dependencies (ten packages
-in all) and no install scripts; the browser app and grammars ship prebuilt.
-Licences of everything it ships are in [docs/licences.md](docs/licences.md) and
-`THIRD-PARTY-NOTICES`.
-
-For coding agents, prefer the MCP server (`pymtheg mcp`, one long-running
-process) or a global install over running `npx` per call: each `npx` call costs
-about 3 s and 165 MiB before any work (measured on the dev server).
-
-`pymtheg studio` and `pymtheg mcp` stop cleanly on SIGINT (Ctrl-C) and SIGTERM.
-When they run under `npx`, npm passes a signal sent to the `npx` process only to
-its own child, a `sh -c` shell. Where that shell keeps itself as the parent of
-the command instead of replacing itself with it (as in some Debian-based images),
-the signal never reaches Pymtheg and `npx`, the shell and the server keep running.
-A terminal's Ctrl-C signals the whole process group and is not affected. A
-supervisor that stops the server by PID should signal the process group
-(`kill -INT -- -PGID`) or run the installed `pymtheg` binary directly.
-
-The algorithm reports `N * N` comparisons (at most 40,000 for N <= 200) and an
-independent alpha-renamed policy copy. The bad file flow leaks on InvalidData;
-the corrected version closes on success, error and cancellation. The local task
-model contrasts three blind retry attempts with one attempt followed by explicit
-uncertainty propagation. The exploratory
-checkout quote reports `3 * N = 600` remote calls against a budget of 500 and keeps
-the payment reconciliation hole incomplete. These examples deliberately have
-different exit statuses; a warning about duplicate rules alone doesn't fail.
-
-You write Pymtheg designs; you do not need to learn a backend language.
-`check` runs local analyses and works offline once built. For behavioural
-exploration, `verify` runs a built-in exhaustive breadth-first search and
-`simulate` a built-in seeded sampler. Both run in Node worker threads inside
-Pymtheg: no other program, runtime or download is needed, and the CLI, Studio and
-MCP use the same engines. Findings map back to your source and each invariant
-gets its own result, plus one `state-domains` result for declared ranges.
-`--state-budget N` (default 1,000,000 distinct states) bounds `verify`; running out
-leaves the unviolated properties inconclusive (exit 2), never passed. An engine
-or worker error is a failure (exit 3, `B104`), never a verdict.
-
-```sh
-./pymtheg simulate examples/mvp/task-buggy.pym --entry TaskRunner --seed 42 --max-steps 12 --max-samples 1000
-./pymtheg simulate examples/mvp/task-fixed.pym --entry TaskRunner --seed 42 --max-steps 12 --max-samples 1000
-./pymtheg simulate examples/mvp/checkout-fixed.pym --entry Checkout --seed 42 --max-steps 12 --max-samples 1000
-./pymtheg verify examples/mvp/checkout-fixed.pym --entry Checkout
-./pymtheg emit examples/mvp/task-buggy.pym --entry TaskRunner --target json --out /tmp/task-model.json
-```
-
-Models and their source maps come from the typed project, not fixture names.
-Counterexamples are replayed against the source event semantics before they are
-reported. A corrected sampled run reports
-`no_counterexample (simulation, sampled, not exhaustive)`, never an unqualified
-verified result. In JSON (CLI `--format json`, MCP, Studio) every behaviour
-result carries `exhaustive`. It describes the search, not the verdict: `true`
-only when every reachable state was searched (a completed `verify`), `false` for
-every `simulate` result and every search that stopped early or never started
-(budget, timeout, engine error, unsupported lowering). Read `exhaustive`, not
-`completion`, to tell a proof from a sample: a sampled run reports
-`no_counterexample` / `complete` with `exhaustive: false`. A counterexample is
-real whatever `exhaustive` says.
-`emit --target json` writes the lowered model the engines check
-(machine, source mapping, bounds, assumptions and, for flows, the finite
-source-state graph) so you can inspect it.
-
-Source domains define finite scope. Optional `--scope scope.json` must contain
-`{"domains":{"phase":"0..4", ...},"assumptions":[]}` with **all** domain entries
-exactly matching the source. No automatic scope reduction. `--timeout 500ms` or
-`45s` bounds checking work (max 120s). `--seed`, `--max-steps` and `--max-samples`
-belong to `simulate`; `--state-budget` to `verify`.
-`--out report.json` on check/simulate/verify atomically publishes a report while
-retaining stdout findings. `--format json` is versioned, log-free stdout;
-`--verbose` phase messages go to stderr. Bounds are decimal strings in JSON.
-
-Exit codes: **0** requested checks complete without errors; **1** design/language
-errors or counterexample; **2** incomplete/unsupported/timeout/stale evidence;
-**3** invocation, IO, integration or internal failure; **130** cancellation.
-Cancellation wins; fatal failure wins over errors, errors over incomplete-only.
-Every property retains its own evidence even when the single exit code differs.
-
-## Language boundary
-
-Read the [grammar](docs/grammar.md) and [support/semantics matrix](docs/support.md).
-The core supports typed records/unions/results/lists, named pure rules, explicit
-operations/effects, structured bounded flows, unknown decisions, and conservative
-single-owner resources. Costs are declared additive counters, not inferred elapsed
-time or peak memory. Abstract operation summaries are environment assumptions.
-
-Behavioural lowering supports **explicit finite scalar event machines and bounded
-structured flows**, including finite records/lists/outcomes, nested calls, retries,
-resource results and linked provider protocols. General aliases, owned resource
-collections, outer-resource loop invariants, full logical proofs, recursive cost
-proofs, arbitrary parallelism, temporal liveness, extraction and production
-conformance remain outside this bounded release. Unsupported requested claims remain
-visible and fail with status 2. Read [decisions and risks](https://github.com/KarlLivesey/pymtheg/blob/main/docs/decisions.md).
-
-The four domains are in [examples/mvp](examples/mvp). The separate
-`checkout-late.pym` models late effects and independently failing compensation;
-pending reconciliation is not terminal and no eventual completion is claimed.
-Executable [self-models](examples/self) expose repeated parsing and worker/publication
-lifecycle decisions without reimplementing the compiler.
-
-## Validation and evidence
-
-```sh
-npm test                    # fast source/CLI, schema, lifecycle and cancellation suite
-npm run test:backend        # behavioural, Rust/Go compiler and MCP integration suite
-npm run bench               # instrumented 1,000 / 10,000-rule measurements
-npm run capture             # schema-validated reports, bounded real runs
-npm run format:check
-./pymtheg fmt examples/mvp/library.pym --check
-./pymtheg doctor --format json
-```
-
-Behavioural integration tests explicitly report a skip when a configured checker
-time budget expires; that is never a passed correctness assertion. Set
-`PYM_TEST_BACKEND_TIMEOUT=45s` to choose a larger explicit integration budget.
-Correctness tests use readiness events, controlled clocks and deterministic counts;
-benchmark timings are informational only.
-
-- [Maintained self-map](https://github.com/KarlLivesey/pymtheg/blob/main/docs/runtime-map.md), [initial prerequisite map](https://github.com/KarlLivesey/pymtheg/blob/main/design/initial-system-map.md).
-- [Requirement/component/test checklist](https://github.com/KarlLivesey/pymtheg/blob/main/docs/requirements.md), [loop record](https://github.com/KarlLivesey/pymtheg/blob/main/docs/progress.md).
-- [Versioned report schema](docs/report.schema.json), [captured acceptance commands/results](https://github.com/KarlLivesey/pymtheg/blob/main/evidence/acceptance.json).
-- [Measured parser/rule/graph/cost counters](https://github.com/KarlLivesey/pymtheg/blob/main/evidence/benchmarks.json), [validation notes](https://github.com/KarlLivesey/pymtheg/blob/main/evidence/validation.md).
-
-## Preserved research
-
-[Comparison](https://github.com/KarlLivesey/pymtheg/blob/main/research/comparison.md), [original proposal](https://github.com/KarlLivesey/pymtheg/blob/main/design/proposal.md),
-[primary-source manifest](https://github.com/KarlLivesey/pymtheg/blob/main/research/sources/index.json), and the hand-written
-[Quint](https://github.com/KarlLivesey/pymtheg/blob/main/examples/checkout.qnt)/[TLA+](https://github.com/KarlLivesey/pymtheg/blob/main/examples/Checkout.tla) baseline remain intact.
-Historical logs are under `research/results/`. New implementation evidence is
-under `evidence/`; it does not retroactively upgrade the research spike.
-`examples/checkout.s15` is an aspirational incomplete sketch, **not accepted input**.
-
-The original experiments sampled 1,000 corrected Quint traces of six transitions
-and exhausted eight states of a manually aligned TLA+ model, using external tools
-that Pymtheg no longer uses or needs (decision D2). The generated checkout
-separates submission, provider effect and delivery; the built-in search exhausts
-its corrected finite case. Neither proves translation correctness in general or
-conformance of a production implementation.
-
-Public naming values live in `src/shared/identity-values.ts`, re-exported by
-`src/shared/identity.ts`. The CLI, source discovery, scenarios, generated source
-filenames and browser forms use those values. A rename also updates package
-metadata/bin and the local launcher; persisted storage/protocol IDs need an
-explicit migration rather than a cosmetic rename. No publication work.
-
-For a design that already has handwritten implementations, use
-`pymtheg scaffold design.pym --mode contracts --target typescript` (or `rust` /
-`go`). Keep that generated interface/trait file separate and implement
-`PymthegContracts` in your own file. Save a comparison baseline with
-`--manifest contracts.manifest.json`; after a design change,
-`pymtheg scaffold design.pym --check contracts.manifest.json` lists added,
-removed or changed contracts. Studio offers the same workflow under output
-purpose. Neither comparison nor compilation proves the implementation's behaviour.
-
-## Licence
-
-Pymtheg is licensed under the MIT License; see [LICENSE](LICENSE).
-Third-party components and their licences are listed in
-[docs/licences.md](docs/licences.md), and their full notices and licence texts are
-in [THIRD-PARTY-NOTICES](THIRD-PARTY-NOTICES).
+Pymtheg is licensed under the MIT License; see [LICENSE](LICENSE). Third-party
+components and their licences are listed in [docs/licences.md](docs/licences.md),
+with full notices in [THIRD-PARTY-NOTICES](THIRD-PARTY-NOTICES).
