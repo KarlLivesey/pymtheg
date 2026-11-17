@@ -172,16 +172,31 @@ test("path reads create nothing and reject symlink directories and database side
     assert.throws(() => storagePath(root, "planning"), /regular files/);
   }));
 
-test("the planning store opened by the product waits for a held writer lock instead of failing", () =>
+test("every project database that waits for writers keeps the 30-second lock wait", () =>
   fixture(async (root) => {
-    const store = await ArchitectureStore.open(root);
+    // Concurrent writers rely on this wait; 0 would fail at once with
+    // "database is locked". Each store is opened through the product's own
+    // entry point and its connection's pragma is read.
+    const wait = (db) => ({ ...db.prepare("PRAGMA busy_timeout").get() });
+    const planning = await ArchitectureStore.open(root);
+    const graph = openProjectGraph(root, "id");
+    const recovery = await RecoveryStore.openOrCreate(root);
     try {
-      // Concurrent link writers rely on this wait; 0 would fail at once.
       assert.deepEqual(
-        { ...store.db.prepare("PRAGMA busy_timeout").get() },
-        { timeout: 30000 },
+        {
+          planning: wait(planning.db),
+          graph: wait(graph.db),
+          runs: wait(recovery.runsDb),
+        },
+        {
+          planning: { timeout: 30000 },
+          graph: { timeout: 30000 },
+          runs: { timeout: 30000 },
+        },
       );
     } finally {
-      store.close();
+      planning.close();
+      graph.close();
+      recovery.close();
     }
   }));

@@ -31,9 +31,9 @@ unused. The backend files were read but needed no change.
 | File | Test | Rule | Why |
 | --- | --- | --- | --- |
 | `test/contracts-1.test.mjs` | caller and branch facts discharge scalar preconditions | duplicate of `contract-candidate.test.mjs` "guarded calls stay established and definite violations retain their existing error" | Both check that `if x > 0 { call f(x); }` establishes the callee's `x > 0` precondition; the other test also checks the unguarded and literal cases. The deleted test used `Int`, the survivor `Nat`, so after review the survivor now runs for both (see Rewritten tests). |
-| `test/core.test.mjs` | a newly added error variant breaks a previously exhaustive source consumer | duplicate of `core.test.mjs` "outcome addition breaks consumer and valid propagation remains valid" | Both check that a `match` missing one error variant is reported as C002; the kept test also checks valid propagation and an unknown variant. The deleted test also showed that a complete `match` is accepted; the kept core test does not catch a change that rejects valid exhaustive matches, but `flow.test.mjs` "tagged outcomes and nested calls share source semantics" does (it type-checks a complete `match` with no errors). Those two are the survivors. |
+| `test/core.test.mjs` | a newly added error variant breaks a previously exhaustive source consumer | duplicate of `core.test.mjs` "outcome addition breaks consumer and valid propagation remains valid" | Both check that a `match` missing one error variant is reported as C002; the kept test also checks valid propagation and an unknown variant. The deleted test also showed that a complete `match` passes cleanly. That half is guarded by `core.test.mjs` "file success/error exits and cleanup correction" (the corrected `match` exits 0) and by `flow.test.mjs` "tagged outcomes and nested calls share source semantics" (a complete `match` type-checks with no errors). Those are the survivors. |
 | `test/initial-domain.test.mjs` | initial constant comparison and event replay use the same scalar evaluator | implementation | It calls the evaluator directly to pin which helper both paths use. After review, the first test in the same file now checks the behaviour it stood for: the machine lowered from `= 3 - 1` starts at 2 (see Rewritten tests). |
-| `test/storage-boundary.test.mjs` | SQLite connection constructors and runtime imports stay inside the storage boundary | implementation | It reads `src/` text and fails whenever a module moves, whatever the behaviour. Where stores live and how paths are refused are checked by "initialization and all project stores use only .pymtheg" and "path reads create nothing and reject symlink directories and database sidecars". Review found it also, indirectly, kept the writer wait on the planning database; a new behaviour test now guards that (see Added test). |
+| `test/storage-boundary.test.mjs` | SQLite connection constructors and runtime imports stay inside the storage boundary | implementation | It read `src/` text and failed when code outside `src/storage/` opened SQLite directly (the rule in `docs/support.md`, "All features open their SQLite databases through one storage boundary", and `docs/decisions.md`). The behaviour that rule protects is the 30-second writer wait `openDatabase` applies (`src/storage/local.ts`). The added behaviour test "every project database that waits for writers keeps the 30-second lock wait" now replaces it. Where stores live and how paths are refused stay checked by "initialization and all project stores use only .pymtheg" and "path reads create nothing and reject symlink directories and database sidecars". |
 
 ## Rewritten tests
 
@@ -57,7 +57,17 @@ unused. The backend files were read but needed no change.
 
 | File | Test | Why |
 | --- | --- | --- |
-| `test/storage-boundary.test.mjs` | the planning store opened by the product waits for a held writer lock instead of failing | The deleted source scan indirectly kept every database open going through the shared opener, which sets SQLite's writer wait. This test opens the planning store the way the product does and reads `PRAGMA busy_timeout` through it: it must be 30000, not 0. Concurrent link writers rely on that wait. It reads the store's connection directly, which the manager allowed. There are no timing assertions. |
+| `test/storage-boundary.test.mjs` | every project database that waits for writers keeps the 30-second lock wait | Replaces the deleted source scan with the behaviour it protected. It opens each store through the product's own entry point and reads `PRAGMA busy_timeout` on that connection, which must be 30000, not 0. The stores are the planning store (`ArchitectureStore.open`), the graph store (`openProjectGraph`) and the recent-run cache (`RecoveryStore.openOrCreate`). Concurrent writers rely on the wait; without it a second writer fails at once with "database is locked". The test reads each store's connection field directly, which the manager allowed. There are no sleeps or timing assertions. |
+
+Every `openDatabase` caller in `src/`, and how the test treats it:
+
+| Caller | Database | Covered |
+| --- | --- | --- |
+| `src/architecture/store.ts` | planning store (`.pymtheg/shared/`) | yes |
+| `src/graph/store.ts` | code graph cache (`.pymtheg/rebuildable/`) | yes |
+| `src/studio/recovery.ts` (`runs`) | recent-run cache (`.pymtheg/rebuildable/`) | yes |
+| `src/studio/recovery.ts` (drafts) | unsaved-draft recovery store | no wait to guard: right after opening, the product itself sets `PRAGMA busy_timeout=0` on this connection (stale writers are refused through its revision check). A direct open would give the same 0, so no wait test can tell the two apart. |
+| `src/project/doctor.ts` | in-memory probe (`:memory:`) | not a project database |
 
 ## Mutation checks (after review)
 
@@ -67,7 +77,7 @@ reviewer's mutation applied:
 | Point | Mutation | Result |
 | --- | --- | --- |
 | 1 | Integer subtraction returns its right operand (`src/shared/operators.ts`). | `initial-domain` fails: start value `1n`, expected `2n`. |
-| 2 | The planning store opens its database with `timeout: 0` (`src/architecture/store.ts`). | The new storage test fails: `timeout: 0`, expected `30000`. |
+| 2 | Each store bypasses `openDatabase`: the graph store opens `DatabaseSync` directly (the second reviewer's mutation, `src/graph/store.ts`); the run cache does the same (`src/studio/recovery.ts`); the planning store opens with `timeout: 0` (`src/architecture/store.ts`). Each was run separately. | The new storage test fails under each one: `timeout: 0`, expected `30000`. |
 | 3 | `>` refinement does nothing for an input without a lower bound, so `Int` inputs are not refined (`src/analysis/facts.ts`). | `contract-candidate` fails for `Int`: a C006 finding appears. The `Nat` case still passes, as the reviewer found. This mutation causes type errors, but `tsc` still emits the JavaScript the test runs. |
 
 ## Production code removed
@@ -138,3 +148,6 @@ were rerun (as the manager asked):
   and `storage-boundary` tests: 51 tests, 51 passed.
 - Prettier check on the changed test files: passed.
 - Mutation checks: see the table above.
+
+After the second review, `npx tsc --noEmit -p .` passed and
+`storage-boundary` passed 7 of 7. Prettier passed on the test file.
