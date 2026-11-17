@@ -20,9 +20,11 @@ exists. No test pinned old README wording; no test changed.
   [support.md](../support.md).
 - Language boundary: [grammar.md](../grammar.md), [support.md](../support.md).
 - Contracts-mode scaffolds and `--body empty`: [output-plugins.md](../output-plugins.md).
-- Exit codes, the `exhaustive` field, `npx` signal handling and the tarball
-  `./` rule are covered nowhere else, so they stay, shortened, in the README's
-  "More detail" section.
+- Exit codes and their precedence, `--timeout`, `--out` and `--verbose`, the
+  install footprint, `npx` signal handling and the tarball `./` or `file:`
+  rule are covered in no shipped user doc, so they stay, shortened, in the
+  README's "More detail" section. (The `exhaustive` field is also explained
+  in [mcp.md](../mcp.md) and [support.md](../support.md).)
 
 ## What was removed
 

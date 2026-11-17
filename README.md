@@ -6,15 +6,18 @@ Pymtheg is a local tool for planning and checking software designs and for
 answering questions about existing code. You write a design in small `.pym`
 files and Pymtheg checks it before any code exists. For TypeScript, Go and Rust
 code it builds a call graph and keeps track of which requirement each piece of
-code serves. A coding agent can drive all of it over MCP.
+code serves. A coding agent can drive all of it over MCP (the Model Context
+Protocol, which coding agents use to call tools).
 
 What it does today:
 
 - **Designs and design documents.** Keep requirements, decisions and design
   documents with their revision history. Write `.pym` designs and check them for
-  missing outcomes, resources that are never cleaned up, multiplied work and
-  copied rules. Explore behaviour with a built-in exhaustive search (`verify`) or
-  a seeded sampler (`simulate`), and follow each counterexample back to the design.
+  missing outcomes, resources that are never cleaned up, work multiplied by
+  loops and retries, and the same rule copied in several places. Explore
+  behaviour with a built-in exhaustive search (`verify`) or a seeded sampler
+  (`simulate`: random runs that repeat exactly for the same seed), and follow
+  each counterexample back to the design.
 - **Code graph** for TypeScript/JavaScript, Go and Rust: search, callers, callees,
   paths between two symbols, and the impact of a change. Every call says how
   certain it is.
@@ -66,10 +69,12 @@ check the design first; and to keep requirements tied to the code that serves th
 
 Read the answers with their limits:
 
-- **Definite, candidate, failed.** A definite call has exactly one target. A
-  candidate set lists every possible target and never picks one. An unresolved
-  call has no target. A failed link depends on a file that could not be read;
-  Pymtheg never guesses its target.
+- **Definite, candidate, unresolved, failed.** A definite call has exactly one
+  target. A candidate set lists the possible targets in the project and never
+  picks one; a set marked open may have further targets outside the project or
+  members that are not verified. An unresolved call has no target. A failed
+  link depends on a file that could not be read; Pymtheg never guesses its
+  target.
 - Graph answers come from reading source. Pymtheg never runs your code. Only Go
   can optionally use the project's own `go` toolchain for more definite answers.
 - A sampled `simulate` run that finds nothing is not a proof. Only a completed
@@ -131,8 +136,10 @@ npx pymtheg link add R1 render --root .
 npx pymtheg link check --root .
 ```
 
-Connect a coding agent. The server speaks MCP over stdio and finds the project
-from any subfolder. For an agent, install once so the server starts quickly:
+Connect a coding agent. The agent starts the server itself and talks to it
+over stdio (its standard input and output). Started inside an initialised
+project, the server finds the project from any subfolder. For an agent, install
+once so the server starts quickly:
 
 ```sh
 npm install --global pymtheg
@@ -148,8 +155,8 @@ Then add it to your agent's MCP configuration (formats vary by client):
 }
 ```
 
-Studio's **Connect agent** button prints the exact configuration for your
-installation. Agents start with [docs/agent-workflow.md](docs/agent-workflow.md)
+Studio's **Connect agent** button shows the exact configuration for your
+installation, with a **Copy configuration** button. Agents start with [docs/agent-workflow.md](docs/agent-workflow.md)
 and [docs/code-guide.md](docs/code-guide.md); both are also served as MCP resources.
 
 Open Studio, then open the printed private session URL in Firefox:
@@ -192,11 +199,19 @@ are walked through in [docs/journeys.md](docs/journeys.md).
 **Exit codes** for `check`, `verify` and `simulate`: **0** the requested
 checks completed without errors; **1** design errors or a counterexample;
 **2** incomplete, unsupported, timed out or stale; **3** invocation, file,
-integration or internal failure; **130** cancelled. `verify` stops at
-`--state-budget` distinct states (default 1,000,000); properties it has not
-violated by then are inconclusive (exit 2), never passed. `--format json` gives
-versioned output; every behaviour result carries `exhaustive`, which is `true`
-only for a search that covered every reachable state.
+integration or internal failure; **130** cancelled. When several apply,
+cancellation wins, then a failure (3), then errors (1), then incomplete (2).
+`verify` stops at `--state-budget` distinct states (default 1,000,000);
+properties it has not violated by then are inconclusive (exit 2), never passed.
+`--format json` gives versioned output; every behaviour result carries
+`exhaustive`, which is `true` only for a search that covered every reachable
+state.
+
+**Options for `check`, `verify` and `simulate`.** `--timeout 500ms` or `45s`
+bounds the checking work (default 45s, at most 120s); running out leaves the
+result incomplete. `--out report.json` also writes the JSON report to a file,
+atomically, and still prints the findings. `--verbose` prints progress phases
+on stderr, so stdout stays clean.
 
 **Running under `npx`.** Each `npx` call costs a few seconds and some memory
 before any work, so prefer the MCP server (one long-running process) or a global
@@ -207,10 +222,14 @@ reaches Pymtheg. A terminal's Ctrl-C is not affected. A supervisor that stops
 the server by PID should signal the process group (`kill -INT -- -PGID`) or run
 the installed `pymtheg` binary directly.
 
+**What the install brings.** Five runtime dependencies (ten packages in all)
+and no install scripts. Studio's browser app and the code-graph grammars ship
+prebuilt.
+
 **Installing from a local tarball.** After `npm run build`, `npm pack
---ignore-scripts` writes a tarball. Write it as `./name.tgz` (for example
-`npx ./pymtheg-<version>.tgz --help`): npm treats a bare absolute path as a
-command and fails with exit 126.
+--ignore-scripts` writes a tarball. Write it as `./name.tgz` or
+`file:/absolute/path/name.tgz` (for example `npx ./pymtheg-<version>.tgz
+--help`): npm treats a bare absolute path as a command and fails with exit 126.
 
 ## Status, contributing and licence
 
