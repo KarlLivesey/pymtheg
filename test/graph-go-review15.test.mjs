@@ -644,4 +644,26 @@ test("round 16 Sol 4: combined decisions keep every property of every part", asy
   const lone = call(links, "p/p.go", "f");
   assert.deepEqual(lone.candidates, []);
   assert.ok(reasonsOf(lone).includes(UNSEEN), JSON.stringify(lone.data));
+  // Twenty-four implementations: the combined set keeps the dispatch cap
+  // (interface dispatch keeps sets up to its own cap), so all 25 candidates
+  // stay instead of falling back to a smaller limit and losing them.
+  const many = Array.from(
+    { length: 24 },
+    (_, i) => `T${String(i + 1).padStart(2, "0")}`,
+  );
+  ({ links } = await project({
+    "go.mod": MOD,
+    "p/p.go": lines(
+      "package p",
+      "type I interface{ M() }",
+      ...many.map((name) => `type ${name} struct{}\nfunc (${name}) M() {}`),
+      "func F(i I, a T01, change bool) { f := i.M; if change { f = a.M }; f() }",
+    ),
+  }));
+  const capped = call(links, "p/p.go", "f");
+  assert.equal(capped.candidates.length, 25, JSON.stringify(capped.data));
+  assert.deepEqual(capped.candidates, [
+    ...many.map((name) => `p/p.go:method:(${name}).M`),
+    "p/p.go:method:I.M",
+  ]);
 });

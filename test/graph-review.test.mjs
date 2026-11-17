@@ -595,7 +595,7 @@ test("A7: invalid UTF-8 is failed with original-byte hash and never reaches the 
   });
 });
 
-test("A8: ordering is stable across locale environments", async () => {
+test("A8: ordering is stable across locale environments", async (t) => {
   await sandbox(async ({ root, store }) => {
     for (const path of ["é.toy", "a.toy", "Z.toy"])
       await writeFile(join(root, path), "def x\n");
@@ -619,6 +619,45 @@ test("A8: ordering is stable across locale environments", async () => {
       });
     assert.equal(run("C"), run("sv_SE.UTF-8"));
   });
+  // Graph output lists files in UTF-16 code-unit order whatever the locale:
+  // "Z" < "a" < "z" < "ä". A locale collation puts "ä" before "z" (C/en) or
+  // "Z" after "z" (Swedish), so both runs must give this literal order.
+  const graphUrl = pathToFileURL(
+    join(process.cwd(), "dist/graph/index.js"),
+  ).href;
+  const toyUrl = pathToFileURL(
+    join(process.cwd(), "dist/graph/languages/toy/index.js"),
+  ).href;
+  const listing = [
+    `import {mkdtemp,rm,writeFile} from "node:fs/promises";`,
+    `import {tmpdir} from "node:os";`,
+    `import {join} from "node:path";`,
+    `import {SqliteGraphStore,indexProject,LanguageRegistry} from ${JSON.stringify(graphUrl)};`,
+    `import toy from ${JSON.stringify(toyUrl)};`,
+    `const root = await mkdtemp(join(tmpdir(), "pymtheg-a8-"));`,
+    `for (const name of ["ä.toy","z.toy","a.toy","Z.toy"]) await writeFile(join(root, name), "def x\\n");`,
+    `const store = new SqliteGraphStore(":memory:", "a8");`,
+    `await indexProject(root, new LanguageRegistry([toy]), store);`,
+    `console.log(JSON.stringify({locale: new Intl.Collator().resolvedOptions().locale, files: store.files().map((f) => f.path)}));`,
+    `store.close(); await rm(root, { recursive: true, force: true });`,
+  ].join("\n");
+  for (const [locale, expected] of [
+    ["C", "en"],
+    ["sv_SE.UTF-8", "sv"],
+  ])
+    await t.test(locale, async (sub) => {
+      const out = JSON.parse(
+        execFileSync(process.execPath, ["--input-type=module", "-e", listing], {
+          env: { ...process.env, LANG: locale, LC_ALL: locale },
+          encoding: "utf8",
+        }),
+      );
+      if (!out.locale.startsWith(expected))
+        return sub.skip(
+          `Node resolved ${out.locale} for ${locale}, so this run cannot show a locale-dependent order`,
+        );
+      assert.deepEqual(out.files, ["Z.toy", "a.toy", "z.toy", "ä.toy"]);
+    });
 });
 
 test("A10: production discovery hides test-only languages, including the toy, even from an unrelated working directory", async () => {

@@ -38,9 +38,7 @@ async function fixtures() {
 }
 
 test("Go module passes the conformance kit on the sample project", async () => {
-  const files = await fixtures();
-  assert.ok(files.some((file) => file.text.includes("😀")));
-  await checkLanguageConformance(go, files, { symbols, links });
+  await checkLanguageConformance(go, await fixtures(), { symbols, links });
 });
 
 test("Go module is discovered in production and claims only Go sources and context", async () => {

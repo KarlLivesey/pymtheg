@@ -190,14 +190,36 @@ test("direct partial and failed replacements invalidate incoming definite and de
           store.incoming(target.id, "calls")[0].targetStatus,
           "partial",
         );
-        assert.ok(
-          store
-            .incoming(target.id, "implements")
-            .every(
-              (link) =>
-                link.candidates.find((candidate) => candidate.id === target.id)
-                  .status === "partial",
-            ),
+        // The caller's candidate link survives with every candidate; the two
+        // symbols of the replaced file (target and second) are now partial.
+        const callerLink = store
+          .incoming(target.id, "implements")
+          .find((link) => link.file === "caller.toy");
+        assert.ok(callerLink, "the caller's candidate link survives");
+        assert.deepEqual(
+          callerLink.candidates.map(({ id, status }) => [id, status]),
+          [
+            [
+              "symbol:5f8c8ae4d4c316e22b6c5f5114bcd7d4716e89b05ef101b471470d3cc9704aaa",
+              "clean",
+            ],
+            [
+              "symbol:5ffb272fcb1afdc71e6474802e8f602de793caca33db6acb67ee001a5e00dae4",
+              "partial",
+            ],
+            [
+              "symbol:684c6601f8447b899bb7dc20ba9394dd5315097a84430e96e82a42ceb83d3489",
+              "partial",
+            ],
+            [
+              "symbol:d581d6424c02d95c475d4529e8ef2956a6b5ce113363ac030fdbb435c4c1f7aa",
+              "clean",
+            ],
+          ],
+        );
+        assert.equal(
+          target.id,
+          "symbol:684c6601f8447b899bb7dc20ba9394dd5315097a84430e96e82a42ceb83d3489",
         );
       } else {
         assert.equal(store.incoming(target.id).length, 0);
