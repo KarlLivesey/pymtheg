@@ -116,7 +116,8 @@ All run on the dev server.
 - Before the change (main), the slice's `*.test.mjs` files: 2101 tests,
   2101 pass, 0 fail.
 - After: `npm run build` passes; `tsc --noEmit` passes; Prettier check of the
-  changed files and `npm run format:check` pass.
+  changed test files and `npm run format:check` pass (the check does not cover
+  `docs/changes`, and this note is not Prettier-formatted).
 - After, the slice's `*.test.mjs` files: 2098 tests, 2098 pass, 0 fail
   (2101 minus the three deleted tests).
 - After, full `npm test`: 2920 tests, 2920 pass, 0 fail, 0 skipped.
