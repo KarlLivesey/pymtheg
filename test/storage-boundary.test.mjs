@@ -171,3 +171,17 @@ test("path reads create nothing and reject symlink directories and database side
     await symlink(join(root, "missing"), file + "-journal");
     assert.throws(() => storagePath(root, "planning"), /regular files/);
   }));
+
+test("the planning store opened by the product waits for a held writer lock instead of failing", () =>
+  fixture(async (root) => {
+    const store = await ArchitectureStore.open(root);
+    try {
+      // Concurrent link writers rely on this wait; 0 would fail at once.
+      assert.deepEqual(
+        { ...store.db.prepare("PRAGMA busy_timeout").get() },
+        { timeout: 30000 },
+      );
+    } finally {
+      store.close();
+    }
+  }));

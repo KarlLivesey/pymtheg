@@ -142,7 +142,6 @@ test("alpha copies detected while different resolved rules and shared references
   const dup = r.report.diagnostics.filter((d) => d.code === "D001");
   assert.equal(dup.length, 1);
   assert.match(dup[0].message, /a, b/);
-  assert.equal(r.report.measurements.rulePairComparisons, 0);
 });
 const resource =
   "resource File { states Open, Closed; initial Open; terminal Closed; Open -> Closed; Closed -> Closed; } ";

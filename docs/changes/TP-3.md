@@ -20,19 +20,20 @@ behaviour instead.
 | Unit test files (`*.test.mjs`, run by `npm test`) | 176 | 176 |
 | Backend test files (`*.integration.mjs`) | 12 | 12 |
 | Helpers and scripts (`bench.mjs`, `capture.mjs`, `capture-supervisor-observer.mjs`, `controlled-clock.mjs`, `process-safety.mjs`, `recovery-ack.mjs`) | 6 | 6 |
-| Tests run by the unit files (as counted by `node --test`) | 747 | 743 |
+| Tests run by the unit files (as counted by `node --test`) | 747 | 744 |
 
-No whole file was deleted, so no fixture or helper became unused. The backend
-files were read but needed no change.
+744 = 747 − 4 deleted + 1 added (the storage writer-wait test, added after
+review; see below). No whole file was deleted, so no fixture or helper became
+unused. The backend files were read but needed no change.
 
 ## Deleted tests
 
 | File | Test | Rule | Why |
 | --- | --- | --- | --- |
-| `test/contracts-1.test.mjs` | caller and branch facts discharge scalar preconditions | duplicate of `contract-candidate.test.mjs` "guarded calls stay established and definite violations retain their existing error" | Both check that `if x > 0 { call f(x); }` establishes the callee's `x > 0` precondition; the other test also checks the unguarded and literal cases. |
-| `test/core.test.mjs` | a newly added error variant breaks a previously exhaustive source consumer | duplicate of `core.test.mjs` "outcome addition breaks consumer and valid propagation remains valid" | Both check that a `match` missing one error variant is reported as C002; the kept test also checks valid propagation and an unknown variant. |
-| `test/initial-domain.test.mjs` | initial constant comparison and event replay use the same scalar evaluator | implementation | It calls the evaluator directly to pin which helper both paths use. The behaviour (a `3 - 1` start value is accepted in `1..2`) is already checked by the first test in the same file. |
-| `test/storage-boundary.test.mjs` | SQLite connection constructors and runtime imports stay inside the storage boundary | implementation | It reads `src/` text and fails whenever a module moves, whatever the behaviour. Where stores live and how paths are refused are checked by "initialization and all project stores use only .pymtheg" and "path reads create nothing and reject symlink directories and database sidecars". |
+| `test/contracts-1.test.mjs` | caller and branch facts discharge scalar preconditions | duplicate of `contract-candidate.test.mjs` "guarded calls stay established and definite violations retain their existing error" | Both check that `if x > 0 { call f(x); }` establishes the callee's `x > 0` precondition; the other test also checks the unguarded and literal cases. The deleted test used `Int`, the survivor `Nat`, so after review the survivor now runs for both (see Rewritten tests). |
+| `test/core.test.mjs` | a newly added error variant breaks a previously exhaustive source consumer | duplicate of `core.test.mjs` "outcome addition breaks consumer and valid propagation remains valid" | Both check that a `match` missing one error variant is reported as C002; the kept test also checks valid propagation and an unknown variant. The deleted test also showed that a complete `match` is accepted; the kept core test does not catch a change that rejects valid exhaustive matches, but `flow.test.mjs` "tagged outcomes and nested calls share source semantics" does (it type-checks a complete `match` with no errors). Those two are the survivors. |
+| `test/initial-domain.test.mjs` | initial constant comparison and event replay use the same scalar evaluator | implementation | It calls the evaluator directly to pin which helper both paths use. After review, the first test in the same file now checks the behaviour it stood for: the machine lowered from `= 3 - 1` starts at 2 (see Rewritten tests). |
+| `test/storage-boundary.test.mjs` | SQLite connection constructors and runtime imports stay inside the storage boundary | implementation | It reads `src/` text and fails whenever a module moves, whatever the behaviour. Where stores live and how paths are refused are checked by "initialization and all project stores use only .pymtheg" and "path reads create nothing and reject symlink directories and database sidecars". Review found it also, indirectly, kept the writer wait on the planning database; a new behaviour test now guards that (see Added test). |
 
 ## Rewritten tests
 
@@ -43,6 +44,31 @@ files were read but needed no change.
 | `test/evidence-retention.test.mjs` | historical evidence keeps only needed target rows and still identifies changed contracts → evidence reviewed at many historical revisions is stale only where its target changed | implementation | It replaced `Map.prototype.set` and read the call stack for the name `StudioService.architectureWork` to count rows held in private maps. A rename or a different container would fail it, and a regression that held rows elsewhere would pass. It now checks only the result: of eight plans reviewed at eight earlier revisions, only the one whose type changed is stale evidence. |
 | `test/impact-membership.test.mjs` | planning-heavy impact preserves every consumer without quadratic membership scans → planning-heavy impact lists every consumer exactly once | implementation | It replaced `Array.prototype.includes` to count lookups, which only sees that one helper (a slow loop or `indexOf` would pass). It now checks the result for 2,000 plans: every consumer listed, none twice, and no direct or transitive impact. |
 | `test/output-layout.test.mjs` | large inline cycles use bounded graph work, without recursive host traversal → a ten-thousand-type inline cycle gets indirection on every edge without overflowing the stack | implementation | It asserted a `measurements` field that only repeated the input sizes (declarations and edges), so it measured no work. It now checks that the layout is marked recursive, plus the existing check that every edge of the 10,000-type cycle needs indirection. |
+
+| `test/initial-domain.test.mjs` | out-of-range starting constants are located local design errors and block lowering (name unchanged) | review: lost guard | Added one assertion: the machine lowered from `state count: Int in 1..2 = 3 - 1` starts at the literal `2n`. Before, a wrong computed start value that stayed in range (1) passed. |
+| `test/contract-candidate.test.mjs` | guarded calls stay established and definite violations retain their existing error (name unchanged) | review: lost guard | The guarded-call check now runs for both `Nat` and `Int` inputs, covering the signed input the deleted `contracts-1` test had. |
+| `test/core.test.mjs` | alpha copies detected while different resolved rules and shared references stay distinct (name unchanged) | nothing | Removed `measurements.rulePairComparisons === 0`: the product always sets that value to a hard-coded 0, so it measures no work. The field stays, because it is part of the report output and `test/bench.mjs` reads it. |
+| `test/format.test.mjs` | format preserves every token and comment and is idempotent across the language examples → shipped examples are already formatter-canonical and formatting is idempotent | nothing | Once the test establishes that formatted text equals the source, comparing their tokens and comments cannot fail. Those two comparisons are removed. Token and comment preservation on text that does change stays in the other tests in this file. |
+| `test/package-contents.test.mjs` | the private-name patterns load from a file given by path and fire as written → the private-name scanner reads patterns from a file and reports lines, not text | nothing | It exercised only the test's own scanner on many synthetic inputs. Kept as one compact self-test next to the release check it supports, so that check cannot pass by matching nothing: one hit (reported by line, not text) and one miss. |
+| `test/package-contents.test.mjs` | the private network rules fire on each private form and allow public, loopback and documentation forms → the private network scanner fires on each rule and allows public forms | nothing | As above: one compact self-test next to the network release check. It fires once for each rule (private IPv4, text host name, devserver, minified-code host, first-party dist string) and has three allowed forms. |
+| `test/package-contents.test.mjs` | the owner's name is allowed only in licence texts and package.json's top-level author → the personal scanner allows only the top-level author and flags paths | nothing | As above: one compact self-test next to the personal release check. It covers the allowed author line, a nested author, the name in code and a home path. |
+
+## Added test (after review)
+
+| File | Test | Why |
+| --- | --- | --- |
+| `test/storage-boundary.test.mjs` | the planning store opened by the product waits for a held writer lock instead of failing | The deleted source scan indirectly kept every database open going through the shared opener, which sets SQLite's writer wait. This test opens the planning store the way the product does and reads `PRAGMA busy_timeout` through it: it must be 30000, not 0. Concurrent link writers rely on that wait. It reads the store's connection directly, which the manager allowed. There are no timing assertions. |
+
+## Mutation checks (after review)
+
+Each new assertion was run in a scratch copy on the dev server with the
+reviewer's mutation applied:
+
+| Point | Mutation | Result |
+| --- | --- | --- |
+| 1 | Integer subtraction returns its right operand (`src/shared/operators.ts`). | `initial-domain` fails: start value `1n`, expected `2n`. |
+| 2 | The planning store opens its database with `timeout: 0` (`src/architecture/store.ts`). | The new storage test fails: `timeout: 0`, expected `30000`. |
+| 3 | `>` refinement does nothing for an input without a lower bound, so `Int` inputs are not refined (`src/analysis/facts.ts`). | `contract-candidate` fails for `Int`: a C006 finding appears. The `Nat` case still passes, as the reviewer found. This mutation causes type errors, but `tsc` still emits the JavaScript the test runs. |
 
 ## Production code removed
 
@@ -55,16 +81,9 @@ files were read but needed no change.
 These stay because they guard something real, but they are not plain
 behaviour tests. The manager may decide otherwise.
 
-- `test/package-contents.test.mjs`: "the private-name patterns load from a
-  file given by path and fire as written", "the private network rules fire on
-  each private form and allow public, loopback and documentation forms" and
-  "the owner's name is allowed only in licence texts and package.json's
-  top-level author". They test the scanners in the test file, not the product.
-  No product change can fail them, but they stop the release-safety scan from
-  quietly weakening.
 - `test/shipped-docs-names.test.mjs`, "every MCP tool a shipped doc names is in
   tools/list": its last assertions test the test's own name-matcher on sample
-  sentences, for the same reason.
+  sentences, so the doc check cannot pass by matching nothing.
 - `test/contracts-regeneration.integration.mjs`, "unavailableReason names the
   spawned tool and the missing crate": tests a helper in the test file that
   decides when a missing compiler is a skip rather than a failure.
@@ -110,3 +129,12 @@ Run on the dev server with `pymtheg-dev` (Node 24.21.0):
 - Backend files (`*.integration.mjs`) were not run: none was changed.
 - Full `npm test` (all slices): 2919 tests, 2919 passed.
 - Prettier check on the changed files: passed.
+
+The figures above are from the first round. After review, only the touched files
+were rerun (as the manager asked):
+
+- `npx tsc --noEmit -p .`: passed.
+- `contract-candidate`, `core`, `format`, `initial-domain`, `package-contents`
+  and `storage-boundary` tests: 51 tests, 51 passed.
+- Prettier check on the changed test files: passed.
+- Mutation checks: see the table above.

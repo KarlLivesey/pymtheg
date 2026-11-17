@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { formatSource } from "../dist/language/format.js";
 import { lex } from "../dist/language/lexer.js";
 import { readFileSync, readdirSync } from "node:fs";
-test("format preserves every token and comment and is idempotent across the language examples", () => {
+test("shipped examples are already formatter-canonical and formatting is idempotent", () => {
   for (const file of readdirSync("examples/mvp").filter((f) =>
     f.endsWith(".pym"),
   )) {
@@ -16,15 +16,6 @@ test("format preserves every token and comment and is idempotent across the lang
       "Shipped example must already be formatter-canonical: " + file,
     );
     assert.equal(formatSource(file, formatted), formatted, file);
-    assert.deepEqual(
-      lex(file, formatted).tokens.map((t) => t.text),
-      lex(file, source).tokens.map((t) => t.text),
-      file,
-    );
-    assert.deepEqual(
-      formatted.match(/\/\/[^\n]*/g),
-      source.match(/\/\/[^\n]*/g),
-    );
   }
   assert.throws(() => formatSource("bad.pym", "flow bad( {"), /syntax errors/);
 });

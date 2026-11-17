@@ -9,7 +9,7 @@ import { Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { analyseFile } from "../dist/analysis/index.js";
 import { exitStatus } from "../dist/reporting/report.js";
-import { lower } from "../dist/behaviour/model.js";
+import { lower, initial } from "../dist/behaviour/model.js";
 const file = "/tmp/initial-domain.pym";
 const source = (value) =>
   `machine Counter {\n  state count: Int in 1..2 = ${value};\n  invariant safe = true;\n}\n`;
@@ -30,6 +30,10 @@ test("out-of-range starting constants are located local design errors and block 
   }
   for (const value of ["1", "2", "3 - 1"])
     assert.equal(exitStatus(model(source(value)).report), 0);
+  // A computed starting value starts the machine at its value, not just in range.
+  const computed = lower(model(source("3 - 1")).ir, "Counter");
+  assert.equal(computed.kind, "supported");
+  assert.equal(initial(computed.model.machine).count, 2n);
   const unknown = model(source('unknown "choose a starting value"'));
   assert.equal(
     unknown.report.diagnostics.some((d) => d.code === "B012"),
