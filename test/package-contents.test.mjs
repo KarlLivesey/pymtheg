@@ -391,6 +391,55 @@ test("the private network rules fire on each private form and allow public, loop
   ])
     assert.ok(!fires("dist-web/assets/x.js", text), text);
 });
+/**
+ * Home paths and the owner's name in one shipped file. The owner's name is
+ * public in the licence texts and in exactly one other place: the top-level
+ * `author` field of package.json, a line of the form `  "author": "...",`
+ * (two-space indent, as npm and prettier write it). Any other line of
+ * package.json that names the owner still fails.
+ */
+function personalFindings(path, text) {
+  const found = [];
+  const licenceText = [
+    "LICENSE",
+    "THIRD-PARTY-NOTICES",
+    "docs/licences.md",
+  ].includes(path);
+  const authorLine = (l) =>
+    path === "package.json" && /^ {2}"author": "[^"\\]*",?$/.test(l);
+  const rules = [
+    ["personal path", /\/home\/[a-z_][a-z0-9_.-]*\//i, () => false],
+    ...(licenceText ? [] : [["owner's name", /\bKarl\b/, authorLine]]),
+  ];
+  for (const [what, pattern, allowed] of rules) {
+    const line = text
+      .split("\n")
+      .findIndex((l) => pattern.test(l) && !allowed(l));
+    if (line >= 0) found.push(`${path}:${line + 1}: ${what}`);
+  }
+  return found;
+}
+test("the owner's name is allowed only in licence texts and package.json's top-level author", () => {
+  const pkg =
+    '{\n  "name": "x",\n  "author": "Karl Livesey",\n  "license": "MIT"\n}\n';
+  assert.deepEqual(personalFindings("package.json", pkg), []);
+  assert.deepEqual(personalFindings("LICENSE", "Copyright Karl Livesey"), []);
+  for (const [path, text] of [
+    ["package.json", '{\n  "description": "by Karl",\n  "author": "x"\n}'],
+    [
+      "package.json",
+      '{\n  "contributors": [\n    {\n      "author": "Karl"\n    }\n  ]\n}',
+    ],
+    ["package.json", '{\n  "author": "Karl Livesey", "description": "Karl"\n}'],
+    ["README.md", '  "author": "Karl Livesey",'],
+    ["dist/cli/main.js", "// Karl"],
+  ])
+    assert.equal(personalFindings(path, text).length, 1, `${path}: ${text}`);
+  assert.deepEqual(
+    personalFindings("package.json", '  "x": "/home/someone/y",'),
+    ["package.json:1: personal path"],
+  );
+});
 test("no shipped file carries a personal path, the owner's name or a private project name", () => {
   const offences = [];
   const shipped = [];
@@ -398,19 +447,7 @@ test("no shipped file carries a personal path, the owner's name or a private pro
     if (/\.(wasm|png|ico)$/.test(path) || !existsSync(path)) continue;
     const text = readFileSync(path, "utf8");
     shipped.push({ path, text });
-    const licenceText = [
-      "LICENSE",
-      "THIRD-PARTY-NOTICES",
-      "docs/licences.md",
-    ].includes(path);
-    const rules = [
-      ["personal path", /\/home\/[a-z_][a-z0-9_.-]*\//i],
-      ...(licenceText ? [] : [["owner's name", /\bKarl\b/]]),
-    ];
-    for (const [what, pattern] of rules) {
-      const line = text.split("\n").findIndex((l) => pattern.test(l));
-      if (line >= 0) offences.push(`${path}:${line + 1}: ${what}`);
-    }
+    offences.push(...personalFindings(path, text));
   }
   offences.push(...privateNameFindings(privateNamesFile, shipped));
   assert.deepEqual(offences, []);

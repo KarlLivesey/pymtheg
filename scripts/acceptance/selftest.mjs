@@ -18,7 +18,7 @@
 // Writes selftest.json and selftest.md to --out (default evidence/r1-f).
 import { spawn, spawnSync } from "node:child_process";
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { WORDING, WORDING_CASES } from "./wording.mjs";
 
@@ -116,7 +116,7 @@ const SABOTAGES = [
     what: "`--version` prints an internal-error stack trace and exits 0",
     expect: ["version"],
     apply: (d) =>
-      prelude(d, 'if (process.argv[2] === "--version") { console.log("1.0.0"); console.error("TypeError: Cannot read properties of undefined (reading \'x\')\\n    at main (file:///usr/lib/node_modules/pymtheg/dist/cli/main.js:12:5)"); process.exit(0); }'),
+      prelude(d, 'if (process.argv[2] === "--version") { console.log("0.1.0"); console.error("TypeError: Cannot read properties of undefined (reading \'x\')\\n    at main (file:///usr/lib/node_modules/pymtheg/dist/cli/main.js:12:5)"); process.exit(0); }'),
   },
   { id: "wrong-diagnostic-message", what: "the N002 suggestion text changes", expect: ["check-broken", "mcp-check_design-broken"], apply: (d) => patch(d, "dist/semantic/core.js", /did you mean \$\{match\}\?/, "did you mean ${match} instead?") },
   { id: "listed-tool-throws", what: "a listed MCP tool (`design_recipe`) throws", expect: ["mcp-design_recipe"], apply: (d) => toolThrows(d, "design_recipe") },
@@ -213,7 +213,7 @@ for (const c of cases) {
     continue;
   }
   mkdirSync(join(dir, "out"), { recursive: true });
-  c.tgz = join(dir, "out", "pymtheg-1.0.0.tgz");
+  c.tgz = join(dir, "out", basename(tarball));
   spawnSync("tar", ["-czf", c.tgz, "-C", dir, "package"], { stdio: "inherit" });
 }
 
