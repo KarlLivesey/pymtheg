@@ -89,3 +89,88 @@ output for diagnosis. Completed attempts, including failures, get an atomic
 record by repository ID and SHA. Rerun with the same scratch path to skip those
 records and regenerate the aggregate. Use a new scratch folder for an independent
 rerun of the same commits. Only the compact aggregate and report belong in Git.
+
+## Coverage scoreboard
+
+`coverage-export.mjs` opens a completed graph in read-only mode and checks its
+link totals against that run's warm CLI result. Its aggregate includes every
+stored language, kind, outcome, `data.reason` and `data.uncertainty` combination,
+plus the file scope and the coverage classification. Ambiguous links remain
+in the denominator. Resolved structural links such as `contains` count too.
+The scoreboard reports both per-module rates across all checkouts and an
+unweighted pinned mean that scores failed attempts as zero. Its overall
+pinned mean uses the whole checkout. A failed attempt contributes no measured
+link weights. Estimated links from missing graphs are part of the separate
+planning calculation.
+
+Outside requires evidence that the target is unavailable in the checkout.
+
+- **Go.** Follow import edges or a selector whose recorded expression has a
+  package-name root. Use an explicit alias, or an undisputed last path segment
+  for the implicit alias. The released Go layout checks local modules and
+  replacements. A recorded `vendor/` package stays inside. The standard
+  library roots, recorded builtin calls and dependencies declared in the owning
+  `go.mod` can count as outside. The score retains C imports and unresolved
+  receiver chains without this evidence.
+- **Rust.** Use explicit `std`, `core`, `alloc`, `proc_macro` and `test` paths,
+  an unconditional top-level import binding, or a named Cargo dependency with
+  an unambiguous path or registry origin. Local Rust names and conflicting
+  bindings prevent external attribution. A fixed list of prelude macros and
+  types also counts as outside when the checkout shows no possible shadow,
+  disabled prelude or relevant `no_std` restriction. Macro-use imports and
+  blocked sites prevent that inference. `crate`, `self`, `super` and authored
+  module declarations are inside. Uncertain receiver types stay unclassified.
+- **TypeScript and JavaScript.** Use literal specifiers or simple, unshadowed
+  import bindings. A workspace package or relative import under the checkout
+  stays inside. Relative imports that escape the checkout count as outside.
+  Built-in Node specifiers and unvendored declared package dependencies can
+  be outside. A configured alias that could bind locally prevents an external
+  guess. An `external` link to a known runtime or compiler-library name with no captured
+  shadow can count as outside. An `external-package` label with no package
+  evidence stays unclassified. The released TypeScript parser reads import
+  declarations for this rule without executing source.
+
+The file-scope split recognizes checked-in minified JavaScript, PocketBase's
+checked-in `ui/dist/` bundles, explicit negative fixture paths, Tauri's
+unexpanded source templates and mdBook's hidden-line snippets. The default
+score counts them. The alternate scores remove one named scope at a time and
+all three together. The split follows the source of a link. An incoming link
+from another scope retains that scope. A failed file with no links still
+appears in the failed-source counts. The 14 known invalid Go tools inputs count
+as broken fixtures. The three reviewed valid Go files that the grammar rejected
+stay in the source scope.
+
+The audit stratifies eligible unresolved and ambiguous links by language and
+reason family. It ranks sites by a SHA-256 hash of seed `0x7c8a59bd2e41`, the
+repository pin, source span, kind and target spelling. It takes 96 sites in
+each of four large strata and up to 32 in each remaining stratum. The review
+labels concrete shapes in those source sites. Unlabeled sites still contribute
+to the sample denominator. Rust links marked `failed-file-unseen-declarations`
+use a separate exact count, including links which also carry a receiver reason.
+
+### Recompute after a candidate run
+
+Use one dev-server scratch directory for the npm baseline and candidate runs
+so the export can use the same released metadata readers and npm cache. A local
+build directory needs built `dist/` files and its runtime dependencies. A
+local `.tgz` installs offline from the scratch cache. Candidate records are
+keyed by artifact digest and live separately from the release records.
+
+```sh
+pymtheg-dev --name sw3 -- bash -c '
+  node scripts/sweep/run.mjs --manifest "$PYM_SCRATCH/affected.json" \
+    --local-build "$PYM_SCRATCH/pymtheg-candidate.tgz" \
+    --output "$PYM_SCRATCH/candidate-run.json" --parallel 12
+  node scripts/sweep/coverage-export.mjs --results "$PYM_SCRATCH/candidate-run.json" \
+    --output "$PYM_SCRATCH/candidate-coverage.json" \
+    --reference-samples evidence/sw-3/samples.json.gz
+'
+pymtheg-dev --name sw3 --no-sync -- bash -c 'cat "$PYM_SCRATCH/candidate-coverage.json"' > /tmp/pymtheg-candidate-coverage.json
+node scripts/sweep/coverage.mjs --results /tmp/pymtheg-candidate-coverage.json \
+  --base evidence/sw-3/breakdown.json.gz --plan docs/coverage-plan.md
+```
+
+After a full run or subset overlay, `--scoreboard FILE` also writes the rates
+and per-repository table. For an archived baseline, pass only its breakdown
+as `--results`. The plan retains its prose and replaces the marked table and
+running totals.
