@@ -2517,7 +2517,7 @@ size. Impact's per-frontier counts are unchanged (still capped at the limit).
 server info, `doctor` and reports read from `identity.version`. `package.json`
 no longer has `"private": true` and now carries `description`, `keywords`, `homepage`, `bugs`, `repository`,
 `author` (the copyright holder named in `LICENSE`) and
-`"publishConfig": {"access": "public"}`. The shipped files are unchanged. The
+`"publishConfig": {"access": "public"}`. The shipped file list is unchanged. The
 owner publishes by hand, following "Publishing" in `CONTRIBUTING.md`; no script
 or CI job publishes. **Why:** the initial release is `npx pymtheg` on a clean
 machine, which needs the package on the registry. This supersedes "`"private":

@@ -1,7 +1,7 @@
 {
   "name": "pymtheg",
   "version": "0.1.0",
-  "description": "A local architecture, planning and specification workspace.",
+  "description": "A local tool for planning and checking software designs and for answering questions about existing code.",
   "keywords": [
     "architecture",
     "specification",

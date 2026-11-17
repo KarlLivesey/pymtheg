@@ -6,7 +6,9 @@ version `0.1.0`. This change makes the package ready; it publishes nothing.
 ## package.json
 
 - Removed `"private": true`.
-- Added `description` (the README's own one-line description), `keywords`,
+- Added `description` (the opening sentence of the README as rewritten by
+  PUB-3, which this branch merged: "A local tool for planning and checking
+  software designs and for answering questions about existing code."), `keywords`,
   `homepage`, `bugs`, `repository` (the GitHub repository), `author` (the
   copyright holder named in `LICENSE`) and `"publishConfig": {"access": "public"}`.
 - `version` is `0.1.0` (the owner's decision, 17 November 2026), not `1.0.0`.
@@ -44,15 +46,25 @@ publishing.
 
 `test/package-contents.test.mjs` fails when a shipped file names the owner,
 except the licence texts. The `author` field adds the name to `package.json`,
-so the rule now also allows exactly the top-level `"author": "..."` line of
-`package.json`. Any other line of `package.json` naming the owner still fails; a
-new test case covers both.
+so the rule now also allows the name there, but only as the value of the single
+top-level `author` key. The check is structural: `package.json` must parse as
+JSON with a string top-level `author`; exactly one line of its text may name the
+owner, and that line must be `  "author": <that value>`; exactly one line may
+have the top-level `"author":` shape (so a duplicated key fails); and no other
+key or string anywhere in the parsed object may name the owner. Otherwise the
+first line naming the owner fails. New test cases cover the allowed form, a
+duplicated top-level `author` (three orders), a nested `author` (as an object
+and as a two-space-indented line), an object-valued `author`, the name in
+`description` and in `contributors`, invalid JSON, and other files.
 
 ## Documents
 
-- `CONTRIBUTING.md`: a "Publishing" section with the owner's manual steps.
+- `CONTRIBUTING.md`: a "Publishing" section with the owner's manual steps for
+  any release (version choice in the three places that must agree, login,
+  checks, publish, verification).
 - `docs/decisions.md`: the D12 row and a new entry, "The package is publishable".
-- `README.md` statements ("The package is private", "not published yet") are
-  rewritten by PUB-3, not here.
+- `README.md` is PUB-3's: its rewrite (merged into this branch from `main`)
+  removed "The package is private" and the tarball install steps; PUB-2 does
+  not change it.
 - Earlier ledger paragraphs (`docs/build-plan.md`, `docs/changes/`) are history
   and unchanged.
