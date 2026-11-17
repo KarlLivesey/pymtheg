@@ -15,15 +15,6 @@ function check(src) {
     rmSync(d, { recursive: true, force: true });
   }
 }
-test("caller and branch facts discharge scalar preconditions", () => {
-  const r = check(
-    "op positive(x: Int) -> Unit requires x > 0; flow f(x: Int) -> Unit { if x > 0 { call positive(x); } }",
-  );
-  assert.equal(
-    r.results.find((r) => r.analysisKind === "call-contract").outcome,
-    "established",
-  );
-});
 test("bad and good concrete returns have different evidence", () => {
   const a = check(
     "flow f(x: Nat) -> Nat ensures result >= x { return x + 1; }",

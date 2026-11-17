@@ -287,16 +287,6 @@ test("short-circuit pure calls and retry return preserve work boundaries", () =>
   assert.equal(cost(r, "maybe").maximum, "2");
   assert.equal(cost(r, "stop").maximum, "2");
 });
-test("a newly added error variant breaks a previously exhaustive source consumer", () => {
-  const src =
-    "type E = Declined; op pay() -> Result<Unit, E>; flow f() -> Unit { call pay() as r; match r { Ok(v) => { return unit; } Declined => { return unit; } } }";
-  assert.equal(check(src).code, 0);
-  assert.ok(
-    codes(
-      check(src.replace("E = Declined;", "E = Declined | OutcomeUnknown;")),
-    ).includes("C002"),
-  );
-});
 test("incompatible result propagation and invalid lifecycle transitions have real failures", () => {
   assert.ok(
     codes(

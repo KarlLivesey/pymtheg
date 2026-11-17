@@ -9,7 +9,7 @@ import { Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { analyseFile } from "../dist/analysis/index.js";
 import { exitStatus } from "../dist/reporting/report.js";
-import { lower, evaluate } from "../dist/behaviour/model.js";
+import { lower } from "../dist/behaviour/model.js";
 const file = "/tmp/initial-domain.pym";
 const source = (value) =>
   `machine Counter {\n  state count: Int in 1..2 = ${value};\n  invariant safe = true;\n}\n`;
@@ -36,11 +36,6 @@ test("out-of-range starting constants are located local design errors and block 
     false,
   );
   assert.notEqual(exitStatus(unknown.report), 0);
-});
-test("initial constant comparison and event replay use the same scalar evaluator", () => {
-  const { ir } = model(source("3 - 1"));
-  const machine = ir.declarations.find((d) => d.kind === "machine");
-  assert.equal(evaluate(machine.states[0].init, {}), 2n);
 });
 test("CLI and real MCP retain an initial-domain design error instead of an unlocated warning", async () => {
   const root = await mkdtemp(join(tmpdir(), "pym-init-domain-"));

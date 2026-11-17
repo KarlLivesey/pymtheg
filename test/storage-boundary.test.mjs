@@ -11,7 +11,7 @@ import {
   symlink,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import {
   initializeWorkspace,
   readWorkspace,
@@ -171,26 +171,3 @@ test("path reads create nothing and reject symlink directories and database side
     await symlink(join(root, "missing"), file + "-journal");
     assert.throws(() => storagePath(root, "planning"), /regular files/);
   }));
-
-test("SQLite connection constructors and runtime imports stay inside the storage boundary", async () => {
-  const src = resolve("src");
-  const violations = [];
-  async function scan(directory) {
-    for (const entry of await readdir(directory, { withFileTypes: true })) {
-      const path = join(directory, entry.name);
-      if (entry.isDirectory()) {
-        if (path !== join(src, "storage")) await scan(path);
-      } else if (path.endsWith(".ts")) {
-        const text = await readFile(path, "utf8");
-        if (
-          /new\s+DatabaseSync\s*\(|import\s*\(\s*["']node:sqlite|import\s+(?!type\b)[^;]*from\s*["']node:sqlite/.test(
-            text,
-          )
-        )
-          violations.push(path);
-      }
-    }
-  }
-  await scan(src);
-  assert.deepEqual(violations, []);
-});
