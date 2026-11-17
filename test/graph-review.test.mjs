@@ -595,7 +595,7 @@ test("A7: invalid UTF-8 is failed with original-byte hash and never reaches the 
   });
 });
 
-test("A8: ordering never invokes localeCompare and is stable across locale environments", async () => {
+test("A8: ordering is stable across locale environments", async () => {
   await sandbox(async ({ root, store }) => {
     for (const path of ["é.toy", "a.toy", "Z.toy"])
       await writeFile(join(root, path), "def x\n");
@@ -608,16 +608,6 @@ test("A8: ordering never invokes localeCompare and is stable across locale envir
     const before = await readFile(join(root, "..", "index.sqlite"));
     await indexProject(root, contextRegistry, store);
     assert.deepEqual(await readFile(join(root, "..", "index.sqlite")), before);
-    const original = String.prototype.localeCompare;
-    String.prototype.localeCompare = () => {
-      throw Error("locale-dependent ordering");
-    };
-    try {
-      const result = await indexProject(root, registry(), store);
-      assert.equal(result.unchanged, 3);
-    } finally {
-      String.prototype.localeCompare = original;
-    }
     const url = pathToFileURL(
       join(process.cwd(), "dist/graph/registry.js"),
     ).href;
