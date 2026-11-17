@@ -1,0 +1,59 @@
+[
+  {
+    "id": "t3code",
+    "language": "typescript",
+    "url": "https://github.com/pingdotgg/t3code",
+    "commit": "b387e3a179d7495321019363c5ba11e847834cd0",
+    "category": "large application monorepo with vendored trees",
+    "why": "T3 Code at main on 17 November 2026, named by the owner for the pilot: 7,204 of the project's own TS/JS files plus about 20,000 vendored under .repos/. Not the SW-1 sweep pin (v0.0.24, ea20e80, 1,006 files)."
+  },
+  {
+    "id": "t3code-first-party",
+    "language": "typescript",
+    "url": "https://github.com/pingdotgg/t3code",
+    "commit": "b387e3a179d7495321019363c5ba11e847834cd0",
+    "category": "application monorepo, vendored trees left out",
+    "why": "The same T3 Code commit with its vendored .repos/ directory (two upstream projects, about 20,000 of its 27,000 JS/TS files) left out of each tool copy, so the comparison covers the project's own code.",
+    "exclude": [".repos"]
+  },
+  {
+    "id": "ky",
+    "language": "typescript",
+    "url": "https://github.com/sindresorhus/ky",
+    "commit": "3541888878c4d303a8bc2ad61815f4e048f55a5d",
+    "category": "small library",
+    "why": "Small, well-known TypeScript HTTP client with classes, overloads and tests; easy to hand-check."
+  },
+  {
+    "id": "chi",
+    "language": "go",
+    "url": "https://github.com/go-chi/chi",
+    "commit": "c64ed7d6635f33a8b2feaff7dcfa55677023ac7d",
+    "category": "small library",
+    "why": "Small Go HTTP router with interfaces, method values and middleware closures; several modules in _examples."
+  },
+  {
+    "id": "cobra",
+    "language": "go",
+    "url": "https://github.com/spf13/cobra",
+    "commit": "adbc8813901bba65827259daa8e22ff94ec1f30e",
+    "category": "medium library",
+    "why": "Widely used Go CLI library; struct methods, function-valued fields and large test files."
+  },
+  {
+    "id": "fd",
+    "language": "rust",
+    "url": "https://github.com/sharkdp/fd",
+    "commit": "6cf330283cfdcd1b8a6100beec7375bbb58975a3",
+    "category": "small application",
+    "why": "Small Rust command-line application with modules, traits and a clap derive front end."
+  },
+  {
+    "id": "just",
+    "language": "rust",
+    "url": "https://github.com/casey/just",
+    "commit": "62784c2a6e169b8ca5f32bd69d5cfeb1d6b5e1fe",
+    "category": "medium application",
+    "why": "Medium Rust application with a parser, many small modules, traits, macros and a large test suite."
+  }
+]
