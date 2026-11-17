@@ -43,8 +43,9 @@ commits in `scripts/compare/pilot-repos.json`.
 | 19  | cobra `command.go:1807`                        | `HasPersistentFlags` → `Command.HasFlags`                        | CG exact-match 0.9                         | no link                   | false                   | `PersistentFlags()` returns `*pflag.FlagSet`                                                                                             |
 | 20  | cobra `command.go:1817`                        | `HasInheritedFlags` → `Command.HasFlags`                         | CG exact-match 0.9                         | no link                   | false                   | as 19                                                                                                                                    |
 
-Go, only others: **9 true** (3 of them only attributed to a different
-source, so not misses), **1 arguable**, **10 false**. Every false one is
+Go, only others: **8 true** (rows 2, 6, 8, 10, 13, 15, 17, 18; 10, 15 and
+18 are only attributed to a different source, so not misses), **1 arguable**
+(row 3), **11 false** (rows 1, 4, 5, 7, 9, 11, 12, 14, 16, 19, 20). Every false one is
 CodeGraph linking a method call to a same-named method in the project when
 the receiver is a standard-library or dependency type. Real Pymtheg misses: a
 call on an interface-typed parameter (2), a range variable over a map of

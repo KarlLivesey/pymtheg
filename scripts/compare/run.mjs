@@ -156,6 +156,7 @@ export function loadRepos(text) {
   const ok = [];
   const bad = [];
   const seen = new Set();
+  const dirs = new Map();
   for (const r of items) {
     const problems = [];
     if (
@@ -172,6 +173,10 @@ export function loadRepos(text) {
     if (typeof r?.commit !== "string" || !/^[0-9a-f]{40}$/.test(r.commit))
       problems.push("commit (full SHA)");
     if (r && seen.has(r.id)) problems.push("duplicate id");
+    else if (typeof r?.id === "string" && dirs.has(repoDir(r.id)))
+      problems.push(
+        `folder name ${repoDir(r.id)} clashes with ${dirs.get(repoDir(r.id))}`,
+      );
     if (
       r?.exclude != null &&
       (!Array.isArray(r.exclude) ||
@@ -189,6 +194,7 @@ export function loadRepos(text) {
       bad.push({ entry: r?.id ?? JSON.stringify(r).slice(0, 80), problems });
     else {
       seen.add(r.id);
+      dirs.set(repoDir(r.id), r.id);
       ok.push(r);
     }
   }
@@ -283,6 +289,25 @@ export async function requireIsolation(isolate, probe = probeIsolation) {
   throw new Error(
     "cannot run the tools without network: `unshare -rn true` failed (util-linux missing, or unprivileged user namespaces are off). Fix that, or pass --no-isolate to run the tools with network; the results then record isolated: false.",
   );
+}
+
+/**
+ * A kept tool result is reused only when it was recorded in the same network
+ * mode as this run; otherwise a normal run reruns the tool and a
+ * `--renormalise` run (which cannot rerun tools) stops.
+ */
+export const sameIsolation = (outcome, isolate) =>
+  outcome?.isolated === isolate;
+
+export function isolationMismatches(outDir, repos, tools, isolate) {
+  const found = [];
+  for (const r of repos)
+    for (const t of tools) {
+      const f = join(outDir, "repos", repoDir(r.id), t, "outcome.json");
+      if (existsSync(f) && !sameIsolation(readJson(f), isolate))
+        found.push(`${r.id}/${t}`);
+    }
+  return found;
 }
 
 class Pool {
@@ -508,7 +533,13 @@ async function runTool(tool, repo, src, o, pool) {
     writeJson(outcomeFile, outcome);
     return outcome;
   }
-  if (!o.force && existsSync(outcomeFile)) return readJson(outcomeFile);
+  if (!o.force && existsSync(outcomeFile)) {
+    const kept = readJson(outcomeFile);
+    if (sameIsolation(kept, o.isolate)) return kept;
+    log(
+      `${repo.id} ${tool}: kept result was recorded with isolated: ${kept.isolated}; running again`,
+    );
+  }
   return pool.use(async () => {
     rmSync(dir, { recursive: true, force: true });
     mkdirSync(dir, { recursive: true });
@@ -648,6 +679,13 @@ async function main() {
   const { ok: repos, bad } = loadRepos(readFileSync(o.repos, "utf8"));
   const selected = o.only ? repos.filter((r) => o.only.includes(r.id)) : repos;
   o.isolate = await requireIsolation(o.isolate);
+  if (o.renormalise) {
+    const stale = isolationMismatches(o.out, selected, o.tools, o.isolate);
+    if (stale.length)
+      throw new Error(
+        `--renormalise cannot mix network modes: ${stale.join(", ")} recorded isolated: ${!o.isolate}. Rerun those tools, or match --no-isolate to how they ran.`,
+      );
+  }
   mkdirSync(o.out, { recursive: true });
   writeJson(join(o.out, "run.json"), {
     repos: o.repos,

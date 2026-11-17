@@ -24,9 +24,11 @@ chunks are merged.
   from the tools' copies only (used to leave out vendored trees).
 - Network isolation is required by default: if `unshare -rn` does not work,
   the run stops with a message. `--no-isolate` runs the tools with network on
-  purpose, and the results record `isolated: false`.
+  purpose, and the results record `isolated: false`. A kept result recorded
+  in the other mode is run again, and `--renormalise` refuses to mix modes.
 - Repository ids may be `owner/name`, as in `sweep/repos.json`; each id gets a
-  folder named `owner__name`.
+  folder named `owner__name`. Two ids that would share a folder are rejected
+  before the run.
 - `show.mjs` prints a bucket's sampled links with their source lines for
   hand-checking.
 - `test/compare-harness.test.mjs` checks the normalising and matching on tiny

@@ -25,7 +25,7 @@ Nothing in Pymtheg was changed. Findings are listed for later chunks.
   positions in TypeScript, cross-package Go calls, and candidate sets where
   there is more than one possible target.
 - **CodeGraph is often wrong when it is the only one to see a link.** In Go,
-  10 of the 20 sampled links that only the other tools had were false, all of
+  11 of the 20 sampled links that only the other tools had were false, all of
   them CodeGraph's: it links a method call to a same-named project method when
   the receiver is a standard-library or dependency type (`ctx.Value` → chi's
   `endpoints.Value`). Its confidence
@@ -161,7 +161,7 @@ the raised-heap run, since the default run of Pymtheg did not finish T3 Code). A
 
 | Language   | Bucket       |                                               True | Arguable | False |
 | ---------- | ------------ | -------------------------------------------------: | -------: | ----: |
-| Go         | only others  |  9 (3 only attributed to another enclosing symbol) |        1 |    10 |
+| Go         | only others  |  8 (3 only attributed to another enclosing symbol) |        1 |    11 |
 | Go         | only Pymtheg |                                                 20 |        0 |     0 |
 | Rust       | only others  |                                                 17 |        0 |     3 |
 | Rust       | only Pymtheg |                                                 20 |        0 |     0 |
@@ -178,15 +178,16 @@ Only classes the hand-check found true. Ranked by the number of pilot sites
 where another tool has an in-project link and Pymtheg's state there is that
 class (from each diff's `byAbsentState`). The counts are upper bounds, since
 some of the others' links at those sites are false (in the samples 3 of 20
-in Rust, 4 of 20 in TypeScript and 10 of 20 in Go; in Go most counted sites
+in Rust, 4 of 20 in TypeScript and 11 of 20 in Go; in Go most counted sites
 are false, see item 7), and T3 Code, the largest repository, dominates the TypeScript counts.
 
 1. **TypeScript: imports of sibling workspace packages in a pnpm monorepo are
    treated as external** (`external-package`; 22,379 sites in T3 Code, 7 in
    `ky`, where they are real package imports).
    Pymtheg documents pnpm-only workspaces as unresolved; T3 Code is one.
-   Example: T3 Code `apps/server/src/mcp/OrchestratorMcpService.ts:226` (a type
-   from `@t3tools/contracts`). Expect it in most TypeScript monorepos in the
+   Example: T3 Code `apps/server/src/assets/AssetAccess.ts:399`
+   (`isNetworkPath`, imported from `@t3tools/shared/path`, defined once in
+   `packages/shared/src/path.ts:14`; CodeGraph and graphify both link it). Expect it in most TypeScript monorepos in the
    sweep.
 2. **TypeScript: functions declared inside functions are not symbols**
    (`local`; 16,221 sites in T3 Code, 53 in `ky`). React components and Effect
@@ -227,12 +228,16 @@ are false, see item 7), and T3 Code, the largest repository, dominates the TypeS
 7. **Go: calls on interface-typed values** are left unresolved with no reason
    recorded, instead of linking to the interface method (or a candidate set of
    implementations); a range variable over a named map of slices is not typed
-   either. About 60 to 70 sites, all in chi: the genuine `Router.*` and
-   `Handler.ServeHTTP` interface calls among chi's 147 Go calls left
-   unresolved with no reason. The rest of that bucket, and all 13 such sites in
-   cobra, are false CodeGraph links (52 chi sites to `compressResponseWriter.Close`
-   from `ts.Close()` on an `*httptest.Server`, 7 to `endpoints.Value` from
-   `ctx.Value`; in cobra `os.File.Name`, pflag `FlagSet` methods and
+   either. About 60 sites, all in chi. Of chi's 147 Go calls left unresolved
+   with no reason that another tool links: 57 go to interface methods
+   (`Router.*` 46, `Handler.ServeHTTP` 7, `WrapResponseWriter.*` 4), true by
+   the hand-checked pattern but not checked one by one; 1 is the range
+   variable (`HeaderRoute.IsMatch`, checked true); 59 are false CodeGraph links
+   (52 to `compressResponseWriter.Close` from `ts.Close()` on an
+   `*httptest.Server`, 7 to `endpoints.Value` from `ctx.Value`); the other 30
+   (for example `NewArticleResponse` 6, `Context.URLParam` 3, middleware
+   functions passed by name) were not checked. All 13 such sites in cobra are
+   false CodeGraph links (`os.File.Name`, pflag `FlagSet` methods,
    `template.Execute`). Examples: `chi` `tree_test.go:553` (`r.Use(mw)` with
    `r Router`), `middleware/route_headers.go:93` (`matcher.IsMatch` over a map
    of `[]HeaderRoute`).

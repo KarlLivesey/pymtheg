@@ -4,7 +4,7 @@
 // SQLite stores and graph files in a temporary folder.
 
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -30,9 +30,11 @@ import {
   TOLERANCE,
 } from "../scripts/compare/lib/match.mjs";
 import {
+  isolationMismatches,
   loadRepos,
   probeIsolation,
   requireIsolation,
+  sameIsolation,
 } from "../scripts/compare/run.mjs";
 
 const tmp = () => mkdtempSync(join(tmpdir(), "pym-compare-"));
@@ -652,4 +654,51 @@ test("repository list: sweep ids of the form owner/name are accepted", () => {
     ["a/../b", "../x", "a__b"],
   );
   assert.equal(repoDir("pingdotgg/t3code"), "pingdotgg__t3code");
+});
+
+test("isolation: kept results recorded in another network mode are not reused", () => {
+  assert.equal(sameIsolation({ isolated: true }, true), true);
+  assert.equal(sameIsolation({ isolated: false }, true), false);
+  assert.equal(sameIsolation({}, false), false);
+  const dir = tmp();
+  try {
+    const put = (id, tool, isolated) => {
+      const d = join(dir, "repos", repoDir(id), tool);
+      mkdirSync(d, { recursive: true });
+      writeFileSync(join(d, "outcome.json"), JSON.stringify({ isolated }));
+    };
+    put("o/a", "pymtheg", false);
+    put("o/a", "codegraph", true);
+    put("b", "pymtheg", true);
+    const repos = [{ id: "o/a" }, { id: "b" }, { id: "never-run" }];
+    assert.deepEqual(
+      isolationMismatches(dir, repos, ["pymtheg", "codegraph"], true),
+      ["o/a/pymtheg"],
+    );
+    assert.deepEqual(
+      isolationMismatches(dir, repos, ["pymtheg", "codegraph"], false),
+      ["o/a/codegraph", "b/pymtheg"],
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("repository list: ids whose folder names clash are rejected", () => {
+  const sha = "ea20e800216417c8d3b5dfc54a863bbd9e0b3e20";
+  const entry = (id) => ({
+    id,
+    language: "go",
+    url: "https://github.com/x/y",
+    commit: sha,
+  });
+  const { ok, bad } = loadRepos(JSON.stringify([entry("a_/b"), entry("a/_b")]));
+  assert.equal(repoDir("a_/b"), repoDir("a/_b"));
+  assert.deepEqual(
+    ok.map((r) => r.id),
+    ["a_/b"],
+  );
+  assert.deepEqual(bad, [
+    { entry: "a/_b", problems: ["folder name a___b clashes with a_/b"] },
+  ]);
 });
