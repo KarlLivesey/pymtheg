@@ -50,7 +50,9 @@ so the rule now also allows the name there, but only as the value of the single
 top-level `author` key. The check is structural: `package.json` must parse as
 JSON with a string top-level `author`; exactly one line of its text may name the
 owner, and that line must be `  "author": <that value>`; exactly one line may
-have the top-level `"author":` shape (so a duplicated key fails); and no other
+have the two-space-indented `"author":` shape (so a duplicated key written
+that way fails; a duplicate with other indentation or escapes is not
+detected, and the owner's name still appears on one line only); and no other
 key or string anywhere in the parsed object may name the owner. Otherwise the
 first line naming the owner fails. New test cases cover the allowed form, a
 duplicated top-level `author` (three orders), a nested `author` (as an object
@@ -64,7 +66,8 @@ and as a two-space-indented line), an object-valued `author`, the name in
   checks, publish, verification).
 - `docs/decisions.md`: the D12 row and a new entry, "The package is publishable".
 - `README.md` is PUB-3's: its rewrite (merged into this branch from `main`)
-  removed "The package is private" and the tarball install steps; PUB-2 does
-  not change it.
+  removed "The package is private", the "not published yet" wording and the
+  `pymtheg-1.0.0.tgz` commands, and kept a short note on installing from a
+  local tarball; PUB-2 does not change it.
 - Earlier ledger paragraphs (`docs/build-plan.md`, `docs/changes/`) are history
   and unchanged.
