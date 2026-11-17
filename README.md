@@ -16,8 +16,8 @@ What it does today:
   missing outcomes, resources that are never cleaned up, work multiplied by
   loops and retries, and the same rule copied in several places. Explore
   behaviour with a built-in exhaustive search (`verify`) or a seeded sampler
-  (`simulate`: random runs that repeat exactly for the same seed), and follow
-  each counterexample back to the design.
+  (`simulate`: random runs where the same seed and limits give the same
+  result), and follow each counterexample back to the design.
 - **Code graph** for TypeScript/JavaScript, Go and Rust: search, callers, callees,
   paths between two symbols, and the impact of a change. Every call says how
   certain it is.
@@ -72,9 +72,9 @@ Read the answers with their limits:
 - **Definite, candidate, unresolved, failed.** A definite call has exactly one
   target. A candidate set lists the possible targets in the project and never
   picks one; a set marked open may have further targets outside the project or
-  members that are not verified. An unresolved call has no target. A failed
-  link depends on a file that could not be read; Pymtheg never guesses its
-  target.
+  in a file that could not be read, or members that are not verified. An
+  unresolved call has no target. A failed link depends on a file that could
+  not be read; Pymtheg never guesses its target.
 - Graph answers come from reading source. Pymtheg never runs your code. Only Go
   can optionally use the project's own `go` toolchain for more definite answers.
 - A sampled `simulate` run that finds nothing is not a proof. Only a completed
@@ -156,8 +156,9 @@ Then add it to your agent's MCP configuration (formats vary by client):
 ```
 
 Studio's **Connect agent** button shows the exact configuration for your
-installation, with a **Copy configuration** button. Agents start with [docs/agent-workflow.md](docs/agent-workflow.md)
-and [docs/code-guide.md](docs/code-guide.md); both are also served as MCP resources.
+installation, with a **Copy configuration** button. Agents start with
+[docs/agent-workflow.md](docs/agent-workflow.md) and
+[docs/code-guide.md](docs/code-guide.md); both are also served as MCP resources.
 
 Open Studio, then open the printed private session URL in Firefox:
 
@@ -207,11 +208,12 @@ properties it has not violated by then are inconclusive (exit 2), never passed.
 `exhaustive`, which is `true` only for a search that covered every reachable
 state.
 
-**Options for `check`, `verify` and `simulate`.** `--timeout 500ms` or `45s`
-bounds the checking work (default 45s, at most 120s); running out leaves the
-result incomplete. `--out report.json` also writes the JSON report to a file,
-atomically, and still prints the findings. `--verbose` prints progress phases
-on stderr, so stdout stays clean.
+**Options for `check`, `verify` and `simulate`.** `--out report.json` also
+writes the JSON report to a file, atomically, and still prints the findings.
+`--verbose` prints progress phases on stderr, so stdout stays clean. For
+`verify` and `simulate` only, `--timeout 500ms` or `45s` bounds the behavioural
+exploration (default 45s, 1ms to 120s); running out leaves the result
+incomplete (exit 2). It does not bound `check` or the whole invocation.
 
 **Running under `npx`.** Each `npx` call costs a few seconds and some memory
 before any work, so prefer the MCP server (one long-running process) or a global

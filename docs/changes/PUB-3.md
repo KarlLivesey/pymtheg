@@ -20,11 +20,15 @@ exists. No test pinned old README wording; no test changed.
   [support.md](../support.md).
 - Language boundary: [grammar.md](../grammar.md), [support.md](../support.md).
 - Contracts-mode scaffolds and `--body empty`: [output-plugins.md](../output-plugins.md).
-- Exit codes and their precedence, `--timeout`, `--out` and `--verbose`, the
-  install footprint, `npx` signal handling and the tarball `./` or `file:`
-  rule are covered in no shipped user doc, so they stay, shortened, in the
-  README's "More detail" section. (The `exhaustive` field is also explained
-  in [mcp.md](../mcp.md) and [support.md](../support.md).)
+- The README's "More detail" section keeps, shortened: exit codes and their
+  precedence; `--out` and `--verbose` (all three commands) and `--timeout`
+  (`verify` and `simulate` only); the install footprint (five direct
+  dependencies, ten packages in all, no install scripts, prebuilt browser app
+  and grammars); `npx` signal handling and cost; the tarball `./` or `file:`
+  form. Some of this is also in shipped docs: the installed package count and
+  the bundled browser app and grammars in [licences.md](../licences.md); exit 3
+  for an engine error in [support.md](../support.md); the `exhaustive` field in
+  [mcp.md](../mcp.md) and [support.md](../support.md).
 
 ## What was removed
 
