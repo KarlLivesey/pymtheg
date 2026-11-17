@@ -241,7 +241,7 @@ const COMBINE: {
   from: (values) => values.find((value) => value !== undefined),
   sourceOnly: (values) => values.find((value) => value !== undefined),
 };
-export const combine = (parts: Decision[]): Decision => {
+const combine = (parts: Decision[]): Decision => {
   const out: Record<string, unknown> = {};
   for (const key of Object.keys(COMBINE) as (keyof Decision)[]) {
     const merge = COMBINE[key] as (values: unknown[]) => unknown;

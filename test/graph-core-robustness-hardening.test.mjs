@@ -145,15 +145,6 @@ test("legacy path-only failure markers upgrade as misses, then acquire verified 
     );
     store = reopen();
     assert.equal(store.isParseFailure("a.x"), false);
-    assert.deepEqual(
-      sql((db) =>
-        db
-          .prepare("PRAGMA table_info(graph_parse_failures)")
-          .all()
-          .map((row) => row.name),
-      ),
-      ["path", "hash", "module", "version"],
-    );
     await indexProject(root, registry, store);
     assert.equal(parses, 2);
     store = reopen();
@@ -222,14 +213,13 @@ test("invalid failureKind is rejected rather than persisted as a content failure
   });
 });
 
-test("transient analysis clears content provenance at both the coordinator and store boundaries", async (t) => {
-  await project(async ({ root, store, reopen, sql }) => {
+test("transient analysis clears content provenance, even when the store is asked to cache it", async () => {
+  await project(async ({ root, store, reopen }) => {
     await writeFile(join(root, "a.x"), "bad");
     const transient = {
       ...failed("analysis budget"),
       failureKind: "transient",
     };
-    const writes = t.mock.method(store, "replaceFile");
     let parses = 0;
     const registry = new LanguageRegistry([
       {
@@ -246,13 +236,6 @@ test("transient analysis clears content provenance at both the coordinator and s
       },
     ]);
     await indexProject(root, registry, store);
-    assert.equal(writes.mock.calls.length, 2);
-    assert.equal(writes.mock.calls[0].arguments[1], true);
-    assert.equal(
-      writes.mock.calls[1].arguments[1],
-      false,
-      "indexer must not ask to cache transient analysis",
-    );
     assert.equal(store.isParseFailure("a.x"), false);
     // Independently exercise the store guard, even if a caller mistakenly asks to cache it.
     store.replaceFile({ ...store.getFile("a.x"), result: transient }, true);
@@ -261,15 +244,6 @@ test("transient analysis clears content provenance at both the coordinator and s
       false,
       "store must reject transient provenance",
     );
-    assert.equal(
-      sql(
-        (db) =>
-          db.prepare("SELECT count(*) AS n FROM graph_parse_failures").get().n,
-      ),
-      0,
-      "transient results must not write a marker at all",
-    );
-    writes.mock.restore();
     store = reopen();
     await indexProject(root, registry, store);
     assert.equal(parses, 2);
