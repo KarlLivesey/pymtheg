@@ -11,10 +11,24 @@ export const columns = ["module", "kind", "outcome", "reason", "uncertainty", "s
 export const sampleSeed = 0x7c8a59bd2e41;
 export const sampleSize = (stratum) => ["go:empty", "rust:empty", "rust:receiver", "typescript:no-symbol"].includes(stratum) ? 96 : 32;
 const standardGo = new Set(`archive bufio bytes cmp compress container context crypto database debug embed encoding errors expvar flag fmt go hash html image index io iter log maps math mime net os path plugin reflect regexp runtime slices sort strconv strings sync syscall testing text time unicode unique unsafe weak`.split(" "));
+const goConcrete = new Map(Object.entries({
+  bufio: "Reader Scanner Writer", bytes: "Buffer Reader", "encoding/json": "Decoder Encoder", "html/template": "Template",
+  "mime/multipart": "FileHeader Form Reader Writer", "net/http": "Client Cookie Header Request Response Server ServeMux Transport",
+  "net/http/httptest": "ResponseRecorder Server", "net/url": "URL Values", os: "File", reflect: "Value", regexp: "Regexp",
+  strings: "Builder Reader Replacer", sync: "Map Mutex Once Pool RWMutex WaitGroup", testing: "B F T", "text/template": "Template", time: "Duration Time Timer Ticker",
+}).map(([path, types]) => [path, new Set(types.split(" "))]));
+const standardGoResults = new Map(Object.entries({
+  "context.WithCancel": "1:CancelFunc", "context.WithTimeout": "1:CancelFunc", "context.WithDeadline": "1:CancelFunc",
+  "context.WithCancelCause": "1:CancelCauseFunc", "context.WithTimeoutCause": "1:CancelFunc", "context.WithDeadlineCause": "1:CancelFunc",
+  "os/signal.NotifyContext": "1:CancelFunc", "net/http/httptest.NewRecorder": "0:ResponseRecorder", "net/http.NewRequest": "0:Request",
+  "net/http.NewRequestWithContext": "0:Request", "net/url.Parse": "0:URL", "reflect.ValueOf": "0:Value", "reflect.Indirect": "0:Value",
+  "bytes.NewBuffer": "0:Buffer", "bytes.NewReader": "0:Reader", "strings.NewReader": "0:Reader",
+}));
 const standardRust = new Set(["std", "core", "alloc", "proc_macro", "test"]);
 export const rustPreludeMacros = new Set(`assert assert_eq assert_ne cfg column compile_error concat dbg debug_assert debug_assert_eq debug_assert_ne eprint eprintln env file format format_args include include_bytes include_str line matches module_path option_env panic print println stringify todo unimplemented unreachable vec write writeln`.split(" "));
 export const rustPreludeTypes = new Set(`bool char str f32 f64 i8 i16 i32 i64 i128 isize u8 u16 u32 u64 u128 usize Box Clone Copy Default DoubleEndedIterator Drop Eq ExactSizeIterator Fn FnMut FnOnce From FromIterator Into IntoIterator Iterator Option Ord PartialEq PartialOrd Result Send Sized String Sync ToOwned ToString TryFrom TryInto Unpin Vec`.split(" "));
-const standardJs = new Set(`Array ArrayBuffer BigInt Boolean DataView Date Error EvalError FinalizationRegistry Function Infinity Intl JSON Map Math NaN Number Object Promise Proxy RangeError ReferenceError Reflect RegExp Set SharedArrayBuffer String Symbol SyntaxError TypeError URIError WeakMap WeakRef WeakSet console decodeURI decodeURIComponent encodeURI encodeURIComponent isFinite isNaN parseFloat parseInt undefined Awaited ConstructorParameters Exclude Extract InstanceType NonNullable Omit Parameters Partial Pick PromiseLike Readonly ReadonlyArray Record Required ReturnType ThisParameterType ThisType`.split(" "));
+const standardJs = new Set(`Array ArrayBuffer BigInt Boolean DataView Date Error EvalError FinalizationRegistry Function Infinity Intl JSON Map Math NaN Number Object Promise Proxy RangeError ReferenceError Reflect RegExp Set SharedArrayBuffer String Symbol SyntaxError TypeError URIError WeakMap WeakRef WeakSet clearInterval clearTimeout console decodeURI decodeURIComponent encodeURI encodeURIComponent isFinite isNaN parseFloat parseInt queueMicrotask setInterval setTimeout structuredClone undefined Awaited ConstructorParameters Exclude Extract InstanceType NonNullable Omit Parameters Partial Pick PromiseLike Readonly ReadonlyArray Record Required ReturnType ThisParameterType ThisType`.split(" "));
+const assertionPackages = new Set(["chai", "vitest", "@vitest/expect", "@jest/expect", "expect"]);
 
 export const countLines = (text) => text ? text.split("\n").length - Number(text.endsWith("\n")) : 0;
 export const packageName = (value) => /^(@[^/]+\/[^/]+|[^/@][^/]*)/.exec(value)?.[1];
@@ -51,7 +65,7 @@ export function failedFamily(scope, reason, module, source = "") {
   if (/Unreadable package manifest/.test(reason) && reason.includes("\ufeff")) return "manifest-bom";
   if (/TypeScript config .* (extends|is unreadable)|^Unreadable TypeScript config/.test(reason)) return "tsconfig";
   if (module === "rust" && /^(?:line \d|Syntax error)/.test(reason)) {
-    if (reason.includes("unexpected `!`") && /\bstr!\s*\[\s*\[r#/.test(source)) return "rust-snapshot-macro";
+    if (reason.includes("unexpected `!`") && /\bstr!\s*\[\s*\[/.test(source)) return "rust-snapshot-macro";
     if (reason.includes("unexpected `#[rustfmt::skip]`") || reason.includes("unexpected `|`") && /\|\s*#\[/.test(source)) return "rust-parameter-attribute";
     return "rust-grammar";
   }
@@ -78,6 +92,23 @@ function goPath(link, imports) {
   return alias ? imports.get(alias) : undefined;
 }
 
+function goValueOrigin(desc, evidence, link, project) {
+  if (desc?.k === "val" && desc.t?.q) {
+    const path = evidence.goImports.get(desc.t.q);
+    return path && goImport(path, project, link.file) === "outside" ? { path, type: desc.t.n } : null;
+  }
+  if (desc?.k !== "call") return null;
+  const f = desc.f;
+  if (f?.k === "sel" && f.x?.k === "name") {
+    const path = evidence.goImports.get(f.x.n);
+    const [slot, type] = standardGoResults.get(`${path}.${f.n}`)?.split(":") ?? [];
+    if (type && desc.i === Number(slot) && goImport(path, project, link.file) === "outside") {
+      return { path: path === "os/signal" ? "context" : path, type };
+    }
+  }
+  return evidence.goReturned?.(desc) ?? null;
+}
+
 export function goImports(links) {
   const aliases = new Map();
   for (const link of links) {
@@ -94,6 +125,8 @@ export function tsBindings(ts, file, text) {
   const names = new Map();
   const imports = new Map();
   const specifiers = [];
+  const propertyRoots = new Map();
+  const literalProperties = new Set();
   let unsafe = false;
   const rememberSpecifier = (node, value) => {
     if (value) specifiers.push({ start: node.getStart(source), end: node.end, value });
@@ -109,6 +142,14 @@ export function tsBindings(ts, file, text) {
   };
   const visit = (node) => {
     if (ts.isWithStatement(node) || ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "eval") unsafe = true;
+    if (ts.isPropertyAccessExpression(node)) {
+      const offset = node.name.getStart(source);
+      let receiver = node.expression;
+      while (ts.isParenthesizedExpression(receiver)) receiver = receiver.expression;
+      if (ts.isArrayLiteralExpression(receiver) || ts.isStringLiteralLike(receiver) || ts.isRegularExpressionLiteral(receiver) || ts.isNumericLiteral(receiver)) literalProperties.add(offset);
+      while (ts.isPropertyAccessExpression(receiver) || ts.isCallExpression(receiver) || ts.isParenthesizedExpression(receiver)) receiver = receiver.expression;
+      if (ts.isIdentifier(receiver)) propertyRoots.set(offset, receiver.text);
+    }
     if (ts.isImportDeclaration(node) && ts.isStringLiteralLike(node.moduleSpecifier)) {
       const { importClause: clause, moduleSpecifier } = node;
       const specifier = node.parent === source ? moduleSpecifier.text : undefined;
@@ -138,10 +179,12 @@ export function tsBindings(ts, file, text) {
     ts.forEachChild(node, visit);
   };
   visit(source);
-  return { unsafe, names, specifiers, imports: unsafe ? new Map() : new Map([...imports].filter(([name]) => names.get(name) === 1)) };
+  return { unsafe, names, specifiers, propertyRoots, literalProperties,
+    imports: unsafe ? new Map() : new Map([...imports].filter(([name]) => names.get(name) === 1)) };
 }
 
 const tsHead = (target) => /^(?:new\s+)?([\w$]+)(?:\??\.[\w$]+)?$/.exec(target)?.[1];
+const tsGlobalHead = (target) => /^(?:new\s+)?([\w$]+)(?:\??\.[\w$]+)*$/.exec(target)?.[1];
 
 function tsSpecifier(link, evidence) {
   if (typeof link.data?.specifier === "string") return link.data.specifier;
@@ -149,10 +192,16 @@ function tsSpecifier(link, evidence) {
     const declared = evidence.tsSpecifierAt?.(link.range?.start);
     if (declared) return declared;
   }
-  // Declared import aliases: direct values or one property, without chasing the
-  // return type of a call or guessing the owner of an arbitrary receiver.
+  // A direct import or member has a lexical base. After a call, the named assertion
+  // APIs below supply enough origin evidence for their fluent result.
   const name = tsHead(link.targetName);
-  return name ? evidence.tsImports().get(name) : undefined;
+  if (name) return evidence.tsImports().get(name);
+  if (link.data?.reason === "external-package") {
+    const root = evidence.tsPropertyRoot?.(link.range?.start);
+    const specifier = root && evidence.tsImports().get(root);
+    if (specifier && assertionPackages.has(packageName(specifier))) return specifier;
+  }
+  return undefined;
 }
 
 function tsPath(path, project, file) {
@@ -215,14 +264,22 @@ export function classify(link, evidence, project) {
   const data = link.data ?? {};
   if (["local", "invalid-code", "unresolved-alias", "target-unavailable"].includes(data.reason) ||
       data.uncertainty?.split("; ").includes("invalid-code")) return "inside";
-  if (module === "go") return data.builtin === true ? "outside" : goImport(goPath(link, evidence.goImports), project, link.file);
+  if (module === "go") {
+    if (data.builtin === true) return "outside";
+    const path = goPath(link, evidence.goImports);
+    if (path) return goImport(path, project, link.file);
+    const expr = data.expr?.k === "inst" ? data.expr.x : data.expr;
+    const origin = goValueOrigin(expr?.k === "sel" ? expr.x : expr, evidence, link, project);
+    if (origin && (expr?.k === "sel" ? goConcrete.get(origin.path)?.has(origin.type)
+      : origin.path === "context" && ["CancelFunc", "CancelCauseFunc"].includes(origin.type))) return "outside";
+  }
   if (module === "typescript") {
     const path = tsSpecifier(link, evidence);
     if (path && (link.data?.specifier || evidence.tsSpecifiers.has(path))) return tsPath(path, project, link.file);
     if (data.reference === "lib" && data.reason === "external") return "outside";
     if (data.reference === "types" && data.reason === "external-package" && !project.tsPackages.has(`@types/${link.targetName}`) && project.tsExternal.has(`@types/${link.targetName}`)) return "outside";
-    const head = tsHead(link.targetName);
-    if (data.reason === "external" && standardJs.has(head) && evidence.tsGlobal?.(head)) return "outside";
+    const head = tsGlobalHead(link.targetName);
+    if (data.reason === "external" && (standardJs.has(head) && evidence.tsGlobal?.(head) || evidence.tsLiteral?.(link.range?.start))) return "outside";
   }
   if (module === "rust") {
     if (link.kind === "modules") return "inside";

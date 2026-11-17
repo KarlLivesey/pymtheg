@@ -1,0 +1,667 @@
+{
+  "items": [
+    {
+      "id": "go-file-broken-fixture",
+      "module": "go",
+      "title": "Recognize deliberately broken fixture inputs and keep their failure local",
+      "family": "broken-fixture",
+      "examples": [
+        {
+          "repo": "golang/tools",
+          "file": "cmd/fiximports/testdata/src/old.com/bad/bad.go",
+          "line": 1,
+          "code": "// This ill-formed Go source file is here to ensure the tool is robust"
+        },
+        {
+          "repo": "golang/tools",
+          "file": "go/analysis/passes/copylock/testdata/src/a/newexpr_go126.go",
+          "line": 11,
+          "code": "func _(ptr *sync.Mutex) {"
+        }
+      ]
+    },
+    {
+      "id": "go-file-go-grammar",
+      "module": "go",
+      "title": "Parse parenthesized Go builtins and method expressions on anonymous structs",
+      "family": "go-grammar",
+      "examples": [
+        {
+          "repo": "golang/tools",
+          "file": "go/ssa/interp/testdata/static.go",
+          "line": 55,
+          "code": "_ = (make)([]int, 0)"
+        },
+        {
+          "repo": "golang/tools",
+          "file": "go/ssa/testdata/objlookup.go",
+          "line": 116,
+          "code": "_ = (*struct{ J }).method"
+        }
+      ]
+    },
+    {
+      "id": "go-interface",
+      "module": "go",
+      "title": "Establish exact Go interface implementation links from known method sets",
+      "examples": [
+        {
+          "repo": "protocolbuffers/protobuf-go",
+          "file": "internal/testprotos/testeditions/test.pb.go",
+          "line": 2190,
+          "code": "type TestRequiredForeign struct {"
+        },
+        {
+          "repo": "etcd-io/bbolt",
+          "file": "tests/dmflakey/dmflakey.go",
+          "line": 133,
+          "code": "type flakey struct {"
+        }
+      ]
+    },
+    {
+      "id": "go-local-binding",
+      "module": "go",
+      "title": "Narrow Go references to types in generated source variants",
+      "examples": [
+        {
+          "repo": "protocolbuffers/protobuf-go",
+          "file": "internal/testprotos/test3/test3_hybrid/test.hybrid.pb.go",
+          "line": 2323,
+          "code": "(*TestAllTypes_NestedMessage)(nil), // 4: hybrid.goproto.proto.test3.TestAllTypes.NestedMessage"
+        },
+        {
+          "repo": "protocolbuffers/protobuf-go",
+          "file": "cmd/protoc-gen-go/testdata/nameclash/test_name_clash_hybrid3/test_name_clash_hybrid3.pb.go",
+          "line": 436,
+          "code": "func (x *M3) Get_GetFoo() *M0 {"
+        }
+      ]
+    },
+    {
+      "id": "go-local-method",
+      "module": "go",
+      "title": "Narrow Go method candidates using a source-evident receiver",
+      "examples": [
+        {
+          "repo": "golang/tools",
+          "file": "cmd/callgraph/testdata/src/pkg/pkg.go",
+          "line": 17,
+          "code": "i.f() // dynamic call"
+        },
+        {
+          "repo": "evanw/esbuild",
+          "file": "internal/resolver/resolver.go",
+          "line": 610,
+          "code": "if !r.fs.IsAbs(firstPrefix) {"
+        }
+      ]
+    },
+    {
+      "id": "heap-go",
+      "module": "go",
+      "title": "Keep Go graphs within the Node heap in mixed-language TypeScript and Turborepo checkouts",
+      "missing": [
+        "microsoft/TypeScript",
+        "vercel/turborepo"
+      ],
+      "examples": [
+        {
+          "repo": "microsoft/TypeScript",
+          "file": "tsc/cmd/tsc/api.go",
+          "line": 17,
+          "code": "type apiFlags struct {"
+        },
+        {
+          "repo": "vercel/turborepo",
+          "file": "crates/turborepo-trace-testkit/fixtures/go/basic/main.go",
+          "line": 24,
+          "code": "func main() {"
+        }
+      ]
+    },
+    {
+      "id": "heap-rust",
+      "module": "rust",
+      "title": "Keep Rust graph assembly within the Node heap in Turborepo",
+      "missing": [
+        "vercel/turborepo"
+      ],
+      "examples": [
+        {
+          "repo": "vercel/turborepo",
+          "file": "crates/turborepo/src/main.rs",
+          "line": 38,
+          "code": "struct TurboQueryServer;"
+        },
+        {
+          "repo": "vercel/turborepo",
+          "file": "crates/turbo-trace/src/main.rs",
+          "line": 12,
+          "code": "struct Args {"
+        }
+      ]
+    },
+    {
+      "id": "heap-typescript",
+      "module": "typescript",
+      "title": "Keep TypeScript and JavaScript graphs within the Node heap in mixed-language checkouts",
+      "missing": [
+        "microsoft/TypeScript",
+        "vercel/turborepo"
+      ],
+      "examples": [
+        {
+          "repo": "microsoft/TypeScript",
+          "file": "packages/typescript/src/api/fs.ts",
+          "line": 23,
+          "code": "export interface FileSystemEntries {"
+        },
+        {
+          "repo": "vercel/turborepo",
+          "file": "packages/turbo-gen/src/types.ts",
+          "line": 13,
+          "code": "export interface Answers {"
+        }
+      ]
+    },
+    {
+      "id": "rust-ambiguous",
+      "module": "rust",
+      "title": "Narrow Rust candidates using source-evident module and receiver bindings",
+      "examples": [
+        {
+          "repo": "helix-editor/helix",
+          "file": "helix-term/src/application.rs",
+          "line": 1302,
+          "code": "pub fn event_stream(&self) -> impl Stream<Item = std::io::Result<TerminalEvent>> + Unpin {"
+        },
+        {
+          "repo": "crossbeam-rs/crossbeam",
+          "file": "crossbeam-channel/src/flavors/array.rs",
+          "line": 96,
+          "code": "one_lap: Index,"
+        }
+      ]
+    },
+    {
+      "id": "rust-analysis",
+      "module": "rust",
+      "title": "Finish Rust analysis on Dioxus, Embassy and SWC",
+      "missing": [
+        "DioxusLabs/dioxus",
+        "embassy-rs/embassy",
+        "swc-project/swc"
+      ],
+      "examples": [
+        {
+          "repo": "DioxusLabs/dioxus",
+          "file": "packages/dx/src/main.rs",
+          "line": 54,
+          "code": "async fn main() -> ExitCode {"
+        },
+        {
+          "repo": "embassy-rs/embassy",
+          "file": "cyw43/src/fmt.rs",
+          "line": 205,
+          "code": "pub trait Debuggable: Debug + defmt::Format {}"
+        }
+      ]
+    },
+    {
+      "id": "rust-crate-taint",
+      "module": "rust",
+      "title": "Keep independent Rust links resolvable when another file in the crate fails",
+      "exact": "rust-taint",
+      "examples": [
+        {
+          "repo": "alacritty/alacritty",
+          "file": "alacritty/src/window_context.rs",
+          "line": 158,
+          "code": "let mut window_context = Self::new(display, config, options, proxy)?;"
+        },
+        {
+          "repo": "alacritty/alacritty",
+          "file": "alacritty/src/config/color.rs",
+          "line": 264,
+          "code": "green: Rgb::new(0x5f, 0x6f, 0x3a),"
+        }
+      ]
+    },
+    {
+      "id": "rust-file-rust-parameter-attribute",
+      "module": "rust",
+      "title": "Parse Rust attributes on function and closure parameters",
+      "family": "rust-parameter-attribute",
+      "examples": [
+        {
+          "repo": "alacritty/alacritty",
+          "file": "alacritty/src/display/window.rs",
+          "line": 136,
+          "code": "#[rustfmt::skip]"
+        },
+        {
+          "repo": "tauri-apps/tauri",
+          "file": "examples/file-associations/src-tauri/src/main.rs",
+          "line": 52,
+          "code": ".setup(|#[allow(unused_variables)] app| {"
+        }
+      ]
+    },
+    {
+      "id": "rust-file-rust-snapshot-macro",
+      "module": "rust",
+      "title": "Parse Rust snapshot macros with nested bracket token trees",
+      "family": "rust-snapshot-macro",
+      "examples": [
+        {
+          "repo": "clap-rs/clap",
+          "file": "tests/builder/cargo.rs",
+          "line": 36,
+          "code": "utils::assert_error(err, ErrorKind::DisplayHelp, str![[r#\""
+        },
+        {
+          "repo": "rust-lang/mdBook",
+          "file": "tests/testsuite/build.rs",
+          "line": 12,
+          "code": "cmd.expect_stderr(str![[r#\""
+        }
+      ]
+    },
+    {
+      "id": "rust-file-template",
+      "module": "rust",
+      "title": "Recognize unrendered source templates and documentation snippets",
+      "family": "template",
+      "examples": [
+        {
+          "repo": "rust-lang/mdBook",
+          "file": "guide/src/format/example.rs",
+          "line": 3,
+          "code": "#"
+        },
+        {
+          "repo": "tauri-apps/tauri",
+          "file": "crates/tauri-cli/templates/plugin/__example-api/tauri-app/src-tauri/src/lib.rs",
+          "line": 11,
+          "code": ".plugin(tauri_plugin_{{ plugin_name_snake_case }}::init())"
+        }
+      ]
+    },
+    {
+      "id": "rust-import",
+      "module": "rust",
+      "title": "Resolve Rust imports and module declarations through `crate`, `self` and `super`",
+      "examples": [
+        {
+          "repo": "cberner/redb",
+          "file": "src/transactions.rs",
+          "line": 15,
+          "code": "PageListMut, PageNumber, PageNumberHashMap, PageResolver, PageTracker, SerializedSavepoint,"
+        },
+        {
+          "repo": "tauri-apps/tauri",
+          "file": "crates/tauri/src/path/plugin.rs",
+          "line": 9,
+          "code": "use super::{BaseDirectory, Error, PathResolver, Result};"
+        }
+      ]
+    },
+    {
+      "id": "rust-let",
+      "module": "rust",
+      "title": "Infer the receiver type of a local Rust `let` when resolving a method call",
+      "examples": [
+        {
+          "repo": "actix/actix-web",
+          "file": "actix-http/src/responses/response.rs",
+          "line": 435,
+          "code": "assert_eq!(res.status(), StatusCode::OK);"
+        },
+        {
+          "repo": "cberner/redb",
+          "file": "tests/basic_tests.rs",
+          "line": 2936,
+          "code": "write_txn.commit().unwrap();"
+        }
+      ]
+    },
+    {
+      "id": "rust-self",
+      "module": "rust",
+      "title": "Resolve Rust method calls through `self` and fields of checked-in types",
+      "examples": [
+        {
+          "repo": "BurntSushi/ripgrep",
+          "file": "crates/printer/src/standard.rs",
+          "line": 802,
+          "code": "self.record_matches(searcher, ctx.bytes(), 0..ctx.bytes().len())?;"
+        },
+        {
+          "repo": "fjall-rs/fjall",
+          "file": "src/tx/optimistic/write_tx.rs",
+          "line": 912,
+          "code": "let mut t2 = env.db.write_tx()?;"
+        }
+      ]
+    },
+    {
+      "id": "rust-serde",
+      "module": "rust",
+      "title": "Finish the recursive Rust scope and import analysis on Serde",
+      "missing": [
+        "serde-rs/serde"
+      ],
+      "examples": [
+        {
+          "repo": "serde-rs/serde",
+          "file": "serde_derive/src/de.rs",
+          "line": 25,
+          "code": "pub fn expand_derive_deserialize(input: &mut syn::DeriveInput) -> syn::Result<TokenStream> {"
+        },
+        {
+          "repo": "serde-rs/serde",
+          "file": "serde/src/private/de.rs",
+          "line": 38,
+          "code": "fn deserialize_any<V>(self, _visitor: V) -> Result<V::Value, E>"
+        }
+      ]
+    },
+    {
+      "id": "rust-value",
+      "module": "rust",
+      "title": "Link Rust references to locally declared value bindings",
+      "examples": [
+        {
+          "repo": "cberner/redb",
+          "file": "src/tree_store/btree_cursor.rs",
+          "line": 1973,
+          "code": "let result = operation(&mut cursor);"
+        },
+        {
+          "repo": "helix-editor/helix",
+          "file": "helix-core/src/transaction.rs",
+          "line": 679,
+          "code": "if last > to {"
+        }
+      ]
+    },
+    {
+      "id": "rustls-resolve",
+      "module": "rust",
+      "title": "Finish the Rust resolution pass on rustls",
+      "missing": [
+        "rustls/rustls"
+      ],
+      "examples": [
+        {
+          "repo": "rustls/rustls",
+          "file": "bogo/src/main.rs",
+          "line": 56,
+          "code": "pub fn main() {"
+        },
+        {
+          "repo": "rustls/rustls",
+          "file": "bogo/src/opts.rs",
+          "line": 18,
+          "code": "pub(crate) struct Options {"
+        }
+      ]
+    },
+    {
+      "id": "ts-candidate",
+      "module": "typescript",
+      "title": "Narrow TypeScript candidate sets using the concrete receiver or local declaration",
+      "examples": [
+        {
+          "repo": "colinhacks/zod",
+          "file": "packages/zod/src/v3/locales/en.ts",
+          "line": 2,
+          "code": "import { util, ZodParsedType } from \"../helpers/util.js\";"
+        },
+        {
+          "repo": "dexie/Dexie.js",
+          "file": "addons/dexie-cloud/src/sync/messagesFromServerQueue.ts",
+          "line": 3,
+          "code": "import { DexieCloudDB } from '../db/DexieCloudDB';"
+        }
+      ]
+    },
+    {
+      "id": "ts-config",
+      "module": "typescript",
+      "title": "Recover local TypeScript links when a base configuration is missing",
+      "examples": [
+        {
+          "repo": "changesets/changesets",
+          "file": "packages/config/src/defaults.ts",
+          "line": 1,
+          "code": "import type { Config, WrittenConfig } from \"@changesets/types\";"
+        },
+        {
+          "repo": "withastro/astro",
+          "file": "packages/astro/e2e/fixtures/cloudflare/src/content.config.ts",
+          "line": 83,
+          "code": "description: z.string(),"
+        }
+      ]
+    },
+    {
+      "id": "ts-jsx",
+      "module": "typescript",
+      "title": "Resolve JSX components through captured imports and local aliases",
+      "examples": [
+        {
+          "repo": "trpc/trpc",
+          "file": "examples/next-prisma-starter/src/pages/post/[id].tsx",
+          "line": 114,
+          "code": "<Empty className=\"border bg-background\">"
+        },
+        {
+          "repo": "trpc/trpc",
+          "file": "examples/.test/monotest-app/src/App.tsx",
+          "line": 21,
+          "code": "<TRPCReactProvider>"
+        }
+      ]
+    },
+    {
+      "id": "ts-local-access",
+      "module": "typescript",
+      "title": "Link TypeScript calls and references to local parameters, variables and fields",
+      "examples": [
+        {
+          "repo": "pingdotgg/t3code",
+          "file": "apps/server/src/auth/Layers/SessionCredentialService.ts",
+          "line": 476,
+          "code": "yield* emitRemoved(sessionId);"
+        },
+        {
+          "repo": "honojs/hono",
+          "file": "src/types.ts",
+          "line": 2582,
+          "code": "? Prefix"
+        }
+      ]
+    },
+    {
+      "id": "ts-local-chain",
+      "module": "typescript",
+      "title": "Resolve calls through imports from checked-in TypeScript packages",
+      "examples": [
+        {
+          "repo": "vitest-dev/vitest",
+          "file": "test/unit/test/mocking/automocking-class-inheritance.test.ts",
+          "line": 7,
+          "code": "describe('not mocking class when parent is mocked', () => {"
+        },
+        {
+          "repo": "withastro/astro",
+          "file": "packages/integrations/cloudflare/src/utils/image-config.ts",
+          "line": 89,
+          "code": "service: passthroughImageService(),"
+        }
+      ]
+    },
+    {
+      "id": "ts-props",
+      "module": "typescript",
+      "title": "Follow TypeScript callbacks passed through props, options and destructured parameters",
+      "examples": [
+        {
+          "repo": "trpc/trpc",
+          "file": "packages/server/src/adapters/next-app-dir/nextAppDirCaller.ts",
+          "line": 73,
+          "code": "config.onError?.({"
+        },
+        {
+          "repo": "excalidraw/excalidraw",
+          "file": "packages/excalidraw/components/RadioSelection.tsx",
+          "line": 50,
+          "code": "onChange={() => props.onChange(option.value)}"
+        }
+      ]
+    },
+    {
+      "id": "ts-relative",
+      "module": "typescript",
+      "title": "Resolve TypeScript relative and workspace imports to checked-in source",
+      "examples": [
+        {
+          "repo": "vitest-dev/vitest",
+          "file": "test/browser/fixtures/print-logs/vitest.config.ts",
+          "line": 1,
+          "code": "import { defineConfig } from 'vitest/config'"
+        },
+        {
+          "repo": "withastro/astro",
+          "file": "packages/astro/test/fixtures/container-custom-renderers/src/pages/button-directive.ts",
+          "line": 1,
+          "code": "import type { APIRoute, SSRLoadedRenderer } from 'astro';"
+        }
+      ]
+    },
+    {
+      "id": "ts-type-parameters",
+      "module": "typescript",
+      "title": "Link TypeScript type parameters to their declarations",
+      "examples": [
+        {
+          "repo": "honojs/hono",
+          "file": "src/types.ts",
+          "line": 659,
+          "code": "I3 extends Input = I & I2,"
+        },
+        {
+          "repo": "withastro/astro",
+          "file": "packages/astro/templates/content/types.d.ts",
+          "line": 22,
+          "code": "export type CollectionEntry<C extends CollectionKey> = Flatten<DataEntryMap[C]>;"
+        }
+      ]
+    },
+    {
+      "id": "typescript-file-broken-fixture",
+      "module": "typescript",
+      "title": "Recognize deliberately broken fixture inputs and keep their failure local",
+      "family": "broken-fixture",
+      "examples": [
+        {
+          "repo": "puppeteer/puppeteer",
+          "file": "test/assets/syntax-error.js",
+          "line": 3,
+          "code": "const = ;"
+        },
+        {
+          "repo": "vitejs/vite",
+          "file": "packages/vite/src/node/ssr/__tests__/fixtures/errors/syntax-error.js",
+          "line": 1,
+          "code": "invalid code"
+        }
+      ]
+    },
+    {
+      "id": "typescript-file-manifest-bom",
+      "module": "typescript",
+      "title": "Read TypeScript package manifests that start with a UTF-8 BOM",
+      "family": "manifest-bom",
+      "examples": [
+        {
+          "repo": "vitejs/vite",
+          "file": "playground/resolve/utf8-bom-package/package.json",
+          "line": 1,
+          "code": "﻿{"
+        },
+        {
+          "repo": "vitejs/vite",
+          "file": "playground/resolve/utf8-bom-package/index.mjs",
+          "line": 1,
+          "code": "export const msg = '[success]'"
+        }
+      ]
+    },
+    {
+      "id": "typescript-file-template",
+      "module": "typescript",
+      "title": "Recognize unrendered source templates and documentation snippets",
+      "family": "template",
+      "examples": [
+        {
+          "repo": "tauri-apps/tauri",
+          "file": "crates/tauri-cli/templates/plugin/guest-js/index.ts",
+          "line": 1,
+          "code": "{{#if license_header}}"
+        },
+        {
+          "repo": "tauri-apps/tauri",
+          "file": "crates/tauri-cli/templates/plugin/guest-js/index.ts",
+          "line": 7,
+          "code": "return await invoke<{value?: string}>('plugin:{{ plugin_name }}|ping', {"
+        }
+      ]
+    },
+    {
+      "id": "typescript-file-tsconfig",
+      "module": "typescript",
+      "title": "Recover readable TypeScript files under missing or malformed base configs",
+      "family": "tsconfig",
+      "examples": [
+        {
+          "repo": "trpc/trpc",
+          "file": "examples/nuxt/tsconfig.json",
+          "line": 3,
+          "code": "\"extends\": \"./.nuxt/tsconfig.json\""
+        },
+        {
+          "repo": "trpc/trpc",
+          "file": "examples/nuxt/server/tsconfig.json",
+          "line": 2,
+          "code": "\"extends\": \"../.nuxt/tsconfig.server.json\""
+        }
+      ]
+    },
+    {
+      "id": "typescript-rust-blocks",
+      "module": "typescript",
+      "title": "Complete TypeScript graphs when an earlier Rust analysis stalls in Dioxus or SWC",
+      "missing": [
+        "DioxusLabs/dioxus",
+        "swc-project/swc"
+      ],
+      "examples": [
+        {
+          "repo": "DioxusLabs/dioxus",
+          "file": "packages/web/src/ts/eval.ts",
+          "line": 11,
+          "code": "export class WebDioxusChannel extends DioxusChannel {"
+        },
+        {
+          "repo": "swc-project/swc",
+          "file": "packages/core/src/util.ts",
+          "line": 2,
+          "code": "export function wrapNativeSuper(Class) {"
+        }
+      ]
+    }
+  ]
+}

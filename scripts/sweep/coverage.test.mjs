@@ -19,7 +19,7 @@ const project = {
 };
 const imports = (...paths) => paths.map((path) => ({ targetName: path, data: { path } }));
 const evidence = {
-  goImports: goImports(imports("strconv", "example.org/vendored", "example.net/dependency", "example.com/app/local")),
+  goImports: goImports(imports("strconv", "context", "net/http", "example.org/vendored", "example.net/dependency", "example.com/app/local")),
   rustImports: rustImports([{ targetName: "std::fs", data: { alias: "filesystem" } }]),
   tsImports: () => new Map([["io", "node:fs"], ["example", "@my/workspace"]]),
   tsSpecifiers: new Set(["node:fs", "@my/workspace"]),
@@ -34,6 +34,9 @@ test("excludes proved external paths and keeps vendoring, aliases and shadows di
   assert.equal(classifyLink("go", "dependency.Run", selector("dependency")), "outside");
   assert.equal(classifyLink("go", "strconv.Quote", { expr: { k: "sel", x: { k: "local" } } }), "unclassified");
   assert.equal(classifyLink("go", "C", { path: "C" }, "imports"), "unclassified");
+  assert.equal(classifyLink("go", "cancel", { expr: { k: "call", f: { ...selector("context").expr, n: "WithCancel" }, i: 1 } }), "outside");
+  assert.equal(classifyLink("go", "response.Body", { expr: { k: "sel", x: { k: "val", t: { q: "http", n: "Response" } } } }), "outside");
+  assert.equal(classifyLink("go", "writer.Write", { expr: { k: "sel", x: { k: "val", t: { q: "http", n: "ResponseWriter" } } } }), "unclassified");
   assert.equal(classifyLink("rust", "filesystem::read", { pathSyntax: "filesystem::read" }), "outside");
   assert.equal(classifyLink("rust", "core::run", {}), "unclassified");
   assert.equal(classifyLink("rust", "std::run", { blocked: true }), "unclassified");
@@ -84,7 +87,7 @@ test("failed-file taint reserves links that also have a receiver reason", () => 
     ["rust", "calls", "unresolved", null, uncertainty, "source", "inside", 8, 5],
     ["rust", "calls", "unresolved", null, uncertainty, "source", "outside", 3, 1],
     ["rust", "calls", "unresolved", null, "receiver-type-unverified", "source", "unclassified", 2, 1],
-  ] }), { total: 11, eligible: 8, blocked: 6, receivers: 11 });
+  ] }), { total: 11, eligible: 8, blocked: 6, receivers: 11, allBlocked: 7 });
 });
 
 test("candidate overlay rewrites the plan only for matched evidence", () => {

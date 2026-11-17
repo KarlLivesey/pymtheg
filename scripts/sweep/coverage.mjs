@@ -64,9 +64,11 @@ const metric = (repo, module, allowed) => repositoryScore(repo.breakdown ?? [], 
   (module === "overall" || module === language) && allowed.includes(scope));
 
 export function failedRustInfluence(repo, allowed = scopes) {
-  const result = { total: 0, eligible: 0, blocked: 0, receivers: 0 };
+  const result = { total: 0, eligible: 0, blocked: 0, receivers: 0, allBlocked: 0 };
   for (const [module, , outcome, reason, uncertainty, scope, disposition, count, blocked] of repo.breakdown ?? []) {
-    if (module !== "rust" || outcome !== "unresolved" || !allowed.includes(scope) || !rustTaint(reason, uncertainty)) continue;
+    if (module !== "rust" || outcome !== "unresolved" || !allowed.includes(scope)) continue;
+    result.allBlocked += blocked;
+    if (!rustTaint(reason, uncertainty)) continue;
     result.total += count;
     result.blocked += blocked;
     if (disposition !== "outside") result.eligible += count;
@@ -250,12 +252,28 @@ function renderScore(repos, input, base) {
   }
   lines.push("", "## Attempts with no completed graph", "");
   for (const repo of repos.filter((row) => !finished(row))) lines.push(`- ${code(repo.id)} ${repo.outcome}${repo.failure?.lastProgress ? ` at ${code(repo.failure.lastProgress)}` : ""}.`);
-  lines.push("", "## Rust failed-file influence", "", "These are exact stored unresolved counts. The eligible column excludes proved outside targets. The two rightmost columns include every tainted link with the corresponding stored flag, including outside links. A row with both failure and receiver reasons belongs to the taint support item only.", "",
-    "| Repository | Unresolved with failed-file reason | Eligible | Marked blocked | Also receiver-unverified |",
-    "| --- | ---: | ---: | ---: | ---: |");
+  lines.push("", "## Rust failed-file influence", "", "These are exact stored unresolved counts. The eligible column excludes proved outside targets. The blocked and receiver columns count the stored flags. The receiver count covers tainted links. A row with both failure and receiver reasons belongs to the taint support item only.", "",
+    "| Repository | Unresolved with failed-file reason | Eligible | Tainted and blocked | Also receiver-unverified | All unresolved marked blocked |",
+    "| --- | ---: | ---: | ---: | ---: | ---: |");
   for (const repo of repos) {
     const a = failedRustInfluence(repo);
-    if (a.total) lines.push(`| ${repo.id} | ${[a.total, a.eligible, a.blocked, a.receivers].map(number).join(" | ")} |`);
+    if (a.total || repo.failedSources?.some(({ module }) => module === "rust")) {
+      lines.push(`| ${repo.id} | ${[a.total, a.eligible, a.blocked, a.receivers, a.allBlocked].map(number).join(" | ")} |`);
+    }
+  }
+  const checks = ["gin-gonic/gin", "yargs/yargs", "alacritty/alacritty"].flatMap((id) => {
+    const repo = repos.find((row) => row.id === id && finished(row));
+    if (!repo) return [];
+    const a = metric(repo, repo.language, scopes);
+    const imports = repositoryScore(repo.breakdown, (module, _, kind) => module === repo.language && kind === "imports");
+    return [[id, a.outside, a.inside + a.outside + a.unclassified, imports.outside, imports.inside + imports.outside + imports.unclassified]];
+  });
+  if (checks.length) {
+    lines.push("", "## Outside-link review checks", "", "These counts use source evidence from the full primary-module breakdown for the SW-1 review cases. For example, yargs imports its own build output, so `missing-module` on those relative paths remains inside. Unproven package links and return types stay unclassified.", "",
+      "| Repository | Outside / unresolved | Outside / unresolved imports |", "| --- | ---: | ---: |");
+    for (const [id, outside, unresolved, outsideImports, unresolvedImports] of checks) {
+      lines.push(`| ${id} | ${number(outside)} / ${number(unresolved)} (${percent(ratio(outside, unresolved))}) | ${number(outsideImports)} / ${number(unresolvedImports)} |`);
+    }
   }
   return lines.join("\n") + "\n";
 }

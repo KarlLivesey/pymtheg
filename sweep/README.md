@@ -115,8 +115,10 @@ Outside requires evidence that the target is unavailable in the checkout.
   for the implicit alias. The released Go layout checks local modules and
   replacements. A recorded `vendor/` package stays inside. The standard
   library roots, recorded builtin calls and dependencies declared in the owning
-  `go.mod` can count as outside. The score retains C imports and unresolved
-  receiver chains without this evidence.
+  `go.mod` can count as outside. Concrete standard-library receiver types and
+  named standard factory results can also be traced from stored Go expressions
+  and same-package signatures. This trace keeps interface dispatch, C imports
+  and unproved receiver chains in the denominator.
 - **Rust.** Use explicit `std`, `core`, `alloc`, `proc_macro` and `test` paths,
   an unconditional top-level import binding, or a named Cargo dependency with
   an unambiguous path or registry origin. Local Rust names and conflicting
@@ -130,10 +132,11 @@ Outside requires evidence that the target is unavailable in the checkout.
   stays inside. Relative imports that escape the checkout count as outside.
   Built-in Node specifiers and unvendored declared package dependencies can
   be outside. A configured alias that could bind locally prevents an external
-  guess. An `external` link to a known runtime or compiler-library name with no captured
-  shadow can count as outside. An `external-package` label with no package
-  evidence stays unclassified. The released TypeScript parser reads import
-  declarations for this rule without executing source.
+  guess. An `external` link on a literal receiver or an unshadowed runtime or
+  compiler-library name can count as outside. Fluent assertions can be traced
+  to a named assertion package through their import. Other `external-package`
+  links with no package evidence stay unclassified. The released TypeScript
+  parser reads import declarations for this rule without executing source.
 
 The file-scope split recognizes checked-in minified JavaScript, PocketBase's
 checked-in `ui/dist/` bundles, explicit negative fixture paths, Tauri's

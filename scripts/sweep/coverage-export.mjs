@@ -180,7 +180,8 @@ function scanRepo(scratch, repo, readers, referenceFiles) {
   const db = new DatabaseSync(join(attempt, "checkout/.pymtheg/rebuildable/graph.sqlite"), { readOnly: true });
   try {
     if (db.prepare("SELECT value FROM graph_meta WHERE key='schema'").get()?.value !== "3") throw Error("Coverage export supports graph schema 3");
-    const files = db.prepare("SELECT path,status,json_extract(body,'$.module') AS module FROM graph_files ORDER BY path").all();
+    const files = db.prepare(`SELECT path,status,json_extract(body,'$.module') AS module,
+      json_extract(body,'$.result.data.go.package') AS package FROM graph_files ORDER BY path`).all();
     const getFile = db.prepare(`SELECT json_extract(body,'$.text') AS text,
       json_extract(body,'$.result.diagnostics[0].message') AS reason,
       json_extract(body,'$.result.diagnostics[0].range.start') AS start FROM graph_files WHERE path=?`);
@@ -191,8 +192,39 @@ function scanRepo(scratch, repo, readers, referenceFiles) {
     const hasName = db.prepare("SELECT 1 FROM graph_symbols WHERE name=? AND json_extract(body,'$.module')='typescript' LIMIT 1");
     const goSignatures = db.prepare(`SELECT file, json_extract(body,'$.data') AS data FROM graph_symbols WHERE name=?
       AND json_extract(body,'$.module')='go' AND json_extract(body,'$.kind')=?`);
+    const goDefinitions = db.prepare(`SELECT file, json_extract(body,'$.kind') AS kind,
+      json_extract(body,'$.data') AS data FROM graph_symbols WHERE name=? AND json_extract(body,'$.module')='go'`);
     const capturedNames = new Map();
     const project = projectEvidence(db, readers, files, paths);
+    const goPackages = new Map(files.filter(({ module }) => module === "go").map((file) => [file.path, file.package]));
+    const goAliasCache = new Map();
+    const goAliasesFor = (file, rows) => {
+      if (!goAliasCache.has(file)) goAliasCache.set(file, goImports(rows ?? imports.all(file).map(({ body }) => JSON.parse(body))));
+      return goAliasCache.get(file);
+    };
+    const returnedCache = new Map();
+    const goReturned = (file, desc) => {
+      if (desc.f?.k !== "name") return null;
+      const owner = goPackages.get(file);
+      if (!owner) return null;
+      const directory = posix.dirname(file);
+      const key = JSON.stringify([directory, owner, desc.f.n, desc.i]);
+      if (!returnedCache.has(key)) {
+        const definitions = goDefinitions.all(desc.f.n).filter((row) => posix.dirname(row.file) === directory && goPackages.get(row.file) === owner);
+        const origins = definitions.map((row) => {
+          if (row.kind !== "function") return null;
+          const result = JSON.parse(row.data)?.results?.[desc.i];
+          if (result?.k !== "val" || !result.t?.q) return null;
+          const path = goAliasesFor(row.file).get(result.t.q);
+          if (!path || classify({ module: "go", kind: "imports", resolution: "unresolved", file: row.file,
+            targetName: path }, {}, project) !== "outside") return null;
+          return { path, type: result.t.n };
+        });
+        const first = origins[0];
+        returnedCache.set(key, first && origins.every((row) => row?.path === first.path && row?.type === first.type) ? first : null);
+      }
+      return returnedCache.get(key);
+    };
     const goFactory = (file, expr, imports) => {
       const called = expr?.k === "sel" && expr.x?.k === "call" ? expr.x.f : null;
       const specifier = called?.k === "sel" && called.x?.k === "name" ? imports.get(called.x.n) : null;
@@ -242,11 +274,14 @@ function scanRepo(scratch, repo, readers, referenceFiles) {
       let bindings;
       const tsSourceBindings = () => bindings ??= tsBindings(readers.ts, file.path, source);
       const evidence = {
-        goImports: file.module === "go" ? goImports(records) : new Map(),
+        goImports: file.module === "go" ? goAliasesFor(file.path, records) : new Map(),
+        goReturned: (desc) => goReturned(file.path, desc),
         rustImports: file.module === "rust" ? rustImports(records) : new Map(),
         tsSpecifiers: new Set(records.map((link) => link.data?.specifier).filter(Boolean)),
         tsImports: () => tsSourceBindings().imports,
         tsSpecifierAt: (offset) => tsSourceBindings().specifiers.find(({ start, end }) => start <= offset && offset < end)?.value,
+        tsPropertyRoot: (offset) => tsSourceBindings().propertyRoots.get(offset),
+        tsLiteral: (offset) => tsSourceBindings().literalProperties.has(offset),
         tsGlobal: (name) => {
           if (!capturedNames.has(name)) capturedNames.set(name, Boolean(hasName.get(name)));
           const local = tsSourceBindings();
