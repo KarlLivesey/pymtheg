@@ -75,3 +75,14 @@ Run on the dev server.
 - Full `npm test`: 2922 tests, 2922 pass, 0 fail, 0 skipped.
 - Browser journeys were not run: this chunk has no browser access, and the
   only journey change is a deleted file.
+
+## Review follow-up
+
+- `test/studio.browser.mjs` checked the repository's copy of
+  `examples/mvp/checkout.pym` for an accidental save, while Studio had the
+  temporary copy open, so the check could not fail. It now reads the temporary
+  copy. (Found in review.)
+- The deleted journey also polled the service's internal run list until the
+  check on `task-buggy.pym` left `running`. That is internal state; the visible
+  result (the entry point becomes `TaskRunner`) is still asserted by
+  `test/studio.browser.mjs`.

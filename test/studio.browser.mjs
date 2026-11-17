@@ -53,7 +53,10 @@ try {
   ).toBeVisible();
   await page.getByRole("button", { name: /Check design/ }).click();
   await expect(quoteBudget).toHaveCount(0);
-  if ((await readFile("examples/mvp/checkout.pym", "utf8")) !== original)
+  if (
+    (await readFile(join(root, "examples/mvp/checkout.pym"), "utf8")) !==
+    original
+  )
     throw Error("Unsaved edit changed disk");
   await page.getByRole("button", { name: "Work", exact: true }).click();
   await expect(
