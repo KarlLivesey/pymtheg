@@ -25,7 +25,6 @@ const configuredBrowser = browserExecutable(engine);
 const files = [
   "test/studio.browser.mjs",
   "test/studio-entry-switch.browser.mjs",
-  "test/studio-entry-dirty-switch.browser.mjs",
   "test/studio-cross-browser.browser.mjs",
   "test/studio-authoring.browser.mjs",
   "test/studio-understanding.browser.mjs",

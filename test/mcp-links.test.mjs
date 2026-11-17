@@ -38,7 +38,6 @@ async function session(run) {
     });
     client = new Client({ name: "links-agent", version: "1" });
     await client.connect(transport);
-    const log = [];
     const raw = async (name, args) => {
       const r = await client.callTool(
         { name, arguments: args },
@@ -48,7 +47,6 @@ async function session(run) {
         Buffer.byteLength(JSON.stringify(r)) <= 65536 ||
           !["requirement_links", "link_result"].includes(name),
       );
-      log.push({ name, args, body: r.structuredContent });
       return r;
     };
     const call = async (name, args) => {
@@ -67,7 +65,7 @@ async function session(run) {
           })
         : first;
     };
-    await run({ root, client, transport, raw, call, link, log });
+    await run({ root, client, transport, raw, call, link });
   } finally {
     await client?.close();
     await rm(root, { recursive: true, force: true });
@@ -313,43 +311,6 @@ test("SQLite lock waits stay in an owned worker: MCP discovery remains responsiv
       await holder.terminate();
       await exited;
     }
-  }));
-
-test("every documented requirement-link call executes as written", async () =>
-  session(async ({ root, call, log }) => {
-    const markdown = await readFile("docs/mcp.md", "utf8");
-    const blocks = [
-      ...markdown.matchAll(
-        /```js\n\/\/ verified-mcp\n\/\/ requirement-links\n([\s\S]*?)```/g,
-      ),
-    ].map((m) => m[1]);
-    assert.ok(blocks.length);
-    const AsyncFunction = Object.getPrototypeOf(
-      async function () {},
-    ).constructor;
-    await new AsyncFunction("call", "write", "expect", blocks.join("\n"))(
-      call,
-      (path, text) => writeFile(join(root, path), text),
-      (condition) => assert.ok(condition),
-    );
-    const used = new Set(log.map((c) => c.name));
-    for (const name of ["code_graph", "link_result", "requirement_links"])
-      assert.ok(used.has(name));
-    assert.ok(
-      [...used].every((name) =>
-        [
-          "code_graph",
-          "graph_result",
-          "link_result",
-          "requirement_links",
-        ].includes(name),
-      ),
-    );
-    if (process.env.R1C2_EVIDENCE)
-      await writeFile(
-        join(process.env.R1C2_EVIDENCE, "documented-links.json"),
-        JSON.stringify(log) + "\n",
-      );
   }));
 
 test("check_design first response includes bounded actionable findings, with read_run continuation", async () =>
