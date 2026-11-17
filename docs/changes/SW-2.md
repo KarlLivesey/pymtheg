@@ -22,6 +22,11 @@ chunks are merged.
   sample per diff bucket. It is resumable, and a failing tool or repository is
   recorded without stopping the run. An entry may name `exclude` paths, removed
   from the tools' copies only (used to leave out vendored trees).
+- Network isolation is required by default: if `unshare -rn` does not work,
+  the run stops with a message. `--no-isolate` runs the tools with network on
+  purpose, and the results record `isolated: false`.
+- Repository ids may be `owner/name`, as in `sweep/repos.json`; each id gets a
+  folder named `owner__name`.
 - `show.mjs` prints a bucket's sampled links with their source lines for
   hand-checking.
 - `test/compare-harness.test.mjs` checks the normalising and matching on tiny
@@ -33,3 +38,10 @@ fixed here.
 
 Rejected as extra tools, with reasons in the summary: Sourcegraph's SCIP
 indexers, universal-ctags, GitHub stack graphs and tree-sitter tags.
+
+Known limit, not fixed here: when one tool emits the same link twice from two
+enclosing symbols (CodeGraph's `Gt` reference at cobra `cobra.go:38`, once from
+the file and once from `templateFuncs`), the second copy cannot join the
+cluster that already holds that tool, so it is counted as "only others"
+(`scripts/compare/lib/match.mjs`, the second matching pass). Absorbing such
+duplicates would change the pilot's samples, so it is left for the full run.

@@ -30,10 +30,14 @@ Nothing in Pymtheg was changed. Findings are listed for later chunks.
   the receiver is a standard-library or dependency type (`ctx.Value` → chi's
   `endpoints.Value`). Its confidence
   number does not separate these (0.9 on false links). In Rust and TypeScript
-  the others were right more often (17 of 20, and 15 of 20 with 2 arguable).
-- **Pymtheg could not index T3 Code as installed.** It ran out of Node's
-  default heap (about 4 GB) both on the whole repository and on its own code
-  without the vendored trees. CodeGraph and graphify finished both. With the
+  the others were right more often (17 of 20, and 14 of 20 with 2 arguable).
+- **Pymtheg could not index this pilot's T3 Code checkout with the default
+  heap.** The pilot pins `b387e3a` (17 November 2026): 7,204 of the project's
+  own TS/JS files plus about 20,000 vendored under `.repos/`. SW-1's sweep
+  pins v0.0.24, `ea20e80` (14 May 2026, 1,006 files), which Pymtheg indexed in
+  267 s at about 3 GB; see "T3 Code here and in the SW-1 sweep" below. On the
+  newer checkout Pymtheg ran out of Node's default heap (about 4 GB) both on
+  the whole repository and on its own code without the vendored trees. CodeGraph and graphify finished both. With the
   heap raised to 32 GB it finished T3 Code's own code in 22 minutes at 11.9 GB
   peak, which is the run the T3 Code comparison uses.
 - **Recommendation:** run CodeGraph on all 60; run graphify too only because it
@@ -42,15 +46,15 @@ Nothing in Pymtheg was changed. Findings are listed for later chunks.
 
 ## Tools: what installed and what ran
 
-| Tool | Version, licence | Installed from | What ran | Network, models |
-|---|---|---|---|---|
-| Pymtheg | 0.1.0, MIT | npm `pymtheg@0.1.0` into a scratch prefix | `pymtheg init`, `pymtheg graph index --json`, source only (the Go toolchain route is off by default and stayed off) | none |
-| CodeGraph | 1.6.2, MIT | npm `@colbymchenry/codegraph@1.6.2` into a scratch prefix | `codegraph init -y` with telemetry off (`CODEGRAPH_TELEMETRY=0`) | none |
-| graphify | 0.9.112, Apache-2.0 (some older parts MIT, per its NOTICE) | PyPI `graphifyy` (the real project, `Graphify-Labs/graphify`, formerly `safishamsi/graphify`; not the unrelated npm `graphify`) into a virtual environment made with uv's standalone binary, since the server has no pip | `graphify extract --code-only --no-cluster --max-workers 4`: its local tree-sitter extraction only | none |
+| Tool      | Version, licence                                           | Installed from                                                                                                                                                                                                           | What ran                                                                                                            | Network, models |
+| --------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- | --------------- |
+| Pymtheg   | 0.1.0, MIT                                                 | npm `pymtheg@0.1.0` into a scratch prefix                                                                                                                                                                                | `pymtheg init`, `pymtheg graph index --json`, source only (the Go toolchain route is off by default and stayed off) | none            |
+| CodeGraph | 1.6.2, MIT                                                 | npm `@colbymchenry/codegraph@1.6.2` into a scratch prefix                                                                                                                                                                | `codegraph init -y` with telemetry off (`CODEGRAPH_TELEMETRY=0`)                                                    | none            |
+| graphify  | 0.9.112, Apache-2.0 (some older parts MIT, per its NOTICE) | PyPI `graphifyy` (the real project, `Graphify-Labs/graphify`, formerly `safishamsi/graphify`; not the unrelated npm `graphify`) into a virtual environment made with uv's standalone binary, since the server has no pip | `graphify extract --code-only --no-cluster --max-workers 4`: its local tree-sitter extraction only                  | none            |
 
 All three ran in their own copy of each checkout, with a scratch `HOME`, no API
 keys in the environment and no network (`unshare -rn`; the harness checks
-this works before using it). None of them ran the project's toolchain, install
+this works first and stops if it does not, unless told `--no-isolate`). None of them ran the project's toolchain, install
 scripts, builds or tests in these modes.
 
 **Left out of graphify:** the semantic pass over documents, papers and images
@@ -62,12 +66,12 @@ run had no network, so no model call could have happened.
 
 **Extra tools considered and rejected** (the brief allowed up to two more):
 
-| Tool | Why not now |
-|---|---|
+| Tool                                                                           | Why not now                                                                                                                                                                                                                                                                                                                                                                                   |
+| ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Sourcegraph SCIP indexers (`scip-typescript`, `scip-go`, `rust-analyzer scip`) | The strongest candidates and well known, but they are compiler front ends: accurate types need the dependencies installed (`node_modules`, Go module download, `cargo metadata`), and `rust-analyzer` runs build scripts and proc macros (project code) unless both are turned off. That is a sandboxing job, not a quick add. They would make a good referee later (see the recommendation). |
-| universal-ctags | Symbols only, no call or reference edges. |
-| GitHub stack graphs | Archived by GitHub in September 2025 and flagged unmaintained (RUSTSEC-2026-0303); only a few languages. |
-| tree-sitter `tags` queries (as used by repo maps) | Name-level references with no resolution; adds nothing that graphify does not. |
+| universal-ctags                                                                | Symbols only, no call or reference edges.                                                                                                                                                                                                                                                                                                                                                     |
+| GitHub stack graphs                                                            | Archived by GitHub in September 2025 and flagged unmaintained (RUSTSEC-2026-0303); only a few languages.                                                                                                                                                                                                                                                                                      |
+| tree-sitter `tags` queries (as used by repo maps)                              | Name-level references with no resolution; adds nothing that graphify does not.                                                                                                                                                                                                                                                                                                                |
 
 ## How links are matched
 
@@ -99,31 +103,31 @@ does not. Full tables with every bucket: [`results.md`](results.md).
 
 **t3code** (typescript, `b387e3a179d7`, Go 0, Rust 10, TS/JS 27468 source files)
 
-| Tool | Outcome | Wall s | Peak MB | Symbols | Calls | References | Unresolved | Compared |
-|---|---|---:|---:|---:|---:|---:|---:|---:|
-| pymtheg | partial (exit 134) | 1670.7 | 4706.1 | 345 | 0 | 0 | 4312 | – |
-| codegraph | ok | 922.3 | 12328.1 | 310790 | 543056 | 252687 | 1504752 | 438870 |
-| graphify | ok | 1263.7 | 1902.1 | 249946 | 158821 | 9467 | 0 | 162057 |
+| Tool      | Outcome            | Wall s | Peak MB | Symbols |  Calls | References | Unresolved | Compared |
+| --------- | ------------------ | -----: | ------: | ------: | -----: | ---------: | ---------: | -------: |
+| pymtheg   | partial (exit 134) | 1670.7 |  4706.1 |     345 |      0 |          0 |       4312 |        – |
+| codegraph | ok                 |  922.3 | 12328.1 |  310790 | 543056 |     252687 |    1504752 |   438870 |
+| graphify  | ok                 | 1263.7 |  1902.1 |  249946 | 158821 |       9467 |          0 |   162057 |
 
 Pymtheg left out of the diff (partial (exit 134)). Links: CodeGraph and graphify both 146478; only CodeGraph 292392; only graphify 15579.
 
 **t3code** (typescript, `b387e3a179d7`, Go 0, Rust 10, TS/JS 27468 source files)
 
-| Tool | Outcome | Wall s | Peak MB | Symbols | Calls | References | Unresolved | Compared |
-|---|---|---:|---:|---:|---:|---:|---:|---:|
-| pymtheg | incomplete (exit 2) | 6155.8 | 24179.4 | 286931 | 438104 | 187829 | 2018561 | 325141 |
-| codegraph | ok | 891.1 | 12380.4 | 310790 | 543056 | 252687 | 1504752 | 438870 |
-| graphify | ok | 1183.8 | 1912.7 | 249946 | 158821 | 9467 | 0 | 162057 |
+| Tool      | Outcome             | Wall s | Peak MB | Symbols |  Calls | References | Unresolved | Compared |
+| --------- | ------------------- | -----: | ------: | ------: | -----: | ---------: | ---------: | -------: |
+| pymtheg   | incomplete (exit 2) | 6155.8 | 24179.4 |  286931 | 438104 |     187829 |    2018561 |   325141 |
+| codegraph | ok                  |  891.1 | 12380.4 |  310790 | 543056 |     252687 |    1504752 |   438870 |
+| graphify  | ok                  | 1183.8 |  1912.7 |  249946 | 158821 |       9467 |          0 |   162057 |
 
 Links: all three 118168; only Pymtheg 101194 (definite 101009, candidate 185); only others 230509 (only CodeGraph 191170, only graphify 11036); Pymtheg candidate where others claim one target 4.
 
 **t3code-first-party** (typescript, `b387e3a179d7`, Go 0, Rust 10, TS/JS 7204 source files)
 
-| Tool | Outcome | Wall s | Peak MB | Symbols | Calls | References | Unresolved | Compared |
-|---|---|---:|---:|---:|---:|---:|---:|---:|
-| pymtheg | incomplete (exit 2) | 1338.9 | 11860.5 | 94855 | 117731 | 40126 | 849960 | 82916 |
-| codegraph | ok | 434.8 | 6233.6 | 113355 | 181826 | 82507 | 669273 | 161339 |
-| graphify | ok | 392.5 | 687.6 | 73679 | 62792 | 6890 | 0 | 61387 |
+| Tool      | Outcome             | Wall s | Peak MB | Symbols |  Calls | References | Unresolved | Compared |
+| --------- | ------------------- | -----: | ------: | ------: | -----: | ---------: | ---------: | -------: |
+| pymtheg   | incomplete (exit 2) | 1338.9 | 11860.5 |   94855 | 117731 |      40126 |     849960 |    82916 |
+| codegraph | ok                  |  434.8 |  6233.6 |  113355 | 181826 |      82507 |     669273 |   161339 |
+| graphify  | ok                  |  392.5 |   687.6 |   73679 |  62792 |       6890 |          0 |    61387 |
 
 Links: all three 42895; only Pymtheg 13308 (definite 13308, candidate 0); only others 94627 (only CodeGraph 76796, only graphify 2235); Pymtheg candidate where others claim one target 0.
 
@@ -132,20 +136,37 @@ minutes at 12 GB, graphify 20 minutes at 1.9 GB). The vendored `.repos/` trees
 make up most of it, and its "only others" sites follow the same classes as the
 project's own code.
 
+### T3 Code here and in the SW-1 sweep
+
+SW-1 (merged, `evidence/sw-1/results.json`) indexed T3 Code with Pymtheg 0.1.0
+in 267 s at 3,006 MiB, while this pilot reports an out-of-memory failure. They
+are different checkouts, not a contradiction:
+
+|                       | SW-1 sweep                                                            | SW-2 pilot                                                                                                                                                                         |
+| --------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pin                   | tag v0.0.24 (14 May 2026), `ea20e800216417c8d3b5dfc54a863bbd9e0b3e20` | `main` on 17 November 2026, `b387e3a179d7495321019363c5ba11e847834cd0`                                                                                                             |
+| Scope                 | 1,006 tracked TS/JS files                                             | 27,468 TS/JS files, of which 20,264 are in the vendored `.repos/` directory; 7,204 without it (`t3code-first-party`). CodeGraph's 7,438 is its count of all files it indexed there |
+| Pymtheg, default heap | finished, 267 s, 3,006 MiB                                            | out of memory on both scopes                                                                                                                                                       |
+| Pymtheg, 32 GB heap   | not run                                                               | 22 minutes, 11.9 GB (7,204 files); 103 minutes, 24 GB (whole)                                                                                                                      |
+
+The newer commit has about seven times the project's own TS/JS files of
+v0.0.24, plus the vendored trees. The `sweep/repos.json` entry is the one the
+full comparison over the 60 will use.
+
 ## Hand-checked samples
 
 40 per language: the first ten links in each bucket's fixed-seed sample from
 each of the two repositories (for TypeScript, `ky` and T3 Code's own code from
 the raised-heap run, since the default run of Pymtheg did not finish T3 Code). All rows: [`hand-check.md`](hand-check.md).
 
-| Language | Bucket | True | Arguable | False |
-|---|---|---:|---:|---:|
-| Go | only others | 9 (3 only attributed to another enclosing symbol) | 1 | 10 |
-| Go | only Pymtheg | 20 | 0 | 0 |
-| Rust | only others | 17 | 0 | 3 |
-| Rust | only Pymtheg | 20 | 0 | 0 |
-| TypeScript | only others | 15 (2 only attributed to another enclosing symbol) | 2 | 3 |
-| TypeScript | only Pymtheg | 20 | 0 | 0 |
+| Language   | Bucket       |                                               True | Arguable | False |
+| ---------- | ------------ | -------------------------------------------------: | -------: | ----: |
+| Go         | only others  |  9 (3 only attributed to another enclosing symbol) |        1 |    10 |
+| Go         | only Pymtheg |                                                 20 |        0 |     0 |
+| Rust       | only others  |                                                 17 |        0 |     3 |
+| Rust       | only Pymtheg |                                                 20 |        0 |     0 |
+| TypeScript | only others  | 14 (2 only attributed to another enclosing symbol) |        2 |     4 |
+| TypeScript | only Pymtheg |                                                 20 |        0 |     0 |
 
 Every false link in the samples came from a tool linking by name: a method
 call to a same-named project method when the receiver is a library type, or a
@@ -156,11 +177,13 @@ library type to a same-named project type.
 Only classes the hand-check found true. Ranked by the number of pilot sites
 where another tool has an in-project link and Pymtheg's state there is that
 class (from each diff's `byAbsentState`). The counts are upper bounds, since
-some of the others' links at those sites are false (2 to 5 in 20 in the
-samples), and T3 Code, the largest repository, dominates the TypeScript counts.
+some of the others' links at those sites are false (in the samples 3 of 20
+in Rust, 4 of 20 in TypeScript and 10 of 20 in Go; in Go most counted sites
+are false, see item 7), and T3 Code, the largest repository, dominates the TypeScript counts.
 
 1. **TypeScript: imports of sibling workspace packages in a pnpm monorepo are
-   treated as external** (`external-package`; 22,379 sites, all in T3 Code).
+   treated as external** (`external-package`; 22,379 sites in T3 Code, 7 in
+   `ky`, where they are real package imports).
    Pymtheg documents pnpm-only workspaces as unresolved; T3 Code is one.
    Example: T3 Code `apps/server/src/mcp/OrchestratorMcpService.ts:226` (a type
    from `@t3tools/contracts`). Expect it in most TypeScript monorepos in the
@@ -195,19 +218,24 @@ samples), and T3 Code, the largest repository, dominates the TypeScript counts.
    Examples: `just` `src/attribute.rs:451` (`CompileErrorKind::ArgumentCountParse`),
    `src/analyzer.rs:155` (`Table::default()`), `src/recipe.rs:6`
    (field type `AttributeSet`).
-6. **Go: calls on interface-typed values and on range variables** are left
-   unresolved with no reason recorded (160 sites: 147 in chi, 13 in cobra),
-   instead of linking to the interface method (or a candidate set of
-   implementations) or typing the range variable. Examples: `chi`
-   `tree_test.go:553` (`r.Use(mw)` with `r Router`),
-   `middleware/route_headers.go:93` (`matcher.IsMatch` over a map of
-   `[]HeaderRoute`).
-7. **Rust: `Self::method` and `self.method()` that go through a trait impl**
+6. **Rust: `Self::method` and `self.method()` that go through a trait impl**
    (`trait-dispatch`, `later-probe-step`, `inherent-applicability-unverified`;
    about 110 sites in the two repositories). Examples: `fd` `src/cli.rs:898`
    (`Self::from_arg_matches` inside `impl FromArgMatches for Exec`),
    `fd` `src/dir_entry.rs:130` (`self.cmp(other)` in `impl PartialOrd`),
    `fd` `tests/testenv/mod.rs:204` (`self.test_root()`).
+7. **Go: calls on interface-typed values** are left unresolved with no reason
+   recorded, instead of linking to the interface method (or a candidate set of
+   implementations); a range variable over a named map of slices is not typed
+   either. About 60 to 70 sites, all in chi: the genuine `Router.*` and
+   `Handler.ServeHTTP` interface calls among chi's 147 Go calls left
+   unresolved with no reason. The rest of that bucket, and all 13 such sites in
+   cobra, are false CodeGraph links (52 chi sites to `compressResponseWriter.Close`
+   from `ts.Close()` on an `*httptest.Server`, 7 to `endpoints.Value` from
+   `ctx.Value`; in cobra `os.File.Name`, pflag `FlagSet` methods and
+   `template.Execute`). Examples: `chi` `tree_test.go:553` (`r.Use(mw)` with
+   `r Router`), `middleware/route_headers.go:93` (`matcher.IsMatch` over a map
+   of `[]HeaderRoute`).
 8. **Rust: functions brought in with `use`** (`namespace-binding-unverified`;
    9 sites in `fd`, a few dozen more in combination with other reasons in
    `just`). Example: `fd` `src/fmt/mod.rs:130` (`dirname`, imported from
@@ -231,12 +259,14 @@ look in the full run.
 Not a link class, but it decides what the full comparison can cover:
 **Pymtheg could not index T3 Code with Node's default heap** (about 4 GB). It
 ran out of memory during TypeScript analysis after 28 minutes on the whole
-repository (27,468 JS/TS files) and 23 minutes on its own code (7,438 files).
+repository (27,468 JS/TS files) and 23 minutes on its own code (7,204 JS/TS
+files; the 7,438 that CodeGraph's table reports is every file CodeGraph
+indexed there, which includes other languages and configuration files).
 CodeGraph took 15 and 7.5 minutes (12.3 and 6.3 GB peak), graphify 21 and 6.6
 minutes. With the heap raised to 32 GB, Pymtheg finished T3 Code's own code in
-22 minutes at 11.9 GB peak. On the whole repository it finished in 103 minutes at 24 GB peak. On `just` (277 Rust files) Pymtheg
-took 222 s against CodeGraph's 6 s. SW-1 measures speed and memory across the
-60.
+22 minutes at 11.9 GB peak, and the whole repository in 103 minutes at 24 GB
+peak. On `just` (277 Rust files) Pymtheg
+took 222 s against CodeGraph's 6 s. SW-1 measures speed and memory across the 60.
 
 Not counted as misses: CodeGraph's synthetic route nodes (`GET /search` →
 `SearchArticles`) and file-level attributions that Pymtheg has from another
@@ -312,9 +342,9 @@ All 60 sampled links were true.
   and give no certainty that Pymtheg could keep. Two ideas are worth taking:
   CodeGraph stores each function's declared return type to type the receiver
   of the next call (its `nodes.return_type`), which is what Pymtheg's Rust
-  module lacks for class 1; and treating an uninstalled `extends` preset as
+  module lacks for item 4; and treating an uninstalled `extends` preset as
   "use the compiler's defaults and keep resolving project files" (both other
-  tools resolve those files regardless), for class 2. Both would have to keep
+  tools resolve those files regardless), for item 3. Both would have to keep
   Pymtheg's rule that a guess is never shown as definite.
 
 ## Reproduce

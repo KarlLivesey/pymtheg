@@ -4,8 +4,8 @@
     "language": "typescript",
     "url": "https://github.com/pingdotgg/t3code",
     "commit": "b387e3a179d7495321019363c5ba11e847834cd0",
-    "category": "application monorepo",
-    "why": "Medium TypeScript monorepo (desktop, web and server workspaces) named by the owner for the pilot."
+    "category": "large application monorepo with vendored trees",
+    "why": "T3 Code at main on 17 November 2026, named by the owner for the pilot: 7,204 of the project's own TS/JS files plus about 20,000 vendored under .repos/. Not the SW-1 sweep pin (v0.0.24, ea20e80, 1,006 files)."
   },
   {
     "id": "t3code-first-party",
@@ -14,9 +14,7 @@
     "commit": "b387e3a179d7495321019363c5ba11e847834cd0",
     "category": "application monorepo, vendored trees left out",
     "why": "The same T3 Code commit with its vendored .repos/ directory (two upstream projects, about 20,000 of its 27,000 JS/TS files) left out of each tool copy, so the comparison covers the project's own code.",
-    "exclude": [
-      ".repos"
-    ]
+    "exclude": [".repos"]
   },
   {
     "id": "ky",

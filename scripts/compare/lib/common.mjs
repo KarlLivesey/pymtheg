@@ -16,6 +16,14 @@ import { closeSync, openSync, readSync, renameSync, writeSync } from "node:fs";
 // `certainty` keeps each tool's own wording; nothing is upgraded or flattened.
 // Lines are 1-based. Paths are POSIX and relative to the repository root.
 
+/**
+ * Repository ids may be `owner/name` (the `sweep/repos.json` form); results
+ * and clones live in one folder per id, with `/` written as `__`.
+ */
+export const REPO_ID =
+  /^[A-Za-z0-9_-][A-Za-z0-9._-]*(?:\/[A-Za-z0-9_-][A-Za-z0-9._-]*)?$/;
+export const repoDir = (id) => id.replace(/\//g, "__");
+
 /** Source files the comparison covers (the three languages Pymtheg supports). */
 export const SOURCE_EXT = /\.(?:ts|tsx|mts|cts|js|jsx|mjs|cjs|go|rs)$/;
 

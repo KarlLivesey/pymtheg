@@ -12,6 +12,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { repoDir } from "./lib/common.mjs";
 
 const args = process.argv.slice(2);
 const opt = (name, dflt) => {
@@ -34,7 +35,7 @@ if (!repo) {
   process.exit(64);
 }
 const d = JSON.parse(
-  readFileSync(join(out, "repos", repo, "diff.json"), "utf8"),
+  readFileSync(join(out, "repos", repoDir(repo), "diff.json"), "utf8"),
 );
 if (args.includes("--list")) {
   for (const [k, v] of Object.entries(d.buckets))
@@ -46,7 +47,7 @@ if (!bucket) {
   process.stderr.write(`no bucket ${opt("bucket")}\n`);
   process.exit(1);
 }
-const src = join(out, "work", repo, "src");
+const src = join(out, "work", repoDir(repo), "src");
 const cache = new Map();
 const lineOf = (file, line) => {
   if (!cache.has(file)) {

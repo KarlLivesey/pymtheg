@@ -4,6 +4,7 @@
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { repoDir } from "./common.mjs";
 
 const readJson = (f) =>
   existsSync(f) ? JSON.parse(readFileSync(f, "utf8")) : undefined;
@@ -28,7 +29,7 @@ function classCounts(counts) {
 export function collect(outDir, repos, tools) {
   const rows = [];
   for (const repo of repos) {
-    const base = join(outDir, "repos", repo.id);
+    const base = join(outDir, "repos", repoDir(repo.id));
     const meta = readJson(join(base, "meta.json")) ?? {
       ...repo,
       fetched: false,

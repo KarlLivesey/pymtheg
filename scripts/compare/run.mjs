@@ -30,7 +30,9 @@
 //   --renormalise       rebuild normalised output and diffs from copies kept
 //                       by an earlier --keep run, without running any tool
 //   --seed N --sample N fixed-seed sample size per diff bucket (default 1, 25)
-//   --no-isolate        do not run tools without network (`unshare -rn`)
+//   --no-isolate        run the tools with network. By default they run without
+//                       network (`unshare -rn`), and the run stops if that is
+//                       not possible on this machine.
 //   --node-heap MB      raise the V8 heap limit of the Node-based tools (Pymtheg,
 //                       CodeGraph) through NODE_OPTIONS; off by default, so the
 //                       default run measures what a user gets. Recorded in results.
@@ -39,7 +41,8 @@
 // commit with hooks off and no submodules or LFS, then only read by the
 // tools. Nothing here runs a repository's install scripts, builds or tests.
 // Each tool runs in its own copy of the checkout, with a scratch HOME, an
-// environment holding no API keys and, where the kernel allows, no network.
+// environment holding no API keys and no network (`unshare -rn`; the run stops
+// if that cannot be arranged, unless --no-isolate is given).
 //
 // Resumable: a repository is fetched once, a tool's result is kept once
 // written, and the diff is rebuilt from kept results. A failing tool or
@@ -65,6 +68,8 @@ import * as pymtheg from "./adapters/pymtheg.mjs";
 import * as codegraph from "./adapters/codegraph.mjs";
 import * as graphify from "./adapters/graphify.mjs";
 import {
+  REPO_ID,
+  repoDir,
   languageOf,
   readNormalised,
   summarise,
@@ -153,7 +158,12 @@ export function loadRepos(text) {
   const seen = new Set();
   for (const r of items) {
     const problems = [];
-    if (!r || typeof r.id !== "string" || !/^[A-Za-z0-9._-]+$/.test(r.id))
+    if (
+      !r ||
+      typeof r.id !== "string" ||
+      !REPO_ID.test(r.id) ||
+      r.id.includes("__")
+    )
       problems.push("id");
     if (!["typescript", "go", "rust"].includes(r?.language))
       problems.push("language");
@@ -254,12 +264,25 @@ function run(
   });
 }
 
-function probeIsolation() {
+export function probeIsolation(command = "unshare") {
   return new Promise((done) => {
-    const c = spawn("unshare", ["-rn", "true"], { stdio: "ignore" });
+    const c = spawn(command, ["-rn", "true"], { stdio: "ignore" });
     c.on("error", () => done(false));
     c.on("close", (code) => done(code === 0));
   });
+}
+
+/**
+ * Tools run without network by default. If that cannot be arranged the run
+ * stops, rather than quietly running the tools with network; `--no-isolate`
+ * runs them with network on purpose and the results record `isolated: false`.
+ */
+export async function requireIsolation(isolate, probe = probeIsolation) {
+  if (!isolate) return false;
+  if (await probe()) return true;
+  throw new Error(
+    "cannot run the tools without network: `unshare -rn true` failed (util-linux missing, or unprivileged user namespaces are off). Fix that, or pass --no-isolate to run the tools with network; the results then record isolated: false.",
+  );
 }
 
 class Pool {
@@ -298,15 +321,15 @@ const scrub = (s, o) =>
     .join("~");
 
 async function fetchRepo(repo, o) {
-  const src = join(o.work, repo.id, "src");
-  const marker = join(o.work, repo.id, "fetched.json");
+  const src = join(o.work, repoDir(repo.id), "src");
+  const marker = join(o.work, repoDir(repo.id), "fetched.json");
   if (existsSync(marker) && readJson(marker).commit === repo.commit)
     return { ok: true, src };
-  rmSync(join(o.work, repo.id), { recursive: true, force: true });
+  rmSync(join(o.work, repoDir(repo.id)), { recursive: true, force: true });
   mkdirSync(src, { recursive: true });
   const env = {
     PATH: process.env.PATH,
-    HOME: join(o.work, repo.id),
+    HOME: join(o.work, repoDir(repo.id)),
     GIT_TERMINAL_PROMPT: "0",
     GIT_LFS_SKIP_SMUDGE: "1",
     GIT_CONFIG_NOSYSTEM: "1",
@@ -328,7 +351,7 @@ async function fetchRepo(repo, o) {
         env,
         timeoutMs: 600_000,
         isolate: false,
-        timeFile: join(o.work, repo.id, "git.time"),
+        timeFile: join(o.work, repoDir(repo.id), "git.time"),
       },
     );
   let last;
@@ -465,18 +488,18 @@ function normaliseInto(tool, copy, toolOut, dir, outcome, failed, o) {
 }
 
 async function runTool(tool, repo, src, o, pool) {
-  const dir = join(o.out, "repos", repo.id, tool);
+  const dir = join(o.out, "repos", repoDir(repo.id), tool);
   const outcomeFile = join(dir, "outcome.json");
   if (o.renormalise && existsSync(outcomeFile)) {
     // Re-read kept tool output (needs an earlier --keep run); no tool runs.
     const outcome = readJson(outcomeFile);
-    const copy = join(o.work, repo.id, tool, "repo");
+    const copy = join(o.work, repoDir(repo.id), tool, "repo");
     if (!existsSync(copy)) return outcome;
     const failed = /^partial \((.*)\)$/.exec(outcome.outcome ?? "")?.[1];
     normaliseInto(
       tool,
       copy,
-      join(o.work, repo.id, tool, "out"),
+      join(o.work, repoDir(repo.id), tool, "out"),
       dir,
       outcome,
       failed,
@@ -491,9 +514,12 @@ async function runTool(tool, repo, src, o, pool) {
     mkdirSync(dir, { recursive: true });
     const adapter = ADAPTERS[tool];
     const bin = binFor(tool, o);
-    const copy = join(o.work, repo.id, tool, "repo");
-    const toolOut = join(o.work, repo.id, tool, "out");
-    rmSync(join(o.work, repo.id, tool), { recursive: true, force: true });
+    const copy = join(o.work, repoDir(repo.id), tool, "repo");
+    const toolOut = join(o.work, repoDir(repo.id), tool, "out");
+    rmSync(join(o.work, repoDir(repo.id), tool), {
+      recursive: true,
+      force: true,
+    });
     mkdirSync(toolOut, { recursive: true });
     const outcome = {
       tool,
@@ -524,7 +550,7 @@ async function runTool(tool, repo, src, o, pool) {
     for (const rel of repo.exclude ?? [])
       rmSync(join(copy, rel), { recursive: true, force: true });
     if (repo.exclude?.length) outcome.excluded = repo.exclude;
-    const env = toolEnv(tool, o, join(o.work, repo.id, tool, "home"));
+    const env = toolEnv(tool, o, join(o.work, repoDir(repo.id), tool, "home"));
     let wallMs = 0;
     let peakKb = 0;
     let failed;
@@ -565,7 +591,10 @@ async function runTool(tool, repo, src, o, pool) {
     normaliseInto(tool, copy, toolOut, dir, outcome, failed, o);
     writeJson(outcomeFile, outcome);
     if (!o.keep)
-      rmSync(join(o.work, repo.id, tool), { recursive: true, force: true });
+      rmSync(join(o.work, repoDir(repo.id), tool), {
+        recursive: true,
+        force: true,
+      });
     log(
       `${repo.id} ${tool}: ${outcome.outcome} ${(outcome.wallMs / 1000).toFixed(1)}s`,
     );
@@ -576,7 +605,7 @@ async function runTool(tool, repo, src, o, pool) {
 const log = (s) => process.stderr.write(`[compare] ${s}\n`);
 
 async function runRepo(repo, o, pool) {
-  const base = join(o.out, "repos", repo.id);
+  const base = join(o.out, "repos", repoDir(repo.id));
   mkdirSync(base, { recursive: true });
   const f = await pool.use(() => fetchRepo(repo, o));
   const meta = { ...repo, fetched: f.ok, error: f.error };
@@ -618,10 +647,7 @@ async function main() {
   const o = parseArgs(process.argv.slice(2));
   const { ok: repos, bad } = loadRepos(readFileSync(o.repos, "utf8"));
   const selected = o.only ? repos.filter((r) => o.only.includes(r.id)) : repos;
-  if (o.isolate && !(await probeIsolation())) {
-    log("unshare -rn is not available; tools will run with network");
-    o.isolate = false;
-  }
+  o.isolate = await requireIsolation(o.isolate);
   mkdirSync(o.out, { recursive: true });
   writeJson(join(o.out, "run.json"), {
     repos: o.repos,

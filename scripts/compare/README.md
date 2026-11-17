@@ -6,7 +6,8 @@ the others do not. Results of the pilot are in
 [`evidence/sw-2/summary.md`](../../evidence/sw-2/summary.md).
 
 Run it on the dev server, never on a workstation. It reads the same list
-format as `sweep/repos.json`.
+format as `sweep/repos.json`, including ids of the form `owner/name` (stored
+in folders named `owner__name`).
 
 ## Install the tools once
 
@@ -44,16 +45,18 @@ At most 12 tool runs at once (`--jobs`), because the machine is shared.
 
 What each tool runs:
 
-| Tool | Command | Reads |
-|---|---|---|
-| Pymtheg 0.1.0 | `pymtheg init`, `pymtheg graph index --json` (source only; the Go toolchain route is off by default) | `.pymtheg/rebuildable/graph.sqlite` |
-| CodeGraph 1.6.2 | `codegraph init -y` (telemetry off) | `.codegraph/codegraph.db` |
-| graphify 0.9.112 | `graphify extract --code-only --no-cluster --max-workers 4` | `graphify-out/graph.json` |
+| Tool             | Command                                                                                              | Reads                               |
+| ---------------- | ---------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| Pymtheg 0.1.0    | `pymtheg init`, `pymtheg graph index --json` (source only; the Go toolchain route is off by default) | `.pymtheg/rebuildable/graph.sqlite` |
+| CodeGraph 1.6.2  | `codegraph init -y` (telemetry off)                                                                  | `.codegraph/codegraph.db`           |
+| graphify 0.9.112 | `graphify extract --code-only --no-cluster --max-workers 4`                                          | `graphify-out/graph.json`           |
 
 Safety: repositories are untrusted. Each is fetched shallow at its pinned
 commit with git hooks off and no submodules or LFS. Each tool gets its own
-copy, a scratch `HOME`, an environment with no API keys and, where the kernel
-allows (`unshare -rn`), no network. Nothing runs a repository's install
+copy, a scratch `HOME`, an environment with no API keys and no network
+(`unshare -rn`). If `unshare -rn` does not work on the machine the run stops
+with a message; `--no-isolate` runs the tools with network on purpose, and
+`run.json` and each outcome then record `isolated: false`. Nothing runs a repository's install
 scripts, builds or tests. None of the three tools runs the project's
 toolchain in these modes.
 

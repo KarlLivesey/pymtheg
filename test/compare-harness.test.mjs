@@ -20,6 +20,7 @@ import {
   normName,
   parseLoc,
   readNormalised,
+  repoDir,
   writeNormalised,
 } from "../scripts/compare/lib/common.mjs";
 import {
@@ -28,7 +29,11 @@ import {
   pairsOf,
   TOLERANCE,
 } from "../scripts/compare/lib/match.mjs";
-import { loadRepos } from "../scripts/compare/run.mjs";
+import {
+  loadRepos,
+  probeIsolation,
+  requireIsolation,
+} from "../scripts/compare/run.mjs";
 
 const tmp = () => mkdtempSync(join(tmpdir(), "pym-compare-"));
 
@@ -591,4 +596,60 @@ test("normalised output: JSON Lines round trip keeps every field", () => {
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("isolation: a missing isolation tool stops the run unless --no-isolate", async () => {
+  assert.equal(await probeIsolation("pymtheg-no-such-command"), false);
+  await assert.rejects(
+    requireIsolation(true, async () => false),
+    /--no-isolate/,
+  );
+  assert.equal(await requireIsolation(true, async () => true), true);
+  let probed = false;
+  const off = await requireIsolation(false, async () => {
+    probed = true;
+    return true;
+  });
+  assert.deepEqual([off, probed], [false, false]);
+});
+
+test("repository list: sweep ids of the form owner/name are accepted", () => {
+  const sha = "ea20e800216417c8d3b5dfc54a863bbd9e0b3e20";
+  const { ok, bad } = loadRepos(
+    JSON.stringify([
+      {
+        id: "pingdotgg/t3code",
+        language: "typescript",
+        url: "https://github.com/pingdotgg/t3code.git",
+        commit: sha,
+      },
+      {
+        id: "a/../b",
+        language: "go",
+        url: "https://github.com/x/y",
+        commit: sha,
+      },
+      {
+        id: "../x",
+        language: "go",
+        url: "https://github.com/x/y",
+        commit: sha,
+      },
+      {
+        id: "a__b",
+        language: "go",
+        url: "https://github.com/x/y",
+        commit: sha,
+      },
+    ]),
+  );
+  assert.deepEqual(
+    ok.map((r) => r.id),
+    ["pingdotgg/t3code"],
+  );
+  assert.deepEqual(
+    bad.map((b) => b.entry),
+    ["a/../b", "../x", "a__b"],
+  );
+  assert.equal(repoDir("pingdotgg/t3code"), "pingdotgg__t3code");
 });
