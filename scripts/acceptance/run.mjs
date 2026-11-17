@@ -337,7 +337,18 @@ function inspectTarball(tgz) {
     command: "package.json private",
     required: false,
     status: "observed",
-    reason: pkg.private ? '"private": true — npm refuses to publish it, so `npx pymtheg` from the registry cannot work until the owner decides to publish; `npx ./pymtheg-*.tgz` works without publishing' : "not private",
+    reason: pkg.private ? '"private": true — npm refuses to publish it, so `npx pymtheg` from the registry cannot work; `npx ./pymtheg-*.tgz` works without publishing' : 'no "private" flag — npm may publish it (publishing is a manual owner step, not part of this gate)',
+  });
+  // This gate installs only the tarball it built. Whether `npx pymtheg` works
+  // from the npm registry is never tested here, so it is reported as not
+  // verified, never as passing, whatever package.json says.
+  add("0-build", "registry-npx", {
+    command: "npx pymtheg (from the npm registry)",
+    required: false,
+    status: "observed",
+    reason: pkg.private
+      ? "not verified: the package is private, so it cannot be on the registry; scenarios install the local tarball only"
+      : "not verified: scenarios install the local tarball only; check the published package by hand with `npx pymtheg@<version> --version` from an empty directory",
   });
   add("0-build", "package-engines", {
     command: "package.json engines",

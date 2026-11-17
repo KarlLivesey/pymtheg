@@ -1,8 +1,27 @@
 {
   "name": "pymtheg",
-  "version": "1.0.0",
+  "version": "0.1.0",
+  "description": "A local tool for planning and checking software designs and for answering questions about existing code.",
+  "keywords": [
+    "architecture",
+    "specification",
+    "requirements",
+    "design",
+    "planning",
+    "model-checking",
+    "code-graph",
+    "mcp"
+  ],
+  "homepage": "https://github.com/KarlLivesey/pymtheg#readme",
+  "bugs": {
+    "url": "https://github.com/KarlLivesey/pymtheg/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KarlLivesey/pymtheg.git"
+  },
+  "author": "Karl Livesey",
   "license": "MIT",
-  "private": true,
   "type": "module",
   "engines": {
     "node": ">=24"
@@ -84,5 +103,8 @@
     "grammars/*/manifest.json",
     "grammars/*/LICENSE",
     "grammars/README.md"
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

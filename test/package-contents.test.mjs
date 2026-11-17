@@ -391,6 +391,108 @@ test("the private network rules fire on each private form and allow public, loop
   ])
     assert.ok(!fires("dist-web/assets/x.js", text), text);
 });
+const ownerName = /\bKarl\b/;
+/**
+ * The one line of package.json allowed to name the owner, or -1. Allowed only
+ * when all of these hold: the file parses as JSON; its top-level `author` is a
+ * string; exactly one line of the raw text names the owner, and that line is
+ * `  "author": <that string>` (optionally followed by a comma); exactly one
+ * line has the top-level `"author":` shape, so a duplicated key cannot hide a
+ * second value; and no other key or string anywhere in the parsed object names
+ * the owner.
+ */
+function allowedAuthorLine(lines, text) {
+  let pkg;
+  try {
+    pkg = JSON.parse(text);
+  } catch {
+    return -1;
+  }
+  if (!pkg || typeof pkg !== "object" || typeof pkg.author !== "string")
+    return -1;
+  const naming = lines.flatMap((l, i) => (ownerName.test(l) ? [i] : []));
+  if (naming.length !== 1) return -1;
+  const expected = `  "author": ${JSON.stringify(pkg.author)}`;
+  const line = lines[naming[0]];
+  if (line !== expected && line !== expected + ",") return -1;
+  if (lines.filter((l) => /^ {2}"author"\s*:/.test(l)).length !== 1) return -1;
+  const elsewhere = (value, top) => {
+    if (typeof value === "string") return ownerName.test(value);
+    if (!value || typeof value !== "object") return false;
+    return Object.entries(value).some(
+      ([key, v]) =>
+        ownerName.test(key) || (!(top && key === "author") && elsewhere(v)),
+    );
+  };
+  return elsewhere(pkg, true) ? -1 : naming[0];
+}
+/**
+ * Home paths and the owner's name in one shipped file. The owner's name is
+ * public in the licence texts and, in package.json, only as the value of the
+ * single top-level `author` key (see allowedAuthorLine). Any other mention
+ * fails, at its first line.
+ */
+function personalFindings(path, text) {
+  const found = [];
+  const lines = text.split("\n");
+  const home = lines.findIndex((l) => /\/home\/[a-z_][a-z0-9_.-]*\//i.test(l));
+  if (home >= 0) found.push(`${path}:${home + 1}: personal path`);
+  const licenceText = [
+    "LICENSE",
+    "THIRD-PARTY-NOTICES",
+    "docs/licences.md",
+  ].includes(path);
+  if (!licenceText) {
+    const allowed =
+      path === "package.json" ? allowedAuthorLine(lines, text) : -1;
+    const line = lines.findIndex((l, i) => ownerName.test(l) && i !== allowed);
+    if (line >= 0) found.push(`${path}:${line + 1}: owner's name`);
+  }
+  return found;
+}
+test("the owner's name is allowed only in licence texts and package.json's top-level author", () => {
+  const pkg = (body) => `{\n  "name": "x",\n${body}\n}\n`;
+  for (const ok of [
+    pkg('  "author": "Karl Livesey",\n  "license": "MIT"'),
+    pkg('  "author": "Karl Livesey"'),
+  ])
+    assert.deepEqual(personalFindings("package.json", ok), [], ok);
+  assert.deepEqual(personalFindings("LICENSE", "Copyright Karl Livesey"), []);
+  for (const [path, text] of [
+    // duplicated top-level author: both lines, or a later value overriding it
+    [
+      "package.json",
+      pkg('  "author": "Karl Livesey",\n  "author": "Karl Livesey"'),
+    ],
+    ["package.json", pkg('  "author": "Karl Livesey",\n  "author": "x"')],
+    ["package.json", pkg('  "author": "x",\n  "author": "Karl Livesey"')],
+    // nested author, as an object or as a two-space-indented line
+    [
+      "package.json",
+      pkg('  "author": "x",\n  "maintainer": {\n    "author": "Karl"\n  }'),
+    ],
+    ["package.json", pkg('  "maintainer": {\n  "author": "Karl Livesey"\n  }')],
+    ["package.json", pkg('  "author": { "name": "Karl Livesey" }')],
+    // the name anywhere else
+    [
+      "package.json",
+      pkg('  "description": "by Karl",\n  "author": "Karl Livesey"'),
+    ],
+    [
+      "package.json",
+      pkg('  "author": "Karl Livesey",\n  "contributors": ["Karl"]'),
+    ],
+    ["package.json", pkg('  "author": "Karl Livesey", "description": "Karl"')],
+    ["package.json", '{\n  "author": "Karl Livesey",\n'],
+    ["README.md", '  "author": "Karl Livesey",'],
+    ["dist/cli/main.js", "// Karl"],
+  ])
+    assert.equal(personalFindings(path, text).length, 1, `${path}: ${text}`);
+  assert.deepEqual(
+    personalFindings("package.json", '  "x": "/home/someone/y",'),
+    ["package.json:1: personal path"],
+  );
+});
 test("no shipped file carries a personal path, the owner's name or a private project name", () => {
   const offences = [];
   const shipped = [];
@@ -398,19 +500,7 @@ test("no shipped file carries a personal path, the owner's name or a private pro
     if (/\.(wasm|png|ico)$/.test(path) || !existsSync(path)) continue;
     const text = readFileSync(path, "utf8");
     shipped.push({ path, text });
-    const licenceText = [
-      "LICENSE",
-      "THIRD-PARTY-NOTICES",
-      "docs/licences.md",
-    ].includes(path);
-    const rules = [
-      ["personal path", /\/home\/[a-z_][a-z0-9_.-]*\//i],
-      ...(licenceText ? [] : [["owner's name", /\bKarl\b/]]),
-    ];
-    for (const [what, pattern] of rules) {
-      const line = text.split("\n").findIndex((l) => pattern.test(l));
-      if (line >= 0) offences.push(`${path}:${line + 1}: ${what}`);
-    }
+    offences.push(...personalFindings(path, text));
   }
   offences.push(...privateNameFindings(privateNamesFile, shipped));
   assert.deepEqual(offences, []);

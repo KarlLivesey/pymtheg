@@ -8,7 +8,7 @@ export const identity = {
   extension: ".pym",
   projectMarker: layout.marker,
   projectConfig: layout.settings,
-  version: "1.0.0",
+  version: "0.1.0",
   schema: "pymtheg.report/v1",
   semantics: "1.0",
 } as const;

@@ -152,7 +152,7 @@ contract proof and nonliteral feasibility remain explicitly unsupported.
 | D09 duplicate scaling | resolved exact-copy slice | 10,000-rule node counters, hash buckets, no all-pairs; near-copy suggestions deferred |
 | D10 tool cleanup | resolved POSIX inherited-group slice | process/session tests; session-escaping descendants require future cgroup containment |
 | D11 drift/cache | snapshot drift implemented; caching deferred | frozen source hashes/text and stale result indication; no implementation conformance |
-| D12 name/publication | deferred intentionally | identity constants, private package, no publication/branding work |
+| D12 name/publication | name kept; package publishable (PUB-2) | identity constants; npm package `pymtheg` without `"private": true`, with public metadata; publishing is a manual owner step; no branding work |
 | D13 CPU cancellation | resolved owned-worker strategy | production coordinator + ready-signalled indefinitely CPU-bound worker; no timing assertion; initial real-source measurement retained as historical loop evidence |
 
 ## Deterministic validation refinement
@@ -2509,3 +2509,20 @@ stay bounded by the limit. **Why:** MCP's limit is at most 100, so it
 reported `unresolved: 100, countsTruncated: true` where the CLI (default limit
 1,000) reported the real 441. **Rules out:** counts that depend on the page
 size. Impact's per-frontier counts are unchanged (still capped at the limit).
+
+### The package is publishable (PUB-2)
+
+**Decided (Karl, 17 November 2026):** Pymtheg is to be published to npm as
+`pymtheg`, starting at version `0.1.0` (not `1.0.0`), which `--version`, the MCP
+server info, `doctor` and reports read from `identity.version`. `package.json`
+no longer has `"private": true` and now carries `description`, `keywords`, `homepage`, `bugs`, `repository`,
+`author` (the copyright holder named in `LICENSE`) and
+`"publishConfig": {"access": "public"}`. The shipped file list is unchanged. The
+owner publishes by hand, following "Publishing" in `CONTRIBUTING.md`; no script
+or CI job publishes. **Why:** the initial release is `npx pymtheg` on a clean
+machine, which needs the package on the registry. This supersedes "`"private":
+true` and publishing remain the owner's decisions" (LIC-1) and the deferred D12
+row. **Rules out:** automated publishing. The acceptance gate still installs
+only the tarball it builds and reports `npx pymtheg` from the registry as not
+verified; the package-contents test allows the owner's name only in the licence
+texts and the top-level `author` field. See [PUB-2](changes/PUB-2.md).
