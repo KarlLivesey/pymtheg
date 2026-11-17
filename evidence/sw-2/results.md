@@ -201,10 +201,38 @@ Pymtheg at the sites the others link and it does not: unresolved(receiver-type-u
 ## T3 Code with the Node heap raised to 32 GB
 
 Same commit, `--node-heap 32768` for Pymtheg and CodeGraph, safety limit two
-hours. Pymtheg on the whole repository had not finished after 50 minutes
-when this was written, so only the `t3code-first-party` entry is here.
+hours.
 
 Timings and peak memory are observations on a shared machine, never pass or fail.
+
+### t3code (typescript)
+
+https://github.com/pingdotgg/t3code at `b387e3a179d7`
+
+Source files: Go 0, Rust 10, TS/JS 27468.
+
+| Tool | Outcome | Wall s | Peak MB | Files | Symbols | Calls | References | Heritage | Imports | Unresolved (all) | Compared pairs |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| pymtheg | incomplete (exit 2) | 6155.8 | 24179.4 | 27478 | 286931 | 438104 | 187829 | 2009 | 178924 | 2018561 | 325141 |
+| codegraph | ok | 891.1 | 12380.4 | 28552 | 310790 | 543056 | 252687 | 221 | 259288 | 1504752 | 438870 |
+| graphify | ok | 1183.8 | 1912.7 | 29616 | 249946 | 158821 | 9467 | 2982 | 321266 | 0 | 162057 |
+
+| Bucket | Edges | By class | By target kind |
+|---|---:|---|---|
+| all | 118168 | call 108646, call+reference 7227, reference 2161, heritage 123, call+heritage 10, heritage+reference 1 | callable 97939, type 9715, value 9395, callable+value 1002, callable+member 60, type+value 47, member 6, callable+type 4 |
+| only:codegraph | 191170 | reference 111523, call 76749, call+reference 2856, heritage 42 | callable 72265, value 69235, type 41377, member 7993, callable+value 250, other 35, module 15 |
+| only:graphify | 11036 | call 8820, reference 1192, heritage 1024 | callable 7121, type 3251, other 664 |
+| only:pymtheg | 101194 | reference 61984, call 38740, heritage 420, call+reference 45, heritage+reference 3, call+heritage 2 | type 60534, value 17997, callable 17796, member 4845, module 22 |
+| only:pymtheg:candidate | 185 | call 167, reference 14, heritage 4 | callable 161, member 8, type 6, module 5, value 5 |
+| only:pymtheg:definite | 101009 | reference 61970, call 38573, heritage 416, call+reference 45, heritage+reference 3, call+heritage 2 | type 60528, value 17992, callable 17635, member 4837, module 17 |
+| others-missing:codegraph | 105744 | reference 62075, call 41755, heritage 1767, call+reference 85, call+heritage 31, heritage+reference 31 | type 62038, callable 20332, value 18504, member 4845, module 22, callable+member 3 |
+| others-missing:graphify | 202423 | reference 132788, call 67804, call+reference 1365, heritage 450, heritage+reference 13, call+heritage 3 | type 132561, callable 34579, value 29636, member 4988, type+value 292, callable+value 275, callable+member 42, callable+type 27, module 22, member+type 1 |
+| others-not-pymtheg | 230509 | reference 115267, call 107328, call+reference 6844, heritage 1068, call+heritage 1, heritage+reference 1 | callable 99718, value 73258, type 46844, member 7993, type+value 1696, other 731, callable+value 250, module 15, callable+type 4 |
+| pymtheg-candidate-others-have | 4 | reference 2, call 1, call+reference 1 | type 3, callable 1 |
+| pymtheg-missing-vs:codegraph | 219473 | reference 114075, call 98508, call+reference 6844, heritage 44, call+heritage 1, heritage+reference 1 | callable 92597, value 73258, type 43593, member 7993, type+value 1696, callable+value 250, other 67, module 15, callable+type 4 |
+| pymtheg-missing-vs:graphify | 39339 | call 30579, call+reference 3988, reference 3744, heritage 1026, call+heritage 1, heritage+reference 1 | callable 27453, type 5467, value 4023, type+value 1696, other 696, callable+type 4 |
+
+Pymtheg at the sites the others link and it does not: unresolved(external-package) 61592; no-link-at-site 55357; unresolved(local) 37333; unresolved(external) 20812; unresolved(no-symbol) 14440; other-target 12118; unresolved(incomplete-config) 11337; same-target-other-source 10544.
 
 ### t3code-first-party (typescript)
 
@@ -232,5 +260,4 @@ Source files: Go 0, Rust 10, TS/JS 7204.
 | pymtheg-missing-vs:graphify | 17831 | call 12990, reference 2902, call+reference 1906, heritage 33 | callable 13781, type 1792, type+value 1666, other 460, value 132 |
 
 Pymtheg at the sites the others link and it does not: no-link-at-site 28609; unresolved(external-package) 22379; unresolved(local) 16221; unresolved(incomplete-config) 10453; same-target-other-source 6608; no-link-at-site(partial-file) 5586; other-target 2083; unresolved(no-symbol) 1558.
-
 

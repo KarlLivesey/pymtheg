@@ -107,70 +107,15 @@ does not. Full tables with every bucket: [`results.md`](results.md).
 
 Pymtheg left out of the diff (partial (exit 134)). Links: CodeGraph and graphify both 146478; only CodeGraph 292392; only graphify 15579.
 
-**t3code-first-party** (typescript, `b387e3a179d7`, Go 0, Rust 10, TS/JS 7204 source files)
+**t3code** (typescript, `b387e3a179d7`, Go 0, Rust 10, TS/JS 27468 source files)
 
 | Tool | Outcome | Wall s | Peak MB | Symbols | Calls | References | Unresolved | Compared |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
-| pymtheg | partial (exit 134) | 1374.4 | 5687.8 | 94855 | 215 | 352 | 1148100 | – |
-| codegraph | ok | 450.1 | 6274.1 | 113355 | 181826 | 82507 | 669273 | 161339 |
-| graphify | ok | 395.9 | 689.4 | 73679 | 62792 | 6890 | 0 | 61387 |
+| pymtheg | incomplete (exit 2) | 6155.8 | 24179.4 | 286931 | 438104 | 187829 | 2018561 | 325141 |
+| codegraph | ok | 891.1 | 12380.4 | 310790 | 543056 | 252687 | 1504752 | 438870 |
+| graphify | ok | 1183.8 | 1912.7 | 249946 | 158821 | 9467 | 0 | 162057 |
 
-Pymtheg left out of the diff (partial (exit 134)). Links: CodeGraph and graphify both 58485; only CodeGraph 102854; only graphify 2902.
-
-**ky** (typescript, `3541888878c4`, Go 0, Rust 0, TS/JS 98 source files)
-
-| Tool | Outcome | Wall s | Peak MB | Symbols | Calls | References | Unresolved | Compared |
-|---|---|---:|---:|---:|---:|---:|---:|---:|
-| pymtheg | incomplete (exit 2) | 27.5 | 664 | 570 | 2224 | 216 | 14441 | 437 |
-| codegraph | ok | 17.6 | 492.8 | 827 | 3179 | 398 | 12310 | 847 |
-| graphify | ok | 4.7 | 69.9 | 721 | 361 | 21 | 0 | 390 |
-
-Links: all three 204; only Pymtheg 47 (definite 47, candidate 0); only others 496 (only CodeGraph 317, only graphify 32); Pymtheg candidate where others claim one target 0.
-
-**chi** (go, `c64ed7d6635f`, Go 90, Rust 0, TS/JS 0 source files)
-
-| Tool | Outcome | Wall s | Peak MB | Symbols | Calls | References | Unresolved | Compared |
-|---|---|---:|---:|---:|---:|---:|---:|---:|
-| pymtheg | ok | 23.7 | 393.9 | 834 | 1362 | 1371 | 5641 | 1650 |
-| codegraph | ok | 4 | 350.7 | 905 | 1339 | 253 | 4445 | 1046 |
-| graphify | ok | 2.1 | 47.4 | 656 | 498 | 553 | 0 | 626 |
-
-Links: all three 532; only Pymtheg 847 (definite 819, candidate 28); only others 282 (only CodeGraph 226, only graphify 1); Pymtheg candidate where others claim one target 5.
-
-**cobra** (go, `adbc8813901b`, Go 36, Rust 0, TS/JS 0 source files)
-
-| Tool | Outcome | Wall s | Peak MB | Symbols | Calls | References | Unresolved | Compared |
-|---|---|---:|---:|---:|---:|---:|---:|---:|
-| pymtheg | ok | 20.8 | 430.7 | 832 | 2221 | 2326 | 3238 | 2918 |
-| codegraph | ok | 3.1 | 354 | 720 | 2671 | 315 | 3033 | 2126 |
-| graphify | ok | 1.6 | 49.5 | 757 | 1410 | 532 | 0 | 1532 |
-
-Links: all three 1507; only Pymtheg 801 (definite 800, candidate 1); only others 34 (only CodeGraph 33, only graphify 1); Pymtheg candidate where others claim one target 1.
-
-**fd** (rust, `6cf330283cfd`, Go 0, Rust 25, TS/JS 0 source files)
-
-| Tool | Outcome | Wall s | Peak MB | Symbols | Calls | References | Unresolved | Compared |
-|---|---|---:|---:|---:|---:|---:|---:|---:|
-| pymtheg | ok | 16.4 | 401.8 | 638 | 449 | 535 | 3914 | 866 |
-| codegraph | ok | 3.2 | 359.9 | 544 | 810 | 285 | 1999 | 815 |
-| graphify | ok | 1.5 | 50.9 | 678 | 234 | 245 | 0 | 382 |
-
-Links: all three 236; only Pymtheg 221 (definite 219, candidate 2); only others 278 (only CodeGraph 221, only graphify 19); Pymtheg candidate where others claim one target 4.
-
-**just** (rust, `62784c2a6e16`, Go 0, Rust 277, TS/JS 0 source files)
-
-| Tool | Outcome | Wall s | Peak MB | Symbols | Calls | References | Unresolved | Compared |
-|---|---|---:|---:|---:|---:|---:|---:|---:|
-| pymtheg | ok | 221.7 | 1204.2 | 4666 | 4093 | 2013 | 27103 | 4733 |
-| codegraph | ok | 5.8 | 516.5 | 4123 | 13118 | 1294 | 6964 | 12750 |
-| graphify | ok | 4.5 | 55.3 | 4224 | 1281 | 1683 | 0 | 2632 |
-
-Links: all three 1262; only Pymtheg 1224 (definite 1224, candidate 0); only others 9791 (only CodeGraph 8531, only graphify 440); Pymtheg candidate where others claim one target 0.
-
-### T3 Code with the Node heap raised to 32 GB
-
-`--node-heap 32768`, applied to Pymtheg and CodeGraph; graphify is Python and
-unchanged. Used for the T3 Code hand-check.
+Links: all three 118168; only Pymtheg 101194 (definite 101009, candidate 185); only others 230509 (only CodeGraph 191170, only graphify 11036); Pymtheg candidate where others claim one target 4.
 
 **t3code-first-party** (typescript, `b387e3a179d7`, Go 0, Rust 10, TS/JS 7204 source files)
 
@@ -182,10 +127,10 @@ unchanged. Used for the T3 Code hand-check.
 
 Links: all three 42895; only Pymtheg 13308 (definite 13308, candidate 0); only others 94627 (only CodeGraph 76796, only graphify 2235); Pymtheg candidate where others claim one target 0.
 
-**t3code** (whole repository, raised heap): CodeGraph finished in 891 s and
-graphify in 1,184 s. Pymtheg had not finished after 50 minutes (about 10 GB
-resident and steady) when this was written; its outcome is not part of this
-comparison.
+The whole repository took Pymtheg 103 minutes at 24 GB peak (CodeGraph 15
+minutes at 12 GB, graphify 20 minutes at 1.9 GB). The vendored `.repos/` trees
+make up most of it, and its "only others" sites follow the same classes as the
+project's own code.
 
 ## Hand-checked samples
 
@@ -289,7 +234,7 @@ ran out of memory during TypeScript analysis after 28 minutes on the whole
 repository (27,468 JS/TS files) and 23 minutes on its own code (7,438 files).
 CodeGraph took 15 and 7.5 minutes (12.3 and 6.3 GB peak), graphify 21 and 6.6
 minutes. With the heap raised to 32 GB, Pymtheg finished T3 Code's own code in
-22 minutes at 11.9 GB peak. On the whole repository it had not finished after 50 minutes. On `just` (277 Rust files) Pymtheg
+22 minutes at 11.9 GB peak. On the whole repository it finished in 103 minutes at 24 GB peak. On `just` (277 Rust files) Pymtheg
 took 222 s against CodeGraph's 6 s. SW-1 measures speed and memory across the
 60.
 
