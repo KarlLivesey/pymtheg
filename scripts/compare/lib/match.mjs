@@ -255,6 +255,15 @@ function presenceOf(tool, r) {
   return c.join("|");
 }
 
+/** The cluster's representative, with every member's call-site lines when it has none of its own. */
+function siteRecord(c) {
+  if (c.rep.sites.size) return c.rep;
+  const lines = new Set();
+  for (const m of Object.values(c.members))
+    for (const l of m.sites) lines.add(l);
+  return { ...c.rep, sites: lines };
+}
+
 function example(c, tools, sites, absentTools) {
   const rep = c.rep;
   const presence = Object.fromEntries(
@@ -288,13 +297,7 @@ function example(c, tools, sites, absentTools) {
   };
   if (absentTools.length)
     out.absentState = Object.fromEntries(
-      absentTools.map((t) => [
-        t,
-        stateAt(
-          sites[t],
-          rep.sites.size ? rep : { ...rep, sites: new Set(siteLines) },
-        ),
-      ]),
+      absentTools.map((t) => [t, stateAt(sites[t], siteRecord(c))]),
     );
   return out;
 }
@@ -387,11 +390,11 @@ export function diff(results, { seed = 1, sample = 25 } = {}) {
         name === "others-not-pymtheg" ||
         name.startsWith("pymtheg-missing-vs:")
       ) {
-        const s = stateAt(sites.pymtheg, c.rep);
+        const s = stateAt(sites.pymtheg, siteRecord(c));
         byAbsentState[s] = (byAbsentState[s] ?? 0) + 1;
       } else if (name.startsWith("others-missing:")) {
         const t = name.slice("others-missing:".length);
-        const s = stateAt(sites[t], c.rep);
+        const s = stateAt(sites[t], siteRecord(c));
         byAbsentState[s] = (byAbsentState[s] ?? 0) + 1;
       }
     }
