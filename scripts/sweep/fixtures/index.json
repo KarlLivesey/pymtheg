@@ -1,0 +1,27 @@
+{
+  "schema": "pymtheg.graph/v1",
+  "command": "index",
+  "exitCode": 2,
+  "status": "incomplete",
+  "modules": [
+    { "id": "go", "files": 3 },
+    { "id": "rust", "files": 1 },
+    { "id": "typescript", "files": 2 }
+  ],
+  "counts": { "files": 6, "symbols": 11, "links": 8, "failed": 4, "partial": 1, "unresolved": 3, "ambiguous": 1 },
+  "failedFiles": [
+    { "path": "a.go", "language": "go", "reason": "syntax error in line 3: found `}`", "range": { "start": 18, "end": 19 } },
+    { "path": "b.go", "language": "go", "reason": "syntax error in lines 5–6: found `}`", "range": { "start": 29, "end": 30 } },
+    { "path": "c.go", "language": "go", "reason": "syntax error in line 8: found `}`", "range": { "start": 40, "end": 41 } },
+    { "path": "tsconfig.json", "language": null, "reason": "Source is not valid UTF-8" },
+    { "path": "x.ts", "language": "typescript", "reason": "Syntax error at line 2, column 1: Expression expected. Found: \"!\".", "range": { "start": 13, "end": 14 } }
+  ],
+  "sync": {
+    "complete": false,
+    "report": {
+      "errors": [],
+      "analysisErrors": [],
+      "resolutionErrors": [{ "module": "rust", "message": "budget exhausted" }]
+    }
+  }
+}
