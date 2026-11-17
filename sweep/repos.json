@@ -1,0 +1,482 @@
+[
+  {
+    "id": "swc-project/swc",
+    "language": "rust",
+    "url": "https://github.com/swc-project/swc.git",
+    "commit": "52efb5cb2c50c8348a7dc54ed42aeb35c675009a",
+    "category": "compiler / dev tool",
+    "why": "Large TypeScript compiler workspace with proc macros and build-time code generation."
+  },
+  {
+    "id": "microsoft/TypeScript",
+    "language": "typescript",
+    "url": "https://github.com/microsoft/TypeScript.git",
+    "commit": "21ba970871efd2766ee46813d0bb67253e7878fa",
+    "category": "compiler / dev tool",
+    "why": "Language compiler repository with a Go compiler port, large TypeScript and JavaScript fixtures, and intentional negative tests."
+  },
+  {
+    "id": "embassy-rs/embassy",
+    "language": "rust",
+    "url": "https://github.com/embassy-rs/embassy.git",
+    "commit": "41d7b34f69fa530d30439516dced774eedebcd02",
+    "category": "library / workspace",
+    "why": "Large no_std embedded workspace with build scripts and target-specific examples."
+  },
+  {
+    "id": "golang/tools",
+    "language": "go",
+    "url": "https://github.com/golang/tools.git",
+    "commit": "831b0d72bf6b86d0a2dbf015bfe04448443b17b9",
+    "category": "compiler / multi-module",
+    "why": "Large collection of Go analysis tools with gopls and additional nested modules."
+  },
+  {
+    "id": "cli/cli",
+    "language": "go",
+    "url": "https://github.com/cli/cli.git",
+    "commit": "42d52b4c1a70bd2f8ec34cb1533df2487a2165d9",
+    "category": "CLI app",
+    "why": "Large command tree with internal command packages and generated documentation."
+  },
+  {
+    "id": "pingdotgg/t3code",
+    "language": "typescript",
+    "url": "https://github.com/pingdotgg/t3code.git",
+    "commit": "ea20e800216417c8d3b5dfc54a863bbd9e0b3e20",
+    "category": "UI / app monorepo",
+    "why": "Agent orchestration app with React TSX and multiple apps and packages in a Turbo monorepo."
+  },
+  {
+    "id": "protocolbuffers/protobuf-go",
+    "language": "go",
+    "url": "https://github.com/protocolbuffers/protobuf-go.git",
+    "commit": "ef99f06f37ec921e64fdbcec131a82013f38776e",
+    "category": "library / code generator",
+    "why": "Protobuf runtime and generator with checked-in .pb.go output."
+  },
+  {
+    "id": "withastro/astro",
+    "language": "typescript",
+    "url": "https://github.com/withastro/astro.git",
+    "commit": "3ac5ad3ae05ddc461bcc7748f0c55fd6da056652",
+    "category": "web / server framework",
+    "why": "Site framework with pnpm workspaces, package aliases and integrations."
+  },
+  {
+    "id": "cockroachdb/pebble",
+    "language": "go",
+    "url": "https://github.com/cockroachdb/pebble.git",
+    "commit": "a995e890c06ef86c583927906e16e7f313083a3f",
+    "category": "database / storage",
+    "why": "LSM storage engine with range-key iterator and internal packages."
+  },
+  {
+    "id": "nestjs/nest",
+    "language": "typescript",
+    "url": "https://github.com/nestjs/nest.git",
+    "commit": "085f83a168e9edbedfe9560428dcfd270073ae00",
+    "category": "web / server framework",
+    "why": "Decorator-heavy server framework with dependency injection and cross-package path aliases."
+  },
+  {
+    "id": "excalidraw/excalidraw",
+    "language": "typescript",
+    "url": "https://github.com/excalidraw/excalidraw.git",
+    "commit": "680f58ccfdaa1ae5b7f606ad4568f6df46acacb5",
+    "category": "UI / app",
+    "why": "React drawing app with TSX, workspace packages and cross-package imports."
+  },
+  {
+    "id": "vitest-dev/vitest",
+    "language": "typescript",
+    "url": "https://github.com/vitest-dev/vitest.git",
+    "commit": "161e25f663a838f6a30890f8a6827ff83ff1b3c7",
+    "category": "monorepo / dev tool",
+    "why": "Test runner with pnpm workspace packages and TypeScript and JavaScript fixtures."
+  },
+  {
+    "id": "mermaid-js/mermaid",
+    "language": "typescript",
+    "url": "https://github.com/mermaid-js/mermaid.git",
+    "commit": "e5fdf81d222d9e011ca75d9e4363f3bd7bf99616",
+    "category": "compiler / dev tool",
+    "why": "Diagram parsing and rendering with generated parser inputs and workspace packages."
+  },
+  {
+    "id": "DioxusLabs/dioxus",
+    "language": "rust",
+    "url": "https://github.com/DioxusLabs/dioxus.git",
+    "commit": "97adf7915e1adfef4e2da436c9bd0b6add0dfa39",
+    "category": "UI / app framework",
+    "why": "UI workspace with proc macros and macro-heavy RSX examples."
+  },
+  {
+    "id": "trpc/trpc",
+    "language": "typescript",
+    "url": "https://github.com/trpc/trpc.git",
+    "commit": "1abda6cc6cd9ac149e474936f5dfcb679a983fb3",
+    "category": "web / server framework",
+    "why": "Inference-heavy RPC client/server library with cross-workspace examples."
+  },
+  {
+    "id": "gofiber/fiber",
+    "language": "go",
+    "url": "https://github.com/gofiber/fiber.git",
+    "commit": "3ad98ff611fc72db358339125c0987d1096ebfc1",
+    "category": "web / server framework",
+    "why": "Server framework and client with adapters and generic APIs."
+  },
+  {
+    "id": "evanw/esbuild",
+    "language": "go",
+    "url": "https://github.com/evanw/esbuild.git",
+    "commit": "f6058f8364fe7ab91ca57a83e02577ed74c9cae4",
+    "category": "compiler / dev tool",
+    "why": "JavaScript bundler with separate parsers, compiler packages and generated tables."
+  },
+  {
+    "id": "pocketbase/pocketbase",
+    "language": "go",
+    "url": "https://github.com/pocketbase/pocketbase.git",
+    "commit": "7f2773ec234b62d0b80ca47c508397cb3d0da3ea",
+    "category": "web / app",
+    "why": "Backend app with an embedded admin UI and JavaScript extension interface."
+  },
+  {
+    "id": "puppeteer/puppeteer",
+    "language": "typescript",
+    "url": "https://github.com/puppeteer/puppeteer.git",
+    "commit": "e82d656004488cc2f635f878da7cede1b4631235",
+    "category": "library / dev tool",
+    "why": "Browser automation API with protocol packages and multiple tsconfig files."
+  },
+  {
+    "id": "tauri-apps/tauri",
+    "language": "rust",
+    "url": "https://github.com/tauri-apps/tauri.git",
+    "commit": "f5578bc1e07cc2e87a6b4526bc20299aaba3495e",
+    "category": "UI / app framework",
+    "why": "Desktop app framework with proc macros, platform dependencies and build scripts."
+  },
+  {
+    "id": "helix-editor/helix",
+    "language": "rust",
+    "url": "https://github.com/helix-editor/helix.git",
+    "commit": "872b240251876e56787ad7ec312cefae70e3e28e",
+    "category": "UI / app",
+    "why": "Editor workspace with terminal UI and build.rs."
+  },
+  {
+    "id": "colinhacks/zod",
+    "language": "typescript",
+    "url": "https://github.com/colinhacks/zod.git",
+    "commit": "90bf57b8e96a3729d766fff3185d39b2ab3ba016",
+    "category": "library",
+    "why": "Schema validation with heavily generic types and type-level tests."
+  },
+  {
+    "id": "vitejs/vite",
+    "language": "typescript",
+    "url": "https://github.com/vitejs/vite.git",
+    "commit": "60c260dea1fa9f628c22e32b14dddf6ca3088f2b",
+    "category": "compiler / dev tool",
+    "why": "Dev server and bundler with a large fixture tree mixing JavaScript, TS and TSX."
+  },
+  {
+    "id": "reduxjs/redux-toolkit",
+    "language": "typescript",
+    "url": "https://github.com/reduxjs/redux-toolkit.git",
+    "commit": "1a7d3b5251ceda61b77928e357a22086b45aaab1",
+    "category": "library",
+    "why": "State management with TypeScript and React entry points across packages."
+  },
+  {
+    "id": "honojs/hono",
+    "language": "typescript",
+    "url": "https://github.com/honojs/hono.git",
+    "commit": "676c8f80fcafc49e6e74c847a8f0d9c44cc7faee",
+    "category": "web / server framework",
+    "why": "Server framework with runtime-specific adapters and routing types."
+  },
+  {
+    "id": "react-hook-form/react-hook-form",
+    "language": "typescript",
+    "url": "https://github.com/react-hook-form/react-hook-form.git",
+    "commit": "66f4d72b8c66627d5542dd13e15070227d84d4a2",
+    "category": "UI library",
+    "why": "Generic React hooks with TSX and broad form fixtures."
+  },
+  {
+    "id": "actix/actix-web",
+    "language": "rust",
+    "url": "https://github.com/actix/actix-web.git",
+    "commit": "3c6ea6acf52d9e6f41207222b672774246be7205",
+    "category": "web / server framework",
+    "why": "Web framework workspace with route proc macros and HTTP fixtures."
+  },
+  {
+    "id": "restic/restic",
+    "language": "go",
+    "url": "https://github.com/restic/restic.git",
+    "commit": "74f00280e21a67b6dd80de7a6b4a79db3b2770e5",
+    "category": "CLI / storage",
+    "why": "Backup CLI with multiple storage backends and restore logic."
+  },
+  {
+    "id": "ratatui/ratatui",
+    "language": "rust",
+    "url": "https://github.com/ratatui/ratatui.git",
+    "commit": "60feb0eb09789f4c0ed11c0c532bb605689fbbc0",
+    "category": "UI library",
+    "why": "Terminal UI widgets and multiple workspace crates with examples."
+  },
+  {
+    "id": "rustls/rustls",
+    "language": "rust",
+    "url": "https://github.com/rustls/rustls.git",
+    "commit": "53db4d1398f16d5bac98eacf02f0dff4b242fd92",
+    "category": "library",
+    "why": "TLS library with conditional providers and platform and no_std code."
+  },
+  {
+    "id": "clap-rs/clap",
+    "language": "rust",
+    "url": "https://github.com/clap-rs/clap.git",
+    "commit": "db86ef6eccb2ed5ae16d3035982907692ecb10ef",
+    "category": "CLI library",
+    "why": "Command-line parser with derive proc macros and builder crates."
+  },
+  {
+    "id": "vercel/turborepo",
+    "language": "typescript",
+    "url": "https://github.com/vercel/turborepo.git",
+    "commit": "eda8172408e89671cf71c39a2ffe4e05e07624bf",
+    "category": "monorepo / dev tool",
+    "why": "Turbo and pnpm monorepo examples, TypeScript tooling, and mixed Rust and JavaScript."
+  },
+  {
+    "id": "cilium/ebpf",
+    "language": "go",
+    "url": "https://github.com/cilium/ebpf.git",
+    "commit": "6951718af7885e1aeaf98624960ca88c86112303",
+    "category": "library / dev tool",
+    "why": "eBPF library with generated bindings, build tags and platform-specific files."
+  },
+  {
+    "id": "cberner/redb",
+    "language": "rust",
+    "url": "https://github.com/cberner/redb.git",
+    "commit": "357f8bf3f554e85bff1c6c605713ae57c3901006",
+    "category": "database / storage",
+    "why": "Embedded database with typed table APIs, storage and fuzz fixtures."
+  },
+  {
+    "id": "tree-sitter/tree-sitter",
+    "language": "rust",
+    "url": "https://github.com/tree-sitter/tree-sitter.git",
+    "commit": "564fa307125d78d51479b12dc079ac69abe46a30",
+    "category": "compiler / dev tool",
+    "why": "Parser generator and bindings spanning Rust and C with build scripts."
+  },
+  {
+    "id": "BurntSushi/ripgrep",
+    "language": "rust",
+    "url": "https://github.com/BurntSushi/ripgrep.git",
+    "commit": "178cc027e283fd965cb72d0a7395b219eada170c",
+    "category": "CLI tool",
+    "why": "Search CLI with multiple crates and platform dispatch."
+  },
+  {
+    "id": "samber/lo",
+    "language": "go",
+    "url": "https://github.com/samber/lo.git",
+    "commit": "6f5a63afb19f34755bea97f2b37a0a7f3814f80c",
+    "category": "library",
+    "why": "Generic collections and functional helpers with pervasive type parameters."
+  },
+  {
+    "id": "tokio-rs/axum",
+    "language": "rust",
+    "url": "https://github.com/tokio-rs/axum.git",
+    "commit": "36d38c4cf2766cd7313dd53d808f30546ee36b1e",
+    "category": "web / server framework",
+    "why": "Async web framework using generic handlers and proc macros."
+  },
+  {
+    "id": "crossbeam-rs/crossbeam",
+    "language": "rust",
+    "url": "https://github.com/crossbeam-rs/crossbeam.git",
+    "commit": "a28f40fdddb70bea8e5faf0efad9af0be4b9dbea",
+    "category": "library",
+    "why": "Concurrency workspace and declarative macros across crates."
+  },
+  {
+    "id": "labstack/echo",
+    "language": "go",
+    "url": "https://github.com/labstack/echo.git",
+    "commit": "f275a6b1109ee90f288b51a5e2a6fcc617491255",
+    "category": "web / server framework",
+    "why": "Routing and middleware with interfaces and HTTP examples."
+  },
+  {
+    "id": "serde-rs/serde",
+    "language": "rust",
+    "url": "https://github.com/serde-rs/serde.git",
+    "commit": "e306b0c7c40ad21d5bdf52bcd20da513904682ae",
+    "category": "library",
+    "why": "Serialization trait library with derive proc macros and macro_rules-heavy internals."
+  },
+  {
+    "id": "dexie/Dexie.js",
+    "language": "typescript",
+    "url": "https://github.com/dexie/Dexie.js.git",
+    "commit": "95666bf5370a222a21d7f53130d87b42e9b7bac7",
+    "category": "database / storage",
+    "why": "IndexedDB wrapper with TypeScript library code and JavaScript tests and examples."
+  },
+  {
+    "id": "junegunn/fzf",
+    "language": "go",
+    "url": "https://github.com/junegunn/fzf.git",
+    "commit": "4499615fe9c06c0651aa5650e5d0d0a5face99a8",
+    "category": "UI / app",
+    "why": "Interactive fuzzy finder with terminal and platform-specific implementations."
+  },
+  {
+    "id": "alacritty/alacritty",
+    "language": "rust",
+    "url": "https://github.com/alacritty/alacritty.git",
+    "commit": "aa5d942f46c40184a3f214830ff5f7989f4733a1",
+    "category": "UI / app",
+    "why": "Terminal emulator with platform code and a multi-crate workspace."
+  },
+  {
+    "id": "changesets/changesets",
+    "language": "typescript",
+    "url": "https://github.com/changesets/changesets.git",
+    "commit": "9a035ec36045aeb6141dd0bbac9ab9e3c69ac0bc",
+    "category": "CLI tool",
+    "why": "Release-management CLI with multiple published packages and fixture projects."
+  },
+  {
+    "id": "stretchr/testify",
+    "language": "go",
+    "url": "https://github.com/stretchr/testify.git",
+    "commit": "87a7b9d57689f6579db2da795ab8deeab29cb724",
+    "category": "library / dev tool",
+    "why": "Assertions, mocks, test suites and generated assertion helpers."
+  },
+  {
+    "id": "oclif/core",
+    "language": "typescript",
+    "url": "https://github.com/oclif/core.git",
+    "commit": "50a4bc0ecd123733cd974866f8db0f1cb5a6a06f",
+    "category": "CLI tool",
+    "why": "CLI framework with CommonJS and ESM plugin-loading examples."
+  },
+  {
+    "id": "go-task/task",
+    "language": "go",
+    "url": "https://github.com/go-task/task.git",
+    "commit": "bb2a8adae96a43af1fc8bddb9efd6e4e68ca3b38",
+    "category": "CLI tool",
+    "why": "Task runner with configuration packages and tool modules."
+  },
+  {
+    "id": "etcd-io/bbolt",
+    "language": "go",
+    "url": "https://github.com/etcd-io/bbolt.git",
+    "commit": "622eada16b5e733bc3bcacf17ca394452fc621f0",
+    "category": "database / storage",
+    "why": "Small embedded key-value store with architecture-specific files."
+  },
+  {
+    "id": "gin-gonic/gin",
+    "language": "go",
+    "url": "https://github.com/gin-gonic/gin.git",
+    "commit": "0f09c3a9b4626d9fe9979cf4d0521d6ae32ab646",
+    "category": "web / server framework",
+    "why": "Small routing and middleware framework."
+  },
+  {
+    "id": "RustCrypto/hashes",
+    "language": "rust",
+    "url": "https://github.com/RustCrypto/hashes.git",
+    "commit": "c50eeb468b26629bbd1177620733a32a084d6f86",
+    "category": "library",
+    "why": "no_std crypto primitives with shared macro_rules and separate crates."
+  },
+  {
+    "id": "wagoodman/dive",
+    "language": "go",
+    "url": "https://github.com/wagoodman/dive.git",
+    "commit": "75dea9077a4f0c0328cf0084d9b1e32f2f22df87",
+    "category": "UI / app",
+    "why": "Container image inspection app with a terminal UI."
+  },
+  {
+    "id": "rust-lang/mdBook",
+    "language": "rust",
+    "url": "https://github.com/rust-lang/mdBook.git",
+    "commit": "7f307f5e845284f41adeaf7f18f4783f7711343c",
+    "category": "CLI / dev tool",
+    "why": "Documentation compiler with CLI, rendering and preprocessors."
+  },
+  {
+    "id": "fjall-rs/fjall",
+    "language": "rust",
+    "url": "https://github.com/fjall-rs/fjall.git",
+    "commit": "87006048139bfe1b072bbc29a5a92bf1f97628e3",
+    "category": "database / storage",
+    "why": "Small embeddable LSM key-value storage library."
+  },
+  {
+    "id": "spf13/cobra",
+    "language": "go",
+    "url": "https://github.com/spf13/cobra.git",
+    "commit": "adbc8813901bba65827259daa8e22ff94ec1f30e",
+    "category": "CLI library",
+    "why": "Small command framework with independent command and completion implementations."
+  },
+  {
+    "id": "mattn/go-sqlite3",
+    "language": "go",
+    "url": "https://github.com/mattn/go-sqlite3.git",
+    "commit": "8ff398bed68d13ffdacad010ad6f65c6993de6b2",
+    "category": "database / storage",
+    "why": "cgo bridge to an embedded C SQLite implementation."
+  },
+  {
+    "id": "charmbracelet/bubbletea",
+    "language": "go",
+    "url": "https://github.com/charmbracelet/bubbletea.git",
+    "commit": "6b30ecf3280d88d949dcc916bb91fc5e9d56f667",
+    "category": "UI library",
+    "why": "Terminal UI and component examples in a small codebase."
+  },
+  {
+    "id": "rust-embedded/cortex-m",
+    "language": "rust",
+    "url": "https://github.com/rust-embedded/cortex-m.git",
+    "commit": "b79801ce4884fe46105b562f701a7d2fd5c586c7",
+    "category": "library",
+    "why": "Small no_std hardware library with architecture gates and build scripts."
+  },
+  {
+    "id": "pmndrs/zustand",
+    "language": "typescript",
+    "url": "https://github.com/pmndrs/zustand.git",
+    "commit": "9fed2eb2f3af672da9f7bf694b996df3831fc207",
+    "category": "library",
+    "why": "Small state library with generic middleware and React examples."
+  },
+  {
+    "id": "yargs/yargs",
+    "language": "typescript",
+    "url": "https://github.com/yargs/yargs.git",
+    "commit": "9588a764365c0fd9a6b5dd2f76f2e1be805c5426",
+    "category": "CLI library",
+    "why": "Small command-line parsing library with ESM and CommonJS entry points."
+  }
+]
