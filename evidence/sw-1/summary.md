@@ -10,6 +10,15 @@ limit. The finished runs reported 78 failed files across 10 repositories.
 with 37.02% resolved links, no failed files and two partial files. Full
 diagnostic groups and query sizes are in [results.json](results.json).
 
+**The resolved share is not a miss rate.** `unresolved` includes links whose
+target lies outside the checkout — the standard library, Node built-ins,
+third-party packages and crates, standard macros — which a source-only graph
+cannot resolve, alongside links whose target is in the checkout and was not
+found. `results.json` does not separate the two. Review replays measured, as
+lower bounds, at least 68% of gin's unresolved links, 20% of yargs's and 15%
+of alacritty's as clearly outside the checkout. Chunk SW-3 exports the full
+breakdown and reports coverage of in-checkout links only.
+
 ## How to read the results
 
 The dev server ran the public npm `pymtheg@0.1.0` release with Node 24.21.0
@@ -102,6 +111,15 @@ more than one failed-file class. For the link classes, “low” means under 50%
 resolved in the cold graph. Each low-link repository is assigned to its
 largest unresolved bucket, grouped by module, link kind and recorded reason
 in the stored graph. Missing reason fields are counted separately.
+
+The repository counts for the link classes (9 to 15) come from per-reason
+bucket analysis of the stored graphs. Those buckets are not in `results.json`
+and the committed runner does not produce them, so these counts cannot be
+checked from the committed files; SW-3 commits the breakdown. One failed Rust
+file also blocks links well beyond itself: in alacritty the single failed
+`window.rs` adds `failed-file-unseen-declarations` to 12,344 of 21,467
+unresolved links (measured in review), so class 3 costs far more links than
+its file count suggests.
 
 1. **Node heap exhaustion during cold indexing (2 repositories).**
     Microsoft TypeScript exited 134 during `graph analyze typescript: 0/27194`.

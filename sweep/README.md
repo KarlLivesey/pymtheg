@@ -89,3 +89,8 @@ output for diagnosis. Completed attempts, including failures, get an atomic
 record by repository ID and SHA. Rerun with the same scratch path to skip those
 records and regenerate the aggregate. Use a new scratch folder for an independent
 rerun of the same commits. Only the compact aggregate and report belong in Git.
+
+The committed `evidence/sw-1/results.json` also contains two things the three
+commands above do not reproduce on their own: a sampled memory high-water mark
+for runs that were force-stopped, and a re-run of the callee query after a
+harness mistake in the symbol reference was corrected.
