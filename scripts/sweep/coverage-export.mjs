@@ -6,8 +6,9 @@ import { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import { gunzipSync } from "node:zlib";
-import { classify, columns, countLines, failedFamily, goImports, modules, repositoryScore,
-  rustImports, rustPreludeMacros, rustPreludeTypes, sampleKey, sampleSize, sampleStratum, sourceScope, tsBindings } from "./coverage-rules.mjs";
+import { goMapKeyReader, typescriptShapes } from "./coverage-source.mjs";
+import { classify, columns, countLines, failedFamily, goImports, modules, packageName, repositoryScore,
+  reviewBucket, reviewQuotas, rustImports, rustPreludeMacros, rustPreludeTypes, sampleKey, sampleSize, sampleStratum, sourceScope, tsBindings, workspaceNames } from "./coverage-rules.mjs";
 
 const readJson = (name) => JSON.parse(name.endsWith(".gz") ? gunzipSync(readFileSync(name)) : readFileSync(name, "utf8"));
 const compare = (a, b) => a < b ? -1 : a > b ? 1 : 0;
@@ -27,11 +28,13 @@ async function loadReaders(packageRoot) {
   return { ts: ts.default, go, rust, toml };
 }
 
-function projectEvidence(db, readers, files, paths) {
+function projectEvidence(db, readers, files, paths, checkout) {
   const contexts = db.prepare("SELECT body FROM graph_contexts").all().map(({ body }) => JSON.parse(body));
   const tsPackages = new Set();
   const tsExternal = new Set();
   const tsAliasStrings = new Set();
+  const tsManifests = new Map();
+  const tsConfigs = new Map();
   const rustLocal = new Set();
   const rustShadows = new Set();
   let explicitPrelude = false, opaqueMacroImports = false, noStd = false;
@@ -46,6 +49,7 @@ function projectEvidence(db, readers, files, paths) {
     if (context.path.endsWith("package.json")) {
       try {
         const doc = JSON.parse(context.text.replace(/^\ufeff/, ""));
+        tsManifests.set(context.path, doc);
         if (typeof doc?.name === "string") tsPackages.add(doc.name);
         for (const field of ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"]) {
           for (const [name, value] of Object.entries(doc?.[field] ?? {})) {
@@ -58,12 +62,22 @@ function projectEvidence(db, readers, files, paths) {
     }
     if (/(?:ts|js)config[^/]*\.json$/.test(context.path)) {
       const { config } = readers.ts.parseConfigFileTextToJson(context.path, context.text);
+      if (config?.extends) tsConfigs.set(context.path, [config.extends].flat().filter((part) => typeof part === "string"));
       for (const alias of Object.keys(config?.compilerOptions?.paths ?? {})) {
         const literal = alias.split("*").map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join(".*");
         tsAliasStrings.add(`^${literal}$`);
       }
     }
   }
+  const pnpmFiles = new Map();
+  if (files.some(({ module }) => module === "typescript")) for (const path of paths) {
+    if (posix.basename(path) === "pnpm-workspace.yaml") pnpmFiles.set(path, readFileSync(join(checkout, path), "utf8"));
+    if (posix.basename(path) !== "package.json" || tsManifests.has(path)) continue;
+    try { tsManifests.set(path, JSON.parse(readFileSync(join(checkout, path), "utf8").replace(/^\ufeff/, ""))); }
+    catch (error) { if (!(error instanceof SyntaxError)) throw error; }
+  }
+  const workspace = workspaceNames(tsManifests, pnpmFiles);
+  for (const name of workspace) tsPackages.add(name);
   const rustContexts = readers.rust.crates(contexts, new Set(files.filter(({ module }) => module === "rust").map(({ path }) => path)));
   for (const crate of rustContexts) {
     const dir = posix.dirname(crate.manifest);
@@ -132,7 +146,7 @@ function projectEvidence(db, readers, files, paths) {
     const options = ownerMemo.get(original)?.get(name);
     return options?.size === 1 ? options.values().next().value : undefined;
   };
-  return { tsPackages, tsExternal, tsAliases: [...tsAliasStrings].map((pattern) => new RegExp(pattern)),
+  return { tsPackages, workspace, tsConfigs, tsExternal, tsAliases: [...tsAliasStrings].map((pattern) => new RegExp(pattern)),
     goModules, goDestinations, goExternal, vendoredGo, rustLocal, rustBindings,
     rustPrelude: (name, kind) => !explicitPrelude && !rustShadows.has(name) && !rustLocal.has(name) &&
       (kind === "macros" ? !opaqueMacroImports && (!noStd || !/^(?:e?print(?:ln)?|dbg|vec|format)$/.test(name))
@@ -154,14 +168,55 @@ function selectAttempt(scratch, repo) {
   return candidates[0];
 }
 
-function remember(samples, stratum, key, makeSample) {
+function remember(samples, stratum, key, makeSample, limit) {
+  if (limit === 0) return;
   const entries = samples.get(stratum) ?? [];
-  const limit = sampleSize(stratum);
   if (entries.length === limit && compare(key, entries.at(-1).key) >= 0) return;
+  const existing = entries.findIndex((entry) => entry.key === key);
+  if (existing !== -1) return;
   entries.push({ key, ...makeSample() });
   entries.sort((a, b) => compare(a.key, b.key));
   if (entries.length > limit) entries.pop();
   samples.set(stratum, entries);
+}
+
+function sourceClues(source, at, names) {
+  if (!names.length) return [];
+  const pattern = new RegExp(`\\b(?:${names.join("|")})\\b`);
+  const lines = [];
+  let offset = 0;
+  for (const line of source.split("\n")) {
+    if (line.length < 520 && pattern.test(line) && /\b(use|import|from|let|const|var|fn|func|class|type|struct|enum|trait)\b|\w+\s*[:=]/.test(line)) {
+      lines.push({ code: line.trim(), distance: Math.abs(offset - at) });
+    }
+    offset += line.length + 1;
+  }
+  return lines.sort((a, b) => a.distance - b.distance).slice(0, 7).map((line) => line.code);
+}
+
+function tsCallSite(ts, source, range) {
+  if (!range) return undefined;
+  const { start, end } = range;
+  const visit = (node) => {
+    if (node.pos > start || node.end < end) return undefined;
+    if (node.getStart(source) === start && node.end === end) return node;
+    return ts.forEachChild(node, visit);
+  };
+  const node = visit(source);
+  if (!node) return undefined;
+  const unwrap = (value) => {
+    while (ts.isParenthesizedExpression(value) || ts.isNonNullExpression(value)) value = value.expression;
+    return value;
+  };
+  const expression = unwrap(node);
+  if (ts.isArrowFunction(expression) || ts.isFunctionExpression(expression)) return { kind: "inline-function" };
+  if (ts.isElementAccessExpression(expression)) {
+    return { kind: ts.isStringLiteralLike(expression.argumentExpression) ? "literal-property" : "computed-property" };
+  }
+  const member = node.parent;
+  if (!member || !ts.isPropertyAccessExpression(member) || member.name !== node) return undefined;
+  const receiver = unwrap(member.expression);
+  return { kind: "member", receiver: receiver.getText(source).slice(0, 160), syntax: ts.SyntaxKind[receiver.kind] };
 }
 
 function location(text, offset) {
@@ -173,7 +228,7 @@ function location(text, offset) {
   return { line, code: text.slice(Math.max(start, at - 85), Math.min(stop < 0 ? text.length : stop, at + 146)).trim(), before };
 }
 
-function scanRepo(scratch, repo, readers, referenceFiles) {
+function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys) {
   const attempt = selectAttempt(scratch, repo);
   const paths = readFileSync(join(attempt, "tree.out"), "utf8").split("\0")
     .filter((item) => /^100(?:644|755) blob /.test(item)).map((item) => item.slice(item.indexOf("\t") + 1));
@@ -194,13 +249,39 @@ function scanRepo(scratch, repo, readers, referenceFiles) {
       AND json_extract(body,'$.module')='go' AND json_extract(body,'$.kind')=?`);
     const goDefinitions = db.prepare(`SELECT file, json_extract(body,'$.kind') AS kind,
       json_extract(body,'$.data') AS data FROM graph_symbols WHERE name=? AND json_extract(body,'$.module')='go'`);
+    const namesInModule = db.prepare(`SELECT name,file,json_extract(body,'$.kind') AS kind FROM graph_symbols
+      WHERE name=? AND json_extract(body,'$.module')=? ORDER BY file,kind LIMIT 16`);
+    const candidateOf = db.prepare("SELECT file,name,kind FROM graph_symbols WHERE id=?");
+    const definitionMemo = new Map();
+    const definitions = (name, module) => {
+      const key = `${name}\0${module}`;
+      if (!definitionMemo.has(key)) definitionMemo.set(key, namesInModule.all(name, module));
+      return definitionMemo.get(key);
+    };
     const capturedNames = new Map();
-    const project = projectEvidence(db, readers, files, paths);
+    const project = projectEvidence(db, readers, files, paths, join(attempt, "checkout"));
     const goPackages = new Map(files.filter(({ module }) => module === "go").map((file) => [file.path, file.package]));
     const goAliasCache = new Map();
     const goAliasesFor = (file, rows) => {
       if (!goAliasCache.has(file)) goAliasCache.set(file, goImports(rows ?? imports.all(file).map(({ body }) => JSON.parse(body))));
       return goAliasCache.get(file);
+    };
+    const goDeclarations = new Map();
+    const goSampleDeclarations = (names, file, aliases) => {
+      const directories = new Set([posix.dirname(file)]);
+      for (const path of aliases.values()) {
+        if (!path) continue;
+        for (const directory of project.goDestinations(file, path).directories) directories.add(directory || ".");
+      }
+      return names.flatMap((name) => {
+        if (!goDeclarations.has(name)) goDeclarations.set(name, goDefinitions.all(name).map((row) => ({ ...row, data: JSON.parse(row.data) })));
+        return goDeclarations.get(name).filter((row) => directories.has(posix.dirname(row.file))).slice(0, 8).map((row) => {
+          const { receiver, owner, results, t, v, underlying } = row.data ?? {};
+          const types = new Set([t?.q, underlying?.q, ...(results ?? []).map((result) => result.t?.q)]);
+          const bindings = [...goAliasesFor(row.file)].filter(([name]) => types.has(name));
+          return { file: row.file, name, kind: row.kind, receiver, owner, results, t, v, underlying, bindings };
+        });
+      });
     };
     const returnedCache = new Map();
     const goReturned = (file, desc) => {
@@ -243,6 +324,8 @@ function scanRepo(scratch, repo, readers, referenceFiles) {
     const counts = new Map();
     const samples = new Map();
     const strata = {};
+    const workspaceMisses = new Map();
+    const omissions = new Map();
     const failed = new Map();
     const sourceFiles = new Map();
     const checks = {};
@@ -273,6 +356,10 @@ function scanRepo(scratch, repo, readers, referenceFiles) {
       const records = imports.all(file.path).map(({ body, resolution }) => ({ ...JSON.parse(body), resolution }));
       let bindings;
       const tsSourceBindings = () => bindings ??= tsBindings(readers.ts, file.path, source);
+      const shapes = quotas && file.module === "typescript" && file.status !== "failed" ?
+        typescriptShapes(readers.ts, tsSourceBindings().source, tsSourceBindings().names) : undefined;
+      const observedSites = new Set();
+      const omittedCandidates = shapes?.omittedCandidates ?? [];
       const evidence = {
         goImports: file.module === "go" ? goAliasesFor(file.path, records) : new Map(),
         goReturned: (desc) => goReturned(file.path, desc),
@@ -290,7 +377,33 @@ function scanRepo(scratch, repo, readers, referenceFiles) {
       };
       for (const row of getLinks.iterate(file.path)) {
         const link = { ...JSON.parse(row.body), module: row.module, kind: row.kind, resolution: row.resolution };
+        if (quotas && link.range && !["contains", "receiver"].includes(link.kind)) {
+          if (link.kind !== "calls" || file.module === "typescript") observedSites.add(link.range.start);
+          const base = link.data?.expr?.x;
+          if (file.module === "go" && link.kind === "calls" && base?.k === "name" && !evidence.goImports.has(base.n)) {
+            const local = goSampleDeclarations([base.n], file.path, new Map()).some((row) =>
+              row.kind === "var" && goPackages.get(row.file) === file.package);
+            if (local) omittedCandidates.push({ family: "go-package-receiver", name: base.n, start: link.range.start });
+          }
+        }
         const disposition = classify(link, evidence, project);
+        const tsExternal = link.module === "typescript" && link.resolution === "unresolved" && link.data?.reason === "external-package";
+        const tsRoot = tsExternal ? /^(?:new\s+)?([\w$]+)(?:\??\.[\w$]+)?$/.exec(link.targetName)?.[1] : undefined;
+        const specifier = tsExternal ? link.data?.specifier ?? (["imports", "exports"].includes(link.kind) ?
+          evidence.tsSpecifierAt(link.range?.start) : evidence.tsImports().get(tsRoot)) : undefined;
+        const workspaceName = specifier ? packageName(specifier) : undefined;
+        const sibling = workspaceName && project.workspace.has(workspaceName) ? workspaceName : undefined;
+        if (sibling) {
+          if (disposition === "outside") throw Error(`Workspace package classified outside at ${repo.id}/${file.path}`);
+          const row = workspaceMisses.get(sibling) ?? { name: sibling, links: 0, files: new Set(), examples: [] };
+          row.links++;
+          row.files.add(file.path);
+          if (row.examples.length < 2) {
+            const { line } = location(source, link.range?.start);
+            row.examples.push({ file: file.path, line });
+          }
+          workspaceMisses.set(sibling, row);
+        }
         const tuple = [link.module, link.kind, link.resolution, link.data?.reason ?? null, link.data?.uncertainty ?? null, scope, disposition];
         const key = JSON.stringify(tuple);
         const aggregate = counts.get(key);
@@ -302,27 +415,83 @@ function scanRepo(scratch, repo, readers, referenceFiles) {
         const rank = stratum || references ? sampleKey(repo, link) : null;
         if (rank && references?.has(rank)) {
           const previous = checks[rank];
-          // Identical source facts can occur twice. Credit recovery only when
-          // every matching fact is resolved.
-          if (!previous || previous === "resolved") checks[rank] = link.resolution;
+          // Identical source facts can occur twice. Credit a settled site
+          // only when every matching fact agrees.
+          const verdict = disposition === "outside" ? "outside" : link.resolution;
+          checks[rank] = previous && previous !== verdict ? "mixed" : verdict;
         }
         if (!stratum) continue;
         const population = `${stratum}:${scope}`;
         strata[population] = (strata[population] ?? 0) + 1;
-        remember(samples, stratum, rank, () => {
+        const bucket = quotas ? reviewBucket(stratum, scope, disposition) : stratum;
+        remember(samples, bucket, rank, () => {
           const p = location(source, link.range?.start);
           const data = link.data ?? {};
-          const targetRoot = /^[\w$]+/.exec(link.targetName)?.[0];
+          const propertyRoot = quotas && link.module === "typescript" ? evidence.tsPropertyRoot(link.range?.start) : undefined;
+          const targetRoot = propertyRoot ?? /^[\w$]+/.exec(link.targetName)?.[0];
           const expr = data.expr;
           const type = data.receiverType?.split("::").at(-1) ?? targetRoot;
+          const binding = link.module === "rust" ? evidence.rustImports.get(targetRoot) :
+            link.module === "typescript" ? evidence.tsImports().get(targetRoot) : evidence.goImports.get(targetRoot);
+          const used = new Set([...(link.targetName ?? "").matchAll(/\b\w+\b/g)].map(([name]) => name));
+          if (quotas) for (const [name] of JSON.stringify(expr ?? {}).matchAll(/\b\w+\b/g)) used.add(name);
+          const aliases = link.module === "rust" ? evidence.rustImports : link.module === "go" ? evidence.goImports :
+            quotas ? evidence.tsImports() : [];
+          const origin = (path) => path && classify({ module: link.module, kind: "imports", file: file.path,
+            resolution: "unresolved", targetName: path, data: { path, specifier: path } }, evidence, project);
+          if (targetRoot) used.add(targetRoot);
+          const relevantNames = [...new Set([targetRoot, type, expr?.x?.t?.n, data.method,
+            /(?:\.|::)(\w+)$/.exec(link.targetName)?.[1]])].filter((name) => /^\w{2,65}$/.test(name ?? ""));
+          const clues = quotas ? sourceClues(source, link.range?.start ?? 0, relevantNames) : [];
+          for (const clue of clues) for (const [name] of clue.matchAll(/\b\w+\b/g)) used.add(name);
+          const tsSite = quotas && link.module === "typescript" && link.kind === "calls" ?
+            tsCallSite(readers.ts, tsSourceBindings().source, link.range) : undefined;
           return { repo: repo.id, file: file.path, line: p.line, code: p.code, before: p.before,
             scope, kind: link.kind, disposition, target: link.targetName, reason: link.data?.reason ?? link.data?.uncertainty ?? null,
+            ...(quotas ? { stratum, binding, sibling, propertyRoot, offset: link.range?.start,
+              after: source.slice(link.range?.start ?? 0, (link.range?.start ?? 0) + 460),
+              aliases: [...aliases].filter(([name]) => used.has(name)).map(([name, path]) => [name, path, origin(path)]),
+              clues, tsSite,
+              tsNestedFunction: shapes?.nested.has(targetRoot) || undefined,
+              tsObjectMember: shapes?.objectMembers.has(link.range?.start) || undefined,
+              rustGlob: link.module === "rust" ? records.filter((record) => record.data?.glob).map((record) => record.targetName) : undefined,
+              tsConfig: link.module === "typescript" ? [...project.tsConfigs].filter(([path]) => {
+                const dir = posix.dirname(path);
+                return dir === "." || file.path.startsWith(`${dir}/`);
+              }).sort(([a], [b]) => b.length - a.length).slice(0, 3) : undefined,
+              definitions: relevantNames.flatMap((name) => definitions(name, link.module)),
+              goDefinitions: link.module === "go" ? goSampleDeclarations([...used].filter((name) => /^\w{2,65}$/.test(name)),
+                file.path, evidence.goImports) : undefined,
+              candidates: link.candidates?.slice(0, 12).map(({ id }) => candidateOf.get(id)).filter(Boolean),
+              tsLocalBindings: link.module === "typescript" ? tsSourceBindings().names.get(targetRoot) : undefined,
+              tsLiteralReceiver: link.module === "typescript" && evidence.tsLiteral(link.range?.start) || undefined } : {}),
             ...(type && declared.get(type, file.path) ? { declaredHere: true } : {}),
             ...(link.module === "go" ? { expr, open: data.open,
               ...(link.kind === "calls" && goFactory(file.path, expr, evidence.goImports) ? { factory: "inside" } : {}) } : {}),
             ...(link.module === "rust" ? { receiver: data.receiverType, method: data.method, impl: data.implType } : {}),
             ...(link.module === "typescript" ? { jsx: data.jsx, specifier: data.specifier ?? evidence.tsImports().get(targetRoot) } : {}) };
-        });
+        }, quotas?.get(bucket) ?? (quotas ? 0 : sampleSize(bucket)));
+      }
+      if (goMapKeys && file.module === "go" && file.status !== "failed" && /\bmap\s*\[/.test(source)) {
+        for (const site of goMapKeys(source)) {
+          if (goSampleDeclarations([site.name], file.path, new Map()).some((row) =>
+            ["const", "var"].includes(row.kind) && goPackages.get(row.file) === file.package)) {
+            omittedCandidates.push({ ...site, family: "go-map-key" });
+          }
+        }
+      }
+      const visited = new Set();
+      for (const { family, name, start } of omittedCandidates) {
+        if (observedSites.has(start)) continue;
+        const key = `${family}:${start}`;
+        if (visited.has(key)) continue;
+        visited.add(key);
+        const row = omissions.get(family) ?? { family, sites: 0, examples: [] };
+        row.sites++;
+        if (row.examples.length < 2) {
+          row.examples.push({ file: file.path, line: location(source, start).line, name });
+        }
+        omissions.set(family, row);
       }
     }
     const rows = [...counts].sort(([a], [b]) => compare(a, b)).map(([, value]) => value);
@@ -332,7 +501,10 @@ function scanRepo(scratch, repo, readers, referenceFiles) {
         actual.inside + actual.outside + actual.unclassified !== warm.unresolved) throw Error(`Stored link totals disagree with released CLI for ${repo.id}`);
     return { audit: { id: repo.id, language: repo.language, commit: repo.commit, outcome: repo.outcome,
       trackedSource: repo.trackedSource, breakdown: rows, sourceFiles: [...sourceFiles.values()],
-      failedSources: [...failed.values()].map(({ examples, ...record }) => record), strata, ...(referenceFiles ? { checks } : {}) },
+      failedSources: [...failed.values()].map(({ examples, ...record }) => record), strata,
+      ...(omissions.size ? { sourceOmissions: [...omissions.values()] } : {}),
+      ...(workspaceMisses.size ? { workspaceMisses: [...workspaceMisses.values()].map((row) => ({ ...row, files: row.files.size })) } : {}),
+      ...(referenceFiles ? { checks } : {}) },
       failedExamples: [...failed.values()],
       samples: Object.fromEntries(samples) };
   } finally { db.close(); }
@@ -342,11 +514,13 @@ const { values } = parseArgs({ options: {
   results: { type: "string" }, scratch: { type: "string", default: process.env.PYM_SCRATCH },
   output: { type: "string" }, "metadata-root": { type: "string" }, "reference-samples": { type: "string" },
   "include-failed": { type: "string" },
+  "sampling-base": { type: "string" },
 } });
 if (!values.results || !values.scratch || !values.output) throw Error("Use --results, --output and --scratch (or PYM_SCRATCH)");
 const scratch = resolve(values.scratch);
 const output = resolve(values.output);
 const input = readJson(values.results);
+const quotas = values["sampling-base"] ? reviewQuotas(readJson(values["sampling-base"]).repos) : null;
 if (values["include-failed"]) {
   const previous = readJson(values["include-failed"]);
   if (previous.release.integrity !== input.release.integrity || !input.release.integrity) {
@@ -355,7 +529,10 @@ if (values["include-failed"]) {
   const current = new Set(input.repos.map(({ id }) => id));
   input.repos.push(...previous.repos.filter((repo) => repo.outcome !== "finished" && !current.has(repo.id)));
 }
-const readers = await loadReaders(resolve(values["metadata-root"] ?? join(scratch, "release/node_modules/pymtheg")));
+const packageRoot = resolve(values["metadata-root"] ?? join(scratch, "release/node_modules/pymtheg"));
+const readers = await loadReaders(packageRoot);
+const goMapKeys = quotas ? await goMapKeyReader((await import(pathToFileURL(join(packageRoot, "dist/graph/tree-sitter.js")))).createTagsParser,
+  packageRoot) : undefined;
 const reference = new Map();
 if (values["reference-samples"]) {
   for (const row of readJson(values["reference-samples"]).samples) {
@@ -367,6 +544,8 @@ if (values["reference-samples"]) {
 }
 const cacheVersion = createHash("sha256").update(readFileSync(new URL(import.meta.url)))
   .update(readFileSync(new URL("./coverage-rules.mjs", import.meta.url)))
+  .update(readFileSync(new URL("./coverage-source.mjs", import.meta.url)))
+  .update(JSON.stringify([...quotas ?? []]))
   .update(values["reference-samples"] ? readFileSync(values["reference-samples"]) : "").digest("hex");
 const cache = `${output}.cache`;
 mkdirSync(dirname(output), { recursive: true });
@@ -387,14 +566,14 @@ for (const repo of input.repos) {
   const path = join(cache, `${key}.json`);
   if (!existsSync(path)) {
     console.error(`Exporting ${repo.id}`);
-    atomicJson(path, scanRepo(scratch, repo, readers, reference.get(repo.id)));
+    atomicJson(path, scanRepo(scratch, repo, readers, reference.get(repo.id), quotas, goMapKeys));
   }
   const { audit, samples, failedExamples } = readJson(path);
   if (failedExamples.length) failures[repo.id] = failedExamples;
   if (samples["rust:failed-file-taint"]?.length) taintExamples[repo.id] = samples["rust:failed-file-taint"].slice(0, 5);
   repositories.push(audit);
   for (const [stratum, entries] of Object.entries(samples)) for (const { key, ...sample } of entries) {
-    remember(shortlist, stratum, key, () => sample);
+    remember(shortlist, stratum, key, () => sample, quotas?.get(stratum) ?? sampleSize(stratum));
   }
 }
 const release = input.release;

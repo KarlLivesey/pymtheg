@@ -32,6 +32,29 @@ const assertionPackages = new Set(["chai", "vitest", "@vitest/expect", "@jest/ex
 
 export const countLines = (text) => text ? text.split("\n").length - Number(text.endsWith("\n")) : 0;
 export const packageName = (value) => /^(@[^/]+\/[^/]+|[^/@][^/]*)/.exec(value)?.[1];
+export function workspaceNames(manifests, pnpmFiles) {
+  const roots = [];
+  for (const [path, doc] of manifests) {
+    const patterns = Array.isArray(doc?.workspaces) ? doc.workspaces : doc?.workspaces?.packages;
+    if (Array.isArray(patterns)) roots.push([posix.dirname(path), patterns.filter((pattern) => typeof pattern === "string")]);
+  }
+  for (const [path, text] of pnpmFiles) {
+    const section = /^packages:\s*\n((?:[ \t]+[^\n]*\n?)*)/m.exec(text)?.[1] ?? "";
+    const patterns = [...section.matchAll(/^[ \t]*-[ \t]*(?:'([^'\n]+)'|"([^"\n]+)"|([^#\n]+))/gm)]
+      .map((match) => (match[1] ?? match[2] ?? match[3]).trim());
+    roots.push([posix.dirname(path), patterns]);
+  }
+  const names = new Set();
+  for (const [path, doc] of manifests) for (const [root, patterns] of roots) {
+    if (typeof doc?.name !== "string") continue;
+    const relative = posix.relative(root, posix.dirname(path));
+    if (!relative || relative === ".." || relative.startsWith("../")) continue;
+    const matches = (pattern) => posix.matchesGlob(relative, pattern.replace(/^\.\//, "").replace(/\/$/, ""));
+    if (patterns.some((pattern) => !pattern.startsWith("!") && matches(pattern)) &&
+        !patterns.some((pattern) => pattern.startsWith("!") && matches(pattern.slice(1)))) names.add(doc.name);
+  }
+  return names;
+}
 const canonicalCrate = (value) => value?.replaceAll("-", "_");
 const knownInvalidGo = new Set([
   "cmd/fiximports/testdata/src/old.com/bad/bad.go", "go/analysis/passes/copylock/testdata/src/a/newexpr_go126.go",
@@ -179,7 +202,7 @@ export function tsBindings(ts, file, text) {
     ts.forEachChild(node, visit);
   };
   visit(source);
-  return { unsafe, names, specifiers, propertyRoots, literalProperties,
+  return { source, unsafe, names, specifiers, propertyRoots, literalProperties,
     imports: unsafe ? new Map() : new Map([...imports].filter(([name]) => names.get(name) === 1)) };
 }
 
@@ -298,8 +321,40 @@ export function sampleStratum(link, disposition) {
   if (link.module === "rust" && rustTaint(link.data?.reason, link.data?.uncertainty)) return "rust:failed-file-taint";
   const reason = link.data?.reason ?? link.data?.uncertainty ?? "";
   if (link.module === "rust" && /receiver-type-unverified/.test(reason)) return "rust:receiver";
-  if (link.module === "typescript" && ["no-symbol", "local", "external-package", "incomplete-config"].includes(reason)) return `typescript:${reason}`;
+  if (link.module === "rust" && /opaque-item-may-shadow-name/.test(reason)) return "rust:opaque-declaration";
+  if (link.module === "rust" && /path-type-unverified|namespace-binding-unverified/.test(reason)) return "rust:path-or-namespace";
+  if (link.module === "typescript" && ["no-symbol", "local", "external-package", "incomplete-config", "external", "missing-module"].includes(reason)) {
+    return `typescript:${reason}`;
+  }
+  if (link.module === "go" && reason === "invalid-code") return "go:invalid-code";
   return `${link.module}:${reason ? "other" : "empty"}`;
+}
+
+export function reviewBucket(stratum, scope, disposition) {
+  return `${stratum}:${scope}:${disposition}`;
+}
+
+export function reviewPopulation(repos) {
+  const population = new Map();
+  for (const repo of repos) {
+    if (repo.outcome !== "finished") continue;
+    for (const [module, , resolution, reason, uncertainty, scope, disposition, count] of repo.breakdown) {
+      const stratum = sampleStratum({ module, resolution, data: { reason, uncertainty } }, disposition);
+      if (!stratum) continue;
+      const key = reviewBucket(stratum, scope, disposition);
+      population.set(key, (population.get(key) ?? 0) + count);
+    }
+  }
+  return population;
+}
+
+export function reviewQuotas(repos) {
+  const population = reviewPopulation(repos);
+  return new Map(modules.flatMap((module) => {
+    const rows = [...population].filter(([key]) => key.startsWith(`${module}:`));
+    const total = rows.reduce((sum, [, count]) => sum + count, 0);
+    return rows.map(([key, count]) => [key, Math.min(count, Math.max(count < 100 ? 1 : 6, Math.round(420 * count / total)))]);
+  }));
 }
 
 export function sampleKey(repo, link) {

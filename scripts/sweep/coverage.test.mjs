@@ -6,8 +6,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { aggregate, failedRustInfluence, median } from "./coverage.mjs";
-import { classify, columns, goImports, repositoryScore, rustImports, sampleKey, sampleStratum, sourceScope } from "./coverage-rules.mjs";
+import { aggregate, estimateCoverage, failedRustInfluence, interval, median } from "./coverage.mjs";
+import { classify, columns, goImports, repositoryScore, reviewQuotas, rustImports, sampleKey, sampleStratum, sourceScope, workspaceNames } from "./coverage-rules.mjs";
 
 const project = {
   tsPackages: new Set(["@my/workspace"]), tsExternal: new Set(["react", "@my/workspace"]), tsAliases: [/@app\//],
@@ -53,17 +53,30 @@ test("excludes proved external paths and keeps vendoring, aliases and shadows di
   assert.equal(classifyLink("typescript", "../../outside.js", { specifier: "../../outside.js", reason: "missing-module" }, "imports"), "outside");
 });
 
-test("raw, adjusted and zero-scored inputs have separate denominators", () => {
+test("raw and strict denominators use finished graphs only", () => {
   const row = (outcome, disposition, count, scope = "source") => ["go", "calls", outcome, null, null, scope, disposition, count, 0];
   const breakdown = [row("resolved", "eligible", 3), row("ambiguous", "eligible", 2), row("unresolved", "inside", 2),
     row("unresolved", "unclassified", 1), row("unresolved", "outside", 4, "bundle")];
   assert.deepEqual(repositoryScore(breakdown), { resolved: 3, ambiguous: 2, inside: 2, outside: 4, unclassified: 1,
     eligible: 8, total: 12, raw: 3/12, adjusted: 3/8 });
   const repos = [{ language: "go", outcome: "finished", breakdown }, { language: "go", outcome: "wall-limit" }];
-  assert.equal(aggregate(repos, "go").all.adjusted, 3/16);
+  assert.equal(aggregate(repos, "go").observed, 1);
+  assert.equal(aggregate(repos, "go").weighted.adjusted, 3/8);
   assert.equal(aggregate(repos, "go").median.adjusted, 3/8);
   assert.equal(aggregate(repos, "go", ["source"]).weighted.raw, 3/8);
   assert.equal(median([3, 1, 9, 6]), 4.5);
+});
+
+test("tracks declared npm and pnpm siblings and honours exclusions", () => {
+  const manifests = new Map([
+    ["package.json", { workspaces: { packages: ["tools/*"] } }],
+    ["tools/cli/package.json", { name: "@local/cli" }],
+    ["apps/editor/package.json", { name: "@local/editor" }],
+    ["apps/fixtures/package.json", { name: "@local/fixtures" }],
+    ["unrelated/package.json", { name: "@local/unrelated" }],
+  ]);
+  const pnpm = new Map([["pnpm-workspace.yaml", "packages:\n  - 'apps/*'\n  - '!apps/fixtures' # fixtures have their own package name\n"]]);
+  assert.deepEqual([...workspaceNames(manifests, pnpm)], ["@local/cli", "@local/editor"]);
 });
 
 test("artifact rules are explicit and sample keys survive graph ID changes", () => {
@@ -90,6 +103,30 @@ test("failed-file taint reserves links that also have a receiver reason", () => 
   ] }), { total: 11, eligible: 8, blocked: 6, receivers: 11, allBlocked: 7 });
 });
 
+test("estimated coverage removes sampled outside links and leaves dynamic and unknown links eligible", () => {
+  const breakdown = [
+    ["go", "calls", "resolved", null, null, "source", "eligible", 40, 0],
+    ["go", "calls", "unresolved", null, null, "source", "outside", 20, 0],
+    ["go", "calls", "unresolved", null, null, "source", "unclassified", 40, 0],
+  ];
+  const repo = { id: "fixture/repo", language: "go", outcome: "finished", breakdown };
+  const samples = ["support", "outside", "dynamic", "unknown"].map((label, index) => ({
+    repo: repo.id, key: String(index), label, stratum: "go:empty", disposition: "unclassified", scope: "source",
+    ...(label === "support" || label === "outside" ? { item: label } : {}),
+  }));
+  const result = estimateCoverage([repo, { id: "fixture/unavailable", outcome: "wall-limit" }], samples, "go");
+  assert.equal(result.measured.raw, 0.4);
+  assert.equal(result.measured.adjusted, 0.5);
+  assert.equal(result.estimated, 40 / 70);
+  assert.equal(result.ceiling, 1 - 10 / 70);
+  assert.equal(result.unexplained, 1 / 3);
+  assert.equal(result.support.get("outside").outside, 10);
+  assert.equal(result.support.get("support").inside, 10);
+  assert.ok(result.range[0] < result.estimated && result.estimated < result.range[1]);
+  assert.deepEqual(interval(0, 0), [0, 1]);
+  assert.deepEqual([...reviewQuotas([repo])], [["go:empty:source:unclassified", 40]]);
+});
+
 test("candidate overlay rewrites the plan only for matched evidence", () => {
   const scratch = mkdtempSync(join(tmpdir(), "coverage-progress-"));
   try {
@@ -101,6 +138,9 @@ test("candidate overlay rewrites the plan only for matched evidence", () => {
     const candidate = packet([{ ...repo, checks: { known: "resolved" }, strata: { "go:empty:source": 1 }, breakdown: [
       ["go", "calls", "resolved", null, null, "source", "eligible", 1, 0],
       ["go", "calls", "unresolved", null, null, "source", "unclassified", 1, 0],
+    ] }, { ...base.repos[1], outcome: "finished", sourceFiles: [], failedSources: [], strata: {}, breakdown: [
+      ["rust", "calls", "resolved", null, null, "source", "eligible", 2, 0],
+      ["rust", "calls", "unresolved", null, null, "source", "unclassified", 3, 0],
     ] }]);
     const put = (filename, data) => {
       const file = join(scratch, filename);
@@ -110,17 +150,20 @@ test("candidate overlay rewrites the plan only for matched evidence", () => {
     const example = { repo: repo.id, file: "main.go", line: 2, code: "work()" };
     const item = { id: "calls", module: "go", title: "Resolve local calls", examples: [example, { ...example, line: 5 }] };
     const items = put("items.json", { items: [item] });
-    const samples = put("samples.json", { samples: ["known", "missing"].map((key) => ({ key, item: "calls", repo: repo.id, stratum: "go:empty", scope: "source" })) });
+    const samples = put("samples.json", { samples: ["known", "missing"].map((key) => ({ key, item: "calls", repo: repo.id,
+      label: "support", basis: "Checked-in call", stratum: "go:empty", disposition: "unclassified", scope: "source" })) });
     const plan = put("plan.md", "Before.\n<!-- sweep:coverage:start -->\nold\n<!-- sweep:coverage:end -->\nAfter.\n");
     const scoreboard = join(scratch, "score.md");
     execFileSync(process.execPath, [fileURLToPath(new URL("./coverage.mjs", import.meta.url)), "--results", put("candidate.json", candidate),
       "--base", put("base.json", base), "--plan", plan, "--scoreboard", scoreboard, "--items", items, "--samples", samples]);
     const rendered = readFileSync(plan, "utf8");
     assert.match(rendered, /^Before\./);
-    assert.match(rendered, /1\/2 sample sites resolved/);
+    assert.match(rendered, /1\/2 reference sites settled/);
     assert.match(rendered, /50\.00 pp/);
     assert.match(rendered, /After\.\n$/);
-    assert.match(readFileSync(scoreboard, "utf8"), /fixture\/other .*wall-limit.*0% \/ 0%/);
+    const report = readFileSync(scoreboard, "utf8");
+    assert.match(report, /- \[x\] fixture\/other · wall-limit · finished/);
+    assert.match(report, /\| All files \| Rust \| 1 \| 40\.00% \| 40\.00%/);
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }

@@ -1,6 +1,120 @@
 {
   "items": [
     {
+      "id": "go-container",
+      "module": "go",
+      "title": "Use the element type of slices, maps and ranged values for member links",
+      "examples": [
+        {
+          "repo": "golang/tools",
+          "file": "internal/diff/diff_test.go",
+          "line": 109,
+          "code": "tc.In, tc.Out, tc.Edits, got, want)"
+        },
+        {
+          "repo": "cli/cli",
+          "file": "pkg/cmd/pr/view/view_test.go",
+          "line": 966,
+          "code": "if len(tt.fixtures) > 0 {"
+        }
+      ]
+    },
+    {
+      "id": "go-external-fields",
+      "module": "go",
+      "title": "Trace dependency types through Go fields and embedded members",
+      "examples": [
+        {
+          "repo": "cockroachdb/pebble",
+          "file": "version_set_test.go",
+          "line": 307,
+          "code": "defer buf.Mutex.Unlock()"
+        },
+        {
+          "repo": "gofiber/fiber",
+          "file": "middleware/csrf/cross_origin_test.go",
+          "line": 243,
+          "code": "ctx.Request.Header.SetMethod(fiber.MethodPost)"
+        }
+      ]
+    },
+    {
+      "id": "go-external-import",
+      "module": "go",
+      "title": "Trace package-qualified selectors to dependencies outside the checkout",
+      "examples": [
+        {
+          "repo": "golang/tools",
+          "file": "go/analysis/passes/unmarshal/testdata/src/a/a.go",
+          "line": 28,
+          "code": "gob.NewDecoder(r).Decode(v) // want \"call of Decode passes non-pointer\""
+        },
+        {
+          "repo": "restic/restic",
+          "file": "internal/fs/fs_local_vss_test.go",
+          "line": 285,
+          "code": "} else if !ole.IsEqualGUID(id, test.id) {"
+        }
+      ]
+    },
+    {
+      "id": "go-external-result",
+      "module": "go",
+      "title": "Trace methods and fields on concrete standard or dependency results",
+      "examples": [
+        {
+          "repo": "samber/lo",
+          "file": "map_test.go",
+          "line": 832,
+          "code": "is.NoError(err)"
+        },
+        {
+          "repo": "golang/tools",
+          "file": "internal/robustio/robustio_test.go",
+          "line": 80,
+          "code": "if !realMtime.Equal(symlinkMtime) {"
+        }
+      ]
+    },
+    {
+      "id": "go-factory",
+      "module": "go",
+      "title": "Follow results of functions and methods in checked-in packages",
+      "examples": [
+        {
+          "repo": "cli/cli",
+          "file": "script/ghmock/schemacmd.go",
+          "line": 321,
+          "code": "if schema.Value != nil {"
+        },
+        {
+          "repo": "pocketbase/pocketbase",
+          "file": "core/db_table.go",
+          "line": 14,
+          "code": "err := app.ConcurrentDB().NewQuery(\"SELECT name FROM PRAGMA_TABLE_INFO({:tableName})\")."
+        }
+      ]
+    },
+    {
+      "id": "go-fields",
+      "module": "go",
+      "title": "Resolve fields of local structs, including embedded and anonymous fields",
+      "examples": [
+        {
+          "repo": "cockroachdb/pebble",
+          "file": "objstorage/objstorageprovider/vfs.go",
+          "line": 116,
+          "code": "prefix := base.MakeFilepath(p.st.Local.FS, p.st.Local.FSDirName, metaFileType, fileNum)"
+        },
+        {
+          "repo": "cli/cli",
+          "file": ".github/skills/cli-exercise/tool/internal/evidence/raster.go",
+          "line": 150,
+          "code": "lines := data.Lines[max(0, len(data.Lines)-data.Rows):]"
+        }
+      ]
+    },
+    {
       "id": "go-file-broken-fixture",
       "module": "go",
       "title": "Recognize deliberately broken fixture inputs and keep their failure local",
@@ -41,9 +155,28 @@
       ]
     },
     {
+      "id": "go-generated",
+      "module": "go",
+      "title": "Use package identity and build variants for generated Go declarations",
+      "examples": [
+        {
+          "repo": "protocolbuffers/protobuf-go",
+          "file": "internal/testprotos/test3/test3_hybrid/test.hybrid.pb.go",
+          "line": 2323,
+          "code": "(*TestAllTypes_NestedMessage)(nil), // 4: hybrid.goproto.proto.test3.TestAllTypes.NestedMessage"
+        },
+        {
+          "repo": "protocolbuffers/protobuf-go",
+          "file": "internal/testprotos/testeditions/testeditions_hybrid/test.hybrid.pb.go",
+          "line": 2847,
+          "code": "func (x *TestManyMessageFieldsMessage) GetF20() *TestAllTypes {"
+        }
+      ]
+    },
+    {
       "id": "go-interface",
       "module": "go",
-      "title": "Establish exact Go interface implementation links from known method sets",
+      "title": "Match declared implementation relations using local Go method sets",
       "examples": [
         {
           "repo": "protocolbuffers/protobuf-go",
@@ -60,171 +193,116 @@
       ]
     },
     {
-      "id": "go-local-binding",
+      "id": "go-local-method",
       "module": "go",
-      "title": "Narrow Go references to types in generated source variants",
+      "title": "Resolve a method on a concrete local receiver or checked-in field",
       "examples": [
         {
-          "repo": "protocolbuffers/protobuf-go",
-          "file": "internal/testprotos/test3/test3_hybrid/test.hybrid.pb.go",
-          "line": 2323,
-          "code": "(*TestAllTypes_NestedMessage)(nil), // 4: hybrid.goproto.proto.test3.TestAllTypes.NestedMessage"
+          "repo": "cli/cli",
+          "file": "pkg/cmd/release/create/create_test.go",
+          "line": 1394,
+          "code": "pm.RegisterConfirm(\"Is this a prerelease?\", func(_ string, _ bool) (bool, error) {"
         },
         {
-          "repo": "protocolbuffers/protobuf-go",
-          "file": "cmd/protoc-gen-go/testdata/nameclash/test_name_clash_hybrid3/test_name_clash_hybrid3.pb.go",
-          "line": 436,
-          "code": "func (x *M3) Get_GetFoo() *M0 {"
+          "repo": "restic/restic",
+          "file": "internal/archiver/exclude.go",
+          "line": 123,
+          "code": "if fs.Base(filename) == tagFilename {"
         }
       ]
     },
     {
-      "id": "go-local-method",
+      "id": "go-pointer-conversion",
       "module": "go",
-      "title": "Narrow Go method candidates using a source-evident receiver",
+      "title": "Link Go pointer conversions to their checked-in type declarations",
       "examples": [
         {
-          "repo": "golang/tools",
-          "file": "cmd/callgraph/testdata/src/pkg/pkg.go",
-          "line": 17,
-          "code": "i.f() // dynamic call"
+          "repo": "cockroachdb/pebble",
+          "file": "batch.go",
+          "line": 480,
+          "code": "var _ Writer = (*Batch)(nil)"
+        },
+        {
+          "repo": "protocolbuffers/protobuf-go",
+          "file": "internal/testprotos/legacy/proto2_20180125_92554152/test.pb.go",
+          "line": 2634,
+          "code": "ExtendedType:  (*Message)(nil),"
+        }
+      ]
+    },
+    {
+      "id": "go-stdlib",
+      "module": "go",
+      "title": "Recognize standard packages in type references and signatures",
+      "examples": [
+        {
+          "repo": "cli/cli",
+          "file": "pkg/cmd/agent-task/view/view_test.go",
+          "line": 768,
+          "code": "capiStubs: func(t *testing.T, m *capi.CapiClientMock) {"
         },
         {
           "repo": "evanw/esbuild",
-          "file": "internal/resolver/resolver.go",
-          "line": 610,
-          "code": "if !r.fs.IsAbs(firstPrefix) {"
+          "file": "internal/compat/compat_test.go",
+          "line": 74,
+          "code": "t.Run(fmt.Sprintf(\"%q ? %q\", at, bt), func(t *testing.T) {"
         }
       ]
     },
     {
-      "id": "heap-go",
+      "id": "go-type-parameter",
       "module": "go",
-      "title": "Keep Go graphs within the Node heap in mixed-language TypeScript and Turborepo checkouts",
-      "missing": [
-        "microsoft/TypeScript",
-        "vercel/turborepo"
-      ],
+      "title": "Anchor Go type-parameter conversions to their local constraint declarations",
       "examples": [
         {
-          "repo": "microsoft/TypeScript",
-          "file": "tsc/cmd/tsc/api.go",
-          "line": 17,
-          "code": "type apiFlags struct {"
+          "repo": "cockroachdb/pebble",
+          "file": "sstable/reader_iter_single_lvl.go",
+          "line": 1812,
+          "code": "kv, kvMeta = PD(&i.data).SeekGEWithMeta(i.lower, base.SeekGEFlagsNone)"
         },
         {
-          "repo": "vercel/turborepo",
-          "file": "crates/turborepo-trace-testkit/fixtures/go/basic/main.go",
-          "line": 24,
-          "code": "func main() {"
+          "repo": "gofiber/fiber",
+          "file": "helpers_test.go",
+          "line": 1183,
+          "code": "if test.bits <= int(unsafe.Sizeof(V(0)))*8 {"
         }
       ]
     },
     {
-      "id": "heap-rust",
+      "id": "go-typed-reference",
+      "module": "go",
+      "title": "Resolve named Go types and package members across files and local modules",
+      "examples": [
+        {
+          "repo": "golang/tools",
+          "file": "gopls/internal/util/typesutil/typesutil.go",
+          "line": 186,
+          "code": "case edge.CallExpr_Args:"
+        },
+        {
+          "repo": "cilium/ebpf",
+          "file": "prog_test.go",
+          "line": 959,
+          "code": "testutils.RunWithToken(t, \"no-prog\", testutils.Delegated{"
+        }
+      ]
+    },
+    {
+      "id": "rust-chain",
       "module": "rust",
-      "title": "Keep Rust graph assembly within the Node heap in Turborepo",
-      "missing": [
-        "vercel/turborepo"
-      ],
+      "title": "Carry a checked-in Rust type through chained calls and indexed values",
       "examples": [
         {
-          "repo": "vercel/turborepo",
-          "file": "crates/turborepo/src/main.rs",
-          "line": 38,
-          "code": "struct TurboQueryServer;"
+          "repo": "fjall-rs/fjall",
+          "file": "examples/rolling-log/src/main.rs",
+          "line": 9,
+          "code": "let db = Database::builder(path).temporary(true).open()?;"
         },
         {
-          "repo": "vercel/turborepo",
-          "file": "crates/turbo-trace/src/main.rs",
-          "line": 12,
-          "code": "struct Args {"
-        }
-      ]
-    },
-    {
-      "id": "heap-typescript",
-      "module": "typescript",
-      "title": "Keep TypeScript and JavaScript graphs within the Node heap in mixed-language checkouts",
-      "missing": [
-        "microsoft/TypeScript",
-        "vercel/turborepo"
-      ],
-      "examples": [
-        {
-          "repo": "microsoft/TypeScript",
-          "file": "packages/typescript/src/api/fs.ts",
-          "line": 23,
-          "code": "export interface FileSystemEntries {"
-        },
-        {
-          "repo": "vercel/turborepo",
-          "file": "packages/turbo-gen/src/types.ts",
-          "line": 13,
-          "code": "export interface Answers {"
-        }
-      ]
-    },
-    {
-      "id": "rust-ambiguous",
-      "module": "rust",
-      "title": "Narrow Rust candidates using source-evident module and receiver bindings",
-      "examples": [
-        {
-          "repo": "helix-editor/helix",
-          "file": "helix-term/src/application.rs",
-          "line": 1302,
-          "code": "pub fn event_stream(&self) -> impl Stream<Item = std::io::Result<TerminalEvent>> + Unpin {"
-        },
-        {
-          "repo": "crossbeam-rs/crossbeam",
-          "file": "crossbeam-channel/src/flavors/array.rs",
-          "line": 96,
-          "code": "one_lap: Index,"
-        }
-      ]
-    },
-    {
-      "id": "rust-analysis",
-      "module": "rust",
-      "title": "Finish Rust analysis on Dioxus, Embassy and SWC",
-      "missing": [
-        "DioxusLabs/dioxus",
-        "embassy-rs/embassy",
-        "swc-project/swc"
-      ],
-      "examples": [
-        {
-          "repo": "DioxusLabs/dioxus",
-          "file": "packages/dx/src/main.rs",
-          "line": 54,
-          "code": "async fn main() -> ExitCode {"
-        },
-        {
-          "repo": "embassy-rs/embassy",
-          "file": "cyw43/src/fmt.rs",
-          "line": 205,
-          "code": "pub trait Debuggable: Debug + defmt::Format {}"
-        }
-      ]
-    },
-    {
-      "id": "rust-crate-taint",
-      "module": "rust",
-      "title": "Keep independent Rust links resolvable when another file in the crate fails",
-      "exact": "rust-taint",
-      "examples": [
-        {
-          "repo": "alacritty/alacritty",
-          "file": "alacritty/src/window_context.rs",
-          "line": 158,
-          "code": "let mut window_context = Self::new(display, config, options, proxy)?;"
-        },
-        {
-          "repo": "alacritty/alacritty",
-          "file": "alacritty/src/config/color.rs",
-          "line": 264,
-          "code": "green: Rgb::new(0x5f, 0x6f, 0x3a),"
+          "repo": "actix/actix-web",
+          "file": "actix-files/src/lib.rs",
+          "line": 1101,
+          "code": "test::init_service(App::new().service(Files::new(\"/\", \".\").show_files_listing())).await;"
         }
       ]
     },
@@ -289,47 +367,123 @@
       ]
     },
     {
-      "id": "rust-import",
+      "id": "rust-glob",
       "module": "rust",
-      "title": "Resolve Rust imports and module declarations through `crate`, `self` and `super`",
+      "title": "Resolve checkout names brought into scope by Rust glob imports",
       "examples": [
         {
-          "repo": "cberner/redb",
-          "file": "src/transactions.rs",
-          "line": 15,
-          "code": "PageListMut, PageNumber, PageNumberHashMap, PageResolver, PageTracker, SerializedSavepoint,"
+          "repo": "ratatui/ratatui",
+          "file": "ratatui-core/src/backend/test.rs",
+          "line": 1119,
+          "code": "let mut backend = TestBackend::with_lines(initial_screen);"
         },
         {
-          "repo": "tauri-apps/tauri",
-          "file": "crates/tauri/src/path/plugin.rs",
-          "line": 9,
-          "code": "use super::{BaseDirectory, Error, PathResolver, Result};"
+          "repo": "actix/actix-web",
+          "file": "actix-web/src/rmap.rs",
+          "line": 419,
+          "code": "ResourceMap::finish(&root);"
+        }
+      ]
+    },
+    {
+      "id": "rust-import",
+      "module": "rust",
+      "title": "Resolve Rust names through local modules, imports and re-exports",
+      "examples": [
+        {
+          "repo": "alacritty/alacritty",
+          "file": "alacritty_terminal/src/event.rs",
+          "line": 7,
+          "code": "use crate::vte::ansi::Rgb;"
+        },
+        {
+          "repo": "tree-sitter/tree-sitter",
+          "file": "crates/cli/src/parse.rs",
+          "line": 17,
+          "code": "InputEdit, Language, LogType, ParseOptions, ParseState, Parser, Point, Range, Tree, TreeCursor,"
+        }
+      ]
+    },
+    {
+      "id": "rust-imported-function",
+      "module": "rust",
+      "title": "Link calls to checked-in Rust functions brought into scope by use",
+      "examples": [
+        {
+          "repo": "crossbeam-rs/crossbeam",
+          "file": "crossbeam-channel/tests/array.rs",
+          "line": 127,
+          "code": "let (s, r) = bounded::<i32>(100);"
+        },
+        {
+          "repo": "crossbeam-rs/crossbeam",
+          "file": "crossbeam-channel/tests/ready.rs",
+          "line": 591,
+          "code": "scope(|scope| {"
         }
       ]
     },
     {
       "id": "rust-let",
       "module": "rust",
-      "title": "Infer the receiver type of a local Rust `let` when resolving a method call",
+      "title": "Infer types from Rust local bindings and constructor results for method calls",
       "examples": [
         {
-          "repo": "actix/actix-web",
-          "file": "actix-http/src/responses/response.rs",
-          "line": 435,
-          "code": "assert_eq!(res.status(), StatusCode::OK);"
+          "repo": "clap-rs/clap",
+          "file": "clap_builder/src/builder/debug_asserts.rs",
+          "line": 662,
+          "code": "p.get_index()"
         },
         {
-          "repo": "cberner/redb",
-          "file": "tests/basic_tests.rs",
-          "line": 2936,
-          "code": "write_txn.commit().unwrap();"
+          "repo": "actix/actix-web",
+          "file": "actix-web/tests/compression.rs",
+          "line": 108,
+          "code": "assert_eq!(res.headers().get(header::CONTENT_ENCODING).unwrap(), \"gzip\");"
         }
       ]
     },
     {
-      "id": "rust-self",
+      "id": "rust-macro",
       "module": "rust",
-      "title": "Resolve Rust method calls through `self` and fields of checked-in types",
+      "title": "Resolve checked-in macros and names generated by them",
+      "examples": [
+        {
+          "repo": "tauri-apps/tauri",
+          "file": "examples/state/main.rs",
+          "line": 42,
+          "code": ".invoke_handler(tauri::generate_handler![increment, decrement, reset, get])"
+        },
+        {
+          "repo": "RustCrypto/hashes",
+          "file": "sha1/src/compress/x86_sha.rs",
+          "line": 61,
+          "code": "h0 = rounds4!(h1, h0, w3, 0);"
+        }
+      ]
+    },
+    {
+      "id": "rust-parameter",
+      "module": "rust",
+      "title": "Bind Rust type and const parameters in signatures and constraints",
+      "examples": [
+        {
+          "repo": "actix/actix-web",
+          "file": "actix-web/src/test/test_utils.rs",
+          "line": 59,
+          "code": "R: IntoServiceFactory<S, Request>,"
+        },
+        {
+          "repo": "tree-sitter/tree-sitter",
+          "file": "crates/generate/src/quickjs.rs",
+          "line": 23,
+          "code": "fn or_js_error(self, ctx: &Ctx) -> JSResult<T> {"
+        }
+      ]
+    },
+    {
+      "id": "rust-self-trait",
+      "module": "rust",
+      "title": "Resolve Self and self method calls through checked-in trait implementations",
       "examples": [
         {
           "repo": "BurntSushi/ripgrep",
@@ -338,39 +492,94 @@
           "code": "self.record_matches(searcher, ctx.bytes(), 0..ctx.bytes().len())?;"
         },
         {
-          "repo": "fjall-rs/fjall",
-          "file": "src/tx/optimistic/write_tx.rs",
-          "line": 912,
-          "code": "let mut t2 = env.db.write_tx()?;"
+          "repo": "cberner/redb",
+          "file": "src/types.rs",
+          "line": 942,
+          "code": "Self::from_bytes(data1).cmp(&Self::from_bytes(data2))"
         }
       ]
     },
     {
-      "id": "rust-serde",
+      "id": "rust-std-path",
       "module": "rust",
-      "title": "Finish the recursive Rust scope and import analysis on Serde",
-      "missing": [
-        "serde-rs/serde"
-      ],
+      "title": "Recognize Rust prelude and dependency names through imports and macro arguments",
       "examples": [
         {
-          "repo": "serde-rs/serde",
-          "file": "serde_derive/src/de.rs",
-          "line": 25,
-          "code": "pub fn expand_derive_deserialize(input: &mut syn::DeriveInput) -> syn::Result<TokenStream> {"
+          "repo": "helix-editor/helix",
+          "file": "helix-stdx/src/faccess.rs",
+          "line": 407,
+          "code": "if unsafe { IsValidAcl(sd.dacl) } != 0 {"
         },
         {
-          "repo": "serde-rs/serde",
-          "file": "serde/src/private/de.rs",
-          "line": 38,
-          "code": "fn deserialize_any<V>(self, _visitor: V) -> Result<V::Value, E>"
+          "repo": "tree-sitter/tree-sitter",
+          "file": "crates/generate/src/build_tables.rs",
+          "line": 289,
+          "code": "&& let Some(index) = conflict_free_tokens.terminals().find(|&other| {"
+        }
+      ]
+    },
+    {
+      "id": "rust-std-receiver",
+      "module": "rust",
+      "title": "Identify when a Rust method receiver has a standard or dependency type",
+      "examples": [
+        {
+          "repo": "clap-rs/clap",
+          "file": "clap_complete/tests/testsuite/engine.rs",
+          "line": 549,
+          "code": "fs::write(testdir_path.join(\"b_file\"), \"\").unwrap();"
+        },
+        {
+          "repo": "tokio-rs/axum",
+          "file": "examples/parse-body-based-on-content-type/src/main.rs",
+          "line": 69,
+          "code": "if content_type.starts_with(\"application/x-www-form-urlencoded\") {"
+        }
+      ]
+    },
+    {
+      "id": "rust-taint",
+      "module": "rust",
+      "title": "Keep independent Rust links resolvable after a different file fails",
+      "examples": [
+        {
+          "repo": "alacritty/alacritty",
+          "file": "alacritty/src/input/mod.rs",
+          "line": 1426,
+          "code": "window_id: WindowId::dummy(),"
+        },
+        {
+          "repo": "alacritty/alacritty",
+          "file": "alacritty/src/renderer/text/gles2.rs",
+          "line": 375,
+          "code": "gl::ARRAY_BUFFER,"
+        }
+      ],
+      "exact": "rust-taint"
+    },
+    {
+      "id": "rust-trait",
+      "module": "rust",
+      "title": "Resolve associated names through checked-in Rust types, traits and impls",
+      "examples": [
+        {
+          "repo": "clap-rs/clap",
+          "file": "tests/derive/subcommands.rs",
+          "line": 83,
+          "code": "let result = Opt::try_parse_from([\"test\", \"badcmd\", \"-i\", \"-v\"]);"
+        },
+        {
+          "repo": "tree-sitter/tree-sitter",
+          "file": "crates/cli/src/tests/query_test.rs",
+          "line": 3869,
+          "code": "QueryProperty::new(\"cool\", None, None),"
         }
       ]
     },
     {
       "id": "rust-value",
       "module": "rust",
-      "title": "Link Rust references to locally declared value bindings",
+      "title": "Link Rust references and patterns to their local bindings",
       "examples": [
         {
           "repo": "cberner/redb",
@@ -387,43 +596,21 @@
       ]
     },
     {
-      "id": "rustls-resolve",
-      "module": "rust",
-      "title": "Finish the Rust resolution pass on rustls",
-      "missing": [
-        "rustls/rustls"
-      ],
-      "examples": [
-        {
-          "repo": "rustls/rustls",
-          "file": "bogo/src/main.rs",
-          "line": 56,
-          "code": "pub fn main() {"
-        },
-        {
-          "repo": "rustls/rustls",
-          "file": "bogo/src/opts.rs",
-          "line": 18,
-          "code": "pub(crate) struct Options {"
-        }
-      ]
-    },
-    {
-      "id": "ts-candidate",
+      "id": "ts-bundle",
       "module": "typescript",
-      "title": "Narrow TypeScript candidate sets using the concrete receiver or local declaration",
+      "title": "Follow lexical functions and objects within checked-in JavaScript bundles",
       "examples": [
         {
-          "repo": "colinhacks/zod",
-          "file": "packages/zod/src/v3/locales/en.ts",
+          "repo": "golang/tools",
+          "file": "cmd/present/static/jquery.js",
           "line": 2,
-          "code": "import { util, ZodParsedType } from \"../helpers/util.js\";"
+          "code": "return this.each(function(c){p(this).wrapAll(b?a.call(this,c):a)})"
         },
         {
-          "repo": "dexie/Dexie.js",
-          "file": "addons/dexie-cloud/src/sync/messagesFromServerQueue.ts",
-          "line": 3,
-          "code": "import { DexieCloudDB } from '../db/DexieCloudDB';"
+          "repo": "pocketbase/pocketbase",
+          "file": "ui/public/libs/tinymce/themes/silver/theme.min.js",
+          "line": 1,
+          "code": "n).fold(x(e),(t=>({len:t.finish,list:e.list.concat([t])}))))"
         }
       ]
     },
@@ -431,6 +618,25 @@
       "id": "ts-config",
       "module": "typescript",
       "title": "Recover local TypeScript links when a base configuration is missing",
+      "examples": [
+        {
+          "repo": "withastro/astro",
+          "file": "packages/astro/test/fixtures/content-intellisense/src/content.config.ts",
+          "line": 5,
+          "code": "const blogCC = defineCollection({"
+        },
+        {
+          "repo": "vitest-dev/vitest",
+          "file": "packages/ui/client/components/views/ViewReport.spec.ts",
+          "line": 4,
+          "code": "import { page, render } from '~/test'"
+        }
+      ]
+    },
+    {
+      "id": "ts-config-preset",
+      "module": "typescript",
+      "title": "Recover checked-in TypeScript links when a package tsconfig preset is missing",
       "examples": [
         {
           "repo": "changesets/changesets",
@@ -447,28 +653,66 @@
       ]
     },
     {
-      "id": "ts-jsx",
+      "id": "ts-inline",
       "module": "typescript",
-      "title": "Resolve JSX components through captured imports and local aliases",
+      "title": "Link immediately invoked function expressions to their checked-in bodies",
       "examples": [
         {
-          "repo": "trpc/trpc",
-          "file": "examples/next-prisma-starter/src/pages/post/[id].tsx",
-          "line": 114,
-          "code": "<Empty className=\"border bg-background\">"
+          "repo": "excalidraw/excalidraw",
+          "file": "packages/element/src/selection.ts",
+          "line": 123,
+          "code": "export const isSomeElementSelected = (function () {"
         },
         {
-          "repo": "trpc/trpc",
-          "file": "examples/.test/monotest-app/src/App.tsx",
-          "line": 21,
-          "code": "<TRPCReactProvider>"
+          "repo": "honojs/hono",
+          "file": "src/utils/color.ts",
+          "line": 44,
+          "code": "? await (async () => {"
         }
       ]
     },
     {
       "id": "ts-local-access",
       "module": "typescript",
-      "title": "Link TypeScript calls and references to local parameters, variables and fields",
+      "title": "Link lexical TypeScript and JavaScript declarations and their call sites",
+      "examples": [
+        {
+          "repo": "react-hook-form/react-hook-form",
+          "file": "examples/V6/typescript/SubmitHandler.tsx",
+          "line": 12,
+          "code": "const onSubmit: SubmitHandler<FormValues> = (data) =>"
+        },
+        {
+          "repo": "vitest-dev/vitest",
+          "file": "test/unit/test/jest-mock.test.ts",
+          "line": 499,
+          "code": "expect(spy.mock.settledResults[1]).toEqual(h(new Error('error')))"
+        }
+      ]
+    },
+    {
+      "id": "ts-local-chain",
+      "module": "typescript",
+      "title": "Follow checked-in TypeScript types and return values through property chains",
+      "examples": [
+        {
+          "repo": "pingdotgg/t3code",
+          "file": "apps/server/src/vcs/GitVcsDriverCore.test.ts",
+          "line": 283,
+          "code": "yield* driver.removeWorktree({ cwd, path: worktreePath });"
+        },
+        {
+          "repo": "mermaid-js/mermaid",
+          "file": "packages/mermaid/src/diagrams/flowchart/parser/flow-arrows.spec.js",
+          "line": 76,
+          "code": "const edges = flow.parser.yy.getEdges();"
+        }
+      ]
+    },
+    {
+      "id": "ts-nested-function",
+      "module": "typescript",
+      "title": "Anchor functions declared inside React components and other functions",
       "examples": [
         {
           "repo": "pingdotgg/t3code",
@@ -477,36 +721,74 @@
           "code": "yield* emitRemoved(sessionId);"
         },
         {
-          "repo": "honojs/hono",
-          "file": "src/types.ts",
-          "line": 2582,
-          "code": "? Prefix"
+          "repo": "cli/cli",
+          "file": "evals/src/review-loop.test.ts",
+          "line": 25,
+          "code": "io, repo: \"sandbox/run\", workDir: \"/unused\", baseSha: \"base\", initialHead: head, pr: pull() };"
         }
       ]
     },
     {
-      "id": "ts-local-chain",
+      "id": "ts-object-member",
       "module": "typescript",
-      "title": "Resolve calls through imports from checked-in TypeScript packages",
+      "title": "Anchor members of checked-in TypeScript object types",
       "examples": [
         {
-          "repo": "vitest-dev/vitest",
-          "file": "test/unit/test/mocking/automocking-class-inheritance.test.ts",
-          "line": 7,
-          "code": "describe('not mocking class when parent is mocked', () => {"
+          "repo": "pocketbase/pocketbase",
+          "file": "plugins/jsvm/internal/types/generated/types.d.ts",
+          "line": 12606,
+          "code": "date: types.DateTime"
         },
         {
-          "repo": "withastro/astro",
-          "file": "packages/integrations/cloudflare/src/utils/image-config.ts",
-          "line": 89,
-          "code": "service: passthroughImageService(),"
+          "repo": "oclif/core",
+          "file": "src/util/find-root.ts",
+          "line": 150,
+          "code": "const childLocator = pnp.getLocator(name, referencish)"
+        }
+      ]
+    },
+    {
+      "id": "ts-package",
+      "module": "typescript",
+      "title": "Trace Node and third-party import aliases and globals to outside packages",
+      "examples": [
+        {
+          "repo": "trpc/trpc",
+          "file": "packages/react-query/test/useUtils.test.tsx",
+          "line": 106,
+          "code": "test('client query sad path', async () => {"
+        },
+        {
+          "repo": "reduxjs/redux-toolkit",
+          "file": "packages/toolkit/src/query/tests/buildHooks.test.tsx",
+          "line": 3207,
+          "code": "test('useMutation hook callback returns various properties to handle the result', async () => {"
+        }
+      ]
+    },
+    {
+      "id": "ts-package-chain",
+      "module": "typescript",
+      "title": "Track outside return types through test, browser and other dependency APIs",
+      "examples": [
+        {
+          "repo": "react-hook-form/react-hook-form",
+          "file": "e2e/basicSchemaValidation.spec.ts",
+          "line": 37,
+          "code": "await type(page.locator('input[name=\"lastName\"]'), 'luo');"
+        },
+        {
+          "repo": "nestjs/nest",
+          "file": "integration/cookies/e2e/cookies.spec.ts",
+          "line": 304,
+          "code": "expect(setCookieHeaders(res)).toEqual(["
         }
       ]
     },
     {
       "id": "ts-props",
       "module": "typescript",
-      "title": "Follow TypeScript callbacks passed through props, options and destructured parameters",
+      "title": "Use known assignments for calls through props and option callbacks",
       "examples": [
         {
           "repo": "trpc/trpc",
@@ -525,26 +807,45 @@
     {
       "id": "ts-relative",
       "module": "typescript",
-      "title": "Resolve TypeScript relative and workspace imports to checked-in source",
+      "title": "Bind TypeScript imports and re-exports to checked-in modules",
+      "examples": [
+        {
+          "repo": "nestjs/nest",
+          "file": "packages/microservices/test/context/rpc-context-creator.spec.ts",
+          "line": 23,
+          "code": "import { RpcException } from '../../index';"
+        },
+        {
+          "repo": "colinhacks/zod",
+          "file": "packages/zod/src/v4/classic/tests/optional.test.ts",
+          "line": 4,
+          "code": "import * as z from \"zod/v4\";"
+        }
+      ]
+    },
+    {
+      "id": "ts-runtime",
+      "module": "typescript",
+      "title": "Recognize standard JavaScript and DOM targets from source types",
       "examples": [
         {
           "repo": "vitest-dev/vitest",
-          "file": "test/browser/fixtures/print-logs/vitest.config.ts",
-          "line": 1,
-          "code": "import { defineConfig } from 'vitest/config'"
+          "file": "packages/vitest/src/node/pools/browser.ts",
+          "line": 571,
+          "code": "this.openingSessions.delete(sessionId)"
         },
         {
-          "repo": "withastro/astro",
-          "file": "packages/astro/test/fixtures/container-custom-renderers/src/pages/button-directive.ts",
-          "line": 1,
-          "code": "import type { APIRoute, SSRLoadedRenderer } from 'astro';"
+          "repo": "trpc/trpc",
+          "file": "www/build/og-cards.ts",
+          "line": 142,
+          "code": "...cloudModules.map((file) => path.join(www, file)),"
         }
       ]
     },
     {
       "id": "ts-type-parameters",
       "module": "typescript",
-      "title": "Link TypeScript type parameters to their declarations",
+      "title": "Link TypeScript references to their generic parameter declarations",
       "examples": [
         {
           "repo": "honojs/hono",
@@ -557,6 +858,25 @@
           "file": "packages/astro/templates/content/types.d.ts",
           "line": 22,
           "code": "export type CollectionEntry<C extends CollectionKey> = Flatten<DataEntryMap[C]>;"
+        }
+      ]
+    },
+    {
+      "id": "ts-workspace",
+      "module": "typescript",
+      "title": "Resolve imports and uses of sibling pnpm and workspace packages",
+      "examples": [
+        {
+          "repo": "vitest-dev/vitest",
+          "file": "packages/browser-preview/src/locators.ts",
+          "line": 21,
+          "code": "} from '@vitest/browser/locators'"
+        },
+        {
+          "repo": "withastro/astro",
+          "file": "packages/astro/src/core/routing/match-request.ts",
+          "line": 1,
+          "code": "import { prependForwardSlash, stripRequestBase } from '@astrojs/internal-helpers/path';"
         }
       ]
     },
@@ -637,29 +957,6 @@
           "file": "examples/nuxt/server/tsconfig.json",
           "line": 2,
           "code": "\"extends\": \"../.nuxt/tsconfig.server.json\""
-        }
-      ]
-    },
-    {
-      "id": "typescript-rust-blocks",
-      "module": "typescript",
-      "title": "Complete TypeScript graphs when an earlier Rust analysis stalls in Dioxus or SWC",
-      "missing": [
-        "DioxusLabs/dioxus",
-        "swc-project/swc"
-      ],
-      "examples": [
-        {
-          "repo": "DioxusLabs/dioxus",
-          "file": "packages/web/src/ts/eval.ts",
-          "line": 11,
-          "code": "export class WebDioxusChannel extends DioxusChannel {"
-        },
-        {
-          "repo": "swc-project/swc",
-          "file": "packages/core/src/util.ts",
-          "line": 2,
-          "code": "export function wrapNativeSuper(Class) {"
         }
       ]
     }

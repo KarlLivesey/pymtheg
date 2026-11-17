@@ -102,11 +102,9 @@ link totals against that run's warm CLI result. Its aggregate includes every
 stored language, kind, outcome, `data.reason` and `data.uncertainty` combination,
 plus the file scope and the coverage classification. Ambiguous links remain
 in the denominator. Resolved structural links such as `contains` count too.
-The scoreboard reports both per-module rates across all checkouts and an
-unweighted pinned mean that scores failed attempts as zero. Its overall
-pinned mean uses the whole checkout. A failed attempt contributes no measured
-link weights. Estimated links from missing graphs are part of the separate
-planning calculation.
+The scoreboard has a completion checklist and separate per-module rates
+across finished checkouts. An unfinished attempt contributes no links to
+coverage. A newly finished pin enters the measured denominator.
 
 Outside requires evidence that the target is unavailable in the checkout.
 
@@ -129,7 +127,8 @@ Outside requires evidence that the target is unavailable in the checkout.
   module declarations are inside. Uncertain receiver types stay unclassified.
 - **TypeScript and JavaScript.** Use literal specifiers or simple, unshadowed
   import bindings. A workspace package or relative import under the checkout
-  stays inside. Relative imports that escape the checkout count as outside.
+  stays inside. The export checks tracked npm and pnpm workspace manifests
+  before assigning package origins. Relative imports that escape the checkout count as outside.
   Built-in Node specifiers and unvendored declared package dependencies can
   be outside. A configured alias that could bind locally prevents an external
   guess. An `external` link on a literal receiver or an unshadowed runtime or
@@ -148,13 +147,19 @@ appears in the failed-source counts. The 14 known invalid Go tools inputs count
 as broken fixtures. The three reviewed valid Go files that the grammar rejected
 stay in the source scope.
 
-The audit stratifies eligible unresolved and ambiguous links by language and
-reason family. It ranks sites by a SHA-256 hash of seed `0x7c8a59bd2e41`, the
-repository pin, source span, kind and target spelling. It takes 96 sites in
-each of four large strata and up to 32 in each remaining stratum. The review
-labels concrete shapes in those source sites. Unlabeled sites still contribute
-to the sample denominator. Rust links marked `failed-file-unseen-declarations`
-use a separate exact count, including links which also carry a receiver reason.
+The source audit stratifies unresolved and ambiguous links by language,
+reason family, source scope and strict disposition. It ranks sites by a
+SHA-256 hash of seed `0x7c8a59bd2e41`, the repository pin, source span, kind
+and target spelling. Pass `--sampling-base` with the measured breakdown to
+allocate about 420 sites per module in proportion to bucket volumes. The
+review records a support shape, an outside target, a legitimately ambiguous
+runtime target or a cannot-tell reason for every selected site. Only the
+estimate uses the review's outside labels. Rust links marked
+`failed-file-unseen-declarations` keep a separate exact count, including when
+they also carry a receiver reason. The same baseline export checks a few
+syntactically identifiable source shapes with no stored link, using the
+installed release's TypeScript and Go readers. They remain outside the
+stored-link measure.
 
 ### Recompute after a candidate run
 
@@ -181,4 +186,8 @@ node scripts/sweep/coverage.mjs --results /tmp/pymtheg-candidate-coverage.json \
 After a full run or subset overlay, `--scoreboard FILE` also writes the rates
 and per-repository table. For an archived baseline, pass only its breakdown
 as `--results`. The plan retains its prose and replaces the marked table and
-running totals.
+running totals. The candidate estimate reweights the labelled reference
+sample. Buckets with no remaining reference observations stay unclassified
+and are reported in the candidate scoreboard. A finished pin that lacked a
+baseline graph has measured strict coverage immediately. Refresh the sample
+to review the shapes in a materially changed corpus.
