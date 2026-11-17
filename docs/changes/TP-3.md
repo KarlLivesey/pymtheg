@@ -108,4 +108,5 @@ Run on the dev server with `pymtheg-dev` (Node 24.21.0):
 - `npx tsc --noEmit -p .`: passed.
 - All 176 unit test files in this slice: 743 tests, 743 passed.
 - Backend files (`*.integration.mjs`) were not run: none was changed.
-- Full `npm test`: results are in the pull request description.
+- Full `npm test` (all slices): 2919 tests, 2919 passed.
+- Prettier check on the changed files: passed.
