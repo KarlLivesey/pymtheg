@@ -969,3 +969,75 @@ test("build constraints: every legacy +build line holds; a caller's constraint e
     "c/v122.go:field:Item.Name",
   );
 });
+
+test("legacy +build lines: all hold, only before a blank line; Go's full GOARCH list", async () => {
+  // Second review of C-4, round 2: t1 has two legacy lines (linux, cgo).
+  const { links } = await project({
+    "go.mod": MOD,
+    "p/use.go": lines(
+      "// +build linux",
+      "",
+      "package p",
+      "func use(x T) int { x.M(); return x.F }",
+    ),
+    "p/t1.go": lines(
+      "// +build linux",
+      "// +build cgo",
+      "",
+      "package p",
+      "type T struct{ Inner; F int }",
+      "func (*T) M() {}",
+    ),
+    "p/t2.go": lines(
+      "// +build linux,!cgo",
+      "",
+      "package p",
+      "type T struct{ Inner; F int }",
+    ),
+    "p/t3.go": lines(
+      "// +build !linux",
+      "",
+      "package p",
+      "type T struct{ Inner; F int }",
+    ),
+    "p/inner.go": lines(
+      "package p",
+      "type Inner struct{}",
+      "func (Inner) M() {}",
+    ),
+    // A +build line directly above `package` is not a constraint in Go:
+    // q/t_any.go builds everywhere, q/t_only.go only under `never`.
+    "q/t_any.go": lines(
+      "// +build never",
+      "package q",
+      "type T struct{ F int }",
+    ),
+    "q/t_only.go": lines(
+      "//go:build never",
+      "",
+      "package q",
+      "type T struct{ F int }",
+    ),
+    "q/use.go": lines("package q", "func use(x T) int { return x.F }"),
+    // `_ppc` is a GOARCH suffix.
+    "r/t_ppc.go": lines("package r", "type T struct{ F int }"),
+    "r/t_amd64.go": lines("package r", "type T struct{ F int }"),
+    "r/use_amd64.go": lines("package r", "func use(x T) int { return x.F }"),
+  });
+  const xf = at(links, "p/use.go", "x.F");
+  assert.equal(xf.target, null);
+  assert.deepEqual(xf.candidates, ["p/t1.go:field:T.F", "p/t2.go:field:T.F"]);
+  // linux+cgo: (*T).M at depth 0; linux+!cgo: Inner.M promoted.
+  const xm = at(links, "p/use.go", "x.M");
+  assert.equal(xm.target, null);
+  assert.deepEqual(xm.candidates, [
+    "p/inner.go:method:(Inner).M",
+    "p/t1.go:method:(*T).M",
+  ]);
+  // t_any.go is in every build (a `never` build would hold both: invalid).
+  assert.equal(at(links, "q/use.go", "x.F").target, "q/t_any.go:field:T.F");
+  assert.equal(
+    at(links, "r/use_amd64.go", "x.F").target,
+    "r/t_amd64.go:field:T.F",
+  );
+});

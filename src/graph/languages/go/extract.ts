@@ -266,9 +266,10 @@ export class GoExtractor {
     let beforePackage = true;
     for (const child of root.namedChildren) {
       if (child.type === "comment") {
-        if (beforePackage) this.buildLine(child.text);
+        if (beforePackage) this.buildLine(child.text, child.startPosition.row);
       } else if (child.type === "package_clause") {
         beforePackage = false;
+        this.legacyBuild(child.startPosition.row);
         const name = named(child).find(
           (item) => item.type === "package_identifier",
         );
@@ -301,20 +302,33 @@ export class GoExtractor {
 
   /** A `//go:build` line was seen: it alone is the constraint, as in Go. */
   private modernBuild = false;
-  private buildLine(comment: string): void {
+  /** Legacy `+build` lines before the package clause, with their rows. */
+  private legacyLines: { text: string; row: number }[] = [];
+  private buildLine(comment: string, row: number): void {
     const modern = /^\/\/go:build\s+(.+)$/.exec(comment.trim());
     if (modern) {
       this.fact.build = modern[1]!.trim();
       this.modernBuild = true;
     }
-    // Without one, every legacy `+build` line applies (Go ANDs them): kept
-    // one per line, each starting `+build `.
     const legacy = /^\/\/\s*\+build\s+(.+)$/.exec(comment.trim());
-    if (legacy && !this.modernBuild) {
-      const line = `+build ${legacy[1]!.trim()}`;
-      this.fact.build =
-        this.fact.build === undefined ? line : `${this.fact.build}\n${line}`;
-    }
+    if (legacy) this.legacyLines.push({ text: legacy[1]!.trim(), row });
+  }
+  /**
+   * Without a `//go:build` line, every legacy `+build` line followed by a
+   * blank line before the package clause applies (Go ANDs them; one directly
+   * above `package`, with no blank line, is not a constraint): kept one per
+   * line, each starting `+build `.
+   */
+  private legacyBuild(packageRow: number): void {
+    if (this.modernBuild || !this.legacyLines.length) return;
+    const rows = this.text.split("\n");
+    let blank = -1;
+    for (let row = 0; row < packageRow; row++)
+      if (!rows[row]!.trim()) blank = row;
+    const lines = this.legacyLines
+      .filter((line) => line.row < blank)
+      .map((line) => `+build ${line.text}`);
+    if (lines.length) this.fact.build = lines.join("\n");
   }
 
   // ---- symbols and links -------------------------------------------------
