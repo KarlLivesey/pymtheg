@@ -20,11 +20,6 @@ import type {
 export class SqliteGraphStore implements GraphStorage {
   private readonly db: DatabaseSync;
   readonly projectId: string;
-  private readonly decodedFiles = new Map<
-    string,
-    { body: string; file: GraphFile }
-  >();
-  private readonly fileBodies = new Map<string, string>();
   private readonly decodedContexts = new Map<string, ContextFile>();
   /** " INDEXED BY graph_file_status" when that covering index exists, else "".
    * Link reads join graph_files only for status, which is stored after the whole
@@ -41,16 +36,13 @@ export class SqliteGraphStore implements GraphStorage {
       ? " INDEXED BY graph_file_status"
       : "";
   }
+  /**
+   * Every read decodes a fresh, independent record. Decoded files are never
+   * kept: a whole-graph cache held every source text and parse result for
+   * the life of the store (C-2).
+   */
   private decodeFile(body: string): GraphFile {
-    const parsed = this.decodedFiles.get(body);
-    if (parsed) return structuredClone(parsed.file);
-    const file = JSON.parse(body) as GraphFile;
-    // Only the current captured record for a path is retained.
-    const previous = this.fileBodies.get(file.path);
-    if (previous !== undefined) this.decodedFiles.delete(previous);
-    this.fileBodies.set(file.path, body);
-    this.decodedFiles.set(body, { body, file });
-    return structuredClone(file);
+    return JSON.parse(body) as GraphFile;
   }
   constructor(
     path: string,
@@ -184,10 +176,30 @@ export class SqliteGraphStore implements GraphStorage {
     }
   }
   files(): GraphFile[] {
-    return this.db
+    // One stored body at a time: never every body string and its decoding at once.
+    const files: GraphFile[] = [];
+    for (const row of this.db
       .prepare("SELECT body FROM graph_files ORDER BY path")
+      .iterate())
+      files.push(this.decodeFile(row.body as string));
+    return files.sort((a, b) => compare(a.path, b.path));
+  }
+  /** Path, module and status of every stored file, without decoding records. */
+  fileSummaries(): {
+    path: string;
+    module: string;
+    status: GraphFile["result"]["status"];
+  }[] {
+    return this.db
+      .prepare(
+        "SELECT path,json_extract(body,'$.module') AS module,status FROM graph_files ORDER BY path",
+      )
       .all()
-      .map((row) => this.decodeFile(row.body as string))
+      .map((row) => ({
+        path: row.path as string,
+        module: row.module as string,
+        status: row.status as GraphFile["result"]["status"],
+      }))
       .sort((a, b) => compare(a.path, b.path));
   }
   getFile(path: string): GraphFile | undefined {
@@ -349,9 +361,6 @@ export class SqliteGraphStore implements GraphStorage {
   }
   removeFile(path: string): void {
     this.db.prepare("DELETE FROM graph_files WHERE path=?").run(path);
-    const body = this.fileBodies.get(path);
-    if (body !== undefined) this.decodedFiles.delete(body);
-    this.fileBodies.delete(path);
   }
   findSymbols(query: SymbolQuery = {}): GraphSymbol[] {
     const conditions: string[] = [];
@@ -407,6 +416,10 @@ export class SqliteGraphStore implements GraphStorage {
   }
   links(): GraphLink[] {
     return this.selectLinks();
+  }
+  /** One module's parsed links, as links() reports them. */
+  moduleLinks(module: string): GraphLink[] {
+    return this.selectLinks("l.module=? AND l.origin='parse'", [module]);
   }
   outgoing(id: string, kind?: string): GraphLink[] {
     return this.selectLinks(
@@ -472,7 +485,7 @@ export class SqliteGraphStore implements GraphStorage {
       this.projectId,
       module,
       result,
-      this.files(),
+      (path) => this.getFile(path),
       this.findSymbols(),
       current,
     );

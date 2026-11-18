@@ -190,6 +190,22 @@ export interface GraphStorage {
   readonly projectId: string;
   files(): StorageResult<GraphFile[]>;
   getFile(path: string): StorageResult<GraphFile | undefined>;
+  /**
+   * Optional light listing (path, module, status) that decodes no records.
+   * The indexer otherwise derives it from files().
+   */
+  fileSummaries?(): StorageResult<
+    { path: string; module: string; status: ParseStatus }[]
+  >;
+  /** Optional: one module's parsed links, as links() reports them. */
+  moduleLinks?(module: string): StorageResult<GraphLink[]>;
+  /** Optional row counts; the indexer otherwise counts decoded reads. */
+  counts?(): StorageResult<{
+    symbols: number;
+    links: number;
+    unresolved: number;
+    ambiguous: number;
+  }>;
   contexts(): StorageResult<ContextFile[]>;
   replaceContexts(files: readonly ContextFile[]): StorageResult<void>;
   /** Optional capability for backends predating failed-parse caching. */

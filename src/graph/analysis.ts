@@ -63,7 +63,8 @@ export function resolutionFacts(
   projectId: string,
   module: string,
   result: ResolutionResult,
-  files: readonly GraphFile[],
+  /** A stored file by path. Read only for files that receive added links. */
+  fileOf: (path: string) => GraphFile | undefined,
   symbols: readonly GraphSymbol[],
   existing: readonly GraphLink[],
 ): GraphLink[] {
@@ -72,16 +73,35 @@ export function resolutionFacts(
   );
   const linkIds = new Set(links.map((link) => link.id));
   const decider = new LinkDecider(symbols);
-  const filesByPath = new Map(
-    files
-      .filter((file) => file.module === module)
-      .map((file) => [file.path, file]),
-  );
   const symbolsById = new Map(symbols.map((symbol) => [symbol.id, symbol]));
-  const validated = new Map<
-    string,
-    Map<string, GraphFile["result"]["symbols"][number]>
-  >();
+  /** Per file with added links: what validation needs, not the whole record. */
+  interface Checked {
+    path: string;
+    text: string;
+    status: GraphFile["result"]["status"];
+    symbols: Map<string, GraphFile["result"]["symbols"][number]>;
+  }
+  const checked = new Map<string, Checked | undefined>();
+  const fileFor = (path: string): Checked | undefined => {
+    if (checked.has(path)) return checked.get(path);
+    const file = fileOf(path);
+    let entry: Checked | undefined;
+    if (file?.module === module) {
+      // Stored files were validated when written; this re-check is cheap insurance.
+      if (file.result.status !== "failed")
+        validateResult(file.text, { ...file.result, links: [] });
+      entry = {
+        path: file.path,
+        text: file.text,
+        status: file.result.status,
+        symbols: new Map(
+          file.result.symbols.map((symbol) => [symbol.key, symbol]),
+        ),
+      };
+    }
+    checked.set(path, entry);
+    return entry;
+  };
   const decisions = new Map<string, LinkResolution>();
   for (const decision of result.resolutions) {
     if (decisions.has(decision.linkId) || !linkIds.has(decision.linkId))
@@ -93,13 +113,13 @@ export function resolutionFacts(
   );
   const keys = new Set<string>();
   for (const added of result.links) {
-    const file = filesByPath.get(added.file);
+    const file = fileFor(added.file);
     const source =
       added.sourceId === null ? undefined : symbolsById.get(added.sourceId);
     const identity = JSON.stringify([added.file, added.key]);
     if (
       !file ||
-      file.result.status === "failed" ||
+      file.status === "failed" ||
       !added.key ||
       keys.has(identity) ||
       (added.sourceId !== null && (!source || source.file !== file.path))
@@ -113,15 +133,7 @@ export function resolutionFacts(
       range: added.range,
       ...(added.data === undefined ? {} : { data: added.data }),
     };
-    let localSymbols = validated.get(file.path);
-    if (!localSymbols) {
-      validateResult(file.text, { ...file.result, links: [] });
-      localSymbols = new Map(
-        file.result.symbols.map((symbol) => [symbol.key, symbol]),
-      );
-      validated.set(file.path, localSymbols);
-    }
-    const localSource = source ? localSymbols.get(source.key) : undefined;
+    const localSource = source ? file.symbols.get(source.key) : undefined;
     validateResult(file.text, {
       status: "clean",
       diagnostics: [],
@@ -137,7 +149,7 @@ export function resolutionFacts(
       sourceId: added.sourceId,
       targetId: null,
       targetStatus: null,
-      sourceStatus: file.result.status,
+      sourceStatus: file.status,
       candidates: [],
       resolution: "unresolved",
     };
