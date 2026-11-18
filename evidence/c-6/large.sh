@@ -10,8 +10,8 @@ o="$PYM_SCRATCH/out/large.jsonl"; mkdir -p "$(dirname "$o")"
 for corpus in embassy-rs/embassy swc-project/swc; do
   for build in c6 base; do
     tree=$c6; [ $build = base ] && tree=$base
-    w="$PYM_SCRATCH/work/large"
-    chmod -R u+w "$w" 2>/dev/null; rm -rf "$w"
+    # A fresh work copy per run; the scratch folder is removed by --clean.
+    w="$PYM_SCRATCH/work/large-$build-$(date +%s%N)"; mkdir -p "$(dirname "$w")"
     cp -a --reflink=auto "$PYM_SCRATCH/src/$corpus" "$w"; chmod -R u+w "$w"; rm -f "$w/.done"
     start=$(date +%s)
     timeout -k 10 3600 /usr/bin/time -f '%M' -o "$PYM_SCRATCH/large.time" \

@@ -13,9 +13,8 @@ case "$corpus" in
   *) src="$S/src/$corpus" ;;
 esac
 for variant in "$@"; do
-  w="$S/work/${corpus//\//_}"
-  chmod -R u+w "$w" 2>/dev/null || true
-  rm -rf "$w"; mkdir -p "$(dirname "$w")"
+  # A fresh work copy per run; the scratch folder is removed by --clean.
+  w="$S/work/${corpus//\//_}-$(date +%s%N)"; mkdir -p "$(dirname "$w")"
   cp -a --reflink=auto "$src" "$w"; chmod -R u+w "$w"; rm -f "$w/.done"
   node "$tree/evidence/c-6/measure.mjs" "$dist" "$w" "$corpus" "$variant" >> "$out"
   tail -1 "$out" | cut -c1-400
