@@ -83,3 +83,29 @@ The merged sweep brings the count to 58 of 60. Weighted Rust Level 2 moves
 from 31.4718% to 31.8986% as Dioxus, Rustls and Serde enter the score.
 Embassy and SWC remain open in the generated plan.
 [Coverage plan](../../docs/coverage-plan.md)
+
+## Second review follow-up
+
+The dev-server build, format check, 17 focused tests and all 2,977 tests in
+one full `npm test` run passed after merging main through C-4. The coverage
+test renders a crash and a wall limit with the same
+final Rust progress line as distinct outcomes. The four CLI cancellation
+cases start with a completed index, edit a Rust call, and interrupt either
+analysis or resolution with SIGINT or SIGTERM. Before any retry, `graph
+status` and the no-sync file query report an incomplete index, and the
+query exits 2. The next syncing file query resolves the edited call and
+returns the same graph facts and counts as a clean index.
+[Coverage test](../../scripts/sweep/coverage.test.mjs) · [Rust CLI tests](../../test/graph-rust-finishing.test.mjs)
+
+The plan was regenerated against `e5f86db` by overlaying C-4's retained
+40-pin export on the SW-3 breakdown, then applying the C-1 coverage input.
+The input contains three fresh graphs and the previously measured Embassy
+and SWC wall limits. The new plan has 58 of 60 completed pins, up from 55
+on main. Weighted Rust Level 2 is 31.4718% → 31.8986%.
+[C-4 baseline input](../c-4/coverage-plan-input.json.gz) · [C-1 coverage input](coverage-plan-input.json.gz)
+
+| Repository | Cold status | Cold wall time | Peak RSS | Checkout Level 2 | Stored links |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Dioxus | Finished with source diagnostics | 1,341.14 s | 2,180.8 MiB | 37.3099% | 149,963 |
+| Rustls | Finished with source diagnostics | 521.10 s | 1,295.4 MiB | 26.9079% | 69,251 |
+| Serde | Finished, clean | 264.78 s | 864.0 MiB | 36.4664% | 29,641 |

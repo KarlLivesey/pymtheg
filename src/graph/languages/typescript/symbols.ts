@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 import ts from "typescript";
+import { createHash } from "node:crypto";
 import type { SourceRange } from "../../types.js";
 
 /**
@@ -126,8 +127,29 @@ function eligibleVariable(declaration: ts.VariableDeclaration): boolean {
     !requireAlias(declaration)
   );
 }
-/** The anchored declaration that holds an expression (variable, default export, CommonJS export). */
-function holderOf(expression: ts.Node): ts.Node | undefined {
+function localFunctionInitializer(node: ts.VariableDeclaration): boolean {
+  return (
+    ts.isVariableDeclarationList(node.parent) &&
+    !!(node.parent.flags & (ts.NodeFlags.Let | ts.NodeFlags.Const)) &&
+    isFunctionLike(node.initializer)
+  );
+}
+
+export const isScopedDeclaration = (node: ts.Node) =>
+  isLocalCallable(node) ||
+  (ts.isEnumDeclaration(node) && !isStatementContainer(node.parent));
+
+/** These declarations were previously absent from the graph. */
+export function isLocalCallable(node: ts.Node): boolean {
+  return (
+    ((ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node)) &&
+      !isStatementContainer(node.parent)) ||
+    (ts.isVariableDeclaration(node) &&
+      !eligibleVariable(node) &&
+      localFunctionInitializer(node))
+  );
+}
+function outerExpression(expression: ts.Node): ts.Node {
   let current = expression;
   while (
     ts.isParenthesizedExpression(current.parent) ||
@@ -137,6 +159,12 @@ function holderOf(expression: ts.Node): ts.Node | undefined {
     ts.isTypeAssertionExpression(current.parent)
   )
     current = current.parent;
+  return current;
+}
+
+/** The anchored declaration that holds an expression (variable, default export, CommonJS export). */
+function holderOf(expression: ts.Node): ts.Node | undefined {
+  const current = outerExpression(expression);
   const parent = current.parent;
   if (
     (ts.isVariableDeclaration(parent) && parent.initializer === current) ||
@@ -213,14 +241,14 @@ export function anchorOf(node: ts.Node): ts.Node | undefined {
     // Constructor parameter properties (`constructor(public cb: T)`) are class properties.
     const owner = node.parent.parent;
     if (
-      !ts.isParameterPropertyDeclaration(node, node.parent) ||
       !ts.isIdentifier(node.name) ||
-      !owner
+      !owner ||
+      !ts.isParameterPropertyDeclaration(node, node.parent)
     )
       return undefined;
     return (
       ts.isClassDeclaration(owner)
-        ? anchorOf(owner) === owner
+        ? isStatementContainer(owner.parent) && anchorOf(owner) === owner
         : ts.isClassExpression(owner) && !!holderOf(owner)
     )
       ? node
@@ -235,20 +263,20 @@ export function anchorOf(node: ts.Node): ts.Node | undefined {
   )
     return anchorOf(parent);
   if (ts.isFunctionDeclaration(node))
-    return isStatementContainer(parent) ? overloadGroup(node).head : undefined;
-  if (
-    ts.isClassDeclaration(node) ||
-    ts.isInterfaceDeclaration(node) ||
-    ts.isTypeAliasDeclaration(node) ||
-    ts.isEnumDeclaration(node)
-  )
+    return isStatementContainer(parent) || node.name
+      ? overloadGroup(node).head
+      : undefined;
+  if (ts.isClassDeclaration(node) || ts.isEnumDeclaration(node))
+    return isStatementContainer(parent) || node.name ? node : undefined;
+  if (ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node))
     return isStatementContainer(parent) ? node : undefined;
   if (ts.isModuleDeclaration(node))
     return isStatementContainer(parent) || ts.isModuleDeclaration(parent)
       ? node
       : undefined;
   if (ts.isVariableDeclaration(node))
-    return ts.isIdentifier(node.name) && eligibleVariable(node)
+    return ts.isIdentifier(node.name) &&
+      (eligibleVariable(node) || localFunctionInitializer(node))
       ? node
       : undefined;
   if (ts.isBindingElement(node)) {
@@ -272,7 +300,9 @@ export function anchorOf(node: ts.Node): ts.Node | undefined {
   )
     return holderOf(node);
   if (ts.isEnumMember(node))
-    return anchorOf(parent) === parent ? node : undefined;
+    return isStatementContainer(parent.parent) && anchorOf(parent) === parent
+      ? node
+      : undefined;
   if (
     ts.isMethodSignature(node) ||
     ts.isPropertySignature(node) ||
@@ -305,7 +335,7 @@ export function anchorOf(node: ts.Node): ts.Node | undefined {
     if (!ts.isClassLike(parent) || ts.isPropertyAssignment(node))
       return undefined;
     const owner = ts.isClassDeclaration(parent)
-      ? anchorOf(parent) === parent
+      ? isStatementContainer(parent.parent) && anchorOf(parent) === parent
       : !!holderOf(parent);
     if (!owner) return undefined;
     return ts.isMethodDeclaration(node) || ts.isConstructorDeclaration(node)
@@ -394,24 +424,117 @@ export function containerOf(anchor: ts.Node): ts.Node | undefined {
     return ts.isClassExpression(owner) ? holderOf(owner) : owner;
   }
   let statement: ts.Node = anchor;
-  if (ts.isBindingElement(anchor))
-    statement = rootDeclaration(anchor)!.parent.parent;
-  else if (ts.isVariableDeclaration(anchor)) statement = anchor.parent.parent;
+  const variable = ts.isBindingElement(anchor)
+    ? rootDeclaration(anchor)
+    : ts.isVariableDeclaration(anchor)
+      ? anchor
+      : undefined;
+  if (variable && ts.isVariableDeclarationList(variable.parent))
+    statement = variable.parent.parent;
   else if (ts.isBinaryExpression(anchor)) statement = anchor.parent;
   const parent = statement.parent;
   if (ts.isSourceFile(parent)) return parent;
   if (ts.isModuleBlock(parent)) return parent.parent;
   if (ts.isModuleDeclaration(parent)) return parent;
-  if (ts.isClassExpression(parent) || ts.isObjectLiteralExpression(parent))
-    return holderOf(parent);
-  return parent;
+  for (
+    let current: ts.Node | undefined = parent;
+    current;
+    current = current.parent
+  ) {
+    const container = anchorOf(current);
+    if (container) return container;
+  }
+  return anchor.getSourceFile();
 }
+
+/** Position-independent syntax outside an anonymous function's body. */
+function callbackSite(node: ts.FunctionLikeDeclaration): unknown[] {
+  const argument = outerExpression(node);
+  const parent = argument.parent;
+  if (ts.isCallExpression(parent) || ts.isNewExpression(parent)) {
+    const position = parent.arguments?.findIndex((item) => item === argument);
+    if (position !== undefined && position >= 0)
+      return [
+        parent.expression.getText(),
+        position,
+        parent.arguments!.map((item) =>
+          isFunctionLike(item) ? null : item.getText(),
+        ),
+      ];
+  }
+  if (ts.isPropertyAssignment(parent)) return [parent.name.getText()];
+  return [ts.SyntaxKind[parent.kind]];
+}
+
+const scopeKey = (parts: unknown[]) =>
+  createHash("sha256").update(JSON.stringify(parts)).digest("hex").slice(0, 16);
+
+function blockSite(block: ts.Block): unknown[] {
+  const parent = block.parent;
+  const kind = ts.SyntaxKind[parent.kind];
+  if (ts.isIfStatement(parent))
+    return [
+      kind,
+      parent.expression.getText(),
+      parent.thenStatement === block ? "then" : "else",
+    ];
+  if (ts.isForStatement(parent))
+    return [
+      kind,
+      parent.initializer?.getText(),
+      parent.condition?.getText(),
+      parent.incrementor?.getText(),
+    ];
+  if (ts.isForOfStatement(parent) || ts.isForInStatement(parent))
+    return [kind, parent.initializer.getText(), parent.expression.getText()];
+  if (
+    ts.isWhileStatement(parent) ||
+    ts.isDoStatement(parent) ||
+    ts.isWithStatement(parent)
+  )
+    return [kind, parent.expression.getText()];
+  if (ts.isCatchClause(parent))
+    return [kind, parent.variableDeclaration?.getText()];
+  if (ts.isTryStatement(parent))
+    return [kind, parent.tryBlock === block ? "try" : "finally"];
+  if (ts.isLabeledStatement(parent)) return [kind, parent.label.text];
+  return [kind];
+}
+
+function scopeOf(anchor: ts.Node, owner: ts.Node | undefined): string {
+  const parts: string[] = [];
+  for (
+    let node: ts.Node | undefined = anchor.parent;
+    node && node !== owner;
+    node = node.parent
+  ) {
+    if (ts.isFunctionLike(node) && anchorOf(node) === owner) break;
+    if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) {
+      parts.push(
+        `[callback:${scopeKey([node.name?.text, node.parameters.map((p) => p.getText()), ...callbackSite(node)])}]`,
+      );
+    } else if (ts.isBlock(node) && !ts.isFunctionLike(node.parent)) {
+      // Keep the branch or loop header in the identity. Bare blocks can
+      // share a key, so requirement links verify multiplicity separately.
+      parts.push(`[block:${scopeKey(blockSite(node))}]`);
+    } else if (ts.isCaseClause(node) || ts.isDefaultClause(node)) {
+      parts.push(
+        `[case:${scopeKey([ts.isCaseClause(node) ? node.expression.getText() : null])}]`,
+      );
+    }
+  }
+  return parts.length ? parts.reverse().join(".") + "." : "";
+}
+
 export function identityOf(anchor: ts.Node): string {
   if (ts.isSourceFile(anchor)) return nameOf(anchor);
   const container = containerOf(anchor);
   const prefix =
     !container || ts.isSourceFile(container) ? "" : identityOf(container) + ".";
-  return prefix + (isStatic(anchor) ? "static " : "") + nameOf(anchor);
+  const scope = isScopedDeclaration(anchor)
+    ? scopeOf(anchor, container) || "[local]."
+    : "";
+  return prefix + scope + (isStatic(anchor) ? "static " : "") + nameOf(anchor);
 }
 export function rangeOf(anchor: ts.Node): SourceRange {
   const file = anchor.getSourceFile();
@@ -419,6 +542,7 @@ export function rangeOf(anchor: ts.Node): SourceRange {
   if (
     ts.isVariableDeclaration(anchor) &&
     ts.isVariableDeclarationList(anchor.parent) &&
+    ts.isVariableStatement(anchor.parent.parent) &&
     anchor.parent.declarations.length === 1
   ) {
     const statement = anchor.parent.parent;

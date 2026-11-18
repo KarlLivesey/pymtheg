@@ -19,6 +19,12 @@ import {
 } from "./gomod.js";
 import type { GoProjectLayout } from "./gomod.js";
 import {
+  fileConstraint,
+  implies,
+  satisfiable,
+  type Formula,
+} from "./constraints.js";
+import {
   BUILTIN_FUNCTIONS,
   PREDECLARED_TYPES,
   PREDECLARED_VALUES,
@@ -37,6 +43,8 @@ const MAX_DEPTH = 12;
 /** Embedding depth and per-depth path limits for selector search; beyond them: not known. */
 const MAX_EMBED_DEPTH = 6;
 const MAX_EMBED_PATHS = 64;
+/** Configurations (choices of build variant) one selection may search; beyond: not known. */
+const MAX_VARIANT_RUNS = 32;
 
 interface Pkg {
   key: string;
@@ -126,6 +134,14 @@ interface View {
   declared?: (name: string) => GraphSymbol[];
   /** Only because of a type outside the project (cannot hold project-unexported names). */
   externalOnly?: true;
+  /**
+   * A type declared in several build variants: a method of this name is
+   * declared in a file that may or may not be built with this variant.
+   */
+  uncertain?: (
+    name: string,
+    from?: string,
+  ) => { method: GraphSymbol; built: false | undefined }[];
 }
 interface InterfaceMethod {
   /** Name, plus the declaring package for an unexported name. */
@@ -419,17 +435,33 @@ class GoResolver {
   /** Interfaces whose method set is fully known, so their implementer list is complete. */
   private complete = new Set<string>();
   private memo = new Map<string, TypeValue>();
+  /**
+   * How many answers the depth limit or a cycle guard has cut short. A cached
+   * answer (`memo`, `views`, `hiddenMemo`, `externalMemo`) is kept only when
+   * none was cut short while computing it, so the order in which deep and
+   * shallow routes first reach a type cannot change any answer.
+   */
+  private cutoffs = 0;
+  private cut<T>(value: T): T {
+    this.cutoffs++;
+    return value;
+  }
   private selections = new Map<string, Selection>();
 
+  private readonly context: ResolutionContext;
   constructor(
     private readonly moduleId: string,
-    private readonly context: ResolutionContext,
+    context: ResolutionContext,
     /**
      * Only to name an open set's reasons: resolve as if no file were lossy
      * (failed files' directories are not treated as holding unseen ones).
      */
     private readonly ignoreLossy = false,
   ) {
+    // One fixed order, whatever order the store supplies: the caches and the
+    // depth limit make which route reaches a type first matter, so the
+    // outcome must not depend on how the files were read.
+    this.context = ordered(context);
     this.layout = readLayout(context.contextFiles);
   }
 
@@ -997,7 +1029,7 @@ class GoResolver {
   }
 
   private typeFromRef(ref: TypeRef, from: string, depth: number): TypeValue {
-    if (depth > MAX_DEPTH) return UNKNOWN;
+    if (depth > MAX_DEPTH) return this.cut(UNKNOWN);
     if (ref.l !== undefined) {
       // A function-local type: its symbol in the same file (scope resolved at parse).
       const local = this.localTypes.get(`${from}\u0000${ref.l}`);
@@ -1017,8 +1049,10 @@ class GoResolver {
     const key = `${from}\u0000${ref.q ?? ""}\u0000${ref.n}`;
     const cached = this.memo.get(key);
     if (cached) return cached;
+    const cutoffs = this.cutoffs;
     let value: TypeValue = UNKNOWN;
-    if (depth < MAX_DEPTH) {
+    if (depth >= MAX_DEPTH) this.cutoffs++;
+    else {
       if (ref.q !== undefined) {
         const base = this.lookupName(ref.q, from);
         // A qualifier that is no project import can only be an external import
@@ -1047,7 +1081,8 @@ class GoResolver {
           value = { kind: "failed", cause: found.cause };
       }
     }
-    this.memo.set(key, value);
+    // An answer cut short by the depth limit is not this name's type: not kept.
+    if (this.cutoffs === cutoffs) this.memo.set(key, value);
     return value;
   }
 
@@ -1055,7 +1090,7 @@ class GoResolver {
   private aliasesFollowed = new Set<string>();
   /** Follows aliases; non-type symbols give an unknown type. */
   private typeSyms(syms: GraphSymbol[], depth: number): TypeValue {
-    if (depth > MAX_DEPTH) return UNKNOWN;
+    if (depth > MAX_DEPTH) return this.cut(UNKNOWN);
     const out: GraphSymbol[] = [];
     for (const symbol of syms) {
       if (!TYPE_KINDS.has(symbol.kind)) return UNKNOWN;
@@ -1075,7 +1110,8 @@ class GoResolver {
         // (pointer method sets are kept where they matter: embedding, through
         // `aliasPointer`, and defined types over A, which are unknown in `view`).
         if (!data.underlying) return UNKNOWN;
-        if (this.aliasesFollowed.has(symbol.id)) return UNKNOWN;
+        // A cycle on this route: unknown here, not necessarily on another.
+        if (this.aliasesFollowed.has(symbol.id)) return this.cut(UNKNOWN);
         this.aliasesFollowed.add(symbol.id);
         let target: TypeValue;
         try {
@@ -1106,7 +1142,7 @@ class GoResolver {
 
   /** Type of a variable, constant or field symbol, evaluated in its own file. */
   private valueType(symbol: GraphSymbol, depth: number): TypeValue {
-    if (depth > MAX_DEPTH) return UNKNOWN;
+    if (depth > MAX_DEPTH) return this.cut(UNKNOWN);
     const data = (symbol.data ?? {}) as { d?: Desc; t?: TypeRef; v?: Desc };
     if (symbol.kind === "field") {
       if (data.v) return this.typeOf(data.v, symbol.file, depth + 1);
@@ -1143,7 +1179,7 @@ class GoResolver {
 
   /** What an expression denotes: a package, declarations, an external thing, or a typed value. */
   private denote(desc: Desc, from: string, depth: number): Entity {
-    if (depth > MAX_DEPTH) return NONE;
+    if (depth > MAX_DEPTH) return this.cut(NONE);
     switch (desc.k) {
       case "name":
         return this.lookupName(desc.n, from);
@@ -1171,9 +1207,24 @@ class GoResolver {
         };
       case "opaque":
         return { e: "value", type: OPAQUE };
+      case "local":
+        // An anonymous struct: its own local struct symbol (in this file).
+        return desc.sym !== undefined
+          ? {
+              e: "value",
+              type: this.typeFromRef(
+                { n: desc.sym, l: desc.sym },
+                from,
+                depth + 1,
+              ),
+            }
+          : { e: "value", type: UNKNOWN };
       case "elem":
       case "key": {
-        const container = this.typeOf(desc.x, from, depth + 1);
+        let container = this.typeOf(desc.x, from, depth + 1);
+        // A defined type over a container literal (`type R map[string][]T`).
+        if (container.kind === "project")
+          container = this.underlyingContainer(container.syms, depth + 1);
         if (container.kind === "external" || container.kind === "failed")
           return { e: "value", type: container };
         if (container.kind === "cont") {
@@ -1222,6 +1273,32 @@ class GoResolver {
       default:
         return { e: "value", type: UNKNOWN };
     }
+  }
+
+  /**
+   * The container a value of these named types is, for its elements and keys:
+   * a defined type written as a container literal (`type R []T`), or over
+   * another named type that is one (`type S R`). Build variants must agree.
+   * Anything else (a struct, an interface, an external underlying type that is
+   * not proved a container) is unknown.
+   */
+  private underlyingContainer(syms: GraphSymbol[], depth: number): TypeValue {
+    if (depth > MAX_DEPTH) return this.cut(UNKNOWN);
+    return this.sameType(
+      syms.map((symbol) => {
+        if (symbol.kind !== "type") return UNKNOWN;
+        const data = (symbol.data ?? {}) as { v?: Desc; underlying?: TypeRef };
+        if (data.v?.k === "cont")
+          return this.typeOf(data.v, symbol.file, depth + 1);
+        if (!data.underlying) return UNKNOWN;
+        const next = this.typeFromRef(data.underlying, symbol.file, depth + 1);
+        return next.kind === "project"
+          ? this.underlyingContainer(next.syms, depth + 1)
+          : next.kind === "failed"
+            ? next
+            : UNKNOWN;
+      }),
+    );
   }
 
   private callResult(
@@ -1400,15 +1477,39 @@ class GoResolver {
   private view(type: GraphSymbol, depth = 0): View {
     const cached = this.views.get(type.id);
     if (cached) return cached;
+    const cutoffs = this.cutoffs;
     const data = (type.data ?? {}) as {
       shape?: string;
       underlying?: TypeRef;
       underlyingPointer?: boolean;
     };
     const pkg = this.pkgOf(type);
-    const own = (name: string) =>
+    // A type declared in several build variants: each declaration has its
+    // own fields, and a method belongs to it only when its file can be built
+    // with the declaration's file (`buildsWith`).
+    const variants =
+      !!pkg &&
+      (this.decls.get(pkg.key)?.get(type.name) ?? []).filter(isTypeSymbol)
+        .length > 1;
+    const all = (name: string) =>
       pkg
         ? (this.members.get(`${pkg.key}\u0000${type.name}\u0000${name}`) ?? [])
+        : [];
+    const own = (name: string) =>
+      all(name).filter((symbol) =>
+        symbol.kind === "field"
+          ? symbol.file === type.file
+          : !variants || this.buildsWith(symbol.file, type.file) !== false,
+      );
+    // The methods of this name that may or may not be part of this variant
+    // in the referencing file's builds.
+    const uncertain = (name: string, from?: string) =>
+      variants
+        ? own(name).flatMap((method) => {
+            if (method.kind === "field") return [];
+            const built = this.buildsWith(method.file, type.file, from);
+            return built === true ? [] : [{ method, built }];
+          })
         : [];
     const declared = (name: string) =>
       own(name).filter((symbol) => symbol.kind === "method");
@@ -1420,7 +1521,7 @@ class GoResolver {
       ...(externalOnly ? { externalOnly: true } : {}),
     });
     let result: View;
-    if (depth > MAX_DEPTH) result = unknown();
+    if (depth > MAX_DEPTH) result = this.cut(unknown());
     else if (
       pkg &&
       this.uncertainMethodSets.has(pkg.key) &&
@@ -1508,7 +1609,8 @@ class GoResolver {
       const known = result.members;
       result = { members: known, declared: known, embedded: [], unknown: true };
     }
-    this.views.set(type.id, result);
+    if (variants && !result.iface) result = { ...result, uncertain };
+    if (this.cutoffs === cutoffs) this.views.set(type.id, result);
     return result;
   }
 
@@ -1533,12 +1635,86 @@ class GoResolver {
       .sort()
       .join(
         ",",
-      )}\u0000${name}\u0000${access ?? ""}\u0000${from === undefined ? "" : this.files.get(from)?.fact.test ? `t:${directoryOf(from)}` : "n"}`;
+      )}\u0000${name}\u0000${access ?? ""}\u0000${from === undefined ? "" : this.files.get(from)?.fact.test ? `t:${directoryOf(from)}` : "n"}\u0000${from === undefined ? "" : JSON.stringify(this.constraintOf(from) ?? null)}`;
     const cached = this.selections.get(memoKey);
     if (cached) return cached;
+    // A type declared in several build variants is a different type in each
+    // configuration: search each choice of variant separately (choosing only
+    // when a variant set is reached), and agree only on what they all find.
+    const results: Selection[] = [];
+    const pending: Map<string, number>[] = [new Map()];
+    let runs = 0;
+    let result: Selection | undefined;
+    while (pending.length) {
+      if (++runs > MAX_VARIANT_RUNS) {
+        result = { kind: "unknown" };
+        break;
+      }
+      const choice = pending.pop()!;
+      const run = this.selectIn(
+        types,
+        name,
+        from,
+        access,
+        skipExternal,
+        choice,
+      );
+      if ("group" in run)
+        for (let index = run.size - 1; index >= 0; index--)
+          pending.push(new Map(choice).set(run.group, index));
+      else results.push(run);
+    }
+    result ??= combineVariants(results);
+    this.selections.set(memoKey, result);
+    return result;
+  }
+
+  /**
+   * Go's selector rule for one choice of build variant per variant set
+   * (`choice`, keyed by the set). A variant set without a choice stops the
+   * search and is returned (`group`, with its size) for the caller to choose.
+   */
+  private selectIn(
+    types: GraphSymbol[],
+    name: string,
+    from: string | undefined,
+    access: string | undefined,
+    skipExternal: boolean,
+    choice: Map<string, number>,
+  ): Selection | { group: string; size: number } {
+    let unchosen: { group: string; size: number } | undefined;
+    const pick = (set: GraphSymbol[]): GraphSymbol[] => {
+      // Only the variants that can be built with the referencing file; one
+      // that every build of it includes is the only one (two declarations of
+      // a name are never in one valid build).
+      const buildable =
+        from === undefined
+          ? set
+          : set.filter((type) => this.buildTogether(from, type.file) !== false);
+      const included =
+        from === undefined
+          ? []
+          : buildable.filter((type) => this.includedWith(from, type.file));
+      // Declared in the referencing file itself: that declaration.
+      const own = buildable.filter((type) => type.file === from);
+      if (own.length === 1) return own;
+      if (included.length === 1) return included;
+      const variants = unique(buildable.length ? buildable : set).sort(
+        (a, b) => compareText(a.file, b.file) || compareText(a.id, b.id),
+      );
+      if (variants.length < 2) return variants;
+      const group = variants.map((symbol) => symbol.id).join(",");
+      const index = choice.get(group);
+      if (index === undefined) {
+        unchosen ??= { group, size: variants.length };
+        return [];
+      }
+      return [variants[index]!];
+    };
     let level: { types: GraphSymbol[]; pointer: boolean; path: string[] }[] = [
-      { types: unique(types), pointer: false, path: [] },
+      { types: pick(types), pointer: false, path: [] },
     ];
+    if (unchosen) return unchosen;
     let externalAt: number | undefined;
     let result: Selection = { kind: "none" };
     const causes: string[] = [];
@@ -1581,6 +1757,22 @@ class GoResolver {
               );
           }
         });
+        // A method never built with this variant in the referencing file's
+        // builds is absent; one that may or may not be is one more choice of
+        // configuration (present or absent).
+        const absent = new Set<string>();
+        for (const view of views)
+          for (const { method, built } of view.uncertain?.(name, from) ?? []) {
+            if (built === false) {
+              absent.add(method.id);
+              continue;
+            }
+            const group = `method:${method.id}`;
+            const index = choice.get(group);
+            if (index === undefined) unchosen ??= { group, size: 2 };
+            else if (index === 1) absent.add(method.id);
+          }
+        if (unchosen) return unchosen;
         const found: GraphSymbol[] = [];
         // Interfaces: a flat method set; identical methods inherited along several
         // paths merge, so it is one occurrence and is not expanded further.
@@ -1606,7 +1798,9 @@ class GoResolver {
             .flatMap((item) => item.members(name))
             .filter(
               (symbol) =>
-                this.visible(symbol, from) && this.accessible(symbol, access),
+                !absent.has(symbol.id) &&
+                this.visible(symbol, from) &&
+                this.accessible(symbol, access),
             ),
         );
         if (found.length)
@@ -1632,7 +1826,7 @@ class GoResolver {
           const ids = item.value.syms.map((symbol) => symbol.id);
           if (ids.some((id) => node.path.includes(id))) continue; // embedding cycle
           next.push({
-            types: item.value.syms,
+            types: pick(item.value.syms),
             pointer: node.pointer || item.pointer,
             path: [...node.path, ...ids],
           });
@@ -1642,6 +1836,8 @@ class GoResolver {
         result = { kind: "unknown" };
         break;
       }
+      // A variant set at the next depth matters only if nothing is found here.
+      if (unchosen && !occurrences.length) return unchosen;
       if (occurrences.length === 1) {
         result = { kind: "found", ...occurrences[0]! };
         break;
@@ -1660,8 +1856,55 @@ class GoResolver {
     // Unknown because of code in failed files: the selection fails with them.
     if (result.kind === "unknown" && causes.length)
       result = { kind: "failed", cause: unique(causes).sort() };
-    this.selections.set(memoKey, result);
     return result;
+  }
+
+  private constraints = new Map<string, Formula | undefined>();
+  /** A file's build constraint (TRUE: none); undefined when not readable. */
+  private constraintOf(path: string): Formula | undefined {
+    if (!this.constraints.has(path)) {
+      const fact = this.files.get(path)?.fact;
+      this.constraints.set(path, fact ? fileConstraint(fact) : undefined);
+    }
+    return this.constraints.get(path);
+  }
+  /**
+   * Is a method declared in `path` part of the type declared in `type`'s
+   * file (in the builds of `from`, when given)? Yes when that constraint
+   * implies the method file's (the same file, an unconstrained one, the same
+   * constraint); no when the files are never built together; otherwise not
+   * known.
+   */
+  private buildsWith(
+    path: string,
+    type: string,
+    from?: string,
+  ): boolean | undefined {
+    if (path === type) return true;
+    const method = this.constraintOf(path);
+    if (method?.k === "t") return true;
+    let declared = this.constraintOf(type);
+    // In the builds of the referencing file only.
+    if (declared && from !== undefined) {
+      const context = this.constraintOf(from);
+      declared = context ? { k: "and", a: declared, b: context } : undefined;
+    }
+    if (!method || !declared) return undefined;
+    if (implies(declared, method) === true) return true;
+    return satisfiable([declared, method]) === false ? false : undefined;
+  }
+  /** Is `path` in every build that includes `from`? */
+  private includedWith(from: string, path: string): boolean {
+    if (from === path) return true;
+    const x = this.constraintOf(from);
+    const y = this.constraintOf(path);
+    return !!x && !!y && implies(x, y) === true;
+  }
+  /** Can these two files be in one build (false only when proved not)? */
+  private buildTogether(a: string, b: string): boolean | undefined {
+    const x = this.constraintOf(a);
+    const y = this.constraintOf(b);
+    return x && y ? satisfiable([x, y]) : undefined;
   }
 
   /** Interface methods named `name` through interface embedding (cycle-safe by path). */
@@ -1953,9 +2196,14 @@ class GoResolver {
       const set = new Map<string, InterfaceMethod>();
       // The crude structural method set (no-toolchain fallback): methods
       // inherited along several paths merge by name, without any identity proof
-      // (identity only annotates). The first declaration found is kept.
+      // (identity only annotates). The first declaration found is kept, unless
+      // the two are provably different (`interface{ I; X }` with `M()` and
+      // `M() int`, which Go rejects): then the set is not known, whatever the
+      // order the declarations were met in.
       const add = (method: InterfaceMethod): boolean => {
-        if (!set.has(method.key)) set.set(method.key, method);
+        const existing = set.get(method.key);
+        if (!existing) set.set(method.key, method);
+        else if (identical(existing.sig, method.sig) === false) return false;
         return true;
       };
       for (const symbol of this.ownMethods(iface)) {
@@ -3254,6 +3502,7 @@ class GoResolver {
     const key = `${pkgKey}\u0000${name}`;
     const cached = this.hiddenMemo.get(key);
     if (cached !== undefined) return cached;
+    const cutoffs = this.cutoffs;
     let reachable = false;
     for (const type of this.symbolsById.values()) {
       if (!TYPE_KINDS.has(type.kind) || !exported(type.name)) continue;
@@ -3265,7 +3514,7 @@ class GoResolver {
         break;
       }
     }
-    this.hiddenMemo.set(key, reachable);
+    if (this.cutoffs === cutoffs) this.hiddenMemo.set(key, reachable);
     return reachable;
   }
   /** The type's method set includes (or may include) package `pkgKey`'s unexported `name`. */
@@ -3316,7 +3565,9 @@ class GoResolver {
   private embedsExternal(type: GraphSymbol, seen = new Set<string>()): boolean {
     const cached = this.externalMemo.get(type.id);
     if (cached !== undefined) return cached;
-    if (seen.has(type.id)) return false;
+    // Already on this route (a cycle): the answer for the route is the rest's.
+    if (seen.has(type.id)) return this.cut(false);
+    const cutoffs = this.cutoffs;
     seen.add(type.id);
     const view = this.view(type);
     let result = !!view.unknown;
@@ -3326,7 +3577,7 @@ class GoResolver {
         result = true;
       if (result) break;
     }
-    this.externalMemo.set(type.id, result);
+    if (this.cutoffs === cutoffs) this.externalMemo.set(type.id, result);
     return result;
   }
 
@@ -3599,4 +3850,68 @@ function push2<T>(map: Map<string, T[]>, key: string, value: T): void {
   const list = map.get(key);
   if (list) list.push(value);
   else map.set(key, [value]);
+}
+
+const compareText = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+/** The context's files, symbols and links in a fixed, source-based order. */
+function ordered(context: ResolutionContext): ResolutionContext {
+  const place = (item: {
+    file: string;
+    range: { start: number; end: number };
+    kind: string;
+  }) => [item.file, item.range.start, item.range.end, item.kind] as const;
+  const byPlace = (a: ReturnType<typeof place>, b: ReturnType<typeof place>) =>
+    compareText(a[0], b[0]) ||
+    a[1] - b[1] ||
+    a[2] - b[2] ||
+    compareText(a[3], b[3]);
+  return {
+    ...context,
+    files: [...context.files].sort((a, b) => compareText(a.path, b.path)),
+    symbols: [...context.symbols].sort(
+      (a, b) =>
+        byPlace(place(a), place(b)) ||
+        compareText(a.identity, b.identity) ||
+        compareText(a.id, b.id),
+    ),
+    links: [...context.links].sort(
+      (a, b) =>
+        byPlace(place(a), place(b)) ||
+        compareText(a.targetName, b.targetName) ||
+        compareText(a.id, b.id),
+    ),
+  };
+}
+
+/**
+ * One answer from the answers of every configuration. A configuration that
+ * finds nothing is one in which the referencing code does not compile, so it
+ * does not count. Of the rest: definite only when all find the same
+ * declarations; all found but different: the set of their answers (build
+ * variants are candidates); any unknown or failed: that; any ambiguous:
+ * ambiguous.
+ */
+function combineVariants(all: Selection[]): Selection {
+  const results = all.filter((item) => item.kind !== "none");
+  if (!results.length) return { kind: "none" };
+  if (results.length === 1) return results[0]!;
+  const causes = results.flatMap((item) =>
+    item.kind === "failed" ? item.cause : [],
+  );
+  if (causes.length) return { kind: "failed", cause: unique(causes).sort() };
+  if (results.some((item) => item.kind === "unknown"))
+    return { kind: "unknown" };
+  const syms = unique(
+    results.flatMap((item) =>
+      item.kind === "found" || item.kind === "ambiguous" ? item.syms : [],
+    ),
+  );
+  if (!syms.length) return { kind: "none" };
+  if (results.every((item) => item.kind === "found"))
+    return {
+      kind: "found",
+      syms,
+      pointer: results.some((item) => item.kind === "found" && item.pointer),
+    };
+  return { kind: "ambiguous", syms };
 }

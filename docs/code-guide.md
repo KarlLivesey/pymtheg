@@ -331,7 +331,7 @@ expect(String(refused).includes("unlinked accepts symbols, symbolLimit"));
 ```
 
 Check states are `ok`, `changed`, `moved` (unconfirmed until `refresh`, or
-pass `allowMoved: true`), `missing` and `unverifiable` (a failed or unreadable
+pass `allowMoved: true`), `ambiguous`, `missing` and `unverifiable` (a failed or unreadable
 file). `summary.passed` is false when any link needs attention or the graph
 could not verify every link. Links record reviewed intent, never proof that the
 code meets the requirement. Requirement records live in the project's planning

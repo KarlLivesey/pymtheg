@@ -4,6 +4,8 @@ import { test } from "node:test";
 import { mkdtemp, cp, rm, writeFile, mkdir, access } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { spawnSync } from "node:child_process";
+import { openProjectGraph } from "../dist/storage/graph.js";
 import { connect } from "./fixtures/mcp-graph/client.mjs";
 async function project(run) {
   const root = await mkdtemp(join(tmpdir(), "pym-r1c-graph-"));
@@ -122,6 +124,53 @@ test("stdio mixed init-free graph: every action, certainty classes, failures, pa
     for (const entry of s.log)
       if (["code_graph", "graph_result"].includes(entry.name))
         assert.ok(entry.bytes <= 65536);
+  }));
+
+test("bounded CLI and MCP file listings keep top-level declarations ahead of nested functions", async () =>
+  project(async (s, root) => {
+    const file = "ts/scoped.ts";
+    const nested = Array.from(
+      { length: 30 },
+      (_, i) => `  function nested${i}() {}`,
+    ).join("\n");
+    await writeFile(
+      join(root, file),
+      `export class Activity {}\nexport const itWithActivity = 1;\nexport function setup() {\n${nested}\n}\n`,
+    );
+    // Stable project identity makes the old hash ordering reproducible.
+    openProjectGraph(root, "c3-file-listing").close();
+
+    const cli = spawnSync(
+      process.execPath,
+      [
+        "dist/cli/main.js",
+        "graph",
+        "file",
+        file,
+        "--root",
+        root,
+        "--limit",
+        "20",
+        "--json",
+      ],
+      { encoding: "utf8" },
+    );
+    assert.equal(cli.status, 2, cli.stderr); // The mixed fixture has one failed Go file.
+    const cliAnswer = JSON.parse(cli.stdout);
+    assert.equal(cliAnswer.truncated, true);
+    const { answer } = await s.graph("file", file);
+    assert.equal(answer.summary.truncated, true);
+
+    for (const symbols of [cliAnswer.data.symbols, answer.items]) {
+      assert.equal(symbols.length, 20);
+      assert.deepEqual(
+        symbols
+          .slice(0, 4)
+          .map((symbol) => symbol.name)
+          .sort(),
+        ["Activity", "itWithActivity", "setup", file],
+      );
+    }
   }));
 
 test("MCP graph jobs are nonblocking, cancellable, bounded, session-owned and confined", async () =>

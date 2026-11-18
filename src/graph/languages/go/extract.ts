@@ -200,6 +200,8 @@ function channelTerm(node: Node, element: (node: Node) => TypeTerm): TypeTerm {
 const MAX_WALK_DEPTH = 500;
 /** Type terms deeper than this are unknown (no unbounded recursion). */
 const MAX_TERM_DEPTH = 64;
+/** Prefix of an anonymous struct's reference before its identity is known. */
+const PENDING = "\u0000anon:";
 
 export function fileFacts(path: string): FileFact {
   const fact: FileFact = { imports: [], test: path.endsWith("_test.go") };
@@ -264,9 +266,10 @@ export class GoExtractor {
     let beforePackage = true;
     for (const child of root.namedChildren) {
       if (child.type === "comment") {
-        if (beforePackage) this.buildLine(child.text);
+        if (beforePackage) this.buildLine(child.text, child.startPosition.row);
       } else if (child.type === "package_clause") {
         beforePackage = false;
+        this.legacyBuild(child.startPosition.row);
         const name = named(child).find(
           (item) => item.type === "package_identifier",
         );
@@ -292,14 +295,40 @@ export class GoExtractor {
     if (this.fact.build !== undefined) fileData.build = this.fact.build;
     if (this.fact.goos !== undefined) fileData.goos = this.fact.goos;
     if (this.fact.goarch !== undefined) fileData.goarch = this.fact.goarch;
+    // Only now is every anonymous struct's identity known.
+    for (const item of [...this.symbols, ...this.links])
+      if (item.data) item.data = this.anonymous(item.data) as typeof item.data;
   }
 
-  private buildLine(comment: string): void {
+  /** A `//go:build` line was seen: it alone is the constraint, as in Go. */
+  private modernBuild = false;
+  /** Legacy `+build` lines before the package clause, with their rows. */
+  private legacyLines: { text: string; row: number }[] = [];
+  private buildLine(comment: string, row: number): void {
     const modern = /^\/\/go:build\s+(.+)$/.exec(comment.trim());
-    if (modern) this.fact.build = modern[1]!.trim();
+    if (modern) {
+      this.fact.build = modern[1]!.trim();
+      this.modernBuild = true;
+    }
     const legacy = /^\/\/\s*\+build\s+(.+)$/.exec(comment.trim());
-    if (legacy && this.fact.build === undefined)
-      this.fact.build = `+build ${legacy[1]!.trim()}`;
+    if (legacy) this.legacyLines.push({ text: legacy[1]!.trim(), row });
+  }
+  /**
+   * Without a `//go:build` line, every legacy `+build` line followed by a
+   * blank line before the package clause applies (Go ANDs them; one directly
+   * above `package`, with no blank line, is not a constraint): kept one per
+   * line, each starting `+build `.
+   */
+  private legacyBuild(packageRow: number): void {
+    if (this.modernBuild || !this.legacyLines.length) return;
+    const rows = this.text.split("\n");
+    let blank = -1;
+    for (let row = 0; row < packageRow; row++)
+      if (!rows[row]!.trim()) blank = row;
+    const lines = this.legacyLines
+      .filter((line) => line.row < blank)
+      .map((line) => `+build ${line.text}`);
+    if (lines.length) this.fact.build = lines.join("\n");
   }
 
   // ---- symbols and links -------------------------------------------------
@@ -413,6 +442,7 @@ export class GoExtractor {
                     })),
                   }
                 : {}),
+              ...(desc.sym !== undefined ? { sym: desc.sym } : {}),
             }
           : desc;
       case "unknown":
@@ -452,6 +482,8 @@ export class GoExtractor {
     if (desc.k === "sel" || desc.k === "elem" || desc.k === "key")
       return this.rootKind(desc.x, depth + 1);
     if (desc.k === "call") return this.rootKind(desc.f, depth + 1);
+    // An anonymous struct value: its members resolve through its own symbol.
+    if (desc.k === "local" && desc.sym !== undefined) return "struct";
     return desc.k;
   }
   private local(name: string): Desc | undefined {
@@ -613,6 +645,14 @@ export class GoExtractor {
   }
 
   private localIdentities = new Set<string>();
+  /** A file-unique identity that already carries the file name. */
+  private uniqueIdentity(scoped: string): string {
+    let identity = scoped;
+    for (let index = 2; this.localIdentities.has(identity); index++)
+      identity = `${scoped}#${index}`;
+    this.localIdentities.add(identity);
+    return identity;
+  }
   /** A file-unique identity for a function-local or anonymous type. */
   private localIdentity(base: string): string {
     // Unique per package: the file name, then the enclosing declaration, the local
@@ -692,7 +732,12 @@ export class GoExtractor {
     );
   }
 
-  private structFields(owner: string, ownerKey: string, struct: Node): void {
+  private structFields(
+    owner: string,
+    ownerKey: string,
+    struct: Node,
+    anonymous = false,
+  ): void {
     for (const list of named(struct))
       for (const field of named(list)) {
         if (field.type !== "field_declaration") continue;
@@ -714,6 +759,7 @@ export class GoExtractor {
                 owner,
                 ...(ref ? { t: { ...ref } } : {}),
                 v: this.typedValue(type) as unknown as Json,
+                ...(anonymous ? { anonymous: true } : {}),
               },
             );
             this.contains(ownerKey, key, {
@@ -751,6 +797,7 @@ export class GoExtractor {
               t: { ...ref },
               embedded: true,
               pointer: embeddedPointer,
+              ...(anonymous ? { anonymous: true } : {}),
             },
           );
           this.contains(ownerKey, key, range(field));
@@ -1143,7 +1190,10 @@ export class GoExtractor {
             ? bound.c
               ? { k: "tval", c: { ...bound.c } }
               : { k: "tval" }
-            : { k: "opaque" };
+            : bound.sym !== undefined
+              ? // A function-local type: its symbol (members resolve on it).
+                { k: "val", t: { n: current.text, l: bound.sym } }
+              : { k: "opaque" };
         if (bound) return { k: "local" };
         return PREDECLARED_TYPES.has(current.text)
           ? { k: "val", t: { q: "", n: current.text } }
@@ -1184,6 +1234,10 @@ export class GoExtractor {
           k: "local",
           ...(m.length ? { m } : {}),
           ...(f.length ? { f } : {}),
+          // Its symbol, named when the walk reaches it (see `anonymous`).
+          ...(f.length || m.length
+            ? { sym: `${PENDING}${current.startIndex}` }
+            : {}),
         };
       }
       case "interface_type": {
@@ -1740,32 +1794,87 @@ export class GoExtractor {
   }
 
   private localStructs = new Map<string, number>();
+  private fieldStructs = new Map<string, number>();
+  /** Identity of each anonymous struct symbol, by the start offset of its type. */
+  private anonymousStructs = new Map<number, string>();
   /**
-   * A function-local or anonymous struct type. If it embeds anything, its promoted
-   * method set can implement interfaces, so it becomes a struct symbol (identity
-   * `<enclosing>.<name>` or `<enclosing>.struct#<n>` in source order, `data.local`)
-   * with its fields and `embeds` links, like a package-level struct.
+   * A function-local or anonymous struct type with at least one field. It
+   * becomes a struct symbol (`data.local`) with its fields and `embeds` links,
+   * like a package-level struct, so selectors on its values resolve to its
+   * fields and promoted members. Its identity is anchored to the declaration
+   * that owns it when the walk reaches it (a variable, a field, a type, or the
+   * enclosing function): `<owner>.struct#<n>` for one that embeds something
+   * (the 0.1.0 identity, numbered among those), `<owner>.anon#<n>` for one with
+   * named fields only (numbered among those). `struct{}` is not a symbol.
    */
-  private localStruct(node: Node, localName?: string): void {
-    const embeds = named(named(node)[0]).some(
-      (field) =>
-        field.type === "field_declaration" && !fieldsOf(field, "name").length,
+  private localStruct(node: Node): void {
+    const fields = named(named(node)[0]).filter(
+      (field) => field.type === "field_declaration",
     );
-    if (!embeds) return this.walkChildren(node);
+    if (!fields.length) return this.walkChildren(node);
+    const embeds = fields.some((field) => !fieldsOf(field, "name").length);
     const enclosing = this.byKey.get(this.owner)?.identity ?? "file";
     let name: string;
-    if (localName !== undefined)
-      name = this.localIdentity(`${enclosing}.${localName}`);
-    else {
-      const count = (this.localStructs.get(enclosing) ?? 0) + 1;
-      this.localStructs.set(enclosing, count);
-      name = this.localIdentity(`${enclosing}.struct#${count}`);
+    const outer = this.legacyOwner;
+    if (embeds) {
+      // The 0.1.0 identity: owned by the nearest declaration that is not
+      // inside a field-only anonymous struct (those were not symbols then).
+      const owner = outer ?? enclosing;
+      const count = (this.localStructs.get(owner) ?? 0) + 1;
+      this.localStructs.set(owner, count);
+      name = this.localIdentity(`${owner}.struct#${count}`);
+      // Its own fields own what is inside it, as in 0.1.0.
+      this.legacyOwner = undefined;
+    } else {
+      const count = (this.fieldStructs.get(enclosing) ?? 0) + 1;
+      this.fieldStructs.set(enclosing, count);
+      // An owner inside this file already carries the file name.
+      const prefix = `${basename(this.path)}:`;
+      name = enclosing.startsWith(prefix)
+        ? this.uniqueIdentity(`${enclosing}.anon#${count}`)
+        : this.localIdentity(`${enclosing}.anon#${count}`);
+      this.legacyOwner = outer ?? enclosing;
     }
+    this.anonymousStructs.set(node.startIndex, name);
+    // `anonymous`: generated, not a name in the source; listed after named
+    // declarations by search and file listings.
     const key = this.symbol("struct", name, name, range(node), {
       local: true,
+      anonymous: true,
     });
     this.contains(this.owner, key, range(node));
-    this.within(key, () => this.structFields(name, key, node));
+    try {
+      this.within(key, () => this.structFields(name, key, node, true));
+    } finally {
+      this.legacyOwner = outer;
+    }
+  }
+  /**
+   * While inside a field-only anonymous struct: the owner an embedding
+   * anonymous struct had in 0.1.0, when such structs were not symbols.
+   */
+  private legacyOwner: string | undefined;
+  /**
+   * Replaces each anonymous struct's pending reference (`local.sym`) in the
+   * file's facts by its identity; one the walk never reached loses it.
+   */
+  private anonymous(value: Json): Json {
+    if (Array.isArray(value)) return value.map((item) => this.anonymous(item));
+    if (!value || typeof value !== "object") return value;
+    const out: { [key: string]: Json } = {};
+    for (const [key, item] of Object.entries(value)) {
+      if (
+        key === "sym" &&
+        typeof item === "string" &&
+        item.startsWith(PENDING)
+      ) {
+        const identity = this.anonymousStructs.get(
+          Number(item.slice(PENDING.length)),
+        );
+        if (identity !== undefined) out[key] = identity;
+      } else out[key] = this.anonymous(item as Json);
+    }
+    return out;
   }
 
   /** A use of a predeclared name: a link only if a package declaration shadows it. */
