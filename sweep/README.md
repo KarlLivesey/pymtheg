@@ -94,3 +94,106 @@ The committed `evidence/sw-1/results.json` also contains two things the three
 commands above do not reproduce on their own: a sampled memory high-water mark
 for runs that were force-stopped, and a re-run of the callee query after a
 harness mistake in the symbol reference was corrected.
+
+## Coverage scoreboard
+
+`coverage-export.mjs` opens each completed graph read-only and checks the
+counts against its warm CLI result. The v2 archive keeps every stored
+module, kind, outcome, reason and uncertainty combination. File scope,
+audit disposition and library evidence are additional dimensions.
+
+Level 2 means a resolved checkout link or a stored library unit plus a
+symbol name. Level 1 adds sites that name only the library unit. Both
+use every stored link in the finished graphs. The strict-inside column
+excludes only proved outside targets. Raw uses the released graph's
+resolved count. Completion is a separate checklist.
+
+The released graph has no target-ID representation for a library symbol.
+The export derives an identity only from precise facts already captured.
+
+- **Go.** A literal import gives the full package path. A named selector
+  or qualified type provides a symbol through an explicit import alias
+  or a standard package name. A receiver type alone leaves open whether
+  a method or field is promoted from an embedded type. Unproved default
+  dependency package names and interface dispatch need more evidence.
+  Vendored paths and checked-in module replacements stay inside.
+- **Rust.** A qualified path gives a crate and, when named, a member path.
+  A glob or bare crate use identifies a unit only. An explicitly
+  qualified trait call can identify the declaring trait and method
+  through a crate path or import binding. A dot call's receiver type
+  can be an alias, use deref or dispatch through a trait from another
+  crate. Those receiver facts alone earn no unit or symbol credit.
+  An unqualified standard prelude spelling can help explain an outside
+  miss. It carries no stored unit by itself.
+- **TypeScript and JavaScript.** A stored literal specifier identifies
+  the module. A named import binds the recorded imported name to that
+  module at its captured source position. Subsequent direct selectors
+  can re-use that binding and append the member path. A declaration
+  directive can name a unit like the DOM library. A reason such as
+  `external-package` without a binding identifies no particular
+  package. Fluent calls through an untyped return carry no inferred
+  symbol credit.
+
+The boundary check uses tracked workspace and vendor manifests. A package
+found in the central directory of a tracked Yarn cache archive is inside
+the checkout. Relative npm `file:`, `link:` and `portal:` entries and
+recorded Cargo path dependencies resolve against the owning manifest and
+the checkout boundary. Known paths beyond that boundary are outside.
+Missing in-checkout path targets, unsupported absolute paths and paths
+through tracked symlinks remain unclassified. No archives are extracted.
+The strict-inside column can differ from older SW-3 exports because these
+checks and exact recorded library identities refine the outside partition.
+
+The file-scope split recognizes minified JavaScript by its filename or
+long lines in `dist/`, `public/libs/` and `static/`. PocketBase's checked-in
+`ui/dist/` JavaScript is also marked as a bundle. Explicit negative
+fixtures and unexpanded templates have their own scopes. The default
+counts all scopes. Alternate rows remove each scope separately and all
+three together. A failed input still appears in the failed-source count.
+A source site with no stored link is reported in the extraction checks.
+
+The audit strata combine module, recorded reason, scope and disposition.
+With `--sampling-base` the exporter uses the supplied measured strata
+to allocate fixed site quotas. Within each stratum it selects the lowest
+fixed-seed hashes of pinned source sites. Repeated stored links at a
+selected site contribute their multiplicity to the ratio estimate.
+Intervals use within-stratum variance and a finite-population correction
+on the number of sites. A bucket that cannot be sized from a sample is
+visible in the audit. The curated source labels distinguish local
+misses, library misses, legitimate ambiguity and unclassified sites.
+These estimates prioritise work. They do not add definite score credit.
+
+### Recompute after a candidate run
+
+Use one dev-server scratch directory for the npm baseline and candidate runs
+so the export can use the same released metadata readers and npm cache. A local
+build directory needs built `dist/` files and its runtime dependencies. A
+local `.tgz` installs offline from the scratch cache. Candidate records are
+keyed by artifact digest and live separately from the release records.
+
+```sh
+pymtheg-dev --name sw3 -- bash -c '
+  node scripts/sweep/run.mjs --manifest "$PYM_SCRATCH/affected.json" \
+    --local-build "$PYM_SCRATCH/pymtheg-candidate.tgz" \
+    --output "$PYM_SCRATCH/candidate-run.json" --parallel 12
+  node scripts/sweep/coverage-export.mjs --results "$PYM_SCRATCH/candidate-run.json" \
+    --output "$PYM_SCRATCH/candidate-coverage.json" \
+    --reference-samples evidence/sw-3/samples.json.gz
+'
+pymtheg-dev --name sw3 --no-sync -- bash -c 'cat "$PYM_SCRATCH/candidate-coverage.json"' > /tmp/pymtheg-candidate-coverage.json
+node scripts/sweep/coverage.mjs --results /tmp/pymtheg-candidate-coverage.json \
+  --base evidence/sw-3/breakdown.json.gz --plan docs/coverage-plan.md
+```
+
+After a full run or subset overlay, `--scoreboard FILE` also writes the rates
+and per-repository table. For an archived baseline, pass only its breakdown
+as `--results`. The plan retains its prose and replaces the marked table and
+running totals. The exporter records each matched site's current reason,
+outcome and multiplicity. The estimate keeps its original sampling stratum
+and weight when a diagnostic changes. A sample only contributes to remaining
+misses while its outcome still matches. The estimate caps weighted misses at
+the current measured total for each language, scope and outcome, and reports
+any uncovered remainder. A changed graph without matching observations
+contributes measured counts immediately. Item status tracks observed
+resolution or library identification at reference sites. Refresh the sample
+to review the shapes in a materially changed corpus.

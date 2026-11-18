@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 import { spawn } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { closeSync, openSync } from "node:fs";
-import { lstat, mkdir, open, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { lstat, mkdir, open, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { extname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
@@ -211,6 +211,49 @@ async function installRelease(scratch) {
   return { entry, provenance: { package: `pymtheg@${version}`, resolved, integrity, node: process.version } };
 }
 
+async function buildDigest(path) {
+  const hash = createHash("sha256");
+  async function capture(name) {
+    const file = join(path, name);
+    if ((await lstat(file)).isDirectory()) {
+      for (const child of (await readdir(file)).sort(compare)) await capture(join(name, child));
+    } else {
+      const bytes = await readFile(file);
+      hash.update(JSON.stringify([name, bytes.length])).update(bytes);
+    }
+  }
+  for (const name of ["package.json", "package-lock.json", "dist", "grammars"]) {
+    if (await exists(join(path, name))) await capture(name);
+  }
+  return hash.digest("hex");
+}
+
+async function localBuild(scratch, path) {
+  const input = resolve(path);
+  const directory = (await lstat(input)).isDirectory();
+  if (!directory && extname(input) !== ".tgz") throw Error("Use a built package directory or a local .tgz");
+  const sha256 = directory ? await buildDigest(input) : createHash("sha256").update(await readFile(input)).digest("hex");
+  let root = input;
+  if (!directory) {
+    const prefix = join(scratch, "builds", sha256);
+    root = join(prefix, "node_modules/pymtheg");
+    if (!await exists(join(prefix, "package-lock.json")) || !await exists(join(root, "dist/cli/main.js"))) {
+      await rm(prefix, { recursive: true, force: true });
+      await mkdir(prefix, { recursive: true });
+      const result = await measured({ command: "npm", args: [
+        "install", "--offline", "--prefix", prefix, "--cache", join(scratch, "npm-cache"),
+        "--userconfig", "/dev/null", "--globalconfig", join(scratch, "empty-npmrc"),
+        "--ignore-scripts", "--no-audit", "--no-fund", "--no-update-notifier", input,
+      ], cwd: prefix, log: join(prefix, "install"), seconds: 600 });
+      if (result.code !== 0) throw Error("Offline candidate install failed. Use the release cache or an installed build directory.");
+    }
+  }
+  const manifest = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
+  const entry = join(root, "dist/cli/main.js");
+  if (manifest.name !== "pymtheg" || !await exists(entry)) throw Error("Candidate must contain a built Pymtheg CLI");
+  return { entry, sha256, provenance: { package: `pymtheg@${manifest.version}`, source: directory ? "local build" : "local tarball", sha256, node: process.version } };
+}
+
 async function corpusSize(root, listing) {
   const files = Object.fromEntries(Object.keys(languageExtensions).map((key) => [key, 0]));
   const lines = { ...files };
@@ -234,7 +277,8 @@ async function runRepository(repo, release, scratch, limitSeconds) {
   // A retry gets a distinct directory even if a previous child is winding down.
   const work = join(scratch, "work", ...repo.id.split("/"), repo.commit, randomUUID());
   const root = join(work, "checkout");
-  const record = { id: repo.id, language: repo.language, commit: repo.commit, limitSeconds, queries: [] };
+  const record = { id: repo.id, language: repo.language, commit: repo.commit,
+    attempt: relative(scratch, work), limitSeconds, queries: [] };
   const started = performance.now();
   let peak = null;
   let stage = "prepare";
@@ -352,6 +396,8 @@ async function main() {
     scratch: { type: "string", default: process.env.PYM_SCRATCH },
     parallel: { type: "string", default: "1" },
     "wall-minutes": { type: "string", default: "60" },
+    "local-build": { type: "string" },
+    output: { type: "string" },
   } });
   const parallel = Number(values.parallel);
   const limitSeconds = 60 * Number(values["wall-minutes"]);
@@ -361,9 +407,10 @@ async function main() {
   }
   const scratch = resolve(values.scratch);
   const repos = await checkedSelection(values.manifest);
-  const recordsDirectory = join(scratch, "records");
+  const release = values["local-build"] ? await localBuild(scratch, values["local-build"]) : await installRelease(scratch);
+  const recordsDirectory = release.sha256 ? join(scratch, "build-records", release.sha256) : join(scratch, "records");
+  const outputPath = values.output ? resolve(values.output) : join(scratch, release.sha256 ? `results-${release.sha256}.json` : "results.json");
   await mkdir(recordsDirectory, { recursive: true });
-  const release = await installRelease(scratch);
   const records = new Map();
   const recordPath = (repo) => join(recordsDirectory, ...repo.id.split("/"), `${repo.commit}.json`);
   for (const repo of repos) {
@@ -371,7 +418,7 @@ async function main() {
     if (await exists(path)) records.set(repo.id, JSON.parse(await readFile(path, "utf8")));
   }
   const pending = repos.filter((repo) => !records.has(repo.id));
-  const saveResults = () => writeAtomic(join(scratch, "results.json"), [
+  const saveResults = () => writeAtomic(outputPath, [
     "{", `  "release": ${JSON.stringify(release.provenance)},`, '  "mode": "source-only (default)",', '  "repos": [',
     [...records].sort(([a], [b]) => compare(a, b)).map(([, record]) => `    ${JSON.stringify(record)}`).join(",\n"),
     "  ]", "}", "",
