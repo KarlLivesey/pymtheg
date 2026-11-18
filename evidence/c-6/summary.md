@@ -109,7 +109,20 @@ Variants:
 - a writable store open and close;
 - a writable open that makes one graph write and closes.
 
-CONCURRENCY_TABLE
+| Build | Index wall | Writes | `status` failed | `search --no-sync` failed | Writable open failed | Open + write failed |
+| --- | --- | --- | --- | --- | --- | --- |
+| main | 2497 s | 3123 | 0/32 (slowest 19.5 s) | 0/32 (slowest 22.4 s) | 7/32 (slowest 44.2 s) | 6/32 (slowest 32.1 s) |
+| branch | 916 s | 3123 | 0/32 (slowest 3.9 s) | 0/32 (slowest 4.3 s) | 0/32 (slowest 3.1 s) | 0/32 (slowest 3.1 s) |
+
+Both runs shared the server with the swc runs of section 6 (load about 35).
+Every main failure is `database is locked` after the full 30-second wait.
+
+- **Main.** Readers kept working, but 13 of 64 second writers ran out of
+  their 30-second wait on this loaded disk. W3-P1 measured 0 of 32 on a
+  quieter server.
+- **Branch.** Every probe succeeded, and the slowest took 4.3 s. With one
+  commit per file, a writer holds the lock for the same writes as on main,
+  but each commit no longer waits for the disk.
 
 ## 4. Kill and recover
 

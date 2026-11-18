@@ -88,11 +88,11 @@ if (kind === "compare") {
 } else if (kind === "large") {
   console.log(
     table(
-      ["Repository", "Build", "Outcome", "Wall s", "In COMMIT s", "In transactions s", "Peak RSS MiB", "Files / links stored"],
+      ["Repository", "Build", "Outcome", "Wall s", "In COMMIT s", "In transactions s", "Peak RSS MiB", "Stored: files / links (or file rows:digest)"],
       rows.map((r) =>
         r.exit === undefined
           ? [r.label, r.build, r.complete ? "complete" : "incomplete", r.wallS, r.commitS, r.txS, r.processPeakRssMB ?? r.maxRssMB, `${r.counts.files} / ${r.counts.links}`]
-          : [r.label, r.build, r.exit === 124 ? "not finished in 60 min" : `exit ${r.exit}`, r.wallS, "–", "–", "–", r.storedFiles],
+          : [r.label, r.build, r.exit === 124 ? "not finished in 60 min" : r.exit === 134 ? "JavaScript heap out of memory (exit 134)" : `exit ${r.exit}`, r.wallS, "–", "–", "–", r.storedFiles],
       ),
     ),
   );
