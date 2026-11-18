@@ -54,10 +54,10 @@ const count = (db) => ({
     .get().n,
 });
 const location = (source, offset) => {
-  const start = source.lastIndexOf("\n", offset - 1) + 1;
+  const start = offset === 0 ? 0 : source.lastIndexOf("\n", offset - 1) + 1;
   const end = source.indexOf("\n", offset);
   return {
-    line: 1 + source.slice(0, start).split("\n").length - 1,
+    line: source.slice(0, start).split("\n").length,
     code: source
       .slice(start, end === -1 ? undefined : end)
       .trim()
@@ -78,7 +78,9 @@ for (const repo of current) {
     const texts = newDb.prepare(
       "SELECT json_extract(body,'$.text') AS text FROM graph_files WHERE path=?",
     );
-    const symbols = newDb.prepare("SELECT body FROM graph_symbols WHERE id=?");
+    const candidatesFor = newDb.prepare(`
+      SELECT s.body FROM graph_candidates c JOIN graph_symbols s ON s.id=c.symbol
+      WHERE c.link=? ORDER BY s.file,s.kind,s.id`);
     const oldSources = oldDb.prepare(
       "SELECT path FROM graph_files WHERE json_extract(body,'$.module')='typescript'",
     );
@@ -176,8 +178,8 @@ for (const repo of current) {
               resolution: item.resolution,
               reason: item.data?.reason,
               assumptions: item.data?.assumes,
-              candidates: item.candidates.map(({ id }) =>
-                label(JSON.parse(symbols.get(id).body)),
+              candidates: candidatesFor.all(item.id).map(({ body }) =>
+                label(JSON.parse(body)),
               ),
             })),
           });
