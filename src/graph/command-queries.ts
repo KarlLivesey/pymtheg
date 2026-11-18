@@ -108,12 +108,15 @@ export function queryGraph(
     const offset =
       column === null ? null : locations.offset(path, line, column);
     if (column !== null && offset === null) return [];
-    const found = store.symbolsAt(
-      path,
-      offset ?? range.start,
-      offset ?? range.end,
-      column !== null,
-    );
+    // A line selects declarations as before. An explicit column can select a lexical binding.
+    const found = store
+      .symbolsAt(
+        path,
+        offset ?? range.start,
+        offset ?? range.end,
+        column !== null,
+      )
+      .filter((candidate) => column !== null || candidate.kind !== "lexical");
     // Remove strict containers, keeping equal-range declarations and same-line siblings ambiguous.
     found.sort(
       (a, b) =>

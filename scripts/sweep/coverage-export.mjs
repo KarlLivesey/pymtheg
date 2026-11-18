@@ -9,7 +9,7 @@ import { gunzipSync } from "node:zlib";
 import { cargoPathLocations, checkoutLocation, npmPathLocation, yarnArchivePackages } from "./coverage-locations.mjs";
 import { goMapKeyReader, typescriptShapes } from "./coverage-source.mjs";
 import { classify, columns, countLines, externalIdentity, failedFamily, goImports, modules, packageName, repositoryScore,
-  reviewBucket, reviewQuotas, rustImports, rustPreludeMacros, rustPreludeTypes, sampleKey, sampleSize, sampleStratum, sourceScope, tsBindings, workspaceNames } from "./coverage-rules.mjs";
+  reviewBucket, reviewQuotas, rustImports, rustPreludeMacros, rustPreludeTypes, sampleKey, sampleSize, sampleStratum, sourceScope, tsBindings, workspaceEntryMissing, workspaceNames } from "./coverage-rules.mjs";
 
 const readJson = (name) => JSON.parse(name.endsWith(".gz") ? gunzipSync(readFileSync(name)) : readFileSync(name, "utf8"));
 const compare = (a, b) => a < b ? -1 : a > b ? 1 : 0;
@@ -284,7 +284,7 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys) {
     const imports = db.prepare("SELECT body,resolution FROM graph_links WHERE file=? AND kind='imports'");
     const declared = db.prepare(`SELECT 1 AS present FROM graph_symbols WHERE name=? AND file=?
       AND json_extract(body,'$.kind') IN ('enum','struct','type','trait','class','interface','function','method') LIMIT 1`);
-    const hasName = db.prepare("SELECT 1 FROM graph_symbols WHERE name=? AND json_extract(body,'$.module')='typescript' LIMIT 1");
+    const hasName = db.prepare("SELECT 1 FROM graph_symbols WHERE name=? AND kind<>'lexical' AND json_extract(body,'$.module')='typescript' LIMIT 1");
     const goSignatures = db.prepare(`SELECT file, json_extract(body,'$.data') AS data FROM graph_symbols WHERE name=?
       AND json_extract(body,'$.module')='go' AND json_extract(body,'$.kind')=?`);
     const goDefinitions = db.prepare(`SELECT file, json_extract(body,'$.kind') AS kind,
@@ -444,7 +444,8 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys) {
         }
         const disposition = classify(link, evidence, project);
         const library = externalIdentity(link, evidence, project, disposition);
-        const tsExternal = link.module === "typescript" && link.resolution === "unresolved" && link.data?.reason === "external-package";
+        const tsExternal = link.module === "typescript" && link.resolution === "unresolved" &&
+          (link.data?.reason === "external-package" || workspaceEntryMissing(link.data?.reason));
         const tsRoot = tsExternal ? /^(?:new\s+)?([\w$]+)(?:\??\.[\w$]+)?$/.exec(link.targetName)?.[1] : undefined;
         const specifier = tsExternal ? link.data?.specifier ?? (["imports", "exports"].includes(link.kind) ?
           evidence.tsSpecifierAt(link.range?.start) : evidence.tsImports().get(tsRoot)) : undefined;

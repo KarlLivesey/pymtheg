@@ -31,6 +31,11 @@ export interface RenameContext {
   renamed?: Renamed | undefined;
   /** Resolves a module specifier from a file to a captured path, if any. */
   resolveModule: (specifier: string, from: string) => string | undefined;
+  workspaceReason: (
+    specifier: string,
+    from: string,
+    lookups: readonly string[],
+  ) => string | undefined;
   /** Nodes (and warm-up steps) whose checker lookups overflowed before. */
   skip: ReadonlySet<string>;
   /**
@@ -58,12 +63,31 @@ import {
   bindingSpecifier,
   isCommonJsRequire,
   isJsFile,
+  isLexicalBinding,
+  isLocalCallable,
   keyOf,
   kindOf,
   nameOf,
   rangeOf,
   unwrap,
 } from "./symbols.js";
+
+// These syntax classifiers are exported by the pinned compiler alongside its
+// checker. Assignment targets include updates, destructuring and for-in/of.
+const syntax = ts as typeof ts & {
+  getAssignmentTargetKind(node: ts.Node): number;
+  isInExpressionContext(node: ts.Node): boolean;
+};
+
+function insideWith(node: ts.Node): boolean {
+  return !!ts.findAncestor(
+    node,
+    (at) =>
+      !!at.parent &&
+      ts.isWithStatement(at.parent) &&
+      at.parent.statement === at,
+  );
+}
 
 /** A link target recorded by analysis: a symbol key inside a captured file. */
 export interface TargetFact {
@@ -173,6 +197,8 @@ interface Lookup {
   name?: string | undefined;
   reason?: string;
   receiver?: ts.Expression | undefined;
+  at?: ts.Node;
+  construct?: boolean;
 }
 const clip = (text: string) => {
   const flat = text
@@ -208,6 +234,7 @@ export function extractFile(
   const symbols: SymbolDraft[] = [];
   const links: LinkDraft[] = [];
   const keys = new Set<string>();
+  const lexicalReferences = new Map<string, Set<ts.Node>>();
   const moduleKey = keyOf(file);
   const range = (node: ts.Node) => ({
     start: node.getStart(file),
@@ -221,6 +248,52 @@ export function extractFile(
   // node in `skip`, whose links are then `compiler-limit` without asking.
   let limitHit = false;
   let limited = false;
+  let mutations: { writes: Set<ts.Symbol>; eval: boolean } | undefined;
+  function localMutations() {
+    if (mutations) return mutations;
+    const result = { writes: new Set<ts.Symbol>(), eval: false };
+    const visitWrite = (node: ts.Node) => {
+      if (ts.isIdentifier(node)) {
+        if (node.text === "eval") {
+          let outer: ts.Node = node;
+          while (ts.isParenthesizedExpression(outer.parent))
+            outer = outer.parent;
+          if (
+            ts.isCallExpression(outer.parent) &&
+            outer.parent.expression === outer
+          )
+            result.eval = true;
+        }
+        if (syntax.getAssignmentTargetKind(node)) {
+          const symbol = ts.isShorthandPropertyAssignment(node.parent)
+            ? checker.getShorthandAssignmentValueSymbol(node.parent)
+            : checker.getSymbolAtLocation(node);
+          if (symbol) result.writes.add(symbol);
+        }
+      }
+      ts.forEachChild(node, visitWrite);
+    };
+    visitWrite(file);
+    mutations = result;
+    return result;
+  }
+
+  function provenLocalCall(
+    declaration: ts.Declaration,
+    symbol: ts.Symbol,
+  ): boolean {
+    if (declaration.getSourceFile() !== file) return false;
+    const name = symbol.getName();
+    const outer = checker.resolveName(name, file, ts.SymbolFlags.Alias, true);
+    if (outer && outer !== symbol && bindingSpecifier(outer)) return false;
+    if (
+      ts.isVariableDeclaration(declaration) &&
+      declaration.parent.flags & ts.NodeFlags.Const
+    )
+      return true;
+    const { writes, eval: mayEval } = localMutations();
+    return !writes.has(symbol) && !mayEval;
+  }
   function targetsOf(
     query: Lookup | ts.Symbol | undefined,
     meaning: Meaning,
@@ -268,11 +341,34 @@ export function extractFile(
     let firstAlias: ts.Symbol | undefined;
     let declaredSomewhere = false;
     const declarations: ts.Node[] = [];
-    const record = (declaration: ts.Declaration): boolean => {
+    const record = (
+      declaration: ts.Declaration,
+      symbol: ts.Symbol,
+    ): boolean => {
       const target = fromVirtual(declaration.getSourceFile().fileName);
       if (target === undefined || !captured.has(target)) return false;
       const anchor = anchorOf(declaration);
       if (!anchor) return false;
+      if (meaning === "call") {
+        if (isLexicalBinding(anchor)) return false;
+        if (
+          ts.isEnumDeclaration(anchor) &&
+          !ts.isSourceFile(anchor.parent) &&
+          !ts.isModuleBlock(anchor.parent)
+        )
+          return false;
+        if (
+          isLocalCallable(anchor) &&
+          (found.receiver ||
+            (found.at && insideWith(found.at)) ||
+            (ts.isClassDeclaration(anchor) && !found.construct) ||
+            (ts.isVariableDeclaration(anchor) &&
+              found.construct &&
+              ts.isArrowFunction(unwrap(anchor.initializer!))) ||
+            !provenLocalCall(declaration, symbol))
+        )
+          return false;
+      }
       const key = keyOf(anchor);
       facts.set(`${target}\0${key}`, { file: target, key });
       declarations.push(declaration);
@@ -312,7 +408,7 @@ export function extractFile(
           external++;
           continue;
         }
-        if (!record(declaration)) local++;
+        if (!record(declaration, current)) local++;
       }
     };
     visit(found.symbol, 0);
@@ -728,10 +824,7 @@ export function extractFile(
   function bindingModuleReason(specifier: ts.Expression): string | undefined {
     const reason = moduleReason(specifier);
     if (reason !== CAPTURED) return reason;
-    const file = context.resolveModule(
-      (specifier as ts.StringLiteralLike).text,
-      path,
-    )!;
+    const file = specifierResolution(specifier as ts.StringLiteralLike).path!;
     return KIND_REASON[context.moduleKind(file)];
   }
   /**
@@ -793,13 +886,7 @@ export function extractFile(
     if (
       !found.targets.length &&
       (reason === "no-symbol" || reason === "external") &&
-      ts.findAncestor(
-        at,
-        (node) =>
-          !!node.parent &&
-          ts.isWithStatement(node.parent) &&
-          node.parent.statement === node,
-      )
+      insideWith(at)
     )
       reason = "dynamic-scope";
     if (
@@ -836,6 +923,43 @@ export function extractFile(
     });
   }
   const paths = Object.keys(program.getCompilerOptions().paths ?? {});
+  const specifierResolutions = new Map<
+    ts.StringLiteralLike,
+    {
+      path: string | undefined;
+      lookups: readonly string[];
+    }
+  >();
+  function specifierResolution(specifier: ts.StringLiteralLike) {
+    const previous = specifierResolutions.get(specifier);
+    if (previous) return previous;
+    // Reuse the compiler's result in the actual import/require mode. The
+    // snapshot-only fallback is for forms the compiler did not resolve at all.
+    const resolution = (
+      program as ts.Program & {
+        getResolvedModuleFromModuleSpecifier(
+          specifier: ts.StringLiteralLike,
+          source: ts.SourceFile,
+        ):
+          | (ts.ResolvedModuleWithFailedLookupLocations & {
+              failedLookupLocations?: readonly string[];
+            })
+          | undefined;
+      }
+    ).getResolvedModuleFromModuleSpecifier(
+      specifier,
+      specifier.getSourceFile(),
+    );
+    const resolved = resolution?.resolvedModule?.resolvedFileName;
+    const result = {
+      path: resolution
+        ? resolved && fromVirtual(resolved)
+        : context.resolveModule(specifier.text, path),
+      lookups: resolution?.failedLookupLocations ?? [],
+    };
+    specifierResolutions.set(specifier, result);
+    return result;
+  }
   /** Why a module specifier does not resolve, or undefined when it does. */
   function moduleReason(specifier: ts.Expression): string | undefined {
     if (!ts.isStringLiteralLike(specifier)) return "computed-specifier";
@@ -844,7 +968,7 @@ export function extractFile(
     const text = specifier.text;
     // A captured file the compiler did not type here (a script, or a require
     // form the compiler does not recognise): the edge to that file is known.
-    const resolved = context.resolveModule(text, path);
+    const { path: resolved, lookups } = specifierResolution(specifier);
     if (resolved !== undefined && captured.has(resolved)) return CAPTURED;
     if (/^\.\.?(\/|$)/.test(text) || text.startsWith("/"))
       return "missing-module";
@@ -858,7 +982,9 @@ export function extractFile(
               text.startsWith(pattern.slice(0, star)) &&
               text.endsWith(pattern.slice(star + 1));
       });
-    return aliased ? "unresolved-alias" : "external-package";
+    return aliased
+      ? "unresolved-alias"
+      : (context.workspaceReason(text, path, lookups) ?? "external-package");
   }
   function moduleLink(
     owner: string,
@@ -868,9 +994,7 @@ export function extractFile(
     const reason = moduleReason(specifier);
     // The compiler did not type this edge, but the file is captured: link it.
     const file =
-      reason === CAPTURED
-        ? context.resolveModule(specifier.text, path)
-        : undefined;
+      reason === CAPTURED ? specifierResolution(specifier).path : undefined;
     const kind = file ? context.moduleKind(file) : undefined;
     const found: Targets = file
       ? kind === "invalid"
@@ -1102,7 +1226,10 @@ export function extractFile(
       : ts.isPropertyAccessExpression(expression)
         ? `(expression).${expression.name.text}`
         : "(expression)";
-    let found = targetsOf(symbol, "call");
+    let found = targetsOf(
+      { ...symbol, at, construct: extra.construct === true },
+      "call",
+    );
     // The callee decides a call; its arguments only pick between distinct
     // overload targets. With two or more, a tainted argument fails the link.
     if (call && found.targets.length > 1 && !found.reason) {
@@ -1144,13 +1271,13 @@ export function extractFile(
     // Bindings from a module that does not resolve share its reason.
     let reason = specifier && bindingModuleReason(specifier);
     if (!reason && specifier && ts.isStringLiteralLike(specifier)) {
-      const target = context.resolveModule(specifier.text, path);
+      const target = specifierResolution(specifier).path;
       if (target !== undefined && context.moduleKind(target) === "unavailable")
         reason = "target-unavailable";
     }
     const module =
       specifier && ts.isStringLiteralLike(specifier)
-        ? context.resolveModule(specifier.text, path)
+        ? specifierResolution(specifier).path
         : undefined;
     let found: Targets =
       reason === "invalid-code" && module !== undefined
@@ -1190,7 +1317,7 @@ export function extractFile(
         ...(Object.keys(symbolData).length ? { data: symbolData } : {}),
       });
       const container = containerOf(node);
-      if (container) {
+      if (container && !isLexicalBinding(node)) {
         const containerKey = keyOf(container);
         links.push({
           sourceKey: containerKey,
@@ -1201,7 +1328,7 @@ export function extractFile(
         });
       }
     }
-    if (anchor) owner = keyOf(anchor);
+    if (anchor && !isLexicalBinding(anchor)) owner = keyOf(anchor);
 
     if (
       ts.isImportDeclaration(node) &&
@@ -1423,7 +1550,7 @@ export function extractFile(
           "calls",
           tag.getText(file),
           at,
-          targetsOf(lookup(at), "call"),
+          targetsOf({ ...lookup(at), at }, "call"),
           { jsx: true },
         );
       }
@@ -1480,6 +1607,48 @@ export function extractFile(
         ts.isStringLiteralLike(argument.literal)
       )
         moduleLink(owner, argument.literal, { typeOnly: true });
+    } else if (ts.isIdentifier(node) && !limited) {
+      const parent = node.parent;
+      const shorthand =
+        ts.isShorthandPropertyAssignment(parent) && parent.name === node;
+      if (
+        (shorthand || syntax.isInExpressionContext(node)) &&
+        !(ts.isPropertyAccessExpression(parent) && parent.name === node) &&
+        !(
+          (ts.isCallExpression(parent) || ts.isNewExpression(parent)) &&
+          parent.expression === node
+        ) &&
+        !(ts.isTaggedTemplateExpression(parent) && parent.tag === node) &&
+        !insideWith(node)
+      ) {
+        const symbol = shorthand
+          ? checker.getShorthandAssignmentValueSymbol(parent)
+          : symbolOf(node);
+        const declaration = symbol?.valueDeclaration;
+        const local = declaration && anchorOf(declaration);
+        if (
+          local &&
+          local.getSourceFile() === file &&
+          (isLexicalBinding(local) ||
+            isLocalCallable(local) ||
+            (ts.isEnumDeclaration(local) &&
+              !ts.isSourceFile(local.parent) &&
+              !ts.isModuleBlock(local.parent)))
+        ) {
+          let seen = lexicalReferences.get(owner);
+          if (!seen) lexicalReferences.set(owner, (seen = new Set()));
+          if (!seen.has(local)) {
+            seen.add(local);
+            link(
+              owner,
+              "references",
+              node.text,
+              node,
+              targetsOf(symbol, "value"),
+            );
+          }
+        }
+      }
     }
     return owner;
   }

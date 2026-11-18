@@ -36,7 +36,7 @@ import {
  * facts; resolve maps those facts to symbol IDs. See docs/changes/W2-D.md.
  */
 // Bump the leading number whenever extraction or resolution semantics change.
-const MODULE_VERSION = `17+typescript-${ts.version}`;
+const MODULE_VERSION = `18+typescript-${ts.version}`;
 
 /** Observation counters for tests (programs built, files extracted). Not a correctness input. */
 export const statistics = {
@@ -82,6 +82,7 @@ function openSession(
   makeHost: () => ts.CompilerHost,
   failures: Map<string, string>,
   captured: ReadonlySet<string>,
+  projectReferences: readonly ts.ProjectReference[] | undefined,
   /** Fails files with syntactic diagnostics the parser alone does not report; true to rebuild. */
   validate?: (program: ts.Program) => boolean,
 ): Session {
@@ -91,7 +92,12 @@ function openSession(
   let lastProgram: ts.Program | undefined;
   const compile = () => {
     statistics.programs++;
-    const program = ts.createProgram({ rootNames: roots(), options, host });
+    const program = ts.createProgram({
+      rootNames: roots(),
+      options,
+      host,
+      ...(projectReferences?.length ? { projectReferences } : {}),
+    });
     try {
       return { program, checker: program.getTypeChecker() };
     } catch (error) {
@@ -590,6 +596,7 @@ const module: LanguageModule = {
         () => model.host(group),
         model.parseFailures,
         captured,
+        group.references,
         // Any syntactic diagnostic fails a file: also the compiler's
         // syntax-phase checks the parser does not make (TypeScript-only
         // syntax in a JS file, TS8xxx).
@@ -611,7 +618,9 @@ const module: LanguageModule = {
           group.options,
           normal.host,
         ).resolvedModule?.resolvedFileName;
-        return resolved === undefined ? undefined : fromVirtual(resolved);
+        return resolved === undefined
+          ? undefined
+          : fromVirtual(normal.host.realpath?.(resolved) ?? resolved);
       };
       /**
        * What a captured target file is. `script` means only: analysed, no
@@ -685,6 +694,7 @@ const module: LanguageModule = {
                 fresh: model.fresh,
                 ...(renamed ? { renamed } : {}),
                 resolveModule,
+                workspaceReason: model.workspaceReason,
                 skip,
                 moduleKind,
                 anyFailed: unseen.size > 0,
@@ -793,6 +803,7 @@ const module: LanguageModule = {
             }),
           failures,
           captured,
+          group.references,
         );
         for (const [path, result] of analysed) {
           if (result.status === "failed") continue;

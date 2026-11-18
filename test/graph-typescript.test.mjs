@@ -168,6 +168,19 @@ sym(
   "export const café: Config = { name: Config.fallback };",
 );
 sym(MAIN, "function", "main", span(MAIN, "export function main", "\n}"));
+for (const [file, owner, name, at] of [
+  ["src/loader.js", "require", "name", nth("src/loader.js", "name", 2)],
+  [API, "format", "value", { at: "value: string | number" }],
+  [MAIN, "main", "runner", { at: "runner: Runner" }],
+  [MAIN, "main", "shape", { at: "shape: Circle | Square" }],
+])
+  symbols.push({
+    file,
+    name,
+    identity: `${owner}.${name}`,
+    kind: "lexical",
+    ...at,
+  });
 sym(SHAPES, "class", "Circle", span(SHAPES, "export class Circle", "\n  }\n}"));
 sym(
   SHAPES,
@@ -234,6 +247,30 @@ const job = target(API, "Job", "class");
 const mainFn = { name: "main", kind: "function" };
 const LOADER = "src/loader.js";
 const links = [
+  link(
+    "src/loader.js",
+    "references",
+    "name",
+    { name: "require", kind: "function" },
+    target("src/loader.js", "name", "lexical"),
+    nth("src/loader.js", "name", 3),
+  ),
+  link(
+    API,
+    "references",
+    "value",
+    { name: "format", kind: "function" },
+    target(API, "value", "lexical"),
+    nth(API, "value", 3),
+  ),
+  link(
+    MAIN,
+    "references",
+    "shape",
+    { name: "main", kind: "function" },
+    target(MAIN, "shape", "lexical"),
+    nth(MAIN, "shape", 2),
+  ),
   // The call goes to the file's own function, not to an import of ./lib/api.
   link(
     LOADER,

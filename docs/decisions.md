@@ -2526,3 +2526,17 @@ row. **Rules out:** automated publishing. The acceptance gate still installs
 only the tarball it builds and reports `npx pymtheg` from the registry as not
 verified; the package-contents test allows the owner's name only in the licence
 texts and the top-level `author` field. See [PUB-2](changes/PUB-2.md).
+
+## C-3: TypeScript lexical bindings and workspace packages
+
+TypeScript graph identities for local declarations use the existing scoped
+name and same-name ordinal. Plain local bindings use the `lexical` kind and
+retain one expression reference per owner and target. Runtime call evidence
+comes from the bound declaration and excludes parameter values, import
+shadows and callable declarations with detected writes.
+
+The snapshot host supplies virtual links for proven local package installs.
+TypeScript resolves the entry point with the importing file's compiler options
+and resolution mode. References can redirect declaration outputs to source when
+the compiler establishes the correspondence. Missing build output remains
+unresolved and has a distinct reason when a compiler lookup probed a build path.

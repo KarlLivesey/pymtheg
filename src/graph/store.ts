@@ -678,7 +678,7 @@ export class SqliteGraphStore implements GraphStorage {
     return this.db
       .prepare(
         `SELECT body FROM graph_symbols
-      WHERE instr(${name},${needle})>0 OR instr(${identity},${needle})>0
+      WHERE kind<>'lexical' AND (instr(${name},${needle})>0 OR instr(${identity},${needle})>0)
       ORDER BY CASE WHEN ${name}=${needle} OR ${identity}=${needle} THEN 0
         WHEN instr(${name},${needle})=1 OR instr(${identity},${needle})=1 THEN 1 ELSE 2 END,
         ${name},name,file,kind,id LIMIT ?`,
@@ -722,7 +722,9 @@ export class SqliteGraphStore implements GraphStorage {
     this.queryLimit(limit);
     return this.db
       .prepare(
-        "SELECT body FROM graph_symbols WHERE name=? OR json_extract(body,'$.identity')=? ORDER BY file,id LIMIT ?",
+        `SELECT body FROM graph_symbols WHERE (name=? AND kind<>'lexical')
+          OR (json_extract(body,'$.identity')=? AND (kind<>'lexical' OR name<>json_extract(body,'$.identity')))
+          ORDER BY file,id LIMIT ?`,
       )
       .all(name, name, limit)
       .map((row) => JSON.parse(row.body as string) as GraphSymbol);

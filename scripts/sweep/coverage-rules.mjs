@@ -25,6 +25,8 @@ const assertionPackages = new Set(["chai", "vitest", "@vitest/expect", "@jest/ex
 
 export const countLines = (text) => text ? text.split("\n").length - Number(text.endsWith("\n")) : 0;
 export const packageName = (value) => /^(@[^/]+\/[^/]+|[^/@][^/]*)/.exec(value)?.[1];
+export const workspaceEntryMissing = (reason) =>
+  reason === "workspace-entry-unavailable" || reason === "workspace-build-output-missing";
 export function workspaceNames(manifests, pnpmFiles) {
   const roots = [];
   for (const [path, doc] of manifests) {
@@ -293,6 +295,7 @@ export function classify(link, evidence, project) {
     if (origin?.path === "context" && ["CancelFunc", "CancelCauseFunc"].includes(origin.type)) return "outside";
   }
   if (module === "typescript") {
+    if (workspaceEntryMissing(data.reason)) return "inside";
     const path = tsSpecifier(link, evidence);
     if (path && (link.data?.specifier || evidence.tsSpecifiers.has(path))) return tsPath(path, project, link.file);
     if (data.reference === "lib") return "outside";
@@ -417,7 +420,7 @@ function tsExternalIdentity(link, evidence, project, disposition) {
 export function externalIdentity(link, evidence, project, disposition) {
   if (link.resolution !== "unresolved") return null;
   const data = link.data ?? {};
-  if (data.cause) return null;
+  if (data.cause || link.module === "typescript" && workspaceEntryMissing(data.reason)) return null;
   const observed = link.module === "go" ? goExternalIdentity(link, evidence, project)
     : link.module === "rust" ? rustExternalIdentity(link, evidence, project)
       : tsExternalIdentity(link, evidence, project, disposition);
@@ -445,6 +448,7 @@ export function sampleStratum(link, disposition) {
   if (link.module === "rust" && /receiver-type-unverified/.test(reason)) return "rust:receiver";
   if (link.module === "rust" && /opaque-item-may-shadow-name/.test(reason)) return "rust:opaque-declaration";
   if (link.module === "rust" && /path-type-unverified|namespace-binding-unverified/.test(reason)) return "rust:path-or-namespace";
+  if (link.module === "typescript" && workspaceEntryMissing(reason)) return "typescript:external-package";
   if (link.module === "typescript" && ["no-symbol", "local", "external-package", "incomplete-config", "external", "missing-module"].includes(reason)) {
     return `typescript:${reason}`;
   }

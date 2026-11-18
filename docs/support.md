@@ -472,9 +472,10 @@ parameter parses), a turbofish on a function named like a primitive
 #### TypeScript and JavaScript
 
 Uses the TypeScript compiler over the captured snapshot. The only other input
-is the installed compiler's standard-library declarations; `node_modules` is not
-read. Claims `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs`,
-`.cjs`; context `*tsconfig*.json`, `*jsconfig*.json` and `package.json`. Each file
+is the installed compiler's standard-library declarations. The snapshot host
+models checkout-local package links in a virtual `node_modules`. Claims
+`.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs`, `.cjs`; context
+`*tsconfig*.json`, `*jsconfig*.json`, `package.json` and `pnpm-workspace.yaml`. Each file
 is analysed under its owning config (nearest containing directory, then
 `tsconfig` before `jsconfig`); genuinely tied configs are merged to the weakest
 answer.
@@ -484,11 +485,25 @@ answer.
   `require` with a literal specifier; calls, `new`, JSX components, type
   references and heritage when the checker gives one graph symbol (overloads are
   one symbol); `contains`.
+- **Lexical bindings:** nested functions, function-valued `const` and `let`
+  declarations, and local classes and enums have scoped symbols. Plain local
+  bindings and parameters are `lexical` targets. Reference links record the
+  first expression use for each enclosing symbol and binding pair. Text search
+  and unqualified selectors skip `lexical` targets. File queries,
+  column-qualified locations, qualified names and direct symbol IDs can reach them.
+- **Checkout packages:** npm, Yarn and Bun workspace lists, pnpm workspace
+  member links, and checkout-local `file:` and `link:` dependencies expose
+  manifests to the compiler. TypeScript applies its own package export
+  conditions, subpath rules, `main`, `types`, `paths` and project reference
+  redirects within the snapshot.
 - **Candidates:** several graph symbols for one callee (union receivers, merged
   declarations, duplicate JavaScript functions).
 - **Unresolved:** standard library and `node_modules` packages
   (`external`, `external-package`); computed `require` or `import()` specifiers;
-  workspace packages whose entry is not a captured file; pnpm-only workspaces.
+  calls through parameters, import shadows, and reassigned local functions;
+  installed workspace bindings with no captured entry
+  (`workspace-entry-unavailable` or `workspace-build-output-missing` when
+  TypeScript probed a missing build path).
 - **`partial` files** have complete but qualified facts, never syntax errors: an
   `extends` base that was not captured (`incomplete-config`; a package preset
   such as `@tsconfig/node20` leaves most cross-file links unresolved), compiler
