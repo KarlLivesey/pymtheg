@@ -315,7 +315,21 @@ test("Rust Cargo context changes re-resolve cached sources and workspace depende
       store,
     );
     assert.equal(repeat.indexed, 0);
-    unresolved(store, "renamed::f");
+    const [external] = calls(store, "renamed::f");
+    assert.equal(external.resolution, "library");
+    assert.equal(external.targetId, null);
+    assert.deepEqual(
+      external.libraries.map(({ id, ...target }) => target),
+      [
+        {
+          ecosystem: "cargo",
+          unit: "renamed",
+          symbol: "f",
+          evidence: "qualified-path",
+        },
+      ],
+    );
+    unresolved(store, "dep_real::f");
   });
 });
 
