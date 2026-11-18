@@ -8,7 +8,10 @@ prior definite Rust checkout links. [Coverage and preservation](coverage.md)
 ## Checks
 
 The dev-server build, `tsc --noEmit`, and `npm run format:check` passed.
-All 17 sweep-tool tests passed.
+All 3,005 tests in `npm test` and all 17 sweep-tool tests passed. The Cargo
+context test checks that a cached call switches from a checkout symbol to a
+library target when the manifest replaces its local dependency with a registry
+dependency.
 
 The compiler fixture exercises both the original receiver calls and the
 associated paths from the SW-3 review. The latter use local traits to make
