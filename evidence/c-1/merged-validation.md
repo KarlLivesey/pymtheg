@@ -67,3 +67,19 @@ emits that line after the worker returns. The indexer then validates the
 returned facts and writes the changed files to SQLite. The process was
 waiting in the filesystem at the limit, before the Rust resolve marker.
 [Analysis progress](../../src/graph/commands.ts) · [Database writes](../../src/graph/indexer.ts)
+
+## Coverage plan
+
+The generator used main's 55 completed pins as its baseline. The two
+fresh main sweeps for the repositories added by PR 9 hit the wall limit.
+Retries on their existing stores recovered 483,985 TypeScript repository
+links and 726,108 Turborepo links, matching the published C-2 totals. The
+coverage exporter checked each SQLite breakdown against its retry's CLI
+totals. The baseline uses those completed graphs and C-2's recorded sweep
+outcomes.
+[C-2 evidence](../c-2/summary.md)
+
+The merged sweep brings the count to 58 of 60. Weighted Rust Level 2 moves
+from 31.4718% to 31.8986% as Dioxus, Rustls and Serde enter the score.
+Embassy and SWC remain open in the generated plan.
+[Coverage plan](../../docs/coverage-plan.md)
