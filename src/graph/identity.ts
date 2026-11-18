@@ -157,6 +157,29 @@ export const libraryEvidence: Readonly<
   "glob-import": { symbol: true, definite: false },
   "declaring-owner": { symbol: "required", definite: true },
 };
+/**
+ * The manifests and lockfiles that can state a library version, by file name,
+ * per ecosystem. A version's source must be one of its ecosystem's files (a
+ * `go.mod` never states an npm version); an ecosystem not listed takes no
+ * version. The single list both the indexer's and the store's checks use.
+ */
+export const versionFiles: Readonly<Record<string, readonly string[]>> = {
+  npm: [
+    "package.json",
+    "package-lock.json",
+    "npm-shrinkwrap.json",
+    "pnpm-lock.yaml",
+    "yarn.lock",
+    "bun.lock",
+    "bun.lockb",
+    "deno.json",
+    "deno.lock",
+  ],
+  node: ["package.json"],
+  go: ["go.mod", "go.sum", "go.work", "go.work.sum"],
+  "go-std": ["go.mod", "go.work"],
+  cargo: ["Cargo.toml", "Cargo.lock"],
+};
 const text = (value: unknown, max: number): value is string =>
   typeof value === "string" &&
   value.length > 0 &&
@@ -211,8 +234,15 @@ export function libraryTarget(
     );
   if (
     value.versionSource !== undefined &&
-    (!text(value.versionSource, 4096) || !versionSource(value.versionSource))
+    (!text(value.versionSource, 4096) ||
+      !versionFiles[value.ecosystem]?.includes(
+        value.versionSource.split("/").at(-1)!,
+      ))
   )
+    throw Error(
+      `A library version's source must be one of the ${value.ecosystem} manifests or lockfiles (${(versionFiles[value.ecosystem] ?? []).join(", ") || "none for this ecosystem"})`,
+    );
+  if (value.versionSource !== undefined && !versionSource(value.versionSource))
     throw Error(
       "A library version's source must be a clean manifest or lockfile in the snapshot",
     );

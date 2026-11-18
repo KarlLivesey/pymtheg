@@ -275,10 +275,20 @@ file (its ID can change when files are added or removed).
 - **Definite:** imports of packages in the importing file's module, a `go.work`
   module or a proven local `replace`; package-qualified references; direct calls;
   calls and selections on a concrete receiver whose type is evident from the
-  source, by Go's selector rule including promotion; field, type, receiver and
-  embedding references; `contains`.
+  source, by Go's selector rule including promotion; the same on elements of
+  slices, arrays, maps (value, and key for a ranged key) and channels, on range
+  variables and index expressions over them, also through a named type written
+  as a container (`type R map[string][]T`, also a generic defined type over
+  one); fields and promoted members of anonymous struct types (every anonymous
+  struct type with a field is a local struct symbol with its fields, its
+  identity anchored to its owning declaration: table tests, nested
+  `mu struct{…}` fields; ranked after named symbols in search) and of
+  function-local struct types; field, type, receiver and embedding references;
+  `contains`.
 - **Candidates:** a name declared in several build variants (build constraints
-  are not evaluated); several equally shallow promotion paths; interface dispatch
+  are not evaluated; a selection on a type declared in several variants is
+  searched per variant and is definite only when all variants agree, otherwise
+  the set of their answers); several equally shallow promotion paths; interface dispatch
   (the interface method plus every project type whose method set matches by name
   and parameter/result counts; always open, `structural-match-unverified`);
   calls on a receiver whose type the source does not show (name-only, open,
@@ -287,11 +297,14 @@ file (its ID can change when files are added or removed).
   unresolved); reassigned function-valued locals.
 - **Never definite:** `implements` links (unresolved, interface kept in
   `data.interfaceId`, `structural-match-unverified`; computed type identity is an
-  annotation only).
+  annotation only). An interface that embeds two provably different
+  declarations of one method (invalid Go) has no implementers.
 - **Unresolved:** standard library, third-party and non-local `replace` imports and
   everything reached through them; imports Go forbids (`internal`, `package main`,
   `testdata`); unexported names from another package; builtins (`data.builtin`);
-  elements of function containers; explicit generic-method instantiation
+  elements of function containers; elements of a generic named container
+  (`type L[E any] []E`); a field of an anonymous struct type declared in several
+  build variants of its enclosing type; explicit generic-method instantiation
   `t.Map[C](x)`; `new(variable).M()`.
 - **Not extracted:** locals, parameters and type parameters as symbols; keys of
   keyed composite literals; generic type arguments (`Stack[int]` methods resolve
@@ -486,9 +499,10 @@ parameter parses), a turbofish on a function named like a primitive
 #### TypeScript and JavaScript
 
 Uses the TypeScript compiler over the captured snapshot. The only other input
-is the installed compiler's standard-library declarations; `node_modules` is not
-read. Claims `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs`,
-`.cjs`; context `*tsconfig*.json`, `*jsconfig*.json` and `package.json`. Each file
+is the installed compiler's standard-library declarations. The snapshot host
+models checkout-local package links in a virtual `node_modules`. Claims
+`.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs`, `.cjs`; context
+`*tsconfig*.json`, `*jsconfig*.json`, `package.json` and `pnpm-workspace.yaml`. Each file
 is analysed under its owning config (nearest containing directory, then
 `tsconfig` before `jsconfig`); genuinely tied configs are merged to the weakest
 answer.
@@ -498,11 +512,31 @@ answer.
   `require` with a literal specifier; calls, `new`, JSX components, type
   references and heritage when the checker gives one graph symbol (overloads are
   one symbol); `contains`.
+- **Lexical declarations:** nested functions, function-valued `const` and
+  `let` declarations, and local classes and enums have scoped symbols.
+  References record the first expression use per enclosing symbol and target.
+  Existing `typeof` references to plain local bindings identify the enclosing
+  symbol and record the binding name and declaration span in `data.localBinding`.
+  Plain locals add zero symbol rows and zero new reference sites. Name lookup
+  lists top-level and exported declarations ahead of scoped ones.
+- **Checkout packages:** npm, Yarn and Bun workspace lists, pnpm workspace
+  member links, and checkout-local `file:` and `link:` dependencies expose
+  manifests to the compiler. TypeScript applies its own package export
+  conditions, subpath rules, `main`, `types`, `paths` and project reference
+  redirects within the snapshot. The selected module file has an entry edge
+  independent of any declaration augmentations. When ESM-mode resolution
+  misses an extensionless relative import, the 0.1.0 extension lookup can
+  still establish its module-file edge. Named bindings use the checker.
+  Calls use the same declaration rule for relative imports, workspace imports
+  and local aliases, including when TypeScript selects a `types` export.
 - **Candidates:** several graph symbols for one callee (union receivers, merged
   declarations, duplicate JavaScript functions).
 - **Unresolved:** standard library and `node_modules` packages
   (`external`, `external-package`); computed `require` or `import()` specifiers;
-  workspace packages whose entry is not a captured file; pnpm-only workspaces.
+  calls through parameters, import shadows, and reassigned local functions;
+  installed workspace bindings with no captured entry
+  (`workspace-entry-unavailable` or `workspace-build-output-missing` when
+  TypeScript probed a missing path under a configured output directory).
 - **`partial` files** have complete but qualified facts, never syntax errors: an
   `extends` base that was not captured (`incomplete-config`; a package preset
   such as `@tsconfig/node20` leaves most cross-file links unresolved), compiler

@@ -582,15 +582,24 @@ test("a reader opened on a schema-3 graph agrees with itself after another conne
   });
 });
 
-/** Toy with a declared lockfile, recording one versioned library target. */
+/** Toy declaring manifests and lockfiles as context, recording one versioned library target. */
 const versioned = (library) => ({
   ...toy,
-  contextFiles: ["toy.lock"],
+  contextFiles: ["package-lock.json", "tsconfig.json", "go.mod"],
   resolve(context) {
     const link = context.links.find((item) => item.kind === "calls");
     return [{ linkId: link.id, library }];
   },
 });
+/** Clean context files of three kinds: an npm lockfile, a TypeScript config and a Go manifest. */
+async function contexts(root) {
+  await writeFile(
+    join(root, "package-lock.json"),
+    '{"packages":{"node_modules/zod":{"version":"3.0.0"}}}\n',
+  );
+  await writeFile(join(root, "tsconfig.json"), "{}\n");
+  await writeFile(join(root, "go.mod"), "module example.com/m\n");
+}
 const zodBinding = {
   ecosystem: "npm",
   unit: "zod",
@@ -605,23 +614,33 @@ for (const [label, library, message] of [
   ],
   [
     "a source without a version",
-    { ...zodBinding, versionSource: "toy.lock" },
+    { ...zodBinding, versionSource: "package-lock.json" },
     /only with a version/,
   ],
   [
-    "a source missing from the snapshot",
-    { ...zodBinding, version: "3.0.0", versionSource: "missing.lock" },
+    "a lockfile missing from the snapshot",
+    { ...zodBinding, version: "3.0.0", versionSource: "web/package-lock.json" },
     /clean manifest or lockfile in the snapshot/,
   ],
   [
     "a source file as the source",
     { ...zodBinding, version: "3.0.0", versionSource: "a.toy" },
-    /clean manifest or lockfile in the snapshot/,
+    /one of the npm manifests or lockfiles/,
+  ],
+  [
+    "a clean tsconfig.json as the source",
+    { ...zodBinding, version: "99.99.99", versionSource: "tsconfig.json" },
+    /one of the npm manifests or lockfiles/,
+  ],
+  [
+    "another ecosystem's manifest as the source",
+    { ...zodBinding, version: "3.0.0", versionSource: "go.mod" },
+    /one of the npm manifests or lockfiles/,
   ],
 ])
   test(`a library version is refused with ${label}`, async () => {
     await project(async (root, scratch) => {
-      await writeFile(join(root, "toy.lock"), "zod 3.0.0\n");
+      await contexts(root);
       const store = new SqliteGraphStore(join(scratch, "g.sqlite"), "p");
       try {
         const report = await indexProject(
@@ -644,9 +663,9 @@ for (const [label, library, message] of [
     });
   });
 
-test("a library version from a lockfile in the snapshot is stored with its source", async () => {
+test("a library version from its ecosystem's lockfile in the snapshot is stored with its source", async () => {
   await project(async (root, scratch) => {
-    await writeFile(join(root, "toy.lock"), "zod 3.0.0\n");
+    await contexts(root);
     const store = new SqliteGraphStore(join(scratch, "g.sqlite"), "p");
     try {
       const report = await indexProject(
@@ -655,7 +674,7 @@ test("a library version from a lockfile in the snapshot is stored with its sourc
           versioned({
             ...zodBinding,
             version: "3.0.0",
-            versionSource: "toy.lock",
+            versionSource: "package-lock.json",
           }),
         ]),
         store,
@@ -666,7 +685,7 @@ test("a library version from a lockfile in the snapshot is stored with its sourc
       assert.deepEqual(target, {
         ...zodBinding,
         version: "3.0.0",
-        versionSource: "toy.lock",
+        versionSource: "package-lock.json",
       });
     } finally {
       store.close();

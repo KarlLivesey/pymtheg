@@ -133,7 +133,8 @@ Rust, how to read each section, limits, and turning on the Go toolchain route.
 All but index/status require `query`; path also requires `to`. `uses` takes a
 library unit as `query` and an optional `symbol`, and lists the project links to
 it. A link to a library has certainty `library` and a `library` field (ecosystem,
-unit, symbol, version when the manifest states it, evidence,
+unit, symbol, version and `versionSource` (the manifest or lockfile that
+states it) when a manifest states one, evidence,
 `place:"outside-project"`); library members of a candidate set are rows of
 `candidates` with a `library` field instead of a `symbol`. Selectors are
 exact names, recorded qualified names, `path:line[:column]` or an unchanged

@@ -36,7 +36,7 @@ import {
  * facts; resolve maps those facts to symbol IDs. See docs/changes/W2-D.md.
  */
 // Bump the leading number whenever extraction or resolution semantics change.
-const MODULE_VERSION = `17+typescript-${ts.version}`;
+const MODULE_VERSION = `19+typescript-${ts.version}`;
 
 /** Observation counters for tests (programs built, files extracted). Not a correctness input. */
 export const statistics = {
@@ -61,8 +61,8 @@ interface Session {
   /** Parser and binder failures of this session's files. */
   readonly failures: Map<string, string>;
   rebuilds: number;
-  /** A fresh program and checker (the old checker is untrustworthy). */
-  rebuild(): void;
+  /** Build a fresh checker. True when this also enables full dependency warm-up. */
+  rebuild(): boolean;
 }
 
 /**
@@ -71,10 +71,10 @@ interface Session {
  * The binder writes into cached SourceFiles: after a binder overflow that
  * cache is corrupt, so the host (and its cache) is replaced. The binder runs
  * inside getTypeChecker(): a binder overflow is traced to the file(s) that
- * cause it, which then fail alone (like parser failures). The warm-up asks
- * for variable types and function return types of every captured file in
- * program order, so a file's answers never depend on which other file
- * happened to be extracted before a rebuild.
+ * cause it, which then fail alone (like parser failures). Workspace programs
+ * warm their owned files first and let the checker infer imported types on
+ * demand. After a stack limit, retry with the full source-order warm-up
+ * before skipping any lookup.
  */
 function openSession(
   roots: () => string[],
@@ -82,16 +82,24 @@ function openSession(
   makeHost: () => ts.CompilerHost,
   failures: Map<string, string>,
   captured: ReadonlySet<string>,
+  projectReferences: readonly ts.ProjectReference[] | undefined,
+  lazyDependencies: boolean,
   /** Fails files with syntactic diagnostics the parser alone does not report; true to rebuild. */
   validate?: (program: ts.Program) => boolean,
 ): Session {
   let host = makeHost();
+  let fullWarmup = !lazyDependencies;
   /** Captured files whose warm-up overflowed: never warmed again. */
   const warmSkip = new Set<string>();
   let lastProgram: ts.Program | undefined;
   const compile = () => {
     statistics.programs++;
-    const program = ts.createProgram({ rootNames: roots(), options, host });
+    const program = ts.createProgram({
+      rootNames: roots(),
+      options,
+      host,
+      ...(projectReferences?.length ? { projectReferences } : {}),
+    });
     try {
       return { program, checker: program.getTypeChecker() };
     } catch (error) {
@@ -99,13 +107,19 @@ function openSession(
       throw error;
     }
   };
-  const warmAll = (
+  const warmProgram = (
     program: ts.Program,
     checker: ts.TypeChecker,
   ): string | undefined => {
+    const owned = fullWarmup ? undefined : new Set(program.getRootFileNames());
     for (const source of program.getSourceFiles()) {
       const path = fromVirtual(source.fileName);
-      if (path === undefined || !captured.has(path) || warmSkip.has(path))
+      if (
+        path === undefined ||
+        !captured.has(path) ||
+        warmSkip.has(path) ||
+        (owned && !owned.has(source.fileName))
+      )
         continue;
       const warm = (node: ts.Node): void => {
         if (ts.isVariableDeclaration(node) || ts.isBindingElement(node))
@@ -181,9 +195,10 @@ function openSession(
       }
       // A file failed by the syntax phase is absent from the next build.
       if (validate?.(compiled.program)) continue;
-      const failedWarm = warmAll(compiled.program, compiled.checker);
+      const failedWarm = warmProgram(compiled.program, compiled.checker);
       if (failedWarm === undefined) return compiled;
-      warmSkip.add(failedWarm);
+      if (fullWarmup) warmSkip.add(failedWarm);
+      fullWarmup = true;
     }
   };
   let current = build();
@@ -200,8 +215,11 @@ function openSession(
     failures,
     rebuilds: 0,
     rebuild() {
+      const broadened = !fullWarmup;
+      fullWarmup = true;
       session.rebuilds++;
       current = build();
+      return broadened;
     },
   };
   return session;
@@ -584,12 +602,14 @@ const module: LanguageModule = {
       if (!group.roots.length) continue;
       const roots = () =>
         group.roots.filter((root) => !model.parseFailures.has(root.slice(1)));
-      const normal = openSession(
+      let normal: Session | undefined = openSession(
         roots,
         group.options,
         () => model.host(group),
         model.parseFailures,
         captured,
+        group.references,
+        model.hasWorkspacePackages,
         // Any syntactic diagnostic fails a file: also the compiler's
         // syntax-phase checks the parser does not make (TypeScript-only
         // syntax in a JS file, TS8xxx).
@@ -604,14 +624,18 @@ const module: LanguageModule = {
           return failedAny;
         },
       );
+      let baseHost = normal.host;
+      const hostOfNormal = () => normal?.host ?? baseHost;
       const resolveModule = (specifier: string, from: string) => {
         const resolved = ts.resolveModuleName(
           specifier,
           toVirtual(from),
           group.options,
-          normal.host,
+          hostOfNormal(),
         ).resolvedModule?.resolvedFileName;
-        return resolved === undefined ? undefined : fromVirtual(resolved);
+        return resolved === undefined
+          ? undefined
+          : fromVirtual(hostOfNormal().realpath?.(resolved) ?? resolved);
       };
       /**
        * What a captured target file is. `script` means only: analysed, no
@@ -626,8 +650,8 @@ const module: LanguageModule = {
         if (model.parseFailures.has(path) || model.failures.has(path))
           return "unavailable";
         const source =
-          normal.program.getSourceFile(toVirtual(path)) ??
-          normal.host.getSourceFile(toVirtual(path), ts.ScriptTarget.Latest);
+          normal?.program.getSourceFile(toVirtual(path)) ??
+          hostOfNormal().getSourceFile(toVirtual(path), ts.ScriptTarget.Latest);
         // Parsing it just now may have found a syntax error.
         if (model.syntaxFailures.has(path)) return "invalid";
         if (!source) return "unavailable";
@@ -685,6 +709,7 @@ const module: LanguageModule = {
                 fresh: model.fresh,
                 ...(renamed ? { renamed } : {}),
                 resolveModule,
+                workspaceReason: model.workspaceReason,
                 skip,
                 moduleKind,
                 anyFailed: unseen.size > 0,
@@ -700,9 +725,8 @@ const module: LanguageModule = {
               session.rebuilds <= MAX_PROGRAM_REBUILDS
             ) {
               // The checker's state is untrustworthy after an overflow:
-              // rebuild it, and answer that node without asking next time.
-              skip.add(error.key);
-              session.rebuild();
+              // retry with dependencies warmed before omitting a lookup.
+              if (!session.rebuild()) skip.add(error.key);
               continue;
             }
             // Never leave an overflowed checker in use for the next file.
@@ -778,6 +802,10 @@ const module: LanguageModule = {
             neutralizeAssumed(source.text, offsets, model.fresh.uncertain),
           );
       }
+      // The differential pass shares the original parse cache. Its lookups
+      // do not need the original program or checker.
+      baseHost = normal.host;
+      normal = undefined;
       const assumed = new Map<string, Set<number>>();
       if (assumedTexts.size) {
         statistics.neutralPrograms++;
@@ -788,11 +816,13 @@ const module: LanguageModule = {
           () =>
             model.host(group, {
               texts: assumedTexts,
-              base: normal.host,
+              base: baseHost,
               failures,
             }),
           failures,
           captured,
+          group.references,
+          model.hasWorkspacePackages,
         );
         for (const [path, result] of analysed) {
           if (result.status === "failed") continue;

@@ -1487,7 +1487,10 @@ selector rules over the snapshot. Rust (`parse.ts`, `resolve.ts`, `cargo.ts`,
 `toml.ts`, `cfg.ts`) reads `Cargo.toml` as context with its own TOML reader and
 resolves modules, imports, paths and first-step inherent dot calls. TypeScript
 (`project.ts`, `extract.ts`, `symbols.ts`, `rename.ts`, `taint.ts`, `judge.ts`) is
-analyze-only: one compiler program per owning config over a snapshot-only host;
+analyze-only: one compiler program per owning config over a snapshot-only host.
+`workspace.ts` builds virtual install links from captured manifests and the
+compiler resolves their entries and project references. References to scoped
+declarations use compiler identities and retain one site per owner and target.
 `rename.ts` renames locally bound `require`/`module`/`exports` before the compiler
 sees them; `taint.ts` and `judge.ts` decide which links depend on a failed file.
 All three apply the whole-file rule. Support levels are in
@@ -1510,7 +1513,7 @@ symbol. Shape (`src/graph/types.ts` `LibraryTarget`, `GraphLibrary`):
 | `unit` | module path, crate, package name or standard-library unit |
 | `symbol` | optional symbol path in the unit, spelled as the unit spells it (level 2); absent for the unit itself (level 1) |
 | `version` | optional; only when the checkout's manifest or lockfile states it |
-| `versionSource` | required with a version, and only then: the project path of that manifest or lockfile. The store refuses it unless the path is a clean context file in the snapshot (and, during indexing, one of the module's own declared context files) |
+| `versionSource` | required with a version, and only then: the project path of that manifest or lockfile. Its file name must be one of the target ecosystem's manifests or lockfiles (`versionFiles` in `src/graph/identity.ts`: npm `package.json`, `package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `yarn.lock`, `bun.lock`, `bun.lockb`, `deno.json`, `deno.lock`; node `package.json`; go `go.mod`, `go.sum`, `go.work`, `go.work.sum`; go-std `go.mod`, `go.work`; cargo `Cargo.toml`, `Cargo.lock`; any other ecosystem takes no version), and the path must be a clean context file in the snapshot (during indexing, one of the module's own declared context files). A `tsconfig.json` or another ecosystem's manifest is refused |
 | `evidence` | required: how the source proves it (below) |
 | `id` | `library:` + sha256 of (ecosystem, unit, version, symbol): deterministic and independent of the project and of the evidence |
 

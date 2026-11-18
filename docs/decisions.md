@@ -2527,6 +2527,26 @@ only the tarball it builds and reports `npx pymtheg` from the registry as not
 verified; the package-contents test allows the owner's name only in the licence
 texts and the top-level `author` field. See [PUB-2](changes/PUB-2.md).
 
+## C-3: TypeScript lexical bindings and workspace packages
+
+TypeScript graph identities for local declarations include anonymous callback
+sites and enclosing blocks. Requirement links report ambiguous continuity when
+an edit leaves indistinguishable siblings. Existing references to plain local
+bindings record the enclosing symbol and the binding's name and span. Plain
+locals grant no additional symbol or link rows. Parameter values, import
+shadows and local callable declarations with detected writes stay unresolved
+at call sites.
+
+The snapshot host supplies virtual links for proven local package installs.
+TypeScript resolves the entry point with the importing file's compiler options
+and resolution mode. References can redirect declaration outputs to source when
+the compiler establishes the correspondence. Missing build output remains
+unresolved with a distinct reason when a compiler lookup probes an explicitly
+configured output directory.
+Relative extension lookup retains the release's module-file edge. The release's
+call declaration rule applies equally to relative imports, workspace imports
+and aliases.
+
 ### Indexing holds one copy of the graph at a time (C-2)
 
 **Decided (C-2):** the graph store no longer keeps decoded file records between
@@ -2566,7 +2586,7 @@ target, or a `declaring-owner` without the member. `declaring-owner` records
 a member whose declaring owner the module has proven (after alias, deref,
 trait or embedding selection, or from the type checker); a target guessed
 from the receiver's type alone is never recorded. A version must name the
-manifest or lockfile in the snapshot that states it (`versionSource`, a clean
+manifest or lockfile of the target's ecosystem, by file name, in the snapshot that states it (`versionSource`, a clean
 context file); the store checks that file is there, never the module's
 semantic proof, which the conformance kit and the language chunks' reviews
 carry. Graph schema 3 becomes 4: a schema-3
