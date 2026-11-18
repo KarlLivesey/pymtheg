@@ -2531,10 +2531,11 @@ texts and the top-level `author` field. See [PUB-2](changes/PUB-2.md).
 
 TypeScript graph identities for local declarations include anonymous callback
 sites and enclosing blocks. Requirement links report ambiguous continuity when
-an edit leaves indistinguishable siblings. Plain local bindings supply
-compiler information without allocating graph rows for declarations, reads or
-writes. Runtime call evidence excludes parameter values, import shadows,
-callable declarations with detected writes and declaration-only signatures.
+an edit leaves indistinguishable siblings. Existing references to plain local
+bindings record the enclosing symbol and the binding's name and span. Plain
+locals grant no additional symbol or link rows. Parameter values, import
+shadows and local callable declarations with detected writes stay unresolved
+at call sites.
 
 The snapshot host supplies virtual links for proven local package installs.
 TypeScript resolves the entry point with the importing file's compiler options
@@ -2542,6 +2543,9 @@ and resolution mode. References can redirect declaration outputs to source when
 the compiler establishes the correspondence. Missing build output remains
 unresolved with a distinct reason when a compiler lookup probes an explicitly
 configured output directory.
+Relative extension lookup retains the release's module-file edge. The release's
+call declaration rule applies equally to relative imports, workspace imports
+and aliases.
 
 ### Indexing holds one copy of the graph at a time (C-2)
 

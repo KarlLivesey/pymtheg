@@ -260,8 +260,7 @@ test("calls follow the checker: locals shadow imports, unions give candidates, a
       assert.equal(go[0].resolution, "ambiguous");
       assert.deepEqual(graph.candidates(go[0]), ["lib.ts#A.go", "lib.ts#B.go"]);
       assert.equal(graph.target(go[1]), "lib.ts#A.go");
-      assert.equal(go[2].resolution, "unresolved");
-      assert.equal(go[2].data.reason, "declaration-only-call");
+      assert.equal(graph.target(go[2]), "lib.ts#Port.go");
       assert.equal(go[3].resolution, "unresolved");
       assert.equal(go[3].targetName, "x.go");
     },
@@ -475,6 +474,8 @@ test("lexical references and calls use the declaration in the checker's scope", 
     'import { shadow } from "./outer";',
     "export function CommandPalette(callback: () => void, { project }: { project: string }) {",
     "  const title = project;",
+    "  type Title = typeof title;",
+    "  type Callback = typeof callback;",
     "  const submitNewProject = () => title;",
     "  let render = function () { return submitNewProject(); };",
     "  render();",
@@ -498,28 +499,65 @@ test("lexical references and calls use the declaration in the checker's scope", 
     "}",
   ].join("\n");
   await project(
-    { "outer.ts": "export function shadow() {}", "use.ts": source },
+    {
+      "outer.ts": "export function shadow() {}",
+      "use.ts": source,
+      "outer.cjs": "exports.shadow = function shadow() {};",
+      "use.cjs": [
+        'const { shadow } = require("./outer.cjs");',
+        "function run() { const shadow = () => {}; shadow(); }",
+        "exports.run = run;",
+      ].join("\n"),
+    },
     async (graph, report) => {
       clean(report);
       const target = (name, kind) =>
         graph.target(graph.link("use.ts", name, kind));
       assert.equal(
         target("submitNewProject", "calls"),
-        "use.ts#CommandPalette.submitNewProject",
+        "use.ts#CommandPalette.[local].submitNewProject",
       );
-      assert.equal(target("render", "calls"), "use.ts#CommandPalette.render");
-      assert.equal(target("Dialog", "calls"), "use.ts#CommandPalette.Dialog");
-      assert.equal(target("Mode", "references"), "use.ts#CommandPalette.Mode");
-      assert.equal(target("render", "references"), "use.ts#CommandPalette.render");
+      assert.equal(
+        target("render", "calls"),
+        "use.ts#CommandPalette.[local].render",
+      );
+      assert.equal(
+        target("Dialog", "calls"),
+        "use.ts#CommandPalette.[local].Dialog",
+      );
+      assert.equal(
+        target("Mode", "references"),
+        "use.ts#CommandPalette.[local].Mode",
+      );
+      assert.equal(
+        target("render", "references"),
+        "use.ts#CommandPalette.[local].render",
+      );
       for (const name of ["project", "title", "callback"]) {
-        assert.deepEqual(graph.links("use.ts", name, "references"), []);
         assert.deepEqual(graph.store.findSymbols({ file: "use.ts", name }), []);
+      }
+      assert.deepEqual(graph.links("use.ts", "project", "references"), []);
+      for (const [name, start] of [
+        ["title", source.indexOf("title =")],
+        ["callback", source.indexOf("callback:")],
+      ]) {
+        const reference = graph.link("use.ts", name, "references");
+        assert.equal(graph.target(reference), "use.ts#CommandPalette");
+        assert.deepEqual(reference.data.localBinding, {
+          name,
+          start,
+          end: start + name.length,
+        });
       }
       for (const name of ["callback", "shadow", "unstable", "alias"])
         assert.equal(
           graph.link("use.ts", name, "calls").resolution,
           "unresolved",
         );
+      assert.equal(
+        graph.link("use.cjs", "shadow", "calls").resolution,
+        "unresolved",
+      );
       const helpers = () =>
         graph
           .links("use.ts", "helper", "calls")
@@ -564,11 +602,11 @@ test("a generator callback calls the local emitRemoved in its enclosing generato
       const call = graph.link("session.ts", "emitRemoved", "calls");
       assert.equal(
         graph.target(call),
-        "session.ts#makeSessionCredentialService.emitRemoved",
+        "session.ts#makeSessionCredentialService.[local].emitRemoved",
       );
       assert.equal(
         graph.store.getSymbol(call.sourceId)?.identity,
-        "makeSessionCredentialService.revoke",
+        "makeSessionCredentialService.[local].revoke",
       );
     },
   );
@@ -601,10 +639,12 @@ test("pnpm subpath exports and checkout path dependencies use TypeScript's resol
         'import { resolveHome } from "@t3tools/shared/missing";',
         'import { linked } from "@pkg/linked";',
         'import { linked as localFile } from "@pkg/file";',
-        'import { plugin } from "@t3tools/shared/devHome";',
+        'import { plugin, load } from "@t3tools/shared/devHome";',
         'import "@pkg/excluded";',
         'import "external-package";',
         "resolveWorktreeT3Home(); resolveHome(); linked(); localFile(); plugin.run();",
+        "const alias = plugin; alias.run();",
+        "const made = load(); made.run(); made.callback();",
       ].join("\n"),
       "apps/server/require.cts":
         'import shared = require("@t3tools/shared/devHome"); shared.resolveWorktreeT3Home();',
@@ -618,8 +658,8 @@ test("pnpm subpath exports and checkout path dependencies use TypeScript's resol
       }),
       "packages/nested/shared/src/devHome.ts": [
         "export function resolveWorktreeT3Home() {}",
-        "interface Plugin { run(): void }",
-        "export function load(): Plugin { return { run() {} }; }",
+        "interface Plugin { run(): void; get callback(): () => void }",
+        "export function load(): Plugin { return { run() {}, callback() {} }; }",
         "export const plugin: Plugin = load();",
       ].join("\n"),
       "packages/nested/shared/src/missing.ts":
@@ -651,9 +691,17 @@ test("pnpm subpath exports and checkout path dependencies use TypeScript's resol
         graph.target(graph.link(file, "localFile", "calls")),
         "loose/index.js#linked",
       );
-      const member = graph.link(file, "run", "calls");
-      assert.equal(member.resolution, "unresolved");
-      assert.equal(member.data.reason, "declaration-only-call");
+      const members = graph.links(file, "run", "calls");
+      assert.equal(members.length, 3);
+      for (const member of [
+        ...members,
+        graph.link(file, "callback", "calls"),
+      ]) {
+        assert.equal(
+          graph.target(member),
+          `packages/nested/shared/src/devHome.ts#Plugin.${member.targetName.split(".").at(-1)}`,
+        );
+      }
       for (const name of ['"@t3tools/shared/missing"', "resolveHome"]) {
         const link = graph.link(
           file,
@@ -675,6 +723,48 @@ test("pnpm subpath exports and checkout path dependencies use TypeScript's resol
       );
       assert.equal(require.resolution, "unresolved");
       assert.equal(require.data.reason, "workspace-build-output-missing");
+    },
+  );
+});
+
+test("Yarn Plug'n'Play workspace access follows declared dependencies", async () => {
+  await project(
+    {
+      "package.json": JSON.stringify({
+        packageManager: "yarn@4.0.0",
+        workspaces: ["packages/*"],
+      }),
+      "packages/app/package.json": JSON.stringify({
+        name: "app",
+        dependencies: { declared: "workspace:*" },
+      }),
+      "packages/app/use.ts": [
+        'import { run } from "declared";',
+        'import { phantom } from "undeclared";',
+        "run(); phantom();",
+      ].join("\n"),
+      "packages/declared/package.json": JSON.stringify({
+        name: "declared",
+        main: "./index.ts",
+      }),
+      "packages/declared/index.ts": "export function run() {}",
+      "packages/undeclared/package.json": JSON.stringify({
+        name: "undeclared",
+        main: "./index.ts",
+      }),
+      "packages/undeclared/index.ts": "export function phantom() {}",
+    },
+    async (graph, report) => {
+      clean(report);
+      const use = "packages/app/use.ts";
+      assert.equal(
+        graph.target(graph.link(use, "run", "calls")),
+        "packages/declared/index.ts#run",
+      );
+      assert.equal(
+        graph.link(use, "phantom", "calls").resolution,
+        "unresolved",
+      );
     },
   );
 });
@@ -717,75 +807,142 @@ test("a TypeScript project reference can redirect a missing workspace declaratio
   );
 });
 
-test("workspace signatures cannot supply a runtime call through imports, aliases or factory results", async () => {
-  await project({
-    "package.json": JSON.stringify({ type: "module", workspaces: ["packages/*"] }),
-    "tsconfig.json": JSON.stringify({ compilerOptions: { module: "NodeNext" } }),
-    "packages/api/package.json": JSON.stringify({
-      name: "demo-api",
-      type: "module",
-      exports: { types: "./api.d.ts", default: "./runtime.js" },
-    }),
-    "packages/api/api.d.ts": [
-      "export interface Plugin { run(): void; get callback(): () => void; }",
-      "export declare function declared(): void;",
-      "export declare const plugin: Plugin;",
-      "export declare function make(): Plugin;",
-    ].join("\n"),
-    "packages/api/runtime.js": "export function declared() {}",
-    "use.ts": [
-      'import { declared, plugin, make } from "demo-api";',
-      "declared();",
-      "plugin.run();",
-      "const alias = plugin; alias.run();",
-      "const made = make(); made.run();",
-      "made.callback();",
-    ].join("\n"),
-  }, async (graph, report) => {
-    clean(report);
-    assert.equal(graph.target(graph.link("use.ts", "declared", "imports")), "packages/api/api.d.ts#declared");
-    for (const name of ["declared", "run", "make", "callback"]) {
-      const calls = graph.links("use.ts", name, "calls");
-      assert.equal(calls.length, name === "run" ? 3 : 1);
-      for (const call of calls) {
-        assert.equal(call.resolution, "unresolved");
-        assert.equal(call.data.reason, "declaration-only-call");
+test("workspace and relative imports retain the same declaration targets for calls", async () => {
+  const calls = [
+    "declared();",
+    "plugin.run();",
+    "const alias = plugin; alias.run();",
+    "const made = make(); made.run();",
+    "made.callback();",
+  ];
+  await project(
+    {
+      "package.json": JSON.stringify({
+        type: "module",
+        workspaces: ["packages/*"],
+      }),
+      "tsconfig.json": JSON.stringify({
+        compilerOptions: { module: "NodeNext" },
+      }),
+      "packages/api/package.json": JSON.stringify({
+        name: "demo-api",
+        type: "module",
+        exports: { types: "./api.d.ts", default: "./runtime.js" },
+      }),
+      "packages/api/api.d.ts": [
+        "export interface Plugin { run(): void; get callback(): () => void; }",
+        "export declare function declared(): void;",
+        "export declare const plugin: Plugin;",
+        "export declare function make(): Plugin;",
+      ].join("\n"),
+      "packages/api/runtime.js": "export function declared() {}",
+      "use.ts": [
+        'import { declared, plugin, make } from "demo-api";',
+        ...calls,
+      ].join("\n"),
+      "relative.ts": [
+        'import { declared, plugin, make } from "./packages/api/api.js";',
+        ...calls,
+      ].join("\n"),
+    },
+    async (graph, report) => {
+      clean(report);
+      assert.equal(
+        graph.target(graph.link("use.ts", "declared", "imports")),
+        "packages/api/api.d.ts#declared",
+      );
+      for (const file of ["use.ts", "relative.ts"]) {
+        for (const [name, identity] of [
+          ["declared", "declared"],
+          ["run", "Plugin.run"],
+          ["make", "make"],
+          ["callback", "Plugin.callback"],
+        ]) {
+          const found = graph.links(file, name, "calls");
+          assert.equal(found.length, name === "run" ? 3 : 1);
+          for (const call of found)
+            assert.equal(
+              graph.target(call),
+              `packages/api/api.d.ts#${identity}`,
+            );
+        }
       }
-    }
-  });
+    },
+  );
 });
 
 test("only configured output directories establish that a workspace entry needs building", async () => {
-  await project({
-    "package.json": JSON.stringify({ workspaces: ["packages/*"] }),
-    "packages/pkg/package.json": JSON.stringify({
-      name: "demo",
-      exports: { "./manual": "./lib/false-build.js", "./built": "./generated/output.js" },
-    }),
-    "packages/pkg/tsconfig.json": JSON.stringify({ compilerOptions: { outDir: "generated" } }),
-    "packages/pkg/lib/source.ts": "export const source = 1;",
-    "use.ts": 'import "demo/manual"; import "demo/built";',
-  }, async (graph, report) => {
-    clean(report);
-    assert.equal(graph.link("use.ts", '"demo/manual"', "imports").data.reason, "workspace-entry-unavailable");
-    assert.equal(graph.link("use.ts", '"demo/built"', "imports").data.reason, "workspace-build-output-missing");
-  });
+  await project(
+    {
+      "package.json": JSON.stringify({ workspaces: ["packages/*"] }),
+      "packages/pkg/package.json": JSON.stringify({
+        name: "demo",
+        exports: {
+          "./manual": "./lib/false-build.js",
+          "./built": "./generated/output.js",
+        },
+      }),
+      "packages/pkg/tsconfig.json": JSON.stringify({
+        compilerOptions: { outDir: "generated" },
+      }),
+      "packages/pkg/lib/source.ts": "export const source = 1;",
+      "use.ts": 'import "demo/manual"; import "demo/built";',
+    },
+    async (graph, report) => {
+      clean(report);
+      assert.equal(
+        graph.link("use.ts", '"demo/manual"', "imports").data.reason,
+        "workspace-entry-unavailable",
+      );
+      assert.equal(
+        graph.link("use.ts", '"demo/built"', "imports").data.reason,
+        "workspace-build-output-missing",
+      );
+    },
+  );
 });
 
 test("extension lookup preserves a relative module edge and augmentation leaves the selected entry intact", async () => {
-  await project({
-    "package.json": JSON.stringify({ type: "module", workspaces: ["packages/*"], scripts: {test: "vitest run"} }),
-    "tsconfig.json": JSON.stringify({ compilerOptions: { module: "NodeNext" } }),
-    "packages/pkg/package.json": JSON.stringify({ name: "demo", type: "module", exports: "./index.ts" }),
-    "packages/pkg/index.ts": "export function selected() {}",
-    "augment.ts": 'import "demo"; declare module "demo" { interface Added {} }',
-    "diagram-viewer.ts": "export const open = 1;",
-    "explorer.spec.ts": 'import "demo"; import "./diagram-viewer";',
-  }, async (graph, report) => {
-    clean(report);
-    assert.equal(graph.target(graph.link("explorer.spec.ts", '"demo"', "imports")), "packages/pkg/index.ts#packages/pkg/index.ts");
-    assert.equal(graph.target(graph.link("explorer.spec.ts", '"./diagram-viewer"', "imports")), "diagram-viewer.ts#diagram-viewer.ts");
-  });
+  await project(
+    {
+      "package.json": JSON.stringify({
+        type: "module",
+        workspaces: ["packages/*"],
+        scripts: { test: "vitest run" },
+      }),
+      "tsconfig.json": JSON.stringify({
+        compilerOptions: { module: "Node16" },
+      }),
+      "packages/pkg/package.json": JSON.stringify({
+        name: "demo",
+        type: "module",
+        exports: "./index.ts",
+      }),
+      "packages/pkg/index.ts": "export function selected() {}",
+      "augment.ts":
+        'import "demo"; declare module "demo" { interface Added {} }',
+      "diagram-viewer.ts": "export const open = 1;",
+      "explorer.spec.ts":
+        'import "demo"; import { open } from "./diagram-viewer"; void open;',
+    },
+    async (graph, report) => {
+      clean(report);
+      assert.equal(
+        graph.target(graph.link("explorer.spec.ts", '"demo"', "imports")),
+        "packages/pkg/index.ts#packages/pkg/index.ts",
+      );
+      const relative = graph.link(
+        "explorer.spec.ts",
+        '"./diagram-viewer"',
+        "imports",
+      );
+      assert.equal(
+        graph.target(relative),
+        "diagram-viewer.ts#diagram-viewer.ts",
+      );
+      assert.equal(relative.data.extensionFallback, true);
+    },
+  );
 });
 
 test("extends and implements resolve; an external base class stays unresolved with its name", async () => {
@@ -868,7 +1025,7 @@ test("symbols cover the declaration kinds with scoped identities and exact UTF-1
         "function Outer.Inner.deep",
         'function "ambient".amb',
         "function local",
-        "function local.nested",
+        "function local.[local].nested",
         "getter Shape.size",
         "interface global.Window",
         "method Klass.method",
@@ -1334,7 +1491,10 @@ test("constructor parameter properties are class properties", async () => {
       clean(report);
       for (const identity of ["A.cb", "A.id", "A.base", "Base.base"])
         graph.symbol("a.ts", identity, "property");
-      assert.deepEqual(graph.store.findSymbols({ file: "a.ts", name: "plain" }), []);
+      assert.deepEqual(
+        graph.store.findSymbols({ file: "a.ts", name: "plain" }),
+        [],
+      );
       assert.equal(
         graph.target(graph.link("a.ts", "cb", "calls")),
         "a.ts#A.cb",

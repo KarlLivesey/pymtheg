@@ -125,6 +125,7 @@ export function workspaceLinks(
       packages: Map<string, string | undefined>;
       paths: ReadonlySet<string>;
       pnpm: boolean;
+      hoist: boolean;
       linkVersions: boolean;
     }
   >();
@@ -138,6 +139,7 @@ export function workspaceLinks(
       roots.set(root, {
         ...members(root, settings.patterns, manifests, true),
         pnpm: true,
+        hoist: false,
         linkVersions: settings.linkVersions,
       });
   }
@@ -151,12 +153,16 @@ export function workspaceLinks(
     if (
       Array.isArray(patterns) &&
       patterns.every((pattern) => typeof pattern === "string")
-    )
+    ) {
+      const yarnMajor = /^yarn@(\d+)/.exec(String(json.packageManager))?.[1];
       roots.set(root, {
         ...members(root, patterns, manifests),
         pnpm: false,
+        // Yarn's Plug'n'Play layout only grants access to declared packages.
+        hoist: yarnMajor === undefined || Number(yarnMajor) < 2,
         linkVersions: false,
       });
+    }
   }
   const add = (directory: string, name: string, target: string) =>
     links.set(posix.join(directory, "node_modules", name), target);
@@ -216,7 +222,7 @@ export function workspaceLinks(
       const hoisted = workspace?.packages.get(name);
       if (
         inWorkspace &&
-        !inWorkspace.pnpm &&
+        inWorkspace.hoist &&
         hoisted !== undefined &&
         hoisted !== target
       )
@@ -225,7 +231,7 @@ export function workspaceLinks(
   }
   for (const link of conflicts) links.delete(link);
   for (const [root, workspace] of roots)
-    if (!workspace.pnpm)
+    if (workspace.hoist)
       for (const [name, target] of workspace.packages) {
         const link = posix.join(root, "node_modules", name);
         if (

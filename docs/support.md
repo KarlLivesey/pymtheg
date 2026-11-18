@@ -498,22 +498,25 @@ answer.
 - **Lexical declarations:** nested functions, function-valued `const` and
   `let` declarations, and local classes and enums have scoped symbols.
   References record the first expression use per enclosing symbol and target.
-  Plain local variables and parameters use compiler information during lookup.
-  Their declarations and read/write sites are omitted from the stored graph.
+  Existing `typeof` references to plain local bindings identify the enclosing
+  symbol and record the binding name and declaration span in `data.localBinding`.
+  Plain locals add zero symbol rows and zero new reference sites. Name lookup
+  lists top-level and exported declarations ahead of scoped ones.
 - **Checkout packages:** npm, Yarn and Bun workspace lists, pnpm workspace
   member links, and checkout-local `file:` and `link:` dependencies expose
   manifests to the compiler. TypeScript applies its own package export
   conditions, subpath rules, `main`, `types`, `paths` and project reference
   redirects within the snapshot. The selected module file has an entry edge
-  independent of any declaration augmentations. A captured relative module
-  can also be located by extension lookup.
+  independent of any declaration augmentations. When ESM-mode resolution
+  misses an extensionless relative import, the 0.1.0 extension lookup can
+  still establish its module-file edge. Named bindings use the checker.
+  Calls use the same declaration rule for relative imports, workspace imports
+  and local aliases, including when TypeScript selects a `types` export.
 - **Candidates:** several graph symbols for one callee (union receivers, merged
   declarations, duplicate JavaScript functions).
 - **Unresolved:** standard library and `node_modules` packages
   (`external`, `external-package`); computed `require` or `import()` specifiers;
   calls through parameters, import shadows, and reassigned local functions;
-  calls whose only targets are declaration files or signatures without an
-  implementation (`declaration-only-call`);
   installed workspace bindings with no captured entry
   (`workspace-entry-unavailable` or `workspace-build-output-missing` when
   TypeScript probed a missing path under a configured output directory).

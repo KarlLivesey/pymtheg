@@ -234,28 +234,6 @@ function overloadGroup(node: Member): { head: Member; tail: Member } {
   return { head, tail: list[end] as Member };
 }
 
-/** Type signatures can describe an implementation without identifying it. */
-export function declarationOnlyCall(
-  declaration: ts.Declaration,
-  anchor: ts.Node,
-): boolean {
-  return (
-    declaration.getSourceFile().isDeclarationFile ||
-    !!ts.findAncestor(
-      declaration,
-      (node) =>
-        ts.canHaveModifiers(node) &&
-        !!ts
-          .getModifiers(node)
-          ?.some((modifier) => modifier.kind === ts.SyntaxKind.DeclareKeyword),
-    ) ||
-    (!!declaration.parent && ts.isInterfaceDeclaration(declaration.parent)) ||
-    ts.isMethodSignature(declaration) ||
-    ts.isPropertySignature(declaration) ||
-    (isOverloadable(anchor) && bodiless(overloadGroup(anchor).tail))
-  );
-}
-
 /** Canonical symbol node for a declaration, or undefined when it is not a graph symbol. */
 export function anchorOf(node: ts.Node): ts.Node | undefined {
   if (ts.isSourceFile(node)) return node;
@@ -553,7 +531,9 @@ export function identityOf(anchor: ts.Node): string {
   const container = containerOf(anchor);
   const prefix =
     !container || ts.isSourceFile(container) ? "" : identityOf(container) + ".";
-  const scope = isScopedDeclaration(anchor) ? scopeOf(anchor, container) : "";
+  const scope = isScopedDeclaration(anchor)
+    ? scopeOf(anchor, container) || "[local]."
+    : "";
   return prefix + scope + (isStatic(anchor) ? "static " : "") + nameOf(anchor);
 }
 export function rangeOf(anchor: ts.Node): SourceRange {

@@ -144,6 +144,78 @@ test("linked TypeScript callbacks keep their original locations after a sibling 
   }
 });
 
+test("named hook callbacks and a preexisting top-level requirement keep their linked declarations", async () => {
+  const root = await project();
+  const options = { root, writer };
+  const path = join(root, "ts", "app.ts");
+  const effect = (key) => [
+    "  useEffect(() => {",
+    "    const handler = () => topHelper();",
+    "    handler();",
+    `  }, [${key}]);`,
+  ];
+  const source = (insert) =>
+    [
+      ...(insert
+        ? [
+            "[0].map(() => { function topHelper() { return 0; } return topHelper(); });",
+          ]
+        : []),
+      "export function topHelper() { return 1; }",
+      "declare function useEffect(callback: () => void, deps: number[]): void;",
+      "export function component() {",
+      ...(insert ? effect(2) : []),
+      ...effect(1),
+      "}",
+    ].join("\n");
+  try {
+    await writeFile(path, source(false));
+    await createRequirement({ ...options, id: "R1", title: "Effects" });
+    for (const selector of ["topHelper", "ts/app.ts:5"])
+      assert.equal(
+        (await createCodeLink({ ...options, record: "R1", selector })).status,
+        "created",
+      );
+    const before = new Map(
+      (await listCodeLinks(options)).links.map(({ link, current }) => [
+        link.symbol.name,
+        current.graphId,
+      ]),
+    );
+    await writeFile(path, source(true));
+    const links = (await listCodeLinks(options)).links.map(
+      ({ link, state, current }) => [
+        link.symbol.name,
+        state,
+        current?.line,
+        current?.graphId === before.get(link.symbol.name),
+      ],
+    );
+    assert.deepEqual(links.sort(), [
+      ["handler", "ok", 10, true],
+      ["topHelper", "ok", 2, true],
+    ]);
+    const lookup = JSON.parse(
+      (
+        await pym(
+          root,
+          "graph",
+          "symbol",
+          "topHelper",
+          "--limit",
+          "1",
+          "--json",
+        )
+      ).stdout,
+    );
+    assert.equal(lookup.status, "ambiguous");
+    assert.equal(lookup.truncated, true);
+    assert.equal(lookup.data.inputs[0].matches[0].line, 2);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("requirement ↔ Go/Rust/TypeScript links: states, rebuild, removal and history", async () => {
   const root = await project();
   const options = { root, writer };

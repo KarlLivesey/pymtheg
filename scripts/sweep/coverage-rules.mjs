@@ -27,6 +27,7 @@ export const countLines = (text) => text ? text.split("\n").length - Number(text
 export const packageName = (value) => /^(@[^/]+\/[^/]+|[^/@][^/]*)/.exec(value)?.[1];
 export const workspaceEntryMissing = (reason) =>
   reason === "workspace-entry-unavailable" || reason === "workspace-build-output-missing";
+const underlyingReason = (data) => data.reasonWithoutConfig ?? data.reason;
 export function workspaceNames(manifests, pnpmFiles) {
   const roots = [];
   for (const [path, doc] of manifests) {
@@ -295,8 +296,7 @@ export function classify(link, evidence, project) {
     if (origin?.path === "context" && ["CancelFunc", "CancelCauseFunc"].includes(origin.type)) return "outside";
   }
   if (module === "typescript") {
-    if (workspaceEntryMissing(data.reason)) return "inside";
-    if (data.reason === "declaration-only-call") return "unclassified";
+    if (workspaceEntryMissing(underlyingReason(data))) return "inside";
     const path = tsSpecifier(link, evidence);
     if (path && (link.data?.specifier || evidence.tsSpecifiers.has(path))) return tsPath(path, project, link.file);
     if (data.reference === "lib") return "outside";
@@ -421,8 +421,7 @@ function tsExternalIdentity(link, evidence, project, disposition) {
 export function externalIdentity(link, evidence, project, disposition) {
   if (link.resolution !== "unresolved") return null;
   const data = link.data ?? {};
-  if (data.cause || link.module === "typescript" &&
-    (workspaceEntryMissing(data.reason) || data.reason === "declaration-only-call")) return null;
+  if (data.cause || link.module === "typescript" && workspaceEntryMissing(underlyingReason(data))) return null;
   const observed = link.module === "go" ? goExternalIdentity(link, evidence, project)
     : link.module === "rust" ? rustExternalIdentity(link, evidence, project)
       : tsExternalIdentity(link, evidence, project, disposition);

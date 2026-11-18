@@ -63,7 +63,6 @@ import {
   bindingSpecifier,
   isCommonJsRequire,
   isJsFile,
-  declarationOnlyCall,
   isLocalCallable,
   isScopedDeclaration,
   keyOf,
@@ -299,7 +298,12 @@ export function extractFile(
   ): boolean {
     if (declaration.getSourceFile() !== file) return false;
     const name = symbol.getName();
-    const outer = checker.resolveName(name, file, ts.SymbolFlags.Alias, true);
+    const outer = checker.resolveName(
+      name,
+      file,
+      ts.SymbolFlags.Alias | ts.SymbolFlags.Value,
+      true,
+    );
     if (outer && outer !== symbol && bindingSpecifier(outer)) return false;
     if (
       ts.isVariableDeclaration(declaration) &&
@@ -352,7 +356,6 @@ export function extractFile(
     const facts = new Map<string, TargetFact>();
     let external = 0;
     let local = 0;
-    let declarationOnly = false;
     let viaAlias = false;
     let firstAlias: ts.Symbol | undefined;
     let declaredSomewhere = false;
@@ -366,10 +369,6 @@ export function extractFile(
       const anchor = anchorOf(declaration);
       if (!anchor) return false;
       if (meaning === "call") {
-        if (declarationOnlyCall(declaration, anchor)) {
-          declarationOnly = true;
-          return false;
-        }
         if (
           ts.isEnumDeclaration(anchor) &&
           !ts.isSourceFile(anchor.parent) &&
@@ -442,11 +441,7 @@ export function extractFile(
         (receiver && receiverReason(receiver)));
     const result: Targets = {
       targets,
-      reason: declarationOnly
-        ? "declaration-only-call"
-        : local
-          ? "local"
-          : moduleFailure || "external",
+      reason: local ? "local" : moduleFailure || "external",
       viaAlias,
       receiver,
       ...(!targets.length && !declaredSomewhere ? { noAnswer: true } : {}),
@@ -1608,14 +1603,37 @@ export function extractFile(
     } else if (ts.isTypeQueryNode(node)) {
       const name = node.exprName;
       const at = ts.isQualifiedName(name) ? name.right : name;
-      link(
-        owner,
-        "references",
-        name.getText(file),
-        name,
-        targetsOf(lookup(at), "value"),
-        { typeof: true },
-      );
+      const lookupResult = lookup(at);
+      let found = targetsOf(lookupResult, "value");
+      const extra: { [key: string]: Json } = { typeof: true };
+      const declaration = lookupResult.symbol?.valueDeclaration;
+      if (
+        found.reason === "local" &&
+        !found.targets.length &&
+        ts.isIdentifier(name) &&
+        declaration &&
+        declaration.getSourceFile() === file &&
+        lookupResult.symbol?.declarations?.length === 1 &&
+        (ts.isVariableDeclaration(declaration) ||
+          ts.isParameter(declaration) ||
+          ts.isBindingElement(declaration)) &&
+        ts.isIdentifier(declaration.name) &&
+        !anchorOf(declaration) &&
+        !insideWith(name)
+      ) {
+        let owner: ts.Node = declaration.parent;
+        let container = anchorOf(owner);
+        while (!container) {
+          owner = owner.parent;
+          container = anchorOf(owner);
+        }
+        extra.localBinding = {
+          name: restoreNames(declaration.name.text, context.fresh),
+          ...range(declaration.name),
+        };
+        found = { targets: [{ file: path, key: keyOf(container) }] };
+      }
+      link(owner, "references", name.getText(file), name, found, extra);
     } else if (
       ts.isExpressionWithTypeArguments(node) &&
       ts.isHeritageClause(node.parent)

@@ -451,8 +451,9 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys, pre
         }
         const disposition = classify(link, evidence, project);
         const library = externalIdentity(link, evidence, project, disposition);
+        const tsReason = link.data?.reasonWithoutConfig ?? link.data?.reason;
         const tsExternal = link.module === "typescript" && link.resolution === "unresolved" &&
-          (link.data?.reason === "external-package" || workspaceEntryMissing(link.data?.reason));
+          (link.data?.reason === "external-package" || workspaceEntryMissing(tsReason));
         const tsRoot = tsExternal ? /^(?:new\s+)?([\w$]+)(?:\??\.[\w$]+)?$/.exec(link.targetName)?.[1] : undefined;
         const specifier = tsExternal ? link.data?.specifier ?? (["imports", "exports"].includes(link.kind) ?
           evidence.tsSpecifierAt(link.range?.start) : evidence.tsImports().get(tsRoot)) : undefined;

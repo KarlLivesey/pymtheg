@@ -67,6 +67,7 @@ export interface ProjectGroup {
 }
 export interface ProjectModel {
   groups: ProjectGroup[];
+  hasWorkspacePackages: boolean;
   owner: Map<string, ProjectGroup>;
   /**
    * Files that two or more configs own equally (same containment, depth and
@@ -983,6 +984,7 @@ export function projectModel(
   };
   return {
     groups,
+    hasWorkspacePackages: fs.links.size > 0,
     owner,
     ties,
     failures,
