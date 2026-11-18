@@ -144,6 +144,53 @@ test("linked TypeScript callbacks keep their original locations after a sibling 
   }
 });
 
+test("a requirement link to an object member survives unrelated insertions", async () => {
+  const root = await project();
+  const options = { root, writer };
+  const path = join(root, "ts", "app.ts");
+  const source = [
+    "export function make() {",
+    "  return { run() { return 7; } };",
+    "}",
+    "export function run() { return 2; }",
+  ].join("\n");
+  try {
+    await writeFile(path, source);
+    await createRequirement({ ...options, id: "R1", title: "Run operation" });
+    assert.equal(
+      (
+        await createCodeLink({
+          ...options,
+          record: "R1",
+          selector: "ts/app.ts:2",
+        })
+      ).status,
+      "created",
+    );
+    const search = await pym(
+      root,
+      "graph",
+      "search",
+      "run",
+      "--limit",
+      "1",
+      "--json",
+    );
+    assert.equal(search.code, 0, search.stderr);
+    assert.equal(JSON.parse(search.stdout).data.matches[0].identity, "run");
+    await writeFile(
+      path,
+      "export const earlier = { run() { return 9; } };\n" + source,
+    );
+    const { state, current, link } = (await listCodeLinks(options)).links[0];
+    assert.equal(state, "ok");
+    assert.equal(current.line, 3);
+    assert.equal(link.symbol.identity, "make.[return].[object].run");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("named hook callbacks and a preexisting top-level requirement keep their linked declarations", async () => {
   const root = await project();
   const options = { root, writer };
