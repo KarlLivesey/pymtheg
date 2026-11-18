@@ -1,0 +1,64 @@
+{
+  "phase": "analyze",
+  "rustFiles": 1523,
+  "typescriptAndJavaScriptFiles": 50158,
+  "capturedRustLinks": 394584,
+  "sampledRootMs": {
+    "ordinaryPathLookup": 4507,
+    "receiverTypeExpansion": 1684,
+    "macroLookup": 343,
+    "outsidePathLookup": 275
+  },
+  "sampledSelfMs": {
+    "resolveUse": 2064,
+    "find": 1608,
+    "ownerPlace": 364,
+    "merge": 350,
+    "inScope": 340,
+    "lookupPath": 208
+  },
+  "observedLinkOrdinals": [
+    {
+      "file": "crates/swc_ecma_react_compiler/src/convert_ast.rs",
+      "ordinal": 250562
+    },
+    {
+      "file": "crates/swc_ecma_react_compiler/src/convert_ast.rs",
+      "ordinal": 251304
+    },
+    {
+      "file": "crates/swc_ecma_react_compiler/src/convert_ast_reverse.rs",
+      "ordinal": 251613
+    },
+    {
+      "file": "crates/swc_ecma_react_compiler/src/convert_ast_reverse.rs",
+      "ordinal": 253257
+    },
+    {
+      "file": "crates/swc_ecma_react_compiler/src/convert_ast_reverse.rs",
+      "ordinal": 254281
+    },
+    {
+      "file": "crates/swc_native_addon/src/cache.rs",
+      "ordinal": 359245
+    }
+  ],
+  "rustOnlyInMemoryProbe": {
+    "outcome": "diagnostic wall limit in Rust analysis",
+    "wallSeconds": 1201.42,
+    "peakRssKiB": 5265488
+  },
+  "analysisCompletionObservedByColdSeconds": 3427,
+  "coldOutcome": {
+    "stage": "cold",
+    "lastProgress": "graph analyze rust: 1523/1523",
+    "wallSeconds": 3568.02,
+    "peakRssKiB": 5663972
+  },
+  "postAnalysisMainThreadSampleMs": {
+    "total": 7744,
+    "replaceFileInclusive": 7512,
+    "transactionInclusive": 7438,
+    "validateResultInclusive": 29
+  }
+}

@@ -2233,6 +2233,17 @@ from later toolchain chunks. Tools outside the default build chain
 reason in itself, the mega-plan Stage 4 line that set rust-analyzer aside because
 it needs language toolchains.
 
+### C-1 Rust lookup reuse and cancellation
+
+An incomplete path lookup can be reused within one resolver pass when the
+module, visibility and configuration inputs match and its recorded recursion
+tests still have the same answers.
+Cache eviction leaves the resolver free to compute the same lookup afresh.
+The import depth boundary reports an unresolved reason when it prevents
+resolution. The graph coordinator owns the Rust CPU worker for each
+cancellable phase and awaits termination before returning cancellation.
+[C-1 change note](changes/C-1.md)
+
 ### Unreadable code is failed; the unit is the file
 
 **Decided (Karl, 11 November 2026, for all language modules):** unreadable code is

@@ -177,6 +177,7 @@ export interface ResolutionResult {
 }
 export interface ResolutionContext {
   projectId: string;
+  signal?: AbortSignal;
   /** Entire captured graph. Resolve from facts or the program constructed by analyze, never disk. */
   files: readonly GraphFile[];
   contextFiles: readonly ContextFile[];
@@ -207,6 +208,7 @@ export interface ToolchainRequest {
 }
 export interface ProjectAnalysisContext {
   projectId: string;
+  signal?: AbortSignal;
   /** Present only when the project opted in for this module's toolchain. */
   toolchain?: ToolchainRequest;
   /** All this module's captured sources, including unchanged/reopened files. */

@@ -13,7 +13,7 @@ export const contentHash = (text: string | Uint8Array): string =>
 const digest = (parts: unknown[]): string => contentHash(JSON.stringify(parts));
 export function fileFacts(
   projectId: string,
-  file: GraphFile,
+  file: Pick<GraphFile, "path" | "module" | "result">,
 ): { symbols: GraphSymbol[]; links: GraphLink[] } {
   const ordinals = new Map<string, number>();
   const ordered = [...file.result.symbols].sort(
