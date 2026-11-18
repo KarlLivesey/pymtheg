@@ -238,8 +238,11 @@ diagnostic). Partial files are not in it. Derived links are compared and stored
 one row at a time, so no single string holds a whole module's analysis; this
 does not make an arbitrarily large snapshot fit in memory. Each module's
 `resolve` receives its own independent copy of files, symbols, links and
-context files, decoded afresh from storage for that module, so a module that
-mutates its input cannot affect later modules or stored facts. The store keeps
+context files, so a module that mutates its input cannot affect later modules
+or stored facts. `SqliteGraphStore` declares `independentReads`: every read
+decodes fresh records from storage, and the indexer passes those to the module
+without copying them again. For a storage backend that does not declare it,
+the indexer deep-copies the module's input as before. The SQLite store keeps
 no decoded file between reads and indexing holds no whole-graph copy from one
 module to the next, so memory follows the largest single phase rather than the
 number of copies.

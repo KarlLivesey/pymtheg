@@ -2532,8 +2532,10 @@ texts and the top-level `author` field. See [PUB-2](changes/PUB-2.md).
 **Decided (C-2):** the graph store no longer keeps decoded file records between
 reads; every read decodes fresh, independent records. Resolution reads the graph
 afresh for each module and drops it before the next, instead of reading it once
-and deep-copying it (`structuredClone`) for every module. Added-link validation
-keeps only the files that receive added links, and the closing report counts
+and deep-copying it (`structuredClone`) for every module. The module gets the
+records as read only from a store that declares `independentReads`; any other
+`GraphStorage` still gets a deep copy. Added-link validation reads only the
+files that receive added links, and the closing report counts
 rows instead of decoding every symbol and link. **Why:** the decoded-file cache
 kept every source text and parse result alive for the whole run, and resolution
 held the cache, the indexer's own copy, each module's clone and the store's

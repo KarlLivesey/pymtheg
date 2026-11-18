@@ -163,3 +163,142 @@ test("a module's analysis write prepares each statement once, however many links
   assert.equal(prepared[0], prepared[1], JSON.stringify(prepared));
   assert.ok(prepared[0] <= 12, JSON.stringify(prepared));
 });
+
+/**
+ * A storage backend that does not declare independent reads: it caches its
+ * symbol list and returns the same records to every caller, and it lacks the
+ * optional light reads.
+ */
+function cachingAdapter(store) {
+  let symbols;
+  return {
+    projectId: store.projectId,
+    files: () => store.files(),
+    getFile: (path) => store.getFile(path),
+    contexts: () => store.contexts(),
+    replaceContexts: (files) => store.replaceContexts(files),
+    isParseFailure: (path) => store.isParseFailure(path),
+    replaceFile(file, parseFailure) {
+      symbols = undefined;
+      return store.replaceFile(file, parseFailure);
+    },
+    removeFile(path) {
+      symbols = undefined;
+      return store.removeFile(path);
+    },
+    findSymbols: (query) =>
+      query && Object.keys(query).length
+        ? store.findSymbols(query)
+        : (symbols ??= store.findSymbols()),
+    links: () => store.links(),
+    outgoing: (id, kind) => store.outgoing(id, kind),
+    incoming: (id, kind) => store.incoming(id, kind),
+    unresolved: () => store.unresolved(),
+    ambiguous: () => store.ambiguous(),
+    resolveLinks: (resolutions) => store.resolveLinks(resolutions),
+    replaceAnalysis: (module, result) => store.replaceAnalysis(module, result),
+    neighbourhood: (id, depth, kind) => store.neighbourhood(id, depth, kind),
+    close: () => store.close(),
+  };
+}
+
+test("a store that does not declare independent reads still gives each resolver its own input", async () => {
+  const scratch = await mkdtemp(join(tmpdir(), "pymtheg-index-shared-"));
+  let store;
+  try {
+    const root = join(scratch, "project");
+    await mkdir(root);
+    for (let i = 0; i < 5; i++)
+      await writeFile(join(root, `${i}.syn`), `source ${i}`);
+    store = new SqliteGraphStore(join(scratch, "graph.sqlite"), "shared");
+    // Runs first and scribbles over the symbols it was given.
+    const mutator = {
+      id: "mutator",
+      version: "1",
+      extensions: [".mut"],
+      parse: () => ({
+        status: "clean",
+        diagnostics: [],
+        symbols: [],
+        links: [],
+      }),
+      resolve({ symbols }) {
+        for (const symbol of symbols) {
+          symbol.name = "changed";
+          symbol.key = "changed";
+        }
+        return [];
+      },
+    };
+    const report = await indexProject(
+      root,
+      new LanguageRegistry([mutator, synthetic]),
+      cachingAdapter(store),
+    );
+    assert.deepEqual(report.resolutionErrors, []);
+    // Every parsed call resolves to its own symbol, as with an unshared store.
+    assert.equal(report.links, 5 * 30);
+    assert.equal(report.unresolved, 0);
+    assert.equal(report.ambiguous, 5 * 10);
+    assert.ok(store.findSymbols().every((symbol) => symbol.name !== "changed"));
+  } finally {
+    store?.close();
+    await rm(scratch, { recursive: true, force: true });
+  }
+});
+
+test("validating added links decodes only the files that receive them", async () => {
+  const { default: toy } = await import("../dist/graph/languages/toy/index.js");
+  const scratch = await mkdtemp(join(tmpdir(), "pymtheg-index-validate-"));
+  let store;
+  try {
+    const root = join(scratch, "project");
+    await mkdir(root);
+    await writeFile(join(root, "a.syn"), "source");
+    await writeFile(join(root, "z.toy"), "def z\ncall z\n");
+    store = new SqliteGraphStore(join(scratch, "graph.sqlite"), "validate");
+    // From the moment the synthetic resolver returns until the store writes
+    // its result, record which stored files are decoded.
+    let validating = false;
+    const decoded = [];
+    const resolveThenValidate = {
+      ...synthetic,
+      resolve(context) {
+        const result = synthetic.resolve({
+          ...context,
+          symbols: context.symbols.filter((s) => s.module === synthetic.id),
+        });
+        validating = true;
+        return result;
+      },
+    };
+    const replace = store.replaceAnalysis.bind(store);
+    store.replaceAnalysis = (...args) => {
+      validating = false;
+      return replace(...args);
+    };
+    const parse = JSON.parse;
+    JSON.parse = function (...args) {
+      const value = parse.apply(this, args);
+      if (validating && isFileRecord(value)) decoded.push(value.path);
+      return value;
+    };
+    let report;
+    try {
+      report = await indexProject(
+        root,
+        new LanguageRegistry([resolveThenValidate, toy]),
+        store,
+      );
+    } finally {
+      JSON.parse = parse;
+    }
+    assert.deepEqual(report.resolutionErrors, []);
+    // The synthetic resolver adds links to a.syn only.
+    assert.equal(store.linksForFile("a.syn").length, 30);
+    assert.deepEqual(decoded, ["a.syn"]);
+  } finally {
+    store?.close();
+    await rm(scratch, { recursive: true, force: true });
+  }
+});

@@ -20,6 +20,8 @@ import type {
 export class SqliteGraphStore implements GraphStorage {
   private readonly db: DatabaseSync;
   readonly projectId: string;
+  /** Every read decodes fresh records from storage; nothing is shared or cached. */
+  readonly independentReads = true as const;
   private readonly decodedContexts = new Map<string, ContextFile>();
   /** " INDEXED BY graph_file_status" when that covering index exists, else "".
    * Link reads join graph_files only for status, which is stored after the whole
@@ -198,6 +200,15 @@ export class SqliteGraphStore implements GraphStorage {
       .iterate())
       files.push(this.decodeFile(row.body as string));
     return files.sort((a, b) => compare(a.path, b.path));
+  }
+  filesAt(paths: readonly string[]): GraphFile[] {
+    const select = this.db.prepare("SELECT body FROM graph_files WHERE path=?");
+    const files: GraphFile[] = [];
+    for (const path of [...new Set(paths)].sort(compare)) {
+      const row = select.get(path);
+      if (row) files.push(this.decodeFile(row.body as string));
+    }
+    return files;
   }
   /** Path, module and status of every stored file, without decoding records. */
   fileSummaries(): {

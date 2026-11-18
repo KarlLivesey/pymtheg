@@ -352,8 +352,9 @@ export async function indexProject(
     if (module.analyze) await analyzeModule(module);
   // Resolution reads the graph afresh for each module and keeps nothing
   // between modules: no whole-graph copy outlives the module that needs it.
-  // Every read decodes independent records, so a module's mutations cannot
-  // reach the indexer, the store or the next module (C-2).
+  // A module's input is its own: records from a store that declares
+  // independent reads, a deep copy otherwise. Its mutations cannot reach the
+  // indexer, the store or the next module (C-2).
   const resolveModule = async (module: LanguageModule): Promise<void> => {
     const ownContexts = contexts.filter((file) =>
       needsContext(module, file.path),
@@ -379,8 +380,8 @@ export async function indexProject(
       }
       const needed = new Map<string, GraphFile>();
       if (wanted.size)
-        for (const file of await read(() => store.files()))
-          if (wanted.has(file.path)) needed.set(file.path, file);
+        for (const file of await read(() => filesAt(store, [...wanted])))
+          needed.set(file.path, file);
       resolutionFacts(
         store.projectId,
         module.id,
@@ -451,19 +452,25 @@ async function runResolve(
   contexts: readonly ContextFile[],
 ): Promise<readonly LinkResolution[] | ResolutionResult> {
   if (!module.resolve) return [];
+  // Only a store that declares independent reads is trusted not to share
+  // records with itself or with the next module; any other gets a deep copy.
+  const own = <T>(value: T): T =>
+    store.independentReads === true ? value : structuredClone(value);
   return (
     (await module.resolve({
       projectId: store.projectId,
-      files: await read(() => store.files()),
+      files: own(await read(() => store.files())),
       contextFiles: structuredClone(contexts),
-      symbols: await read(() => store.findSymbols()),
-      links: (await read(() => parsedLinks(store, module.id))).map((link) => ({
-        ...link,
-        targetId: null,
-        targetStatus: null,
-        candidates: [],
-        resolution: "unresolved" as const,
-      })),
+      symbols: own(await read(() => store.findSymbols())),
+      links: own(await read(() => parsedLinks(store, module.id))).map(
+        (link) => ({
+          ...link,
+          targetId: null,
+          targetStatus: null,
+          candidates: [],
+          resolution: "unresolved" as const,
+        }),
+      ),
     })) ?? []
   );
 }
@@ -485,6 +492,12 @@ async function summaries(store: GraphStorage) {
       status: file.result.status,
     }))
   );
+}
+/** Stored files at these paths; a store without filesAt is read in full and filtered. */
+async function filesAt(store: GraphStorage, paths: readonly string[]) {
+  if (store.filesAt) return await store.filesAt(paths);
+  const wanted = new Set(paths);
+  return (await store.files()).filter((file) => wanted.has(file.path));
 }
 async function parsedLinks(store: GraphStorage, module: string) {
   return (

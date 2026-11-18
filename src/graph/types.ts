@@ -188,8 +188,17 @@ export interface FailedFile {
 }
 export interface GraphStorage {
   readonly projectId: string;
+  /**
+   * Declared by a store whose every read (files, getFile, filesAt, findSymbols,
+   * links, moduleLinks) returns freshly decoded records that share nothing
+   * with the store or with earlier reads. The indexer then hands them to a
+   * module as they are; otherwise it hands the module a deep copy.
+   */
+  readonly independentReads?: true;
   files(): StorageResult<GraphFile[]>;
   getFile(path: string): StorageResult<GraphFile | undefined>;
+  /** Optional: the stored files at these paths (absent paths are skipped), decoding no others. */
+  filesAt?(paths: readonly string[]): StorageResult<GraphFile[]>;
   /**
    * Optional light listing (path, module, status) that decodes no records.
    * The indexer otherwise derives it from files().

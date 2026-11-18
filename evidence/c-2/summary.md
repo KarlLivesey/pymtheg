@@ -50,7 +50,8 @@ Tools are in [`tools/`](tools/):
 
 "Done (exit 2)" is the sweep's `incomplete`: the graph is complete and some
 files failed to read, the same as before the change. The 12 repositories
-that finished before are a mix of 6 TypeScript, 3 Go and 3 Rust; the
+that finished before are 5 TypeScript, 4 Go and 3 Rust by the sweep's
+language labels; the
 required nestjs/nest, excalidraw, cli/cli and helix are among them.
 
 Ask 1 in the task, identity: every stored row on all 12 is byte-identical,
@@ -65,6 +66,10 @@ Peak RSS per 1,000 stored files falls as checkouts grow: about 0.35–7.6 GB on
 small and medium repositories, 0.13–0.8 GB on the large ones. Fixed costs
 dominate small checkouts: Node, the compiler and the language library files.
 
+After the review fixes (`independentReads`, `filesAt`), cobra and restic
+were indexed again on the new head and on `c2573cb`. The digests are
+unchanged: `4cc5a16c…` and `2525620f…`.
+
 ### Headroom
 
 | Repository | Heap cap | Outcome | Largest heap after a full GC, MiB | Peak RSS MiB | Stored records vs default heap |
@@ -73,9 +78,13 @@ dominate small checkouts: Node, the compiler and the language library files.
 | vercel/turborepo | 3,072 MB | done (exit 2) | 1,962 | 3,326 | identical |
 | T3 Code `b387e3a1`, own code | 3,072 MB | done (exit 2) | 2,542 | 3,491 | identical |
 
-At a 2,048 MB cap, my build before the statement fix ran out of heap on
-T3 Code `b387e3a1`, the TypeScript repository and Turborepo. So the largest
-checkouts need between 2 and 3 GB of heap. The default limit is 4.2 GB.
+The 3,072 MB runs above used commit `706fc5a`, whose source is the same
+as the reviewed head `c2573cb`. The 2,048 MB runs used an earlier revision:
+commit `597bf71`, before statement reuse. At that cap it ran out of heap on
+T3 Code `b387e3a1`, the TypeScript repository and Turborepo. Statement
+reuse changes native memory, not the V8 heap, but the 2 GB runs were not
+repeated on the final revision. So the largest checkouts need between 2 and
+3 GB of heap. The default limit is 4.2 GB.
 
 ### Digests
 
@@ -181,15 +190,21 @@ reclaimed until a full collection.
 
 ## Tests
 
-Full suite on the dev server: 2,935 tests, 2,935 pass. `npm run
+Full suite on the dev server after the review fixes: 2,937 tests, 2,937 pass. `npm run
 format:check` is clean.
 
-`test/graph-index-memory.test.mjs` checks two things:
+`test/graph-index-memory.test.mjs` checks four things:
 - Live decoded records, counted with `v8.queryObjects`: zero after every
   run, and one per file while each module resolves.
 - Statements prepared during a module's analysis write: 7 for both 20 and
   80 files. The old build prepares 1,403 and 5,603.
+- With a storage adapter that caches its symbol list and does not declare
+  independent reads, a resolver that rewrites symbol names and keys cannot
+  change the next resolver's results. This fails on `c2573cb`, which passed
+  such a store's records through uncopied, and passes on `main`.
+- Validating added links decodes only the files that receive them: `a.syn`,
+  not the unrelated `z.toy`. This fails on `c2573cb` and on `main`.
 
-Both checks fail on the old build. The first fails there because 100 file
-records are cloned. It also fails on this branch before the analyze and
+The first two checks fail on the old build. The first fails there because
+120 file records are cloned (cold run, 20 files). It also fails on this branch before the analyze and
 resolve phases moved into their own frames: 40 live records instead of 20.
