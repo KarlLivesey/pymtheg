@@ -107,6 +107,9 @@ export function fileConstraint(fact: FileFact): Formula | undefined {
     if (!parsed) return undefined;
     formula = parsed;
   }
+  // A cgo file (`import "C"`) is built only with cgo.
+  if (fact.imports.some((item) => item.path === "C"))
+    formula = and(formula, { k: "v", n: "cgo" });
   if (fact.goos !== undefined) formula = and(formula, { k: "v", n: fact.goos });
   if (fact.goarch !== undefined)
     formula = and(formula, { k: "v", n: fact.goarch });

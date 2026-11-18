@@ -771,3 +771,50 @@ test("an embedding anonymous struct inside field-only ones keeps its 0.1.0 ident
     "Commit",
   ].sort());
 });
+
+test("build variants: the declaration every build of the file includes, and cgo files", async () => {
+  // pebble tool/make_test_find_db.go declares `db` behind its own tag, as
+  // another tool file does; mattn/go-sqlite3: a cgo file and a `!cgo` mock.
+  const { links } = await project({
+    "go.mod": MOD,
+    "tool/make_test_find_db.go": lines(
+      "//go:build make_test_find_db",
+      "",
+      "package tool",
+      "type db struct{ comparer int }",
+      "func (d *db) use() int { return d.comparer }",
+    ),
+    "tool/make_other.go": lines(
+      "//go:build make_other",
+      "",
+      "package tool",
+      "type db struct{ other int }",
+    ),
+    "s/sqlite3.go": lines(
+      "package s",
+      'import "C"',
+      "type SQLiteConn struct{ db int }",
+    ),
+    "s/static_mock.go": lines(
+      "//go:build !cgo",
+      "",
+      "package s",
+      "type SQLiteConn struct{}",
+    ),
+    "s/load_extension.go": lines(
+      "//go:build !sqlite_omit_load_extension",
+      "",
+      "package s",
+      'import "C"',
+      "func (c *SQLiteConn) load() int { return c.db }",
+    ),
+  });
+  assert.equal(
+    at(links, "tool/make_test_find_db.go", "d.comparer").target,
+    "tool/make_test_find_db.go:field:db.comparer",
+  );
+  assert.equal(
+    at(links, "s/load_extension.go", "c.db").target,
+    "s/sqlite3.go:field:SQLiteConn.db",
+  );
+});

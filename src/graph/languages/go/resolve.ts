@@ -1680,11 +1680,18 @@ class GoResolver {
   ): Selection | { group: string; size: number } {
     let unchosen: { group: string; size: number } | undefined;
     const pick = (set: GraphSymbol[]): GraphSymbol[] => {
-      // Only the variants that can be built with the referencing file.
+      // Only the variants that can be built with the referencing file; one
+      // that every build of it includes is the only one (two declarations of
+      // a name are never in one valid build).
       const buildable =
         from === undefined
           ? set
           : set.filter((type) => this.buildTogether(from, type.file) !== false);
+      const included =
+        from === undefined
+          ? []
+          : buildable.filter((type) => this.includedWith(from, type.file));
+      if (included.length === 1) return included;
       const variants = unique(buildable.length ? buildable : set).sort(
         (a, b) => compareText(a.file, b.file) || compareText(a.id, b.id),
       );
@@ -1863,6 +1870,13 @@ class GoResolver {
     if (!method || !declared) return undefined;
     if (implies(declared, method) === true) return true;
     return satisfiable([declared, method]) === false ? false : undefined;
+  }
+  /** Is `path` in every build that includes `from`? */
+  private includedWith(from: string, path: string): boolean {
+    if (from === path) return true;
+    const x = this.constraintOf(from);
+    const y = this.constraintOf(path);
+    return !!x && !!y && implies(x, y) === true;
   }
   /** Can these two files be in one build (false only when proved not)? */
   private buildTogether(a: string, b: string): boolean | undefined {
