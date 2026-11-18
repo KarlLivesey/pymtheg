@@ -627,6 +627,10 @@ test("static object destructuring follows factory members and reachable defaults
     Reflect.set({ reflected: createDeferredQueue() }, "reflected", backup(), reflective);
     const { reflected } = reflective;
     reflected.resolveOldest();
+    const extended = {};
+    Object.assign(extended, { added: backup() });
+    const { added = createDeferredQueue() } = extended as { added?: ReturnType<typeof createDeferredQueue> };
+    added.resolveOldest();
   `;
   await project(
     {
@@ -665,7 +669,11 @@ test("static object destructuring follows factory members and reachable defaults
         assert.equal(call.resolution, "ambiguous", at);
         assert.deepEqual(graph.candidates(call), [backup, primary], at);
       }
-      for (const at of ["changing.resolveOldest", "reflected.resolveOldest"]) {
+      for (const at of [
+        "changing.resolveOldest",
+        "reflected.resolveOldest",
+        "added.resolveOldest",
+      ]) {
         const call = callAt(at);
         assert.equal(call.resolution, "unresolved", at);
         assert.equal(call.data.reason, "object-producer-unverified", at);

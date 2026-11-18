@@ -92,6 +92,7 @@ export function objectProducers(
     | {
         bindings: Map<ts.Symbol, (ts.Expression | null)[]>;
         properties: Map<string, Set<ts.Expression>>;
+        openProperties: Set<ts.Expression>;
       }
     | undefined;
 
@@ -118,12 +119,14 @@ export function objectProducers(
     if (writes) return writes;
     const bindings = new Map<ts.Symbol, (ts.Expression | null)[]>();
     const properties = new Map<string, Set<ts.Expression>>();
+    const openProperties = new Set<ts.Expression>();
     const addProperty = (name: string, target: ts.Expression) => {
       const previous = properties.get(name);
       if (previous) previous.add(target);
       else properties.set(name, new Set([target]));
     };
     const addProperties = (target: ts.Expression) => {
+      openProperties.add(target);
       for (const member of checker.getPropertiesOfType(
         checker.getTypeAtLocation(target),
       ))
@@ -188,7 +191,7 @@ export function objectProducers(
     };
     for (const file of program.getSourceFiles())
       if (!file.isDeclarationFile) scan(file);
-    return (writes = { bindings, properties });
+    return (writes = { bindings, properties, openProperties });
   }
 
   function combine<T>(
@@ -290,10 +293,14 @@ export function objectProducers(
   ): boolean {
     // A write to the same key matters if it can reach this literal or the
     // receiver is opaque. A different proven literal does not alias it.
-    for (const target of knownWrites().properties.get(name) ?? []) {
+    const { properties, openProperties } = knownWrites();
+    for (const target of properties.get(name) ?? []) {
       const objects = read(target, depth);
       if (!objects || objects.includes(object)) return true;
     }
+    // A direct dynamic write can also add a key absent from the target's type.
+    for (const target of openProperties)
+      if (read(target, depth)?.includes(object)) return true;
     return false;
   }
 
