@@ -37,6 +37,8 @@ const MAX_DEPTH = 12;
 /** Embedding depth and per-depth path limits for selector search; beyond them: not known. */
 const MAX_EMBED_DEPTH = 6;
 const MAX_EMBED_PATHS = 64;
+/** Configurations (choices of build variant) one selection may search; beyond: not known. */
+const MAX_VARIANT_RUNS = 32;
 
 interface Pkg {
   key: string;
@@ -126,6 +128,11 @@ interface View {
   declared?: (name: string) => GraphSymbol[];
   /** Only because of a type outside the project (cannot hold project-unexported names). */
   externalOnly?: true;
+  /**
+   * A type declared in several build variants: a method of this name is
+   * declared in a file that may or may not be built with this variant.
+   */
+  uncertain?: (name: string) => boolean;
 }
 interface InterfaceMethod {
   /** Name, plus the declaring package for an unexported name. */
@@ -1468,10 +1475,30 @@ class GoResolver {
       underlyingPointer?: boolean;
     };
     const pkg = this.pkgOf(type);
-    const own = (name: string) =>
+    // A type declared in several build variants: each declaration has its
+    // own fields, and a method belongs to it only when its file can be built
+    // with the declaration's file (`buildsWith`).
+    const variants =
+      !!pkg &&
+      (this.decls.get(pkg.key)?.get(type.name) ?? []).filter(isTypeSymbol)
+        .length > 1;
+    const all = (name: string) =>
       pkg
         ? (this.members.get(`${pkg.key}\u0000${type.name}\u0000${name}`) ?? [])
         : [];
+    const own = (name: string) =>
+      all(name).filter((symbol) =>
+        symbol.kind === "field"
+          ? symbol.file === type.file
+          : !variants || this.buildsWith(symbol.file, type.file) === true,
+      );
+    const uncertain = (name: string) =>
+      variants &&
+      all(name).some(
+        (symbol) =>
+          symbol.kind !== "field" &&
+          this.buildsWith(symbol.file, type.file) === undefined,
+      );
     const declared = (name: string) =>
       own(name).filter((symbol) => symbol.kind === "method");
     const unknown = (externalOnly = false): View => ({
@@ -1570,6 +1597,7 @@ class GoResolver {
       const known = result.members;
       result = { members: known, declared: known, embedded: [], unknown: true };
     }
+    if (variants && !result.iface) result = { ...result, uncertain };
     if (this.cutoffs === cutoffs) this.views.set(type.id, result);
     return result;
   }
@@ -1598,9 +1626,68 @@ class GoResolver {
       )}\u0000${name}\u0000${access ?? ""}\u0000${from === undefined ? "" : this.files.get(from)?.fact.test ? `t:${directoryOf(from)}` : "n"}`;
     const cached = this.selections.get(memoKey);
     if (cached) return cached;
+    // A type declared in several build variants is a different type in each
+    // configuration: search each choice of variant separately (choosing only
+    // when a variant set is reached), and agree only on what they all find.
+    const results: Selection[] = [];
+    const pending: Map<string, number>[] = [new Map()];
+    let runs = 0;
+    let result: Selection | undefined;
+    while (pending.length) {
+      if (++runs > MAX_VARIANT_RUNS) {
+        result = { kind: "unknown" };
+        break;
+      }
+      const choice = pending.pop()!;
+      const run = this.selectIn(
+        types,
+        name,
+        from,
+        access,
+        skipExternal,
+        choice,
+      );
+      if ("group" in run)
+        for (let index = run.size - 1; index >= 0; index--)
+          pending.push(new Map(choice).set(run.group, index));
+      else results.push(run);
+    }
+    result ??= combineVariants(results);
+    this.selections.set(memoKey, result);
+    return result;
+  }
+
+  /**
+   * Go's selector rule for one choice of build variant per variant set
+   * (`choice`, keyed by the set). A variant set without a choice stops the
+   * search and is returned (`group`, with its size) for the caller to choose.
+   */
+  private selectIn(
+    types: GraphSymbol[],
+    name: string,
+    from: string | undefined,
+    access: string | undefined,
+    skipExternal: boolean,
+    choice: Map<string, number>,
+  ): Selection | { group: string; size: number } {
+    let unchosen: { group: string; size: number } | undefined;
+    const pick = (set: GraphSymbol[]): GraphSymbol[] => {
+      const variants = unique(set).sort(
+        (a, b) => compareText(a.file, b.file) || compareText(a.id, b.id),
+      );
+      if (variants.length < 2) return variants;
+      const group = variants.map((symbol) => symbol.id).join(",");
+      const index = choice.get(group);
+      if (index === undefined) {
+        unchosen ??= { group, size: variants.length };
+        return [];
+      }
+      return [variants[index]!];
+    };
     let level: { types: GraphSymbol[]; pointer: boolean; path: string[] }[] = [
-      { types: unique(types), pointer: false, path: [] },
+      { types: pick(types), pointer: false, path: [] },
     ];
+    if (unchosen) return unchosen;
     let externalAt: number | undefined;
     let result: Selection = { kind: "none" };
     const causes: string[] = [];
@@ -1643,6 +1730,9 @@ class GoResolver {
               );
           }
         });
+        // A method that may or may not be built with this variant: not known.
+        if (views.some((item) => item.uncertain?.(name)))
+          externalAt = Math.min(externalAt ?? depth, depth);
         const found: GraphSymbol[] = [];
         // Interfaces: a flat method set; identical methods inherited along several
         // paths merge, so it is one occurrence and is not expanded further.
@@ -1694,7 +1784,7 @@ class GoResolver {
           const ids = item.value.syms.map((symbol) => symbol.id);
           if (ids.some((id) => node.path.includes(id))) continue; // embedding cycle
           next.push({
-            types: item.value.syms,
+            types: pick(item.value.syms),
             pointer: node.pointer || item.pointer,
             path: [...node.path, ...ids],
           });
@@ -1704,6 +1794,8 @@ class GoResolver {
         result = { kind: "unknown" };
         break;
       }
+      // A variant set at the next depth matters only if nothing is found here.
+      if (unchosen && !occurrences.length) return unchosen;
       if (occurrences.length === 1) {
         result = { kind: "found", ...occurrences[0]! };
         break;
@@ -1722,8 +1814,33 @@ class GoResolver {
     // Unknown because of code in failed files: the selection fails with them.
     if (result.kind === "unknown" && causes.length)
       result = { kind: "failed", cause: unique(causes).sort() };
-    this.selections.set(memoKey, result);
     return result;
+  }
+
+  /**
+   * Can a file be built together with another? Yes for the same file, an
+   * unconstrained file or the same constraint; no for different GOOS or GOARCH
+   * filename suffixes without a build line; otherwise not known.
+   */
+  private buildsWith(path: string, other: string): boolean | undefined {
+    if (path === other) return true;
+    const a = this.files.get(path)?.fact;
+    const b = this.files.get(other)?.fact;
+    if (!a || !b) return undefined;
+    if (a.build === undefined && a.goos === undefined && a.goarch === undefined)
+      return true;
+    if (a.build === b.build && a.goos === b.goos && a.goarch === b.goarch)
+      return true;
+    if (
+      a.build === undefined &&
+      b.build === undefined &&
+      ((a.goos !== undefined && b.goos !== undefined && a.goos !== b.goos) ||
+        (a.goarch !== undefined &&
+          b.goarch !== undefined &&
+          a.goarch !== b.goarch))
+    )
+      return false;
+    return undefined;
   }
 
   /** Interface methods named `name` through interface embedding (cycle-safe by path). */
@@ -3700,4 +3817,32 @@ function ordered(context: ResolutionContext): ResolutionContext {
         compareText(a.id, b.id),
     ),
   };
+}
+
+/**
+ * One answer from the answers of every configuration: definite only when all
+ * find the same declarations; all found but different: the set of their
+ * answers (build variants are candidates); any unknown or failed: that;
+ * otherwise (found in some, missing or ambiguous in others): ambiguous.
+ */
+function combineVariants(results: Selection[]): Selection {
+  if (results.length === 1) return results[0]!;
+  const causes = results.flatMap((item) =>
+    item.kind === "failed" ? item.cause : [],
+  );
+  if (causes.length) return { kind: "failed", cause: unique(causes).sort() };
+  if (results.some((item) => item.kind === "unknown")) return { kind: "unknown" };
+  const syms = unique(
+    results.flatMap((item) =>
+      item.kind === "found" || item.kind === "ambiguous" ? item.syms : [],
+    ),
+  );
+  if (!syms.length) return { kind: "none" };
+  if (results.every((item) => item.kind === "found"))
+    return {
+      kind: "found",
+      syms,
+      pointer: results.some((item) => item.kind === "found" && item.pointer),
+    };
+  return { kind: "ambiguous", syms };
 }

@@ -6,6 +6,16 @@
 // external interface).
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { execFile } from "node:child_process";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { promisify } from "node:util";
+import {
+  checkCodeLinks,
+  createCodeLink,
+  createRequirement,
+} from "../dist/architecture/code-links.js";
 import { project } from "./fixtures/graph-go/harness.mjs";
 
 const MOD = "module example.com/m\n\ngo 1.22\n";
@@ -49,11 +59,11 @@ test("cobra table test: fields of a ranged map of anonymous structs, also inside
   });
   assert.equal(
     at(links, "args_test.go", "tc.args").target,
-    "args_test.go:field:args_test.go:TestMatchAll.struct#1.args",
+    "args_test.go:field:args_test.go:TestMatchAll.anon#1.args",
   );
   assert.equal(
     at(links, "args_test.go", "tc.fail").target,
-    "args_test.go:field:args_test.go:TestMatchAll.struct#1.fail",
+    "args_test.go:field:args_test.go:TestMatchAll.anon#1.fail",
   );
 });
 
@@ -82,17 +92,17 @@ test("slice, array, map value and key, channel receive and range variables of an
     ),
   });
   const target = (text) => at(links, "q/q.go", text).target;
-  assert.equal(target("tc.kid"), "q/q.go:field:q.go:Use.struct#2.kid");
+  assert.equal(target("tc.kid"), "q/q.go:field:q.go:Use.anon#2.kid");
   assert.equal(target("tc.kid.Run"), "q/q.go:method:(Kid).Run");
-  assert.equal(target("tests[0].name"), "q/q.go:field:q.go:Use.struct#2.name");
-  assert.equal(target("arr[1].A"), "q/q.go:field:q.go:Use.struct#3.A");
-  assert.equal(target("k.K"), "q/q.go:field:q.go:Use.struct#4.K");
-  assert.equal(target("v.V"), "q/q.go:field:q.go:Use.struct#5.V");
+  assert.equal(target("tests[0].name"), "q/q.go:field:q.go:Use.anon#2.name");
+  assert.equal(target("arr[1].A"), "q/q.go:field:q.go:Use.anon#3.A");
+  assert.equal(target("k.K"), "q/q.go:field:q.go:Use.anon#4.K");
+  assert.equal(target("v.V"), "q/q.go:field:q.go:Use.anon#5.V");
   assert.equal(target("v.V.Run"), "q/q.go:method:(Kid).Run");
-  assert.equal(target("(<-c).C"), "q/q.go:field:q.go:Use.struct#1.C");
+  assert.equal(target("(<-c).C"), "q/q.go:field:q.go:Use.anon#1.C");
   assert.equal(target("(<-c).C.Run"), "q/q.go:method:(Kid).Run");
-  assert.equal(target("x.C"), "q/q.go:field:q.go:Use.struct#1.C");
-  assert.equal(target("w.X"), "q/q.go:field:q.go:Use.struct#6.X");
+  assert.equal(target("x.C"), "q/q.go:field:q.go:Use.anon#1.C");
+  assert.equal(target("w.X"), "q/q.go:field:q.go:Use.anon#6.X");
 });
 
 test("pebble: a nested anonymous struct field of a named struct, from another file and package", async () => {
@@ -136,15 +146,15 @@ test("pebble: a nested anonymous struct field of a named struct, from another fi
     assert.equal(link.target, "settings/settings.go:field:Settings.Local");
   assert.equal(
     target("provider/vfs.go", "p.st.Local.FS"),
-    "settings/settings.go:field:settings.go:Settings.struct#1.FS",
+    "settings/settings.go:field:settings.go:Settings.Local.anon#1.FS",
   );
   assert.equal(
     target("provider/vfs.go", "p.st.Local.FSDirName"),
-    "settings/settings.go:field:settings.go:Settings.struct#1.FSDirName",
+    "settings/settings.go:field:settings.go:Settings.Local.anon#1.FSDirName",
   );
   assert.equal(
     target("provider/db.go", "d.mu.mem.queue"),
-    "provider/db.go:field:db.go:DB.struct#2.queue",
+    "provider/db.go:field:db.go:db.go:DB.mu.anon#1.mem.anon#1.queue",
   );
   assert.equal(
     target("provider/db.go", "d.mu.log.manager.path"),
@@ -329,7 +339,7 @@ test("build variants: an anonymous struct field of a type declared in two varian
   // The ranged literal is the use file's own: definite.
   assert.equal(
     at(links, "q/use.go", "x.n").target,
-    "q/use.go:field:use.go:Use.struct#1.n",
+    "q/use.go:field:use.go:Use.anon#1.n",
   );
 });
 
@@ -475,4 +485,198 @@ test("the outcome does not depend on the order the store supplies files, symbols
   assert.equal(idx.length, 2);
   for (const line of idx)
     assert.ok(line.endsWith("router_skip.go:indexedRoute.idx"), line);
+});
+
+test("build variants: a field or method promoted differently per variant is never one variant's definite target", async () => {
+  // Review of C-4: `items[0].Name` was definite to the Windows field while
+  // the Linux build selects the promoted `forwarded.Name`.
+  const { links } = await project({
+    "go.mod": MOD,
+    "v/value_windows.go": lines(
+      "package v",
+      "type Item struct{ Name string }",
+      "func (Item) Run() {}",
+    ),
+    "v/value_linux.go": lines(
+      "package v",
+      "type Item struct{ forwarded }",
+      "type forwarded struct{ Name string }",
+      "func (forwarded) Run() {}",
+    ),
+    "v/shared.go": lines(
+      "package v",
+      "type Items []Item",
+      "type Same struct{ ID int }",
+      "func Use(items Items, it Item, s []Same) {",
+      "\t_ = items[0].Name",
+      "\titems[0].Run()",
+      "\t_ = it.Name",
+      "\t_ = s[0].ID",
+      "}",
+    ),
+  });
+  const get = (text) => at(links, "v/shared.go", text);
+  for (const text of ["items[0].Name", "it.Name"]) {
+    assert.equal(get(text).target, null, text);
+    assert.deepEqual(
+      get(text).candidates,
+      ["v/value_linux.go:field:forwarded.Name", "v/value_windows.go:field:Item.Name"],
+      text,
+    );
+  }
+  assert.equal(get("items[0].Run").target, null);
+  assert.deepEqual(get("items[0].Run").candidates, [
+    "v/value_linux.go:method:(forwarded).Run",
+    "v/value_windows.go:method:(Item).Run",
+  ]);
+  // One declaration: definite.
+  assert.equal(get("s[0].ID").target, "v/shared.go:field:Same.ID");
+});
+
+test("a field-less struct{} is not a symbol", async () => {
+  const { symbols } = await project({
+    "go.mod": MOD,
+    "q/q.go": lines(
+      "package q",
+      "var set = map[string]struct{}{}",
+      "func Use(done chan struct{}) { done <- struct{}{}; _ = set }",
+    ),
+  });
+  assert.deepEqual(
+    symbols.filter((item) => item.kind === "struct").map((item) => item.identity),
+    [],
+  );
+});
+
+test("an answer cut short by the depth limit is not cached for shallower routes to the same type", async () => {
+  // A long chain of defined container types is first reached from p/a.go at
+  // the depth limit; the same types, reached later through fields declared
+  // beside them, are shallow enough to resolve and must.
+  const n = 14;
+  const chain = Array.from({ length: n }, (_, i) =>
+    i + 1 < n ? `type A${i} A${i + 1}` : `type A${i} []T`,
+  );
+  const { links } = await project({
+    "go.mod": MOD,
+    "p/a.go": lines("package p", "func deep(x A0) int { return x[0].F }"),
+    "p/types.go": lines(
+      "package p",
+      ...chain,
+      "type T struct{ F int }",
+      `type Holder struct{ ${chain.map((_, i) => `a${i} A${i}`).join("; ")} }`,
+    ),
+    "p/z.go": lines(
+      "package p",
+      ...chain.map(
+        (_, i) => `func s${i}(h Holder) int { return h.a${i}[0].F }`,
+      ),
+    ),
+  });
+  // Beyond the limit: no target (never a guess).
+  assert.equal(at(links, "p/a.go", "x[0].F").target, null);
+  for (let i = 4; i < n; i++)
+    assert.equal(
+      at(links, "p/z.go", `h.a${i}[0].F`).target,
+      "p/types.go:field:T.F",
+      `a${i}`,
+    );
+});
+
+test("a requirement link to an anonymous struct's field keeps its anchor; renaming the owner is missing", async () => {
+  // Review of C-4: a file-wide counter gave an inserted `Unrelated` the
+  // linked struct's old identity, and `link check` said ok on the wrong
+  // declaration. The identity is anchored to the owning declaration.
+  let tick = 0;
+  const writer = {
+    origin: { machine: "machine-1", actor: "actor-1", author: "Link Tester" },
+    now: () => new Date(Date.UTC(2026, 10, 15, 12, 0, tick++)).toISOString(),
+  };
+  const root = await mkdtemp(join(tmpdir(), "pym-go-anon-link-"));
+  const first = "var First = struct {\n\tValue int\n}{}\n";
+  const unrelated = "var Unrelated = struct {\n\tValue int\n}{}\n\n";
+  try {
+    await writeFile(join(root, "go.mod"), MOD);
+    await mkdir(join(root, "p"));
+    await writeFile(join(root, "p/id.go"), `package p\n\n${first}`);
+    await promisify(execFile)(process.execPath, [
+      join(import.meta.dirname, "..", "dist", "cli", "main.js"),
+      "init",
+      root,
+      "--format",
+      "json",
+    ]);
+    await createRequirement({ root, id: "R1", title: "First" });
+    const made = await createCodeLink({
+      root,
+      writer,
+      record: "R1",
+      selector: "p/id.go:4",
+    });
+    assert.equal(made.status, "created", made.message);
+    assert.equal(made.link.symbol.identity, "id.go:First.anon#1.Value");
+    await writeFile(join(root, "p/id.go"), `package p\n\n${unrelated}${first}`);
+    const kept = (await checkCodeLinks({ root, writer })).links[0];
+    assert.equal(kept.state, "ok");
+    assert.equal(kept.current.identity, "id.go:First.anon#1.Value");
+    await writeFile(
+      join(root, "p/id.go"),
+      `package p\n\n${unrelated}${first.replace("First", "Second")}`,
+    );
+    const check = await checkCodeLinks({ root, writer });
+    assert.equal(check.links[0].state, "missing");
+    assert.equal(check.passed, false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("search and file listings put generated anonymous-struct symbols after named declarations", async () => {
+  // bbolt: `graph search name` filled its first page with table-test
+  // `name` fields and pushed `(*worker).name` down.
+  const { LanguageRegistry, SqliteGraphStore, indexProject } = await import(
+    "../dist/graph/index.js"
+  );
+  const go = (await import("../dist/graph/languages/go/index.js")).default;
+  const scratch = await mkdtemp(join(tmpdir(), "pym-go-anon-search-"));
+  const root = join(scratch, "project");
+  const store = new SqliteGraphStore(join(scratch, "graph.sqlite"), "go-test");
+  try {
+    await mkdir(join(root, "p"), { recursive: true });
+    await writeFile(join(root, "go.mod"), MOD);
+    const table = (test) =>
+      `func ${test}() {\n\tfor _, tt := range []struct{ name string }{} { _ = tt.name }\n}`;
+    await writeFile(
+      join(root, "p/a_test.go"),
+      lines("package p", table("TestA"), table("TestB"), table("TestC")),
+    );
+    await writeFile(
+      join(root, "p/worker.go"),
+      lines(
+        "package p",
+        "type worker struct{}",
+        'func (w *worker) name() string { return "" }',
+      ),
+    );
+    await indexProject(root, new LanguageRegistry([go]), store);
+    const first = store.searchSymbols("name", 2);
+    assert.equal(first[0].identity, "(*worker).name");
+    const all = store.searchSymbols("name", 10);
+    assert.equal(all.length, 4);
+    assert.deepEqual(
+      all.slice(1).map((item) => [item.kind, !!item.data?.anonymous]),
+      [
+        ["field", true],
+        ["field", true],
+        ["field", true],
+      ],
+    );
+    const listed = store.symbolsForFile("p/a_test.go", 3);
+    assert.deepEqual(
+      listed.map((item) => item.kind).sort(),
+      ["file", "function", "function"],
+    );
+  } finally {
+    store.close();
+    await rm(scratch, { recursive: true, force: true });
+  }
 });

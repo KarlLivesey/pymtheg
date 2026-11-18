@@ -200,6 +200,8 @@ function channelTerm(node: Node, element: (node: Node) => TypeTerm): TypeTerm {
 const MAX_WALK_DEPTH = 500;
 /** Type terms deeper than this are unknown (no unbounded recursion). */
 const MAX_TERM_DEPTH = 64;
+/** Prefix of an anonymous struct's reference before its identity is known. */
+const PENDING = "\u0000anon:";
 
 export function fileFacts(path: string): FileFact {
   const fact: FileFact = { imports: [], test: path.endsWith("_test.go") };
@@ -292,6 +294,10 @@ export class GoExtractor {
     if (this.fact.build !== undefined) fileData.build = this.fact.build;
     if (this.fact.goos !== undefined) fileData.goos = this.fact.goos;
     if (this.fact.goarch !== undefined) fileData.goarch = this.fact.goarch;
+    // Only now is every anonymous struct's identity known.
+    for (const item of [...this.symbols, ...this.links])
+      if (item.data)
+        item.data = this.anonymous(item.data) as typeof item.data;
   }
 
   private buildLine(comment: string): void {
@@ -695,7 +701,12 @@ export class GoExtractor {
     );
   }
 
-  private structFields(owner: string, ownerKey: string, struct: Node): void {
+  private structFields(
+    owner: string,
+    ownerKey: string,
+    struct: Node,
+    anonymous = false,
+  ): void {
     for (const list of named(struct))
       for (const field of named(list)) {
         if (field.type !== "field_declaration") continue;
@@ -717,6 +728,7 @@ export class GoExtractor {
                 owner,
                 ...(ref ? { t: { ...ref } } : {}),
                 v: this.typedValue(type) as unknown as Json,
+                ...(anonymous ? { anonymous: true } : {}),
               },
             );
             this.contains(ownerKey, key, {
@@ -754,6 +766,7 @@ export class GoExtractor {
               t: { ...ref },
               embedded: true,
               pointer: embeddedPointer,
+              ...(anonymous ? { anonymous: true } : {}),
             },
           );
           this.contains(ownerKey, key, range(field));
@@ -1171,7 +1184,6 @@ export class GoExtractor {
         return { k: "func", r: this.resultDescs(field("result")) };
       case "struct_type": {
         // An anonymous struct: its named fields, and the types it embeds.
-        const sym = this.anonymousStruct(current);
         const f: { n: string; d: Desc }[] = [];
         const m: Desc[] = [];
         const list = named(current).find(
@@ -1191,7 +1203,10 @@ export class GoExtractor {
           k: "local",
           ...(m.length ? { m } : {}),
           ...(f.length ? { f } : {}),
-          sym,
+          // Its symbol, named when the walk reaches it (see `anonymous`).
+          ...(f.length || m.length
+            ? { sym: `${PENDING}${current.startIndex}` }
+            : {}),
         };
       }
       case "interface_type": {
@@ -1748,36 +1763,59 @@ export class GoExtractor {
   }
 
   private localStructs = new Map<string, number>();
-  /** Identity of each anonymous struct type node, by start offset. */
+  private fieldStructs = new Map<string, number>();
+  /** Identity of each anonymous struct symbol, by the start offset of its type. */
   private anonymousStructs = new Map<number, string>();
   /**
-   * The identity of an anonymous struct type's symbol: `<enclosing>.struct#<n>`,
-   * numbered per enclosing declaration in the order the extractor first meets
-   * it (its value description or its walk, whichever comes first).
-   */
-  private anonymousStruct(node: Node): string {
-    const known = this.anonymousStructs.get(node.startIndex);
-    if (known !== undefined) return known;
-    const enclosing = this.byKey.get(this.owner)?.identity ?? "file";
-    const count = (this.localStructs.get(enclosing) ?? 0) + 1;
-    this.localStructs.set(enclosing, count);
-    const name = this.localIdentity(`${enclosing}.struct#${count}`);
-    this.anonymousStructs.set(node.startIndex, name);
-    return name;
-  }
-  /**
-   * An anonymous struct type (in a function, a field, a variable, a composite
-   * literal or a type literal). It becomes a struct symbol (`data.local`) with
-   * its fields and `embeds` links, like a package-level struct, so selectors
-   * on its values resolve to its fields and promoted members.
+   * A function-local or anonymous struct type with at least one field. It
+   * becomes a struct symbol (`data.local`) with its fields and `embeds` links,
+   * like a package-level struct, so selectors on its values resolve to its
+   * fields and promoted members. Its identity is anchored to the declaration
+   * that owns it when the walk reaches it (a variable, a field, a type, or the
+   * enclosing function): `<owner>.struct#<n>` for one that embeds something
+   * (the 0.1.0 identity, numbered among those), `<owner>.anon#<n>` for one with
+   * named fields only (numbered among those). `struct{}` is not a symbol.
    */
   private localStruct(node: Node): void {
-    const name = this.anonymousStruct(node);
+    const fields = named(named(node)[0]).filter(
+      (field) => field.type === "field_declaration",
+    );
+    if (!fields.length) return this.walkChildren(node);
+    const embeds = fields.some((field) => !fieldsOf(field, "name").length);
+    const enclosing = this.byKey.get(this.owner)?.identity ?? "file";
+    const counters = embeds ? this.localStructs : this.fieldStructs;
+    const count = (counters.get(enclosing) ?? 0) + 1;
+    counters.set(enclosing, count);
+    const name = this.localIdentity(
+      `${enclosing}.${embeds ? "struct" : "anon"}#${count}`,
+    );
+    this.anonymousStructs.set(node.startIndex, name);
+    // `anonymous`: generated, not a name in the source; listed after named
+    // declarations by search and file listings.
     const key = this.symbol("struct", name, name, range(node), {
       local: true,
+      anonymous: true,
     });
     this.contains(this.owner, key, range(node));
-    this.within(key, () => this.structFields(name, key, node));
+    this.within(key, () => this.structFields(name, key, node, true));
+  }
+  /**
+   * Replaces each anonymous struct's pending reference (`local.sym`) in the
+   * file's facts by its identity; one the walk never reached loses it.
+   */
+  private anonymous(value: Json): Json {
+    if (Array.isArray(value)) return value.map((item) => this.anonymous(item));
+    if (!value || typeof value !== "object") return value;
+    const out: { [key: string]: Json } = {};
+    for (const [key, item] of Object.entries(value)) {
+      if (key === "sym" && typeof item === "string" && item.startsWith(PENDING)) {
+        const identity = this.anonymousStructs.get(
+          Number(item.slice(PENDING.length)),
+        );
+        if (identity !== undefined) out[key] = identity;
+      } else out[key] = this.anonymous(item as Json);
+    }
+    return out;
   }
 
   /** A use of a predeclared name: a link only if a package declaration shadows it. */
