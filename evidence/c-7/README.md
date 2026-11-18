@@ -25,6 +25,9 @@ like-for-like rates therefore agree. All **617,076** existing definite
 links kept their targets. All **145,828** existing symbol keys and identities
 were preserved. The candidate added **30,532** verified type-parameter
 references and **1,581** verified member links at existing sites.
+All **440,761** links carrying `external` or `external-package` on main kept
+their outcomes and reasons, including reasons qualified by a partial config.
+The exporter credited the same 189,111 library-symbol links in each build.
 
 | Repository | Level 2 main → candidate | Like-for-like main → candidate | TS/JS links | Main definite / changed | Main keys / changed |
 | --- | ---: | ---: | ---: | ---: | ---: |

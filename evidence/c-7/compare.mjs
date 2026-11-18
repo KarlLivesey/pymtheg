@@ -18,6 +18,7 @@ const candidateCoverage = read("candidate-coverage.json");
 const mainByRepo = new Map(main.repos.map((row) => [row.id, row]));
 const seed = "c-7:4c3bed4d";
 const changed = [];
+const outsideChanges = [];
 const missingSymbols = [];
 const samples = new Map();
 const repositories = [];
@@ -54,6 +55,7 @@ const sourceFiles = (db) =>
 const label = (symbol) =>
   symbol && [symbol.file, symbol.kind, symbol.identity, symbol.ordinal];
 const targetKey = (symbol) => JSON.stringify(label(symbol));
+const reasonOf = (link) => link.data?.reasonWithoutConfig ?? link.data?.reason;
 const symbolKey = ({ kind, identity, ordinal, key }) =>
   JSON.stringify([kind, identity, ordinal, key]);
 const verified = (link) =>
@@ -131,6 +133,7 @@ for (const repo of candidate.repos) {
       lostSymbols: 0,
       priorDefinite: 0,
       changedDefinite: 0,
+      oldOutsideReasons: 0,
       newSites: 0,
       removedSites: 0,
       gains: {},
@@ -155,6 +158,29 @@ for (const repo of candidate.repos) {
         const next = after.get(key) ?? [];
         record.removedSites += Math.max(links.length - next.length, 0);
         for (const link of links) {
+          const reason = reasonOf(link);
+          if (
+            link.resolution === "unresolved" &&
+            (reason === "external" || reason === "external-package")
+          ) {
+            record.oldOutsideReasons++;
+            if (
+              !next.some(
+                (n) =>
+                  n.resolution === "unresolved" &&
+                  reasonOf(n) === reason &&
+                  n.data?.reason === link.data?.reason,
+              )
+            )
+              outsideChanges.push({
+                repo: repo.id,
+                file,
+                ...position(link.range.start, file),
+                at: link.targetName,
+                reason,
+                after: next.map((n) => [n.resolution, reasonOf(n)]),
+              });
+          }
           if (link.resolution !== "resolved") continue;
           record.priorDefinite++;
           const same = next.some(
@@ -175,7 +201,7 @@ for (const repo of candidate.repos) {
             after: next.map((n) => ({
               outcome: n.resolution,
               target: label(n.target),
-              reason: n.data?.reasonWithoutConfig ?? n.data?.reason,
+              reason: reasonOf(n),
               assumes: n.data?.assumes,
             })),
           });
@@ -232,6 +258,7 @@ writeFileSync(
       seed,
       repositories,
       changed,
+      outsideChanges,
       missingSymbols,
       samples: Object.fromEntries(samples),
     },
