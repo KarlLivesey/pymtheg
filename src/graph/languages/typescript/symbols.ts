@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 import ts from "typescript";
 import { createHash } from "node:crypto";
-import type { SourceRange } from "../../types.js";
+import type { SourceRange, SymbolDraft } from "../../types.js";
 
 /**
  * Which compiler nodes are graph symbols. Every function here is purely
@@ -557,6 +557,85 @@ export function rangeOf(anchor: ts.Node): SourceRange {
 }
 export const keyOf = (anchor: ts.Node) =>
   `${kindOf(anchor)}@${rangeOf(anchor).start}`;
+
+/** The existing graph owner of a declaration without its own symbol. */
+export function enclosingAnchor(node: ts.Node): ts.Node {
+  for (let parent = node.parent; parent; parent = parent.parent) {
+    const anchor = anchorOf(parent);
+    if (anchor) return anchor;
+  }
+  return node.getSourceFile();
+}
+
+/** A static object member in a named binding or a declaration's return value. */
+export function objectMember(node: ts.Node): SymbolDraft | undefined {
+  const parent = node.parent;
+  if (!parent) return undefined;
+  const literal = ts.isObjectLiteralExpression(parent);
+  if (
+    !(literal
+      ? ts.isPropertyAssignment(node) ||
+        ts.isShorthandPropertyAssignment(node) ||
+        ts.isMethodDeclaration(node) ||
+        ts.isGetAccessorDeclaration(node) ||
+        ts.isSetAccessorDeclaration(node)
+      : ts.isTypeLiteralNode(parent) &&
+        (ts.isPropertySignature(node) || ts.isMethodSignature(node))) ||
+    anchorOf(node)
+  )
+    return undefined;
+  const names: string[] = [];
+  let member = node;
+  let object = parent;
+  let holder: ts.Node;
+  for (;;) {
+    const name = (member as ts.NamedDeclaration).name as ts.PropertyName;
+    if (
+      ts.isComputedPropertyName(name) &&
+      !ts.isStringLiteralLike(name.expression) &&
+      !ts.isNumericLiteral(name.expression)
+    )
+      return undefined;
+    names.unshift(memberName(name));
+    holder = (literal ? outerExpression(object) : object).parent;
+    if (
+      (ts.isPropertyAssignment(holder) &&
+        ts.isObjectLiteralExpression(holder.parent)) ||
+      (ts.isPropertySignature(holder) && ts.isTypeLiteralNode(holder.parent))
+    ) {
+      member = holder;
+      object = holder.parent;
+    } else break;
+  }
+  let owner = anchorOf(holder);
+  let slot = "";
+  if (ts.isVariableDeclaration(holder) && ts.isIdentifier(holder.name)) {
+    if (!owner) {
+      owner = enclosingAnchor(holder);
+      slot = `${scopeOf(holder, owner)}[local].${holder.name.text}.`;
+    }
+  } else if (literal && ts.isReturnStatement(holder)) {
+    const signature = ts.findAncestor(holder, ts.isFunctionLike);
+    if (!signature || !(owner = anchorOf(signature))) return undefined;
+    slot = `${scopeOf(holder, signature)}[return].`;
+  } else if (literal && ts.isArrowFunction(holder)) {
+    if (!owner) return undefined;
+    slot = "[return].";
+  }
+  if (!owner || ts.isSourceFile(owner)) return undefined;
+  const kind = ts.isShorthandPropertyAssignment(node)
+    ? "property"
+    : kindOf(node);
+  const range = { start: node.getStart(), end: node.end };
+  return {
+    key: `${kind}@${range.start}`,
+    kind,
+    name: names.at(-1)!,
+    identity: `${identityOf(owner)}.${slot}[${literal ? "object" : "type"}].${names.join(".")}`,
+    range,
+    data: { scoped: true },
+  };
+}
 
 /** The module specifier an import binding comes from, if the symbol is one. */
 export function bindingSpecifier(symbol: ts.Symbol): ts.Expression | undefined {

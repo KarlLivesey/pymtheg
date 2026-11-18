@@ -267,6 +267,168 @@ test("calls follow the checker: locals shadow imports, unions give candidates, a
   );
 });
 
+test("checkout member chains use typed declarations and preserve open receivers", async () => {
+  const source = [
+    "class A { run() {} }",
+    "class B { run() {} }",
+    "class Holder { x = { y: new A() }; use() { this.x.y.run(); } }",
+    "const chain = { b: { c() {} } };",
+    'const one = { nested: { run: () => "one" as const } };',
+    'const two = { nested: { run: () => "two" as const } };',
+    "declare const either: typeof one | typeof two;",
+    "function make() { return { nested: { run() {} } }; }",
+    "async function later() { return new A(); }",
+    "function save() {}",
+    "const api = { load() {}, save, [7]() {} };",
+    "function local() {",
+    "  const write = () => {};",
+    "  const ops = { write };",
+    "  ops.write();",
+    "}",
+    "declare const maybe: { b: A } | undefined;",
+    "declare const variant: { b: A | B };",
+    "declare const openReceiver: A | Record<string, () => void>;",
+    "declare const unchecked: any;",
+    "declare const opaque: unknown;",
+    "declare const dict: { [key: string]: () => void };",
+    "declare const record: Record<string, () => void>;",
+    "declare const fromLib: string | undefined;",
+    "declare const key: string;",
+    "declare const inferred: { run: () => void };",
+    "type Run = typeof inferred.run;",
+    "inferred.run();",
+    "chain.b.c();",
+    "either.nested.run();",
+    "make().nested.run();",
+    "async function then() { (await later()).run(); }",
+    'maybe?.b["run"]();',
+    'maybe?.["b"]["run"]();',
+    "variant.b.run();",
+    "openReceiver.run();",
+    "unchecked.run();",
+    "opaque.run();",
+    "dict.missing();",
+    'dict["literal"]();',
+    "record.missing();",
+    "api.load();",
+    "api.save();",
+    "api[7]();",
+    "api[key]();",
+    "fromLib?.trim();",
+    'fromLib?.["trim"]();',
+  ].join("\n");
+  await project(
+    {
+      "tsconfig.json": JSON.stringify({
+        compilerOptions: { strict: true, target: "es2022" },
+      }),
+      "use.ts": source,
+    },
+    async (graph, report) => {
+      clean(report);
+      const calls = graph.store.links().filter((link) => link.kind === "calls");
+      const callOn = (line) => {
+        const start = source.indexOf(line);
+        const end = start + line.length;
+        return calls
+          .filter((link) => link.range.start >= start && link.range.end <= end)
+          .sort((a, b) => b.range.end - a.range.end)[0];
+      };
+      for (const [line, identity] of [
+        ["this.x.y.run();", "A.run"],
+        ["chain.b.c();", "chain.[object].b.c"],
+        ["make().nested.run();", "make.[return].[object].nested.run"],
+        ["(await later()).run();", "A.run"],
+        ['maybe?.b["run"]();', "A.run"],
+        ['maybe?.["b"]["run"]();', "A.run"],
+        ["api.load();", "api.load"],
+        ["api.save();", "save"],
+        ["api[7]();", "api.[7]"],
+        ["ops.write();", "local.[local].ops.[object].write"],
+      ])
+        assert.equal(graph.target(callOn(line)), `use.ts#${identity}`, line);
+      assert.deepEqual(graph.candidates(callOn("variant.b.run();")), [
+        "use.ts#A.run",
+        "use.ts#B.run",
+      ]);
+      assert.deepEqual(graph.candidates(callOn("either.nested.run();")), [
+        "use.ts#one.[object].nested.run",
+        "use.ts#two.[object].nested.run",
+      ]);
+      for (const [line, reason] of [
+        ["openReceiver.run();", "index-signature"],
+        ["unchecked.run();", "any-receiver"],
+        ["opaque.run();", "unknown-receiver"],
+        ["dict.missing();", "index-signature"],
+        ['dict["literal"]();', "index-signature"],
+        ["record.missing();", "index-signature"],
+        ["api[key]();", "no-symbol"],
+        ["fromLib?.trim();", "external"],
+        ['fromLib?.["trim"]();', "no-symbol"],
+        ["inferred.run();", "local"],
+      ]) {
+        const call = callOn(line);
+        assert.equal(call.resolution, "unresolved", line);
+        assert.equal(call.data.reason, reason, line);
+        assert.deepEqual(call.candidates, [], line);
+      }
+      assert.equal(
+        graph.target(graph.link("use.ts", "inferred.run", "references")),
+        "use.ts#inferred.[type].run",
+      );
+    },
+  );
+});
+
+test("recorded generic references identify their owner and the precise binding", async () => {
+  // Hono's HandlerInterface overload defaults I3 to I & I2 (src/types.ts:659).
+  const source = [
+    "type Input = { value?: string };",
+    "interface HandlerInterface {",
+    "  <I extends Input, I2 extends Input = I, I3 extends Input = I & I2>(fn: (input: I3) => void): void;",
+    "}",
+    "function identity<T extends Input>(value: T): T {",
+    "  function inner<T>(value: T): T { return value; }",
+    "  const result: T = inner(value);",
+    "  return result;",
+    "}",
+  ].join("\n");
+  await project({ "generics.ts": source }, async (graph, report) => {
+    clean(report);
+    const i = source.indexOf("I extends");
+    const t = source.indexOf("T extends");
+    const inner = source.indexOf("T>(value", t + 1);
+    const refs = graph
+      .links("generics.ts", "T", "references")
+      .sort((a, b) => a.range.start - b.range.start);
+    assert.deepEqual(
+      refs.map((ref) => [
+        graph.target(ref),
+        ref.data.localBinding?.name,
+        ref.data.localBinding?.start,
+        ref.data.localBinding?.end,
+      ]),
+      [
+        ["generics.ts#identity", "T", t, t + 1],
+        ["generics.ts#identity", "T", t, t + 1],
+        ["generics.ts#identity.[local].inner", "T", inner, inner + 1],
+        ["generics.ts#identity.[local].inner", "T", inner, inner + 1],
+        ["generics.ts#identity", "T", t, t + 1],
+      ],
+    );
+    assert.equal(graph.store.findSymbols({ name: "T" }).length, 0);
+    assert.deepEqual(
+      graph
+        .links("generics.ts", "I", "references")
+        .map((ref) => [graph.target(ref), ref.data.localBinding]),
+      [
+        ["generics.ts#HandlerInterface", { name: "I", start: i, end: i + 1 }],
+        ["generics.ts#HandlerInterface", { name: "I", start: i, end: i + 1 }],
+      ],
+    );
+  });
+});
+
 test("overloads are one symbol with a definite target; repeated JS declarations keep ordinals", async () => {
   await project(
     {
@@ -1041,6 +1203,8 @@ test("symbols cover the declaration kinds with scoped identities and exact UTF-1
         "property Shape.count",
         "property Shape.handler",
         "property Shape.static count",
+        "property api.[object].data",
+        "property default.[object].anonymous",
         "property global.Window.extra",
         "setter Shape.size",
         "type Id",

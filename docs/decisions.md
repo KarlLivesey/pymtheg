@@ -2547,6 +2547,22 @@ Relative extension lookup retains the release's module-file edge. The release's
 call declaration rule applies equally to relative imports, workspace imports
 and aliases.
 
+### C-7 TypeScript member and type-parameter targets
+
+An existing generic reference stores the enclosing symbol and the name and
+span of the type parameter in `data.localBinding`. The span distinguishes
+shadowed parameters and separate overloads. Graph queries can use the
+enclosing declaration and the binding location without a separate symbol row
+for each parameter.
+
+New object member symbols have position-independent identities scoped to
+their owner and the static member path. They are available to search and
+requirement links. Existing source links keep their enclosing symbols and
+the new member symbols add no containment links. For a literal member call,
+the checker supplies the declarations. A property symbol from a union can
+omit an alternative that comes only from an index signature. Such a lookup
+stays unresolved because it lacks a named declaration for that alternative.
+
 ### Indexing holds one copy of the graph at a time (C-2)
 
 **Decided (C-2):** the graph store no longer keeps decoded file records between

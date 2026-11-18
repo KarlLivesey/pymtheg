@@ -58,6 +58,7 @@ import {
   anchorOf,
   rootDeclaration,
   containerOf,
+  enclosingAnchor,
   identityOf,
   isEntityName,
   bindingSpecifier,
@@ -68,6 +69,7 @@ import {
   keyOf,
   kindOf,
   nameOf,
+  objectMember,
   rangeOf,
   unwrap,
 } from "./symbols.js";
@@ -199,6 +201,7 @@ interface Lookup {
   receiver?: ts.Expression | undefined;
   at?: ts.Node;
   construct?: boolean;
+  memberCall?: boolean;
 }
 const clip = (text: string) => {
   const flat = text
@@ -360,15 +363,45 @@ export function extractFile(
     let firstAlias: ts.Symbol | undefined;
     let declaredSomewhere = false;
     const declarations: ts.Node[] = [];
+    const usableLocalCall = (
+      anchor: ts.Node,
+      declaration: ts.Declaration,
+      symbol: ts.Symbol,
+    ) =>
+      !(found.at && insideWith(found.at)) &&
+      (!ts.isClassDeclaration(anchor) || found.construct) &&
+      !(
+        ts.isVariableDeclaration(anchor) &&
+        found.construct &&
+        ts.isArrowFunction(unwrap(anchor.initializer!))
+      ) &&
+      provenLocalCall(declaration, symbol);
     const record = (
       declaration: ts.Declaration,
       symbol: ts.Symbol,
+      shorthandMember = false,
     ): boolean => {
       const target = fromVirtual(declaration.getSourceFile().fileName);
       if (target === undefined || !captured.has(target)) return false;
       const anchor = anchorOf(declaration);
-      if (!anchor) return false;
-      if (meaning === "call") {
+      const member =
+        !anchor &&
+        (shorthandMember || !ts.isShorthandPropertyAssignment(declaration)) &&
+        (meaning !== "call" ||
+          (found.memberCall &&
+            ts.isObjectLiteralExpression(declaration.parent) &&
+            !declaration.getSourceFile().isDeclarationFile &&
+            !!found.at &&
+            checker.getSignaturesOfType(
+              checker.getNonNullableType(checker.getTypeAtLocation(found.at)),
+              found.construct
+                ? ts.SignatureKind.Construct
+                : ts.SignatureKind.Call,
+            ).length > 0))
+          ? objectMember(declaration)
+          : undefined;
+      if (!anchor && !member) return false;
+      if (anchor && meaning === "call") {
         if (
           ts.isEnumDeclaration(anchor) &&
           !ts.isSourceFile(anchor.parent) &&
@@ -377,17 +410,11 @@ export function extractFile(
           return false;
         if (
           isLocalCallable(anchor) &&
-          (found.receiver ||
-            (found.at && insideWith(found.at)) ||
-            (ts.isClassDeclaration(anchor) && !found.construct) ||
-            (ts.isVariableDeclaration(anchor) &&
-              found.construct &&
-              ts.isArrowFunction(unwrap(anchor.initializer!))) ||
-            !provenLocalCall(declaration, symbol))
+          (found.receiver || !usableLocalCall(anchor, declaration, symbol))
         )
           return false;
       }
-      const key = keyOf(anchor);
+      const key = anchor ? keyOf(anchor) : member!.key;
       facts.set(`${target}\0${key}`, { file: target, key });
       declarations.push(declaration);
       return true;
@@ -417,6 +444,19 @@ export function extractFile(
           const shorthand =
             checker.getShorthandAssignmentValueSymbol(declaration);
           if (shorthand) {
+            const value = shorthand.valueDeclaration;
+            // Preserve existing shorthand links to named functions. For a
+            // proven scoped callable the receiver guard excludes that route;
+            // the independently declared property is the member target.
+            if (
+              found.memberCall &&
+              value &&
+              shorthand.declarations?.length === 1 &&
+              isLocalCallable(value) &&
+              usableLocalCall(value, value, shorthand) &&
+              record(declaration, current, true)
+            )
+              continue;
             visit(shorthand, depth + 1);
             continue;
           }
@@ -1226,20 +1266,120 @@ export function extractFile(
     }
     return symbol ? { symbol, receiver, name } : { receiver, name };
   }
+
+  function inCheckout(declaration: ts.Declaration): boolean {
+    const path = fromVirtual(declaration.getSourceFile().fileName);
+    return path !== undefined && captured.has(path);
+  }
+
+  /** Only literal member lookups can identify a named declaration. */
+  function memberCallLookup(
+    access: ts.PropertyAccessExpression | ts.ElementAccessExpression,
+    key:
+      | ts.Identifier
+      | ts.PrivateIdentifier
+      | ts.StringLiteralLike
+      | ts.NumericLiteral,
+  ): Lookup {
+    // Numeric keys had no checker lookup on main. In particular, keep the
+    // existing outcome when the newly queried declaration is outside.
+    const numeric = ts.isNumericLiteral(key);
+    const previous = numeric ? {} : lookup(key);
+    if (
+      previous.reason ||
+      previous.symbol === LIMIT ||
+      (!previous.symbol && insideWith(key))
+    )
+      return previous;
+    const receiver = access.expression;
+    const literal = ts.isElementAccessExpression(access);
+    let symbol = numeric ? symbolOf(key) : previous.symbol;
+    if (symbol === LIMIT) return { symbol };
+    if (numeric && !symbol?.declarations?.length) symbol = undefined;
+    if (symbol?.declarations?.length && !symbol.declarations.some(inCheckout))
+      return previous;
+    if (
+      symbol &&
+      !(symbol.flags & ts.SymbolFlags.Transient) &&
+      !symbol.declarations?.some(ts.isIndexSignatureDeclaration)
+    )
+      return { symbol, receiver, memberCall: true };
+    let type = checker.getTypeAtLocation(receiver);
+    if (
+      access.questionDotToken ||
+      (ts.isOptionalChain(receiver) &&
+        type.isUnion() &&
+        type.types.every(
+          (part) =>
+            !(part.flags & (ts.TypeFlags.Null | ts.TypeFlags.Undefined)) ||
+            // The checker uses a distinct undefined marker for a short
+            // circuit in an earlier segment of the same chain.
+            ((part.flags & ts.TypeFlags.Undefined) !== 0 &&
+              part !== checker.getUndefinedType()),
+        ))
+    )
+      type = checker.getNonNullableType(type);
+    if (!symbol && literal && ts.isOptionalChain(access)) {
+      const member = checker.getPropertyOfType(type, key.text);
+      if (member?.declarations?.length && member.declarations.every(inCheckout))
+        symbol = member;
+    }
+    if (!symbol) {
+      if (type === checker.getAnyType())
+        return { reason: "any-receiver", receiver };
+      if (type.flags & ts.TypeFlags.Unknown)
+        return { reason: "unknown-receiver", receiver };
+    }
+    if (
+      symbol?.declarations?.some(ts.isIndexSignatureDeclaration) ||
+      (!ts.isPrivateIdentifier(key) &&
+        (!symbol || type.isUnion()) &&
+        (type.isUnion() ? type.types : [type]).some((part) => {
+          // A union property symbol can omit an arm supplied only by an
+          // index signature. That arm has no named declaration to link.
+          if (symbol && checker.getPropertyOfType(part, key.text)) return false;
+          const name = checker.getStringLiteralType(key.text);
+          const number = Number(key.text);
+          const numericName =
+            String(number) === key.text
+              ? checker.getNumberLiteralType(number)
+              : undefined;
+          return checker
+            .getIndexInfosOfType(part)
+            .some(
+              ({ declaration, keyType }) =>
+                (symbol?.declarations?.length ||
+                  !declaration ||
+                  inCheckout(declaration)) &&
+                (checker.isTypeAssignableTo(name, keyType) ||
+                  (numericName &&
+                    checker.isTypeAssignableTo(numericName, keyType))),
+            );
+        }))
+    )
+      return { reason: "index-signature", receiver };
+    return symbol ? { symbol, receiver, memberCall: true } : previous;
+  }
   function calleeTarget(callee: ts.Expression): {
     at: ts.Node;
     symbol: Lookup;
   } {
     const expression = unwrap(callee);
     if (ts.isPropertyAccessExpression(expression))
-      return { at: expression.name, symbol: lookup(expression.name) };
-    if (ts.isElementAccessExpression(expression))
+      return {
+        at: expression.name,
+        symbol: memberCallLookup(expression, expression.name),
+      };
+    if (ts.isElementAccessExpression(expression)) {
+      const key = expression.argumentExpression;
       return {
         at: expression,
-        symbol: ts.isStringLiteralLike(expression.argumentExpression)
-          ? lookup(expression.argumentExpression)
-          : {},
+        symbol:
+          ts.isStringLiteralLike(key) || ts.isNumericLiteral(key)
+            ? memberCallLookup(expression, key)
+            : {},
       };
+    }
     if (
       ts.isIdentifier(expression) ||
       expression.kind === ts.SyntaxKind.SuperKeyword
@@ -1333,6 +1473,10 @@ export function extractFile(
 
   function handle(node: ts.Node, owner: string): string | null {
     const anchor = anchorOf(node);
+    if (!anchor) {
+      const member = objectMember(node);
+      if (member) symbols.push(member);
+    }
     if (anchor === node) {
       const key = keyOf(node);
       if (keys.has(key)) throw Error(`Duplicate symbol key ${key} in ${path}`);
@@ -1593,13 +1737,28 @@ export function extractFile(
     } else if (ts.isTypeReferenceNode(node)) {
       const name = node.typeName;
       const at = ts.isQualifiedName(name) ? name.right : name;
-      link(
-        owner,
-        "references",
-        name.getText(file),
-        name,
-        targetsOf(lookup(at), "type"),
-      );
+      const lookupResult = lookup(at);
+      let found = targetsOf(lookupResult, "type");
+      const declarations = lookupResult.symbol?.declarations;
+      const parameter =
+        declarations?.length === 1 ? declarations[0] : undefined;
+      const extra: { [key: string]: Json } = {};
+      if (
+        found.reason === "local" &&
+        !found.targets.length &&
+        parameter &&
+        ts.isTypeParameterDeclaration(parameter) &&
+        parameter.getSourceFile() === file
+      ) {
+        found = {
+          targets: [{ file: path, key: keyOf(enclosingAnchor(parameter)) }],
+        };
+        extra.localBinding = {
+          name: restoreNames(parameter.name.text, context.fresh),
+          ...range(parameter.name),
+        };
+      }
+      link(owner, "references", name.getText(file), name, found, extra);
     } else if (ts.isTypeQueryNode(node)) {
       const name = node.exprName;
       const at = ts.isQualifiedName(name) ? name.right : name;
@@ -1621,17 +1780,13 @@ export function extractFile(
         !anchorOf(declaration) &&
         !insideWith(name)
       ) {
-        let owner: ts.Node = declaration.parent;
-        let container = anchorOf(owner);
-        while (!container) {
-          owner = owner.parent;
-          container = anchorOf(owner);
-        }
         extra.localBinding = {
           name: restoreNames(declaration.name.text, context.fresh),
           ...range(declaration.name),
         };
-        found = { targets: [{ file: path, key: keyOf(container) }] };
+        found = {
+          targets: [{ file: path, key: keyOf(enclosingAnchor(declaration)) }],
+        };
       }
       link(owner, "references", name.getText(file), name, found, extra);
     } else if (
