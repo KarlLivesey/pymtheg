@@ -57,7 +57,7 @@ function nth(file, text, index) {
 
 const symbols = [];
 const contains = [];
-/** Declares a symbol and its expected `contains` link from `parent` (default: the module). */
+/** Declares a symbol and, when present, its `contains` link from `parent`. */
 function sym(
   file,
   kind,
@@ -72,6 +72,7 @@ function sym(
       : identity.slice(identity.lastIndexOf(".") + 1);
   const position = typeof at === "string" ? { at } : at;
   symbols.push({ file, name, kind, identity, ...position });
+  if (!parent) return;
   contains.push({
     file,
     kind: "contains",
@@ -122,12 +123,26 @@ sym(
   "module.exports",
   "module.exports = { legacy }",
 );
+sym(
+  "src/legacy.js",
+  "property",
+  "module.exports.[object].legacy",
+  nth("src/legacy.js", "legacy", 1),
+  null,
+);
 // A locally declared require: renamed for the compiler, reported as written.
 sym(
   "src/loader.js",
   "function",
   "require",
   span("src/loader.js", "function require", "\n}"),
+);
+sym(
+  "src/loader.js",
+  "property",
+  "require.[return].[object].name",
+  nth("src/loader.js", "name", 3),
+  null,
 );
 sym(
   "src/loader.js",
@@ -167,6 +182,7 @@ sym(
   "café",
   "export const café: Config = { name: Config.fallback };",
 );
+sym(MAIN, "property", "café.[object].name", "name: Config.fallback", null);
 sym(MAIN, "function", "main", span(MAIN, "export function main", "\n}"));
 sym(SHAPES, "class", "Circle", span(SHAPES, "export class Circle", "\n  }\n}"));
 sym(
