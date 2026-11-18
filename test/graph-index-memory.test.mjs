@@ -115,3 +115,51 @@ test("indexing keeps no decoded file alive and deep-copies no file record, at an
     }
   }
 });
+
+test("a module's analysis write prepares each statement once, however many links it writes", async () => {
+  const prepared = [];
+  for (const count of [20, 80]) {
+    const scratch = await mkdtemp(join(tmpdir(), "pymtheg-index-statements-"));
+    let store;
+    try {
+      const root = join(scratch, "project");
+      await mkdir(root);
+      for (let i = 0; i < count; i++)
+        await writeFile(join(root, `${i}.syn`), `source ${i}`);
+      store = new SqliteGraphStore(join(scratch, "graph.sqlite"), "statements");
+      // Count statements prepared while the store writes a module's
+      // resolution: ten resolved links, ten definite and ten candidate
+      // derived links per file.
+      let writing = false;
+      let calls = 0;
+      const prepare = store.db.prepare.bind(store.db);
+      store.db.prepare = (sql) => {
+        if (writing) calls++;
+        return prepare(sql);
+      };
+      const replace = store.replaceAnalysis.bind(store);
+      store.replaceAnalysis = (...args) => {
+        writing = true;
+        try {
+          return replace(...args);
+        } finally {
+          writing = false;
+        }
+      };
+      const report = await indexProject(
+        root,
+        new LanguageRegistry([synthetic]),
+        store,
+      );
+      assert.equal(report.links, count * 30);
+      assert.equal(report.ambiguous, count * 10);
+      prepared.push(calls);
+    } finally {
+      store?.close();
+      await rm(scratch, { recursive: true, force: true });
+    }
+  }
+  // The reads before the write prepare a fixed few as well.
+  assert.equal(prepared[0], prepared[1], JSON.stringify(prepared));
+  assert.ok(prepared[0] <= 12, JSON.stringify(prepared));
+});

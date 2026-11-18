@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-import type { DatabaseSync } from "node:sqlite";
+import type { DatabaseSync, StatementSync } from "node:sqlite";
 import { openDatabase } from "../storage/local.js";
 import { randomUUID } from "node:crypto";
 import { compare, fileFacts, validateResult } from "./identity.js";
@@ -165,6 +165,21 @@ export class SqliteGraphStore implements GraphStorage {
       throw error;
     }
   }
+  /**
+   * Statements for one write operation, each prepared once and reused for
+   * every row (C-2). A statement prepared per row holds native memory, with
+   * this schema's triggers compiled in, that V8 does not see, so it is not
+   * freed promptly: hundreds of thousands per module write grew RSS by
+   * gigabytes.
+   */
+  private writer(): (sql: string) => StatementSync {
+    const statements = new Map<string, StatementSync>();
+    return (sql) => {
+      let statement = statements.get(sql);
+      if (!statement) statements.set(sql, (statement = this.db.prepare(sql)));
+      return statement;
+    };
+  }
   private transaction(action: () => void): void {
     this.db.exec("BEGIN IMMEDIATE");
     try {
@@ -291,27 +306,22 @@ export class SqliteGraphStore implements GraphStorage {
       throw Error("Expected project-relative POSIX path");
     validateResult(file.text, file.result);
     const facts = fileFacts(this.projectId, file);
+    const sql = this.writer();
     this.transaction(() => {
-      this.db.prepare("DELETE FROM graph_links WHERE file=?").run(file.path);
-      this.db
-        .prepare(
-          "INSERT INTO graph_files VALUES (?,?,?) ON CONFLICT(path) DO UPDATE SET body=excluded.body,status=excluded.status",
-        )
-        .run(file.path, JSON.stringify(file), file.result.status);
-      this.db
-        .prepare("DELETE FROM graph_parse_failures WHERE path=?")
-        .run(file.path);
+      sql("DELETE FROM graph_links WHERE file=?").run(file.path);
+      sql(
+        "INSERT INTO graph_files VALUES (?,?,?) ON CONFLICT(path) DO UPDATE SET body=excluded.body,status=excluded.status",
+      ).run(file.path, JSON.stringify(file), file.result.status);
+      sql("DELETE FROM graph_parse_failures WHERE path=?").run(file.path);
       if (
         parseFailure &&
         file.result.status === "failed" &&
         file.result.failureKind !== "transient"
       )
-        this.db
-          .prepare(
-            "INSERT INTO graph_parse_failures (path,hash,module,version) VALUES (?,?,?,?)",
-          )
-          .run(file.path, file.hash, file.module, file.version);
-      const insert = this.db.prepare(
+        sql(
+          "INSERT INTO graph_parse_failures (path,hash,module,version) VALUES (?,?,?,?)",
+        ).run(file.path, file.hash, file.module, file.version);
+      const insert = sql(
         "INSERT INTO graph_symbols VALUES (?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,kind=excluded.kind,body=excluded.body",
       );
       for (const symbol of facts.symbols)
@@ -323,41 +333,42 @@ export class SqliteGraphStore implements GraphStorage {
           JSON.stringify(symbol),
         );
       const retained = new Set(facts.symbols.map((symbol) => symbol.id));
-      for (const row of this.db
-        .prepare("SELECT id FROM graph_symbols WHERE file=?")
-        .all(file.path))
+      for (const row of sql("SELECT id FROM graph_symbols WHERE file=?").all(
+        file.path,
+      ))
         if (!retained.has(row.id as string))
-          this.db.prepare("DELETE FROM graph_symbols WHERE id=?").run(row.id!);
+          sql("DELETE FROM graph_symbols WHERE id=?").run(row.id!);
       if (file.result.status === "failed")
         for (const symbol of facts.symbols) {
-          this.db
-            .prepare("UPDATE graph_links SET target=NULL WHERE target=?")
-            .run(symbol.id);
-          this.db
-            .prepare("DELETE FROM graph_candidates WHERE symbol=?")
-            .run(symbol.id);
+          sql("UPDATE graph_links SET target=NULL WHERE target=?").run(
+            symbol.id,
+          );
+          sql("DELETE FROM graph_candidates WHERE symbol=?").run(symbol.id);
         }
-      for (const link of facts.links) this.insertLink(link);
+      for (const link of facts.links) this.insertLink(link, sql);
     });
   }
-  private insertLink(link: GraphLink): void {
-    this.db
-      .prepare("INSERT INTO graph_links VALUES (?,?,?,?,?,?,?,?,?)")
-      .run(
-        link.id,
-        link.file,
-        link.sourceId,
-        link.targetId,
-        link.kind,
-        JSON.stringify(link),
-        link.module,
-        link.origin,
-        link.resolution,
-      );
+  private insertLink(
+    link: GraphLink,
+    sql: (sql: string) => StatementSync,
+  ): void {
+    sql("INSERT INTO graph_links VALUES (?,?,?,?,?,?,?,?,?)").run(
+      link.id,
+      link.file,
+      link.sourceId,
+      link.targetId,
+      link.kind,
+      JSON.stringify(link),
+      link.module,
+      link.origin,
+      link.resolution,
+    );
     for (const candidate of link.candidates)
-      this.db
-        .prepare("INSERT INTO graph_candidates VALUES (?,?,?)")
-        .run(link.id, candidate.id, link.kind);
+      sql("INSERT INTO graph_candidates VALUES (?,?,?)").run(
+        link.id,
+        candidate.id,
+        link.kind,
+      );
   }
   removeFile(path: string): void {
     this.db.prepare("DELETE FROM graph_files WHERE path=?").run(path);
@@ -443,6 +454,7 @@ export class SqliteGraphStore implements GraphStorage {
   private writeTargets(
     current: readonly GraphLink[],
     desired: readonly GraphLink[],
+    sql: (sql: string) => StatementSync,
   ): void {
     const byId = new Map(current.map((link) => [link.id, link]));
     for (const link of desired) {
@@ -453,14 +465,17 @@ export class SqliteGraphStore implements GraphStorage {
           JSON.stringify(link.candidates.map((item) => item.id))
       )
         continue;
-      this.db
-        .prepare("UPDATE graph_links SET target=? WHERE id=?")
-        .run(link.targetId, link.id);
-      this.db.prepare("DELETE FROM graph_candidates WHERE link=?").run(link.id);
+      sql("UPDATE graph_links SET target=? WHERE id=?").run(
+        link.targetId,
+        link.id,
+      );
+      sql("DELETE FROM graph_candidates WHERE link=?").run(link.id);
       for (const candidate of link.candidates)
-        this.db
-          .prepare("INSERT INTO graph_candidates VALUES (?,?,?)")
-          .run(link.id, candidate.id, link.kind);
+        sql("INSERT INTO graph_candidates VALUES (?,?,?)").run(
+          link.id,
+          candidate.id,
+          link.kind,
+        );
     }
   }
   resolveLinks(resolutions: readonly LinkResolution[]): void {
@@ -477,15 +492,21 @@ export class SqliteGraphStore implements GraphStorage {
       decider.decide(link, decisions.get(link.id)),
     );
     if (!sameLinks(current, desired))
-      this.transaction(() => this.writeTargets(current, desired));
+      this.transaction(() =>
+        this.writeTargets(current, desired, this.writer()),
+      );
   }
   replaceAnalysis(module: string, result: ResolutionResult): void {
     const current = this.selectLinks("l.module=?", [module]);
+    const sql = this.writer();
     const desired = resolutionFacts(
       this.projectId,
       module,
       result,
-      (path) => this.getFile(path),
+      (path) => {
+        const row = sql("SELECT body FROM graph_files WHERE path=?").get(path);
+        return row ? this.decodeFile(row.body as string) : undefined;
+      },
       this.findSymbols(),
       current,
     );
@@ -499,16 +520,17 @@ export class SqliteGraphStore implements GraphStorage {
           (!wanted.has(link.id) ||
             JSON.stringify(link) !== JSON.stringify(wanted.get(link.id)))
         )
-          this.db.prepare("DELETE FROM graph_links WHERE id=?").run(link.id);
+          sql("DELETE FROM graph_links WHERE id=?").run(link.id);
       for (const link of desired)
         if (
           link.origin === "analysis" &&
           JSON.stringify(previous.get(link.id)) !== JSON.stringify(link)
         )
-          this.insertLink(link);
+          this.insertLink(link, sql);
       this.writeTargets(
         current,
         desired.filter((link) => link.origin === "parse"),
+        sql,
       );
     });
   }
