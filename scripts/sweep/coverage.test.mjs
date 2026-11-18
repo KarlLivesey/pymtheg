@@ -319,6 +319,9 @@ test("a stored library target is credited as stored; a 0.1.0 link is reconstruct
     { level: 2, unit: "strconv", symbol: "Quote", evidence: "import-binding", gap: null });
   assert.deepEqual(externalIdentity(library({ ecosystem: "go-std", unit: "strconv", evidence: "import-path" }), evidence, project, "outside"),
     { level: 1, unit: "strconv", evidence: "import-path", gap: "whole-unit" });
+  assert.deepEqual(externalIdentity(library({ ecosystem: "go-std", unit: "time", symbol: "Time.Equal", evidence: "declaring-owner" }), evidence, project, "outside"),
+    { level: 2, unit: "time", symbol: "Time.Equal", evidence: "declaring-owner", gap: null });
+  assert.deepEqual(externalIdentity(library({ ecosystem: "go-std", unit: "builtin", symbol: "len", evidence: "declared-builtin" }), evidence, project, "outside").level, 2);
   assert.throws(() => externalIdentity(library(undefined), evidence, project, "outside"), /without a stored target/);
   // The same site in a schema-3 graph: unresolved, identity rebuilt from its selector.
   const released = { resolution: "unresolved", module: "go", kind: "calls", file: "src/main", targetName: "strconv.Quote",

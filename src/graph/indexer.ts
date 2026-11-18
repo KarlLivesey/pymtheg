@@ -470,8 +470,10 @@ async function runResolve(
       files: own(await read(() => store.files())),
       contextFiles: structuredClone(contexts),
       symbols: own(await read(() => store.findSymbols())),
+      // Presented unresolved: no target, candidates or library targets
+      // from the previous run.
       links: own(await read(() => parsedLinks(store, module.id))).map(
-        (link) => ({
+        ({ libraries: _previous, ...link }) => ({
           ...link,
           targetId: null,
           targetStatus: null,

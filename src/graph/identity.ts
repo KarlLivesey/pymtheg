@@ -92,6 +92,9 @@ export function validateResult(
   }
   for (const link of result.links) {
     range(link.range);
+    // Library targets are decisions (resolve or analysis), never parse facts.
+    if (Object.hasOwn(link, "libraries"))
+      throw Error("Parse links cannot carry library targets");
     if (
       !link.kind ||
       !link.targetName ||
@@ -138,11 +141,12 @@ export const addedLinkId = (
 ): string => `link:${digest(["v2", project, module, file, "analysis", key])}`;
 
 /**
- * What each evidence kind can prove. `symbol: false`: it names the unit only.
+ * What each evidence kind can prove. `symbol: false`: it names the unit only;
+ * `"required"`: it proves a member, so the symbol must be given.
  * `definite: false`: it only makes the target possible (candidate sets only).
  */
 export const libraryEvidence: Readonly<
-  Record<LibraryEvidence, { symbol: boolean; definite: boolean }>
+  Record<LibraryEvidence, { symbol: boolean | "required"; definite: boolean }>
 > = {
   "import-path": { symbol: false, definite: true },
   "import-binding": { symbol: true, definite: true },
@@ -151,6 +155,7 @@ export const libraryEvidence: Readonly<
   "declared-builtin": { symbol: true, definite: true },
   "reference-directive": { symbol: false, definite: true },
   "glob-import": { symbol: true, definite: false },
+  "declaring-owner": { symbol: "required", definite: true },
 };
 const text = (value: unknown, max: number): value is string =>
   typeof value === "string" &&
@@ -189,6 +194,8 @@ export function libraryTarget(
     throw Error(
       `Library evidence ${value.evidence} names a unit, not a symbol`,
     );
+  if (value.symbol === undefined && evidence.symbol === "required")
+    throw Error(`Library evidence ${value.evidence} needs the member's symbol`);
   if (definite && !evidence.definite)
     throw Error(
       `Library evidence ${value.evidence} only supports a candidate set`,

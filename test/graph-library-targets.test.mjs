@@ -228,7 +228,7 @@ test("CLI and MCP show library targets as outside the project and answer uses", 
           "library",
           "zod.string",
           null,
-          1,
+          0,
           {
             ref: zodString,
             ecosystem: "npm",
@@ -319,6 +319,11 @@ for (const [label, decision, message] of [
     /at least two distinct targets/,
   ],
   [
+    "from a declaring owner without the member",
+    { library: { ...zod, evidence: "declaring-owner" } },
+    /needs the member's symbol/,
+  ],
+  [
     "with an invalid ecosystem",
     { library: { ...zod, ecosystem: "NPM", evidence: "import-path" } },
     /ecosystem/,
@@ -397,5 +402,129 @@ test("a 0.1.0 (schema 3) graph reads as having no library targets and migrates i
       "4",
     );
     check.close();
+  });
+});
+
+test("a proven declaring owner is a definite level-2 library target", async () => {
+  await project(async (root, scratch) => {
+    const store = new SqliteGraphStore(join(scratch, "g.sqlite"), "p");
+    try {
+      const report = await indexProject(
+        root,
+        new LanguageRegistry([
+          recording({
+            library: {
+              ecosystem: "go-std",
+              unit: "time",
+              symbol: "Time.Equal",
+              evidence: "declaring-owner",
+            },
+          }),
+        ]),
+        store,
+      );
+      assert.deepEqual(report.resolutionErrors, []);
+      const [link] = store.libraryUses("time", "Time.Equal", 10);
+      const { id, ...target } = link.libraries[0];
+      assert.equal(link.resolution, "library");
+      assert.match(id, /^library:[a-f0-9]{64}$/);
+      assert.deepEqual(target, {
+        ecosystem: "go-std",
+        unit: "time",
+        symbol: "Time.Equal",
+        evidence: "declaring-owner",
+      });
+    } finally {
+      store.close();
+    }
+  });
+});
+
+test("a second resolution gets its links without the previous run's library targets", async () => {
+  await project(async (root, scratch) => {
+    const seen = [];
+    const watching = {
+      ...toy,
+      resolve(context) {
+        seen.push(
+          context.links.filter((link) => Object.hasOwn(link, "libraries"))
+            .length,
+        );
+        return toy.resolve(context);
+      },
+    };
+    const store = new SqliteGraphStore(join(scratch, "g.sqlite"), "p");
+    try {
+      const registry = new LanguageRegistry([watching]);
+      await indexProject(root, registry, store);
+      assert.equal(store.counts().library, 3);
+      await indexProject(root, registry, store);
+      assert.deepEqual(seen, [0, 0]);
+      assert.equal(store.counts().library, 3);
+    } finally {
+      store.close();
+    }
+  });
+});
+
+test("a parse result cannot smuggle library targets into the store", async () => {
+  await project(async (root, scratch) => {
+    const forging = {
+      ...toy,
+      parse(source) {
+        const result = toy.parse(source);
+        return {
+          ...result,
+          links: result.links.map((link) => ({
+            ...link,
+            libraries: [
+              {
+                id: "library:forged",
+                ecosystem: "npm",
+                unit: "x",
+                evidence: "made-up",
+              },
+            ],
+          })),
+        };
+      },
+      resolve: undefined,
+    };
+    const store = new SqliteGraphStore(join(scratch, "g.sqlite"), "p");
+    try {
+      const report = await indexProject(
+        root,
+        new LanguageRegistry([forging]),
+        store,
+      );
+      assert.deepEqual(report.failed, ["a.toy", "b.toy"]);
+      assert.match(report.errors[0].message, /cannot carry library targets/);
+      assert.equal(store.links().length, 0);
+      const file = { ...store.getFile("a.toy") };
+      assert.throws(
+        () =>
+          store.replaceFile({
+            ...file,
+            result: {
+              status: "clean",
+              diagnostics: [],
+              symbols: [],
+              links: [
+                {
+                  sourceKey: null,
+                  kind: "imports",
+                  targetName: "x",
+                  range: { start: 0, end: 1 },
+                  libraries: [{ id: "library:forged", evidence: "made-up" }],
+                },
+              ],
+            },
+          }),
+        /cannot carry library targets/,
+      );
+      assert.equal(store.links().length, 0);
+    } finally {
+      store.close();
+    }
   });
 });

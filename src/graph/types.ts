@@ -84,7 +84,13 @@ export type LibraryEvidence =
   /** A reference directive naming a declaration unit (`/// <reference lib>`). */
   | "reference-directive"
   /** A glob/dot import puts the unit in scope; the symbol is only possible. Candidate sets only. */
-  | "glob-import";
+  | "glob-import"
+  /**
+   * The member's declaring owner is proven: the declaration was established
+   * after alias, deref, trait or embedding selection, or by the type checker.
+   * Never the receiver's type alone. Symbol required.
+   */
+  | "declaring-owner";
 /**
  * A target outside the checkout: a library unit (level 1) or a symbol in it
  * (level 2). Never read from dependency sources, the network or a resolver.

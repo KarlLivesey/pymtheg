@@ -2562,7 +2562,10 @@ checkout symbols and library targets. Targets are rows of their own
 symbol are one index read; `pymtheg graph uses UNIT [SYMBOL]` and MCP action
 `uses` ask that question. The store refuses a library target without a known
 evidence kind, a unit-only kind with a symbol, and a `glob-import` as a definite
-target. There is no receiver-type kind. Graph schema 3 becomes 4: a schema-3
+target, or a `declaring-owner` without the member. `declaring-owner` records
+a member whose declaring owner the module has proven (after alias, deref,
+trait or embedding selection, or from the type checker); a target guessed
+from the receiver's type alone is never recorded. Graph schema 3 becomes 4: a schema-3
 graph is migrated in place (rows unchanged, new table and resolution triggers),
 so 0.1.0 indexes are kept, not rebuilt; 0.1.0 refuses a schema-4 graph. The
 coverage export credits a stored library target as stored (level 2 with a
@@ -2571,7 +2574,10 @@ symbol, level 1 without) and reconstructs identities only for links without one.
 unit and the symbol; until now the graph had nowhere to say so, and the measure
 rebuilt identities from whatever each module happened to record. **Rules out:**
 reading dependency sources, network access, version resolution beyond the
-manifest, library targets inferred from a receiver's type, and showing a library
-target as a missing local symbol. **Open:** once the Go, Rust and TypeScript
+manifest, library targets inferred from the receiver's type alone, and showing a
+library target as a missing local symbol. **Owner decision (C-5 review):** Go
+builtins (`len`, `append`, `make`, …) recorded as `go-std` `builtin` targets
+with evidence `declared-builtin` count as identified library targets at
+level 2. **Open:** once the Go, Rust and TypeScript
 items record library targets, the export's reconstruction can be limited to
 schema-3 graphs. See [C-5](changes/C-5.md).

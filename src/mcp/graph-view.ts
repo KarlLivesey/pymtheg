@@ -80,7 +80,11 @@ export class GraphView {
           targetName: clip(l.targetName),
           ...this.location(l),
           reasons: this.reasons(l.data),
-          candidateCount: list(l.candidates).length + list(l.libraries).length,
+          // A definite library link has a target, not candidates.
+          candidateCount:
+            l.certainty === "library"
+              ? 0
+              : list(l.candidates).length + list(l.libraries).length,
           // Library targets are outside this project, never local symbols.
           ...(l.certainty === "library"
             ? { library: this.library(list(l.libraries)[0]) }

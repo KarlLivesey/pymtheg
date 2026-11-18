@@ -209,7 +209,7 @@ Link outcomes:
 | Outcome | Meaning |
 |---|---|
 | `resolved` | One definite target in the checkout |
-| `library` | One definite target outside the project: a library unit (level 1) or a symbol in it (level 2), recorded with how the source proves it. Never a local symbol. **No production module records one yet** (C-5 is the core; the Go, Rust and TypeScript items follow) |
+| `library` | One definite target outside the project: a library unit (level 1) or a symbol in it (level 2), recorded with how the source proves it (never the receiver's type alone; see the design section in `runtime-map.md`). Never a local symbol. **No production module records one yet** (C-5 is the core; the Go, Rust and TypeScript items follow) |
 | `ambiguous` | A candidate set, never a pick. It may mix checkout symbols and library targets. A set is **closed** only when it provably holds every possible target and every member is provably possible. Otherwise it is **open**, and `data.open` gives the reasons (for example a type outside the project could be the target); an open set still lists every project target |
 | `unresolved` | No target; the written name is kept. The reason, when recorded, is in `data` (`reason` in Go and TypeScript, `uncertainty` in Rust). Rust may also list unverified would-be targets in `data.targets` (at most 16, else a count) |
 | failed (`unresolved`, reason `invalid-code`) | The link depends on a file that could not be read. `data.cause` names the failed file(s). It has no target, no candidates and no would-be targets |
