@@ -16,7 +16,7 @@ step() { # label cli args...
   local label="$1" cli="$2"; shift 2
   local out; out=$(cd "$P" && node "$cli" "$@" --json 2>"$C/err")
   local code=$?
-  local summary; summary=$(printf '%s' "$out" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const r=JSON.parse(s);console.log("status="+r.status+" complete="+r.sync?.complete+" files="+r.counts?.files+" links="+r.counts?.links)}catch{console.log("error: "+require("fs").readFileSync(process.argv[1],"utf8").trim().split("\n").filter(l=>!/Experimental|trace-warnings/.test(l)).slice(-1)[0])}})' "$C/err")
+  local summary; summary=$(printf '%s' "$out" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const r=JSON.parse(s);console.log(r.error ? "status="+r.status+" message="+JSON.stringify(r.error.message ?? r.error) : "status="+r.status+" complete="+r.sync?.complete+" files="+r.counts?.files+" links="+r.counts?.links)}catch{console.log("error: "+require("fs").readFileSync(process.argv[1],"utf8").trim().split("\n").filter(l=>!/Experimental|trace-warnings/.test(l)).slice(-1)[0])}})' "$C/err")
   local fmt; fmt=$(node -e 'const b=require("fs").readFileSync(process.argv[1]);console.log(b[18]+","+b[19])' "$db" 2>/dev/null)
   echo "$label: exit=$code $summary format=$fmt files=$(ls "$(dirname "$db")" | tr '\n' ' ')"
 }
