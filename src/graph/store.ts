@@ -779,7 +779,8 @@ export class SqliteGraphStore implements GraphStorage {
     this.queryLimit(limit);
     return this.db
       .prepare(
-        "SELECT body FROM graph_symbols WHERE file=? ORDER BY id LIMIT ?",
+        `SELECT body FROM graph_symbols WHERE file=?
+         ORDER BY COALESCE(json_extract(body,'$.data.scoped'),0),id LIMIT ?`,
       )
       .all(path, limit)
       .map((row) => JSON.parse(row.body as string) as GraphSymbol);

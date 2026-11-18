@@ -82,6 +82,10 @@ freshly sampled definite links matched the pinned source.
 
 ## Cost against main
 
+The same-session runs supersede these paired timings from a loaded shared
+server. This section records the earlier observations.
+[Same-session measurements and profile](cost-profile.md)
+
 The paired passes used main `32ca757` and the candidate tarball, fresh copies
 of the same pins, Node 24.21.0 with its default heap, and `--trace-gc` on both
 sides. Cold wall time includes disk waits on the shared dev server.
