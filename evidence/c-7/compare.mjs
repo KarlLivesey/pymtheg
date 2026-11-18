@@ -11,9 +11,14 @@ import {
 
 const scratch = process.env.PYM_SCRATCH;
 const read = (file) => JSON.parse(readFileSync(join(scratch, file), "utf8"));
-const main = read("main-run.json");
-const candidate = read(process.argv[2] ?? "candidate-run.json");
-const mainCoverage = read("main-coverage.json");
+const [
+  candidateFile = "candidate-run.json",
+  baseline = "main",
+  output = "comparison.json",
+] = process.argv.slice(2);
+const main = read(`${baseline}-run.json`);
+const candidate = read(candidateFile);
+const mainCoverage = read(`${baseline}-coverage.json`);
 const candidateCoverage = read("candidate-coverage.json");
 const mainByRepo = new Map(main.repos.map((row) => [row.id, row]));
 const seed = "c-7:4c3bed4d";
@@ -113,6 +118,8 @@ for (const repo of candidate.repos) {
     const texts = newDb.prepare(
       "SELECT json_extract(body, '$.text') AS text FROM graph_files WHERE path=?",
     );
+    const candidatesFor = newDb.prepare(`SELECT s.body FROM graph_candidates c
+      JOIN graph_symbols s ON s.id=c.symbol WHERE c.link=? ORDER BY s.file,s.kind,s.id`);
     const position = (offset, file) => {
       const text = texts.get(file)?.text ?? "";
       const line = text.slice(0, offset).split("\n").length;
@@ -198,11 +205,17 @@ for (const repo of candidate.repos) {
             kind: link.kind,
             at: link.targetName,
             before: label(link.target),
+            beforeAssumes: link.data?.assumes,
             after: next.map((n) => ({
               outcome: n.resolution,
               target: label(n.target),
               reason: reasonOf(n),
               assumes: n.data?.assumes,
+              ...(n.resolution === "ambiguous" && {
+                candidates: candidatesFor
+                  .all(n.id)
+                  .map(({ body }) => label(JSON.parse(body))),
+              }),
             })),
           });
         }
@@ -252,7 +265,7 @@ for (const repo of candidate.repos) {
     }));
 }
 writeFileSync(
-  join(scratch, "comparison.json"),
+  join(scratch, output),
   JSON.stringify(
     {
       seed,

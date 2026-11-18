@@ -389,6 +389,8 @@ test("object-member calls account for every explicit producer and withhold opaqu
     "  return { log(m: string) { console.log(m); } };",
     "}",
     'createLogger(true).log("x");',
+    "function make(flag) { if (flag) return { run() { return 1 } }; return { run() { return 2 } } }",
+    "make(flag).run()",
     "function readMode(mode: number) {",
     "  switch (mode) {",
     '    case 0: return { read() { return "first"; } };',
@@ -411,6 +413,8 @@ test("object-member calls account for every explicit producer and withhold opaqu
     "const nullable = flag ? { pick() { return 1; } } : null;",
     "const otherwise = nullable ?? { pick() { return 2; } };",
     "otherwise.pick();",
+    "const viaOr = nullable || { pick() { return 3; } };",
+    "viaOr.pick();",
     "function reassigned() {",
     "  let lr = { run() { return 1; } };",
     "  lr = { run() { return 2; } };",
@@ -432,6 +436,7 @@ test("object-member calls account for every explicit producer and withhold opaqu
     "  const second = { item() { return 2; } };",
     "  const list = [first, second];",
     "  list[index]!.item();",
+    "  list[0]!.item();",
     "  const direct = [{ item() { return 1; } }, { item() { return 2; } }];",
     "  direct[index]!.item();",
     "}",
@@ -468,6 +473,7 @@ test("object-member calls account for every explicit producer and withhold opaqu
           'createLogger(true).log("x");',
           ["log() {}", "log(m: string) { console.log(m); }"],
         ],
+        ["make(flag).run()", ["run() { return 1 }", "run() { return 2 }"]],
         [
           "readMode(key).read();",
           ['read() { return "first"; }', 'read() { return "second"; }'],
@@ -478,6 +484,7 @@ test("object-member calls account for every explicit producer and withhold opaqu
         ],
         ["choice.take();", ["take() { return 1; }", "take() { return 2; }"]],
         ["otherwise.pick();", ["pick() { return 1; }", "pick() { return 2; }"]],
+        ["viaOr.pick();", ["pick() { return 1; }", "pick() { return 3; }"]],
       ]) {
         const call = callOn(line);
         assert.equal(call.resolution, "ambiguous", line);
@@ -492,6 +499,7 @@ test("object-member calls account for every explicit producer and withhold opaqu
         ["holder.inner.next();", "object-producer-unverified"],
         ["this.state.update();", "object-producer-unverified"],
         ["list[index]!.item();", "object-producer-unverified"],
+        ["list[0]!.item();", "object-producer-unverified"],
       ]) {
         const call = callOn(line);
         assert.equal(call.resolution, "unresolved", line);

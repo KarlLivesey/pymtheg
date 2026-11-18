@@ -16,7 +16,10 @@ const scratch = process.env.PYM_SCRATCH;
 const baseline = JSON.parse(
   readFileSync(join(scratch, "main-run.json"), "utf8"),
 );
-const selected = ["excalidraw/excalidraw", "pmndrs/zustand"];
+const [candidate = "candidate", ...pins] = process.argv.slice(2);
+const selected = pins.length
+  ? pins
+  : ["excalidraw/excalidraw", "pmndrs/zustand"];
 const work = mkdtempSync(join(scratch, "cold-"));
 function run(command, args, cwd, log, codes) {
   const file = openSync(log, "w");
@@ -46,7 +49,7 @@ for (const [i, repo] of selected.entries()) {
         verbatimSymlinks: true,
       });
   const observations = [];
-  for (const [j, build] of ["main", "candidate", "main"].entries()) {
+  for (const [j, build] of ["main", candidate, "main"].entries()) {
     const cli = join(scratch, build, "dist/cli/main.js");
     const prefix = join(work, `${i}-${j}`);
     run(

@@ -1,5 +1,9 @@
 # C-7 coverage evidence
 
+This page records the version-20 build submitted for review. The producer
+fix, rescanned links, and current coverage are in the
+[review follow-up](review-1/README.md).
+
 The dev-server sweep used Node 24.21.0, default graph settings and the 20
 TypeScript pins in `sweep/repos.json`. Each revision was built locally and the
 corpus checkouts were indexed from source. The main revision was `e5f86db`.
