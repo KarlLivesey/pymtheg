@@ -40,6 +40,11 @@ function load(record) {
     .prepare("SELECT id, file, kind, json_extract(body,'$.identity') AS identity FROM graph_symbols")
     .iterate())
     symbols.set(row.id, `${row.file}:${row.kind}:${row.identity}`);
+  const keys = new Set();
+  for (const row of db
+    .prepare("SELECT file, kind, json_extract(body,'$.identity') AS identity FROM graph_symbols WHERE json_extract(body,'$.module')='go'")
+    .iterate())
+    keys.add(`${row.file}\u0000${row.kind}\u0000${row.identity}`);
   const links = new Map();
   for (const row of db
     .prepare("SELECT file, kind, target, resolution, body FROM graph_links WHERE module='go'")
@@ -56,7 +61,7 @@ function load(record) {
     });
   }
   db.close();
-  return links;
+  return { links, keys };
 }
 
 const lineOf = (record, file, offset) => {
@@ -68,14 +73,20 @@ const lineOf = (record, file, offset) => {
   return { line, source };
 };
 
-const out = { repos: [], totals: {}, changed: [], sample: [] };
+const out = { repos: [], totals: {}, changed: [], missingSymbols: [], sample: [] };
 const add = (bucket, key, n = 1) => (bucket[key] = (bucket[key] ?? 0) + n);
 const pool = [];
 for (const [id, cand] of [...candidate].sort()) {
   const was = base.get(id);
   if (!was) continue;
-  const before = load(was);
-  const after = load(cand);
+  const { links: before, keys: keysBefore } = load(was);
+  const { links: after, keys: keysAfter } = load(cand);
+  // Every symbol of the base graph keeps its identity (0.1.0 anchors).
+  const missingSymbols = [...keysBefore].filter((key) => !keysAfter.has(key));
+  for (const key of missingSymbols.slice(0, 20)) {
+    const [file, kind, identity] = key.split("\u0000");
+    out.missingSymbols.push({ id, file, kind, identity });
+  }
   const row = {
     id,
     linksBefore: before.size,
@@ -87,6 +98,9 @@ for (const [id, cand] of [...candidate].sort()) {
     lost: 0,
     retargeted: 0,
     removedSites: 0,
+    symbolsBefore: keysBefore.size,
+    symbolsAfter: keysAfter.size,
+    symbolsMissing: missingSymbols.length,
   };
   for (const [key, link] of after) {
     const old = before.get(key);

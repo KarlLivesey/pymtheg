@@ -154,7 +154,7 @@ test("pebble: a nested anonymous struct field of a named struct, from another fi
   );
   assert.equal(
     target("provider/db.go", "d.mu.mem.queue"),
-    "provider/db.go:field:db.go:db.go:DB.mu.anon#1.mem.anon#1.queue",
+    "provider/db.go:field:db.go:DB.mu.anon#1.mem.anon#1.queue",
   );
   assert.equal(
     target("provider/db.go", "d.mu.log.manager.path"),
@@ -679,4 +679,95 @@ test("search and file listings put generated anonymous-struct symbols after name
     store.close();
     await rm(scratch, { recursive: true, force: true });
   }
+});
+
+test("generic named containers: over a non-generic container they resolve, a generic literal does not", async () => {
+  const { links } = await project({
+    "go.mod": MOD,
+    "q/q.go": lines(
+      "package q",
+      "type Row struct{ N int }",
+      "type Rows []Row",
+      "type Gen[T any] Rows",
+      "type L[E any] []E",
+      "func Use(g Gen[string], l L[Row]) {",
+      "\t_ = g[0].N",
+      "\t_ = l[0].N",
+      "}",
+    ),
+  });
+  assert.equal(at(links, "q/q.go", "g[0].N").target, "q/q.go:field:Row.N");
+  assert.equal(at(links, "q/q.go", "l[0].N").target, null);
+  assert.deepEqual(at(links, "q/q.go", "l[0].N").candidates, []);
+});
+
+test("build variants: a link in a constrained file sees only the variants built with it", async () => {
+  // ebpf internal/testutils/netns_linux.go: NetNS is also declared in a
+  // `//go:build !linux` file; inside the Linux file it is the Linux NetNS.
+  const { links } = await project({
+    "go.mod": MOD,
+    "t/netns_linux.go": lines(
+      "package t",
+      "type NetNS struct{ f int }",
+      "func (h *NetNS) close() {}",
+      "func use(ns *NetNS) { ns.close(); _ = ns.f }",
+    ),
+    "t/netns_other.go": lines(
+      "//go:build !linux",
+      "",
+      "package t",
+      "type NetNS struct{}",
+    ),
+    "t/extra_unix.go": lines(
+      "//go:build unix && !linux",
+      "",
+      "package t",
+      "func (h *NetNS) extra() {}",
+      "func use2(ns *NetNS) { ns.extra() }",
+    ),
+  });
+  assert.equal(
+    at(links, "t/netns_linux.go", "ns.close").target,
+    "t/netns_linux.go:method:(*NetNS).close",
+  );
+  assert.equal(
+    at(links, "t/netns_linux.go", "ns.f").target,
+    "t/netns_linux.go:field:NetNS.f",
+  );
+  // `unix && !linux` builds only with the `!linux` declaration, which the
+  // method's constraint implies: definite.
+  assert.equal(
+    at(links, "t/extra_unix.go", "ns.extra").target,
+    "t/extra_unix.go:method:(*NetNS).extra",
+  );
+});
+
+test("an embedding anonymous struct inside field-only ones keeps its 0.1.0 identity", async () => {
+  // cli/cli api/queries_repo.go: `LastCommit.struct#1` (0.1.0) sits inside
+  // field-only anonymous structs that were not symbols then.
+  const { symbols } = await project({
+    "go.mod": MOD,
+    "api/queries_repo.go": lines(
+      "package api",
+      "type Commit struct{ OID string }",
+      "func LastCommit() {",
+      "\tvar responseData struct {",
+      "\t\tRepository struct {",
+      "\t\t\tTarget struct{ Commit }",
+      "\t\t}",
+      "\t}",
+      "\t_ = responseData.Repository.Target.OID",
+      "}",
+    ),
+  });
+  const identities = symbols
+    .filter((item) => item.kind === "struct" && item.file === "api/queries_repo.go")
+    .map((item) => item.identity)
+    .sort();
+  assert.deepEqual(identities, [
+    "queries_repo.go:LastCommit.anon#1",
+    "queries_repo.go:LastCommit.anon#1.Repository.anon#1",
+    "queries_repo.go:LastCommit.struct#1",
+    "Commit",
+  ].sort());
 });

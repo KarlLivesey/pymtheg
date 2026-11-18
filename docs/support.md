@@ -274,13 +274,17 @@ file (its ID can change when files are added or removed).
   source, by Go's selector rule including promotion; the same on elements of
   slices, arrays, maps (value, and key for a ranged key) and channels, on range
   variables and index expressions over them, also through a named type written
-  as a container (`type R map[string][]T`); fields and promoted members of
-  anonymous struct types (every anonymous struct type is a local struct symbol
-  with its fields: table tests, nested `mu struct{…}` fields) and of
+  as a container (`type R map[string][]T`, also a generic defined type over
+  one); fields and promoted members of anonymous struct types (every anonymous
+  struct type with a field is a local struct symbol with its fields, its
+  identity anchored to its owning declaration: table tests, nested
+  `mu struct{…}` fields; ranked after named symbols in search) and of
   function-local struct types; field, type, receiver and embedding references;
   `contains`.
 - **Candidates:** a name declared in several build variants (build constraints
-  are not evaluated); several equally shallow promotion paths; interface dispatch
+  are not evaluated; a selection on a type declared in several variants is
+  searched per variant and is definite only when all variants agree, otherwise
+  the set of their answers); several equally shallow promotion paths; interface dispatch
   (the interface method plus every project type whose method set matches by name
   and parameter/result counts; always open, `structural-match-unverified`);
   calls on a receiver whose type the source does not show (name-only, open,

@@ -19,6 +19,12 @@ import {
 } from "./gomod.js";
 import type { GoProjectLayout } from "./gomod.js";
 import {
+  fileConstraint,
+  implies,
+  satisfiable,
+  type Formula,
+} from "./constraints.js";
+import {
   BUILTIN_FUNCTIONS,
   PREDECLARED_TYPES,
   PREDECLARED_VALUES,
@@ -132,7 +138,7 @@ interface View {
    * A type declared in several build variants: a method of this name is
    * declared in a file that may or may not be built with this variant.
    */
-  uncertain?: (name: string) => boolean;
+  uncertain?: (name: string, from?: string) => boolean;
 }
 interface InterfaceMethod {
   /** Name, plus the declaring package for an unexported name. */
@@ -1490,14 +1496,16 @@ class GoResolver {
       all(name).filter((symbol) =>
         symbol.kind === "field"
           ? symbol.file === type.file
-          : !variants || this.buildsWith(symbol.file, type.file) === true,
+          : !variants || this.buildsWith(symbol.file, type.file) !== false,
       );
-    const uncertain = (name: string) =>
+    // Some method of this name might be missing from this variant in the
+    // referencing file's builds: the name is not known at this depth.
+    const uncertain = (name: string, from?: string) =>
       variants &&
-      all(name).some(
+      own(name).some(
         (symbol) =>
           symbol.kind !== "field" &&
-          this.buildsWith(symbol.file, type.file) === undefined,
+          this.buildsWith(symbol.file, type.file, from) !== true,
       );
     const declared = (name: string) =>
       own(name).filter((symbol) => symbol.kind === "method");
@@ -1623,7 +1631,7 @@ class GoResolver {
       .sort()
       .join(
         ",",
-      )}\u0000${name}\u0000${access ?? ""}\u0000${from === undefined ? "" : this.files.get(from)?.fact.test ? `t:${directoryOf(from)}` : "n"}`;
+      )}\u0000${name}\u0000${access ?? ""}\u0000${from === undefined ? "" : this.files.get(from)?.fact.test ? `t:${directoryOf(from)}` : "n"}\u0000${from === undefined ? "" : JSON.stringify(this.constraintOf(from) ?? null)}`;
     const cached = this.selections.get(memoKey);
     if (cached) return cached;
     // A type declared in several build variants is a different type in each
@@ -1672,7 +1680,12 @@ class GoResolver {
   ): Selection | { group: string; size: number } {
     let unchosen: { group: string; size: number } | undefined;
     const pick = (set: GraphSymbol[]): GraphSymbol[] => {
-      const variants = unique(set).sort(
+      // Only the variants that can be built with the referencing file.
+      const buildable =
+        from === undefined
+          ? set
+          : set.filter((type) => this.buildTogether(from, type.file) !== false);
+      const variants = unique(buildable.length ? buildable : set).sort(
         (a, b) => compareText(a.file, b.file) || compareText(a.id, b.id),
       );
       if (variants.length < 2) return variants;
@@ -1731,7 +1744,7 @@ class GoResolver {
           }
         });
         // A method that may or may not be built with this variant: not known.
-        if (views.some((item) => item.uncertain?.(name)))
+        if (views.some((item) => item.uncertain?.(name, from)))
           externalAt = Math.min(externalAt ?? depth, depth);
         const found: GraphSymbol[] = [];
         // Interfaces: a flat method set; identical methods inherited along several
@@ -1817,30 +1830,45 @@ class GoResolver {
     return result;
   }
 
+  private constraints = new Map<string, Formula | undefined>();
+  /** A file's build constraint (TRUE: none); undefined when not readable. */
+  private constraintOf(path: string): Formula | undefined {
+    if (!this.constraints.has(path)) {
+      const fact = this.files.get(path)?.fact;
+      this.constraints.set(path, fact ? fileConstraint(fact) : undefined);
+    }
+    return this.constraints.get(path);
+  }
   /**
-   * Can a file be built together with another? Yes for the same file, an
-   * unconstrained file or the same constraint; no for different GOOS or GOARCH
-   * filename suffixes without a build line; otherwise not known.
+   * Is a method declared in `path` part of the type declared in `type`'s
+   * file (in the builds of `from`, when given)? Yes when that constraint
+   * implies the method file's (the same file, an unconstrained one, the same
+   * constraint); no when the files are never built together; otherwise not
+   * known.
    */
-  private buildsWith(path: string, other: string): boolean | undefined {
-    if (path === other) return true;
-    const a = this.files.get(path)?.fact;
-    const b = this.files.get(other)?.fact;
-    if (!a || !b) return undefined;
-    if (a.build === undefined && a.goos === undefined && a.goarch === undefined)
-      return true;
-    if (a.build === b.build && a.goos === b.goos && a.goarch === b.goarch)
-      return true;
-    if (
-      a.build === undefined &&
-      b.build === undefined &&
-      ((a.goos !== undefined && b.goos !== undefined && a.goos !== b.goos) ||
-        (a.goarch !== undefined &&
-          b.goarch !== undefined &&
-          a.goarch !== b.goarch))
-    )
-      return false;
-    return undefined;
+  private buildsWith(
+    path: string,
+    type: string,
+    from?: string,
+  ): boolean | undefined {
+    if (path === type) return true;
+    const method = this.constraintOf(path);
+    if (method?.k === "t") return true;
+    let declared = this.constraintOf(type);
+    // In the builds of the referencing file only.
+    if (declared && from !== undefined) {
+      const context = this.constraintOf(from);
+      declared = context ? { k: "and", a: declared, b: context } : undefined;
+    }
+    if (!method || !declared) return undefined;
+    if (implies(declared, method) === true) return true;
+    return satisfiable([declared, method]) === false ? false : undefined;
+  }
+  /** Can these two files be in one build (false only when proved not)? */
+  private buildTogether(a: string, b: string): boolean | undefined {
+    const x = this.constraintOf(a);
+    const y = this.constraintOf(b);
+    return x && y ? satisfiable([x, y]) : undefined;
   }
 
   /** Interface methods named `name` through interface embedding (cycle-safe by path). */

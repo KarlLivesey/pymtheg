@@ -622,6 +622,14 @@ export class GoExtractor {
   }
 
   private localIdentities = new Set<string>();
+  /** A file-unique identity that already carries the file name. */
+  private uniqueIdentity(scoped: string): string {
+    let identity = scoped;
+    for (let index = 2; this.localIdentities.has(identity); index++)
+      identity = `${scoped}#${index}`;
+    this.localIdentities.add(identity);
+    return identity;
+  }
   /** A file-unique identity for a function-local or anonymous type. */
   private localIdentity(base: string): string {
     // Unique per package: the file name, then the enclosing declaration, the local
@@ -1783,12 +1791,27 @@ export class GoExtractor {
     if (!fields.length) return this.walkChildren(node);
     const embeds = fields.some((field) => !fieldsOf(field, "name").length);
     const enclosing = this.byKey.get(this.owner)?.identity ?? "file";
-    const counters = embeds ? this.localStructs : this.fieldStructs;
-    const count = (counters.get(enclosing) ?? 0) + 1;
-    counters.set(enclosing, count);
-    const name = this.localIdentity(
-      `${enclosing}.${embeds ? "struct" : "anon"}#${count}`,
-    );
+    let name: string;
+    const outer = this.legacyOwner;
+    if (embeds) {
+      // The 0.1.0 identity: owned by the nearest declaration that is not
+      // inside a field-only anonymous struct (those were not symbols then).
+      const owner = outer ?? enclosing;
+      const count = (this.localStructs.get(owner) ?? 0) + 1;
+      this.localStructs.set(owner, count);
+      name = this.localIdentity(`${owner}.struct#${count}`);
+      // Its own fields own what is inside it, as in 0.1.0.
+      this.legacyOwner = undefined;
+    } else {
+      const count = (this.fieldStructs.get(enclosing) ?? 0) + 1;
+      this.fieldStructs.set(enclosing, count);
+      // An owner inside this file already carries the file name.
+      const prefix = `${basename(this.path)}:`;
+      name = enclosing.startsWith(prefix)
+        ? this.uniqueIdentity(`${enclosing}.anon#${count}`)
+        : this.localIdentity(`${enclosing}.anon#${count}`);
+      this.legacyOwner = outer ?? enclosing;
+    }
     this.anonymousStructs.set(node.startIndex, name);
     // `anonymous`: generated, not a name in the source; listed after named
     // declarations by search and file listings.
@@ -1797,8 +1820,17 @@ export class GoExtractor {
       anonymous: true,
     });
     this.contains(this.owner, key, range(node));
-    this.within(key, () => this.structFields(name, key, node, true));
+    try {
+      this.within(key, () => this.structFields(name, key, node, true));
+    } finally {
+      this.legacyOwner = outer;
+    }
   }
+  /**
+   * While inside a field-only anonymous struct: the owner an embedding
+   * anonymous struct had in 0.1.0, when such structs were not symbols.
+   */
+  private legacyOwner: string | undefined;
   /**
    * Replaces each anonymous struct's pending reference (`local.sym`) in the
    * file's facts by its identity; one the walk never reached loses it.
