@@ -339,11 +339,11 @@ export async function executeGraph(
       options.progress?.({ phase: "inventory", done: 0, total });
       report = await indexProject(root, tracked, adapter, {
         excludeDirectories: [".pymtheg"],
+        ...(options.signal || toolchainOn ? { signal } : {}),
         ...(toolchainOn
           ? {
               toolchains,
               toolchainDirectory,
-              signal,
             }
           : {}),
       });

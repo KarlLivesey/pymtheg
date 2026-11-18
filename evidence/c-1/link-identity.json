@@ -1,0 +1,98 @@
+[
+  {
+    "id": "BurntSushi/ripgrep",
+    "before": {
+      "links": 39086,
+      "sha256": "6c387a0583131515ef9adf400e5de5f36bb92e08557abcdd8faf4e0961454cac"
+    },
+    "after": {
+      "links": 39086,
+      "sha256": "6c387a0583131515ef9adf400e5de5f36bb92e08557abcdd8faf4e0961454cac"
+    },
+    "identical": true
+  },
+  {
+    "id": "RustCrypto/hashes",
+    "before": {
+      "links": 12870,
+      "sha256": "47e37aa4be32e68372da48660936f3294f42c6febce41049f4613f40ddd3d7c7"
+    },
+    "after": {
+      "links": 12870,
+      "sha256": "47e37aa4be32e68372da48660936f3294f42c6febce41049f4613f40ddd3d7c7"
+    },
+    "identical": true
+  },
+  {
+    "id": "actix/actix-web",
+    "before": {
+      "links": 85053,
+      "sha256": "3ab53695bf3c5513cf13aeb3258eb39f403e653dbd031e91995f416d64e6a951"
+    },
+    "after": {
+      "links": 85053,
+      "sha256": "3ab53695bf3c5513cf13aeb3258eb39f403e653dbd031e91995f416d64e6a951"
+    },
+    "identical": true
+  },
+  {
+    "id": "alacritty/alacritty",
+    "before": {
+      "links": 30052,
+      "sha256": "0913e36b819f7914aef42bcd5a3fff3f868f4b9b0fa71376f0e59f6a9db80ae6"
+    },
+    "after": {
+      "links": 30052,
+      "sha256": "0913e36b819f7914aef42bcd5a3fff3f868f4b9b0fa71376f0e59f6a9db80ae6"
+    },
+    "identical": true
+  },
+  {
+    "id": "clap-rs/clap",
+    "before": {
+      "links": 50949,
+      "sha256": "2c94cf97639fc9557271b2678d1565f2b8b6b5ed290324f7a9a3018c18093a5c"
+    },
+    "after": {
+      "links": 50949,
+      "sha256": "2c94cf97639fc9557271b2678d1565f2b8b6b5ed290324f7a9a3018c18093a5c"
+    },
+    "identical": true
+  },
+  {
+    "id": "helix-editor/helix",
+    "before": {
+      "links": 86281,
+      "sha256": "bcdcc588d624b54703ba68cb64d43d64547387b51026dd009b033f3736aa9269"
+    },
+    "after": {
+      "links": 86281,
+      "sha256": "bcdcc588d624b54703ba68cb64d43d64547387b51026dd009b033f3736aa9269"
+    },
+    "identical": true
+  },
+  {
+    "id": "rust-embedded/cortex-m",
+    "before": {
+      "links": 5200,
+      "sha256": "738bc78c337696cc2c77e3889cb89214fd3a0c5233aeb0df17f80b563be09b12"
+    },
+    "after": {
+      "links": 5200,
+      "sha256": "738bc78c337696cc2c77e3889cb89214fd3a0c5233aeb0df17f80b563be09b12"
+    },
+    "identical": true
+  },
+  {
+    "id": "tokio-rs/axum",
+    "before": {
+      "links": 39950,
+      "sha256": "7f6c55681afac7dcc6b1f44054eac82fbf53b84b132b61c0bade96cfcce46101"
+    },
+    "after": {
+      "links": 39950,
+      "sha256": "7f6c55681afac7dcc6b1f44054eac82fbf53b84b132b61c0bade96cfcce46101"
+    },
+    "identical": true
+  }
+]

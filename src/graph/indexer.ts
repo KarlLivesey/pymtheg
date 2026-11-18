@@ -282,6 +282,7 @@ export async function indexProject(
               };
         results = await module.analyze({
           projectId: store.projectId,
+          ...(options.signal ? { signal: options.signal } : {}),
           ...(toolchain ? { toolchain } : {}),
           files,
           contextFiles: ownContexts,
@@ -316,6 +317,10 @@ export async function indexProject(
             "Analyze-only modules must return every readable captured file",
           );
       } catch (error) {
+        // A source phase can reject with the caller's abort reason. Toolchain
+        // diagnostics follow the module's normal report path.
+        if (options.signal?.aborted && Object.is(error, options.signal.reason))
+          throw error;
         const detail = message(error);
         analysisFailed = true;
         report.analysisErrors.push({ module: module.id, message: detail });
@@ -367,6 +372,7 @@ export async function indexProject(
       const output =
         (await module.resolve?.({
           projectId: store.projectId,
+          ...(options.signal ? { signal: options.signal } : {}),
           ...structuredClone({
             files,
             contextFiles: ownContexts,
@@ -386,6 +392,8 @@ export async function indexProject(
         links,
       );
     } catch (error) {
+      if (options.signal?.aborted && Object.is(error, options.signal.reason))
+        throw error;
       report.resolutionErrors.push({
         module: module.id,
         message: message(error),
