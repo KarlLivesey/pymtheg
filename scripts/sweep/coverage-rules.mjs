@@ -5,7 +5,8 @@ import { posix } from "node:path";
 
 export const modules = ["go", "rust", "typescript"];
 export const scopes = ["source", "bundle", "broken-fixture", "template"];
-export const outcomes = ["resolved", "ambiguous", "unresolved"];
+// "library": a stored library target (graph schema 4); the link is proven outside.
+export const outcomes = ["resolved", "ambiguous", "unresolved", "library"];
 export const dispositions = ["eligible", "outside", "inside", "unclassified"];
 export const columns = ["module", "kind", "outcome", "reason", "uncertainty", "scope", "disposition", "count", "blocked",
   "externalLevel", "externalEvidence", "externalGap"];
@@ -283,6 +284,7 @@ function rustDisposition(path, project, file) {
 }
 
 export function classify(link, evidence, project) {
+  if (link.resolution === "library") return "outside";
   if (link.resolution !== "unresolved") return "eligible";
   const { module } = link;
   const data = link.data ?? {};
@@ -317,7 +319,11 @@ export function classify(link, evidence, project) {
   return "unclassified";
 }
 
-export const externalEvidenceKinds = ["path", "import-binding", "explicit-trait", "reference-directive"];
+// Reconstructed from 0.1.0 facts: path, import-binding, explicit-trait,
+// reference-directive. Stored with a library target (graph schema 4): the
+// graph's own evidence kinds, which reuse the last three spellings.
+export const externalEvidenceKinds = ["path", "import-binding", "explicit-trait", "reference-directive",
+  "import-path", "qualified-path", "declared-builtin", "declaring-owner"];
 export const externalGapKinds = ["whole-unit", "intrinsic", "dependency", "unknown",
   "go-external-result", "rust-std-path", "rust-std-receiver", "ts-runtime"];
 const identifier = /^[\w$]+$/;
@@ -417,8 +423,22 @@ function tsExternalIdentity(link, evidence, project, disposition) {
   return identified(binding.specifier, path.join("."), "import-binding");
 }
 
+/**
+ * A stored library target (graph schema 4) is credited as stored: level 2
+ * with a symbol, level 1 for the unit alone. Links without one, which is
+ * every link in a 0.1.0 graph, fall back to reconstruction from stored facts.
+ */
+export function storedLibraryIdentity(link) {
+  const target = link.library;
+  if (link.resolution !== "library" || !target?.unit || !externalEvidenceKinds.includes(target.evidence)) {
+    throw Error(`Library link without a stored target at ${link.file}`);
+  }
+  return identified(target.unit, target.symbol ?? null, target.evidence);
+}
+
 /** Identity already expressible using the released link and its stored facts. */
 export function externalIdentity(link, evidence, project, disposition) {
+  if (link.resolution === "library") return storedLibraryIdentity(link);
   if (link.resolution !== "unresolved") return null;
   const data = link.data ?? {};
   if (data.cause || link.module === "typescript" && workspaceEntryMissing(underlyingReason(data))) return null;
@@ -497,11 +517,24 @@ export function sampleKey(repo, link) {
 export function repositoryScore(rows, filter = () => true) {
   const counts = { resolved: 0, ambiguous: 0, inside: 0, outside: 0, unclassified: 0 };
   for (const [module, kind, outcome, reason, uncertainty, scope, disposition, count] of rows) {
-    if (filter(module, scope, kind)) counts[outcome === "unresolved" ? disposition : outcome] += count;
+    if (filter(module, scope, kind)) counts[outcome === "unresolved" || outcome === "library" ? disposition : outcome] += count;
   }
   const eligible = counts.resolved + counts.ambiguous + counts.inside + counts.unclassified;
   const total = eligible + counts.outside;
   return { ...counts, eligible, total, adjusted: eligible ? counts.resolved / eligible : null, raw: total ? counts.resolved / total : null };
+}
+
+/**
+ * Each stored resolution class of a breakdown against the CLI's counts, one
+ * class at a time. A 0.1.0 CLI reports no library count: schema 3 has none.
+ */
+export function storedTotalsAgree(rows, counts) {
+  const stored = Object.fromEntries(outcomes.map((outcome) => [outcome, 0]));
+  for (const row of rows) stored[row[2]] += row[7];
+  const total = Object.values(stored).reduce((sum, count) => sum + count, 0);
+  return total === counts.links && stored.ambiguous === counts.ambiguous &&
+    stored.unresolved === counts.unresolved && stored.library === (counts.library ?? 0) &&
+    stored.resolved === counts.links - counts.ambiguous - counts.unresolved - (counts.library ?? 0);
 }
 
 export function libraryScore(rows, filter = () => true) {

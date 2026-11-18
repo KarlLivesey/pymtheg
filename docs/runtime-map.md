@@ -42,7 +42,7 @@ The language is a bounded design tool, not a universal proof engine.
 | Built-in engines `src/behaviour/explore.ts`, `explore-worker.ts`, `explore-runner.ts` | `GeneratedModel` (+ `ProjectIR` for flow replay) -> `ExploreResult` (per-property verdicts, `state-domains`, measurements) | exhaustive BFS (`stateBudget`, default 1,000,000) or seeded sampler; runs in an owned worker with a readiness handshake, signal and timeout; the runner awaits worker termination on every exit; uses the existing `initial`/`step`/`replay` semantics, never reparses |
 | Storage boundary `src/storage/local.ts`, `layout.ts`, `graph.ts` | `storagePath(root, item, create?)`, `openDatabase`, `findProjectRoot`, `openProjectGraph` | only module that chooses project paths and opens SQLite; refuses old layouts and symlinked storage; creates `.pymtheg/rebuildable/.gitignore`; feature stores keep their schemas and transactions |
 | Recorded history `src/storage/recorded-history.ts`, `writer.ts`, `paths.ts` | checkpoint/acknowledgement/withdrawal/draft transactions -> UUID registrations + receipts; `exportRecordedHistory()` | additive tables in the planning database, written inside the feature transaction; writer identity in `.pymtheg/local/writer.json`; order `(sequence, machine, actor, change UUID)` |
-| Graph core `src/graph/` (`indexer.ts`, `store.ts`, `registry.ts`, `analysis.ts`, `identity.ts`, `tree-sitter.ts`, `conformance.ts`) | `indexProject(root, registry, store)` -> `IndexReport`; queries `findSymbols`, `outgoing`, `incoming`, `links`, `unresolved`, `ambiguous`, `neighbourhood` | language-neutral; strict UTF-8 capture; per-file atomic replacement; validates every module result before writing; SQLite schema 3; not wired to any command yet |
+| Graph core `src/graph/` (`indexer.ts`, `store.ts`, `registry.ts`, `analysis.ts`, `identity.ts`, `tree-sitter.ts`, `conformance.ts`) | `indexProject(root, registry, store)` -> `IndexReport`; queries `findSymbols`, `outgoing`, `incoming`, `links`, `unresolved`, `ambiguous`, `neighbourhood` | language-neutral; strict UTF-8 capture; per-file atomic replacement; validates every module result before writing; SQLite schema 4 (library targets, below) |
 | Language modules `src/graph/languages/{go,rust,typescript}/` | default-exported `LanguageModule`: claims, context files, `parse`/`analyze`/`resolve` | discovered from the folder, no core list; Go and Rust parse with tree-sitter WASM grammars, TypeScript with the compiler over the captured snapshot; none runs a toolchain or project code |
 | Vendored grammars `grammars/<lang>/` | `manifest.json`, patches, built `.wasm`, licence; `grammars/build.mjs` | Go only so far; the module loads the `.wasm` relative to its compiled file; `test/grammar-vendored.test.mjs` checks sha256, ABI and licence; rebuilding is a maintainer step |
 
@@ -1500,3 +1500,125 @@ All three apply the whole-file rule. Support levels are in
 the npm `tree-sitter-rust` grammar through `tagsFromPackage`. One parser instance
 per process per grammar is kept alive; trees are deleted after each extraction.
 
+## Library targets in the code graph (C-5)
+
+A link from project code into a library whose source is not in the checkout
+(Go `strconv.Quote`, Rust `Result::unwrap`, Node `child_process.spawnSync`,
+`z.string()` from `zod`) can have a **library target** instead of a checkout
+symbol. Shape (`src/graph/types.ts` `LibraryTarget`, `GraphLibrary`):
+
+| Field | Meaning |
+|---|---|
+| `ecosystem` | lowercase id: `go`, `go-std`, `cargo`, `rust-std`, `npm`, `node`, `dom`, `typescript-lib`, … |
+| `unit` | module path, crate, package name or standard-library unit |
+| `symbol` | optional symbol path in the unit, spelled as the unit spells it (level 2); absent for the unit itself (level 1) |
+| `version` | optional; only when the checkout's manifest or lockfile states it |
+| `versionSource` | required with a version, and only then: the project path of that manifest or lockfile. Its file name must be one of the target ecosystem's manifests or lockfiles (`versionFiles` in `src/graph/identity.ts`: npm `package.json`, `package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `yarn.lock`, `bun.lock`, `bun.lockb`, `deno.json`, `deno.lock`; node `package.json`; go `go.mod`, `go.sum`, `go.work`, `go.work.sum`; go-std `go.mod`, `go.work`; cargo `Cargo.toml`, `Cargo.lock`; any other ecosystem takes no version), and the path must be a clean context file in the snapshot (during indexing, one of the module's own declared context files). A `tsconfig.json` or another ecosystem's manifest is refused |
+| `evidence` | required: how the source proves it (below) |
+| `id` | `library:` + sha256 of (ecosystem, unit, version, symbol): deterministic and independent of the project and of the evidence |
+
+Outcomes: `library` is a link whose only target is one library target;
+`ambiguous` may mix checkout candidates and library candidates (two or more
+targets in all); `resolved` and `unresolved` are unchanged. Library targets are
+rows of their own (`graph_library_targets`: link, id, role `target` or
+`candidate`, kind, ecosystem, unit, symbol, version, evidence), indexed by
+(unit, symbol) and by id, so "uses of unit U" and "uses of U's symbol s" are
+one index read (`SqliteGraphStore.libraryUses`, `libraryUseCounts`). The role
+column keeps a candidate set that loses a checkout member (its symbol's file was
+removed) from turning definite before the next resolution.
+
+Evidence kinds (`libraryEvidence` in `src/graph/identity.ts`), checked by the
+store before any write; an unknown or missing kind fails the module's
+resolution:
+
+| Kind | Proves | Symbol | Definite |
+|---|---|---|---|
+| `import-path` | an import names the unit | no | yes |
+| `import-binding` | a name bound by an import of the unit, and the member selected from it | yes | yes |
+| `qualified-path` | a fully qualified written path names unit and symbol | yes | yes |
+| `explicit-trait` | an explicit trait/interface qualification (`<T as Trait>::m`) | yes | yes |
+| `declared-builtin` | a language-declared builtin, intrinsic or global | yes | yes |
+| `reference-directive` | a reference directive names a declaration unit | no | yes |
+| `glob-import` | a glob or dot import puts the unit in scope; the name is only possible | yes | candidate sets only |
+| `declaring-owner` | the member's declaring owner is proven | required | yes |
+
+`declaring-owner` is for a member reached through a receiver, once the module
+has established the declaration itself: after alias, deref, auto-ref, trait or
+embedding selection, or from the type checker. Examples: Go `time.Time.Equal`
+on a value whose type is proven to be `time.Time` and where no embedding can
+promote another `Equal`; Rust `Into::into` proven to resolve to the `core`
+trait method (no checkout or other-crate trait in scope supplies an `into`
+for that receiver); TypeScript `Map.prototype.delete` when the checker gives
+the declaration in `lib.es2015.collection.d.ts`. The store cannot check the
+proof. A module may use the kind only when it has (1) the receiver's type
+proven, not guessed from a name; (2) every method-selection step that could
+change the owner (auto-deref, `Deref`, embedding and promotion, extension
+traits in scope, blanket impls, overloads, declaration merging) ruled out or
+followed to one declaration; and (3) that declaration located in the named
+unit. If any step is open, the link stays unresolved, or becomes a candidate
+set when the possible owners are listed. Ruled out: the receiver's type
+**alone** as evidence ("its type comes from library L, so the method is L's").
+
+**Spelling conventions** every language module follows, so a unit or symbol
+has one spelling across languages and versions:
+
+- **Symbol paths** are written as the unit declares them, joined the
+  language's way (Go `Time.Equal`, Rust `fs::read`, `Result::unwrap`,
+  TypeScript `Map.prototype.delete` for an instance member, `string` for an
+  export).
+- **Rust macros** end in `!` (`env!`), so `std::env` (module) and `std::env!`
+  (macro) stay distinct.
+- **Rust re-exports**: record the declaring crate (`core`, `alloc`) only when
+  the declaration is proven to be there; otherwise record the path as written
+  in the source (`std::...`). Never rewrite `std` to `core` by name.
+- **Renamed Cargo dependency**: the unit is the package name from the
+  manifest (`package = "..."`), not the local rename, with `-` kept as the
+  package spells it.
+- **Node built-ins**: one canonical unit per module, without the `node:`
+  prefix (`fs`, `child_process`), ecosystem `node`, whether the source wrote
+  `node:fs` or `fs`.
+- **`@types/x`** describes unit `x` (ecosystem `npm`); a target found through
+  it names `x`.
+- **Go**: the unit is the import path (`net/http`, `github.com/x/y/v2`),
+  ecosystem `go-std` for the standard library and `go` otherwise. Builtins
+  (`len`, `append`, `make`, …) are unit `builtin`, ecosystem `go-std`,
+  evidence `declared-builtin`.
+
+By owner decision (C-5 review), a Go builtin identified this way counts as an
+identified library target at level 2, so the measure credits a stored
+`declared-builtin` with a symbol at level 2.
+
+**What the store checks, and what it trusts.** The store checks the shape of
+every target, the evidence kind's rules (unit only, symbol required,
+candidate only), and that a version names a clean manifest or lockfile in the
+snapshot. It cannot check the module's semantic proof: that the evidence kind
+is true of this source, that the unit and symbol are the ones the source
+selects, or that the cited file states that version for this unit. That trust
+is in the language module. The conformance kit's literal expectations and each
+language chunk's review (with a fixed-seed hand-check of new library links
+against the pinned source) carry it.
+
+Reads that mix the capability check (does this graph have library targets)
+with rows and counts run in one read snapshot, so a reader that opened while
+the graph was schema 3 and is migrated by another connection reports one
+database state per read: counts and rows agree.
+
+What each language chunk supplies: in `resolve` (or as an added link), a
+`LinkResolution` with `library: {ecosystem, unit, symbol?, version?, evidence}`
+for a definite library target, or `candidateIds` plus `libraries` for a mixed
+set; the ecosystem names it uses; the manifest/lockfile reading, if any, that
+supplies `version` and `versionSource` (declared in the module's
+`contextFiles`); and a module version bump. Nothing else in the core changes.
+
+Out of scope by design: reading dependency sources, any network access, and
+resolving versions beyond what the checkout's manifest states. A library target
+says where the use points, never that the library declares the symbol.
+
+Queries: `pymtheg graph uses UNIT [SYMBOL]` and MCP `code_graph` action `uses`
+(`query`, optional `symbol`). Every link answer shows certainty `library` and
+the library's unit, symbol and `outside-project` place, never a missing local
+symbol. Counts (`counts.library`, `IndexReport.library`) include the outcome.
+Path and impact traversals do not enter library targets. No Studio screen shows
+graph links, so Studio is unchanged. The coverage export credits a stored
+library target directly and reconstructs identities only for links without one
+(every link of a 0.1.0 graph).

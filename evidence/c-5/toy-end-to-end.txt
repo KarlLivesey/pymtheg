@@ -1,0 +1,63 @@
+{"files":2,"symbols":5,"links":6,"failed":0,"partial":0,"unresolved":1,"ambiguous":1,"library":3} 3
+===== uses [ 'zod' ] ok 0
+Graph uses: ok
+2 files, 5 symbols, 6 links; 1 unresolved, 1 candidate sets, 3 to libraries outside the project
+Sync: unchanged
+Failed files (0):
+Warning [unresolved-coverage]: Unresolved links may hide additional callers or paths; returned routes are observations, not a completeness proof.
+Uses of library "zod" (outside this project): {"library":2,"candidateSet":0}
+  library calls: "main" (function) a.toy:3:1-3:9 [UTF-16 29..37] symbol:ID -> library npm "zod" symbol "string" (outside this project; import-binding) at a.toy:4:1-4:16 [UTF-16 38..53]
+  library imports: "a.toy" -> library npm "zod" (outside this project; import-path) at a.toy:1:1-1:12 [UTF-16 0..11]
+    Stored details: {"library":"npm"}
+
+[{"type":"library","unit":"zod","place":"outside-project"}]
+[{"kind":"calls","certainty":"library","sourceStatus":"clean","targetStatus":null,"target":null,"targetName":"zod.string","file":"a.toy","at":"a.toy:4:1","line":4,"column":1,"endLine":4,"endColumn":16,"range":{"start":38,"end":53},"reasons":[],"candidateCount":1,"library":{"ref":"library:e238bc0bfc0620108b21fe4ed43154516d67b90d35ba24f3e0b9fb31385a539d","ecosystem":"npm","unit":"zod","symbol":"string","evidence":"import-binding","place":"outside-project"}},{"kind":"imports","certainty":"library","sourceStatus":"clean","targetStatus":null,"target":null,"targetName":"zod","file":"a.toy","at":"a.toy:1:1","line":1,"column":1,"endLine":1,"endColumn":12,"range":{"start":0,"end":11},"reasons":[],"candidateCount":1,"library":{"ref":"library:91067ac286c2964801b10009b40334c7c2abda63ced247c6c20a916628210f2e","ecosystem":"npm","unit":"zod","evidence":"import-path","place":"outside-project"}}]
+[]
+===== uses [ 'zod', 'string' ] ok 0
+Graph uses: ok
+2 files, 5 symbols, 6 links; 1 unresolved, 1 candidate sets, 3 to libraries outside the project
+Sync: unchanged
+Failed files (0):
+Warning [unresolved-coverage]: Unresolved links may hide additional callers or paths; returned routes are observations, not a completeness proof.
+Uses of library "zod" symbol "string" (outside this project): {"library":1,"candidateSet":0}
+  library calls: "main" (function) a.toy:3:1-3:9 [UTF-16 29..37] symbol:ID -> library npm "zod" symbol "string" (outside this project; import-binding) at a.toy:4:1-4:16 [UTF-16 38..53]
+
+[{"type":"library","unit":"zod","symbol":"string","place":"outside-project"}]
+[{"kind":"calls","certainty":"library","sourceStatus":"clean","targetStatus":null,"target":null,"targetName":"zod.string","file":"a.toy","at":"a.toy:4:1","line":4,"column":1,"endLine":4,"endColumn":16,"range":{"start":38,"end":53},"reasons":[],"candidateCount":1,"library":{"ref":"library:e238bc0bfc0620108b21fe4ed43154516d67b90d35ba24f3e0b9fb31385a539d","ecosystem":"npm","unit":"zod","symbol":"string","evidence":"import-binding","place":"outside-project"}}]
+[]
+===== uses [ 'lodash', 'map' ] ok 0
+Graph uses: ok
+2 files, 5 symbols, 6 links; 1 unresolved, 1 candidate sets, 3 to libraries outside the project
+Sync: unchanged
+Failed files (0):
+Warning [unresolved-coverage]: Unresolved links may hide additional callers or paths; returned routes are observations, not a completeness proof.
+Uses of library "lodash" symbol "map" (outside this project): {"library":0,"candidateSet":1}
+  candidate-set calls: "main" (function) a.toy:3:1-3:9 [UTF-16 29..37] symbol:ID -> one of ["map" (function) a.toy:7:1-7:8 [UTF-16 82..89] symbol:ID; library npm "lodash" symbol "map" (outside this project; glob-import)] at a.toy:6:1-6:9 [UTF-16 73..81]
+
+[{"type":"library","unit":"lodash","symbol":"map","place":"outside-project"}]
+[{"kind":"calls","certainty":"candidate-set","sourceStatus":"clean","targetStatus":null,"target":null,"targetName":"map","file":"a.toy","at":"a.toy:6:1","line":6,"column":1,"endLine":6,"endColumn":9,"range":{"start":73,"end":81},"reasons":[],"candidateCount":2}]
+[{"link":"link:ID","symbol":"symbol:ID","status":"clean"},{"link":"link:ID","library":{"ref":"library:844c979480a71108c5e6e42bd3fe8c520b85ab2ce83f304fb40d4753934e0c50","ecosystem":"npm","unit":"lodash","symbol":"map","evidence":"glob-import","place":"outside-project"}}]
+===== uses [ 'nothere' ] ok 0
+Graph uses: ok
+2 files, 5 symbols, 6 links; 1 unresolved, 1 candidate sets, 3 to libraries outside the project
+Sync: unchanged
+Failed files (0):
+Warning [unresolved-coverage]: Unresolved links may hide additional callers or paths; returned routes are observations, not a completeness proof.
+Uses of library "nothere" (outside this project): {"library":0,"candidateSet":0}
+
+[{"type":"library","unit":"nothere","place":"outside-project"}]
+[]
+[]
+===== callees [ 'main' ] ok 0
+Graph callees: ok
+2 files, 5 symbols, 6 links; 1 unresolved, 1 candidate sets, 3 to libraries outside the project
+Sync: unchanged
+Failed files (0):
+  "main" (function) a.toy:3:1-3:9 [UTF-16 29..37] symbol:ID
+  candidate-set calls: "main" (function) a.toy:3:1-3:9 [UTF-16 29..37] symbol:ID -> one of ["map" (function) a.toy:7:1-7:8 [UTF-16 82..89] symbol:ID; library npm "lodash" symbol "map" (outside this project; glob-import)] at a.toy:6:1-6:9 [UTF-16 73..81]
+  library calls: "main" (function) a.toy:3:1-3:9 [UTF-16 29..37] symbol:ID -> library npm "zod" symbol "string" (outside this project; import-binding) at a.toy:4:1-4:16 [UTF-16 38..53]
+  unresolved calls: "main" (function) a.toy:3:1-3:9 [UTF-16 29..37] symbol:ID -> "nothere.thing" at a.toy:5:1-5:19 [UTF-16 54..72]
+
+[{"ref":"symbol:ID","name":"main","qualifiedName":"main","kind":"function","language":"toy","status":"clean","file":"a.toy","at":"a.toy:3:1","line":3,"column":1,"endLine":3,"endColumn":9,"range":{"start":29,"end":37},"type":"selected"}]
+[{"kind":"calls","certainty":"candidate-set","sourceStatus":"clean","targetStatus":null,"target":null,"targetName":"map","file":"a.toy","at":"a.toy:6:1","line":6,"column":1,"endLine":6,"endColumn":9,"range":{"start":73,"end":81},"reasons":[],"candidateCount":2},{"kind":"calls","certainty":"library","sourceStatus":"clean","targetStatus":null,"target":null,"targetName":"zod.string","file":"a.toy","at":"a.toy:4:1","line":4,"column":1,"endLine":4,"endColumn":16,"range":{"start":38,"end":53},"reasons":[],"candidateCount":1,"library":{"ref":"library:e238bc0bfc0620108b21fe4ed43154516d67b90d35ba24f3e0b9fb31385a539d","ecosystem":"npm","unit":"zod","symbol":"string","evidence":"import-binding","place":"outside-project"}},{"kind":"calls","certainty":"unresolved","sourceStatus":"clean","targetStatus":null,"target":null,"targetName":"nothere.thing","file":"a.toy","at":"a.toy:5:1","line":5,"column":1,"endLine":5,"endColumn":19,"range":{"start":54,"end":72},"reasons":[],"candidateCount":0}]
+[{"link":"link:ID","symbol":"symbol:ID","status":"clean"},{"link":"link:ID","library":{"ref":"library:844c979480a71108c5e6e42bd3fe8c520b85ab2ce83f304fb40d4753934e0c50","ecosystem":"npm","unit":"lodash","symbol":"map","evidence":"glob-import","place":"outside-project"}}]

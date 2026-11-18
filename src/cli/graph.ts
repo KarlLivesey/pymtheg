@@ -5,7 +5,7 @@ import {
   type GraphResponse,
 } from "../graph/commands.js";
 import type { Located } from "../graph/command-locations.js";
-import type { GraphLink, GraphSymbol } from "../graph/types.js";
+import type { GraphLibrary, GraphLink, GraphSymbol } from "../graph/types.js";
 const quote = (value: unknown) => JSON.stringify(value);
 type DisplaySymbol = GraphSymbol & Partial<Located>;
 function locationText(
@@ -16,13 +16,17 @@ function locationText(
     ? `${file}:${value.line}:${value.column}${typeof value.endLine === "number" && typeof value.endColumn === "number" ? `-${value.endLine}:${value.endColumn}` : ""} [UTF-16 ${value.range.start}..${value.range.end}]`
     : `${file} [UTF-16 ${value.range.start}..${value.range.end}; line unavailable]`;
 }
+/** A library target is outside this project, never a local symbol. */
+function libraryText(library: GraphLibrary) {
+  return `library ${library.ecosystem} ${quote(library.unit)}${library.symbol === undefined ? "" : ` symbol ${quote(library.symbol)}`}${library.version === undefined ? "" : ` version ${quote(library.version)} from ${quote(library.versionSource)}`} (outside this project; ${library.evidence})`;
+}
 function symbolText(symbol: DisplaySymbol) {
   return `${quote(symbol.name)}${symbol.identity !== symbol.name ? " [" + symbol.identity + "]" : ""} (${symbol.kind}) ${locationText(symbol.file, symbol)} ${symbol.id}`;
 }
 export function formatGraph(response: GraphResponse): string {
   const lines = [
     `Graph ${response.command}: ${response.status}${response.indexExists ? "" : " (no index)"}`,
-    `${response.counts.files} files, ${response.counts.symbols} symbols, ${response.counts.links} links; ${response.counts.unresolved} unresolved, ${response.counts.ambiguous} candidate sets`,
+    `${response.counts.files} files, ${response.counts.symbols} symbols, ${response.counts.links} links; ${response.counts.unresolved} unresolved, ${response.counts.ambiguous} candidate sets, ${response.counts.library} to libraries outside the project`,
     `Sync: ${response.sync.mode}${response.sync.durationMs === null ? "" : `; ${response.sync.durationMs.toFixed(1)} ms (observation)`}`,
   ];
   if (response.sync.report)
@@ -75,7 +79,7 @@ export function formatGraph(response: GraphResponse): string {
       })[];
     })[]) {
       lines.push(
-        `  ${link.certainty}${link.decidedBy === "toolchain" ? " (toolchain)" : ""} ${link.kind}: ${link.source ? symbolText(link.source) : quote(link.file)} -> ${link.target ? symbolText(link.target) : link.resolution === "ambiguous" ? "one of [" + link.candidates.map((item) => (item.symbol ? symbolText(item.symbol) : item.id)).join("; ") + "]" : quote(link.targetName)} at ${locationText(link.file, link)}`,
+        `  ${link.certainty}${link.decidedBy === "toolchain" ? " (toolchain)" : ""} ${link.kind}: ${link.source ? symbolText(link.source) : quote(link.file)} -> ${link.target ? symbolText(link.target) : link.resolution === "library" ? libraryText(link.libraries![0]!) : link.resolution === "ambiguous" ? "one of [" + [...link.candidates.map((item) => (item.symbol ? symbolText(item.symbol) : item.id)), ...(link.libraries ?? []).map(libraryText)].join("; ") + "]" : quote(link.targetName)} at ${locationText(link.file, link)}`,
       );
       if (link.data !== undefined)
         lines.push(`    Stored details: ${quote(link.data)}`);
@@ -95,6 +99,12 @@ export function formatGraph(response: GraphResponse): string {
           showSymbols(input.nearMatches);
         }
       }
+    if (data.library) {
+      const library = data.library as { unit: string; symbol?: string };
+      lines.push(
+        `Uses of library ${quote(library.unit)}${library.symbol === undefined ? "" : ` symbol ${quote(library.symbol)}`} (outside this project): ${quote(data.classCounts)}`,
+      );
+    }
     if (data.symbol) showSymbols([data.symbol]);
     showSymbols(data.matches);
     showSymbols(data.symbols);
