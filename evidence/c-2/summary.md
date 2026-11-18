@@ -78,13 +78,14 @@ unchanged: `4cc5a16c…` and `2525620f…`.
 | vercel/turborepo | 3,072 MB | done (exit 2) | 1,962 | 3,326 | identical |
 | T3 Code `b387e3a1`, own code | 3,072 MB | done (exit 2) | 2,542 | 3,491 | identical |
 
-The 3,072 MB runs above used commit `706fc5a`, whose source is the same
-as the reviewed head `c2573cb`. The 2,048 MB runs used an earlier revision:
-commit `597bf71`, before statement reuse. At that cap it ran out of heap on
-T3 Code `b387e3a1`, the TypeScript repository and Turborepo. Statement
-reuse changes native memory, not the V8 heap, but the 2 GB runs were not
-repeated on the final revision. So the largest checkouts need between 2 and
-3 GB of heap. The default limit is 4.2 GB.
+Measured outcomes by revision:
+- **3,072 MB cap:** the runs above used commit `706fc5a`, whose source is
+  the same as `c2573cb`. All three finished.
+- **2,048 MB cap:** these used commit `597bf71`, before statement reuse.
+  T3 Code `b387e3a1`, the TypeScript repository and Turborepo all ran out of
+  heap.
+
+No 2 GB run was made on a later revision. The default limit is 4.2 GB.
 
 ### Digests
 
@@ -193,7 +194,7 @@ reclaimed until a full collection.
 Full suite on the dev server after the review fixes: 2,937 tests, 2,937 pass. `npm run
 format:check` is clean.
 
-`test/graph-index-memory.test.mjs` checks four things:
+`test/graph-index-memory.test.mjs` checks five things:
 - Live decoded records, counted with `v8.queryObjects`: zero after every
   run, and one per file while each module resolves.
 - Statements prepared during a module's analysis write: 7 for both 20 and
@@ -202,6 +203,8 @@ format:check` is clean.
   independent reads, a resolver that rewrites symbol names and keys cannot
   change the next resolver's results. This fails on `c2573cb`, which passed
   such a store's records through uncopied, and passes on `main`.
+- An added link without a `file` is recorded as a resolution error and the
+  run completes. On `aec2a16` the run crashed with `ERR_INVALID_ARG_TYPE`.
 - Validating added links decodes only the files that receive them: `a.syn`,
   not the unrelated `z.toy`. This fails on `c2573cb` and on `main`.
 

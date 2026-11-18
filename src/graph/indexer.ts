@@ -374,7 +374,8 @@ export async function indexProject(
       // getFile: the command layer counts those calls as inventory progress.)
       const wanted = new Set<string>();
       try {
-        for (const added of result.links) wanted.add(added.file);
+        for (const added of result.links)
+          if (typeof added?.file === "string") wanted.add(added.file);
       } catch {
         // A malformed result: resolutionFacts reports it, in its own order.
       }

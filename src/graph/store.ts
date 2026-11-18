@@ -20,7 +20,7 @@ import type {
 export class SqliteGraphStore implements GraphStorage {
   private readonly db: DatabaseSync;
   readonly projectId: string;
-  /** Every read decodes fresh records from storage; nothing is shared or cached. */
+  /** files, getFile, filesAt, findSymbols, links and moduleLinks decode fresh records every call. */
   readonly independentReads = true as const;
   private readonly decodedContexts = new Map<string, ContextFile>();
   /** " INDEXED BY graph_file_status" when that covering index exists, else "".

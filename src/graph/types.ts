@@ -189,9 +189,10 @@ export interface FailedFile {
 export interface GraphStorage {
   readonly projectId: string;
   /**
-   * Declared by a store whose every read (files, getFile, filesAt, findSymbols,
-   * links, moduleLinks) returns freshly decoded records that share nothing
-   * with the store or with earlier reads. The indexer then hands them to a
+   * Declared by a store whose six record reads (files, getFile, filesAt,
+   * findSymbols, links, moduleLinks) return freshly decoded records that share
+   * nothing with the store or with earlier reads. Other reads (e.g. contexts)
+   * are not covered. The indexer then hands them to a
    * module as they are; otherwise it hands the module a deep copy.
    */
   readonly independentReads?: true;

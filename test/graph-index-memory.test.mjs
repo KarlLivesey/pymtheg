@@ -302,3 +302,47 @@ test("validating added links decodes only the files that receive them", async ()
     await rm(scratch, { recursive: true, force: true });
   }
 });
+
+test("an added link without a file is a resolution error, not a crash", async () => {
+  const scratch = await mkdtemp(join(tmpdir(), "pymtheg-index-nofile-"));
+  let store;
+  try {
+    const root = join(scratch, "project");
+    await mkdir(root);
+    await writeFile(join(root, "a.syn"), "source");
+    store = new SqliteGraphStore(join(scratch, "graph.sqlite"), "nofile");
+    const malformed = {
+      ...synthetic,
+      resolve: ({ symbols }) => ({
+        resolutions: [],
+        links: [
+          {
+            key: "no-file",
+            sourceId: symbols[0].id,
+            kind: "calls",
+            targetName: "x",
+            range: { start: 0, end: 1 },
+          },
+        ],
+      }),
+    };
+    const report = await indexProject(
+      root,
+      new LanguageRegistry([malformed]),
+      store,
+    );
+    assert.deepEqual(report.resolutionErrors, [
+      {
+        module: "synthetic",
+        message: "Invalid or duplicate added link origin/key",
+      },
+    ]);
+    // Parsed facts stay; no link is resolved by the rejected result.
+    assert.equal(report.symbols, 10);
+    assert.equal(report.links, 10);
+    assert.equal(report.unresolved, 10);
+  } finally {
+    store?.close();
+    await rm(scratch, { recursive: true, force: true });
+  }
+});
