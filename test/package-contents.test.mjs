@@ -262,15 +262,18 @@ test("no shipped file carries a private network address or host name", () => {
 test("the private network scanner fires on each rule and allows public forms", () => {
   const fires = (path, text) => networkFindings(path, text).length > 0;
   for (const [path, text] of [
+    ["README.md", "server at 10.0.0.1"],
     ["README.md", "server at 192.168.88.47"],
     ["README.md", "see private-box.internal"],
     ["README.md", "ssh devserver"],
     ["dist-web/assets/x.js", 'const host = "nas.local";'],
     ["dist/cli/x.js", 'throw Error("Connect to private-box.internal");'],
+    ["dist/cli/x.js", "throw Error(`Cannot reach ${user} on box.internal`);"],
   ])
     assert.ok(fires(path, text), `${path}: ${text}`);
   for (const [path, text] of [
     ["README.md", "listen on 127.0.0.1; example 192.0.2.10; version 10.2.3"],
+    ["README.md", "public 8.8.8.8 and 172.32.0.1"],
     ["dist-web/assets/x.js", "this.local = initial;"],
     ["dist/graph/x.js", "const key = `${place.file}|${place.local}`;"],
   ])
@@ -350,6 +353,12 @@ test("the personal scanner allows only the top-level author and flags paths", ()
     ).length,
     1,
   );
+  // A duplicated top-level author cannot hide a second value.
+  for (const body of [
+    '  "author": "Karl Livesey",\n  "author": "Karl Livesey"',
+    '  "author": "x",\n  "author": "Karl Livesey"',
+  ])
+    assert.equal(personalFindings("package.json", pkg(body)).length, 1, body);
   assert.deepEqual(personalFindings("dist/cli/main.js", "// Karl"), [
     "dist/cli/main.js:1: owner's name",
   ]);
@@ -362,13 +371,32 @@ test("the private-name scanner reads patterns from a file and reports lines, not
   const dir = mkdtempSync(join(tmpdir(), "pym-private-names-"));
   try {
     const file = join(dir, "names.local");
-    writeFileSync(file, "# made-up name for this test\n\\bZorblat\\b\n");
+    writeFileSync(
+      file,
+      "# made-up names for this test\n\\bZorblat\\b\nquuxfold/i\n",
+    );
     const scan = (text) =>
       privateNameFindings(file, [{ path: "README.md", text }]);
     assert.deepEqual(scan("intro\nthe Zorblat engine\n"), [
       "README.md:2: private name (names.local line 2)",
     ]);
-    assert.deepEqual(scan("nothing private here"), []);
+    // Flags apply: the /i pattern matches any case.
+    assert.deepEqual(scan("a QuuxFold schema"), [
+      "README.md:1: private name (names.local line 3)",
+    ]);
+    // The case-sensitive pattern ignores the lower-case word.
+    assert.deepEqual(scan("a zorblat pricing plan"), []);
+    // An unreadable pattern file fails loudly; only a missing one means none.
+    assert.throws(
+      () => privateNameFindings(dir, [{ path: "README.md", text: "x" }]),
+      /cannot be read/,
+    );
+    assert.deepEqual(
+      privateNameFindings(join(dir, "absent.local"), [
+        { path: "README.md", text: "Zorblat" },
+      ]),
+      [],
+    );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
