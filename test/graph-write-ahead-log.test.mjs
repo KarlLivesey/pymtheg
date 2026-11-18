@@ -49,7 +49,9 @@ function rows(root) {
   try {
     const out = {};
     for (const { name } of db
-      .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name",
+      )
       .all())
       out[name] = db
         .prepare(`SELECT * FROM ${name}`)
@@ -130,61 +132,69 @@ for (const point of ["open", "file", "resolved", "complete"])
     }
   });
 
-test("power loss: a cold index loses its unsynced log tail mid-frame, reports incomplete and is repaired", {
-  skip: !wal && "no write-ahead log on this filesystem",
-}, async () => {
-  const files = fixtureFiles();
-  const root = await project(files);
-  try {
-    await mkdir(join(root, ".pymtheg/rebuildable"), { recursive: true });
-    new SqliteGraphStore(graphPath(root)).close();
-    const before = await walAtRest(root);
-    assert.equal((await killAt(root, "resolved")).signal, "SIGKILL");
-    // Nothing of this run reached the database file: every commit is still
-    // in the unsynced log, so any cut of the log is a state power loss can leave.
-    assert.deepEqual(await readFile(graphPath(root)), before);
-    const log = graphPath(root) + "-wal";
-    const size = (await stat(log)).size;
-    assert.ok(size > 32 + 4096 * 3);
-    await truncate(log, Math.floor(size / 2) + 7);
-    await rm(graphPath(root) + "-shm", { force: true });
-    assert.equal((await run(root)).sync.complete, false);
-    const repaired = await run(root, "index");
-    assert.equal(repaired.sync.complete, true);
-    assert.deepEqual(rows(root), await cleanRows(files, projectId(root)));
-  } finally {
-    await rm(root, { recursive: true, force: true });
-  }
-});
+test(
+  "power loss: a cold index loses its unsynced log tail mid-frame, reports incomplete and is repaired",
+  {
+    skip: !wal && "no write-ahead log on this filesystem",
+  },
+  async () => {
+    const files = fixtureFiles();
+    const root = await project(files);
+    try {
+      await mkdir(join(root, ".pymtheg/rebuildable"), { recursive: true });
+      new SqliteGraphStore(graphPath(root)).close();
+      const before = await walAtRest(root);
+      assert.equal((await killAt(root, "resolved")).signal, "SIGKILL");
+      // Nothing of this run reached the database file: every commit is still
+      // in the unsynced log, so any cut of the log is a state power loss can leave.
+      assert.deepEqual(await readFile(graphPath(root)), before);
+      const log = graphPath(root) + "-wal";
+      const size = (await stat(log)).size;
+      assert.ok(size > 32 + 4096 * 3);
+      await truncate(log, Math.floor(size / 2) + 7);
+      await rm(graphPath(root) + "-shm", { force: true });
+      assert.equal((await run(root)).sync.complete, false);
+      const repaired = await run(root, "index");
+      assert.equal(repaired.sync.complete, true);
+      assert.deepEqual(rows(root), await cleanRows(files, projectId(root)));
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  },
+);
 
-test("power loss: an edit's re-index that loses its whole log returns to the previous complete index, which is reported stale and repaired", {
-  skip: !wal && "no write-ahead log on this filesystem",
-}, async () => {
-  const files = fixtureFiles();
-  const root = await project(files);
-  try {
-    assert.equal((await run(root, "index")).sync.complete, true);
-    const previous = rows(root);
-    files["f0.x"] += "def h\ncall g1\n";
-    await writeFile(join(root, "f0.x"), files["f0.x"]);
-    const before = await walAtRest(root);
-    assert.equal((await killAt(root, "resolved")).signal, "SIGKILL");
-    assert.deepEqual(await readFile(graphPath(root)), before);
-    await rm(graphPath(root) + "-wal");
-    await rm(graphPath(root) + "-shm", { force: true });
-    assert.deepEqual(rows(root), previous);
-    const status = await run(root);
-    assert.equal(status.sync.complete, false);
-    assert.deepEqual(
-      status.staleFiles.map((file) => file.path),
-      ["f0.x"],
-    );
-    assert.equal((await run(root, "index")).sync.complete, true);
-    assert.deepEqual(rows(root), await cleanRows(files, projectId(root)));
-  } finally {
-    await rm(root, { recursive: true, force: true });
-  }
-});
+test(
+  "power loss: an edit's re-index that loses its whole log returns to the previous complete index, which is reported stale and repaired",
+  {
+    skip: !wal && "no write-ahead log on this filesystem",
+  },
+  async () => {
+    const files = fixtureFiles();
+    const root = await project(files);
+    try {
+      assert.equal((await run(root, "index")).sync.complete, true);
+      const previous = rows(root);
+      files["f0.x"] += "def h\ncall g1\n";
+      await writeFile(join(root, "f0.x"), files["f0.x"]);
+      const before = await walAtRest(root);
+      assert.equal((await killAt(root, "resolved")).signal, "SIGKILL");
+      assert.deepEqual(await readFile(graphPath(root)), before);
+      await rm(graphPath(root) + "-wal");
+      await rm(graphPath(root) + "-shm", { force: true });
+      assert.deepEqual(rows(root), previous);
+      const status = await run(root);
+      assert.equal(status.sync.complete, false);
+      assert.deepEqual(
+        status.staleFiles.map((file) => file.path),
+        ["f0.x"],
+      );
+      assert.equal((await run(root, "index")).sync.complete, true);
+      assert.deepEqual(rows(root), await cleanRows(files, projectId(root)));
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  },
+);
 
 test("while a writer holds the write lock, readers keep reading and a second index waits, then succeeds", async () => {
   const root = await project();

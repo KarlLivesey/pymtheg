@@ -2605,3 +2605,33 @@ with evidence `declared-builtin` count as identified library targets at
 level 2. **Open:** once the Go, Rust and TypeScript
 items record library targets, the export's reconstruction can be limited to
 schema-3 graphs. See [C-5](changes/C-5.md).
+
+### Graph writes use a write-ahead log on local disks (C-6)
+
+**Decided (C-6):** from its first write, a writable graph connection on a Linux
+local filesystem switches the file to SQLite's write-ahead log with
+`synchronous=NORMAL` and a checkpoint every 10,000 pages. Writes keep one
+commit per file; commits are not synced. The completion record is committed
+with `synchronous=FULL`. When its last writer closes, the file returns to the
+rollback journal. Elsewhere, and whenever another connection prevents the
+switch, the connection keeps the rollback journal with a full sync per commit,
+as before. The switch never waits on another connection. **Why:** synced
+commits, one per file, dominated cold indexing; Embassy and swc ran out of the
+sweep's 60 minutes writing analysed facts. A write-ahead log also lets readers
+read while a writer commits. **Safety argument:** after a crash or power loss,
+a database in a write-ahead log is the state after some prefix of its commits.
+The log is append-only and checksummed, it is synced before a checkpoint
+copies it into the database, and the database is synced before the log is
+reused. Every graph write deletes the completion record (triggers), an index
+deletes it before its first write, and writes it last. So any surviving prefix
+either ends before the index started (the previous completed index, trusted
+only for the inputs it records) or has no completion record (reported
+incomplete; the next sync rebuilds it), or the index completed. **Trade:** an
+index cut short by a power loss loses its unsynced writes, which it would
+redo anyway. A store whose writer was killed stays in write-ahead-log format
+until a writer closes it normally. A reader in a directory it cannot write
+cannot open it in that state. **Rules out:** more writes per commit (batches
+or one transaction per phase: W3-P1 measured readers and second writers locked
+out, and under a write-ahead log batches of 64 were no faster), and
+`synchronous=OFF` (the database itself may be corrupted by a power loss).
+See [C-6](changes/C-6.md).

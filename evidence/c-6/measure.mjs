@@ -68,18 +68,23 @@ for (const name of [
     }
   };
 }
-const batch = variant.startsWith("batch-") ? Number(variant.slice(6)) : 0;
-// wal-normal-ck<N>: wal-normal with an automatic checkpoint every N pages
+const batch = Number(/^batch-(\d+)/.exec(variant)?.[1] ?? 0);
+// wal-normal-ck<N>, batch-<B>-ck<N>: with an automatic checkpoint every N pages
 // (SQLite's default is 1000).
-const checkpoint = /^wal-normal-ck(\d+)$/.exec(variant)?.[1];
+// ...-cache<MB> (any variant, including asis): page cache of MB mebibytes
+// (SQLite's default is about 2).
+const cache = /-cache(\d+)$/.exec(variant)?.[1];
+const base = cache ? variant.replace(/-cache\d+$/, "") : variant;
+const checkpoint = /^(?:wal-normal|batch-\d+)-ck(\d+)$/.exec(base)?.[1];
 const pragmas = {
   asis: "",
   "wal-normal": "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;",
   "wal-full": "PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;",
   "wal-off": "PRAGMA journal_mode=WAL; PRAGMA synchronous=OFF;",
   "sync-off": "PRAGMA synchronous=OFF;",
-}[batch || checkpoint ? "wal-normal" : variant]?.concat(
+}[batch || checkpoint ? "wal-normal" : base]?.concat(
   checkpoint ? `PRAGMA wal_autocheckpoint=${checkpoint};` : "",
+  cache ? `PRAGMA cache_size=-${Number(cache) * 1024};` : "",
 );
 if (pragmas === undefined) throw Error("unknown variant " + variant);
 // findFileStatusIndex runs once per open, after the connection exists.

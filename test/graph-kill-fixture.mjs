@@ -17,9 +17,20 @@ export function fixtureModule() {
         const range = { start: offset, end: offset + line.length };
         if (word === "def") {
           owner = name;
-          symbols.push({ key: name, name, identity: name, kind: "function", range });
+          symbols.push({
+            key: name,
+            name,
+            identity: name,
+            kind: "function",
+            range,
+          });
         } else if (word === "call" && owner)
-          links.push({ sourceKey: owner, kind: "calls", targetName: name, range });
+          links.push({
+            sourceKey: owner,
+            kind: "calls",
+            targetName: name,
+            range,
+          });
         offset += line.length + 1;
       }
       return { status: "clean", diagnostics: [], symbols, links };
@@ -27,7 +38,10 @@ export function fixtureModule() {
     resolve({ symbols, links }) {
       return links.map((link) => {
         const named = symbols.filter((s) => s.name === link.targetName);
-        return { linkId: link.id, targetId: named.length === 1 ? named[0].id : null };
+        return {
+          linkId: link.id,
+          targetId: named.length === 1 ? named[0].id : null,
+        };
       });
     },
   };
