@@ -1,72 +1,130 @@
 # Source sample review
 
-The fixed seed selected **1,331** source sites. Each has a label and a review basis in [the sample archive](samples.json.gz).
+The fixed seed selected **1,331** distinct sites within their strata. Each has a review label, source basis and the current observed link multiplicity in [the sample archive](samples.json.gz).
 
-Sampling allocates about 420 sites per module in proportion to the observed eligible gap, with a minimum of six in buckets of at least 100 links and one in smaller buckets. Buckets combine the recorded reason family, source scope and strict disposition. The lowest fixed-seed hashes are selected within each bucket.
+Strata use the recorded reason family, source scope and audit disposition. Equal-probability site samples use the smallest hashes within each stratum. All links at each selected site contribute. The estimates multiply the link-weighted sample share by the exact link population in the stratum.
+Intervals use per-stratum ratio-estimator variance with a finite-population correction on site counts. The normal interval sums those variances and bounds covariance when strata share a source-site hash. A noncensus stratum with fewer than two sites contributes its full possible range. For a noncensus sample with all or no matches, a conservative zero-hit bound allows for an unseen category and its unsampled link multiplicity. Source judgment and missed origins can add error.
 
-Inside below means a source-supported shape or a site with legitimate runtime ambiguity that stays in the denominator. Cannot-tell sites stay eligible. The outside share for each unresolved bucket has a 95% Wilson interval. The language interval pools using the population weights and their effective sample size. These intervals describe sampling error. Source-trace judgment and unknown sites can introduce additional uncertainty.
-
-| Module, reason, scope and strict disposition | Links | Sampled | Support shape | Outside after all | Correctly ambiguous | Cannot tell | Estimated inside share | Estimated outside share (95% interval) |
+| Bucket | Sites sampled | Stored links at those sites | Inside misses | Outside L2 | Outside L1 only | Outside neither | Valid alternatives | Cannot tell |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| ` go:ambiguous:source:eligible ` | 38,500 | 60 | 34 | 0 | 23 | 3 | — | — |
-| ` go:empty:source:inside ` | 495 | 6 | 6 | 0 | 0 | 0 | 100.00% (60.97%–100.00%) | 0.00% (0.00%–39.03%) |
-| ` go:empty:source:unclassified ` | 231,940 | 359 | 114 | 218 | 23 | 4 | 38.16% (33.29%–43.29%) | 60.72% (55.58%–65.64%) |
-| ` go:invalid-code:source:inside ` | 149 | 6 | 0 | 0 | 0 | 6 | 0.00% (0.00%–39.03%) | 0.00% (0.00%–39.03%) |
-| ` rust:ambiguous:source:eligible ` | 781 | 6 | 6 | 0 | 0 | 0 | — | — |
-| ` rust:empty:source:inside ` | 5,025 | 6 | 6 | 0 | 0 | 0 | 100.00% (60.97%–100.00%) | 0.00% (0.00%–39.03%) |
-| ` rust:empty:source:unclassified ` | 155,172 | 151 | 105 | 44 | 0 | 2 | 69.54% (61.79%–76.32%) | 29.14% (22.48%–36.83%) |
-| ` rust:failed-file-taint:source:inside ` | 738 | 6 | 6 | 0 | 0 | 0 | 100.00% (60.97%–100.00%) | 0.00% (0.00%–39.03%) |
-| ` rust:failed-file-taint:source:unclassified ` | 9,333 | 9 | 2 | 6 | 0 | 1 | 22.22% (6.32%–54.74%) | 66.67% (35.42%–87.94%) |
-| ` rust:opaque-declaration:source:inside ` | 25,809 | 25 | 25 | 0 | 0 | 0 | 100.00% (86.68%–100.00%) | 0.00% (0.00%–13.32%) |
-| ` rust:opaque-declaration:source:unclassified ` | 47,987 | 47 | 20 | 26 | 0 | 1 | 42.55% (29.51%–56.72%) | 55.32% (41.25%–68.59%) |
-| ` rust:other:source:inside ` | 9,075 | 9 | 9 | 0 | 0 | 0 | 100.00% (70.08%–100.00%) | 0.00% (0.00%–29.92%) |
-| ` rust:other:source:unclassified ` | 12,126 | 12 | 7 | 5 | 0 | 0 | 58.33% (31.95%–80.67%) | 41.67% (19.33%–68.05%) |
-| ` rust:path-or-namespace:source:inside ` | 1,938 | 6 | 6 | 0 | 0 | 0 | 100.00% (60.97%–100.00%) | 0.00% (0.00%–39.03%) |
-| ` rust:path-or-namespace:source:unclassified ` | 9,231 | 9 | 2 | 6 | 0 | 1 | 22.22% (6.32%–54.74%) | 66.67% (35.42%–87.94%) |
-| ` rust:receiver:source:inside ` | 147 | 6 | 6 | 0 | 0 | 0 | 100.00% (60.97%–100.00%) | 0.00% (0.00%–39.03%) |
-| ` rust:receiver:source:unclassified ` | 153,557 | 150 | 68 | 77 | 1 | 4 | 46.00% (38.22%–53.98%) | 51.33% (43.40%–59.20%) |
-| ` typescript:ambiguous:bundle:eligible ` | 1 | 1 | 0 | 0 | 0 | 1 | — | — |
-| ` typescript:ambiguous:source:eligible ` | 4,274 | 6 | 6 | 0 | 0 | 0 | — | — |
-| ` typescript:external-package:broken-fixture:inside ` | 9 | 1 | 1 | 0 | 0 | 0 | 100.00% (20.65%–100.00%) | 0.00% (0.00%–79.35%) |
-| ` typescript:external-package:source:inside ` | 55,503 | 35 | 35 | 0 | 0 | 0 | 100.00% (90.11%–100.00%) | 0.00% (0.00%–9.89%) |
-| ` typescript:external-package:source:unclassified ` | 32,260 | 20 | 0 | 20 | 0 | 0 | 0.00% (0.00%–16.11%) | 100.00% (83.89%–100.00%) |
-| ` typescript:external:bundle:unclassified ` | 4,479 | 6 | 0 | 6 | 0 | 0 | 0.00% (0.00%–39.03%) | 100.00% (60.97%–100.00%) |
-| ` typescript:external:source:inside ` | 4,818 | 6 | 5 | 1 | 0 | 0 | 83.33% (43.65%–96.99%) | 16.67% (3.01%–56.35%) |
-| ` typescript:external:source:unclassified ` | 98,307 | 61 | 2 | 58 | 0 | 1 | 3.28% (0.90%–11.19%) | 95.08% (86.51%–98.31%) |
-| ` typescript:incomplete-config:source:inside ` | 3,607 | 6 | 6 | 0 | 0 | 0 | 100.00% (60.97%–100.00%) | 0.00% (0.00%–39.03%) |
-| ` typescript:incomplete-config:source:unclassified ` | 5,644 | 6 | 1 | 4 | 0 | 1 | 16.67% (3.01%–56.35%) | 66.67% (30.00%–90.32%) |
-| ` typescript:local:bundle:inside ` | 60,055 | 37 | 37 | 0 | 0 | 0 | 100.00% (90.59%–100.00%) | 0.00% (0.00%–9.41%) |
-| ` typescript:local:source:inside ` | 96,430 | 60 | 60 | 0 | 0 | 0 | 100.00% (93.98%–100.00%) | 0.00% (0.00%–6.02%) |
-| ` typescript:missing-module:source:inside ` | 13,553 | 8 | 8 | 0 | 0 | 0 | 100.00% (67.56%–100.00%) | 0.00% (0.00%–32.44%) |
-| ` typescript:missing-module:source:unclassified ` | 793 | 6 | 6 | 0 | 0 | 0 | 100.00% (60.97%–100.00%) | 0.00% (0.00%–39.03%) |
-| ` typescript:no-symbol:bundle:unclassified ` | 37,244 | 23 | 19 | 0 | 0 | 4 | 82.61% (62.86%–93.02%) | 0.00% (0.00%–14.31%) |
-| ` typescript:no-symbol:source:inside ` | 4,542 | 6 | 0 | 6 | 0 | 0 | 0.00% (0.00%–39.03%) | 100.00% (60.97%–100.00%) |
-| ` typescript:no-symbol:source:unclassified ` | 251,791 | 157 | 31 | 120 | 0 | 6 | 19.75% (14.27%–26.66%) | 76.43% (69.21%–82.39%) |
-| ` typescript:other:broken-fixture:inside ` | 2 | 1 | 1 | 0 | 0 | 0 | 100.00% (20.65%–100.00%) | 0.00% (0.00%–79.35%) |
-| ` typescript:other:source:inside ` | 1,159 | 6 | 6 | 0 | 0 | 0 | 100.00% (60.97%–100.00%) | 0.00% (0.00%–39.03%) |
-| ` typescript:other:source:unclassified ` | 314 | 6 | 0 | 0 | 6 | 0 | 100.00% (60.97%–100.00%) | 0.00% (0.00%–39.03%) |
+| ` go:ambiguous:source:eligible ` | 60 | 60 | 26 | 0 | 0 | 1 | 32 | 1 |
+| ` go:empty:source:inside ` | 6 | 6 | 6 | 0 | 0 | 0 | 0 | 0 |
+| ` go:empty:source:unclassified ` | 359 | 359 | 103 | 110 | 0 | 113 | 29 | 4 |
+| ` go:invalid-code:source:inside ` | 6 | 6 | 0 | 0 | 0 | 0 | 0 | 6 |
+| ` rust:ambiguous:source:eligible ` | 6 | 6 | 1 | 0 | 0 | 0 | 4 | 1 |
+| ` rust:empty:source:inside ` | 6 | 6 | 6 | 0 | 0 | 0 | 0 | 0 |
+| ` rust:empty:source:unclassified ` | 151 | 151 | 106 | 2 | 0 | 43 | 0 | 0 |
+| ` rust:failed-file-taint:source:inside ` | 6 | 6 | 6 | 0 | 0 | 0 | 0 | 0 |
+| ` rust:failed-file-taint:source:unclassified ` | 9 | 9 | 2 | 0 | 0 | 6 | 0 | 1 |
+| ` rust:opaque-declaration:source:inside ` | 25 | 25 | 22 | 0 | 0 | 3 | 0 | 0 |
+| ` rust:opaque-declaration:source:unclassified ` | 47 | 47 | 16 | 4 | 0 | 26 | 0 | 1 |
+| ` rust:other:source:inside ` | 9 | 9 | 9 | 0 | 0 | 0 | 0 | 0 |
+| ` rust:other:source:unclassified ` | 12 | 12 | 7 | 0 | 0 | 5 | 0 | 0 |
+| ` rust:path-or-namespace:source:inside ` | 6 | 6 | 5 | 0 | 0 | 1 | 0 | 0 |
+| ` rust:path-or-namespace:source:unclassified ` | 9 | 9 | 2 | 0 | 0 | 7 | 0 | 0 |
+| ` rust:receiver:source:inside ` | 6 | 6 | 5 | 0 | 0 | 1 | 0 | 0 |
+| ` rust:receiver:source:unclassified ` | 150 | 150 | 61 | 4 | 0 | 82 | 1 | 2 |
+| ` typescript:ambiguous:bundle:eligible ` | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 1 |
+| ` typescript:ambiguous:source:eligible ` | 6 | 6 | 5 | 0 | 0 | 0 | 1 | 0 |
+| ` typescript:external-package:broken-fixture:inside ` | 1 | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| ` typescript:external-package:source:inside ` | 35 | 35 | 35 | 0 | 0 | 0 | 0 | 0 |
+| ` typescript:external-package:source:unclassified ` | 20 | 20 | 0 | 4 | 0 | 16 | 0 | 0 |
+| ` typescript:external:bundle:unclassified ` | 6 | 6 | 0 | 0 | 0 | 6 | 0 | 0 |
+| ` typescript:external:source:inside ` | 6 | 6 | 5 | 0 | 0 | 1 | 0 | 0 |
+| ` typescript:external:source:unclassified ` | 61 | 61 | 2 | 0 | 0 | 58 | 0 | 1 |
+| ` typescript:incomplete-config:source:inside ` | 6 | 6 | 6 | 0 | 0 | 0 | 0 | 0 |
+| ` typescript:incomplete-config:source:unclassified ` | 6 | 6 | 1 | 0 | 0 | 5 | 0 | 0 |
+| ` typescript:local:bundle:inside ` | 37 | 37 | 37 | 0 | 0 | 0 | 0 | 0 |
+| ` typescript:local:source:inside ` | 60 | 60 | 58 | 0 | 0 | 0 | 2 | 0 |
+| ` typescript:missing-module:source:inside ` | 8 | 8 | 8 | 0 | 0 | 0 | 0 | 0 |
+| ` typescript:missing-module:source:unclassified ` | 6 | 6 | 6 | 0 | 0 | 0 | 0 | 0 |
+| ` typescript:no-symbol:bundle:unclassified ` | 23 | 23 | 6 | 0 | 0 | 5 | 3 | 9 |
+| ` typescript:no-symbol:source:inside ` | 6 | 6 | 0 | 0 | 0 | 6 | 0 | 0 |
+| ` typescript:no-symbol:source:unclassified ` | 157 | 157 | 26 | 0 | 0 | 126 | 5 | 0 |
+| ` typescript:other:broken-fixture:inside ` | 1 | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| ` typescript:other:source:inside ` | 6 | 6 | 5 | 0 | 0 | 1 | 0 | 0 |
+| ` typescript:other:source:unclassified ` | 6 | 6 | 0 | 0 | 0 | 0 | 6 | 0 |
+
+### Remaining strata after exact outside identification
+
+| Bucket | Population sites | Population links | Reviewed sites | Reviewed links | Outside share (95% interval) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| ` go:ambiguous:source:eligible ` | 38,470 | 38,470 | 60 | 60 | 1.67% (0.00%–4.93%) |
+| ` go:empty:source:inside ` | 495 | 495 | 6 | 6 | 0.00% (0.00%–45.93%) |
+| ` go:empty:source:unclassified ` | 170,349 | 170,756 | 249 | 249 | 45.38% (39.19%–51.57%) |
+| ` go:invalid-code:source:inside ` | 149 | 149 | 6 | 6 | 0.00% (0.00%–45.93%) |
+| ` rust:ambiguous:source:eligible ` | 781 | 781 | 6 | 6 | 0.00% (0.00%–45.93%) |
+| ` rust:empty:source:inside ` | 5,025 | 5,025 | 6 | 6 | 0.00% (0.00%–45.93%) |
+| ` rust:empty:source:unclassified ` | 154,135 | 154,135 | 149 | 149 | 28.86% (21.56%–36.16%) |
+| ` rust:failed-file-taint:source:inside ` | 738 | 738 | 6 | 6 | 0.00% (0.00%–45.93%) |
+| ` rust:failed-file-taint:source:unclassified ` | 8,996 | 8,996 | 9 | 9 | 66.67% (34.02%–99.32%) |
+| ` rust:opaque-declaration:source:inside ` | 25,687 | 25,809 | 25 | 25 | 12.00% (0.00%–24.99%) |
+| ` rust:opaque-declaration:source:unclassified ` | 45,818 | 45,927 | 43 | 43 | 60.47% (45.69%–75.24%) |
+| ` rust:other:source:inside ` | 8,701 | 9,073 | 9 | 9 | 0.00% (0.00%–36.35%) |
+| ` rust:other:source:unclassified ` | 11,839 | 11,922 | 12 | 12 | 41.67% (12.55%–70.79%) |
+| ` rust:path-or-namespace:source:inside ` | 1,938 | 1,938 | 6 | 6 | 16.67% (0.00%–49.28%) |
+| ` rust:path-or-namespace:source:unclassified ` | 7,920 | 7,920 | 9 | 9 | 77.78% (48.98%–100.00%) |
+| ` rust:receiver:source:inside ` | 147 | 147 | 6 | 6 | 16.67% (0.00%–48.66%) |
+| ` rust:receiver:source:unclassified ` | 152,363 | 152,363 | 146 | 146 | 56.16% (48.09%–64.24%) |
+| ` typescript:ambiguous:bundle:eligible ` | 1 | 1 | 1 | 1 | 0.00% (0.00%–0.00%) |
+| ` typescript:ambiguous:source:eligible ` | 4,274 | 4,274 | 6 | 6 | 0.00% (0.00%–45.93%) |
+| ` typescript:external-package:broken-fixture:inside ` | 9 | 9 | 1 | 1 | 0.00% (0.00%–100.00%) |
+| ` typescript:external-package:source:inside ` | 54,410 | 54,410 | 35 | 35 | 0.00% (0.00%–10.00%) |
+| ` typescript:external-package:source:unclassified ` | 30,397 | 30,397 | 16 | 16 | 100.00% (79.41%–100.00%) |
+| ` typescript:external:bundle:unclassified ` | 4,968 | 4,968 | 6 | 6 | 100.00% (54.07%–100.00%) |
+| ` typescript:external:source:inside ` | 4,818 | 4,818 | 6 | 6 | 16.67% (0.00%–49.31%) |
+| ` typescript:external:source:unclassified ` | 97,818 | 97,818 | 61 | 61 | 95.08% (89.61%–100.00%) |
+| ` typescript:incomplete-config:source:inside ` | 3,607 | 3,607 | 6 | 6 | 0.00% (0.00%–45.93%) |
+| ` typescript:incomplete-config:source:unclassified ` | 5,639 | 5,639 | 6 | 6 | 83.33% (50.68%–100.00%) |
+| ` typescript:local:bundle:inside ` | 61,580 | 61,580 | 37 | 37 | 0.00% (0.00%–9.49%) |
+| ` typescript:local:source:inside ` | 94,905 | 94,905 | 60 | 60 | 0.00% (0.00%–5.96%) |
+| ` typescript:missing-module:source:inside ` | 13,553 | 13,553 | 8 | 8 | 0.00% (0.00%–36.94%) |
+| ` typescript:missing-module:source:unclassified ` | 793 | 793 | 6 | 6 | 0.00% (0.00%–45.93%) |
+| ` typescript:no-symbol:bundle:unclassified ` | 39,150 | 39,150 | 23 | 23 | 21.74% (4.51%–38.97%) |
+| ` typescript:no-symbol:source:inside ` | 4,542 | 4,542 | 6 | 6 | 100.00% (54.07%–100.00%) |
+| ` typescript:no-symbol:source:unclassified ` | 249,884 | 249,884 | 157 | 157 | 80.25% (74.01%–86.50%) |
+| ` typescript:other:broken-fixture:inside ` | 2 | 2 | 1 | 1 | 0.00% (0.00%–100.00%) |
+| ` typescript:other:source:inside ` | 1,159 | 1,159 | 6 | 6 | 16.67% (0.00%–49.25%) |
+| ` typescript:other:source:unclassified ` | 314 | 314 | 6 | 6 | 0.00% (0.00%–45.93%) |
+
+### Reviewed closed candidate sets
+
+- clap-rs/clap ` clap_builder/src/output/help_template.rs:1040 `. The checkout defines exactly two debug macros here, under complementary debug feature gates. Both stored candidates are real in their respective configurations.
+- clap-rs/clap ` clap_builder/src/parser/parser.rs:1521 `. The checkout defines exactly two debug macros here, under complementary debug feature gates. Both stored candidates are real in their respective configurations.
+- clap-rs/clap ` clap_builder/src/output/usage.rs:255 `. The checkout defines exactly two debug macros here, under complementary debug feature gates. Both stored candidates are real in their respective configurations.
+- clap-rs/clap ` clap_builder/src/builder/command.rs:3906 `. The checkout defines exactly two debug macros here, under complementary debug feature gates. Both stored candidates are real in their respective configurations.
+- pingdotgg/t3code ` apps/web/src/session-logic.ts:4 `. The unqualified import selects both the exported type and its schema value from one checked-in declaration file. The stored set contains exactly those two targets.
+
+### Library misses that need dependency information
+
+- **Go** samber/lo ` map_test.go:832 `. The call is on the result of testify/assert.New. Its Assertions return type comes from the dependency declaration.
+- **Go** cli/cli ` pkg/cmd/project/field-list/field_list_test.go:457 `. CLI declares gopkg.in/h2non/gock.v1, which owns this HTTP test builder.
+- **Rust** clap-rs/clap ` clap_derive/src/item.rs:97 `. syn declares the ident field of its derive input. That dependency field type selects proc_macro2 Ident’s span method.
+- **Rust** tauri-apps/tauri ` crates/tauri-cli/src/dev/builtin_dev_server.rs:64 `. The method chain starts at the Tokio runtime builder. The next receiver type depends on the dependency return declarations.
+- **TypeScript / JS** trpc/trpc ` www/src/flags.test.ts:28 `. The recorded property receiver is a test-framework assertion or mock chain.
+- **TypeScript / JS** pingdotgg/t3code ` apps/server/src/auth/Layers/ServerSecretStore.test.ts:234 `. The recorded property receiver is a test-framework assertion or mock chain.
 
 ### Support labels within each sampled bucket
 
 | Bucket | Label and sampled count |
 | --- | --- |
-| ` go:ambiguous:source:eligible ` | ` go-factory ` 8, ` go-fields ` 2, ` go-generated ` 17, ` go-local-method ` 2, ` go-typed-reference ` 5 |
+| ` go:ambiguous:source:eligible ` | ` go-external-fields ` 1, ` go-factory ` 1, ` go-fields ` 2, ` go-generated ` 17, ` go-local-method ` 1, ` go-typed-reference ` 5 |
 | ` go:empty:source:inside ` | ` go-typed-reference ` 6 |
-| ` go:empty:source:unclassified ` | ` go-container ` 41, ` go-external-fields ` 21, ` go-external-import ` 24, ` go-external-result ` 62, ` go-factory ` 15, ` go-fields ` 20, ` go-interface ` 15, ` go-local-method ` 2, ` go-pointer-conversion ` 6, ` go-stdlib ` 111, ` go-type-parameter ` 3, ` go-typed-reference ` 12 |
-| ` rust:ambiguous:source:eligible ` | ` rust-macro ` 4, ` rust-parameter ` 1, ` rust-trait ` 1 |
-| ` rust:empty:source:inside ` | ` rust-macro ` 3, ` rust-trait ` 3 |
-| ` rust:empty:source:unclassified ` | ` rust-chain ` 5, ` rust-let ` 1, ` rust-macro ` 2, ` rust-parameter ` 17, ` rust-std-path ` 41, ` rust-std-receiver ` 3, ` rust-trait ` 3, ` rust-value ` 77 |
+| ` go:empty:source:unclassified ` | ` go-container ` 41, ` go-external-fields ` 23, ` go-external-import ` 24, ` go-external-result ` 65, ` go-factory ` 4, ` go-fields ` 20, ` go-interface ` 15, ` go-local-method ` 2, ` go-pointer-conversion ` 6, ` go-stdlib ` 111, ` go-type-parameter ` 3, ` go-typed-reference ` 12 |
+| ` rust:ambiguous:source:eligible ` | ` rust-parameter ` 1 |
+| ` rust:empty:source:inside ` | ` rust-imported-function ` 1, ` rust-macro ` 3, ` rust-trait ` 2 |
+| ` rust:empty:source:unclassified ` | ` rust-chain ` 5, ` rust-macro ` 2, ` rust-parameter ` 17, ` rust-std-path ` 42, ` rust-std-receiver ` 3, ` rust-trait ` 1, ` rust-typed-receiver ` 1, ` rust-value ` 80 |
 | ` rust:failed-file-taint:source:inside ` | ` rust-taint ` 6 |
 | ` rust:failed-file-taint:source:unclassified ` | ` rust-taint ` 8 |
-| ` rust:opaque-declaration:source:inside ` | ` rust-glob ` 15, ` rust-import ` 2, ` rust-parameter ` 1, ` rust-self-trait ` 1, ` rust-trait ` 6 |
-| ` rust:opaque-declaration:source:unclassified ` | ` rust-glob ` 13, ` rust-import ` 1, ` rust-parameter ` 1, ` rust-std-path ` 26, ` rust-trait ` 4, ` rust-value ` 1 |
-| ` rust:other:source:inside ` | ` rust-import ` 2, ` rust-imported-function ` 2, ` rust-parameter ` 1, ` rust-trait ` 4 |
-| ` rust:other:source:unclassified ` | ` rust-import ` 1, ` rust-let ` 2, ` rust-self-trait ` 1, ` rust-std-path ` 5, ` rust-trait ` 3 |
-| ` rust:path-or-namespace:source:inside ` | ` rust-import ` 2, ` rust-trait ` 4 |
-| ` rust:path-or-namespace:source:unclassified ` | ` rust-std-path ` 6, ` rust-trait ` 1, ` rust-value ` 1 |
-| ` rust:receiver:source:inside ` | ` rust-let ` 6 |
-| ` rust:receiver:source:unclassified ` | ` rust-chain ` 19, ` rust-let ` 45, ` rust-macro ` 2, ` rust-std-receiver ` 77, ` rust-value ` 2 |
-| ` typescript:ambiguous:source:eligible ` | ` ts-object-member ` 1, ` ts-relative ` 5 |
+| ` rust:opaque-declaration:source:inside ` | ` rust-import ` 10, ` rust-imported-function ` 2, ` rust-macro ` 1, ` rust-parameter ` 1, ` rust-self-trait ` 1, ` rust-std-path ` 3, ` rust-trait ` 7 |
+| ` rust:opaque-declaration:source:unclassified ` | ` rust-glob ` 3, ` rust-import ` 2, ` rust-imported-function ` 1, ` rust-macro ` 1, ` rust-parameter ` 1, ` rust-std-path ` 30, ` rust-trait ` 7, ` rust-value ` 1 |
+| ` rust:other:source:inside ` | ` rust-import ` 2, ` rust-imported-function ` 2, ` rust-macro ` 2, ` rust-parameter ` 1, ` rust-trait ` 2 |
+| ` rust:other:source:unclassified ` | ` rust-chain ` 2, ` rust-import ` 1, ` rust-self-trait ` 1, ` rust-std-path ` 5, ` rust-trait ` 3 |
+| ` rust:path-or-namespace:source:inside ` | ` rust-import ` 2, ` rust-std-path ` 1, ` rust-trait ` 3 |
+| ` rust:path-or-namespace:source:unclassified ` | ` rust-std-path ` 7, ` rust-trait ` 1, ` rust-value ` 1 |
+| ` rust:receiver:source:inside ` | ` rust-std-receiver ` 1, ` rust-typed-receiver ` 5 |
+| ` rust:receiver:source:unclassified ` | ` rust-chain ` 28, ` rust-let ` 27, ` rust-macro ` 2, ` rust-std-path ` 1, ` rust-std-receiver ` 85, ` rust-typed-receiver ` 3, ` rust-value ` 1 |
+| ` typescript:ambiguous:source:eligible ` | ` ts-object-member ` 1, ` ts-relative ` 4 |
 | ` typescript:external-package:broken-fixture:inside ` | ` ts-workspace ` 1 |
 | ` typescript:external-package:source:inside ` | ` ts-local-access ` 1, ` ts-local-chain ` 7, ` ts-workspace ` 27 |
 | ` typescript:external-package:source:unclassified ` | ` ts-package ` 11, ` ts-package-chain ` 8, ` ts-runtime ` 1 |
@@ -74,24 +132,28 @@ Inside below means a source-supported shape or a site with legitimate runtime am
 | ` typescript:external:source:inside ` | ` ts-local-access ` 2, ` ts-relative ` 3, ` ts-runtime ` 1 |
 | ` typescript:external:source:unclassified ` | ` ts-config ` 2, ` ts-runtime ` 58 |
 | ` typescript:incomplete-config:source:inside ` | ` ts-config-preset ` 6 |
-| ` typescript:incomplete-config:source:unclassified ` | ` ts-config ` 1, ` ts-package-chain ` 1, ` ts-runtime ` 3 |
+| ` typescript:incomplete-config:source:unclassified ` | ` ts-config ` 1, ` ts-package-chain ` 2, ` ts-runtime ` 3 |
 | ` typescript:local:bundle:inside ` | ` ts-bundle ` 21, ` ts-nested-function ` 16 |
-| ` typescript:local:source:inside ` | ` ts-local-access ` 27, ` ts-nested-function ` 9, ` ts-props ` 2, ` ts-type-parameters ` 22 |
+| ` typescript:local:source:inside ` | ` ts-local-access ` 26, ` ts-nested-function ` 9, ` ts-type-parameters ` 23 |
 | ` typescript:missing-module:source:inside ` | ` ts-local-access ` 4, ` ts-relative ` 4 |
 | ` typescript:missing-module:source:unclassified ` | ` ts-local-access ` 1, ` ts-local-chain ` 5 |
-| ` typescript:no-symbol:bundle:unclassified ` | ` ts-bundle ` 14, ` ts-inline ` 2, ` ts-local-chain ` 3 |
+| ` typescript:no-symbol:bundle:unclassified ` | ` ts-bundle-flow ` 4, ` ts-inline ` 2, ` ts-runtime ` 5 |
 | ` typescript:no-symbol:source:inside ` | ` ts-package-chain ` 6 |
-| ` typescript:no-symbol:source:unclassified ` | ` ts-bundle ` 1, ` ts-inline ` 2, ` ts-local-chain ` 28, ` ts-package ` 38, ` ts-package-chain ` 60, ` ts-runtime ` 22 |
+| ` typescript:no-symbol:source:unclassified ` | ` ts-inline ` 2, ` ts-local-chain ` 20, ` ts-package ` 38, ` ts-package-chain ` 65, ` ts-runtime ` 23, ` ts-script-tag ` 4 |
 | ` typescript:other:broken-fixture:inside ` | ` ts-relative ` 1 |
-| ` typescript:other:source:inside ` | ` ts-local-access ` 3, ` ts-local-chain ` 1, ` ts-relative ` 2 |
+| ` typescript:other:source:inside ` | ` ts-local-access ` 3, ` ts-package-chain ` 1, ` ts-relative ` 2 |
 
 ## Cannot-tell labels
 
 - 5 sites. Minified source or fixture syntax obscures the declaration and receiver. Example pocketbase/pocketbase ` ui/dist/assets/index-B7vkkFa_.js:68 `.
-- 8 sites. The call lacks a usable receiver type or package binding. Example pingdotgg/t3code ` apps/web/src/components/settings/SettingsPanels.tsx:94 `.
-- 9 sites. The nearby source and recorded path give no reliable receiver, binding or macro origin. Example BurntSushi/ripgrep ` crates/ignore/tests/gitignore_matched_path_or_any_parents_tests.rs:38 `.
-- 7 sites. The receiver comes from an untraced return or interface, or the selector has no usable import or type. Example protocolbuffers/protobuf-go ` internal/testprotos/nullable/nullable_test.go:37 `.
+- 3 sites. The bundle has no recorded local binding and the final method owner is not established by the minified closure. Example pocketbase/pocketbase ` ui/public/libs/tinymce/themes/silver/theme.min.js:1 `.
+- 1 sites. The call lacks a usable receiver type or package binding. Example pingdotgg/t3code ` apps/web/src/components/settings/SettingsPanels.tsx:94 `.
+- 2 sites. The minified caller supplies this receiver through another closure. The final member declaration remains unverified. Example pocketbase/pocketbase ` ui/public/libs/tinymce/tinymce.min.js:13 `.
+- 1 sites. The nearby source and recorded path give no reliable receiver, binding or macro origin. Example alacritty/alacritty ` alacritty/src/renderer/text/mod.rs:199 `.
+- 1 sites. The outer interface and its generated return declarations do not establish a single method from the captured source. Example tauri-apps/tauri ` crates/tauri-cli/src/mobile/ios/xcode_script.rs:263 `.
+- 5 sites. The receiver comes from an untraced return or interface, or the selector has no usable import or type. Example labstack/echo ` middleware/static.go:298 `.
 - 6 sites. The stored diagnostic marks invalid input, so the intended target cannot reliably be determined. Example golang/tools ` go/ssa/testdata/valueforexpr.go:94 `.
+- 3 sites. The terminal declaration cannot be confirmed from the fresh site’s source context. Example crossbeam-rs/crossbeam ` crossbeam-channel/src/flavors/array.rs:96 `.
 
 ## Cross-checks from the tool-comparison candidates
 
@@ -103,12 +165,12 @@ All counts here come from this sweep. The comparison supplied shapes to look for
 | TypeScript nested function | 25 | cli/cli ` .github/extensions/terminal-mockup/assets/html2canvas.min.js:20 `<br>pocketbase/pocketbase ` ui/public/libs/tinymce/models/dom/model.min.js:1 ` |
 | TypeScript missing package config preset | 6 | changesets/changesets ` packages/config/src/defaults.ts:1 `<br>withastro/astro ` packages/astro/e2e/fixtures/cloudflare/src/content.config.ts:83 ` |
 | TypeScript member of an object type | 1 | pocketbase/pocketbase ` plugins/jsvm/internal/types/generated/types.d.ts:12606 ` |
-| Rust typed local or builder-chain receiver | 78 | clap-rs/clap ` tests/builder/require.rs:505 `<br>actix/actix-web ` actix-web-codegen/tests/trybuild/route-ok.rs:27 ` |
-| Rust name brought into scope by a checkout glob | 28 | ratatui/ratatui ` ratatui-core/src/layout/rect/ops.rs:109 `<br>actix/actix-web ` actix-web/src/middleware/compress.rs:141 ` |
+| Rust typed local or builder-chain receiver | 62 | clap-rs/clap ` tests/builder/require.rs:505 `<br>actix/actix-web ` actix-web-codegen/tests/trybuild/route-ok.rs:27 ` |
+| Rust name brought into scope by a checkout glob | 3 | ratatui/ratatui ` ratatui-core/src/backend/test.rs:1119 `<br>actix/actix-web ` actix-web/src/rmap.rs:419 ` |
 | Rust Self or self dispatch through a trait impl | 2 | cberner/redb ` src/types.rs:942 `<br>BurntSushi/ripgrep ` crates/printer/src/standard.rs:802 ` |
-| Rust call through an explicit use binding | 2 | crossbeam-rs/crossbeam ` crossbeam-channel/tests/array.rs:127 `<br>crossbeam-rs/crossbeam ` crossbeam-channel/tests/ready.rs:591 ` |
+| Rust call through an explicit use binding | 6 | clap-rs/clap ` clap_complete/tests/testsuite/elvish.rs:137 `<br>actix/actix-web ` actix-web/src/resource.rs:816 ` |
 | Go member through an indexed or ranged value | 41 | golang/tools ` internal/diff/diff_test.go:109 `<br>cli/cli ` pkg/cmd/pr/view/view_test.go:966 ` |
-| Go interface dispatch retained as runtime ambiguity | 42 | gofiber/fiber ` middleware/session/middleware_test.go:171 `<br>gofiber/fiber ` middleware/cache/cache_test.go:2775 ` |
+| Go interface dispatch retained as runtime ambiguity | 54 | gofiber/fiber ` middleware/session/middleware_test.go:171 `<br>gofiber/fiber ` middleware/cache/cache_test.go:2775 ` |
 
 Tracked npm and pnpm manifests identified **41,569** stored external-package links from 14 repositories naming a sibling workspace package. The strict denominator retains them. A package-name match establishes that the package is checked in. The source review also checks member and subpath context.
 

@@ -97,69 +97,68 @@ harness mistake in the symbol reference was corrected.
 
 ## Coverage scoreboard
 
-`coverage-export.mjs` opens a completed graph in read-only mode and checks its
-link totals against that run's warm CLI result. Its aggregate includes every
-stored language, kind, outcome, `data.reason` and `data.uncertainty` combination,
-plus the file scope and the coverage classification. Ambiguous links remain
-in the denominator. Resolved structural links such as `contains` count too.
-The scoreboard has a completion checklist and separate per-module rates
-across finished checkouts. An unfinished attempt contributes no links to
-coverage. A newly finished pin enters the measured denominator.
+`coverage-export.mjs` opens each completed graph read-only and checks the
+counts against its warm CLI result. The v2 archive keeps every stored
+module, kind, outcome, reason and uncertainty combination. File scope,
+audit disposition and library evidence are additional dimensions.
 
-Outside requires evidence that the target is unavailable in the checkout.
+Level 2 means a resolved checkout link or a stored library unit plus a
+symbol name. Level 1 adds sites that name only the library unit. Both
+use every stored link in the finished graphs. The strict-inside column
+excludes only proved outside targets. Raw uses the released graph's
+resolved count. Completion is a separate checklist.
 
-- **Go.** Follow import edges or a selector whose recorded expression has a
-  package-name root. Use an explicit alias, or an undisputed last path segment
-  for the implicit alias. The released Go layout checks local modules and
-  replacements. A recorded `vendor/` package stays inside. The standard
-  library roots, recorded builtin calls and dependencies declared in the owning
-  `go.mod` can count as outside. Concrete standard-library receiver types and
-  named standard factory results can also be traced from stored Go expressions
-  and same-package signatures. This trace keeps interface dispatch, C imports
-  and unproved receiver chains in the denominator.
-- **Rust.** Use explicit `std`, `core`, `alloc`, `proc_macro` and `test` paths,
-  an unconditional top-level import binding, or a named Cargo dependency with
-  an unambiguous path or registry origin. Local Rust names and conflicting
-  bindings prevent external attribution. A fixed list of prelude macros and
-  types also counts as outside when the checkout shows no possible shadow,
-  disabled prelude or relevant `no_std` restriction. Macro-use imports and
-  blocked sites prevent that inference. `crate`, `self`, `super` and authored
-  module declarations are inside. Uncertain receiver types stay unclassified.
-- **TypeScript and JavaScript.** Use literal specifiers or simple, unshadowed
-  import bindings. A workspace package or relative import under the checkout
-  stays inside. The export checks tracked npm and pnpm workspace manifests
-  before assigning package origins. Relative imports that escape the checkout count as outside.
-  Built-in Node specifiers and unvendored declared package dependencies can
-  be outside. A configured alias that could bind locally prevents an external
-  guess. An `external` link on a literal receiver or an unshadowed runtime or
-  compiler-library name can count as outside. Fluent assertions can be traced
-  to a named assertion package through their import. Other `external-package`
-  links with no package evidence stay unclassified. The released TypeScript
-  parser reads import declarations for this rule without executing source.
+The released graph has no target-ID representation for a library symbol.
+The export derives an identity only from precise facts already captured.
 
-The file-scope split recognizes checked-in minified JavaScript, PocketBase's
-checked-in `ui/dist/` bundles, explicit negative fixture paths, Tauri's
-unexpanded source templates and mdBook's hidden-line snippets. The default
-score counts them. The alternate scores remove one named scope at a time and
-all three together. The split follows the source of a link. An incoming link
-from another scope retains that scope. A failed file with no links still
-appears in the failed-source counts. The 14 known invalid Go tools inputs count
-as broken fixtures. The three reviewed valid Go files that the grammar rejected
-stay in the source scope.
+- **Go.** A literal import gives the full package path. A named selector
+  or qualified type provides a symbol through an explicit import alias
+  or a standard package name. A stored typed receiver can identify a
+  member when it uses a known concrete standard type. Unproved default
+  dependency package names and interface dispatch need more evidence.
+  Vendored paths and checked-in module replacements stay inside.
+- **Rust.** A qualified path gives a crate and, when named, a member path.
+  A glob or bare crate use identifies a unit only. A method needs an
+  unblocked receiver name with a qualified type or a recorded import
+  binding. An unqualified standard prelude spelling can help explain an
+  outside miss. It carries no stored unit by itself.
+- **TypeScript and JavaScript.** A stored literal specifier identifies
+  the module. A named import binds the recorded imported name to that
+  module at its captured source position. Subsequent direct selectors
+  can re-use that binding and append the member path. A declaration
+  directive can name a unit like the DOM library. A reason such as
+  `external-package` without a binding identifies no particular
+  package. Fluent calls through an untyped return carry no inferred
+  symbol credit.
 
-The source audit stratifies unresolved and ambiguous links by language,
-reason family, source scope and strict disposition. It ranks sites by a
-SHA-256 hash of seed `0x7c8a59bd2e41`, the repository pin, source span, kind
-and target spelling. Pass `--sampling-base` with the measured breakdown to
-allocate about 420 sites per module in proportion to bucket volumes. The
-review records a support shape, an outside target, a legitimately ambiguous
-runtime target or a cannot-tell reason for every selected site. Only the
-estimate uses the review's outside labels. Rust links marked
-`failed-file-unseen-declarations` keep a separate exact count, including when
-they also carry a receiver reason. The same baseline export checks a few
-syntactically identifiable source shapes with no stored link, using the
-installed release's TypeScript and Go readers. They remain outside the
-stored-link measure.
+The boundary check uses tracked workspace and vendor manifests. A package
+found in the central directory of a tracked Yarn cache archive is inside
+the checkout. Relative npm `file:`, `link:` and `portal:` entries and
+recorded Cargo path dependencies resolve against the owning manifest and
+the checkout boundary. Known paths beyond that boundary are outside.
+Missing in-checkout path targets, unsupported absolute paths and paths
+through tracked symlinks remain unclassified. No archives are extracted.
+The strict-inside column can differ from older SW-3 exports because these
+checks and exact recorded library identities refine the outside partition.
+
+The file-scope split recognizes minified JavaScript by its filename or
+long lines in `dist/`, `public/libs/` and `static/`. PocketBase's checked-in
+`ui/dist/` JavaScript is also marked as a bundle. Explicit negative
+fixtures and unexpanded templates have their own scopes. The default
+counts all scopes. Alternate rows remove each scope separately and all
+three together. A failed input still appears in the failed-source count.
+A source site with no stored link is reported in the extraction checks.
+
+The audit strata combine module, recorded reason, scope and disposition.
+With `--sampling-base` the exporter uses the supplied measured strata
+to allocate fixed site quotas. Within each stratum it selects the lowest
+fixed-seed hashes of pinned source sites. Repeated stored links at a
+selected site contribute their multiplicity to the ratio estimate.
+Intervals use within-stratum variance and a finite-population correction
+on the number of sites. A bucket that cannot be sized from a sample is
+visible in the audit. The curated source labels distinguish local
+misses, library misses, legitimate ambiguity and unclassified sites.
+These estimates prioritise work. They do not add definite score credit.
 
 ### Recompute after a candidate run
 
@@ -186,8 +185,10 @@ node scripts/sweep/coverage.mjs --results /tmp/pymtheg-candidate-coverage.json \
 After a full run or subset overlay, `--scoreboard FILE` also writes the rates
 and per-repository table. For an archived baseline, pass only its breakdown
 as `--results`. The plan retains its prose and replaces the marked table and
-running totals. The candidate estimate reweights the labelled reference
-sample. Buckets with no remaining reference observations stay unclassified
-and are reported in the candidate scoreboard. A finished pin that lacked a
-baseline graph has measured strict coverage immediately. Refresh the sample
-to review the shapes in a materially changed corpus.
+running totals. The candidate estimate reweights the labelled reference sample in each
+matched link’s current bucket. The exporter records current reason, outcome
+and multiplicity. Buckets with no remaining reference observations are
+reported in the candidate scoreboard. A changed graph without matching
+reference observations contributes measured counts immediately. Item status
+tracks observed resolution or library identification at reference sites.
+Refresh the sample to review the shapes in a materially changed corpus.

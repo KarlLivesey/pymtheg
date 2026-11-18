@@ -6,8 +6,9 @@ import { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import { gunzipSync } from "node:zlib";
+import { cargoPathLocations, checkoutLocation, npmPathLocation, yarnArchivePackages } from "./coverage-locations.mjs";
 import { goMapKeyReader, typescriptShapes } from "./coverage-source.mjs";
-import { classify, columns, countLines, failedFamily, goImports, modules, packageName, repositoryScore,
+import { classify, columns, countLines, externalIdentity, failedFamily, goImports, modules, packageName, repositoryScore,
   reviewBucket, reviewQuotas, rustImports, rustPreludeMacros, rustPreludeTypes, sampleKey, sampleSize, sampleStratum, sourceScope, tsBindings, workspaceNames } from "./coverage-rules.mjs";
 
 const readJson = (name) => JSON.parse(name.endsWith(".gz") ? gunzipSync(readFileSync(name)) : readFileSync(name, "utf8"));
@@ -28,13 +29,14 @@ async function loadReaders(packageRoot) {
   return { ts: ts.default, go, rust, toml };
 }
 
-function projectEvidence(db, readers, files, paths, checkout) {
+function projectEvidence(db, readers, files, paths, symlinks, checkout) {
   const contexts = db.prepare("SELECT body FROM graph_contexts").all().map(({ body }) => JSON.parse(body));
   const tsPackages = new Set();
   const tsExternal = new Set();
   const tsAliasStrings = new Set();
   const tsManifests = new Map();
   const tsConfigs = new Map();
+  const cargoManifests = new Map();
   const rustLocal = new Set();
   const rustShadows = new Set();
   let explicitPrelude = false, opaqueMacroImports = false, noStd = false;
@@ -44,6 +46,7 @@ function projectEvidence(db, readers, files, paths, checkout) {
     if (context.status !== "clean") continue;
     if (context.path.endsWith("Cargo.toml")) {
       const doc = readers.toml.readToml(context.text);
+      if (doc) cargoManifests.set(context.path, doc);
       for (const name of [doc?.package?.name, doc?.lib?.name]) if (typeof name === "string") rustLocal.add(normalise(name));
     }
     if (context.path.endsWith("package.json")) {
@@ -51,13 +54,6 @@ function projectEvidence(db, readers, files, paths, checkout) {
         const doc = JSON.parse(context.text.replace(/^\ufeff/, ""));
         tsManifests.set(context.path, doc);
         if (typeof doc?.name === "string") tsPackages.add(doc.name);
-        for (const field of ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"]) {
-          for (const [name, value] of Object.entries(doc?.[field] ?? {})) {
-            if (typeof value !== "string") continue;
-            if (/^(?:file|link|workspace|portal):/.test(value)) tsPackages.add(name);
-            else tsExternal.add(name);
-          }
-        }
       } catch { /* An unreadable manifest establishes no package binding. */ }
     }
     if (/(?:ts|js)config[^/]*\.json$/.test(context.path)) {
@@ -78,13 +74,45 @@ function projectEvidence(db, readers, files, paths, checkout) {
   }
   const workspace = workspaceNames(tsManifests, pnpmFiles);
   for (const name of workspace) tsPackages.add(name);
+  const tracked = new Set([".", ...paths]);
+  for (const path of paths) {
+    for (let dir = posix.dirname(path); !tracked.has(dir); dir = posix.dirname(dir)) tracked.add(dir);
+  }
+  const tsLocations = new Map();
+  for (const [manifest, doc] of tsManifests) {
+    const directory = posix.dirname(manifest);
+    const local = new Map();
+    for (const field of ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"]) {
+      for (const [name, value] of Object.entries(doc?.[field] ?? {})) {
+        if (typeof value !== "string") continue;
+        const location = npmPathLocation(directory, value, tracked, symlinks) ??
+          (value.startsWith("workspace:") ? workspace.has(name) ? "inside" : "unclassified" : undefined);
+        if (location === undefined) tsExternal.add(name);
+        else local.set(name, local.has(name) && local.get(name) !== location ? "unclassified" : location);
+      }
+    }
+    if (local.size) tsLocations.set(directory, local);
+  }
+  const tsLocation = (file, name) => {
+    for (let dir = posix.dirname(file); ; dir = posix.dirname(dir)) {
+      const value = tsLocations.get(dir)?.get(name);
+      if (value || dir === ".") return value;
+    }
+  };
+  let tsArchiveUnknown = false;
+  for (const path of paths.filter((file) => /(?:^|\/)\.yarn\/cache\/[^/]+\.zip$/i.test(file))) {
+    const packages = yarnArchivePackages(join(checkout, path));
+    if (packages) for (const name of packages) tsPackages.add(name);
+    else tsArchiveUnknown = true;
+  }
   const rustContexts = readers.rust.crates(contexts, new Set(files.filter(({ module }) => module === "rust").map(({ path }) => path)));
+  const cargoLocations = cargoPathLocations(cargoManifests, tracked, symlinks);
   for (const crate of rustContexts) {
     const dir = posix.dirname(crate.manifest);
     const entries = rustByDirectory.get(dir) ?? new Map();
     for (const dependency of crate.dependencies ?? []) {
       const known = entries.get(dependency.name) ?? new Set();
-      const destination = dependency.manifest ? "inside"
+      const destination = dependency.manifest ? cargoLocations.get(dependency.manifest) ?? checkoutLocation(".", dependency.manifest, tracked, symlinks)
         : dependency.registryVersion || dependency.registryRequirement ? "outside" : "unclassified";
       known.add(destination === "outside" && dependency.packageName && rustLocal.has(normalise(dependency.packageName)) ? "unclassified" : destination);
       entries.set(dependency.name, known);
@@ -144,9 +172,10 @@ function projectEvidence(db, readers, files, paths, checkout) {
       ownerMemo.set(original, rustByDirectory.get(dir));
     }
     const options = ownerMemo.get(original)?.get(name);
-    return options?.size === 1 ? options.values().next().value : undefined;
+    return options?.size === 1 ? options.values().next().value : options?.size ? "unclassified" : undefined;
   };
-  return { tsPackages, workspace, tsConfigs, tsExternal, tsAliases: [...tsAliasStrings].map((pattern) => new RegExp(pattern)),
+  return { tsPackages, workspace, tsConfigs, tsExternal, tsLocation, tsArchiveUnknown,
+    tsAliases: [...tsAliasStrings].map((pattern) => new RegExp(pattern)),
     goModules, goDestinations, goExternal, vendoredGo, rustLocal, rustBindings,
     rustPrelude: (name, kind) => !explicitPrelude && !rustShadows.has(name) && !rustLocal.has(name) &&
       (kind === "macros" ? !opaqueMacroImports && (!noStd || !/^(?:e?print(?:ln)?|dbg|vec|format)$/.test(name))
@@ -178,6 +207,15 @@ function remember(samples, stratum, key, makeSample, limit) {
   entries.sort((a, b) => compare(a.key, b.key));
   if (entries.length > limit) entries.pop();
   samples.set(stratum, entries);
+}
+
+function addObservation(observations, identity, make) {
+  let entry = observations.get(identity);
+  if (!entry) {
+    entry = { ...make(), links: 0 };
+    observations.set(identity, entry);
+  }
+  entry.links++;
 }
 
 function sourceClues(source, at, names) {
@@ -230,7 +268,9 @@ function location(text, offset) {
 
 function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys) {
   const attempt = selectAttempt(scratch, repo);
-  const paths = readFileSync(join(attempt, "tree.out"), "utf8").split("\0")
+  const tree = readFileSync(join(attempt, "tree.out"), "utf8").split("\0");
+  const symlinks = new Set(tree.filter((item) => /^120000 blob /.test(item)).map((item) => item.slice(item.indexOf("\t") + 1)));
+  const paths = tree
     .filter((item) => /^100(?:644|755) blob /.test(item)).map((item) => item.slice(item.indexOf("\t") + 1));
   const db = new DatabaseSync(join(attempt, "checkout/.pymtheg/rebuildable/graph.sqlite"), { readOnly: true });
   try {
@@ -240,7 +280,7 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys) {
     const getFile = db.prepare(`SELECT json_extract(body,'$.text') AS text,
       json_extract(body,'$.result.diagnostics[0].message') AS reason,
       json_extract(body,'$.result.diagnostics[0].range.start') AS start FROM graph_files WHERE path=?`);
-    const getLinks = db.prepare("SELECT body,resolution,kind,module FROM graph_links WHERE file=?");
+    const getLinks = db.prepare("SELECT id,body,resolution,kind,module FROM graph_links WHERE file=?");
     const imports = db.prepare("SELECT body,resolution FROM graph_links WHERE file=? AND kind='imports'");
     const declared = db.prepare(`SELECT 1 AS present FROM graph_symbols WHERE name=? AND file=?
       AND json_extract(body,'$.kind') IN ('enum','struct','type','trait','class','interface','function','method') LIMIT 1`);
@@ -251,7 +291,8 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys) {
       json_extract(body,'$.data') AS data FROM graph_symbols WHERE name=? AND json_extract(body,'$.module')='go'`);
     const namesInModule = db.prepare(`SELECT name,file,json_extract(body,'$.kind') AS kind FROM graph_symbols
       WHERE name=? AND json_extract(body,'$.module')=? ORDER BY file,kind LIMIT 16`);
-    const candidateOf = db.prepare("SELECT file,name,kind FROM graph_symbols WHERE id=?");
+    const candidatesFor = db.prepare(`SELECT s.file,s.name,s.kind,json_extract(s.body,'$.identity') AS identity
+      FROM graph_candidates c JOIN graph_symbols s ON s.id=c.symbol WHERE c.link=? ORDER BY s.file,s.name,s.kind,identity`);
     const definitionMemo = new Map();
     const definitions = (name, module) => {
       const key = `${name}\0${module}`;
@@ -259,7 +300,7 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys) {
       return definitionMemo.get(key);
     };
     const capturedNames = new Map();
-    const project = projectEvidence(db, readers, files, paths, join(attempt, "checkout"));
+    const project = projectEvidence(db, readers, files, paths, symlinks, join(attempt, "checkout"));
     const goPackages = new Map(files.filter(({ module }) => module === "go").map((file) => [file.path, file.package]));
     const goAliasCache = new Map();
     const goAliasesFor = (file, rows) => {
@@ -324,7 +365,10 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys) {
     const counts = new Map();
     const samples = new Map();
     const strata = {};
+    const reviewSites = {};
+    const reviewOverlap = new Set();
     const workspaceMisses = new Map();
+    const librarySites = new Map();
     const omissions = new Map();
     const failed = new Map();
     const sourceFiles = new Map();
@@ -354,18 +398,30 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys) {
         failed.set(key, entry);
       }
       const records = imports.all(file.path).map(({ body, resolution }) => ({ ...JSON.parse(body), resolution }));
+      const tsRecordedBindings = new Set(records.filter((link) => !link.data?.specifier)
+        .map((link) => `${link.range?.start}:${link.targetName}`));
+      const tsRequires = new Set(records.filter((link) => link.data?.require && link.data?.specifier)
+        .map((link) => `${link.range?.start}:${link.data.specifier}`));
       let bindings;
       const tsSourceBindings = () => bindings ??= tsBindings(readers.ts, file.path, source);
       const shapes = quotas && file.module === "typescript" && file.status !== "failed" ?
         typescriptShapes(readers.ts, tsSourceBindings().source, tsSourceBindings().names) : undefined;
       const observedSites = new Set();
+      const reviewByBucket = new Map();
       const omittedCandidates = shapes?.omittedCandidates ?? [];
       const evidence = {
         goImports: file.module === "go" ? goAliasesFor(file.path, records) : new Map(),
+        goExplicitAliases: new Set(records.map((link) => link.data?.alias).filter(Boolean)),
         goReturned: (desc) => goReturned(file.path, desc),
         rustImports: file.module === "rust" ? rustImports(records) : new Map(),
         tsSpecifiers: new Set(records.map((link) => link.data?.specifier).filter(Boolean)),
         tsImports: () => tsSourceBindings().imports,
+        tsImportMember: (name) => {
+          const binding = tsSourceBindings().importMembers.get(name);
+          if (binding && (tsRecordedBindings.has(`${binding.start}:${binding.member}`) ||
+              binding.member === "*" && tsRequires.has(`${binding.start}:${binding.specifier}`))) return binding;
+          return undefined;
+        },
         tsSpecifierAt: (offset) => tsSourceBindings().specifiers.find(({ start, end }) => start <= offset && offset < end)?.value,
         tsPropertyRoot: (offset) => tsSourceBindings().propertyRoots.get(offset),
         tsLiteral: (offset) => tsSourceBindings().literalProperties.has(offset),
@@ -387,14 +443,16 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys) {
           }
         }
         const disposition = classify(link, evidence, project);
+        const library = externalIdentity(link, evidence, project, disposition);
         const tsExternal = link.module === "typescript" && link.resolution === "unresolved" && link.data?.reason === "external-package";
         const tsRoot = tsExternal ? /^(?:new\s+)?([\w$]+)(?:\??\.[\w$]+)?$/.exec(link.targetName)?.[1] : undefined;
         const specifier = tsExternal ? link.data?.specifier ?? (["imports", "exports"].includes(link.kind) ?
           evidence.tsSpecifierAt(link.range?.start) : evidence.tsImports().get(tsRoot)) : undefined;
         const workspaceName = specifier ? packageName(specifier) : undefined;
-        const sibling = workspaceName && project.workspace.has(workspaceName) ? workspaceName : undefined;
+        const sibling = workspaceName && project.workspace.has(workspaceName) &&
+          !["outside", "unclassified"].includes(project.tsLocation(file.path, workspaceName)) ? workspaceName : undefined;
         if (sibling) {
-          if (disposition === "outside") throw Error(`Workspace package classified outside at ${repo.id}/${file.path}`);
+          if (disposition === "outside" || library) throw Error(`Workspace package classified outside at ${repo.id}/${file.path}`);
           const row = workspaceMisses.get(sibling) ?? { name: sibling, links: 0, files: new Set(), examples: [] };
           row.links++;
           row.files.add(file.path);
@@ -405,26 +463,46 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys) {
           workspaceMisses.set(sibling, row);
         }
         const tuple = [link.module, link.kind, link.resolution, link.data?.reason ?? null, link.data?.uncertainty ?? null, scope, disposition];
-        const key = JSON.stringify(tuple);
+        const identity = [library?.level ?? null, library?.evidence ?? null, library?.gap ?? null];
+        const key = JSON.stringify([...tuple, ...identity]);
         const aggregate = counts.get(key);
         const blocked = Number(link.data?.blocked === true);
         if (aggregate) { aggregate[7]++; aggregate[8] += blocked; }
-        else counts.set(key, [...tuple, 1, blocked]);
+        else counts.set(key, [...tuple, 1, blocked, ...identity]);
+        if (library) {
+          const group = JSON.stringify([link.module, link.kind, library.level, library.evidence, library.gap]);
+          if (!librarySites.has(group)) {
+            librarySites.set(group, { module: link.module, kind: link.kind, file: file.path,
+              line: location(source, link.range?.start).line, ...library });
+          }
+        }
         const stratum = sampleStratum(link, disposition);
+        const bucket = stratum ? reviewBucket(stratum, scope, disposition) : null;
         const references = referenceFiles?.get(file.path);
         const rank = stratum || references ? sampleKey(repo, link) : null;
-        if (rank && references?.has(rank)) {
-          const previous = checks[rank];
-          // Identical source facts can occur twice. Credit a settled site
-          // only when every matching fact agrees.
-          const verdict = disposition === "outside" ? "outside" : link.resolution;
-          checks[rank] = previous && previous !== verdict ? "mixed" : verdict;
+        const state = library ? "outside" : link.resolution;
+        const matched = rank && references?.has(rank);
+        const verifiedCandidates = matched && state === "ambiguous" ? candidatesFor.all(row.id) : [];
+        const candidateKey = verifiedCandidates.length ? createHash("sha256").update(JSON.stringify(verifiedCandidates)).digest("hex") : null;
+        let site;
+        if (bucket) {
+          const ranks = reviewByBucket.get(bucket) ?? new Map();
+          if (!reviewByBucket.has(bucket)) reviewByBucket.set(bucket, ranks);
+          site = ranks.get(rank) ?? new Map();
+          if (!ranks.has(rank)) ranks.set(rank, site);
+          addObservation(site, JSON.stringify(library ?? state), () => ({ state, bucket, ...(library && { library }) }));
+        }
+        if (matched) {
+          const observations = checks[rank] ?? new Map();
+          if (!checks[rank]) checks[rank] = observations;
+          addObservation(observations, JSON.stringify([state, bucket, library, candidateKey]),
+            () => ({ state, bucket, ...(library && { library }), ...(candidateKey && { candidateKey }) }));
         }
         if (!stratum) continue;
         const population = `${stratum}:${scope}`;
         strata[population] = (strata[population] ?? 0) + 1;
-        const bucket = quotas ? reviewBucket(stratum, scope, disposition) : stratum;
-        remember(samples, bucket, rank, () => {
+        const sampleBucket = quotas ? bucket : stratum;
+        remember(samples, sampleBucket, rank, () => {
           const p = location(source, link.range?.start);
           const data = link.data ?? {};
           const propertyRoot = quotas && link.module === "typescript" ? evidence.tsPropertyRoot(link.range?.start) : undefined;
@@ -446,9 +524,11 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys) {
           for (const clue of clues) for (const [name] of clue.matchAll(/\b\w+\b/g)) used.add(name);
           const tsSite = quotas && link.module === "typescript" && link.kind === "calls" ?
             tsCallSite(readers.ts, tsSourceBindings().source, link.range) : undefined;
+          const candidates = quotas && state === "ambiguous" ? verifiedCandidates.length ?
+            verifiedCandidates : candidatesFor.all(row.id) : undefined;
           return { repo: repo.id, file: file.path, line: p.line, code: p.code, before: p.before,
             scope, kind: link.kind, disposition, target: link.targetName, reason: link.data?.reason ?? link.data?.uncertainty ?? null,
-            ...(quotas ? { stratum, binding, sibling, propertyRoot, offset: link.range?.start,
+            ...(quotas ? { stratum, binding, sibling, propertyRoot, offset: link.range?.start, observations: site,
               after: source.slice(link.range?.start ?? 0, (link.range?.start ?? 0) + 460),
               aliases: [...aliases].filter(([name]) => used.has(name)).map(([name, path]) => [name, path, origin(path)]),
               clues, tsSite,
@@ -462,7 +542,8 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys) {
               definitions: relevantNames.flatMap((name) => definitions(name, link.module)),
               goDefinitions: link.module === "go" ? goSampleDeclarations([...used].filter((name) => /^\w{2,65}$/.test(name)),
                 file.path, evidence.goImports) : undefined,
-              candidates: link.candidates?.slice(0, 12).map(({ id }) => candidateOf.get(id)).filter(Boolean),
+              candidates: candidates?.slice(0, 20), candidateCount: candidates?.length,
+              candidateKey: candidates?.length ? createHash("sha256").update(JSON.stringify(candidates)).digest("hex") : undefined,
               tsLocalBindings: link.module === "typescript" ? tsSourceBindings().names.get(targetRoot) : undefined,
               tsLiteralReceiver: link.module === "typescript" && evidence.tsLiteral(link.range?.start) || undefined } : {}),
             ...(type && declared.get(type, file.path) ? { declaredHere: true } : {}),
@@ -470,7 +551,19 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys) {
               ...(link.kind === "calls" && goFactory(file.path, expr, evidence.goImports) ? { factory: "inside" } : {}) } : {}),
             ...(link.module === "rust" ? { receiver: data.receiverType, method: data.method, impl: data.implType } : {}),
             ...(link.module === "typescript" ? { jsx: data.jsx, specifier: data.specifier ?? evidence.tsImports().get(targetRoot) } : {}) };
-        }, quotas?.get(bucket) ?? (quotas ? 0 : sampleSize(bucket)));
+        }, quotas?.get(sampleBucket) ?? (quotas ? 6 : sampleSize(sampleBucket)));
+      }
+      const strataBySite = new Map();
+      for (const [bucket, ranks] of reviewByBucket) {
+        const eligible = [...ranks.values()].filter((observations) =>
+          [...observations.values()].some(({ state }) => state !== "outside"));
+        reviewSites[bucket] = (reviewSites[bucket] ?? 0) + eligible.length;
+        for (const rank of ranks.keys()) {
+          const others = strataBySite.get(rank) ?? [];
+          for (const other of others) reviewOverlap.add(JSON.stringify([bucket, other].sort(compare)));
+          others.push(bucket);
+          strataBySite.set(rank, others);
+        }
       }
       if (goMapKeys && file.module === "go" && file.status !== "failed" && /\bmap\s*\[/.test(source)) {
         for (const site of goMapKeys(source)) {
@@ -501,12 +594,15 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys) {
         actual.inside + actual.outside + actual.unclassified !== warm.unresolved) throw Error(`Stored link totals disagree with released CLI for ${repo.id}`);
     return { audit: { id: repo.id, language: repo.language, commit: repo.commit, outcome: repo.outcome,
       trackedSource: repo.trackedSource, breakdown: rows, sourceFiles: [...sourceFiles.values()],
-      failedSources: [...failed.values()].map(({ examples, ...record }) => record), strata,
+      failedSources: [...failed.values()].map(({ examples, ...record }) => record), strata, reviewSites,
+      ...(reviewOverlap.size ? { reviewOverlap: [...reviewOverlap].sort(compare).map((key) => JSON.parse(key)) } : {}),
+      ...(librarySites.size ? { libraryExamples: [...librarySites.values()] } : {}),
       ...(omissions.size ? { sourceOmissions: [...omissions.values()] } : {}),
       ...(workspaceMisses.size ? { workspaceMisses: [...workspaceMisses.values()].map((row) => ({ ...row, files: row.files.size })) } : {}),
-      ...(referenceFiles ? { checks } : {}) },
+      ...(referenceFiles ? { checks: Object.fromEntries(Object.entries(checks).map(([key, facts]) => [key, [...facts.values()]])) } : {}) },
       failedExamples: [...failed.values()],
-      samples: Object.fromEntries(samples) };
+      samples: Object.fromEntries([...samples].map(([bucket, rows]) => [bucket, rows.map(({ observations, ...row }) =>
+        observations ? { ...row, observations: [...observations.values()] } : row)])) };
   } finally { db.close(); }
 }
 
@@ -520,7 +616,8 @@ if (!values.results || !values.scratch || !values.output) throw Error("Use --res
 const scratch = resolve(values.scratch);
 const output = resolve(values.output);
 const input = readJson(values.results);
-const quotas = values["sampling-base"] ? reviewQuotas(readJson(values["sampling-base"]).repos) : null;
+const basis = values["sampling-base"] ? readJson(values["sampling-base"]) : null;
+const quotas = basis ? basis.samplingQuotas ? new Map(Object.entries(basis.samplingQuotas)) : reviewQuotas(basis.repos) : null;
 if (values["include-failed"]) {
   const previous = readJson(values["include-failed"]);
   if (previous.release.integrity !== input.release.integrity || !input.release.integrity) {
@@ -544,6 +641,7 @@ if (values["reference-samples"]) {
 }
 const cacheVersion = createHash("sha256").update(readFileSync(new URL(import.meta.url)))
   .update(readFileSync(new URL("./coverage-rules.mjs", import.meta.url)))
+  .update(readFileSync(new URL("./coverage-locations.mjs", import.meta.url)))
   .update(readFileSync(new URL("./coverage-source.mjs", import.meta.url)))
   .update(JSON.stringify([...quotas ?? []]))
   .update(values["reference-samples"] ? readFileSync(values["reference-samples"]) : "").digest("hex");
@@ -573,11 +671,12 @@ for (const repo of input.repos) {
   if (samples["rust:failed-file-taint"]?.length) taintExamples[repo.id] = samples["rust:failed-file-taint"].slice(0, 5);
   repositories.push(audit);
   for (const [stratum, entries] of Object.entries(samples)) for (const { key, ...sample } of entries) {
-    remember(shortlist, stratum, key, () => sample, quotas?.get(stratum) ?? sampleSize(stratum));
+    remember(shortlist, stratum, key, () => sample, quotas?.get(stratum) ?? (quotas ? 6 : sampleSize(stratum)));
   }
 }
 const release = input.release;
-writeFileSync(output, ["{", '  "schema": "pymtheg.sweep.coverage/v1",', `  "columns": ${JSON.stringify(columns)},`,
+writeFileSync(output, ["{", '  "schema": "pymtheg.sweep.coverage/v2",', `  "columns": ${JSON.stringify(columns)},`,
+  ...(quotas ? [`  "samplingQuotas": ${JSON.stringify(Object.fromEntries(quotas))},`] : []),
   `  "release": ${JSON.stringify(release)},`, '  "repos": [',
   repositories.sort((a, b) => compare(a.id, b.id)).map((repo) => `    ${JSON.stringify(repo)}`).join(",\n"), "  ]", "}", ""].join("\n"));
 atomicJson(`${output}.samples.json`, Object.fromEntries([...shortlist].sort(([a], [b]) => compare(a, b))));

@@ -6,8 +6,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { aggregate, estimateCoverage, failedRustInfluence, interval, median } from "./coverage.mjs";
-import { classify, columns, goImports, repositoryScore, reviewQuotas, rustImports, sampleKey, sampleStratum, sourceScope, workspaceNames } from "./coverage-rules.mjs";
+import { aggregate, estimateCoverage, failedRustInfluence, median, stratumShare } from "./coverage.mjs";
+import { classify, columns, externalIdentity, goImports, libraryScore, repositoryScore, reviewQuotas, rustImports, sampleKey, sampleStratum, sourceScope, workspaceNames } from "./coverage-rules.mjs";
+
+import { cargoPathLocations, checkoutLocation, npmPathLocation, yarnArchivePackages } from "./coverage-locations.mjs";
 
 const project = {
   tsPackages: new Set(["@my/workspace"]), tsExternal: new Set(["react", "@my/workspace"]), tsAliases: [/@app\//],
@@ -53,8 +55,83 @@ test("excludes proved external paths and keeps vendoring, aliases and shadows di
   assert.equal(classifyLink("typescript", "../../outside.js", { specifier: "../../outside.js", reason: "missing-module" }, "imports"), "outside");
 });
 
+const linkRow = (module, outcome, disposition, count, scope = "source", level = null, encoding = null, gap = null, reason = null) =>
+  [module, "calls", outcome, reason, null, scope, disposition, count, 0, level, encoding, gap];
+const bucketFor = (reason) => `typescript:${reason}:source:unclassified`;
+const observed = (bucket, links = 1, state = "unresolved") => [{ bucket, links, state }];
+
+test("distinguishes named packages, named members, and unproved receivers", () => {
+  const external = (module, targetName, data, kind = "calls", details = evidence, location = project) => {
+    const link = { resolution: "unresolved", module, kind, file: "src/main", targetName, data };
+    return externalIdentity(link, details, location, classify(link, details, location));
+  };
+  assert.deepEqual(external("go", "strconv", { path: "strconv" }, "imports"),
+    { level: 1, unit: "strconv", evidence: "path", gap: "whole-unit" });
+  assert.deepEqual(external("go", "strconv.Quote", { expr: { ...selector("strconv").expr, n: "Quote" } }),
+    { level: 2, unit: "strconv", symbol: "Quote", evidence: "import-binding", gap: null });
+  assert.equal(external("go", "T", { t: { q: "vendor", n: "T" } }, "references"), null);
+  assert.equal(external("go", "len", { builtin: true }).gap, "intrinsic");
+  assert.deepEqual(external("rust", "std::fs::read", { pathSyntax: "std::fs::read" }),
+    { level: 2, unit: "std", symbol: "fs::read", evidence: "path", gap: null });
+  assert.equal(external("rust", "res.unwrap", { method: "unwrap" }), null);
+  assert.equal(external("rust", "res.unwrap", { method: "unwrap", receiverType: "std::result::Result", blocked: true }).level, 0);
+  assert.equal(external("rust", "res.unwrap", { method: "unwrap", receiverType: "std::result::Result" }).symbol, "result::Result::unwrap");
+  const binding = { ...evidence, tsImportMember: (name) => name === "run" ? { specifier: "node:child_process", member: "spawnSync" }
+    : name === "z" ? { specifier: "zod", member: "z" } : undefined };
+  const declared = { ...project, tsExternal: new Set(["zod"]) };
+  assert.equal(external("typescript", "run", { reason: "external-package" }, "calls", binding).symbol, "spawnSync");
+  assert.equal(external("typescript", "z.string", { reason: "external-package" }, "calls", binding, declared).symbol, "z.string");
+  assert.equal(external("typescript", "z.string", { reason: "external-package" }, "calls", binding,
+    { ...declared, tsPackages: new Set(["zod"]) }), null);
+  assert.equal(external("typescript", "foo", { reason: "external-package" }), null);
+});
+
+test("reads Yarn package membership and resolves dependency paths against the checkout", () => {
+  const scratch = mkdtempSync(join(tmpdir(), "coverage-locations-"));
+  try {
+    const name = Buffer.from("node_modules/@example/tool/package.json");
+    const directory = Buffer.alloc(46 + name.length);
+    directory.writeUInt32LE(0x02014b50);
+    directory.writeUInt16LE(name.length, 28);
+    name.copy(directory, 46);
+    const end = Buffer.alloc(22);
+    end.writeUInt32LE(0x06054b50);
+    end.writeUInt16LE(1, 8);
+    end.writeUInt16LE(1, 10);
+    end.writeUInt32LE(directory.length, 12);
+    const archive = join(scratch, "cached-package.zip");
+    writeFileSync(archive, Buffer.concat([directory, end]));
+    assert.deepEqual([...yarnArchivePackages(archive)], ["@example/tool"]);
+    const link = { resolution: "unresolved", module: "typescript", kind: "imports", file: "app/main.ts",
+      targetName: "@example/tool", data: { specifier: "@example/tool", reason: "external-package" } };
+    const cached = { ...project, tsPackages: yarnArchivePackages(archive), tsExternal: new Set(["@example/tool"]) };
+    assert.equal(classify(link, evidence, cached), "inside");
+    assert.equal(externalIdentity(link, evidence, cached, "inside"), null);
+    assert.equal(yarnArchivePackages(join(scratch, "missing.zip")), null);
+    const tracked = new Set(["shared", "app"]);
+    assert.equal(npmPathLocation(".", "file:../shared", tracked), "outside");
+    assert.equal(npmPathLocation("app", "file:../shared", tracked), "inside");
+    assert.equal(npmPathLocation("app", "file:/var/shared", tracked), "unclassified");
+    assert.equal(npmPathLocation(".", "file:linked/../shared", tracked, new Set(["linked"])), "unclassified");
+    assert.equal(checkoutLocation(".", "../shared/Cargo.toml", tracked), "outside");
+    assert.equal(checkoutLocation(".", "missing/Cargo.toml", tracked), "unclassified");
+    const cargoPaths = cargoPathLocations(new Map([["Cargo.toml", {
+      workspace: { dependencies: { shared: { path: "../shared" } } },
+      dependencies: { symlink: { path: "linked/../local" }, absolute: { path: "/other" } },
+    }]]), new Set(["local/Cargo.toml", "other/Cargo.toml"]), new Set(["linked"]));
+    assert.deepEqual([...cargoPaths], [["local/Cargo.toml", "unclassified"], ["other/Cargo.toml", "unclassified"],
+      ["../shared/Cargo.toml", "outside"]]);
+    assert.equal(classify(link, evidence, { ...project, tsLocation: () => "outside" }), "outside");
+    const rust = { ...link, module: "rust", targetName: "shared::work", data: {} };
+    assert.equal(externalIdentity(rust, evidence, { ...project, rustBindings: () => "outside" }, "outside").level, 2);
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
 test("raw and strict denominators use finished graphs only", () => {
-  const row = (outcome, disposition, count, scope = "source") => ["go", "calls", outcome, null, null, scope, disposition, count, 0];
+  const row = (outcome, disposition, count, scope = "source") => linkRow("go", outcome, disposition, count, scope,
+    ...(disposition === "outside" ? [1, "path", "whole-unit"] : []));
   const breakdown = [row("resolved", "eligible", 3), row("ambiguous", "eligible", 2), row("unresolved", "inside", 2),
     row("unresolved", "unclassified", 1), row("unresolved", "outside", 4, "bundle")];
   assert.deepEqual(repositoryScore(breakdown), { resolved: 3, ambiguous: 2, inside: 2, outside: 4, unclassified: 1,
@@ -81,6 +158,8 @@ test("tracks declared npm and pnpm siblings and honours exclusions", () => {
 
 test("artifact rules are explicit and sample keys survive graph ID changes", () => {
   assert.equal(sourceScope("pocketbase/pocketbase", "ui/dist/assets/file.js", "x()"), "bundle");
+  assert.equal(sourceScope("pocketbase/pocketbase", "ui/public/libs/uplot/uplot.iife.js", "x".repeat(900)), "bundle");
+  assert.equal(sourceScope("pocketbase/pocketbase", "ui/public/libs/readable.js", "x()"), "source");
   assert.equal(sourceScope("vitejs/vite", "src/SyntaxError.ts", "x()"), "source");
   assert.equal(sourceScope("vitejs/vite", "test/fixtures/SyntaxError.ts", "x()"), "broken-fixture");
   assert.equal(sourceScope("tauri-apps/tauri", "a/templates/plugin.rs", "{{#if a}}"), "template");
@@ -100,31 +179,58 @@ test("failed-file taint reserves links that also have a receiver reason", () => 
     ["rust", "calls", "unresolved", null, uncertainty, "source", "inside", 8, 5],
     ["rust", "calls", "unresolved", null, uncertainty, "source", "outside", 3, 1],
     ["rust", "calls", "unresolved", null, "receiver-type-unverified", "source", "unclassified", 2, 1],
-  ] }), { total: 11, eligible: 8, blocked: 6, receivers: 11, allBlocked: 7 });
+  ] }), { total: 11, eligible: 8, missing: 11, blocked: 6, receivers: 11, allBlocked: 7 });
 });
 
-test("estimated coverage removes sampled outside links and leaves dynamic and unknown links eligible", () => {
+test("observes full-denominator coverage and weights each sampled site by its links", () => {
   const breakdown = [
-    ["go", "calls", "resolved", null, null, "source", "eligible", 40, 0],
-    ["go", "calls", "unresolved", null, null, "source", "outside", 20, 0],
-    ["go", "calls", "unresolved", null, null, "source", "unclassified", 40, 0],
+    linkRow("go", "resolved", "eligible", 40),
+    linkRow("go", "unresolved", "outside", 7, "source", 2, "import-binding"),
+    linkRow("go", "unresolved", "outside", 3, "source", 1, "path", "whole-unit"),
+    linkRow("go", "unresolved", "outside", 10, "source", 0, null, "dependency"),
+    linkRow("go", "unresolved", "unclassified", 32),
+    linkRow("go", "ambiguous", "eligible", 8),
   ];
-  const repo = { id: "fixture/repo", language: "go", outcome: "finished", breakdown };
-  const samples = ["support", "outside", "dynamic", "unknown"].map((label, index) => ({
-    repo: repo.id, key: String(index), label, stratum: "go:empty", disposition: "unclassified", scope: "source",
-    ...(label === "support" || label === "outside" ? { item: label } : {}),
-  }));
-  const result = estimateCoverage([repo, { id: "fixture/unavailable", outcome: "wall-limit" }], samples, "go");
+  const missing = "go:empty:source:unclassified", options = "go:ambiguous:source:eligible";
+  const repo = { id: "fixture/repo", language: "go", outcome: "finished", breakdown, reviewSites: { [missing]: 8, [options]: 2 } };
+  const sample = (key, label, links, extra = {}) => ({ repo: repo.id, key, label, observations: observed(missing, links), ...extra });
+  const samples = [sample("inside", "support", 4, { item: "inside" }),
+    sample("outside", "outside", 1, { item: "outside" }), sample("dependency", "outside", 2, { horizon: "dependency" }),
+    sample("unknown", "unknown", 1),
+    sample("closed", "dynamic", 1, { observations: observed(options, 1, "ambiguous"), closed: "Both targets verified", candidateKey: "key" }),
+    sample("open", "dynamic", 1, { observations: observed(options, 1, "ambiguous") })];
+  const result = estimateCoverage([repo, { outcome: "wall-limit" }], samples, "go");
   assert.equal(result.measured.raw, 0.4);
   assert.equal(result.measured.adjusted, 0.5);
-  assert.equal(result.estimated, 40 / 70);
-  assert.equal(result.ceiling, 1 - 10 / 70);
-  assert.equal(result.unexplained, 1 / 3);
-  assert.equal(result.support.get("outside").outside, 10);
-  assert.equal(result.support.get("support").inside, 10);
-  assert.ok(result.range[0] < result.estimated && result.estimated < result.range[1]);
-  assert.deepEqual(interval(0, 0), [0, 1]);
-  assert.deepEqual([...reviewQuotas([repo])], [["go:empty:source:unclassified", 40]]);
+  assert.equal(result.measured.level1, 0.5);
+  assert.equal(result.measured.level2, 0.47);
+  assert.equal(result.closedCoverage, 0.51);
+  assert.equal(result.ceiling, 0.71);
+  assert.equal(result.dependency, 18);
+  assert.equal(result.support.get("outside").outside, 4);
+  assert.equal(result.support.get("inside").inside, 16);
+  assert.ok(result.intervals.dependency[0] <= result.dependency && result.intervals.dependency[1] >= result.dependency);
+  assert.equal(libraryScore(breakdown).neither, 10);
+  assert.deepEqual([...reviewQuotas([repo])], [[missing, 32], [options, 8]]);
+  const stats = stratumShare([{ links: 4, outside: 4 }, { links: 1, outside: 0 }], 4, "outside");
+  assert.equal(stats.share, .8);
+  assert.ok(Math.abs(stats.variance - .0512) < 1e-10);
+});
+
+test("a matched site changing only its recorded reason follows the current stratum", () => {
+  const old = bucketFor("no-symbol"), current = bucketFor("external-package");
+  const repo = { id: "fixture/repo", language: "typescript", outcome: "finished", reviewSites: { [old]: 16 },
+    breakdown: [linkRow("typescript", "resolved", "eligible", 48), linkRow("typescript", "unresolved", "unclassified", 16, "source", null, null, null, "no-symbol")] };
+  const sample = { repo: repo.id, key: "same", label: "outside", item: "identify", observations: observed(old) };
+  const candidate = { ...repo, reviewSites: { [current]: 16 },
+    breakdown: [repo.breakdown[0], linkRow("typescript", "unresolved", "unclassified", 16, "source", null, null, null, "external-package")],
+    checks: { same: observed(current) } };
+  const before = estimateCoverage([repo], [sample], "typescript");
+  const after = estimateCoverage([candidate], [sample], "typescript");
+  assert.equal(before.measured.level2, 0.75);
+  assert.equal(after.measured.level2, before.measured.level2);
+  assert.equal(after.support.get("identify").outside, before.support.get("identify").outside);
+  assert.equal(after.unaudited, 0);
 });
 
 test("candidate overlay rewrites the plan only for matched evidence", () => {
@@ -132,15 +238,15 @@ test("candidate overlay rewrites the plan only for matched evidence", () => {
   try {
     const repo = { id: "fixture/repo", commit: "a".repeat(40), language: "go", outcome: "finished",
       sourceFiles: [{ module: "go", scope: "source", readableLines: 10 }], failedSources: [],
-      strata: { "go:empty:source": 2 }, breakdown: [["go", "calls", "unresolved", null, null, "source", "unclassified", 2, 0]] };
-    const packet = (repos) => ({ schema: "pymtheg.sweep.coverage/v1", release: { package: "fixture" }, columns, repos });
+      reviewSites: { "go:empty:source:unclassified": 2 }, breakdown: [linkRow("go", "unresolved", "unclassified", 2)] };
+    const packet = (repos) => ({ schema: "pymtheg.sweep.coverage/v2", release: { package: "fixture" }, columns, repos });
     const base = packet([repo, { id: "fixture/other", commit: "b".repeat(40), language: "rust", outcome: "wall-limit" }]);
-    const candidate = packet([{ ...repo, checks: { known: "resolved" }, strata: { "go:empty:source": 1 }, breakdown: [
-      ["go", "calls", "resolved", null, null, "source", "eligible", 1, 0],
-      ["go", "calls", "unresolved", null, null, "source", "unclassified", 1, 0],
-    ] }, { ...base.repos[1], outcome: "finished", sourceFiles: [], failedSources: [], strata: {}, breakdown: [
-      ["rust", "calls", "resolved", null, null, "source", "eligible", 2, 0],
-      ["rust", "calls", "unresolved", null, null, "source", "unclassified", 3, 0],
+    const candidate = packet([{ ...repo, checks: { known: observed(null, 1, "resolved"), missing: observed("go:empty:source:unclassified") }, reviewSites: { "go:empty:source:unclassified": 1 }, breakdown: [
+      linkRow("go", "resolved", "eligible", 1),
+      linkRow("go", "unresolved", "unclassified", 1),
+    ] }, { ...base.repos[1], outcome: "finished", sourceFiles: [], failedSources: [], reviewSites: { "rust:empty:source:unclassified": 3 }, breakdown: [
+      linkRow("rust", "resolved", "eligible", 2),
+      linkRow("rust", "unresolved", "unclassified", 3),
     ] }]);
     const put = (filename, data) => {
       const file = join(scratch, filename);
@@ -148,10 +254,10 @@ test("candidate overlay rewrites the plan only for matched evidence", () => {
       return file;
     };
     const example = { repo: repo.id, file: "main.go", line: 2, code: "work()" };
-    const item = { id: "calls", module: "go", title: "Resolve local calls", examples: [example, { ...example, line: 5 }] };
+    const item = { id: "calls", module: "go", kind: "inside", title: "Resolve local calls", examples: [example, { ...example, line: 5 }] };
     const items = put("items.json", { items: [item] });
     const samples = put("samples.json", { samples: ["known", "missing"].map((key) => ({ key, item: "calls", repo: repo.id,
-      label: "support", basis: "Checked-in call", stratum: "go:empty", disposition: "unclassified", scope: "source" })) });
+      label: "support", observations: observed("go:empty:source:unclassified"), basis: "Checked-in call", stratum: "go:empty", disposition: "unclassified", scope: "source" })) });
     const plan = put("plan.md", "Before.\n<!-- sweep:coverage:start -->\nold\n<!-- sweep:coverage:end -->\nAfter.\n");
     const scoreboard = join(scratch, "score.md");
     execFileSync(process.execPath, [fileURLToPath(new URL("./coverage.mjs", import.meta.url)), "--results", put("candidate.json", candidate),
@@ -164,6 +270,12 @@ test("candidate overlay rewrites the plan only for matched evidence", () => {
     const report = readFileSync(scoreboard, "utf8");
     assert.match(report, /- \[x\] fixture\/other · wall-limit · finished/);
     assert.match(report, /\| All files \| Rust \| 1 \| 40\.00% \| 40\.00%/);
+
+    delete candidate.repos[0].checks;
+    execFileSync(process.execPath, [fileURLToPath(new URL("./coverage.mjs", import.meta.url)), "--results", put("candidate.json", candidate),
+      "--base", put("base.json", base), "--plan", plan, "--scoreboard", scoreboard, "--items", items, "--samples", samples]);
+    assert.doesNotMatch(readFileSync(plan, "utf8"), /reference sites settled/);
+    assert.match(readFileSync(scoreboard, "utf8"), /\| Go \| 0 \| 1 \|/);
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }

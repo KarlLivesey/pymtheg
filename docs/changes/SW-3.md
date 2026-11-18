@@ -1,15 +1,20 @@
-# SW-3: a coverage scoreboard and support plan
+# SW-3: coverage for checkout and library links
 
-The sweep exports every stored link outcome and its reason. Completion has
-its own checklist. Coverage uses measured links from finished checkouts,
-with separate figures for bundles, broken fixtures and templates.
+The sweep exports all stored link outcomes and reasons from the finished
+graphs. Completion has its own seven-repository checklist. The coverage
+score counts definite checkout targets and named library symbols over all
+links. It also shows unit-level coverage, strict-inside and raw scores,
+and an estimate that would credit verified closed candidate sets.
 
-The source audit estimates how many remaining links target outside code,
-how many need new support, and how many are ambiguous at run time. The plan
-reports the raw score, the conservative strict score and a sample-corrected
-score with an interval. It ranks support items by how much strict coverage
-could improve in each language.
+The source audit weights sites by the number of stored links at each site.
+The support plan separates inside-target work from library identification
+and estimates the cases that need dependency declarations. The report
+keeps bundles, fixtures and templates visible.
 
-The runner accepts a local build and can refresh a subset of the pinned
-corpus. The progress script recomputes completion, coverage, and the
-support tables after a candidate run.
+A path dependency is checked against the checkout boundary. Tracked Yarn
+cache archives can establish that a dependency is present. The plan keeps
+runtime dispatch separate from opportunities to identify a definite target.
+
+A candidate build can refresh any subset of the pinned corpus. The progress
+script uses the current bucket of each matched site and recomputes the
+coverage scores, support points and completion checklist.

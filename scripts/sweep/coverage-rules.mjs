@@ -7,7 +7,8 @@ export const modules = ["go", "rust", "typescript"];
 export const scopes = ["source", "bundle", "broken-fixture", "template"];
 export const outcomes = ["resolved", "ambiguous", "unresolved"];
 export const dispositions = ["eligible", "outside", "inside", "unclassified"];
-export const columns = ["module", "kind", "outcome", "reason", "uncertainty", "scope", "disposition", "count", "blocked"];
+export const columns = ["module", "kind", "outcome", "reason", "uncertainty", "scope", "disposition", "count", "blocked",
+  "externalLevel", "externalEvidence", "externalGap"];
 export const sampleSeed = 0x7c8a59bd2e41;
 export const sampleSize = (stratum) => ["go:empty", "rust:empty", "rust:receiver", "typescript:no-symbol"].includes(stratum) ? 96 : 32;
 const standardGo = new Set(`archive bufio bytes cmp compress container context crypto database debug embed encoding errors expvar flag fmt go hash html image index io iter log maps math mime net os path plugin reflect regexp runtime slices sort strconv strings sync syscall testing text time unicode unique unsafe weak`.split(" "));
@@ -69,9 +70,9 @@ export const rustTaint = (reason, uncertainty) => [reason, uncertainty].some((va
 
 export function sourceScope(repo, file, text) {
   if (repo === "golang/tools" && knownInvalidGo.has(file)) return "broken-fixture";
-  if ((/\.(?:m?js|cjs)$/.test(file) && /(?:^|\/)dist\//.test(file) &&
-       (/\.min\./.test(file) || /[^\n]{900}/.test(text) ||
-        (repo === "pocketbase/pocketbase" && file.startsWith("ui/dist/")))) || /\.min\.(?:m?js|cjs)$/.test(file)) {
+  if (/\.(?:m?js|cjs)$/.test(file) && (/\.min\./.test(file) ||
+      /(?:^|\/)(?:dist|public\/libs|static)\//.test(file) && /[^\n]{900}/.test(text) ||
+      repo === "pocketbase/pocketbase" && file.startsWith("ui/dist/"))) {
     return "bundle";
   }
   if ((repo === "tauri-apps/tauri" && file.includes("/templates/") && /\{\{/.test(text)) ||
@@ -147,6 +148,7 @@ export function tsBindings(ts, file, text) {
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
   const names = new Map();
   const imports = new Map();
+  const importMembers = new Map();
   const specifiers = [];
   const propertyRoots = new Map();
   const literalProperties = new Set();
@@ -154,11 +156,14 @@ export function tsBindings(ts, file, text) {
   const rememberSpecifier = (node, value) => {
     if (value) specifiers.push({ start: node.getStart(source), end: node.end, value });
   };
-  const bind = (name, specifier) => {
+  const bind = (name, specifier, member, declaration = name) => {
     if (!name) return;
     if (ts.isIdentifier(name)) {
       names.set(name.text, (names.get(name.text) ?? 0) + 1);
-      if (specifier) imports.set(name.text, specifier);
+      if (specifier) {
+        imports.set(name.text, specifier);
+        if (member !== undefined) importMembers.set(name.text, { specifier, member, start: declaration.getStart(source) });
+      }
     } else if (ts.isObjectBindingPattern(name) || ts.isArrayBindingPattern(name)) {
       for (const item of name.elements) if (ts.isBindingElement(item)) bind(item.name, specifier);
     }
@@ -177,15 +182,17 @@ export function tsBindings(ts, file, text) {
       const { importClause: clause, moduleSpecifier } = node;
       const specifier = node.parent === source ? moduleSpecifier.text : undefined;
       rememberSpecifier(node, specifier);
-      bind(clause?.name, specifier);
+      bind(clause?.name, specifier, "default");
       const bindings = clause?.namedBindings;
-      if (bindings && ts.isNamespaceImport(bindings)) bind(bindings.name, specifier);
-      else for (const element of bindings?.elements ?? []) bind(element.name, specifier);
+      if (bindings && ts.isNamespaceImport(bindings)) bind(bindings.name, specifier, "*", bindings);
+      else for (const element of bindings?.elements ?? []) {
+        bind(element.name, specifier, (element.propertyName ?? element.name).text, element);
+      }
     } else if (ts.isImportEqualsDeclaration(node)) {
       const ref = node.moduleReference;
       const specifier = node.parent === source && ts.isExternalModuleReference(ref) && ref.expression && ts.isStringLiteralLike(ref.expression) ? ref.expression.text : undefined;
       rememberSpecifier(node, specifier);
-      bind(node.name, specifier);
+      bind(node.name, specifier, "*", node.name);
     } else if (ts.isExportDeclaration(node) && node.parent === source && node.moduleSpecifier && ts.isStringLiteralLike(node.moduleSpecifier)) {
       rememberSpecifier(node, node.moduleSpecifier.text);
     } else if (ts.isVariableDeclaration(node)) {
@@ -194,7 +201,7 @@ export function tsBindings(ts, file, text) {
         call && ts.isCallExpression(call) && ts.isIdentifier(call.expression) &&
         call.expression.text === "require" && call.arguments.length === 1 && ts.isStringLiteralLike(call.arguments[0]) ? call.arguments[0] : undefined;
       // Require bindings enter through an actual graph import, checked by caller.
-      bind(node.name, literal?.text);
+      bind(node.name, literal?.text, "*", literal);
     } else if (ts.isParameter(node) || ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node) ||
         ts.isClassDeclaration(node) || ts.isClassExpression(node) || ts.isEnumDeclaration(node) ||
         ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node) || ts.isTypeParameterDeclaration(node) ||
@@ -203,6 +210,7 @@ export function tsBindings(ts, file, text) {
   };
   visit(source);
   return { source, unsafe, names, specifiers, propertyRoots, literalProperties,
+    importMembers: unsafe ? new Map() : new Map([...importMembers].filter(([name]) => names.get(name) === 1)),
     imports: unsafe ? new Map() : new Map([...imports].filter(([name]) => names.get(name) === 1)) };
 }
 
@@ -234,9 +242,12 @@ function tsPath(path, project, file) {
   if (/^\.{1,2}(?:\/|$)|^[#/]/.test(path)) return "inside";
   const pkg = packageName(path);
   if (!pkg) return "unclassified";
-  if (project.tsPackages.has(pkg)) return "inside";
+  const location = project.tsLocation?.(file, pkg);
+  if (location === "inside") return "inside";
+  if (project.tsPackages.has(pkg)) return location ? "unclassified" : "inside";
   if (project.tsAliases.some((match) => match.test(path))) return "unclassified";
-  if (isBuiltin(path) || project.tsExternal.has(pkg)) return "outside";
+  if (location) return location;
+  if (isBuiltin(path) || !project.tsArchiveUnknown && project.tsExternal.has(pkg)) return "outside";
   return "unclassified";
 }
 
@@ -275,7 +286,7 @@ function rustDisposition(path, project, file) {
   if (!name) return "unclassified";
   if (["self", "Self", "super", "crate"].includes(name)) return "inside";
   const bindings = project.rustBindings(file, name);
-  if (bindings === "inside") return "inside";
+  if (bindings === "inside" || bindings === "unclassified") return bindings;
   if (project.rustLocal.has(canonicalCrate(name))) return "unclassified";
   if (standardRust.has(name) || bindings === "outside") return "outside";
   return "unclassified";
@@ -315,6 +326,135 @@ export function classify(link, evidence, project) {
   return "unclassified";
 }
 
+export const externalEvidenceKinds = ["path", "import-binding", "typed-receiver", "reference-directive"];
+export const externalGapKinds = ["whole-unit", "intrinsic", "dependency", "unknown",
+  "go-external-result", "rust-std-path", "rust-std-receiver", "ts-runtime"];
+const identifier = /^[\w$]+$/;
+const rustNamePath = /^(?:::)?\w+(?:::\w+)*$/;
+
+function identified(unit, symbol, evidence) {
+  return symbol
+    ? { level: 2, unit, symbol, evidence, gap: null }
+    : { level: 1, unit, evidence, gap: "whole-unit" };
+}
+
+function goExternalIdentity(link, evidence, project) {
+  const { data = {}, file, kind, targetName } = link;
+  const external = (path) => goImport(path, project, file) === "outside";
+  if (kind === "imports") {
+    const path = data.path ?? targetName;
+    return external(path) ? identified(path, null, "path") : null;
+  }
+  const packageOf = (alias) => {
+    const path = evidence.goImports.get(alias);
+    // The path basename does not establish a third-party package's declared
+    // name. The stored explicit alias or the standard package spelling does.
+    return path && external(path) && (evidence.goExplicitAliases?.has(alias) ||
+      standardGo.has(path.split("/")[0])) ? path : null;
+  };
+  if (data.t?.q && identifier.test(data.t.n ?? "")) {
+    const path = packageOf(data.t.q);
+    if (path) return identified(path, data.t.n, "import-binding");
+  }
+  const expr = data.expr?.k === "inst" ? data.expr.x : data.expr;
+  if (expr?.k !== "sel" || !identifier.test(expr.n ?? "")) return null;
+  const receiver = expr.x;
+  if (receiver?.k === "name") {
+    const path = packageOf(receiver.n);
+    if (path) return identified(path, expr.n, "import-binding");
+  }
+  if (receiver?.k === "val") {
+    const path = packageOf(receiver.t?.q);
+    if (goConcrete.get(path)?.has(receiver.t.n)) {
+      return identified(path, receiver.t.n + "." + expr.n, "typed-receiver");
+    }
+  }
+  return null;
+}
+
+function rustExternalIdentity(link, evidence, project) {
+  const { data = {}, file, kind, targetName } = link;
+  const externalPath = (path, via, method) => {
+    const glob = path?.endsWith("::*");
+    const literal = glob ? path.slice(0, -3) : path;
+    if (!rustNamePath.test(literal ?? "") || rustDisposition(literal, project, file) !== "outside") return null;
+    const [unit, ...parts] = literal.replace(/^::/, "").split("::");
+    if (method) parts.push(method);
+    return identified(glob ? literal : unit, glob ? null : parts.join("::"), via);
+  };
+  if (kind === "imports" || data.externCrate) return externalPath(targetName, "path");
+  if (data.blocked || data.stdFallbackBlocked || data.stdFallbackConditional || data.stdFallbackReceiverUnknown) return null;
+  if (kind === "calls" && data.method) {
+    if (!rustNamePath.test(data.receiverType ?? "") || !identifier.test(data.method)) return null;
+    const receiver = data.receiverType;
+    const aliased = evidence.rustImports.get(receiver);
+    // A method name alone is insufficient. The graph must name the receiver's
+    // type, either with its crate path or with a recorded import binding.
+    return receiver.includes("::") || aliased ? externalPath(aliased ?? receiver, "typed-receiver", data.method) : null;
+  }
+  if (!["calls", "types", "values", "macros", "patterns", "implements"].includes(kind)) return null;
+  const path = data.pathSyntax ?? targetName;
+  if (!rustNamePath.test(path)) return null;
+  const [head, ...parts] = path.replace(/^::/, "").split("::");
+  const alias = !path.startsWith("::") && evidence.rustImports.get(head);
+  if (alias) return externalPath([alias, ...parts].join("::"), "import-binding");
+  if (parts.length && !evidence.rustImports.has(head)) return externalPath(path, "path");
+  return null;
+}
+
+function tsExternalIdentity(link, evidence, project, disposition) {
+  const { data = {}, file, kind, targetName, range } = link;
+  const external = (specifier) => tsPath(specifier, project, file) === "outside";
+  if (data.specifier && external(data.specifier)) return identified(data.specifier, null, "path");
+  if (disposition === "outside" && ["lib", "types"].includes(data.reference)) {
+    return identified(data.reference === "lib" ? "typescript/lib/" + targetName : "@types/" + targetName,
+      null, "reference-directive");
+  }
+  if (["dynamic-scope", "computed-specifier", "invalid-code"].includes(data.reason)) return null;
+  if (["imports", "exports"].includes(kind)) {
+    const path = evidence.tsSpecifierAt?.(range?.start);
+    if (evidence.tsSpecifiers.has(path) && external(path)) {
+      return identified(path, identifier.test(targetName) ? targetName : null, "import-binding");
+    }
+    // An import binding's stored span must select the enclosing declaration.
+    // Falling back to a same-named binding could pick the preceding import.
+    return null;
+  }
+  const name = tsGlobalHead(targetName);
+  const binding = name && evidence.tsImportMember?.(name);
+  if (!binding || !external(binding.specifier)) return null;
+  const suffix = targetName.replace(/^new\s+/, "").replaceAll("?.", ".").split(".").slice(1);
+  const path = [binding.member === "*" ? null : binding.member, ...suffix].filter(Boolean);
+  return identified(binding.specifier, path.join("."), "import-binding");
+}
+
+/** Identity already expressible using the released link and its stored facts. */
+export function externalIdentity(link, evidence, project, disposition) {
+  if (link.resolution !== "unresolved") return null;
+  const data = link.data ?? {};
+  if (["local", "invalid-code", "unresolved-alias", "target-unavailable"].includes(data.reason) ||
+      data.uncertainty?.split("; ").includes("invalid-code")) return null;
+  const observed = link.module === "go" ? goExternalIdentity(link, evidence, project)
+    : link.module === "rust" ? rustExternalIdentity(link, evidence, project)
+      : tsExternalIdentity(link, evidence, project, disposition);
+  if (observed || disposition !== "outside") return observed;
+  let gap = "unknown";
+  if (link.module === "go") {
+    if (data.builtin) gap = "intrinsic";
+    else if (goPath(link, evidence.goImports)) gap = "dependency";
+    else if (data.expr) gap = "go-external-result";
+  }
+  if (link.module === "rust" && !data.blocked && !data.stdFallbackReceiverUnknown) {
+    if (data.method) gap = "rust-std-receiver";
+    else if (["types", "macros"].includes(link.kind)) gap = "rust-std-path";
+  }
+  if (link.module === "typescript") {
+    if (data.reason === "external") gap = "ts-runtime";
+    else if (tsSpecifier(link, evidence)) gap = "dependency";
+  }
+  return { level: 0, evidence: null, gap };
+}
+
 export function sampleStratum(link, disposition) {
   if (disposition === "outside" || link.resolution === "resolved") return null;
   if (link.resolution === "ambiguous") return `${link.module}:ambiguous`;
@@ -338,7 +478,8 @@ export function reviewPopulation(repos) {
   const population = new Map();
   for (const repo of repos) {
     if (repo.outcome !== "finished") continue;
-    for (const [module, , resolution, reason, uncertainty, scope, disposition, count] of repo.breakdown) {
+    for (const [module, , resolution, reason, uncertainty, scope, disposition, count, , level] of repo.breakdown) {
+      if (level != null) continue;
       const stratum = sampleStratum({ module, resolution, data: { reason, uncertainty } }, disposition);
       if (!stratum) continue;
       const key = reviewBucket(stratum, scope, disposition);
@@ -374,4 +515,25 @@ export function repositoryScore(rows, filter = () => true) {
   const eligible = counts.resolved + counts.ambiguous + counts.inside + counts.unclassified;
   const total = eligible + counts.outside;
   return { ...counts, eligible, total, adjusted: eligible ? counts.resolved / eligible : null, raw: total ? counts.resolved / total : null };
+}
+
+export function libraryScore(rows, filter = () => true) {
+  const score = repositoryScore(rows, filter);
+  const levels = [0, 0, 0];
+  const gaps = new Map();
+  for (const [module, kind, , , , scope, , count, , level, , gap] of rows) {
+    if (level == null || !filter(module, scope, kind)) continue;
+    levels[level] += count;
+    if (gap) gaps.set(gap, (gaps.get(gap) ?? 0) + count);
+  }
+  const [neither, unitOnly, symbol] = levels;
+  const identifiedUnit = unitOnly + symbol;
+  const provenOutside = neither + identifiedUnit;
+  const strictDenominator = score.total - provenOutside;
+  return {
+    ...score, neither, unitOnly, symbol, identifiedUnit, provenOutside, gaps,
+    adjusted: strictDenominator ? score.resolved / strictDenominator : null,
+    level1: score.total ? (score.resolved + identifiedUnit) / score.total : null,
+    level2: score.total ? (score.resolved + symbol) / score.total : null,
+  };
 }

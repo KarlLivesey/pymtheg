@@ -4,6 +4,7 @@
       "id": "go-container",
       "module": "go",
       "title": "Use the element type of slices, maps and ranged values for member links",
+      "kind": "inside",
       "examples": [
         {
           "repo": "golang/tools",
@@ -22,26 +23,28 @@
     {
       "id": "go-external-fields",
       "module": "go",
-      "title": "Trace dependency types through Go fields and embedded members",
+      "title": "Identify Go library members reached through fields and embedding",
+      "kind": "library",
       "examples": [
+        {
+          "repo": "cli/cli",
+          "file": "script/ghmock/schemacmd.go",
+          "line": 321,
+          "code": "if schema.Value != nil {"
+        },
         {
           "repo": "cockroachdb/pebble",
           "file": "version_set_test.go",
           "line": 307,
           "code": "defer buf.Mutex.Unlock()"
-        },
-        {
-          "repo": "gofiber/fiber",
-          "file": "middleware/csrf/cross_origin_test.go",
-          "line": 243,
-          "code": "ctx.Request.Header.SetMethod(fiber.MethodPost)"
         }
       ]
     },
     {
       "id": "go-external-import",
       "module": "go",
-      "title": "Trace package-qualified selectors to dependencies outside the checkout",
+      "title": "Identify Go library symbols through package-qualified selectors",
+      "kind": "library",
       "examples": [
         {
           "repo": "golang/tools",
@@ -60,7 +63,8 @@
     {
       "id": "go-external-result",
       "module": "go",
-      "title": "Trace methods and fields on concrete standard or dependency results",
+      "title": "Identify Go library methods on results and typed receivers",
+      "kind": "library",
       "examples": [
         {
           "repo": "samber/lo",
@@ -77,21 +81,43 @@
       ]
     },
     {
-      "id": "go-factory",
+      "id": "go-external-targets",
       "module": "go",
-      "title": "Follow results of functions and methods in checked-in packages",
+      "title": "Make Go library targets first-class graph nodes",
+      "kind": "library",
+      "representation": true,
       "examples": [
         {
           "repo": "cli/cli",
-          "file": "script/ghmock/schemacmd.go",
-          "line": 321,
-          "code": "if schema.Value != nil {"
+          "file": "pkg/cmd/agent-task/view/view_test.go",
+          "line": 768,
+          "code": "capiStubs: func(t *testing.T, m *capi.CapiClientMock) {"
         },
         {
-          "repo": "pocketbase/pocketbase",
-          "file": "core/db_table.go",
-          "line": 14,
-          "code": "err := app.ConcurrentDB().NewQuery(\"SELECT name FROM PRAGMA_TABLE_INFO({:tableName})\")."
+          "repo": "evanw/esbuild",
+          "file": "internal/compat/compat_test.go",
+          "line": 74,
+          "code": "t.Run(fmt.Sprintf(\"%q ? %q\", at, bt), func(t *testing.T) {"
+        }
+      ]
+    },
+    {
+      "id": "go-factory",
+      "module": "go",
+      "title": "Follow checked-in Go return types to local method or field targets",
+      "kind": "inside",
+      "examples": [
+        {
+          "repo": "cilium/ebpf",
+          "file": "link/perf_event.go",
+          "line": 275,
+          "code": "return fd.File(\"perf-event\")"
+        },
+        {
+          "repo": "restic/restic",
+          "file": "internal/archiver/scanner_test.go",
+          "line": 87,
+          "code": "defer back()"
         }
       ]
     },
@@ -99,6 +125,7 @@
       "id": "go-fields",
       "module": "go",
       "title": "Resolve fields of local structs, including embedded and anonymous fields",
+      "kind": "inside",
       "examples": [
         {
           "repo": "cockroachdb/pebble",
@@ -132,7 +159,8 @@
           "line": 11,
           "code": "func _(ptr *sync.Mutex) {"
         }
-      ]
+      ],
+      "kind": "inside"
     },
     {
       "id": "go-file-go-grammar",
@@ -152,12 +180,14 @@
           "line": 116,
           "code": "_ = (*struct{ J }).method"
         }
-      ]
+      ],
+      "kind": "inside"
     },
     {
       "id": "go-generated",
       "module": "go",
       "title": "Use package identity and build variants for generated Go declarations",
+      "kind": "inside",
       "examples": [
         {
           "repo": "protocolbuffers/protobuf-go",
@@ -177,6 +207,7 @@
       "id": "go-interface",
       "module": "go",
       "title": "Match declared implementation relations using local Go method sets",
+      "kind": "inside",
       "examples": [
         {
           "repo": "protocolbuffers/protobuf-go",
@@ -196,6 +227,7 @@
       "id": "go-local-method",
       "module": "go",
       "title": "Resolve a method on a concrete local receiver or checked-in field",
+      "kind": "inside",
       "examples": [
         {
           "repo": "cli/cli",
@@ -204,10 +236,10 @@
           "code": "pm.RegisterConfirm(\"Is this a prerelease?\", func(_ string, _ bool) (bool, error) {"
         },
         {
-          "repo": "restic/restic",
-          "file": "internal/archiver/exclude.go",
-          "line": 123,
-          "code": "if fs.Base(filename) == tagFilename {"
+          "repo": "protocolbuffers/protobuf-go",
+          "file": "internal/reflection_test/reflection_hybrid_test.go",
+          "line": 427,
+          "code": "return m.GetMapSfixed32Sfixed32()"
         }
       ]
     },
@@ -215,6 +247,7 @@
       "id": "go-pointer-conversion",
       "module": "go",
       "title": "Link Go pointer conversions to their checked-in type declarations",
+      "kind": "inside",
       "examples": [
         {
           "repo": "cockroachdb/pebble",
@@ -233,7 +266,8 @@
     {
       "id": "go-stdlib",
       "module": "go",
-      "title": "Recognize standard packages in type references and signatures",
+      "title": "Identify standard Go packages and symbols in type references",
+      "kind": "library",
       "examples": [
         {
           "repo": "cli/cli",
@@ -253,6 +287,7 @@
       "id": "go-type-parameter",
       "module": "go",
       "title": "Anchor Go type-parameter conversions to their local constraint declarations",
+      "kind": "inside",
       "examples": [
         {
           "repo": "cockroachdb/pebble",
@@ -272,6 +307,7 @@
       "id": "go-typed-reference",
       "module": "go",
       "title": "Resolve named Go types and package members across files and local modules",
+      "kind": "inside",
       "examples": [
         {
           "repo": "golang/tools",
@@ -280,10 +316,10 @@
           "code": "case edge.CallExpr_Args:"
         },
         {
-          "repo": "cilium/ebpf",
-          "file": "prog_test.go",
-          "line": 959,
-          "code": "testutils.RunWithToken(t, \"no-prog\", testutils.Delegated{"
+          "repo": "gin-gonic/gin",
+          "file": "binding/binding_test.go",
+          "line": 1055,
+          "code": "b := Form"
         }
       ]
     },
@@ -291,6 +327,7 @@
       "id": "rust-chain",
       "module": "rust",
       "title": "Carry a checked-in Rust type through chained calls and indexed values",
+      "kind": "inside",
       "examples": [
         {
           "repo": "fjall-rs/fjall",
@@ -299,10 +336,31 @@
           "code": "let db = Database::builder(path).temporary(true).open()?;"
         },
         {
-          "repo": "actix/actix-web",
-          "file": "actix-files/src/lib.rs",
-          "line": 1101,
-          "code": "test::init_service(App::new().service(Files::new(\"/\", \".\").show_files_listing())).await;"
+          "repo": "ratatui/ratatui",
+          "file": "ratatui-widgets/examples/chart.rs",
+          "line": 106,
+          "code": "frame.render_widget(chart, area);"
+        }
+      ]
+    },
+    {
+      "id": "rust-external-targets",
+      "module": "rust",
+      "title": "Make Rust library targets first-class graph nodes",
+      "kind": "library",
+      "representation": true,
+      "examples": [
+        {
+          "repo": "BurntSushi/ripgrep",
+          "file": "crates/ignore/src/gitignore.rs",
+          "line": 670,
+          "code": "use regex_automata::{meta::Regex, util::syntax};"
+        },
+        {
+          "repo": "clap-rs/clap",
+          "file": "clap_builder/src/builder/range.rs",
+          "line": 192,
+          "code": "impl std::fmt::Display for ValueRange {"
         }
       ]
     },
@@ -324,7 +382,8 @@
           "line": 52,
           "code": ".setup(|#[allow(unused_variables)] app| {"
         }
-      ]
+      ],
+      "kind": "inside"
     },
     {
       "id": "rust-file-rust-snapshot-macro",
@@ -344,7 +403,8 @@
           "line": 12,
           "code": "cmd.expect_stderr(str![[r#\""
         }
-      ]
+      ],
+      "kind": "inside"
     },
     {
       "id": "rust-file-template",
@@ -364,12 +424,14 @@
           "line": 11,
           "code": ".plugin(tauri_plugin_{{ plugin_name_snake_case }}::init())"
         }
-      ]
+      ],
+      "kind": "inside"
     },
     {
       "id": "rust-glob",
       "module": "rust",
       "title": "Resolve checkout names brought into scope by Rust glob imports",
+      "kind": "inside",
       "examples": [
         {
           "repo": "ratatui/ratatui",
@@ -389,6 +451,7 @@
       "id": "rust-import",
       "module": "rust",
       "title": "Resolve Rust names through local modules, imports and re-exports",
+      "kind": "inside",
       "examples": [
         {
           "repo": "alacritty/alacritty",
@@ -397,10 +460,10 @@
           "code": "use crate::vte::ansi::Rgb;"
         },
         {
-          "repo": "tree-sitter/tree-sitter",
-          "file": "crates/cli/src/parse.rs",
-          "line": 17,
-          "code": "InputEdit, Language, LogType, ParseOptions, ParseState, Parser, Point, Range, Tree, TreeCursor,"
+          "repo": "ratatui/ratatui",
+          "file": "ratatui-core/src/layout/rect/ops.rs",
+          "line": 109,
+          "code": "fn sub_offset(#[case] rect: Rect, #[case] offset: Offset, #[case] expected: Rect) {"
         }
       ]
     },
@@ -408,25 +471,27 @@
       "id": "rust-imported-function",
       "module": "rust",
       "title": "Link calls to checked-in Rust functions brought into scope by use",
+      "kind": "inside",
       "examples": [
+        {
+          "repo": "actix/actix-web",
+          "file": "actix-web/src/resource.rs",
+          "line": 816,
+          "code": "App::new().service(web::resource(\"/test\").route(web::query().to(HttpResponse::Ok))),"
+        },
         {
           "repo": "crossbeam-rs/crossbeam",
           "file": "crossbeam-channel/tests/array.rs",
           "line": 127,
           "code": "let (s, r) = bounded::<i32>(100);"
-        },
-        {
-          "repo": "crossbeam-rs/crossbeam",
-          "file": "crossbeam-channel/tests/ready.rs",
-          "line": 591,
-          "code": "scope(|scope| {"
         }
       ]
     },
     {
       "id": "rust-let",
       "module": "rust",
-      "title": "Infer types from Rust local bindings and constructor results for method calls",
+      "title": "Infer inside receiver types from local bindings and constructors",
+      "kind": "inside",
       "examples": [
         {
           "repo": "clap-rs/clap",
@@ -435,10 +500,10 @@
           "code": "p.get_index()"
         },
         {
-          "repo": "actix/actix-web",
-          "file": "actix-web/tests/compression.rs",
-          "line": 108,
-          "code": "assert_eq!(res.headers().get(header::CONTENT_ENCODING).unwrap(), \"gzip\");"
+          "repo": "cberner/redb",
+          "file": "tests/integration_tests.rs",
+          "line": 5008,
+          "code": "let id = txn.persistent_savepoint().unwrap();"
         }
       ]
     },
@@ -446,6 +511,7 @@
       "id": "rust-macro",
       "module": "rust",
       "title": "Resolve checked-in macros and names generated by them",
+      "kind": "inside",
       "examples": [
         {
           "repo": "tauri-apps/tauri",
@@ -465,6 +531,7 @@
       "id": "rust-parameter",
       "module": "rust",
       "title": "Bind Rust type and const parameters in signatures and constraints",
+      "kind": "inside",
       "examples": [
         {
           "repo": "actix/actix-web",
@@ -484,6 +551,7 @@
       "id": "rust-self-trait",
       "module": "rust",
       "title": "Resolve Self and self method calls through checked-in trait implementations",
+      "kind": "inside",
       "examples": [
         {
           "repo": "BurntSushi/ripgrep",
@@ -502,7 +570,8 @@
     {
       "id": "rust-std-path",
       "module": "rust",
-      "title": "Recognize Rust prelude and dependency names through imports and macro arguments",
+      "title": "Identify Rust prelude and dependency symbols by their final paths",
+      "kind": "library",
       "examples": [
         {
           "repo": "helix-editor/helix",
@@ -511,17 +580,18 @@
           "code": "if unsafe { IsValidAcl(sd.dacl) } != 0 {"
         },
         {
-          "repo": "tree-sitter/tree-sitter",
-          "file": "crates/generate/src/build_tables.rs",
-          "line": 289,
-          "code": "&& let Some(index) = conflict_free_tokens.terminals().find(|&other| {"
+          "repo": "ratatui/ratatui",
+          "file": "ratatui-termion/src/lib.rs",
+          "line": 276,
+          "code": "let terminal = termion::terminal_size()?;"
         }
       ]
     },
     {
       "id": "rust-std-receiver",
       "module": "rust",
-      "title": "Identify when a Rust method receiver has a standard or dependency type",
+      "title": "Identify standard or dependency methods from Rust receiver types",
+      "kind": "library",
       "examples": [
         {
           "repo": "clap-rs/clap",
@@ -541,6 +611,7 @@
       "id": "rust-taint",
       "module": "rust",
       "title": "Keep independent Rust links resolvable after a different file fails",
+      "kind": "both",
       "examples": [
         {
           "repo": "alacritty/alacritty",
@@ -550,9 +621,9 @@
         },
         {
           "repo": "alacritty/alacritty",
-          "file": "alacritty/src/renderer/text/gles2.rs",
-          "line": 375,
-          "code": "gl::ARRAY_BUFFER,"
+          "file": "alacritty/src/display/mod.rs",
+          "line": 1441,
+          "code": "/ self"
         }
       ],
       "exact": "rust-taint"
@@ -561,18 +632,39 @@
       "id": "rust-trait",
       "module": "rust",
       "title": "Resolve associated names through checked-in Rust types, traits and impls",
+      "kind": "inside",
       "examples": [
+        {
+          "repo": "cberner/redb",
+          "file": "src/tree_store/btree_base.rs",
+          "line": 2553,
+          "code": "let accessor2 = BranchAccessor::new(&page2, u64::fixed_width());"
+        },
         {
           "repo": "clap-rs/clap",
           "file": "tests/derive/subcommands.rs",
           "line": 83,
           "code": "let result = Opt::try_parse_from([\"test\", \"badcmd\", \"-i\", \"-v\"]);"
+        }
+      ]
+    },
+    {
+      "id": "rust-typed-receiver",
+      "module": "rust",
+      "title": "Link Rust methods on explicitly typed checkout receivers",
+      "kind": "inside",
+      "examples": [
+        {
+          "repo": "tauri-apps/tauri",
+          "file": "crates/tauri/src/webview/mod.rs",
+          "line": 871,
+          "code": "let webview = match &mut window.runtime() {"
         },
         {
-          "repo": "tree-sitter/tree-sitter",
-          "file": "crates/cli/src/tests/query_test.rs",
-          "line": 3869,
-          "code": "QueryProperty::new(\"cool\", None, None),"
+          "repo": "helix-editor/helix",
+          "file": "helix-term/src/ui/editor.rs",
+          "line": 890,
+          "code": ".or_else(|| theme.try_get_exact(\"ui.cursorcolumn\"))"
         }
       ]
     },
@@ -580,6 +672,7 @@
       "id": "rust-value",
       "module": "rust",
       "title": "Link Rust references and patterns to their local bindings",
+      "kind": "inside",
       "examples": [
         {
           "repo": "cberner/redb",
@@ -598,19 +691,40 @@
     {
       "id": "ts-bundle",
       "module": "typescript",
-      "title": "Follow lexical functions and objects within checked-in JavaScript bundles",
+      "title": "Anchor recorded lexical declarations in checked-in bundles",
+      "kind": "inside",
       "examples": [
         {
-          "repo": "golang/tools",
-          "file": "cmd/present/static/jquery.js",
-          "line": 2,
-          "code": "return this.each(function(c){p(this).wrapAll(b?a.call(this,c):a)})"
+          "repo": "pocketbase/pocketbase",
+          "file": "ui/public/libs/tinymce/plugins/fullscreen/plugin.min.js",
+          "line": 5,
+          "code": "ew Error(null!=e?e:\"Called getOrDie on None\")}static from(e){return d(e)?b.some(e):b.none()}getOrNull(){return this.tag?this.value:null}getOrUndefined(){return this.value}each(e){this.tag&&e(this.value)}toArray(){return this.tag?[t"
         },
         {
           "repo": "pocketbase/pocketbase",
-          "file": "ui/public/libs/tinymce/themes/silver/theme.min.js",
+          "file": "ui/dist/libs/tinymce/models/dom/model.min.js",
           "line": 1,
-          "code": "n).fold(x(e),(t=>({len:t.finish,list:e.list.concat([t])}))))"
+          "code": "e:g({nu:xe.fromTag,clone:e=>xe.fromDom(e.dom.cloneNode(!1)),text:xe.fromText}),query:g({comparePosition:(e,t)=>e.dom.compareDocumentPosition(t.dom),prevSibling:ze,nextSibling:Ae}),property:g({children:Le,name:ne,parent:Ne,document:"
+        }
+      ]
+    },
+    {
+      "id": "ts-bundle-flow",
+      "module": "typescript",
+      "title": "Follow checked-in bundle receivers with a visible terminal definition",
+      "kind": "inside",
+      "examples": [
+        {
+          "repo": "pocketbase/pocketbase",
+          "file": "ui/dist/libs/tinymce/plugins/fullscreen/plugin.min.js",
+          "line": 5,
+          "code": "e.ui.registry.addToggleMenuItem(\"fullscreen\",{text:\"Fullscreen\",icon:\"fullscreen\""
+        },
+        {
+          "repo": "pocketbase/pocketbase",
+          "file": "ui/public/libs/tinymce/tinymce.min.js",
+          "line": 13,
+          "code": "ai(e,I.some(t)).fold((()=>{o.each((e=>{"
         }
       ]
     },
@@ -618,6 +732,7 @@
       "id": "ts-config",
       "module": "typescript",
       "title": "Recover local TypeScript links when a base configuration is missing",
+      "kind": "inside",
       "examples": [
         {
           "repo": "withastro/astro",
@@ -637,6 +752,7 @@
       "id": "ts-config-preset",
       "module": "typescript",
       "title": "Recover checked-in TypeScript links when a package tsconfig preset is missing",
+      "kind": "inside",
       "examples": [
         {
           "repo": "changesets/changesets",
@@ -653,9 +769,31 @@
       ]
     },
     {
+      "id": "ts-external-targets",
+      "module": "typescript",
+      "title": "Make TypeScript library targets first-class graph nodes",
+      "kind": "library",
+      "representation": true,
+      "examples": [
+        {
+          "repo": "puppeteer/puppeteer",
+          "file": "packages/puppeteer-core/src/bidi/Connection.ts",
+          "line": 37,
+          "code": "returnType: ChromiumBidi.Cdp.GetSessionResult;"
+        },
+        {
+          "repo": "pingdotgg/t3code",
+          "file": "packages/effect-codex-app-server/src/_generated/schema.gen.ts",
+          "line": 8697,
+          "code": "lineEnd: Schema.Number.annotate({ format: \"uint32\" })"
+        }
+      ]
+    },
+    {
       "id": "ts-inline",
       "module": "typescript",
       "title": "Link immediately invoked function expressions to their checked-in bodies",
+      "kind": "inside",
       "examples": [
         {
           "repo": "excalidraw/excalidraw",
@@ -675,6 +813,7 @@
       "id": "ts-local-access",
       "module": "typescript",
       "title": "Link lexical TypeScript and JavaScript declarations and their call sites",
+      "kind": "inside",
       "examples": [
         {
           "repo": "react-hook-form/react-hook-form",
@@ -683,10 +822,10 @@
           "code": "const onSubmit: SubmitHandler<FormValues> = (data) =>"
         },
         {
-          "repo": "vitest-dev/vitest",
-          "file": "test/unit/test/jest-mock.test.ts",
-          "line": 499,
-          "code": "expect(spy.mock.settledResults[1]).toEqual(h(new Error('error')))"
+          "repo": "honojs/hono",
+          "file": "src/types.ts",
+          "line": 2582,
+          "code": "? Prefix"
         }
       ]
     },
@@ -694,18 +833,19 @@
       "id": "ts-local-chain",
       "module": "typescript",
       "title": "Follow checked-in TypeScript types and return values through property chains",
+      "kind": "inside",
       "examples": [
-        {
-          "repo": "pingdotgg/t3code",
-          "file": "apps/server/src/vcs/GitVcsDriverCore.test.ts",
-          "line": 283,
-          "code": "yield* driver.removeWorktree({ cwd, path: worktreePath });"
-        },
         {
           "repo": "mermaid-js/mermaid",
           "file": "packages/mermaid/src/diagrams/flowchart/parser/flow-arrows.spec.js",
           "line": 76,
           "code": "const edges = flow.parser.yy.getEdges();"
+        },
+        {
+          "repo": "pingdotgg/t3code",
+          "file": "apps/server/src/vcs/GitVcsDriverCore.test.ts",
+          "line": 283,
+          "code": "yield* driver.removeWorktree({ cwd, path: worktreePath });"
         }
       ]
     },
@@ -713,6 +853,7 @@
       "id": "ts-nested-function",
       "module": "typescript",
       "title": "Anchor functions declared inside React components and other functions",
+      "kind": "inside",
       "examples": [
         {
           "repo": "pingdotgg/t3code",
@@ -732,6 +873,7 @@
       "id": "ts-object-member",
       "module": "typescript",
       "title": "Anchor members of checked-in TypeScript object types",
+      "kind": "inside",
       "examples": [
         {
           "repo": "pocketbase/pocketbase",
@@ -750,7 +892,8 @@
     {
       "id": "ts-package",
       "module": "typescript",
-      "title": "Trace Node and third-party import aliases and globals to outside packages",
+      "title": "Identify Node and third-party symbols through aliases and globals",
+      "kind": "library",
       "examples": [
         {
           "repo": "trpc/trpc",
@@ -769,7 +912,8 @@
     {
       "id": "ts-package-chain",
       "module": "typescript",
-      "title": "Track outside return types through test, browser and other dependency APIs",
+      "title": "Identify library members through TypeScript return types and re-exports",
+      "kind": "library",
       "examples": [
         {
           "repo": "react-hook-form/react-hook-form",
@@ -786,28 +930,10 @@
       ]
     },
     {
-      "id": "ts-props",
-      "module": "typescript",
-      "title": "Use known assignments for calls through props and option callbacks",
-      "examples": [
-        {
-          "repo": "trpc/trpc",
-          "file": "packages/server/src/adapters/next-app-dir/nextAppDirCaller.ts",
-          "line": 73,
-          "code": "config.onError?.({"
-        },
-        {
-          "repo": "excalidraw/excalidraw",
-          "file": "packages/excalidraw/components/RadioSelection.tsx",
-          "line": 50,
-          "code": "onChange={() => props.onChange(option.value)}"
-        }
-      ]
-    },
-    {
       "id": "ts-relative",
       "module": "typescript",
       "title": "Bind TypeScript imports and re-exports to checked-in modules",
+      "kind": "inside",
       "examples": [
         {
           "repo": "nestjs/nest",
@@ -826,7 +952,8 @@
     {
       "id": "ts-runtime",
       "module": "typescript",
-      "title": "Recognize standard JavaScript and DOM targets from source types",
+      "title": "Identify JavaScript standard and DOM symbols",
+      "kind": "library",
       "examples": [
         {
           "repo": "vitest-dev/vitest",
@@ -843,9 +970,30 @@
       ]
     },
     {
+      "id": "ts-script-tag",
+      "module": "typescript",
+      "title": "Link literal tag factories exposed by a checked-in browser script",
+      "kind": "inside",
+      "examples": [
+        {
+          "repo": "pocketbase/pocketbase",
+          "file": "ui/src/base/confirm.js",
+          "line": 117,
+          "code": "t.div("
+        },
+        {
+          "repo": "pocketbase/pocketbase",
+          "file": "ui/src/fields/relation/settings.js",
+          "line": 168,
+          "code": "t.div("
+        }
+      ]
+    },
+    {
       "id": "ts-type-parameters",
       "module": "typescript",
       "title": "Link TypeScript references to their generic parameter declarations",
+      "kind": "inside",
       "examples": [
         {
           "repo": "honojs/hono",
@@ -865,6 +1013,7 @@
       "id": "ts-workspace",
       "module": "typescript",
       "title": "Resolve imports and uses of sibling pnpm and workspace packages",
+      "kind": "inside",
       "examples": [
         {
           "repo": "vitest-dev/vitest",
@@ -898,7 +1047,8 @@
           "line": 1,
           "code": "invalid code"
         }
-      ]
+      ],
+      "kind": "inside"
     },
     {
       "id": "typescript-file-manifest-bom",
@@ -918,7 +1068,8 @@
           "line": 1,
           "code": "export const msg = '[success]'"
         }
-      ]
+      ],
+      "kind": "inside"
     },
     {
       "id": "typescript-file-template",
@@ -938,7 +1089,8 @@
           "line": 7,
           "code": "return await invoke<{value?: string}>('plugin:{{ plugin_name }}|ping', {"
         }
-      ]
+      ],
+      "kind": "inside"
     },
     {
       "id": "typescript-file-tsconfig",
@@ -958,7 +1110,8 @@
           "line": 2,
           "code": "\"extends\": \"../.nuxt/tsconfig.server.json\""
         }
-      ]
+      ],
+      "kind": "inside"
     }
   ]
 }

@@ -1,45 +1,59 @@
 # SW-3 evidence
 
-[The scoreboard](scoreboard.md) separates the completion checklist from
-raw, strict and estimated-true coverage in the finished graphs, with
-file-scope variants and repository scores. The archived breakdown contains all stored link
-combinations for the 53 finished repositories and the seven zero-scored
-attempts from SW-1. The archive's `columns` array names each field in the
-ordered `breakdown` tuples. A null reason means the graph recorded no reason
-in that field. `eligible` is used for resolved or ambiguous rows, with the
-remaining dispositions reserved for unresolved rows. `blocked` is the number
-of links in that tuple whose stored data marks them blocked.
+The [scoreboard](scoreboard.md) shows completion separately from link
+coverage. Level 2 is the headline. Level 1, strict-inside and raw are
+shown beside it, with an alternative that includes reviewed closed
+candidate sets. The [sample review](sampling.md) describes the audit,
+its intervals and the checkable source examples.
 
-```sh
-gzip -dc evidence/sw-3/breakdown.json.gz
-node scripts/sweep/coverage.mjs --results evidence/sw-3/breakdown.json.gz
-```
+The v2 archive contains all stored link combinations for the 53 finished
+repositories and the seven historical outcomes. The ordered tuple
+fields are in its columns array. The outside proof columns record the
+level, evidence and gap. A null level means outside origin was not proved
+from the stored facts and the boundary check. Level zero means an outside
+identity is missing, despite evidence that the link goes outside. Scope
+and original disposition remain available. The sample archive gives each
+site’s reason, label, and observed multiplicity.
 
-The sample archive contains reference site keys, source file and line,
-strata, scopes, labels and the basis for each label. The support item catalog keeps the short
-source excerpts used in the plan. The published evidence contains counts,
-sampled sites and support examples. Checkouts and databases lived in dev-server
-scratch. [Sample sizes and populations](sampling.md)
+The warm CLI totals were checked against each read-only export. The sweep
+uses the Go and Rust source routes and never installs or runs a corpus
+project’s code. The library proof uses captured graph facts and checkout
+locations. The optional dependency information in the plan was not
+consulted for these measurements.
 
-The warm CLI totals agree with the exported store for all 53 replayed pins.
-All 53 have the same link volume as SW-1. The current replay differs from
-SW-1 in three Go graphs. Fiber has 21 fewer resolved links, Go tools has 109
-fewer, and Protobuf has two fewer. Those differences put the Go strict figure
-at 77.75%, compared with 77.76% in the earlier SW-3 export. Pebble now agrees
-with SW-1. The scoreboard uses the current replay.
+The replay preserved every repository's link total and completion outcome.
+Pebble, Fiber, golang/tools, PocketBase and protobuf-go had small changes
+in their Go outcome counts compared with the previous SW-3 archive. The
+boundary checks and stored library evidence also refine the strict-inside
+partition, so that metric can move even with identical graph counts.
 
-To reproduce the baseline from fresh graph stores, run the SW-1 runner with
-a manifest containing the 53 previously finished pins. Then run the exporter
-on the dev server. The seven historical attempts retain their recorded outcomes.
+The bundle comparison uses the filename and long-line rules documented
+in the sweep guide. It retains the vendored Ace bundle under mdBook's
+`playground_editor/` directory, which falls outside those rules.
+[Scope rules](../../sweep/README.md#coverage-scoreboard)
+
+The source audit follows sampled calls to their final targets. In cli/cli,
+the helper behind `pkg/cmd/project/item-list/item_list_test.go:119` returns
+a Cobra command, so `cmd.ExecuteC()` is a library use. In Actix Web,
+`actix-web/src/http/header/entity.rs:182` reaches the `http` crate through a
+local re-export. In Fiber, the sampled span at `ctx_test.go:1973` covers
+`c.Response()` through the `Ctx` interface. The next call, `Body()`, uses
+the fasthttp result. [Sample review](sampling.md) · [Sample archive](samples.json.gz)
+
+To reproduce the export, run the sweep with a manifest containing the
+53 finished pins. Then run the exporter on the dev server. The existing
+archive supplies the sample allocations. The seven historical outcomes
+come from SW-1.
 
 ```sh
 node scripts/sweep/coverage-export.mjs --results "$PYM_SCRATCH/results.json" \
   --include-failed evidence/sw-1/results.json \
   --sampling-base evidence/sw-3/breakdown.json.gz \
+  --reference-samples evidence/sw-3/samples.json.gz \
   --output "$PYM_SCRATCH/audit.json"
 ```
 
-To recalculate the tables and check the published labels, use the archived data.
+Use the archived graph counts and reviewed labels to regenerate the reports.
 
 ```sh
 node scripts/sweep/coverage.mjs --results evidence/sw-3/breakdown.json.gz \
