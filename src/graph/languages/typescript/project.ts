@@ -5,6 +5,7 @@ import { dirname, posix } from "node:path";
 import ts from "typescript";
 import { compare, matchesPattern } from "../../index.js";
 import type { ContextFile, Diagnostic, GraphFile } from "../../types.js";
+import { workspaceLinks, type Manifest } from "./workspace.js";
 import {
   freshNames,
   renameShadowed,
@@ -53,6 +54,7 @@ export interface ProjectGroup {
   /** Owning config path, or null for the inferred project (no config includes the file). */
   config: string | null;
   options: ts.CompilerOptions;
+  references?: readonly ts.ProjectReference[];
   roots: string[];
   /** Limitations that make every owned file's facts partial. */
   limitations: string[];
@@ -65,6 +67,7 @@ export interface ProjectGroup {
 }
 export interface ProjectModel {
   groups: ProjectGroup[];
+  hasWorkspacePackages: boolean;
   owner: Map<string, ProjectGroup>;
   /**
    * Files that two or more configs own equally (same containment, depth and
@@ -97,6 +100,11 @@ export interface ProjectModel {
   requested: (host: ts.CompilerHost) => ReadonlySet<string>;
   /** A compiler host over the snapshot; a variant replaces some files' text. */
   host: (group: ProjectGroup, variant?: HostVariant) => ts.CompilerHost;
+  workspaceReason: (
+    specifier: string,
+    from: string,
+    lookups: readonly string[],
+  ) => string | undefined;
 }
 
 const INFERRED: ts.CompilerOptions = {
@@ -348,6 +356,12 @@ class VirtualFileSystem {
   readonly directories = new Set<string>(["/"]);
   /** Virtual node_modules/<name> directory -> real workspace package directory. */
   readonly links = new Map<string, string>();
+  readonly linkDirectories = new Set<string>();
+  readonly outputs = new Set<string>();
+  private readonly listings = new Map<
+    string,
+    { files: string[]; directories: string[] }
+  >();
   add(path: string, text: string) {
     const name = toVirtual(path);
     this.files.set(name, text);
@@ -359,22 +373,74 @@ class VirtualFileSystem {
       this.directories.add(directory);
   }
   real(path: string): string {
-    for (const [link, target] of this.links)
-      if (path === link || path.startsWith(link + "/"))
-        return target + path.slice(link.length);
+    const marker = "/node_modules/";
+    for (
+      let at = path.lastIndexOf(marker);
+      at >= 0;
+      at = path.lastIndexOf(marker, at - 1)
+    ) {
+      const start = at + marker.length;
+      let end = path.indexOf("/", start);
+      if (path[start] === "@" && end >= 0) end = path.indexOf("/", end + 1);
+      const link = end === -1 ? path : path.slice(0, end);
+      const target = this.links.get(link);
+      if (target !== undefined)
+        return end < 0 ? target : posix.join(target, path.slice(end));
+      if (at === 0) break;
+    }
     return path;
+  }
+  link(path: string, target: string) {
+    this.links.set(path, target);
+    for (
+      let directory = posix.dirname(path);
+      !this.directories.has(directory) && !this.linkDirectories.has(directory);
+      directory = posix.dirname(directory)
+    )
+      this.linkDirectories.add(directory);
   }
   fileExists = (path: string) => this.files.has(this.real(path));
   readFile = (path: string) => this.files.get(this.real(path));
-  directoryExists = (path: string) => {
-    if (this.directories.has(this.real(path))) return true;
-    // Ancestors of a virtual workspace link (e.g. /node_modules/@scope).
-    for (const link of this.links.keys())
-      if (link.startsWith(path.endsWith("/") ? path : path + "/")) return true;
-    return false;
-  };
+  directoryExists = (path: string) =>
+    this.directories.has(this.real(path)) || this.linkDirectories.has(path);
+  workspaceReason(specifier: string, from: string, lookups: readonly string[]) {
+    const name = /^(@[^/]+\/[^/]+|[^/@#.][^/]*)/.exec(specifier)?.[1];
+    if (!name) return undefined;
+    for (
+      let directory = posix.dirname(toVirtual(from));
+      ;
+      directory = posix.dirname(directory)
+    ) {
+      const link = posix.join(directory, "node_modules", name);
+      const target = this.links.get(link);
+      if (target !== undefined) {
+        const built = lookups.some((lookup) => {
+          if (
+            !lookup.startsWith(link + "/") &&
+            !lookup.startsWith(target + "/")
+          )
+            return false;
+          const resolved = this.real(lookup);
+          if (this.files.has(resolved)) return false;
+          for (
+            let dir = posix.dirname(resolved);
+            dir !== target && dir !== "/";
+            dir = posix.dirname(dir)
+          )
+            if (this.outputs.has(dir)) return true;
+          return false;
+        });
+        return built
+          ? "workspace-build-output-missing"
+          : "workspace-entry-unavailable";
+      }
+      if (directory === "/") return undefined;
+    }
+  }
   entries = (path: string) => {
     const directory = path === "/" ? "/" : path.replace(/\/$/, "");
+    const cached = this.listings.get(directory);
+    if (cached) return cached;
     const files: string[] = [];
     const directories: string[] = [];
     for (const file of this.files.keys())
@@ -382,55 +448,13 @@ class VirtualFileSystem {
     for (const child of this.directories)
       if (child !== directory && posix.dirname(child) === directory)
         directories.push(posix.basename(child));
-    return {
+    const listing = {
       files: files.sort(compare),
       directories: directories.sort(compare),
     };
+    this.listings.set(directory, listing);
+    return listing;
   };
-}
-
-interface Workspace {
-  root: string;
-  packages: Map<string, string>;
-}
-function workspaces(
-  packages: { path: string; json: Record<string, unknown> }[],
-): Workspace[] {
-  const result: Workspace[] = [];
-  for (const manifest of packages) {
-    const declared = manifest.json.workspaces;
-    const patterns = Array.isArray(declared)
-      ? declared
-      : declared && typeof declared === "object"
-        ? (declared as { packages?: unknown }).packages
-        : undefined;
-    if (!Array.isArray(patterns)) continue;
-    const root = posix.dirname(manifest.path);
-    const prefix = root === "." ? "" : root + "/";
-    const members = new Map<string, string>();
-    for (const other of packages) {
-      const directory = posix.dirname(other.path);
-      if (other === manifest || !directory.startsWith(prefix)) continue;
-      const relative = directory.slice(prefix.length);
-      const name = other.json.name;
-      if (
-        typeof name === "string" &&
-        patterns.some(
-          (pattern) =>
-            typeof pattern === "string" &&
-            !pattern.startsWith("!") &&
-            matchesPattern(
-              relative,
-              pattern.replace(/^\.\//, "").replace(/\/$/, ""),
-            ) &&
-            pattern.includes("/") === relative.includes("/"),
-        )
-      )
-        members.set(name, directory);
-    }
-    result.push({ root, packages: members });
-  }
-  return result;
 }
 
 /** Context patterns; also used to tell a missing base from an uncaptured one. */
@@ -438,6 +462,7 @@ export const CONTEXT_PATTERNS = [
   "*tsconfig*.json",
   "*jsconfig*.json",
   "package.json",
+  "pnpm-workspace.yaml",
 ] as const;
 const isContextPath = (path: string) =>
   CONTEXT_PATTERNS.some((pattern) => matchesPattern(path, pattern));
@@ -461,7 +486,7 @@ export function projectModel(
 ): ProjectModel {
   const fs = new VirtualFileSystem();
   for (const file of contexts) fs.add(file.path, file.text);
-  const manifests: { path: string; json: Record<string, unknown> }[] = [];
+  const manifests: Manifest[] = [];
   /** Package directory -> why its manifest is unreadable. */
   const brokenManifests = new Map<string, string>();
   const packageDirectories: string[] = [];
@@ -524,16 +549,8 @@ export function projectModel(
       renames.set(file.path, renamed);
     fs.add(file.path, renamed.error ? file.text : renamed.text);
   }
-  for (const workspace of workspaces(manifests))
-    for (const [name, directory] of workspace.packages)
-      fs.links.set(
-        toVirtual(
-          (workspace.root === "." ? "" : workspace.root + "/") +
-            "node_modules/" +
-            name,
-        ),
-        toVirtual(directory),
-      );
+  for (const [link, target] of workspaceLinks(manifests, contexts))
+    fs.link(toVirtual(link), target === "." ? "/" : toVirtual(target));
   const matchFiles = (
     ts as unknown as {
       matchFiles?: (
@@ -572,6 +589,8 @@ export function projectModel(
       ),
   };
   const groups: ProjectGroup[] = [];
+  // Reference redirects reuse the parsed snapshot config across programs.
+  const parsedConfigs = new Map<string, ts.ParsedCommandLine>();
   const claimed = new Map<string, ProjectGroup[]>();
   const claim = (path: string, group: ProjectGroup) => {
     const list = claimed.get(path) ?? [];
@@ -709,7 +728,7 @@ export function projectModel(
         ]);
       }
     }
-    // References are not passed to the compiler: a missing one is only a note.
+    // Missing references are recorded without adding roots outside the snapshot.
     for (const reference of Array.isArray(object.references)
       ? object.references
       : []) {
@@ -718,9 +737,7 @@ export function projectModel(
           ? (reference as { path?: unknown }).path
           : undefined;
       if (typeof value !== "string") {
-        group.notes.push(
-          `${config.path}: invalid project reference (ignored; references are not used for resolution)`,
-        );
+        group.notes.push(`${config.path}: invalid project reference (ignored)`);
         continue;
       }
       const target = posix.normalize(
@@ -731,7 +748,7 @@ export function projectModel(
         !fs.fileExists(posix.join(target, "tsconfig.json"))
       )
         group.notes.push(
-          `${config.path}: references "${value}", which is missing from the snapshot (references are not used for resolution)`,
+          `${config.path}: references "${value}", which is missing from the snapshot`,
         );
     }
     if (!syntax) {
@@ -750,6 +767,8 @@ export function projectModel(
         toVirtual(config.path),
       );
       if (!group.failure) {
+        if (!group.limitations.length)
+          parsedConfigs.set(toVirtual(config.path), parsed);
         group.notes.push(
           ...parsed.errors
             // 18003: "No inputs were found" is a normal state for solution-style configs.
@@ -766,6 +785,17 @@ export function projectModel(
             ),
         );
         group.options = forced(parsed.options);
+        if (!group.limitations.length)
+          for (const output of [
+            parsed.options.outDir,
+            parsed.options.declarationDir,
+          ])
+            if (output && output !== posix.dirname(toVirtual(config.path)))
+              fs.outputs.add(output);
+        if (parsed.projectReferences?.length)
+          group.references = parsed.projectReferences.filter((reference) =>
+            fs.fileExists(ts.resolveProjectReferencePath(reference)),
+          );
       }
       // A broken config still claims whatever its own file list names. A config
       // whose selection cannot be read claims nothing here: the compiler would
@@ -866,7 +896,10 @@ export function projectModel(
     const failures = variant?.failures ?? parseFailures;
     const shared = variant?.base && caches.get(variant.base);
     const requested = new Set<string>();
-    const created: ts.CompilerHost = {
+    const created: ts.CompilerHost & {
+      useSourceOfProjectReferenceRedirect: () => boolean;
+    } = {
+      useSourceOfProjectReferenceRedirect: () => true,
       getSourceFile(name, languageVersion) {
         if (name.startsWith(LIB_ROOT + "/")) return libFile(name);
         const real = fs.real(name);
@@ -941,6 +974,8 @@ export function projectModel(
           : fs.readFile(name),
       directoryExists: (name) => name === LIB_ROOT || fs.directoryExists(name),
       getDirectories: (name) => fs.entries(fs.real(name)).directories,
+      readDirectory: (...args) => [...parseHost.readDirectory(...args)],
+      getParsedCommandLine: (name) => parsedConfigs.get(fs.real(name)),
       realpath: (name) => fs.real(name),
     };
     caches.set(created, sources);
@@ -949,6 +984,7 @@ export function projectModel(
   };
   return {
     groups,
+    hasWorkspacePackages: fs.links.size > 0,
     owner,
     ties,
     failures,
@@ -969,5 +1005,7 @@ export function projectModel(
       return true;
     },
     host,
+    workspaceReason: (specifier, from, lookups) =>
+      fs.workspaceReason(specifier, from, lookups),
   };
 }

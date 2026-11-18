@@ -108,6 +108,10 @@ test("distinguishes named packages, named members, and unproved receivers", () =
   assert.equal(external("typescript", "z.string", { reason: "external-package" }, "calls", binding,
     { ...declared, tsPackages: new Set(["zod"]) }), null);
   assert.equal(external("typescript", "foo", { reason: "external-package" }), null);
+  for (const reasonWithoutConfig of ["workspace-build-output-missing", "workspace-entry-unavailable"]) {
+    assert.equal(external("typescript", "io.readFile",
+      { reason: "incomplete-config", reasonWithoutConfig }, "calls", binding), null);
+  }
 });
 
 test("reads Yarn package membership and resolves dependency paths against the checkout", () => {
