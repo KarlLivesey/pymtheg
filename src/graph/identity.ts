@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 import { createHash } from "node:crypto";
-import type { GraphFile, GraphLink, GraphSymbol } from "./types.js";
+import type {
+  GraphFile,
+  GraphLibrary,
+  GraphLink,
+  GraphSymbol,
+  LibraryEvidence,
+  LibraryTarget,
+} from "./types.js";
 export const contentHash = (text: string | Uint8Array): string =>
   createHash("sha256").update(text).digest("hex");
 const digest = (parts: unknown[]): string => contentHash(JSON.stringify(parts));
@@ -85,6 +92,9 @@ export function validateResult(
   }
   for (const link of result.links) {
     range(link.range);
+    // Library targets are decisions (resolve or analysis), never parse facts.
+    if (Object.hasOwn(link, "libraries"))
+      throw Error("Parse links cannot carry library targets");
     if (
       !link.kind ||
       !link.targetName ||
@@ -129,3 +139,127 @@ export const addedLinkId = (
   file: string,
   key: string,
 ): string => `link:${digest(["v2", project, module, file, "analysis", key])}`;
+
+/**
+ * What each evidence kind can prove. `symbol: false`: it names the unit only;
+ * `"required"`: it proves a member, so the symbol must be given.
+ * `definite: false`: it only makes the target possible (candidate sets only).
+ */
+export const libraryEvidence: Readonly<
+  Record<LibraryEvidence, { symbol: boolean | "required"; definite: boolean }>
+> = {
+  "import-path": { symbol: false, definite: true },
+  "import-binding": { symbol: true, definite: true },
+  "qualified-path": { symbol: true, definite: true },
+  "explicit-trait": { symbol: true, definite: true },
+  "declared-builtin": { symbol: true, definite: true },
+  "reference-directive": { symbol: false, definite: true },
+  "glob-import": { symbol: true, definite: false },
+  "declaring-owner": { symbol: "required", definite: true },
+};
+/**
+ * The manifests and lockfiles that can state a library version, by file name,
+ * per ecosystem. A version's source must be one of its ecosystem's files (a
+ * `go.mod` never states an npm version); an ecosystem not listed takes no
+ * version. The single list both the indexer's and the store's checks use.
+ */
+export const versionFiles: Readonly<Record<string, readonly string[]>> = {
+  npm: [
+    "package.json",
+    "package-lock.json",
+    "npm-shrinkwrap.json",
+    "pnpm-lock.yaml",
+    "yarn.lock",
+    "bun.lock",
+    "bun.lockb",
+    "deno.json",
+    "deno.lock",
+  ],
+  node: ["package.json"],
+  go: ["go.mod", "go.sum", "go.work", "go.work.sum"],
+  "go-std": ["go.mod", "go.work"],
+  cargo: ["Cargo.toml", "Cargo.lock"],
+};
+const text = (value: unknown, max: number): value is string =>
+  typeof value === "string" &&
+  value.length > 0 &&
+  value.length <= max &&
+  value.trim() === value &&
+  !/[\u0000-\u001f\u007f]/.test(value);
+/**
+ * Checks a module's library target and returns its stored form with a
+ * deterministic, project-independent id. The evidence kind is required.
+ */
+export function libraryTarget(
+  value: LibraryTarget,
+  definite: boolean,
+  /** Whether a path is a clean manifest/lockfile context file in the snapshot. */
+  versionSource: (path: string) => boolean = () => false,
+): GraphLibrary {
+  const known = [
+    "ecosystem",
+    "unit",
+    "symbol",
+    "version",
+    "versionSource",
+    "evidence",
+  ];
+  const evidence =
+    value &&
+    typeof value === "object" &&
+    Object.hasOwn(libraryEvidence, value.evidence)
+      ? libraryEvidence[value.evidence]
+      : undefined;
+  if (
+    !evidence ||
+    Object.keys(value).some((key) => !known.includes(key)) ||
+    typeof value.ecosystem !== "string" ||
+    !/^[a-z][a-z0-9-]{0,63}$/.test(value.ecosystem) ||
+    !text(value.unit, 1024) ||
+    (value.symbol !== undefined && !text(value.symbol, 1024)) ||
+    (value.version !== undefined && !text(value.version, 256))
+  )
+    throw Error(
+      "Invalid library target: ecosystem, unit and a known evidence kind are required",
+    );
+  if (value.symbol !== undefined && !evidence.symbol)
+    throw Error(
+      `Library evidence ${value.evidence} names a unit, not a symbol`,
+    );
+  // A version is a fact about the checkout: it must name the manifest or
+  // lockfile in the snapshot that states it.
+  if ((value.version === undefined) !== (value.versionSource === undefined))
+    throw Error(
+      "A library version needs the manifest or lockfile that states it, and only with a version",
+    );
+  if (
+    value.versionSource !== undefined &&
+    (!text(value.versionSource, 4096) ||
+      !versionFiles[value.ecosystem]?.includes(
+        value.versionSource.split("/").at(-1)!,
+      ))
+  )
+    throw Error(
+      `A library version's source must be one of the ${value.ecosystem} manifests or lockfiles (${(versionFiles[value.ecosystem] ?? []).join(", ") || "none for this ecosystem"})`,
+    );
+  if (value.versionSource !== undefined && !versionSource(value.versionSource))
+    throw Error(
+      "A library version's source must be a clean manifest or lockfile in the snapshot",
+    );
+  if (value.symbol === undefined && evidence.symbol === "required")
+    throw Error(`Library evidence ${value.evidence} needs the member's symbol`);
+  if (definite && !evidence.definite)
+    throw Error(
+      `Library evidence ${value.evidence} only supports a candidate set`,
+    );
+  return {
+    id: `library:${digest(["v1", value.ecosystem, value.unit, value.version ?? null, value.symbol ?? null])}`,
+    ecosystem: value.ecosystem,
+    unit: value.unit,
+    ...(value.symbol === undefined ? {} : { symbol: value.symbol }),
+    ...(value.version === undefined
+      ? {}
+      : { version: value.version, versionSource: value.versionSource! }),
+    evidence: value.evidence,
+  };
+}

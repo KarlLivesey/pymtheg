@@ -66,6 +66,55 @@ export interface GraphSymbol extends SymbolDraft {
   module: string;
   status: ParseStatus;
 }
+/**
+ * How the source proves a library target. Kinds that name only a unit, or
+ * only make the target possible, are restricted (see libraryEvidence).
+ */
+export type LibraryEvidence =
+  /** An import/use statement names the unit by its path. Unit only. */
+  | "import-path"
+  /** A name bound by an import of the unit, and the member selected from it. */
+  | "import-binding"
+  /** A fully qualified path written in the source names the unit and symbol. */
+  | "qualified-path"
+  /** An explicit trait or interface qualification (`<T as Trait>::m`). */
+  | "explicit-trait"
+  /** A language-declared builtin, intrinsic or global, by its declared name. */
+  | "declared-builtin"
+  /** A reference directive naming a declaration unit (`/// <reference lib>`). */
+  | "reference-directive"
+  /** A glob/dot import puts the unit in scope; the symbol is only possible. Candidate sets only. */
+  | "glob-import"
+  /**
+   * The member's declaring owner is proven: the declaration was established
+   * after alias, deref, trait or embedding selection, or by the type checker.
+   * Never the receiver's type alone. Symbol required.
+   */
+  | "declaring-owner";
+/**
+ * A target outside the checkout: a library unit (level 1) or a symbol in it
+ * (level 2). Never read from dependency sources, the network or a resolver.
+ */
+export interface LibraryTarget {
+  /** Lowercase id, e.g. go, go-std, cargo, rust-std, npm, node, dom, typescript-lib. */
+  ecosystem: string;
+  /** Module path, crate or package name, or standard-library unit. */
+  unit: string;
+  /** Symbol path within the unit, as the unit spells it; absent for the unit itself. */
+  symbol?: string;
+  /** Only when the checkout's manifest or lockfile states it; never guessed. */
+  version?: string;
+  /**
+   * Required with a version, and only then: the project path of the clean
+   * context file (manifest or lockfile) in the snapshot that states it.
+   */
+  versionSource?: string;
+  evidence: LibraryEvidence;
+}
+/** A stored library target: its deterministic, project-independent identity. */
+export interface GraphLibrary extends LibraryTarget {
+  id: string;
+}
 export interface GraphLink extends LinkDraft {
   id: string;
   file: string;
@@ -73,14 +122,38 @@ export interface GraphLink extends LinkDraft {
   origin: "parse" | "analysis";
   sourceId: string | null;
   targetId: string | null;
-  resolution: "resolved" | "unresolved" | "ambiguous";
+  /**
+   * resolved: a target in the checkout; library: exactly one library target
+   * and nothing else; ambiguous: a candidate set of at least two targets,
+   * which may mix checkout symbols and library targets.
+   */
+  resolution: "resolved" | "library" | "unresolved" | "ambiguous";
   candidates: { id: string; status: ParseStatus }[];
+  /** Present only when the link has library targets (sorted by id). */
+  libraries?: GraphLibrary[];
   sourceStatus: ParseStatus;
   targetStatus: ParseStatus | null;
 }
 export type LinkResolution = { linkId: string } & (
-  | { targetId: string | null; candidateIds?: never }
-  | { candidateIds: readonly string[]; targetId?: never }
+  | {
+      targetId: string | null;
+      candidateIds?: never;
+      library?: never;
+      libraries?: never;
+    }
+  | {
+      library: LibraryTarget;
+      targetId?: never;
+      candidateIds?: never;
+      libraries?: never;
+    }
+  | {
+      /** Checkout candidates; with libraries, at least two targets in total. */
+      candidateIds: readonly string[];
+      libraries?: readonly LibraryTarget[];
+      targetId?: never;
+      library?: never;
+    }
 );
 /** A relationship discovered after file parsing (e.g. implicit implements). */
 export interface AddedLink {
@@ -93,6 +166,10 @@ export interface AddedLink {
   data?: Json;
   targetId?: string;
   candidateIds?: readonly string[];
+  /** A definite library target. */
+  library?: LibraryTarget;
+  /** Library members of a candidate set (with candidateIds). */
+  libraries?: readonly LibraryTarget[];
 }
 export interface ResolutionResult {
   resolutions: readonly LinkResolution[];
@@ -215,6 +292,7 @@ export interface GraphStorage {
     links: number;
     unresolved: number;
     ambiguous: number;
+    library?: number;
   }>;
   contexts(): StorageResult<ContextFile[]>;
   replaceContexts(files: readonly ContextFile[]): StorageResult<void>;

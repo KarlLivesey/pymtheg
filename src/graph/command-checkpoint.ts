@@ -24,6 +24,7 @@ export const zeroCounts = () => ({
   partial: 0,
   unresolved: 0,
   ambiguous: 0,
+  library: 0,
 });
 export function readMetadata(store: SqliteGraphStore | null): CommandMetadata {
   return {

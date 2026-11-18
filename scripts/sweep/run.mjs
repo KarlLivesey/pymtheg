@@ -111,14 +111,18 @@ export function reasonFamily(reason) {
     .replace(/ Found: ".*"\.$/, "");
 }
 
-export function linkShares({ links, ambiguous, unresolved }) {
-  const resolved = links - ambiguous - unresolved;
-  if (![links, resolved, ambiguous, unresolved].every((value) => Number.isSafeInteger(value) && value >= 0))
+// Each stored resolution class separately. A 0.1.0 CLI reports no library
+// count (schema 3 has none); a library link is never resolved in the checkout.
+export function linkShares({ links, ambiguous, unresolved, library }) {
+  const outside = library ?? 0;
+  const resolved = links - ambiguous - unresolved - outside;
+  if (![links, resolved, ambiguous, unresolved, outside].every((value) => Number.isSafeInteger(value) && value >= 0))
     throw Error("Invalid released graph link counts");
+  const classes = { resolved, ambiguous, unresolved, ...(library === undefined ? {} : { library }) };
   return {
     total: links,
-    resolved, ambiguous, unresolved,
-    percentages: links ? Object.fromEntries(Object.entries({ resolved, ambiguous, unresolved })
+    ...classes,
+    percentages: links ? Object.fromEntries(Object.entries(classes)
       .map(([key, count]) => [key, Math.round(10_000 * count / links) / 100])) : null,
   };
 }

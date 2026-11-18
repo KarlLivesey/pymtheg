@@ -7,7 +7,12 @@ import { LanguageRegistry, matchesPattern } from "./registry.js";
 import { SqliteGraphStore } from "./store.js";
 import { indexProject } from "./indexer.js";
 import { compare, validateResult } from "./identity.js";
-import type { LanguageModule, ParseStatus, SourceRange } from "./types.js";
+import type {
+  LanguageModule,
+  LibraryTarget,
+  ParseStatus,
+  SourceRange,
+} from "./types.js";
 
 export interface ConformanceFixture {
   path: string;
@@ -31,6 +36,8 @@ export interface ConformanceExpectations {
     source: { name: string; kind: string } | null;
     target: Selector | null;
     candidates?: Selector[];
+    /** Library targets: the only target (target null, no candidates) or candidate-set members. */
+    libraries?: LibraryTarget[];
   } & PositionExpectation)[];
 }
 const canonical = (value: unknown): unknown => {
@@ -79,10 +86,10 @@ export async function checkLanguageConformance(
 ): Promise<void> {
   const registry = new LanguageRegistry([module]);
   assert.ok(fixtures.length, "Provide a sample project");
+  const unresolved = (link: ConformanceExpectations["links"][number]) =>
+    link.target === null && !link.candidates?.length && !link.libraries?.length;
   assert.ok(
-    expected.links.some(
-      (link) => link.target === null && !link.candidates?.length,
-    ),
+    expected.links.some(unresolved),
     "Provide an unresolved-link control",
   );
   const scratch = await mkdtemp(join(tmpdir(), "pymtheg-graph-conformance-"));
@@ -183,19 +190,27 @@ export async function checkLanguageConformance(
           candidates: candidateSet(
             link.candidates.map((candidate) => selector(candidate.id)),
           ),
+          ...(link.libraries
+            ? {
+                libraries: candidateSet(
+                  link.libraries.map(({ id: _id, ...library }) => library),
+                ),
+              }
+            : {}),
           ...location(link.file, link.range),
         };
       }),
       expected.links.map((link) => ({
         ...link,
         candidates: candidateSet(link.candidates ?? []),
+        ...(link.libraries?.length
+          ? { libraries: candidateSet(link.libraries) }
+          : { libraries: undefined }),
       })),
     );
     assert.equal(
       store.unresolved().length,
-      expected.links.filter(
-        (link) => link.target === null && !link.candidates?.length,
-      ).length,
+      expected.links.filter(unresolved).length,
     );
     const retryCount = store
       .files()

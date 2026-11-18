@@ -314,3 +314,92 @@ test("candidate overlay rewrites the plan only for matched evidence", () => {
     rmSync(scratch, { recursive: true, force: true });
   }
 });
+
+test("a stored library target is credited as stored; a 0.1.0 link is reconstructed", () => {
+  const library = (target) => ({ resolution: "library", module: "go", kind: "calls", file: "src/main", targetName: "strconv.Quote", library: target });
+  const stored = library({ ecosystem: "go-std", unit: "strconv", symbol: "Quote", evidence: "import-binding" });
+  assert.equal(classify(stored, evidence, project), "outside");
+  assert.deepEqual(externalIdentity(stored, evidence, project, "outside"),
+    { level: 2, unit: "strconv", symbol: "Quote", evidence: "import-binding", gap: null });
+  assert.deepEqual(externalIdentity(library({ ecosystem: "go-std", unit: "strconv", evidence: "import-path" }), evidence, project, "outside"),
+    { level: 1, unit: "strconv", evidence: "import-path", gap: "whole-unit" });
+  assert.deepEqual(externalIdentity(library({ ecosystem: "go-std", unit: "time", symbol: "Time.Equal", evidence: "declaring-owner" }), evidence, project, "outside"),
+    { level: 2, unit: "time", symbol: "Time.Equal", evidence: "declaring-owner", gap: null });
+  assert.deepEqual(externalIdentity(library({ ecosystem: "go-std", unit: "builtin", symbol: "len", evidence: "declared-builtin" }), evidence, project, "outside").level, 2);
+  assert.throws(() => externalIdentity(library(undefined), evidence, project, "outside"), /without a stored target/);
+  // The same site in a schema-3 graph: unresolved, identity rebuilt from its selector.
+  const released = { resolution: "unresolved", module: "go", kind: "calls", file: "src/main", targetName: "strconv.Quote",
+    data: { expr: { ...selector("strconv").expr, n: "Quote" } } };
+  assert.deepEqual(externalIdentity(released, evidence, project, classify(released, evidence, project)),
+    { level: 2, unit: "strconv", symbol: "Quote", evidence: "import-binding", gap: null });
+  const rows = [linkRow("go", "resolved", "eligible", 6),
+    [..."go calls library".split(" "), null, null, "source", "outside", 3, 0, 2, "import-binding", null],
+    [..."go imports library".split(" "), null, null, "source", "outside", 1, 0, 1, "import-path", "whole-unit"],
+    linkRow("go", "unresolved", "unclassified", 10)];
+  const score = libraryScore(rows);
+  assert.deepEqual([score.outside, score.total, score.level2, score.level1], [4, 20, 0.45, 0.5]);
+});
+
+test("coverage accepts stored library rows and rejects a library row without a named unit", () => {
+  const scratch = mkdtempSync(join(tmpdir(), "coverage-library-"));
+  try {
+    const repo = (breakdown) => ({ id: "fixture/repo", commit: "a".repeat(40), language: "rust", outcome: "finished",
+      sourceFiles: [{ module: "rust", scope: "source", readableLines: 10 }], failedSources: [], reviewSites: {}, breakdown });
+    const packet = (breakdown) => ({ schema: "pymtheg.sweep.coverage/v2", release: { package: "fixture" }, columns, repos: [repo(breakdown)] });
+    const put = (filename, data) => {
+      const file = join(scratch, filename);
+      writeFileSync(file, JSON.stringify(data));
+      return file;
+    };
+    const run = (breakdown) => execFileSync(process.execPath, [fileURLToPath(new URL("./coverage.mjs", import.meta.url)),
+      "--results", put("candidate.json", packet(breakdown)), "--scoreboard", join(scratch, "score.md")], { stdio: "pipe" });
+    run([linkRow("rust", "resolved", "eligible", 2), ["rust", "calls", "library", null, null, "source", "outside", 2, 0, 2, "qualified-path", null],
+      linkRow("rust", "unresolved", "unclassified", 1)]);
+    assert.match(readFileSync(join(scratch, "score.md"), "utf8"), /\| fixture\/repo \| Rust \| finished \| 5 \| 2 \| 80\.00%/);
+    assert.throws(() => run([["rust", "calls", "library", null, null, "source", "outside", 2, 0, 0, null, "unknown"]]), /Invalid breakdown/);
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
+test("stored resolution classes, library included, agree with the CLI's counts one class at a time", async () => {
+  const { linkShares } = await import("./run.mjs");
+  const { storedTotalsAgree } = await import("./coverage-rules.mjs");
+  const dist = (path) => new URL(`../../dist/${path}`, import.meta.url).href;
+  const { executeGraph } = await import(dist("graph/commands.js"));
+  const { LanguageRegistry, SqliteGraphStore } = await import(dist("graph/index.js"));
+  const toy = (await import(dist("graph/languages/toy/index.js"))).default;
+  const scratch = mkdtempSync(join(tmpdir(), "coverage-library-store-"));
+  try {
+    const root = join(scratch, "project");
+    execFileSync("cp", ["-r", fileURLToPath(new URL("../../test/fixtures/graph-library-targets/", import.meta.url)), root]);
+    const registry = new LanguageRegistry([toy]);
+    await executeGraph({ command: "index", root }, { registry });
+    // What the runner records as warm.out.
+    const { counts } = JSON.parse(JSON.stringify(await executeGraph({ command: "status", root }, { registry })));
+    assert.deepEqual(linkShares(counts), {
+      total: 6, resolved: 1, ambiguous: 1, unresolved: 1, library: 3,
+      percentages: { resolved: 16.67, ambiguous: 16.67, unresolved: 16.67, library: 50 },
+    });
+    // The 0.1.0 CLI reports no library count.
+    assert.deepEqual(linkShares({ links: 4, ambiguous: 1, unresolved: 1 }).resolved, 2);
+    const store = new SqliteGraphStore(join(root, ".pymtheg/rebuildable/graph.sqlite"), undefined, { readOnly: true });
+    const grouped = new Map();
+    for (const link of store.links()) {
+      const key = `${link.kind}:${link.resolution}`;
+      grouped.set(key, (grouped.get(key) ?? 0) + 1);
+    }
+    store.close();
+    const rows = [...grouped].map(([key, count]) => {
+      const [kind, outcome] = key.split(":");
+      return ["go", kind, outcome, null, null, "source", outcome === "library" ? "outside" : outcome === "unresolved" ? "unclassified" : "eligible", count];
+    });
+    assert.equal(storedTotalsAgree(rows, counts), true);
+    const { library, ...released } = counts;
+    assert.equal(library, 3);
+    assert.equal(storedTotalsAgree(rows, released), false, "a CLI without library counts cannot have stored library rows");
+    assert.equal(storedTotalsAgree(rows, { ...counts, unresolved: counts.unresolved + library, library: 0 }), false);
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+});

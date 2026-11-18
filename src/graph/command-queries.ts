@@ -29,7 +29,8 @@ export type QueryCommand =
   | "callees"
   | "path"
   | "impact"
-  | "file";
+  | "file"
+  | "uses";
 export interface QueryResult {
   status: "ok" | "ambiguous" | "not-found" | "bounded";
   data: Record<string, unknown>;
@@ -65,9 +66,11 @@ export function queryGraph(
       certainty:
         link.resolution === "resolved"
           ? "definite"
-          : link.resolution === "ambiguous"
-            ? "candidate-set"
-            : "unresolved",
+          : link.resolution === "library"
+            ? "library"
+            : link.resolution === "ambiguous"
+              ? "candidate-set"
+              : "unresolved",
       // Where a toolchain decided the link (W3-L2): `decidedBy`, beside the
       // certainty it has as stored (`origin` is the link's parse/analysis
       // origin). Absent for source-only links.
@@ -78,6 +81,15 @@ export function queryGraph(
         ...item,
         symbol: symbol(item.id),
       })),
+      // A library target is outside this project: never a local symbol.
+      ...(link.libraries
+        ? {
+            libraries: link.libraries.map((item) => ({
+              ...item,
+              place: "outside-project" as const,
+            })),
+          }
+        : {}),
     }));
   const select = (input: string): (GraphSymbol & Located)[] => {
     if (/^symbol:[a-f0-9]{64}$/.test(input)) {
@@ -230,6 +242,25 @@ export function queryGraph(
       },
       symbols.length > limit || found.length > limit,
       exists ? "ok" : "not-found",
+    );
+  }
+  if (command === "uses") {
+    const [unit, librarySymbol] = args as [string, string | undefined];
+    if (!unit || (librarySymbol !== undefined && !librarySymbol))
+      throw Error("Expected a library unit and an optional symbol");
+    const found = store.libraryUses(unit, librarySymbol, limit + 1);
+    return result(
+      {
+        library: {
+          unit,
+          ...(librarySymbol === undefined ? {} : { symbol: librarySymbol }),
+          place: "outside-project",
+        },
+        links: links(found.slice(0, limit)),
+        classCounts: store.libraryUseCounts(unit, librarySymbol),
+        limit,
+      },
+      found.length > limit,
     );
   }
   const inputs = args.map((input) => {

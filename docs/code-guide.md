@@ -187,8 +187,13 @@ first row of `symbols`, `links`, `possibleCallers` and `failedFiles`).
 Every call has a certainty:
 
 - `definite`: the graph found exactly this target.
+- `library`: the target is a library outside this project; the row's `library`
+  field names its ecosystem, unit and (when proven) symbol. It is not a missing
+  local symbol. `code_graph` action `uses` (`query` a unit, optional `symbol`)
+  lists the project's links to one. No production language records these yet.
 - `candidate-set`: one of several listed targets (`candidateCount`); read
-  section `candidates` with `ref` set to the link's `ref`. Never pick one.
+  section `candidates` with `ref` set to the link's `ref`. Never pick one. A
+  candidate may be a library (a `library` field instead of a `symbol`).
 - `unresolved`: the target is unknown. When it might be this symbol it appears
   under section `possible_callers` with `matchKind` `target-hint` (the language module
   recorded this symbol as a would-be target), `receiver-qualified` (the written

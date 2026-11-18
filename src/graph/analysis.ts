@@ -1,5 +1,10 @@
 // SPDX-License-Identifier: MIT
-import { addedLinkId, compare, validateResult } from "./identity.js";
+import {
+  addedLinkId,
+  compare,
+  libraryTarget,
+  validateResult,
+} from "./identity.js";
 import type {
   GraphFile,
   GraphLink,
@@ -18,7 +23,11 @@ export function decideLink(
 /** Internal per-pass lookup; callers of decideLink retain its original signature. */
 export class LinkDecider {
   private readonly byId: Map<string, GraphSymbol>;
-  constructor(symbols: readonly GraphSymbol[]) {
+  constructor(
+    symbols: readonly GraphSymbol[],
+    /** Whether a path is a clean manifest/lockfile context file in the snapshot. */
+    private readonly versionSource: (path: string) => boolean = () => false,
+  ) {
     this.byId = new Map(symbols.map((symbol) => [symbol.id, symbol]));
   }
   decide(link: GraphLink, decision: LinkResolution | undefined): GraphLink {
@@ -35,12 +44,29 @@ export class LinkDecider {
       candidates: [],
       resolution: "unresolved",
     };
+    delete next.libraries;
     if (!decision) return next;
-    if (decision.candidateIds !== undefined) {
+    if (decision.library !== undefined) {
       if (
         decision.targetId !== undefined ||
-        decision.candidateIds.length < 2 ||
-        new Set(decision.candidateIds).size !== decision.candidateIds.length
+        decision.candidateIds !== undefined ||
+        decision.libraries !== undefined
+      )
+        throw Error("A library target excludes other targets");
+      next.libraries = [
+        libraryTarget(decision.library, true, this.versionSource),
+      ];
+      next.resolution = "library";
+    } else if (decision.candidateIds !== undefined) {
+      const libraries = (decision.libraries ?? []).map((item) =>
+        libraryTarget(item, false, this.versionSource),
+      );
+      const libraryIds = new Set(libraries.map((item) => item.id));
+      if (
+        decision.targetId !== undefined ||
+        decision.candidateIds.length + libraries.length < 2 ||
+        new Set(decision.candidateIds).size !== decision.candidateIds.length ||
+        libraryIds.size !== libraries.length
       )
         throw Error(
           "Candidates must contain at least two distinct targets, without a definite target",
@@ -48,8 +74,12 @@ export class LinkDecider {
       next.candidates = [...decision.candidateIds]
         .sort(compare)
         .map((id) => ({ id, status: target(id).status }));
+      if (libraries.length)
+        next.libraries = libraries.sort((a, b) => compare(a.id, b.id));
       next.resolution = "ambiguous";
-    } else if (decision.targetId !== null && decision.targetId !== undefined) {
+    } else if (decision.libraries !== undefined)
+      throw Error("Library candidates need candidateIds");
+    else if (decision.targetId !== null && decision.targetId !== undefined) {
       const symbol = target(decision.targetId);
       next.targetId = symbol.id;
       next.targetStatus = symbol.status;
@@ -67,12 +97,14 @@ export function resolutionFacts(
   fileOf: (path: string) => GraphFile | undefined,
   symbols: readonly GraphSymbol[],
   existing: readonly GraphLink[],
+  /** Whether a path is a clean context file in the snapshot (library versions). */
+  versionSource: (path: string) => boolean = () => false,
 ): GraphLink[] {
   const links = existing.filter(
     (link) => link.module === module && link.origin === "parse",
   );
   const linkIds = new Set(links.map((link) => link.id));
-  const decider = new LinkDecider(symbols);
+  const decider = new LinkDecider(symbols, versionSource);
   const symbolsById = new Map(symbols.map((symbol) => [symbol.id, symbol]));
   /** Per file with added links: what validation needs, not the whole record. */
   interface Checked {
@@ -153,12 +185,25 @@ export function resolutionFacts(
       candidates: [],
       resolution: "unresolved",
     };
+    if (
+      [added.candidateIds, added.targetId, added.library].filter(
+        (item) => item !== undefined,
+      ).length > 1 ||
+      (added.libraries !== undefined && added.candidateIds === undefined)
+    )
+      throw Error("Added link cannot have definite and candidate targets");
     const decision: LinkResolution =
       added.candidateIds !== undefined
-        ? { linkId: link.id, candidateIds: added.candidateIds }
-        : { linkId: link.id, targetId: added.targetId ?? null };
-    if (added.candidateIds !== undefined && added.targetId !== undefined)
-      throw Error("Added link cannot have definite and candidate targets");
+        ? {
+            linkId: link.id,
+            candidateIds: added.candidateIds,
+            ...(added.libraries === undefined
+              ? {}
+              : { libraries: added.libraries }),
+          }
+        : added.library !== undefined
+          ? { linkId: link.id, library: added.library }
+          : { linkId: link.id, targetId: added.targetId ?? null };
     output.push(decider.decide(link, decision));
   }
   return output.sort((a, b) => compare(a.id, b.id));

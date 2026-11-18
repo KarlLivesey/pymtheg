@@ -28,6 +28,8 @@ export interface IndexReport {
   links: number;
   unresolved: number;
   ambiguous: number;
+  /** Links whose only target is a library outside the project. */
+  library: number;
   contextFiles: number;
   unclaimedCount: number;
   failedCount: number;
@@ -85,6 +87,7 @@ export async function indexProject(
     links: 0,
     unresolved: 0,
     ambiguous: 0,
+    library: 0,
     contextFiles: 0,
     unclaimedCount: 0,
     failedCount: 0,
@@ -390,6 +393,11 @@ export async function indexProject(
         (path) => needed.get(path),
         await read(() => store.findSymbols()),
         await read(() => parsedLinks(store, module.id)),
+        // A library version must come from a context file this module read.
+        (path) =>
+          ownContexts.some(
+            (file) => file.path === path && file.status === "clean",
+          ),
       );
     } catch (error) {
       // Storage errors propagate; they are not mislabeled as module failures.
@@ -419,6 +427,10 @@ export async function indexProject(
   report.links = counts?.links ?? (await store.links()).length;
   report.unresolved = counts?.unresolved ?? (await store.unresolved()).length;
   report.ambiguous = counts?.ambiguous ?? (await store.ambiguous()).length;
+  report.library =
+    counts?.library ??
+    (await store.links()).filter((link) => link.resolution === "library")
+      .length;
   return report;
 }
 
@@ -463,8 +475,10 @@ async function runResolve(
       files: own(await read(() => store.files())),
       contextFiles: structuredClone(contexts),
       symbols: own(await read(() => store.findSymbols())),
+      // Presented unresolved: no target, candidates or library targets
+      // from the previous run.
       links: own(await read(() => parsedLinks(store, module.id))).map(
-        (link) => ({
+        ({ libraries: _previous, ...link }) => ({
           ...link,
           targetId: null,
           targetStatus: null,
