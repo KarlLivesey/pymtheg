@@ -829,3 +829,46 @@ test("build variants: the declaration every build of the file includes, and cgo 
     "s/sqlite3.go:field:SQLiteConn.db",
   );
 });
+
+test("build variants: a method that may or may not be built with a variant is a choice of configuration", async () => {
+  // mattn/go-sqlite3 _example/vtable: CreateModule is declared in a
+  // `sqlite_vtable` cgo file; the example compiles only where it exists.
+  const { links } = await project({
+    "go.mod": MOD,
+    "s/sqlite3.go": lines(
+      "package s",
+      'import "C"',
+      "type Inner struct{}",
+      "func (Inner) Alt() {}",
+      "type SQLiteConn struct{ Inner }",
+    ),
+    "s/static_mock.go": lines("//go:build !cgo", "", "package s", "type SQLiteConn struct{}"),
+    "s/sqlite3_opt_vtable.go": lines(
+      "//go:build sqlite_vtable",
+      "",
+      "package s",
+      'import "C"',
+      "func (c *SQLiteConn) CreateModule() {}",
+      "func (c *SQLiteConn) Alt() {}",
+    ),
+    "example/main.go": lines(
+      "package main",
+      'import "example.com/m/s"',
+      "func use(c *s.SQLiteConn) {",
+      "\tc.CreateModule()",
+      "\tc.Alt()",
+      "}",
+    ),
+  });
+  assert.equal(
+    at(links, "example/main.go", "c.CreateModule").target,
+    "s/sqlite3_opt_vtable.go:method:(*SQLiteConn).CreateModule",
+  );
+  // Without the tag, Alt is the one promoted from Inner: two answers.
+  const alt = at(links, "example/main.go", "c.Alt");
+  assert.equal(alt.target, null);
+  assert.deepEqual(alt.candidates, [
+    "s/sqlite3.go:method:(Inner).Alt",
+    "s/sqlite3_opt_vtable.go:method:(*SQLiteConn).Alt",
+  ]);
+});

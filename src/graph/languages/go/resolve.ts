@@ -138,7 +138,7 @@ interface View {
    * A type declared in several build variants: a method of this name is
    * declared in a file that may or may not be built with this variant.
    */
-  uncertain?: (name: string, from?: string) => boolean;
+  uncertain?: (name: string, from?: string) => GraphSymbol[];
 }
 interface InterfaceMethod {
   /** Name, plus the declaring package for an unexported name. */
@@ -1498,15 +1498,16 @@ class GoResolver {
           ? symbol.file === type.file
           : !variants || this.buildsWith(symbol.file, type.file) !== false,
       );
-    // Some method of this name might be missing from this variant in the
-    // referencing file's builds: the name is not known at this depth.
+    // The methods of this name that may or may not be part of this variant
+    // in the referencing file's builds.
     const uncertain = (name: string, from?: string) =>
-      variants &&
-      own(name).some(
-        (symbol) =>
-          symbol.kind !== "field" &&
-          this.buildsWith(symbol.file, type.file, from) !== true,
-      );
+      variants
+        ? own(name).filter(
+            (symbol) =>
+              symbol.kind !== "field" &&
+              this.buildsWith(symbol.file, type.file, from) !== true,
+          )
+        : [];
     const declared = (name: string) =>
       own(name).filter((symbol) => symbol.kind === "method");
     const unknown = (externalOnly = false): View => ({
@@ -1753,9 +1754,17 @@ class GoResolver {
               );
           }
         });
-        // A method that may or may not be built with this variant: not known.
-        if (views.some((item) => item.uncertain?.(name, from)))
-          externalAt = Math.min(externalAt ?? depth, depth);
+        // A method that may or may not be built with this variant: one more
+        // choice of configuration (present or absent).
+        const absent = new Set<string>();
+        for (const view of views)
+          for (const method of view.uncertain?.(name, from) ?? []) {
+            const group = `method:${method.id}`;
+            const index = choice.get(group);
+            if (index === undefined) unchosen ??= { group, size: 2 };
+            else if (index === 1) absent.add(method.id);
+          }
+        if (unchosen) return unchosen;
         const found: GraphSymbol[] = [];
         // Interfaces: a flat method set; identical methods inherited along several
         // paths merge, so it is one occurrence and is not expanded further.
@@ -1781,7 +1790,9 @@ class GoResolver {
             .flatMap((item) => item.members(name))
             .filter(
               (symbol) =>
-                this.visible(symbol, from) && this.accessible(symbol, access),
+                !absent.has(symbol.id) &&
+                this.visible(symbol, from) &&
+                this.accessible(symbol, access),
             ),
         );
         if (found.length)
