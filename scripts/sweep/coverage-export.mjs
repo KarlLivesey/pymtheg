@@ -549,7 +549,8 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys) {
             ...(type && declared.get(type, file.path) ? { declaredHere: true } : {}),
             ...(link.module === "go" ? { expr, open: data.open,
               ...(link.kind === "calls" && goFactory(file.path, expr, evidence.goImports) ? { factory: "inside" } : {}) } : {}),
-            ...(link.module === "rust" ? { receiver: data.receiverType, method: data.method, impl: data.implType } : {}),
+            ...(link.module === "rust" ? { receiver: data.receiverType, method: data.method, impl: data.implType,
+              ...(quotas && { receiverBindings: data.genericBindings }) } : {}),
             ...(link.module === "typescript" ? { jsx: data.jsx, specifier: data.specifier ?? evidence.tsImports().get(targetRoot) } : {}) };
         }, quotas?.get(sampleBucket) ?? (quotas ? 6 : sampleSize(sampleBucket)));
       }

@@ -15,6 +15,10 @@ A path dependency is checked against the checkout boundary. Tracked Yarn
 cache archives can establish that a dependency is present. The plan keeps
 runtime dispatch separate from opportunities to identify a definite target.
 
-A candidate build can refresh any subset of the pinned corpus. The progress
-script uses the current bucket of each matched site and recomputes the
+A library method needs evidence of its declaring owner. Rust receiver
+types and Go promoted members can lead to a different owner. Recorded
+bindings keep their identity when a diagnostic changes.
+
+A candidate build can refresh any subset of the pinned corpus. The
+progress script retains the reference design weights and recomputes the
 coverage scores, support points and completion checklist.

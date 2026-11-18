@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { aggregate, estimateCoverage, failedRustInfluence, median, stratumShare } from "./coverage.mjs";
+import { aggregate, auditDesign, estimateCoverage, failedRustInfluence, median, stratumShare } from "./coverage.mjs";
 import { classify, columns, externalIdentity, goImports, libraryScore, repositoryScore, reviewQuotas, rustImports, sampleKey, sampleStratum, sourceScope, workspaceNames } from "./coverage-rules.mjs";
 
 import { cargoPathLocations, checkoutLocation, npmPathLocation, yarnArchivePackages } from "./coverage-locations.mjs";
@@ -37,7 +37,7 @@ test("excludes proved external paths and keeps vendoring, aliases and shadows di
   assert.equal(classifyLink("go", "strconv.Quote", { expr: { k: "sel", x: { k: "local" } } }), "unclassified");
   assert.equal(classifyLink("go", "C", { path: "C" }, "imports"), "unclassified");
   assert.equal(classifyLink("go", "cancel", { expr: { k: "call", f: { ...selector("context").expr, n: "WithCancel" }, i: 1 } }), "outside");
-  assert.equal(classifyLink("go", "response.Body", { expr: { k: "sel", x: { k: "val", t: { q: "http", n: "Response" } } } }), "outside");
+  assert.equal(classifyLink("go", "response.Body", { expr: { k: "sel", x: { k: "val", t: { q: "http", n: "Response" } } } }), "unclassified");
   assert.equal(classifyLink("go", "writer.Write", { expr: { k: "sel", x: { k: "val", t: { q: "http", n: "ResponseWriter" } } } }), "unclassified");
   assert.equal(classifyLink("rust", "filesystem::read", { pathSyntax: "filesystem::read" }), "outside");
   assert.equal(classifyLink("rust", "core::run", {}), "unclassified");
@@ -74,12 +74,36 @@ test("distinguishes named packages, named members, and unproved receivers", () =
   assert.deepEqual(external("rust", "std::fs::read", { pathSyntax: "std::fs::read" }),
     { level: 2, unit: "std", symbol: "fs::read", evidence: "path", gap: null });
   assert.equal(external("rust", "res.unwrap", { method: "unwrap" }), null);
-  assert.equal(external("rust", "res.unwrap", { method: "unwrap", receiverType: "std::result::Result", blocked: true }).level, 0);
-  assert.equal(external("rust", "res.unwrap", { method: "unwrap", receiverType: "std::result::Result" }).symbol, "result::Result::unwrap");
+  assert.equal(external("rust", "res.unwrap", { method: "unwrap", receiverType: "std::result::Result", blocked: true }), null);
+  assert.equal(external("rust", "path.into", { method: "into", receiverType: "std::path::Path" }), null);
+  const dependency = { ...project, rustBindings: (_file, name) => name === "keccak" ? "outside" : project.rustBindings(_file, name) };
+  assert.equal(external("rust", "state.iter", { method: "iter", receiverType: "keccak::State1600" }, "calls", evidence, dependency), null);
+  const externalCrates = { ...project, rustBindings: (_file, name) => ["ropey", "thiserror"].includes(name) ? "outside" : undefined };
+  const importsWithLocalNames = { ...evidence, rustImports: rustImports([
+    { targetName: "ropey::RopeSlice", data: { alias: "RopeSlice" } },
+    { targetName: "helix_stdx::rope::RopeSliceExt", data: { alias: "_" } },
+    { targetName: "thiserror::Error", data: { alias: "Error" } },
+  ]) };
+  // The dot call can pick the checkout's extension trait or the local
+  // enum named Error. Neither the type spelling nor a matching import
+  // establishes a library method owner.
+  for (const [target, type] of [["text.regex_input", "RopeSlice"], ["source.floor_char_boundary", "ropey::RopeSlice"],
+    ["source.ceil_char_boundary", "ropey::RopeSlice"], ["self.to_string", "Error"]]) {
+    const method = target.split(".")[1];
+    assert.equal(external("rust", target, { method, receiverType: type }, "calls", importsWithLocalNames, externalCrates), null);
+  }
+  assert.deepEqual(external("rust", "<T as std::io::Write>::write_all", { pathSyntax: "<T as std::io::Write>::write_all" }),
+    { level: 2, unit: "std", symbol: "io::Write::write_all", evidence: "explicit-trait", gap: null });
+  assert.equal(external("go", "file.Fd", { expr: { k: "sel", n: "Fd", x: { k: "val", t: { q: "os", n: "File" } } } },
+    "calls", { ...evidence, goImports: goImports(imports("os")) }), null);
   const binding = { ...evidence, tsImportMember: (name) => name === "run" ? { specifier: "node:child_process", member: "spawnSync" }
-    : name === "z" ? { specifier: "zod", member: "z" } : undefined };
+    : name === "z" ? { specifier: "zod", member: "z" } : name === "io" ? { specifier: "node:fs", member: "*" } : undefined };
   const declared = { ...project, tsExternal: new Set(["zod"]) };
   assert.equal(external("typescript", "run", { reason: "external-package" }, "calls", binding).symbol, "spawnSync");
+  for (const reason of ["no-symbol", "local"]) {
+    assert.deepEqual(external("typescript", "io.readFile", { reason }, "calls", binding),
+      { level: 2, unit: "node:fs", symbol: "readFile", evidence: "import-binding", gap: null });
+  }
   assert.equal(external("typescript", "z.string", { reason: "external-package" }, "calls", binding, declared).symbol, "z.string");
   assert.equal(external("typescript", "z.string", { reason: "external-package" }, "calls", binding,
     { ...declared, tsPackages: new Set(["zod"]) }), null);
@@ -217,19 +241,25 @@ test("observes full-denominator coverage and weights each sampled site by its li
   assert.ok(Math.abs(stats.variance - .0512) < 1e-10);
 });
 
-test("a matched site changing only its recorded reason follows the current stratum", () => {
+test("a reason-only move between populated strata retains the original design weight", () => {
   const old = bucketFor("no-symbol"), current = bucketFor("external-package");
-  const repo = { id: "fixture/repo", language: "typescript", outcome: "finished", reviewSites: { [old]: 16 },
-    breakdown: [linkRow("typescript", "resolved", "eligible", 48), linkRow("typescript", "unresolved", "unclassified", 16, "source", null, null, null, "no-symbol")] };
-  const sample = { repo: repo.id, key: "same", label: "outside", item: "identify", observations: observed(old) };
-  const candidate = { ...repo, reviewSites: { [current]: 16 },
-    breakdown: [repo.breakdown[0], linkRow("typescript", "unresolved", "unclassified", 16, "source", null, null, null, "external-package")],
-    checks: { same: observed(current) } };
-  const before = estimateCoverage([repo], [sample], "typescript");
-  const after = estimateCoverage([candidate], [sample], "typescript");
-  assert.equal(before.measured.level2, 0.75);
+  const misses = (count, reason) => linkRow("typescript", "unresolved", "unclassified", count, "source", null, null, null, reason);
+  const bound = (reason) => linkRow("typescript", "unresolved", "outside", 1, "source", 2, "import-binding", null, reason);
+  const repo = { id: "fixture/repo", language: "typescript", outcome: "finished", reviewSites: { [old]: 100, [current]: 99 },
+    breakdown: [misses(100, "no-symbol"), misses(99, "external-package"), bound("no-symbol")] };
+  const sample = (key, bucket, label, item) => ({ repo: repo.id, key, label, item, observations: observed(bucket) });
+  const samples = [sample("moves", old, "outside", "identify"), sample("stays", old, "support", "inside"),
+    sample("there1", current, "support", "inside"), sample("there2", current, "support", "inside")];
+  const candidate = { ...repo, reviewSites: { [old]: 99, [current]: 100 },
+    breakdown: [misses(99, "no-symbol"), misses(100, "external-package"), bound("local")],
+    checks: { moves: observed(current), stays: observed(old), there1: observed(current), there2: observed(current) } };
+  const before = estimateCoverage([repo], samples, "typescript");
+  const after = estimateCoverage([candidate], samples, "typescript", undefined, auditDesign([candidate], samples, [repo]));
+  assert.equal(before.measured.level2, 1 / 200);
   assert.equal(after.measured.level2, before.measured.level2);
-  assert.equal(after.support.get("identify").outside, before.support.get("identify").outside);
+  assert.equal(after.support.get("identify").outside, 50);
+  assert.deepEqual(after.support, before.support);
+  assert.deepEqual(after.intervals, before.intervals);
   assert.equal(after.unaudited, 0);
 });
 

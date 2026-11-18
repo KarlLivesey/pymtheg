@@ -12,18 +12,10 @@ export const columns = ["module", "kind", "outcome", "reason", "uncertainty", "s
 export const sampleSeed = 0x7c8a59bd2e41;
 export const sampleSize = (stratum) => ["go:empty", "rust:empty", "rust:receiver", "typescript:no-symbol"].includes(stratum) ? 96 : 32;
 const standardGo = new Set(`archive bufio bytes cmp compress container context crypto database debug embed encoding errors expvar flag fmt go hash html image index io iter log maps math mime net os path plugin reflect regexp runtime slices sort strconv strings sync syscall testing text time unicode unique unsafe weak`.split(" "));
-const goConcrete = new Map(Object.entries({
-  bufio: "Reader Scanner Writer", bytes: "Buffer Reader", "encoding/json": "Decoder Encoder", "html/template": "Template",
-  "mime/multipart": "FileHeader Form Reader Writer", "net/http": "Client Cookie Header Request Response Server ServeMux Transport",
-  "net/http/httptest": "ResponseRecorder Server", "net/url": "URL Values", os: "File", reflect: "Value", regexp: "Regexp",
-  strings: "Builder Reader Replacer", sync: "Map Mutex Once Pool RWMutex WaitGroup", testing: "B F T", "text/template": "Template", time: "Duration Time Timer Ticker",
-}).map(([path, types]) => [path, new Set(types.split(" "))]));
 const standardGoResults = new Map(Object.entries({
   "context.WithCancel": "1:CancelFunc", "context.WithTimeout": "1:CancelFunc", "context.WithDeadline": "1:CancelFunc",
   "context.WithCancelCause": "1:CancelCauseFunc", "context.WithTimeoutCause": "1:CancelFunc", "context.WithDeadlineCause": "1:CancelFunc",
-  "os/signal.NotifyContext": "1:CancelFunc", "net/http/httptest.NewRecorder": "0:ResponseRecorder", "net/http.NewRequest": "0:Request",
-  "net/http.NewRequestWithContext": "0:Request", "net/url.Parse": "0:URL", "reflect.ValueOf": "0:Value", "reflect.Indirect": "0:Value",
-  "bytes.NewBuffer": "0:Buffer", "bytes.NewReader": "0:Reader", "strings.NewReader": "0:Reader",
+  "os/signal.NotifyContext": "1:CancelFunc",
 }));
 const standardRust = new Set(["std", "core", "alloc", "proc_macro", "test"]);
 export const rustPreludeMacros = new Set(`assert assert_eq assert_ne cfg column compile_error concat dbg debug_assert debug_assert_eq debug_assert_ne eprint eprintln env file format format_args include include_bytes include_str line matches module_path option_env panic print println stringify todo unimplemented unreachable vec write writeln`.split(" "));
@@ -227,11 +219,9 @@ function tsSpecifier(link, evidence) {
   // APIs below supply enough origin evidence for their fluent result.
   const name = tsHead(link.targetName);
   if (name) return evidence.tsImports().get(name);
-  if (link.data?.reason === "external-package") {
-    const root = evidence.tsPropertyRoot?.(link.range?.start);
-    const specifier = root && evidence.tsImports().get(root);
-    if (specifier && assertionPackages.has(packageName(specifier))) return specifier;
-  }
+  const root = evidence.tsPropertyRoot?.(link.range?.start);
+  const specifier = root && evidence.tsImports().get(root);
+  if (specifier && assertionPackages.has(packageName(specifier))) return specifier;
   return undefined;
 }
 
@@ -258,10 +248,7 @@ function rustPath(link, evidence) {
     const root = /^\w+/.exec(link.targetName)?.[0];
     return evidence.rustImports.has(root) ? evidence.rustImports.get(root) ?? undefined : link.targetName;
   }
-  if (link.kind === "calls" && link.data?.method) {
-    const receiver = link.data?.receiverType;
-    return /^[\w:]+$/.test(receiver ?? "") && receiver.includes("::") ? receiver : undefined;
-  }
+  if (link.kind === "calls" && link.data?.method) return undefined;
   if (!["calls", "types", "values", "macros"].includes(link.kind)) return undefined;
   const target = link.data?.pathSyntax ?? link.targetName;
   const prefix = /^(?:::)?([\w]+)(?=::|$)/.exec(target)?.[1];
@@ -296,24 +283,22 @@ export function classify(link, evidence, project) {
   if (link.resolution !== "unresolved") return "eligible";
   const { module } = link;
   const data = link.data ?? {};
-  if (["local", "invalid-code", "unresolved-alias", "target-unavailable"].includes(data.reason) ||
-      data.uncertainty?.split("; ").includes("invalid-code")) return "inside";
+  if (data.cause) return "inside";
   if (module === "go") {
     if (data.builtin === true) return "outside";
     const path = goPath(link, evidence.goImports);
     if (path) return goImport(path, project, link.file);
     const expr = data.expr?.k === "inst" ? data.expr.x : data.expr;
-    const origin = goValueOrigin(expr?.k === "sel" ? expr.x : expr, evidence, link, project);
-    if (origin && (expr?.k === "sel" ? goConcrete.get(origin.path)?.has(origin.type)
-      : origin.path === "context" && ["CancelFunc", "CancelCauseFunc"].includes(origin.type))) return "outside";
+    const origin = goValueOrigin(expr, evidence, link, project);
+    if (origin?.path === "context" && ["CancelFunc", "CancelCauseFunc"].includes(origin.type)) return "outside";
   }
   if (module === "typescript") {
     const path = tsSpecifier(link, evidence);
     if (path && (link.data?.specifier || evidence.tsSpecifiers.has(path))) return tsPath(path, project, link.file);
-    if (data.reference === "lib" && data.reason === "external") return "outside";
-    if (data.reference === "types" && data.reason === "external-package" && !project.tsPackages.has(`@types/${link.targetName}`) && project.tsExternal.has(`@types/${link.targetName}`)) return "outside";
+    if (data.reference === "lib") return "outside";
+    if (data.reference === "types" && tsPath(`@types/${link.targetName}`, project, link.file) === "outside") return "outside";
     const head = tsGlobalHead(link.targetName);
-    if (data.reason === "external" && (standardJs.has(head) && evidence.tsGlobal?.(head) || evidence.tsLiteral?.(link.range?.start))) return "outside";
+    if (standardJs.has(head) && evidence.tsGlobal?.(head) || evidence.tsLiteral?.(link.range?.start)) return "outside";
   }
   if (module === "rust") {
     if (link.kind === "modules") return "inside";
@@ -323,10 +308,12 @@ export function classify(link, evidence, project) {
     if (names?.has(link.targetName) && !data.blocked && !data.stdFallbackBlocked && !data.stdFallbackConditional &&
         !evidence.rustImports.has(link.targetName) && project.rustPrelude?.(link.targetName, link.kind)) return "outside";
   }
+  if (["local", "invalid-code", "unresolved-alias", "target-unavailable"].includes(data.reason) ||
+      data.uncertainty?.split("; ").includes("invalid-code")) return "inside";
   return "unclassified";
 }
 
-export const externalEvidenceKinds = ["path", "import-binding", "typed-receiver", "reference-directive"];
+export const externalEvidenceKinds = ["path", "import-binding", "explicit-trait", "reference-directive"];
 export const externalGapKinds = ["whole-unit", "intrinsic", "dependency", "unknown",
   "go-external-result", "rust-std-path", "rust-std-receiver", "ts-runtime"];
 const identifier = /^[\w$]+$/;
@@ -363,12 +350,8 @@ function goExternalIdentity(link, evidence, project) {
     const path = packageOf(receiver.n);
     if (path) return identified(path, expr.n, "import-binding");
   }
-  if (receiver?.k === "val") {
-    const path = packageOf(receiver.t?.q);
-    if (goConcrete.get(path)?.has(receiver.t.n)) {
-      return identified(path, receiver.t.n + "." + expr.n, "typed-receiver");
-    }
-  }
+  // Go selectors can promote a member of an embedded type. A receiver's
+  // written type supplies neither the declaring type nor its package.
   return null;
 }
 
@@ -384,16 +367,19 @@ function rustExternalIdentity(link, evidence, project) {
   };
   if (kind === "imports" || data.externCrate) return externalPath(targetName, "path");
   if (data.blocked || data.stdFallbackBlocked || data.stdFallbackConditional || data.stdFallbackReceiverUnknown) return null;
-  if (kind === "calls" && data.method) {
-    if (!rustNamePath.test(data.receiverType ?? "") || !identifier.test(data.method)) return null;
-    const receiver = data.receiverType;
-    const aliased = evidence.rustImports.get(receiver);
-    // A method name alone is insufficient. The graph must name the receiver's
-    // type, either with its crate path or with a recorded import binding.
-    return receiver.includes("::") || aliased ? externalPath(aliased ?? receiver, "typed-receiver", data.method) : null;
-  }
+  // A dot call supplies a receiver, which may use an alias, deref to a
+  // different type, or select a trait from a different crate.
+  if (kind === "calls" && data.method) return null;
   if (!["calls", "types", "values", "macros", "patterns", "implements"].includes(kind)) return null;
   const path = data.pathSyntax ?? targetName;
+  const traitCall = kind === "calls" && /^<.+\bas\s+((?:::)?\w+(?:::\w+)*)\s*>\s*::\s*(\w+)$/s.exec(path);
+  if (traitCall) {
+    const [, trait, method] = traitCall;
+    const [head, ...parts] = trait.split("::");
+    const alias = evidence.rustImports.get(head);
+    if (alias) return externalPath([alias, ...parts].join("::"), "explicit-trait", method);
+    return evidence.rustImports.has(head) ? null : externalPath(trait, "explicit-trait", method);
+  }
   if (!rustNamePath.test(path)) return null;
   const [head, ...parts] = path.replace(/^::/, "").split("::");
   const alias = !path.startsWith("::") && evidence.rustImports.get(head);
@@ -410,7 +396,6 @@ function tsExternalIdentity(link, evidence, project, disposition) {
     return identified(data.reference === "lib" ? "typescript/lib/" + targetName : "@types/" + targetName,
       null, "reference-directive");
   }
-  if (["dynamic-scope", "computed-specifier", "invalid-code"].includes(data.reason)) return null;
   if (["imports", "exports"].includes(kind)) {
     const path = evidence.tsSpecifierAt?.(range?.start);
     if (evidence.tsSpecifiers.has(path) && external(path)) {
@@ -432,8 +417,7 @@ function tsExternalIdentity(link, evidence, project, disposition) {
 export function externalIdentity(link, evidence, project, disposition) {
   if (link.resolution !== "unresolved") return null;
   const data = link.data ?? {};
-  if (["local", "invalid-code", "unresolved-alias", "target-unavailable"].includes(data.reason) ||
-      data.uncertainty?.split("; ").includes("invalid-code")) return null;
+  if (data.cause) return null;
   const observed = link.module === "go" ? goExternalIdentity(link, evidence, project)
     : link.module === "rust" ? rustExternalIdentity(link, evidence, project)
       : tsExternalIdentity(link, evidence, project, disposition);
@@ -445,12 +429,10 @@ export function externalIdentity(link, evidence, project, disposition) {
     else if (data.expr) gap = "go-external-result";
   }
   if (link.module === "rust" && !data.blocked && !data.stdFallbackReceiverUnknown) {
-    if (data.method) gap = "rust-std-receiver";
-    else if (["types", "macros"].includes(link.kind)) gap = "rust-std-path";
+    if (["types", "macros"].includes(link.kind)) gap = "rust-std-path";
   }
   if (link.module === "typescript") {
-    if (data.reason === "external") gap = "ts-runtime";
-    else if (tsSpecifier(link, evidence)) gap = "dependency";
+    gap = tsSpecifier(link, evidence) ? "dependency" : "ts-runtime";
   }
   return { level: 0, evidence: null, gap };
 }

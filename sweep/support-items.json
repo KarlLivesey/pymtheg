@@ -186,7 +186,7 @@
     {
       "id": "go-generated",
       "module": "go",
-      "title": "Use package identity and build variants for generated Go declarations",
+      "title": "Use package identity and build constraints to select Go declarations",
       "kind": "inside",
       "examples": [
         {
@@ -196,10 +196,10 @@
           "code": "(*TestAllTypes_NestedMessage)(nil), // 4: hybrid.goproto.proto.test3.TestAllTypes.NestedMessage"
         },
         {
-          "repo": "protocolbuffers/protobuf-go",
-          "file": "internal/testprotos/testeditions/testeditions_hybrid/test.hybrid.pb.go",
-          "line": 2847,
-          "code": "func (x *TestManyMessageFieldsMessage) GetF20() *TestAllTypes {"
+          "repo": "cilium/ebpf",
+          "file": "link/perf_event.go",
+          "line": 275,
+          "code": "return fd.File(\"perf-event\")"
         }
       ]
     },
@@ -260,26 +260,6 @@
           "file": "internal/testprotos/legacy/proto2_20180125_92554152/test.pb.go",
           "line": 2634,
           "code": "ExtendedType:  (*Message)(nil),"
-        }
-      ]
-    },
-    {
-      "id": "go-stdlib",
-      "module": "go",
-      "title": "Identify standard Go packages and symbols in type references",
-      "kind": "library",
-      "examples": [
-        {
-          "repo": "cli/cli",
-          "file": "pkg/cmd/agent-task/view/view_test.go",
-          "line": 768,
-          "code": "capiStubs: func(t *testing.T, m *capi.CapiClientMock) {"
-        },
-        {
-          "repo": "evanw/esbuild",
-          "file": "internal/compat/compat_test.go",
-          "line": 74,
-          "code": "t.Run(fmt.Sprintf(\"%q ? %q\", at, bt), func(t *testing.T) {"
         }
       ]
     },
@@ -590,7 +570,7 @@
     {
       "id": "rust-std-receiver",
       "module": "rust",
-      "title": "Identify standard or dependency methods from Rust receiver types",
+      "title": "Find the declaring owner of a Rust library method",
       "kind": "library",
       "examples": [
         {
@@ -600,10 +580,10 @@
           "code": "fs::write(testdir_path.join(\"b_file\"), \"\").unwrap();"
         },
         {
-          "repo": "tokio-rs/axum",
-          "file": "examples/parse-body-based-on-content-type/src/main.rs",
-          "line": 69,
-          "code": "if content_type.starts_with(\"application/x-www-form-urlencoded\") {"
+          "repo": "crossbeam-rs/crossbeam",
+          "file": "crossbeam-deque/tests/fifo.rs",
+          "line": 257,
+          "code": "done.store(true, SeqCst);"
         }
       ]
     },

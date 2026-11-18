@@ -21,11 +21,48 @@ project’s code. The library proof uses captured graph facts and checkout
 locations. The optional dependency information in the plan was not
 consulted for these measurements.
 
+Level 2 requires a declaring method owner. The previous shortcut used
+the receiver name as the owner. The RustCrypto `State1600` array alias
+would therefore take credit for a slice method, and Actix's `&Path`
+would take credit for `Into::into`. The Rust dot calls and Go's
+potentially promoted selectors now stay unclassified when the owner
+is missing. A directly qualified library name or named trait can
+still establish the declaring unit and symbol.
+
+The overlay regression moves a site between two populated diagnostic
+buckets in a 200-link fixture. The library item retains its 50-link
+estimate. A `node:fs` binding earns the same Level 2 credit under
+`no-symbol` and `local`.
+
+The source audit labels ripgrep's `caps.get(0)` at
+`crates/matcher/src/lib.rs:840` as a candidate set. `Self::Captures::get`
+has checkout implementations in both the regex and PCRE2 matchers. This
+site was in the previous draw and fell outside the new fixed-seed draw
+after its receiver moved to the unclassified stratum. The follow-up
+label contributes no sampling weight.
+
+At cilium/ebpf's `link/perf_event.go:275`, both the caller and
+`internal/sys/fd_other.go` require `!windows`. The implicit Windows
+constraint on `internal/sys/fd_windows.go` excludes that stored
+candidate from this call. The gap is caller-aware build filtering.
+
 The replay preserved every repository's link total and completion outcome.
-Pebble, Fiber, golang/tools, PocketBase and protobuf-go had small changes
-in their Go outcome counts compared with the previous SW-3 archive. The
-boundary checks and stored library evidence also refine the strict-inside
-partition, so that metric can move even with identical graph counts.
+Pebble, golang/tools and PocketBase had small changes in Go outcomes
+compared with `82af34d2`. Apply both scoring rules to the same released
+graphs to isolate the method proof change. The fix to diagnostic handling
+did not move Level 2 on this replay.
+
+| Module | Before | After | Change (pp) |
+| --- | ---: | ---: | ---: |
+| Go | 77.0163% | 74.1651% | −2.8512 |
+| Rust | 33.4832% | 33.2695% | −0.2136 |
+| TypeScript / JS | 48.0225% | 48.0225% | 0.0000 |
+
+The old rule credited 42,346 Go selectors and 1,454 Rust dot calls based
+on receiver spellings. The replay also found four Rust calls with an
+explicitly named declaring trait that now earn Level 2 credit. TypeScript
+and JavaScript use stored import bindings and named paths for library
+symbols, so they had no receiver-type shortcuts to remove.
 
 The bundle comparison uses the filename and long-line rules documented
 in the sweep guide. It retains the vendored Ace bundle under mdBook's

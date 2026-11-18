@@ -137,43 +137,86 @@ function boundaryMargin(share, sites, populationSites, populationLinks) {
   return margin;
 }
 
-const observationsFor = (sample, repo) => repo.checks ? repo.checks[sample.key] ?? [] : sample.observations;
+const reviewable = (fact) => fact.state === "unresolved" || fact.state === "ambiguous";
+
+// The draw was stratified before the candidate ran. Pair multiplicities at
+// each source site, preferring unchanged observations, then reason-only
+// moves. A changed outcome stops contributing its original miss weight.
+function referencePairs(draw, current) {
+  const pairs = draw.filter(({ fact }) => reviewable(fact)).map((row) => ({ ...row, left: row.fact.links, remaining: [] }));
+  const available = current.map((fact) => ({ fact, left: fact.links }));
+  for (const matches of [
+    (a, b) => a.bucket === b.bucket && a.state === b.state,
+    (a, b) => a.state === b.state,
+  ]) for (const pair of pairs) for (const next of available) {
+    if (!pair.left || !next.left || !matches(pair.fact, next.fact)) continue;
+    const count = Math.min(pair.left, next.left);
+    pair.left -= count;
+    next.left -= count;
+    pair.remaining.push({ ...next.fact, links: count });
+  }
+  return pairs;
+}
 
 function reviewedBuckets(repos, samples) {
   const active = new Map(repos.filter(finished).map((row) => [row.id, row]));
   const grouped = new Map();
-  const bySite = Map.groupBy(samples, (sample) => sample.key);
-  for (const original of samples) {
-    let sample = original;
-    const repo = active.get(sample.repo);
-    if (!repo) continue;
-    if (repo.checks) {
-      const labels = bySite.get(sample.key);
-      if (labels[0] !== sample) continue;
-      if (labels.some((other) => other.label !== sample.label || other.item !== sample.item || other.horizon !== sample.horizon)) {
-        sample = { ...sample, label: "unknown", item: null, horizon: null, closed: null };
-      }
-    }
-    for (const fact of observationsFor(sample, repo)) {
-      if (fact.state !== "unresolved" && fact.state !== "ambiguous") continue;
+  for (const rows of Map.groupBy(samples, (row) => row.key).values()) {
+    const repo = active.get(rows[0].repo);
+    const draw = rows.flatMap((sample) => sample.observations.map((fact) => ({ sample, fact })));
+    const pairs = repo?.checks ? referencePairs(draw, repo.checks[rows[0].key] ?? []) : draw
+      .filter(({ fact }) => reviewable(fact)).map((row) => ({ ...row, remaining: repo ? [row.fact] : [] }));
+    for (const { sample, fact, remaining } of pairs) {
       const sites = grouped.get(fact.bucket) ?? new Map();
-      if (!grouped.has(fact.bucket)) grouped.set(fact.bucket, sites);
-      const site = sites.get(sample.key) ?? { ...sample, links: 0, outside: 0, dependency: 0, dynamic: 0, closed: 0, unknown: 0 };
+      grouped.set(fact.bucket, sites);
+      const site = sites.get(sample.key) ?? { ...sample, links: 0, remaining: 0, outside: 0, dependency: 0, dynamic: 0, closed: 0, unknown: 0 };
       site.links += fact.links;
-      if (sample.label === "outside") site.outside += fact.links;
-      if (sample.horizon === "dependency") site.dependency += fact.links;
-      if (sample.label === "dynamic") site.dynamic += fact.links;
-      if (sample.horizon === "intrinsic") site.intrinsic = (site.intrinsic ?? 0) + fact.links;
-      if (sample.label === "unknown") site.unknown += fact.links;
-      const candidateKey = fact.candidateKey ?? (!repo.checks ? sample.candidateKey : null);
-      if (fact.state === "ambiguous" && sample.closed && candidateKey === sample.candidateKey) site.closed += fact.links;
+      for (const next of remaining.filter(reviewable)) {
+        site.remaining += next.links;
+        if (sample.label === "outside") site.outside += next.links;
+        if (sample.horizon === "dependency") site.dependency += next.links;
+        if (sample.horizon === "intrinsic") site.intrinsic = (site.intrinsic ?? 0) + next.links;
+        if (sample.label === "dynamic") site.dynamic += next.links;
+        if (sample.label === "unknown") site.unknown += next.links;
+        const candidateKey = next.candidateKey ?? (!repo?.checks ? sample.candidateKey : null);
+        if (next.state === "ambiguous" && sample.closed && candidateKey === sample.candidateKey) site.closed += next.links;
+      }
       sites.set(sample.key, site);
     }
   }
   return grouped;
 }
 
-export function estimateCoverage(repos, samples, module, allowed = scopes, population = reviewPopulation(repos), grouped = reviewedBuckets(repos, samples)) {
+function designDomain(bucket) {
+  const [module, , scope, disposition] = bucket.split(":");
+  return `${module}:${scope}:${disposition === "eligible" ? "ambiguous" : "unresolved"}`;
+}
+
+export function auditDesign(repos, samples, baseline = repos) {
+  const population = reviewPopulation(baseline);
+  const grouped = reviewedBuckets(repos, samples);
+  const sitePopulation = new Map();
+  for (const repo of baseline.filter(finished)) for (const [bucket, count] of Object.entries(repo.reviewSites)) {
+    sitePopulation.set(bucket, (sitePopulation.get(bucket) ?? 0) + count);
+  }
+  const remaining = new Map();
+  const actual = new Map();
+  for (const [key, count] of reviewPopulation(repos)) {
+    const domain = designDomain(key);
+    actual.set(domain, (actual.get(domain) ?? 0) + count);
+  }
+  for (const [key, count] of population) {
+    const domain = designDomain(key);
+    const sites = [...grouped.get(key)?.values() ?? []];
+    const weight = stratumShare(sites, sitePopulation.get(key) ?? 0, "remaining").share;
+    remaining.set(domain, (remaining.get(domain) ?? 0) + count * weight);
+  }
+  const factors = new Map([...remaining].map(([key, count]) => [key, count ? Math.min(1, (actual.get(key) ?? 0) / count) : 1]));
+  return { population, grouped, sitePopulation, factors, actual, remaining, baseline };
+}
+
+export function estimateCoverage(repos, samples, module, allowed = scopes, design = auditDesign(repos, samples)) {
+  const { population, grouped, sitePopulation, factors, actual, remaining, baseline } = design;
   const measured = aggregate(repos, module, allowed).weighted;
   const output = { measured, support: new Map(), outside: 0, dynamic: 0, closed: 0, dependency: 0, intrinsic: 0,
     unknownUnresolved: 0, insideOrUnknownUnresolved: 0, unaudited: 0, sampleCount: 0 };
@@ -181,40 +224,42 @@ export function estimateCoverage(repos, samples, module, allowed = scopes, popul
   const stratumVariances = new Map();
   const tails = Object.fromEntries(Object.keys(variance).map((category) => [category, { lower: 0, upper: 0 }]));
   const proven = (gap) => measured.gaps.get(gap) ?? 0;
-  const sitePopulation = new Map();
-  for (const repo of repos.filter(finished)) for (const [bucket, count] of Object.entries(repo.reviewSites)) {
-    sitePopulation.set(bucket, (sitePopulation.get(bucket) ?? 0) + count);
+  for (const [key, total] of actual) {
+    const [language, scope, disposition] = key.split(":");
+    if ((module !== "overall" && module !== language) || !allowed.includes(scope)) continue;
+    const remainder = Math.max(0, total - (remaining.get(key) ?? 0));
+    output.unaudited += remainder;
+    if (disposition === "unresolved") {
+      output.insideOrUnknownUnresolved += total;
+      output.unknownUnresolved += remainder;
+    }
   }
   for (const [key, count] of population) {
     const [language, , scope, disposition] = key.split(":");
     if ((module !== "overall" && language !== module) || !allowed.includes(scope)) continue;
     const sites = [...grouped.get(key)?.values() ?? []];
     const ambiguous = disposition === "eligible";
-    if (!ambiguous) output.insideOrUnknownUnresolved += count;
-    if (!sites.length) {
-      output.unaudited += count;
-      if (!ambiguous) output.unknownUnresolved += count;
-    }
-    output.sampleCount += sites.length;
+    const scale = factors.get(designDomain(key)) ?? 1;
+    output.sampleCount += sites.filter((site) => site.remaining > 0).length;
     for (const category of ["outside", "dynamic", "closed", "dependency", "intrinsic", "unknown"]) {
       if (category === "closed" && !ambiguous) continue;
       const populationSites = sitePopulation.get(key) ?? 0;
       const { share, variance: within } = stratumShare(sites, populationSites, category);
-      if (!ambiguous && (category === "outside" || category === "dynamic")) output.insideOrUnknownUnresolved -= count * share;
+      if (!ambiguous && (category === "outside" || category === "dynamic")) output.insideOrUnknownUnresolved -= scale * count * share;
       if (category === "unknown") {
-        if (!ambiguous) output.unknownUnresolved += count * share;
+        if (!ambiguous) output.unknownUnresolved += scale * count * share;
         continue;
       }
-      output[category] += count * share;
+      output[category] += scale * count * share;
       if (Object.hasOwn(variance, category)) {
         if (within === null) {
-          tails[category].lower += count * share;
-          tails[category].upper += count * (1 - share);
+          tails[category].lower += scale * count * share;
+          tails[category].upper += scale * count * (1 - share);
         } else {
           const { lower, upper } = boundaryMargin(share, sites, populationSites, count);
-          tails[category].lower += lower;
-          tails[category].upper += upper;
-          const value = count ** 2 * within;
+          tails[category].lower += scale * lower;
+          tails[category].upper += scale * upper;
+          const value = (scale * count) ** 2 * within;
           variance[category] += value;
           if (!stratumVariances.has(key)) stratumVariances.set(key, {});
           stratumVariances.get(key)[category] = value;
@@ -222,15 +267,15 @@ export function estimateCoverage(repos, samples, module, allowed = scopes, popul
       }
     }
     const reviewedLinks = sites.reduce((sum, site) => sum + site.links, 0);
-    for (const { label, item, repo, links, horizon } of sites) {
-      if (!item || horizon || !["support", "outside"].includes(label)) continue;
+    for (const { label, item, repo, remaining, horizon } of sites) {
+      if (!remaining || !item || horizon || !["support", "outside"].includes(label)) continue;
       const entry = output.support.get(item) ?? { inside: 0, outside: 0, repos: new Set() };
-      entry[label === "outside" ? "outside" : "inside"] += count * links / reviewedLinks;
+      entry[label === "outside" ? "outside" : "inside"] += scale * count * remaining / reviewedLinks;
       entry.repos.add(repo);
       output.support.set(item, entry);
     }
   }
-  const overlapping = new Set(repos.filter(finished).flatMap((row) =>
+  const overlapping = new Set(baseline.filter(finished).flatMap((row) =>
     (row.reviewOverlap ?? []).map((pair) => JSON.stringify(pair))));
   for (const pair of overlapping) {
     const [a, b] = JSON.parse(pair).map((key) => stratumVariances.get(key));
@@ -321,29 +366,28 @@ function renderScore(repos, input, base, baseline, samples) {
     "The closed-set alternative adds the sample estimate for verified complete candidate sets. Candidate evaluations reuse the reference sample.", "",
     "| Files counted | Module | Graphs | Level 2 | Level 1 | L2 + verified closed sets (95% interval) | L2 median | Strict-inside weighted / median | Raw |",
     "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"];
-  const population = reviewPopulation(repos);
-  const reviewed = reviewedBuckets(repos, samples);
+  const design = auditDesign(repos, samples, baseline);
   for (const [label, allowed] of variants) for (const module of [...modules, "overall"]) {
     const a = aggregate(repos, module, allowed);
-    const { closedCoverage, intervals } = estimateCoverage(repos, samples, module, allowed, population, reviewed);
+    const { closedCoverage, intervals } = estimateCoverage(repos, samples, module, allowed, design);
     const closedRange = intervals.closed.map((n) => percent(ratio(a.weighted.resolved + a.weighted.symbol + Math.min(n, a.weighted.ambiguous), a.weighted.total))).join("–");
     lines.push(`| ${label} | ${names[module]} | ${a.observed} | ${percent(a.weighted.level2)} | ${percent(a.weighted.level1)} | ${percent(closedCoverage)} (${closedRange}) | ${percent(a.median.level2)} | ${percent(a.weighted.adjusted)} / ${percent(a.median.adjusted)} | ${percent(a.weighted.raw)} |`);
   }
   if (base) {
-    lines.push("", "### Candidate sampling", "", "| Module | Remaining reference sites used | Missed links in buckets with no remaining sample |",
+    lines.push("", "### Candidate sampling", "", "| Module | Remaining reference sites used | Missed links outside the remaining projection |",
       "| --- | ---: | ---: |");
     for (const module of modules) {
-      const { sampleCount, unaudited } = estimateCoverage(repos, samples, module, scopes, population, reviewed);
+      const { sampleCount, unaudited } = estimateCoverage(repos, samples, module, scopes, design);
       lines.push(`| ${names[module]} | ${number(sampleCount)} | ${number(unaudited)} |`);
     }
   }
   lines.push("", "## What the released store says about outside links", "",
     "Unit and symbol counts are exact on stored links with proof of outside origin. The final column estimates additional outside sites whose current facts name neither.",
-    "The schema can recover these identities from paths, import bindings, typed-receiver spellings or directives. The target-ID slot points to a symbol in a captured file. The released graph has no first-class external target nodes.", "",
+    "The audit recovers these identities from paths, import bindings, named declaring traits or directives. The target-ID slot points to a symbol in a captured file. The released graph has no first-class external target nodes.", "",
     "| Module | Proven outside | Named unit, including L2 | Unit only | Unit and symbol | Neither, proven outside | Additional outside with neither (95% interval) |",
     "| --- | ---: | ---: | ---: | ---: | ---: | ---: |");
   for (const module of [...modules, "overall"]) {
-    const a = estimateCoverage(repos, samples, module, scopes, population, reviewed);
+    const a = estimateCoverage(repos, samples, module, scopes, design);
     const m = a.measured;
     lines.push(`| ${names[module]} | ${[m.provenOutside, m.identifiedUnit, m.unitOnly, m.symbol, m.neither].map(number).join(" | ")} | ${number(a.outside)} (${a.intervals.outside.map(number).join("–")}) |`);
   }
@@ -407,9 +451,10 @@ function renderPlan(repos, baseline, items, samples, isProgress) {
   const currentFailures = [...active.values()].flatMap((repo) => repo.failedSources.map((row) => ({ ...row, repo: repo.id })));
   const previousFailures = baseline.filter((repo) => finished(repo) && active.has(repo.id)).flatMap((repo) => repo.failedSources);
   const tainted = repos.map((repo) => failedRustInfluence(repo)).filter((row) => row.missing);
+  const design = auditDesign(repos, samples, baseline);
   const example = ({ repo, file, line, code: source }) => `${repo} ${code(`${file}:${line}`)} ${code(source)}`;
   for (const module of modules) {
-    const forecast = estimateCoverage(repos, samples, module);
+    const forecast = estimateCoverage(repos, samples, module, scopes, design);
     const { measured, support } = forecast;
     const gain = (row) => ratio(row.inside + row.outside, measured.total) ?? 0;
     const density = donorDensity(baseline, module);
@@ -473,11 +518,22 @@ function renderPlan(repos, baseline, items, samples, isProgress) {
     const intrinsics = forecast.intrinsic + (measured.gaps.get("intrinsic") ?? 0);
     const unattributedOutside = measured.gaps.get("unknown") ?? 0;
     lines.push("", `**${percent(measured.level2)} baseline → ${percent(score())} after the listed items (+${points((score() ?? 0) - (measured.level2 ?? 0))}) → ${percent(forecast.ceiling)} source-only ceiling.** ${number(forecast.unknownUnresolved)} unresolved links remain unexplained (${percent(forecast.unexplained)} of links estimated inside or still unclassified). ${number(forecast.dynamic)} estimated links have valid alternatives, ${number(wholeUnit)} name a unit only by design, and ${number(intrinsics)} are language intrinsics without a library symbol.`,
-      `About ${number(forecast.dependency)} links need dependency information (${forecast.intervals.dependency.map(number).join("–")} from the sample and exact gaps). Resolving them all could lift the ceiling to ${percent(forecast.ceilingWithMetadata)}.`);
+      `About ${number(forecast.dependency)} links need dependency information (${forecast.intervals.dependency.map(number).join("–")} from the sample and exact gaps). The ${percent(forecast.ceilingWithMetadata)} ceiling assumes all of those misses are recovered.`);
+    if (module === "go" && forecast.ceiling !== null && forecast.ceiling < 0.9) {
+      lines.push(`Go stays below 90% on the source-only Level 2 estimate (${percent(forecast.ceiling)}).`);
+    }
+    if (module === "go" && forecast.ceiling !== null) {
+      const recordedBuiltins = measured.gaps.get("intrinsic") ?? 0;
+      const withBuiltins = ratio(measured.resolved + measured.symbol + recordedBuiltins, measured.total);
+      lines.push(`**Should identified Go builtins count?** The current Level 2 measure gives ${percent(measured.level2)} and a source-only ceiling of ${percent(forecast.ceiling)}. Crediting the ${number(recordedBuiltins)} recorded builtin links would give ${percent(withBuiltins)} and a ceiling of ${percent(forecast.ceiling + recordedBuiltins / measured.total)}.`);
+      if (forecast.intrinsic) {
+        lines.push(`If the estimated ${number(forecast.intrinsic)} additional intrinsic calls were also identified, the ceiling would be ${percent(forecast.ceiling + intrinsics / measured.total)}.`);
+      }
+    }
     if (unattributedOutside) lines.push(`${number(unattributedOutside)} proved outside links also lack an identified support shape.`);
     if (module === "rust") {
       const modelled = rows.filter((row) => ["rust-value", "rust-let"].includes(row.id)).reduce((sum, row) => sum + gain(row), 0);
-      lines.push(`The previous strict-inside plan assigned about 22 pp to local binding anchors and source-only local receiver inference. Those choices account for ${points(modelled)} on this denominator. The library receiver item prices the separate gain from identifying an outside receiver.`);
+      lines.push(`The previous strict-inside plan assigned about 22 pp to local binding anchors and source-only local receiver inference. Those choices account for ${points(modelled)} on this denominator. The library receiver item requires the declaring owner. A checkout trait declaring the same method or a local type shadowing the imported name must be ruled out before taking library credit from a receiver.`);
     }
   }
   return lines.join("\n");

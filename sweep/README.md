@@ -113,15 +113,18 @@ The export derives an identity only from precise facts already captured.
 
 - **Go.** A literal import gives the full package path. A named selector
   or qualified type provides a symbol through an explicit import alias
-  or a standard package name. A stored typed receiver can identify a
-  member when it uses a known concrete standard type. Unproved default
+  or a standard package name. A receiver type alone leaves open whether
+  a method or field is promoted from an embedded type. Unproved default
   dependency package names and interface dispatch need more evidence.
   Vendored paths and checked-in module replacements stay inside.
 - **Rust.** A qualified path gives a crate and, when named, a member path.
-  A glob or bare crate use identifies a unit only. A method needs an
-  unblocked receiver name with a qualified type or a recorded import
-  binding. An unqualified standard prelude spelling can help explain an
-  outside miss. It carries no stored unit by itself.
+  A glob or bare crate use identifies a unit only. An explicitly
+  qualified trait call can identify the declaring trait and method
+  through a crate path or import binding. A dot call's receiver type
+  can be an alias, use deref or dispatch through a trait from another
+  crate. Those receiver facts alone earn no unit or symbol credit.
+  An unqualified standard prelude spelling can help explain an outside
+  miss. It carries no stored unit by itself.
 - **TypeScript and JavaScript.** A stored literal specifier identifies
   the module. A named import binds the recorded imported name to that
   module at its captured source position. Subsequent direct selectors
@@ -185,10 +188,12 @@ node scripts/sweep/coverage.mjs --results /tmp/pymtheg-candidate-coverage.json \
 After a full run or subset overlay, `--scoreboard FILE` also writes the rates
 and per-repository table. For an archived baseline, pass only its breakdown
 as `--results`. The plan retains its prose and replaces the marked table and
-running totals. The candidate estimate reweights the labelled reference sample in each
-matched link’s current bucket. The exporter records current reason, outcome
-and multiplicity. Buckets with no remaining reference observations are
-reported in the candidate scoreboard. A changed graph without matching
-reference observations contributes measured counts immediately. Item status
-tracks observed resolution or library identification at reference sites.
-Refresh the sample to review the shapes in a materially changed corpus.
+running totals. The exporter records each matched site's current reason,
+outcome and multiplicity. The estimate keeps its original sampling stratum
+and weight when a diagnostic changes. A sample only contributes to remaining
+misses while its outcome still matches. The estimate caps weighted misses at
+the current measured total for each language, scope and outcome, and reports
+any uncovered remainder. A changed graph without matching observations
+contributes measured counts immediately. Item status tracks observed
+resolution or library identification at reference sites. Refresh the sample
+to review the shapes in a materially changed corpus.
