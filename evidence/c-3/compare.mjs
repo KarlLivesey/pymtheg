@@ -109,9 +109,10 @@ for (const repo of current) {
       for (const [key, links] of updated) {
         const old = original.get(key) ?? [];
         for (const link of links) {
-          if (link.data?.reason === "workspace-build-output-missing")
+          const reason = link.data?.reasonWithoutConfig ?? link.data?.reason;
+          if (reason === "workspace-build-output-missing")
             run.buildOutput++;
-          if (link.data?.reason === "workspace-entry-unavailable")
+          if (reason === "workspace-entry-unavailable")
             run.workspaceEntry++;
           if (
             !verified(link) ||
