@@ -281,14 +281,6 @@ const directoryOf = (path: string) => {
 };
 const exported = (name: string) => /^\p{Lu}/u.test(name);
 const unique = <T>(items: T[]) => [...new Set(items)];
-/** Directories the go tool ignores when importing (testdata, _x, .x). */
-const ignoredDirectory = (directory: string) =>
-  directory
-    .split("/")
-    .some(
-      (part) =>
-        part === "testdata" || part.startsWith("_") || part.startsWith("."),
-    );
 /** Package name a non-project import is conventionally referred to by (only used to recognise qualifiers). */
 export function conventionalName(path: string): string {
   const parts = path.split("/");
@@ -823,13 +815,14 @@ class GoResolver {
     from: FileInfo,
     path: string,
   ): { pkgs: Pkg[]; uncertain: boolean; failed?: string[] } {
-    const destinations = directoryOfImport(this.layout, from.directory, path);
-    const directories = destinations.directories.filter(
-      (directory) => !ignoredDirectory(directory),
+    // A package under `testdata`, `_x` or `.x` is imported like any other (the
+    // go tool skips those directories only when expanding `./...` patterns),
+    // and a module may itself sit under one (cli/cli's `.github/…/tool`).
+    const { directories, outside } = directoryOfImport(
+      this.layout,
+      from.directory,
+      path,
     );
-    const outside =
-      destinations.outside ||
-      directories.length < destinations.directories.length;
     if (!directories.length) return { pkgs: [], uncertain: false };
     const parts = path.split("/");
     const internal = parts.lastIndexOf("internal");
@@ -1270,6 +1263,12 @@ class GoResolver {
       }
       case "sel":
         return this.select(desc, from, depth);
+      case "unknown":
+        // A call whose callee is not described (`(*p.T)(x)`, `(<-fc)()`):
+        // the value of calling what is written, as the backstop reads it.
+        return desc.m?.length === 1
+          ? this.denote({ k: "call", f: desc.m[0]!, i: 0 }, from, depth + 1)
+          : { e: "value", type: UNKNOWN };
       default:
         return { e: "value", type: UNKNOWN };
     }
@@ -1319,7 +1318,14 @@ class GoResolver {
     if (callee.e !== "syms") return UNKNOWN;
     if (callee.syms.every(isTypeSymbol))
       return this.typeSyms(callee.syms, depth + 1);
-    const results = callee.syms.map((symbol) => {
+    // A function declared in several build variants: only the variants that
+    // can be built with the file the call is written in are called there.
+    const buildable = callee.syms.filter(
+      (symbol) => this.buildTogether(from, symbol.file) !== false,
+    );
+    const callees =
+      callee.syms.length > 1 && buildable.length ? buildable : callee.syms;
+    const results = callees.map((symbol) => {
       if (symbol.kind === "function" || symbol.kind === "method") {
         const data = (symbol.data ?? {}) as { results?: Desc[] };
         const result = data.results?.[desc.i];
@@ -3216,6 +3222,14 @@ class GoResolver {
   }
 
   private resolveExpression(desc: Desc, link: GraphLink): Decision {
+    if (desc.k === "unknown" && desc.m?.length === 1 && link.kind === "calls") {
+      // A callee not described is a conversion when what is written in it
+      // names a type: `(*T)(x)`, `(*p.T)(nil)` call T as `T(x)` does.
+      const written = this.denote(desc.m[0]!, link.file, 0);
+      if (written.e === "syms" && written.syms.every(isTypeSymbol))
+        return this.resolveExpression(desc.m[0]!, link);
+      return UNRESOLVED;
+    }
     if (desc.k === "sel") {
       const base = this.denote(staticDesc(desc.x), link.file, 0);
       if (base.e === "unknown" && base.cause) return failed(base.cause);

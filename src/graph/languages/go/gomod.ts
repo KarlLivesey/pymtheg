@@ -91,7 +91,13 @@ function replacement(
   const version = fromParts[1];
   const toPath = unquote(to?.split(/\s+/)[0] ?? "");
   if (!fromPath || !toPath) return undefined;
-  const local = toPath.startsWith("./") || toPath.startsWith("../");
+  // A directory path, as Go reads one (modfile.IsDirectoryPath): `.`, `..`,
+  // or beginning with `./` or `../` (gopls: `replace golang.org/x/tools => ..`).
+  const local =
+    toPath === "." ||
+    toPath === ".." ||
+    toPath.startsWith("./") ||
+    toPath.startsWith("../");
   // A module path, or a directory leaving the project: outside (no directory).
   const target = local ? joinDirectory(directory, toPath) : undefined;
   return {

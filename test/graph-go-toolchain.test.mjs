@@ -3,6 +3,7 @@
 // test/fixtures/graph-go-toolchain/ are compiler-checked (Go 1.27.4):
 //   basic, config: `go build ./... && go vet ./...` pass (config also with
 //     CGO_ENABLED=1 and with GOOS=windows);
+//   conversion: `go build ./... && go vet ./...` pass;
 //   typeerror: `go build ./...` fails in package bad only ("cannot use
 //     "three" (untyped string constant) as int value"), `go build ./good` passes.
 // These tests need the user's `go` (the toolchain route's own requirement);
@@ -381,6 +382,40 @@ test(
       assert.deepEqual(left, []);
     } finally {
       await rm(scratch, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  "pointer conversions: the toolchain names the converted type, agreeing with the source-only route",
+  needsGo,
+  async () => {
+    const off = await index("conversion");
+    const dump = await index("conversion", on);
+    assert.deepEqual(note(dump.report, "merged").disagreements, []);
+    for (const result of [off, dump]) {
+      const conversions = result.links.filter(
+        (item) =>
+          item.file === "p/p.go" &&
+          item.kind === "calls" &&
+          item.at === "*Batch",
+      );
+      assert.deepEqual(
+        conversions.map((item) => item.target),
+        ["p/p.go:Batch", "p/p.go:Batch"],
+      );
+      assert.equal(
+        link(result, "p/p.go", "(*Batch)(nil).Apply").target,
+        "p/p.go:(*Batch).Apply",
+      );
+    }
+    // Decided by the toolchain, confirming the source-only target.
+    for (const item of dump.links.filter(
+      (entry) => entry.kind === "calls" && entry.at === "*Batch",
+    )) {
+      assert.equal(item.data.toolchain.origin, "toolchain");
+      assert.equal(item.data.toolchain.from, "definite");
+      assert.equal(item.data.toolchain.sourceOnly, undefined);
     }
   },
 );

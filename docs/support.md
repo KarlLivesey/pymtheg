@@ -269,7 +269,14 @@ toolchain route below. Claims `*.go`; context `go.mod` and
 file (its ID can change when files are added or removed).
 
 - **Definite:** imports of packages in the importing file's module, a `go.work`
-  module or a proven local `replace`; package-qualified references; direct calls;
+  module or a proven local `replace` (also `=> ..` and `=> .`, and packages
+  under `testdata`, `_x` or `.x` directories, which Go imports like any other;
+  a module may itself sit under such a directory); package-qualified references;
+  direct calls; conversions, also to a pointer type (`(*T)(x)`, `(*p.T)(nil)`
+  link to `T`); members of call results of checkout functions and methods
+  (`x := pkg.New(); x.M()`, `v, err := f()`, chains, `(*T)(p).M()`), a
+  function declared per build variant giving the result of the variants that
+  can be built with the calling file;
   calls and selections on a concrete receiver whose type is evident from the
   source, by Go's selector rule including promotion; the same on elements of
   slices, arrays, maps (value, and key for a ranged key) and channels, on range
@@ -296,12 +303,13 @@ file (its ID can change when files are added or removed).
   annotation only). An interface that embeds two provably different
   declarations of one method (invalid Go) has no implementers.
 - **Unresolved:** standard library, third-party and non-local `replace` imports and
-  everything reached through them; imports Go forbids (`internal`, `package main`,
-  `testdata`); unexported names from another package; builtins (`data.builtin`);
+  everything reached through them; imports Go forbids (`internal`, `package main`); unexported names from another package; builtins (`data.builtin`);
   elements of function containers; elements of a generic named container
   (`type L[E any] []E`); a field of an anonymous struct type declared in several
   build variants of its enclosing type; explicit generic-method instantiation
-  `t.Map[C](x)`; `new(variable).M()`.
+  `t.Map[C](x)`; `new(variable).M()`; results of generic type-parameter type
+  (`As[*Int](x)`: type arguments are not extracted); a call whose callee is a
+  function declared per build variant returning different named types.
 - **Not extracted:** locals, parameters and type parameters as symbols; keys of
   keyed composite literals; generic type arguments (`Stack[int]` methods resolve
   on `Stack`); cgo (`import "C"` is an unresolved import); imports into `vendor/`.

@@ -1,0 +1,562 @@
+{
+ "repos": [
+  {
+   "id": "charmbracelet/bubbletea",
+   "linksBefore": 12533,
+   "linksAfter": 12533,
+   "definiteBefore": 7747,
+   "definiteAfter": 7747,
+   "newlyDefiniteExisting": {},
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 2000,
+   "symbolsAfter": 2000,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "cilium/ebpf",
+   "linksBefore": 50239,
+   "linksAfter": 50239,
+   "definiteBefore": 33366,
+   "definiteAfter": 33461,
+   "newlyDefiniteExisting": {
+    "calls": 95
+   },
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 8314,
+   "symbolsAfter": 8314,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "cli/cli",
+   "linksBefore": 208845,
+   "linksAfter": 208845,
+   "definiteBefore": 133526,
+   "definiteAfter": 134437,
+   "newlyDefiniteExisting": {
+    "imports": 72,
+    "references": 603,
+    "calls": 234,
+    "embeds": 2
+   },
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 27259,
+   "symbolsAfter": 27259,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "cockroachdb/pebble",
+   "linksBefore": 200878,
+   "linksAfter": 200878,
+   "definiteBefore": 144642,
+   "definiteAfter": 144835,
+   "newlyDefiniteExisting": {
+    "calls": 193
+   },
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 20080,
+   "symbolsAfter": 20080,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "etcd-io/bbolt",
+   "linksBefore": 16898,
+   "linksAfter": 16898,
+   "definiteBefore": 10692,
+   "definiteAfter": 10750,
+   "newlyDefiniteExisting": {
+    "calls": 58
+   },
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 1905,
+   "symbolsAfter": 1905,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "evanw/esbuild",
+   "linksBefore": 98034,
+   "linksAfter": 98034,
+   "definiteBefore": 88193,
+   "definiteAfter": 88193,
+   "newlyDefiniteExisting": {},
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 8329,
+   "symbolsAfter": 8329,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "gin-gonic/gin",
+   "linksBefore": 21066,
+   "linksAfter": 21066,
+   "definiteBefore": 10901,
+   "definiteAfter": 10948,
+   "newlyDefiniteExisting": {
+    "calls": 33,
+    "imports": 3,
+    "references": 11
+   },
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 2729,
+   "symbolsAfter": 2729,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "go-task/task",
+   "linksBefore": 18333,
+   "linksAfter": 18333,
+   "definiteBefore": 11569,
+   "definiteAfter": 11569,
+   "newlyDefiniteExisting": {},
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 2772,
+   "symbolsAfter": 2772,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "gofiber/fiber",
+   "linksBefore": 143673,
+   "linksAfter": 143673,
+   "definiteBefore": 80435,
+   "definiteAfter": 80460,
+   "newlyDefiniteExisting": {
+    "calls": 25
+   },
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 16070,
+   "symbolsAfter": 16070,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "golang/tools",
+   "linksBefore": 250351,
+   "linksAfter": 250351,
+   "definiteBefore": 149472,
+   "definiteAfter": 154564,
+   "newlyDefiniteExisting": {
+    "imports": 777,
+    "calls": 1984,
+    "references": 2331
+   },
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 30732,
+   "symbolsAfter": 30732,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "junegunn/fzf",
+   "linksBefore": 25947,
+   "linksAfter": 25947,
+   "definiteBefore": 18695,
+   "definiteAfter": 18695,
+   "newlyDefiniteExisting": {},
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 2984,
+   "symbolsAfter": 2984,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "labstack/echo",
+   "linksBefore": 31880,
+   "linksAfter": 31880,
+   "definiteBefore": 17275,
+   "definiteAfter": 17276,
+   "newlyDefiniteExisting": {
+    "calls": 1
+   },
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 4168,
+   "symbolsAfter": 4168,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "mattn/go-sqlite3",
+   "linksBefore": 9650,
+   "linksAfter": 9650,
+   "definiteBefore": 3642,
+   "definiteAfter": 3643,
+   "newlyDefiniteExisting": {
+    "calls": 1
+   },
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 1204,
+   "symbolsAfter": 1204,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "pocketbase/pocketbase",
+   "linksBefore": 70628,
+   "linksAfter": 70628,
+   "definiteBefore": 44794,
+   "definiteAfter": 44933,
+   "newlyDefiniteExisting": {
+    "calls": 139
+   },
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 8172,
+   "symbolsAfter": 8172,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "protocolbuffers/protobuf-go",
+   "linksBefore": 216975,
+   "linksAfter": 216975,
+   "definiteBefore": 175091,
+   "definiteAfter": 179186,
+   "newlyDefiniteExisting": {
+    "imports": 60,
+    "references": 238,
+    "calls": 3797
+   },
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 46060,
+   "symbolsAfter": 46060,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "restic/restic",
+   "linksBefore": 64165,
+   "linksAfter": 64165,
+   "definiteBefore": 42347,
+   "definiteAfter": 42379,
+   "newlyDefiniteExisting": {
+    "calls": 32
+   },
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 8092,
+   "symbolsAfter": 8092,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "samber/lo",
+   "linksBefore": 28881,
+   "linksAfter": 28881,
+   "definiteBefore": 12914,
+   "definiteAfter": 12914,
+   "newlyDefiniteExisting": {},
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 4645,
+   "symbolsAfter": 4645,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "spf13/cobra",
+   "linksBefore": 8886,
+   "linksAfter": 8886,
+   "definiteBefore": 5758,
+   "definiteAfter": 5759,
+   "newlyDefiniteExisting": {
+    "calls": 1
+   },
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 926,
+   "symbolsAfter": 926,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "stretchr/testify",
+   "linksBefore": 19828,
+   "linksAfter": 19828,
+   "definiteBefore": 12986,
+   "definiteAfter": 13017,
+   "newlyDefiniteExisting": {
+    "imports": 2,
+    "calls": 27,
+    "references": 2
+   },
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 2542,
+   "symbolsAfter": 2542,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "wagoodman/dive",
+   "linksBefore": 14901,
+   "linksAfter": 14901,
+   "definiteBefore": 8611,
+   "definiteAfter": 8631,
+   "newlyDefiniteExisting": {
+    "calls": 20
+   },
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 1958,
+   "symbolsAfter": 1958,
+   "symbolsMissing": 0
+  }
+ ],
+ "totals": {
+  "linksBefore": 1512591,
+  "linksAfter": 1512591,
+  "definiteBefore": 1012656,
+  "definiteAfter": 1023397,
+  "lost": 0,
+  "retargeted": 0,
+  "removedSites": 0,
+  "symbolsBefore": 200941,
+  "symbolsAfter": 200941,
+  "symbolsMissing": 0
+ },
+ "changed": [],
+ "missingSymbols": [],
+ "sample": [
+  {
+   "repo": "protocolbuffers/protobuf-go",
+   "file": "internal/testprotos/test3/test_extension.pb.go",
+   "line": 20,
+   "kind": "calls",
+   "name": "*descriptorpb.MessageOptions",
+   "was": "unresolved",
+   "target": "types/descriptorpb/descriptor.pb.go:struct:MessageOptions",
+   "source": "ExtendedType:  (*descriptorpb.MessageOptions)(nil),"
+  },
+  {
+   "repo": "protocolbuffers/protobuf-go",
+   "file": "cmd/protoc-gen-go/feature_resolution_test/feature_resolution_test.go",
+   "line": 724,
+   "kind": "calls",
+   "name": "testfeaturespb.EnumFeature_VALUE5.Number",
+   "was": "unresolved",
+   "target": "cmd/protoc-gen-go/testdata/features/test_features.pb.go:method:(EnumFeature).Number",
+   "source": "checkTestFeature(t, tc2.features, \"enum_feature\", testfeaturespb.EnumFeature_VALUE5.Number())"
+  },
+  {
+   "repo": "protocolbuffers/protobuf-go",
+   "file": "cmd/protoc-gen-go/testdata/comments/comments.pb.go",
+   "line": 421,
+   "kind": "calls",
+   "name": "*Message1_Oneof1AField1",
+   "was": "unresolved",
+   "target": "cmd/protoc-gen-go/testdata/comments/comments.pb.go:struct:Message1_Oneof1AField1",
+   "source": "(*Message1_Oneof1AField1)(nil),"
+  },
+  {
+   "repo": "golang/tools",
+   "file": "gopls/internal/cache/typerefs/pkgrefs_test.go",
+   "line": 242,
+   "kind": "calls",
+   "name": "gcexportdata.Write",
+   "was": "unresolved",
+   "target": "go/gcexportdata/gcexportdata.go:function:Write",
+   "source": "err = gcexportdata.Write(&out, fset, tpkg)"
+  },
+  {
+   "repo": "cli/cli",
+   "file": ".github/codeql/tests/unsanitized-response-to-terminal/hits_scanner_crossfunc.go",
+   "line": 30,
+   "kind": "references",
+   "name": "ios.Out",
+   "was": "unresolved",
+   "target": ".github/codeql/tests/unsanitized-response-to-terminal/pkg/iostreams/iostreams.go:field:IOStreams.Out",
+   "source": "fmt.Fprintf(ios.Out, \"%s\\n\", scanner.Text())"
+  },
+  {
+   "repo": "golang/tools",
+   "file": "gopls/internal/cache/typerefs/pkgrefs_test.go",
+   "line": 337,
+   "kind": "references",
+   "name": "packages.NeedImports",
+   "was": "unresolved",
+   "target": "go/packages/packages.go:const:NeedImports",
+   "source": "packages.NeedImports |"
+  },
+  {
+   "repo": "golang/tools",
+   "file": "gopls/internal/analysis/infertypeargs/infertypeargs.go",
+   "line": 52,
+   "kind": "references",
+   "name": "inspector.Inspector",
+   "was": "unresolved",
+   "target": "go/ast/inspector/inspector.go:struct:Inspector",
+   "source": "func diagnose(fset *token.FileSet, inspect *inspector.Inspector, start, end token.Pos, pkg *types.Package, info *types.Info) []analysis.Diagnostic {"
+  },
+  {
+   "repo": "cli/cli",
+   "file": ".github/skills/cli-exercise/tool/internal/evidence/session_media_test.go",
+   "line": 359,
+   "kind": "references",
+   "name": "receipt.Tools.FFmpeg.Path",
+   "was": "unresolved",
+   "target": ".github/skills/cli-exercise/tool/internal/recording/models.go:field:Executable.Path",
+   "source": "args, err := encodingArguments(receipt.Tools.FFmpeg.Path, filename, clip.Width, clip.Height, clip.FPS, \"mp4\")"
+  },
+  {
+   "repo": "cli/cli",
+   "file": ".github/skills/cli-exercise/tool/internal/evidence/session_media_test.go",
+   "line": 359,
+   "kind": "references",
+   "name": "receipt.Tools.FFmpeg",
+   "was": "unresolved",
+   "target": ".github/skills/cli-exercise/tool/internal/recording/models.go:field:Tools.FFmpeg",
+   "source": "args, err := encodingArguments(receipt.Tools.FFmpeg.Path, filename, clip.Width, clip.Height, clip.FPS, \"mp4\")"
+  },
+  {
+   "repo": "cli/cli",
+   "file": ".github/skills/cli-exercise/tool/internal/evidence/session_media_test.go",
+   "line": 359,
+   "kind": "references",
+   "name": "receipt.Tools",
+   "was": "unresolved",
+   "target": ".github/skills/cli-exercise/tool/internal/recording/models.go:field:Receipt.Tools",
+   "source": "args, err := encodingArguments(receipt.Tools.FFmpeg.Path, filename, clip.Width, clip.Height, clip.FPS, \"mp4\")"
+  },
+  {
+   "repo": "golang/tools",
+   "file": "gopls/internal/debug/serve.go",
+   "line": 619,
+   "kind": "calls",
+   "name": "p.WriteEvent",
+   "was": "unresolved",
+   "target": "internal/event/export/printer.go:method:(*Printer).WriteEvent",
+   "source": "p.WriteEvent(stderr, ev, lm)"
+  },
+  {
+   "repo": "golang/tools",
+   "file": "gopls/internal/golang/comment.go",
+   "line": 169,
+   "kind": "references",
+   "name": "partPos.EndPos",
+   "was": "unresolved",
+   "target": "internal/astutil/util.go:field:Range.EndPos",
+   "source": "partPos.EndPos = partPos.Start + token.Pos(len(part)) // Move end to next char of current part"
+  },
+  {
+   "repo": "golang/tools",
+   "file": "gopls/internal/debug/trace.go",
+   "line": 194,
+   "kind": "calls",
+   "name": "span.Start().At",
+   "was": "unresolved",
+   "target": "internal/event/core/event.go:method:(Event).At",
+   "source": "Start:    span.Start().At(),"
+  },
+  {
+   "repo": "golang/tools",
+   "file": "gopls/internal/debug/trace.go",
+   "line": 194,
+   "kind": "calls",
+   "name": "span.Start",
+   "was": "unresolved",
+   "target": "internal/event/export/trace.go:method:(*Span).Start",
+   "source": "Start:    span.Start().At(),"
+  },
+  {
+   "repo": "protocolbuffers/protobuf-go",
+   "file": "cmd/protoc-gen-go/testdata/import_public/a.pb.go",
+   "line": 55,
+   "kind": "references",
+   "name": "sub.E_ExtensionField",
+   "was": "unresolved",
+   "target": "cmd/protoc-gen-go/testdata/import_public/sub/a.pb.go:var:E_ExtensionField",
+   "source": "var E_ExtensionField = sub.E_ExtensionField"
+  },
+  {
+   "repo": "golang/tools",
+   "file": "gopls/internal/server/type_hierarchy.go",
+   "line": 34,
+   "kind": "calls",
+   "name": "event.Start",
+   "was": "unresolved",
+   "target": "internal/event/event.go:function:Start",
+   "source": "ctx, done := event.Start(ctx, \"server.Subtypes\")"
+  },
+  {
+   "repo": "protocolbuffers/protobuf-go",
+   "file": "internal/testprotos/test/test.pb.go",
+   "line": 4169,
+   "kind": "calls",
+   "name": "*TestUnpackedExtensions",
+   "was": "unresolved",
+   "target": "internal/testprotos/test/test.pb.go:struct:TestUnpackedExtensions",
+   "source": "ExtendedType:  (*TestUnpackedExtensions)(nil),"
+  },
+  {
+   "repo": "golang/tools",
+   "file": "gopls/internal/analysis/writestring/writestring.go",
+   "line": 107,
+   "kind": "references",
+   "name": "analysis.SuggestedFix",
+   "was": "unresolved",
+   "target": "go/analysis/diagnostic.go:struct:SuggestedFix",
+   "source": "SuggestedFixes: []analysis.SuggestedFix{{"
+  },
+  {
+   "repo": "golang/tools",
+   "file": "txtar/fs.go",
+   "line": 237,
+   "kind": "calls",
+   "name": "*openDir",
+   "was": "unresolved",
+   "target": "txtar/fs.go:struct:openDir",
+   "source": "var _ fs.ReadDirFile = (*openDir)(nil)"
+  },
+  {
+   "repo": "golang/tools",
+   "file": "gopls/internal/golang/completion/format.go",
+   "line": 308,
+   "kind": "calls",
+   "name": "event.Error",
+   "was": "unresolved",
+   "target": "internal/event/event.go:function:Error",
+   "source": "event.Error(ctx, fmt.Sprintf(\"failed to find Hover for %q\", obj.Name()), err)"
+  }
+ ],
+ "poolSize": 9825
+}
