@@ -76,7 +76,11 @@ export interface FileFact {
   imports: ImportFact[];
   /** `_test.go` file. */
   test: boolean;
-  /** Text of a `//go:build` constraint line before the package clause, if any. */
+  /**
+   * The build constraint before the package clause, if any: the `//go:build`
+   * expression, or without one every legacy line, one per line as
+   * `+build <terms>` (they all hold).
+   */
   build?: string;
   /** GOOS/GOARCH implied by a `_os`, `_arch` or `_os_arch` filename suffix. */
   goos?: string;

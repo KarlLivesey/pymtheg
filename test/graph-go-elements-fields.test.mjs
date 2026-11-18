@@ -888,3 +888,84 @@ test("build variants: a method that may or may not be built with a variant is a 
     "s/sqlite3_opt_vtable.go:method:(*SQLiteConn).Alt",
   ]);
 });
+
+test("build constraints: every legacy +build line holds; a caller's constraint excludes a method; release tags are cumulative", async () => {
+  // Review of C-4, round 2.
+  const { links } = await project({
+    "go.mod": MOD,
+    // 1. Two legacy lines are ANDed: value_legacy.go is Windows only.
+    "a/value_legacy.go": lines(
+      "// +build linux windows",
+      "// +build !linux",
+      "",
+      "package a",
+      "type Item struct{ Name string }",
+      "func (Item) M() {}",
+    ),
+    "a/value_other.go": lines(
+      "//go:build linux",
+      "",
+      "package a",
+      "type Item struct{ Name string }",
+      "func (Item) M() {}",
+    ),
+    "a/use.go": lines(
+      "//go:build linux",
+      "",
+      "package a",
+      "type Items []Item",
+      "func use(items Items) { _ = items[0].Name; items[0].M() }",
+    ),
+    // 2. The `fast` method is never built with this caller: Base.M.
+    "b/base.go": lines("package b", "type Base struct{}", "func (Base) M() {}"),
+    "b/item_linux.go": lines("package b", "type Item struct{ Base }"),
+    "b/item_windows.go": lines("package b", "type Item struct{ Base }"),
+    "b/fast_linux.go": lines(
+      "//go:build fast",
+      "",
+      "package b",
+      "func (Item) M() {}",
+    ),
+    "b/caller.go": lines(
+      "//go:build (linux || windows) && !fast",
+      "",
+      "package b",
+      "func use(i Item) { i.M() }",
+    ),
+    // 3. go1.23 implies go1.22: only the go1.22 declaration.
+    "c/v122.go": lines(
+      "//go:build go1.22",
+      "",
+      "package c",
+      "type Item struct{ Name string }",
+    ),
+    "c/vold.go": lines(
+      "//go:build !go1.22",
+      "",
+      "package c",
+      "type Item struct{ Name string }",
+    ),
+    "c/use.go": lines(
+      "//go:build go1.23",
+      "",
+      "package c",
+      "func use(items []Item) { _ = items[0].Name }",
+    ),
+  });
+  assert.equal(
+    at(links, "a/use.go", "items[0].Name").target,
+    "a/value_other.go:field:Item.Name",
+  );
+  assert.equal(
+    at(links, "a/use.go", "items[0].M").target,
+    "a/value_other.go:method:(Item).M",
+  );
+  assert.equal(
+    at(links, "b/caller.go", "i.M").target,
+    "b/base.go:method:(Base).M",
+  );
+  assert.equal(
+    at(links, "c/use.go", "items[0].Name").target,
+    "c/v122.go:field:Item.Name",
+  );
+});

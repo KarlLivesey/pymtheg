@@ -138,7 +138,10 @@ interface View {
    * A type declared in several build variants: a method of this name is
    * declared in a file that may or may not be built with this variant.
    */
-  uncertain?: (name: string, from?: string) => GraphSymbol[];
+  uncertain?: (
+    name: string,
+    from?: string,
+  ) => { method: GraphSymbol; built: false | undefined }[];
 }
 interface InterfaceMethod {
   /** Name, plus the declaring package for an unexported name. */
@@ -1502,11 +1505,11 @@ class GoResolver {
     // in the referencing file's builds.
     const uncertain = (name: string, from?: string) =>
       variants
-        ? own(name).filter(
-            (symbol) =>
-              symbol.kind !== "field" &&
-              this.buildsWith(symbol.file, type.file, from) !== true,
-          )
+        ? own(name).flatMap((method) => {
+            if (method.kind === "field") return [];
+            const built = this.buildsWith(method.file, type.file, from);
+            return built === true ? [] : [{ method, built }];
+          })
         : [];
     const declared = (name: string) =>
       own(name).filter((symbol) => symbol.kind === "method");
@@ -1754,11 +1757,16 @@ class GoResolver {
               );
           }
         });
-        // A method that may or may not be built with this variant: one more
-        // choice of configuration (present or absent).
+        // A method never built with this variant in the referencing file's
+        // builds is absent; one that may or may not be is one more choice of
+        // configuration (present or absent).
         const absent = new Set<string>();
         for (const view of views)
-          for (const method of view.uncertain?.(name, from) ?? []) {
+          for (const { method, built } of view.uncertain?.(name, from) ?? []) {
+            if (built === false) {
+              absent.add(method.id);
+              continue;
+            }
             const group = `method:${method.id}`;
             const index = choice.get(group);
             if (index === undefined) unchosen ??= { group, size: 2 };

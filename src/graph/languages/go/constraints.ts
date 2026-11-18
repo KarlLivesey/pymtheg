@@ -101,11 +101,20 @@ function parseLegacy(text: string): Formula | undefined {
 export function fileConstraint(fact: FileFact): Formula | undefined {
   let formula: Formula = TRUE;
   if (fact.build !== undefined) {
-    const parsed = fact.build.startsWith("+build ")
-      ? parseLegacy(fact.build.slice("+build ".length))
-      : parseExpression(fact.build);
-    if (!parsed) return undefined;
-    formula = parsed;
+    if (fact.build.startsWith("+build ")) {
+      // Legacy lines, one per line: all of them hold.
+      for (const line of fact.build.split("\n")) {
+        const parsed = line.startsWith("+build ")
+          ? parseLegacy(line.slice("+build ".length))
+          : undefined;
+        if (!parsed) return undefined;
+        formula = and(formula, parsed);
+      }
+    } else {
+      const parsed = parseExpression(fact.build);
+      if (!parsed) return undefined;
+      formula = parsed;
+    }
   }
   // A cgo file (`import "C"`) is built only with cgo.
   if (fact.imports.some((item) => item.path === "C"))
@@ -161,31 +170,39 @@ export function satisfiable(formulas: Formula[]): boolean | undefined {
   const oses = [...new Set([...goos, ...implied]), undefined];
   const arches = [...goarch, undefined];
   const unixFree = free.includes("unix");
-  const freeTags = free.filter((name) => name !== "unix");
+  // Release tags are cumulative: go1.N holds for every Go at least 1.N, so
+  // one release level decides them all (below every named one, or at one).
+  const release = (name: string) => /^go1\.(\d+)$/.exec(name);
+  const releases = free
+    .filter((name) => release(name))
+    .sort((a, b) => Number(release(a)![1]) - Number(release(b)![1]));
+  const levels = [-1, ...releases.map((_, index) => index)];
+  const freeTags = free.filter((name) => name !== "unix" && !release(name));
   if (freeTags.length > MAX_FREE_TAGS) return undefined;
   for (const os of oses)
     for (const arch of arches)
-      for (let bits = 0; bits < 1 << freeTags.length; bits++) {
-        const tags = new Set<string>();
-        if (os) {
-          tags.add(os);
-          if (IMPLIED[os]) tags.add(IMPLIED[os]!);
+      for (const level of levels)
+        for (let bits = 0; bits < 1 << freeTags.length; bits++) {
+          const tags = new Set<string>(releases.slice(0, level + 1));
+          if (os) {
+            tags.add(os);
+            if (IMPLIED[os]) tags.add(IMPLIED[os]!);
+          }
+          if (arch) tags.add(arch);
+          freeTags.forEach((name, index) => {
+            if (bits & (1 << index)) tags.add(name);
+          });
+          const unixChoices = os
+            ? [UNIX.has(os)]
+            : unixFree
+              ? [false, true]
+              : [false];
+          for (const unix of unixChoices) {
+            const with_ = unix ? new Set([...tags, "unix"]) : tags;
+            if (formulas.every((formula) => evaluate(formula, with_)))
+              return true;
+          }
         }
-        if (arch) tags.add(arch);
-        freeTags.forEach((name, index) => {
-          if (bits & (1 << index)) tags.add(name);
-        });
-        const unixChoices = os
-          ? [UNIX.has(os)]
-          : unixFree
-            ? [false, true]
-            : [false];
-        for (const unix of unixChoices) {
-          const with_ = unix ? new Set([...tags, "unix"]) : tags;
-          if (formulas.every((formula) => evaluate(formula, with_)))
-            return true;
-        }
-      }
   return false;
 }
 

@@ -299,12 +299,22 @@ export class GoExtractor {
       if (item.data) item.data = this.anonymous(item.data) as typeof item.data;
   }
 
+  /** A `//go:build` line was seen: it alone is the constraint, as in Go. */
+  private modernBuild = false;
   private buildLine(comment: string): void {
     const modern = /^\/\/go:build\s+(.+)$/.exec(comment.trim());
-    if (modern) this.fact.build = modern[1]!.trim();
+    if (modern) {
+      this.fact.build = modern[1]!.trim();
+      this.modernBuild = true;
+    }
+    // Without one, every legacy `+build` line applies (Go ANDs them): kept
+    // one per line, each starting `+build `.
     const legacy = /^\/\/\s*\+build\s+(.+)$/.exec(comment.trim());
-    if (legacy && this.fact.build === undefined)
-      this.fact.build = `+build ${legacy[1]!.trim()}`;
+    if (legacy && !this.modernBuild) {
+      const line = `+build ${legacy[1]!.trim()}`;
+      this.fact.build =
+        this.fact.build === undefined ? line : `${this.fact.build}\n${line}`;
+    }
   }
 
   // ---- symbols and links -------------------------------------------------
