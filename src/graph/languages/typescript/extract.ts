@@ -63,8 +63,9 @@ import {
   bindingSpecifier,
   isCommonJsRequire,
   isJsFile,
-  isLexicalBinding,
+  declarationOnlyCall,
   isLocalCallable,
+  isScopedDeclaration,
   keyOf,
   kindOf,
   nameOf,
@@ -216,6 +217,8 @@ const isEntityChain = (node: ts.Expression): boolean =>
     ts.isStringLiteralLike(node.argumentExpression) &&
     isEntityChain(node.expression));
 
+const relativeSpecifier = (value: string) => /^\.\.?(\/|$)/.test(value);
+
 export function extractFile(
   file: ts.SourceFile,
   checker: ts.TypeChecker,
@@ -235,6 +238,15 @@ export function extractFile(
   const links: LinkDraft[] = [];
   const keys = new Set<string>();
   const lexicalReferences = new Map<string, Set<ts.Node>>();
+  const scopedNames = new Set<string>();
+  const collectScopedNames = (node: ts.Node): void => {
+    if (isScopedDeclaration(node)) {
+      const name = (node as ts.NamedDeclaration).name;
+      if (name && ts.isIdentifier(name)) scopedNames.add(name.text);
+    }
+    ts.forEachChild(node, collectScopedNames);
+  };
+  collectScopedNames(file);
   const moduleKey = keyOf(file);
   const range = (node: ts.Node) => ({
     start: node.getStart(file),
@@ -264,7 +276,10 @@ export function extractFile(
           )
             result.eval = true;
         }
-        if (syntax.getAssignmentTargetKind(node)) {
+        if (
+          scopedNames.has(node.text) &&
+          syntax.getAssignmentTargetKind(node)
+        ) {
           const symbol = ts.isShorthandPropertyAssignment(node.parent)
             ? checker.getShorthandAssignmentValueSymbol(node.parent)
             : checker.getSymbolAtLocation(node);
@@ -337,7 +352,7 @@ export function extractFile(
     const facts = new Map<string, TargetFact>();
     let external = 0;
     let local = 0;
-    let declarationOnlyMember = false;
+    let declarationOnly = false;
     let viaAlias = false;
     let firstAlias: ts.Symbol | undefined;
     let declaredSomewhere = false;
@@ -351,24 +366,10 @@ export function extractFile(
       const anchor = anchorOf(declaration);
       if (!anchor) return false;
       if (meaning === "call") {
-        if (
-          receiver &&
-          (ts.isMethodSignature(declaration) ||
-            ts.isPropertySignature(declaration))
-        ) {
-          const root = rootOf(receiver);
-          const symbol = root && symbolOf(root);
-          const specifier = symbol && bindingSpecifier(symbol);
-          if (
-            specifier &&
-            ts.isStringLiteralLike(specifier) &&
-            context.workspaceReason(specifier.text, path, []) !== undefined
-          ) {
-            declarationOnlyMember = true;
-            return false;
-          }
+        if (declarationOnlyCall(declaration, anchor)) {
+          declarationOnly = true;
+          return false;
         }
-        if (isLexicalBinding(anchor)) return false;
         if (
           ts.isEnumDeclaration(anchor) &&
           !ts.isSourceFile(anchor.parent) &&
@@ -441,8 +442,8 @@ export function extractFile(
         (receiver && receiverReason(receiver)));
     const result: Targets = {
       targets,
-      reason: declarationOnlyMember
-        ? "workspace-member-runtime-unverified"
+      reason: declarationOnly
+        ? "declaration-only-call"
         : local
           ? "local"
           : moduleFailure || "external",
@@ -950,6 +951,7 @@ export function extractFile(
     {
       path: string | undefined;
       lookups: readonly string[];
+      extensionFallback: boolean;
     }
   >();
   function specifierResolution(specifier: ts.StringLiteralLike) {
@@ -973,11 +975,17 @@ export function extractFile(
       specifier.getSourceFile(),
     );
     const resolved = resolution?.resolvedModule?.resolvedFileName;
+    const from = fromVirtual(specifier.getSourceFile().fileName) ?? path;
+    const fallback =
+      !resolved && (!resolution || relativeSpecifier(specifier.text))
+        ? context.resolveModule(specifier.text, from)
+        : undefined;
     const result = {
-      path: resolution
-        ? resolved && fromVirtual(resolved)
-        : context.resolveModule(specifier.text, path),
+      path: resolved
+        ? fromVirtual(program.getSourceFile(resolved)?.fileName ?? resolved)
+        : fallback,
       lookups: resolution?.failedLookupLocations ?? [],
+      extensionFallback: !!(resolution && fallback),
     };
     specifierResolutions.set(specifier, result);
     return result;
@@ -992,7 +1000,7 @@ export function extractFile(
     // form the compiler does not recognise): the edge to that file is known.
     const { path: resolved, lookups } = specifierResolution(specifier);
     if (resolved !== undefined && captured.has(resolved)) return CAPTURED;
-    if (/^\.\.?(\/|$)/.test(text) || text.startsWith("/"))
+    if (relativeSpecifier(text) || text.startsWith("/"))
       return "missing-module";
     const aliased =
       text.startsWith("#") ||
@@ -1006,17 +1014,25 @@ export function extractFile(
       });
     return aliased
       ? "unresolved-alias"
-      : (context.workspaceReason(text, path, lookups) ?? "external-package");
+      : (context.workspaceReason(
+          text,
+          fromVirtual(specifier.getSourceFile().fileName) ?? path,
+          lookups,
+        ) ?? "external-package");
   }
   function moduleLink(
     owner: string,
     specifier: ts.StringLiteralLike,
     extra: { [key: string]: Json },
   ) {
-    const reason = moduleReason(specifier);
-    // The compiler did not type this edge, but the file is captured: link it.
+    const selection = limited ? undefined : specifierResolution(specifier);
+    // An entry edge identifies the file selected by module resolution. A
+    // merged declaration symbol may include augmentations in other files.
     const file =
-      reason === CAPTURED ? specifierResolution(specifier).path : undefined;
+      selection?.path && captured.has(selection.path)
+        ? selection.path
+        : undefined;
+    const reason = file ? undefined : moduleReason(specifier);
     const kind = file ? context.moduleKind(file) : undefined;
     const found: Targets = file
       ? kind === "invalid"
@@ -1040,6 +1056,7 @@ export function extractFile(
         : found;
     link(owner, "imports", specifier.text, specifier, final, {
       specifier: specifier.text,
+      ...(selection?.extensionFallback ? { extensionFallback: true } : {}),
       // `notAModule` means one thing: the target file has no imports/exports.
       ...(file && context.moduleKind(file) === "script"
         ? { notAModule: true }
@@ -1330,27 +1347,29 @@ export function extractFile(
         symbolData.declarationFile = node.isDeclarationFile;
         symbolData.javascript = isJsFile(node);
       }
+      if (isScopedDeclaration(node)) symbolData.scoped = true;
+      const identity = identityOf(node);
       symbols.push({
         key,
         name: nameOf(node),
         kind: kindOf(node),
-        identity: identityOf(node),
+        identity,
         range: rangeOf(node),
         ...(Object.keys(symbolData).length ? { data: symbolData } : {}),
       });
       const container = containerOf(node);
-      if (container && !isLexicalBinding(node)) {
+      if (container) {
         const containerKey = keyOf(container);
         links.push({
           sourceKey: containerKey,
           kind: "contains",
-          targetName: identityOf(node),
+          targetName: identity,
           range: rangeOf(node),
           data: { targets: [{ file: path, key }] },
         });
       }
     }
-    if (anchor && !isLexicalBinding(anchor)) owner = keyOf(anchor);
+    if (anchor) owner = keyOf(anchor);
 
     if (
       ts.isImportDeclaration(node) &&
@@ -1629,7 +1648,11 @@ export function extractFile(
         ts.isStringLiteralLike(argument.literal)
       )
         moduleLink(owner, argument.literal, { typeOnly: true });
-    } else if (ts.isIdentifier(node) && !limited) {
+    } else if (
+      ts.isIdentifier(node) &&
+      scopedNames.has(node.text) &&
+      !limited
+    ) {
       const parent = node.parent;
       const shorthand =
         ts.isShorthandPropertyAssignment(parent) && parent.name === node;
@@ -1651,11 +1674,7 @@ export function extractFile(
         if (
           local &&
           local.getSourceFile() === file &&
-          (isLexicalBinding(local) ||
-            isLocalCallable(local) ||
-            (ts.isEnumDeclaration(local) &&
-              !ts.isSourceFile(local.parent) &&
-              !ts.isModuleBlock(local.parent)))
+          isScopedDeclaration(local)
         ) {
           let seen = lexicalReferences.get(owner);
           if (!seen) lexicalReferences.set(owner, (seen = new Set()));

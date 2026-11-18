@@ -39,6 +39,8 @@ export interface CodeSymbolRef {
   name: string;
   /** Position among same kind+identity symbols in the file (graph ordinal). */
   ordinal: number;
+  /** A lexical scope can have indistinguishable siblings in the same file. */
+  scope?: { fileHash: string; count: number };
 }
 /** Whitespace-normalised source hashes of the symbol at link (or refresh) time. */
 export interface CodeFingerprint {
@@ -74,6 +76,7 @@ export type CodeLinkState =
   | "ok"
   | "changed"
   | "moved"
+  | "ambiguous"
   | "missing"
   | "unverifiable";
 export interface SymbolSummary {
@@ -484,6 +487,7 @@ interface GraphView {
   inFile(path: string): GraphSymbol[];
   named(identity: string): GraphSymbol[];
   fileStatus(path: string): { status: string; reason: string } | null;
+  fileHash(path: string): string | undefined;
 }
 function graphView(
   store: SqliteGraphStore,
@@ -496,11 +500,13 @@ function graphView(
       .map((f) => f.module),
   );
   const locations = new GraphLocations(store);
-  const texts = new Map<string, string | null>();
-  const text = (path: string) => {
-    if (!texts.has(path))
-      texts.set(path, store.fileSnapshot(path)?.text ?? null);
-    return texts.get(path)!;
+  const sources = new Map<
+    string,
+    ReturnType<SqliteGraphStore["fileSnapshot"]>
+  >();
+  const source = (path: string) => {
+    if (!sources.has(path)) sources.set(path, store.fileSnapshot(path));
+    return sources.get(path);
   };
   const failedByPath = new Map(failed.map((f) => [f.path, f.reason]));
   const fileSymbols = new Map<string, GraphSymbol[]>();
@@ -519,16 +525,17 @@ function graphView(
       ...(reason ? { reason } : {}),
     }),
     fingerprint: (symbol) => {
-      const source = text(symbol.file) ?? "";
+      const text = source(symbol.file)?.text ?? "";
       if (!fileSymbols.has(symbol.file))
         fileSymbols.set(symbol.file, store.findSymbols({ file: symbol.file }));
       return fingerprintText(
-        source.slice(symbol.range.start, symbol.range.end),
-        attachedAttributes(source, symbol, fileSymbols.get(symbol.file)!),
+        text.slice(symbol.range.start, symbol.range.end),
+        attachedAttributes(text, symbol, fileSymbols.get(symbol.file)!),
       );
     },
     inFile: (path) => store.findSymbols({ file: path }),
     named: (identity) => store.namedSymbols(identity, 10001),
+    fileHash: (path) => source(path)?.hash,
     fileStatus: (path) => {
       if (failedByPath.has(path))
         return { status: "failed", reason: failedByPath.get(path)! };
@@ -549,6 +556,33 @@ const sameIdentity = (s: GraphSymbol, ref: CodeSymbolRef) =>
   s.module === ref.language &&
   s.kind === ref.kind &&
   s.identity === ref.identity;
+
+const scoped = ({ data }: GraphSymbol) =>
+  !!data &&
+  typeof data === "object" &&
+  !Array.isArray(data) &&
+  data.scoped === true;
+
+function symbolReference(view: GraphView, symbol: GraphSymbol): CodeSymbolRef {
+  const ref: CodeSymbolRef = {
+    language: symbol.module,
+    path: symbol.file,
+    kind: symbol.kind,
+    identity: symbol.identity,
+    name: symbol.name,
+    ordinal: symbol.ordinal,
+  };
+  if (scoped(symbol)) {
+    const fileHash = view.fileHash(ref.path);
+    if (fileHash)
+      ref.scope = {
+        fileHash,
+        count: view.inFile(ref.path).filter((item) => sameIdentity(item, ref))
+          .length,
+      };
+  }
+  return ref;
+}
 
 function resolveOne(
   link: StoredCodeLink,
@@ -576,7 +610,8 @@ function resolveOne(
     return differs;
   };
   const status = view.fileStatus(ref.path);
-  const here = view.inFile(ref.path).filter((s) => sameIdentity(s, ref));
+  const inFile = view.inFile(ref.path);
+  const here = inFile.filter((s) => sameIdentity(s, ref));
   const atPath =
     here.length === 1 ? here[0] : here.find((s) => s.ordinal === ref.ordinal);
   if (status && status.status === "failed")
@@ -585,6 +620,30 @@ function resolveOne(
       state: "unverifiable",
       unverifiableFile: { path: ref.path, reason: status.reason },
       message: `File ${ref.path} failed to parse (${status.reason}); the link cannot be checked.`,
+    };
+  const related =
+    atPath || ref.language !== "typescript"
+      ? here
+      : inFile.filter(
+          (symbol) =>
+            scoped(symbol) &&
+            symbol.kind === ref.kind &&
+            symbol.name === ref.name,
+        );
+  if (
+    (ref.scope &&
+      related.length &&
+      (!atPath ||
+        !scoped(atPath) ||
+        ((ref.scope.count !== 1 || here.length !== 1) &&
+          view.fileHash(ref.path) !== ref.scope.fileHash))) ||
+    (!ref.scope && related.some(scoped))
+  )
+    return {
+      ...base,
+      state: "ambiguous",
+      suggestions: related.slice(0, 20).map((symbol) => view.summarize(symbol)),
+      message: `The scope of ${ref.identity} in ${ref.path} cannot be identified from the recorded link. Choose the intended declaration explicitly.`,
     };
   if (atPath) {
     const differs = compare(atPath);
@@ -928,9 +987,10 @@ export async function createCodeLink(
     let fingerprint: CodeFingerprint,
       fileState: string,
       reason: string,
+      ref: CodeSymbolRef,
       twins: StoredCodeLink["twins"];
     try {
-      ({ fingerprint, fileState, reason, twins } =
+      ({ fingerprint, fileState, reason, ref, twins } =
         graphStore.readCommandSnapshot(() => {
           const view = graphView(graphStore, response.failedFiles);
           const current = graphStore.getSymbol(symbol.id);
@@ -942,6 +1002,7 @@ export async function createCodeLink(
           const state = view.fileStatus(symbol.file);
           return {
             fingerprint: view.fingerprint(current),
+            ref: symbolReference(view, current),
             twins: recordTwins(view, current),
             fileState: state?.status ?? "missing",
             reason: state?.reason ?? "",
@@ -958,14 +1019,6 @@ export async function createCodeLink(
         status: "failed-file",
         message: `File ${symbol.file} is ${fileState}${reason ? ` (${reason})` : ""}; links into code that did not parse cleanly are refused. Nothing was linked.`,
       };
-    const ref: CodeSymbolRef = {
-      language: symbol.module,
-      path: symbol.file,
-      kind: symbol.kind,
-      identity: symbol.identity,
-      name: symbol.name,
-      ordinal: symbol.ordinal,
-    };
     const value = {
       record: chosen.record.id,
       symbol: ref,
@@ -1069,10 +1122,10 @@ export async function refreshCodeLink(
       };
     const graph = openGraph(root)!;
     let fingerprint: CodeFingerprint,
-      symbol: GraphSymbol,
+      ref: CodeSymbolRef,
       twins: StoredCodeLink["twins"];
     try {
-      ({ fingerprint, symbol, twins } = graph.readCommandSnapshot(() => {
+      ({ fingerprint, ref, twins } = graph.readCommandSnapshot(() => {
         const s = graph.getSymbol(before.current!.graphId);
         if (!s)
           throw new CodeLinkError(
@@ -1081,7 +1134,7 @@ export async function refreshCodeLink(
           );
         const view = graphView(graph, []);
         return {
-          symbol: s,
+          ref: symbolReference(view, s),
           fingerprint: view.fingerprint(s),
           twins: recordTwins(view, s),
         };
@@ -1110,17 +1163,10 @@ export async function refreshCodeLink(
     store!.writeCodeLink(row.key, {
       ...stored,
       pathHistory: { ...stored.pathHistory, [sha(row.body)]: stored.symbol },
-      symbol: {
-        language: symbol.module,
-        path: symbol.file,
-        kind: symbol.kind,
-        identity: symbol.identity,
-        name: symbol.name,
-        ordinal: symbol.ordinal,
-      },
+      symbol: ref,
       fingerprint,
       twins,
-      hint: { line: before.current.line ?? 0, graphId: symbol.id },
+      hint: { line: before.current.line ?? 0, graphId: before.current.graphId },
       refreshed: input.writer ? input.writer.now() : new Date().toISOString(),
     });
     return {
@@ -1128,7 +1174,7 @@ export async function refreshCodeLink(
       status: "refreshed" as const,
       before,
       link: readLinks(store).find((l) => l.id === link.id)!,
-      message: `Link ${link.id} now records ${symbol.identity} in ${symbol.file} as reviewed.`,
+      message: `Link ${link.id} now records ${ref.identity} in ${ref.path} as reviewed.`,
     };
   });
 }
@@ -1152,6 +1198,7 @@ const countStates = (links: ResolvedCodeLink[]) => {
     ok: 0,
     changed: 0,
     moved: 0,
+    ambiguous: 0,
     missing: 0,
     unverifiable: 0,
   };
@@ -1231,6 +1278,7 @@ export interface CheckCodeLinksResult extends ListCodeLinksResult {
   orphaned: string[];
 }
 export const failsCheck = (r: ResolvedCodeLink, allowMoved = false) =>
+  r.state === "ambiguous" ||
   r.state === "missing" ||
   r.state === "changed" ||
   r.state === "unverifiable" ||

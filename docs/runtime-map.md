@@ -1489,8 +1489,8 @@ resolves modules, imports, paths and first-step inherent dot calls. TypeScript
 (`project.ts`, `extract.ts`, `symbols.ts`, `rename.ts`, `taint.ts`, `judge.ts`) is
 analyze-only: one compiler program per owning config over a snapshot-only host.
 `workspace.ts` builds virtual install links from captured manifests and the
-compiler resolves their entries and any project references. Lexical references
-use compiler declaration identities and retain one site per owner and binding.
+compiler resolves their entries and project references. References to scoped
+declarations use compiler identities and retain one site per owner and target.
 `rename.ts` renames locally bound `require`/`module`/`exports` before the compiler
 sees them; `taint.ts` and `judge.ts` decide which links depend on a failed file.
 All three apply the whole-file rule. Support levels are in

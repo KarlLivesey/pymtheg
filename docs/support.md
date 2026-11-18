@@ -495,26 +495,28 @@ answer.
   `require` with a literal specifier; calls, `new`, JSX components, type
   references and heritage when the checker gives one graph symbol (overloads are
   one symbol); `contains`.
-- **Lexical bindings:** nested functions, function-valued `const` and `let`
-  declarations, and local classes and enums have scoped symbols. Plain local
-  bindings and parameters are `lexical` targets. Reference links record the
-  first expression use for each enclosing symbol and binding pair. Text search
-  and unqualified selectors skip `lexical` targets. File queries,
-  column-qualified locations, qualified names and direct symbol IDs can reach them.
+- **Lexical declarations:** nested functions, function-valued `const` and
+  `let` declarations, and local classes and enums have scoped symbols.
+  References record the first expression use per enclosing symbol and target.
+  Plain local variables and parameters use compiler information during lookup.
+  Their declarations and read/write sites are omitted from the stored graph.
 - **Checkout packages:** npm, Yarn and Bun workspace lists, pnpm workspace
   member links, and checkout-local `file:` and `link:` dependencies expose
   manifests to the compiler. TypeScript applies its own package export
   conditions, subpath rules, `main`, `types`, `paths` and project reference
-  redirects within the snapshot. An interface signature reached through a
-  workspace import leaves a runtime member call unresolved.
+  redirects within the snapshot. The selected module file has an entry edge
+  independent of any declaration augmentations. A captured relative module
+  can also be located by extension lookup.
 - **Candidates:** several graph symbols for one callee (union receivers, merged
   declarations, duplicate JavaScript functions).
 - **Unresolved:** standard library and `node_modules` packages
   (`external`, `external-package`); computed `require` or `import()` specifiers;
   calls through parameters, import shadows, and reassigned local functions;
+  calls whose only targets are declaration files or signatures without an
+  implementation (`declaration-only-call`);
   installed workspace bindings with no captured entry
   (`workspace-entry-unavailable` or `workspace-build-output-missing` when
-  TypeScript probed a missing build path).
+  TypeScript probed a missing path under a configured output directory).
 - **`partial` files** have complete but qualified facts, never syntax errors: an
   `extends` base that was not captured (`incomplete-config`; a package preset
   such as `@tsconfig/node20` leaves most cross-file links unresolved), compiler

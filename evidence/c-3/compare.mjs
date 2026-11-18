@@ -12,7 +12,7 @@ const previous = new Map(
   read("baseline-run.json").repos.map((repo) => [repo.id, repo]),
 );
 const current = read(process.argv[3] ?? "candidate-run.json").repos;
-const seed = "c-3:6a32d988";
+const seed = "c-3-review:b04f14fa";
 const sample = new Map();
 const changed = [];
 
@@ -49,6 +49,13 @@ const count = (db) => ({
   lexical: db
     .prepare("SELECT count(*) AS n FROM graph_symbols WHERE kind='lexical'")
     .get().n,
+  scoped: db.prepare(
+    "SELECT count(*) AS n FROM graph_symbols WHERE json_extract(body,'$.data.scoped')=1",
+  ).get().n,
+  scopedLinks: Object.fromEntries(db.prepare(`
+    SELECT l.kind,count(*) AS n FROM graph_links l JOIN graph_symbols s ON l.target=s.id
+    WHERE json_extract(s.body,'$.data.scoped')=1 GROUP BY l.kind
+  `).all().map(({kind,n}) => [kind,n])),
   links: db
     .prepare("SELECT count(*) AS n FROM graph_links WHERE module='typescript'")
     .get().n,
@@ -123,7 +130,7 @@ for (const repo of current) {
             continue;
           const group =
             !old.length && link.kind === "references"
-              ? "lexical-reference"
+              ? "scoped-reference"
               : link.kind === "calls" && link.target.file === file
                 ? "local-call"
                 : old.some((prior) => prior.data?.reason === "external-package")
@@ -191,7 +198,7 @@ for (const repo of current) {
     newDb.close();
   }
 }
-const quotas = { "local-call": 10, workspace: 5, "lexical-reference": 5 };
+const quotas = { "local-call": 10, workspace: 5, "scoped-reference": 5 };
 const chosen = Object.entries(quotas).flatMap(([group, quota]) =>
   (sample.get(group) ?? []).slice(0, quota),
 );

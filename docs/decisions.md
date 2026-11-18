@@ -2529,17 +2529,19 @@ texts and the top-level `author` field. See [PUB-2](changes/PUB-2.md).
 
 ## C-3: TypeScript lexical bindings and workspace packages
 
-TypeScript graph identities for local declarations use the existing scoped
-name and same-name ordinal. Plain local bindings use the `lexical` kind and
-retain one expression reference per owner and target. Runtime call evidence
-comes from the bound declaration and excludes parameter values, import
-shadows and callable declarations with detected writes.
+TypeScript graph identities for local declarations include anonymous callback
+sites and enclosing blocks. Requirement links report ambiguous continuity when
+an edit leaves indistinguishable siblings. Plain local bindings supply
+compiler information without allocating graph rows for declarations, reads or
+writes. Runtime call evidence excludes parameter values, import shadows,
+callable declarations with detected writes and declaration-only signatures.
 
 The snapshot host supplies virtual links for proven local package installs.
 TypeScript resolves the entry point with the importing file's compiler options
 and resolution mode. References can redirect declaration outputs to source when
 the compiler establishes the correspondence. Missing build output remains
-unresolved and has a distinct reason when a compiler lookup probed a build path.
+unresolved with a distinct reason when a compiler lookup probes an explicitly
+configured output directory.
 
 ### Indexing holds one copy of the graph at a time (C-2)
 

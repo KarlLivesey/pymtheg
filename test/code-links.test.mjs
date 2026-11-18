@@ -85,6 +85,65 @@ async function project() {
 const byIdentity = (list, identity) =>
   list.links.find((r) => r.link.symbol.identity === identity);
 
+test("linked TypeScript callbacks keep their original locations after a sibling is inserted", async () => {
+  const root = await project();
+  const options = { root, writer };
+  const path = join(root, "ts", "app.ts");
+  const callback = (input) =>
+    [
+      `  [${input}].map(value => {`,
+      "    function helper() { return value; }",
+      "    const arrow = () => helper();",
+      "    return arrow();",
+      "  });",
+    ].join("\n");
+  const original = callback(10);
+  const source = (...callbacks) =>
+    ["export function setup() {", ...callbacks, "}"].join("\n");
+  try {
+    await writeFile(path, source(original));
+    await createRequirement({ ...options, id: "R1", title: "Callbacks" });
+    for (const selector of ["ts/app.ts:3", "ts/app.ts:4"])
+      assert.equal(
+        (await createCodeLink({ ...options, record: "R1", selector })).status,
+        "created",
+      );
+    const locations = async () =>
+      (await listCodeLinks(options)).links
+        .map(({ link, state, current }) => [
+          link.symbol.name,
+          state,
+          current?.line,
+        ])
+        .sort(([a], [b]) => a.localeCompare(b));
+    assert.deepEqual(await locations(), [
+      ["arrow", "ok", 4],
+      ["helper", "ok", 3],
+    ]);
+    await writeFile(path, source(callback(20), original));
+    assert.deepEqual(await locations(), [
+      ["arrow", "ok", 9],
+      ["helper", "ok", 8],
+    ]);
+    await writeFile(path, source(callback(20)));
+    assert.deepEqual(await locations(), [
+      ["arrow", "ambiguous", undefined],
+      ["helper", "ambiguous", undefined],
+    ]);
+    await writeFile(path, source(original, original));
+    assert.deepEqual(await locations(), [
+      ["arrow", "ambiguous", undefined],
+      ["helper", "ambiguous", undefined],
+    ]);
+    assert.equal(
+      (await checkCodeLinks({ ...options, allowMoved: true })).passed,
+      false,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("requirement ↔ Go/Rust/TypeScript links: states, rebuild, removal and history", async () => {
   const root = await project();
   const options = { root, writer };

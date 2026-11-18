@@ -356,6 +356,11 @@ class VirtualFileSystem {
   /** Virtual node_modules/<name> directory -> real workspace package directory. */
   readonly links = new Map<string, string>();
   readonly linkDirectories = new Set<string>();
+  readonly outputs = new Set<string>();
+  private readonly listings = new Map<
+    string,
+    { files: string[]; directories: string[] }
+  >();
   add(path: string, text: string) {
     const name = toVirtual(path);
     this.files.set(name, text);
@@ -408,13 +413,21 @@ class VirtualFileSystem {
       const link = posix.join(directory, "node_modules", name);
       const target = this.links.get(link);
       if (target !== undefined) {
-        const prefix = link + "/";
         const built = lookups.some((lookup) => {
-          if (!lookup.startsWith(prefix)) return false;
-          const match = /^(dist|build|out|lib|esm|cjs)\//.exec(
-            lookup.slice(prefix.length),
-          );
-          return match && !this.fileExists(lookup);
+          if (
+            !lookup.startsWith(link + "/") &&
+            !lookup.startsWith(target + "/")
+          )
+            return false;
+          const resolved = this.real(lookup);
+          if (this.files.has(resolved)) return false;
+          for (
+            let dir = posix.dirname(resolved);
+            dir !== target && dir !== "/";
+            dir = posix.dirname(dir)
+          )
+            if (this.outputs.has(dir)) return true;
+          return false;
         });
         return built
           ? "workspace-build-output-missing"
@@ -425,6 +438,8 @@ class VirtualFileSystem {
   }
   entries = (path: string) => {
     const directory = path === "/" ? "/" : path.replace(/\/$/, "");
+    const cached = this.listings.get(directory);
+    if (cached) return cached;
     const files: string[] = [];
     const directories: string[] = [];
     for (const file of this.files.keys())
@@ -432,10 +447,12 @@ class VirtualFileSystem {
     for (const child of this.directories)
       if (child !== directory && posix.dirname(child) === directory)
         directories.push(posix.basename(child));
-    return {
+    const listing = {
       files: files.sort(compare),
       directories: directories.sort(compare),
     };
+    this.listings.set(directory, listing);
+    return listing;
   };
 }
 
@@ -571,6 +588,8 @@ export function projectModel(
       ),
   };
   const groups: ProjectGroup[] = [];
+  // Reference redirects reuse the parsed snapshot config across programs.
+  const parsedConfigs = new Map<string, ts.ParsedCommandLine>();
   const claimed = new Map<string, ProjectGroup[]>();
   const claim = (path: string, group: ProjectGroup) => {
     const list = claimed.get(path) ?? [];
@@ -747,6 +766,8 @@ export function projectModel(
         toVirtual(config.path),
       );
       if (!group.failure) {
+        if (!group.limitations.length)
+          parsedConfigs.set(toVirtual(config.path), parsed);
         group.notes.push(
           ...parsed.errors
             // 18003: "No inputs were found" is a normal state for solution-style configs.
@@ -763,6 +784,13 @@ export function projectModel(
             ),
         );
         group.options = forced(parsed.options);
+        if (!group.limitations.length)
+          for (const output of [
+            parsed.options.outDir,
+            parsed.options.declarationDir,
+          ])
+            if (output && output !== posix.dirname(toVirtual(config.path)))
+              fs.outputs.add(output);
         if (parsed.projectReferences?.length)
           group.references = parsed.projectReferences.filter((reference) =>
             fs.fileExists(ts.resolveProjectReferencePath(reference)),
@@ -946,6 +974,7 @@ export function projectModel(
       directoryExists: (name) => name === LIB_ROOT || fs.directoryExists(name),
       getDirectories: (name) => fs.entries(fs.real(name)).directories,
       readDirectory: (...args) => [...parseHost.readDirectory(...args)],
+      getParsedCommandLine: (name) => parsedConfigs.get(fs.real(name)),
       realpath: (name) => fs.real(name),
     };
     caches.set(created, sources);

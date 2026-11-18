@@ -266,14 +266,19 @@ function location(text, offset) {
   return { line, code: text.slice(Math.max(start, at - 85), Math.min(stop < 0 ? text.length : stop, at + 146)).trim(), before };
 }
 
-function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys) {
+function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys, previous) {
   const attempt = selectAttempt(scratch, repo);
   const tree = readFileSync(join(attempt, "tree.out"), "utf8").split("\0");
   const symlinks = new Set(tree.filter((item) => /^120000 blob /.test(item)).map((item) => item.slice(item.indexOf("\t") + 1)));
   const paths = tree
     .filter((item) => /^100(?:644|755) blob /.test(item)).map((item) => item.slice(item.indexOf("\t") + 1));
   const db = new DatabaseSync(join(attempt, "checkout/.pymtheg/rebuildable/graph.sqlite"), { readOnly: true });
+  let other;
   try {
+    if (previous)
+      other = new DatabaseSync(join(selectAttempt(scratch, previous), "checkout/.pymtheg/rebuildable/graph.sqlite"), { readOnly: true });
+    const otherLinks = other?.prepare("SELECT body,kind,module FROM graph_links WHERE file=?");
+    const shared = {};
     if (db.prepare("SELECT value FROM graph_meta WHERE key='schema'").get()?.value !== "3") throw Error("Coverage export supports graph schema 3");
     const files = db.prepare(`SELECT path,status,json_extract(body,'$.module') AS module,
       json_extract(body,'$.result.data.go.package') AS package FROM graph_files ORDER BY path`).all();
@@ -284,7 +289,7 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys) {
     const imports = db.prepare("SELECT body,resolution FROM graph_links WHERE file=? AND kind='imports'");
     const declared = db.prepare(`SELECT 1 AS present FROM graph_symbols WHERE name=? AND file=?
       AND json_extract(body,'$.kind') IN ('enum','struct','type','trait','class','interface','function','method') LIMIT 1`);
-    const hasName = db.prepare("SELECT 1 FROM graph_symbols WHERE name=? AND kind<>'lexical' AND json_extract(body,'$.module')='typescript' LIMIT 1");
+    const hasName = db.prepare("SELECT 1 FROM graph_symbols WHERE name=? AND json_extract(body,'$.module')='typescript' LIMIT 1");
     const goSignatures = db.prepare(`SELECT file, json_extract(body,'$.data') AS data FROM graph_symbols WHERE name=?
       AND json_extract(body,'$.module')='go' AND json_extract(body,'$.kind')=?`);
     const goDefinitions = db.prepare(`SELECT file, json_extract(body,'$.kind') AS kind,
@@ -374,6 +379,8 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys) {
     const sourceFiles = new Map();
     const checks = {};
     for (const file of files) {
+      const sharedKeys = otherLinks && new Set(otherLinks.all(file.path).map((row) =>
+        sampleKey(repo, { ...JSON.parse(row.body), kind: row.kind, module: row.module })));
       const snapshot = getFile.get(file.path);
       const source = snapshot.text ?? "";
       const scope = sourceScope(repo.id, file.path, source);
@@ -480,7 +487,12 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys) {
         const stratum = sampleStratum(link, disposition);
         const bucket = stratum ? reviewBucket(stratum, scope, disposition) : null;
         const references = referenceFiles?.get(file.path);
-        const rank = stratum || references ? sampleKey(repo, link) : null;
+        const rank = stratum || references || sharedKeys ? sampleKey(repo, link) : null;
+        if (sharedKeys?.has(rank)) {
+          const score = shared[link.module] ??= { links: 0, level2: 0 };
+          score.links++;
+          if (link.resolution === "resolved" || library?.level === 2) score.level2++;
+        }
         const state = library ? "outside" : link.resolution;
         const matched = rank && references?.has(rank);
         const verifiedCandidates = matched && state === "ambiguous" ? candidatesFor.all(row.id) : [];
@@ -597,6 +609,7 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys) {
     return { audit: { id: repo.id, language: repo.language, commit: repo.commit, outcome: repo.outcome,
       trackedSource: repo.trackedSource, breakdown: rows, sourceFiles: [...sourceFiles.values()],
       failedSources: [...failed.values()].map(({ examples, ...record }) => record), strata, reviewSites,
+      ...(other ? { shared } : {}),
       ...(reviewOverlap.size ? { reviewOverlap: [...reviewOverlap].sort(compare).map((key) => JSON.parse(key)) } : {}),
       ...(librarySites.size ? { libraryExamples: [...librarySites.values()] } : {}),
       ...(omissions.size ? { sourceOmissions: [...omissions.values()] } : {}),
@@ -605,7 +618,7 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys) {
       failedExamples: [...failed.values()],
       samples: Object.fromEntries([...samples].map(([bucket, rows]) => [bucket, rows.map(({ observations, ...row }) =>
         observations ? { ...row, observations: [...observations.values()] } : row)])) };
-  } finally { db.close(); }
+  } finally { other?.close(); db.close(); }
 }
 
 const { values } = parseArgs({ options: {
@@ -613,11 +626,17 @@ const { values } = parseArgs({ options: {
   output: { type: "string" }, "metadata-root": { type: "string" }, "reference-samples": { type: "string" },
   "include-failed": { type: "string" },
   "sampling-base": { type: "string" },
+  "shared-with": { type: "string" },
 } });
 if (!values.results || !values.scratch || !values.output) throw Error("Use --results, --output and --scratch (or PYM_SCRATCH)");
 const scratch = resolve(values.scratch);
 const output = resolve(values.output);
 const input = readJson(values.results);
+const sharedWith = new Map(values["shared-with"]
+  ? readJson(values["shared-with"]).repos
+    .filter((repo) => repo.outcome === "finished")
+    .map((repo) => [repo.id, repo])
+  : []);
 const basis = values["sampling-base"] ? readJson(values["sampling-base"]) : null;
 const quotas = basis ? basis.samplingQuotas ? new Map(Object.entries(basis.samplingQuotas)) : reviewQuotas(basis.repos) : null;
 if (values["include-failed"]) {
@@ -646,6 +665,7 @@ const cacheVersion = createHash("sha256").update(readFileSync(new URL(import.met
   .update(readFileSync(new URL("./coverage-locations.mjs", import.meta.url)))
   .update(readFileSync(new URL("./coverage-source.mjs", import.meta.url)))
   .update(JSON.stringify([...quotas ?? []]))
+  .update(values["shared-with"] ? readFileSync(values["shared-with"]) : "")
   .update(values["reference-samples"] ? readFileSync(values["reference-samples"]) : "").digest("hex");
 const cache = `${output}.cache`;
 mkdirSync(dirname(output), { recursive: true });
@@ -666,7 +686,10 @@ for (const repo of input.repos) {
   const path = join(cache, `${key}.json`);
   if (!existsSync(path)) {
     console.error(`Exporting ${repo.id}`);
-    atomicJson(path, scanRepo(scratch, repo, readers, reference.get(repo.id), quotas, goMapKeys));
+    const previous = sharedWith.get(repo.id);
+    if (previous && previous.commit !== repo.commit)
+      throw Error(`Shared-site comparison requires the same pin for ${repo.id}`);
+    atomicJson(path, scanRepo(scratch, repo, readers, reference.get(repo.id), quotas, goMapKeys, previous));
   }
   const { audit, samples, failedExamples } = readJson(path);
   if (failedExamples.length) failures[repo.id] = failedExamples;
