@@ -80,7 +80,15 @@ export class GraphView {
           targetName: clip(l.targetName),
           ...this.location(l),
           reasons: this.reasons(l.data),
-          candidateCount: list(l.candidates).length,
+          // A definite library link has a target, not candidates.
+          candidateCount:
+            l.certainty === "library"
+              ? 0
+              : list(l.candidates).length + list(l.libraries).length,
+          // Library targets are outside this project, never local symbols.
+          ...(l.certainty === "library"
+            ? { library: this.library(list(l.libraries)[0]) }
+            : {}),
           detailRef: l.id,
         };
         this.linkRows.set(l.id, row);
@@ -90,11 +98,28 @@ export class GraphView {
             symbol: symbol(c.symbol) ?? c.id,
             status: c.status,
           });
+        if (l.certainty !== "library")
+          for (const c of list(l.libraries))
+            this.tables.candidates!.push({
+              link: l.id,
+              library: this.library(c),
+            });
       }
       return this.linkRows.get(l.id)!;
     };
     const data = record(response.data);
     const answer: Record<string, unknown>[] = [];
+    if (data.library) {
+      const library = record(data.library);
+      answer.push({
+        type: "library",
+        unit: clip(library.unit),
+        ...(library.symbol === undefined
+          ? {}
+          : { symbol: clip(library.symbol) }),
+        place: "outside-project",
+      });
+    }
     if (data.symbol)
       answer.push({ type: "selected", ref: symbol(data.symbol) });
     if (data.from) answer.push({ type: "from", ref: symbol(data.from) });
@@ -287,6 +312,21 @@ export class GraphView {
       locationBasis:
         "indexed snapshot; 1-based UTF-16 columns; current files may differ when stale",
       next: "Repair named failed files first. If the index is absent/incomplete, start code_graph index (or a query with noSync:false) and await completion. Read named sections with graph_result; follow nextOffset. Candidate membership is in candidates (filter ref=link ref). Narrow code_graph selectors/limit/depth if core truncated; pages do not recover core omissions.",
+    };
+  }
+  /** A library target: unit and symbol outside this project, clipped. */
+  private library(value: unknown) {
+    const l = record(value);
+    return {
+      ref: l.id,
+      ecosystem: l.ecosystem,
+      unit: clip(l.unit),
+      ...(l.symbol === undefined ? {} : { symbol: clip(l.symbol) }),
+      ...(l.version === undefined
+        ? {}
+        : { version: clip(l.version), versionSource: clip(l.versionSource) }),
+      evidence: l.evidence,
+      place: "outside-project",
     };
   }
   private detail(ref: string, value: unknown) {

@@ -8,7 +8,7 @@ import { parseArgs } from "node:util";
 import { gunzipSync } from "node:zlib";
 import { cargoPathLocations, checkoutLocation, npmPathLocation, yarnArchivePackages } from "./coverage-locations.mjs";
 import { goMapKeyReader, typescriptShapes } from "./coverage-source.mjs";
-import { classify, columns, countLines, externalIdentity, failedFamily, goImports, modules, packageName, repositoryScore,
+import { classify, columns, countLines, externalIdentity, failedFamily, goImports, modules, packageName, storedTotalsAgree,
   reviewBucket, reviewQuotas, rustImports, rustPreludeMacros, rustPreludeTypes, sampleKey, sampleSize, sampleStratum, sourceScope, tsBindings, workspaceEntryMissing, workspaceNames } from "./coverage-rules.mjs";
 
 const readJson = (name) => JSON.parse(name.endsWith(".gz") ? gunzipSync(readFileSync(name)) : readFileSync(name, "utf8"));
@@ -279,7 +279,12 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys, pre
       other = new DatabaseSync(join(selectAttempt(scratch, previous), "checkout/.pymtheg/rebuildable/graph.sqlite"), { readOnly: true });
     const otherLinks = other?.prepare("SELECT body,kind,module FROM graph_links WHERE file=?");
     const shared = {};
-    if (db.prepare("SELECT value FROM graph_meta WHERE key='schema'").get()?.value !== "3") throw Error("Coverage export supports graph schema 3");
+    const graphSchema = db.prepare("SELECT value FROM graph_meta WHERE key='schema'").get()?.value;
+    if (graphSchema !== "3" && graphSchema !== "4") throw Error("Coverage export supports graph schemas 3 and 4");
+    // Schema 4 stores library targets; schema 3 (0.1.0) has none, so its
+    // library identities are reconstructed from link facts.
+    const storedLibrary = graphSchema === "4" ? db.prepare(`SELECT ecosystem,unit,symbol,version,evidence
+      FROM graph_library_targets WHERE link=? AND role='target'`) : null;
     const files = db.prepare(`SELECT path,status,json_extract(body,'$.module') AS module,
       json_extract(body,'$.result.data.go.package') AS package FROM graph_files ORDER BY path`).all();
     const getFile = db.prepare(`SELECT json_extract(body,'$.text') AS text,
@@ -440,6 +445,7 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys, pre
       };
       for (const row of getLinks.iterate(file.path)) {
         const link = { ...JSON.parse(row.body), module: row.module, kind: row.kind, resolution: row.resolution };
+        if (row.resolution === "library") link.library = storedLibrary?.get(row.id);
         if (quotas && link.range && !["contains", "receiver"].includes(link.kind)) {
           if (link.kind !== "calls" || file.module === "typescript") observedSites.add(link.range.start);
           const base = link.data?.expr?.x;
@@ -603,10 +609,8 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys, pre
       }
     }
     const rows = [...counts].sort(([a], [b]) => compare(a, b)).map(([, value]) => value);
-    const actual = repositoryScore(rows);
     const warm = readJson(join(attempt, "warm.out")).counts;
-    if (actual.total !== warm.links || actual.ambiguous !== warm.ambiguous ||
-        actual.inside + actual.outside + actual.unclassified !== warm.unresolved) throw Error(`Stored link totals disagree with released CLI for ${repo.id}`);
+    if (!storedTotalsAgree(rows, warm)) throw Error(`Stored link totals disagree with released CLI for ${repo.id}`);
     return { audit: { id: repo.id, language: repo.language, commit: repo.commit, outcome: repo.outcome,
       trackedSource: repo.trackedSource, breakdown: rows, sourceFiles: [...sourceFiles.values()],
       failedSources: [...failed.values()].map(({ examples, ...record }) => record), strata, reviewSites,

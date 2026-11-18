@@ -9,6 +9,7 @@ import type {
   GraphStorage,
   FailedFile,
   GraphFile,
+  GraphLibrary,
   GraphLink,
   GraphSymbol,
   SymbolQuery,
@@ -29,6 +30,40 @@ export class SqliteGraphStore implements GraphStorage {
    * The planner does not choose the index on its own, so link reads name it.
    * Read-only opens of a graph written before the index existed keep the plain plan. */
   private fileStatusIndex = "";
+  /**
+   * Known to have library targets (schema 4). A graph never returns to
+   * schema 3, so once true it stays true; a writable store migrates on open.
+   */
+  private libraryKnown = false;
+  /**
+   * Whether this database has library targets. Until that is known, it is
+   * asked inside the read that uses it: a reader opened on a schema-3 graph
+   * that another connection migrates sees one database state per read, never
+   * a count of library links beside rows read without them.
+   */
+  private libraryTable(): boolean {
+    return (this.libraryKnown ||= !!this.db
+      .prepare(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='graph_library_targets'",
+      )
+      .get());
+  }
+  /** One read snapshot for several statements, unless one is open or not needed. */
+  private snapshot<T>(read: () => T): T {
+    return this.libraryKnown || this.db.isTransaction
+      ? read()
+      : this.readCommandSnapshot(read);
+  }
+  /** A clean context file (manifest or lockfile) in the snapshot. */
+  private cleanContext(path: string): boolean {
+    return (
+      this.db
+        .prepare(
+          "SELECT json_extract(body,'$.status') AS status FROM graph_contexts WHERE path=?",
+        )
+        .get(path)?.status === "clean"
+    );
+  }
   private findFileStatusIndex(): void {
     this.fileStatusIndex = this.db
       .prepare(
@@ -54,11 +89,11 @@ export class SqliteGraphStore implements GraphStorage {
     this.db = openDatabase(path, { readOnly: options.readOnly ?? false });
     try {
       if (options.readOnly) {
-        if (
-          this.db
-            .prepare("SELECT value FROM graph_meta WHERE key='schema'")
-            .get()?.value !== "3"
-        )
+        const schema = this.db
+          .prepare("SELECT value FROM graph_meta WHERE key='schema'")
+          .get()?.value;
+        // Schema 3 (0.1.0) has no library targets; it reads as having none.
+        if (schema !== "3" && schema !== "4")
           throw Error("Unsupported graph schema; rebuild the index");
         const saved = this.db
           .prepare("SELECT value FROM graph_meta WHERE key='project'")
@@ -72,18 +107,29 @@ export class SqliteGraphStore implements GraphStorage {
           );
         this.projectId = saved;
         this.findFileStatusIndex();
+        this.libraryKnown = schema === "4";
         return;
       }
       this.db.exec(`PRAGMA foreign_keys=ON;
         CREATE TABLE IF NOT EXISTS graph_meta(key TEXT PRIMARY KEY,value TEXT NOT NULL);`);
       this.db
-        .prepare("INSERT OR IGNORE INTO graph_meta VALUES ('schema','3')")
+        .prepare("INSERT OR IGNORE INTO graph_meta VALUES ('schema','4')")
         .run();
-      if (
-        this.db.prepare("SELECT value FROM graph_meta WHERE key='schema'").get()
-          ?.value !== "3"
-      )
+      const schema = this.db
+        .prepare("SELECT value FROM graph_meta WHERE key='schema'")
+        .get()?.value;
+      if (schema !== "3" && schema !== "4")
         throw Error("Unsupported graph schema; rebuild the index");
+      // Schema 3 (0.1.0) differs only by the library-target table and the
+      // triggers that derive resolution. Its rows stay valid unchanged: none
+      // has a library target. Migrate in place instead of re-indexing.
+      if (schema === "3")
+        this.transaction(() => {
+          this.db.exec(`DROP TRIGGER IF EXISTS graph_target_changed;
+            DROP TRIGGER IF EXISTS graph_candidate_removed;
+            UPDATE graph_meta SET value='4' WHERE key='schema';`);
+          this.db.exec(libraryTables);
+        });
       this.db
         .exec(`CREATE TABLE IF NOT EXISTS graph_files(path TEXT PRIMARY KEY,body TEXT NOT NULL,status TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS graph_parse_failures(path TEXT PRIMARY KEY REFERENCES graph_files(path) ON DELETE CASCADE,hash TEXT,module TEXT,version TEXT);
@@ -103,24 +149,12 @@ export class SqliteGraphStore implements GraphStorage {
         CREATE INDEX IF NOT EXISTS graph_link_module ON graph_links(module);
         CREATE INDEX IF NOT EXISTS graph_link_resolution ON graph_links(resolution);
         CREATE INDEX IF NOT EXISTS graph_candidate_symbol ON graph_candidates(symbol,kind,link);
-        CREATE TRIGGER IF NOT EXISTS graph_target_changed AFTER UPDATE OF target ON graph_links
-        WHEN OLD.target IS NOT NEW.target BEGIN
-          UPDATE graph_links SET resolution=CASE WHEN NEW.target IS NOT NULL THEN 'resolved'
-            WHEN EXISTS(SELECT 1 FROM graph_candidates WHERE link=NEW.id) THEN 'ambiguous' ELSE 'unresolved' END WHERE id=NEW.id;
-        END;
-        CREATE TRIGGER IF NOT EXISTS graph_candidate_added AFTER INSERT ON graph_candidates BEGIN
-          UPDATE graph_links SET resolution='ambiguous' WHERE id=NEW.link AND target IS NULL AND resolution!='ambiguous';
-        END;
-        CREATE TRIGGER IF NOT EXISTS graph_candidate_removed AFTER DELETE ON graph_candidates BEGIN
-          UPDATE graph_links SET resolution=CASE WHEN target IS NOT NULL THEN 'resolved'
-            WHEN EXISTS(SELECT 1 FROM graph_candidates WHERE link=OLD.link) THEN 'ambiguous' ELSE 'unresolved' END
-            WHERE id=OLD.link AND resolution IS NOT CASE WHEN target IS NOT NULL THEN 'resolved'
-            WHEN EXISTS(SELECT 1 FROM graph_candidates WHERE link=OLD.link) THEN 'ambiguous' ELSE 'unresolved' END;
-        END;
+        ${libraryTables}
         CREATE INDEX IF NOT EXISTS graph_link_source ON graph_links(source,kind);
         CREATE INDEX IF NOT EXISTS graph_link_target ON graph_links(target,kind);
         CREATE INDEX IF NOT EXISTS graph_file_status ON graph_files(path,status);`);
       this.findFileStatusIndex();
+      this.libraryKnown = true;
       // Path-only markers from early W2-M builds have unknown provenance. Adding
       // nullable columns makes them cache misses until a successful parse stamps them.
       const markerColumns = new Set(
@@ -146,6 +180,7 @@ export class SqliteGraphStore implements GraphStorage {
         "graph_symbols",
         "graph_links",
         "graph_candidates",
+        "graph_library_targets",
         "graph_parse_failures",
       ])
         for (const event of ["INSERT", "UPDATE", "DELETE"])
@@ -380,6 +415,25 @@ export class SqliteGraphStore implements GraphStorage {
         candidate.id,
         link.kind,
       );
+    this.insertLibraries(link, sql);
+  }
+  private insertLibraries(
+    link: GraphLink,
+    sql: (sql: string) => StatementSync,
+  ): void {
+    for (const library of link.libraries ?? [])
+      sql("INSERT INTO graph_library_targets VALUES (?,?,?,?,?,?,?,?,?,?)").run(
+        link.id,
+        library.id,
+        link.resolution === "library" ? "target" : "candidate",
+        link.kind,
+        library.ecosystem,
+        library.unit,
+        library.symbol ?? null,
+        library.version ?? null,
+        library.versionSource ?? null,
+        library.evidence,
+      );
   }
   removeFile(path: string): void {
     this.db.prepare("DELETE FROM graph_files WHERE path=?").run(path);
@@ -404,37 +458,71 @@ export class SqliteGraphStore implements GraphStorage {
     values: string[] = [],
     limit?: number,
   ): GraphLink[] {
-    return this.db
-      .prepare(
-        `SELECT l.body,l.target,f.status AS sourceStatus,tf.status AS targetStatus,
+    // The capability check and the read describe one database state.
+    return this.snapshot(() =>
+      this.db
+        .prepare(
+          `SELECT l.body,l.target,f.status AS sourceStatus,tf.status AS targetStatus,
       (SELECT json_group_array(json_object('id',id,'status',status)) FROM
         (SELECT c.symbol AS id,cf.status AS status FROM graph_candidates c
          JOIN graph_symbols cs ON cs.id=c.symbol JOIN graph_files cf${this.fileStatusIndex} ON cf.path=cs.file
-         WHERE c.link=l.id ORDER BY c.symbol)) AS candidates
+         WHERE c.link=l.id ORDER BY c.symbol)) AS candidates${
+           this.libraryTable()
+             ? `,
+      (SELECT json_group_array(json_object('id',id,'role',role,'ecosystem',ecosystem,'unit',unit,
+        'symbol',symbol,'version',version,'versionSource',version_source,'evidence',evidence)) FROM
+        (SELECT * FROM graph_library_targets WHERE link=l.id ORDER BY id)) AS libraries`
+             : ""
+         }
       FROM graph_links l JOIN graph_files f${this.fileStatusIndex} ON f.path=l.file
       LEFT JOIN graph_symbols ts ON ts.id=l.target LEFT JOIN graph_files tf${this.fileStatusIndex} ON tf.path=ts.file
       ${where ? `WHERE ${where}` : ""} ORDER BY l.id${limit === undefined ? "" : ` LIMIT ${limit}`}`,
-      )
-      .all(...values)
-      .map((row) => {
-        const link = JSON.parse(row.body as string) as GraphLink;
-        const candidates = JSON.parse(
-          row.candidates as string,
-        ) as GraphLink["candidates"];
-        const targetId = row.target as string | null;
-        return {
-          ...link,
-          targetId,
-          targetStatus: (row.targetStatus ?? null) as GraphLink["targetStatus"],
-          sourceStatus: row.sourceStatus as GraphLink["sourceStatus"],
-          candidates,
-          resolution: targetId
-            ? "resolved"
-            : candidates.length
-              ? "ambiguous"
-              : "unresolved",
-        };
-      });
+        )
+        .all(...values)
+        .map((row) => {
+          const link = JSON.parse(row.body as string) as GraphLink;
+          const candidates = JSON.parse(
+            row.candidates as string,
+          ) as GraphLink["candidates"];
+          const targetId = row.target as string | null;
+          const stored = row.libraries
+            ? (JSON.parse(row.libraries as string) as (Record<
+                keyof GraphLibrary,
+                string | null
+              > & { role: string })[])
+            : [];
+          const libraries = stored.map(
+            ({ role: _role, symbol, version, versionSource, ...item }) =>
+              ({
+                id: item.id,
+                ecosystem: item.ecosystem,
+                unit: item.unit,
+                ...(symbol === null ? {} : { symbol }),
+                ...(version === null ? {} : { version, versionSource }),
+                evidence: item.evidence,
+              }) as GraphLibrary,
+          );
+          const result: GraphLink = {
+            ...link,
+            targetId,
+            targetStatus: (row.targetStatus ??
+              null) as GraphLink["targetStatus"],
+            sourceStatus: row.sourceStatus as GraphLink["sourceStatus"],
+            candidates,
+            resolution: targetId
+              ? "resolved"
+              : candidates.length ||
+                  stored.some((item) => item.role === "candidate")
+                ? "ambiguous"
+                : stored.length
+                  ? "library"
+                  : "unresolved",
+          };
+          delete result.libraries;
+          if (libraries.length) result.libraries = libraries;
+          return result;
+        }),
+    );
   }
   links(): GraphLink[] {
     return this.selectLinks();
@@ -462,6 +550,42 @@ export class SqliteGraphStore implements GraphStorage {
   ambiguous(): GraphLink[] {
     return this.selectLinks("l.resolution='ambiguous'");
   }
+  /**
+   * Project links whose target, or one of whose candidates, is library unit
+   * `unit` (any ecosystem), or exactly symbol `symbol` in it.
+   */
+  libraryUses(unit: string, symbol: string | undefined, limit: number) {
+    this.queryLimit(limit);
+    return this.snapshot(() =>
+      !this.libraryTable()
+        ? []
+        : this.selectLinks(
+            `l.id IN (SELECT link FROM graph_library_targets WHERE unit=?${symbol === undefined ? "" : " AND symbol=?"})`,
+            symbol === undefined ? [unit] : [unit, symbol],
+            limit,
+          ),
+    );
+  }
+  /** Exact counts of the same links as libraryUses, by class. */
+  libraryUseCounts(
+    unit: string,
+    symbol: string | undefined,
+  ): { library: number; candidateSet: number } {
+    return this.snapshot(() => {
+      if (!this.libraryTable()) return { library: 0, candidateSet: 0 };
+      const row = this.db
+        .prepare(
+          `SELECT COUNT(DISTINCT CASE WHEN role='target' THEN link END) AS library,
+          COUNT(DISTINCT CASE WHEN role='candidate' THEN link END) AS candidateSet
+        FROM graph_library_targets WHERE unit=?${symbol === undefined ? "" : " AND symbol=?"}`,
+        )
+        .get(...(symbol === undefined ? [unit] : [unit, symbol]))!;
+      return {
+        library: Number(row.library),
+        candidateSet: Number(row.candidateSet),
+      };
+    });
+  }
   private writeTargets(
     current: readonly GraphLink[],
     desired: readonly GraphLink[],
@@ -473,7 +597,10 @@ export class SqliteGraphStore implements GraphStorage {
       if (
         before?.targetId === link.targetId &&
         JSON.stringify(before.candidates.map((item) => item.id)) ===
-          JSON.stringify(link.candidates.map((item) => item.id))
+          JSON.stringify(link.candidates.map((item) => item.id)) &&
+        before.resolution === link.resolution &&
+        JSON.stringify(before.libraries ?? []) ===
+          JSON.stringify(link.libraries ?? [])
       )
         continue;
       sql("UPDATE graph_links SET target=? WHERE id=?").run(
@@ -487,11 +614,17 @@ export class SqliteGraphStore implements GraphStorage {
           candidate.id,
           link.kind,
         );
+      if (before?.libraries || link.libraries) {
+        sql("DELETE FROM graph_library_targets WHERE link=?").run(link.id);
+        this.insertLibraries(link, sql);
+      }
     }
   }
   resolveLinks(resolutions: readonly LinkResolution[]): void {
     const current = this.links();
-    const decider = new LinkDecider(this.findSymbols());
+    const decider = new LinkDecider(this.findSymbols(), (path) =>
+      this.cleanContext(path),
+    );
     const linkIds = new Set(current.map((link) => link.id));
     const decisions = new Map<string, LinkResolution>();
     for (const item of resolutions) {
@@ -520,6 +653,7 @@ export class SqliteGraphStore implements GraphStorage {
       },
       this.findSymbols(),
       current,
+      (path) => this.cleanContext(path),
     );
     if (sameLinks(current, desired)) return;
     this.transaction(() => {
@@ -694,7 +828,8 @@ export class SqliteGraphStore implements GraphStorage {
       Number(
         this.db.prepare(`SELECT count(*) AS n FROM ${table} ${where}`).get()!.n,
       );
-    return {
+    // Every class from one database state.
+    return this.snapshot(() => ({
       files: count("graph_files"),
       symbols: count("graph_symbols"),
       links: count("graph_links"),
@@ -702,7 +837,8 @@ export class SqliteGraphStore implements GraphStorage {
       partial: count("graph_files", "WHERE status='partial'"),
       unresolved: count("graph_links", "WHERE resolution='unresolved'"),
       ambiguous: count("graph_links", "WHERE resolution='ambiguous'"),
-    };
+      library: count("graph_links", "WHERE resolution='library'"),
+    }));
   }
   getSymbol(id: string): GraphSymbol | undefined {
     const row = this.db
@@ -856,3 +992,40 @@ function sameLinks(a: readonly GraphLink[], b: readonly GraphLink[]): boolean {
     a.every((link, i) => JSON.stringify(link) === JSON.stringify(b[i]))
   );
 }
+
+/** Resolution derived from the stored target, candidates and library rows. */
+const resolutionOf = (link: string, target: string) => `CASE
+  WHEN ${target} IS NOT NULL THEN 'resolved'
+  WHEN EXISTS(SELECT 1 FROM graph_candidates WHERE link=${link})
+    OR EXISTS(SELECT 1 FROM graph_library_targets WHERE link=${link} AND role='candidate') THEN 'ambiguous'
+  WHEN EXISTS(SELECT 1 FROM graph_library_targets WHERE link=${link}) THEN 'library'
+  ELSE 'unresolved' END`;
+/**
+ * Library targets (schema 4): one row per link and target. role 'target' is
+ * the link's only target (resolution 'library'); 'candidate' is a member of a
+ * candidate set. Rows of their own so uses of a unit or symbol are one index read.
+ */
+const libraryTables = `CREATE TABLE IF NOT EXISTS graph_library_targets(link TEXT NOT NULL REFERENCES graph_links(id) ON DELETE CASCADE,
+  id TEXT NOT NULL,role TEXT NOT NULL CHECK(role IN ('target','candidate')),kind TEXT NOT NULL,
+  ecosystem TEXT NOT NULL,unit TEXT NOT NULL,symbol TEXT,version TEXT,version_source TEXT,evidence TEXT NOT NULL,PRIMARY KEY(link,id));
+  CREATE INDEX IF NOT EXISTS graph_library_unit ON graph_library_targets(unit,symbol,link);
+  CREATE INDEX IF NOT EXISTS graph_library_id ON graph_library_targets(id,link);
+  CREATE TRIGGER IF NOT EXISTS graph_target_changed AFTER UPDATE OF target ON graph_links
+  WHEN OLD.target IS NOT NEW.target BEGIN
+    UPDATE graph_links SET resolution=${resolutionOf("NEW.id", "NEW.target")} WHERE id=NEW.id;
+  END;
+  CREATE TRIGGER IF NOT EXISTS graph_candidate_added AFTER INSERT ON graph_candidates BEGIN
+    UPDATE graph_links SET resolution='ambiguous' WHERE id=NEW.link AND target IS NULL AND resolution!='ambiguous';
+  END;
+  CREATE TRIGGER IF NOT EXISTS graph_candidate_removed AFTER DELETE ON graph_candidates BEGIN
+    UPDATE graph_links SET resolution=${resolutionOf("OLD.link", "target")}
+      WHERE id=OLD.link AND resolution IS NOT ${resolutionOf("OLD.link", "target")};
+  END;
+  CREATE TRIGGER IF NOT EXISTS graph_library_added AFTER INSERT ON graph_library_targets BEGIN
+    UPDATE graph_links SET resolution=${resolutionOf("NEW.link", "target")}
+      WHERE id=NEW.link AND resolution IS NOT ${resolutionOf("NEW.link", "target")};
+  END;
+  CREATE TRIGGER IF NOT EXISTS graph_library_removed AFTER DELETE ON graph_library_targets BEGIN
+    UPDATE graph_links SET resolution=${resolutionOf("OLD.link", "target")}
+      WHERE id=OLD.link AND resolution IS NOT ${resolutionOf("OLD.link", "target")};
+  END;`;

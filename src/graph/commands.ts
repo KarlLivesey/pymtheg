@@ -75,6 +75,8 @@ export interface GraphResponse {
     partial: number;
     unresolved: number;
     ambiguous: number;
+    /** Links whose only target is a library outside the project. */
+    library: number;
   };
   failedFiles: {
     path: string;
@@ -116,6 +118,7 @@ const arity: Record<GraphCommand, number> = {
   path: 2,
   impact: 1,
   file: 1,
+  uses: 1,
 };
 
 /** Data-only entry point for CLI and future MCP wrappers. No stdout/stderr or module execution of project code. */
@@ -127,7 +130,9 @@ export async function executeGraph(
   signal.throwIfAborted();
   if (
     !(request.command in arity) ||
-    (request.args?.length ?? 0) !== arity[request.command]
+    ((request.args?.length ?? 0) !== arity[request.command] &&
+      // uses <unit> [symbol]
+      !(request.command === "uses" && request.args?.length === 2))
   )
     throw Error("Invalid graph subcommand or argument count");
   const depth = request.depth ?? 5,
@@ -554,7 +559,7 @@ export async function executeGraph(
         response.status = query.status;
       }
       if (
-        ["callers", "impact", "path"].includes(request.command) &&
+        ["callers", "impact", "path", "uses"].includes(request.command) &&
         response.counts.unresolved > 0
       )
         response.warnings.push({
