@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-import type { DatabaseSync } from "node:sqlite";
+import type { DatabaseSync, StatementSync } from "node:sqlite";
 import { openDatabase } from "../storage/local.js";
 import { randomUUID } from "node:crypto";
 import { compare, fileFacts, validateResult } from "./identity.js";
@@ -20,11 +20,8 @@ import type {
 export class SqliteGraphStore implements GraphStorage {
   private readonly db: DatabaseSync;
   readonly projectId: string;
-  private readonly decodedFiles = new Map<
-    string,
-    { body: string; file: GraphFile }
-  >();
-  private readonly fileBodies = new Map<string, string>();
+  /** files, getFile, filesAt, findSymbols, links and moduleLinks decode fresh records every call. */
+  readonly independentReads = true as const;
   private readonly decodedContexts = new Map<string, ContextFile>();
   /** " INDEXED BY graph_file_status" when that covering index exists, else "".
    * Link reads join graph_files only for status, which is stored after the whole
@@ -41,16 +38,13 @@ export class SqliteGraphStore implements GraphStorage {
       ? " INDEXED BY graph_file_status"
       : "";
   }
+  /**
+   * Every read decodes a fresh, independent record. Decoded files are never
+   * kept: a whole-graph cache held every source text and parse result for
+   * the life of the store (C-2).
+   */
   private decodeFile(body: string): GraphFile {
-    const parsed = this.decodedFiles.get(body);
-    if (parsed) return structuredClone(parsed.file);
-    const file = JSON.parse(body) as GraphFile;
-    // Only the current captured record for a path is retained.
-    const previous = this.fileBodies.get(file.path);
-    if (previous !== undefined) this.decodedFiles.delete(previous);
-    this.fileBodies.set(file.path, body);
-    this.decodedFiles.set(body, { body, file });
-    return structuredClone(file);
+    return JSON.parse(body) as GraphFile;
   }
   constructor(
     path: string,
@@ -173,6 +167,21 @@ export class SqliteGraphStore implements GraphStorage {
       throw error;
     }
   }
+  /**
+   * Statements for one write operation, each prepared once and reused for
+   * every row (C-2). A statement prepared per row holds native memory, with
+   * this schema's triggers compiled in, that V8 does not see, so it is not
+   * freed promptly: hundreds of thousands per module write grew RSS by
+   * gigabytes.
+   */
+  private writer(): (sql: string) => StatementSync {
+    const statements = new Map<string, StatementSync>();
+    return (sql) => {
+      let statement = statements.get(sql);
+      if (!statement) statements.set(sql, (statement = this.db.prepare(sql)));
+      return statement;
+    };
+  }
   private transaction(action: () => void): void {
     this.db.exec("BEGIN IMMEDIATE");
     try {
@@ -184,10 +193,39 @@ export class SqliteGraphStore implements GraphStorage {
     }
   }
   files(): GraphFile[] {
-    return this.db
+    // One stored body at a time: never every body string and its decoding at once.
+    const files: GraphFile[] = [];
+    for (const row of this.db
       .prepare("SELECT body FROM graph_files ORDER BY path")
+      .iterate())
+      files.push(this.decodeFile(row.body as string));
+    return files.sort((a, b) => compare(a.path, b.path));
+  }
+  filesAt(paths: readonly string[]): GraphFile[] {
+    const select = this.db.prepare("SELECT body FROM graph_files WHERE path=?");
+    const files: GraphFile[] = [];
+    for (const path of [...new Set(paths)].sort(compare)) {
+      const row = select.get(path);
+      if (row) files.push(this.decodeFile(row.body as string));
+    }
+    return files;
+  }
+  /** Path, module and status of every stored file, without decoding records. */
+  fileSummaries(): {
+    path: string;
+    module: string;
+    status: GraphFile["result"]["status"];
+  }[] {
+    return this.db
+      .prepare(
+        "SELECT path,json_extract(body,'$.module') AS module,status FROM graph_files ORDER BY path",
+      )
       .all()
-      .map((row) => this.decodeFile(row.body as string))
+      .map((row) => ({
+        path: row.path as string,
+        module: row.module as string,
+        status: row.status as GraphFile["result"]["status"],
+      }))
       .sort((a, b) => compare(a.path, b.path));
   }
   getFile(path: string): GraphFile | undefined {
@@ -279,27 +317,22 @@ export class SqliteGraphStore implements GraphStorage {
       throw Error("Expected project-relative POSIX path");
     validateResult(file.text, file.result);
     const facts = fileFacts(this.projectId, file);
+    const sql = this.writer();
     this.transaction(() => {
-      this.db.prepare("DELETE FROM graph_links WHERE file=?").run(file.path);
-      this.db
-        .prepare(
-          "INSERT INTO graph_files VALUES (?,?,?) ON CONFLICT(path) DO UPDATE SET body=excluded.body,status=excluded.status",
-        )
-        .run(file.path, JSON.stringify(file), file.result.status);
-      this.db
-        .prepare("DELETE FROM graph_parse_failures WHERE path=?")
-        .run(file.path);
+      sql("DELETE FROM graph_links WHERE file=?").run(file.path);
+      sql(
+        "INSERT INTO graph_files VALUES (?,?,?) ON CONFLICT(path) DO UPDATE SET body=excluded.body,status=excluded.status",
+      ).run(file.path, JSON.stringify(file), file.result.status);
+      sql("DELETE FROM graph_parse_failures WHERE path=?").run(file.path);
       if (
         parseFailure &&
         file.result.status === "failed" &&
         file.result.failureKind !== "transient"
       )
-        this.db
-          .prepare(
-            "INSERT INTO graph_parse_failures (path,hash,module,version) VALUES (?,?,?,?)",
-          )
-          .run(file.path, file.hash, file.module, file.version);
-      const insert = this.db.prepare(
+        sql(
+          "INSERT INTO graph_parse_failures (path,hash,module,version) VALUES (?,?,?,?)",
+        ).run(file.path, file.hash, file.module, file.version);
+      const insert = sql(
         "INSERT INTO graph_symbols VALUES (?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,kind=excluded.kind,body=excluded.body",
       );
       for (const symbol of facts.symbols)
@@ -311,47 +344,45 @@ export class SqliteGraphStore implements GraphStorage {
           JSON.stringify(symbol),
         );
       const retained = new Set(facts.symbols.map((symbol) => symbol.id));
-      for (const row of this.db
-        .prepare("SELECT id FROM graph_symbols WHERE file=?")
-        .all(file.path))
+      for (const row of sql("SELECT id FROM graph_symbols WHERE file=?").all(
+        file.path,
+      ))
         if (!retained.has(row.id as string))
-          this.db.prepare("DELETE FROM graph_symbols WHERE id=?").run(row.id!);
+          sql("DELETE FROM graph_symbols WHERE id=?").run(row.id!);
       if (file.result.status === "failed")
         for (const symbol of facts.symbols) {
-          this.db
-            .prepare("UPDATE graph_links SET target=NULL WHERE target=?")
-            .run(symbol.id);
-          this.db
-            .prepare("DELETE FROM graph_candidates WHERE symbol=?")
-            .run(symbol.id);
+          sql("UPDATE graph_links SET target=NULL WHERE target=?").run(
+            symbol.id,
+          );
+          sql("DELETE FROM graph_candidates WHERE symbol=?").run(symbol.id);
         }
-      for (const link of facts.links) this.insertLink(link);
+      for (const link of facts.links) this.insertLink(link, sql);
     });
   }
-  private insertLink(link: GraphLink): void {
-    this.db
-      .prepare("INSERT INTO graph_links VALUES (?,?,?,?,?,?,?,?,?)")
-      .run(
-        link.id,
-        link.file,
-        link.sourceId,
-        link.targetId,
-        link.kind,
-        JSON.stringify(link),
-        link.module,
-        link.origin,
-        link.resolution,
-      );
+  private insertLink(
+    link: GraphLink,
+    sql: (sql: string) => StatementSync,
+  ): void {
+    sql("INSERT INTO graph_links VALUES (?,?,?,?,?,?,?,?,?)").run(
+      link.id,
+      link.file,
+      link.sourceId,
+      link.targetId,
+      link.kind,
+      JSON.stringify(link),
+      link.module,
+      link.origin,
+      link.resolution,
+    );
     for (const candidate of link.candidates)
-      this.db
-        .prepare("INSERT INTO graph_candidates VALUES (?,?,?)")
-        .run(link.id, candidate.id, link.kind);
+      sql("INSERT INTO graph_candidates VALUES (?,?,?)").run(
+        link.id,
+        candidate.id,
+        link.kind,
+      );
   }
   removeFile(path: string): void {
     this.db.prepare("DELETE FROM graph_files WHERE path=?").run(path);
-    const body = this.fileBodies.get(path);
-    if (body !== undefined) this.decodedFiles.delete(body);
-    this.fileBodies.delete(path);
   }
   findSymbols(query: SymbolQuery = {}): GraphSymbol[] {
     const conditions: string[] = [];
@@ -408,6 +439,10 @@ export class SqliteGraphStore implements GraphStorage {
   links(): GraphLink[] {
     return this.selectLinks();
   }
+  /** One module's parsed links, as links() reports them. */
+  moduleLinks(module: string): GraphLink[] {
+    return this.selectLinks("l.module=? AND l.origin='parse'", [module]);
+  }
   outgoing(id: string, kind?: string): GraphLink[] {
     return this.selectLinks(
       `l.source=?${kind === undefined ? "" : " AND l.kind=?"}`,
@@ -430,6 +465,7 @@ export class SqliteGraphStore implements GraphStorage {
   private writeTargets(
     current: readonly GraphLink[],
     desired: readonly GraphLink[],
+    sql: (sql: string) => StatementSync,
   ): void {
     const byId = new Map(current.map((link) => [link.id, link]));
     for (const link of desired) {
@@ -440,14 +476,17 @@ export class SqliteGraphStore implements GraphStorage {
           JSON.stringify(link.candidates.map((item) => item.id))
       )
         continue;
-      this.db
-        .prepare("UPDATE graph_links SET target=? WHERE id=?")
-        .run(link.targetId, link.id);
-      this.db.prepare("DELETE FROM graph_candidates WHERE link=?").run(link.id);
+      sql("UPDATE graph_links SET target=? WHERE id=?").run(
+        link.targetId,
+        link.id,
+      );
+      sql("DELETE FROM graph_candidates WHERE link=?").run(link.id);
       for (const candidate of link.candidates)
-        this.db
-          .prepare("INSERT INTO graph_candidates VALUES (?,?,?)")
-          .run(link.id, candidate.id, link.kind);
+        sql("INSERT INTO graph_candidates VALUES (?,?,?)").run(
+          link.id,
+          candidate.id,
+          link.kind,
+        );
     }
   }
   resolveLinks(resolutions: readonly LinkResolution[]): void {
@@ -464,15 +503,21 @@ export class SqliteGraphStore implements GraphStorage {
       decider.decide(link, decisions.get(link.id)),
     );
     if (!sameLinks(current, desired))
-      this.transaction(() => this.writeTargets(current, desired));
+      this.transaction(() =>
+        this.writeTargets(current, desired, this.writer()),
+      );
   }
   replaceAnalysis(module: string, result: ResolutionResult): void {
     const current = this.selectLinks("l.module=?", [module]);
+    const sql = this.writer();
     const desired = resolutionFacts(
       this.projectId,
       module,
       result,
-      this.files(),
+      (path) => {
+        const row = sql("SELECT body FROM graph_files WHERE path=?").get(path);
+        return row ? this.decodeFile(row.body as string) : undefined;
+      },
       this.findSymbols(),
       current,
     );
@@ -486,16 +531,17 @@ export class SqliteGraphStore implements GraphStorage {
           (!wanted.has(link.id) ||
             JSON.stringify(link) !== JSON.stringify(wanted.get(link.id)))
         )
-          this.db.prepare("DELETE FROM graph_links WHERE id=?").run(link.id);
+          sql("DELETE FROM graph_links WHERE id=?").run(link.id);
       for (const link of desired)
         if (
           link.origin === "analysis" &&
           JSON.stringify(previous.get(link.id)) !== JSON.stringify(link)
         )
-          this.insertLink(link);
+          this.insertLink(link, sql);
       this.writeTargets(
         current,
         desired.filter((link) => link.origin === "parse"),
+        sql,
       );
     });
   }
@@ -678,7 +724,7 @@ export class SqliteGraphStore implements GraphStorage {
     return this.db
       .prepare(
         `SELECT body FROM graph_symbols
-      WHERE kind<>'lexical' AND (instr(${name},${needle})>0 OR instr(${identity},${needle})>0)
+      WHERE instr(${name},${needle})>0 OR instr(${identity},${needle})>0
       ORDER BY CASE WHEN ${name}=${needle} OR ${identity}=${needle} THEN 0
         WHEN instr(${name},${needle})=1 OR instr(${identity},${needle})=1 THEN 1 ELSE 2 END,
         ${name},name,file,kind,id LIMIT ?`,
@@ -722,9 +768,7 @@ export class SqliteGraphStore implements GraphStorage {
     this.queryLimit(limit);
     return this.db
       .prepare(
-        `SELECT body FROM graph_symbols WHERE (name=? AND kind<>'lexical')
-          OR (json_extract(body,'$.identity')=? AND (kind<>'lexical' OR name<>json_extract(body,'$.identity')))
-          ORDER BY file,id LIMIT ?`,
+        "SELECT body FROM graph_symbols WHERE name=? OR json_extract(body,'$.identity')=? ORDER BY file,id LIMIT ?",
       )
       .all(name, name, limit)
       .map((row) => JSON.parse(row.body as string) as GraphSymbol);

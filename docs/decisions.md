@@ -2540,3 +2540,24 @@ TypeScript resolves the entry point with the importing file's compiler options
 and resolution mode. References can redirect declaration outputs to source when
 the compiler establishes the correspondence. Missing build output remains
 unresolved and has a distinct reason when a compiler lookup probed a build path.
+
+### Indexing holds one copy of the graph at a time (C-2)
+
+**Decided (C-2):** the graph store no longer keeps decoded file records between
+reads; every read decodes fresh, independent records. Resolution reads the graph
+afresh for each module and drops it before the next, instead of reading it once
+and deep-copying it (`structuredClone`) for every module. The module gets the
+records as read only from a store that declares `independentReads`; any other
+`GraphStorage` still gets a deep copy. Added-link validation reads only the
+files that receive added links, and the closing report counts
+rows instead of decoding every symbol and link. **Why:** the decoded-file cache
+kept every source text and parse result alive for the whole run, and resolution
+held the cache, the indexer's own copy, each module's clone and the store's
+re-validation copy at once. Large and mixed checkouts (the TypeScript compiler
+repository, Turborepo, T3 Code at `b387e3a1`) ran out of Node's default heap.
+**Trade:** this supersedes W2-I's "unchanged subsequent invocations reuse
+decoded records". A store reused for a second index now decodes each file
+again in each phase that needs records: a number of times linear in files
+and modules, instead of zero. The CLI opens a new store for every command, so
+it never had that reuse. **Rules out:**
+store-level caches of decoded records and per-module whole-graph clones.

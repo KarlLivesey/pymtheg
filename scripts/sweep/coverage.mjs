@@ -630,7 +630,7 @@ function renderSampling(repos, samples) {
   const workspace = repos.flatMap((repo) => (repo.workspaceMisses ?? []).map((row) => ({ repo: repo.id, ...row })));
   const workspaceCount = workspace.reduce((sum, row) => sum + row.links, 0);
   lines.push("", `Tracked npm and pnpm manifests identified **${number(workspaceCount)}** stored ` +
-    `unresolved links from ${new Set(workspace.map((entry) => entry.repo)).size} repositories naming a sibling workspace package. ` +
+    `external-package links from ${new Set(workspace.map((entry) => entry.repo)).size} repositories naming a sibling workspace package. ` +
     "The strict denominator retains them. A package-name match establishes that the package is checked in. The source review also checks member and subpath context.");
   if (workspace.length) {
     lines.push("", "| Repository | Sibling packages | Links | Example |", "| --- | ---: | ---: | --- |");
