@@ -40,13 +40,13 @@ The closed-set alternative adds the sample estimate for verified complete candid
 | Source only | Go | 23 | 74.16% | 76.35% | 74.16% (74.16%–74.31%) | 73.35% | 78.82% / 78.12% | 63.79% |
 | Source only | Rust | 15 | 33.27% | 33.31% | 33.35% (33.30%–33.38%) | 35.20% | 28.51% / 28.56% | 25.05% |
 | Source only | TypeScript / JS | 31 | 51.70% | 53.32% | 51.75% (51.70%–51.85%) | 47.92% | 49.27% / 45.98% | 38.16% |
-| Source only | Overall | 53 | 57.50% | 59.05% | 57.53% (57.50%–57.63%) | 54.10% | 57.23% / 50.66% | 46.27% |
+| Source only | Overall | 53 | 57.50% | 59.05% | 57.53% (57.50%–57.64%) | 54.10% | 57.23% / 50.66% | 46.27% |
 
 ### Candidate sampling
 
 | Module | Remaining reference sites used | Missed links outside the remaining projection |
 | --- | ---: | ---: |
-| Go | 340 | 153 |
+| Go | 339 | 781 |
 | Rust | 430 | 0 |
 | TypeScript / JS | 454 | 0 |
 
@@ -57,10 +57,10 @@ The audit recovers these identities from paths, import bindings, named declaring
 
 | Module | Proven outside | Named unit, including L2 | Unit only | Unit and symbol | Neither, proven outside | Additional outside with neither (95% interval) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Go | 283,154 | 186,419 | 32,537 | 153,882 | 96,735 | 122,753 (109,904–135,898) |
+| Go | 283,154 | 186,419 | 32,537 | 153,882 | 96,735 | 122,754 (109,904–135,899) |
 | Rust | 82,503 | 56,079 | 276 | 55,803 | 26,424 | 176,992 (157,979–202,296) |
 | TypeScript / JS | 328,146 | 217,021 | 23,141 | 193,880 | 111,125 | 343,808 (315,282–387,804) |
-| Overall | 693,803 | 459,519 | 55,954 | 403,565 | 234,284 | 643,553 (603,823–705,340) |
+| Overall | 693,803 | 459,519 | 55,954 | 403,565 | 234,284 | 643,553 (603,823–705,341) |
 
 ### Recorded library identities by encoding
 
@@ -81,7 +81,7 @@ Counts include every observed link. Broken and template files that produced no l
 
 | Module | Scope | Resolved | Ambiguous | Inside | Outside | Unclassified | Failed source files |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Go | source | 947,494 | 38,474 | 644 | 221,988 | 276,622 | 3 |
+| Go | source | 947,495 | 38,466 | 644 | 221,988 | 276,629 | 3 |
 | Go | bundle | 0 | 0 | 0 | 0 | 0 | 0 |
 | Go | broken-fixture | 0 | 0 | 0 | 0 | 0 | 14 |
 | Go | template | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -132,8 +132,8 @@ Totals include every module in a finished checkout. For each attempt, the archiv
 | oclif/core | TypeScript / JS | finished | 14,031 | 4,256 | 63.11% | 64.67% | 68.80% | 47.93% | 63.11% |
 | pingdotgg/t3code | TypeScript / JS | finished | 161,530 | 65,155 | 67.21% | 71.18% | 62.04% | 37.02% | 67.21% |
 | pmndrs/zustand | TypeScript / JS | finished | 6,821 | 3,101 | 54.38% | 55.59% | 50.54% | 27.56% | 54.38% |
-| pocketbase/pocketbase | Go | finished | 180,199 | 18,266 | 32.12% | 33.34% | 30.11% | 27.06% | 66.00% |
-| protocolbuffers/protobuf-go | Go | finished | 216,552 | 10,342 | 81.56% | 82.13% | 83.21% | 79.23% | 81.56% |
+| pocketbase/pocketbase | Go | finished | 180,199 | 18,266 | 32.04% | 33.26% | 30.02% | 26.98% | 65.84% |
+| protocolbuffers/protobuf-go | Go | finished | 216,552 | 10,342 | 81.63% | 82.20% | 83.27% | 79.30% | 81.63% |
 | puppeteer/puppeteer | TypeScript / JS | finished | 57,957 | 15,750 | 50.75% | 52.15% | 50.66% | 36.89% | 50.75% |
 | ratatui/ratatui | Rust | finished | 57,390 | 3,082 | 31.34% | 31.37% | 28.74% | 27.19% | 31.34% |
 | react-hook-form/react-hook-form | TypeScript / JS | finished | 46,333 | 11,483 | 41.14% | 42.00% | 27.47% | 20.66% | 41.14% |

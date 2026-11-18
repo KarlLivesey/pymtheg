@@ -3,369 +3,434 @@
   {
    "id": "charmbracelet/bubbletea",
    "linksBefore": 12498,
-   "linksAfter": 12590,
+   "linksAfter": 12533,
    "definiteBefore": 7665,
-   "definiteAfter": 7804,
+   "definiteAfter": 7747,
    "newlyDefiniteExisting": {
     "references": 44,
     "calls": 3
    },
    "newlyDefiniteNewSite": {
-    "contains": 92
+    "contains": 35
    },
    "lost": 0,
    "retargeted": 0,
-   "removedSites": 0
+   "removedSites": 0,
+   "symbolsBefore": 1965,
+   "symbolsAfter": 2000,
+   "symbolsMissing": 0
   },
   {
    "id": "cilium/ebpf",
    "linksBefore": 49614,
-   "linksAfter": 50300,
+   "linksAfter": 50239,
    "definiteBefore": 32029,
-   "definiteAfter": 33261,
+   "definiteAfter": 33366,
    "newlyDefiniteExisting": {
-    "calls": 129,
-    "references": 417
+    "calls": 158,
+    "references": 554
    },
    "newlyDefiniteNewSite": {
-    "contains": 544,
+    "contains": 480,
     "references": 145
    },
    "lost": 0,
    "retargeted": 0,
-   "removedSites": 3
+   "removedSites": 0,
+   "symbolsBefore": 7839,
+   "symbolsAfter": 8314,
+   "symbolsMissing": 0
   },
   {
    "id": "cli/cli",
    "linksBefore": 198086,
-   "linksAfter": 209033,
+   "linksAfter": 208845,
    "definiteBefore": 112260,
-   "definiteAfter": 133707,
+   "definiteAfter": 133526,
    "newlyDefiniteExisting": {
-    "references": 10088,
+    "references": 10095,
     "calls": 419
    },
    "newlyDefiniteNewSite": {
-    "contains": 9524,
+    "contains": 9320,
     "references": 1432
    },
    "lost": 0,
    "retargeted": 0,
-   "removedSites": 16
+   "removedSites": 0,
+   "symbolsBefore": 17939,
+   "symbolsAfter": 27259,
+   "symbolsMissing": 0
   },
   {
    "id": "cockroachdb/pebble",
    "linksBefore": 199841,
-   "linksAfter": 201225,
+   "linksAfter": 200878,
    "definiteBefore": 137287,
-   "definiteAfter": 144954,
+   "definiteAfter": 144642,
    "newlyDefiniteExisting": {
-    "references": 5642,
-    "calls": 641
+    "references": 5668,
+    "calls": 650
    },
    "newlyDefiniteNewSite": {
-    "contains": 1435,
+    "contains": 792,
     "references": 245
    },
    "lost": 0,
    "retargeted": 0,
-   "removedSites": 296
+   "removedSites": 0,
+   "symbolsBefore": 19288,
+   "symbolsAfter": 20080,
+   "symbolsMissing": 0
   },
   {
    "id": "etcd-io/bbolt",
    "linksBefore": 16741,
-   "linksAfter": 16939,
+   "linksAfter": 16898,
    "definiteBefore": 10167,
-   "definiteAfter": 10733,
+   "definiteAfter": 10692,
    "newlyDefiniteExisting": {
     "references": 274,
     "calls": 94
    },
    "newlyDefiniteNewSite": {
-    "contains": 198
+    "contains": 157
    },
    "lost": 0,
    "retargeted": 0,
-   "removedSites": 0
+   "removedSites": 0,
+   "symbolsBefore": 1748,
+   "symbolsAfter": 1905,
+   "symbolsMissing": 0
   },
   {
    "id": "evanw/esbuild",
    "linksBefore": 97970,
-   "linksAfter": 98067,
+   "linksAfter": 98034,
    "definiteBefore": 87747,
-   "definiteAfter": 88225,
+   "definiteAfter": 88193,
    "newlyDefiniteExisting": {
-    "references": 376,
+    "references": 377,
     "calls": 5
    },
    "newlyDefiniteNewSite": {
     "references": 48,
-    "contains": 49
+    "contains": 16
    },
    "lost": 0,
    "retargeted": 0,
-   "removedSites": 0
+   "removedSites": 0,
+   "symbolsBefore": 8313,
+   "symbolsAfter": 8329,
+   "symbolsMissing": 0
   },
   {
    "id": "gin-gonic/gin",
    "linksBefore": 20349,
-   "linksAfter": 21071,
+   "linksAfter": 21066,
    "definiteBefore": 9969,
-   "definiteAfter": 10906,
+   "definiteAfter": 10901,
    "newlyDefiniteExisting": {
     "references": 199,
     "calls": 16
    },
    "newlyDefiniteNewSite": {
-    "contains": 470,
+    "contains": 465,
     "references": 252
    },
    "lost": 0,
    "retargeted": 0,
-   "removedSites": 0
+   "removedSites": 0,
+   "symbolsBefore": 2264,
+   "symbolsAfter": 2729,
+   "symbolsMissing": 0
   },
   {
    "id": "go-task/task",
    "linksBefore": 17795,
-   "linksAfter": 18353,
+   "linksAfter": 18333,
    "definiteBefore": 10739,
-   "definiteAfter": 11589,
+   "definiteAfter": 11569,
    "newlyDefiniteExisting": {
     "references": 282,
     "calls": 10
    },
    "newlyDefiniteNewSite": {
-    "contains": 429,
+    "contains": 409,
     "references": 129
    },
    "lost": 0,
    "retargeted": 0,
-   "removedSites": 0
+   "removedSites": 0,
+   "symbolsBefore": 2363,
+   "symbolsAfter": 2772,
+   "symbolsMissing": 0
   },
   {
    "id": "gofiber/fiber",
    "linksBefore": 139671,
-   "linksAfter": 143978,
+   "linksAfter": 143673,
    "definiteBefore": 72058,
-   "definiteAfter": 80744,
+   "definiteAfter": 80435,
    "newlyDefiniteExisting": {
-    "references": 4089,
+    "references": 4085,
     "calls": 291
    },
    "newlyDefiniteNewSite": {
-    "contains": 4215,
+    "contains": 3905,
     "references": 96
    },
    "lost": 0,
    "retargeted": 0,
-   "removedSites": 5
+   "removedSites": 0,
+   "symbolsBefore": 12165,
+   "symbolsAfter": 16070,
+   "symbolsMissing": 0
   },
   {
    "id": "golang/tools",
    "linksBefore": 248364,
-   "linksAfter": 250545,
+   "linksAfter": 250351,
    "definiteBefore": 144749,
-   "definiteAfter": 149638,
+   "definiteAfter": 149472,
    "newlyDefiniteExisting": {
-    "references": 2662,
+    "references": 2690,
     "calls": 65
    },
    "newlyDefiniteNewSite": {
-    "contains": 2001,
+    "contains": 1795,
     "references": 173
    },
    "lost": 0,
    "retargeted": 0,
-   "removedSites": 12
+   "removedSites": 0,
+   "symbolsBefore": 28939,
+   "symbolsAfter": 30732,
+   "symbolsMissing": 0
   },
   {
    "id": "junegunn/fzf",
    "linksBefore": 25820,
-   "linksAfter": 25970,
+   "linksAfter": 25947,
    "definiteBefore": 18275,
-   "definiteAfter": 18697,
+   "definiteAfter": 18695,
    "newlyDefiniteExisting": {
-    "references": 268,
-    "calls": 4
+    "references": 283,
+    "calls": 10
    },
    "newlyDefiniteNewSite": {
-    "contains": 137,
+    "contains": 114,
     "references": 13
    },
    "lost": 0,
    "retargeted": 0,
-   "removedSites": 0
+   "removedSites": 0,
+   "symbolsBefore": 2870,
+   "symbolsAfter": 2984,
+   "symbolsMissing": 0
   },
   {
    "id": "labstack/echo",
    "linksBefore": 30180,
-   "linksAfter": 31900,
+   "linksAfter": 31880,
    "definiteBefore": 13920,
-   "definiteAfter": 17295,
+   "definiteAfter": 17275,
    "newlyDefiniteExisting": {
     "references": 1627,
     "calls": 28
    },
    "newlyDefiniteNewSite": {
-    "contains": 1540,
+    "contains": 1520,
     "references": 180
    },
    "lost": 0,
    "retargeted": 0,
-   "removedSites": 0
+   "removedSites": 0,
+   "symbolsBefore": 2648,
+   "symbolsAfter": 4168,
+   "symbolsMissing": 0
   },
   {
    "id": "mattn/go-sqlite3",
    "linksBefore": 9598,
-   "linksAfter": 9664,
+   "linksAfter": 9650,
    "definiteBefore": 3379,
-   "definiteAfter": 3570,
+   "definiteAfter": 3638,
    "newlyDefiniteExisting": {
-    "references": 122,
-    "calls": 3
+    "calls": 82,
+    "references": 125
    },
    "newlyDefiniteNewSite": {
-    "contains": 66
+    "contains": 52
    },
    "lost": 0,
    "retargeted": 0,
-   "removedSites": 0
+   "removedSites": 0,
+   "symbolsBefore": 1152,
+   "symbolsAfter": 1204,
+   "symbolsMissing": 0
   },
   {
    "id": "pocketbase/pocketbase",
    "linksBefore": 68286,
-   "linksAfter": 70696,
-   "definiteBefore": 39959,
-   "definiteAfter": 44862,
+   "linksAfter": 70628,
+   "definiteBefore": 39821,
+   "definiteAfter": 44794,
    "newlyDefiniteExisting": {
-    "references": 2289,
-    "calls": 204
+    "references": 2366,
+    "calls": 265
    },
    "newlyDefiniteNewSite": {
-    "contains": 2066,
+    "contains": 1994,
     "references": 348
    },
    "lost": 0,
    "retargeted": 0,
-   "removedSites": 4
+   "removedSites": 0,
+   "symbolsBefore": 6178,
+   "symbolsAfter": 8172,
+   "symbolsMissing": 0
   },
   {
    "id": "protocolbuffers/protobuf-go",
    "linksBefore": 216440,
-   "linksAfter": 217025,
-   "definiteBefore": 171580,
-   "definiteAfter": 173348,
+   "linksAfter": 216975,
+   "definiteBefore": 171719,
+   "definiteAfter": 175091,
    "newlyDefiniteExisting": {
-    "references": 986,
-    "calls": 197
+    "references": 2630,
+    "calls": 207
    },
    "newlyDefiniteNewSite": {
-    "contains": 572,
+    "contains": 516,
     "references": 19
    },
    "lost": 0,
    "retargeted": 0,
-   "removedSites": 6
+   "removedSites": 0,
+   "symbolsBefore": 45544,
+   "symbolsAfter": 46060,
+   "symbolsMissing": 0
   },
   {
    "id": "restic/restic",
    "linksBefore": 63408,
-   "linksAfter": 64359,
+   "linksAfter": 64165,
    "definiteBefore": 40115,
-   "definiteAfter": 42538,
+   "definiteAfter": 42347,
    "newlyDefiniteExisting": {
-    "references": 1337,
+    "references": 1340,
     "calls": 135
    },
    "newlyDefiniteNewSite": {
-    "contains": 920,
+    "contains": 723,
     "references": 34
    },
    "lost": 0,
    "retargeted": 0,
-   "removedSites": 3
+   "removedSites": 0,
+   "symbolsBefore": 7369,
+   "symbolsAfter": 8092,
+   "symbolsMissing": 0
   },
   {
    "id": "samber/lo",
    "linksBefore": 26989,
-   "linksAfter": 28949,
+   "linksAfter": 28881,
    "definiteBefore": 9475,
-   "definiteAfter": 12982,
+   "definiteAfter": 12914,
    "newlyDefiniteExisting": {
     "references": 1524,
     "calls": 23
    },
    "newlyDefiniteNewSite": {
-    "contains": 1854,
+    "contains": 1786,
     "references": 106
    },
    "lost": 0,
    "retargeted": 0,
-   "removedSites": 0
+   "removedSites": 0,
+   "symbolsBefore": 2859,
+   "symbolsAfter": 4645,
+   "symbolsMissing": 0
   },
   {
    "id": "spf13/cobra",
    "linksBefore": 8792,
-   "linksAfter": 8888,
+   "linksAfter": 8886,
    "definiteBefore": 5552,
-   "definiteAfter": 5760,
+   "definiteAfter": 5758,
    "newlyDefiniteExisting": {
     "references": 107,
     "calls": 5
    },
    "newlyDefiniteNewSite": {
-    "contains": 96
+    "contains": 94
    },
    "lost": 0,
    "retargeted": 0,
-   "removedSites": 0
+   "removedSites": 0,
+   "symbolsBefore": 832,
+   "symbolsAfter": 926,
+   "symbolsMissing": 0
   },
   {
    "id": "stretchr/testify",
    "linksBefore": 19481,
-   "linksAfter": 19879,
+   "linksAfter": 19828,
    "definiteBefore": 12213,
-   "definiteAfter": 13037,
+   "definiteAfter": 12986,
    "newlyDefiniteExisting": {
     "references": 404,
     "calls": 22
    },
    "newlyDefiniteNewSite": {
-    "contains": 395,
+    "contains": 344,
     "references": 3
    },
    "lost": 0,
    "retargeted": 0,
-   "removedSites": 0
+   "removedSites": 0,
+   "symbolsBefore": 2198,
+   "symbolsAfter": 2542,
+   "symbolsMissing": 0
   },
   {
    "id": "wagoodman/dive",
    "linksBefore": 14691,
-   "linksAfter": 14913,
+   "linksAfter": 14901,
    "definiteBefore": 8216,
-   "definiteAfter": 8623,
+   "definiteAfter": 8611,
    "newlyDefiniteExisting": {
     "references": 184,
     "calls": 2
    },
    "newlyDefiniteNewSite": {
-    "contains": 199,
+    "contains": 181,
     "references": 28
    },
    "lost": 0,
    "retargeted": 0,
-   "removedSites": 6
+   "removedSites": 0,
+   "symbolsBefore": 1777,
+   "symbolsAfter": 1958,
+   "symbolsMissing": 0
   }
  ],
  "totals": {
   "linksBefore": 1484614,
-  "linksAfter": 1514344,
-  "definiteBefore": 947354,
-  "definiteAfter": 1012273,
+  "linksAfter": 1512591,
+  "definiteBefore": 947355,
+  "definiteAfter": 1012652,
   "lost": 0,
   "retargeted": 0,
-  "removedSites": 351
+  "removedSites": 0,
+  "symbolsBefore": 176250,
+  "symbolsAfter": 200941,
+  "symbolsMissing": 0
  },
+ "changed": [],
+ "missingSymbols": [],
  "sample": [
   {
    "repo": "gin-gonic/gin",
@@ -374,7 +439,7 @@
    "kind": "references",
    "name": "s.SlicePtrs",
    "was": "no link",
-   "target": "binding/multipart_form_mapping_test.go:field:multipart_form_mapping_test.go:TestFormMultipartBindingBindTwoFiles.struct#1.SlicePtrs",
+   "target": "binding/multipart_form_mapping_test.go:field:multipart_form_mapping_test.go:TestFormMultipartBindingBindTwoFiles.anon#1.SlicePtrs",
    "source": "assertMultipartFileHeader(t, s.SlicePtrs[i], file)"
   },
   {
@@ -384,7 +449,7 @@
    "kind": "references",
    "name": "tt.name",
    "was": "unresolved",
-   "target": "acceptance/fixture_repository_test.go:field:fixture_repository_test.go:TestRegisterFixtureRepositoryCleanup.struct#1.name",
+   "target": "acceptance/fixture_repository_test.go:field:fixture_repository_test.go:TestRegisterFixtureRepositoryCleanup.anon#1.name",
    "source": "t.Run(tt.name, func(t *testing.T) {"
   },
   {
@@ -394,8 +459,18 @@
    "kind": "references",
    "name": "tt.wantErr",
    "was": "unresolved",
-   "target": "pkg/cmd/pr/shared/templates_test.go:field:templates_test.go:TestTemplateManagerSelect.struct#1.wantErr",
+   "target": "pkg/cmd/pr/shared/templates_test.go:field:templates_test.go:TestTemplateManagerSelect.anon#1.wantErr",
    "source": "if tt.wantErr {"
+  },
+  {
+   "repo": "pocketbase/pocketbase",
+   "file": "apis/record_crud.go",
+   "line": 474,
+   "kind": "references",
+   "name": "e.App",
+   "was": "unresolved",
+   "target": "core/event_request.go:field:RequestEvent.App",
+   "source": "hasAuthManageAccess(e.App, requestInfo, collection, manageRuleQuery) {"
   },
   {
    "repo": "gin-gonic/gin",
@@ -404,7 +479,7 @@
    "kind": "references",
    "name": "tt.form",
    "was": "unresolved",
-   "target": "binding/form_mapping_test.go:field:form_mapping_test.go:TestMappingBaseTypes.struct#1.form",
+   "target": "binding/form_mapping_test.go:field:form_mapping_test.go:TestMappingBaseTypes.anon#1.form",
    "source": "_, err := mapping(val, emptyField, formSource{field.Name: {tt.form}}, \"form\")"
   },
   {
@@ -424,7 +499,7 @@
    "kind": "references",
    "name": "vs.metrics.Compact",
    "was": "unresolved",
-   "target": "version_set.go:field:version_set.go:versionSet.struct#1.Compact",
+   "target": "version_set.go:field:version_set.go:versionSet.metrics.anon#1.Compact",
    "source": "vs.metrics.Compact.ElisionOnlyCount++"
   },
   {
@@ -434,7 +509,7 @@
    "kind": "references",
    "name": "s.id",
    "was": "unresolved",
-   "target": "core/log_query_test.go:field:log_query_test.go:TestFindLogById.struct#1.id",
+   "target": "core/log_query_test.go:field:log_query_test.go:TestFindLogById.anon#1.id",
    "source": "t.Run(fmt.Sprintf(\"%d_%s\", i, s.id), func(t *testing.T) {"
   },
   {
@@ -444,7 +519,7 @@
    "kind": "references",
    "name": "test.line",
    "was": "unresolved",
-   "target": "cmd/digraph/digraph_test.go:field:digraph_test.go:TestSplit.struct#1.line",
+   "target": "cmd/digraph/digraph_test.go:field:digraph_test.go:TestSplit.anon#1.line",
    "source": "got, err := split(test.line)"
   },
   {
@@ -454,7 +529,7 @@
    "kind": "references",
    "name": "tc.want",
    "was": "unresolved",
-   "target": "middleware/hostauthorization/hostauthorization_test.go:field:hostauthorization_test.go:Test_IsAllowed_Allocations.struct#1.want",
+   "target": "middleware/hostauthorization/hostauthorization_test.go:field:hostauthorization_test.go:Test_IsAllowed_Allocations.anon#1.want",
    "source": "require.Equal(t, tc.want, got)"
   },
   {
@@ -464,7 +539,7 @@
    "kind": "references",
    "name": "tt.want",
    "was": "unresolved",
-   "target": "pkg/cmd/variable/shared/shared_test.go:field:shared_test.go:TestGetVariableEntity.struct#1.want",
+   "target": "pkg/cmd/variable/shared/shared_test.go:field:shared_test.go:TestGetVariableEntity.anon#1.want",
    "source": "assert.Equal(t, tt.want, entity)"
   },
   {
@@ -474,7 +549,7 @@
    "kind": "references",
    "name": "opts.IgnoreChangelogReleaseDate",
    "was": "unresolved",
-   "target": "helpers/prepare-release/main.go:field:main.go:file.struct#1.IgnoreChangelogReleaseDate",
+   "target": "helpers/prepare-release/main.go:field:main.go:opts.anon#1.IgnoreChangelogReleaseDate",
    "source": "pflag.BoolVar(&opts.IgnoreChangelogReleaseDate, \"ignore-changelog-release-date\", false, \"ignore missing subdir with date in changelog/\")"
   },
   {
@@ -484,7 +559,7 @@
    "kind": "references",
    "name": "test.dir",
    "was": "unresolved",
-   "target": "go/packages/overlay_test.go:field:overlay_test.go:TestOverlayModulePath.struct#1.dir",
+   "target": "go/packages/overlay_test.go:field:overlay_test.go:TestOverlayModulePath.anon#1.dir",
    "source": "pkgs, err := packages.Load(config, test.dir)"
   },
   {
@@ -494,7 +569,7 @@
    "kind": "references",
    "name": "tc.args",
    "was": "unresolved",
-   "target": "completions_test.go:field:completions_test.go:TestCompletionForGroupedFlags.struct#1.args",
+   "target": "completions_test.go:field:completions_test.go:TestCompletionForGroupedFlags.anon#1.args",
    "source": "args = append(args, tc.args...)"
   },
   {
@@ -524,7 +599,7 @@
    "kind": "references",
    "name": "d.mu.mem.queue",
    "was": "unresolved",
-   "target": "db.go:field:db.go:DB.struct#6.queue",
+   "target": "db.go:field:db.go:DB.mu.struct#1.mem.anon#1.queue",
    "source": "errors.Safe(n), errors.Safe(d.mu.mem.queue[n].flushable), minUnflushedLogNum))"
   },
   {
@@ -534,7 +609,7 @@
    "kind": "references",
    "name": "d.mu.mem",
    "was": "unresolved",
-   "target": "db.go:field:db.go:DB.struct#3.mem",
+   "target": "db.go:field:db.go:DB.mu.struct#1.mem",
    "source": "errors.Safe(n), errors.Safe(d.mu.mem.queue[n].flushable), minUnflushedLogNum))"
   },
   {
@@ -544,7 +619,7 @@
    "kind": "references",
    "name": "s.expectError",
    "was": "unresolved",
-   "target": "core/record_query_test.go:field:record_query_test.go:TestFindAuthRecordByEmail.struct#1.expectError",
+   "target": "core/record_query_test.go:field:record_query_test.go:TestFindAuthRecordByEmail.anon#1.expectError",
    "source": "t.Fatalf(\"Expected hasErr to be %v, got %v (%v)\", s.expectError, hasErr, err)"
   },
   {
@@ -554,109 +629,13 @@
    "kind": "references",
    "name": "tt.input",
    "was": "unresolved",
-   "target": "it/string_test.go:field:string_test.go:TestChunkString.struct#1.input",
+   "target": "it/string_test.go:field:string_test.go:TestChunkString.anon#1.input",
    "source": "result := ChunkString(tt.input, tt.size)"
-  },
-  {
-   "repo": "golang/tools",
-   "file": "internal/graph/graphfmt/dot.go",
-   "line": 97,
-   "kind": "references",
-   "name": "clusters[id].nodes",
-   "was": "unresolved",
-   "target": "internal/graph/graphfmt/dot.go:field:dot.go:(Dot).Sprint.cluster.nodes",
-   "source": "clusters[id].nodes = append(clusters[id].nodes, nid)"
   }
  ],
- "poolSize": 38468,
+ "poolSize": 40599,
  "changedSummary": {
-  "count": 351,
-  "byKindAndOutcome": {
-   "contains/site removed": 351
-  },
-  "note": "Every changed site is a contains link whose target name is a renumbered anonymous struct identity (struct#n); no definite reference or call lost or changed target.",
-  "allRenumberedAnonymousStructs": true
- },
- "changedExamples": [
-  {
-   "id": "cilium/ebpf",
-   "file": "internal/io.go",
-   "kind": "contains",
-   "name": "io.go:uint64FromFileCache.struct#1",
-   "before": "internal/io.go:struct:io.go:uint64FromFileCache.struct#1",
-   "after": "site removed"
-  },
-  {
-   "id": "cilium/ebpf",
-   "file": "internal/io.go",
-   "kind": "contains",
-   "name": "io.go:uint64FromFileCache.struct#1.RWMutex",
-   "before": "internal/io.go:field:io.go:uint64FromFileCache.struct#1.RWMutex",
-   "after": "site removed"
-  },
-  {
-   "id": "cilium/ebpf",
-   "file": "internal/io.go",
-   "kind": "contains",
-   "name": "io.go:uint64FromFileCache.struct#1.values",
-   "before": "internal/io.go:field:io.go:uint64FromFileCache.struct#1.values",
-   "after": "site removed"
-  },
-  {
-   "id": "cli/cli",
-   "file": "api/queries_repo.go",
-   "kind": "contains",
-   "name": "queries_repo.go:LastCommit.struct#1",
-   "before": "api/queries_repo.go:struct:queries_repo.go:LastCommit.struct#1",
-   "after": "site removed"
-  },
-  {
-   "id": "cli/cli",
-   "file": "api/queries_repo.go",
-   "kind": "contains",
-   "name": "queries_repo.go:LastCommit.struct#1.Commit",
-   "before": "api/queries_repo.go:field:queries_repo.go:LastCommit.struct#1.Commit",
-   "after": "site removed"
-  },
-  {
-   "id": "cli/cli",
-   "file": "pkg/cmd/discussion/client/client.go",
-   "kind": "contains",
-   "name": "client.go:(*discussionClient).GetByNumber.struct#1",
-   "before": "pkg/cmd/discussion/client/client.go:struct:client.go:(*discussionClient).GetByNumber.struct#1",
-   "after": "site removed"
-  },
-  {
-   "id": "cli/cli",
-   "file": "pkg/cmd/discussion/client/client.go",
-   "kind": "contains",
-   "name": "client.go:(*discussionClient).GetByNumber.struct#1.discussionListNode",
-   "before": "pkg/cmd/discussion/client/client.go:field:client.go:(*discussionClient).GetByNumber.struct#1.discussionListNode",
-   "after": "site removed"
-  },
-  {
-   "id": "cli/cli",
-   "file": "pkg/cmd/discussion/client/client.go",
-   "kind": "contains",
-   "name": "client.go:(*discussionClient).GetByNumber.struct#1.Comments",
-   "before": "pkg/cmd/discussion/client/client.go:field:client.go:(*discussionClient).GetByNumber.struct#1.Comments",
-   "after": "site removed"
-  },
-  {
-   "id": "cli/cli",
-   "file": "pkg/cmd/discussion/client/client.go",
-   "kind": "contains",
-   "name": "client.go:(*discussionClient).GetWithComments.struct#1",
-   "before": "pkg/cmd/discussion/client/client.go:struct:client.go:(*discussionClient).GetWithComments.struct#1",
-   "after": "site removed"
-  },
-  {
-   "id": "cli/cli",
-   "file": "pkg/cmd/discussion/client/client.go",
-   "kind": "contains",
-   "name": "client.go:(*discussionClient).GetWithComments.struct#1.discussionListNode",
-   "before": "pkg/cmd/discussion/client/client.go:field:client.go:(*discussionClient).GetWithComments.struct#1.discussionListNode",
-   "after": "site removed"
-  }
- ]
+  "count": 0,
+  "note": "No definite link lost or changed target, no site removed, and every Go symbol of the base graph keeps its file, kind and identity."
+ }
 }

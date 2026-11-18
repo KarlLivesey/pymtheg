@@ -17,7 +17,7 @@
  },
  "candidate": {
   "counts": {
-   "links": 63996,
+   "links": 63802,
    "toolchainDecided": 32986,
    "confirmedDefinite": 32525,
    "upgraded": 461,
