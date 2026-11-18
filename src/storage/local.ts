@@ -134,7 +134,11 @@ export function openWriteAheadLog(db: DatabaseSync, file: string): boolean {
     !file.startsWith("file:") &&
     writeAheadLogSafe(dirname(file));
   const mode = switchJournal(db, safe ? "WAL" : "DELETE");
-  if (mode === "wal") db.exec("PRAGMA synchronous=NORMAL");
+  // A checkpoint syncs the log and the database. Every 10,000 pages (40 MB
+  // of log) instead of SQLite's 1,000 took a cold restic index from 73 s to
+  // 52 s, the same as with no sync at all (evidence/c-6).
+  if (safe && mode === "wal")
+    db.exec("PRAGMA synchronous=NORMAL; PRAGMA wal_autocheckpoint=10000");
   return mode === "wal";
 }
 /**

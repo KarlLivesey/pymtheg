@@ -788,22 +788,28 @@ export class SqliteGraphStore implements GraphStorage {
     let written = false;
     // The completion record is durable when this returns: its commit is
     // synced, and with it every earlier commit in the log.
-    if (this.writeAheadLog) this.db.exec("PRAGMA synchronous=FULL");
-    // Lock publication so another connection cannot commit between validation and publication.
-    this.transaction(() => {
-      if (
-        expectedVersion !== undefined &&
-        this.commandDataVersion() !== expectedVersion
-      )
-        return;
-      this.db
-        .prepare(
-          "INSERT INTO graph_meta VALUES ('command-complete',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+    const sync = Number(
+      this.db.prepare("PRAGMA synchronous").get()!.synchronous,
+    );
+    this.db.exec("PRAGMA synchronous=FULL");
+    try {
+      // Lock publication so another connection cannot commit between validation and publication.
+      this.transaction(() => {
+        if (
+          expectedVersion !== undefined &&
+          this.commandDataVersion() !== expectedVersion
         )
-        .run(JSON.stringify(state));
-      written = true;
-    });
-    if (this.writeAheadLog) this.db.exec("PRAGMA synchronous=NORMAL");
+          return;
+        this.db
+          .prepare(
+            "INSERT INTO graph_meta VALUES ('command-complete',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+          )
+          .run(JSON.stringify(state));
+        written = true;
+      });
+    } finally {
+      this.db.exec(`PRAGMA synchronous=${sync}`);
+    }
     return written;
   }
   /** Command preflight reads metadata without returning source text or parse facts. */
