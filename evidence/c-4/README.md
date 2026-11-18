@@ -188,3 +188,18 @@ under 3.5). Both builds include C-2's memory changes.
 vercel/turborepo (no Go files) took 1,468 s with the base build and 1,204 s
 with the candidate; it and microsoft/TypeScript exceeded the sweep's
 60-minute limit when run two at a time and finished with a 120-minute limit.
+
+## Review round 2 (build constraints)
+
+After the second round's fixes (every legacy `+build` line followed by a
+blank line, methods excluded by the caller's constraint, cumulative release
+tags, Go's full GOARCH list; Go module version 28), the comparison against
+a build of `main` was rerun on the two repositories with the most build
+tags:
+
+| Repository | Definite before | Definite after | Lost | Retargeted | Sites removed | Base symbols missing |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| cilium/ebpf | 32,029 | 33,366 | 0 | 0 | 0 | 0 |
+| mattn/go-sqlite3 | 3,379 | 3,642 | 0 | 0 | 0 | 0 |
+
+Full `npm test`: 2,970 of 2,970 pass.
