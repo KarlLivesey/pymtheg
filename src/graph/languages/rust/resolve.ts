@@ -27,9 +27,16 @@ import type {
   GraphLink,
   Json,
   LinkResolution,
+  ParseResult,
   ResolutionContext,
 } from "../../types.js";
 import { crates, type Crate } from "./cargo.js";
+import {
+  LookupMemo,
+  LookupTrace,
+  lookupDepth,
+  type ImportExpansion,
+} from "./lookup-memo.js";
 type Data = Record<string, Json>;
 const data = (x: { data?: Json }) => (x.data ?? {}) as Data;
 const str = (x: unknown) => (typeof x === "string" ? x : "");
@@ -127,7 +134,14 @@ const acceptsAt = (
         : false;
 };
 export function resolveRust(
-  ctx: ResolutionContext,
+  ctx: Pick<ResolutionContext, "projectId" | "symbols" | "links"> & {
+    contextFiles: Parameters<typeof crates>[0];
+    files: readonly {
+      path: string;
+      module: string;
+      result: Pick<ParseResult, "status" | "diagnostics" | "data">;
+    }[];
+  },
   uncertain?: (
     link: GraphLink,
     targets: GraphSymbol[],
@@ -151,6 +165,12 @@ export function resolveRust(
   let cycleCuts = 0;
   const namespaceParents = new WeakMap<Place, number>();
   let nextNamespaceParent = 0;
+  function parentIdentity(loc: Place): number {
+    if (!loc.parent) return 0;
+    const id = namespaceParents.get(loc.parent) ?? ++nextNamespaceParent;
+    namespaceParents.set(loc.parent, id);
+    return id;
+  }
   const implicationCache = new Map<string, boolean>();
   const possibilityCache = new Map<string, boolean>();
   const implies = (caller: readonly string[], condition: string): boolean => {
@@ -546,6 +566,7 @@ export function resolveRust(
         }
       }
       helperCache.set(key, shadow);
+      clearIncompleteLookups();
       return shadow;
     } finally {
       helperBusy.delete(key);
@@ -1147,7 +1168,7 @@ export function resolveRust(
     start: number;
     order: number[];
   };
-  const textMacros: TextMacro[] = symbols
+  const directText: TextMacro[] = symbols
     .filter((s) => data(s).macroRules)
     .map((symbol) => ({
       symbol,
@@ -1159,7 +1180,6 @@ export function resolveRust(
   // macro_use transfers a module's ending textual scope, recursively across
   // captured module files. Source order within that ending scope is retained.
   const modules = symbols.filter((s) => s.kind === "module" && !data(s).unit);
-  const directText = [...textMacros];
   function importedText(m: GraphSymbol, seen = new Set<string>()): TextMacro[] {
     if (seen.has(m.id)) return [];
     seen = new Set([...seen, m.id]);
@@ -1228,15 +1248,35 @@ export function resolveRust(
     }
     return result;
   }
-  for (const m of modules) textMacros.push(...importedText(m));
-  const textMacrosByName = new Map<string, TextMacro[]>();
-  const unseenTextMacros = textMacros.filter((entry) => !entry.symbol);
-  for (const entry of textMacros) {
-    if (!entry.symbol) continue;
-    textMacrosByName.set(entry.symbol.name, [
-      ...(textMacrosByName.get(entry.symbol.name) ?? []),
-      entry,
-    ]);
+  const textMacrosByFile = new Map<
+    string,
+    { named: Map<string, TextMacro[]>; unseen: TextMacro[] }
+  >();
+  {
+    const unseen = new Set<string>();
+    const indexTextMacro = (entry: TextMacro): void => {
+      let file = textMacrosByFile.get(entry.file);
+      if (!file) {
+        file = { named: new Map(), unseen: [] };
+        textMacrosByFile.set(entry.file, file);
+      }
+      if (!entry.symbol) {
+        // Identical unseen imports contribute the same reason in the same
+        // textual position. Keep the first occurrence and all distinct facts.
+        const key = JSON.stringify(entry);
+        if (unseen.has(key)) return;
+        unseen.add(key);
+        file.unseen.push(entry);
+      } else {
+        const name = entry.symbol.name;
+        const named = file.named.get(name) ?? [];
+        named.push(entry);
+        file.named.set(name, named);
+      }
+    };
+    for (const entry of directText) indexTextMacro(entry);
+    for (const module of modules)
+      for (const entry of importedText(module)) indexTextMacro(entry);
   }
   function textualMacro(
     name: string,
@@ -1248,10 +1288,10 @@ export function resolveRust(
     const guard = `${site.file}|${scope}|${site.range.start}`;
     if (seen.has(guard)) return null;
     seen = new Set([...seen, guard]);
-    const entries = [...(textMacrosByName.get(name) ?? []), ...unseenTextMacros]
+    const file = textMacrosByFile.get(site.file);
+    const entries = [...(file?.named.get(name) ?? []), ...(file?.unseen ?? [])]
       .filter(
         (e) =>
-          e.file === site.file &&
           e.start <= site.range.start &&
           (!e.scope || e.scope === scope || scope.startsWith(e.scope + "::")) &&
           possible([
@@ -1353,7 +1393,7 @@ export function resolveRust(
     let path = find(name, loc, scope, "macro");
     // Captured macro_export definitions are path-based at the exporting crate
     // root. Proc-macro expansion itself remains outside the fallback.
-    path.symbols = path.symbols.filter(
+    const visibleSymbols = path.symbols.filter(
       (s) =>
         (ownerPlace(s.file, str(data(s).scope)).some(
           (p) => p.crate.root === loc.crate.root,
@@ -1363,6 +1403,10 @@ export function resolveRust(
           data(s).macroRules &&
           ((data(s).macroExportConditions ?? []) as string[][]).length > 0),
     );
+    if (visibleSymbols.length !== path.symbols.length) {
+      if (path.complete) clearIncompleteLookups();
+      path.symbols = visibleSymbols;
+    }
     if (
       !loc.noImplicitPrelude &&
       !name.includes("::") &&
@@ -1460,6 +1504,26 @@ export function resolveRust(
   }
   const memo = new Map<string, Found>();
   const importExpansions = new Map<string, number[]>();
+  // Incomplete results are reusable only with the same active guards and
+  // expansion limits. A cycle cut here can be a real route in another search.
+  const incompleteLookups = new LookupMemo<Found>();
+  const observedIncompleteGuards = new Set<string>();
+  const observedImportProofs = new Set<string>();
+  let lookupRevision = 0;
+  let lookupFactsFinal = false;
+  let activeLookup:
+    | {
+        trace: LookupTrace;
+        seen: Set<string>;
+        expansion: ImportExpansion | undefined;
+      }
+    | undefined;
+  function clearIncompleteLookups() {
+    incompleteLookups.clear();
+    observedIncompleteGuards.clear();
+    observedImportProofs.clear();
+    lookupRevision++;
+  }
   const empty = (complete = true): Found => ({ symbols: [], complete });
   const merge = (xs: Found[]): Found => {
     const causes = xs.flatMap((x) => x.failedFiles ?? []);
@@ -1741,13 +1805,8 @@ export function resolveRust(
       // an unknown external namespace. Unknown is not a binding in every ns.
       bindings = bindings.filter((binding) => {
         if (!("targetName" in binding)) return accepts(binding, headNs);
-        let parent = 0;
-        if (loc.parent) {
-          parent = namespaceParents.get(loc.parent) ?? ++nextNamespaceParent;
-          namespaceParents.set(loc.parent, parent);
-        }
         const proofKey = JSON.stringify([
-          parent,
+          parentIdentity(loc),
           loc.symbol?.id,
           binding.id,
           loc.crate.root,
@@ -1770,8 +1829,10 @@ export function resolveRust(
         const head = reused?.found ?? resolveUse(binding, [], headNs);
         const proven =
           head.complete && head.symbols.some((s) => accepts(s, headNs));
-        if (!proven && (reused ? reused.cycleFree : cycleCuts === before))
+        if (!proven && (reused ? reused.cycleFree : cycleCuts === before)) {
           unprovedImports.add(proofKey);
+          if (observedImportProofs.has(proofKey)) clearIncompleteLookups();
+        } else if (activeLookup) observedImportProofs.add(proofKey);
         return proven;
       });
       found = conditional(found, bindings, loc);
@@ -1835,8 +1896,15 @@ export function resolveRust(
       ]);
       const suffixes = importExpansions.get(expansionKey) ?? [];
       if (suffixes.some((length) => suffix.length > length)) {
+        activeLookup?.trace.requireShorterSuffix(expansionKey, suffix.length);
         cycleCuts++;
         return { ...empty(false), reason: "import-cycle-unverified" };
+      }
+      const lookup = activeLookup;
+      const previousExpansion = lookup?.expansion;
+      if (lookup) {
+        lookup.trace.requireSuffix(expansionKey, suffix.length);
+        lookup.expansion = { key: expansionKey, length: suffix.length };
       }
       suffixes.push(suffix.length);
       importExpansions.set(expansionKey, suffixes);
@@ -1856,6 +1924,7 @@ export function resolveRust(
           !l.targetName.includes("::") && data(l).alias === l.targetName,
         );
       } finally {
+        if (lookup) lookup.expansion = previousExpansion;
         activeMacroImports.pop();
         suffixes.pop();
         if (!suffixes.length) importExpansions.delete(expansionKey);
@@ -2211,15 +2280,92 @@ export function resolveRust(
     ]);
     const cached = memo.get(guard);
     if (cached) return cached;
+    const outer = activeLookup;
+    if (outer && outer.seen !== seen) outer.trace.valid = false;
     if (seen.has(guard)) {
+      if (lookupFactsFinal) observedIncompleteGuards.add(guard);
+      outer?.trace.required.add(guard);
       cycleCuts++;
       return empty(!accessFrom ? false : true);
     }
-    if (seen.size > 128) {
+    if (seen.size > lookupDepth) {
+      if (outer) outer.trace.valid = false;
       cycleCuts++;
-      return empty(false);
+      return { ...empty(false), reason: "import-lookup-depth-unverified" };
     }
-    seen = new Set([...seen, guard]);
+    const state = lookupFactsFinal
+      ? JSON.stringify([
+          guard,
+          ns === "macro" ? activeMacroImports.at(-1)?.id : undefined,
+          parentIdentity(loc),
+          loc.local,
+          loc.symbol?.id,
+          loc.crate.manifest,
+          loc.crate.edition,
+          loc.crate.kind,
+          loc.crate.name,
+          !!loc.uncertain,
+          !!loc.directoryUnverified,
+          accessFrom.conditions?.length
+            ? [...new Set(accessFrom.conditions)].sort()
+            : undefined,
+          helperBusy.size ? [...helperBusy].sort() : undefined,
+        ])
+      : undefined;
+    const reused =
+      state === undefined
+        ? undefined
+        : incompleteLookups.get(state, seen, importExpansions);
+    if (reused) {
+      outer?.trace.absorb(reused.trace, outer.expansion);
+      if (reused.cut) cycleCuts++;
+      return { ...reused.result };
+    }
+    const revision = lookupRevision;
+    const cutsBefore = cycleCuts;
+    const next = new Set([...seen, guard]);
+    const trace = state === undefined ? undefined : new LookupTrace();
+    if (!trace && outer) outer.trace.valid = false;
+    activeLookup = trace
+      ? { trace, seen: next, expansion: undefined }
+      : undefined;
+    let result: Found;
+    try {
+      result = lookupPath(name, loc, scope, ns, next, allowGlobs, accessFrom);
+    } finally {
+      activeLookup = outer;
+    }
+    if (result.complete) {
+      // A complete entry preempts a previous incomplete result or cycle cut,
+      // including when another saved lookup depended on that answer.
+      if (observedIncompleteGuards.has(guard)) clearIncompleteLookups();
+      memo.set(guard, result);
+    } else if (trace && state !== undefined) {
+      observedIncompleteGuards.add(guard);
+      // This guard is supplied by the lookup itself, and must be absent on
+      // entry. Other observed guards still depend on the caller's stack.
+      trace.required.delete(guard);
+      trace.excluded.add(guard);
+      outer?.trace.absorb(trace, outer.expansion);
+      if (trace.fits() && revision === lookupRevision)
+        incompleteLookups.set(state, {
+          result: { ...result },
+          cut: cycleCuts !== cutsBefore,
+          trace,
+        });
+    }
+    return result;
+  }
+
+  function lookupPath(
+    name: string,
+    loc: Place,
+    scope: string,
+    ns: Namespace,
+    seen: Set<string>,
+    allowGlobs: boolean,
+    accessFrom: Place,
+  ): Found {
     const absolute = name.startsWith("::");
     const parts = name.replace(/^::/, "").split("::");
     let first = parts.shift()!;
@@ -2401,7 +2547,6 @@ export function resolveRust(
         ].join("; "),
       };
     }
-    if (result.complete) memo.set(guard, result);
     return result;
   }
   const opaqueStandardRoots = new Map<string, Set<string>>();
@@ -3446,14 +3591,21 @@ export function resolveRust(
   attributeShadowCache.clear();
   memo.clear();
   unprovedImports.clear();
+  lookupFactsFinal = true;
   for (const origin of deferredHelpers)
     if (helperShadowed(origin))
-      for (const loc of ownerPlace(origin.file, origin.scope))
-        opaqueScopes.add(`${loc.crate.root}|${qualified(loc, origin.scope)}`);
+      for (const loc of ownerPlace(origin.file, origin.scope)) {
+        const key = `${loc.crate.root}|${qualified(loc, origin.scope)}`;
+        if (!opaqueScopes.has(key)) {
+          opaqueScopes.add(key);
+          clearIncompleteLookups();
+        }
+      }
   itemPresenceCache.clear();
   helperCache.clear();
   memo.clear();
   unprovedImports.clear();
+  clearIncompleteLookups();
   if (markPresence)
     for (const symbol of symbols) {
       const attributes = itemPresence(symbol);

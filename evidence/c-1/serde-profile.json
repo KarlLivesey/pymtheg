@@ -1,0 +1,35 @@
+{
+  "wallSampleMs": 46605,
+  "resolverStackMs": 9583,
+  "pathLookupStackMs": 9186,
+  "self": {
+    "find": 3176,
+    "merge": 1529,
+    "inScope": 1415,
+    "(anonymous)": 761,
+    "resolveUse": 426,
+    "ownerPlace": 312,
+    "conditionsFor": 215,
+    "contextOf": 137,
+    "children": 136,
+    "unique": 127,
+    "possible": 121,
+    "dependencyLookup": 113,
+    "compact": 106,
+    "conditional": 101,
+    "textualMacro": 93
+  },
+  "maxPathLookupFrames": 45,
+  "samples": 32138,
+  "lookupProbe": {
+    "calls": 300000,
+    "distinctFileScopeNameNamespaceCombinations": 446,
+    "lookupDepthMax": 15,
+    "cycleCuts": 17824,
+    "growingImportSuffixCuts": 127,
+    "depthCuts": 0,
+    "distinctGuardKeysOnCacheMissThatWereNotActive": 899,
+    "callsOnCacheMissWithNonemptyAncestorSet": 256211,
+    "distinctFullAncestorStatesOnCacheMissThatWereNotActive": 16209
+  }
+}

@@ -1,20 +1,25 @@
 // SPDX-License-Identifier: MIT
-import type { LanguageModule } from "../../types.js";
+import type { ContextFile, GraphFile, LanguageModule } from "../../types.js";
 import { crates } from "./cargo.js";
 import type { AddedLink, Json } from "../../types.js";
 import { parseRust } from "./parse.js";
 import { fileFacts } from "../../identity.js";
 import { resolveRust } from "./resolve.js";
+import { runRustPhase } from "./phase-runner.js";
 
 const TARGET_HINT_LIMIT = 16;
 
-const rust: LanguageModule = {
-  id: "rust",
-  version: "27",
-  extensions: [".rs"],
-  contextFiles: ["Cargo.toml", "Cargo.lock"],
-  parse: parseRust,
-  analyze({ projectId, files, contextFiles }) {
+type RustAnalysisInput = {
+  projectId: string;
+  files: readonly Pick<GraphFile, "path" | "module" | "result">[];
+  contextFiles: Parameters<typeof crates>[0];
+};
+
+const cargoInputs = (files: readonly ContextFile[]) =>
+  files.map(({ path, status, text }) => ({ path, status, text }));
+
+export const rustPhases = {
+  analyze({ projectId, files, contextFiles }: RustAnalysisInput) {
     const roots = new Map(
       crates(contextFiles, new Set(files.map((f) => f.path))).map((c) => [
         c.root,
@@ -190,12 +195,62 @@ const rust: LanguageModule = {
   },
   // Derived links (calls in macro bodies) are returned only when present, so
   // a project without them keeps the plain resolution list.
-  resolve(ctx) {
+  resolve(ctx: Parameters<typeof resolveRust>[0]) {
     const links: AddedLink[] = [];
     const resolutions = resolveRust(ctx, undefined, undefined, undefined, (l) =>
       links.push(l),
     );
     return links.length ? { resolutions, links } : resolutions;
+  },
+} satisfies Pick<LanguageModule, "analyze" | "resolve">;
+
+const rust: LanguageModule = {
+  id: "rust",
+  version: "28",
+  extensions: [".rs"],
+  contextFiles: ["Cargo.toml", "Cargo.lock"],
+  parse: parseRust,
+  analyze({ projectId, files, contextFiles, signal }) {
+    if (!files.length) return [];
+    const context = {
+      projectId,
+      files: files.map(({ path, module, result }) => ({
+        path,
+        module,
+        result,
+      })),
+      contextFiles: cargoInputs(contextFiles),
+    };
+    return signal
+      ? runRustPhase({ phase: "analyze", context }, signal)
+      : rustPhases.analyze(context);
+  },
+  resolve({ projectId, files, contextFiles, symbols, links, signal }) {
+    if (!links.length) return [];
+    // Parsed drafts and raw source text are not consumed by the resolver.
+    const input = {
+      projectId,
+      contextFiles: cargoInputs(contextFiles),
+      files: files
+        .filter((file) => file.module === "rust")
+        .map(({ path, module, result }) => {
+          const { status, diagnostics, data } = result;
+          return {
+            path,
+            module,
+            result: {
+              status,
+              diagnostics,
+              ...(data === undefined ? {} : { data }),
+            },
+          };
+        }),
+      symbols: symbols.filter((symbol) => symbol.module === "rust"),
+      links,
+    };
+    return signal
+      ? runRustPhase({ phase: "resolve", context: input }, signal)
+      : rustPhases.resolve(input);
   },
 };
 export default rust;

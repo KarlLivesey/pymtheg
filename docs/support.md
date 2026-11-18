@@ -348,6 +348,10 @@ Claims `*.rs`; context `Cargo.toml`, read by a snapshot-only TOML reader (an
 unsupported or invalid manifest, including any TOML datetime, makes that whole
 manifest unknown). Private items are ordinary symbols.
 
+- **Cancellation:** the graph CLI can interrupt Rust analysis and resolution
+  with SIGINT or SIGTERM. Interrupted syncs leave an incomplete index and can
+  be retried. When an import path reaches the resolver's depth boundary, an
+  unresolved link can report `import-lookup-depth-unverified`.
 - **Definite:** module declarations and file modules; free-function, type, pattern
   and value paths from proven bindings written in the source; imports, including
   re-exports and globs where the binding is proven; associated calls such as
