@@ -1,0 +1,50 @@
+[
+  {
+    "id": "BurntSushi/ripgrep",
+    "baselineLevel2": 0.41682443841784783,
+    "candidateLevel2": 0.41682443841784783,
+    "identical": true
+  },
+  {
+    "id": "RustCrypto/hashes",
+    "baselineLevel2": 0.4069153069153069,
+    "candidateLevel2": 0.4069153069153069,
+    "identical": true
+  },
+  {
+    "id": "actix/actix-web",
+    "baselineLevel2": 0.3101713049510305,
+    "candidateLevel2": 0.3101713049510305,
+    "identical": true
+  },
+  {
+    "id": "alacritty/alacritty",
+    "baselineLevel2": 0.39391721016904035,
+    "candidateLevel2": 0.39391721016904035,
+    "identical": true
+  },
+  {
+    "id": "clap-rs/clap",
+    "baselineLevel2": 0.2695636813283872,
+    "candidateLevel2": 0.2695636813283872,
+    "identical": true
+  },
+  {
+    "id": "helix-editor/helix",
+    "baselineLevel2": 0.3322631865648289,
+    "candidateLevel2": 0.3322631865648289,
+    "identical": true
+  },
+  {
+    "id": "rust-embedded/cortex-m",
+    "baselineLevel2": 0.5409615384615385,
+    "candidateLevel2": 0.5409615384615385,
+    "identical": true
+  },
+  {
+    "id": "tokio-rs/axum",
+    "baselineLevel2": 0.35181476846057574,
+    "candidateLevel2": 0.35181476846057574,
+    "identical": true
+  }
+]

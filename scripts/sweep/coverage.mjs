@@ -309,10 +309,11 @@ function completion(repos, baseline) {
     `**${repos.filter(finished).length} of ${repos.length} finished.**`, ""];
   for (const repo of repos.filter((row) => !finished(row) || !finished(before.get(row.id) ?? row))) {
     const attempt = finished(repo) ? before.get(repo.id) : repo;
-    const progress = attempt.failure?.lastProgress ?? "";
+    const progress = attempt.outcome === "wall-limit" ? attempt.failure?.lastProgress ?? "" : "";
     const profiledSerde = attempt.id === "serde-rs/serde" && attempt === before.get(repo.id) && attempt.outcome === "wall-limit";
     const cause = attempt.outcome === "killed-for-memory" ? "Node heap exhausted"
       : profiledSerde ? "Rust resolution stalled in recursive scope and use lookups"
+        : /^graph analyze rust: (\d+)\/\1$/.test(progress) ? "Wall limit after Rust analysis completed"
         : progress.startsWith("graph analyze rust") ? "Rust analysis stalled at the wall limit"
         : progress.startsWith("graph resolve rust") ? "Rust resolution stalled at the wall limit" : attempt.outcome;
     lines.push(`- [${finished(repo) ? "x" : " "}] ${repo.id} · ${cause} · ${finished(repo) ? "finished" : "open"}`);

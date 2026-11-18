@@ -274,14 +274,17 @@ test("candidate overlay rewrites the plan only for matched evidence", () => {
       sourceFiles: [{ module: "go", scope: "source", readableLines: 10 }], failedSources: [],
       reviewSites: { "go:empty:source:unclassified": 2 }, breakdown: [linkRow("go", "unresolved", "unclassified", 2)] };
     const packet = (repos) => ({ schema: "pymtheg.sweep.coverage/v2", release: { package: "fixture" }, columns, repos });
-    const base = packet([repo, { id: "fixture/other", commit: "b".repeat(40), language: "rust", outcome: "wall-limit" }]);
+    const stalled = { id: "fixture/stalled", commit: "c".repeat(40), language: "rust", outcome: "wall-limit",
+      failure: { lastProgress: "graph analyze rust: 1523/1523" } };
+    const crash = { ...stalled, id: "fixture/crash", commit: "d".repeat(40) };
+    const base = packet([repo, { id: "fixture/other", commit: "b".repeat(40), language: "rust", outcome: "wall-limit" }, stalled, crash]);
     const candidate = packet([{ ...repo, checks: { known: observed(null, 1, "resolved"), missing: observed("go:empty:source:unclassified") }, reviewSites: { "go:empty:source:unclassified": 1 }, breakdown: [
       linkRow("go", "resolved", "eligible", 1),
       linkRow("go", "unresolved", "unclassified", 1),
     ] }, { ...base.repos[1], outcome: "finished", sourceFiles: [], failedSources: [], reviewSites: { "rust:empty:source:unclassified": 3 }, breakdown: [
       linkRow("rust", "resolved", "eligible", 2),
       linkRow("rust", "unresolved", "unclassified", 3),
-    ] }]);
+    ] }, stalled, { ...crash, outcome: "crashed" }]);
     const put = (filename, data) => {
       const file = join(scratch, filename);
       writeFileSync(file, typeof data === "string" ? data : JSON.stringify(data));
@@ -300,6 +303,8 @@ test("candidate overlay rewrites the plan only for matched evidence", () => {
     assert.match(rendered, /^Before\./);
     assert.match(rendered, /1\/2 reference sites settled/);
     assert.match(rendered, /50\.00 pp/);
+    assert.ok(rendered.split("\n").includes("- [ ] fixture/stalled · Wall limit after Rust analysis completed · open"));
+    assert.ok(rendered.split("\n").includes("- [ ] fixture/crash · crashed · open"));
     assert.match(rendered, /After\.\n$/);
     const report = readFileSync(scoreboard, "utf8");
     assert.match(report, /- \[x\] fixture\/other · wall-limit · finished/);

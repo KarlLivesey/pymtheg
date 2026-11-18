@@ -298,6 +298,7 @@ export async function indexProject(
             };
       results = await module.analyze!({
         projectId: store.projectId,
+        ...(options.signal ? { signal: options.signal } : {}),
         ...(toolchain ? { toolchain } : {}),
         files,
         contextFiles: ownContexts,
@@ -326,6 +327,10 @@ export async function indexProject(
           "Analyze-only modules must return every readable captured file",
         );
     } catch (error) {
+      // A source phase can reject with the caller's abort reason. Toolchain
+      // diagnostics follow the module's normal report path.
+      if (options.signal?.aborted && Object.is(error, options.signal.reason))
+        throw error;
       const detail = message(error);
       analysisFailed = true;
       report.analysisErrors.push({ module: module.id, message: detail });
@@ -369,7 +374,12 @@ export async function indexProject(
         report.analysisErrors.some((error) => error.module === module.id)
       )
         throw Error("Project analysis/context is incomplete");
-      const output = await runResolve(module, store, ownContexts);
+      const output = await runResolve(
+        module,
+        store,
+        ownContexts,
+        options.signal,
+      );
       result = Array.isArray(output)
         ? { resolutions: output, links: [] }
         : (output as ResolutionResult);
@@ -402,6 +412,8 @@ export async function indexProject(
     } catch (error) {
       // Storage errors propagate; they are not mislabeled as module failures.
       if (error instanceof StorageRead) throw error.cause;
+      if (options.signal?.aborted && Object.is(error, options.signal.reason))
+        throw error;
       report.resolutionErrors.push({
         module: module.id,
         message: message(error),
@@ -463,6 +475,7 @@ async function runResolve(
   module: LanguageModule,
   store: GraphStorage,
   contexts: readonly ContextFile[],
+  signal?: AbortSignal,
 ): Promise<readonly LinkResolution[] | ResolutionResult> {
   if (!module.resolve) return [];
   // Only a store that declares independent reads is trusted not to share
@@ -472,6 +485,7 @@ async function runResolve(
   return (
     (await module.resolve({
       projectId: store.projectId,
+      ...(signal ? { signal } : {}),
       files: own(await read(() => store.files())),
       contextFiles: structuredClone(contexts),
       symbols: own(await read(() => store.findSymbols())),
