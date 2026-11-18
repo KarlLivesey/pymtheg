@@ -307,7 +307,9 @@ file (its ID can change when files are added or removed).
   annotation only). An interface that embeds two provably different
   declarations of one method (invalid Go) has no implementers.
 - **Unresolved:** standard library, third-party and non-local `replace` imports and
-  everything reached through them; imports Go forbids (`internal`, `package main`); unexported names from another package; builtins (`data.builtin`);
+  everything reached through them; imports Go forbids (`internal`,
+  `package main`); unexported names from another package; builtins
+  (`data.builtin`);
   elements of function containers; elements of a generic named container
   (`type L[E any] []E`); a field of an anonymous struct type declared in several
   build variants of its enclosing type; explicit generic-method instantiation

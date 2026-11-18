@@ -2605,3 +2605,22 @@ with evidence `declared-builtin` count as identified library targets at
 level 2. **Open:** once the Go, Rust and TypeScript
 items record library targets, the export's reconstruction can be limited to
 schema-3 graphs. See [C-5](changes/C-5.md).
+
+### Go imports follow the go command, not its pattern rules (C-8)
+
+**Decided (C-8):** a Go import resolves to a package under a `testdata`,
+`_x` or `.x` directory like any other, and a module may sit under such a
+directory; a `replace` to `.` or `..` is a local directory, as
+`modfile.IsDirectoryPath` reads it. A conversion to a pointer type
+(`(*T)(x)`) links to `T` as `T(x)` does, and its value has type `T`. A
+function declared in several build variants is called only in the variants
+that can be built with the calling file. **Why:** the go command skips those
+directories only when it expands `./...` patterns, and builds explicit
+imports of them (checked with Go 1.27.4); the earlier rule called them
+forbidden, which left protobuf-go's generated test packages, cli/cli's
+`.github` modules and all of gopls (`replace golang.org/x/tools => ..`)
+outside the checkout. **Supersedes:** the support matrix's "imports Go forbids
+(`testdata`)". **Rules out:** results of type-parameter type without
+stored type arguments; one definite target for a call whose build-variant
+callees return different named types. See [C-8](changes/C-8.md).
+
