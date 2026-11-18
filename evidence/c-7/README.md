@@ -81,6 +81,13 @@ checks covered 7,099 Zustand links and 12,205 yargs links.
 
 [Schema identity check](../c-5/identity.mjs)
 
+## Validation
+
+The production build, no-emit TypeScript check and formatting check passed on
+the merged branch. All 2,996 repository tests and all 16 sweep-tool tests
+passed after updating the exact TypeScript conformance fixture to include
+its three new member anchors.
+
 ## Reproduction
 
 Use `scripts/sweep/run.mjs --local-build` with the TypeScript manifest for each
