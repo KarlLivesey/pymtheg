@@ -237,9 +237,19 @@ by path, as `{path, language, reason, range?}` (reason and range from the first
 diagnostic). Partial files are not in it. Derived links are compared and stored
 one row at a time, so no single string holds a whole module's analysis; this
 does not make an arbitrarily large snapshot fit in memory. Each module's
-`resolve` receives its own deep copy of files, symbols, links and context files,
-so a module that mutates its input cannot affect later modules or stored facts.
-Source: [W2-M](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-M.md).
+`resolve` receives its own independent copy of files, symbols, links and
+context files, so a module that mutates its input cannot affect later modules
+or stored facts. `SqliteGraphStore` declares `independentReads`: its file,
+symbol and link reads (`files`, `getFile`, `filesAt`, `findSymbols`, `links`,
+`moduleLinks`) decode fresh records from storage, and the indexer passes those
+to the module without copying them again. Context files are always
+deep-copied. For a storage backend that does not declare it,
+the indexer deep-copies the module's input as before. The SQLite store keeps
+no decoded file between reads and indexing holds no whole-graph copy from one
+module to the next, so memory follows the largest single phase rather than the
+number of copies.
+Source: [W2-M](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-M.md),
+[C-2](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/C-2.md).
 
 **Internal errors are not invalid code.** An exception inside the TypeScript
 module while reading one file, and the TypeScript compiler's stack limits, fail

@@ -2526,3 +2526,24 @@ row. **Rules out:** automated publishing. The acceptance gate still installs
 only the tarball it builds and reports `npx pymtheg` from the registry as not
 verified; the package-contents test allows the owner's name only in the licence
 texts and the top-level `author` field. See [PUB-2](changes/PUB-2.md).
+
+### Indexing holds one copy of the graph at a time (C-2)
+
+**Decided (C-2):** the graph store no longer keeps decoded file records between
+reads; every read decodes fresh, independent records. Resolution reads the graph
+afresh for each module and drops it before the next, instead of reading it once
+and deep-copying it (`structuredClone`) for every module. The module gets the
+records as read only from a store that declares `independentReads`; any other
+`GraphStorage` still gets a deep copy. Added-link validation reads only the
+files that receive added links, and the closing report counts
+rows instead of decoding every symbol and link. **Why:** the decoded-file cache
+kept every source text and parse result alive for the whole run, and resolution
+held the cache, the indexer's own copy, each module's clone and the store's
+re-validation copy at once. Large and mixed checkouts (the TypeScript compiler
+repository, Turborepo, T3 Code at `b387e3a1`) ran out of Node's default heap.
+**Trade:** this supersedes W2-I's "unchanged subsequent invocations reuse
+decoded records". A store reused for a second index now decodes each file
+again in each phase that needs records: a number of times linear in files
+and modules, instead of zero. The CLI opens a new store for every command, so
+it never had that reuse. **Rules out:**
+store-level caches of decoded records and per-module whole-graph clones.
