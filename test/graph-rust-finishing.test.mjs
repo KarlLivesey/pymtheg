@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -23,6 +23,20 @@ async function project(t, files) {
 }
 
 const cargo = '[package]\nname="app"\nedition="2021"\n';
+const cli = fileURLToPath(new URL("../dist/cli/main.js", import.meta.url));
+
+function graphCli(root, ...args) {
+  const result = spawnSync(
+    process.execPath,
+    [cli, "graph", ...args, "--json", "--root", root],
+    { encoding: "utf8" },
+  );
+  assert.ifError(result.error);
+  assert.equal(result.signal, null, result.stderr);
+  const response = JSON.parse(result.stdout);
+  assert.equal(result.status, response.exitCode, result.stderr);
+  return response;
+}
 
 async function graph(t, files) {
   const root = await project(t, files);
@@ -123,14 +137,23 @@ test("a path beyond the existing import depth boundary has an explicit reason", 
 
 for (const [phase, signal] of [
   ["analyze", "SIGINT"],
+  ["analyze", "SIGTERM"],
+  ["resolve", "SIGINT"],
   ["resolve", "SIGTERM"],
 ]) {
   test(`graph index handles ${signal} during a CPU-bound Rust ${phase} worker`, async (t) => {
-    const root = await project(t, {
+    const file = "src/lib.rs";
+    const sources = {
       "Cargo.toml": cargo,
-      "src/lib.rs": "pub fn entry() {}",
+      [file]: "fn helper() {}\npub fn entry() { helper(); }\n",
+    };
+    const root = await project(t, {
+      ...sources,
+      [file]: "fn previous() {}\npub fn entry() { previous(); }\n",
     });
-    const cli = fileURLToPath(new URL("../dist/cli/main.js", import.meta.url));
+    assert.equal(graphCli(root, "index").sync.complete, true);
+    await writeFile(join(root, file), sources[file]);
+
     const preload = new URL(
       "./fixtures/graph-rust/busy-phase.mjs",
       import.meta.url,
@@ -167,8 +190,46 @@ for (const [phase, signal] of [
     assert.deepEqual(await once(child, "close"), [130, null]);
     assert.ok(ready);
     assert.equal(JSON.parse(stdout).exitCode, 130);
-    const retried = await executeGraph({ command: "index", root });
+
+    const status = graphCli(root, "status");
+    assert.equal(status.indexExists, true);
+    assert.equal(status.sync.complete, false);
+    assert.ok(
+      status.warnings.some((warning) => warning.code === "index-incomplete"),
+    );
+    const partial = graphCli(root, "file", file, "--no-sync");
+    assert.equal(partial.status, "incomplete");
+    assert.equal(partial.exitCode, 2);
+    assert.equal(partial.sync.complete, false);
+    assert.ok(
+      partial.warnings.some((warning) => warning.code === "index-incomplete"),
+    );
+
+    const retried = graphCli(root, "file", file);
     assert.equal(retried.status, "ok");
-    assert.equal(retried.counts.failed, 0);
+    assert.equal(retried.sync.complete, true);
+    assert.equal(retried.sync.mode, "updated");
+    assert.equal(retried.truncated, false);
+    assert.equal(
+      retried.data.links.find((link) => link.kind === "calls").target.name,
+      "helper",
+    );
+
+    // Use the same project identity so the query can compare IDs as stored.
+    const database = ".pymtheg/rebuildable/graph.sqlite";
+    const recovered = new SqliteGraphStore(join(root, database), undefined, {
+      readOnly: true,
+    });
+    const projectId = recovered.projectId;
+    recovered.close();
+    const cleanRoot = await project(t, sources);
+    const cleanPath = join(cleanRoot, database);
+    await mkdir(dirname(cleanPath), { recursive: true });
+    new SqliteGraphStore(cleanPath, projectId).close();
+    assert.equal(graphCli(cleanRoot, "index").sync.complete, true);
+    const clean = graphCli(cleanRoot, "file", file, "--no-sync");
+    assert.equal(clean.sync.complete, true);
+    assert.deepEqual(retried.counts, clean.counts);
+    assert.deepEqual(retried.data, clean.data);
   });
 }

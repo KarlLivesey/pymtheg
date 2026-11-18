@@ -308,7 +308,7 @@ function completion(repos, baseline) {
     `**${repos.filter(finished).length} of ${repos.length} finished.**`, ""];
   for (const repo of repos.filter((row) => !finished(row) || !finished(before.get(row.id) ?? row))) {
     const attempt = finished(repo) ? before.get(repo.id) : repo;
-    const progress = attempt.failure?.lastProgress ?? "";
+    const progress = attempt.outcome === "wall-limit" ? attempt.failure?.lastProgress ?? "" : "";
     const profiledSerde = attempt.id === "serde-rs/serde" && attempt === before.get(repo.id) && attempt.outcome === "wall-limit";
     const cause = attempt.outcome === "killed-for-memory" ? "Node heap exhausted"
       : profiledSerde ? "Rust resolution stalled in recursive scope and use lookups"
