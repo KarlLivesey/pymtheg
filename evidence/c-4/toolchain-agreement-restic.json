@@ -1,0 +1,33 @@
+{
+ "restic": "c734245 (pinned corpus copy)",
+ "base": {
+  "counts": {
+   "links": 63054,
+   "toolchainDecided": 31949,
+   "confirmedDefinite": 31115,
+   "upgraded": 834,
+   "disagreements": 0,
+   "withdrawn": 0
+  },
+  "files": {
+   "outside-configuration": 52,
+   "in-configuration": 507
+  },
+  "disagreements": []
+ },
+ "candidate": {
+  "counts": {
+   "links": 63802,
+   "toolchainDecided": 32986,
+   "confirmedDefinite": 32525,
+   "upgraded": 461,
+   "disagreements": 0,
+   "withdrawn": 0
+  },
+  "files": {
+   "outside-configuration": 52,
+   "in-configuration": 507
+  },
+  "disagreements": []
+ }
+}

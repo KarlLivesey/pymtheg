@@ -49,9 +49,11 @@ export type Desc =
   /**
    * A local without a syntactically evident type. For an anonymous struct or
    * interface type: `m`, the named types it embeds, as values; `f`, its named
-   * fields (a struct) or methods as func values (an interface).
+   * fields (a struct) or methods as func values (an interface). `sym`: an
+   * anonymous struct's own symbol (a local struct, by identity in the file
+   * where the description is written), through which its members resolve.
    */
-  | { k: "local"; m?: Desc[]; f?: { n: string; d: Desc }[] }
+  | { k: "local"; m?: Desc[]; f?: { n: string; d: Desc }[]; sym?: string }
   /** A value whose type is known to defeat member resolution (local named type). */
   | { k: "opaque" }
   /** A local type or type parameter declared inside a function or generic declaration. */
@@ -74,7 +76,11 @@ export interface FileFact {
   imports: ImportFact[];
   /** `_test.go` file. */
   test: boolean;
-  /** Text of a `//go:build` constraint line before the package clause, if any. */
+  /**
+   * The build constraint before the package clause, if any: the `//go:build`
+   * expression, or without one every legacy line, one per line as
+   * `+build <terms>` (they all hold).
+   */
   build?: string;
   /** GOOS/GOARCH implied by a `_os`, `_arch` or `_os_arch` filename suffix. */
   goos?: string;
@@ -162,20 +168,30 @@ export const KNOWN_GOOS = new Set([
   "windows",
   "zos",
 ]);
+/** Go's known GOARCH values (go/build/syslist.go). */
 export const KNOWN_GOARCH = new Set([
   "386",
   "amd64",
+  "amd64p32",
   "arm",
+  "armbe",
   "arm64",
+  "arm64be",
   "loong64",
   "mips",
   "mipsle",
   "mips64",
   "mips64le",
+  "mips64p32",
+  "mips64p32le",
+  "ppc",
   "ppc64",
   "ppc64le",
+  "riscv",
   "riscv64",
+  "s390",
   "s390x",
+  "sparc",
   "sparc64",
   "wasm",
 ]);

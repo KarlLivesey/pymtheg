@@ -211,12 +211,8 @@ test("method calls resolve only where the receiver type is syntactically evident
   // Element types of written container types and results of func-typed values are evident.
   assert.equal(run("v.Run").target, "p/types.go:method:(A).Run");
   assert.equal(run("fn().Run").target, "p/types.go:method:(A).Run");
-  // Ambiguous: ranging over a named project slice type (element type not tracked).
-  assert.deepEqual(run("w.Run").candidates, [
-    "p/types.go:method:(*B).Run",
-    "p/types.go:method:(A).Run",
-  ]);
-  assert.equal(run("w.Run").target, null);
+  // Ranging over a named project slice type (`type List []A`): its element type.
+  assert.equal(run("w.Run").target, "p/types.go:method:(A).Run");
   // Negative: a known external receiver type never yields project candidates.
   assert.equal(run("buf.Write").target, null);
   assert.deepEqual(run("buf.Write").candidates, []);
