@@ -1,0 +1,14 @@
+{
+  "phase": "analyze",
+  "node": "v24.21.0",
+  "build": "Candidate with path lookup memoization",
+  "textualMacroSelfSampleMs": 2691,
+  "possibleSelfSampleMs": 1124,
+  "textualMacroInclusiveSampleMs": 4708,
+  "sampledFile": "rustls-test/tests/api.rs",
+  "unseenEntriesInProject": 246697,
+  "unseenEntriesInFile": 244628,
+  "distinctUnseenEntriesInFile": 786,
+  "distinctConditionArraysInFile": 178,
+  "distinctFileScopeStartReasonTuples": 30
+}

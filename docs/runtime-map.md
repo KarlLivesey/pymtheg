@@ -1478,7 +1478,10 @@ file records (C-2). `failedFiles()` reads the failed source
 files back; derived links are compared and written per row. Results are validated before any write;
 module exceptions are reported in `errors`, `analysisErrors` or
 `resolutionErrors` and leave earlier valid facts in place; storage failures
-propagate. Symbol IDs hash project, module, path, kind, scoped identity and
+propagate. A cancellable request runs each Rust project phase in an owned
+worker over captured facts. The graph coordinator awaits worker termination
+on abort and publishes the completion checkpoint after a successful sync.
+Symbol IDs hash project, module, path, kind, scoped identity and
 ordinal, never positions. Native compiler or tree-sitter state is never persisted.
 
 **Language modules.** Go (`extract.ts`, `resolve.ts`, `gomod.ts`, `failure.ts`)
