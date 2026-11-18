@@ -1691,6 +1691,9 @@ class GoResolver {
         from === undefined
           ? []
           : buildable.filter((type) => this.includedWith(from, type.file));
+      // Declared in the referencing file itself: that declaration.
+      const own = buildable.filter((type) => type.file === from);
+      if (own.length === 1) return own;
       if (included.length === 1) return included;
       const variants = unique(buildable.length ? buildable : set).sort(
         (a, b) => compareText(a.file, b.file) || compareText(a.id, b.id),
@@ -3862,12 +3865,16 @@ function ordered(context: ResolutionContext): ResolutionContext {
 }
 
 /**
- * One answer from the answers of every configuration: definite only when all
- * find the same declarations; all found but different: the set of their
- * answers (build variants are candidates); any unknown or failed: that;
- * otherwise (found in some, missing or ambiguous in others): ambiguous.
+ * One answer from the answers of every configuration. A configuration that
+ * finds nothing is one in which the referencing code does not compile, so it
+ * does not count. Of the rest: definite only when all find the same
+ * declarations; all found but different: the set of their answers (build
+ * variants are candidates); any unknown or failed: that; any ambiguous:
+ * ambiguous.
  */
-function combineVariants(results: Selection[]): Selection {
+function combineVariants(all: Selection[]): Selection {
+  const results = all.filter((item) => item.kind !== "none");
+  if (!results.length) return { kind: "none" };
   if (results.length === 1) return results[0]!;
   const causes = results.flatMap((item) =>
     item.kind === "failed" ? item.cause : [],

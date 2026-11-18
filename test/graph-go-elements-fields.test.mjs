@@ -794,6 +794,7 @@ test("build variants: the declaration every build of the file includes, and cgo 
       "package s",
       'import "C"',
       "type SQLiteConn struct{ db int }",
+      "func (c *SQLiteConn) Exec() {}",
     ),
     "s/static_mock.go": lines(
       "//go:build !cgo",
@@ -808,7 +809,17 @@ test("build variants: the declaration every build of the file includes, and cgo 
       'import "C"',
       "func (c *SQLiteConn) load() int { return c.db }",
     ),
+    // No `import "C"`: both declarations may build with it, but only the
+    // cgo one has Exec, so only there does this file compile.
+    "s/vtable_test.go": lines(
+      "package s",
+      "func use(c *SQLiteConn) { c.Exec() }",
+    ),
   });
+  assert.equal(
+    at(links, "s/vtable_test.go", "c.Exec").target,
+    "s/sqlite3.go:method:(*SQLiteConn).Exec",
+  );
   assert.equal(
     at(links, "tool/make_test_find_db.go", "d.comparer").target,
     "tool/make_test_find_db.go:field:db.comparer",
