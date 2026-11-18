@@ -11,6 +11,7 @@ import type {
   GraphStorage,
   Json,
   LanguageModule,
+  LinkResolution,
   ParseResult,
   ResolutionResult,
   ToolchainRequest,
@@ -121,10 +122,11 @@ export async function indexProject(
   await walk("");
   paths.sort(compare);
   // Storage reads are deliberately outside all source/module error catches, before any writes.
-  const oldFiles = await store.files();
+  const oldFiles = await summaries(store);
   const oldContexts = await store.contexts();
   const claims = new Map<string, LanguageModule>();
-  const previous = new Map<string, GraphFile | undefined>();
+  // Only what the cache check needs: never every previous record at once.
+  const previous = new Map<string, Previous | undefined>();
   for (const path of paths) {
     report.discovered++;
     let module;
@@ -137,7 +139,7 @@ export async function indexProject(
     }
     if (module) {
       claims.set(path, module);
-      previous.set(path, await store.getFile(path));
+      previous.set(path, await previousOf(store, path));
       report.claimed++;
     } else if (!registry.modules.some((module) => needsContext(module, path)))
       report.unclaimed.push(path);
@@ -204,7 +206,7 @@ export async function indexProject(
       old?.hash === source.hash &&
       old.module === module.id &&
       old.version === module.version &&
-      (old.result.status !== "failed" || (await store.isParseFailure?.(path)))
+      (!old.failed || (await store.isParseFailure?.(path)))
     ) {
       report.unchanged++;
       continue;
@@ -240,128 +242,128 @@ export async function indexProject(
     await store.replaceFile(file, cacheableFailures.has(file.path));
     report.indexed++;
   }
+  // Written: release every captured text and parse result (C-2). Only the
+  // context files and which captures failed are needed from here on.
+  updates.length = 0;
+  const unreadable = new Set(
+    [...captures.values()]
+      .filter((file) => file.status === "failed")
+      .map((file) => file.path),
+  );
+  captures.clear();
   for (const file of oldFiles)
     if (!claims.has(file.path)) {
       await store.removeFile(file.path);
       changed.add(file.path);
       report.removed++;
     }
-  for (const module of registry.modules)
-    if (module.analyze) {
-      const files = (await store.files()).filter(
-        (file) => file.module === module.id,
-      );
-      const filesByPath = new Map(files.map((file) => [file.path, file]));
-      const oldPaths = new Set(
-        oldFiles
-          .filter((file) => file.module === module.id)
-          .map((file) => file.path),
-      );
-      const ownContexts = contexts.filter((file) =>
-        needsContext(module, file.path),
-      );
-      let results: readonly AnalyzedFile[];
-      let analysisFailed = false;
-      try {
-        if (ownContexts.some((file) => file.status === "failed"))
-          throw Error("Project context could not be captured");
-        const setting = options.toolchains?.[module.id];
-        const toolchain: ToolchainRequest | undefined =
-          setting === undefined || setting === false || setting === null
-            ? undefined
-            : {
-                root,
-                setting,
-                workDir:
-                  options.toolchainDirectory ??
-                  resolve(root, ".pymtheg", "rebuildable", "toolchain"),
-                environment: options.environment ?? process.env,
-                ...(options.signal ? { signal: options.signal } : {}),
-                note: (note) =>
-                  (report.toolchains ??= []).push({ module: module.id, note }),
-              };
-        results = await module.analyze({
-          projectId: store.projectId,
-          ...(options.signal ? { signal: options.signal } : {}),
-          ...(toolchain ? { toolchain } : {}),
-          files,
-          contextFiles: ownContexts,
-          changedFiles: [...changed]
-            .filter((path) => filesByPath.has(path) || oldPaths.has(path))
-            .sort(compare),
-          changedContextFiles: changedContexts.filter((path) =>
-            needsContext(module, path),
-          ),
-        });
-        const seen = new Set<string>();
-        for (const item of results) {
-          const file = filesByPath.get(item.path);
-          if (!file || seen.has(item.path))
-            throw Error(
-              "Project analysis returned a duplicate or foreign file",
-            );
-          if (captures.get(item.path)?.status === "failed")
-            throw Error("Project analysis cannot clean an unreadable source");
-          validateResult(file.text, item.result);
-          seen.add(item.path);
-        }
-        if (
-          !module.parse &&
-          files.some(
-            (file) =>
-              captures.get(file.path)?.status !== "failed" &&
-              !seen.has(file.path),
-          )
-        )
-          throw Error(
-            "Analyze-only modules must return every readable captured file",
-          );
-      } catch (error) {
-        // A source phase can reject with the caller's abort reason. Toolchain
-        // diagnostics follow the module's normal report path.
-        if (options.signal?.aborted && Object.is(error, options.signal.reason))
-          throw error;
-        const detail = message(error);
-        analysisFailed = true;
-        report.analysisErrors.push({ module: module.id, message: detail });
-        results = files.map((file) => ({
-          path: file.path,
-          result: failure(detail),
-        }));
-      }
-      for (const item of results) {
-        const file = filesByPath.get(item.path)!;
-        if (JSON.stringify(file.result) !== JSON.stringify(item.result))
-          await store.replaceFile(
-            { ...file, result: item.result },
-            !analysisFailed &&
-              item.result.status === "failed" &&
-              item.result.failureKind !== "transient" &&
-              // Analyze-only modules may explicitly certify a file-local content
-              // failure. Unclassified analysis failures are never cached.
-              (item.result.failureKind === "content" ||
-                (file.result.status === "failed" &&
-                  (await store.isParseFailure?.(file.path)) === true)),
-          );
-        report.analyzed++;
-      }
-    }
-  const files = await store.files();
-  const symbols = await store.findSymbols();
-  const links = await store.links();
-  for (const module of registry.modules) {
+  // Each module's analysis runs in its own frame, so its input files and
+  // results are released when it returns instead of lingering in this
+  // function's suspended frame through the remaining phases (C-2).
+  const analyzeModule = async (module: LanguageModule): Promise<void> => {
+    const files = (await store.files()).filter(
+      (file) => file.module === module.id,
+    );
+    const filesByPath = new Map(files.map((file) => [file.path, file]));
+    const oldPaths = new Set(
+      oldFiles
+        .filter((file) => file.module === module.id)
+        .map((file) => file.path),
+    );
     const ownContexts = contexts.filter((file) =>
       needsContext(module, file.path),
     );
-    const own = links
-      .filter((link) => link.module === module.id && link.origin === "parse")
-      .map((link) => ({
-        ...link,
-        targetId: null,
-        targetStatus: null,
-        candidates: [],
-        resolution: "unresolved" as const,
+    let results: readonly AnalyzedFile[];
+    let analysisFailed = false;
+    try {
+      if (ownContexts.some((file) => file.status === "failed"))
+        throw Error("Project context could not be captured");
+      const setting = options.toolchains?.[module.id];
+      const toolchain: ToolchainRequest | undefined =
+        setting === undefined || setting === false || setting === null
+          ? undefined
+          : {
+              root,
+              setting,
+              workDir:
+                options.toolchainDirectory ??
+                resolve(root, ".pymtheg", "rebuildable", "toolchain"),
+              environment: options.environment ?? process.env,
+              ...(options.signal ? { signal: options.signal } : {}),
+              note: (note) =>
+                (report.toolchains ??= []).push({ module: module.id, note }),
+            };
+      results = await module.analyze!({
+        projectId: store.projectId,
+        ...(options.signal ? { signal: options.signal } : {}),
+        ...(toolchain ? { toolchain } : {}),
+        files,
+        contextFiles: ownContexts,
+        changedFiles: [...changed]
+          .filter((path) => filesByPath.has(path) || oldPaths.has(path))
+          .sort(compare),
+        changedContextFiles: changedContexts.filter((path) =>
+          needsContext(module, path),
+        ),
+      });
+      const seen = new Set<string>();
+      for (const item of results) {
+        const file = filesByPath.get(item.path);
+        if (!file || seen.has(item.path))
+          throw Error("Project analysis returned a duplicate or foreign file");
+        if (unreadable.has(item.path))
+          throw Error("Project analysis cannot clean an unreadable source");
+        validateResult(file.text, item.result);
+        seen.add(item.path);
+      }
+      if (
+        !module.parse &&
+        files.some((file) => !unreadable.has(file.path) && !seen.has(file.path))
+      )
+        throw Error(
+          "Analyze-only modules must return every readable captured file",
+        );
+    } catch (error) {
+      // A source phase can reject with the caller's abort reason. Toolchain
+      // diagnostics follow the module's normal report path.
+      if (options.signal?.aborted && Object.is(error, options.signal.reason))
+        throw error;
+      const detail = message(error);
+      analysisFailed = true;
+      report.analysisErrors.push({ module: module.id, message: detail });
+      results = files.map((file) => ({
+        path: file.path,
+        result: failure(detail),
       }));
+    }
+    for (const item of results) {
+      const file = filesByPath.get(item.path)!;
+      if (JSON.stringify(file.result) !== JSON.stringify(item.result))
+        await store.replaceFile(
+          { ...file, result: item.result },
+          !analysisFailed &&
+            item.result.status === "failed" &&
+            item.result.failureKind !== "transient" &&
+            // Analyze-only modules may explicitly certify a file-local content
+            // failure. Unclassified analysis failures are never cached.
+            (item.result.failureKind === "content" ||
+              (file.result.status === "failed" &&
+                (await store.isParseFailure?.(file.path)) === true)),
+        );
+      report.analyzed++;
+    }
+  };
+  for (const module of registry.modules)
+    if (module.analyze) await analyzeModule(module);
+  // Resolution reads the graph afresh for each module and keeps nothing
+  // between modules: no whole-graph copy outlives the module that needs it.
+  // A module's input is its own: records from a store that declares
+  // independent reads, a deep copy otherwise. Its mutations cannot reach the
+  // indexer, the store or the next module (C-2).
+  const resolveModule = async (module: LanguageModule): Promise<void> => {
+    const ownContexts = contexts.filter((file) =>
+      needsContext(module, file.path),
+    );
     let result: ResolutionResult = { resolutions: [], links: [] };
     try {
       if (
@@ -369,29 +371,39 @@ export async function indexProject(
         report.analysisErrors.some((error) => error.module === module.id)
       )
         throw Error("Project analysis/context is incomplete");
-      const output =
-        (await module.resolve?.({
-          projectId: store.projectId,
-          ...(options.signal ? { signal: options.signal } : {}),
-          ...structuredClone({
-            files,
-            contextFiles: ownContexts,
-            symbols,
-            links: own,
-          }),
-        })) ?? [];
+      const output = await runResolve(
+        module,
+        store,
+        ownContexts,
+        options.signal,
+      );
       result = Array.isArray(output)
         ? { resolutions: output, links: [] }
         : (output as ResolutionResult);
+      // Only files that receive added links are kept for validation. (Not
+      // getFile: the command layer counts those calls as inventory progress.)
+      const wanted = new Set<string>();
+      try {
+        for (const added of result.links)
+          if (typeof added?.file === "string") wanted.add(added.file);
+      } catch {
+        // A malformed result: resolutionFacts reports it, in its own order.
+      }
+      const needed = new Map<string, GraphFile>();
+      if (wanted.size)
+        for (const file of await read(() => filesAt(store, [...wanted])))
+          needed.set(file.path, file);
       resolutionFacts(
         store.projectId,
         module.id,
         result,
-        files,
-        symbols,
-        links,
+        (path) => needed.get(path),
+        await read(() => store.findSymbols()),
+        await read(() => parsedLinks(store, module.id)),
       );
     } catch (error) {
+      // Storage errors propagate; they are not mislabeled as module failures.
+      if (error instanceof StorageRead) throw error.cause;
       if (options.signal?.aborted && Object.is(error, options.signal.reason))
         throw error;
       report.resolutionErrors.push({
@@ -400,12 +412,11 @@ export async function indexProject(
       });
       result = { resolutions: [], links: [] };
     }
-    // Storage errors propagate; they are not mislabeled as module failures.
     await store.replaceAnalysis(module.id, result);
-  }
-  for (const file of files)
-    if (file.result.status !== "clean")
-      report[file.result.status].push(file.path);
+  };
+  for (const module of registry.modules) await resolveModule(module);
+  for (const file of await summaries(store))
+    if (file.status !== "clean") report[file.status].push(file.path);
   for (const file of contexts)
     if (file.status === "failed") report.failed.push(file.path);
   report.failed = [...new Set(report.failed)].sort(compare);
@@ -415,9 +426,99 @@ export async function indexProject(
   report.unclaimedCount = report.unclaimed.length;
   report.failedCount = report.failed.length;
   report.partialCount = report.partial.length;
-  report.symbols = (await store.findSymbols()).length;
-  report.links = (await store.links()).length;
-  report.unresolved = (await store.unresolved()).length;
-  report.ambiguous = (await store.ambiguous()).length;
+  const counts = await store.counts?.();
+  report.symbols = counts?.symbols ?? (await store.findSymbols()).length;
+  report.links = counts?.links ?? (await store.links()).length;
+  report.unresolved = counts?.unresolved ?? (await store.unresolved()).length;
+  report.ambiguous = counts?.ambiguous ?? (await store.ambiguous()).length;
   return report;
+}
+
+interface Previous {
+  hash: string;
+  module: string;
+  version: string;
+  failed: boolean;
+}
+/** The cache-check facts of a stored file; its decoded record is not kept. */
+async function previousOf(
+  store: GraphStorage,
+  path: string,
+): Promise<Previous | undefined> {
+  const old = await store.getFile(path);
+  return (
+    old && {
+      hash: old.hash,
+      module: old.module,
+      version: old.version,
+      failed: old.result.status === "failed",
+    }
+  );
+}
+/**
+ * One module's resolve over freshly read input. The input lives only in this
+ * frame, so it is released when the module returns.
+ */
+async function runResolve(
+  module: LanguageModule,
+  store: GraphStorage,
+  contexts: readonly ContextFile[],
+  signal?: AbortSignal,
+): Promise<readonly LinkResolution[] | ResolutionResult> {
+  if (!module.resolve) return [];
+  // Only a store that declares independent reads is trusted not to share
+  // records with itself or with the next module; any other gets a deep copy.
+  const own = <T>(value: T): T =>
+    store.independentReads === true ? value : structuredClone(value);
+  return (
+    (await module.resolve({
+      projectId: store.projectId,
+      ...(signal ? { signal } : {}),
+      files: own(await read(() => store.files())),
+      contextFiles: structuredClone(contexts),
+      symbols: own(await read(() => store.findSymbols())),
+      links: own(await read(() => parsedLinks(store, module.id))).map(
+        (link) => ({
+          ...link,
+          targetId: null,
+          targetStatus: null,
+          candidates: [],
+          resolution: "unresolved" as const,
+        }),
+      ),
+    })) ?? []
+  );
+}
+/** A storage read inside a module's error boundary; its error propagates. */
+class StorageRead extends Error {}
+async function read<T>(action: () => T | Promise<T>): Promise<T> {
+  try {
+    return await action();
+  } catch (error) {
+    throw new StorageRead("Storage read failed", { cause: error });
+  }
+}
+async function summaries(store: GraphStorage) {
+  return (
+    (await store.fileSummaries?.()) ??
+    (await store.files()).map((file) => ({
+      path: file.path,
+      module: file.module,
+      status: file.result.status,
+    }))
+  );
+}
+/** Stored files at these paths; a store without filesAt is read in full and filtered. */
+async function filesAt(store: GraphStorage, paths: readonly string[]) {
+  if (store.filesAt) return await store.filesAt(paths);
+  const wanted = new Set(paths);
+  return (await store.files()).filter((file) => wanted.has(file.path));
+}
+async function parsedLinks(store: GraphStorage, module: string) {
+  return (
+    (await store.moduleLinks?.(module)) ??
+    (await store.links()).filter(
+      (link) => link.module === module && link.origin === "parse",
+    )
+  );
 }

@@ -82,7 +82,7 @@ function glob(pattern: string, path: string): boolean | null {
  * interpreted. Unsupported syntax invalidates the document, not just one line.
  * No recovery, filesystem reads, environment evaluation or Cargo invocation. */
 export function crates(
-  contexts: readonly ContextFile[],
+  contexts: readonly Pick<ContextFile, "path" | "status" | "text">[],
   paths: Set<string>,
 ): Crate[] {
   const docs = contexts

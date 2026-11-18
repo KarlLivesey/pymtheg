@@ -61,11 +61,16 @@ test("overlapping globs stay bounded during derive-helper and call lookup", asyn
   const calls = store.links().filter((link) => link.kind === "calls");
   assert.deepEqual(
     calls.map((call) => [call.targetName, call.resolution]).sort(),
-    [["local", "resolved"], ["unavailable", "unresolved"]],
+    [
+      ["local", "resolved"],
+      ["unavailable", "unresolved"],
+    ],
   );
   const local = calls.find((call) => call.targetName === "local");
   assert.equal(store.findSymbols({ name: "local" })[0].id, local.targetId);
-  assert.ok(calls.find((call) => call.targetName === "unavailable").data.uncertainty);
+  assert.ok(
+    calls.find((call) => call.targetName === "unavailable").data.uncertainty,
+  );
 });
 
 test("serde's alternate internals path with an uncaptured arm stays unproved", async (t) => {
@@ -85,9 +90,15 @@ fn local() {}
   const calls = store.links().filter((link) => link.kind === "calls");
   assert.deepEqual(
     calls.map((call) => [call.targetName, call.resolution]).sort(),
-    [["crate::local", "resolved"], ["helper", "unresolved"]],
+    [
+      ["crate::local", "resolved"],
+      ["helper", "unresolved"],
+    ],
   );
-  assert.equal(calls.find((call) => call.targetName === "helper").targetId, null);
+  assert.equal(
+    calls.find((call) => call.targetName === "helper").targetId,
+    null,
+  );
 });
 
 test("a path beyond the existing import depth boundary has an explicit reason", async (t) => {
@@ -115,19 +126,38 @@ for (const [phase, signal] of [
   ["resolve", "SIGTERM"],
 ]) {
   test(`graph index handles ${signal} during a CPU-bound Rust ${phase} worker`, async (t) => {
-    const root = await project(t, { "Cargo.toml": cargo, "src/lib.rs": "pub fn entry() {}" });
-    const cli = fileURLToPath(new URL("../dist/cli/main.js", import.meta.url));
-    const preload = new URL("./fixtures/graph-rust/busy-phase.mjs", import.meta.url);
-    const child = spawn(process.execPath, [
-      "--import", preload.href, cli, "graph", "index", "--json", "--root", root,
-    ], {
-      env: { ...process.env, PYM_TEST_BUSY_RUST_PHASE: phase },
-      stdio: ["ignore", "pipe", "pipe"],
+    const root = await project(t, {
+      "Cargo.toml": cargo,
+      "src/lib.rs": "pub fn entry() {}",
     });
+    const cli = fileURLToPath(new URL("../dist/cli/main.js", import.meta.url));
+    const preload = new URL(
+      "./fixtures/graph-rust/busy-phase.mjs",
+      import.meta.url,
+    );
+    const child = spawn(
+      process.execPath,
+      [
+        "--import",
+        preload.href,
+        cli,
+        "graph",
+        "index",
+        "--json",
+        "--root",
+        root,
+      ],
+      {
+        env: { ...process.env, PYM_TEST_BUSY_RUST_PHASE: phase },
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
     t.after(() => child.kill("SIGKILL"));
     let ready = false;
     let stdout = "";
-    child.stdout.setEncoding("utf8").on("data", (text) => { stdout += text; });
+    child.stdout.setEncoding("utf8").on("data", (text) => {
+      stdout += text;
+    });
     const stderr = createInterface({ input: child.stderr });
     stderr.on("line", (line) => {
       if (line !== "rust cancellation fixture ready") return;

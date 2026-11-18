@@ -134,7 +134,8 @@ const acceptsAt = (
         : false;
 };
 export function resolveRust(
-  ctx: Omit<ResolutionContext, "files"> & {
+  ctx: Pick<ResolutionContext, "projectId" | "symbols" | "links"> & {
+    contextFiles: Parameters<typeof crates>[0];
     files: readonly {
       path: string;
       module: string;
@@ -1511,7 +1512,11 @@ export function resolveRust(
   let lookupRevision = 0;
   let lookupFactsFinal = false;
   let activeLookup:
-    | { trace: LookupTrace; seen: Set<string>; expansion: ImportExpansion | undefined }
+    | {
+        trace: LookupTrace;
+        seen: Set<string>;
+        expansion: ImportExpansion | undefined;
+      }
     | undefined;
   function clearIncompleteLookups() {
     incompleteLookups.clear();
@@ -2288,26 +2293,25 @@ export function resolveRust(
       cycleCuts++;
       return { ...empty(false), reason: "import-lookup-depth-unverified" };
     }
-    const state =
-      lookupFactsFinal
-        ? JSON.stringify([
-            guard,
-            ns === "macro" ? activeMacroImports.at(-1)?.id : undefined,
-            parentIdentity(loc),
-            loc.local,
-            loc.symbol?.id,
-            loc.crate.manifest,
-            loc.crate.edition,
-            loc.crate.kind,
-            loc.crate.name,
-            !!loc.uncertain,
-            !!loc.directoryUnverified,
-            accessFrom.conditions?.length
-              ? [...new Set(accessFrom.conditions)].sort()
-              : undefined,
-            helperBusy.size ? [...helperBusy].sort() : undefined,
-          ])
-        : undefined;
+    const state = lookupFactsFinal
+      ? JSON.stringify([
+          guard,
+          ns === "macro" ? activeMacroImports.at(-1)?.id : undefined,
+          parentIdentity(loc),
+          loc.local,
+          loc.symbol?.id,
+          loc.crate.manifest,
+          loc.crate.edition,
+          loc.crate.kind,
+          loc.crate.name,
+          !!loc.uncertain,
+          !!loc.directoryUnverified,
+          accessFrom.conditions?.length
+            ? [...new Set(accessFrom.conditions)].sort()
+            : undefined,
+          helperBusy.size ? [...helperBusy].sort() : undefined,
+        ])
+      : undefined;
     const reused =
       state === undefined
         ? undefined
@@ -2322,7 +2326,9 @@ export function resolveRust(
     const next = new Set([...seen, guard]);
     const trace = state === undefined ? undefined : new LookupTrace();
     if (!trace && outer) outer.trace.valid = false;
-    activeLookup = trace ? { trace, seen: next, expansion: undefined } : undefined;
+    activeLookup = trace
+      ? { trace, seen: next, expansion: undefined }
+      : undefined;
     let result: Found;
     try {
       result = lookupPath(name, loc, scope, ns, next, allowGlobs, accessFrom);

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-import type { LanguageModule } from "../../types.js";
+import type { ContextFile, GraphFile, LanguageModule } from "../../types.js";
 import { crates } from "./cargo.js";
 import type { AddedLink, Json } from "../../types.js";
 import { parseRust } from "./parse.js";
@@ -9,8 +9,17 @@ import { runRustPhase } from "./phase-runner.js";
 
 const TARGET_HINT_LIMIT = 16;
 
+type RustAnalysisInput = {
+  projectId: string;
+  files: readonly Pick<GraphFile, "path" | "module" | "result">[];
+  contextFiles: Parameters<typeof crates>[0];
+};
+
+const cargoInputs = (files: readonly ContextFile[]) =>
+  files.map(({ path, status, text }) => ({ path, status, text }));
+
 export const rustPhases = {
-  analyze({ projectId, files, contextFiles }) {
+  analyze({ projectId, files, contextFiles }: RustAnalysisInput) {
     const roots = new Map(
       crates(contextFiles, new Set(files.map((f) => f.path))).map((c) => [
         c.root,
@@ -201,26 +210,43 @@ const rust: LanguageModule = {
   extensions: [".rs"],
   contextFiles: ["Cargo.toml", "Cargo.lock"],
   parse: parseRust,
-  analyze({ signal, toolchain: _toolchain, ...context }) {
-    if (!context.files.length) return [];
+  analyze({ projectId, files, contextFiles, signal }) {
+    if (!files.length) return [];
+    const context = {
+      projectId,
+      files: files.map(({ path, module, result }) => ({
+        path,
+        module,
+        result,
+      })),
+      contextFiles: cargoInputs(contextFiles),
+    };
     return signal
       ? runRustPhase({ phase: "analyze", context }, signal)
       : rustPhases.analyze(context);
   },
-  resolve({ signal, ...context }) {
-    if (!context.links.length) return [];
+  resolve({ projectId, files, contextFiles, symbols, links, signal }) {
+    if (!links.length) return [];
     // Parsed drafts and raw source text are not consumed by the resolver.
     const input = {
-      ...context,
-      files: context.files.map(({ path, module, result }) => {
-        const { status, diagnostics, data } = result;
-        return {
-          path,
-          module,
-          result: { status, diagnostics, ...(data === undefined ? {} : { data }) },
-        };
-      }),
-      symbols: context.symbols.filter((symbol) => symbol.module === "rust"),
+      projectId,
+      contextFiles: cargoInputs(contextFiles),
+      files: files
+        .filter((file) => file.module === "rust")
+        .map(({ path, module, result }) => {
+          const { status, diagnostics, data } = result;
+          return {
+            path,
+            module,
+            result: {
+              status,
+              diagnostics,
+              ...(data === undefined ? {} : { data }),
+            },
+          };
+        }),
+      symbols: symbols.filter((symbol) => symbol.module === "rust"),
+      links,
     };
     return signal
       ? runRustPhase({ phase: "resolve", context: input }, signal)

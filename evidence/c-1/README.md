@@ -1,5 +1,7 @@
 # C-1 Rust corpus completion
 
+[Validation after merging PR 9](merged-validation.md)
+
 ## What stalled
 
 The dev server ran Node 24.21.0 against the pins in `sweep/repos.json`. The

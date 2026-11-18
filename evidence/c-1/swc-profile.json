@@ -49,6 +49,12 @@
     "peakRssKiB": 5265488
   },
   "analysisCompletionObservedByColdSeconds": 3427,
+  "coldOutcome": {
+    "stage": "cold",
+    "lastProgress": "graph analyze rust: 1523/1523",
+    "wallSeconds": 3568.02,
+    "peakRssKiB": 5663972
+  },
   "postAnalysisMainThreadSampleMs": {
     "total": 7744,
     "replaceFileInclusive": 7512,
