@@ -78,6 +78,7 @@ function members(
   root: string,
   patterns: readonly string[],
   manifests: readonly Manifest[],
+  includeRootPackage = false,
 ) {
   const packages = new Map<string, string | undefined>();
   const paths = new Set<string>();
@@ -101,6 +102,7 @@ function members(
     )
       continue;
     paths.add(local);
+    if (!relative && !includeRootPackage) continue;
     const name = json.name;
     if (typeof name === "string" && validPackageName(name))
       packages.set(name, packages.has(name) ? undefined : local);
@@ -134,7 +136,7 @@ export function workspaceLinks(
     const settings = pnpmSettings(file.text);
     if (settings)
       roots.set(root, {
-        ...members(root, settings.patterns, manifests),
+        ...members(root, settings.patterns, manifests, true),
         pnpm: true,
         linkVersions: settings.linkVersions,
       });

@@ -495,7 +495,8 @@ answer.
   member links, and checkout-local `file:` and `link:` dependencies expose
   manifests to the compiler. TypeScript applies its own package export
   conditions, subpath rules, `main`, `types`, `paths` and project reference
-  redirects within the snapshot.
+  redirects within the snapshot. An interface signature reached through a
+  workspace import leaves a runtime member call unresolved.
 - **Candidates:** several graph symbols for one callee (union receivers, merged
   declarations, duplicate JavaScript functions).
 - **Unresolved:** standard library and `node_modules` packages

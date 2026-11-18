@@ -296,6 +296,7 @@ export function classify(link, evidence, project) {
   }
   if (module === "typescript") {
     if (workspaceEntryMissing(data.reason)) return "inside";
+    if (data.reason === "workspace-member-runtime-unverified") return "unclassified";
     const path = tsSpecifier(link, evidence);
     if (path && (link.data?.specifier || evidence.tsSpecifiers.has(path))) return tsPath(path, project, link.file);
     if (data.reference === "lib") return "outside";
@@ -420,7 +421,8 @@ function tsExternalIdentity(link, evidence, project, disposition) {
 export function externalIdentity(link, evidence, project, disposition) {
   if (link.resolution !== "unresolved") return null;
   const data = link.data ?? {};
-  if (data.cause || link.module === "typescript" && workspaceEntryMissing(data.reason)) return null;
+  if (data.cause || link.module === "typescript" &&
+    (workspaceEntryMissing(data.reason) || data.reason === "workspace-member-runtime-unverified")) return null;
   const observed = link.module === "go" ? goExternalIdentity(link, evidence, project)
     : link.module === "rust" ? rustExternalIdentity(link, evidence, project)
       : tsExternalIdentity(link, evidence, project, disposition);

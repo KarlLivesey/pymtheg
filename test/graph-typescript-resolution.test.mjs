@@ -438,6 +438,7 @@ test("workspace packages resolve to project source; an undeclared package direct
   await project(
     {
       "package.json": JSON.stringify({
+        name: "@w/core",
         private: true,
         workspaces: ["packages/*"],
       }),
@@ -610,9 +611,10 @@ test("pnpm subpath exports and checkout path dependencies use TypeScript's resol
         'import { resolveHome } from "@t3tools/shared/missing";',
         'import { linked } from "@pkg/linked";',
         'import { linked as localFile } from "@pkg/file";',
+        'import { plugin } from "@t3tools/shared/devHome";',
         'import "@pkg/excluded";',
         'import "external-package";',
-        "resolveWorktreeT3Home(); resolveHome(); linked(); localFile();",
+        "resolveWorktreeT3Home(); resolveHome(); linked(); localFile(); plugin.run();",
       ].join("\n"),
       "apps/server/require.cts":
         'import shared = require("@t3tools/shared/devHome"); shared.resolveWorktreeT3Home();',
@@ -621,8 +623,12 @@ test("pnpm subpath exports and checkout path dependencies use TypeScript's resol
         type: "module",
         exports,
       }),
-      "packages/nested/shared/src/devHome.ts":
+      "packages/nested/shared/src/devHome.ts": [
         "export function resolveWorktreeT3Home() {}",
+        "interface Plugin { run(): void }",
+        "export function load(): Plugin { return { run() {} }; }",
+        "export const plugin: Plugin = load();",
+      ].join("\n"),
       "packages/nested/shared/src/missing.ts":
         "export function resolveHome() {}",
       "packages/excluded/package.json": JSON.stringify({
@@ -652,6 +658,9 @@ test("pnpm subpath exports and checkout path dependencies use TypeScript's resol
         graph.target(graph.link(file, "localFile", "calls")),
         "loose/index.js#linked",
       );
+      const member = graph.link(file, "run", "calls");
+      assert.equal(member.resolution, "unresolved");
+      assert.equal(member.data.reason, "workspace-member-runtime-unverified");
       for (const name of ['"@t3tools/shared/missing"', "resolveHome"]) {
         const link = graph.link(
           file,
@@ -795,8 +804,10 @@ test("symbols cover the declaration kinds with scoped identities and exact UTF-1
         "function Outer.Inner.deep",
         'function "ambient".amb',
         "function local",
+        "function local.nested",
         "getter Shape.size",
         "interface global.Window",
+        "lexical Shape.size.v",
         "method Klass.method",
         "method Shape.area",
         "method api.go",
@@ -1260,10 +1271,8 @@ test("constructor parameter properties are class properties", async () => {
       clean(report);
       for (const identity of ["A.cb", "A.id", "A.base", "Base.base"])
         graph.symbol("a.ts", identity, "property");
-      assert.equal(
-        graph.store.findSymbols({ file: "a.ts", name: "plain" }).length,
-        0,
-      );
+      graph.symbol("a.ts", "A.constructor.plain", "lexical");
+      assert.equal(graph.store.namedSymbols("plain", 10).length, 0);
       assert.equal(
         graph.target(graph.link("a.ts", "cb", "calls")),
         "a.ts#A.cb",

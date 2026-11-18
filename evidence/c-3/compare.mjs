@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Run on the dev server against the completed release and candidate sweeps.
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { sampleKey } from "../../scripts/sweep/coverage-rules.mjs";
@@ -11,14 +11,14 @@ const read = (name) => JSON.parse(readFileSync(join(scratch, name), "utf8"));
 const previous = new Map(
   read("baseline-run.json").repos.map((repo) => [repo.id, repo]),
 );
-const current = read("candidate-run.json").repos;
+const current = read(process.argv[3] ?? "candidate-run.json").repos;
 const seed = "c-3:6a32d988";
 const sample = new Map();
 const changed = [];
 
 const select = (db) =>
   db.prepare(`
-  SELECT l.body, l.resolution, s.body AS target FROM graph_links l
+  SELECT l.body, l.resolution, s.body AS target FROM graph_links l INDEXED BY graph_link_file
   LEFT JOIN graph_symbols s ON s.id=l.target
   WHERE l.file=? AND l.module='typescript'`);
 const open = (repo) =>
@@ -78,6 +78,7 @@ for (const repo of current) {
     const texts = newDb.prepare(
       "SELECT json_extract(body,'$.text') AS text FROM graph_files WHERE path=?",
     );
+    const symbols = newDb.prepare("SELECT body FROM graph_symbols WHERE id=?");
     const oldSources = oldDb.prepare(
       "SELECT path FROM graph_files WHERE json_extract(body,'$.module')='typescript'",
     );
@@ -110,10 +111,8 @@ for (const repo of current) {
         const old = original.get(key) ?? [];
         for (const link of links) {
           const reason = link.data?.reasonWithoutConfig ?? link.data?.reason;
-          if (reason === "workspace-build-output-missing")
-            run.buildOutput++;
-          if (reason === "workspace-entry-unavailable")
-            run.workspaceEntry++;
+          if (reason === "workspace-build-output-missing") run.buildOutput++;
+          if (reason === "workspace-entry-unavailable") run.workspaceEntry++;
           if (
             !verified(link) ||
             old.some((prior) => prior.resolution === "resolved") ||
@@ -177,9 +176,9 @@ for (const repo of current) {
               resolution: item.resolution,
               reason: item.data?.reason,
               assumptions: item.data?.assumes,
-              ...(item.candidates.length
-                ? { candidates: item.candidates.length }
-                : {}),
+              candidates: item.candidates.map(({ id }) =>
+                label(JSON.parse(symbols.get(id).body)),
+              ),
             })),
           });
         }
@@ -201,4 +200,8 @@ if (chosen.length < 20) {
     .sort((a, b) => a.rank.localeCompare(b.rank));
   chosen.push(...rest.slice(0, 20 - chosen.length));
 }
-console.log(JSON.stringify({ seed, runs, changed, sample: chosen }, null, 2));
+const report =
+  JSON.stringify({ seed, runs, changed, sample: chosen }, null, 2) + "\n";
+const output = process.argv[2];
+if (output) writeFileSync(join(scratch, output), report);
+else process.stdout.write(report);

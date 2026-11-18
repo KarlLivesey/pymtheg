@@ -337,6 +337,7 @@ export function extractFile(
     const facts = new Map<string, TargetFact>();
     let external = 0;
     let local = 0;
+    let declarationOnlyMember = false;
     let viaAlias = false;
     let firstAlias: ts.Symbol | undefined;
     let declaredSomewhere = false;
@@ -350,6 +351,23 @@ export function extractFile(
       const anchor = anchorOf(declaration);
       if (!anchor) return false;
       if (meaning === "call") {
+        if (
+          receiver &&
+          (ts.isMethodSignature(declaration) ||
+            ts.isPropertySignature(declaration))
+        ) {
+          const root = rootOf(receiver);
+          const symbol = root && symbolOf(root);
+          const specifier = symbol && bindingSpecifier(symbol);
+          if (
+            specifier &&
+            ts.isStringLiteralLike(specifier) &&
+            context.workspaceReason(specifier.text, path, []) !== undefined
+          ) {
+            declarationOnlyMember = true;
+            return false;
+          }
+        }
         if (isLexicalBinding(anchor)) return false;
         if (
           ts.isEnumDeclaration(anchor) &&
@@ -423,7 +441,11 @@ export function extractFile(
         (receiver && receiverReason(receiver)));
     const result: Targets = {
       targets,
-      reason: local ? "local" : moduleFailure || "external",
+      reason: declarationOnlyMember
+        ? "workspace-member-runtime-unverified"
+        : local
+          ? "local"
+          : moduleFailure || "external",
       viaAlias,
       receiver,
       ...(!targets.length && !declaredSomewhere ? { noAnswer: true } : {}),
