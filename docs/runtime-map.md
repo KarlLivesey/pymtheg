@@ -1510,6 +1510,7 @@ symbol. Shape (`src/graph/types.ts` `LibraryTarget`, `GraphLibrary`):
 | `unit` | module path, crate, package name or standard-library unit |
 | `symbol` | optional symbol path in the unit, spelled as the unit spells it (level 2); absent for the unit itself (level 1) |
 | `version` | optional; only when the checkout's manifest or lockfile states it |
+| `versionSource` | required with a version, and only then: the project path of that manifest or lockfile. The store refuses it unless the path is a clean context file in the snapshot (and, during indexing, one of the module's own declared context files) |
 | `evidence` | required: how the source proves it (below) |
 | `id` | `library:` + sha256 of (ecosystem, unit, version, symbol): deterministic and independent of the project and of the evidence |
 
@@ -1584,11 +1585,27 @@ By owner decision (C-5 review), a Go builtin identified this way counts as an
 identified library target at level 2, so the measure credits a stored
 `declared-builtin` with a symbol at level 2.
 
+**What the store checks, and what it trusts.** The store checks the shape of
+every target, the evidence kind's rules (unit only, symbol required,
+candidate only), and that a version names a clean manifest or lockfile in the
+snapshot. It cannot check the module's semantic proof: that the evidence kind
+is true of this source, that the unit and symbol are the ones the source
+selects, or that the cited file states that version for this unit. That trust
+is in the language module. The conformance kit's literal expectations and each
+language chunk's review (with a fixed-seed hand-check of new library links
+against the pinned source) carry it.
+
+Reads that mix the capability check (does this graph have library targets)
+with rows and counts run in one read snapshot, so a reader that opened while
+the graph was schema 3 and is migrated by another connection reports one
+database state per read: counts and rows agree.
+
 What each language chunk supplies: in `resolve` (or as an added link), a
 `LinkResolution` with `library: {ecosystem, unit, symbol?, version?, evidence}`
 for a definite library target, or `candidateIds` plus `libraries` for a mixed
 set; the ecosystem names it uses; the manifest/lockfile reading, if any, that
-supplies `version`; and a module version bump. Nothing else in the core changes.
+supplies `version` and `versionSource` (declared in the module's
+`contextFiles`); and a module version bump. Nothing else in the core changes.
 
 Out of scope by design: reading dependency sources, any network access, and
 resolving versions beyond what the checkout's manifest states. A library target

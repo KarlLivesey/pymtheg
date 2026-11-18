@@ -170,8 +170,17 @@ const text = (value: unknown, max: number): value is string =>
 export function libraryTarget(
   value: LibraryTarget,
   definite: boolean,
+  /** Whether a path is a clean manifest/lockfile context file in the snapshot. */
+  versionSource: (path: string) => boolean = () => false,
 ): GraphLibrary {
-  const known = ["ecosystem", "unit", "symbol", "version", "evidence"];
+  const known = [
+    "ecosystem",
+    "unit",
+    "symbol",
+    "version",
+    "versionSource",
+    "evidence",
+  ];
   const evidence =
     value &&
     typeof value === "object" &&
@@ -194,6 +203,19 @@ export function libraryTarget(
     throw Error(
       `Library evidence ${value.evidence} names a unit, not a symbol`,
     );
+  // A version is a fact about the checkout: it must name the manifest or
+  // lockfile in the snapshot that states it.
+  if ((value.version === undefined) !== (value.versionSource === undefined))
+    throw Error(
+      "A library version needs the manifest or lockfile that states it, and only with a version",
+    );
+  if (
+    value.versionSource !== undefined &&
+    (!text(value.versionSource, 4096) || !versionSource(value.versionSource))
+  )
+    throw Error(
+      "A library version's source must be a clean manifest or lockfile in the snapshot",
+    );
   if (value.symbol === undefined && evidence.symbol === "required")
     throw Error(`Library evidence ${value.evidence} needs the member's symbol`);
   if (definite && !evidence.definite)
@@ -205,7 +227,9 @@ export function libraryTarget(
     ecosystem: value.ecosystem,
     unit: value.unit,
     ...(value.symbol === undefined ? {} : { symbol: value.symbol }),
-    ...(value.version === undefined ? {} : { version: value.version }),
+    ...(value.version === undefined
+      ? {}
+      : { version: value.version, versionSource: value.versionSource! }),
     evidence: value.evidence,
   };
 }

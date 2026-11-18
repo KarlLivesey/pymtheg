@@ -23,7 +23,11 @@ export function decideLink(
 /** Internal per-pass lookup; callers of decideLink retain its original signature. */
 export class LinkDecider {
   private readonly byId: Map<string, GraphSymbol>;
-  constructor(symbols: readonly GraphSymbol[]) {
+  constructor(
+    symbols: readonly GraphSymbol[],
+    /** Whether a path is a clean manifest/lockfile context file in the snapshot. */
+    private readonly versionSource: (path: string) => boolean = () => false,
+  ) {
     this.byId = new Map(symbols.map((symbol) => [symbol.id, symbol]));
   }
   decide(link: GraphLink, decision: LinkResolution | undefined): GraphLink {
@@ -49,11 +53,13 @@ export class LinkDecider {
         decision.libraries !== undefined
       )
         throw Error("A library target excludes other targets");
-      next.libraries = [libraryTarget(decision.library, true)];
+      next.libraries = [
+        libraryTarget(decision.library, true, this.versionSource),
+      ];
       next.resolution = "library";
     } else if (decision.candidateIds !== undefined) {
       const libraries = (decision.libraries ?? []).map((item) =>
-        libraryTarget(item, false),
+        libraryTarget(item, false, this.versionSource),
       );
       const libraryIds = new Set(libraries.map((item) => item.id));
       if (
@@ -91,12 +97,14 @@ export function resolutionFacts(
   fileOf: (path: string) => GraphFile | undefined,
   symbols: readonly GraphSymbol[],
   existing: readonly GraphLink[],
+  /** Whether a path is a clean context file in the snapshot (library versions). */
+  versionSource: (path: string) => boolean = () => false,
 ): GraphLink[] {
   const links = existing.filter(
     (link) => link.module === module && link.origin === "parse",
   );
   const linkIds = new Set(links.map((link) => link.id));
-  const decider = new LinkDecider(symbols);
+  const decider = new LinkDecider(symbols, versionSource);
   const symbolsById = new Map(symbols.map((symbol) => [symbol.id, symbol]));
   /** Per file with added links: what validation needs, not the whole record. */
   interface Checked {

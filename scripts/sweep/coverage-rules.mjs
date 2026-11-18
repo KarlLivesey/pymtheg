@@ -519,6 +519,19 @@ export function repositoryScore(rows, filter = () => true) {
   return { ...counts, eligible, total, adjusted: eligible ? counts.resolved / eligible : null, raw: total ? counts.resolved / total : null };
 }
 
+/**
+ * Each stored resolution class of a breakdown against the CLI's counts, one
+ * class at a time. A 0.1.0 CLI reports no library count: schema 3 has none.
+ */
+export function storedTotalsAgree(rows, counts) {
+  const stored = Object.fromEntries(outcomes.map((outcome) => [outcome, 0]));
+  for (const row of rows) stored[row[2]] += row[7];
+  const total = Object.values(stored).reduce((sum, count) => sum + count, 0);
+  return total === counts.links && stored.ambiguous === counts.ambiguous &&
+    stored.unresolved === counts.unresolved && stored.library === (counts.library ?? 0) &&
+    stored.resolved === counts.links - counts.ambiguous - counts.unresolved - (counts.library ?? 0);
+}
+
 export function libraryScore(rows, filter = () => true) {
   const score = repositoryScore(rows, filter);
   const levels = [0, 0, 0];

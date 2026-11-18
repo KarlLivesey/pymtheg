@@ -8,7 +8,7 @@ import { parseArgs } from "node:util";
 import { gunzipSync } from "node:zlib";
 import { cargoPathLocations, checkoutLocation, npmPathLocation, yarnArchivePackages } from "./coverage-locations.mjs";
 import { goMapKeyReader, typescriptShapes } from "./coverage-source.mjs";
-import { classify, columns, countLines, externalIdentity, failedFamily, goImports, modules, packageName, repositoryScore,
+import { classify, columns, countLines, externalIdentity, failedFamily, goImports, modules, packageName, storedTotalsAgree,
   reviewBucket, reviewQuotas, rustImports, rustPreludeMacros, rustPreludeTypes, sampleKey, sampleSize, sampleStratum, sourceScope, tsBindings, workspaceNames } from "./coverage-rules.mjs";
 
 const readJson = (name) => JSON.parse(name.endsWith(".gz") ? gunzipSync(readFileSync(name)) : readFileSync(name, "utf8"));
@@ -595,10 +595,8 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys) {
       }
     }
     const rows = [...counts].sort(([a], [b]) => compare(a, b)).map(([, value]) => value);
-    const actual = repositoryScore(rows);
     const warm = readJson(join(attempt, "warm.out")).counts;
-    if (actual.total !== warm.links || actual.ambiguous !== warm.ambiguous ||
-        actual.inside + actual.outside + actual.unclassified !== warm.unresolved) throw Error(`Stored link totals disagree with released CLI for ${repo.id}`);
+    if (!storedTotalsAgree(rows, warm)) throw Error(`Stored link totals disagree with released CLI for ${repo.id}`);
     return { audit: { id: repo.id, language: repo.language, commit: repo.commit, outcome: repo.outcome,
       trackedSource: repo.trackedSource, breakdown: rows, sourceFiles: [...sourceFiles.values()],
       failedSources: [...failed.values()].map(({ examples, ...record }) => record), strata, reviewSites,

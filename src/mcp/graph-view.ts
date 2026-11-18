@@ -322,7 +322,9 @@ export class GraphView {
       ecosystem: l.ecosystem,
       unit: clip(l.unit),
       ...(l.symbol === undefined ? {} : { symbol: clip(l.symbol) }),
-      ...(l.version === undefined ? {} : { version: clip(l.version) }),
+      ...(l.version === undefined
+        ? {}
+        : { version: clip(l.version), versionSource: clip(l.versionSource) }),
       evidence: l.evidence,
       place: "outside-project",
     };

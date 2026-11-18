@@ -528,3 +528,148 @@ test("a parse result cannot smuggle library targets into the store", async () =>
     }
   });
 });
+
+test("a reader opened on a schema-3 graph agrees with itself after another connection migrates it", async () => {
+  await project(async (root, scratch) => {
+    const database = join(scratch, "g.sqlite");
+    let writer = new SqliteGraphStore(database, "p");
+    await indexProject(root, registry, writer);
+    writer.close();
+    const raw = new DatabaseSync(database);
+    raw.exec(`DROP TABLE graph_library_targets;
+      DROP TRIGGER graph_target_changed; DROP TRIGGER graph_candidate_removed;
+      ${schema3Triggers}
+      UPDATE graph_links SET resolution='unresolved' WHERE resolution='library';
+      UPDATE graph_meta SET value='3' WHERE key='schema';`);
+    raw.close();
+    // The reader decides nothing at open: it opens while the graph is schema 3.
+    const reader = new SqliteGraphStore(database, undefined, {
+      readOnly: true,
+    });
+    try {
+      assert.deepEqual(
+        [
+          reader.counts().library,
+          reader.libraryUses("zod", undefined, 10).length,
+        ],
+        [0, 0],
+      );
+      // Another connection migrates the graph and records library targets.
+      writer = new SqliteGraphStore(database, "p");
+      await indexProject(root, registry, writer);
+      writer.close();
+      const links = reader.links();
+      assert.deepEqual(
+        [
+          reader.counts().library,
+          links.filter((link) => link.resolution === "library").length,
+          reader.libraryUses("zod", undefined, 10).length,
+          reader.libraryUseCounts("zod", undefined).library,
+        ],
+        [3, 3, 2, 2],
+      );
+      // One snapshot gives every read the same state.
+      assert.deepEqual(
+        reader.readCommandSnapshot(() => [
+          reader.counts().library,
+          reader.libraryUses("lodash", "map", 10).length,
+        ]),
+        [3, 1],
+      );
+    } finally {
+      reader.close();
+    }
+  });
+});
+
+/** Toy with a declared lockfile, recording one versioned library target. */
+const versioned = (library) => ({
+  ...toy,
+  contextFiles: ["toy.lock"],
+  resolve(context) {
+    const link = context.links.find((item) => item.kind === "calls");
+    return [{ linkId: link.id, library }];
+  },
+});
+const zodBinding = {
+  ecosystem: "npm",
+  unit: "zod",
+  symbol: "string",
+  evidence: "import-binding",
+};
+for (const [label, library, message] of [
+  [
+    "a version without its source",
+    { ...zodBinding, version: "99.99.99" },
+    /needs the manifest or lockfile/,
+  ],
+  [
+    "a source without a version",
+    { ...zodBinding, versionSource: "toy.lock" },
+    /only with a version/,
+  ],
+  [
+    "a source missing from the snapshot",
+    { ...zodBinding, version: "3.0.0", versionSource: "missing.lock" },
+    /clean manifest or lockfile in the snapshot/,
+  ],
+  [
+    "a source file as the source",
+    { ...zodBinding, version: "3.0.0", versionSource: "a.toy" },
+    /clean manifest or lockfile in the snapshot/,
+  ],
+])
+  test(`a library version is refused with ${label}`, async () => {
+    await project(async (root, scratch) => {
+      await writeFile(join(root, "toy.lock"), "zod 3.0.0\n");
+      const store = new SqliteGraphStore(join(scratch, "g.sqlite"), "p");
+      try {
+        const report = await indexProject(
+          root,
+          new LanguageRegistry([versioned(library)]),
+          store,
+        );
+        assert.equal(report.resolutionErrors.length, 1);
+        assert.match(report.resolutionErrors[0].message, message);
+        assert.equal(store.counts().library, 0);
+        // The store refuses the same decision made directly.
+        const link = store.links().find((item) => item.kind === "calls");
+        assert.throws(
+          () => store.resolveLinks([{ linkId: link.id, library }]),
+          message,
+        );
+      } finally {
+        store.close();
+      }
+    });
+  });
+
+test("a library version from a lockfile in the snapshot is stored with its source", async () => {
+  await project(async (root, scratch) => {
+    await writeFile(join(root, "toy.lock"), "zod 3.0.0\n");
+    const store = new SqliteGraphStore(join(scratch, "g.sqlite"), "p");
+    try {
+      const report = await indexProject(
+        root,
+        new LanguageRegistry([
+          versioned({
+            ...zodBinding,
+            version: "3.0.0",
+            versionSource: "toy.lock",
+          }),
+        ]),
+        store,
+      );
+      assert.deepEqual(report.resolutionErrors, []);
+      const [link] = store.libraryUses("zod", "string", 10);
+      const { id, ...target } = link.libraries[0];
+      assert.deepEqual(target, {
+        ...zodBinding,
+        version: "3.0.0",
+        versionSource: "toy.lock",
+      });
+    } finally {
+      store.close();
+    }
+  });
+});

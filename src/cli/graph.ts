@@ -18,7 +18,7 @@ function locationText(
 }
 /** A library target is outside this project, never a local symbol. */
 function libraryText(library: GraphLibrary) {
-  return `library ${library.ecosystem} ${quote(library.unit)}${library.symbol === undefined ? "" : ` symbol ${quote(library.symbol)}`}${library.version === undefined ? "" : ` version ${quote(library.version)}`} (outside this project; ${library.evidence})`;
+  return `library ${library.ecosystem} ${quote(library.unit)}${library.symbol === undefined ? "" : ` symbol ${quote(library.symbol)}`}${library.version === undefined ? "" : ` version ${quote(library.version)} from ${quote(library.versionSource)}`} (outside this project; ${library.evidence})`;
 }
 function symbolText(symbol: DisplaySymbol) {
   return `${quote(symbol.name)}${symbol.identity !== symbol.name ? " [" + symbol.identity + "]" : ""} (${symbol.kind}) ${locationText(symbol.file, symbol)} ${symbol.id}`;

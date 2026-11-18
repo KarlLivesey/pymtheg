@@ -2565,7 +2565,11 @@ evidence kind, a unit-only kind with a symbol, and a `glob-import` as a definite
 target, or a `declaring-owner` without the member. `declaring-owner` records
 a member whose declaring owner the module has proven (after alias, deref,
 trait or embedding selection, or from the type checker); a target guessed
-from the receiver's type alone is never recorded. Graph schema 3 becomes 4: a schema-3
+from the receiver's type alone is never recorded. A version must name the
+manifest or lockfile in the snapshot that states it (`versionSource`, a clean
+context file); the store checks that file is there, never the module's
+semantic proof, which the conformance kit and the language chunks' reviews
+carry. Graph schema 3 becomes 4: a schema-3
 graph is migrated in place (rows unchanged, new table and resolution triggers),
 so 0.1.0 indexes are kept, not rebuilt; 0.1.0 refuses a schema-4 graph. The
 coverage export credits a stored library target as stored (level 2 with a

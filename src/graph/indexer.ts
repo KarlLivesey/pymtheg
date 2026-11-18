@@ -393,6 +393,11 @@ export async function indexProject(
         (path) => needed.get(path),
         await read(() => store.findSymbols()),
         await read(() => parsedLinks(store, module.id)),
+        // A library version must come from a context file this module read.
+        (path) =>
+          ownContexts.some(
+            (file) => file.path === path && file.status === "clean",
+          ),
       );
     } catch (error) {
       // Storage errors propagate; they are not mislabeled as module failures.

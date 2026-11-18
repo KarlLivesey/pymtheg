@@ -357,3 +357,45 @@ test("coverage accepts stored library rows and rejects a library row without a n
     rmSync(scratch, { recursive: true, force: true });
   }
 });
+
+test("stored resolution classes, library included, agree with the CLI's counts one class at a time", async () => {
+  const { linkShares } = await import("./run.mjs");
+  const { storedTotalsAgree } = await import("./coverage-rules.mjs");
+  const dist = (path) => new URL(`../../dist/${path}`, import.meta.url).href;
+  const { executeGraph } = await import(dist("graph/commands.js"));
+  const { LanguageRegistry, SqliteGraphStore } = await import(dist("graph/index.js"));
+  const toy = (await import(dist("graph/languages/toy/index.js"))).default;
+  const scratch = mkdtempSync(join(tmpdir(), "coverage-library-store-"));
+  try {
+    const root = join(scratch, "project");
+    execFileSync("cp", ["-r", fileURLToPath(new URL("../../test/fixtures/graph-library-targets/", import.meta.url)), root]);
+    const registry = new LanguageRegistry([toy]);
+    await executeGraph({ command: "index", root }, { registry });
+    // What the runner records as warm.out.
+    const { counts } = JSON.parse(JSON.stringify(await executeGraph({ command: "status", root }, { registry })));
+    assert.deepEqual(linkShares(counts), {
+      total: 6, resolved: 1, ambiguous: 1, unresolved: 1, library: 3,
+      percentages: { resolved: 16.67, ambiguous: 16.67, unresolved: 16.67, library: 50 },
+    });
+    // The 0.1.0 CLI reports no library count.
+    assert.deepEqual(linkShares({ links: 4, ambiguous: 1, unresolved: 1 }).resolved, 2);
+    const store = new SqliteGraphStore(join(root, ".pymtheg/rebuildable/graph.sqlite"), undefined, { readOnly: true });
+    const grouped = new Map();
+    for (const link of store.links()) {
+      const key = `${link.kind}:${link.resolution}`;
+      grouped.set(key, (grouped.get(key) ?? 0) + 1);
+    }
+    store.close();
+    const rows = [...grouped].map(([key, count]) => {
+      const [kind, outcome] = key.split(":");
+      return ["go", kind, outcome, null, null, "source", outcome === "library" ? "outside" : outcome === "unresolved" ? "unclassified" : "eligible", count];
+    });
+    assert.equal(storedTotalsAgree(rows, counts), true);
+    const { library, ...released } = counts;
+    assert.equal(library, 3);
+    assert.equal(storedTotalsAgree(rows, released), false, "a CLI without library counts cannot have stored library rows");
+    assert.equal(storedTotalsAgree(rows, { ...counts, unresolved: counts.unresolved + library, library: 0 }), false);
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+});

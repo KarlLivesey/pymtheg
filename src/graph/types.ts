@@ -104,6 +104,11 @@ export interface LibraryTarget {
   symbol?: string;
   /** Only when the checkout's manifest or lockfile states it; never guessed. */
   version?: string;
+  /**
+   * Required with a version, and only then: the project path of the clean
+   * context file (manifest or lockfile) in the snapshot that states it.
+   */
+  versionSource?: string;
   evidence: LibraryEvidence;
 }
 /** A stored library target: its deterministic, project-independent identity. */
