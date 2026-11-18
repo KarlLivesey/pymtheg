@@ -188,8 +188,34 @@ export interface FailedFile {
 }
 export interface GraphStorage {
   readonly projectId: string;
+  /**
+   * Declared by a store whose six record reads (files, getFile, filesAt,
+   * findSymbols, links, moduleLinks) return freshly decoded records that share
+   * nothing with the store or with earlier reads. Other reads (e.g. contexts)
+   * are not covered. The indexer then hands them to a
+   * module as they are; otherwise it hands the module a deep copy.
+   */
+  readonly independentReads?: true;
   files(): StorageResult<GraphFile[]>;
   getFile(path: string): StorageResult<GraphFile | undefined>;
+  /** Optional: the stored files at these paths (absent paths are skipped), decoding no others. */
+  filesAt?(paths: readonly string[]): StorageResult<GraphFile[]>;
+  /**
+   * Optional light listing (path, module, status) that decodes no records.
+   * The indexer otherwise derives it from files().
+   */
+  fileSummaries?(): StorageResult<
+    { path: string; module: string; status: ParseStatus }[]
+  >;
+  /** Optional: one module's parsed links, as links() reports them. */
+  moduleLinks?(module: string): StorageResult<GraphLink[]>;
+  /** Optional row counts; the indexer otherwise counts decoded reads. */
+  counts?(): StorageResult<{
+    symbols: number;
+    links: number;
+    unresolved: number;
+    ambiguous: number;
+  }>;
   contexts(): StorageResult<ContextFile[]>;
   replaceContexts(files: readonly ContextFile[]): StorageResult<void>;
   /** Optional capability for backends predating failed-parse caching. */
