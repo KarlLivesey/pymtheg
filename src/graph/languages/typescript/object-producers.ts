@@ -91,19 +91,24 @@ export function objectProducers(
   let writes:
     | {
         bindings: Map<ts.Symbol, (ts.Expression | null)[]>;
-        properties: Set<string>;
+        properties: Map<string, Set<ts.Expression>>;
       }
     | undefined;
 
   function knownWrites() {
     if (writes) return writes;
     const bindings = new Map<ts.Symbol, (ts.Expression | null)[]>();
-    const properties = new Set<string>();
+    const properties = new Map<string, Set<ts.Expression>>();
+    const addProperty = (name: string, target: ts.Expression) => {
+      const previous = properties.get(name);
+      if (previous) previous.add(target);
+      else properties.set(name, new Set([target]));
+    };
     const addProperties = (target: ts.Expression) => {
       for (const member of checker.getPropertiesOfType(
         checker.getTypeAtLocation(target),
       ))
-        properties.add(member.getName());
+        addProperty(member.getName(), target);
     };
     const scan = (node: ts.Node): void => {
       if (ts.isIdentifier(node) && isWrite(node)) {
@@ -126,33 +131,39 @@ export function objectProducers(
         ts.isPropertyAccessExpression(node) &&
         (isWrite(node) || ts.isDeleteExpression(node.parent))
       )
-        properties.add(node.name.text);
+        addProperty(node.name.text, node.expression);
       else if (
         ts.isElementAccessExpression(node) &&
         (isWrite(node) || ts.isDeleteExpression(node.parent))
       ) {
         const key = literalKey(node.argumentExpression);
         if (key === undefined) addProperties(node.expression);
-        else properties.add(key);
+        else addProperty(key, node.expression);
       } else if (
         ts.isCallExpression(node) &&
         ts.isPropertyAccessExpression(node.expression)
       ) {
         const { expression, name } = node.expression;
         const target = node.arguments[0];
-        if (
-          target &&
-          ts.isIdentifier(expression) &&
-          ((expression.text === "Object" &&
-            [
-              "assign",
-              "defineProperty",
-              "defineProperties",
-              "setPrototypeOf",
-            ].includes(name.text)) ||
-            (expression.text === "Reflect" && name.text === "set"))
-        )
-          addProperties(target);
+        if (target && ts.isIdentifier(expression)) {
+          const reflectSet =
+            expression.text === "Reflect" && name.text === "set";
+          if (
+            (expression.text === "Object" && name.text === "defineProperty") ||
+            reflectSet
+          ) {
+            const key = node.arguments[1] && literalKey(node.arguments[1]);
+            const receiver = reflectSet && node.arguments[3];
+            for (const written of receiver ? [target, receiver] : [target]) {
+              if (key === undefined) addProperties(written);
+              else addProperty(key, written);
+            }
+          } else if (
+            expression.text === "Object" &&
+            ["assign", "defineProperties", "setPrototypeOf"].includes(name.text)
+          )
+            addProperties(target);
+        }
       }
       ts.forEachChild(node, scan);
     };
@@ -242,7 +253,7 @@ export function objectProducers(
     name: string,
     depth: number,
   ): Values | undefined {
-    if (knownWrites().properties.has(name)) return undefined;
+    if (mayWrite(object, name, depth)) return undefined;
     const member = ownMember(object, name);
     if (member === null) return [undefined];
     if (!member) return undefined;
@@ -251,6 +262,20 @@ export function objectProducers(
       return binding(checker.getShorthandAssignmentValueSymbol(member), depth);
     if (ts.isMethodDeclaration(member)) return [member];
     return undefined;
+  }
+
+  function mayWrite(
+    object: ts.ObjectLiteralExpression,
+    name: string,
+    depth: number,
+  ): boolean {
+    // A write to the same key matters if it can reach this literal or the
+    // receiver is opaque. A different proven literal does not alias it.
+    for (const target of knownWrites().properties.get(name) ?? []) {
+      const objects = read(target, depth);
+      if (!objects || objects.includes(object)) return true;
+    }
+    return false;
   }
 
   function read(
@@ -416,7 +441,6 @@ export function objectProducers(
     receiver: ts.Node,
     name: string,
   ): readonly ts.Declaration[] | undefined => {
-    if (knownWrites().properties.has(name)) return undefined;
     const values = read(receiver, 0);
     if (!values) return undefined;
     const declarations: ts.Declaration[] = [];
@@ -429,7 +453,12 @@ export function objectProducers(
       )
         return undefined;
       const member = ownMember(value, name);
-      if (!member || ts.isSetAccessorDeclaration(member)) return undefined;
+      if (
+        !member ||
+        ts.isSetAccessorDeclaration(member) ||
+        mayWrite(value, name, 0)
+      )
+        return undefined;
       declarations.push(member);
     }
     return declarations.length ? declarations : undefined;

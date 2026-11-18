@@ -590,6 +590,8 @@ test("static object destructuring follows factory members and reachable defaults
   const source = `
     declare const flag: boolean;
     declare function submit(value: unknown): void;
+    declare const service: Function & { gate: unknown };
+    Object.defineProperty(service, "name", { value: "service" });
     function createDeferredQueue() { return { resolveOldest() {} }; }
     function setup() { const gate = createDeferredQueue(); return { gate }; }
     function nested() { return { layer: { item: createDeferredQueue() } }; }
@@ -597,6 +599,8 @@ test("static object destructuring follows factory members and reachable defaults
     function maybeMissing() { return flag ? { gate: createDeferredQueue() } : {}; }
     function nullableQueue() { return { gate: flag ? createDeferredQueue() : null }; }
     function backup() { return { resolveOldest() { return 2; } }; }
+    const other = { resolveOldest() {} };
+    other.resolveOldest = () => {};
     const { gate } = setup();
     submit(gate);
     gate.resolveOldest();
@@ -616,6 +620,11 @@ test("static object destructuring follows factory members and reachable defaults
     holder.changing = backup();
     const { changing } = holder;
     changing.resolveOldest();
+    function reflectiveSetup() { return { reflected: createDeferredQueue() }; }
+    const reflective = reflectiveSetup();
+    Reflect.set({ reflected: createDeferredQueue() }, "reflected", backup(), reflective);
+    const { reflected } = reflective;
+    reflected.resolveOldest();
   `;
   await project(
     {
@@ -653,9 +662,11 @@ test("static object destructuring follows factory members and reachable defaults
         assert.equal(call.resolution, "ambiguous", at);
         assert.deepEqual(graph.candidates(call), [backup, primary], at);
       }
-      const changing = callAt("changing.resolveOldest");
-      assert.equal(changing.resolution, "unresolved");
-      assert.equal(changing.data.reason, "object-producer-unverified");
+      for (const at of ["changing.resolveOldest", "reflected.resolveOldest"]) {
+        const call = callAt(at);
+        assert.equal(call.resolution, "unresolved", at);
+        assert.equal(call.data.reason, "object-producer-unverified", at);
+      }
     },
   );
 });
