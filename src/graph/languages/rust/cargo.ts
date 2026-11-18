@@ -12,6 +12,8 @@ export interface Dependency {
   packageName?: string;
   registryVersion?: string | undefined;
   registryRequirement?: string;
+  libraryVersion?: string;
+  libraryVersionSource?: string;
 }
 export interface Crate {
   root: string;
@@ -22,6 +24,7 @@ export interface Crate {
   workspace: string | null;
   dependencyGraphKnown?: boolean;
   edition?: Edition | null;
+  procMacro?: boolean;
   dependencies?: Dependency[];
 }
 const string = (v: TomlValue | undefined): string | undefined =>
@@ -36,6 +39,10 @@ const edition = (v: TomlValue | undefined): Edition | null =>
     : typeof v === "string" && ["2015", "2018", "2021", "2024"].includes(v)
       ? (v as Edition)
       : null;
+const exactVersion = (requirement: string | undefined): string | undefined =>
+  /^=\s*((?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?)$/.exec(
+    requirement?.trim() ?? "",
+  )?.[1];
 // Only absent keys get Cargo defaults. A present value of an unexpected type
 // has no default and cannot establish a root, name, activation or edition.
 const defaultString = (
@@ -104,7 +111,13 @@ export function crates(
     owner: string,
     name: string,
     requirement: string | undefined,
-  ): Pick<Dependency, "registryVersion" | "registryRequirement"> {
+  ): Pick<
+    Dependency,
+    | "registryVersion"
+    | "registryRequirement"
+    | "libraryVersion"
+    | "libraryVersionSource"
+  > {
     if (!requirement) return {};
     const lockPath = p.join(p.dirname(workspace ?? manifest), "Cargo.lock");
     // Without a lock, retain the requirement for the semver-family proof.
@@ -132,7 +145,12 @@ export function crates(
         "registry+https://github.com/rust-lang/crates.io-index"
     )
       return {};
-    return { registryVersion: string(candidates[0]!.version) };
+    const version = string(candidates[0]!.version)!;
+    return {
+      registryVersion: version,
+      libraryVersion: version,
+      libraryVersionSource: lockPath,
+    };
   }
   function workspaceFor(doc: (typeof docs)[number]): {
     doc?: typeof doc | undefined;
@@ -389,6 +407,27 @@ export function crates(
               : []),
           ]),
         ];
+        const registry =
+          !alternatives.length &&
+          workspace.known &&
+          (fields?.package === undefined ||
+            typeof fields.package === "string") &&
+          !["path", "git", "registry", "registry-index"].some(
+            (k) => fields?.[k] !== undefined,
+          )
+            ? registrySelection(
+                doc.path,
+                workspace.doc?.path,
+                name,
+                packageName,
+                requirement,
+              )
+            : {};
+        const exact = exactVersion(requirement);
+        const version =
+          !registry.libraryVersion && exact && !alternatives.length
+            ? { libraryVersion: exact, libraryVersionSource: origin.path }
+            : {};
         for (const path of targets) {
           const target = byPath.get(path);
           if (path && !target?.value) {
@@ -422,23 +461,8 @@ export function crates(
             kind: group.kind,
             conditions: [...conditions],
             packageName,
-            ...(!alternatives.length &&
-            workspace.known &&
-            (fields?.package === undefined ||
-              typeof fields.package === "string") &&
-            !["path", "git", "registry", "registry-index"].some(
-              (k) => fields?.[k] !== undefined,
-            )
-              ? {
-                  ...registrySelection(
-                    doc.path,
-                    workspace.doc?.path,
-                    name!,
-                    packageName,
-                    requirement,
-                  ),
-                }
-              : {}),
+            ...registry,
+            ...version,
           });
         }
       }
@@ -481,6 +505,9 @@ export function crates(
         edition:
           targetEdition === undefined ? pkgEdition : edition(targetEdition),
         dependencyGraphKnown: known,
+        ...(kind === "lib" && lib?.["proc-macro"] === true
+          ? { procMacro: true }
+          : {}),
         deps,
         dependencies: [
           ...edges

@@ -209,7 +209,7 @@ Link outcomes:
 | Outcome | Meaning |
 |---|---|
 | `resolved` | One definite target in the checkout |
-| `library` | One definite target outside the project: a library unit (level 1) or a symbol in it (level 2), recorded with how the source proves it (never the receiver's type alone; see the design section in `runtime-map.md`). Never a local symbol. **No production module records one yet** (C-5 is the core; the Go, Rust and TypeScript items follow) |
+| `library` | One definite target outside the project: a library unit (level 1) or a symbol in it (level 2), recorded with how the source proves it (see the design section in `runtime-map.md`). Rust records library paths with proven bindings. |
 | `ambiguous` | A candidate set, never a pick. It may mix checkout symbols and library targets. A set is **closed** only when it provably holds every possible target and every member is provably possible. Otherwise it is **open**, and `data.open` gives the reasons (for example a type outside the project could be the target); an open set still lists every project target |
 | `unresolved` | No target; the written name is kept. The reason, when recorded, is in `data` (`reason` in Go and TypeScript, `uncertainty` in Rust). Rust may also list unverified would-be targets in `data.targets` (at most 16, else a count) |
 | failed (`unresolved`, reason `invalid-code`) | The link depends on a file that could not be read. `data.cause` names the failed file(s). It has no target, no candidates and no would-be targets |
@@ -325,9 +325,9 @@ character in a comment or string there is read). Sources: [W2-B](https://github.
 #### Rust
 
 No-toolchain module; nothing runs `cargo` or `rustc`, and macros are not expanded.
-Claims `*.rs`; context `Cargo.toml`, read by a snapshot-only TOML reader (an
-unsupported or invalid manifest, including any TOML datetime, makes that whole
-manifest unknown). Private items are ordinary symbols.
+Claims `*.rs`; context `Cargo.toml` and `Cargo.lock`, read by a snapshot-only
+TOML reader (an unsupported or invalid manifest, including any TOML datetime,
+makes that whole manifest unknown). Private items are ordinary symbols.
 
 - **Cancellation:** the graph CLI can interrupt Rust analysis and resolution
   with SIGINT or SIGTERM. Interrupted syncs leave an incomplete index and can
@@ -339,6 +339,14 @@ manifest unknown). Private items are ordinary symbols.
   `A::new` on a proven inherent impl; written `impl Trait for Type` links;
   `contains` (structure as written, not a claim that an item survives macro
   expansion).
+- **Library paths** identify a sysroot or Cargo library unit
+  and a symbol exported by that unit. The resolver follows proven imports,
+  Cargo renames, inherited workspace dependencies, and written type, trait,
+  and macro paths. Prelude links require an edition and a clear namespace.
+  Associated calls require a proven declaring member or an explicit trait
+  qualification. An exact manifest requirement or a lockfile entry selected
+  by the dependency edge can supply a version. `graph uses` can query the
+  recorded unit or symbol.
 - **Dot calls** (`recv.m()`) are definite only for a unique inherent method at the
   first probe step of a proven receiver type (owned `T` with `self`, `&T` with
   `&self`, `&mut T` with `&mut self`). Every other dot call is unresolved with
@@ -380,9 +388,8 @@ manifest unknown). Private items are ordinary symbols.
   A child module file inherits its parent's textual macros at its `mod child;`
   declaration, so `#[macro_use] mod macros;` macros used in later child files
   resolve. A `#[macro_export]` macro of another crate in the project resolves
-  (by path, `use` or `#[macro_use] extern crate`); macros of crates outside
-  the project are unresolved. Standard-library and external items are
-  unresolved.
+  (by path, `use` or `#[macro_use] extern crate`). Written library macro paths
+  and proven prelude macros can produce library targets.
 - **Clean expansion (both rules below).** A workspace `macro_rules!` arm is
   clean when the code it emits has no attribute anywhere (so no `#[cfg]` can
   remove a call) and no item other than a readable `use` (no `fn`, `mod`,

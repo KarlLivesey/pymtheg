@@ -2616,3 +2616,14 @@ with evidence `declared-builtin` count as identified library targets at
 level 2. **Open:** once the Go, Rust and TypeScript
 items record library targets, the export's reconstruction can be limited to
 schema-3 graphs. See [C-5](changes/C-5.md).
+
+### C-9 Rust library paths
+
+Rust records the final written path through a proven import, qualified crate
+path or edition prelude binding as a library target. A Cargo alias names the
+package from the manifest. A lockfile version needs the owning package's
+dependency edge, or an exact requirement can name the manifest version.
+The resolver keeps the named export when a dependency re-exports it. For an
+associated call it needs a named trait or proof of the declaring member.
+Rust coverage now credits recorded targets on graphs made by the supporting
+module version. See [C-9](changes/C-9.md).

@@ -1,0 +1,9 @@
+[package]
+name = "graph-rust-library-regressions"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+keccak = "=0.2.2"
+ropey = "1.6"
+thiserror = "=2.0.21"

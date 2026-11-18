@@ -1625,3 +1625,11 @@ Path and impact traversals do not enter library targets. No Studio screen shows
 graph links, so Studio is unchanged. The coverage export credits a stored
 library target directly and reconstructs identities only for links without one
 (every link of a 0.1.0 graph).
+
+Rust module 29 records library paths during resolution. Its library lookup uses
+the captured namespace, import, placement and `cfg` facts, with a separate
+lookup cache key for the outside search. `library.ts` supplies edition prelude
+entries and the standard paths where a known module, constructor, variant or
+trait provides the named member. Rust coverage for module 29 and later uses
+stored targets for the level 2 numerator. Historical Rust graphs retain the
+original reconstruction.
