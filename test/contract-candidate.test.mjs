@@ -28,17 +28,22 @@ test("a mixed safe/unsafe input range gives a located replay-confirmed counterex
   assert.deepEqual(result.outstandingObligations, []);
 });
 test("guarded calls stay established and definite violations retain their existing error", () => {
-  const guarded = check(
-    "op charge(amount: Nat) -> Unit requires amount > 0; flow checkout(total: Nat) -> Unit { if total > 0 { call charge(total); } return unit; }",
-  );
-  assert.equal(
-    guarded.diagnostics.some((d) => d.code === "C006"),
-    false,
-  );
-  assert.equal(
-    guarded.results.find((r) => r.analysisKind === "call-contract").outcome,
-    "established",
-  );
+  // Signed (Int) and unsigned (Nat) inputs are both refined by the guard.
+  for (const type of ["Nat", "Int"]) {
+    const guarded = check(
+      `op charge(amount: ${type}) -> Unit requires amount > 0; flow checkout(total: ${type}) -> Unit { if total > 0 { call charge(total); } return unit; }`,
+    );
+    assert.equal(
+      guarded.diagnostics.some((d) => d.code === "C006"),
+      false,
+      type,
+    );
+    assert.equal(
+      guarded.results.find((r) => r.analysisKind === "call-contract").outcome,
+      "established",
+      type,
+    );
+  }
   const violated = check(
     "op charge(amount: Nat) -> Unit requires amount > 0; flow checkout() -> Unit { call charge(0); return unit; }",
   );

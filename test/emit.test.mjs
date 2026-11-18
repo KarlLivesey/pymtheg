@@ -73,7 +73,7 @@ test("typed structured flow cannot silently emit a successful empty model", () =
     rmSync(dir, { recursive: true, force: true });
   }
 });
-test("emit names its one target instead of accepting the removed Quint target", () => {
+test("emit refuses a target other than json and names the one it accepts", () => {
   const p = spawnSync(
     process.execPath,
     [
@@ -83,9 +83,9 @@ test("emit names its one target instead of accepting the removed Quint target", 
       "--entry",
       "TaskRunner",
       "--target",
-      "quint",
+      "xml",
       "--out",
-      join(tmpdir(), "never-written.qnt"),
+      join(tmpdir(), "never-written.xml"),
     ],
     { encoding: "utf8" },
   );

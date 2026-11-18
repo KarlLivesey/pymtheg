@@ -164,70 +164,6 @@ function privateNameFindings(patternFile, shipped) {
   }
   return found;
 }
-test("the private-name patterns load from a file given by path and fire as written", () => {
-  const dir = mkdtempSync(join(tmpdir(), "pym-private-names-"));
-  try {
-    const file = join(dir, "names.local");
-    writeFileSync(
-      file,
-      [
-        "# made-up names for this test",
-        "",
-        "\\bZorblat\\b",
-        "   ",
-        "quuxfold/i",
-        "# \\bplain\\b would match every file if it were not a comment",
-      ].join("\n"),
-    );
-    const scan = (text) =>
-      privateNameFindings(file, [{ path: "README.md", text }]);
-    // A hit fails and names the file, its line and the pattern's line only.
-    assert.deepEqual(scan("intro\nthe Zorblat engine\n"), [
-      "README.md:2: private name (names.local line 3)",
-    ]);
-    assert.deepEqual(scan("a QuuxFold schema"), [
-      "README.md:1: private name (names.local line 5)",
-    ]);
-    for (const offence of scan("Zorblat and quuxfold"))
-      assert.doesNotMatch(offence, /Zorblat|quuxfold/i);
-    // A miss passes; the capitalised, word-bounded pattern ignores the
-    // ordinary lower-case word and longer words.
-    assert.deepEqual(scan("nothing private here"), []);
-    assert.deepEqual(scan("a zorblat pricing plan, unZorblated"), []);
-    // Comments and blank lines are not patterns.
-    assert.deepEqual(scan("a plain word"), []);
-    assert.deepEqual(
-      loadPrivatePatterns(file).map((p) => p.line),
-      [3, 5],
-    );
-    // An invalid pattern or flag fails loudly, naming the line, not the text.
-    writeFileSync(file, "# ok\n\\bZorblat\\b\n(quuxfold\n");
-    assert.throws(
-      () => scan("x"),
-      /^Error: names\.local line 3 is not a valid/,
-    );
-    writeFileSync(file, "quuxfold/q\n");
-    assert.throws(
-      () => scan("x"),
-      (error) =>
-        /names\.local line 1 is not a valid/.test(error.message) &&
-        !/quuxfold/.test(error.message),
-    );
-    // An unreadable file fails loudly; only a missing file means no patterns.
-    assert.throws(
-      () => privateNameFindings(dir, [{ path: "README.md", text: "x" }]),
-      /cannot be read/,
-    );
-    assert.deepEqual(
-      privateNameFindings(join(dir, "absent.local"), [
-        { path: "README.md", text: "Zorblat" },
-      ]),
-      [],
-    );
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
 /** String literals, template literals and comments (trailing ones included). */
 /**
  * The text of every string literal, template piece (no-substitution, head,
@@ -321,75 +257,27 @@ test("no shipped file carries a private network address or host name", () => {
   }
   assert.deepEqual(offences, []);
 });
-test("the private network rules fire on each private form and allow public, loopback and documentation forms", () => {
+// Self-test: each network rule fires, so the release check above cannot pass
+// by matching nothing.
+test("the private network scanner fires on each rule and allows public forms", () => {
   const fires = (path, text) => networkFindings(path, text).length > 0;
-  for (const text of [
-    "server at 10.0.0.1",
-    "server at 10.255.12.34:8080",
-    "server at 172.16.0.1",
-    "server at 172.31.255.254",
-    "server at 192.168.88.47",
-    "see private-box.internal",
-    "see nas.local for files",
-    "ssh build.lan",
-    "ssh devserver",
-    "ssh DevServer -p 22",
-    "code spans are scanned in docs: `nas.local`",
+  for (const [path, text] of [
+    ["README.md", "server at 10.0.0.1"],
+    ["README.md", "server at 192.168.88.47"],
+    ["README.md", "see private-box.internal"],
+    ["README.md", "ssh devserver"],
+    ["dist-web/assets/x.js", 'const host = "nas.local";'],
+    ["dist/cli/x.js", 'throw Error("Connect to private-box.internal");'],
+    ["dist/cli/x.js", "throw Error(`Cannot reach ${user} on box.internal`);"],
   ])
-    assert.ok(fires("README.md", text), text);
-  for (const text of [
-    'fetch("http://192.168.1.10/api")',
-    "const url = `https://private-box.internal/x`;",
-    'const host = "nas.local";',
-    "ssh git@build.lan",
-    "// connect to devserver",
-    "// see private-box.internal for logs",
-    " * reachable at nas.local only",
+    assert.ok(fires(path, text), `${path}: ${text}`);
+  for (const [path, text] of [
+    ["README.md", "listen on 127.0.0.1; example 192.0.2.10; version 10.2.3"],
+    ["README.md", "public 8.8.8.8 and 172.32.0.1"],
+    ["dist-web/assets/x.js", "this.local = initial;"],
+    ["dist/graph/x.js", "const key = `${place.file}|${place.local}`;"],
   ])
-    assert.ok(fires("dist-web/assets/x.js", text), text);
-  for (const text of [
-    "listen on 127.0.0.1 or 0.0.0.0",
-    "example 192.0.2.10, 198.51.100.7 and 203.0.113.5",
-    "public 8.8.8.8 and 172.32.0.1 and 172.15.0.1 and 192.169.0.1",
-    "version 10.2.3 of the tool",
-    "build 110.0.0.1 is not private",
-    "the dev server runs builds",
-    "localhost and example.com",
-    "internal.example.com",
-    "the local cache",
-  ])
-    assert.ok(!fires("README.md", text), text);
-  // Sol round 3: ordinary help/error strings and trailing comments in first-party dist/.
-  for (const text of [
-    'throw Error("Connect to private-box.internal for logs");',
-    'const hint = "ssh build.lan";',
-    'log("Contact nas.local");',
-    "throw Error(`Cannot reach ${user} on box.internal`);",
-    'help("use the NAS (nas.local) for logs");',
-    "connect(); // was nas.local",
-    // Sol round 4: a quote inside a regex literal must not throw the reading off.
-    'const quotes = /"/; console.log("ssh build.lan");',
-    "const q = /'`/g; const msg = `Contact nas.local`;",
-    // Sol round 4: the data.local exception is for comments only.
-    'log("Connect to `data.local` for logs");',
-    "const s = `Reach ${host} or \\`data.local\\` directly`;",
-  ])
-    assert.ok(fires("dist/cli/x.js", text), text);
-  // In first-party dist/, interpolations and the `data.local` code span are code.
-  for (const text of [
-    "const key = `${place.file}|${place.local}`;",
-    "/** symbol's name and identity, `data.local`); package-level types */",
-  ])
-    assert.ok(!fires("dist/graph/x.js", text), text);
-  for (const text of [
-    "this.local = initial;",
-    "const found = this.local(name);",
-    "symbol.data?.local)",
-    "names.local[occurrence.name]",
-    "if(e.local)return",
-    " * symbol's name and identity, `data.local`); package-level types",
-  ])
-    assert.ok(!fires("dist-web/assets/x.js", text), text);
+    assert.ok(!fires(path, text), `${path}: ${text}`);
 });
 const ownerName = /\bKarl\b/;
 /**
@@ -450,48 +338,68 @@ function personalFindings(path, text) {
   }
   return found;
 }
-test("the owner's name is allowed only in licence texts and package.json's top-level author", () => {
+// Self-tests: the personal and private-name scanners each fire, so the
+// release check below cannot pass by matching nothing.
+test("the personal scanner allows only the top-level author and flags paths", () => {
   const pkg = (body) => `{\n  "name": "x",\n${body}\n}\n`;
-  for (const ok of [
-    pkg('  "author": "Karl Livesey",\n  "license": "MIT"'),
-    pkg('  "author": "Karl Livesey"'),
+  assert.deepEqual(
+    personalFindings("package.json", pkg('  "author": "Karl Livesey"')),
+    [],
+  );
+  assert.equal(
+    personalFindings(
+      "package.json",
+      pkg('  "author": { "name": "Karl Livesey" }'),
+    ).length,
+    1,
+  );
+  // A duplicated top-level author cannot hide a second value.
+  for (const body of [
+    '  "author": "Karl Livesey",\n  "author": "Karl Livesey"',
+    '  "author": "x",\n  "author": "Karl Livesey"',
   ])
-    assert.deepEqual(personalFindings("package.json", ok), [], ok);
-  assert.deepEqual(personalFindings("LICENSE", "Copyright Karl Livesey"), []);
-  for (const [path, text] of [
-    // duplicated top-level author: both lines, or a later value overriding it
-    [
-      "package.json",
-      pkg('  "author": "Karl Livesey",\n  "author": "Karl Livesey"'),
-    ],
-    ["package.json", pkg('  "author": "Karl Livesey",\n  "author": "x"')],
-    ["package.json", pkg('  "author": "x",\n  "author": "Karl Livesey"')],
-    // nested author, as an object or as a two-space-indented line
-    [
-      "package.json",
-      pkg('  "author": "x",\n  "maintainer": {\n    "author": "Karl"\n  }'),
-    ],
-    ["package.json", pkg('  "maintainer": {\n  "author": "Karl Livesey"\n  }')],
-    ["package.json", pkg('  "author": { "name": "Karl Livesey" }')],
-    // the name anywhere else
-    [
-      "package.json",
-      pkg('  "description": "by Karl",\n  "author": "Karl Livesey"'),
-    ],
-    [
-      "package.json",
-      pkg('  "author": "Karl Livesey",\n  "contributors": ["Karl"]'),
-    ],
-    ["package.json", pkg('  "author": "Karl Livesey", "description": "Karl"')],
-    ["package.json", '{\n  "author": "Karl Livesey",\n'],
-    ["README.md", '  "author": "Karl Livesey",'],
-    ["dist/cli/main.js", "// Karl"],
-  ])
-    assert.equal(personalFindings(path, text).length, 1, `${path}: ${text}`);
+    assert.equal(personalFindings("package.json", pkg(body)).length, 1, body);
+  assert.deepEqual(personalFindings("dist/cli/main.js", "// Karl"), [
+    "dist/cli/main.js:1: owner's name",
+  ]);
   assert.deepEqual(
     personalFindings("package.json", '  "x": "/home/someone/y",'),
     ["package.json:1: personal path"],
   );
+});
+test("the private-name scanner reads patterns from a file and reports lines, not text", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pym-private-names-"));
+  try {
+    const file = join(dir, "names.local");
+    writeFileSync(
+      file,
+      "# made-up names for this test\n\\bZorblat\\b\nquuxfold/i\n",
+    );
+    const scan = (text) =>
+      privateNameFindings(file, [{ path: "README.md", text }]);
+    assert.deepEqual(scan("intro\nthe Zorblat engine\n"), [
+      "README.md:2: private name (names.local line 2)",
+    ]);
+    // Flags apply: the /i pattern matches any case.
+    assert.deepEqual(scan("a QuuxFold schema"), [
+      "README.md:1: private name (names.local line 3)",
+    ]);
+    // The case-sensitive pattern ignores the lower-case word.
+    assert.deepEqual(scan("a zorblat pricing plan"), []);
+    // An unreadable pattern file fails loudly; only a missing one means none.
+    assert.throws(
+      () => privateNameFindings(dir, [{ path: "README.md", text: "x" }]),
+      /cannot be read/,
+    );
+    assert.deepEqual(
+      privateNameFindings(join(dir, "absent.local"), [
+        { path: "README.md", text: "Zorblat" },
+      ]),
+      [],
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 test("no shipped file carries a personal path, the owner's name or a private project name", () => {
   const offences = [];

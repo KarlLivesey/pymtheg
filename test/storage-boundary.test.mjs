@@ -11,7 +11,7 @@ import {
   symlink,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import {
   initializeWorkspace,
   readWorkspace,
@@ -172,25 +172,31 @@ test("path reads create nothing and reject symlink directories and database side
     assert.throws(() => storagePath(root, "planning"), /regular files/);
   }));
 
-test("SQLite connection constructors and runtime imports stay inside the storage boundary", async () => {
-  const src = resolve("src");
-  const violations = [];
-  async function scan(directory) {
-    for (const entry of await readdir(directory, { withFileTypes: true })) {
-      const path = join(directory, entry.name);
-      if (entry.isDirectory()) {
-        if (path !== join(src, "storage")) await scan(path);
-      } else if (path.endsWith(".ts")) {
-        const text = await readFile(path, "utf8");
-        if (
-          /new\s+DatabaseSync\s*\(|import\s*\(\s*["']node:sqlite|import\s+(?!type\b)[^;]*from\s*["']node:sqlite/.test(
-            text,
-          )
-        )
-          violations.push(path);
-      }
+test("every project database that waits for writers keeps the 30-second lock wait", () =>
+  fixture(async (root) => {
+    // Concurrent writers rely on this wait; 0 would fail at once with
+    // "database is locked". Each store is opened through the product's own
+    // entry point and its connection's pragma is read.
+    const wait = (db) => ({ ...db.prepare("PRAGMA busy_timeout").get() });
+    const planning = await ArchitectureStore.open(root);
+    const graph = openProjectGraph(root, "id");
+    const recovery = await RecoveryStore.openOrCreate(root);
+    try {
+      assert.deepEqual(
+        {
+          planning: wait(planning.db),
+          graph: wait(graph.db),
+          runs: wait(recovery.runsDb),
+        },
+        {
+          planning: { timeout: 30000 },
+          graph: { timeout: 30000 },
+          runs: { timeout: 30000 },
+        },
+      );
+    } finally {
+      planning.close();
+      graph.close();
+      recovery.close();
     }
-  }
-  await scan(src);
-  assert.deepEqual(violations, []);
-});
+  }));

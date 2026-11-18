@@ -80,12 +80,5 @@ export function recursiveLayout(doc: ContractDocument, target: "rust" | "go") {
   const recursive = [...graph].some(([owner, edges]) =>
     [...edges].some((reference) => needsIndirection(owner, reference)),
   );
-  return {
-    needsIndirection,
-    recursive,
-    measurements: {
-      declarations: graph.size,
-      references: [...graph.values()].reduce((n, edges) => n + edges.size, 0),
-    },
-  };
+  return { needsIndirection, recursive };
 }

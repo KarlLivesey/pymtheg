@@ -67,12 +67,17 @@ test("options that belong to another command are refused", () => {
     assert.match(result.stderr, message, args.join(" "));
   }
 });
-test("the removed external-engine options are unknown", () => {
-  for (const option of ["--backend", "--tlc-jar", "--quint"]) {
-    const result = cli(["verify", counter, "--entry", "Counter", option, "x"]);
-    assert.equal(result.status, 3, result.stderr);
-    assert.match(result.stderr, new RegExp(`Unknown option ${option}`));
-  }
+test("an unknown option is refused by name with exit 3", () => {
+  const result = cli([
+    "verify",
+    counter,
+    "--entry",
+    "Counter",
+    "--no-such-option",
+    "x",
+  ]);
+  assert.equal(result.status, 3, result.stderr);
+  assert.match(result.stderr, /Unknown option --no-such-option/);
 });
 test("a built-in worker error is a B104 failure with exit 3, never a verdict", () => {
   for (const command of ["verify", "simulate"]) {

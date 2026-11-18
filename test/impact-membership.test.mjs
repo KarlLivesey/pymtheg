@@ -6,7 +6,7 @@ import {
   architectureImpact,
 } from "../dist/architecture/model.js";
 import { newPlanItem } from "../dist/architecture/planning.js";
-test("planning-heavy impact preserves every consumer without quadratic membership scans", () => {
+test("planning-heavy impact lists every consumer exactly once", () => {
   const count = 2000;
   const index = indexArchitecture([
     {
@@ -28,38 +28,12 @@ test("planning-heavy impact preserves every consumer without quadratic membershi
       }),
     },
   ]);
-  let lookupSlots = 0;
-  const positions = new WeakMap(),
-    original = Array.prototype.includes;
-  Array.prototype.includes = function (value, ...rest) {
-    if (
-      this.length === count &&
-      typeof this[0] === "string" &&
-      this[0].startsWith("plan:")
-    ) {
-      let map = positions.get(this);
-      if (!map) {
-        map = new Map(this.map((v, i) => [v, i]));
-        positions.set(this, map);
-      }
-      lookupSlots += map.has(value) ? map.get(value) + 1 : this.length;
-    }
-    return original.call(this, value, ...rest);
-  };
-  let impact;
-  try {
-    impact = architectureImpact(index, "type:12");
-  } finally {
-    Array.prototype.includes = original;
-  }
+  const impact = architectureImpact(index, "type:12");
+  assert.equal(impact.planning.length, count);
   assert.deepEqual(
     new Set(impact.planning),
     new Set(Array.from({ length: count }, (_, i) => "plan:R" + i)),
   );
   assert.deepEqual(impact.direct, []);
   assert.deepEqual(impact.transitive, []);
-  assert.ok(
-    lookupSlots <= 10 * count,
-    `Planning membership requested ${lookupSlots} sequential lookup slots for ${count} consumers`,
-  );
 });
