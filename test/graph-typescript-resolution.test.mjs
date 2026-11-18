@@ -588,10 +588,12 @@ test("factory fallthrough and bare returns contribute undefined", async () => {
 test("static object destructuring follows factory members and reachable defaults", async () => {
   // Redux Toolkit's ownRequestResult tests take gate from setup().
   const source = `
+    import { serviceKey } from "./keys";
     declare const flag: boolean;
     declare function submit(value: unknown): void;
     declare const service: Function & { gate: unknown };
     Object.defineProperty(service, "name", { value: "service" });
+    Object.defineProperty(service, serviceKey, { value: "service metadata" });
     function createDeferredQueue() { return { resolveOldest() {} }; }
     function setup() { const gate = createDeferredQueue(); return { gate }; }
     function nested() { return { layer: { item: createDeferredQueue() } }; }
@@ -628,6 +630,7 @@ test("static object destructuring follows factory members and reachable defaults
   `;
   await project(
     {
+      "keys.ts": 'export const serviceKey = "metadata";',
       "use.ts": source,
       "tsconfig.json": '{"compilerOptions":{"strict":true}}',
     },

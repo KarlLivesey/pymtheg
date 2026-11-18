@@ -95,6 +95,25 @@ export function objectProducers(
       }
     | undefined;
 
+  function writtenKey(expression: ts.Expression): string | undefined {
+    const key = unwrap(expression);
+    if (!ts.isIdentifier(key)) return literalKey(key);
+    let symbol = checker.getSymbolAtLocation(key);
+    if (symbol && symbol.flags & ts.SymbolFlags.Alias)
+      symbol = checker.getAliasedSymbol(symbol);
+    const declaration = symbol?.valueDeclaration;
+    if (
+      declaration &&
+      symbol?.declarations?.length === 1 &&
+      ts.isVariableDeclaration(declaration) &&
+      ts.isVariableDeclarationList(declaration.parent) &&
+      declaration.parent.flags & ts.NodeFlags.Const &&
+      declaration.initializer
+    )
+      return literalKey(unwrap(declaration.initializer));
+    return undefined;
+  }
+
   function knownWrites() {
     if (writes) return writes;
     const bindings = new Map<ts.Symbol, (ts.Expression | null)[]>();
@@ -152,7 +171,7 @@ export function objectProducers(
             (expression.text === "Object" && name.text === "defineProperty") ||
             reflectSet
           ) {
-            const key = node.arguments[1] && literalKey(node.arguments[1]);
+            const key = node.arguments[1] && writtenKey(node.arguments[1]);
             const receiver = reflectSet && node.arguments[3];
             for (const written of receiver ? [target, receiver] : [target]) {
               if (key === undefined) addProperties(written);
