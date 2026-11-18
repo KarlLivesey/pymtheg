@@ -728,6 +728,7 @@ export class SqliteGraphStore implements GraphStorage {
       ORDER BY CASE WHEN json_extract(body,'$.data.anonymous') THEN 1 ELSE 0 END,
         CASE WHEN ${name}=${needle} OR ${identity}=${needle} THEN 0
         WHEN instr(${name},${needle})=1 OR instr(${identity},${needle})=1 THEN 1 ELSE 2 END,
+        COALESCE(json_extract(body,'$.data.scoped'),0),
         ${name},name,file,kind,id LIMIT ?`,
       )
       .all(text, text, text, text, text, text, limit)
@@ -769,7 +770,8 @@ export class SqliteGraphStore implements GraphStorage {
     this.queryLimit(limit);
     return this.db
       .prepare(
-        "SELECT body FROM graph_symbols WHERE name=? OR json_extract(body,'$.identity')=? ORDER BY file,id LIMIT ?",
+        `SELECT body FROM graph_symbols WHERE name=? OR json_extract(body,'$.identity')=?
+         ORDER BY COALESCE(json_extract(body,'$.data.scoped'),0),file,id LIMIT ?`,
       )
       .all(name, name, limit)
       .map((row) => JSON.parse(row.body as string) as GraphSymbol);
@@ -779,7 +781,9 @@ export class SqliteGraphStore implements GraphStorage {
     return this.db
       .prepare(
         // Generated symbols (a language's `data.anonymous`) after named ones.
-        "SELECT body FROM graph_symbols WHERE file=? ORDER BY CASE WHEN json_extract(body,'$.data.anonymous') THEN 1 ELSE 0 END, id LIMIT ?",
+        `SELECT body FROM graph_symbols WHERE file=?
+         ORDER BY CASE WHEN json_extract(body,'$.data.anonymous') THEN 1 ELSE 0 END,
+           COALESCE(json_extract(body,'$.data.scoped'),0),id LIMIT ?`,
       )
       .all(path, limit)
       .map((row) => JSON.parse(row.body as string) as GraphSymbol);

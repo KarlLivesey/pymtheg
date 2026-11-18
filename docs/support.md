@@ -495,9 +495,10 @@ parameter parses), a turbofish on a function named like a primitive
 #### TypeScript and JavaScript
 
 Uses the TypeScript compiler over the captured snapshot. The only other input
-is the installed compiler's standard-library declarations; `node_modules` is not
-read. Claims `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs`,
-`.cjs`; context `*tsconfig*.json`, `*jsconfig*.json` and `package.json`. Each file
+is the installed compiler's standard-library declarations. The snapshot host
+models checkout-local package links in a virtual `node_modules`. Claims
+`.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs`, `.cjs`; context
+`*tsconfig*.json`, `*jsconfig*.json`, `package.json` and `pnpm-workspace.yaml`. Each file
 is analysed under its owning config (nearest containing directory, then
 `tsconfig` before `jsconfig`); genuinely tied configs are merged to the weakest
 answer.
@@ -507,11 +508,31 @@ answer.
   `require` with a literal specifier; calls, `new`, JSX components, type
   references and heritage when the checker gives one graph symbol (overloads are
   one symbol); `contains`.
+- **Lexical declarations:** nested functions, function-valued `const` and
+  `let` declarations, and local classes and enums have scoped symbols.
+  References record the first expression use per enclosing symbol and target.
+  Existing `typeof` references to plain local bindings identify the enclosing
+  symbol and record the binding name and declaration span in `data.localBinding`.
+  Plain locals add zero symbol rows and zero new reference sites. Name lookup
+  lists top-level and exported declarations ahead of scoped ones.
+- **Checkout packages:** npm, Yarn and Bun workspace lists, pnpm workspace
+  member links, and checkout-local `file:` and `link:` dependencies expose
+  manifests to the compiler. TypeScript applies its own package export
+  conditions, subpath rules, `main`, `types`, `paths` and project reference
+  redirects within the snapshot. The selected module file has an entry edge
+  independent of any declaration augmentations. When ESM-mode resolution
+  misses an extensionless relative import, the 0.1.0 extension lookup can
+  still establish its module-file edge. Named bindings use the checker.
+  Calls use the same declaration rule for relative imports, workspace imports
+  and local aliases, including when TypeScript selects a `types` export.
 - **Candidates:** several graph symbols for one callee (union receivers, merged
   declarations, duplicate JavaScript functions).
 - **Unresolved:** standard library and `node_modules` packages
   (`external`, `external-package`); computed `require` or `import()` specifiers;
-  workspace packages whose entry is not a captured file; pnpm-only workspaces.
+  calls through parameters, import shadows, and reassigned local functions;
+  installed workspace bindings with no captured entry
+  (`workspace-entry-unavailable` or `workspace-build-output-missing` when
+  TypeScript probed a missing path under a configured output directory).
 - **`partial` files** have complete but qualified facts, never syntax errors: an
   `extends` base that was not captured (`incomplete-config`; a package preset
   such as `@tsconfig/node20` leaves most cross-file links unresolved), compiler

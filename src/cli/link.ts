@@ -25,7 +25,7 @@ export const linkUsage = `pymtheg link SUBCOMMAND [--root DIRECTORY] [--json] [-
   remove LINK_ID                         LINK_ID or a unique prefix of 8+ characters
   refresh LINK_ID                        accept the current symbol of a changed/moved link
   list [--record RECORD] [--symbol SELECTOR] [--file PATH]
-  check [--allow-moved]                  exit 1 if any link is missing, changed, unverifiable or moved
+  check [--allow-moved]                  exit 1 if a link is missing, changed, ambiguous, unverifiable or moved
   touched SELECTOR | --file PATH [--impact] [--depth 5]
   unlinked [--symbols] [--limit 200]
   history
@@ -209,7 +209,7 @@ export async function linkCommand(
             });
       const c = result.counts;
       const text = [
-        `${result.links.length} code link${result.links.length === 1 ? "" : "s"}: ${c.ok} ok, ${c.changed} changed, ${c.moved} moved, ${c.missing} missing, ${c.unverifiable} unverifiable`,
+        `${result.links.length} code link${result.links.length === 1 ? "" : "s"}: ${c.ok} ok, ${c.changed} changed, ${c.moved} moved, ${c.missing} missing, ${c.unverifiable} unverifiable${c.ambiguous ? `, ${c.ambiguous} ambiguous` : ""}`,
         ...result.links.flatMap(linkLines),
         ...graphLines(result.graph),
       ];
