@@ -49,9 +49,11 @@ export type Desc =
   /**
    * A local without a syntactically evident type. For an anonymous struct or
    * interface type: `m`, the named types it embeds, as values; `f`, its named
-   * fields (a struct) or methods as func values (an interface).
+   * fields (a struct) or methods as func values (an interface). `sym`: an
+   * anonymous struct's own symbol (a local struct, by identity in the file
+   * where the description is written), through which its members resolve.
    */
-  | { k: "local"; m?: Desc[]; f?: { n: string; d: Desc }[] }
+  | { k: "local"; m?: Desc[]; f?: { n: string; d: Desc }[]; sym?: string }
   /** A value whose type is known to defeat member resolution (local named type). */
   | { k: "opaque" }
   /** A local type or type parameter declared inside a function or generic declaration. */

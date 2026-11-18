@@ -261,8 +261,14 @@ file (its ID can change when files are added or removed).
 - **Definite:** imports of packages in the importing file's module, a `go.work`
   module or a proven local `replace`; package-qualified references; direct calls;
   calls and selections on a concrete receiver whose type is evident from the
-  source, by Go's selector rule including promotion; field, type, receiver and
-  embedding references; `contains`.
+  source, by Go's selector rule including promotion; the same on elements of
+  slices, arrays, maps (value, and key for a ranged key) and channels, on range
+  variables and index expressions over them, also through a named type written
+  as a container (`type R map[string][]T`); fields and promoted members of
+  anonymous struct types (every anonymous struct type is a local struct symbol
+  with its fields: table tests, nested `mu struct{…}` fields) and of
+  function-local struct types; field, type, receiver and embedding references;
+  `contains`.
 - **Candidates:** a name declared in several build variants (build constraints
   are not evaluated); several equally shallow promotion paths; interface dispatch
   (the interface method plus every project type whose method set matches by name
@@ -273,11 +279,14 @@ file (its ID can change when files are added or removed).
   unresolved); reassigned function-valued locals.
 - **Never definite:** `implements` links (unresolved, interface kept in
   `data.interfaceId`, `structural-match-unverified`; computed type identity is an
-  annotation only).
+  annotation only). An interface that embeds two provably different
+  declarations of one method (invalid Go) has no implementers.
 - **Unresolved:** standard library, third-party and non-local `replace` imports and
   everything reached through them; imports Go forbids (`internal`, `package main`,
   `testdata`); unexported names from another package; builtins (`data.builtin`);
-  elements of function containers; explicit generic-method instantiation
+  elements of function containers; elements of a generic named container
+  (`type L[E any] []E`); a field of an anonymous struct type declared in several
+  build variants of its enclosing type; explicit generic-method instantiation
   `t.Map[C](x)`; `new(variable).M()`.
 - **Not extracted:** locals, parameters and type parameters as symbols; keys of
   keyed composite literals; generic type arguments (`Stack[int]` methods resolve

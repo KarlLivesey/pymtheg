@@ -413,6 +413,7 @@ export class GoExtractor {
                     })),
                   }
                 : {}),
+              ...(desc.sym !== undefined ? { sym: desc.sym } : {}),
             }
           : desc;
       case "unknown":
@@ -452,6 +453,8 @@ export class GoExtractor {
     if (desc.k === "sel" || desc.k === "elem" || desc.k === "key")
       return this.rootKind(desc.x, depth + 1);
     if (desc.k === "call") return this.rootKind(desc.f, depth + 1);
+    // An anonymous struct value: its members resolve through its own symbol.
+    if (desc.k === "local" && desc.sym !== undefined) return "struct";
     return desc.k;
   }
   private local(name: string): Desc | undefined {
@@ -1143,7 +1146,10 @@ export class GoExtractor {
             ? bound.c
               ? { k: "tval", c: { ...bound.c } }
               : { k: "tval" }
-            : { k: "opaque" };
+            : bound.sym !== undefined
+              ? // A function-local type: its symbol (members resolve on it).
+                { k: "val", t: { n: current.text, l: bound.sym } }
+              : { k: "opaque" };
         if (bound) return { k: "local" };
         return PREDECLARED_TYPES.has(current.text)
           ? { k: "val", t: { q: "", n: current.text } }
@@ -1165,6 +1171,7 @@ export class GoExtractor {
         return { k: "func", r: this.resultDescs(field("result")) };
       case "struct_type": {
         // An anonymous struct: its named fields, and the types it embeds.
+        const sym = this.anonymousStruct(current);
         const f: { n: string; d: Desc }[] = [];
         const m: Desc[] = [];
         const list = named(current).find(
@@ -1184,6 +1191,7 @@ export class GoExtractor {
           k: "local",
           ...(m.length ? { m } : {}),
           ...(f.length ? { f } : {}),
+          sym,
         };
       }
       case "interface_type": {
@@ -1740,27 +1748,31 @@ export class GoExtractor {
   }
 
   private localStructs = new Map<string, number>();
+  /** Identity of each anonymous struct type node, by start offset. */
+  private anonymousStructs = new Map<number, string>();
   /**
-   * A function-local or anonymous struct type. If it embeds anything, its promoted
-   * method set can implement interfaces, so it becomes a struct symbol (identity
-   * `<enclosing>.<name>` or `<enclosing>.struct#<n>` in source order, `data.local`)
-   * with its fields and `embeds` links, like a package-level struct.
+   * The identity of an anonymous struct type's symbol: `<enclosing>.struct#<n>`,
+   * numbered per enclosing declaration in the order the extractor first meets
+   * it (its value description or its walk, whichever comes first).
    */
-  private localStruct(node: Node, localName?: string): void {
-    const embeds = named(named(node)[0]).some(
-      (field) =>
-        field.type === "field_declaration" && !fieldsOf(field, "name").length,
-    );
-    if (!embeds) return this.walkChildren(node);
+  private anonymousStruct(node: Node): string {
+    const known = this.anonymousStructs.get(node.startIndex);
+    if (known !== undefined) return known;
     const enclosing = this.byKey.get(this.owner)?.identity ?? "file";
-    let name: string;
-    if (localName !== undefined)
-      name = this.localIdentity(`${enclosing}.${localName}`);
-    else {
-      const count = (this.localStructs.get(enclosing) ?? 0) + 1;
-      this.localStructs.set(enclosing, count);
-      name = this.localIdentity(`${enclosing}.struct#${count}`);
-    }
+    const count = (this.localStructs.get(enclosing) ?? 0) + 1;
+    this.localStructs.set(enclosing, count);
+    const name = this.localIdentity(`${enclosing}.struct#${count}`);
+    this.anonymousStructs.set(node.startIndex, name);
+    return name;
+  }
+  /**
+   * An anonymous struct type (in a function, a field, a variable, a composite
+   * literal or a type literal). It becomes a struct symbol (`data.local`) with
+   * its fields and `embeds` links, like a package-level struct, so selectors
+   * on its values resolve to its fields and promoted members.
+   */
+  private localStruct(node: Node): void {
+    const name = this.anonymousStruct(node);
     const key = this.symbol("struct", name, name, range(node), {
       local: true,
     });

@@ -419,17 +419,33 @@ class GoResolver {
   /** Interfaces whose method set is fully known, so their implementer list is complete. */
   private complete = new Set<string>();
   private memo = new Map<string, TypeValue>();
+  /**
+   * How many answers the depth limit or a cycle guard has cut short. A cached
+   * answer (`memo`, `views`, `hiddenMemo`, `externalMemo`) is kept only when
+   * none was cut short while computing it, so the order in which deep and
+   * shallow routes first reach a type cannot change any answer.
+   */
+  private cutoffs = 0;
+  private cut<T>(value: T): T {
+    this.cutoffs++;
+    return value;
+  }
   private selections = new Map<string, Selection>();
 
+  private readonly context: ResolutionContext;
   constructor(
     private readonly moduleId: string,
-    private readonly context: ResolutionContext,
+    context: ResolutionContext,
     /**
      * Only to name an open set's reasons: resolve as if no file were lossy
      * (failed files' directories are not treated as holding unseen ones).
      */
     private readonly ignoreLossy = false,
   ) {
+    // One fixed order, whatever order the store supplies: the caches and the
+    // depth limit make which route reaches a type first matter, so the
+    // outcome must not depend on how the files were read.
+    this.context = ordered(context);
     this.layout = readLayout(context.contextFiles);
   }
 
@@ -997,7 +1013,7 @@ class GoResolver {
   }
 
   private typeFromRef(ref: TypeRef, from: string, depth: number): TypeValue {
-    if (depth > MAX_DEPTH) return UNKNOWN;
+    if (depth > MAX_DEPTH) return this.cut(UNKNOWN);
     if (ref.l !== undefined) {
       // A function-local type: its symbol in the same file (scope resolved at parse).
       const local = this.localTypes.get(`${from}\u0000${ref.l}`);
@@ -1017,8 +1033,10 @@ class GoResolver {
     const key = `${from}\u0000${ref.q ?? ""}\u0000${ref.n}`;
     const cached = this.memo.get(key);
     if (cached) return cached;
+    const cutoffs = this.cutoffs;
     let value: TypeValue = UNKNOWN;
-    if (depth < MAX_DEPTH) {
+    if (depth >= MAX_DEPTH) this.cutoffs++;
+    else {
       if (ref.q !== undefined) {
         const base = this.lookupName(ref.q, from);
         // A qualifier that is no project import can only be an external import
@@ -1047,7 +1065,8 @@ class GoResolver {
           value = { kind: "failed", cause: found.cause };
       }
     }
-    this.memo.set(key, value);
+    // An answer cut short by the depth limit is not this name's type: not kept.
+    if (this.cutoffs === cutoffs) this.memo.set(key, value);
     return value;
   }
 
@@ -1055,7 +1074,7 @@ class GoResolver {
   private aliasesFollowed = new Set<string>();
   /** Follows aliases; non-type symbols give an unknown type. */
   private typeSyms(syms: GraphSymbol[], depth: number): TypeValue {
-    if (depth > MAX_DEPTH) return UNKNOWN;
+    if (depth > MAX_DEPTH) return this.cut(UNKNOWN);
     const out: GraphSymbol[] = [];
     for (const symbol of syms) {
       if (!TYPE_KINDS.has(symbol.kind)) return UNKNOWN;
@@ -1075,7 +1094,8 @@ class GoResolver {
         // (pointer method sets are kept where they matter: embedding, through
         // `aliasPointer`, and defined types over A, which are unknown in `view`).
         if (!data.underlying) return UNKNOWN;
-        if (this.aliasesFollowed.has(symbol.id)) return UNKNOWN;
+        // A cycle on this route: unknown here, not necessarily on another.
+        if (this.aliasesFollowed.has(symbol.id)) return this.cut(UNKNOWN);
         this.aliasesFollowed.add(symbol.id);
         let target: TypeValue;
         try {
@@ -1106,7 +1126,7 @@ class GoResolver {
 
   /** Type of a variable, constant or field symbol, evaluated in its own file. */
   private valueType(symbol: GraphSymbol, depth: number): TypeValue {
-    if (depth > MAX_DEPTH) return UNKNOWN;
+    if (depth > MAX_DEPTH) return this.cut(UNKNOWN);
     const data = (symbol.data ?? {}) as { d?: Desc; t?: TypeRef; v?: Desc };
     if (symbol.kind === "field") {
       if (data.v) return this.typeOf(data.v, symbol.file, depth + 1);
@@ -1143,7 +1163,7 @@ class GoResolver {
 
   /** What an expression denotes: a package, declarations, an external thing, or a typed value. */
   private denote(desc: Desc, from: string, depth: number): Entity {
-    if (depth > MAX_DEPTH) return NONE;
+    if (depth > MAX_DEPTH) return this.cut(NONE);
     switch (desc.k) {
       case "name":
         return this.lookupName(desc.n, from);
@@ -1171,9 +1191,24 @@ class GoResolver {
         };
       case "opaque":
         return { e: "value", type: OPAQUE };
+      case "local":
+        // An anonymous struct: its own local struct symbol (in this file).
+        return desc.sym !== undefined
+          ? {
+              e: "value",
+              type: this.typeFromRef(
+                { n: desc.sym, l: desc.sym },
+                from,
+                depth + 1,
+              ),
+            }
+          : { e: "value", type: UNKNOWN };
       case "elem":
       case "key": {
-        const container = this.typeOf(desc.x, from, depth + 1);
+        let container = this.typeOf(desc.x, from, depth + 1);
+        // A defined type over a container literal (`type R map[string][]T`).
+        if (container.kind === "project")
+          container = this.underlyingContainer(container.syms, depth + 1);
         if (container.kind === "external" || container.kind === "failed")
           return { e: "value", type: container };
         if (container.kind === "cont") {
@@ -1222,6 +1257,32 @@ class GoResolver {
       default:
         return { e: "value", type: UNKNOWN };
     }
+  }
+
+  /**
+   * The container a value of these named types is, for its elements and keys:
+   * a defined type written as a container literal (`type R []T`), or over
+   * another named type that is one (`type S R`). Build variants must agree.
+   * Anything else (a struct, an interface, an external underlying type that is
+   * not proved a container) is unknown.
+   */
+  private underlyingContainer(syms: GraphSymbol[], depth: number): TypeValue {
+    if (depth > MAX_DEPTH) return this.cut(UNKNOWN);
+    return this.sameType(
+      syms.map((symbol) => {
+        if (symbol.kind !== "type") return UNKNOWN;
+        const data = (symbol.data ?? {}) as { v?: Desc; underlying?: TypeRef };
+        if (data.v?.k === "cont")
+          return this.typeOf(data.v, symbol.file, depth + 1);
+        if (!data.underlying) return UNKNOWN;
+        const next = this.typeFromRef(data.underlying, symbol.file, depth + 1);
+        return next.kind === "project"
+          ? this.underlyingContainer(next.syms, depth + 1)
+          : next.kind === "failed"
+            ? next
+            : UNKNOWN;
+      }),
+    );
   }
 
   private callResult(
@@ -1400,6 +1461,7 @@ class GoResolver {
   private view(type: GraphSymbol, depth = 0): View {
     const cached = this.views.get(type.id);
     if (cached) return cached;
+    const cutoffs = this.cutoffs;
     const data = (type.data ?? {}) as {
       shape?: string;
       underlying?: TypeRef;
@@ -1420,7 +1482,7 @@ class GoResolver {
       ...(externalOnly ? { externalOnly: true } : {}),
     });
     let result: View;
-    if (depth > MAX_DEPTH) result = unknown();
+    if (depth > MAX_DEPTH) result = this.cut(unknown());
     else if (
       pkg &&
       this.uncertainMethodSets.has(pkg.key) &&
@@ -1508,7 +1570,7 @@ class GoResolver {
       const known = result.members;
       result = { members: known, declared: known, embedded: [], unknown: true };
     }
-    this.views.set(type.id, result);
+    if (this.cutoffs === cutoffs) this.views.set(type.id, result);
     return result;
   }
 
@@ -1953,9 +2015,14 @@ class GoResolver {
       const set = new Map<string, InterfaceMethod>();
       // The crude structural method set (no-toolchain fallback): methods
       // inherited along several paths merge by name, without any identity proof
-      // (identity only annotates). The first declaration found is kept.
+      // (identity only annotates). The first declaration found is kept, unless
+      // the two are provably different (`interface{ I; X }` with `M()` and
+      // `M() int`, which Go rejects): then the set is not known, whatever the
+      // order the declarations were met in.
       const add = (method: InterfaceMethod): boolean => {
-        if (!set.has(method.key)) set.set(method.key, method);
+        const existing = set.get(method.key);
+        if (!existing) set.set(method.key, method);
+        else if (identical(existing.sig, method.sig) === false) return false;
         return true;
       };
       for (const symbol of this.ownMethods(iface)) {
@@ -3254,6 +3321,7 @@ class GoResolver {
     const key = `${pkgKey}\u0000${name}`;
     const cached = this.hiddenMemo.get(key);
     if (cached !== undefined) return cached;
+    const cutoffs = this.cutoffs;
     let reachable = false;
     for (const type of this.symbolsById.values()) {
       if (!TYPE_KINDS.has(type.kind) || !exported(type.name)) continue;
@@ -3265,7 +3333,7 @@ class GoResolver {
         break;
       }
     }
-    this.hiddenMemo.set(key, reachable);
+    if (this.cutoffs === cutoffs) this.hiddenMemo.set(key, reachable);
     return reachable;
   }
   /** The type's method set includes (or may include) package `pkgKey`'s unexported `name`. */
@@ -3316,7 +3384,9 @@ class GoResolver {
   private embedsExternal(type: GraphSymbol, seen = new Set<string>()): boolean {
     const cached = this.externalMemo.get(type.id);
     if (cached !== undefined) return cached;
-    if (seen.has(type.id)) return false;
+    // Already on this route (a cycle): the answer for the route is the rest's.
+    if (seen.has(type.id)) return this.cut(false);
+    const cutoffs = this.cutoffs;
     seen.add(type.id);
     const view = this.view(type);
     let result = !!view.unknown;
@@ -3326,7 +3396,7 @@ class GoResolver {
         result = true;
       if (result) break;
     }
-    this.externalMemo.set(type.id, result);
+    if (this.cutoffs === cutoffs) this.externalMemo.set(type.id, result);
     return result;
   }
 
@@ -3599,4 +3669,35 @@ function push2<T>(map: Map<string, T[]>, key: string, value: T): void {
   const list = map.get(key);
   if (list) list.push(value);
   else map.set(key, [value]);
+}
+
+const compareText = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+/** The context's files, symbols and links in a fixed, source-based order. */
+function ordered(context: ResolutionContext): ResolutionContext {
+  const place = (item: {
+    file: string;
+    range: { start: number; end: number };
+    kind: string;
+  }) => [item.file, item.range.start, item.range.end, item.kind] as const;
+  const byPlace = (a: ReturnType<typeof place>, b: ReturnType<typeof place>) =>
+    compareText(a[0], b[0]) ||
+    a[1] - b[1] ||
+    a[2] - b[2] ||
+    compareText(a[3], b[3]);
+  return {
+    ...context,
+    files: [...context.files].sort((a, b) => compareText(a.path, b.path)),
+    symbols: [...context.symbols].sort(
+      (a, b) =>
+        byPlace(place(a), place(b)) ||
+        compareText(a.identity, b.identity) ||
+        compareText(a.id, b.id),
+    ),
+    links: [...context.links].sort(
+      (a, b) =>
+        byPlace(place(a), place(b)) ||
+        compareText(a.targetName, b.targetName) ||
+        compareText(a.id, b.id),
+    ),
+  };
 }
