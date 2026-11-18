@@ -191,8 +191,11 @@ The graph store, indexer and three production language modules (`src/graph/`)
 answer the CLI command `pymtheg graph` (below), the MCP tools `code_graph` and
 `graph_result`, and requirement links (`pymtheg link`, MCP `requirement_links`).
 No Studio screen uses them; `observe` still uses the older TypeScript/JavaScript
-reader. The store is `.pymtheg/rebuildable/graph.sqlite`, schema 3; an older
-graph database is refused with a rebuild message. Nothing runs project code.
+reader. The store is `.pymtheg/rebuildable/graph.sqlite`, schema 4; a schema-3
+(0.1.0) graph is migrated in place when opened for writing (its rows are kept
+unchanged) and read as having no library targets when opened read-only. Any
+other graph database is refused with a rebuild message; 0.1.0 refuses a
+schema-4 graph the same way. Nothing runs project code.
 Nothing runs a language toolchain unless the project opts in to the Go
 toolchain route (below); nothing reads or writes `.codegraph/`. Language
 modules are discovered from `src/graph/languages/*/`;
@@ -205,8 +208,9 @@ Link outcomes:
 
 | Outcome | Meaning |
 |---|---|
-| `resolved` | One definite target |
-| `ambiguous` | A candidate set, never a pick. A set is **closed** only when it provably holds every possible target and every member is provably possible. Otherwise it is **open**, and `data.open` gives the reasons (for example a type outside the project could be the target); an open set still lists every project target |
+| `resolved` | One definite target in the checkout |
+| `library` | One definite target outside the project: a library unit (level 1) or a symbol in it (level 2), recorded with how the source proves it. Never a local symbol. **No production module records one yet** (C-5 is the core; the Go, Rust and TypeScript items follow) |
+| `ambiguous` | A candidate set, never a pick. It may mix checkout symbols and library targets. A set is **closed** only when it provably holds every possible target and every member is provably possible. Otherwise it is **open**, and `data.open` gives the reasons (for example a type outside the project could be the target); an open set still lists every project target |
 | `unresolved` | No target; the written name is kept. The reason, when recorded, is in `data` (`reason` in Go and TypeScript, `uncertainty` in Rust). Rust may also list unverified would-be targets in `data.targets` (at most 16, else a count) |
 | failed (`unresolved`, reason `invalid-code`) | The link depends on a file that could not be read. `data.cause` names the failed file(s). It has no target, no candidates and no would-be targets |
 
@@ -517,7 +521,7 @@ answer.
 
 #### Graph commands and the Go toolchain route
 
-`pymtheg graph index|status|search TEXT|symbol SELECTOR|callers SELECTOR|callees SELECTOR|path FROM TO|impact SELECTOR|file PATH`
+`pymtheg graph index|status|search TEXT|symbol SELECTOR|callers SELECTOR|callees SELECTOR|path FROM TO|impact SELECTOR|file PATH|uses UNIT [SYMBOL]`
 (`--root`, `--json`, `--no-sync`, `--case-sensitive`, `--include-possible`,
 `--depth` default 5, `--limit` default 1,000 and at most 10,000) and the MCP
 tools `code_graph`/`graph_result` run the same commands. Every query first syncs
@@ -528,7 +532,11 @@ a selector that selects nothing returns up to five near matches, never selected.
 Callers' class counts are totals whatever the limit: `definite` and
 `candidateSet` are exact; `unresolved` (possible callers) is counted up to 1,000
 or the limit, whichever is larger; `countsTruncated` marks that there are more
-than that bound, so `unresolved` is a lower bound. The MCP form, its
+than that bound, so `unresolved` is a lower bound. `uses UNIT [SYMBOL]` lists
+the project links whose target, or one of whose candidates, is library unit
+`UNIT` (any ecosystem) or exactly `SYMBOL` in it, with exact `library` and
+`candidateSet` counts (MCP: action `uses`, `query` the unit, optional `symbol`).
+It finds only stored library targets: unresolved links may hide more uses. The MCP form, its
 selector forms per language and its limits are in [the code guide](code-guide.md).
 
 **Go toolchain route (opt-in, decision D17).** With the key

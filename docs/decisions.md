@@ -2547,3 +2547,31 @@ again in each phase that needs records: a number of times linear in files
 and modules, instead of zero. The CLI opens a new store for every command, so
 it never had that reuse. **Rules out:**
 store-level caches of decoded records and per-module whole-graph clones.
+
+### Library targets are graph entries with their own outcome (C-5)
+
+**Decided (C-5, on the owner's ruling "libraries are linkable to a certain
+extent as in your code to a library"):** a link may target a library outside
+the checkout. A library target has an ecosystem, a unit, an optional symbol, a
+version only when the checkout's manifest states it, and a required evidence
+kind; its id hashes ecosystem, unit, version and symbol, so it is the same in
+every project. A link whose only target is a library target has the outcome
+`library`, distinct from `resolved` (a checkout target); a candidate set may mix
+checkout symbols and library targets. Targets are rows of their own
+(`graph_library_targets`, role `target` or `candidate`), so uses of a unit or a
+symbol are one index read; `pymtheg graph uses UNIT [SYMBOL]` and MCP action
+`uses` ask that question. The store refuses a library target without a known
+evidence kind, a unit-only kind with a symbol, and a `glob-import` as a definite
+target. There is no receiver-type kind. Graph schema 3 becomes 4: a schema-3
+graph is migrated in place (rows unchanged, new table and resolution triggers),
+so 0.1.0 indexes are kept, not rebuilt; 0.1.0 refuses a schema-4 graph. The
+coverage export credits a stored library target as stored (level 2 with a
+symbol, level 1 without) and reconstructs identities only for links without one.
+**Why:** coverage level 2 credits a link to a library when the graph names the
+unit and the symbol; until now the graph had nowhere to say so, and the measure
+rebuilt identities from whatever each module happened to record. **Rules out:**
+reading dependency sources, network access, version resolution beyond the
+manifest, library targets inferred from a receiver's type, and showing a library
+target as a missing local symbol. **Open:** once the Go, Rust and TypeScript
+items record library targets, the export's reconstruction can be limited to
+schema-3 graphs. See [C-5](changes/C-5.md).

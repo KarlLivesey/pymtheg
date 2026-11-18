@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 import { createHash } from "node:crypto";
-import type { GraphFile, GraphLink, GraphSymbol } from "./types.js";
+import type {
+  GraphFile,
+  GraphLibrary,
+  GraphLink,
+  GraphSymbol,
+  LibraryEvidence,
+  LibraryTarget,
+} from "./types.js";
 export const contentHash = (text: string | Uint8Array): string =>
   createHash("sha256").update(text).digest("hex");
 const digest = (parts: unknown[]): string => contentHash(JSON.stringify(parts));
@@ -129,3 +136,69 @@ export const addedLinkId = (
   file: string,
   key: string,
 ): string => `link:${digest(["v2", project, module, file, "analysis", key])}`;
+
+/**
+ * What each evidence kind can prove. `symbol: false`: it names the unit only.
+ * `definite: false`: it only makes the target possible (candidate sets only).
+ */
+export const libraryEvidence: Readonly<
+  Record<LibraryEvidence, { symbol: boolean; definite: boolean }>
+> = {
+  "import-path": { symbol: false, definite: true },
+  "import-binding": { symbol: true, definite: true },
+  "qualified-path": { symbol: true, definite: true },
+  "explicit-trait": { symbol: true, definite: true },
+  "declared-builtin": { symbol: true, definite: true },
+  "reference-directive": { symbol: false, definite: true },
+  "glob-import": { symbol: true, definite: false },
+};
+const text = (value: unknown, max: number): value is string =>
+  typeof value === "string" &&
+  value.length > 0 &&
+  value.length <= max &&
+  value.trim() === value &&
+  !/[\u0000-\u001f\u007f]/.test(value);
+/**
+ * Checks a module's library target and returns its stored form with a
+ * deterministic, project-independent id. The evidence kind is required.
+ */
+export function libraryTarget(
+  value: LibraryTarget,
+  definite: boolean,
+): GraphLibrary {
+  const known = ["ecosystem", "unit", "symbol", "version", "evidence"];
+  const evidence =
+    value &&
+    typeof value === "object" &&
+    Object.hasOwn(libraryEvidence, value.evidence)
+      ? libraryEvidence[value.evidence]
+      : undefined;
+  if (
+    !evidence ||
+    Object.keys(value).some((key) => !known.includes(key)) ||
+    typeof value.ecosystem !== "string" ||
+    !/^[a-z][a-z0-9-]{0,63}$/.test(value.ecosystem) ||
+    !text(value.unit, 1024) ||
+    (value.symbol !== undefined && !text(value.symbol, 1024)) ||
+    (value.version !== undefined && !text(value.version, 256))
+  )
+    throw Error(
+      "Invalid library target: ecosystem, unit and a known evidence kind are required",
+    );
+  if (value.symbol !== undefined && !evidence.symbol)
+    throw Error(
+      `Library evidence ${value.evidence} names a unit, not a symbol`,
+    );
+  if (definite && !evidence.definite)
+    throw Error(
+      `Library evidence ${value.evidence} only supports a candidate set`,
+    );
+  return {
+    id: `library:${digest(["v1", value.ecosystem, value.unit, value.version ?? null, value.symbol ?? null])}`,
+    ecosystem: value.ecosystem,
+    unit: value.unit,
+    ...(value.symbol === undefined ? {} : { symbol: value.symbol }),
+    ...(value.version === undefined ? {} : { version: value.version }),
+    evidence: value.evidence,
+  };
+}

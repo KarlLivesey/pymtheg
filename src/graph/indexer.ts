@@ -28,6 +28,8 @@ export interface IndexReport {
   links: number;
   unresolved: number;
   ambiguous: number;
+  /** Links whose only target is a library outside the project. */
+  library: number;
   contextFiles: number;
   unclaimedCount: number;
   failedCount: number;
@@ -85,6 +87,7 @@ export async function indexProject(
     links: 0,
     unresolved: 0,
     ambiguous: 0,
+    library: 0,
     contextFiles: 0,
     unclaimedCount: 0,
     failedCount: 0,
@@ -419,6 +422,10 @@ export async function indexProject(
   report.links = counts?.links ?? (await store.links()).length;
   report.unresolved = counts?.unresolved ?? (await store.unresolved()).length;
   report.ambiguous = counts?.ambiguous ?? (await store.ambiguous()).length;
+  report.library =
+    counts?.library ??
+    (await store.links()).filter((link) => link.resolution === "library")
+      .length;
   return report;
 }
 

@@ -26,6 +26,7 @@ const commands = [
   "path",
   "impact",
   "file",
+  "uses",
 ] as const;
 function output(
   value: Record<string, unknown>,
@@ -161,7 +162,7 @@ export function registerGraphTools(
     "code_graph",
     {
       description:
-        "Ask about Go/Rust/TypeScript code: search first, then symbol/callers/callees/impact/path/file. Selectors accept stable symbol refs, exact names, qualified names or path:line[:column]. Queries automatically sync changed content unless noSync. Returns the first result page inline when finished within 5 seconds (default wait:true); otherwise returns a job with progress for graph_result. Use wait:false to return a handle immediately. section chooses the first result page; later pages use graph_result. index explicitly updates all modules; status is read-only. Cold indexing can be long: poll the job for deterministic file/phase progress. Never treat possible/unresolved calls as definite.",
+        "Ask about Go/Rust/TypeScript code: search first, then symbol/callers/callees/impact/path/file. uses lists project links to a library outside the project: query=unit (module path, crate or package), optional symbol=symbol path in it. Selectors accept stable symbol refs, exact names, qualified names or path:line[:column]. Queries automatically sync changed content unless noSync. Returns the first result page inline when finished within 5 seconds (default wait:true); otherwise returns a job with progress for graph_result. Use wait:false to return a handle immediately. section chooses the first result page; later pages use graph_result. index explicitly updates all modules; status is read-only. Cold indexing can be long: poll the job for deterministic file/phase progress. Never treat possible/unresolved calls as definite.",
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -176,6 +177,7 @@ export function registerGraphTools(
             .default("answer"),
           query: z.string().max(4096).optional(),
           to: z.string().max(4096).optional(),
+          symbol: z.string().min(1).max(4096).optional(),
           limit: z.number().int().min(1).max(100).default(20),
           depth: z.number().int().min(0).max(100).default(5),
           noSync: z.boolean().default(false),
@@ -190,10 +192,11 @@ export function registerGraphTools(
         if (
           (needs && a.query === undefined) ||
           (!needs && a.query !== undefined) ||
-          (a.action === "path") !== (a.to !== undefined)
+          (a.action === "path") !== (a.to !== undefined) ||
+          (a.action !== "uses" && a.symbol !== undefined)
         )
           throw Error(
-            "index/status take no query; other actions require query; only path requires to.",
+            "index/status take no query; other actions require query; only path requires to; only uses takes symbol.",
           );
         ctx.mcpReq.signal.throwIfAborted();
         if (workspace.links?.activeId())
@@ -202,7 +205,13 @@ export function registerGraphTools(
           );
         const job = workspace.graph.start({
           command: a.action,
-          args: needs ? [a.query!, ...(a.to !== undefined ? [a.to] : [])] : [],
+          args: needs
+            ? [
+                a.query!,
+                ...(a.to !== undefined ? [a.to] : []),
+                ...(a.symbol !== undefined ? [a.symbol] : []),
+              ]
+            : [],
           limit: a.limit,
           depth: a.depth,
           noSync: a.noSync,

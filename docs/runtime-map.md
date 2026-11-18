@@ -42,7 +42,7 @@ The language is a bounded design tool, not a universal proof engine.
 | Built-in engines `src/behaviour/explore.ts`, `explore-worker.ts`, `explore-runner.ts` | `GeneratedModel` (+ `ProjectIR` for flow replay) -> `ExploreResult` (per-property verdicts, `state-domains`, measurements) | exhaustive BFS (`stateBudget`, default 1,000,000) or seeded sampler; runs in an owned worker with a readiness handshake, signal and timeout; the runner awaits worker termination on every exit; uses the existing `initial`/`step`/`replay` semantics, never reparses |
 | Storage boundary `src/storage/local.ts`, `layout.ts`, `graph.ts` | `storagePath(root, item, create?)`, `openDatabase`, `findProjectRoot`, `openProjectGraph` | only module that chooses project paths and opens SQLite; refuses old layouts and symlinked storage; creates `.pymtheg/rebuildable/.gitignore`; feature stores keep their schemas and transactions |
 | Recorded history `src/storage/recorded-history.ts`, `writer.ts`, `paths.ts` | checkpoint/acknowledgement/withdrawal/draft transactions -> UUID registrations + receipts; `exportRecordedHistory()` | additive tables in the planning database, written inside the feature transaction; writer identity in `.pymtheg/local/writer.json`; order `(sequence, machine, actor, change UUID)` |
-| Graph core `src/graph/` (`indexer.ts`, `store.ts`, `registry.ts`, `analysis.ts`, `identity.ts`, `tree-sitter.ts`, `conformance.ts`) | `indexProject(root, registry, store)` -> `IndexReport`; queries `findSymbols`, `outgoing`, `incoming`, `links`, `unresolved`, `ambiguous`, `neighbourhood` | language-neutral; strict UTF-8 capture; per-file atomic replacement; validates every module result before writing; SQLite schema 3; not wired to any command yet |
+| Graph core `src/graph/` (`indexer.ts`, `store.ts`, `registry.ts`, `analysis.ts`, `identity.ts`, `tree-sitter.ts`, `conformance.ts`) | `indexProject(root, registry, store)` -> `IndexReport`; queries `findSymbols`, `outgoing`, `incoming`, `links`, `unresolved`, `ambiguous`, `neighbourhood` | language-neutral; strict UTF-8 capture; per-file atomic replacement; validates every module result before writing; SQLite schema 4 (library targets, below) |
 | Language modules `src/graph/languages/{go,rust,typescript}/` | default-exported `LanguageModule`: claims, context files, `parse`/`analyze`/`resolve` | discovered from the folder, no core list; Go and Rust parse with tree-sitter WASM grammars, TypeScript with the compiler over the captured snapshot; none runs a toolchain or project code |
 | Vendored grammars `grammars/<lang>/` | `manifest.json`, patches, built `.wasm`, licence; `grammars/build.mjs` | Go only so far; the module loads the `.wasm` relative to its compiled file; `test/grammar-vendored.test.mjs` checks sha256, ABI and licence; rebuilding is a maintainer step |
 
@@ -1497,3 +1497,65 @@ All three apply the whole-file rule. Support levels are in
 the npm `tree-sitter-rust` grammar through `tagsFromPackage`. One parser instance
 per process per grammar is kept alive; trees are deleted after each extraction.
 
+## Library targets in the code graph (C-5)
+
+A link from project code into a library whose source is not in the checkout
+(Go `strconv.Quote`, Rust `Result::unwrap`, Node `child_process.spawnSync`,
+`z.string()` from `zod`) can have a **library target** instead of a checkout
+symbol. Shape (`src/graph/types.ts` `LibraryTarget`, `GraphLibrary`):
+
+| Field | Meaning |
+|---|---|
+| `ecosystem` | lowercase id: `go`, `go-std`, `cargo`, `rust-std`, `npm`, `node`, `dom`, `typescript-lib`, … |
+| `unit` | module path, crate, package name or standard-library unit |
+| `symbol` | optional symbol path in the unit, spelled as the unit spells it (level 2); absent for the unit itself (level 1) |
+| `version` | optional; only when the checkout's manifest or lockfile states it |
+| `evidence` | required: how the source proves it (below) |
+| `id` | `library:` + sha256 of (ecosystem, unit, version, symbol): deterministic and independent of the project and of the evidence |
+
+Outcomes: `library` is a link whose only target is one library target;
+`ambiguous` may mix checkout candidates and library candidates (two or more
+targets in all); `resolved` and `unresolved` are unchanged. Library targets are
+rows of their own (`graph_library_targets`: link, id, role `target` or
+`candidate`, kind, ecosystem, unit, symbol, version, evidence), indexed by
+(unit, symbol) and by id, so "uses of unit U" and "uses of U's symbol s" are
+one index read (`SqliteGraphStore.libraryUses`, `libraryUseCounts`). The role
+column keeps a candidate set that loses a checkout member (its symbol's file was
+removed) from turning definite before the next resolution.
+
+Evidence kinds (`libraryEvidence` in `src/graph/identity.ts`), checked by the
+store before any write; an unknown or missing kind fails the module's
+resolution:
+
+| Kind | Proves | Symbol | Definite |
+|---|---|---|---|
+| `import-path` | an import names the unit | no | yes |
+| `import-binding` | a name bound by an import of the unit, and the member selected from it | yes | yes |
+| `qualified-path` | a fully qualified written path names unit and symbol | yes | yes |
+| `explicit-trait` | an explicit trait/interface qualification (`<T as Trait>::m`) | yes | yes |
+| `declared-builtin` | a language-declared builtin, intrinsic or global | yes | yes |
+| `reference-directive` | a reference directive names a declaration unit | no | yes |
+| `glob-import` | a glob or dot import puts the unit in scope; the name is only possible | yes | candidate sets only |
+
+There is no receiver-type kind: "the receiver's type is from library L, so the
+method is L::Type::m" is not proof (extension traits, `Into`, promoted and
+embedded members). Such a link stays unresolved with its reason.
+
+What each language chunk supplies: in `resolve` (or as an added link), a
+`LinkResolution` with `library: {ecosystem, unit, symbol?, version?, evidence}`
+for a definite library target, or `candidateIds` plus `libraries` for a mixed
+set; the ecosystem names it uses; the manifest/lockfile reading, if any, that
+supplies `version`; and a module version bump. Nothing else in the core changes.
+
+Out of scope by design: reading dependency sources, any network access, and
+resolving versions beyond what the checkout's manifest states. A library target
+says where the use points, never that the library declares the symbol.
+
+Queries: `pymtheg graph uses UNIT [SYMBOL]` and MCP `code_graph` action `uses`
+(`query`, optional `symbol`). Every link answer shows certainty `library` and
+the library's unit, symbol and `outside-project` place, never a missing local
+symbol. Counts (`counts.library`, `IndexReport.library`) include the outcome.
+Path and impact traversals do not enter library targets. No Studio screen shows
+graph links, so Studio is unchanged. The coverage export credits a stored
+library target directly and reconstructs identities only for links without one
+(every link of a 0.1.0 graph).

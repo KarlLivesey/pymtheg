@@ -310,3 +310,47 @@ test("candidate overlay rewrites the plan only for matched evidence", () => {
     rmSync(scratch, { recursive: true, force: true });
   }
 });
+
+test("a stored library target is credited as stored; a 0.1.0 link is reconstructed", () => {
+  const library = (target) => ({ resolution: "library", module: "go", kind: "calls", file: "src/main", targetName: "strconv.Quote", library: target });
+  const stored = library({ ecosystem: "go-std", unit: "strconv", symbol: "Quote", evidence: "import-binding" });
+  assert.equal(classify(stored, evidence, project), "outside");
+  assert.deepEqual(externalIdentity(stored, evidence, project, "outside"),
+    { level: 2, unit: "strconv", symbol: "Quote", evidence: "import-binding", gap: null });
+  assert.deepEqual(externalIdentity(library({ ecosystem: "go-std", unit: "strconv", evidence: "import-path" }), evidence, project, "outside"),
+    { level: 1, unit: "strconv", evidence: "import-path", gap: "whole-unit" });
+  assert.throws(() => externalIdentity(library(undefined), evidence, project, "outside"), /without a stored target/);
+  // The same site in a schema-3 graph: unresolved, identity rebuilt from its selector.
+  const released = { resolution: "unresolved", module: "go", kind: "calls", file: "src/main", targetName: "strconv.Quote",
+    data: { expr: { ...selector("strconv").expr, n: "Quote" } } };
+  assert.deepEqual(externalIdentity(released, evidence, project, classify(released, evidence, project)),
+    { level: 2, unit: "strconv", symbol: "Quote", evidence: "import-binding", gap: null });
+  const rows = [linkRow("go", "resolved", "eligible", 6),
+    [..."go calls library".split(" "), null, null, "source", "outside", 3, 0, 2, "import-binding", null],
+    [..."go imports library".split(" "), null, null, "source", "outside", 1, 0, 1, "import-path", "whole-unit"],
+    linkRow("go", "unresolved", "unclassified", 10)];
+  const score = libraryScore(rows);
+  assert.deepEqual([score.outside, score.total, score.level2, score.level1], [4, 20, 0.45, 0.5]);
+});
+
+test("coverage accepts stored library rows and rejects a library row without a named unit", () => {
+  const scratch = mkdtempSync(join(tmpdir(), "coverage-library-"));
+  try {
+    const repo = (breakdown) => ({ id: "fixture/repo", commit: "a".repeat(40), language: "rust", outcome: "finished",
+      sourceFiles: [{ module: "rust", scope: "source", readableLines: 10 }], failedSources: [], reviewSites: {}, breakdown });
+    const packet = (breakdown) => ({ schema: "pymtheg.sweep.coverage/v2", release: { package: "fixture" }, columns, repos: [repo(breakdown)] });
+    const put = (filename, data) => {
+      const file = join(scratch, filename);
+      writeFileSync(file, JSON.stringify(data));
+      return file;
+    };
+    const run = (breakdown) => execFileSync(process.execPath, [fileURLToPath(new URL("./coverage.mjs", import.meta.url)),
+      "--results", put("candidate.json", packet(breakdown)), "--scoreboard", join(scratch, "score.md")], { stdio: "pipe" });
+    run([linkRow("rust", "resolved", "eligible", 2), ["rust", "calls", "library", null, null, "source", "outside", 2, 0, 2, "qualified-path", null],
+      linkRow("rust", "unresolved", "unclassified", 1)]);
+    assert.match(readFileSync(join(scratch, "score.md"), "utf8"), /\| fixture\/repo \| Rust \| finished \| 5 \| 2 \| 80\.00%/);
+    assert.throws(() => run([["rust", "calls", "library", null, null, "source", "outside", 2, 0, 0, null, "unknown"]]), /Invalid breakdown/);
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+});

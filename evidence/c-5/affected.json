@@ -1,0 +1,26 @@
+[
+  {
+    "id": "charmbracelet/bubbletea",
+    "language": "go",
+    "url": "https://github.com/charmbracelet/bubbletea.git",
+    "commit": "6b30ecf3280d88d949dcc916bb91fc5e9d56f667",
+    "category": "UI library",
+    "why": "Terminal UI and component examples in a small codebase."
+  },
+  {
+    "id": "rust-embedded/cortex-m",
+    "language": "rust",
+    "url": "https://github.com/rust-embedded/cortex-m.git",
+    "commit": "b79801ce4884fe46105b562f701a7d2fd5c586c7",
+    "category": "library",
+    "why": "Small no_std hardware library with architecture gates and build scripts."
+  },
+  {
+    "id": "yargs/yargs",
+    "language": "typescript",
+    "url": "https://github.com/yargs/yargs.git",
+    "commit": "9588a764365c0fd9a6b5dd2f76f2e1be805c5426",
+    "category": "CLI library",
+    "why": "Small command-line parsing library with ESM and CommonJS entry points."
+  }
+]

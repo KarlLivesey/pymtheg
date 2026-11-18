@@ -54,11 +54,12 @@ function checkResult(input) {
       if (!modules.includes(module) || !scopes.includes(scope) || !Number.isSafeInteger(count) || count <= 0 ||
           !Number.isSafeInteger(blocked) || blocked < 0 || blocked > count ||
           (level === null ? disposition === "outside" || encoding !== null || gap !== null :
-            outcome !== "unresolved" || ![0, 1, 2].includes(level) ||
-            (level === 0 ? encoding !== null : !externalEvidenceKinds.includes(encoding)) ||
+            !["unresolved", "library"].includes(outcome) || ![0, 1, 2].includes(level) ||
+            (level === 0 ? encoding !== null || outcome === "library" : !externalEvidenceKinds.includes(encoding)) ||
             (level === 2 ? gap !== null : !externalGapKinds.includes(gap))) ||
           (outcome === "unresolved" ? !["inside", "outside", "unclassified"].includes(disposition)
-            : !["resolved", "ambiguous"].includes(outcome) || disposition !== "eligible")) throw Error(`Invalid breakdown for ${repo.id}`);
+            : outcome === "library" ? disposition !== "outside"
+              : !["resolved", "ambiguous"].includes(outcome) || disposition !== "eligible")) throw Error(`Invalid breakdown for ${repo.id}`);
     }
     ids.add(repo.id);
   }

@@ -274,7 +274,12 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys) {
     .filter((item) => /^100(?:644|755) blob /.test(item)).map((item) => item.slice(item.indexOf("\t") + 1));
   const db = new DatabaseSync(join(attempt, "checkout/.pymtheg/rebuildable/graph.sqlite"), { readOnly: true });
   try {
-    if (db.prepare("SELECT value FROM graph_meta WHERE key='schema'").get()?.value !== "3") throw Error("Coverage export supports graph schema 3");
+    const graphSchema = db.prepare("SELECT value FROM graph_meta WHERE key='schema'").get()?.value;
+    if (graphSchema !== "3" && graphSchema !== "4") throw Error("Coverage export supports graph schemas 3 and 4");
+    // Schema 4 stores library targets; schema 3 (0.1.0) has none, so its
+    // library identities are reconstructed from link facts.
+    const storedLibrary = graphSchema === "4" ? db.prepare(`SELECT ecosystem,unit,symbol,version,evidence
+      FROM graph_library_targets WHERE link=? AND role='target'`) : null;
     const files = db.prepare(`SELECT path,status,json_extract(body,'$.module') AS module,
       json_extract(body,'$.result.data.go.package') AS package FROM graph_files ORDER BY path`).all();
     const getFile = db.prepare(`SELECT json_extract(body,'$.text') AS text,
@@ -433,6 +438,7 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys) {
       };
       for (const row of getLinks.iterate(file.path)) {
         const link = { ...JSON.parse(row.body), module: row.module, kind: row.kind, resolution: row.resolution };
+        if (row.resolution === "library") link.library = storedLibrary?.get(row.id);
         if (quotas && link.range && !["contains", "receiver"].includes(link.kind)) {
           if (link.kind !== "calls" || file.module === "typescript") observedSites.add(link.range.start);
           const base = link.data?.expr?.x;

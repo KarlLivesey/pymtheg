@@ -2,7 +2,7 @@
 import { identity } from "../shared/identity.js";
 const commands = [
   [
-    "graph index|status|search TEXT|symbol SELECTOR|callers SELECTOR|callees SELECTOR|path FROM TO|impact SELECTOR|file PATH [--root DIRECTORY] [--json] [--no-sync] [--case-sensitive] [--include-possible] [--depth 5] [--limit 1000]",
+    "graph index|status|search TEXT|symbol SELECTOR|callers SELECTOR|callees SELECTOR|path FROM TO|impact SELECTOR|file PATH|uses UNIT [SYMBOL] [--root DIRECTORY] [--json] [--no-sync] [--case-sensitive] [--include-possible] [--depth 5] [--limit 1000]",
     "Index and query Go, Rust and TypeScript/JavaScript code; queries sync by content, with explicit candidates, failed files and stale warnings.",
   ],
   [

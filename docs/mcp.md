@@ -129,8 +129,13 @@ session for the two code tools and requirement links: selector forms for Go and
 Rust, how to read each section, limits, and turning on the Go toolchain route.
 
 **code_graph** asks the existing graph command layer a question. Actions:
-`index`, `status`, `search`, `symbol`, `callers`, `callees`, `path`, `impact`, `file`.
-All but index/status require `query`; path also requires `to`. Selectors are
+`index`, `status`, `search`, `symbol`, `callers`, `callees`, `path`, `impact`, `file`, `uses`.
+All but index/status require `query`; path also requires `to`. `uses` takes a
+library unit as `query` and an optional `symbol`, and lists the project links to
+it. A link to a library has certainty `library` and a `library` field (ecosystem,
+unit, symbol, version when the manifest states it, evidence,
+`place:"outside-project"`); library members of a candidate set are rows of
+`candidates` with a `library` field instead of a `symbol`. Selectors are
 exact names, recorded qualified names, `path:line[:column]` or an unchanged
 `symbol:<64 hex digits>` ref. Search folds ASCII case by default; opt out with
 `caseSensitive:true`. Name ambiguity lists matches, never picks one. A selector

@@ -1,0 +1,7 @@
+use npm:zod
+use npm:lodash *
+def main
+call zod.string
+call nothere.thing
+call map
+def map
