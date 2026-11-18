@@ -597,7 +597,29 @@ export function objectMember(node: ts.Node): SymbolDraft | undefined {
     )
       return undefined;
     names.unshift(memberName(name));
-    holder = (literal ? outerExpression(object) : object).parent;
+    let value = literal ? outerExpression(object) : object;
+    holder = value.parent;
+    while (literal) {
+      const branch =
+        ts.isConditionalExpression(holder) && value !== holder.condition
+          ? scopeKey([holder.condition.getText(), value === holder.whenTrue])
+          : ts.isBinaryExpression(holder) &&
+              (holder.operatorToken.kind ===
+                ts.SyntaxKind.QuestionQuestionToken ||
+                holder.operatorToken.kind === ts.SyntaxKind.BarBarToken ||
+                holder.operatorToken.kind ===
+                  ts.SyntaxKind.AmpersandAmpersandToken)
+            ? scopeKey([
+                holder.operatorToken.kind,
+                value === holder.left,
+                (value === holder.left ? holder.right : holder.left).kind,
+              ])
+            : undefined;
+      if (!branch) break;
+      names.unshift(`[branch:${branch}]`);
+      value = outerExpression(holder);
+      holder = value.parent;
+    }
     if (
       (ts.isPropertyAssignment(holder) &&
         ts.isObjectLiteralExpression(holder.parent)) ||

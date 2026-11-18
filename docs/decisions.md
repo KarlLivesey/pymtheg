@@ -2563,6 +2563,14 @@ the checker supplies the declarations. A property symbol from a union can
 omit an alternative that comes only from an index signature. Such a lookup
 stays unresolved because it lacks a named declaration for that alternative.
 
+For a new literal-member link, the checker binds the names, and the source
+must establish which object literals can produce the receiver. Structurally
+identical returns, branches and assignments can share one checker symbol.
+Each producing literal needs its own named member for a complete candidate
+set. Opaque reads, including array selections and mutable class fields, leave
+the new link unresolved. The rule for existing literal anchors continues to
+apply at sites main already resolved.
+
 ### Indexing holds one copy of the graph at a time (C-2)
 
 **Decided (C-2):** the graph store no longer keeps decoded file records between

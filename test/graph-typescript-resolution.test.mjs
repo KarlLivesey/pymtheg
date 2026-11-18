@@ -275,7 +275,8 @@ test("checkout member chains use typed declarations and preserve open receivers"
     "const chain = { b: { c() {} } };",
     'const one = { nested: { run: () => "one" as const } };',
     'const two = { nested: { run: () => "two" as const } };',
-    "declare const either: typeof one | typeof two;",
+    "declare const choose: boolean;",
+    "const either = choose ? one : two;",
     "function make() { return { nested: { run() {} } }; }",
     "async function later() { return new A(); }",
     "function save() {}",
@@ -376,6 +377,138 @@ test("checkout member chains use typed declarations and preserve open receivers"
         graph.target(graph.link("use.ts", "inferred.run", "references")),
         "use.ts#inferred.[type].run",
       );
+    },
+  );
+});
+
+test("object-member calls account for every explicit producer and withhold opaque ones", async () => {
+  const source = [
+    "declare const flag: boolean, key: number;",
+    "function createLogger(on: boolean) {",
+    "  if (!on) return { log() {} };",
+    "  return { log(m: string) { console.log(m); } };",
+    "}",
+    'createLogger(true).log("x");',
+    "function readMode(mode: number) {",
+    "  switch (mode) {",
+    '    case 0: return { read() { return "first"; } };',
+    '    default: return { read() { return "second"; } };',
+    "  }",
+    "}",
+    "readMode(key).read();",
+    // Redux Toolkit's anySignal returns a no-op clear for the empty input
+    // and a cleanup function otherwise (query/utils/signals.ts:25,37).
+    "function anySignal(signals: AbortSignal[]) {",
+    "  const controller = new AbortController();",
+    "  const signal = controller.signal;",
+    "  if (!signals.length) return { signal, clear: () => {} };",
+    "  return { signal, clear: () => controller.abort() };",
+    "}",
+    "const composedSignal = anySignal([]);",
+    "composedSignal?.clear();",
+    "const choice = flag ? { take() { return 1; } } : { take() { return 2; } };",
+    "choice.take();",
+    "const nullable = flag ? { pick() { return 1; } } : null;",
+    "const otherwise = nullable ?? { pick() { return 2; } };",
+    "otherwise.pick();",
+    "function reassigned() {",
+    "  let lr = { run() { return 1; } };",
+    "  lr = { run() { return 2; } };",
+    "  lr.run();",
+    "}",
+    "function mutateAlias() {",
+    "  const holder = { inner: { next() { return 1; } } };",
+    "  const alias = holder;",
+    "  alias.inner = { next() { return 2; } };",
+    "  holder.inner.next();",
+    "}",
+    "class Changing {",
+    "  state = { update() { return 1; } };",
+    "  set() { this.state = { update() { return 2; } }; }",
+    "  call() { this.state.update(); }",
+    "}",
+    "function values(index: number) {",
+    "  const first = { item() { return 1; } };",
+    "  const second = { item() { return 2; } };",
+    "  const list = [first, second];",
+    "  list[index]!.item();",
+    "  const direct = [{ item() { return 1; } }, { item() { return 2; } }];",
+    "  direct[index]!.item();",
+    "}",
+    "let legacy = { old() { return 1; } };",
+    "legacy = { old() { return 2; } };",
+    "legacy.old();",
+    "const legacyFirst = { inspect() { return 1; } };",
+    "const legacySecond = { inspect() { return 2; } };",
+    "const legacyList = [legacyFirst, legacySecond];",
+    "legacyList[key].inspect();",
+    "const legacyChoice = flag ? legacyFirst : legacySecond;",
+    "legacyChoice.inspect();",
+  ].join("\n");
+  await project(
+    {
+      "use.ts": source,
+      "tsconfig.json": '{"compilerOptions":{"strict":true}}',
+    },
+    async (graph, report) => {
+      clean(report);
+      const calls = graph.store.links().filter((link) => link.kind === "calls");
+      const symbols = new Map(
+        graph.store.findSymbols().map((symbol) => [symbol.id, symbol]),
+      );
+      const callOn = (line) => {
+        const start = source.indexOf(line);
+        const end = start + line.length;
+        return calls
+          .filter((link) => link.range.start >= start && link.range.end <= end)
+          .sort((a, b) => b.range.end - a.range.end)[0];
+      };
+      for (const [line, expected] of [
+        [
+          'createLogger(true).log("x");',
+          ["log() {}", "log(m: string) { console.log(m); }"],
+        ],
+        [
+          "readMode(key).read();",
+          ['read() { return "first"; }', 'read() { return "second"; }'],
+        ],
+        [
+          "composedSignal?.clear();",
+          ["clear: () => {}", "clear: () => controller.abort()"],
+        ],
+        ["choice.take();", ["take() { return 1; }", "take() { return 2; }"]],
+        ["otherwise.pick();", ["pick() { return 1; }", "pick() { return 2; }"]],
+      ]) {
+        const call = callOn(line);
+        assert.equal(call.resolution, "ambiguous", line);
+        const declarations = call.candidates
+          .map(({ id }) => symbols.get(id).range)
+          .map(({ start, end }) => source.slice(start, end))
+          .sort();
+        assert.deepEqual(declarations, expected.sort(), line);
+      }
+      for (const [line, reason] of [
+        ["lr.run();", "multiple-object-producers"],
+        ["holder.inner.next();", "object-producer-unverified"],
+        ["this.state.update();", "object-producer-unverified"],
+        ["list[index]!.item();", "object-producer-unverified"],
+      ]) {
+        const call = callOn(line);
+        assert.equal(call.resolution, "unresolved", line);
+        assert.equal(call.data.reason, reason, line);
+      }
+      assert.equal(callOn("direct[index]!.item();").resolution, "unresolved");
+      // Main already targets the initializer's existing symbol for this shape.
+      assert.equal(graph.target(callOn("legacy.old();")), "use.ts#legacy.old");
+      for (const line of [
+        "legacyList[key].inspect();",
+        "legacyChoice.inspect();",
+      ])
+        assert.equal(
+          graph.target(callOn(line)),
+          "use.ts#legacyFirst.inspect",
+          line,
+        );
     },
   );
 });

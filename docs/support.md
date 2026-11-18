@@ -528,6 +528,11 @@ answer.
   keys. Named object-literal members can be targets even inside a local binding
   or a returned object. Their identities use their enclosing declaration and
   member path, and search ranks them after named top-level declarations.
+  A newly supported literal member needs a provable receiver producer.
+  Multiple visible producers supply candidate declarations when each has a
+  graph anchor. Opaque producers stay unresolved (`object-producer-unverified`).
+  Several visible producers with missing anchors stay unresolved
+  (`multiple-object-producers`).
 - **Checkout packages:** npm, Yarn and Bun workspace lists, pnpm workspace
   member links, and checkout-local `file:` and `link:` dependencies expose
   manifests to the compiler. TypeScript applies its own package export

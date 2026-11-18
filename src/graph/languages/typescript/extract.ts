@@ -17,6 +17,7 @@ import {
   type Taint,
 } from "./taint.js";
 import { createJudge, type Judge, type Judged } from "./judge.js";
+import { objectProducers } from "./object-producers.js";
 import {
   NAMES,
   restoreNames,
@@ -54,6 +55,10 @@ export interface RenameContext {
 }
 /** One structural judgement per program (its checker), shared by its files. */
 const judges = new WeakMap<ts.TypeChecker, Judge>();
+const producerReaders = new WeakMap<
+  ts.Program,
+  ReturnType<typeof objectProducers>
+>();
 import {
   anchorOf,
   rootDeclaration,
@@ -202,6 +207,7 @@ interface Lookup {
   at?: ts.Node;
   construct?: boolean;
   memberCall?: boolean;
+  recoveredMember?: boolean;
 }
 const clip = (text: string) => {
   const flat = text
@@ -362,7 +368,8 @@ export function extractFile(
     let viaAlias = false;
     let firstAlias: ts.Symbol | undefined;
     let declaredSomewhere = false;
-    const declarations: ts.Node[] = [];
+    let verifyObjectProducers = false;
+    const declarations: ts.Declaration[] = [];
     const usableLocalCall = (
       anchor: ts.Node,
       declaration: ts.Declaration,
@@ -415,6 +422,11 @@ export function extractFile(
           return false;
       }
       const key = anchor ? keyOf(anchor) : member!.key;
+      if (
+        (!anchor || found.recoveredMember) &&
+        ts.isObjectLiteralExpression(declaration.parent)
+      )
+        verifyObjectProducers = true;
       facts.set(`${target}\0${key}`, { file: target, key });
       declarations.push(declaration);
       return true;
@@ -470,6 +482,44 @@ export function extractFile(
       }
     };
     visit(found.symbol, 0);
+    if (!external && !local && verifyObjectProducers) {
+      let producers = producerReaders.get(program);
+      if (!producers) {
+        producers = objectProducers(
+          program,
+          checker,
+          syntax.getAssignmentTargetKind,
+        );
+        producerReaders.set(program, producers);
+      }
+      const members =
+        receiver && found.name !== undefined
+          ? producers(receiver, found.name)
+          : undefined;
+      const verified =
+        members &&
+        declarations.every((declaration) => members.includes(declaration));
+      if (verified) {
+        for (const member of members) {
+          if (declarations.includes(member)) continue;
+          const name = (member as ts.NamedDeclaration).name;
+          const symbol = name && checker.getSymbolAtLocation(name);
+          if (!symbol || !record(member, symbol, true)) {
+            local++;
+            break;
+          }
+        }
+      }
+      if (!verified || local)
+        return {
+          targets: [],
+          reason:
+            members && members.length > 1
+              ? "multiple-object-producers"
+              : "object-producer-unverified",
+          receiver,
+        };
+    }
     const targets = [...facts.values()];
     if (!external && !local)
       return { targets, viaAlias, receiver, declarations };
@@ -1298,12 +1348,19 @@ export function extractFile(
     if (numeric && !symbol?.declarations?.length) symbol = undefined;
     if (symbol?.declarations?.length && !symbol.declarations.some(inCheckout))
       return previous;
+    const member = (selected: ts.Symbol): Lookup => ({
+      symbol: selected,
+      receiver,
+      name: key.text,
+      memberCall: true,
+      recoveredMember: selected !== previous.symbol,
+    });
     if (
       symbol &&
       !(symbol.flags & ts.SymbolFlags.Transient) &&
       !symbol.declarations?.some(ts.isIndexSignatureDeclaration)
     )
-      return { symbol, receiver, memberCall: true };
+      return member(symbol);
     let type = checker.getTypeAtLocation(receiver);
     if (
       access.questionDotToken ||
@@ -1358,7 +1415,7 @@ export function extractFile(
         }))
     )
       return { reason: "index-signature", receiver };
-    return symbol ? { symbol, receiver, memberCall: true } : previous;
+    return symbol ? member(symbol) : previous;
   }
   function calleeTarget(callee: ts.Expression): {
     at: ts.Node;
