@@ -3891,7 +3891,8 @@ function combineVariants(all: Selection[]): Selection {
     item.kind === "failed" ? item.cause : [],
   );
   if (causes.length) return { kind: "failed", cause: unique(causes).sort() };
-  if (results.some((item) => item.kind === "unknown")) return { kind: "unknown" };
+  if (results.some((item) => item.kind === "unknown"))
+    return { kind: "unknown" };
   const syms = unique(
     results.flatMap((item) =>
       item.kind === "found" || item.kind === "ambiguous" ? item.syms : [],

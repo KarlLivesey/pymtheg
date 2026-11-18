@@ -20,6 +20,20 @@ Files:
   check and the seeded sample, from `compare.mjs` (sites keyed by file,
   kind, range and target name; symbols by file, kind and identity).
 - `toolchain-agreement-restic.json`, from `toolchain-agreement.mjs`.
+- `coverage-plan-input.json.gz`, `scoreboard-plan-input.md`: the export the
+  plan's generated block was regenerated from (see below).
+
+## The coverage plan block
+
+`main` had moved on (C-2 and C-3 merged) and their exports were not
+kept, so the block was regenerated from a build of this branch with `main`
+merged, run on 40 pins: the 20 Go repositories and all 20 TypeScript pins
+(including microsoft/TypeScript, whose checkout has Go code, and
+vercel/turborepo), over the SW-3 base. The generated block then reads Go
+76.81% → 79.11% (the 55 finished graphs, with the Go code of
+microsoft/TypeScript), TypeScript / JS 52.90% → 56.43% and Rust unchanged
+at 31.47%. The TypeScript change is not this chunk's: C-3 had rerun 13 of
+the 20 TypeScript pins, and this run applies the same merged code to all 20.
 
 ## Level 2, Go
 
@@ -160,4 +174,17 @@ with the same target.
 
 ## Time and memory (observations)
 
-TIMING
+One cold `graph index` each, base build then the final build (this branch
+with `main` merged), one after the other on a quiet machine (load average
+under 3.5). Both builds include C-2's memory changes.
+
+| Repository | Build | Wall | Peak RSS | Symbols |
+| --- | --- | ---: | ---: | ---: |
+| cockroachdb/pebble | base | 205.6 s | 1.83 GiB | 19,372 |
+| cockroachdb/pebble | final | 213.8 s | 1.91 GiB | 21,727 |
+| restic/restic | base | 62.4 s | 0.69 GiB | 7,369 |
+| restic/restic | final | 63.9 s | 0.70 GiB | 8,092 |
+
+vercel/turborepo (no Go files) took 1,468 s with the base build and 1,204 s
+with the candidate; it and microsoft/TypeScript exceeded the sweep's
+60-minute limit when run two at a time and finished with a 120-minute limit.

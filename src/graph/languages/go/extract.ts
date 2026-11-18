@@ -296,8 +296,7 @@ export class GoExtractor {
     if (this.fact.goarch !== undefined) fileData.goarch = this.fact.goarch;
     // Only now is every anonymous struct's identity known.
     for (const item of [...this.symbols, ...this.links])
-      if (item.data)
-        item.data = this.anonymous(item.data) as typeof item.data;
+      if (item.data) item.data = this.anonymous(item.data) as typeof item.data;
   }
 
   private buildLine(comment: string): void {
@@ -1840,7 +1839,11 @@ export class GoExtractor {
     if (!value || typeof value !== "object") return value;
     const out: { [key: string]: Json } = {};
     for (const [key, item] of Object.entries(value)) {
-      if (key === "sym" && typeof item === "string" && item.startsWith(PENDING)) {
+      if (
+        key === "sym" &&
+        typeof item === "string" &&
+        item.startsWith(PENDING)
+      ) {
         const identity = this.anonymousStructs.get(
           Number(item.slice(PENDING.length)),
         );

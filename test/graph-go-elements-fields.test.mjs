@@ -520,7 +520,10 @@ test("build variants: a field or method promoted differently per variant is neve
     assert.equal(get(text).target, null, text);
     assert.deepEqual(
       get(text).candidates,
-      ["v/value_linux.go:field:forwarded.Name", "v/value_windows.go:field:Item.Name"],
+      [
+        "v/value_linux.go:field:forwarded.Name",
+        "v/value_windows.go:field:Item.Name",
+      ],
       text,
     );
   }
@@ -543,7 +546,9 @@ test("a field-less struct{} is not a symbol", async () => {
     ),
   });
   assert.deepEqual(
-    symbols.filter((item) => item.kind === "struct").map((item) => item.identity),
+    symbols
+      .filter((item) => item.kind === "struct")
+      .map((item) => item.identity),
     [],
   );
 });
@@ -671,10 +676,11 @@ test("search and file listings put generated anonymous-struct symbols after name
       ],
     );
     const listed = store.symbolsForFile("p/a_test.go", 3);
-    assert.deepEqual(
-      listed.map((item) => item.kind).sort(),
-      ["file", "function", "function"],
-    );
+    assert.deepEqual(listed.map((item) => item.kind).sort(), [
+      "file",
+      "function",
+      "function",
+    ]);
   } finally {
     store.close();
     await rm(scratch, { recursive: true, force: true });
@@ -761,15 +767,20 @@ test("an embedding anonymous struct inside field-only ones keeps its 0.1.0 ident
     ),
   });
   const identities = symbols
-    .filter((item) => item.kind === "struct" && item.file === "api/queries_repo.go")
+    .filter(
+      (item) => item.kind === "struct" && item.file === "api/queries_repo.go",
+    )
     .map((item) => item.identity)
     .sort();
-  assert.deepEqual(identities, [
-    "queries_repo.go:LastCommit.anon#1",
-    "queries_repo.go:LastCommit.anon#1.Repository.anon#1",
-    "queries_repo.go:LastCommit.struct#1",
-    "Commit",
-  ].sort());
+  assert.deepEqual(
+    identities,
+    [
+      "queries_repo.go:LastCommit.anon#1",
+      "queries_repo.go:LastCommit.anon#1.Repository.anon#1",
+      "queries_repo.go:LastCommit.struct#1",
+      "Commit",
+    ].sort(),
+  );
 });
 
 test("build variants: the declaration every build of the file includes, and cgo files", async () => {
@@ -842,7 +853,12 @@ test("build variants: a method that may or may not be built with a variant is a 
       "func (Inner) Alt() {}",
       "type SQLiteConn struct{ Inner }",
     ),
-    "s/static_mock.go": lines("//go:build !cgo", "", "package s", "type SQLiteConn struct{}"),
+    "s/static_mock.go": lines(
+      "//go:build !cgo",
+      "",
+      "package s",
+      "type SQLiteConn struct{}",
+    ),
     "s/sqlite3_opt_vtable.go": lines(
       "//go:build sqlite_vtable",
       "",
