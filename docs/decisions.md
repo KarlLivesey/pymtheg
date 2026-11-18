@@ -2582,6 +2582,12 @@ set. Opaque reads, including array selections and mutable class fields, leave
 the new link unresolved. The rule for existing literal anchors continues to
 apply at sites main already resolved.
 
+Factory fallthrough and bare returns contribute `undefined` to this source
+proof. Static object binding patterns read the selected property and consider
+their defaults on undefined results. A receiver can escape to another call
+and still retain its static declaration. Interprocedural aliasing writes
+through open index signatures or helper calls are outside this rule.
+
 ### Indexing holds one copy of the graph at a time (C-2)
 
 **Decided (C-2):** the graph store no longer keeps decoded file records between

@@ -521,6 +521,145 @@ test("object-member calls account for every explicit producer and withhold opaqu
   );
 });
 
+test("factory fallthrough and bare returns contribute undefined", async () => {
+  const source = `
+    declare const flag: boolean;
+    function maybe() { if (flag) return { run() { return 1; } }; }
+    function fallback() { return { run() { return 2; } }; }
+    function bare() { if (!flag) return; return { run() { return 3; } }; }
+    async function asyncMaybe() { if (flag) return { run() { return 4; } }; }
+    function always() { if (!flag) throw new Error(); return { run() { return 5; } }; }
+    async function asyncFallback() { return { run() { return 6; } }; }
+    function wrapped() { if (flag) return { next: maybe }; }
+    (maybe() ?? fallback()).run();
+    (bare() || fallback()).run();
+    (wrapped()?.next() ?? fallback()).run();
+    (flag ? (maybe() ?? fallback()) : always()).run();
+    async function use() { ((await asyncMaybe()) ?? fallback()).run(); }
+    async function promiseFirst() { (await (asyncMaybe() ?? asyncFallback()))?.run(); }
+    (always() ?? fallback()).run();
+  `;
+  await project(
+    {
+      "use.ts": source,
+      "tsconfig.json": '{"compilerOptions":{"strict":true}}',
+    },
+    async (graph, report) => {
+      clean(report);
+      const methods = (link) => {
+        const ids = link.candidates.map(({ id }) => id);
+        if (link.targetId) ids.push(link.targetId);
+        return ids
+          .map(
+            (id) =>
+              graph.store.findSymbols().find((symbol) => symbol.id === id)
+                .range,
+          )
+          .map(({ start, end }) => source.slice(start, end))
+          .sort();
+      };
+      for (const [callee, expected] of [
+        ["(maybe() ?? fallback()).run", [1, 2]],
+        ["(bare() || fallback()).run", [2, 3]],
+        ["(wrapped()?.next() ?? fallback()).run", [1, 2]],
+        ["(flag ? (maybe() ?? fallback()) : always()).run", [1, 2, 5]],
+        ["((await asyncMaybe()) ?? fallback()).run", [2, 4]],
+        ["(always() ?? fallback()).run", [5]],
+        ["(await (asyncMaybe() ?? asyncFallback()))?.run", [4]],
+      ]) {
+        const end = source.indexOf(callee) + callee.length;
+        const call = graph.store
+          .links()
+          .find((link) => link.kind === "calls" && link.range.end === end);
+        assert.ok(call, callee);
+        assert.equal(
+          call.resolution,
+          expected.length === 1 ? "resolved" : "ambiguous",
+        );
+        assert.deepEqual(
+          methods(call),
+          expected.map((n) => `run() { return ${n}; }`),
+        );
+      }
+    },
+  );
+});
+
+test("static object destructuring follows factory members and reachable defaults", async () => {
+  // Redux Toolkit's ownRequestResult tests take gate from setup().
+  const source = `
+    declare const flag: boolean;
+    declare function submit(value: unknown): void;
+    function createDeferredQueue() { return { resolveOldest() {} }; }
+    function setup() { const gate = createDeferredQueue(); return { gate }; }
+    function nested() { return { layer: { item: createDeferredQueue() } }; }
+    function maybeQueue() { return { gate: flag ? createDeferredQueue() : undefined }; }
+    function maybeMissing() { return flag ? { gate: createDeferredQueue() } : {}; }
+    function nullableQueue() { return { gate: flag ? createDeferredQueue() : null }; }
+    function backup() { return { resolveOldest() { return 2; } }; }
+    const { gate } = setup();
+    submit(gate);
+    gate.resolveOldest();
+    const { layer: { item: renamed } } = nested();
+    renamed.resolveOldest();
+    const { gate: defaulted = backup() } = maybeQueue();
+    defaulted.resolveOldest();
+    const { gate: missing = backup() } = maybeMissing();
+    missing.resolveOldest();
+    const { gate: nullable = backup() } = nullableQueue();
+    nullable?.resolveOldest();
+    let { gate: reassigned } = setup();
+    reassigned = backup();
+    reassigned.resolveOldest();
+    function mutable() { return { changing: createDeferredQueue() }; }
+    const holder = mutable();
+    holder.changing = backup();
+    const { changing } = holder;
+    changing.resolveOldest();
+  `;
+  await project(
+    {
+      "use.ts": source,
+      "tsconfig.json": '{"compilerOptions":{"strict":true}}',
+    },
+    async (graph, report) => {
+      clean(report);
+      const primary =
+        "use.ts#createDeferredQueue.[return].[object].resolveOldest";
+      const backup = "use.ts#backup.[return].[object].resolveOldest";
+      const callAt = (expression) => {
+        const end = source.indexOf(`${expression}();`) + expression.length;
+        const call = graph.store
+          .links()
+          .find((link) => link.kind === "calls" && link.range.end === end);
+        assert.ok(call, expression);
+        return call;
+      };
+      for (const at of [
+        "gate.resolveOldest",
+        "renamed.resolveOldest",
+        "nullable?.resolveOldest",
+      ]) {
+        const call = callAt(at);
+        assert.equal(call.resolution, "resolved", at);
+        assert.equal(graph.target(call), primary, at);
+      }
+      for (const at of [
+        "defaulted.resolveOldest",
+        "missing.resolveOldest",
+        "reassigned.resolveOldest",
+      ]) {
+        const call = callAt(at);
+        assert.equal(call.resolution, "ambiguous", at);
+        assert.deepEqual(graph.candidates(call), [backup, primary], at);
+      }
+      const changing = callAt("changing.resolveOldest");
+      assert.equal(changing.resolution, "unresolved");
+      assert.equal(changing.data.reason, "object-producer-unverified");
+    },
+  );
+});
+
 test("recorded generic references identify their owner and the precise binding", async () => {
   // Hono's HandlerInterface overload defaults I3 to I & I2 (src/types.ts:659).
   const source = [

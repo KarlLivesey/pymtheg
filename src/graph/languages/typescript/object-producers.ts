@@ -7,8 +7,21 @@ type Callable =
   | ts.FunctionExpression
   | ts.ArrowFunction
   | ts.MethodDeclaration;
-type Producer = ts.ObjectLiteralExpression | Callable | ts.SourceFile | null;
+const SHORT_CIRCUIT = Symbol("optional chain short circuit");
+type AsyncResult = { readonly kind: "promise"; readonly values: Values };
+type Producer =
+  | ts.ObjectLiteralExpression
+  | Callable
+  | ts.SourceFile
+  | AsyncResult
+  | null
+  | undefined
+  | typeof SHORT_CIRCUIT;
 type Values = readonly Producer[];
+type ReturnValues = readonly (ts.Expression | undefined)[];
+
+const isAsyncResult = (value: Producer): value is AsyncResult =>
+  typeof value === "object" && value?.kind === "promise";
 
 const isCallable = (node: ts.Node): node is Callable =>
   ts.isFunctionDeclaration(node) ||
@@ -33,15 +46,30 @@ const literalKey = (node: ts.Expression): string | undefined =>
 function ownMember(
   object: ts.ObjectLiteralExpression,
   name: string,
-): Exclude<ts.ObjectLiteralElementLike, ts.SpreadAssignment> | undefined {
+):
+  | Exclude<ts.ObjectLiteralElementLike, ts.SpreadAssignment>
+  | null
+  | undefined {
+  let customPrototype = false;
   for (let index = object.properties.length - 1; index >= 0; index--) {
     const property = object.properties[index]!;
     if (ts.isSpreadAssignment(property)) return undefined;
     const key = staticName(property.name);
     if (key === undefined) return undefined;
+    if (
+      key === "__proto__" &&
+      ts.isPropertyAssignment(property) &&
+      !ts.isComputedPropertyName(property.name)
+    ) {
+      customPrototype = true;
+      continue;
+    }
     if (key === name) return property;
   }
-  return undefined;
+  // A missing own key supplies undefined only for a plain property's lookup.
+  return customPrototype || Object.hasOwn(Object.prototype, name)
+    ? undefined
+    : null;
 }
 
 const MAX_PRODUCERS = 32;
@@ -59,7 +87,7 @@ export function objectProducers(
 ) {
   const cache = new WeakMap<ts.Node, Values>();
   const active = new Set<ts.Node>();
-  const returns = new WeakMap<Callable, readonly ts.Expression[]>();
+  const returns = new WeakMap<Callable, ReturnValues>();
   let writes:
     | {
         bindings: Map<ts.Symbol, (ts.Expression | null)[]>;
@@ -147,25 +175,31 @@ export function objectProducers(
     return values.size ? [...values] : undefined;
   }
 
-  function returned(fn: Callable): readonly ts.Expression[] {
+  function awaited(values: Values): Values | undefined {
+    return combine(values, (value) =>
+      isAsyncResult(value) ? value.values : [value],
+    );
+  }
+
+  function returned(fn: Callable): ReturnValues {
     const known = returns.get(fn);
     if (known) return known;
     const body = fn.body;
-    const values: ts.Expression[] = [];
-    let missing = !body || ("asteriskToken" in fn && !!fn.asteriskToken);
-    if (body && ts.isBlock(body)) {
+    if (!body || ("asteriskToken" in fn && fn.asteriskToken)) return [];
+    const values: (ts.Expression | undefined)[] = [];
+    if (ts.isBlock(body)) {
+      // The pinned compiler's binder marks a reachable end of the body,
+      // including for async functions and with strictNullChecks disabled.
+      if (fn.flags & ts.NodeFlags.HasImplicitReturn) values.push(undefined);
       const visit = (node: ts.Node) => {
         if (ts.isFunctionLike(node) || ts.isClassLike(node)) return;
-        if (ts.isReturnStatement(node)) {
-          if (node.expression) values.push(node.expression);
-          else missing = true;
-        } else ts.forEachChild(node, visit);
+        if (ts.isReturnStatement(node)) values.push(node.expression);
+        else ts.forEachChild(node, visit);
       };
       ts.forEachChild(body, visit);
-    } else if (body) values.push(body);
-    const result = missing ? [] : values;
-    returns.set(fn, result);
-    return result;
+    } else values.push(body);
+    returns.set(fn, values);
+    return values;
   }
 
   function binding(
@@ -192,18 +226,47 @@ export function objectProducers(
     if (ts.isSourceFile(declaration)) return [declaration];
     if (ts.isExportAssignment(declaration))
       return read(declaration.expression, depth);
-    if (ts.isVariableDeclaration(declaration)) {
-      const values = declaration.initializer
-        ? [declaration.initializer, ...mutations]
-        : mutations;
-      return combine(values, (value) =>
-        value ? read(value, depth) : undefined,
-      );
-    }
+    const initializer = ts.isBindingElement(declaration)
+      ? declaration
+      : ts.isVariableDeclaration(declaration)
+        ? declaration.initializer
+        : undefined;
+    if (!initializer && !ts.isVariableDeclaration(declaration))
+      return undefined;
+    const values = initializer ? [initializer, ...mutations] : mutations;
+    return combine(values, (value) => (value ? read(value, depth) : undefined));
+  }
+
+  function propertyValue(
+    object: ts.ObjectLiteralExpression,
+    name: string,
+    depth: number,
+  ): Values | undefined {
+    if (knownWrites().properties.has(name)) return undefined;
+    const member = ownMember(object, name);
+    if (member === null) return [undefined];
+    if (!member) return undefined;
+    if (ts.isPropertyAssignment(member)) return read(member.initializer, depth);
+    if (ts.isShorthandPropertyAssignment(member))
+      return binding(checker.getShorthandAssignmentValueSymbol(member), depth);
+    if (ts.isMethodDeclaration(member)) return [member];
     return undefined;
   }
 
-  function read(node: ts.Node, depth: number): Values | undefined {
+  function read(
+    node: ts.Node,
+    depth: number,
+    continueChain = false,
+  ): Values | undefined {
+    const result = readRaw(node, depth);
+    // An optional access skips the rest of the chain. At its boundary, the
+    // short circuit becomes a regular undefined value (e.g. for `??`).
+    return continueChain || !result?.includes(SHORT_CIRCUIT)
+      ? result
+      : result.map((value) => (value === SHORT_CIRCUIT ? undefined : value));
+  }
+
+  function readRaw(node: ts.Node, depth: number): Values | undefined {
     if (depth >= MAX_DEPTH || active.has(node)) return undefined;
     const previous = cache.get(node);
     if (previous) return previous;
@@ -219,8 +282,37 @@ export function objectProducers(
 
   function collect(node: ts.Node, depth: number): Values | undefined {
     if (ts.isObjectLiteralExpression(node) || isCallable(node)) return [node];
-    if (node.kind === ts.SyntaxKind.NullKeyword || ts.isVoidExpression(node))
-      return [null];
+    if (node.kind === ts.SyntaxKind.NullKeyword) return [null];
+    if (ts.isVoidExpression(node)) return [undefined];
+    if (ts.isBindingElement(node)) {
+      const { parent, propertyName, name, initializer } = node;
+      if (!ts.isObjectBindingPattern(parent) || node.dotDotDotToken)
+        return undefined;
+      const key = staticName(propertyName ?? name);
+      if (key === undefined) return undefined;
+      const owner = parent.parent;
+      const input = ts.isBindingElement(owner)
+        ? owner
+        : ts.isVariableDeclaration(owner)
+          ? owner.initializer
+          : undefined;
+      const objects = input && read(input, depth);
+      const selected =
+        objects &&
+        combine(objects, (value) =>
+          value &&
+          value !== SHORT_CIRCUIT &&
+          !isAsyncResult(value) &&
+          ts.isObjectLiteralExpression(value)
+            ? propertyValue(value, key, depth)
+            : undefined,
+        );
+      return selected && initializer
+        ? combine(selected, (value) =>
+            value === undefined ? read(initializer, depth) : [value],
+          )
+        : selected;
+    }
     if (ts.isIdentifier(node)) {
       const symbol = checker.getSymbolAtLocation(node);
       if (
@@ -228,7 +320,7 @@ export function objectProducers(
         !symbol?.declarations?.length &&
         checker.getTypeAtLocation(node) === checker.getUndefinedType()
       )
-        return [null];
+        return [undefined];
       return binding(symbol, depth);
     }
     if (ts.isConditionalExpression(node))
@@ -247,19 +339,31 @@ export function objectProducers(
       return (
         left &&
         combine(left, (value) =>
-          (value !== null) === and ? read(node.right, depth) : [value],
+          (value != null) === and ? read(node.right, depth) : [value],
         )
       );
     }
     if (ts.isCallExpression(node)) {
-      const callees = read(node.expression, depth);
+      const callees = read(node.expression, depth, ts.isCallChain(node));
       return (
         callees &&
-        combine(callees, (callee) =>
-          callee && isCallable(callee)
-            ? combine(returned(callee), (value) => read(value, depth))
-            : undefined,
-        )
+        combine(callees, (callee) => {
+          if (callee === SHORT_CIRCUIT) return [callee];
+          if (callee == null)
+            return node.questionDotToken ? [SHORT_CIRCUIT] : undefined;
+          if (isAsyncResult(callee) || !isCallable(callee)) return undefined;
+          const values = combine(returned(callee), (value) =>
+            value ? read(value, depth) : [undefined],
+          );
+          if (
+            !values ||
+            !(ts.getCombinedModifierFlags(callee) & ts.ModifierFlags.Async)
+          )
+            return values;
+          // `??` before the await sees the promise, even if it fulfills with undefined.
+          const results = awaited(values);
+          return results && [{ kind: "promise", values: results }];
+        })
       );
     }
 
@@ -280,34 +384,30 @@ export function objectProducers(
     if (selector) {
       const { at, receiver, name } = selector;
       if (name === undefined) return undefined;
-      const values = read(receiver, depth);
+      const chain = ts.isOptionalChain(node) ? node : undefined;
+      const optional =
+        chain && "questionDotToken" in chain && chain.questionDotToken;
+      const values = read(receiver, depth, !!chain);
       return (
         values &&
         combine(values, (value) => {
-          if (!value) return [null];
+          if (value === SHORT_CIRCUIT) return [value];
+          if (value == null) return optional ? [SHORT_CIRCUIT] : undefined;
+          if (isAsyncResult(value)) return undefined;
           if (ts.isSourceFile(value))
             return binding(checker.getSymbolAtLocation(at), depth);
-          if (
-            !ts.isObjectLiteralExpression(value) ||
-            knownWrites().properties.has(name)
-          )
-            return undefined;
-          const member = ownMember(value, name);
-          if (!member) return undefined;
-          if (ts.isPropertyAssignment(member))
-            return read(member.initializer, depth);
-          if (ts.isShorthandPropertyAssignment(member))
-            return binding(
-              checker.getShorthandAssignmentValueSymbol(member),
-              depth,
-            );
-          if (ts.isMethodDeclaration(member)) return [member];
-          return undefined;
+          return ts.isObjectLiteralExpression(value)
+            ? propertyValue(value, name, depth)
+            : undefined;
         })
       );
     }
 
-    if (ts.isAwaitExpression(node)) return read(node.expression, depth);
+    if (ts.isAwaitExpression(node)) {
+      const values = read(node.expression, depth);
+      return values && awaited(values);
+    }
+    if (ts.isNonNullChain(node)) return read(node.expression, depth, true);
     const expression = unwrap(node as ts.Expression);
     return expression !== node ? read(expression, depth) : undefined;
   }
@@ -322,7 +422,12 @@ export function objectProducers(
     const declarations: ts.Declaration[] = [];
     for (const value of values) {
       if (!value) continue;
-      if (!ts.isObjectLiteralExpression(value)) return undefined;
+      if (
+        value === SHORT_CIRCUIT ||
+        isAsyncResult(value) ||
+        !ts.isObjectLiteralExpression(value)
+      )
+        return undefined;
       const member = ownMember(value, name);
       if (!member || ts.isSetAccessorDeclaration(member)) return undefined;
       declarations.push(member);

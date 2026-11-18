@@ -537,6 +537,14 @@ answer.
   graph anchor. Opaque producers stay unresolved (`object-producer-unverified`).
   Several visible producers with missing anchors stay unresolved
   (`multiple-object-producers`).
+  Factory fallthrough and bare returns can contribute `undefined`, including
+  after `await`. Static object destructuring follows named properties,
+  renames, nested patterns, and defaults that can run. Passing a produced
+  object as a call argument preserves static links. A direct binding or
+  property reassignment can change or withhold them. An indirect write through
+  an open index signature or `Object.assign` in another function can leave
+  the original member link in place. The graph uses static declarations and
+  leaves interprocedural aliasing writes untracked, as it does for class fields.
 - **Checkout packages:** npm, Yarn and Bun workspace lists, pnpm workspace
   member links, and checkout-local `file:` and `link:` dependencies expose
   manifests to the compiler. TypeScript applies its own package export
