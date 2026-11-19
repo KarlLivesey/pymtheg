@@ -100,9 +100,13 @@ export function formatGraph(response: GraphResponse): string {
         }
       }
     if (data.library) {
-      const library = data.library as { unit: string; symbol?: string };
+      const library = data.library as {
+        unit: string;
+        symbol?: string;
+        declaredBy?: { unit: string; symbol: string };
+      };
       lines.push(
-        `Uses of library ${quote(library.unit)}${library.symbol === undefined ? "" : ` symbol ${quote(library.symbol)}`} (outside this project): ${quote(data.classCounts)}`,
+        `Uses of library ${quote(library.unit)}${library.symbol === undefined ? "" : ` symbol ${quote(library.symbol)}`}${library.declaredBy ? `, declared by ${quote(library.declaredBy.unit)} symbol ${quote(library.declaredBy.symbol)}` : ""} (outside this project): ${quote(data.classCounts)}`,
       );
     }
     if (data.symbol) showSymbols([data.symbol]);

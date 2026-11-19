@@ -271,6 +271,8 @@ interface Found {
   libraryScopes?: string[];
   associatedFallback?: true;
   scopeChanges?: number;
+  /** C-15: the receiver gap cannot depend on a failed file. */
+  unreadReceiver?: true;
 }
 const unique = (ss: GraphSymbol[]) =>
   ss.length < 2 ? ss.slice() : [...new Map(ss.map((s) => [s.id, s])).values()];
@@ -4906,7 +4908,7 @@ export function resolveRust(
           complete: false,
           reason:
             "receiver-type-unverified" +
-            (relevantFailures(loc.crate.root).length
+            (type.failedFiles?.length
               ? "; failed-file-unseen-declarations"
               : ""),
         };
@@ -4921,8 +4923,22 @@ export function resolveRust(
     )
       return empty();
     const failures = relevantFailures(loc.crate.root);
-    const note = (reason: string) =>
-      reason + (failures.length ? "; failed-file-unseen-declarations" : "");
+    // C-15: name the failed files only where their unread content could
+    // change this answer. They add declarations and impls but cannot remove
+    // a visible competitor, macro or shape gap. A lookup that reached one
+    // already carries its own reason.
+    const note = (reason: string, couldAnswer: boolean) =>
+      reason +
+      (failures.length && couldAnswer
+        ? "; failed-file-unseen-declarations"
+        : "");
+    // An inherent impl must be in the type's own crate.
+    const inherentUnseen = () =>
+      type.symbols.some((t) =>
+        ownerPlace(t.file, str(data(t).scope)).some(
+          (p) => failedByCrate.get(p.crate.root)?.length,
+        ),
+      );
     if (type.failedFiles?.length)
       return instance
         ? {
@@ -4932,6 +4948,7 @@ export function resolveRust(
               ["receiver-type-unverified", type.reason]
                 .filter(Boolean)
                 .join("; "),
+              true,
             ),
           }
         : type;
@@ -4956,6 +4973,8 @@ export function resolveRust(
               ]
                 .filter(Boolean)
                 .join("; "),
+          // An alias expansion can look up names that the failed files hold.
+          !!ex.unknown,
         ),
       };
     const applicable = (m: Method): "yes" | "no" | "unknown" => {
@@ -5038,7 +5057,7 @@ export function resolveRust(
         )
       );
     };
-    const unverified = (reason: string): Found => ({
+    const unverified = (reason: string, couldAnswer = false): Found => ({
       symbols: instance
         ? unique([...targets, ...would(loc.crate.root, name, true)]).filter(
             (m) => data(m).receiverKind !== "none" && accessibleHint(m),
@@ -5053,12 +5072,24 @@ export function resolveRust(
       opaqueAttributes: [
         ...new Set(matches.flatMap((m) => itemPresence(m.symbol))),
       ].sort(),
-      reason: note(
-        matches.some((m) => itemPresence(m.symbol).length)
-          ? "item-under-opaque-attribute"
-          : reason,
-      ),
+      reason: matches.some((m) => itemPresence(m.symbol).length)
+        ? note("item-under-opaque-attribute", gated())
+        : note(reason, couldAnswer || gated()),
     });
+    // A cfg-gated candidate leaves other configurations to impls the failed
+    // files could hold (`impl S { fn new() }` under `#[cfg(unix)]` only).
+    const gated = () =>
+      matches.some(
+        (m) =>
+          conditions(m).length > 0 ||
+          ((data(m.symbol).receiverConditions ?? []) as string[]).some(
+            (c) =>
+              !implies(
+                m.ownerRoot === loc.crate.root ? (loc.conditions ?? []) : [],
+                c,
+              ),
+          ),
+      );
     const inherent = matches.filter(
       (m) =>
         m.inherent &&
@@ -5115,7 +5146,10 @@ export function resolveRust(
     // at the autoref step, after every by-value (and, for `&mut self`, every
     // `&self`) candidate of a trait in scope. Definite only when no such trait
     // candidate can exist at the call site.
+    // Unreadable code in reach could implement a trait with an earlier
+    // by-value candidate for the type, or declare such a trait.
     const autoref =
+      !failures.length &&
       !firstStep &&
       !!site &&
       stepBase &&
@@ -5135,16 +5169,15 @@ export function resolveRust(
         return { symbols: unique(proven.map((m) => m.symbol)), complete: true };
       if (borrow === "unknown" || inherent.some((m) => form(m) === "unknown"))
         return unverified("receiver-type-unverified");
+      if (inherent.length)
+        return proven.length !== inherent.length ||
+          unknownInherentExists ||
+          inherent.some((m) => conditions(m).length || form(m) === borrow)
+          ? unverified("inherent-applicability-unverified")
+          : unverified("later-probe-step", true);
       return unverified(
-        inherent.length
-          ? proven.length !== inherent.length ||
-            unknownInherentExists ||
-            inherent.some((m) => conditions(m).length || form(m) === borrow)
-            ? "inherent-applicability-unverified"
-            : "later-probe-step"
-          : matches.length
-            ? "trait-dispatch"
-            : "receiver-type-unverified",
+        matches.length ? "trait-dispatch" : "receiver-type-unverified",
+        inherentUnseen(),
       );
     }
     const covered =
@@ -5175,9 +5208,9 @@ export function resolveRust(
         inherent.every((m) => applicable(m) === "yes"));
     if (pathInherent)
       return { symbols: unique(inherent.map((m) => m.symbol)), complete: true };
-    return unverified(
-      inherent.length ? "inherent-applicability-unverified" : "trait-dispatch",
-    );
+    return inherent.length
+      ? unverified("inherent-applicability-unverified")
+      : unverified("trait-dispatch", inherentUnseen());
   }
   // C-10: imports that could bring a trait into scope at a call site.
   const importsInScope = new Map<string, GraphLink[]>();
@@ -5472,6 +5505,35 @@ export function resolveRust(
       : { text: rest, borrow: m[1] ? "mutable" : "shared" };
   }
   /** Shapes the method lookup can name; others report their gap. */
+  /**
+   * C-15: receiver gaps fixed by the written shape of a declaration that
+   * was found (or of the expression). Unread files cannot change them.
+   */
+  const shapeGaps = new Set([
+    "unit-return",
+    "impl-trait",
+    "trait-object",
+    "aggregate",
+    "generic-return",
+    "generic-field",
+    "associated-type",
+    "trait-self",
+    "reference-to-reference",
+    "deref-owned",
+    "future-receiver",
+    "await-non-async",
+    "field-unknown",
+    "field-private",
+    "callee-kind",
+  ]);
+  /** C-15: parser receiver gaps that depend on a macro or a named value. */
+  const namedReceiverGaps = new Set([
+    "macro",
+    "binding-unproved",
+    "uninitialized",
+    "non-local-value",
+    "path-value",
+  ]);
   function shapeGap(text: string, generics: string): string | undefined {
     const t = text.trim();
     if (!t) return "unit-return";
@@ -5680,7 +5742,11 @@ export function resolveRust(
    * proved only when the lookup completes with no such item and no import
    * spelling that could supply one.
    */
-  function bindsLocally(l: GraphLink, d: Data): boolean {
+  function bindsLocally(
+    l: GraphLink,
+    d: Data,
+    unread?: (f: Found) => void,
+  ): boolean {
     const name = str((d.localBinding as Data | undefined)?.name);
     if (name === "self") return true;
     // Prelude variants: a path pattern (`None`), or rejected as a shadowing
@@ -5692,6 +5758,7 @@ export function resolveRust(
       places.every((loc) => {
         // Block items are checked by the parser; one lookup per module.
         const f = find(name, loc, loc.local, "value");
+        unread?.(f);
         return (
           f.complete &&
           !f.failedFiles?.length &&
@@ -7107,10 +7174,27 @@ export function resolveRust(
       const target = d.localBinding
         ? byLocalKey.get(`${l.file}|${l.sourceKey ?? ""}`)
         : byLocalKey.get(`${l.file}|${str(d.typeParameterOwner)}`);
+      // C-15: a binding is unproved because of a failed file only when the
+      // check for a same-named constant or unit item reached one.
+      let unread = false;
       found =
-        target && (!d.localBinding || bindsLocally(l, d))
+        target &&
+        (!d.localBinding ||
+          bindsLocally(l, d, (f) => {
+            unread ||=
+              !!f.failedFiles?.length ||
+              !!f.reason
+                ?.split(/;\s*/)
+                .includes("failed-file-unseen-declarations");
+          }))
           ? { symbols: [target], complete: true }
-          : empty();
+          : unread
+            ? {
+                symbols: [],
+                complete: false,
+                reason: "failed-file-unseen-declarations",
+              }
+            : empty();
     } else if (
       (!d.blocked || !!d.method || !!d.conditionalBinding) &&
       !(l.kind === "imports" && d.glob)
@@ -7301,6 +7385,31 @@ export function resolveRust(
         reason: "conditional-binding-may-shadow-name",
       };
     }
+    // C-15: a receiver no failed file can type. A gap the parser reports
+    // from syntax alone, or a type shape read from a found declaration,
+    // stays whatever the failed files hold. A receiver from a macro, or one
+    // naming a value or binding, could come from a failed file and keeps it.
+    const typingGap = (note?.receiverTyping as Data | undefined)?.gap;
+    if (
+      d.method &&
+      !str(d.receiverType) &&
+      (d.receiverExpr
+        ? typeof typingGap === "string" && shapeGaps.has(typingGap)
+        : typeof d.receiverGap === "string" &&
+          !namedReceiverGaps.has(d.receiverGap))
+    )
+      found = {
+        ...found,
+        unreadReceiver: true,
+        ...(found.reason
+          ? {
+              reason: found.reason
+                .split(/;\s*/)
+                .filter((r) => r !== "failed-file-unseen-declarations")
+                .join("; "),
+            }
+          : {}),
+      };
     return associatedFallback ? { ...found, associatedFallback: true } : found;
   }
   type ScopeRetry = {
@@ -7374,6 +7483,12 @@ export function resolveRust(
             }
           : {}),
       });
+    // C-15: a failed file in reach explains a miss only when nothing visible
+    // does. A visible reason (a macro, a competitor, a shape the parser
+    // cannot type) stays whatever the failed files hold, because they can
+    // only add declarations. A lookup that reached one names it already.
+    // Macro lookups keep the wider rule.
+    const unreadReceiver = !!found.unreadReceiver;
     if (
       !found.symbols.length &&
       !found.failedFiles?.length &&
@@ -7381,18 +7496,27 @@ export function resolveRust(
         (loc) => relevantFailures(loc.crate.root).length,
       )
     ) {
-      found = {
-        ...found,
-        complete: false,
-        reason: [
-          ...new Set(
-            [
-              ...(found.reason?.split(/;\s*/) ?? []),
-              "failed-file-unseen-declarations",
-            ].filter(Boolean),
-          ),
-        ].join("; "),
-      };
+      const named =
+        l.kind === "macros" ||
+        // The enclosing macro may itself be one the failed files declare.
+        !!found.reason?.split(/;\s*/).includes("macro-argument-unverified") ||
+        (!found.reason &&
+          !unreadReceiver &&
+          (!d.blocked || !!d.method || !!d.conditionalBinding));
+      // Each reason once, as main recorded them in this step.
+      const reason = [
+        ...new Set(
+          [
+            ...(found.reason?.split(/;\s*/) ?? []),
+            ...(named ? ["failed-file-unseen-declarations"] : []),
+          ].filter(Boolean),
+        ),
+      ].join("; ");
+      found = named
+        ? { ...found, complete: false, reason }
+        : reason
+          ? { ...found, reason }
+          : found;
     }
     if (found.failedFiles?.length) {
       uncertain?.(l, [], "invalid-code", found.failedFiles);
