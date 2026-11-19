@@ -1688,6 +1688,18 @@ trait provides the named member. Rust coverage for module 29 and later uses
 stored targets for the level 2 numerator. Historical Rust graphs retain the
 original reconstruction.
 
+Go records library targets during resolution starting with module 30
+(C-14, `resolve.ts` `libraryOf`, `gomod.ts` `libraryOrigin`): an import's
+unit (`import-path`), an exported name through a library import's qualifier
+(`import-binding`), and an unshadowed builtin call (`declared-builtin`). Only
+where the link has no checkout target, candidate set or failure. A member of a
+library-typed value stays unresolved (`data.uncertainty`
+`library-member-unproven`) unless the opt-in toolchain route selected it:
+the helper's C and U records carry the member's declaring named type
+(`Owner.Name`, after promotion; none for interface methods), and the resolver
+records it with `declaring-owner`. Go coverage for module 30 and later uses
+stored targets only; older Go graphs keep the reconstruction.
+
 Module 30 recognizes captured Cargo directory source replacements as checkout
 dependencies, limits patch uncertainty to affected package edges, and protects
 explicit module imports with a proven namespace from opaque items in that same

@@ -1,0 +1,1841 @@
+{
+ "repos": [
+  {
+   "id": "charmbracelet/bubbletea",
+   "linksBefore": 12533,
+   "linksAfter": 12533,
+   "sitesBefore": 12533,
+   "sitesAfter": 12533,
+   "librarySetsAfter": 0,
+   "definiteBefore": 7747,
+   "definiteAfter": 7747,
+   "libraryAfter": 2939,
+   "librarySymbolAfter": 2446,
+   "lost": 0,
+   "retargeted": 0,
+   "candidateSetChanged": 0,
+   "removedSites": 0,
+   "addedSites": 0,
+   "reconstructedBefore": 1257,
+   "reconstructedKept": 1257,
+   "reconstructedWithheld": 0,
+   "memberReason": 1467,
+   "byEvidence": {
+    "import-path:go": 151,
+    "import-binding:go": 1182,
+    "import-path:go-std": 342,
+    "import-binding:go-std": 1019,
+    "builtin:go-std": 245
+   },
+   "symbolsBefore": 2000,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "cilium/ebpf",
+   "linksBefore": 50239,
+   "linksAfter": 50239,
+   "sitesBefore": 50239,
+   "sitesAfter": 50239,
+   "librarySetsAfter": 0,
+   "definiteBefore": 33456,
+   "definiteAfter": 33456,
+   "libraryAfter": 11802,
+   "librarySymbolAfter": 10328,
+   "lost": 0,
+   "retargeted": 0,
+   "candidateSetChanged": 0,
+   "removedSites": 0,
+   "addedSites": 0,
+   "reconstructedBefore": 5795,
+   "reconstructedKept": 5795,
+   "reconstructedWithheld": 0,
+   "memberReason": 2574,
+   "byEvidence": {
+    "import-path:go-std": 1330,
+    "import-binding:go-std": 5737,
+    "import-path:go": 144,
+    "import-binding:go": 3353,
+    "builtin:go-std": 1238
+   },
+   "symbolsBefore": 8314,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "cli/cli",
+   "linksBefore": 208993,
+   "linksAfter": 208993,
+   "sitesBefore": 208845,
+   "sitesAfter": 208845,
+   "librarySetsAfter": 0,
+   "definiteBefore": 134437,
+   "definiteAfter": 134437,
+   "libraryAfter": 52338,
+   "librarySymbolAfter": 45712,
+   "lost": 0,
+   "retargeted": 0,
+   "candidateSetChanged": 0,
+   "removedSites": 0,
+   "addedSites": 0,
+   "reconstructedBefore": 25536,
+   "reconstructedKept": 25536,
+   "reconstructedWithheld": 0,
+   "memberReason": 13925,
+   "byEvidence": {
+    "import-path:go-std": 4764,
+    "import-binding:go-std": 24913,
+    "import-path:go": 1862,
+    "import-binding:go": 16112,
+    "builtin:go-std": 4687
+   },
+   "symbolsBefore": 27259,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "cockroachdb/pebble",
+   "linksBefore": 200940,
+   "linksAfter": 200940,
+   "sitesBefore": 200878,
+   "sitesAfter": 200878,
+   "librarySetsAfter": 0,
+   "definiteBefore": 144835,
+   "definiteAfter": 144835,
+   "libraryAfter": 35684,
+   "librarySymbolAfter": 31605,
+   "lost": 0,
+   "retargeted": 0,
+   "candidateSetChanged": 0,
+   "removedSites": 0,
+   "addedSites": 0,
+   "reconstructedBefore": 13203,
+   "reconstructedKept": 13203,
+   "reconstructedWithheld": 0,
+   "memberReason": 9119,
+   "byEvidence": {
+    "import-path:go": 1093,
+    "import-binding:go": 9538,
+    "import-path:go-std": 2986,
+    "import-binding:go-std": 13868,
+    "builtin:go-std": 8199
+   },
+   "symbolsBefore": 20080,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "etcd-io/bbolt",
+   "linksBefore": 16898,
+   "linksAfter": 16898,
+   "sitesBefore": 16898,
+   "sitesAfter": 16898,
+   "librarySetsAfter": 0,
+   "definiteBefore": 10750,
+   "definiteAfter": 10750,
+   "libraryAfter": 4078,
+   "librarySymbolAfter": 3571,
+   "lost": 0,
+   "retargeted": 0,
+   "candidateSetChanged": 0,
+   "removedSites": 0,
+   "addedSites": 0,
+   "reconstructedBefore": 2113,
+   "reconstructedKept": 2113,
+   "reconstructedWithheld": 0,
+   "memberReason": 1615,
+   "byEvidence": {
+    "import-path:go-std": 420,
+    "import-path:go": 87,
+    "import-binding:go": 839,
+    "import-binding:go-std": 2099,
+    "builtin:go-std": 633
+   },
+   "symbolsBefore": 1905,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "evanw/esbuild",
+   "linksBefore": 98034,
+   "linksAfter": 98034,
+   "sitesBefore": 98034,
+   "sitesAfter": 98034,
+   "librarySetsAfter": 0,
+   "definiteBefore": 88193,
+   "definiteAfter": 88193,
+   "libraryAfter": 7685,
+   "librarySymbolAfter": 7300,
+   "lost": 0,
+   "retargeted": 0,
+   "candidateSetChanged": 0,
+   "removedSites": 0,
+   "addedSites": 0,
+   "reconstructedBefore": 3778,
+   "reconstructedKept": 3778,
+   "reconstructedWithheld": 0,
+   "memberReason": 1024,
+   "byEvidence": {
+    "import-path:go-std": 382,
+    "import-binding:go-std": 3778,
+    "builtin:go-std": 3511,
+    "import-path:go": 3,
+    "import-binding:go": 11
+   },
+   "symbolsBefore": 8329,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "gin-gonic/gin",
+   "linksBefore": 21081,
+   "linksAfter": 21081,
+   "sitesBefore": 21066,
+   "sitesAfter": 21066,
+   "librarySetsAfter": 0,
+   "definiteBefore": 10948,
+   "definiteAfter": 10948,
+   "libraryAfter": 7042,
+   "librarySymbolAfter": 6552,
+   "lost": 0,
+   "retargeted": 0,
+   "candidateSetChanged": 0,
+   "removedSites": 0,
+   "addedSites": 0,
+   "reconstructedBefore": 3792,
+   "reconstructedKept": 3792,
+   "reconstructedWithheld": 0,
+   "memberReason": 2228,
+   "byEvidence": {
+    "import-path:go-std": 396,
+    "import-path:go": 94,
+    "import-binding:go-std": 3740,
+    "import-binding:go": 2433,
+    "builtin:go-std": 379
+   },
+   "symbolsBefore": 2729,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "go-task/task",
+   "linksBefore": 18346,
+   "linksAfter": 18346,
+   "sitesBefore": 18333,
+   "sitesAfter": 18333,
+   "librarySetsAfter": 0,
+   "definiteBefore": 11569,
+   "definiteAfter": 11569,
+   "libraryAfter": 4556,
+   "librarySymbolAfter": 3943,
+   "lost": 0,
+   "retargeted": 0,
+   "candidateSetChanged": 0,
+   "removedSites": 0,
+   "addedSites": 0,
+   "reconstructedBefore": 2276,
+   "reconstructedKept": 2276,
+   "reconstructedWithheld": 0,
+   "memberReason": 1719,
+   "byEvidence": {
+    "import-path:go-std": 466,
+    "import-binding:go-std": 2228,
+    "import-path:go": 147,
+    "import-binding:go": 1348,
+    "builtin:go-std": 367
+   },
+   "symbolsBefore": 2772,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "gofiber/fiber",
+   "linksBefore": 143673,
+   "linksAfter": 143673,
+   "sitesBefore": 143673,
+   "sitesAfter": 143673,
+   "librarySetsAfter": 0,
+   "definiteBefore": 80460,
+   "definiteAfter": 80460,
+   "libraryAfter": 34123,
+   "librarySymbolAfter": 31776,
+   "lost": 0,
+   "retargeted": 0,
+   "candidateSetChanged": 0,
+   "removedSites": 0,
+   "addedSites": 0,
+   "reconstructedBefore": 14606,
+   "reconstructedKept": 14606,
+   "reconstructedWithheld": 0,
+   "memberReason": 16770,
+   "byEvidence": {
+    "import-path:go-std": 1794,
+    "import-path:go": 553,
+    "import-binding:go": 13347,
+    "import-binding:go-std": 14572,
+    "builtin:go-std": 3857
+   },
+   "symbolsBefore": 16070,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "golang/tools",
+   "linksBefore": 250367,
+   "linksAfter": 250367,
+   "sitesBefore": 250351,
+   "sitesAfter": 250351,
+   "librarySetsAfter": 0,
+   "definiteBefore": 154565,
+   "definiteAfter": 154565,
+   "libraryAfter": 57459,
+   "librarySymbolAfter": 50367,
+   "lost": 0,
+   "retargeted": 0,
+   "candidateSetChanged": 0,
+   "removedSites": 0,
+   "addedSites": 0,
+   "reconstructedBefore": 38026,
+   "reconstructedKept": 37907,
+   "reconstructedWithheld": 119,
+   "memberReason": 28846,
+   "byEvidence": {
+    "import-path:go-std": 6752,
+    "import-binding:go-std": 37920,
+    "import-path:go": 340,
+    "import-binding:go": 748,
+    "builtin:go-std": 11699
+   },
+   "symbolsBefore": 30732,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "junegunn/fzf",
+   "linksBefore": 25947,
+   "linksAfter": 25947,
+   "sitesBefore": 25947,
+   "sitesAfter": 25947,
+   "librarySetsAfter": 0,
+   "definiteBefore": 18695,
+   "definiteAfter": 18695,
+   "libraryAfter": 3891,
+   "librarySymbolAfter": 3553,
+   "lost": 0,
+   "retargeted": 0,
+   "candidateSetChanged": 0,
+   "removedSites": 0,
+   "addedSites": 0,
+   "reconstructedBefore": 1528,
+   "reconstructedKept": 1528,
+   "reconstructedWithheld": 0,
+   "memberReason": 1093,
+   "byEvidence": {
+    "import-path:go-std": 315,
+    "import-binding:go-std": 1528,
+    "import-path:go": 23,
+    "import-binding:go": 646,
+    "builtin:go-std": 1379
+   },
+   "symbolsBefore": 2984,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "labstack/echo",
+   "linksBefore": 31880,
+   "linksAfter": 31880,
+   "sitesBefore": 31880,
+   "sitesAfter": 31880,
+   "librarySetsAfter": 0,
+   "definiteBefore": 17276,
+   "definiteAfter": 17276,
+   "libraryAfter": 10449,
+   "librarySymbolAfter": 9724,
+   "lost": 0,
+   "retargeted": 0,
+   "candidateSetChanged": 0,
+   "removedSites": 0,
+   "addedSites": 0,
+   "reconstructedBefore": 6553,
+   "reconstructedKept": 6553,
+   "reconstructedWithheld": 0,
+   "memberReason": 3293,
+   "byEvidence": {
+    "import-path:go-std": 655,
+    "import-path:go": 70,
+    "import-binding:go-std": 6553,
+    "import-binding:go": 2599,
+    "builtin:go-std": 572
+   },
+   "symbolsBefore": 4168,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "mattn/go-sqlite3",
+   "linksBefore": 9650,
+   "linksAfter": 9650,
+   "sitesBefore": 9650,
+   "sitesAfter": 9650,
+   "librarySetsAfter": 0,
+   "definiteBefore": 3643,
+   "definiteAfter": 3643,
+   "libraryAfter": 2383,
+   "librarySymbolAfter": 2106,
+   "lost": 0,
+   "retargeted": 0,
+   "candidateSetChanged": 0,
+   "removedSites": 0,
+   "addedSites": 0,
+   "reconstructedBefore": 1761,
+   "reconstructedKept": 1761,
+   "reconstructedWithheld": 0,
+   "memberReason": 2245,
+   "byEvidence": {
+    "import-path:go-std": 277,
+    "import-binding:go-std": 1761,
+    "builtin:go-std": 345
+   },
+   "symbolsBefore": 1204,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "pocketbase/pocketbase",
+   "linksBefore": 70629,
+   "linksAfter": 70629,
+   "sitesBefore": 70628,
+   "sitesAfter": 70628,
+   "librarySetsAfter": 0,
+   "definiteBefore": 44933,
+   "definiteAfter": 44933,
+   "libraryAfter": 15284,
+   "librarySymbolAfter": 13095,
+   "lost": 0,
+   "retargeted": 0,
+   "candidateSetChanged": 0,
+   "removedSites": 0,
+   "addedSites": 0,
+   "reconstructedBefore": 9082,
+   "reconstructedKept": 9082,
+   "reconstructedWithheld": 0,
+   "memberReason": 7503,
+   "byEvidence": {
+    "import-path:go": 314,
+    "import-binding:go": 2435,
+    "import-path:go-std": 1875,
+    "import-binding:go-std": 8692,
+    "builtin:go-std": 1968
+   },
+   "symbolsBefore": 8172,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "protocolbuffers/protobuf-go",
+   "linksBefore": 217087,
+   "linksAfter": 217087,
+   "sitesBefore": 216975,
+   "sitesAfter": 216975,
+   "librarySetsAfter": 0,
+   "definiteBefore": 179186,
+   "definiteAfter": 179186,
+   "libraryAfter": 10547,
+   "librarySymbolAfter": 9316,
+   "lost": 0,
+   "retargeted": 0,
+   "candidateSetChanged": 0,
+   "removedSites": 0,
+   "addedSites": 0,
+   "reconstructedBefore": 5049,
+   "reconstructedKept": 5049,
+   "reconstructedWithheld": 0,
+   "memberReason": 3234,
+   "byEvidence": {
+    "import-path:go-std": 1178,
+    "import-binding:go-std": 5049,
+    "import-path:go": 53,
+    "builtin:go-std": 3826,
+    "import-binding:go": 441
+   },
+   "symbolsBefore": 46060,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "restic/restic",
+   "linksBefore": 64165,
+   "linksAfter": 64165,
+   "sitesBefore": 64165,
+   "sitesAfter": 64165,
+   "librarySetsAfter": 0,
+   "definiteBefore": 42379,
+   "definiteAfter": 42379,
+   "libraryAfter": 14004,
+   "librarySymbolAfter": 11786,
+   "lost": 0,
+   "retargeted": 0,
+   "candidateSetChanged": 0,
+   "removedSites": 0,
+   "addedSites": 0,
+   "reconstructedBefore": 8419,
+   "reconstructedKept": 8419,
+   "reconstructedWithheld": 0,
+   "memberReason": 4799,
+   "byEvidence": {
+    "import-path:go": 248,
+    "import-binding:go": 1152,
+    "import-path:go-std": 1970,
+    "import-binding:go-std": 8390,
+    "builtin:go-std": 2244
+   },
+   "symbolsBefore": 8092,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "samber/lo",
+   "linksBefore": 28881,
+   "linksAfter": 28881,
+   "sitesBefore": 28881,
+   "sitesAfter": 28881,
+   "librarySetsAfter": 0,
+   "definiteBefore": 12914,
+   "definiteAfter": 12914,
+   "libraryAfter": 8949,
+   "librarySymbolAfter": 8681,
+   "lost": 0,
+   "retargeted": 0,
+   "candidateSetChanged": 0,
+   "removedSites": 0,
+   "addedSites": 0,
+   "reconstructedBefore": 5442,
+   "reconstructedKept": 5442,
+   "reconstructedWithheld": 0,
+   "memberReason": 5559,
+   "byEvidence": {
+    "import-path:go-std": 234,
+    "import-binding:go-std": 5454,
+    "builtin:go-std": 2074,
+    "import-path:go": 34,
+    "import-binding:go": 1153
+   },
+   "symbolsBefore": 4645,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "spf13/cobra",
+   "linksBefore": 8886,
+   "linksAfter": 8886,
+   "sitesBefore": 8886,
+   "sitesAfter": 8886,
+   "librarySetsAfter": 0,
+   "definiteBefore": 5759,
+   "definiteAfter": 5759,
+   "libraryAfter": 1723,
+   "librarySymbolAfter": 1545,
+   "lost": 0,
+   "retargeted": 0,
+   "candidateSetChanged": 0,
+   "removedSites": 0,
+   "addedSites": 0,
+   "reconstructedBefore": 1213,
+   "reconstructedKept": 1213,
+   "reconstructedWithheld": 0,
+   "memberReason": 1274,
+   "byEvidence": {
+    "import-path:go-std": 167,
+    "import-path:go": 11,
+    "import-binding:go": 104,
+    "import-binding:go-std": 1159,
+    "builtin:go-std": 282
+   },
+   "symbolsBefore": 926,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "stretchr/testify",
+   "linksBefore": 19868,
+   "linksAfter": 19868,
+   "sitesBefore": 19828,
+   "sitesAfter": 19828,
+   "librarySetsAfter": 0,
+   "definiteBefore": 13017,
+   "definiteAfter": 13017,
+   "libraryAfter": 3980,
+   "librarySymbolAfter": 3760,
+   "lost": 0,
+   "retargeted": 0,
+   "candidateSetChanged": 0,
+   "removedSites": 0,
+   "addedSites": 0,
+   "reconstructedBefore": 2754,
+   "reconstructedKept": 2754,
+   "reconstructedWithheld": 0,
+   "memberReason": 1607,
+   "byEvidence": {
+    "import-path:go-std": 218,
+    "import-binding:go-std": 2753,
+    "import-path:go": 2,
+    "import-binding:go": 4,
+    "builtin:go-std": 1003
+   },
+   "symbolsBefore": 2542,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "wagoodman/dive",
+   "linksBefore": 14901,
+   "linksAfter": 14901,
+   "sitesBefore": 14901,
+   "sitesAfter": 14901,
+   "librarySetsAfter": 0,
+   "definiteBefore": 8631,
+   "definiteAfter": 8631,
+   "libraryAfter": 4356,
+   "librarySymbolAfter": 3575,
+   "lost": 0,
+   "retargeted": 0,
+   "candidateSetChanged": 0,
+   "removedSites": 0,
+   "addedSites": 0,
+   "reconstructedBefore": 1685,
+   "reconstructedKept": 1685,
+   "reconstructedWithheld": 0,
+   "memberReason": 1512,
+   "byEvidence": {
+    "import-path:go-std": 415,
+    "import-path:go": 366,
+    "import-binding:go-std": 1521,
+    "import-binding:go": 1722,
+    "builtin:go-std": 332
+   },
+   "symbolsBefore": 1958,
+   "symbolsMissing": 0
+  }
+ ],
+ "totals": {
+  "linksBefore": 1512998,
+  "linksAfter": 1512998,
+  "sitesBefore": 1512591,
+  "sitesAfter": 1512591,
+  "librarySetsAfter": 0,
+  "definiteBefore": 1023393,
+  "definiteAfter": 1023393,
+  "libraryAfter": 293272,
+  "librarySymbolAfter": 260741,
+  "lost": 0,
+  "retargeted": 0,
+  "candidateSetChanged": 0,
+  "removedSites": 0,
+  "addedSites": 0,
+  "reconstructedBefore": 153868,
+  "reconstructedKept": 153749,
+  "reconstructedWithheld": 119,
+  "memberReason": 111406,
+  "symbolsBefore": 200941,
+  "symbolsMissing": 0,
+  "byEvidence": {
+   "import-path:go": 5595,
+   "import-binding:go": 59167,
+   "import-path:go-std": 26936,
+   "import-binding:go-std": 152734,
+   "builtin:go-std": 48840
+  }
+ },
+ "changed": [],
+ "missingSymbols": [],
+ "withheld": {
+  "unresolved:-:std:under-testdata": 119
+ },
+ "withheldExamples": [
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/boundmeth.go",
+   "kind": "calls",
+   "name": "errors.New",
+   "path": "errors",
+   "line": 111,
+   "source": "err := errors.New(\"ok\")",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/boundmeth.go",
+   "kind": "calls",
+   "name": "fmt.Sprint",
+   "path": "fmt",
+   "line": 123,
+   "source": "r := fmt.Sprint(recover())",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/complit.go",
+   "kind": "calls",
+   "name": "fmt.Sprint",
+   "path": "fmt",
+   "line": 14,
+   "source": "if got := fmt.Sprint(*m1[0], *m1[1]); got != want {",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/complit.go",
+   "kind": "calls",
+   "name": "fmt.Sprint",
+   "path": "fmt",
+   "line": 18,
+   "source": "if got := fmt.Sprint(m2[0], m2[1]); got != want {",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/complit.go",
+   "kind": "calls",
+   "name": "fmt.Sprint",
+   "path": "fmt",
+   "line": 27,
+   "source": "if x := fmt.Sprint(v); x != \"[0 0 42]\" {",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/complit.go",
+   "kind": "calls",
+   "name": "fmt.Sprint",
+   "path": "fmt",
+   "line": 94,
+   "source": "panic(fmt.Sprint(m))",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/complit.go",
+   "kind": "calls",
+   "name": "fmt.Sprint",
+   "path": "fmt",
+   "line": 99,
+   "source": "if got := fmt.Sprint(m[\"x\"], n[\"x\"]); got != \"3 2\" {",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/complit.go",
+   "kind": "calls",
+   "name": "fmt.Sprint",
+   "path": "fmt",
+   "line": 110,
+   "source": "if got := fmt.Sprint(t); got != \"{2 3 1}\" {",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/complit.go",
+   "kind": "calls",
+   "name": "fmt.Sprint",
+   "path": "fmt",
+   "line": 115,
+   "source": "if got := fmt.Sprint(t); got != \"{3 4 0}\" {",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/complit.go",
+   "kind": "calls",
+   "name": "fmt.Sprint",
+   "path": "fmt",
+   "line": 121,
+   "source": "if got := fmt.Sprint(t, u); got != \"{5 0 0} {3 0 0}\" {",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/complit.go",
+   "kind": "calls",
+   "name": "fmt.Sprint",
+   "path": "fmt",
+   "line": 131,
+   "source": "if got := fmt.Sprint(a); got != \"[2 3 1]\" {",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/complit.go",
+   "kind": "calls",
+   "name": "fmt.Sprint",
+   "path": "fmt",
+   "line": 136,
+   "source": "if got := fmt.Sprint(a); got != \"[3 4 0]\" {",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/complit.go",
+   "kind": "calls",
+   "name": "fmt.Sprint",
+   "path": "fmt",
+   "line": 142,
+   "source": "if got := fmt.Sprint(a, b); got != \"[5 0 0] [3 0 0]\" {",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/complit.go",
+   "kind": "calls",
+   "name": "fmt.Sprint",
+   "path": "fmt",
+   "line": 152,
+   "source": "if got := fmt.Sprint(s); got != \"[2 3 1]\" {",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/complit.go",
+   "kind": "calls",
+   "name": "fmt.Sprint",
+   "path": "fmt",
+   "line": 157,
+   "source": "if got := fmt.Sprint(s); got != \"[3 4]\" {",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/complit.go",
+   "kind": "calls",
+   "name": "fmt.Sprint",
+   "path": "fmt",
+   "line": 163,
+   "source": "if got := fmt.Sprint(s, t); got != \"[5] [3]\" {",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/coverage.go",
+   "kind": "calls",
+   "name": "fmt.Sprint",
+   "path": "fmt",
+   "line": 17,
+   "source": "if x := fmt.Sprint(); x != \"\" {",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/coverage.go",
+   "kind": "calls",
+   "name": "fmt.Sprint",
+   "path": "fmt",
+   "line": 76,
+   "source": "if x := fmt.Sprint(fibs); x != \"[0 1 1 2 3 5 8 13 21 34]\" {",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/coverage.go",
+   "kind": "calls",
+   "name": "fmt.Sprint",
+   "path": "fmt",
+   "line": 90,
+   "source": "if x := fmt.Sprint(s1, s2); x != \"[wiz bar] [wiz bar]\" {",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/coverage.go",
+   "kind": "calls",
+   "name": "fmt.Sprint",
+   "path": "fmt",
+   "line": 97,
+   "source": "if x := fmt.Sprint(*pa1, *pa2); x != \"[wiz bar] [wiz bar]\" {",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/coverage.go",
+   "kind": "calls",
+   "name": "fmt.Sprint",
+   "path": "fmt",
+   "line": 104,
+   "source": "if x := fmt.Sprint(a1, a2); x != \"[foo bar] [wiz bar]\" {",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/coverage.go",
+   "kind": "calls",
+   "name": "fmt.Sprint",
+   "path": "fmt",
+   "line": 111,
+   "source": "if x := fmt.Sprint(t1, t2); x != \"{foo bar} {wiz bar}\" {",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/coverage.go",
+   "kind": "calls",
+   "name": "reflect.TypeOf",
+   "path": "reflect",
+   "line": 130,
+   "source": "if x := reflect.TypeOf(n).String(); x != \"main.N\" {",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/coverage.go",
+   "kind": "calls",
+   "name": "reflect.TypeOf",
+   "path": "reflect",
+   "line": 215,
+   "source": "if x := reflect.TypeOf(i).String(); x != \"struct { main.T }\" && x != \"struct{main.T}\" {",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/coverage.go",
+   "kind": "calls",
+   "name": "fmt.Sprint",
+   "path": "fmt",
+   "line": 221,
+   "source": "if fmt.Sprint(\"Hello\", \", \", \"World\", \"!\") != message {",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/coverage.go",
+   "kind": "calls",
+   "name": "reflect.TypeOf",
+   "path": "reflect",
+   "line": 236,
+   "source": "panic(reflect.TypeOf(v))",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/coverage.go",
+   "kind": "calls",
+   "name": "fmt.Sprint",
+   "path": "fmt",
+   "line": 372,
+   "source": "r := fmt.Sprint(recover())",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/coverage.go",
+   "kind": "calls",
+   "name": "fmt.Sprint",
+   "path": "fmt",
+   "line": 443,
+   "source": "if x := fmt.Sprint(trace); x != \"[0 1 2]\" {",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/coverage.go",
+   "kind": "calls",
+   "name": "fmt.Sprint",
+   "path": "fmt",
+   "line": 474,
+   "source": "r := fmt.Sprint(recover())",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/coverage.go",
+   "kind": "calls",
+   "name": "strings.Contains",
+   "path": "strings",
+   "line": 475,
+   "source": "if !(strings.Contains(r, \"compar\") && strings.Contains(r, \"[]string\")) {",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/coverage.go",
+   "kind": "calls",
+   "name": "strings.Contains",
+   "path": "strings",
+   "line": 475,
+   "source": "if !(strings.Contains(r, \"compar\") && strings.Contains(r, \"[]string\")) {",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/coverage.go",
+   "kind": "calls",
+   "name": "fmt.Sprint",
+   "path": "fmt",
+   "line": 490,
+   "source": "if fmt.Sprint(ints) != \"[1 1 1]\" {",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/coverage.go",
+   "kind": "calls",
+   "name": "fmt.Sprint",
+   "path": "fmt",
+   "line": 555,
+   "source": "r := fmt.Sprint(recover())",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/deepequal.go",
+   "kind": "calls",
+   "name": "reflect.DeepEqual",
+   "path": "reflect",
+   "line": 38,
+   "source": "assert(reflect.DeepEqual(nil, nil))",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/deepequal.go",
+   "kind": "calls",
+   "name": "reflect.DeepEqual",
+   "path": "reflect",
+   "line": 39,
+   "source": "assert(reflect.DeepEqual((*int)(nil), (*int)(nil)))",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/deepequal.go",
+   "kind": "calls",
+   "name": "reflect.DeepEqual",
+   "path": "reflect",
+   "line": 40,
+   "source": "assert(!reflect.DeepEqual(nil, (*int)(nil)))",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/deepequal.go",
+   "kind": "calls",
+   "name": "reflect.DeepEqual",
+   "path": "reflect",
+   "line": 42,
+   "source": "assert(reflect.DeepEqual(0, 0))",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/deepequal.go",
+   "kind": "calls",
+   "name": "reflect.DeepEqual",
+   "path": "reflect",
+   "line": 43,
+   "source": "assert(!reflect.DeepEqual(0, int64(0)))",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/deepequal.go",
+   "kind": "calls",
+   "name": "reflect.DeepEqual",
+   "path": "reflect",
+   "line": 45,
+   "source": "assert(!reflect.DeepEqual(\"\", 0))",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/deepequal.go",
+   "kind": "calls",
+   "name": "reflect.DeepEqual",
+   "path": "reflect",
+   "line": 47,
+   "source": "assert(reflect.DeepEqual(a, []int{0, 1, 2, 3}))",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/deepequal.go",
+   "kind": "calls",
+   "name": "reflect.DeepEqual",
+   "path": "reflect",
+   "line": 48,
+   "source": "assert(!reflect.DeepEqual(a, []int{0, 1, 2}))",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/deepequal.go",
+   "kind": "calls",
+   "name": "reflect.DeepEqual",
+   "path": "reflect",
+   "line": 49,
+   "source": "assert(!reflect.DeepEqual(a, []int{0, 1, 0, 3}))",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/deepequal.go",
+   "kind": "calls",
+   "name": "reflect.DeepEqual",
+   "path": "reflect",
+   "line": 51,
+   "source": "assert(reflect.DeepEqual(b, []X{0, 1, 2, 3}))",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/deepequal.go",
+   "kind": "calls",
+   "name": "reflect.DeepEqual",
+   "path": "reflect",
+   "line": 52,
+   "source": "assert(!reflect.DeepEqual(b, []X{0, 1, 0, 3}))",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/deepequal.go",
+   "kind": "calls",
+   "name": "reflect.DeepEqual",
+   "path": "reflect",
+   "line": 54,
+   "source": "assert(reflect.DeepEqual(c, map[int]string{0: \"zero\", 1: \"one\"}))",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/deepequal.go",
+   "kind": "calls",
+   "name": "reflect.DeepEqual",
+   "path": "reflect",
+   "line": 55,
+   "source": "assert(!reflect.DeepEqual(c, map[int]string{0: \"zero\", 1: \"one\", 2: \"two\"}))",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/deepequal.go",
+   "kind": "calls",
+   "name": "reflect.DeepEqual",
+   "path": "reflect",
+   "line": 56,
+   "source": "assert(!reflect.DeepEqual(c, map[int]string{1: \"one\", 2: \"two\"}))",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/deepequal.go",
+   "kind": "calls",
+   "name": "reflect.DeepEqual",
+   "path": "reflect",
+   "line": 57,
+   "source": "assert(!reflect.DeepEqual(c, map[int]string{1: \"one\"}))",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/deepequal.go",
+   "kind": "calls",
+   "name": "reflect.DeepEqual",
+   "path": "reflect",
+   "line": 59,
+   "source": "assert(reflect.DeepEqual(d, map[X]string{0: \"zero\", 1: \"one\"}))",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/deepequal.go",
+   "kind": "calls",
+   "name": "reflect.DeepEqual",
+   "path": "reflect",
+   "line": 60,
+   "source": "assert(!reflect.DeepEqual(d, map[int]string{0: \"zero\", 1: \"one\"}))",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/deepequal.go",
+   "kind": "calls",
+   "name": "reflect.DeepEqual",
+   "path": "reflect",
+   "line": 62,
+   "source": "assert(reflect.DeepEqual(e, &Y{}))",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/deepequal.go",
+   "kind": "calls",
+   "name": "reflect.DeepEqual",
+   "path": "reflect",
+   "line": 63,
+   "source": "assert(reflect.DeepEqual(e, &Y{z: [3]int{0, 0, 0}}))",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/deepequal.go",
+   "kind": "calls",
+   "name": "reflect.DeepEqual",
+   "path": "reflect",
+   "line": 64,
+   "source": "assert(!reflect.DeepEqual(e, &Y{z: [3]int{0, 1, 0}}))",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/deepequal.go",
+   "kind": "calls",
+   "name": "reflect.DeepEqual",
+   "path": "reflect",
+   "line": 66,
+   "source": "assert(reflect.DeepEqual(f, (*Y)(nil)))",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/deepequal.go",
+   "kind": "calls",
+   "name": "reflect.DeepEqual",
+   "path": "reflect",
+   "line": 67,
+   "source": "assert(!reflect.DeepEqual(f, nil))",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/deepequal.go",
+   "kind": "calls",
+   "name": "reflect.DeepEqual",
+   "path": "reflect",
+   "line": 72,
+   "source": "assert(reflect.DeepEqual(h, eq_h))",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/deepequal.go",
+   "kind": "calls",
+   "name": "reflect.DeepEqual",
+   "path": "reflect",
+   "line": 77,
+   "source": "assert(reflect.DeepEqual(h, deepeq_h))",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/deepequal.go",
+   "kind": "calls",
+   "name": "reflect.DeepEqual",
+   "path": "reflect",
+   "line": 82,
+   "source": "assert((x == y) == reflect.DeepEqual(distinct[x], distinct[y]))",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/deepequal.go",
+   "kind": "calls",
+   "name": "reflect.DeepEqual",
+   "path": "reflect",
+   "line": 87,
+   "source": "assert(reflect.DeepEqual(struct{}{}, struct{}{}))",
+   "now": "none"
+  },
+  {
+   "id": "golang/tools",
+   "file": "go/ssa/interp/testdata/deepequal.go",
+   "kind": "calls",
+   "name": "reflect.DeepEqual",
+   "path": "reflect",
+   "line": 88,
+   "source": "assert(reflect.DeepEqual(struct{ x int }{1}, struct{ x int }{1}))",
+   "now": "none"
+  }
+ ],
+ "sample": [
+  {
+   "repo": "cockroachdb/pebble",
+   "file": "db_test.go",
+   "line": 987,
+   "kind": "calls",
+   "name": "require.NoError",
+   "library": {
+    "ecosystem": "go",
+    "unit": "github.com/stretchr/testify/require",
+    "symbol": "NoError",
+    "version": "v1.9.0",
+    "evidence": "import-binding"
+   },
+   "source": "require.NoError(t, d.Flush())"
+  },
+  {
+   "repo": "cli/cli",
+   "file": "git/client_test.go",
+   "line": 1737,
+   "kind": "calls",
+   "name": "append",
+   "library": {
+    "ecosystem": "go-std",
+    "unit": "builtin",
+    "symbol": "append",
+    "version": null,
+    "evidence": "declared-builtin"
+   },
+   "source": "*gotArgs = append([]string(nil), cmd.Args...)"
+  },
+  {
+   "repo": "cli/cli",
+   "file": "pkg/cmd/run/download/http_test.go",
+   "line": 92,
+   "kind": "calls",
+   "name": "require.NoError",
+   "library": {
+    "ecosystem": "go",
+    "unit": "github.com/stretchr/testify/require",
+    "symbol": "NoError",
+    "version": "v1.12.1",
+    "evidence": "import-binding"
+   },
+   "source": "require.NoError(t, err)"
+  },
+  {
+   "repo": "cli/cli",
+   "file": "script/ghmock/gitcmd.go",
+   "line": 224,
+   "kind": "calls",
+   "name": "len",
+   "library": {
+    "ecosystem": "go-std",
+    "unit": "builtin",
+    "symbol": "len",
+    "version": null,
+    "evidence": "declared-builtin"
+   },
+   "source": "return \"\", fmt.Errorf(\"run %s has only %d builds\", rec.ID, len(rec.Results))"
+  },
+  {
+   "repo": "cli/cli",
+   "file": "pkg/cmd/search/shared/shared.go",
+   "line": 148,
+   "kind": "calls",
+   "name": "len",
+   "library": {
+    "ecosystem": "go-std",
+    "unit": "builtin",
+    "symbol": "len",
+    "version": null,
+    "evidence": "declared-builtin"
+   },
+   "source": "header = fmt.Sprintf(\"Showing %d of %d issues and pull requests\\n\\n\", len(results.Items), results.Total)"
+  },
+  {
+   "repo": "cli/cli",
+   "file": "pkg/cmd/skills/install/install_test.go",
+   "line": 280,
+   "kind": "calls",
+   "name": "heredoc.Doc",
+   "library": {
+    "ecosystem": "go",
+    "unit": "github.com/MakeNowJust/heredoc",
+    "symbol": "Doc",
+    "version": "v1.0.0",
+    "evidence": "import-binding"
+   },
+   "source": "var codeReviewContent = heredoc.Doc(`"
+  },
+  {
+   "repo": "gin-gonic/gin",
+   "file": "utils_test.go",
+   "line": 62,
+   "kind": "calls",
+   "name": "assert.Panics",
+   "library": {
+    "ecosystem": "go",
+    "unit": "github.com/stretchr/testify/assert",
+    "symbol": "Panics",
+    "version": "v1.12.1",
+    "evidence": "import-binding"
+   },
+   "source": "assert.Panics(t, func() { lastChar(\"\") })"
+  },
+  {
+   "repo": "cli/cli",
+   "file": "internal/codespaces/ssh.go",
+   "line": 107,
+   "kind": "references",
+   "name": "exec.Cmd",
+   "library": {
+    "ecosystem": "go-std",
+    "unit": "os/exec",
+    "symbol": "Cmd",
+    "version": null,
+    "evidence": "import-binding"
+   },
+   "source": "func newSCPCommand(ctx context.Context, port int, dst string, cmdArgs []string) (*exec.Cmd, error) {"
+  },
+  {
+   "repo": "cockroachdb/pebble",
+   "file": "tool/logs/compaction_test.go",
+   "line": 525,
+   "kind": "calls",
+   "name": "len",
+   "library": {
+    "ecosystem": "go-std",
+    "unit": "builtin",
+    "symbol": "len",
+    "version": null,
+    "evidence": "declared-builtin"
+   },
+   "source": "expectedHandled := len(allKinds) - len(flushLoggedKinds)"
+  },
+  {
+   "repo": "cockroachdb/pebble",
+   "file": "compaction_scheduler_test.go",
+   "line": 152,
+   "kind": "references",
+   "name": "time.Time",
+   "library": {
+    "ecosystem": "go-std",
+    "unit": "time",
+    "symbol": "Time",
+    "version": null,
+    "evidence": "import-binding"
+   },
+   "source": "tts.tt.channel <- time.Time{}"
+  },
+  {
+   "repo": "cli/cli",
+   "file": "pkg/cmd/browse/browse_test.go",
+   "line": 755,
+   "kind": "calls",
+   "name": "filepath.FromSlash",
+   "library": {
+    "ecosystem": "go-std",
+    "unit": "path/filepath",
+    "symbol": "FromSlash",
+    "version": null,
+    "evidence": "import-binding"
+   },
+   "source": "fileArg:      filepath.FromSlash(\"../\"),"
+  },
+  {
+   "repo": "restic/restic",
+   "file": "cmd/restic/cmd_rewrite_integration_test.go",
+   "line": 123,
+   "kind": "calls",
+   "name": "len",
+   "library": {
+    "ecosystem": "go-std",
+    "unit": "builtin",
+    "symbol": "len",
+    "version": null,
+    "evidence": "declared-builtin"
+   },
+   "source": "rtest.Assert(t, len(newSnapshotIDs) == 1, \"expected one snapshot, got %v\", newSnapshotIDs)"
+  },
+  {
+   "repo": "cli/cli",
+   "file": "pkg/cmd/codespace/create.go",
+   "line": 37,
+   "kind": "embeds",
+   "name": "time.Duration",
+   "library": {
+    "ecosystem": "go-std",
+    "unit": "time",
+    "symbol": "Duration",
+    "version": null,
+    "evidence": "import-binding"
+   },
+   "source": "*time.Duration"
+  },
+  {
+   "repo": "cockroachdb/pebble",
+   "file": "commit_test.go",
+   "line": 305,
+   "kind": "calls",
+   "name": "leaktest.AfterTest",
+   "library": {
+    "ecosystem": "go",
+    "unit": "github.com/cockroachdb/crlib/testutils/leaktest",
+    "symbol": "AfterTest",
+    "version": "v0.0.0-20251122031428-fe658a2dbda1",
+    "evidence": "import-binding"
+   },
+   "source": "defer leaktest.AfterTest(t)()"
+  },
+  {
+   "repo": "restic/restic",
+   "file": "internal/fs/sd_windows_test_helpers.go",
+   "line": 53,
+   "kind": "references",
+   "name": "windows.SID",
+   "library": {
+    "ecosystem": "go",
+    "unit": "golang.org/x/sys/windows",
+    "symbol": "SID",
+    "version": "v0.49.0",
+    "evidence": "import-binding"
+   },
+   "source": "var ownerExpected *windows.SID"
+  },
+  {
+   "repo": "gin-gonic/gin",
+   "file": "auth.go",
+   "line": 93,
+   "kind": "references",
+   "name": "base64.StdEncoding",
+   "library": {
+    "ecosystem": "go-std",
+    "unit": "encoding/base64",
+    "symbol": "StdEncoding",
+    "version": null,
+    "evidence": "import-binding"
+   },
+   "source": "return \"Basic \" + base64.StdEncoding.EncodeToString(bytesconv.StringToBytes(base))"
+  },
+  {
+   "repo": "cockroachdb/pebble",
+   "file": "cockroachkvs/cockroachkvs.go",
+   "line": 1153,
+   "kind": "calls",
+   "name": "fmt.Fprintf",
+   "library": {
+    "ecosystem": "go-std",
+    "unit": "fmt",
+    "symbol": "Fprintf",
+    "version": null,
+    "evidence": "import-binding"
+   },
+   "source": "fmt.Fprintf(f, \"%d,%d\", wallTime/1e9, logical)"
+  },
+  {
+   "repo": "samber/lo",
+   "file": "it/intersect_test.go",
+   "line": 330,
+   "kind": "references",
+   "name": "iter.Seq",
+   "library": {
+    "ecosystem": "go-std",
+    "unit": "iter",
+    "symbol": "Seq",
+    "version": null,
+    "evidence": "import-binding"
+   },
+   "source": "type myStrings iter.Seq[string]"
+  },
+  {
+   "repo": "cli/cli",
+   "file": "pkg/cmd/release/create/http.go",
+   "line": 189,
+   "kind": "calls",
+   "name": "fmt.Sprintf",
+   "library": {
+    "ecosystem": "go-std",
+    "unit": "fmt",
+    "symbol": "Sprintf",
+    "version": null,
+    "evidence": "import-binding"
+   },
+   "source": "params[\"make_latest\"] = fmt.Sprintf(\"%v\", *isLatest)"
+  },
+  {
+   "repo": "cockroachdb/pebble",
+   "file": "sstable/blob/handle.go",
+   "line": 49,
+   "kind": "references",
+   "name": "redact.SafePrinter",
+   "library": {
+    "ecosystem": "go",
+    "unit": "github.com/cockroachdb/redact",
+    "symbol": "SafePrinter",
+    "version": "v1.1.5",
+    "evidence": "import-binding"
+   },
+   "source": "func (h Handle) SafeFormat(w redact.SafePrinter, _ rune) {"
+  },
+  {
+   "repo": "gin-gonic/gin",
+   "file": "context_test.go",
+   "line": 1442,
+   "kind": "calls",
+   "name": "assert.Equal",
+   "library": {
+    "ecosystem": "go",
+    "unit": "github.com/stretchr/testify/assert",
+    "symbol": "Equal",
+    "version": "v1.12.1",
+    "evidence": "import-binding"
+   },
+   "source": "assert.Equal(t, tt.wantNextCalled, nextHandlerCalled)"
+  },
+  {
+   "repo": "cockroachdb/pebble",
+   "file": "internal/randvar/flag.go",
+   "line": 18,
+   "kind": "calls",
+   "name": "regexp.MustCompile",
+   "library": {
+    "ecosystem": "go-std",
+    "unit": "regexp",
+    "symbol": "MustCompile",
+    "version": null,
+    "evidence": "import-binding"
+   },
+   "source": "var randVarRE = regexp.MustCompile(`^(?:(latest|uniform|zipf):)?(\\d+)(?:-(\\d+))?$`)"
+  },
+  {
+   "repo": "cockroachdb/pebble",
+   "file": "internal/compact/splitting.go",
+   "line": 443,
+   "kind": "calls",
+   "name": "panic",
+   "library": {
+    "ecosystem": "go-std",
+    "unit": "builtin",
+    "symbol": "panic",
+    "version": null,
+    "evidence": "declared-builtin"
+   },
+   "source": "panic(errors.AssertionFailedf(\"unreachable\"))"
+  },
+  {
+   "repo": "cockroachdb/pebble",
+   "file": "file_cache_test.go",
+   "line": 1039,
+   "kind": "calls",
+   "name": "require.NoError",
+   "library": {
+    "ecosystem": "go",
+    "unit": "github.com/stretchr/testify/require",
+    "symbol": "NoError",
+    "version": "v1.9.0",
+    "evidence": "import-binding"
+   },
+   "source": "require.NoError(t, iters.Point().Close())"
+  },
+  {
+   "repo": "gin-gonic/gin",
+   "file": "gin_test.go",
+   "line": 448,
+   "kind": "calls",
+   "name": "assert.NotNil",
+   "library": {
+    "ecosystem": "go",
+    "unit": "github.com/stretchr/testify/assert",
+    "symbol": "NotNil",
+    "version": "v1.12.1",
+    "evidence": "import-binding"
+   },
+   "source": "assert.NotNil(t, router.trees.get(http.MethodGet))"
+  },
+  {
+   "repo": "restic/restic",
+   "file": "internal/fs/node_test.go",
+   "line": 43,
+   "kind": "calls",
+   "name": "time.Parse",
+   "library": {
+    "ecosystem": "go-std",
+    "unit": "time",
+    "symbol": "Parse",
+    "version": null,
+    "evidence": "import-binding"
+   },
+   "source": "t, err := time.Parse(\"2006-01-02 15:04:05.999\", s)"
+  },
+  {
+   "repo": "cockroachdb/pebble",
+   "file": "vfs/syncing_file_test.go",
+   "line": 27,
+   "kind": "calls",
+   "name": "require.NoError",
+   "library": {
+    "ecosystem": "go",
+    "unit": "github.com/stretchr/testify/require",
+    "symbol": "NoError",
+    "version": "v1.9.0",
+    "evidence": "import-binding"
+   },
+   "source": "require.NoError(t, err)"
+  },
+  {
+   "repo": "cli/cli",
+   "file": "internal/skills/frontmatter/frontmatter.go",
+   "line": 117,
+   "kind": "calls",
+   "name": "delete",
+   "library": {
+    "ecosystem": "go-std",
+    "unit": "builtin",
+    "symbol": "delete",
+    "version": null,
+    "evidence": "declared-builtin"
+   },
+   "source": "delete(meta, \"github-repo\")"
+  },
+  {
+   "repo": "restic/restic",
+   "file": "internal/repository/pack/pack.go",
+   "line": 243,
+   "kind": "calls",
+   "name": "fmt.Sprintf",
+   "library": {
+    "ecosystem": "go-std",
+    "unit": "fmt",
+    "symbol": "Sprintf",
+    "version": null,
+    "evidence": "import-binding"
+   },
+   "source": "return fmt.Sprintf(\"<Packer %d blobs, %d bytes>\", len(p.blobs), p.bytes)"
+  },
+  {
+   "repo": "cockroachdb/pebble",
+   "file": "blob_rewrite_test.go",
+   "line": 170,
+   "kind": "calls",
+   "name": "strconv.ParseUint",
+   "library": {
+    "ecosystem": "go-std",
+    "unit": "strconv",
+    "symbol": "ParseUint",
+    "version": null,
+    "evidence": "import-binding"
+   },
+   "source": "targetBlobFileNum, err := strconv.ParseUint(targetBlobFileStr, 10, 64)"
+  },
+  {
+   "repo": "gin-gonic/gin",
+   "file": "render/html.go",
+   "line": 74,
+   "kind": "references",
+   "name": "template.Template",
+   "library": {
+    "ecosystem": "go-std",
+    "unit": "html/template",
+    "symbol": "Template",
+    "version": null,
+    "evidence": "import-binding"
+   },
+   "source": "func (r HTMLDebug) loadTemplate() *template.Template {"
+  },
+  {
+   "repo": "cockroachdb/pebble",
+   "file": "mem_table_test.go",
+   "line": 366,
+   "kind": "calls",
+   "name": "errors.Errorf",
+   "library": {
+    "ecosystem": "go",
+    "unit": "github.com/cockroachdb/errors",
+    "symbol": "Errorf",
+    "version": "v1.11.3",
+    "evidence": "import-binding"
+   },
+   "source": "return errors.Errorf(\"%d: expected %d tombstones, but found %d\", i, j+1, count)"
+  },
+  {
+   "repo": "restic/restic",
+   "file": "internal/repository/checker.go",
+   "line": 371,
+   "kind": "references",
+   "name": "bufio.Reader",
+   "library": {
+    "ecosystem": "go-std",
+    "unit": "bufio",
+    "symbol": "Reader",
+    "version": null,
+    "evidence": "import-binding"
+   },
+   "source": "func checkPackInner(ctx context.Context, r *Repository, id restic.ID, blobs pack.Blobs, size int64, bufRd *bufio.Reader, dec *zstd.Decoder) error {"
+  },
+  {
+   "repo": "gin-gonic/gin",
+   "file": "render/render_test.go",
+   "line": 357,
+   "kind": "calls",
+   "name": "assert.Equal",
+   "library": {
+    "ecosystem": "go",
+    "unit": "github.com/stretchr/testify/assert",
+    "symbol": "Equal",
+    "version": "v1.12.1",
+    "evidence": "import-binding"
+   },
+   "source": "assert.Equal(t, \"application/toml; charset=utf-8\", w.Header().Get(\"Content-Type\"))"
+  },
+  {
+   "repo": "cockroachdb/pebble",
+   "file": "record/log_writer_test.go",
+   "line": 465,
+   "kind": "calls",
+   "name": "require.LessOrEqual",
+   "library": {
+    "ecosystem": "go",
+    "unit": "github.com/stretchr/testify/require",
+    "symbol": "LessOrEqual",
+    "version": "v1.9.0",
+    "evidence": "import-binding"
+   },
+   "source": "require.LessOrEqual(t, float64(syncLatency/(2*time.Microsecond)),"
+  },
+  {
+   "repo": "cli/cli",
+   "file": "internal/skills/installer/installer.go",
+   "line": 97,
+   "kind": "references",
+   "name": "sync.WaitGroup",
+   "library": {
+    "ecosystem": "go-std",
+    "unit": "sync",
+    "symbol": "WaitGroup",
+    "version": null,
+    "evidence": "import-binding"
+   },
+   "source": "var wg sync.WaitGroup"
+  },
+  {
+   "repo": "cockroachdb/pebble",
+   "file": "compaction.go",
+   "line": 498,
+   "kind": "references",
+   "name": "atomic.Int64",
+   "library": {
+    "ecosystem": "go-std",
+    "unit": "sync/atomic",
+    "symbol": "Int64",
+    "version": null,
+    "evidence": "import-binding"
+   },
+   "source": "bytesWritten atomic.Int64"
+  },
+  {
+   "repo": "cli/cli",
+   "file": "pkg/cmd/pr/merge/merge_test.go",
+   "line": 1857,
+   "kind": "references",
+   "name": "testing.T",
+   "library": {
+    "ecosystem": "go-std",
+    "unit": "testing",
+    "symbol": "T",
+    "version": null,
+    "evidence": "import-binding"
+   },
+   "source": "func TestPrInMergeQueue(t *testing.T) {"
+  },
+  {
+   "repo": "cockroachdb/pebble",
+   "file": "external_test.go",
+   "line": 365,
+   "kind": "calls",
+   "name": "require.NoError",
+   "library": {
+    "ecosystem": "go",
+    "unit": "github.com/stretchr/testify/require",
+    "symbol": "NoError",
+    "version": "v1.9.0",
+    "evidence": "import-binding"
+   },
+   "source": "require.NoError(t, err)"
+  },
+  {
+   "repo": "samber/lo",
+   "file": "find_test.go",
+   "line": 2003,
+   "kind": "calls",
+   "name": "assert.New",
+   "library": {
+    "ecosystem": "go",
+    "unit": "github.com/stretchr/testify/assert",
+    "symbol": "New",
+    "version": "v1.12.1",
+    "evidence": "import-binding"
+   },
+   "source": "is := assert.New(t)"
+  }
+ ],
+ "poolSize": 104336
+}

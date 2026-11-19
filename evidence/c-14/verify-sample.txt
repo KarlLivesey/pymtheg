@@ -1,0 +1,146 @@
+== cockroachdb/pebble db_test.go:987 -> github.com/stretchr/testify/require NoError v1.9.0
+   source: require.NoError(t, d.Flush())
+   import: 39:	"github.com/stretchr/testify/require"
+   go.mod: 31:	github.com/stretchr/testify v1.9.0
+== cli/cli git/client_test.go:1737 -> append
+   source: *gotArgs = append([]string(nil), cmd.Args...)
+== cli/cli pkg/cmd/run/download/http_test.go:92 -> github.com/stretchr/testify/require NoError v1.12.1
+   source: require.NoError(t, err)
+   import: 18:	"github.com/stretchr/testify/require"
+   go.mod: 52:	github.com/stretchr/testify v1.12.1
+== cli/cli script/ghmock/gitcmd.go:224 -> len
+   source: return "", fmt.Errorf("run %s has only %d builds", rec.ID, len(rec.Results))
+== cli/cli pkg/cmd/search/shared/shared.go:148 -> len
+   source: header = fmt.Sprintf("Showing %d of %d issues and pull requests\n\n", len(results.Items), results.Total)
+== cli/cli pkg/cmd/skills/install/install_test.go:280 -> github.com/MakeNowJust/heredoc Doc v1.0.0
+   source: var codeReviewContent = heredoc.Doc(`
+   import: 14:	"github.com/MakeNowJust/heredoc"
+   go.mod: 14:	github.com/MakeNowJust/heredoc v1.0.0
+== gin-gonic/gin utils_test.go:62 -> github.com/stretchr/testify/assert Panics v1.12.1
+   source: assert.Panics(t, func() { lastChar("") })
+   import: 15:	"github.com/stretchr/testify/assert"
+   go.mod: 16:	github.com/stretchr/testify v1.12.1
+== cli/cli internal/codespaces/ssh.go:107 -> os/exec Cmd
+   source: func newSCPCommand(ctx context.Context, port int, dst string, cmdArgs []string) (*exec.Cmd, error) {
+   import: 7:	"os/exec"
+   go doc: type Cmd struct {
+== cockroachdb/pebble tool/logs/compaction_test.go:525 -> len
+   source: expectedHandled := len(allKinds) - len(flushLoggedKinds)
+== cockroachdb/pebble compaction_scheduler_test.go:152 -> time Time
+   source: tts.tt.channel <- time.Time{}
+   import: 12:	"time"
+   go doc: type Time struct {
+== cli/cli pkg/cmd/browse/browse_test.go:755 -> path/filepath FromSlash
+   source: fileArg:      filepath.FromSlash("../"),
+   import: 8:	"path/filepath"
+   go doc: func FromSlash(path string) string
+== restic/restic cmd/restic/cmd_rewrite_integration_test.go:123 -> len
+   source: rtest.Assert(t, len(newSnapshotIDs) == 1, "expected one snapshot, got %v", newSnapshotIDs)
+== cli/cli pkg/cmd/codespace/create.go:37 -> time Duration
+   source: *time.Duration
+   import: 9:	"time"
+   go doc: type Duration int64
+== cockroachdb/pebble commit_test.go:305 -> github.com/cockroachdb/crlib/testutils/leaktest AfterTest v0.0.0-20251122031428-fe658a2dbda1
+   source: defer leaktest.AfterTest(t)()
+   import: 17:	"github.com/cockroachdb/crlib/testutils/leaktest"
+   go.mod: 10:	github.com/cockroachdb/crlib v0.0.0-20251122031428-fe658a2dbda1
+== restic/restic internal/fs/sd_windows_test_helpers.go:53 -> golang.org/x/sys/windows SID v0.49.0
+   source: var ownerExpected *windows.SID
+   import: 11:	"golang.org/x/sys/windows"
+   go.mod: 39:	golang.org/x/sys v0.49.0
+== gin-gonic/gin auth.go:93 -> encoding/base64 StdEncoding
+   source: return "Basic " + base64.StdEncoding.EncodeToString(bytesconv.StringToBytes(base))
+   import: 9:	"encoding/base64"
+   go doc: var StdEncoding = NewEncoding("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/")
+== cockroachdb/pebble cockroachkvs/cockroachkvs.go:1153 -> fmt Fprintf
+   source: fmt.Fprintf(f, "%d,%d", wallTime/1e9, logical)
+   import: 14:	"fmt"
+   go doc: func Fprintf(w io.Writer, format string, a ...any) (n int, err error)
+== samber/lo it/intersect_test.go:330 -> iter Seq
+   source: type myStrings iter.Seq[string]
+   import: 6:	"iter"
+   go doc: type Seq[V any] func(yield func(V) bool)
+== cli/cli pkg/cmd/release/create/http.go:189 -> fmt Sprintf
+   source: params["make_latest"] = fmt.Sprintf("%v", *isLatest)
+   import: 8:	"fmt"
+   go doc: func Sprintf(format string, a ...any) string
+== cockroachdb/pebble sstable/blob/handle.go:49 -> github.com/cockroachdb/redact SafePrinter v1.1.5
+   source: func (h Handle) SafeFormat(w redact.SafePrinter, _ rune) {
+   import: 12:	"github.com/cockroachdb/redact"
+   go.mod: 14:	github.com/cockroachdb/redact v1.1.5
+== gin-gonic/gin context_test.go:1442 -> github.com/stretchr/testify/assert Equal v1.12.1
+   source: assert.Equal(t, tt.wantNextCalled, nextHandlerCalled)
+   import: 34:	"github.com/stretchr/testify/assert"
+   go.mod: 16:	github.com/stretchr/testify v1.12.1
+== cockroachdb/pebble internal/randvar/flag.go:18 -> regexp MustCompile
+   source: var randVarRE = regexp.MustCompile(`^(?:(latest|uniform|zipf):)?(\d+)(?:-(\d+))?$`)
+   import: 11:	"regexp"
+   go doc: func MustCompile(str string) *Regexp
+== cockroachdb/pebble internal/compact/splitting.go:443 -> panic
+   source: panic(errors.AssertionFailedf("unreachable"))
+== cockroachdb/pebble file_cache_test.go:1039 -> github.com/stretchr/testify/require NoError v1.9.0
+   source: require.NoError(t, iters.Point().Close())
+   import: 31:	"github.com/stretchr/testify/require"
+   go.mod: 31:	github.com/stretchr/testify v1.9.0
+== gin-gonic/gin gin_test.go:448 -> github.com/stretchr/testify/assert NotNil v1.12.1
+   source: assert.NotNil(t, router.trees.get(http.MethodGet))
+   import: 22:	"github.com/stretchr/testify/assert"
+   go.mod: 16:	github.com/stretchr/testify v1.12.1
+== restic/restic internal/fs/node_test.go:43 -> time Parse
+   source: t, err := time.Parse("2006-01-02 15:04:05.999", s)
+   import: 11:	"time"
+   go doc: func Parse(layout, value string) (Time, error)
+== cockroachdb/pebble vfs/syncing_file_test.go:27 -> github.com/stretchr/testify/require NoError v1.9.0
+   source: require.NoError(t, err)
+   import: 13:	"github.com/stretchr/testify/require"
+   go.mod: 31:	github.com/stretchr/testify v1.9.0
+== cli/cli internal/skills/frontmatter/frontmatter.go:117 -> delete
+   source: delete(meta, "github-repo")
+== restic/restic internal/repository/pack/pack.go:243 -> fmt Sprintf
+   source: return fmt.Sprintf("<Packer %d blobs, %d bytes>", len(p.blobs), p.bytes)
+   import: 7:	"fmt"
+   go doc: func Sprintf(format string, a ...any) string
+== cockroachdb/pebble blob_rewrite_test.go:170 -> strconv ParseUint
+   source: targetBlobFileNum, err := strconv.ParseUint(targetBlobFileStr, 10, 64)
+   import: 13:	"strconv"
+   go doc: func ParseUint(s string, base int, bitSize int) (uint64, error)
+== gin-gonic/gin render/html.go:74 -> html/template Template
+   source: func (r HTMLDebug) loadTemplate() *template.Template {
+   import: 9:	"html/template"
+   go doc: type Template struct {
+== cockroachdb/pebble mem_table_test.go:366 -> github.com/cockroachdb/errors Errorf v1.11.3
+   source: return errors.Errorf("%d: expected %d tombstones, but found %d", i, j+1, count)
+   import: 21:	"github.com/cockroachdb/errors"
+   go.mod: 12:	github.com/cockroachdb/errors v1.11.3
+== restic/restic internal/repository/checker.go:371 -> bufio Reader
+   source: func checkPackInner(ctx context.Context, r *Repository, id restic.ID, blobs pack.Blobs, size int64, bufRd *bufio.Reader, dec *zstd.Decoder) error {
+   import: 4:	"bufio"
+   go doc: type Reader struct {
+== gin-gonic/gin render/render_test.go:357 -> github.com/stretchr/testify/assert Equal v1.12.1
+   source: assert.Equal(t, "application/toml; charset=utf-8", w.Header().Get("Content-Type"))
+   import: 20:	"github.com/stretchr/testify/assert"
+   go.mod: 16:	github.com/stretchr/testify v1.12.1
+== cockroachdb/pebble record/log_writer_test.go:465 -> github.com/stretchr/testify/require LessOrEqual v1.9.0
+   source: require.LessOrEqual(t, float64(syncLatency/(2*time.Microsecond)),
+   import: 28:	"github.com/stretchr/testify/require"
+   go.mod: 31:	github.com/stretchr/testify v1.9.0
+== cli/cli internal/skills/installer/installer.go:97 -> sync WaitGroup
+   source: var wg sync.WaitGroup
+   import: 10:	"sync"
+   go doc: type WaitGroup struct {
+== cockroachdb/pebble compaction.go:498 -> sync/atomic Int64
+   source: bytesWritten atomic.Int64
+   import: 15:	"sync/atomic"
+   go doc: type Int64 struct {
+== cli/cli pkg/cmd/pr/merge/merge_test.go:1857 -> testing T
+   source: func TestPrInMergeQueue(t *testing.T) {
+   import: 13:	"testing"
+   go doc: type T struct {
+== cockroachdb/pebble external_test.go:365 -> github.com/stretchr/testify/require NoError v1.9.0
+   source: require.NoError(t, err)
+   import: 28:	"github.com/stretchr/testify/require"
+   go.mod: 31:	github.com/stretchr/testify v1.9.0
+== samber/lo find_test.go:2003 -> github.com/stretchr/testify/assert New v1.12.1
+   source: is := assert.New(t)
+   import: 10:	"github.com/stretchr/testify/assert"
+   go.mod: 10:	github.com/stretchr/testify v1.12.1

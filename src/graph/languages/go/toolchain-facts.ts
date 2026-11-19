@@ -87,10 +87,27 @@ export function parseFacts(
     byte: string,
     pkg: string,
     name: string,
+    member: string | undefined,
   ): Partial<ToolchainFact> => {
     if (cls === "builtin") return { b: true };
-    if (cls === "std" || cls === "dep")
-      return pkg !== "-" && name !== "-" ? { ext: `${pkg}.${name}` } : {};
+    if (cls === "std" || cls === "dep") {
+      if (pkg === "-" || name === "-") return {};
+      // The selected object's symbol (C-14): "=" its own name (not a
+      // selection), "?" a member without a named declaring owner (or an
+      // interface method), else Owner.Name. Older helpers wrote no field.
+      const symbol =
+        member === undefined || member === "?"
+          ? null
+          : member === "="
+            ? name
+            : member;
+      return {
+        ext: `${pkg}.${name}`,
+        ...(member === undefined
+          ? {}
+          : { l: [pkg, symbol, cls as "std" | "dep"] }),
+      };
+    }
     if (cls !== "module") return {};
     const offset = u16(file, Number(byte));
     return offset === undefined ? {} : { at: [file, offset, name] };
@@ -136,8 +153,48 @@ export function parseFacts(
         if (f[1] === "list-failed") facts.listFailed = true;
         break;
       case "C": {
-        // C file funEnd nameEnd cat class defFile defOff pkg name
-        const [, file, funEnd, nameEnd, cat, cls, defFile, defOff, pkg, name] =
+        // C file funEnd nameEnd cat class defFile defOff pkg name member
+        const [
+          ,
+          file,
+          funEnd,
+          nameEnd,
+          cat,
+          cls,
+          defFile,
+          defOff,
+          pkg,
+          name,
+          member,
+        ] = f as [
+          string,
+          string,
+          string,
+          string,
+          string,
+          string,
+          string,
+          string,
+          string,
+          string,
+          string,
+          string | undefined,
+        ];
+        const fact: ToolchainFact = {
+          c: cat,
+          ...at(cls, defFile, defOff, pkg, name, member),
+        };
+        const end = u16(file, Number(funEnd));
+        if (end === undefined) break;
+        pending.push({ file, end, fact });
+        set(facts.calls, file, end, fact);
+        const nameAt = u16(file, Number(nameEnd));
+        if (nameAt !== end) set(facts.calls, file, nameAt, fact);
+        break;
+      }
+      case "U": {
+        // U file identEnd kind class defFile defOff pkg name member
+        const [, file, end, kind, cls, defFile, defOff, pkg, name, member] =
           f as [
             string,
             string,
@@ -149,35 +206,11 @@ export function parseFacts(
             string,
             string,
             string,
+            string | undefined,
           ];
-        const fact: ToolchainFact = {
-          c: cat,
-          ...at(cls, defFile, defOff, pkg, name),
-        };
-        const end = u16(file, Number(funEnd));
-        if (end === undefined) break;
-        pending.push({ file, end, fact });
-        set(facts.calls, file, end, fact);
-        const nameAt = u16(file, Number(nameEnd));
-        if (nameAt !== end) set(facts.calls, file, nameAt, fact);
-        break;
-      }
-      case "U": {
-        // U file identEnd kind class defFile defOff pkg name
-        const [, file, end, kind, cls, defFile, defOff, pkg, name] = f as [
-          string,
-          string,
-          string,
-          string,
-          string,
-          string,
-          string,
-          string,
-          string,
-        ];
         set(facts.uses, file, u16(file, Number(end)), {
           c: kind,
-          ...at(cls, defFile, defOff, pkg, name),
+          ...at(cls, defFile, defOff, pkg, name, member),
         });
         break;
       }
