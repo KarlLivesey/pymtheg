@@ -1672,6 +1672,15 @@ explicit `types` list. Node's value-only `CryptoKey` is excluded in type
 positions.
 Module 31 also accepts parenthesized `require` and treats `.js` as CommonJS
 for this check unless its nearest manifest sets `"type": "module"`.
+Module 32 reuses the selected compiler program's ambient type requests and
+captured declarations to identify supported test globals. A checker-selected
+or explicitly imported checkout declaration takes precedence. Member identity
+still comes from the declaration, including through a return type, re-export,
+immutable alias or constant literal selector. A named annotation for a missing
+imported receiver type can identify its package at unit level.
+Module 33 leaves shared test globals unresolved when a known competing ambient
+package is requested outside the supported framework inventory.
+[C-16](changes/C-16.md)
 
 Rust records library paths during resolution starting with module 29. Its library lookup uses
 the captured namespace, import, placement and `cfg` facts, with a separate
