@@ -1,0 +1,9 @@
+[package]
+name = "macro-identity-registry"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+bitflags = "=2.13.2"
+renamed = { package = "serde", version = "=1.0.229", features = ["derive"] }
+runtime = { package = "tokio", version = "=1.54.1", features = ["macros", "rt"] }

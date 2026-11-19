@@ -174,13 +174,14 @@ These estimates prioritise work. They do not add definite score credit.
 Run this command from the repository root.
 
 ```sh
-node scripts/sweep/coverage.mjs --results sweep/plan-input.json.gz --plan docs/coverage-plan.md --rust-section
+node scripts/sweep/coverage.mjs --results evidence/c-18/coverage-plan-input.json.gz \
+  --plan docs/coverage-plan.md --rust-section
 ```
 
-The archive contains the measured Rust rows and their comparison data.
-The command replaces the Rust section and preserves the Go and
-TypeScript sections from main verbatim. The regression test covers both
-parts of that contract.
+The archive overlays the 18 measured pins on the C-15 plan input and
+keeps its embedded SW-3 comparison base. The command replaces the Rust section.
+It preserves the Go and TypeScript sections from main verbatim. The
+regression test covers both parts of that contract.
 
 ### Recompute after a candidate run
 

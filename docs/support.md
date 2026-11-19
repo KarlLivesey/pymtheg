@@ -574,6 +574,18 @@ makes that whole manifest unknown). Private items are ordinary symbols.
   case-insensitive components of an input item name. Opaque layout
   expansions, known identifier generators and competing glob imports can
   still withhold the link. See [C-12](changes/C-12.md).
+- **Macro identity for scope retries.** Derives and procedural attributes
+  use their attribute macro sub-namespace, and tool attributes use a
+  type-namespace prefix. The lookup follows named imports and verified
+  Cargo paths, including renamed dependencies. Written qualified paths
+  and named imports establish the export for compiling code when registry
+  provenance is verified. Feature facts can identify namespace facets.
+  A registry re-export needs a verified registry edge to the implementing
+  crate. Checkout implementations need an output proof. A glob which could only
+  compete with an established outer macro or path head does not prevent
+  the proof, since rustc rejects that ambiguity. An uncaptured macro-use
+  import and a glob without an established competing binding can still
+  withhold the name. [C-18](changes/C-18.md)
 - **Clean expansion (both rules below).** A workspace `macro_rules!` arm is
   clean when the code it emits has no attribute anywhere (so no `#[cfg]` can
   remove a call) and no item other than a readable `use` (no `fn`, `mod`,

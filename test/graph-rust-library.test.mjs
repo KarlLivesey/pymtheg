@@ -20,6 +20,7 @@ import {
   validateResult,
 } from "../dist/graph/index.js";
 import rust from "../dist/graph/languages/rust/index.js";
+import { macroLock } from "./graph-rust-macro-lock.mjs";
 
 const manifest = (edition = "2021", body = "") =>
   `[package]\nname="app"\nversion="0.1.0"\nedition="${edition}"\n${body}`;
@@ -146,6 +147,15 @@ test("library paths, imports, preludes, Cargo aliases and version sources", asyn
     tokio={version="1",features=["macros","rt-multi-thread"]}
   `,
       ),
+      "Cargo.lock": macroLock(
+        [
+          ["serde", "1.0.219", ["serde_derive", "1.0.219"]],
+          ["tokio", "1.54.1", ["tokio-macros", "2.7.2"]],
+          ["anyhow", "1.0.104"],
+          ["regex-automata", "0.4.14"],
+        ],
+        "0.1.0",
+      ),
     },
   );
   const standard = (symbol, evidence) => ({
@@ -187,17 +197,27 @@ test("library paths, imports, preludes, Cargo aliases and version sources", asyn
       ecosystem: "cargo",
       unit: "anyhow",
       symbol: "bail!",
+      version: "1.0.104",
+      versionSource: "Cargo.lock",
       evidence: "import-binding",
     },
   ]);
   assert.deepEqual(lookup("imports", "any_how"), [
-    { ecosystem: "cargo", unit: "anyhow", evidence: "import-path" },
+    {
+      ecosystem: "cargo",
+      unit: "anyhow",
+      evidence: "import-path",
+      version: "1.0.104",
+      versionSource: "Cargo.lock",
+    },
   ]);
   assert.deepEqual(lookup("imports", "regex_automata::meta::Regex"), [
     {
       ecosystem: "cargo",
       unit: "regex-automata",
       symbol: "meta::Regex",
+      version: "0.4.14",
+      versionSource: "Cargo.lock",
       evidence: "qualified-path",
     },
   ]);
@@ -206,7 +226,7 @@ test("library paths, imports, preludes, Cargo aliases and version sources", asyn
     unit: "serde",
     symbol,
     version: "1.0.219",
-    versionSource: "Cargo.toml",
+    versionSource: "Cargo.lock",
     evidence: "import-binding",
   });
   assert.deepEqual(lookup("types", "Serialize"), [serde("Serialize")]);
@@ -218,6 +238,8 @@ test("library paths, imports, preludes, Cargo aliases and version sources", asyn
       ecosystem: "cargo",
       unit: "tokio",
       symbol: "#[main]",
+      version: "1.54.1",
+      versionSource: "Cargo.lock",
       evidence: "qualified-path",
     },
   ]);
@@ -400,6 +422,15 @@ test("exact library queries include imports and invocations of known macros", as
     "Cargo.toml": manifest(
       "2024",
       '[dependencies]\nsyn="3"\nthiserror="2"\ntokio={version="1",features=["macros","rt-multi-thread"]}\nunknown="1"\n',
+    ),
+    "Cargo.lock": macroLock(
+      [
+        ["syn", "3.0.10"],
+        ["thiserror", "2.0.18", ["thiserror-impl", "2.0.18"]],
+        ["tokio", "1.54.1", ["tokio-macros", "2.7.2"]],
+        ["unknown", "1.0.0"],
+      ],
+      "0.1.0",
     ),
   });
   for (const [unit, symbol, expected] of [
