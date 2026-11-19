@@ -1646,6 +1646,8 @@ written import's extension diagnostics.
 A captured outside declaration package needs installation, type-package or
 dependency evidence. Literal CommonJS binding names use their written keys.
 Same-file writes to a module object suppress that member's export name.
+Module 27 also recognizes qualified `import =` aliases and ambient class
+heritage through a type-only import as lexical proof.
 
 Rust records library paths during resolution starting with module 29. Its library lookup uses
 the captured namespace, import, placement and `cfg` facts, with a separate

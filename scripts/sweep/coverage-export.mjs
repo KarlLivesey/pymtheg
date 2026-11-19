@@ -607,8 +607,10 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys, pre
         if (old?.level !== 2) continue;
         const current = candidateSites.get(sampleKey(repo, previous));
         if (current?.score === 2) continue;
-        const reason = current?.score === 1 ? "unit-only" : current?.link.data?.assumes?.join("+") ||
-          current?.link.data?.reason || current?.link.resolution || "site-absent";
+        const data = current?.link.data;
+        const reason = current?.score === 1 ? "unit-only" :
+          data?.reason === "workspace-manifest-unreadable" ? data.reason :
+            data?.assumes?.join("+") || data?.reason || current?.link.resolution || "site-absent";
         const reasonKey = `${legacyTypeScriptProof(previous, evidence)}:${previous.kind}:${reason}`;
         const loss = legacyTypeScriptLosses[reasonKey] ??= { count: 0, examples: [] };
         loss.count++;

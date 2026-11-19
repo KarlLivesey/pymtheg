@@ -221,7 +221,13 @@ test("missing packages prove imports and namespace exports at their lexical bind
       "nested/package.json": '{"dependencies":{"zod":"3.26.0"}}',
       "nested/bridge.ts": `export { z as getZ } from 'zod';`,
       "jsx.tsx": `import ReactRouterDom = require('react-router-dom');
+        import Link = ReactRouterDom.Link;
+        import Nested = ReactRouterDom.Link.Nested;
         export const view = <ReactRouterDom.Link />;`,
+      "ambient.d.ts": `import type * as http from 'node:http';
+        export class IncomingMessage extends http.IncomingMessage {}`,
+      "non-ambient.ts": `import type * as http from 'node:http';
+        export class IncomingMessage extends http.IncomingMessage {}`,
       "common.cjs": `const fs = require('fs');
         const { join: combine } = require('node:path');
         fs.readFileSync('x');
@@ -280,6 +286,38 @@ test("missing packages prove imports and namespace exports at their lexical bind
       assert.equal(
         libraryTarget(graph.link("jsx.tsx", "Link", "calls")).symbol,
         "Link",
+      );
+      assert.deepEqual(
+        libraryTarget(
+          graph.link("jsx.tsx", "ReactRouterDom.Link", "references"),
+        ),
+        {
+          ecosystem: "npm",
+          unit: "react-router-dom",
+          symbol: "Link",
+          evidence: "import-binding",
+        },
+      );
+      assert.equal(
+        graph.link("jsx.tsx", "ReactRouterDom.Link.Nested", "references")
+          .libraries?.[0]?.symbol,
+        undefined,
+      );
+      assert.deepEqual(
+        libraryTarget(
+          graph.link("ambient.d.ts", "http.IncomingMessage", "extends"),
+        ),
+        {
+          ecosystem: "node",
+          unit: "http",
+          symbol: "IncomingMessage",
+          evidence: "import-binding",
+        },
+      );
+      assert.equal(
+        graph.link("non-ambient.ts", "http.IncomingMessage", "extends")
+          .resolution,
+        "unresolved",
       );
       assert.equal(call("join").resolution, "unresolved");
       const common = (at) => graph.link("common.cjs", at, "calls");

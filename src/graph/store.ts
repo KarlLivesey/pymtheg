@@ -627,7 +627,10 @@ export class SqliteGraphStore implements GraphStorage {
       const before = byId.get(link.id);
       // An unresolved link has no target rows. The library insert triggers
       // the class update, so there are no old relationships to clear.
-      if (before?.resolution === "unresolved" && link.resolution === "library") {
+      if (
+        before?.resolution === "unresolved" &&
+        link.resolution === "library"
+      ) {
         this.insertLibraries(link, sql);
         continue;
       }

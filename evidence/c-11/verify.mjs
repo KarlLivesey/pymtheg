@@ -9,7 +9,7 @@ const testScratch = process.env.C11_TEST_SCRATCH;
 const environment = testScratch
   ? { ...process.env, PYM_SCRATCH: testScratch, TMPDIR: testScratch }
   : process.env;
-const checkout = mkdtempSync(join(scratch, "verify-"));
+const checkout = mkdtempSync(join(testScratch ?? scratch, "verify-"));
 const excluded = new Set([
   ".git",
   ".pymtheg",

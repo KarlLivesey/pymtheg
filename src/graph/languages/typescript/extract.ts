@@ -2203,12 +2203,19 @@ export function extractFile(
         );
       } else if (!ts.isExternalModuleReference(reference)) {
         const at = ts.isQualifiedName(reference) ? reference.right : reference;
+        const checked = targetsOf(symbolOf(at), "any");
+        // The checker keeps the declaration for a qualified import alias
+        // even when the namespace's outside module has no declarations.
+        const lexical =
+          checked.reason === "external" && ts.isQualifiedName(reference)
+            ? targetsOf(lookup(at), "any")
+            : undefined;
         link(
           owner,
           "references",
           reference.getText(file),
           reference,
-          targetsOf(symbolOf(at), "any"),
+          lexical?.lexicalLibrary ? lexical : checked,
         );
       }
       return null;
@@ -2386,12 +2393,19 @@ export function extractFile(
       const at = ts.isPropertyAccessExpression(expression)
         ? expression.name
         : expression;
-      const found = targetsOf(
-        lookup(at),
-        ts.isInterfaceDeclaration(node.parent.parent) || kind === "implements"
-          ? "type"
-          : "value",
-      );
+      const query = lookup(at);
+      const type =
+        ts.isInterfaceDeclaration(node.parent.parent) || kind === "implements";
+      let found = targetsOf(query, type ? "type" : "value");
+      if (
+        !type &&
+        file.isDeclarationFile &&
+        (found.reason === "external-package" || found.reason === "no-symbol")
+      ) {
+        // An ambient heritage clause may use a type-only import.
+        const lexical = targetsOf(query, "type");
+        if (lexical.lexicalLibrary) found = lexical;
+      }
       link(
         owner,
         kind,
