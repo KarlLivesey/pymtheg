@@ -1,0 +1,230 @@
+{
+  "id": "vitejs/vite",
+  "transitions": {
+    "unresolved -> library+library": 10558,
+    "(new site) -> resolved": 1
+  },
+  "gainedLibrary": 10558,
+  "sample": [
+    {
+      "file": "playground/assets/__tests__/encoded-base/assets-encoded-base.spec.ts",
+      "line": 31,
+      "kind": "calls",
+      "targetName": "test",
+      "resolution": "library",
+      "libraries": [
+        "target|vitest|test|import-binding"
+      ],
+      "code": "test('should have no 404s', () => {"
+    },
+    {
+      "file": "packages/vite/src/node/server/index.ts",
+      "line": 14,
+      "kind": "imports",
+      "targetName": "launch-editor-middleware",
+      "resolution": "library",
+      "libraries": [
+        "target|launch-editor-middleware||import-path"
+      ],
+      "code": "import launchEditorMiddleware from 'launch-editor-middleware'"
+    },
+    {
+      "file": "packages/vite/src/node/__tests__/commandLock.spec.ts",
+      "line": 4,
+      "kind": "imports",
+      "targetName": "onTestFinished",
+      "resolution": "library",
+      "libraries": [
+        "target|vitest|onTestFinished|import-binding"
+      ],
+      "code": "import { describe, expect, onTestFinished, test as baseTest, vi } from 'vitest'"
+    },
+    {
+      "file": "playground/alias/__tests__/alias.spec.ts",
+      "line": 1,
+      "kind": "imports",
+      "targetName": "test",
+      "resolution": "library",
+      "libraries": [
+        "target|vitest|test|import-binding"
+      ],
+      "code": "import { expect, test } from 'vitest'"
+    },
+    {
+      "file": "packages/vite/src/node/__tests__/resolve.spec.ts",
+      "line": 371,
+      "kind": "calls",
+      "targetName": "test",
+      "resolution": "library",
+      "libraries": [
+        "target|vitest|test|import-binding"
+      ],
+      "code": "test('$& in string replacement is inserted literally', async () => {"
+    },
+    {
+      "file": "playground/worker/__tests__/sourcemap-hidden/worker-sourcemap-hidden.spec.ts",
+      "line": 78,
+      "kind": "calls",
+      "targetName": "expect",
+      "resolution": "library",
+      "libraries": [
+        "target|vitest|expect|import-binding"
+      ],
+      "code": "expect(files).toContainEqual("
+    },
+    {
+      "file": "playground/assets/__tests__/relative-base/assets-relative-base.spec.ts",
+      "line": 41,
+      "kind": "calls",
+      "targetName": "describe",
+      "resolution": "library",
+      "libraries": [
+        "target|vitest|describe|import-binding"
+      ],
+      "code": "describe('raw references from /public', () => {"
+    },
+    {
+      "file": "packages/vite/src/node/plugins/css.ts",
+      "line": 2072,
+      "kind": "references",
+      "targetName": "PostCSS.ProcessOptions",
+      "resolution": "library",
+      "libraries": [
+        "target|postcss|ProcessOptions|import-binding"
+      ],
+      "code": "options: PostCSS.ProcessOptions"
+    },
+    {
+      "file": "playground/fs-serve/__tests__/commonTests.ts",
+      "line": 8,
+      "kind": "imports",
+      "targetName": "afterEach",
+      "resolution": "library",
+      "libraries": [
+        "target|vitest|afterEach|import-binding"
+      ],
+      "code": "afterEach,"
+    },
+    {
+      "file": "packages/vite/src/node/plugins/workerImportMetaUrl.ts",
+      "line": 6,
+      "kind": "imports",
+      "targetName": "strip-literal",
+      "resolution": "library",
+      "libraries": [
+        "target|strip-literal||import-path"
+      ],
+      "code": "import { stripLiteral } from 'strip-literal'"
+    },
+    {
+      "file": "playground/css/__tests__/tests.ts",
+      "line": 66,
+      "kind": "calls",
+      "targetName": "test.runIf",
+      "resolution": "library",
+      "libraries": [
+        "target|vitest||import-path"
+      ],
+      "code": "test.runIf(isServe)('css import from js HMR', droppedEditTodo, async () => {"
+    },
+    {
+      "file": "packages/create-vite/__tests__/cli.spec.ts",
+      "line": 91,
+      "kind": "calls",
+      "targetName": "test",
+      "resolution": "library",
+      "libraries": [
+        "target|vitest|test|import-binding"
+      ],
+      "code": "test('prompts for the framework on supplying an invalid template', () => {"
+    },
+    {
+      "file": "packages/vite/src/node/__tests__/plugins/import.spec.ts",
+      "line": 55,
+      "kind": "calls",
+      "targetName": "parseImports",
+      "resolution": "library",
+      "libraries": [
+        "target|es-module-lexer|parse|import-binding"
+      ],
+      "code": "const [imports] = parseImports(source)"
+    },
+    {
+      "file": "packages/vite/src/node/plugins/manifest.ts",
+      "line": 104,
+      "kind": "calls",
+      "targetName": "nativeManifestPlugin",
+      "resolution": "library",
+      "libraries": [
+        "target|rolldown|experimental:viteManifestPlugin|import-binding"
+      ],
+      "code": "nativeManifestPlugin({"
+    },
+    {
+      "file": "packages/vite/src/node/ssr/runtime/__tests__/server-runtime.spec.ts",
+      "line": 437,
+      "kind": "calls",
+      "targetName": "expect",
+      "resolution": "library",
+      "libraries": [
+        "target|vitest|expect|import-binding"
+      ],
+      "code": "expect(await runner.import(`/@id/__x00__virtual:normal`))"
+    },
+    {
+      "file": "playground/chunk-importmap/__tests__/chunk-importmap.spec.ts",
+      "line": 22,
+      "kind": "calls",
+      "targetName": "test",
+      "resolution": "library",
+      "libraries": [
+        "target|vitest|test|import-binding"
+      ],
+      "code": "test('static js', async () => {"
+    },
+    {
+      "file": "packages/vite/src/node/plugins/terser.ts",
+      "line": 49,
+      "kind": "imports",
+      "targetName": "terser",
+      "resolution": "library",
+      "libraries": [
+        "target|terser||import-path"
+      ],
+      "code": "const terser: typeof import('terser') = await import(terserPath)"
+    },
+    {
+      "file": "packages/vite/src/node/index.ts",
+      "line": 1,
+      "kind": "imports",
+      "targetName": "*",
+      "resolution": "library",
+      "libraries": [
+        "target|rolldown||import-path"
+      ],
+      "code": "import type * as Rolldown from 'rolldown'"
+    },
+    {
+      "file": "playground/dynamic-import-inline/__tests__/dynamic-import-inline.spec.ts",
+      "line": 5,
+      "kind": "calls",
+      "targetName": "expect",
+      "resolution": "library",
+      "libraries": [
+        "target|vitest|expect|import-binding"
+      ],
+      "code": "expect(serverLogs).not.toContainEqual("
+    },
+    {
+      "file": "packages/vite/src/node/plugins/importAnalysis.ts",
+      "line": 12,
+      "kind": "imports",
+      "targetName": "parseStaticImport",
+      "resolution": "library",
+      "libraries": [
+        "target|mlly|parseStaticImport|import-binding"
+      ],
+      "code": "import { ESM_STATIC_IMPORT_RE, parseStaticImport } from 'mlly'"
+    }
+  ]
+}

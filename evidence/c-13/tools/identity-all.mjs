@@ -20,7 +20,7 @@ for (const [id, b] of base) {
   }
   const result = execFileSync(
     process.execPath,
-    ["--max-old-space-size=12000", join(here, "identity.mjs"), db(b), db(c), "23+typescript-=22+typescript-"],
+    ["--max-old-space-size=12000", join(here, "identity.mjs"), db(b), db(c), "34+typescript-=33+typescript-"],
     { maxBuffer: 1 << 28 },
   ).toString().trim();
   lines.push(JSON.stringify({ id, ...JSON.parse(result) }));
