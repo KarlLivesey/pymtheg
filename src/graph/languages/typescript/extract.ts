@@ -30,6 +30,7 @@ import {
   libraryKey,
   libraryReader,
   packageUnit,
+  returnedMemberTarget,
   storableName,
 } from "./library.js";
 import {
@@ -941,6 +942,37 @@ export function extractFile(
         current = checker.getAliasedSymbol(current);
       }
       let declarations = current.declarations ?? [];
+      if (globals.hasInstalledTypes && firstAlias && declarations.length > 1) {
+        const isAugmentation = (declaration: ts.Declaration) =>
+          ts.isModuleDeclaration(declaration) &&
+          ts.isStringLiteral(declaration.name) &&
+          ts.isSourceFile(declaration.parent) &&
+          ts.isExternalModule(declaration.parent);
+        const specifier = bindingSpecifier(firstAlias);
+        if (
+          specifier &&
+          ts.isStringLiteralLike(specifier) &&
+          declarations.some(isAugmentation)
+        ) {
+          const entry = specifierResolution(specifier).path;
+          const source = entry && program.getSourceFile(toVirtual(entry));
+          const unit = source && importer.installedUnit(source);
+          if (
+            unit &&
+            declarations.some(
+              (declaration) =>
+                !isAugmentation(declaration) &&
+                importer.installedUnit(declaration.getSourceFile()) === unit,
+            )
+          ) {
+            // A module augmentation wrapper is not the declaration of an
+            // export of the module, including its synthetic default.
+            declarations = declarations.filter(
+              (declaration) => !isAugmentation(declaration),
+            );
+          }
+        }
+      }
       if (meaning !== "any" && declarations.length > 1) {
         const filtered = declarations.filter((declaration) =>
           meaning === "type"
@@ -958,14 +990,40 @@ export function extractFile(
         declarations.some((declaration) => declaration.members.length > 0)
       ) {
         // Some packages declare empty compatibility interfaces for projects
-        // without DOM types. In a merge they add no members or constraints.
+        // without DOM types. A stub whose bases are already declared by the
+        // native DOM interface adds no members or constraints to the merge.
+        const nativeBases = new Set<ts.Symbol>();
+        for (const declaration of globals.hasInstalledTypes
+          ? declarations
+          : []) {
+          if (
+            !declaration
+              .getSourceFile()
+              .fileName.startsWith(`${LIB_ROOT}/lib.dom.`)
+          )
+            continue;
+          for (const clause of declaration.heritageClauses ?? [])
+            for (const type of clause.types) {
+              const base =
+                !type.typeArguments?.length &&
+                checker.getSymbolAtLocation(type.expression);
+              if (base) nativeBases.add(base);
+            }
+        }
         declarations = declarations.filter(
           (declaration) =>
             declaration.members.length > 0 ||
-            declaration.heritageClauses?.length ||
             declaration.typeParameters?.length ||
             importer.installedUnit(declaration.getSourceFile())?.ecosystem !==
-              "npm",
+              "npm" ||
+            declaration.heritageClauses?.some((clause) =>
+              clause.types.some((type) => {
+                const base =
+                  !type.typeArguments?.length &&
+                  checker.getSymbolAtLocation(type.expression);
+                return !base || !nativeBases.has(base);
+              }),
+            ),
         );
       }
       if (
@@ -1009,10 +1067,23 @@ export function extractFile(
         const source = declaration.getSourceFile();
         const unit = importer.declarationUnit(source);
         if (unit) {
+          const namespace =
+            globals.hasInstalledTypes &&
+            !receiver &&
+            meaning !== "call" &&
+            declarations.length === 1 &&
+            ts.isSourceFile(declaration) &&
+            firstAlias &&
+            installedNamespaceBinding(firstAlias, source);
           const proved =
             !incompleteConfig &&
-            !context.anyFailed &&
-            importer.targetOf(declaration, unit);
+            (namespace ||
+              (!context.anyFailed &&
+                (importer.targetOf(declaration, unit) ??
+                  (globals.hasInstalledTypes &&
+                    receiver &&
+                    importer.installedUnit(source) === unit &&
+                    returnedMemberTarget(declaration, unit, checker)))));
           if (proved) {
             if (meaning === "type" && importer.installedUnit(source))
               installedType = true;
@@ -1641,6 +1712,34 @@ export function extractFile(
     )
       return undefined;
     return target;
+  }
+
+  function installedNamespaceBinding(
+    alias: ts.Symbol,
+    declaration: ts.SourceFile,
+  ) {
+    const binding = alias.declarations?.length === 1 && alias.declarations[0];
+    if (!binding || !ts.isImportSpecifier(binding)) return undefined;
+    const specifier = bindingSpecifier(alias);
+    if (!specifier || !ts.isStringLiteralLike(specifier)) return undefined;
+    const path = specifierResolution(specifier).path;
+    const entry = path && program.getSourceFile(toVirtual(path));
+    const unit = entry && importer.installedUnit(entry);
+    const selected = selectedSpecifier(specifier);
+    const written = selected && packageUnit(selected);
+    if (
+      !unit ||
+      !written ||
+      unit.unit !== written.unit ||
+      unit !== importer.installedUnit(declaration)
+    )
+      return undefined;
+    // tsc represents a named namespace export as its source file. The
+    // selected package entry supplies the public name of that binding.
+    return writtenLibrary(
+      { ...unit, ...(written.subpath && { subpath: written.subpath }) },
+      (binding.propertyName ?? binding.name).text,
+    );
   }
 
   function declaredModuleFact(

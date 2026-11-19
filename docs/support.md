@@ -776,8 +776,13 @@ answer.
   symbols and link sources. Standard in-checkout pnpm, npm and Yarn
   `node_modules` layouts are supported. The compiler follows the package the
   install exposes to that importer, including overrides and workspace links.
+  A module augmentation owns the members it declares. The original package
+  owns its default export and named namespace bindings proven by its entry.
+  A named member written directly in an installed function's explicit return
+  type can be linked through that declaration when the function has one
+  declaration.
   [Library links](changes/C-11.md) · [Members and test globals](changes/C-16.md) ·
-  [Installed declarations](changes/C-20.md)
+  [Installed declarations](changes/C-20.md) · [Installed ownership](changes/C-23.md)
 - **Candidates:** several checkout or library targets for one callee (union
   receivers, merged declarations, duplicate JavaScript functions). Missing
   selected Node types can leave both DOM and Node targets possible for a shared

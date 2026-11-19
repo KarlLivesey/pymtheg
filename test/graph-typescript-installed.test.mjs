@@ -295,6 +295,37 @@ test("an installed override wins over an inferred workspace package", async () =
   local();
 });
 
+test("a physical workspace link with an unbuilt entry names the missing output", async () => {
+  const { root, request, read, write } = await project();
+  await write("package.json", '{"workspaces":["packages/*"]}');
+  await write(
+    "packages/ui/package.json",
+    '{"name":"fixture-ui","version":"1.0.0","types":"dist/index.d.ts"}',
+  );
+  await write(
+    "packages/ui/tsconfig.json",
+    '{"compilerOptions":{"rootDir":"src","outDir":"dist"},"files":["src/index.ts"]}',
+  );
+  await write("packages/ui/src/index.ts", "export const button = 1;");
+  await write(
+    "packages/app/package.json",
+    '{"name":"fixture-app","dependencies":{"fixture-ui":"^1"}}',
+  );
+  await write("packages/app/main.ts", 'import { button } from "fixture-ui";');
+  await mkdir(join(root, "node_modules"));
+  await symlink("../packages/ui", join(root, "node_modules/fixture-ui"), "dir");
+  await request("index");
+  read((store) => {
+    const link = store
+      .links()
+      .find(
+        (link) => link.kind === "imports" && link.targetName === "fixture-ui",
+      );
+    assert.equal(link.resolution, "unresolved");
+    assert.equal(link.data.reason, "workspace-build-output-missing");
+  });
+});
+
 test("captured competing test types use the compiler's global symbol", async () => {
   const { request, read, write } = await project();
   await write(
@@ -422,6 +453,102 @@ test("a qualified installed type uses its declaration without a runtime receiver
   });
 });
 
+test("an augmentation does not own a synthetic default export", async () => {
+  const { request, read, write } = await project();
+  await write("tsconfig.json", '{"compilerOptions":{"esModuleInterop":true}}');
+  await write(
+    "main.ts",
+    'import React from "react"; import "fixture-augment"; React.open();',
+  );
+  await write("node_modules/react/package.json", manifest("react", "1.2.3"));
+  await write(
+    "node_modules/react/index.d.ts",
+    "export = React; declare namespace React { function open(): void; }",
+  );
+  await write(
+    "node_modules/fixture-augment/package.json",
+    manifest("fixture-augment", "1.0.0"),
+  );
+  await write(
+    "node_modules/fixture-augment/index.d.ts",
+    'import "react"; declare module "react" { interface Extra { value: boolean } }',
+  );
+  await request("index");
+  read((store, call) => {
+    const binding = store
+      .links()
+      .find((link) => link.file === "main.ts" && link.targetName === "default");
+    assert.equal(target(binding).unit, "react");
+    assert.equal(target(binding).version, "1.2.3");
+    assert.equal(target(call("main.ts", "React.open")).unit, "react");
+  });
+});
+
+test("identical DOM heritage in an installed stub leaves the native type as owner", async () => {
+  const { request, read, write } = await project();
+  await write(
+    "main.ts",
+    'import "fixture-dom"; export type Input = HTMLInputElement; export type Label = HTMLLabelElement;',
+  );
+  await write(
+    "node_modules/fixture-dom/package.json",
+    manifest("fixture-dom", "1.0.0"),
+  );
+  await write(
+    "node_modules/fixture-dom/index.d.ts",
+    "export {}; declare global { interface HTMLInputElement extends HTMLElement {} interface Extra { fixtureOnly: boolean } interface HTMLLabelElement extends Extra {} }",
+  );
+  await request("index");
+  read((store) => {
+    const reference = (name) =>
+      store
+        .links()
+        .find((link) => link.targetName === name && link.kind === "references");
+    assert.equal(target(reference("HTMLInputElement")).ecosystem, "dom");
+    assert.equal(reference("HTMLLabelElement").resolution, "ambiguous");
+  });
+});
+
+test("a named re-exported namespace keeps its installed binding even beside a failed source", async () => {
+  const { request, read, write } = await project();
+  await write("tsconfig.json", '{"files":["main.ts","broken.ts"]}');
+  await write(
+    "main.ts",
+    'import { z, missing } from "zod"; export const spec = z;',
+  );
+  await write("broken.ts", "export const fail = ;");
+  await write("node_modules/zod/package.json", manifest("zod", "4.6.6"));
+  await write(
+    "node_modules/zod/index.d.ts",
+    'export * as z from "./namespace";',
+  );
+  await write(
+    "node_modules/zod/namespace.d.ts",
+    "export declare function string(): string;",
+  );
+  await request("index");
+  read((store) => {
+    const binding = (name) =>
+      store
+        .links()
+        .find(
+          (link) =>
+            link.kind === "imports" &&
+            link.file === "main.ts" &&
+            link.targetName === name,
+        );
+    assert.deepEqual(target(binding("z")), {
+      ecosystem: "npm",
+      unit: "zod",
+      symbol: "z",
+      evidence: "import-binding",
+      version: "4.6.6",
+      versionSource: "node_modules/zod/package.json",
+    });
+    assert.equal(binding("missing").resolution, "unresolved");
+  });
+});
+
 test("a failed file does not withdraw an independently written installed import binding", async () => {
   const { request, read, write } = await project();
   await write("tsconfig.json", '{"files":["main.ts","broken.ts"]}');
@@ -471,4 +598,33 @@ test("a mapped member keeps the proven package without inventing a declaring nam
       versionSource: "node_modules/query-kit/package.json",
     }),
   );
+});
+
+test("a named installed factory proves a member of its explicit return type", async () => {
+  const { request, read, write } = await project();
+  await write("package.json", '{"dependencies":{"fixture-checker":"^1"}}');
+  await write(
+    "main.ts",
+    'import { createTypeScriptChecker, choose } from "fixture-checker"; const linter = createTypeScriptChecker(); linter.getRootFileNames(); const result = choose("a"); result.pick();',
+  );
+  await write(
+    "node_modules/fixture-checker/package.json",
+    manifest("fixture-checker", "1.0.0"),
+  );
+  await write(
+    "node_modules/fixture-checker/index.d.ts",
+    'export declare function createTypeScriptChecker(): { getRootFileNames: () => string[] }; export declare function choose(mode: "a"): { pick(): string }; export declare function choose(mode: "b"): { pick(): number };',
+  );
+  await request("index");
+  read((_, call) => {
+    assert.deepEqual(target(call("main.ts", "linter.getRootFileNames")), {
+      ecosystem: "npm",
+      unit: "fixture-checker",
+      symbol: "ReturnType<typeof createTypeScriptChecker>.getRootFileNames",
+      evidence: "declaring-owner",
+      version: "1.0.0",
+      versionSource: "node_modules/fixture-checker/package.json",
+    });
+    assert.equal(call("main.ts", "result.pick").resolution, "unresolved");
+  });
 });

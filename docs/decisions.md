@@ -2889,3 +2889,15 @@ over inferred workspace links. A captured competing test type request is
 settled by the checker's declarations for the selected symbol. The C-16 guard
 still covers missing requests made by checkout code or its compiler config.
 Installed declarations contribute only via the checker. [C-20](changes/C-20.md)
+
+### C-23 Ownership in installed TypeScript declarations
+
+The selected package entry proves the original export's ownership when a
+module augmentation contributes only a wrapper declaration to the export's
+symbol. Members contributed by the augmentation keep their declaring
+package. A named namespace export can use its public binding name when the
+checker points to an installed source file in the same package. A direct
+member in a single named factory's inline return annotation uses the path
+`ReturnType<typeof Factory>.member`. A workspace entry with a physical link
+to a captured package retains the missing build-output reason.
+[C-23](changes/C-23.md)

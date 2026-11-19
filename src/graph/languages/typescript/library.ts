@@ -78,6 +78,49 @@ export const libraryKey = (target: LibraryTarget): string =>
     target.version,
   ]);
 
+/** A named member written directly in a named installed factory's return type. */
+export function returnedMemberTarget(
+  declaration: ts.Declaration,
+  unit: Unit,
+  checker: ts.TypeChecker,
+): LibraryTarget | undefined {
+  if (
+    !ts.isPropertySignature(declaration) &&
+    !ts.isMethodSignature(declaration)
+  )
+    return undefined;
+  const type = declaration.parent;
+  const factory = type.parent;
+  if (
+    !ts.isTypeLiteralNode(type) ||
+    !ts.isFunctionDeclaration(factory) ||
+    type !== factory.type ||
+    !factory.name ||
+    !ts.isSourceFile(factory.parent) ||
+    !(ts.getCombinedModifierFlags(factory) & ts.ModifierFlags.Export)
+  )
+    return undefined;
+  const member = nameOf(declaration);
+  const owner = checker.getSymbolAtLocation(factory.name);
+  const property = checker.getSymbolAtLocation(declaration.name);
+  if (
+    !member ||
+    owner?.declarations?.length !== 1 ||
+    property?.declarations?.length !== 1
+  )
+    return undefined;
+  const symbol = `ReturnType<typeof ${factory.name.text}>.${member}`;
+  return storableName(symbol)
+    ? {
+        ecosystem: unit.ecosystem,
+        unit: unit.unit,
+        symbol,
+        ...unit.pin,
+        evidence: "declaring-owner",
+      }
+    : undefined;
+}
+
 const exactVersion =
   /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[\da-z-]+(?:\.[\da-z-]+)*)?(?:\+[\da-z-]+(?:\.[\da-z-]+)*)?$/i;
 const dependencyFields = [
