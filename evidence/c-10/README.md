@@ -100,3 +100,23 @@ lookup still cannot close are `written-type`):
 | other (31 smaller reasons) | 6,900 |
 
 ## Cost
+
+Cold `graph index` of the same checkout copy, main and C-10 alternated
+(main, C-10, main, C-10) in one session on the dev server, timed with GNU
+`time`. Other builders' sweeps shared the machine (one-minute load 27–48),
+so wall time swung up to 2× between identical runs and is not compared;
+CPU time and peak memory are. Observations, not limits.
+
+| Repository | User CPU s, main | User CPU s, C-10 | User+system s, main | User+system s, C-10 | Peak RSS MiB, main | Peak RSS MiB, C-10 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| BurntSushi/ripgrep | 35.15 / 35.08 | 39.27 / 40.55 | 78.3 / 68.8 | 86.4 / 71.5 | 747 / 720 | 758 / 747 |
+| serde-rs/serde | 45.92 / 48.98 | 48.84 / 52.66 | 74.3 / 72.7 | 75.4 / 74.8 | 884 / 826 | 957 / 812 |
+| helix-editor/helix | 93.20 / 90.47 | 101.52 / 92.12 | 164.7 / 191.0 | 203.9 / 189.9 | 1,095 / 1,268 | 1,080 / 1,173 |
+
+Mean user CPU rises 13.7% on ripgrep, 7.0% on serde and 5.4% on helix;
+user plus system time 7.3%, 2.2% and 10.7%. Mean peak memory changes by
++2.6%, +3.4% and −4.7%, within the runs' own spread. The added work is
+the binding lookups for local references and the receiver recipes, which
+the resolver evaluates once per site and place with C-1's memoised lookups.
+An earlier attempt using the sweep runner's wall times on all ten pins was
+discarded: its two main runs differed by up to 3×.
