@@ -681,7 +681,7 @@ test("same-named installed factory declarations keep separate direct and union t
   const { request, read, write } = await project();
   await write(
     "main.ts",
-    `import { register as configure, publicApi } from "fixture-server/configuration";
+    `import { register as configure, publicApi, exportedApi } from "fixture-server/configuration";
 import { register as registerFolders } from "fixture-server/folders";
 declare const useConfiguration: boolean;
 const configuration = configure();
@@ -694,6 +694,7 @@ folders.local.change();
 configuration.detail.refresh();
 folders.detail.refresh();
 publicApi.open();
+exportedApi.read();
 `,
   );
   await write(
@@ -703,7 +704,24 @@ publicApi.open();
   for (const name of ["configuration", "folders"])
     await write(
       `node_modules/fixture-server/${name}.d.ts`,
-      `export {}; interface Local { change(): void } export type Detail = { refresh(): void }; export declare function register(): { readonly source: "${name}"; onDidChange(action: () => void): void; local: Local; detail: Detail }; interface PublicApi { open(): void } export { PublicApi as p }; export declare const publicApi: PublicApi;`,
+      `export {};
+interface Local { change(): void }
+export type Detail = { refresh(): void };
+export declare function register(): {
+  readonly source: "${name}";
+  onDidChange(action: () => void): void;
+  local: Local;
+  detail: Detail;
+};
+` +
+        (name === "configuration"
+          ? `interface PublicApi { open(): void }
+export { PublicApi as p };
+export declare const publicApi: PublicApi;
+export interface ExportedApi { read(): void }
+export declare const exportedApi: ExportedApi;
+`
+          : ""),
     );
   await request("index");
   const symbols = ["configuration", "folders"].map(
@@ -738,6 +756,10 @@ publicApi.open();
     assert.equal(
       target(main("publicApi.open")).symbol,
       "PublicApi.prototype.open",
+    );
+    assert.equal(
+      target(main("exportedApi.read")).symbol,
+      "ExportedApi.prototype.read",
     );
   });
   for (const [index, symbol] of symbols.entries()) {

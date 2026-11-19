@@ -279,7 +279,10 @@ export function libraryReader(
     LibraryTarget,
     ts.Symbol | ts.Declaration
   >();
-  const exportedOwners = new WeakMap<ts.SourceFile, Set<ts.Symbol>>();
+  const exportedOwners = new WeakMap<
+    ts.SourceFile,
+    ReadonlySet<ts.Declaration>
+  >();
   const installedUnits = new Map<string, Unit | undefined>();
   function installedUnit(path: string): Unit | undefined {
     if (!inputs || !path.split("/").includes("node_modules")) return undefined;
@@ -428,11 +431,11 @@ export function libraryReader(
     source: ts.SourceFile,
     owner: ts.NamedDeclaration,
   ) {
-    const binding = owner.name && checker.getSymbolAtLocation(owner.name);
-    if (!binding) return false;
+    if (ts.getCombinedModifierFlags(owner) & ts.ModifierFlags.Export)
+      return true;
     let owners = exportedOwners.get(source);
     if (!owners) {
-      owners = new Set();
+      const declarations = new Set<ts.Declaration>();
       for (const exported of checker
         .getSymbolAtLocation(source)
         ?.exports?.values() ?? []) {
@@ -450,16 +453,14 @@ export function libraryReader(
             continue;
           origin = checker.getAliasedSymbol(exported);
         }
-        if (
-          origin.declarations?.some(
-            (declaration) => declaration.getSourceFile() === source,
-          )
-        )
-          owners.add(origin);
+        for (const declaration of origin.declarations ?? [])
+          if (declaration.getSourceFile() === source)
+            declarations.add(declaration);
       }
+      owners = declarations;
       exportedOwners.set(source, owners);
     }
-    return owners.has(binding);
+    return owners.has(owner);
   }
 
   function qualifiedTarget(
