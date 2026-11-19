@@ -22,7 +22,12 @@ const below = (file: string, root: string) =>
   file.startsWith(root === "/" ? "/" : root + "/");
 
 function packagePath(root: string, path: unknown): string | undefined {
-  if (typeof path !== "string" || posix.isAbsolute(path) || path.includes("\\"))
+  if (
+    typeof path !== "string" ||
+    posix.isAbsolute(path) ||
+    path.includes("\\") ||
+    path.split("/").includes("..")
+  )
     return undefined;
   const file = posix.join(root, path);
   return below(file, root) && !file.split("/").includes("node_modules")
@@ -108,9 +113,10 @@ export function workspaceEntries(
     available: configs.size > 0 || manifests.some(({ json }) => !!json.tsup),
     proof(root: string, output: string) {
       if (!outputExtension.test(output) || files.has(output)) return undefined;
-      if (cache.has(output)) return cache.get(output) ?? undefined;
+      const key = `${root}\0${output}`;
+      if (cache.has(key)) return cache.get(key) ?? undefined;
       const match = find(root, output);
-      cache.set(output, match ?? null);
+      cache.set(key, match ?? null);
       return match;
     },
     forReference(parsed: ts.ParsedCommandLine) {

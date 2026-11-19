@@ -386,6 +386,50 @@ const isRelativeReference = (value: string) =>
   value === ".." ||
   value.startsWith("/");
 
+/** Virtual paths must not turn a host path outside the checkout into a
+ * captured input or output by normalizing it against the virtual `/`. */
+function scopedConfigPath(config: string, from: string, value: unknown) {
+  if (
+    typeof value !== "string" ||
+    posix.isAbsolute(value) ||
+    value.includes("\\") ||
+    /^[A-Za-z]:/.test(value)
+  )
+    return false;
+  const checkout = "/__checkout__";
+  const token = "${configDir}";
+  const path =
+    value === token || value.startsWith(token + "/")
+      ? posix.resolve(
+          checkout,
+          posix.dirname(config),
+          "." + value.slice(token.length),
+        )
+      : posix.resolve(checkout, posix.dirname(from), value);
+  return path === checkout || path.startsWith(checkout + "/");
+}
+
+function scopedEmitOptions(
+  config: string,
+  from: string,
+  object: Record<string, unknown>,
+) {
+  const options = object.compilerOptions as Record<string, unknown> | undefined;
+  const inputs = [object.files, object.include].flatMap((field) =>
+    Array.isArray(field) ? field : [],
+  );
+  const values = [
+    options?.outDir,
+    options?.outFile,
+    options?.rootDir,
+    options?.declarationDir,
+    ...inputs,
+  ];
+  return values.every(
+    (value) => value === undefined || scopedConfigPath(config, from, value),
+  );
+}
+
 class VirtualFileSystem {
   readonly files = new Map<string, string>();
   readonly directories = new Set<string>(["/"]);
@@ -666,6 +710,7 @@ export function projectModel(
   const groups: ProjectGroup[] = [];
   // Reference redirects reuse the parsed snapshot config across programs.
   const parsedConfigs = new Map<string, ts.ParsedCommandLine>();
+  const emitConfigs = new Map<string, ts.ParsedCommandLine>();
   const claimed = new Map<string, ProjectGroup[]>();
   const claim = (path: string, group: ProjectGroup) => {
     const list = claimed.get(path) ?? [];
@@ -709,6 +754,7 @@ export function projectModel(
     const object = (
       raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {}
     ) as Record<string, unknown>;
+    let emitPathsScoped = scopedEmitOptions(config.path, config.path, object);
     // `files`, `include` and `exclude` must be arrays of strings.
     const badSelection = (["files", "include", "exclude"] as const).find(
       (key) =>
@@ -745,9 +791,11 @@ export function projectModel(
             `${from} extends "${base}" ${detail}; node_modules is never captured, so those settings are missing`,
           );
         if (!isRelativeReference(base)) {
+          emitPathsScoped = false;
           outside("from an external package");
           continue;
         }
+        emitPathsScoped &&= scopedConfigPath(config.path, from, base);
         let target = posix.normalize(
           posix.join(posix.dirname(toVirtual(from)), base),
         );
@@ -797,10 +845,13 @@ export function projectModel(
           );
           break;
         }
-        pending.push([
+        const baseConfig = parsed as Record<string, unknown>;
+        emitPathsScoped &&= scopedEmitOptions(
+          config.path,
           context.path,
-          (parsed as Record<string, unknown>).extends,
-        ]);
+          baseConfig,
+        );
+        pending.push([context.path, baseConfig.extends]);
       }
     }
     // Missing references are recorded without adding roots outside the snapshot.
@@ -853,8 +904,10 @@ export function projectModel(
                 "node_modules is never captured, so those settings are missing",
               ),
           );
-        if (!group.limitations.length)
+        if (!group.limitations.length) {
           parsedConfigs.set(toVirtual(config.path), parsed);
+          if (emitPathsScoped) emitConfigs.set(toVirtual(config.path), parsed);
+        }
         group.notes.push(
           ...parsed.errors
             // 18003: "No inputs were found" is a normal state for solution-style configs.
@@ -999,12 +1052,7 @@ export function projectModel(
   const caches = new WeakMap<ts.CompilerHost, Map<string, ts.SourceFile>>();
   const asked = new WeakMap<ts.CompilerHost, Set<string>>();
   const originals = new Map(files.map((file) => [file.path, file.text]));
-  const entries = workspaceEntries(
-    manifests,
-    parsedConfigs,
-    fs.files,
-    originals,
-  );
+  const entries = workspaceEntries(manifests, emitConfigs, fs.files, originals);
   const redirects = new WeakMap<
     ts.CompilerHost,
     Map<ts.ResolvedModuleFull, UnbuiltEntry>

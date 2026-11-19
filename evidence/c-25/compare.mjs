@@ -26,6 +26,7 @@ const setup = (db) => ({
   links: db.prepare(`SELECT l.kind, l.origin, l.resolution, l.body,
     json_array(json_extract(s.body,'$.key'),json_extract(s.body,'$.ordinal')) AS source,
     json_array(t.file,json_extract(t.body,'$.key'),json_extract(t.body,'$.ordinal')) AS target,
+    json_extract(t.body,'$.range.start') AS targetStart,
     (SELECT json_group_array(json_array(ecosystem,unit,symbol,version))
        FROM graph_library_targets WHERE link=l.id) AS libraries
     FROM graph_links l INDEXED BY graph_link_file
@@ -160,6 +161,10 @@ for (const repo of read(beforePath).repos) {
       count.gainsByProof[proof] = (count.gainsByProof[proof] ?? 0) + 1;
       if (!note) continue;
       const line = text.slice(0, old.range.start).split("\n").length;
+      const declaration = files.get(updated.target[0]);
+      const targetLine = declaration
+        ?.slice(0, updated.targetStart)
+        .split("\n").length;
       saved.push({
         pin: repo.id,
         file,
@@ -170,6 +175,10 @@ for (const repo of read(beforePath).repos) {
         snippet: text.split("\n")[line - 1].trim().slice(0, 180),
         prior: old.data?.reason ?? old.resolution,
         target: updated.target,
+        targetLine,
+        targetSnippet: targetLine
+          ? declaration.split("\n")[targetLine - 1].trim().slice(0, 180)
+          : undefined,
         note,
         rank: createHash("sha256")
           .update(JSON.stringify([seed, repo.id, file, key]))

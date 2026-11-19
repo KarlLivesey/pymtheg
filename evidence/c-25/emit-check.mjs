@@ -36,16 +36,26 @@ function environment(root) {
       return undefined;
     }
   };
-  const fileExists = (name) => !!safe(name, true) && ts.sys.fileExists(name);
-  const readFile = (name) => safe(name, true) && ts.sys.readFile(name);
-  const directoryExists = (name) =>
-    !!safe(name, true) && ts.sys.directoryExists(name);
+  const fileExists = (name) => {
+    const path = safe(name, true);
+    return !!path && ts.sys.fileExists(path);
+  };
+  const readFile = (name) => {
+    const path = safe(name, true);
+    return path && ts.sys.readFile(path);
+  };
+  const directoryExists = (name) => {
+    const path = safe(name, true);
+    return !!path && ts.sys.directoryExists(path);
+  };
   const entries = (name) => {
-    if (!directoryExists(name)) return { files: [], directories: [] };
+    const directory = safe(name, true);
+    if (!directory || !ts.sys.directoryExists(directory))
+      return { files: [], directories: [] };
     const files = [];
     const directories = [];
-    for (const item of readdirSync(name, { withFileTypes: true })) {
-      const path = join(name, item.name);
+    for (const item of readdirSync(directory, { withFileTypes: true })) {
+      const path = join(directory, item.name);
       const kind =
         item.isSymbolicLink() && safe(path, true) ? statSync(path) : item;
       if (kind.isDirectory()) directories.push(item.name);
@@ -97,7 +107,10 @@ function environment(root) {
         getDirectories: (path) => entries(path).directories,
         getCurrentDirectory: () => root,
         getParsedCommandLine: (path) => parse(path),
-        realpath: (path) => (safe(path, true) ? realpathSync(path) : path),
+        realpath: (name) => {
+          const path = safe(name, true);
+          return path ? realpathSync(path) : name;
+        },
         writeFile: () => {
           throw Error("Audit builds capture their writes");
         },

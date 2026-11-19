@@ -415,6 +415,29 @@ test("a physical workspace link follows Astro's declaration-only subpath layout"
   });
 });
 
+test("an output directory outside the checkout supplies no workspace entry proof", async () => {
+  const { root, request, read, write } = await project();
+  await write(
+    "package.json",
+    '{"name":"fixture-root","types":"./dist/index.d.ts"}',
+  );
+  await write(
+    "tsconfig.build.json",
+    '{"compilerOptions":{"rootDir":"src","outDir":"../dist","declaration":true},"include":["src"]}',
+  );
+  await write("src/index.ts", "export function rootEntry() {}");
+  await write(
+    "sample/main.ts",
+    'import { rootEntry } from "fixture-root"; rootEntry();',
+  );
+  await mkdir(join(root, "sample/node_modules"));
+  await symlink("../..", join(root, "sample/node_modules/fixture-root"), "dir");
+  await request("index");
+  read((_, call) =>
+    assert.equal(call("sample/main.ts", "rootEntry").resolution, "unresolved"),
+  );
+});
+
 test("captured competing test types use the compiler's global symbol", async () => {
   const { request, read, write } = await project();
   await write(
