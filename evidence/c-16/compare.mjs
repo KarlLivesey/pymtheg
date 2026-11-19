@@ -19,6 +19,8 @@ const open = (repo) =>
 const candidate = selected[0] === "--candidate";
 if (candidate) selected.shift();
 const verify = process.env.PYM_COMPARE_ALL_LINKS === "1";
+const detailed = process.env.PYM_COMPARE_CANDIDATES === "1";
+const candidateKeys = verify || detailed;
 const old = read(process.env.C16_BASELINE ?? "main");
 const next = new Map(
   candidate
@@ -123,7 +125,7 @@ const queries = (db) => ({
       SELECT json_group_array(json_object('ecosystem',ecosystem,'unit',unit,'symbol',symbol,
         'evidence',evidence,'version',version,'versionSource',version_source)) FROM graph_library_targets WHERE link=l.id
     ) AS libraries${
-      verify
+      candidateKeys
         ? `, (
       SELECT json_group_array(json_array(file,key,ordinal,kind)) FROM (
         SELECT c.kind,cs.file,json_extract(cs.body,'$.key') AS key,json_extract(cs.body,'$.ordinal') AS ordinal
@@ -320,17 +322,16 @@ for (const repo of old) {
         if (b && (exact ?? -1) < 0) {
           const priorUnit = link.libraries[0];
           const newUnit = updated?.libraries[0];
-          if (
+          const refined =
             link.resolution === "library" &&
             updated?.resolution === "library" &&
             priorUnit.symbol === null &&
             newUnit.symbol !== null &&
             priorUnit.ecosystem === newUnit.ecosystem &&
             priorUnit.unit === newUnit.unit &&
-            priorUnit.version === newUnit.version
-          )
-            count.unitUpgrades++;
-          else
+            priorUnit.version === newUnit.version;
+          if (refined) count.unitUpgrades++;
+          if (!refined || detailed)
             count.changedDefinite.push({
               file,
               range: link.range,

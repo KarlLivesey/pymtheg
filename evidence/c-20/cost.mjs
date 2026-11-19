@@ -1,20 +1,25 @@
 // SPDX-License-Identifier: MIT
 import { spawnSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync } from "node:fs";
 import { join } from "node:path";
 
 const [scratch, bareFile, installedFile, ...pins] = process.argv.slice(2);
+const build = process.env.C20_BUILD ?? "candidate";
 const read = (name) => JSON.parse(readFileSync(join(scratch, name), "utf8"));
 const bare = read(bareFile).repos;
 const installed = read(installedFile).repos;
 const costs = join(scratch, "cost");
 mkdirSync(costs, { recursive: true });
+const env = { ...process.env };
+delete env.NODE_OPTIONS;
 
 function cold(repo, build, label) {
   const root = join(scratch, repo.attempt, "checkout");
   const state = join(root, ".pymtheg/rebuildable");
-  const key = repo.id.replaceAll("/", "-") + "-" + label;
-  if (existsSync(state)) renameSync(state, join(costs, key + "-old"));
+  const key = repo.id.replaceAll("/", "-") + "-" + label + "-" + randomUUID();
+  const backup = join(costs, key + "-old");
+  if (existsSync(state)) renameSync(state, backup);
   const metrics = join(costs, key + ".txt");
   const result = spawnSync(
     "/usr/bin/time",
@@ -37,8 +42,11 @@ function cold(repo, build, label) {
       ".",
       "--json",
     ],
-    { cwd: root, stdio: "ignore" },
+    { cwd: root, stdio: "ignore", env },
   );
+  // Restore the sweep store even if the cold process did not complete.
+  if (existsSync(state)) renameSync(state, join(costs, key + "-cold"));
+  if (existsSync(backup)) renameSync(backup, state);
   if (result.status !== 0 && result.status !== 2)
     throw Error(
       `Cold indexing ${repo.id} ${label} failed with ${result.status ?? result.signal}`,
@@ -47,9 +55,6 @@ function cold(repo, build, label) {
     .trim()
     .split(/\s+/)
     .map(Number);
-  // Restore the measured sweep store, preserving this cold store for inspection.
-  renameSync(state, join(costs, key + "-cold"));
-  renameSync(join(costs, key + "-old"), state);
   return { wallSeconds, peakRssKiB, cpuSeconds: user + system };
 }
 
@@ -67,8 +72,8 @@ for (const id of pins) {
     JSON.stringify({
       id,
       main: cold(a, "main", "main"),
-      bare: cold(a, "candidate", "bare"),
-      installed: cold(b, "candidate", "installed"),
+      bare: cold(a, build, "bare"),
+      installed: cold(b, build, "installed"),
       mainRepeat: cold(a, "main", "main-repeat"),
     }),
   );

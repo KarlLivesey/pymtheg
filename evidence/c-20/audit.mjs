@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import ts from "typescript";
 
-const [scratch, comparisonFile] = process.argv.slice(2);
+const [scratch, comparisonFile, ...pins] = process.argv.slice(2);
 const read = (path) => JSON.parse(readFileSync(path, "utf8"));
 const { additions } = read(comparisonFile);
 const checkouts = new Map(
@@ -16,7 +16,8 @@ const checkouts = new Map(
 const pool = Object.values(additions)
   .flat()
   .filter(
-    ({ outcome, targets }) =>
+    ({ pin, outcome, targets }) =>
+      (!pins.length || pins.includes(pin)) &&
       outcome === "library" &&
       targets[0]?.versionSource?.split("/").includes("node_modules") &&
       targets[0].symbol,
@@ -56,9 +57,16 @@ function declarations(root, files, target) {
       if (node.name && ts.isIdentifier(node.name) && node.name.text === name) {
         const owners = [];
         for (let parent = node.parent; parent; parent = parent.parent)
-          if (parent.name && ts.isIdentifier(parent.name))
+          if (
+            parent.name && ts.isIdentifier(parent.name) &&
+            (ts.isInterfaceDeclaration(parent) || ts.isClassDeclaration(parent) ||
+              ts.isEnumDeclaration(parent) || ts.isTypeAliasDeclaration(parent) ||
+              ts.isVariableDeclaration(parent) ||
+              (ts.isModuleDeclaration(parent) && !(parent.flags & ts.NodeFlags.GlobalAugmentation)))
+          )
             owners.unshift(parent.name.text);
         if (
+          (parts.length > 0 || owners.length === 0) &&
           parts.every(
             (part, index) =>
               part === owners[owners.length - parts.length + index],

@@ -24,7 +24,7 @@ const percent = (numerator, denominator) =>
   ((100 * numerator) / denominator).toFixed(2) + "%";
 console.log("# Paired TypeScript dependency sweep\n");
 console.log(
-  "| Pin | Bare Level 2 | With installed declarations | Named delta | Install |\n| --- | ---: | ---: | ---: | --- |",
+  "| Pin | Bare Level 2 | With installed declarations | Level 2 delta | Install |\n| --- | ---: | ---: | ---: | --- |",
 );
 for (const row of stats) {
   const attempt = installByPin.get(row.pin);
@@ -47,7 +47,7 @@ console.log(
   `Matched sites ${sum("shared")} · ${percent(sum("sharedBeforeL2"), sum("shared"))} → ${percent(sum("sharedAfterL2"), sum("shared"))}.\n`,
 );
 console.log(
-  "| Row | New named links | New unit-only links | New candidate sets |\n| --- | ---: | ---: | ---: |",
+  "| Row | New Level 2 links | New unit-only links | New candidate sets | SW-3 reference sites at Level 2 |\n| --- | ---: | ---: | ---: | ---: |",
 );
 for (const [row, label] of [
   ["ts-package", "Aliases and globals"],
@@ -57,7 +57,7 @@ for (const [row, label] of [
   const counts = (key) =>
     stats.reduce((total, pin) => total + pin.rows[row][key], 0);
   console.log(
-    `| ${label} | ${counts("recovered")} | ${counts("unit")} | ${counts("candidates")} |`,
+    `| ${label} | ${counts("recovered")} | ${counts("unit")} | ${counts("candidates")} | ${counts("referenceBefore")}/${counts("referenceSites")} → ${counts("referenceAfter")}/${counts("referenceSites")} |`,
   );
 }
 
@@ -69,6 +69,8 @@ const category = ({ prior, updated }) => {
   if (updated.resolution === "resolved") return "checkout-declaration";
   const before = prior.libraries[0];
   const after = updated.libraries[0];
+  if (before?.unit === after.unit && before.ecosystem === after.ecosystem && before.symbol === null && after.symbol)
+    return "unit-refined-to-member";
   if (
     before &&
     before.ecosystem === after.ecosystem &&
@@ -84,6 +86,7 @@ const target = (link) =>
   link && {
     resolution: link.resolution,
     checkout: JSON.parse(link.target),
+    candidates: JSON.parse(link.candidateKeys ?? "[]"),
     libraries: link.libraries,
     reason: link.data?.reason,
   };

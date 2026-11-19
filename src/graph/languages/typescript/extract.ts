@@ -490,7 +490,11 @@ export function extractFile(
       !result.libraryFacts?.length &&
       (result.noAnswer ||
         result.reason === "no-symbol" ||
-        (found.receiver !== undefined && result.reason === "external") ||
+        (result.reason === "external" &&
+          (found.receiver !== undefined ||
+            (result.viaAlias &&
+              context.anyFailed &&
+              globals.hasInstalledTypes))) ||
         result.reason === "external-package" ||
         result.reason === "any-receiver" ||
         result.reason === "untyped-require" ||
@@ -841,6 +845,7 @@ export function extractFile(
     let firstAlias: ts.Symbol | undefined;
     let declaredSomewhere = false;
     let missingGlobalTypes = false;
+    let installedType = false;
     let nodeReceivers: ReturnType<typeof nodeReceiverTypes> | undefined;
     let verifyObjectProducers = false;
     const declarations: ts.Declaration[] = [];
@@ -964,6 +969,8 @@ export function extractFile(
             !context.anyFailed &&
             importer.targetOf(declaration, unit);
           if (proved) {
+            if (meaning === "type" && importer.installedUnit(source))
+              installedType = true;
             if (
               (missingNode || globals.otherGlobals.size > 0) &&
               source.fileName.startsWith(LIB_ROOT + "/") &&
@@ -1027,6 +1034,7 @@ export function extractFile(
     if (
       !external &&
       !local &&
+      !installedType &&
       libraryFacts?.size &&
       receiver &&
       found.name !== undefined
@@ -1544,6 +1552,21 @@ export function extractFile(
       const routes = reader.importUnits(selection);
       return routes.some((unit) => reader.localPackage(unit)) ? [] : routes;
     }
+    if (reason === undefined && globals.hasInstalledTypes) {
+      // A mapped member or incomplete program may leave its owner open.
+      // A literal binding still names the module when its routes agree.
+      const installed = installedRoutes(specifier, selection);
+      const written = reader.importUnits(selection);
+      if (installed?.length === 1 && written.length === 1) {
+        const actual = installed[0]!;
+        const expected = written[0]!;
+        if (
+          actual.ecosystem === expected.ecosystem &&
+          actual.unit === expected.unit
+        )
+          return [{ ...expected, ...(actual.pin && { pin: actual.pin }) }];
+      }
+    }
     if (declared && reason === undefined && declaredModuleFact(specifier))
       return reader.importUnits(selection);
     return [];
@@ -1582,10 +1605,11 @@ export function extractFile(
       !specifier ||
       !ts.isStringLiteralLike(specifier) ||
       incompleteConfig ||
-      context.anyFailed ||
       limited
     )
       return undefined;
+    if (context.anyFailed)
+      return globals.hasInstalledTypes ? importFact(specifier) : undefined;
     const declarations = checker.getSymbolAtLocation(specifier)?.declarations;
     if (
       !declarations?.length ||
@@ -1595,18 +1619,11 @@ export function extractFile(
     )
       return undefined;
     const selection = selectedSpecifier(specifier);
-    const installed = declarations.map((declaration) =>
-      importerOf(specifier).installedUnit(declaration.getSourceFile()),
-    );
-    if (installed.every((unit) => unit !== undefined)) {
-      const builtin = selection ? packageUnit(selection) : undefined;
+    const installed = selection && installedRoutes(specifier, selection);
+    if (installed) {
       const targets = new Map<string, LibraryTarget>();
       for (const unit of installed) {
-        const target = writtenLibrary(
-          unit!.ecosystem === "node" && builtin?.ecosystem === "node"
-            ? { ...builtin, ...(unit!.pin && { pin: unit!.pin }) }
-            : unit!,
-        );
+        const target = writtenLibrary(unit);
         if (!target) return undefined;
         targets.set(libraryKey(target), target);
       }
@@ -1621,6 +1638,32 @@ export function extractFile(
     return targets.length && targets.every((target) => target !== undefined)
       ? { targets: [], libraryFacts: targets }
       : undefined;
+  }
+
+  function installedRoutes(specifier: ts.StringLiteralLike, selection: string) {
+    if (!globals.hasInstalledTypes) return undefined;
+    const declarations = checker.getSymbolAtLocation(specifier)?.declarations;
+    if (!declarations?.length) return undefined;
+    const builtin = packageUnit(selection);
+    const units = new Map<
+      string,
+      NonNullable<ReturnType<typeof packageUnit>>
+    >();
+    for (const declaration of declarations) {
+      const installed = importerOf(specifier).installedUnit(
+        declaration.getSourceFile(),
+      );
+      if (!installed) return undefined;
+      const unit =
+        installed.ecosystem === "node" && builtin?.ecosystem === "node"
+          ? { ...builtin, ...(installed.pin && { pin: installed.pin }) }
+          : installed;
+      units.set(
+        JSON.stringify([unit.ecosystem, unit.unit, unit.pin?.version]),
+        unit,
+      );
+    }
+    return [...units.values()];
   }
 
   /** Follow a lexical import or immutable bindings back to a literal loader. */
@@ -1779,15 +1822,31 @@ export function extractFile(
         !memberWritten(found.receiver, found.name)
           ? found.name
           : undefined;
+      let selected = found.symbol;
+      const installedFallback =
+        globals.hasInstalledTypes && moduleReason(specifier) === undefined;
+      if (
+        installedFallback &&
+        selected &&
+        selected.flags & ts.SymbolFlags.Alias
+      )
+        selected = checker.getAliasedSymbol(selected);
+      const mayName =
+        !installedFallback ||
+        selected?.declarations?.some((declaration) =>
+          importer.installedUnit(declaration.getSourceFile()),
+        );
       const targets = units.map((unit) =>
         writtenLibrary(
           unit,
-          found.receiver
-            ? moduleObject ||
-              (unit.ecosystem === "node" && exported === "default")
-              ? member
-              : undefined
-            : exported,
+          !mayName
+            ? undefined
+            : found.receiver
+              ? moduleObject ||
+                (unit.ecosystem === "node" && exported === "default")
+                ? member
+                : undefined
+              : exported,
         ),
       );
       if (targets.every((target) => target !== undefined)) return targets;

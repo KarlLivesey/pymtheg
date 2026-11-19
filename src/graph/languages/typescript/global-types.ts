@@ -388,6 +388,7 @@ const programTypes = new WeakMap<
   ts.Program,
   {
     hasNode: boolean;
+    hasInstalledTypes: boolean;
     expectsNode: boolean;
     missingPackageTypes: boolean;
     otherGlobals: ReadonlySet<string>;
@@ -552,12 +553,15 @@ export function globalTypeAvailability(
       | undefined;
   };
   let hasNode = false;
+  let hasInstalledTypes = false;
   for (const source of program.getSourceFiles()) {
     for (const reference of source.typeReferenceDirectives) {
       expected.add(reference.fileName);
       request(reference.fileName, source.fileName);
     }
     const path = fromVirtual(source.fileName);
+    if (path?.split("/").includes("node_modules") && source.isDeclarationFile)
+      hasInstalledTypes = true;
     const runtime =
       path !== undefined ? runtimeHashbang(source.text) : undefined;
     if (runtime === "bun" || runtime === "deno")
@@ -593,6 +597,7 @@ export function globalTypeAvailability(
     }
   const result = {
     hasNode: hasNode || [...available].some(node),
+    hasInstalledTypes,
     expectsNode: [...expected].some(node),
     missingPackageTypes: missing.some(
       (name) => !/^(?:\.{1,2}\/|\/)/.test(name),

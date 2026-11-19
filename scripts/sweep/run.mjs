@@ -234,7 +234,7 @@ async function buildDigest(path) {
   return hash.digest("hex");
 }
 
-async function localBuild(scratch, path) {
+export async function localBuild(scratch, path) {
   const input = resolve(path);
   const directory = (await lstat(input)).isDirectory();
   if (!directory && extname(input) !== ".tgz") throw Error("Use a built package directory or a local .tgz");

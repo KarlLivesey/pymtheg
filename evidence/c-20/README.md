@@ -10,6 +10,8 @@ The analysis uses the pinned TypeScript 5.9.3 compiler on Node 24.
 reinstalling the packages. It moves the interrupted store out of the checkout
 and checks the new cold receipt against a read-only status query. The result
 identifies the interrupted stage and the status-only follow-up.
+An optional build directory name and worker count reindex the retained
+installed checkouts with that build and record its digest.
 
 `overlay.mjs BARE INSTALLED-OVERLAY ATTEMPTS…` retains the bare result for
 any pin with an unavailable installed graph. It also writes an `-attempts`
@@ -18,7 +20,7 @@ these commands from the repository root.
 
 ```sh
 PYM_COMPARE_ALL_LINKS=1 C16_CANDIDATE=bare node evidence/c-16/compare.mjs SCRATCH --candidate
-PYM_COMPARE_SEED=pymtheg-c20-2026 C16_BASELINE=bare C16_CANDIDATE=installed node evidence/c-16/compare.mjs SCRATCH --candidate
+PYM_COMPARE_CANDIDATES=1 PYM_COMPARE_SEED=pymtheg-c20-2026 C16_BASELINE=bare C16_CANDIDATE=installed node evidence/c-16/compare.mjs SCRATCH --candidate
 ```
 
 The bare comparison checks outcomes, stable checkout target keys, library

@@ -228,3 +228,84 @@ test("workspace resolution keeps installed versions separate and blocks escaping
     }
   });
 });
+
+test("a qualified installed type uses its declaration without a runtime receiver", async () => {
+  const { request, read, write } = await project();
+  await write(
+    "tsconfig.json",
+    '{"compilerOptions":{"esModuleInterop":true},"files":["main.ts"]}',
+  );
+  await write(
+    "main.ts",
+    'import Messages from "message-kit"; export type Input = Messages.Request;',
+  );
+  await write(
+    "node_modules/message-kit/package.json",
+    manifest("message-kit", "1.0.0"),
+  );
+  await write(
+    "node_modules/message-kit/index.d.ts",
+    "declare namespace Messages { type Request = { body: string }; } export = Messages;\n",
+  );
+  await request("index");
+  read((store) => {
+    const link = store
+      .links()
+      .find(
+        (link) =>
+          link.kind === "references" && link.targetName === "Messages.Request",
+      );
+    assert.equal(target(link).symbol, "Messages.Request");
+  });
+});
+
+test("a failed file does not withdraw an independently written installed import binding", async () => {
+  const { request, read, write } = await project();
+  await write("tsconfig.json", '{"files":["main.ts","broken.ts"]}');
+  await write("package.json", '{"dependencies":{"direct-kit":"^1"}}');
+  await write("main.ts", 'import { open } from "direct-kit"; open();');
+  await write("broken.ts", "export const = ;");
+  await write(
+    "node_modules/direct-kit/package.json",
+    manifest("direct-kit", "1.2.0"),
+  );
+  await write(
+    "node_modules/direct-kit/index.d.ts",
+    "export declare function open(): void;\n",
+  );
+  await request("index");
+  read((_, call) =>
+    assert.deepEqual(target(call("main.ts", "open")), {
+      ecosystem: "npm",
+      unit: "direct-kit",
+      symbol: "open",
+      evidence: "import-binding",
+      version: "1.2.0",
+      versionSource: "node_modules/direct-kit/package.json",
+    }),
+  );
+});
+
+test("a mapped member keeps the proven package without inventing a declaring name", async () => {
+  const { request, read, write } = await project();
+  await write("package.json", '{"dependencies":{"query-kit":"^1"}}');
+  await write("main.ts", 'import { screen } from "query-kit"; screen.find();');
+  await write(
+    "node_modules/query-kit/package.json",
+    manifest("query-kit", "1.0.0"),
+  );
+  await write(
+    "node_modules/query-kit/index.d.ts",
+    'export type Bound = { [Name in "find"]: () => void }; export declare const screen: Bound;',
+  );
+  await request("index");
+  read((_, call) =>
+    assert.deepEqual(target(call("main.ts", "screen.find")), {
+      ecosystem: "npm",
+      unit: "query-kit",
+      evidence: "import-path",
+      version: "1.0.0",
+      versionSource: "node_modules/query-kit/package.json",
+    }),
+  );
+});
