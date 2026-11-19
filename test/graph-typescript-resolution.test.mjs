@@ -540,6 +540,16 @@ test("Node runtime evidence in a JavaScript file keeps shared globals open", asy
       "scripts/hashbang.js": "#!/usr/bin/env node\n" + shared,
       "scripts/working-directory.js": shared + "process.cwd();",
       "scripts/directory.js": shared + "const current = __dirname;",
+      "scripts/colors.cjs": shared + "require('picocolors');",
+      "scripts/computed.cjs": shared + "require(packageName);",
+      "commonjs/package.json": '{"type":"commonjs"}',
+      "commonjs/colors.js": shared + "require('picocolors');",
+      "commonjs/shadowed.cjs":
+        shared + "function use(require) { require('picocolors'); }",
+      "commonjs/esm/package.json": '{"type":"module"}',
+      "commonjs/esm/tsconfig.json":
+        '{"compilerOptions":{"module":"esnext","moduleResolution":"bundler","allowJs":true},"files":["colors.js"]}',
+      "commonjs/esm/colors.js": shared + "require('picocolors'); export {};",
       "browser.js":
         shared + "export {}; const process = {cwd() {}}; process.cwd();",
       "polyfill/package.json": '{"dependencies":{"path":"^0.12.0"}}',
@@ -549,17 +559,20 @@ test("Node runtime evidence in a JavaScript file keeps shared globals open", asy
     async (graph, report) => {
       clean(report);
       for (const path of [
-        "release.js",
-        "check.mjs",
-        "hashbang.js",
-        "working-directory.js",
-        "directory.js",
+        "scripts/release.js",
+        "scripts/check.mjs",
+        "scripts/hashbang.js",
+        "scripts/working-directory.js",
+        "scripts/directory.js",
+        "scripts/colors.cjs",
+        "scripts/computed.cjs",
+        "commonjs/colors.js",
       ])
         for (const [name, unit] of [
           ["log", "console"],
           ["setTimeout", "timers"],
         ]) {
-          const link = graph.link("scripts/" + path, name, "calls");
+          const link = graph.link(path, name, "calls");
           assert.equal(link.resolution, "ambiguous", path + " " + name);
           assert.deepEqual(
             link.libraries.map(({ unit }) => unit).sort(),
@@ -571,11 +584,59 @@ test("Node runtime evidence in a JavaScript file keeps shared globals open", asy
           .symbol,
         "readFileSync",
       );
-      for (const path of ["browser.js", "polyfill/browser.js"])
+      for (const path of [
+        "browser.js",
+        "polyfill/browser.js",
+        "commonjs/shadowed.cjs",
+        "commonjs/esm/colors.js",
+      ])
         assert.equal(
           libraryTarget(graph.link(path, "log", "calls")).unit,
           "dom",
         );
+    },
+  );
+});
+
+test("inherited Web API members keep Node candidates through checkout heritage", async () => {
+  const source = `class AppResponse<T> extends Response {
+    data() { return this.json(); }
+  }
+  class PageResponse extends AppResponse<string> {}
+  interface TypedResponse extends Response {}
+  declare const typed: TypedResponse;
+  new PageResponse().json();
+  typed.json();
+  type Key = CryptoKey;
+  export {};`;
+  await project(
+    {
+      "node/tsconfig.json": '{"compilerOptions":{"types":["node"]}}',
+      "node/response.ts": source,
+      "web/tsconfig.json": '{"compilerOptions":{"types":[]}}',
+      "web/response.ts": source,
+    },
+    async (graph, report) => {
+      clean(report);
+      const calls = graph.links("node/response.ts", "json", "calls");
+      assert.equal(calls.length, 3);
+      for (const link of calls) {
+        assert.equal(link.resolution, "ambiguous");
+        assert.deepEqual(
+          link.libraries.map(({ unit, symbol }) => [unit, symbol]).sort(),
+          [
+            ["dom", "Body.prototype.json"],
+            ["globals", "Response.prototype.json"],
+          ],
+        );
+      }
+      for (const link of graph.links("web/response.ts", "json", "calls"))
+        assert.equal(libraryTarget(link).symbol, "Body.prototype.json");
+      assert.equal(
+        libraryTarget(graph.link("node/response.ts", "CryptoKey", "references"))
+          .ecosystem,
+        "dom",
+      );
     },
   );
 });

@@ -387,6 +387,9 @@ export function libraryReader(
         return outside ? identity.unit : undefined;
       }
       return {
+        commonJs:
+          path.endsWith(".cjs") ||
+          (path.endsWith(".js") && manifest?.json.type === "commonjs"),
         declarationUnit,
         targetOf,
         expectsNode: () => dependency("@types/node") !== undefined,

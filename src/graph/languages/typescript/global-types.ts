@@ -287,6 +287,14 @@ export function nodeReceiverTypes(
       )
     )
       result.push({ type, name });
+    else if (
+      symbol?.declarations?.some(
+        (decl) => fromVirtual(decl.getSourceFile().fileName) !== undefined,
+      )
+    )
+      (
+        type.getBaseTypes() ?? (type as ts.TypeReference).target?.getBaseTypes()
+      )?.forEach(visit);
   };
   visit(type);
   cache.set(type, result);

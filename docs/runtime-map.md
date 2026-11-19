@@ -1663,6 +1663,10 @@ web globals. Missing test and build-tool types affect their own documented
 globals. Registry aliases and captured pnpm or Bun catalogs can establish an npm
 package's canonical name and exact version provenance. Local dependency
 protocols are checkout routes.
+Module 30 follows checkout class and interface bases for shared Web API
+members and treats an unshadowed `require()` in explicit CommonJS JavaScript
+as file-local Node evidence. Node's value-only `CryptoKey` is excluded in
+type positions.
 
 Rust records library paths during resolution starting with module 29. Its library lookup uses
 the captured namespace, import, placement and `cfg` facts, with a separate

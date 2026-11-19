@@ -319,13 +319,21 @@ export function extractFile(
       ts.isExternalModuleReference(node.moduleReference)
     )
       specifier = node.moduleReference.expression;
-    else if (
-      ts.isCallExpression(node) &&
-      (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
-        ((isCommonJsRequire(node) || requireForm(node)) && !insideWith(node)))
-    )
-      specifier = node.arguments[0];
-    else if (
+    else if (ts.isCallExpression(node)) {
+      const callee = node.expression;
+      if (
+        importer.commonJs &&
+        node.arguments.length > 0 &&
+        ts.isIdentifier(callee) &&
+        callee.text === "require"
+      )
+        nodeProbes.names.push(callee);
+      if (
+        callee.kind === ts.SyntaxKind.ImportKeyword ||
+        ((isCommonJsRequire(node) || requireForm(node)) && !insideWith(node))
+      )
+        specifier = node.arguments[0];
+    } else if (
       ts.isIdentifier(node) &&
       (node.text === "process" ||
         node.text === "__dirname" ||
@@ -735,7 +743,10 @@ export function extractFile(
                       (libraryFacts ??= new Map()).set(libraryKey(node), node);
                     else missingGlobalTypes = true;
                   }
-                } else if (nodeCanDeclare(owner)) {
+                } else if (
+                  nodeCanDeclare(owner) &&
+                  !(meaning === "type" && proved.symbol === "CryptoKey")
+                ) {
                   const node = nodeGlobalTarget(proved.symbol);
                   if (node)
                     (libraryFacts ??= new Map()).set(libraryKey(node), node);
@@ -2625,10 +2636,14 @@ export function extractFile(
         }),
       ) ||
       nodeProbes.names.some((name) =>
-        probe(
-          name,
-          () => !insideWith(name) && !checker.getSymbolAtLocation(name),
-        ),
+        probe(name, () => {
+          if (insideWith(name)) return false;
+          const symbol = checker.getSymbolAtLocation(name);
+          // The JS checker synthesizes a declaration-less CommonJS require.
+          return (
+            !symbol || (name.text === "require" && !symbol.declarations?.length)
+          );
+        }),
       );
   }
   visit(file, moduleKey);
