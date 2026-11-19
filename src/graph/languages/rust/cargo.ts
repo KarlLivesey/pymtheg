@@ -3,6 +3,26 @@ import { posix as p } from "node:path";
 import type { ContextFile } from "../../types.js";
 import { readToml, table, type TomlTable, type TomlValue } from "./toml.js";
 import { matchesVersion } from "./macro-catalog.js";
+import { cargoSources } from "./cargo-sources.js";
+
+function replacementPackage(id: string): string | undefined {
+  const named = /^([\w-]+)[:@]\d+\./.exec(id);
+  if (named) return named[1];
+  if (!id.includes("://")) return;
+  try {
+    const source = new URL(id);
+    const fragment = source.hash.slice(1);
+    const name =
+      /^([\w-]+)[:@]\d+\./.exec(fragment)?.[1] ??
+      (/^\d+\./.test(fragment)
+        ? p.basename(source.pathname).replace(/\.git$/, "")
+        : undefined);
+    return name && /^[\w-]+$/.test(name) ? name : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export type Edition = "2015" | "2018" | "2021" | "2024";
 export interface Dependency {
   name: string;
@@ -23,6 +43,7 @@ export interface Crate {
   deps: Map<string, string>;
   workspace: string | null;
   dependencyGraphKnown?: boolean;
+  libraryDependencyGraphKnown?: boolean;
   edition?: Edition | null;
   procMacro?: boolean;
   dependencies?: Dependency[];
@@ -100,6 +121,7 @@ export function crates(
       value: c.status === "clean" ? readToml(c.text) : null,
     }));
   const byPath = new Map(docs.map((d) => [d.path, d]));
+  const directorySource = cargoSources(contexts);
   const locks = new Map(
     contexts
       .filter((c) => p.basename(c.path) === "Cargo.lock")
@@ -289,6 +311,12 @@ export function crates(
         : edition(table(ws?.package)!.edition)
       : edition(pkg.edition);
     let known = workspace.known;
+    let libraryKnown = workspace.known;
+    // Configs are searched from the invocation directory. When the member
+    // and workspace see different directory sources, leave that edge open.
+    const memberSource = directorySource(doc.dir);
+    const workspaceSource = directorySource(workspace.doc?.dir ?? doc.dir);
+    const vendor = memberSource === workspaceSource ? memberSource : null;
     const maps = {
         normal: new Map<string, string>(),
         build: new Map<string, string>(),
@@ -299,6 +327,16 @@ export function crates(
       doc,
       ...(workspace.doc && workspace.doc !== doc ? [workspace.doc] : []),
     ]) {
+      if (
+        source.value?.patch !== undefined &&
+        (!table(source.value.patch) ||
+          Object.values(table(source.value.patch)!).some(
+            (group) => !table(group),
+          ))
+      )
+        libraryKnown = false;
+      if (source.value?.replace !== undefined && !table(source.value.replace))
+        libraryKnown = false;
       for (const entries of Object.values(table(source.value?.patch) ?? {}))
         for (const [alias, v] of Object.entries(table(entries) ?? {}))
           overrides.push({
@@ -308,14 +346,22 @@ export function crates(
                 ? undefined
                 : p.join(source.dir, string(table(v)!.path)!, "Cargo.toml"),
           });
-      for (const [id, v] of Object.entries(table(source.value?.replace) ?? {}))
+      for (const [id, v] of Object.entries(
+        table(source.value?.replace) ?? {},
+      )) {
+        const name = replacementPackage(id);
+        if (!name) {
+          libraryKnown = false;
+          continue;
+        }
         overrides.push({
-          name: id.split(":")[0]!,
+          name,
           path:
             string(table(v)?.path) === undefined
               ? undefined
               : p.join(source.dir, string(table(v)!.path)!, "Cargo.toml"),
         });
+      }
       if (
         source.value?.patch !== undefined ||
         source.value?.replace !== undefined
@@ -393,7 +439,7 @@ export function crates(
             depPath === undefined
               ? ""
               : p.join(origin.dir, depPath, "Cargo.toml");
-        const targets = [
+        let targets = [
           ...new Set([
             direct,
             ...alternatives.flatMap((o) => (o.path ? [o.path] : [])),
@@ -407,14 +453,15 @@ export function crates(
               : []),
           ]),
         ];
-        const registry =
-          !alternatives.length &&
+        const defaultRegistry =
           workspace.known &&
           (fields?.package === undefined ||
             typeof fields.package === "string") &&
           !["path", "git", "registry", "registry-index"].some(
             (k) => fields?.[k] !== undefined,
-          )
+          );
+        const registry =
+          defaultRegistry && !alternatives.length
             ? registrySelection(
                 doc.path,
                 workspace.doc?.path,
@@ -424,6 +471,26 @@ export function crates(
               )
             : {};
         const exact = exactVersion(requirement);
+        if (defaultRegistry && vendor !== undefined) {
+          const selected = registry.libraryVersion ?? exact;
+          const candidates =
+            typeof vendor === "string" && !p.isAbsolute(vendor) && selected
+              ? docs.filter((d) => {
+                  const relative = p.relative(vendor, d.dir);
+                  const pkg = table(d.value?.package);
+                  return (
+                    !!relative &&
+                    !relative.startsWith("..") &&
+                    !relative.includes("/") &&
+                    pkg?.name === packageName &&
+                    pkg.version === selected
+                  );
+                })
+              : [];
+          if (candidates.length === 1 && !alternatives.length)
+            targets = [candidates[0]!.path];
+          else conditions.push("?directory-source");
+        }
         const version =
           !registry.libraryVersion && exact && !alternatives.length
             ? { libraryVersion: exact, libraryVersionSource: origin.path }
@@ -461,8 +528,9 @@ export function crates(
             kind: group.kind,
             conditions: [...conditions],
             packageName,
-            ...registry,
-            ...version,
+            ...(defaultRegistry && vendor !== undefined
+              ? {}
+              : { ...registry, ...version }),
           });
         }
       }
@@ -477,7 +545,7 @@ export function crates(
         "replace",
       ].some((k) => value[k] !== undefined && !table(value[k]))
     )
-      known = false;
+      known = libraryKnown = false;
     const lib = table(value.lib),
       libPath =
         value.lib === undefined || lib
@@ -505,6 +573,7 @@ export function crates(
         edition:
           targetEdition === undefined ? pkgEdition : edition(targetEdition),
         dependencyGraphKnown: known,
+        libraryDependencyGraphKnown: libraryKnown,
         ...(kind === "lib" && lib?.["proc-macro"] === true
           ? { procMacro: true }
           : {}),

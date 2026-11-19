@@ -390,6 +390,13 @@ makes that whole manifest unknown). Private items are ordinary symbols.
   resolve. A `#[macro_export]` macro of another crate in the project resolves
   (by path, `use` or `#[macro_use] extern crate`). Written library macro paths
   and proven prelude macros can produce library targets.
+- **Outside Rust paths.** Written paths resolve through explicit imports,
+  qualified names and unshadowed edition preludes. A module-level expansion
+  cannot replace a definite explicit import in that module and namespace.
+  Glob imports, prelude names, `#[macro_use]` and block-level expansions
+  still need independent shadowing proof. A directory-source replacement
+  from Cargo configuration uses the captured vendored crate as a checkout
+  dependency. Receiver calls still require the declaring owner.
 - **Clean expansion (both rules below).** A workspace `macro_rules!` arm is
   clean when the code it emits has no attribute anywhere (so no `#[cfg]` can
   remove a call) and no item other than a readable `use` (no `fn`, `mod`,

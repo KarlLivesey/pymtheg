@@ -28,7 +28,13 @@ function score(rows) {
   };
 }
 const repos = matches.map((repo) => ({ id: repo.id, before: score(main.get(repo.id).breakdown),
-  after: score(repo.breakdown), shared: repo.shared?.rust }));
+  after: score(repo.breakdown), sharedBefore: main.get(repo.id).shared?.rust, shared: repo.shared?.rust }));
+function sharedScore(field) {
+  return repos.reduce((result, repo) => ({
+    links: result.links + (repo[field]?.links ?? 0),
+    level2: result.level2 + (repo[field]?.level2 ?? 0),
+  }), { links: 0, level2: 0 });
+}
 const settled = samples.flatMap((sample) => {
   if (!["rust-macro", "rust-std-path", "rust-external-targets"].includes(sample.item)) return [];
   const isSettled = (fact) => sample.label === "outside" ? fact.library?.level === 2 : fact.state === "resolved";
@@ -41,7 +47,8 @@ console.log(JSON.stringify({
   repos,
   before: score(matches.flatMap((repo) => main.get(repo.id).breakdown)),
   after: score(matches.flatMap((repo) => repo.breakdown)),
-  shared: repos.reduce((result, { shared }) => ({ links: result.links + (shared?.links ?? 0), level2: result.level2 + (shared?.level2 ?? 0) }), { links: 0, level2: 0 }),
+  sharedBefore: sharedScore("sharedBefore"),
+  shared: sharedScore("shared"),
   unmatched: [...new Set([...main.keys(), ...candidate.keys()])].filter((id) => !finished(main.get(id)) || !finished(candidate.get(id)))
     .map((id) => ({ id, before: main.get(id)?.outcome, after: candidate.get(id)?.outcome })),
   settled,

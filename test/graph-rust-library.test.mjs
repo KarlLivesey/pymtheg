@@ -1,8 +1,24 @@
 // SPDX-License-Identifier: MIT
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { readFile } from "node:fs/promises";
-import { fileFacts, contentHash, validateResult } from "../dist/graph/index.js";
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  rmdir,
+  unlink,
+  writeFile,
+} from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import {
+  fileFacts,
+  contentHash,
+  indexProject,
+  LanguageRegistry,
+  SqliteGraphStore,
+  validateResult,
+} from "../dist/graph/index.js";
 import rust from "../dist/graph/languages/rust/index.js";
 
 const manifest = (edition = "2021", body = "") =>
@@ -56,6 +72,37 @@ async function graph(sources, manifests = { "Cargo.toml": manifest() }) {
       );
     });
   };
+}
+
+async function indexFixture(t, files) {
+  const root = await mkdtemp(join(tmpdir(), "pymtheg-rust-library-"));
+  const store = new SqliteGraphStore(":memory:", "library-fixture");
+  const dirs = new Set([root]);
+  const written = [];
+  t.after(async () => {
+    store.close();
+    for (const file of written) await unlink(file);
+    for (const dir of [...dirs].reverse()) await rmdir(dir);
+  });
+  for (const [relative, content] of Object.entries(files)) {
+    const segments = relative.split("/");
+    for (let i = 1; i < segments.length; i++) {
+      const dir = join(root, ...segments.slice(0, i));
+      if (dirs.has(dir)) continue;
+      await mkdir(dir);
+      dirs.add(dir);
+    }
+    const file = join(root, relative);
+    assert.ok(dirs.has(dirname(file)));
+    await writeFile(file, content);
+    written.push(file);
+  }
+  const report = await indexProject(root, new LanguageRegistry([rust]), store);
+  assert.deepEqual(
+    [...report.errors, ...report.analysisErrors, ...report.resolutionErrors],
+    [],
+  );
+  return store;
 }
 
 test("library paths, imports, preludes, Cargo aliases and version sources", async () => {
@@ -163,12 +210,14 @@ test("library paths, imports, preludes, Cargo aliases and version sources", asyn
     evidence: "import-binding",
   });
   assert.deepEqual(lookup("types", "Serialize"), [serde("Serialize")]);
-  assert.deepEqual(lookup("macros", "Serialize"), [serde("Serialize!")]);
+  assert.deepEqual(lookup("macros", "Serialize"), [
+    serde("#[derive(Serialize)]"),
+  ]);
   assert.deepEqual(lookup("macros", "tokio::main"), [
     {
       ecosystem: "cargo",
       unit: "tokio",
-      symbol: "main!",
+      symbol: "#[main]",
       evidence: "qualified-path",
     },
   ]);
@@ -317,4 +366,189 @@ test("sysroot names keep their written crate and a no_std crate withholds the st
       evidence: "qualified-path",
     },
   ]);
+});
+
+test("exact library queries include imports and invocations of known macros", async (t) => {
+  const store = await indexFixture(t, {
+    "src/lib.rs": `
+    // From RustCrypto/hashes, sha1/src/compress/loongarch64_asm.rs.
+    use core::arch::asm;
+    use core::assert_eq as check;
+    // As in Serde's derive crate, import through an explicit crate binding.
+    extern crate syn;
+    use syn::parse_macro_input as parse;
+    use thiserror::Error as Query;
+    use unknown::Export;
+    fn assembly() { unsafe { let _ = asm!("nop"); } }
+    fn parse(input: proc_macro::TokenStream) { let _ = parse!(input as syn::DeriveInput); }
+    fn check() { let _ = check!(1, 1); }
+    mod mixed {
+      use core::panic;
+      fn panic() { let _ = core::panic!("example"); }
+    }
+    mod derived {
+      use thiserror::Error as Query;
+      #[derive(Query)]
+      struct Example;
+    }
+    mod attributed {
+      use tokio::main as launch;
+      #[launch]
+      async fn entry() {}
+    }
+  `,
+    "Cargo.toml": manifest(
+      "2024",
+      '[dependencies]\nsyn="3"\nthiserror="2"\ntokio={version="1",features=["macros","rt-multi-thread"]}\nunknown="1"\n',
+    ),
+  });
+  for (const [unit, symbol, expected] of [
+    ["core", "arch::asm!", ["imports", "macros"]],
+    ["core", "assert_eq!", ["imports", "macros"]],
+    ["core", "panic!", ["macros"]],
+    ["core", "panic", []],
+    ["syn", "parse_macro_input!", ["imports", "macros"]],
+    ["thiserror", "#[derive(Error)]", ["imports", "imports", "macros"]],
+    ["tokio", "#[main]", ["imports", "macros"]],
+    ["unknown", "Export", []],
+  ]) {
+    assert.deepEqual(
+      store
+        .libraryUses(unit, symbol, 10)
+        .map(({ kind }) => kind)
+        .sort(),
+      expected,
+      `${unit} ${symbol}`,
+    );
+    assert.deepEqual(store.libraryUseCounts(unit, symbol), {
+      library: expected.length,
+      candidateSet: 0,
+    });
+  }
+});
+
+test("opaque module items cannot replace a known explicit import in its namespace", async () => {
+  const lookup = await graph({
+    "src/lib.rs": `
+    mod explicit {
+      use std::collections::HashMap;
+      macro_rules! items { () => { fn other() {} }; }
+      items!();
+      fn yes(_: HashMap<String, String>) {}
+      fn block() {
+        macro_rules! inner { () => { struct HashMap; }; }
+        inner!();
+        let _: HashMap;
+      }
+    }
+    mod glob {
+      use std::collections::*;
+      macro_rules! items { () => { struct HashMap; }; }
+      items!();
+      fn no(_: HashMap) {}
+    }
+  `,
+  });
+  assert.deepEqual(lookup("types", "HashMap"), [
+    {
+      ecosystem: "rust-std",
+      unit: "std",
+      symbol: "collections::HashMap",
+      evidence: "import-binding",
+    },
+    null,
+    null,
+  ]);
+  assert.deepEqual(lookup("types", "String"), [null, null]);
+});
+
+test("a directory source resolves a versioned vendor crate and withholds an uncaptured one", async (t) => {
+  const config =
+    '[source.crates-io]\nreplace-with="vendored-sources"\n[source.vendored-sources]\ndirectory="vendor"\n';
+  const store = await indexFixture(t, {
+    "Cargo.toml": manifest("2021", '[dependencies]\nitoa="1"\nmissing="1"\n'),
+    "Cargo.lock": `version=4
+      [[package]]
+      name="app"
+      version="0.1.0"
+      dependencies=["itoa", "missing"]
+      [[package]]
+      name="itoa"
+      version="1.0.18"
+      source="registry+https://github.com/rust-lang/crates.io-index"
+      [[package]]
+      name="missing"
+      version="1.0.0"
+      source="registry+https://github.com/rust-lang/crates.io-index"
+    `,
+    "src/lib.rs": "fn f(_: itoa::Buffer, _: missing::Type) {}",
+    "vendor/itoa-1.0.18/src/lib.rs": "pub struct Buffer;",
+    ".cargo/config.toml": config,
+    "vendor/itoa-1.0.18/Cargo.toml":
+      '[package]\nname="itoa"\nversion="1.0.18"\nedition="2021"\n',
+  });
+  const types = store.links().filter(({ kind }) => kind === "types");
+  const buffer = types.find(({ targetName }) => targetName === "itoa::Buffer");
+  assert.equal(buffer.resolution, "resolved");
+  assert.equal(store.findSymbols({ name: "Buffer" })[0].id, buffer.targetId);
+  assert.equal(
+    types.find(({ targetName }) => targetName === "missing::Type").resolution,
+    "unresolved",
+  );
+});
+
+test("an independent type reference is credited without claiming its unproven associated member", async () => {
+  const lookup = await graph(
+    {
+      "src/lib.rs":
+        'use serde_test::Token; fn token() -> Token { Token::Str("sample") }',
+    },
+    { "Cargo.toml": manifest("2021", '[dependencies]\nserde_test="1"\n') },
+  );
+  assert.deepEqual(lookup("types", "Token"), [
+    {
+      ecosystem: "cargo",
+      unit: "serde_test",
+      symbol: "Token",
+      evidence: "import-binding",
+    },
+  ]);
+  assert.deepEqual(lookup("calls", "Token::Str"), [null]);
+});
+
+test("workspace overrides only withhold the named dependency", async () => {
+  for (const override of [
+    '[patch.crates-io]\npatched={path="../unreadable"}\n',
+    '[replace]\n"https://github.com/rust-lang/crates.io-index#patched@1.0.0"={path="../unreadable"}\n',
+  ]) {
+    const lookup = await graph(
+      {
+        "src/lib.rs":
+          "fn f(_: other::Type, _: patched::Type, _: std::path::PathBuf) {}",
+      },
+      {
+        "Cargo.toml": manifest(
+          "2021",
+          '[workspace]\n[dependencies]\nother="1"\npatched="1"\n' + override,
+        ),
+      },
+    );
+    assert.deepEqual(lookup("types", "other::Type"), [
+      {
+        ecosystem: "cargo",
+        unit: "other",
+        symbol: "Type",
+        evidence: "qualified-path",
+      },
+    ]);
+    assert.deepEqual(lookup("types", "patched::Type"), [null]);
+    assert.deepEqual(lookup("types", "std::path::PathBuf"), [
+      {
+        ecosystem: "rust-std",
+        unit: "std",
+        symbol: "path::PathBuf",
+        evidence: "qualified-path",
+      },
+    ]);
+  }
 });

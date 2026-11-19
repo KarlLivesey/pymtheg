@@ -1569,8 +1569,12 @@ has one spelling across languages and versions:
   language's way (Go `Time.Equal`, Rust `fs::read`, `Result::unwrap`,
   TypeScript `Map.prototype.delete` for an instance member, `string` for an
   export).
-- **Rust macros** end in `!` (`env!`), so `std::env` (module) and `std::env!`
-  (macro) stay distinct.
+- **Rust function-like macros** end in `!` (`env!`), so `std::env` (module)
+  and `std::env!` (macro) stay distinct. Derive and attribute macros use
+  `#[derive(path)]` and `#[path]` respectively, where `path` is the export path
+  within the named crate. An import uses the same spelling as an invocation
+  when its namespace is proven. An import gets no symbol target when its
+  namespace is unknown or its simultaneous bindings need different spellings.
 - **Rust re-exports**: record the declaring crate (`core`, `alloc`) only when
   the declaration is proven to be there; otherwise record the path as written
   in the source (`std::...`). Never rewrite `std` to `core` by name.
@@ -1626,10 +1630,17 @@ graph links, so Studio is unchanged. The coverage export credits a stored
 library target directly and reconstructs identities only for links without one
 (every link of a 0.1.0 graph).
 
-Rust module 29 records library paths during resolution. Its library lookup uses
+Rust records library paths during resolution starting with module 29. Its library lookup uses
 the captured namespace, import, placement and `cfg` facts, with a separate
 lookup cache key for the outside search. `library.ts` supplies edition prelude
 entries and the standard paths where a known module, constructor, variant or
 trait provides the named member. Rust coverage for module 29 and later uses
 stored targets for the level 2 numerator. Historical Rust graphs retain the
 original reconstruction.
+
+Module 30 recognizes captured Cargo directory source replacements as checkout
+dependencies, limits patch uncertainty to affected package edges, and protects
+explicit module imports with a proven namespace from opaque items in that same
+module. A type segment and its associated member can name different declarations.
+The type gets its own target where a type link already exists. The associated
+site needs its own proof before it can name a unit or symbol.

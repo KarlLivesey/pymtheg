@@ -33,7 +33,16 @@ import type {
 } from "../../types.js";
 import { crates, type Crate } from "./cargo.js";
 import {
+  libraryBlocker,
+  type BlockingMacro,
+  type LibraryAudit,
+  type WithheldLibrary,
+} from "./library-audit.js";
+import {
   dependencyUnit,
+  exportNamespace,
+  librarySymbol,
+  permitsNamespace,
   preludePath,
   sameLibraryPath,
   sysroot,
@@ -105,6 +114,7 @@ interface Found {
   // be resolved. These are shadowing evidence, never semantic target proofs.
   possibleImportNames?: string[];
   library?: LibraryPath;
+  libraryScopes?: string[];
 }
 const unique = (ss: GraphSymbol[]) => [
   ...new Map(ss.map((s) => [s.id, s])).values(),
@@ -169,11 +179,15 @@ export function resolveRust(
   markConditions?: (link: GraphLink, conditions: string[]) => void,
   /** Derived links (R1-K: calls written in macro bodies, at each invocation). */
   derived?: (link: AddedLink) => void,
+  libraryAudit?: LibraryAudit,
 ): LinkResolution[] {
   // Library proofs use the ordinary scoped lookup with a separate cache key.
   // The analysis pass and existing checkout decisions use the original route.
   let libraryLookup = false;
   let libraryAttributeStart: number | undefined;
+  let libraryImportScope: string | undefined;
+  let libraryProbe = false;
+  let protectModuleImports = true;
   // Cache only unproved import namespaces, never targets or positive proofs.
   // Facts are immutable for this run; caller conditions and placement are in
   // the key. A failed proof keeps alternatives, it never asserts a binding.
@@ -1555,6 +1569,11 @@ export function resolveRust(
     lookupRevision++;
   }
   const empty = (complete = true): Found => ({ symbols: [], complete });
+  const opaqueLibraryBinding = (scope: string): Found => ({
+    ...empty(false),
+    reason: "opaque-item-may-shadow-name",
+    ...(libraryAudit ? { libraryScopes: [scope] } : {}),
+  });
   const merge = (xs: Found[]): Found => {
     const causes = xs.flatMap((x) => x.failedFiles ?? []);
     const possibleImportNames = [
@@ -1587,6 +1606,13 @@ export function resolveRust(
           symbols: unique(xs.flatMap((x) => x.symbols)),
           complete: samePath && xs.every((x) => x.complete),
           ...(library && samePath ? { library } : {}),
+          ...(libraryAudit && libraryLookup
+            ? {
+                libraryScopes: [
+                  ...new Set(xs.flatMap((x) => x.libraryScopes ?? [])),
+                ],
+              }
+            : {}),
           reason: [...new Set(xs.map((x) => x.reason).filter(Boolean))].join(
             "; ",
           ),
@@ -1809,8 +1835,14 @@ export function resolveRust(
   ): Found | null {
     const headNs: Namespace = rest.length ? "type" : ns;
     const uses = importsByScope.get(`${loc.file}|${local}`);
-    if (libraryLookup && libraryOpaque(`${loc.crate.root}|${q}`))
-      return { ...empty(false), reason: "opaque-item-may-shadow-name" };
+    const scopeKey = `${loc.crate.root}|${q}`;
+    const opaqueLibraryScope =
+      libraryLookup &&
+      !libraryProbe &&
+      libraryImportScope !== scopeKey &&
+      libraryOpaque(scopeKey);
+    if (opaqueLibraryScope && (!protectModuleImports || local !== loc.local))
+      return opaqueLibraryBinding(scopeKey);
 
     const declared = fallbackOnly
       ? []
@@ -1887,10 +1919,14 @@ export function resolveRust(
           if (!("targetName" in binding)) return false;
           const head = rest.length ? resolveUse(binding, [], headNs) : found;
           return (
-            !head.complete || !head.library || head.library.parts.length > 0
+            !head.complete ||
+            !head.library ||
+            (head.library.parts.length > 0 && !exportNamespace(head.library))
           );
         });
-        if (unknownNamespace && libraryNamespaceCompetes()) return empty(false);
+        if (libraryProbe) return { ...found, bound: true };
+        if (unknownNamespace && libraryNamespaceCompetes())
+          return { ...empty(false), reason: "competing-library-import" };
         return {
           ...conditional(found, bindings, loc),
           bound: present(bindings, loc),
@@ -1903,6 +1939,8 @@ export function resolveRust(
         if (!("targetName" in binding)) return accepts(binding, headNs);
         const proofKey = JSON.stringify([
           libraryLookup,
+          libraryLookup && libraryProbe,
+          libraryLookup && !protectModuleImports,
           parentIdentity(loc),
           loc.symbol?.id,
           binding.id,
@@ -1978,6 +2016,41 @@ export function resolveRust(
         ]) &&
         (!accessFrom || visible(str(data(l).visibility), loc, accessFrom)),
     );
+    if (opaqueLibraryScope) {
+      // A generated item in this module cannot replace a present explicit
+      // import in the same namespace. A different namespace, a glob, or an
+      // expansion one block closer to the reference has no such protection.
+      if (
+        declared.length ||
+        loc.opaqueAttributes?.length ||
+        !present(explicit, loc)
+      )
+        return opaqueLibraryBinding(scopeKey);
+      const heads = explicit.map((link) => resolveUse(link, [], headNs));
+      if (
+        !heads.every((head) => {
+          if (!head.complete || !head.library || head.symbols.length)
+            return false;
+          if (!head.library.parts.length)
+            return headNs === "type" || headNs === "importType";
+          const exported = exportNamespace(head.library);
+          return (
+            exported !== undefined &&
+            exported !== "multiple" &&
+            permitsNamespace(exported, headNs)
+          );
+        })
+      )
+        return opaqueLibraryBinding(scopeKey);
+      return withFallback(
+        merge(
+          rest.length
+            ? explicit.map((link) => resolveUse(link, rest, ns))
+            : heads,
+        ),
+        explicit,
+      );
+    }
     function resolveUse(
       l: GraphLink,
       suffix: string[],
@@ -2079,6 +2152,17 @@ export function resolveRust(
       // Fall through namespaces only when the import is KNOWN to bind a
       // different namespace. An uncaptured external import could bind this one.
       const all = merge(explicit.map((l) => resolveUse(l, [], "any")));
+      // An explicit whole-crate alias proves the first segment of a qualified
+      // path even when the suffix was absent from this namespace. A macro
+      // import through `extern crate` also tries type and value lookup.
+      if (
+        libraryLookup &&
+        rest.length &&
+        all.complete &&
+        all.library &&
+        !all.library.parts.length
+      )
+        return withFallback(result, explicit);
       if (!all.complete || !all.symbols.length)
         return withFallback(
           {
@@ -2096,7 +2180,10 @@ export function resolveRust(
         : [];
     const shadowed =
       scopeFailures.length > 0 ||
-      (ns !== "macro" && opaqueScopes.has(`${loc.crate.root}|${q}`));
+      (ns !== "macro" &&
+        (!libraryLookup ||
+          (!libraryProbe && libraryImportScope !== scopeKey)) &&
+        opaqueScopes.has(scopeKey));
     const globs = allowGlobs
       ? (uses?.globs ?? []).filter(
           (l) =>
@@ -2151,6 +2238,10 @@ export function resolveRust(
         }),
       );
       result = conditional(result, suppliers, loc);
+      if (libraryProbe && !result.symbols.length && !scopeFailures.length)
+        return null;
+      if (libraryLookup && !result.complete && !result.reason)
+        result = { ...result, reason: "glob-import-unverified" };
       if (result.symbols.length || !result.complete)
         return shadowed && !result.failedFiles?.length
           ? {
@@ -2199,8 +2290,28 @@ export function resolveRust(
           ),
         ),
       );
-    const lookup = (path: string) =>
-      find(path, loc, scope, namespace, seen, allowGlobs);
+    const lookup = (path: string) => {
+      const previous = libraryImportScope;
+      // During import resolution rustc also rejects a generated module that
+      // competes with the extern prelude (E0659). Only this written use's
+      // owning module gets the exception, including while following aliases.
+      libraryImportScope =
+        libraryLookup &&
+        protectModuleImports &&
+        at &&
+        !data(at).glob &&
+        !data(at).externCrate &&
+        scope === loc.local &&
+        !loc.opaqueAttributes?.length &&
+        !itemPresence(at).length
+          ? `${loc.crate.root}|${qualified(loc, scope)}`
+          : undefined;
+      try {
+        return find(path, loc, scope, namespace, seen, allowGlobs);
+      } finally {
+        libraryImportScope = previous;
+      }
+    };
     if (
       namespace === "macro" &&
       !raw.includes("::") &&
@@ -2295,23 +2406,32 @@ export function resolveRust(
             (!implicitRoot2015 || !loc.libraryModuleMember || noStd)) ||
           (name === "std" && !noStd) ||
           (name === "proc_macro" && loc.crate.procMacro));
-      const unit = standard
-        ? { ecosystem: "rust-std", unit: name }
+      const anchor = standard
+        ? { unit: { ecosystem: "rust-std", unit: name } }
         : loc.crate.edition === "2015" && !explicit
           ? undefined
           : loc.libraryModuleMember && !explicit
             ? undefined
-            : dependencyUnit(loc.crate, name, conditions, possible, implies);
-      if (unit) {
+            : dependencyUnit(
+                loc.crate,
+                name,
+                conditions,
+                possible,
+                implies,
+                libraryProbe,
+              );
+      if (anchor) {
         // An extern-prelude entry is a crate name in the type namespace.
         if (!parts.length && !["any", "type", "importType"].includes(ns))
           return empty();
-        return { ...empty(), bound: true, library: { unit, parts } };
+        const path = { ...anchor, parts };
+        if (!permitsNamespace(exportNamespace(path), ns)) return empty();
+        return { ...empty(), bound: true, library: path };
       }
     }
     if (loc.crate.edition === "2015" && !explicit) return empty();
     const edges = (loc.crate.dependencies ?? []).filter((e) => e.name === name);
-    return merge(
+    const found = merge(
       edges.map((edge) => {
         const targets = packagesByManifest.get(edge.manifest) ?? [];
         let found = merge(
@@ -2386,6 +2506,12 @@ export function resolveRust(
         return found;
       }),
     );
+    return libraryAudit && libraryLookup && edges.some((edge) => !edge.manifest)
+      ? {
+          ...found,
+          reason: `Cargo dependency-edge-unverified; ${found.reason ?? ""}`,
+        }
+      : found;
   }
 
   function find(
@@ -2422,6 +2548,9 @@ export function resolveRust(
       libraryLookup
         ? [
             libraryAttributeStart,
+            libraryImportScope,
+            libraryProbe,
+            protectModuleImports,
             !!loc.libraryModuleMember,
             activeMacroImports.at(-1)?.id,
           ]
@@ -2537,6 +2666,7 @@ export function resolveRust(
     const fallbackReasons: string[] = [];
     const fallbackAttributes: string[] = [];
     const fallbackImportNames: string[] = [];
+    const fallbackLibraryScopes: string[] = [];
     if (forcedExtern)
       result = dependencyLookup(
         first,
@@ -2610,6 +2740,8 @@ export function resolveRust(
             conditionalTargets.push(...found.symbols);
             fallbackImportNames.push(...(found.possibleImportNames ?? []));
             fallbackAttributes.push(...(found.opaqueAttributes ?? []));
+            if (found.libraryScopes)
+              fallbackLibraryScopes.push(...found.libraryScopes);
             fallbackReasons.push(
               found.reason || "namespace-binding-unverified",
             );
@@ -2687,6 +2819,16 @@ export function resolveRust(
       const { failedFiles: possibleOuterFailure, ...outer } = result;
       result = {
         ...outer,
+        ...(fallbackLibraryScopes.length
+          ? {
+              libraryScopes: [
+                ...new Set([
+                  ...fallbackLibraryScopes,
+                  ...(outer.libraryScopes ?? []),
+                ]),
+              ],
+            }
+          : {}),
         symbols: unique([...conditionalTargets, ...result.symbols]),
         possibleImportNames: [
           ...new Set([
@@ -3365,6 +3507,7 @@ export function resolveRust(
       return {
         ...profile,
         neutral: false,
+        itemNeutral: false,
         clean: false,
         forwards: null,
         bodyMacros: [],
@@ -3421,6 +3564,7 @@ export function resolveRust(
     scope: string,
     from?: GraphSymbol,
     seen = new Set<string>(),
+    itemsOnly = false,
   ): boolean {
     if (
       standardMacroName(name) &&
@@ -3432,9 +3576,17 @@ export function resolveRust(
     if (!s || seen.has(s.id) || seen.size > 16) return false;
     const profile = profileOf(s)!;
     return (
-      profile.neutral &&
+      (itemsOnly ? profile.itemNeutral : profile.neutral) &&
       profile.nested.every((n) =>
-        projectNeutral(n, site, loc, scope, s, new Set([...seen, s.id])),
+        projectNeutral(
+          n,
+          site,
+          loc,
+          scope,
+          s,
+          new Set([...seen, s.id]),
+          itemsOnly,
+        ),
       )
     );
   }
@@ -3692,6 +3844,20 @@ export function resolveRust(
   memo.clear();
   unprovedImports.clear();
   const unsafeStandardScopes = new Set<string>();
+  type OpaqueOrigin = {
+    loc: Place;
+    name: string;
+    scope: string;
+    start: number;
+    attribute?: true;
+  };
+  const opaqueOrigins = new Map<string, OpaqueOrigin[]>();
+  function recordOpaqueOrigin(key: string, origin: OpaqueOrigin): void {
+    if (!libraryAudit) return;
+    const origins = opaqueOrigins.get(key) ?? [];
+    origins.push(origin);
+    opaqueOrigins.set(key, origins);
+  }
   for (const f of ctx.files)
     for (const loc of ownerPlace(f.path, "")) {
       for (const entry of (data(f.result).standardMacroScopes ?? []) as {
@@ -3709,6 +3875,8 @@ export function resolveRust(
           const q = `${loc.crate.root}|${qualified(loc, entry.scope)}`;
           opaqueScopes.add(q);
           libraryOpaqueScopes.add(q);
+          if (entry.start !== undefined)
+            recordOpaqueOrigin(q, { loc, ...entry, start: entry.start });
           // A module-level macro cannot bind a function's locals; the
           // binding fallback applies only below a block statement (R1-K).
           if (entry.block) unsafeStandardScopes.add(`${f.path}|${entry.scope}`);
@@ -3736,6 +3904,14 @@ export function resolveRust(
           const starts = opaqueAttributeStarts.get(k) ?? new Set<number>();
           starts.add(e.start ?? -1);
           opaqueAttributeStarts.set(k, starts);
+          if (e.start !== undefined)
+            recordOpaqueOrigin(k, {
+              loc,
+              name: e.name,
+              scope: e.scope,
+              start: e.start,
+              attribute: true,
+            });
           if (e.module) {
             opaqueScopes.add(
               `${loc.crate.root}|${[q, e.module].filter(Boolean).join("::")}`,
@@ -3743,6 +3919,17 @@ export function resolveRust(
             libraryOpaqueScopes.add(
               `${loc.crate.root}|${[q, e.module].filter(Boolean).join("::")}`,
             );
+            if (e.start !== undefined)
+              recordOpaqueOrigin(
+                `${loc.crate.root}|${[q, e.module].filter(Boolean).join("::")}`,
+                {
+                  loc,
+                  name: e.name,
+                  scope: e.scope,
+                  start: e.start,
+                  attribute: true,
+                },
+              );
           }
         }
     }
@@ -4498,13 +4685,12 @@ export function resolveRust(
     const head = parts[0]!;
     if (
       !loc.crate.edition ||
-      loc.uncertain ||
-      loc.directoryUnverified ||
+      (!libraryProbe && (loc.uncertain || loc.directoryUnverified)) ||
       !parts.every((p) => /^[_\p{ID_Start}][_\p{ID_Continue}]*$/u.test(p)) ||
       head === "Self" ||
-      (d.macroArguments && !argumentsProven(l, d, loc))
+      (!libraryProbe && d.macroArguments && !argumentsProven(l, d, loc))
     )
-      return;
+      return refuseLibrary("site or placement unverified");
     const namespace =
       l.kind === "macros"
         ? "macro"
@@ -4524,13 +4710,19 @@ export function resolveRust(
     // has no such binding on stable Rust. The outer `derive` must itself be
     // the built-in attribute rather than an imported proc macro.
     if (
+      !libraryProbe &&
       namespace === "macro" &&
       bare &&
       (macroUseDerive(loc.crate.root, head) ||
         (!flavor && textualMacro(head, l, loc, scope)))
     )
-      return;
-    if (flavor === "derive" && macroUseDerive(loc.crate.root, "derive")) return;
+      return refuseLibrary("competing macro import");
+    if (
+      !libraryProbe &&
+      flavor === "derive" &&
+      macroUseDerive(loc.crate.root, "derive")
+    )
+      return refuseLibrary("competing derive import");
 
     libraryLookup = true;
     libraryAttributeStart =
@@ -4538,9 +4730,13 @@ export function resolveRust(
         ? d.libraryAttributeStart
         : undefined;
     try {
-      if (flavor === "derive") {
+      if (!libraryProbe && flavor === "derive") {
         const derive = find("derive", loc, scope, "macro");
-        if (!derive.complete || derive.library || derive.symbols.length) return;
+        if (!derive.complete || derive.library || derive.symbols.length)
+          return refuseLibrary(
+            derive.reason || "competing derive import",
+            derive.libraryScopes,
+          );
       }
       let result: Found;
       if (l.kind === "imports") {
@@ -4567,7 +4763,10 @@ export function resolveRust(
         result.symbols.length ||
         result.failedFiles?.length
       )
-        return;
+        return refuseLibrary(
+          result.reason || "unverified path",
+          result.libraryScopes,
+        );
       let path = result.library;
       let prelude = false;
       if (
@@ -4575,12 +4774,13 @@ export function resolveRust(
         l.kind !== "imports" &&
         flavor !== "attribute" &&
         builtin &&
-        !loc.noImplicitPrelude &&
+        (libraryProbe || !loc.noImplicitPrelude) &&
         !written.startsWith("::") &&
-        !(
-          (data(units.get(loc.crate.root) ?? {}).noStdConditions ??
-            []) as string[][]
-        ).some((cs) => possible([...(loc.conditions ?? []), ...cs]))
+        (libraryProbe ||
+          !(
+            (data(units.get(loc.crate.root) ?? {}).noStdConditions ??
+              []) as string[][]
+          ).some((cs) => possible([...(loc.conditions ?? []), ...cs])))
       ) {
         const binding = !bare ? find(head, loc, scope, "type") : result;
         if (
@@ -4590,18 +4790,26 @@ export function resolveRust(
           binding.library ||
           binding.possibleImportNames?.length
         )
-          return;
+          return refuseLibrary(
+            binding.reason || "competing prelude import",
+            binding.libraryScopes,
+          );
         path = {
           unit: { ecosystem: "rust-std", unit: "std" },
           parts: [...builtin, ...parts.slice(1)],
         };
         prelude = true;
       }
-      if (!path) return;
+      if (!path)
+        return refuseLibrary(
+          result.reason || "no proven library binding",
+          result.libraryScopes,
+        );
       // An explicit import may bind several namespaces. When the chosen
       // namespace has its own implicit name, the import alone cannot prove
       // which spelling a bare use selected (e.g. a function called `vec`).
       if (
+        !libraryProbe &&
         !prelude &&
         path.imported &&
         builtin &&
@@ -4609,11 +4817,25 @@ export function resolveRust(
         (path.unit.ecosystem !== "rust-std" ||
           path.parts.slice(0, builtin.length).join("::") !== builtin.join("::"))
       )
-        return;
+        return refuseLibrary("competing prelude import");
       if (!path.parts.length)
         return l.kind === "imports"
           ? { ...path.unit, evidence: "import-path" }
           : undefined;
+      const exported = exportNamespace(path);
+      if (
+        !libraryProbe &&
+        l.kind === "imports" &&
+        (!exported || exported === "multiple")
+      )
+        return refuseLibrary("import export namespace unavailable");
+      if (
+        namespace === "macro" &&
+        exported &&
+        exported !== "multiple" &&
+        exported !== (flavor || "bang")
+      )
+        return refuseLibrary("different macro namespace");
       if (explicitTrait) {
         if (!member) return;
         return {
@@ -4622,23 +4844,28 @@ export function resolveRust(
           evidence: "explicit-trait",
         };
       }
-      if (l.kind !== "imports" && namespace === "value") {
+      if (!libraryProbe && l.kind !== "imports" && namespace === "value") {
         const kind = valuePathKind(path);
-        if (!kind) return;
+        if (!kind) return refuseLibrary("associated-owner-unverified");
         if (kind === "owner") {
           if (
             l.kind !== "calls" ||
             str(d.pathSyntax).includes("<") ||
             extensionNames.has(path.parts.at(-1)!)
           )
-            return;
+            return refuseLibrary("associated-owner-unverified");
           let local = scope;
           for (;;) {
             if (
               importsByScope.get(`${loc.file}|${local}`)?.globs.length ||
               libraryOpaque(`${loc.crate.root}|${qualified(loc, local)}`)
             )
-              return;
+              return refuseLibrary(
+                importsByScope.get(`${loc.file}|${local}`)?.globs.length
+                  ? "competing-library-glob"
+                  : "opaque-item-may-shadow-name",
+                [`${loc.crate.root}|${qualified(loc, local)}`],
+              );
             if (!local || local === loc.local) break;
             local = local.includes("::")
               ? local.slice(0, local.lastIndexOf("::"))
@@ -4648,7 +4875,14 @@ export function resolveRust(
       }
       return {
         ...path.unit,
-        symbol: path.parts.join("::") + (namespace === "macro" ? "!" : ""),
+        symbol: librarySymbol(
+          path,
+          l.kind === "imports"
+            ? exported
+            : namespace === "macro"
+              ? flavor || "bang"
+              : undefined,
+        ),
         evidence: prelude
           ? "declared-builtin"
           : path.imported
@@ -4659,6 +4893,12 @@ export function resolveRust(
       libraryLookup = false;
       libraryAttributeStart = undefined;
     }
+  }
+  type Refusal = { detail: string; scopes: string[] };
+  let libraryRefusals: Refusal[] = [];
+  function refuseLibrary(detail: string, scopes: string[] = []): undefined {
+    if (libraryAudit && !libraryProbe) libraryRefusals.push({ detail, scopes });
+    return undefined;
   }
   function libraryFor(l: GraphLink, d: Data): LibraryTarget | undefined {
     if (
@@ -4988,9 +5228,107 @@ export function resolveRust(
       resolutions.push({ linkId: l.id, targetId: targets[0]!.id });
   }
   if (derived) macroBodyCalls(derived);
+  const macroAssessments = new Map<OpaqueOrigin, BlockingMacro[]>();
+  const attributesByStart = new Map<string, GraphLink[]>();
+  if (libraryAudit)
+    for (const l of ctx.links) {
+      const d = data(l);
+      if (!d.libraryMacroFlavor) continue;
+      const key = `${l.file}|${d.libraryAttributeStart}`;
+      const sites = attributesByStart.get(key) ?? [];
+      sites.push(l);
+      attributesByStart.set(key, sites);
+    }
+  function assessMacro(origin: OpaqueOrigin): BlockingMacro[] {
+    const cached = macroAssessments.get(origin);
+    if (cached) return cached;
+    const { loc, name, scope, start, attribute } = origin;
+    const macro: BlockingMacro = { file: loc.file, name, start };
+    let result = [macro];
+    if (attribute) {
+      const sites = attributesByStart.get(`${loc.file}|${start}`) ?? [];
+      if (sites.length)
+        result = sites.map((site) => {
+          const target = libraryFor(site, data(site));
+          return {
+            file: loc.file,
+            name: site.targetName,
+            start: site.range.start,
+            ...(target?.unit === "thiserror" &&
+            target.symbol === "#[derive(Error)]"
+              ? { known: "thiserror derive" as const }
+              : {}),
+          };
+        });
+    } else {
+      const site = macroSites.get(`${loc.file}|${start}`);
+      if (site) {
+        const at = siteLoc(site, loc);
+        if (standardSafe(name, site, at, scope)) macro.known = "standard";
+        else if (ecosystemProven({ name, scope, start }, loc))
+          macro.known = "audited dependency";
+        else if (
+          definiteMacro(name, site, at, scope) &&
+          projectNeutral(name, site, at, scope, undefined, new Set(), true)
+        )
+          macro.known = "workspace macro_rules";
+      }
+    }
+    macroAssessments.set(origin, result);
+    return result;
+  }
+  function withheld(
+    candidate: LibraryTarget,
+    refusals: Refusal[],
+    d: Data,
+  ): WithheldLibrary {
+    const causes = refusals.length
+      ? refusals
+      : [{ detail: "no single placement proof", scopes: [] }];
+    const first = causes[0]!;
+    const reason = libraryBlocker(first.detail);
+    const scopes = causes.flatMap((cause) => cause.scopes);
+    const macros =
+      reason === "opaque scope"
+        ? [...new Set(scopes)]
+            .flatMap((scope) => opaqueOrigins.get(scope) ?? [])
+            .filter(
+              (origin) =>
+                !origin.attribute || origin.start !== d.libraryAttributeStart,
+            )
+            .flatMap(assessMacro)
+        : [];
+    return {
+      unit: candidate.unit,
+      symbol: candidate.symbol!,
+      reason,
+      detail: first.detail,
+      macros,
+    };
+  }
   for (const { link, data } of librarySites) {
+    if (libraryAudit) libraryRefusals = [];
     const library = libraryFor(link, data);
     if (library) resolutions.push({ linkId: link.id, library });
+    if (libraryAudit) {
+      const after = libraryRefusals;
+      libraryRefusals = [];
+      protectModuleImports = false;
+      const before = libraryFor(link, data);
+      const prior = libraryRefusals;
+      protectModuleImports = true;
+      if (!before || !library) {
+        libraryProbe = true;
+        const candidate = library ?? before ?? libraryFor(link, data);
+        libraryProbe = false;
+        if (candidate?.symbol)
+          libraryAudit.withheld(
+            link,
+            before?.symbol ? undefined : withheld(candidate, prior, data),
+            library?.symbol ? undefined : withheld(candidate, after, data),
+          );
+      }
+    }
   }
   return resolutions;
 
