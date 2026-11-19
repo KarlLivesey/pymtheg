@@ -3,6 +3,7 @@ import { isBuiltin } from "node:module";
 import { posix } from "node:path";
 import ts from "typescript";
 import type { GraphFile, LibraryTarget } from "../../types.js";
+import type { DependencyInputs } from "../../dependency-inputs.js";
 import { fromVirtual, LIB_ROOT } from "./project.js";
 import {
   dependencyFromCatalog,
@@ -182,6 +183,7 @@ export function libraryReader(
   workspaceRoots: ReadonlySet<string>,
   workspaceBoundaries: ReadonlySet<string>,
   workspaceCatalogs: WorkspaceCatalogs,
+  inputs?: DependencyInputs,
 ) {
   const directories = new Map(
     manifests.map((item) => [posix.dirname(item.path), item]),
@@ -233,6 +235,45 @@ export function libraryReader(
     { unit: Unit; dependency?: Manifest } | null
   >();
   const declarations = new WeakMap<ts.Declaration, LibraryTarget | null>();
+  const installedUnits = new Map<string, Unit | undefined>();
+  function installedUnit(path: string): Unit | undefined {
+    if (!inputs || !path.split("/").includes("node_modules")) return undefined;
+    const real = inputs.realpath(path);
+    if (real === undefined) return undefined;
+    const match = /(?:^|\/)node_modules\/((?:@[^/]+\/)?[^/]+)\//.exec(
+      real.slice(real.lastIndexOf("/node_modules/") + 1),
+    );
+    if (!match) return undefined;
+    const root =
+      real.slice(0, real.lastIndexOf("/node_modules/") + 1) + match[0];
+    if (!installedUnits.has(root)) {
+      const versionSource = root + "package.json";
+      let unit: Unit | undefined;
+      try {
+        const { name, version } = JSON.parse(
+          inputs.read(versionSource) ?? "null",
+        ) as {
+          name?: unknown;
+          version?: unknown;
+        };
+        if (typeof name === "string") {
+          const canonical = name.startsWith("@types/")
+            ? name.slice(7).replace(/^([^_]+)__(.+)$/, "@$1/$2")
+            : name;
+          unit =
+            name === "@types/node"
+              ? { ecosystem: "node", unit: "globals" }
+              : registryUnit(`npm:${canonical}`);
+          if (unit && typeof version === "string" && storableName(version))
+            unit.pin = { version, versionSource };
+        }
+      } catch {
+        // An installed declaration without a readable package identity cannot name a unit.
+      }
+      installedUnits.set(root, unit);
+    }
+    return installedUnits.get(root);
+  }
 
   function sourceUnit(source: ts.SourceFile) {
     if (!source.isDeclarationFile) return undefined;
@@ -245,7 +286,9 @@ export function libraryReader(
     let dependency: Manifest | undefined;
     if (source.fileName.startsWith(`${LIB_ROOT}/`))
       result = bundledLibraryUnit(source.fileName);
-    else if (
+    else if (path !== undefined && (result = installedUnit(path))) {
+      // The declaration is in the installed package identified by its own manifest.
+    } else if (
       manifest &&
       typeof declared === "string" &&
       manifest.path !== "package.json" &&
@@ -306,6 +349,7 @@ export function libraryReader(
                 ? builtin.unit
                 : unit.unit,
             symbol: identity.symbol,
+            ...unit.pin,
             evidence: identity.member
               ? "declaring-owner"
               : !bundled &&
@@ -322,7 +366,10 @@ export function libraryReader(
   return {
     expectsNode,
     isNodeTypeFile(path: string) {
-      return nearest(path)?.json.name === "@types/node";
+      return (
+        nearest(path)?.json.name === "@types/node" ||
+        installedUnit(path)?.ecosystem === "node"
+      );
     },
     forImporter(path: string) {
       const manifest = nearest(path);
@@ -408,6 +455,10 @@ export function libraryReader(
           path.endsWith(".cjs") ||
           (path.endsWith(".js") && manifest?.json.type !== "module"),
         declarationUnit,
+        installedUnit(source: ts.SourceFile) {
+          const path = fromVirtual(source.fileName);
+          return path === undefined ? undefined : installedUnit(path);
+        },
         targetOf,
         typePackageUnredirected(specifier: string) {
           const unit = registryUnit(specifier);

@@ -725,6 +725,11 @@ answer.
   receiver explicitly annotated with an unavailable imported type can name
   its package unit. A named library object can supply checker-selected
   members through immutable aliases and constant literal selectors.
+  The TypeScript compiler can use installed package declarations for named
+  targets and reads the declaring package's own manifest for its version.
+  Installed files supply library targets and are excluded from checkout
+  symbols and link sources. Standard in-checkout pnpm, npm and Yarn
+  `node_modules` layouts are supported.
   [Library links](changes/C-11.md) · [Members and test globals](changes/C-16.md)
 - **Candidates:** several checkout or library targets for one callee (union
   receivers, merged declarations, duplicate JavaScript functions). Missing

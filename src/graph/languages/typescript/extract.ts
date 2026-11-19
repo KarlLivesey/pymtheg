@@ -1595,6 +1595,27 @@ export function extractFile(
     )
       return undefined;
     const selection = selectedSpecifier(specifier);
+    const installed = declarations.map((declaration) =>
+      importerOf(specifier).installedUnit(declaration.getSourceFile()),
+    );
+    if (installed.every((unit) => unit !== undefined)) {
+      const builtin = selection ? packageUnit(selection) : undefined;
+      const targets = new Map<string, LibraryTarget>();
+      for (const unit of installed) {
+        const target = writtenLibrary(
+          unit!.ecosystem === "node" && builtin?.ecosystem === "node"
+            ? { ...builtin, ...(unit!.pin && { pin: unit!.pin }) }
+            : unit!,
+        );
+        if (!target) return undefined;
+        targets.set(libraryKey(target), target);
+      }
+      return {
+        targets: [],
+        libraryFacts: [...targets.values()],
+        lexicalLibrary: true,
+      };
+    }
     const units = selection ? importerOf(specifier).importUnits(selection) : [];
     const targets = units.map((unit) => writtenLibrary(unit));
     return targets.length && targets.every((target) => target !== undefined)

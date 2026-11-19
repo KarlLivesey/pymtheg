@@ -859,7 +859,8 @@ export class SqliteGraphStore implements GraphStorage {
     return this.db
       .prepare(
         `SELECT path,json_extract(body,'$.hash') AS hash,
-      json_extract(body,'$.status') AS status,json_extract(body,'$.diagnostics[0]') AS diagnostic
+      json_extract(body,'$.status') AS status,json_extract(body,'$.diagnostics[0]') AS diagnostic,
+      json_extract(body,'$.dependency') AS dependency
       FROM graph_contexts ORDER BY path`,
       )
       .all()
@@ -867,6 +868,11 @@ export class SqliteGraphStore implements GraphStorage {
         path: row.path as string,
         hash: row.hash as string,
         status: row.status as ContextFile["status"],
+        ...(typeof row.dependency === "string" && {
+          dependency: JSON.parse(row.dependency) as NonNullable<
+            ContextFile["dependency"]
+          >,
+        }),
         diagnostic:
           row.diagnostic === null
             ? null

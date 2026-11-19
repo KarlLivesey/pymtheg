@@ -6,6 +6,7 @@ import { lstat, mkdir, open, readdir, readFile, rename, rm, writeFile } from "no
 import { extname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { installation } from "./install.mjs";
 
 const version = "0.1.0";
 const languageExtensions = {
@@ -52,7 +53,7 @@ async function tail(path) {
   }
 }
 
-async function measured({ command, args, cwd, log, seconds, env = environment, foreground = false }) {
+export async function measured({ command, args, cwd, log, seconds, env = environment, foreground = false }) {
   const started = performance.now();
   const stdout = openSync(`${log}.out`, "w");
   const stderr = openSync(`${log}.err`, "w");
@@ -60,7 +61,7 @@ async function measured({ command, args, cwd, log, seconds, env = environment, f
   try {
     [code, signal] = await new Promise((accept, reject) => {
       const child = spawn("/usr/bin/time", [
-        "-q", "-f", "%M", "-o", `${log}.rss`, "timeout", ...(foreground ? ["--foreground"] : []),
+        "-q", "-f", "%M %U %S", "-o", `${log}.rss`, "timeout", ...(foreground ? ["--foreground"] : []),
         "--verbose", "--kill-after=10s",
         `${Math.max(seconds, 0.001)}s`, "prlimit", "--core=0:0", "--", command, ...args,
       ], { cwd, env, stdio: ["ignore", stdout, stderr] });
@@ -72,9 +73,10 @@ async function measured({ command, args, cwd, log, seconds, env = environment, f
     closeSync(stderr);
   }
   const wallSeconds = Math.round(performance.now() - started) / 1000;
-  const rss = (await readFile(`${log}.rss`, "utf8")).trim();
+  const [rss = "", user = "", system = ""] = (await readFile(`${log}.rss`, "utf8")).trim().split(/\s+/);
   const peakRssKiB = /^[1-9]\d*$/.test(rss) ? Number(rss) : null;
-  return { code, ...(signal ? { signal } : {}), wallSeconds, peakRssKiB };
+  return { code, ...(signal ? { signal } : {}), wallSeconds, peakRssKiB,
+    ...(user && system && { cpuSeconds: Number(user) + Number(system) }) };
 }
 
 function clean(raw, root, scratch) {
@@ -277,7 +279,7 @@ async function corpusSize(root, listing) {
   return { files, lines, samples };
 }
 
-async function runRepository(repo, release, scratch, limitSeconds) {
+async function runRepository(repo, release, scratch, limitSeconds, installed) {
   // A retry gets a distinct directory even if a previous child is winding down.
   const work = join(scratch, "work", ...repo.id.split("/"), repo.commit, randomUUID());
   const root = join(work, "checkout");
@@ -310,7 +312,11 @@ async function runRepository(repo, release, scratch, limitSeconds) {
   const cli = async (label, args, expectedCommand) => {
     // Source-only CLI calls have no toolchain children. Keep timeout alive
     // after a forced kill so GNU time can collect the CLI's peak RSS.
-    const runResult = await run(label, process.execPath, [release.entry, ...args], environment, true);
+    const runner = installed ? "unshare" : process.execPath;
+    const argv = installed
+      ? ["--user", "--map-root-user", "--net", "--", process.execPath, release.entry, ...args]
+      : [release.entry, ...args];
+    const runResult = await run(label, runner, argv, environment, true);
     let body;
     // Exit 2 with a normal graph response means incomplete, so keep its facts.
     if ([0, 2, 3].includes(runResult.process.code)) {
@@ -358,16 +364,27 @@ async function runRepository(repo, release, scratch, limitSeconds) {
     stage = "size";
     const { files, lines, samples } = await corpusSize(root, tracked);
     record.trackedSource = { files, lines };
+    if (installed) {
+      stage = "install";
+      const setup = await installation(root, scratch);
+      if (!setup.command) {
+        record.install = setup;
+        return finalize("install-unavailable");
+      }
+      const install = await run("install", setup.command, setup.args, setup.env);
+      record.install = { manager: setup.manager, status: install.process.code === 0 ? "installed" : "failed", exitCode: install.process.code };
+      if (install.process.code !== 0) return finalize("install-unavailable");
+    }
     stage = "init";
     // Never use project-supplied Pymtheg settings. init creates default settings.
     if (await exists(join(root, ".pymtheg"))) throw Error("Checkout contains existing Pymtheg settings or storage");
     await cli("init", ["init", ".", "--name", repo.id, "--format", "json"]);
     const cold = await graph("cold", "index");
-    record.cold = { wallSeconds: cold.wallSeconds, peakRssKiB: cold.peakRssKiB, exitCode: cold.code, status: cold.body.status };
+    record.cold = { wallSeconds: cold.wallSeconds, cpuSeconds: cold.cpuSeconds, peakRssKiB: cold.peakRssKiB, exitCode: cold.code, status: cold.body.status };
     record.index = await summarizeIndex(cold.body, locate, redact);
     if (cold.body.toolchain) throw Error("Unexpected toolchain state in a default source-only run");
     const warm = await graph("warm", "index");
-    record.warm = { wallSeconds: warm.wallSeconds, peakRssKiB: warm.peakRssKiB, exitCode: warm.code,
+    record.warm = { wallSeconds: warm.wallSeconds, cpuSeconds: warm.cpuSeconds, peakRssKiB: warm.peakRssKiB, exitCode: warm.code,
       status: warm.body.status, unchanged: warm.body.sync.report.unchanged };
     await query("status");
     const found = await query("search", "init");
@@ -401,6 +418,8 @@ async function main() {
     parallel: { type: "string", default: "1" },
     "wall-minutes": { type: "string", default: "60" },
     "local-build": { type: "string" },
+    installed: { type: "boolean" },
+    "retry-unfinished": { type: "boolean" },
     output: { type: "string" },
   } });
   const parallel = Number(values.parallel);
@@ -410,20 +429,26 @@ async function main() {
     throw Error("Use --scratch (or PYM_SCRATCH), --parallel 1..12 and a positive --wall-minutes");
   }
   const scratch = resolve(values.scratch);
-  const repos = await checkedSelection(values.manifest);
+  const repos = (await checkedSelection(values.manifest)).filter((repo) => !values.installed || repo.language === "typescript");
   const release = values["local-build"] ? await localBuild(scratch, values["local-build"]) : await installRelease(scratch);
-  const recordsDirectory = release.sha256 ? join(scratch, "build-records", release.sha256) : join(scratch, "records");
-  const outputPath = values.output ? resolve(values.output) : join(scratch, release.sha256 ? `results-${release.sha256}.json` : "results.json");
+  const recordsDirectory = values.installed
+    ? join(scratch, "installed-records", createHash("sha256").update(await readFile(new URL("./install.mjs", import.meta.url))).digest("hex"), release.sha256 ?? "release")
+    : join(scratch, release.sha256 ? "build-records" : "records", release.sha256 ?? "");
+  const outputPath = values.output ? resolve(values.output) : join(scratch, `results${values.installed ? "-installed" : ""}${release.sha256 ? `-${release.sha256}` : ""}.json`);
   await mkdir(recordsDirectory, { recursive: true });
   const records = new Map();
   const recordPath = (repo) => join(recordsDirectory, ...repo.id.split("/"), `${repo.commit}.json`);
   for (const repo of repos) {
     const path = recordPath(repo);
-    if (await exists(path)) records.set(repo.id, JSON.parse(await readFile(path, "utf8")));
+    if (await exists(path)) {
+      const record = JSON.parse(await readFile(path, "utf8"));
+      if (!values["retry-unfinished"] || record.outcome === "finished" || record.outcome === "install-unavailable")
+        records.set(repo.id, record);
+    }
   }
   const pending = repos.filter((repo) => !records.has(repo.id));
   const saveResults = () => writeAtomic(outputPath, [
-    "{", `  "release": ${JSON.stringify(release.provenance)},`, '  "mode": "source-only (default)",', '  "repos": [',
+    "{", `  "release": ${JSON.stringify(release.provenance)},`, `  "mode": ${JSON.stringify(values.installed ? "installed" : "source-only (default)")},`, '  "repos": [',
     [...records].sort(([a], [b]) => compare(a, b)).map(([, record]) => `    ${JSON.stringify(record)}`).join(",\n"),
     "  ]", "}", "",
   ].join("\n"));
@@ -434,7 +459,7 @@ async function main() {
   await Promise.all(Array.from({ length: parallel }, async () => {
     for (let repo; (repo = pending.shift()); ) {
       console.error(`${repo.id} started`);
-      const record = await runRepository(repo, release, scratch, limitSeconds);
+      const record = await runRepository(repo, release, scratch, limitSeconds, values.installed);
       await mkdir(join(recordsDirectory, ...repo.id.split("/")), { recursive: true });
       await writeAtomic(recordPath(repo), `${JSON.stringify(record)}\n`);
       records.set(repo.id, record);

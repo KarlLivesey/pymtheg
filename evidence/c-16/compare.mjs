@@ -18,6 +18,7 @@ const open = (repo) =>
   );
 const candidate = selected[0] === "--candidate";
 if (candidate) selected.shift();
+const verify = process.env.PYM_COMPARE_ALL_LINKS === "1";
 const old = read(process.env.C16_BASELINE ?? "main");
 const next = new Map(
   candidate
@@ -121,7 +122,17 @@ const queries = (db) => ({
     l.resolution, (
       SELECT json_group_array(json_object('ecosystem',ecosystem,'unit',unit,'symbol',symbol,
         'evidence',evidence,'version',version,'versionSource',version_source)) FROM graph_library_targets WHERE link=l.id
-    ) AS libraries FROM graph_links l INDEXED BY graph_link_file
+    ) AS libraries${
+      verify
+        ? `, (
+      SELECT json_group_array(json_array(file,key,ordinal,kind)) FROM (
+        SELECT c.kind,cs.file,json_extract(cs.body,'$.key') AS key,json_extract(cs.body,'$.ordinal') AS ordinal
+        FROM graph_candidates c JOIN graph_symbols cs ON cs.id=c.symbol WHERE c.link=l.id
+        ORDER BY cs.file,key,ordinal,c.kind
+      )
+    ) AS candidateKeys`
+        : ""
+    } FROM graph_links l INDEXED BY graph_link_file
     LEFT JOIN graph_symbols s ON s.id=l.source LEFT JOIN graph_symbols t ON t.id=l.target
     WHERE l.file=? ORDER BY l.id`),
 });
@@ -140,7 +151,7 @@ const locate = (source, offset) => source.slice(0, offset).split("\n").length;
 const reason = (link) => link.data?.reason ?? link.resolution;
 const rank = (repo, link) =>
   createHash("sha256")
-    .update("pymtheg-c16-2026\0")
+    .update((process.env.PYM_COMPARE_SEED ?? "pymtheg-c16-2026") + "\0")
     .update(sampleKey(repo, link))
     .update(identity(link))
     .digest("hex");
@@ -191,6 +202,7 @@ for (const repo of old) {
     newMemberForms: 0,
     unitUpgrades: 0,
     changedDefinite: [],
+    ...(verify && { changedOutcomes: 0, changedOutcomeExamples: [] }),
     rows: Object.fromEntries(
       rows.map((id) => [
         id,
@@ -261,9 +273,17 @@ for (const repo of old) {
         (other) =>
           other.resolution === link.resolution &&
           other.target === link.target &&
-          JSON.stringify(other.libraries) === JSON.stringify(link.libraries),
+          JSON.stringify(other.libraries) === JSON.stringify(link.libraries) &&
+          (!verify ||
+            (other.candidateKeys === link.candidateKeys &&
+              JSON.stringify(other.data) === JSON.stringify(link.data))),
       );
       const [updated] = choices?.splice(exact >= 0 ? exact : 0, 1) ?? [];
+      if (verify && b && !(exact >= 0)) {
+        count.changedOutcomes++;
+        if (count.changedOutcomeExamples.length < 10)
+          count.changedOutcomeExamples.push(site(link, updated));
+      }
       const wasLevel2 = isLevel2(link);
       const isNowLevel2 = updated && isLevel2(updated);
       if (
