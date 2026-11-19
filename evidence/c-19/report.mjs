@@ -1,8 +1,17 @@
 // SPDX-License-Identifier: MIT
 // C-19: aggregate the per-pin joins and run records into results.json and a
-// markdown summary. Reads WORK/pins.txt, WORK/out/*.join.json, the
+// markdown table. Reads WORK/pins.txt, WORK/out/*.join.json, the
 // rust-analyzer run records (WORK/out/*.meta.txt) and the Pymtheg index
 // records (WORK/pym/*.time.txt, *.index.json).
+//
+// Agreement, over non-structural links Pymtheg calls definite where the
+// strict join gives an answer to compare:
+//   strict     same declaration (checkout: the same graph symbol; library:
+//              both paths resolved to the same definition) over the
+//              comparisons where both sides name a declaration (same, or
+//              verified / seen different)
+//   heuristic  same declaration or same crate family and final name, over
+//              every comparison with an answer
 // Usage: node report.mjs WORK OUT_DIR
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -14,11 +23,7 @@ const num = (text, re) => {
   const m = text.match(re);
   return m ? Number(m[1]) : null;
 };
-const seconds = (s) => {
-  if (!s) return null;
-  const parts = s.split(":").map(Number);
-  return Math.round(parts.reduce((a, b) => a * 60 + b, 0));
-};
+const seconds = (s) => (s ? Math.round(s.split(":").map(Number).reduce((a, b) => a * 60 + b, 0)) : null);
 function timeRecord(text) {
   return {
     wallSeconds: seconds(text.match(/Elapsed \(wall clock\) time \(h:mm:ss or m:ss\): ([\d:.]+)/)?.[1]),
@@ -31,7 +36,7 @@ function raRecord(pin, variant) {
   if (!meta) return null;
   const field = (k) => meta.match(new RegExp(`^${k}: (.*)$`, "m"))?.[1]?.trim() ?? "";
   return {
-    exit: Number(field("exit")),
+    exit: Number(meta.match(/^exit (\d+)/m)?.[1]),
     ...timeRecord(meta),
     indexMB: Math.round(Number(field("scip-bytes")) / 1e5) / 10,
     downloadedCrates: Number(field("crate-archives")),
@@ -39,120 +44,126 @@ function raRecord(pin, variant) {
     buildScriptsRun: Number(field("build-script-runs")),
     procMacroLibraries: Number(field("proc-macro-dylibs")),
     targetDirMB: Math.round(Number(field("target-bytes")) / 1e6),
+    duplicateSymbolMessages: Number(field("duplicate-symbol-messages")),
+    duplicateSymbolFiles: Number(field("duplicate-symbol-files")),
+    notInScipDocumentMessages: Number(field("not-in-scip-document-messages")),
     lockfileTracked: field("lockfile-tracked") === "1",
     worktreeChanged: Number(field("worktree-changes")) > 0,
   };
 }
 function pymRecord(pin) {
-  const dir = existsSync(join(work, "pym", `${pin}-2.time.txt`)) ? `${pin}-2` : pin;
+  if (existsSync(join(work, "pym", `${pin}-2.index.json`))) pin = `${pin}-2`; // an earlier attempt failed
   let status = "";
   try {
-    status = JSON.parse(read(join(work, "pym", `${dir}.index.json`))).status;
+    status = JSON.parse(read(join(work, "pym", `${pin}.index.json`))).status;
   } catch {}
-  return { status, ...timeRecord(read(join(work, "pym", `${dir}.time.txt`))) };
+  return { status, ...timeRecord(read(join(work, "pym", `${pin}.time.txt`))) };
 }
 
-const STRUCT = /structural:/;
-function summarise(r) {
-  let agree = 0, hard = 0, identity = 0, noAnswer = 0, collision = 0, notGraph = 0, generated = 0, definite = 0;
+function agreementOf(r) {
+  const a = { same: 0, heuristic: 0, differ: 0, unverified: 0, noAnswer: 0, filtered: 0, other: 0, byVerdict: {} };
   for (const [key, n] of Object.entries(r.agreement)) {
-    if (STRUCT.test(key)) continue;
-    const verdict = key.split(" | ")[2];
-    definite += n;
-    if (verdict.startsWith("agree")) agree += n;
-    else if (verdict.startsWith("disagree")) hard += n;
-    else if (verdict.startsWith("unit-differs")) identity += n;
-    else if (verdict === "no-answer") noAnswer += n;
-    else if (verdict === "toolchain-symbol-collision") collision += n;
-    else if (verdict === "toolchain-target-not-a-graph-symbol") notGraph += n;
-    else if (verdict === "toolchain-generated-item") generated += n;
+    const v = key.split(" | ")[2];
+    a.byVerdict[v] = (a.byVerdict[v] ?? 0) + n;
+    if (v === "agree-same-declaration" || v === "agree-module-by-name") a.same += n;
+    else if (v === "heuristic-same-family-and-name") a.heuristic += n;
+    else if (v.startsWith("disagree")) a.differ += n;
+    else if (v.startsWith("unverified")) a.unverified += n;
+    else if (v === "no-answer") a.noAnswer += n;
+    else if (v.startsWith("filtered:")) a.filtered += n;
+    else a.other += n;
   }
-  const classes = {};
-  for (const [key, n] of Object.entries(r.toolchainNoAnswer)) {
-    const c = key.startsWith("file-not-indexed") ? key : key.split(":")[0];
-    classes[c] = (classes[c] ?? 0) + n;
-  }
-  const crossCount = (label) => Object.entries(r.cross).filter(([k]) => k.endsWith("| " + label)).reduce((a, [, n]) => a + n, 0);
-  return {
-    links: r.links,
-    level2: r.level2.links,
-    gainCheckout: r.withToolchain.gainCheckout,
-    gainLibrary: r.withToolchain.gainLibrary,
-    gainTraitDeclaration: r.withToolchain.gainThatIsTraitDeclaration,
-    gainUnderNonTestCfg: r.withToolchain.gainUnderNonTestCfg,
-    conservativeLinks: Math.round((r.withToolchain.percentWithoutTraitDeclarationsAndNonTestCfg * r.links) / 100),
-    definiteCompared: definite,
-    agree,
-    hardDisagree: hard,
-    reexportIdentity: identity,
-    definiteNoAnswer: noAnswer,
-    definiteCollision: collision,
-    definiteTargetNotGraphSymbol: notGraph,
-    definiteGenerated: generated,
-    toolchainNoAnswer: classes,
-    symbolCollisionLinks: crossCount("collision"),
-    generatedItemLinks: crossCount("generated"),
-    candidateSets: r.candidateSets,
-    libraryIdentityShapes: r.libraryIdentityShapes,
-    rangeCheck: { textMatches: r.rangeCheck.textMatches, textDiffers: r.rangeCheck.textDiffers },
-  };
+  return a;
 }
 const pct = (a, b) => (b ? Math.round((10000 * a) / b) / 100 : null);
 const rows = [];
 for (const pin of pins) {
   const file = join(work, "out", `${pin}.default.join.json`);
+  const base = { pin, toolchain: raRecord(pin, "default"), pymtheg: pymRecord(pin) };
   if (!existsSync(file)) {
-    rows.push({ pin, missing: true, toolchain: raRecord(pin, "default"), pymtheg: pymRecord(pin) });
+    rows.push({ ...base, missing: true });
     continue;
   }
   const r = JSON.parse(readFileSync(file, "utf8"));
-  rows.push({ pin, ...summarise(r), toolchain: raRecord(pin, "default"), pymtheg: pymRecord(pin) });
+  rows.push({
+    ...base,
+    links: r.links,
+    level2: r.level2.links,
+    loose: r.loose,
+    strict: r.strict,
+    strictRemovedFromLooseGain: r.strictRemovedFromLooseGain,
+    agreement: agreementOf(r),
+    candidateSets: r.candidateSets,
+    toolchainNoAnswer: r.toolchainNoAnswer,
+    symbolsDefinedMoreThanOnce: r.scip.symbolsDefinedMoreThanOnce,
+    libraryIdentityShapes: r.libraryIdentityShapes,
+    libraryVerification: r.libraryVerification,
+    rangeCheck: r.rangeCheck,
+  });
 }
 const done = rows.filter((r) => !r.missing);
-const sum = (k) => done.reduce((a, r) => a + r[k], 0);
+const sum = (f) => done.reduce((a, r) => a + f(r), 0);
+const L = sum((r) => r.links);
+const l2 = sum((r) => r.level2);
+const cov = (k) => ({
+  withToolchain: pct(l2 + sum((r) => r[k].gainCheckout + r[k].gainLibrary), L),
+  checkoutOnly: pct(l2 + sum((r) => r[k].gainCheckout), L),
+  libraryOnly: pct(l2 + sum((r) => r[k].gainLibrary), L),
+  withoutTraitDeclarations: pct(l2 + sum((r) => r[k].gainCheckout + r[k].gainLibrary - r[k].gainTraitDeclaration), L),
+  gated: pct(sum((r) => r[k].gatedLinks), L),
+  gainCheckout: sum((r) => r[k].gainCheckout),
+  gainLibrary: sum((r) => r[k].gainLibrary),
+  gainTraitDeclaration: sum((r) => r[k].gainTraitDeclaration),
+  gainUnderNonTestCfg: sum((r) => r[k].gainUnderNonTestCfg),
+});
+const ag = (k) => sum((r) => r.agreement[k]);
+const removed = {};
+for (const r of done) for (const [k, n] of Object.entries(r.strictRemovedFromLooseGain)) removed[k] = (removed[k] ?? 0) + n;
 const total = {
   pins: done.length,
-  links: sum("links"),
-  level2: pct(sum("level2"), sum("links")),
-  withToolchain: pct(sum("level2") + sum("gainCheckout") + sum("gainLibrary"), sum("links")),
-  checkoutAnswersOnly: pct(sum("level2") + sum("gainCheckout"), sum("links")),
-  conservative: pct(sum("conservativeLinks"), sum("links")),
-  agreement: pct(sum("agree"), sum("agree") + sum("hardDisagree")),
-  agreementCountingReexports: pct(sum("agree"), sum("agree") + sum("hardDisagree") + sum("reexportIdentity")),
-  hardDisagree: sum("hardDisagree"),
-  reexportIdentity: sum("reexportIdentity"),
+  links: L,
+  level2: pct(l2, L),
+  loose: cov("loose"),
+  strict: cov("strict"),
+  strictRemovedFromLooseGain: Object.fromEntries(Object.entries(removed).sort((a, b) => b[1] - a[1])),
+  agreement: {
+    sameDeclaration: ag("same"),
+    sameFamilyAndNameOnly: ag("heuristic"),
+    differ: ag("differ"),
+    unverified: ag("unverified"),
+    strict: pct(ag("same"), ag("same") + ag("differ")),
+    heuristic: pct(ag("same") + ag("heuristic"), ag("same") + ag("heuristic") + ag("differ") + ag("unverified")),
+    sameDeclarationShareOfAllAnswered: pct(ag("same"), ag("same") + ag("heuristic") + ag("differ") + ag("unverified")),
+  },
 };
 const variants = {};
-for (const [pin, variant] of [["axum", "nobuild"], ["axum", "allfeatures"], ["axum", "examples"], ["ripgrep", "rerun"], ["helix", "rerun"]]) {
-  const meta = variant === "rerun" ? read(join(work, "out", `${pin}.rerun.stderr.txt`)) : null;
-  variants[`${pin}.${variant}`] = meta !== null ? timeRecord(meta) : raRecord(pin, variant);
-}
-for (const v of ["allfeatures", "allfeatures-examples"]) {
-  const f = join(work, "out", `axum.${v}.join.json`);
+for (const [pin, variant] of [["axum", "nobuild"], ["axum", "notest"], ["axum", "allfeatures"], ["axum", "examples"]]) variants[`${pin}.${variant}`] = raRecord(pin, variant);
+for (const pin of ["ripgrep", "helix"]) variants[`${pin}.rerun`] = timeRecord(read(join(work, "out", `${pin}.rerun.stderr.txt`)));
+for (const v of ["axum.allfeatures", "axum.allfeatures-examples", "ripgrep.offline"]) {
+  const f = join(work, "out", `${v}.join.json`);
   if (existsSync(f)) {
     const r = JSON.parse(readFileSync(f, "utf8"));
-    variants[`axum.${v}.coverage`] = { level2: r.level2.percent, withToolchain: r.withToolchain.percent, conservative: r.withToolchain.percentWithoutTraitDeclarationsAndNonTestCfg, disagreements: r.disagreementCount };
+    variants[`${v}.coverage`] = { level2: r.level2.percent, looseWithToolchain: r.loose.percent, looseGated: r.loose.gated, strictWithToolchain: r.strict.percent, strictGated: r.strict.gated };
   }
 }
 writeFileSync(join(outDir, "results.json"), JSON.stringify({ total, rows, variants }, null, 1) + "\n");
 
+const pc = (a, b) => `${pct(a, b)}%`;
 const md = [
-  "| Pin | Rust links | Level 2 now | + toolchain answers | checkout answers only | conservative | agreement (hard) | hard / re-export disagreements | RA wall s | RA CPU s | RA peak MB | index MB | crates downloaded (MB) | build scripts run | proc-macro libs | Pymtheg cold wall s | Pymtheg peak MB |",
-  "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+  "| Pin | Rust links | Level 2 now | + toolchain, loose (first run) | + toolchain, strict | gated, loose | gated, strict | strict agreement | same declaration / family+name only / differ / unverified | RA wall s | RA CPU s | RA peak MB | index MB | crates (MB) | build scripts | proc-macro libs | duplicate-symbol messages (files) / symbols defined twice | Pymtheg cold wall s | Pymtheg peak MB |",
+  "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: |",
 ];
-for (const r of rows) {
+for (const r of done) {
   const t = r.toolchain ?? {};
   const p = r.pymtheg ?? {};
-  if (r.missing) {
-    md.push(`| ${r.pin} | — | — | — | — | — | — | — | ${t.wallSeconds ?? "—"} | ${t.cpuSeconds ?? "—"} | ${t.peakMB ?? "—"} | ${t.indexMB ?? "—"} | ${t.downloadedCrates ?? "—"} (${t.downloadMB ?? "—"}) | ${t.buildScriptsRun ?? "—"} | ${t.procMacroLibraries ?? "—"} | ${p.wallSeconds ?? "—"} | ${p.peakMB ?? "—"} |`);
-    continue;
-  }
+  const a = r.agreement;
   md.push(
-    `| ${r.pin} | ${r.links.toLocaleString("en")} | ${pct(r.level2, r.links)}% | ${pct(r.level2 + r.gainCheckout + r.gainLibrary, r.links)}% | ${pct(r.level2 + r.gainCheckout, r.links)}% | ${pct(r.conservativeLinks, r.links)}% | ${pct(r.agree, r.agree + r.hardDisagree)}% | ${r.hardDisagree} / ${r.reexportIdentity} | ${t.wallSeconds} | ${t.cpuSeconds} | ${t.peakMB} | ${t.indexMB} | ${t.downloadedCrates} (${t.downloadMB}) | ${t.buildScriptsRun} | ${t.procMacroLibraries} | ${p.wallSeconds} | ${p.peakMB} |`,
+    `| ${r.pin} | ${r.links.toLocaleString("en")} | ${pc(r.level2, r.links)} | ${r.loose.percent}% | ${r.strict.percent}% | ${r.loose.gated}% | ${r.strict.gated}% | ${pct(a.same, a.same + a.differ)}% | ${a.same.toLocaleString("en")} / ${a.heuristic.toLocaleString("en")} / ${a.differ} / ${a.unverified} | ${t.wallSeconds} | ${t.cpuSeconds} | ${t.peakMB} | ${t.indexMB} | ${t.downloadedCrates} (${t.downloadMB}) | ${t.buildScriptsRun} | ${t.procMacroLibraries} | ${t.duplicateSymbolMessages} (${t.duplicateSymbolFiles}) / ${r.symbolsDefinedMoreThanOnce} | ${p.wallSeconds} | ${p.peakMB} |`,
   );
 }
 md.push(
-  `| **${total.pins} pins** | ${total.links.toLocaleString("en")} | **${total.level2}%** | **${total.withToolchain}%** | ${total.checkoutAnswersOnly}% | ${total.conservative}% | ${total.agreement}% | ${total.hardDisagree} / ${total.reexportIdentity} | | | | | | | | | |`,
+  `| **${total.pins} pins** | ${L.toLocaleString("en")} | **${total.level2}%** | ${total.loose.withToolchain}% | **${total.strict.withToolchain}%** | ${total.loose.gated}% | **${total.strict.gated}%** | **${total.agreement.strict}%** | ${total.agreement.sameDeclaration.toLocaleString("en")} / ${total.agreement.sameFamilyAndNameOnly.toLocaleString("en")} / ${total.agreement.differ} / ${total.agreement.unverified} | | | | | | | | | | |`,
 );
+for (const r of rows.filter((x) => x.missing)) md.push(`| ${r.pin} | missing | | | | | | | | | | | | | | | | | |`);
 writeFileSync(join(outDir, "table.md"), md.join("\n") + "\n");
 console.log(JSON.stringify(total, null, 1));

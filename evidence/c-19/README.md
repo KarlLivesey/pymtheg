@@ -7,67 +7,72 @@ A measurement, no product change. Every Rust pin that finished in the sweep
 (18 of the 20 in `sweep/repos.json`; swc and embassy are still open at the
 wall limit) is indexed twice from the same clean pinned checkout:
 
-1. by Pymtheg `main` (build of `02d0e3d`), source-only, default settings
+1. by Pymtheg `main` (a merge of `e003342`), source-only, default settings
    (`pym-index.sh`); and
 2. by `rust-analyzer scip` from the pinned stable toolchain (Rust 1.98.1,
    the rustup component `rust-analyzer 1.98.1 (48a229c 2026-09-01)`, with
-   `rust-src`), in its own copy with a fresh `CARGO_HOME` so that downloads
-   can be measured (`ra-scip.sh`). One run at a time, 8 threads and 8 cargo
-   jobs, on a shared and loaded dev server: times are observations.
+   `rust-src`), in its own copy with a fresh crate cache (`CARGO_HOME`) so
+   that downloads can be measured (`ra-scip.sh`). One run at a time, 8
+   threads and 8 cargo jobs, on a shared and loaded dev server: times are
+   observations. Build output goes to disk scratch.
 
-`join.mjs` then joins the SCIP index to every stored Rust link of the same
-pin, by file and range, and reports Pymtheg's outcome against the
-toolchain's answer.
+`join.mjs` joins the SCIP index to every stored Rust link of the same pin,
+by file and range, two ways: the first run's loose method (kept for the
+comparison) and the strict method that the figures use. Its header says
+exactly what each requires.
 
-## The join
+## The join, in short
 
-- Pymtheg stores ranges as JavaScript string offsets (UTF-16 code units);
-  SCIP stores UTF-8 byte columns. The join converts. (`rangeCheck` in each
-  result counts stored ranges whose text ends with the written name; the
-  rest are `use … as …` renames, generic arguments, `self` imports and links
-  found inside macro expansions, whose range is the macro's name.)
-- A link matches the SCIP occurrence inside its range whose text is the
-  last segment of the written name (`a::b::c` → `c`, `x.m` → `m`), a
-  reference preferred over a definition.
-- The toolchain's answer is the matched symbol's definition: in a checkout
-  file (mapped to the smallest Pymtheg symbol declaring that name there; a
-  local binding maps to its enclosing item, as Pymtheg links locals), in a
-  checkout crate with no definition site (macro-generated), or in another
-  crate (crate, version, descriptor path).
-- A SCIP symbol defined more than once is a **collision** and gives no
-  answer: SCIP symbol strings carry no function-body scope, so two items
-  declared inside two function bodies of one module share one symbol.
-- `contains` and `modules` links are structural and left out of agreement.
-
-"Level 2 now" is Pymtheg's stored outcome: resolved checkout links plus
-library links with a symbol, over all stored Rust links of the pin.
-"+ toolchain answers" adds every unresolved, candidate or unit-only link
-the toolchain answers with a checkout declaration or a library symbol.
-"Conservative" drops two kinds from that gain: answers that name a trait's
-method declaration (`Trait#m().`, dispatch or a default body) and answers
-on links Pymtheg records under a cfg condition other than `test` (the
-toolchain sees one configuration).
+- Ranges: Pymtheg stores JavaScript string offsets (UTF-16 code units),
+  SCIP UTF-8 byte columns; the join converts.
+- Strict answer: an occurrence at exactly the written name's last segment
+  at the end of the link's range, one symbol there, a symbol kind the link
+  kind can name, and none of the excluded classes (a `use` answered with a
+  module, `extern crate` and crate roots, symbols defined more than once,
+  non-macro items of proc-macro crates referenced from another package).
+- The toolchain's answer: a checkout declaration (mapped to the Pymtheg
+  symbol declaring that name at that place; a local to its enclosing item),
+  a macro-generated checkout item with no definition site, or a library
+  item (crate, version, descriptor path).
+- Gated: also no answers on links Pymtheg records under a cfg condition
+  other than `test`, and no trait-method declarations (dispatch).
+- Agreement on library targets resolves both sides with `rustpath.mjs`, a
+  text-level resolver over the downloaded crate sources and `rust-src`
+  (`mod` declarations, `use` re-exports, renamed dependencies, required
+  versions, proc-macro functions, `#[macro_export]`). It does not evaluate
+  cfg or expand macros; what it cannot follow is reported as unverified or
+  "same crate family and final name" only. `rustpath-check.mjs` holds its
+  checks (`rustpath-check.txt`).
 
 ## Hand-checks
 
-- `handcheck.mjs` lists 30 disagreements per deep-dive pin (ripgrep, axum,
-  helix, tauri) on links Pymtheg calls definite: every hard disagreement
-  first, then same-name re-export cases, in fixed-seed order (`c-19`).
-  Hard ones carry a verdict checked by hand against the pinned source
-  (`handcheck-verdicts.json`); re-export cases are checked in the unit's
-  downloaded source (`reexport.mjs`, a text check).
-- `join.mjs` also draws a fixed-seed sample of conservative gains
-  (`gainSample` in each result); 40 were read against their source line.
+- `handcheck.mjs` lists 30 comparisons per deep-dive pin (ripgrep, axum,
+  helix, tauri) on links Pymtheg calls definite that are not verified as
+  the same declaration. Hard differences come first, then unverified, then
+  family-and-name only. The order is fixed by seed `c-19` over site and
+  written name, so a fresh run draws the same rows. Every row carries a
+  verdict from `handcheck-verdicts.json`, by site or by shape (a Pymtheg
+  target and a toolchain target checked once in the crate source), and
+  the script fails if one is missing.
+- `unconditional.mjs` lists every difference across the 18 pins that has
+  no recorded cfg condition (`unconditional.txt`).
+- `join.mjs` draws a fixed-seed sample of gated gains (`gainSample`); the
+  first 10 per deep-dive pin are in `handcheck.md` and were read against
+  their source lines.
 
 ## Results in this folder
 
-- `table.md`, `results.json`: per-pin coverage, agreement and cost
-  (`report.mjs`); `aggregate.json`: 18-pin sums (`aggregate.mjs`).
+- `table.md`, `results.json`: per-pin coverage (loose and strict),
+  agreement and cost (`report.mjs`).
+- `aggregate.json`: 18-pin sums (`aggregate.mjs`).
 - `joins/*.join.json.gz`: every pin's full join result, and the axum
-  all-features, all-features-plus-examples and ripgrep offline variants.
-- `handcheck.md`: the hand-check table; `unconditional.txt`: every hard
-  disagreement without a recorded cfg condition (`unconditional.mjs`);
-  `reexport-check.jsonl`: the re-export check per pin.
+  variants (build scripts and proc macros configured off, cfg(test) off,
+  all features, all features plus the examples workspace) and the ripgrep
+  offline run.
+- `axum-scip-compare.json`: the variant indexes compared by payload, the
+  metadata left out (`scip-compare.mjs`).
+- `axum-join-compare.json`: their join results compared.
+- `handcheck.md`, `unconditional.txt`, `rustpath-check.txt`.
 
 ## Reproduce (dev server)
 
@@ -75,23 +80,18 @@ toolchain sees one configuration).
 pymtheg-dev --name c19 -- bash -c 'npm ci --ignore-scripts && npm run build'
 pymtheg-dev --name c19 -- bash evidence/c-19/queue-pym.sh "$PWD" /dev/shm/c19
 pymtheg-dev --name c19 -- bash evidence/c-19/queue-ra.sh /dev/shm/c19
-pymtheg-dev --name c19 -- bash evidence/c-19/join-all.sh /dev/shm/c19
-pymtheg-dev --name c19 -- node evidence/c-19/report.mjs /dev/shm/c19 OUT
-pymtheg-dev --name c19 -- node evidence/c-19/handcheck.mjs /dev/shm/c19 ripgrep axum helix tauri
-pymtheg-dev --name c19 -- bash evidence/c-19/ra-extra.sh /dev/shm/c19
+pymtheg-dev --name c19 -- bash evidence/c-19/analyse.sh /dev/shm/c19 OUT
 ```
 
-`queue-ra.sh` also runs the axum variants (build scripts and proc macros
-"off", all features, the separate `examples/` workspace) and the one-file
-edit re-runs (`ra-rerun.sh`). The axum variant joins:
+`queue-ra.sh` runs every pin's default index, then the axum variants, the
+one-file-edit re-runs (`ra-rerun.sh`) and the ripgrep extras (`ra-extra.sh`:
+lsif, offline with an empty crate cache). `analyse.sh` runs the resolver
+checks, all joins (`join-all.sh`), the variant joins and comparisons
+(`variants.sh`), the report, the aggregates, the unconditional list and
+the hand-check. The queues skip finished work and retry failed attempts
+into new folders (nothing is deleted).
 
-```sh
-node evidence/c-19/join.mjs --graph …/axum/…/graph.sqlite \
-  --scip OUT/axum.allfeatures.scip,OUT/axum.examples.scip=examples …
-```
-
-Scripts: `fetch.sh` (pinned shallow fetch, as the sweep runner),
-`scip.mjs` (a minimal SCIP reader), `inspect.mjs` and `occurrences.mjs`
-(index summaries for hand checks), `show.mjs` (print a result section).
-Nothing here installs anything into the checkout; the scratch folder holds
-the clones, indexes, crate caches and build output.
+Other scripts: `fetch.sh` (pinned shallow fetch, as the sweep runner),
+`pins.mjs` (the 18 pins), `scip.mjs` (a minimal SCIP reader), `inspect.mjs`
+and `occurrences.mjs` (index summaries for hand checks), `show.mjs` (print
+a result section). Nothing here installs anything into the checkout.
