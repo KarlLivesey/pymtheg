@@ -536,6 +536,7 @@ export function globalTypeAvailability(
   if (previous) return previous;
   const options = program.getCompilerOptions();
   const expected = new Set(options.types ?? []);
+  const checkoutRequests = new Set(expected);
   const frameworkRequests = new Map<string, string[]>();
   const request = (name: string, source: string) => {
     if (!frameworkTypes.has(name)) return;
@@ -556,13 +557,19 @@ export function globalTypeAvailability(
   let hasNode = false;
   let hasInstalledTypes = false;
   for (const source of program.getSourceFiles()) {
+    const path = fromVirtual(source.fileName);
+    const installed =
+      path?.split("/").includes("node_modules") && source.isDeclarationFile;
+    if (installed) hasInstalledTypes = true;
     for (const reference of source.typeReferenceDirectives) {
       expected.add(reference.fileName);
-      request(reference.fileName, source.fileName);
+      // Installed declarations influence test globals through the checker.
+      // A missing transitive reference cannot add a speculative provider.
+      if (!installed) {
+        checkoutRequests.add(reference.fileName);
+        request(reference.fileName, source.fileName);
+      }
     }
-    const path = fromVirtual(source.fileName);
-    if (path?.split("/").includes("node_modules") && source.isDeclarationFile)
-      hasInstalledTypes = true;
     const runtime =
       path !== undefined ? runtimeHashbang(source.text) : undefined;
     if (runtime === "bun" || runtime === "deno")
@@ -610,7 +617,9 @@ export function globalTypeAvailability(
     competingTestRequests: [...expected].filter(
       (name) =>
         competingTestTypes.has(name) &&
-        (!hasInstalledTypes || !available.has(name) || unavailable.has(name)),
+        (!hasInstalledTypes ||
+          (checkoutRequests.has(name) &&
+            (!available.has(name) || unavailable.has(name)))),
     ),
   };
   programTypes.set(program, result);

@@ -342,6 +342,24 @@ test("captured competing test types use the compiler's global symbol", async () 
   });
 });
 
+test("a missing transitive test type request cannot add a global provider", async () => {
+  const { request, read, write } = await project();
+  await write(
+    "tsconfig.json",
+    '{"compilerOptions":{"types":["vitest/globals"]}}',
+  );
+  await write("main.ts", "expect(true);");
+  await write("node_modules/vitest/package.json", manifest("vitest", "1.0.0"));
+  await write(
+    "node_modules/vitest/globals.d.ts",
+    '/// <reference types="jest" />\nimport "chai"; declare global { function expect(value: boolean): void; }',
+  );
+  await request("index");
+  read((_, call) =>
+    assert.equal(target(call("main.ts", "expect")).unit, "vitest"),
+  );
+});
+
 test("an augmentation contributes its members, not the installed module's identity", async () => {
   const { request, read, write } = await project();
   await write(

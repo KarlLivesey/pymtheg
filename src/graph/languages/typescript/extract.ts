@@ -625,7 +625,13 @@ export function extractFile(
       const units = new Set(globals.missingTestFrameworks);
       const competitors = new Set(globals.competingTestRequests);
       for (const source of program.getSourceFiles()) {
-        if (fromVirtual(source.fileName) === undefined) continue;
+        const sourcePath = fromVirtual(source.fileName);
+        if (
+          sourcePath === undefined ||
+          (source.isDeclarationFile &&
+            sourcePath.split("/").includes("node_modules"))
+        )
+          continue;
         for (const statement of source.statements) {
           if (
             !ts.isImportDeclaration(statement) ||
