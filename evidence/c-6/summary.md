@@ -16,6 +16,18 @@ Files:
   run it on the server.
 - The raw lines are in `compare.jsonl`, `evaluate.jsonl`, `concurrency.jsonl`
   and `large.jsonl`; `summarize.mjs` makes the tables below from them.
+- `concurrency.mjs` and `probe-child.mjs` make the concurrency probes.
+- `compat.sh` runs the version steps; its output is `compat.log`.
+- `stress.mjs` is a journal-switch stress run: two writers in short
+  sessions, three read-only readers and two writable no-write queries, 300
+  rounds each, on one file. The branch had no errors. (It was added after a
+  first version, which switched at open rather than at the first write, failed
+  an existing concurrent-writers test.)
+- `fetch-all.sh`, `detach.sh` and `queue.sh` are helpers.
+
+The section 1 repositories are at their sweep commits (`sweep/repos.json`).
+The section 2 restic runs used the server's pinned restic corpus (`c734245`),
+and Vector is the pinned server corpus (`515e87d9`).
 
 ## 1. Where cold time goes, and main against the branch
 
@@ -163,4 +175,29 @@ main `62d071d` (base), and into this branch (C-6). Each is a cold index under
 the sweep's 60-minute allowance, run while other measurements shared the
 server.
 
-LARGE_TABLE
+| Repository | Build | Outcome | Wall s | In COMMIT s | In transactions s | Peak RSS MiB | Stored: files / links (or file rows:digest) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| embassy-rs/embassy | c6 | complete | 1917.6 | 520.6 | 1049.6 | 3437 | 2514 / 500862 |
+| embassy-rs/embassy | base | complete | 2899.7 | 805.4 | 1989.3 | 3815 | 2514 / 500862 |
+| swc-project/swc | c6 | JavaScript heap out of memory (exit 134) | 2763 | – | – | – | 51681:ec562c5e0b011bba |
+| swc-project/swc | base | not finished in 60 min | 3600 | – | – | – | unreadable |
+
+- **Embassy** completes with both builds; the time is the cold `graph index`
+  alone. Both stores are equal row for row. Exit 2 is the one failed source
+  file, the same as in C-1's evidence.
+  - With C-6: 1,918 s.
+  - Base: 2,900 s.
+
+  The sweep's 60 minutes also covers `init`, a warm index and the queries, so
+  the margin matters.
+- **swc with C-6** gets through the phase that stopped PR 13's own runs (C-1
+  evidence: wall limit while writing analysed Rust facts). All 51,681 files
+  and the 394,584 Rust links are stored. At 2,709 s the process then runs out
+  of Node's default JavaScript heap (about 4 GB, `FATAL ERROR: Ineffective
+  mark-compacts near heap limit`). That happens in a later phase, most likely
+  the TypeScript analysis of swc's 50,158 TypeScript and JavaScript files,
+  which runs next.
+- **The base swc run** was still writing at the 60-minute limit: 90 MB of
+  graph after 30 minutes, against 1.1 GB stored by the C-6 run. Its store was
+  left with a hot rollback journal, which a read-only open cannot replay
+  ("unreadable" above); the next writable open repairs it.
