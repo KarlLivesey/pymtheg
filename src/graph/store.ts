@@ -38,6 +38,8 @@ export class SqliteGraphStore implements GraphStorage {
   private writeAheadLog = false;
   /** A writable connection's file, until its first graph write chooses the journal. */
   private path: string | undefined;
+  /** A SQLite version a test supplies instead of the engine's own. */
+  private readonly sqliteVersion: string | undefined;
   /**
    * Before the first graph write: commits without a sync on a local disk
    * (C-6). Trust comes only from the completion record: every write after it
@@ -49,7 +51,10 @@ export class SqliteGraphStore implements GraphStorage {
    */
   private beforeWrite(): void {
     if (this.path === undefined || this.db.isTransaction) return;
-    this.writeAheadLog = openWriteAheadLog(this.db, this.path);
+    this.writeAheadLog =
+      this.sqliteVersion === undefined
+        ? openWriteAheadLog(this.db, this.path)
+        : openWriteAheadLog(this.db, this.path, this.sqliteVersion);
     this.path = undefined;
   }
   /**
@@ -106,8 +111,9 @@ export class SqliteGraphStore implements GraphStorage {
   constructor(
     path: string,
     projectId?: string,
-    options: { readOnly?: boolean } = {},
+    options: { readOnly?: boolean; sqliteVersion?: string } = {},
   ) {
+    this.sqliteVersion = options.sqliteVersion;
     this.db = openDatabase(path, { readOnly: options.readOnly ?? false });
     try {
       if (options.readOnly) {

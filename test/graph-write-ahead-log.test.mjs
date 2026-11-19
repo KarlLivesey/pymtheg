@@ -24,6 +24,8 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { executeGraph } from "../dist/graph/commands.js";
 import { LanguageRegistry } from "../dist/graph/registry.js";
+import { indexProject } from "../dist/graph/indexer.js";
+import { readdirSync } from "node:fs";
 import { SqliteGraphStore } from "../dist/graph/store.js";
 import {
   openWriteAheadLog,
@@ -430,6 +432,71 @@ test("a reader still open when the last writer closes keeps the log; every later
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test("a cold index with an affected SQLite stays in the rollback journal throughout and stores the fast path's rows", async () => {
+  const files = fixtureFiles(8);
+  /** Cold index with the given SQLite version; records any -wal seen. */
+  async function coldIndex(sqliteVersion) {
+    const root = await project(files);
+    try {
+      await mkdir(join(root, ".pymtheg/rebuildable"), { recursive: true });
+      const path = graphPath(root);
+      const logs = [];
+      // Looked at right after every store write and during resolution.
+      const look = (when) => {
+        if (
+          readdirSync(join(root, ".pymtheg/rebuildable")).includes(
+            "graph.sqlite-wal",
+          )
+        )
+          logs.push(when);
+      };
+      const store = new SqliteGraphStore(path, "c6-e2e", { sqliteVersion });
+      for (const name of [
+        "replaceContexts",
+        "replaceFile",
+        "replaceAnalysis",
+      ]) {
+        const original = store[name].bind(store);
+        store[name] = (...args) => {
+          const result = original(...args);
+          look(`after ${name}`);
+          return result;
+        };
+      }
+      const module = fixtureModule();
+      const resolve = module.resolve;
+      module.resolve = (context) => {
+        look("during resolution");
+        return resolve(context);
+      };
+      try {
+        const report = await indexProject(
+          root,
+          new LanguageRegistry([module]),
+          store,
+          { excludeDirectories: [".pymtheg"] },
+        );
+        assert.deepEqual(report.errors, []);
+        assert.deepEqual(report.resolutionErrors, []);
+        look("after the index");
+      } finally {
+        store.close();
+      }
+      return { logs, rows: rows(root), format: await format(root) };
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  }
+  const fallback = await coldIndex("3.51.2");
+  assert.deepEqual(fallback.logs, []);
+  assert.deepEqual(fallback.format, [1, 1]);
+  const fast = await coldIndex("3.53.0");
+  if (writeAheadLogSafe(tmpdir(), "3.53.0"))
+    assert.ok(fast.logs.includes("during resolution"));
+  assert.deepEqual(fallback.rows, fast.rows);
+  assert.equal(fallback.rows.graph_files.length, 8);
 });
 
 test("write-ahead logs only on local Linux filesystems", () => {

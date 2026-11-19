@@ -41,3 +41,9 @@ Read with `evidence/c-6/sqlite-versions.sh` from the official
 **Who gets the fast path.** Node 24.15.0 and later 24.x, Node 25.9.0 and
 later, and every Node 26 release read here. Every other version keeps main's
 rollback journal with a full sync per commit.
+
+**The gate's `e-node-24.0.0` scenario takes the fallback.** In the
+`node:24.0.0-bookworm-slim` image, `/tmp` is overlayfs (statfs type
+`0x794c7630`, an allowed local type), and `writeAheadLogSafe("/tmp")` returns
+`false` because SQLite 3.49.1 lacks the fix. `test/graph-write-ahead-log.test.mjs`
+run in that image: 12 pass, 0 fail, and the 2 power-loss tests skip for lack of a log.

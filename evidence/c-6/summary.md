@@ -138,6 +138,11 @@ Every main failure is `database is locked` after the full 30-second wait.
   commit per file, a writer holds the lock for the same writes as on main,
   but each commit no longer waits for the disk.
 
+These probes are reads, opens and single writes. A second cold `graph index`
+is not among them, and two cold indexes racing fail the same way on main and
+on the branch (the losing one reports `UNIQUE constraint failed:
+graph_links.id`; the store stays consistent and is repaired).
+
 ## 4. Kill and recover
 
 Deterministic, in `test/graph-write-ahead-log.test.mjs`:

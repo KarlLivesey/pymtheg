@@ -154,12 +154,15 @@ export function writeAheadLogSafe(
  * with full syncs. Where a write-ahead log is not safe, this connection never
  * writes in one: a log left by a killed run is checkpointed and removed first,
  * waiting for other connections up to the writer wait, and otherwise the write
- * fails as "database is locked".
+ * fails as "database is locked". The SQLite version is the connection's own
+ * engine (`sqlite_version()`), unless a test supplies one.
  */
 export function openWriteAheadLog(
   db: DatabaseSync,
   file: string,
-  sqliteVersion: string | undefined = process.versions.sqlite,
+  sqliteVersion: string | undefined = String(
+    db.prepare("SELECT sqlite_version() AS version").get()!.version,
+  ),
 ): boolean {
   const safe =
     file !== ":memory:" &&

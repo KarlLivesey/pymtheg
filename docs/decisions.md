@@ -2656,7 +2656,9 @@ local filesystem, running a SQLite that has the write-ahead-log reset fix
 `synchronous=NORMAL` and a checkpoint every 10,000 pages. Writes keep one
 commit per file; commits are not synced. The completion record is committed
 with `synchronous=FULL`. When its last writer closes, the file returns to the
-rollback journal. If another connection prevents the switch in, the
+rollback journal, with a full sync. If a reader or another connection that has
+read since the log started is still open at that moment, the file stays in
+log format until the next index that closes alone. If another connection prevents the switch in, the
 connection keeps the rollback journal with a full sync per commit, as before,
 without waiting. Elsewhere, including an unknown SQLite version, a writer
 never writes in a write-ahead log: it first folds a left-over log back
