@@ -269,11 +269,16 @@ export function extractFile(
   const freshExportNames = new Set(Object.values(context.fresh.local));
   const path = file.fileName.slice(1);
   const importer = library.forImporter(path);
+  const importers = new WeakMap<ts.SourceFile, typeof importer>();
   const importerOf = (node: ts.Node) => {
     const source = node.getSourceFile();
-    return source === file
-      ? importer
-      : library.forImporter(fromVirtual(source.fileName) ?? path);
+    if (source === file) return importer;
+    let reader = importers.get(source);
+    if (!reader) {
+      reader = library.forImporter(fromVirtual(source.fileName) ?? path);
+      importers.set(source, reader);
+    }
+    return reader;
   };
   const symbols: SymbolDraft[] = [];
   const links: LinkDraft[] = [];
@@ -286,8 +291,14 @@ export function extractFile(
       const name = (node as ts.NamedDeclaration).name;
       if (name && ts.isIdentifier(name)) scopedNames.add(name.text);
     }
-    const written = propertyWrite(node, syntax.getAssignmentTargetKind);
-    if (written) propertyWrites.push(written);
+    if (
+      node.kind === ts.SyntaxKind.PropertyAccessExpression ||
+      node.kind === ts.SyntaxKind.ElementAccessExpression ||
+      node.kind === ts.SyntaxKind.CallExpression
+    ) {
+      const written = propertyWrite(node, syntax.getAssignmentTargetKind);
+      if (written) propertyWrites.push(written);
+    }
     ts.forEachChild(node, collectScopedNames);
   };
   collectScopedNames(file);
@@ -1125,8 +1136,20 @@ export function extractFile(
     return KIND_REASON[context.moduleKind(file)];
   }
 
+  const outsideUnits = new Map<
+    ts.StringLiteralLike,
+    ReturnType<typeof packageUnit>
+  >();
   function missingUnit(specifier: ts.Expression | undefined, declared = false) {
     if (!specifier || !ts.isStringLiteralLike(specifier)) return undefined;
+    if (!declared && outsideUnits.has(specifier))
+      return outsideUnits.get(specifier);
+    const unit = outsideUnit(specifier, declared);
+    if (!declared && !limited) outsideUnits.set(specifier, unit);
+    return unit;
+  }
+
+  function outsideUnit(specifier: ts.StringLiteralLike, declared: boolean) {
     const selection = selectedSpecifier(specifier);
     if (!selection) return undefined;
     const unit = packageUnit(selection);
@@ -1231,18 +1254,13 @@ export function extractFile(
       return call.arguments[0];
     };
     let present = found.symbol;
-    const wanted =
-      found.receiver &&
-      found.name !== undefined &&
-      memberWritten(found.receiver, found.name)
-        ? undefined
-        : found.name;
     if (found.receiver) {
       if (
-        wanted !== undefined &&
+        found.name !== undefined &&
         present &&
         present !== LIMIT &&
-        present.flags & ts.SymbolFlags.Alias
+        present.flags & ts.SymbolFlags.Alias &&
+        !memberWritten(found.receiver, found.name)
       ) {
         const selected = missingBinding(
           { ...found, receiver: undefined },
@@ -1255,9 +1273,16 @@ export function extractFile(
       const base = transparent(found.receiver);
       if (!ts.isIdentifier(base)) {
         const specifier = requireSpecifier(base);
-        return importFact(specifier, wanted, declared)?.libraryFacts?.[0];
+        return importFact(specifier, found.name, declared)?.libraryFacts?.[0];
       }
-      present = propertyWrites.length ? memberBinding(base) : symbolOf(base);
+      present = symbolOf(base);
+      if (
+        present &&
+        present !== LIMIT &&
+        present.declarations?.length !== 1 &&
+        propertyWrites.length
+      )
+        present = memberBinding(base);
     }
     if (!present || present === LIMIT) return undefined;
     const chain =
@@ -1316,7 +1341,6 @@ export function extractFile(
               ...found,
               symbol: found.receiver ? undefined : symbolOf(value),
               receiver: found.receiver ? value : undefined,
-              name: wanted,
             },
             meaning,
             depth + 1,
@@ -1352,8 +1376,11 @@ export function extractFile(
       // Node's ESM wrapper exposes the CommonJS export object as the default.
       // For an arbitrary imported value the selected member has no proven name.
       const symbol = found.receiver
-        ? moduleObject || (unit.ecosystem === "node" && exported === "default")
-          ? wanted
+        ? (moduleObject ||
+            (unit.ecosystem === "node" && exported === "default")) &&
+          found.name !== undefined &&
+          !memberWritten(found.receiver, found.name)
+          ? found.name
           : undefined
         : exported;
       return writtenLibrary(specifier, unit, symbol);
@@ -1453,7 +1480,6 @@ export function extractFile(
         facts.libraryFacts = found.libraryFacts.map((target) => ({
           ...target,
         }));
-      if (found.lexicalLibrary && !reason) facts.lexicalLibrary = true;
     }
     if (reason) facts.reason = reason;
     links.push({
@@ -1535,9 +1561,20 @@ export function extractFile(
     return result;
   }
   /** Why a module specifier does not resolve, or undefined when it does. */
+  const moduleReasons = new Map<ts.StringLiteralLike, string>();
   function moduleReason(specifier: ts.Expression): string | undefined {
     if (!ts.isStringLiteralLike(specifier)) return "computed-specifier";
     if (limited) return "compiler-limit";
+    let reason = moduleReasons.get(specifier);
+    if (reason === undefined) {
+      reason = readModuleReason(specifier) ?? "";
+      moduleReasons.set(specifier, reason);
+    }
+    return reason || undefined;
+  }
+  function readModuleReason(
+    specifier: ts.StringLiteralLike,
+  ): string | undefined {
     const text = selectedSpecifier(specifier);
     if (text === undefined || /^https?:/i.test(text))
       return "deno-import-unverified";

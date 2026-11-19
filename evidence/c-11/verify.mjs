@@ -5,6 +5,10 @@ import { cpSync, mkdtempSync, readdirSync, symlinkSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 
 const scratch = process.env.PYM_SCRATCH;
+const testScratch = process.env.C11_TEST_SCRATCH;
+const environment = testScratch
+  ? { ...process.env, PYM_SCRATCH: testScratch, TMPDIR: testScratch }
+  : process.env;
 const checkout = mkdtempSync(join(scratch, "verify-"));
 const excluded = new Set([
   ".git",
@@ -51,7 +55,11 @@ const focused = [
   ],
 ];
 for (const [command, ...args] of filter ? focused : full) {
-  const result = spawnSync(command, args, { cwd: checkout, stdio: "inherit" });
+  const result = spawnSync(command, args, {
+    cwd: checkout,
+    env: environment,
+    stdio: "inherit",
+  });
   if (result.status !== 0)
     throw (
       result.error ??

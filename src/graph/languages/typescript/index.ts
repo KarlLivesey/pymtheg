@@ -894,9 +894,17 @@ const module: LanguageModule = {
               const data = {
                 ...((link.data ?? {}) as { [key: string]: Json }),
               };
+              const outside = data.libraryFacts as unknown as
+                | LibraryTarget[]
+                | undefined;
               if (
                 data.reason === "invalid-code" ||
-                data.lexicalLibrary === true
+                (outside?.length &&
+                  outside.every(
+                    (fact) =>
+                      fact.evidence === "import-path" ||
+                      fact.evidence === "import-binding",
+                  ))
               )
                 return link;
               assume(data, "no-unseen-declarations");
