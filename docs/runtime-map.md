@@ -1665,8 +1665,11 @@ package's canonical name and exact version provenance. Local dependency
 protocols are checkout routes.
 Module 30 follows checkout class and interface bases for shared Web API
 members and treats an unshadowed `require()` in explicit CommonJS JavaScript
-as file-local Node evidence. Node's value-only `CryptoKey` is excluded in
-type positions.
+as file-local Node evidence. Node evidence applies to the compiler program.
+When a program declares `@types/node`, missing imported declarations and
+missing ambient type entries can introduce Node globals even with an
+explicit `types` list. Node's value-only `CryptoKey` is excluded in type
+positions.
 
 Rust records library paths during resolution starting with module 29. Its library lookup uses
 the captured namespace, import, placement and `cfg` facts, with a separate

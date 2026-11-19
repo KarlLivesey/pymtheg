@@ -7,6 +7,7 @@ import {
   nodeGlobalTarget,
   nodeMemberTarget,
   nodeReceiverTypes,
+  runtimeHashbang,
 } from "./global-types.js";
 import type {
   Diagnostic,
@@ -80,6 +81,7 @@ export interface RenameContext {
 }
 /** One structural judgement per program (its checker), shared by its files. */
 const judges = new WeakMap<ts.TypeChecker, Judge>();
+const programNodeEvidence = new WeakMap<ts.Program, boolean>();
 const producerReaders = new WeakMap<
   ts.Program,
   ReturnType<typeof objectProducers>
@@ -281,17 +283,7 @@ export function extractFile(
   let missingNode =
     !globals.hasNode &&
     (globals.expectsNode ||
-      (!context.explicitTypes && importer.expectsNode()) ||
-      /^#![ \t]*(?:(?:\S+\/)?env(?:[ \t]+-S)?[ \t]+)?(?:\S+\/)?node(?:[ \t\r\n]|$)/.test(
-        file.text,
-      ));
-  const nodeProbes =
-    !globals.hasNode && !missingNode && !incompleteConfig && !context.anyFailed
-      ? {
-          specifiers: [] as ts.StringLiteralLike[],
-          names: [] as ts.Identifier[],
-        }
-      : undefined;
+      (!context.explicitTypes && library.expectsNode(path)));
   const importers = new WeakMap<ts.SourceFile, typeof importer>();
   const importerOf = (node: ts.Node) => {
     const source = node.getSourceFile();
@@ -309,49 +301,7 @@ export function extractFile(
   const lexicalReferences = new Map<string, Set<ts.Node>>();
   const scopedNames = new Set<string>();
   const propertyWrites: NonNullable<ReturnType<typeof propertyWrite>>[] = [];
-  const collectNodeProbe = (node: ts.Node) => {
-    if (!nodeProbes) return;
-    let specifier: ts.Expression | undefined;
-    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node))
-      specifier = node.moduleSpecifier;
-    else if (
-      ts.isImportEqualsDeclaration(node) &&
-      ts.isExternalModuleReference(node.moduleReference)
-    )
-      specifier = node.moduleReference.expression;
-    else if (ts.isCallExpression(node)) {
-      const callee = node.expression;
-      if (
-        importer.commonJs &&
-        node.arguments.length > 0 &&
-        ts.isIdentifier(callee) &&
-        callee.text === "require"
-      )
-        nodeProbes.names.push(callee);
-      if (
-        callee.kind === ts.SyntaxKind.ImportKeyword ||
-        ((isCommonJsRequire(node) || requireForm(node)) && !insideWith(node))
-      )
-        specifier = node.arguments[0];
-    } else if (
-      ts.isIdentifier(node) &&
-      (node.text === "process" ||
-        node.text === "__dirname" ||
-        node.text === "__filename") &&
-      syntax.isInExpressionContext(node) &&
-      !(ts.isPropertyAccessExpression(node.parent) && node.parent.name === node)
-    )
-      nodeProbes.names.push(node);
-    if (
-      specifier &&
-      ts.isStringLiteralLike(specifier) &&
-      (context.hasDenoImports ||
-        packageUnit(specifier.text)?.ecosystem === "node")
-    )
-      nodeProbes.specifiers.push(specifier);
-  };
   const collectScopedNames = (node: ts.Node): void => {
-    if (nodeProbes) collectNodeProbe(node);
     if (isScopedDeclaration(node)) {
       const name = (node as ts.NamedDeclaration).name;
       if (name && ts.isIdentifier(name)) scopedNames.add(name.text);
@@ -1884,8 +1834,11 @@ export function extractFile(
     }
   }
   /** A supported indirect loader call form, by name; undefined otherwise. */
-  function requireForm(call: ts.CallExpression): string | undefined {
-    if (!isJsFile(file) || call.arguments.length !== 1) return undefined;
+  function requireForm(
+    call: ts.CallExpression,
+    source = file,
+  ): string | undefined {
+    if (!isJsFile(source) || call.arguments.length !== 1) return undefined;
     if (!ts.isStringLiteralLike(call.arguments[0]!)) return undefined;
     const callee = call.expression;
     if (
@@ -2617,9 +2570,18 @@ export function extractFile(
   // builds on an already computed one instead of recursing through the chain.
   // The whole program is warmed in program order before extraction (index.ts).
 
-  if (nodeProbes) {
-    const probe = (node: ts.Node, read: () => boolean) => {
-      const key = `${node.kind}@${node.getStart(file)}`;
+  if (
+    !globals.hasNode &&
+    !globals.expectsNode &&
+    !incompleteConfig &&
+    !context.anyFailed
+  ) {
+    const probe = (
+      source: ts.SourceFile,
+      node: ts.Node,
+      read: () => boolean,
+    ) => {
+      const key = `node-probe:${source.fileName}:${node.kind}@${node.getStart(source)}`;
       if (context.skip.has(key)) return false;
       try {
         return read();
@@ -2628,23 +2590,100 @@ export function extractFile(
         throw error;
       }
     };
-    missingNode =
-      nodeProbes.specifiers.some((specifier) =>
-        probe(specifier, () => {
-          const units = missingUnits(specifier, true);
-          return units.length === 1 && units[0]!.ecosystem === "node";
-        }),
-      ) ||
-      nodeProbes.names.some((name) =>
-        probe(name, () => {
-          if (insideWith(name)) return false;
-          const symbol = checker.getSymbolAtLocation(name);
-          // The JS checker synthesizes a declaration-less CommonJS require.
-          return (
-            !symbol || (name.text === "require" && !symbol.declarations?.length)
-          );
-        }),
+    let expected = programNodeEvidence.get(program);
+    if (expected === undefined) {
+      const sources = program.getSourceFiles().filter((source) => {
+        const path = fromVirtual(source.fileName);
+        return path !== undefined && captured.has(path);
+      });
+      const declared = sources.some((source) =>
+        library.expectsNode(fromVirtual(source.fileName)!),
       );
+      // A missing package declaration can reference node, even if its importer
+      // is a different file or the compiler's ambient type list excludes node.
+      expected =
+        (declared && globals.missingPackageTypes) ||
+        sources.some((source) => {
+          if (runtimeHashbang(source.text) === "node") return true;
+          const commonJs = importerOf(source).commonJs;
+          const unbound = (name: ts.Identifier) =>
+            probe(source, name, () => {
+              if (insideWith(name)) return false;
+              const symbol = checker.getSymbolAtLocation(name);
+              // The JS checker synthesizes a declaration-less CommonJS require.
+              return (
+                !symbol ||
+                (name.text === "require" && !symbol.declarations?.length)
+              );
+            });
+          const visit = (node: ts.Node): true | undefined => {
+            let specifier: ts.Expression | undefined;
+            if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node))
+              specifier = node.moduleSpecifier;
+            else if (
+              ts.isImportEqualsDeclaration(node) &&
+              ts.isExternalModuleReference(node.moduleReference)
+            )
+              specifier = node.moduleReference.expression;
+            else if (
+              ts.isImportTypeNode(node) &&
+              ts.isLiteralTypeNode(node.argument)
+            )
+              specifier = node.argument.literal;
+            else if (ts.isCallExpression(node)) {
+              const callee = node.expression;
+              if (
+                commonJs &&
+                node.arguments.length &&
+                ts.isIdentifier(callee) &&
+                callee.text === "require" &&
+                unbound(callee)
+              )
+                return true;
+              if (
+                callee.kind === ts.SyntaxKind.ImportKeyword ||
+                ((isCommonJsRequire(node) || requireForm(node, source)) &&
+                  !insideWith(node))
+              )
+                specifier = node.arguments[0];
+            } else if (
+              ts.isIdentifier(node) &&
+              (node.text === "process" ||
+                node.text === "__dirname" ||
+                node.text === "__filename") &&
+              syntax.isInExpressionContext(node) &&
+              !(
+                ts.isPropertyAccessExpression(node.parent) &&
+                node.parent.name === node
+              ) &&
+              unbound(node)
+            )
+              return true;
+            if (specifier && ts.isStringLiteralLike(specifier)) {
+              const selection = selectedSpecifier(specifier);
+              const unit = selection && packageUnit(selection);
+              if (
+                unit &&
+                probe(source, specifier, () => {
+                  if (unit.ecosystem === "node") {
+                    const units = missingUnits(specifier, true);
+                    if (units.length === 1 && units[0]!.ecosystem === "node")
+                      return true;
+                  }
+                  return (
+                    declared && moduleReason(specifier) === "external-package"
+                  );
+                })
+              )
+                return true;
+            }
+            return ts.forEachChild(node, visit);
+          };
+          return ts.forEachChild(source, visit) === true;
+        });
+      programNodeEvidence.set(program, expected);
+    }
+    missingNode ||= expected;
   }
   visit(file, moduleKey);
 

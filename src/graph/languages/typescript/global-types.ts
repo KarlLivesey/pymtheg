@@ -137,6 +137,7 @@ for (const [unit, names] of [
 // Global types declared by @types/node 24.13.3 alongside its Web API values.
 // The fetch interfaces come from web-globals/fetch.d.ts and undici-types.
 const nodeWebTypes = new Set([
+  "ImportMeta",
   "CloseEventInit",
   "EventListenerOptions",
   "EventSourceInit",
@@ -366,7 +367,12 @@ type VisitTypeResolution = (resolution: TypeResolution, name: string) => void;
 
 const programTypes = new WeakMap<
   ts.Program,
-  { hasNode: boolean; expectsNode: boolean; otherGlobals: ReadonlySet<string> }
+  {
+    hasNode: boolean;
+    expectsNode: boolean;
+    missingPackageTypes: boolean;
+    otherGlobals: ReadonlySet<string>;
+  }
 >();
 const testGlobals = [
   "afterAll",
@@ -410,6 +416,11 @@ function missingAmbientGlobals(name: string): readonly string[] {
     : (ambientGlobals.get(name) ?? []);
 }
 
+export const runtimeHashbang = (text: string) =>
+  /^#![ \t]*(?:(?:\S+\/)?env(?:[ \t]+-S)?[ \t]+)?(?:\S+\/)?(node|bun|deno)(?:[ \t\r\n]|$)/.exec(
+    text,
+  )?.[1];
+
 /** Configured and referenced types participate in the program's global scope. */
 export function globalTypeAvailability(
   program: ts.Program,
@@ -430,6 +441,10 @@ export function globalTypeAvailability(
     for (const reference of source.typeReferenceDirectives)
       expected.add(reference.fileName);
     const path = fromVirtual(source.fileName);
+    const runtime =
+      path !== undefined ? runtimeHashbang(source.text) : undefined;
+    if (runtime === "bun" || runtime === "deno")
+      expected.add(runtime === "bun" ? "bun-types" : "deno.window");
     if (path !== undefined && source.isDeclarationFile && isNodeTypeFile(path))
       hasNode = true;
   }
@@ -443,6 +458,9 @@ export function globalTypeAvailability(
   const result = {
     hasNode: hasNode || [...available].some(node),
     expectsNode: [...expected].some(node),
+    missingPackageTypes: [...expected].some(
+      (name) => !available.has(name) && !/^(?:\.{1,2}\/|\/)/.test(name),
+    ),
     otherGlobals: new Set(
       [...expected].flatMap((name) =>
         available.has(name) ? [] : missingAmbientGlobals(name),

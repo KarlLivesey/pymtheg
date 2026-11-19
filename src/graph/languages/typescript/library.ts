@@ -204,6 +204,12 @@ export function libraryReader(
       if (manifest || directory === "." || directory === "/") return manifest;
     }
   };
+  const expectsNode = (path: string) =>
+    manifestChain(posix.dirname(path)).some((owner) =>
+      dependencyValues(owner, "@types/node").some(
+        (value) => typeof value === "string" && value.length > 0,
+      ),
+    );
   // A captured implementation remains project code. A declaration-only
   // package needs installation, type-package or importer dependency evidence.
   const implemented = new Set<Manifest>();
@@ -304,6 +310,7 @@ export function libraryReader(
   }
 
   return {
+    expectsNode,
     isNodeTypeFile(path: string) {
       return nearest(path)?.json.name === "@types/node";
     },
@@ -392,7 +399,6 @@ export function libraryReader(
           (path.endsWith(".js") && manifest?.json.type === "commonjs"),
         declarationUnit,
         targetOf,
-        expectsNode: () => dependency("@types/node") !== undefined,
         importUnits(specifier: string): readonly Unit[] {
           if (routes.has(specifier)) return routes.get(specifier)!;
           const unit = packageUnit(specifier);

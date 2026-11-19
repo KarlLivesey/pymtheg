@@ -171,12 +171,15 @@ test("bundled declarations prove the owner of an existing runtime use", async ()
         libraryTarget(calls("querySelector")[0]).symbol,
         "ParentNode.prototype.querySelector",
       );
-      assert.deepEqual(libraryTarget(calls("fetch")[0]), {
-        ecosystem: "dom",
-        unit: "dom",
-        symbol: "fetch",
-        evidence: "declared-builtin",
-      });
+      const fetch = calls("fetch")[0];
+      assert.equal(fetch.resolution, "ambiguous");
+      assert.deepEqual(
+        fetch.libraries.map(({ unit, symbol }) => [unit, symbol]).sort(),
+        [
+          ["dom", "fetch"],
+          ["globals", "fetch"],
+        ],
+      );
       const log = graph.link("script.js", "log", "calls");
       assert.equal(log.resolution, "ambiguous");
       assert.deepEqual(
@@ -432,6 +435,9 @@ test("an expected missing global type package keeps overlapping runtime declarat
       "other/tsconfig.json":
         '{"compilerOptions":{"target":"es2022","types":["vite/client","vitest/globals","jest","react"]},"files":["use.ts"]}',
       "other/use.ts": source,
+      "other-browser/tsconfig.json":
+        '{"compilerOptions":{"target":"es2022","types":["vite/client","vitest/globals","jest","react"]},"files":["use.ts"]}',
+      "other-browser/use.ts": source,
       "browser/package.json": '{"devDependencies":{"@types/node":"^24"}}',
       "browser/tsconfig.base.json":
         '{"compilerOptions":{"target":"es2022","types":[]}}',
@@ -447,7 +453,7 @@ test("an expected missing global type package keeps overlapping runtime declarat
     },
     async (graph, report) => {
       clean(report);
-      for (const root of ["manifest", "options", "reference"]) {
+      for (const root of ["manifest", "options", "reference", "other"]) {
         const file = root + "/use.ts";
         for (const [name, node] of [
           ["log", "console"],
@@ -502,7 +508,7 @@ test("an expected missing global type package keeps overlapping runtime declarat
             "es",
           );
       }
-      for (const root of ["other", "browser", "web"])
+      for (const root of ["other-browser", "browser", "web"])
         for (const name of [
           "log",
           "setTimeout",
@@ -544,15 +550,21 @@ test("Node runtime evidence in a JavaScript file keeps shared globals open", asy
       "scripts/computed.cjs": shared + "require(packageName);",
       "commonjs/package.json": '{"type":"commonjs"}',
       "commonjs/colors.js": shared + "require('picocolors');",
-      "commonjs/shadowed.cjs":
+      "commonjs/shadowed/tsconfig.json":
+        '{"compilerOptions":{"allowJs":true},"files":["script.cjs"]}',
+      "commonjs/shadowed/script.cjs":
         shared + "function use(require) { require('picocolors'); }",
       "commonjs/esm/package.json": '{"type":"module"}',
       "commonjs/esm/tsconfig.json":
         '{"compilerOptions":{"module":"esnext","moduleResolution":"bundler","allowJs":true},"files":["colors.js"]}',
       "commonjs/esm/colors.js": shared + "require('picocolors'); export {};",
-      "browser.js":
+      "browser/tsconfig.json":
+        '{"compilerOptions":{"allowJs":true},"files":["script.js"]}',
+      "browser/script.js":
         shared + "export {}; const process = {cwd() {}}; process.cwd();",
       "polyfill/package.json": '{"dependencies":{"path":"^0.12.0"}}',
+      "polyfill/tsconfig.json":
+        '{"compilerOptions":{"allowJs":true},"files":["browser.js"]}',
       "polyfill/browser.js":
         shared + "import * as path from 'path'; path.join('a', 'b');",
     },
@@ -585,14 +597,78 @@ test("Node runtime evidence in a JavaScript file keeps shared globals open", asy
         "readFileSync",
       );
       for (const path of [
-        "browser.js",
+        "browser/script.js",
         "polyfill/browser.js",
-        "commonjs/shadowed.cjs",
+        "commonjs/shadowed/script.cjs",
         "commonjs/esm/colors.js",
       ])
         assert.equal(
           libraryTarget(graph.link(path, "log", "calls")).unit,
           "dom",
+        );
+    },
+  );
+});
+
+test("Node evidence from sibling files and missing package types applies to the compiler program", async () => {
+  const shared = "new URL('https://example.test'); structuredClone({});";
+  const isolated =
+    '{"compilerOptions":{"types":[]},"files":["browser.ts","entry.ts"]}';
+  const importVite = "import { build } from 'vite'; export { build };";
+  await project(
+    {
+      "missing/package.json":
+        '{"devDependencies":{"@types/node":"^24","vite":"^8"}}',
+      "missing/tsconfig.json": isolated,
+      "missing/entry.ts": importVite,
+      "missing/browser.ts": shared,
+      "twin/tsconfig.json": isolated,
+      "twin/entry.ts": importVite,
+      "twin/browser.ts": shared,
+      "captured/package.json":
+        '{"devDependencies":{"@types/node":"^24","vite":"^8"}}',
+      "captured/tsconfig.json":
+        '{"compilerOptions":{"types":[],"paths":{"vite":["./vite.d.ts"]}},"files":["browser.ts","entry.ts"]}',
+      "captured/entry.ts": importVite,
+      "captured/browser.ts": shared,
+      "captured/vite.d.ts": "export declare function build(): void;",
+      "referenced/tsconfig.json":
+        '{"compilerOptions":{"types":[],"paths":{"vite":["./vite.d.ts"]}},"files":["browser.ts","entry.ts"]}',
+      "referenced/entry.ts": importVite,
+      "referenced/browser.ts": shared,
+      "referenced/vite.d.ts":
+        '/// <reference types="node" />\nexport declare function build(): void;',
+      "runtime/tsconfig.json": isolated,
+      "runtime/entry.ts":
+        "import { readFileSync } from 'node:fs'; export { readFileSync };",
+      "runtime/browser.ts": shared,
+      "bun/tsconfig.json":
+        '{"compilerOptions":{"allowJs":true},"files":["script.js"]}',
+      "bun/script.js": "#!/usr/bin/env bun\n" + shared,
+      "deno/tsconfig.json":
+        '{"compilerOptions":{"allowJs":true},"files":["script.js"]}',
+      "deno/script.js": "#!/usr/bin/env deno\n" + shared,
+    },
+    async (graph, report) => {
+      clean(report);
+      for (const root of ["missing", "referenced", "runtime"])
+        for (const name of ["URL", "structuredClone"])
+          assert.deepEqual(
+            graph
+              .link(root + "/browser.ts", name, "calls")
+              .libraries.map(({ ecosystem }) => ecosystem)
+              .sort(),
+            ["dom", "node"],
+          );
+      for (const root of ["twin", "captured"])
+        assert.equal(
+          libraryTarget(graph.link(root + "/browser.ts", "URL", "calls")).unit,
+          "dom",
+        );
+      for (const root of ["bun", "deno"])
+        assert.equal(
+          graph.link(root + "/script.js", "URL", "calls").data.reason,
+          "missing-global-types",
         );
     },
   );
