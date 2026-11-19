@@ -683,8 +683,8 @@ answer.
   manifest or its captured pnpm or Bun catalog can supply its version.
   An ambient type request can establish Vitest, Jest or Mocha globals. A
   receiver explicitly annotated with an unavailable imported type can name
-  its package unit. Checker-selected members can follow immutable aliases and
-  constant literal selectors.
+  its package unit. A named library object can supply checker-selected
+  members through immutable aliases and constant literal selectors.
   [Library links](changes/C-11.md) · [Members and test globals](changes/C-16.md)
 - **Candidates:** several checkout or library targets for one callee (union
   receivers, merged declarations, duplicate JavaScript functions). Missing

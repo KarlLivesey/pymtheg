@@ -710,9 +710,24 @@ export function extractFile(
       { ...lookup(value.name), at: value.name },
       "call",
     );
-    return alias.libraryFacts?.length && !alias.targets.length
+    return alias.libraryFacts?.length &&
+      !alias.targets.length &&
+      (alias.lexicalLibrary || namedLibraryObject(value.expression))
       ? alias
       : undefined;
+  }
+  /** A namespace binding or bundled global supplies a fixed library object. */
+  function namedLibraryObject(expression: ts.Expression): boolean {
+    if (!ts.isIdentifier(expression)) return false;
+    const declarations = checker.getSymbolAtLocation(expression)?.declarations;
+    return (
+      !!declarations?.length &&
+      declarations.every(
+        (declaration) =>
+          ts.isNamespaceImport(declaration) ||
+          declaration.getSourceFile().fileName.startsWith(LIB_ROOT + "/"),
+      )
+    );
   }
   /** An unavailable imported type establishes only the receiver's unit. */
   function typedReceiverUnit(found: Lookup): LibraryTarget[] | undefined {
@@ -2306,7 +2321,8 @@ export function extractFile(
       incompleteConfig ||
       context.anyFailed ||
       !ts.isIdentifier(key) ||
-      insideWith(key)
+      insideWith(key) ||
+      !namedLibraryObject(access.expression)
     )
       return {};
     const declaration = checker.getSymbolAtLocation(key)?.valueDeclaration;

@@ -1091,6 +1091,7 @@ test("immutable member aliases preserve the checker owner and overlapping global
         '{"compilerOptions":{"lib":["es2022"],"types":["node","bun"]}}',
       "mixed-runtime/main.ts": "btoa('abc');",
       "member.ts": `declare const receiver: any;
+      function makeError(): object { return { toString() { return 'custom'; } }; }
       function example() {
       const log = console.log;
       const maximum = (Math.max);
@@ -1098,7 +1099,11 @@ test("immutable member aliases preserve the checker owner and overlapping global
       const written = JSON.parse;
       JSON.parse = () => null;
       const unsafe = receiver.parse;
+      const error = makeError();
+      const stringify = error.toString;
+      const renderKey = 'toString';
       log('ready'); maximum(1, 2); Math[key](1, 2); written('{}'); unsafe('{}');
+      stringify(); error[renderKey]();
       }`,
     },
     async (graph, report) => {
@@ -1142,7 +1147,7 @@ test("immutable member aliases preserve the checker owner and overlapping global
           ["node", "console"],
         ],
       );
-      for (const name of ["written", "unsafe"])
+      for (const name of ["written", "unsafe", "stringify", "error[renderKey]"])
         assert.equal(call(name).resolution, "unresolved");
     },
   );
