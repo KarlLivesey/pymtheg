@@ -639,6 +639,11 @@ export function extractFile(
           const unit =
             provider ?? (competitor && packageUnit(specifier.text)?.unit);
           if (!unit) continue;
+          if (globals.hasInstalledTypes) {
+            const resolved = specifierResolution(specifier).path;
+            if (resolved && program.getSourceFile(toVirtual(resolved)))
+              continue;
+          }
           const routes = missingUnits(specifier, competitor !== undefined);
           if (
             routes.length === 1 &&
@@ -655,7 +660,10 @@ export function extractFile(
     const alternatives = new Map(
       existing.map((target) => [target.unit, target]),
     );
-    if (existing.length)
+    const installedBinding = symbol?.declarations?.some((declaration) =>
+      importer.installedUnit(declaration.getSourceFile()),
+    );
+    if (existing.length && !installedBinding)
       for (const target of capturedTestGlobals(at.text))
         alternatives.set(target.unit, target);
     for (const target of testGlobalTargets(
@@ -936,6 +944,37 @@ export function extractFile(
               : !TYPE_ONLY.has(declaration.kind),
         );
         if (filtered.length) declarations = filtered;
+      }
+      if (
+        meaning === "type" &&
+        declarations.length > 1 &&
+        declarations.every(ts.isInterfaceDeclaration) &&
+        declarations.some((declaration) => declaration.members.length > 0)
+      ) {
+        // Some packages declare empty compatibility interfaces for projects
+        // without DOM types. In a merge they add no members or constraints.
+        declarations = declarations.filter(
+          (declaration) =>
+            declaration.members.length > 0 ||
+            declaration.heritageClauses?.length ||
+            declaration.typeParameters?.length ||
+            importer.installedUnit(declaration.getSourceFile())?.ecosystem !==
+              "npm",
+        );
+      }
+      if (
+        globals.hasInstalledTypes &&
+        meaning === "call" &&
+        found.at?.kind === ts.SyntaxKind.SuperKeyword &&
+        declarations.length > 1 &&
+        declarations.every(ts.isInterfaceDeclaration)
+      ) {
+        // A constructor interface may be augmented with static members
+        // without contributing a declaration of the constructor call.
+        const constructors = declarations.filter((declaration) =>
+          declaration.members.some(ts.isConstructSignatureDeclaration),
+        );
+        if (constructors.length) declarations = constructors;
       }
       if (!declarations.length) external++;
       else declaredSomewhere = true;
@@ -1642,6 +1681,13 @@ export function extractFile(
 
   function installedRoutes(specifier: ts.StringLiteralLike, selection: string) {
     if (!globals.hasInstalledTypes) return undefined;
+    const resolved = specifierResolution(specifier).path;
+    const source = resolved && program.getSourceFile(toVirtual(resolved));
+    if (source) {
+      const unit = importerOf(specifier).installedUnit(source);
+      // A module augmentation does not change which file the import opens.
+      return unit ? [unit] : undefined;
+    }
     const declarations = checker.getSymbolAtLocation(specifier)?.declarations;
     if (!declarations?.length) return undefined;
     const builtin = packageUnit(selection);

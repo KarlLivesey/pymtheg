@@ -2870,4 +2870,7 @@ inventory. A selected declaration identifies its package and member. The
 installed package manifest supplies the version and its provenance. Merged
 Node and DOM declarations retain both candidates when both are possible.
 Resolver probes include absent inputs so a new installation invalidates a
-bare cache. [C-20](changes/C-20.md)
+bare cache. A package exposed by the physical installation takes precedence
+over inferred workspace links. A captured competing test type request is
+settled by the checker's declarations for the selected symbol. Missing
+requests still participate in the C-16 guard. [C-20](changes/C-20.md)

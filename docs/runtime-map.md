@@ -1683,13 +1683,15 @@ Module 33 leaves shared test globals unresolved when a known competing ambient
 package is requested outside the supported framework inventory.
 [C-16](changes/C-16.md)
 
-Module 34 extends the virtual compiler host with resolver-driven installed
+Module 35 extends the virtual compiler host with resolver-driven installed
 inputs. The host records filesystem stamps for positive and negative probes
 and hashes the contents it reads. The graph checkpoint revalidates the
 stamps without loading declaration bodies. A changed probe triggers TypeScript
 analysis, and a bounded text cache can reuse unchanged inputs in the same
 process. An installed file can only supply a library declaration or resolution
-metadata. [C-20](changes/C-20.md)
+metadata. The physical package exposed to the importer supersedes an inferred
+workspace link. The checker supplies test-global owners when the competing
+type requests were captured. [C-20](changes/C-20.md)
 
 Rust records library paths during resolution starting with module 29. Its library lookup uses
 the captured namespace, import, placement and `cfg` facts, with a separate

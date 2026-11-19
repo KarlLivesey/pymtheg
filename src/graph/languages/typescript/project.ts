@@ -572,8 +572,21 @@ export function projectModel(
   const workspace = workspaceLinks(manifests, contexts, [
     ...brokenManifests.keys(),
   ]);
-  for (const [link, target] of workspace.links)
-    fs.link(toVirtual(link), target === "." ? "/" : toVirtual(target));
+  for (const [link, target] of workspace.links) {
+    const separation = link.lastIndexOf("node_modules/");
+    const name = link.slice(separation + "node_modules/".length);
+    let directory = link.slice(0, separation).replace(/\/$/, "") || ".";
+    const supplied = () =>
+      dependencies?.directoryExists(
+        posix.join(directory, "node_modules", name),
+      );
+    // An install can override a declared workspace dependency, including
+    // through a hoisted copy. Keep synthetic links only for absent packages.
+    while (directory !== "." && !supplied())
+      directory = posix.dirname(directory);
+    if (!supplied())
+      fs.link(toVirtual(link), target === "." ? "/" : toVirtual(target));
+  }
   const matchFiles = (
     ts as unknown as {
       matchFiles?: (
@@ -599,18 +612,16 @@ export function projectModel(
   const dependencyFile = (name: string) =>
     declarationPath(name) || name.endsWith(".json");
   const real = (name: string) => {
-    const linked = fs.real(name);
-    if (fs.files.has(linked) || fs.directories.has(linked)) return linked;
+    if (fs.files.has(name) || fs.directories.has(name)) return name;
     const installed = dependencies?.realpath(dependencyPath(name));
-    return installed === undefined ? linked : toVirtual(installed);
+    if (installed !== undefined) return toVirtual(installed);
+    return fs.real(name);
   };
   const fileExists = (name: string) =>
-    fs.fileExists(name) ||
     fs.files.has(real(name)) ||
     (dependencyFile(name) &&
       (dependencies?.fileExists(dependencyPath(name)) ?? false));
   const readFile = (name: string) =>
-    fs.readFile(name) ??
     fs.files.get(real(name)) ??
     (dependencyFile(name)
       ? dependencies?.read(dependencyPath(name))
@@ -1146,9 +1157,7 @@ export function projectModel(
     dependencyLimit: (group) => budgets.get(group)?.limited ?? false,
     groups,
     manifests,
-    workspaceRoots: new Set(
-      [...fs.links.values()].map((path) => fromVirtual(path) || "."),
-    ),
+    workspaceRoots: new Set(workspace.links.values()),
     workspaceBoundaries: workspace.boundaries,
     workspaceCatalogs: workspace.catalogs,
     hasWorkspacePackages: fs.links.size > 0,

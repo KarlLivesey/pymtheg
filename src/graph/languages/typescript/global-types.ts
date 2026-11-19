@@ -546,6 +546,7 @@ export function globalTypeAvailability(
   if (typeof options.configFilePath === "string")
     for (const name of expected) request(name, options.configFilePath);
   const available = new Set<string>();
+  const unavailable = new Set<string>();
   const compiler = program as ts.Program & {
     forEachResolvedTypeReferenceDirective: (visit: VisitTypeResolution) => void;
     getAutomaticTypeDirectiveResolutions: () =>
@@ -572,6 +573,7 @@ export function globalTypeAvailability(
   const read: VisitTypeResolution = (result, name) => {
     const path = result.resolvedTypeReferenceDirective?.resolvedFileName;
     if (path !== undefined && program.getSourceFile(path)) available.add(name);
+    else unavailable.add(name);
   };
   compiler.forEachResolvedTypeReferenceDirective(read);
   compiler.getAutomaticTypeDirectiveResolutions()?.forEach(read);
@@ -605,8 +607,10 @@ export function globalTypeAvailability(
     otherGlobals: new Set(missing.flatMap(missingAmbientGlobals)),
     otherRuntime: [...expected].some(isEnvironment),
     missingTestFrameworks,
-    competingTestRequests: [...expected].filter((name) =>
-      competingTestTypes.has(name),
+    competingTestRequests: [...expected].filter(
+      (name) =>
+        competingTestTypes.has(name) &&
+        (!hasInstalledTypes || !available.has(name) || unavailable.has(name)),
     ),
   };
   programTypes.set(program, result);

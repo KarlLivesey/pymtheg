@@ -229,6 +229,151 @@ test("workspace resolution keeps installed versions separate and blocks escaping
   });
 });
 
+test("an installed override wins over an inferred workspace package", async () => {
+  const { root, request, read, write } = await project();
+  await write("package.json", '{"packageManager":"pnpm@10.15.1"}');
+  await write(
+    "pnpm-workspace.yaml",
+    'packages:\n  - "packages/*"\nlinkWorkspacePackages: true\noverrides:\n  zod: 4.6.6\n',
+  );
+  await write(
+    "packages/app/package.json",
+    '{"name":"app","dependencies":{"zod":"^3"}}',
+  );
+  await write(
+    "packages/app/tsconfig.json",
+    '{"compilerOptions":{"module":"Node16"},"files":["main.ts"]}',
+  );
+  const file = "packages/app/main.ts";
+  await write(file, 'import { z } from "zod"; z.string();');
+  await write(
+    "packages/zod/package.json",
+    '{"name":"zod","version":"3.24.0","types":"index.ts"}',
+  );
+  await write(
+    "packages/zod/index.ts",
+    "export namespace z { export function string() { return 'workspace'; } }",
+  );
+  const imports = (store) =>
+    store.links().find((link) => link.file === file && link.kind === "imports");
+  const local = () =>
+    read((store, call) => {
+      for (const link of [imports(store), call(file, "z.string")]) {
+        assert.equal(link.resolution, "resolved");
+        assert.equal(
+          store.findSymbols().find(({ id }) => id === link.targetId)?.file,
+          "packages/zod/index.ts",
+        );
+      }
+    });
+  await request("index");
+  local();
+  const physical = "node_modules/.pnpm/zod@4.6.6/node_modules/zod";
+  await write(
+    `${physical}/package.json`,
+    '{"name":"zod","version":"4.6.6","types":"index.d.cts"}',
+  );
+  await write(
+    `${physical}/index.d.cts`,
+    "export declare namespace z { function string(): number; }",
+  );
+  // A hoisted physical package must win even over a nearer synthetic link.
+  const installed = join(root, "node_modules/zod");
+  await symlink(".pnpm/zod@4.6.6/node_modules/zod", installed, "dir");
+  await request("index");
+  read((store, call) => {
+    const module = target(imports(store));
+    assert.equal(module.unit, "zod");
+    assert.equal(module.version, "4.6.6");
+    const member = target(call(file, "z.string"));
+    assert.equal(member.symbol, "z.string");
+    assert.equal(member.versionSource, `${physical}/package.json`);
+  });
+  await rename(installed, join(root, "node_modules/old-zod"));
+  await symlink("../packages/zod", installed, "dir");
+  await request("index");
+  local();
+});
+
+test("captured competing test types use the compiler's global symbol", async () => {
+  const { request, read, write } = await project();
+  await write(
+    "tsconfig.json",
+    '{"compilerOptions":{"types":["vitest/globals","chai"]}}',
+  );
+  await write("main.ts", "expect(true); vi.fn();");
+  await write("node_modules/vitest/package.json", manifest("vitest", "1.0.0"));
+  await write(
+    "node_modules/vitest/globals.d.ts",
+    "declare function expect(value: boolean): void; declare namespace vi { function fn(): void; }",
+  );
+  await request("index");
+  read((_, call) => {
+    assert.equal(
+      call("main.ts", "expect").data.reason,
+      "competing-test-globals",
+    );
+    assert.equal(target(call("main.ts", "vi.fn")).unit, "vitest");
+  });
+  await write(
+    "node_modules/@types/chai/package.json",
+    manifest("@types/chai", "1.0.0"),
+  );
+  await write(
+    "node_modules/@types/chai/index.d.ts",
+    "export declare const expect: unknown;",
+  );
+  await request("index");
+  read((_, call) =>
+    assert.equal(target(call("main.ts", "expect")).unit, "vitest"),
+  );
+  await write(
+    "node_modules/@types/chai/index.d.ts",
+    "declare function expect(value: string): void;",
+  );
+  await request("index");
+  read((_, call) => {
+    const link = call("main.ts", "expect");
+    assert.equal(link.resolution, "ambiguous");
+    assert.deepEqual(link.libraries.map(({ unit }) => unit).sort(), [
+      "chai",
+      "vitest",
+    ]);
+  });
+});
+
+test("an augmentation contributes its members, not the installed module's identity", async () => {
+  const { request, read, write } = await project();
+  await write(
+    "node_modules/augment-kit/package.json",
+    manifest("augment-kit", "1.0.0"),
+  );
+  await write(
+    "node_modules/augment-kit/index.d.ts",
+    "export interface Value { original(): void } export declare const value: Value; declare global { interface Element {} interface ErrorConstructor { fixtureStatic(): void } }",
+  );
+  await write(
+    "main.ts",
+    'import { value } from "augment-kit"; declare module "augment-kit" { interface Value { added: () => void } } value.original(); value.added(); export type DomElement = Element; class SubError extends Error { constructor() { super(); } }',
+  );
+  await request("index");
+  read((store, call) => {
+    assert.equal(
+      target(call("main.ts", "value.original")).symbol,
+      "Value.prototype.original",
+    );
+    const added = call("main.ts", "value.added");
+    assert.equal(added.resolution, "resolved");
+    assert.equal(
+      store.findSymbols().find(({ id }) => id === added.targetId)?.file,
+      "main.ts",
+    );
+    const element = store.links().find((link) => link.targetName === "Element");
+    assert.equal(target(element).ecosystem, "dom");
+    assert.equal(target(call("main.ts", "super")).ecosystem, "typescript-lib");
+  });
+});
+
 test("a qualified installed type uses its declaration without a runtime receiver", async () => {
   const { request, read, write } = await project();
   await write(

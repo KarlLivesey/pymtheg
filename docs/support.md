@@ -762,7 +762,8 @@ answer.
   targets and reads the declaring package's own manifest for its version.
   Installed files supply library targets and are excluded from checkout
   symbols and link sources. Standard in-checkout pnpm, npm and Yarn
-  `node_modules` layouts are supported.
+  `node_modules` layouts are supported. The compiler follows the package the
+  install exposes to that importer, including overrides and workspace links.
   [Library links](changes/C-11.md) · [Members and test globals](changes/C-16.md) ·
   [Installed declarations](changes/C-20.md)
 - **Candidates:** several checkout or library targets for one callee (union
