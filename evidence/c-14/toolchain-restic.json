@@ -1,0 +1,51 @@
+graph resolve typescript: 0/559
+graph resolve typescript: 559/559
+graph complete: 559/559
+{
+ "sourceOnly": {
+  "links": 63836,
+  "resolved": 42168,
+  "librarySymbol": 11684,
+  "libraryUnit": 2219,
+  "level2": 0.8435992230089605,
+  "byEvidence": {
+   "import-path:go": 250,
+   "import-binding:go": 1128,
+   "import-path:go-std": 1969,
+   "import-binding:go-std": 8317,
+   "declared-builtin:go-std": 2239
+  }
+ },
+ "toolchain": {
+  "links": 63802,
+  "resolved": 42772,
+  "librarySymbol": 15340,
+  "libraryUnit": 2219,
+  "level2": 0.9108178427008558,
+  "byEvidence": {
+   "import-path:go-std": 1969,
+   "import-binding:go-std": 8317,
+   "declared-builtin:go-std": 2239,
+   "import-path:go": 250,
+   "import-binding:go": 1165,
+   "declaring-owner:go": 720,
+   "declaring-owner:go-std": 2899
+  }
+ },
+ "toolchainNotes": [],
+ "bothLibrary": 13903,
+ "agree": 13903,
+ "disagreements": [],
+ "sourceOnlyLibraryWithoutToolchainLibrary": {},
+ "toolchainOwnerWhereSourceUnresolved": {
+  "go-std": 2899,
+  "go": 720
+ },
+ "memberReasonSourceOnly": 4765,
+ "memberReasonResolvedByToolchain": {
+  "go-std": 2806,
+  "go": 647
+ },
+ "sitesDiffer": 58,
+ "disagreementCount": 0
+}

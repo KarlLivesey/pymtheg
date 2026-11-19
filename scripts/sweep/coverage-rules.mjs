@@ -443,7 +443,7 @@ export function externalIdentity(link, evidence, project, disposition) {
   if (link.resolution !== "unresolved") return null;
   const data = link.data ?? {};
   if (data.cause || link.module === "typescript" && workspaceEntryMissing(underlyingReason(data))) return null;
-  const observed = link.module === "go" ? goExternalIdentity(link, evidence, project)
+  const observed = link.module === "go" ? evidence.goStoredTargets ? null : goExternalIdentity(link, evidence, project)
     : link.module === "rust" ? evidence.rustStoredTargets ? null : rustExternalIdentity(link, evidence, project)
       : tsExternalIdentity(link, evidence, project, disposition);
   if (observed || disposition !== "outside") return observed;

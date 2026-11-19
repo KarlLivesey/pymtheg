@@ -7,6 +7,7 @@ import type {
   GraphLink,
   GraphSymbol,
   Json,
+  LibraryTarget,
   LinkResolution,
   ResolutionContext,
   ResolutionResult,
@@ -14,8 +15,10 @@ import type {
 import {
   directoryOfImport,
   importPathOf,
+  libraryOrigin,
   moduleOf,
   readLayout,
+  type LibraryOrigin,
 } from "./gomod.js";
 import type { GoProjectLayout } from "./gomod.js";
 import {
@@ -175,7 +178,7 @@ export interface Decision {
    * implementer set, or (where the source-only route had a definite project
    * target) an external or builtin callee.
    */
-  toolchain?: "definite" | "verified" | "external";
+  toolchain?: "definite" | "verified" | "external" | "library";
   /** What the source-only route decided, for the report. */
   from?: "definite" | "candidates" | "unresolved" | "invalid";
   /** The source-only route's different definite target (a disagreement). */
@@ -197,6 +200,14 @@ export interface ToolchainFact {
   x?: number;
   /** Import: the imported package's directory in the project (main module or vendor/). */
   dir?: string;
+  /**
+   * A standard-library or dependency object as go/types selected it: the
+   * declaring package's path, the symbol (`Name`, or `Owner.Name` for a
+   * field or concrete method with its declaring named type; absent when the
+   * owner is not a named type of that package, or for an interface method),
+   * and whether the package is in GOROOT (`std`) or a dependency (`dep`).
+   */
+  l?: [string, string | null, "std" | "dep"];
 }
 /** A toolchain `implements` pair on the type's file: type offset, interface file, offset, how. */
 export type ToolchainPair = [number, string, number, "value" | "pointer"];
@@ -315,9 +326,14 @@ export interface LinkNote {
   builtin?: true;
   /** Failed (`invalid-code`): the code it needs is in these failed files. */
   invalid?: string[];
+  /**
+   * Unresolved, with a member selected on a value of a library type: the
+   * member's declaring owner is not provable from the checkout (C-14).
+   */
+  library?: "library-member-unproven";
   /** Decided by the toolchain route (see Decision.toolchain). */
   toolchain?: {
-    upgrade: "definite" | "verified" | "external";
+    upgrade: "definite" | "verified" | "external" | "library";
     from: "definite" | "candidates" | "unresolved" | "invalid";
     sourceOnly?: string;
   };
@@ -388,6 +404,8 @@ export function linkNotes(
   for (const linkId of resolver.builtins) note(linkId).builtin = true;
   for (const [linkId, reasons] of resolver.open) note(linkId).open = reasons;
   for (const [linkId, files] of resolver.invalid) note(linkId).invalid = files;
+  for (const linkId of resolver.libraryMembers)
+    note(linkId).library = "library-member-unproven";
   for (const [linkId, decided] of resolver.toolchain)
     note(linkId).toolchain = decided;
   return output;
@@ -402,6 +420,8 @@ class GoResolver {
   readonly open = new Map<string, OpenReason[]>();
   /** Links that failed because the code they need is in failed files. */
   readonly invalid = new Map<string, string[]>();
+  /** Members selected on a library-typed value whose owner is unproven (C-14). */
+  readonly libraryMembers = new Set<string>();
   /** Links the toolchain route decided (W3-L), for the link notes. */
   readonly toolchain = new Map<string, NonNullable<LinkNote["toolchain"]>>();
   /** Failed files by directory (a file that cannot be read is not valid code). */
@@ -496,6 +516,7 @@ class GoResolver {
         // example on pathological input) leaves that link unresolved.
         decision = UNRESOLVED;
       }
+      const source = decision;
       // The opt-in toolchain route decides where it has a fact (W3-L).
       const decided = this.toolchainDecision(link, decision);
       if (decided) {
@@ -505,6 +526,44 @@ class GoResolver {
           from: decided.from!,
           ...(decided.sourceOnly ? { sourceOnly: decided.sourceOnly } : {}),
         });
+      }
+      // A target outside the checkout (C-14), only where there is no
+      // checkout target, candidate set or failure: the toolchain's selection
+      // when it has one, else what the source proves.
+      if (!decision.invalid?.length && !decision.ids.length) {
+        let library: LibraryTarget | undefined;
+        let fromToolchain = false;
+        try {
+          library = this.toolchainLibrary(link);
+          fromToolchain = !!library;
+          library ??= this.libraryOf(link);
+        } catch {
+          library = undefined;
+        }
+        if (library) {
+          if (fromToolchain) {
+            const ids = unique(source.ids);
+            const sourceTarget =
+              ids.length === 1 && source.definite && !source.invalid?.length
+                ? ids[0]
+                : undefined;
+            this.toolchain.set(link.id, {
+              upgrade: "library",
+              from: source.invalid?.length
+                ? "invalid"
+                : sourceTarget
+                  ? "definite"
+                  : ids.length > 1
+                    ? "candidates"
+                    : "unresolved",
+              ...(sourceTarget
+                ? { sourceOnly: this.describe(sourceTarget) }
+                : {}),
+            });
+          }
+          resolutions.push({ linkId: link.id, library });
+          continue;
+        }
       }
       const {
         ids,
@@ -564,8 +623,222 @@ class GoResolver {
       else if (decision === AMBIGUOUS_IMPORT)
         // Several modules provide the package: unresolved, with the reason.
         this.open.set(link.id, ["import-destination-uncertain"]);
+      else if (!distinct.length && this.libraryMember(link))
+        this.libraryMembers.add(link.id);
     }
     return { resolutions, links: added };
+  }
+
+  // ---- library targets (C-14) -------------------------------------------
+
+  private originMemo = new Map<string, LibraryOrigin | null>();
+  /** The library an import path names from this file's directory (see libraryOrigin). */
+  private origin(info: FileInfo, path: string): LibraryOrigin | undefined {
+    const key = `${info.directory}\u0000${path}`;
+    let found = this.originMemo.get(key);
+    if (found === undefined) {
+      found =
+        libraryOrigin(this.layout, info.directory, path, (directory) =>
+          this.vendorRoots.has(directory),
+        ) ?? null;
+      this.originMemo.set(key, found);
+    }
+    return found ?? undefined;
+  }
+
+  /** The names an import written without a name may bind in this file. */
+  private importNames(info: FileInfo, path: string): string[] {
+    const { pkgs } = this.importTargets(info, path);
+    return pkgs.length
+      ? unique(pkgs.map((pkg) => pkg.name))
+      : [conventionalName(path)];
+  }
+
+  /**
+   * The library package a qualifier written in `info` binds: the qualifier
+   * is no package-level or local declaration (locals are bound at parse),
+   * exactly one of the file's imports can bind it, and that import names a
+   * package outside the checkout. An explicit import name binds itself; a
+   * standard-library package's name is its last path element (before a
+   * `/vN` suffix). An unnamed dependency import binds the package clause of
+   * a package the checkout does not hold: taken as its conventional name
+   * (`conventionalName`), as goimports writes an explicit name whenever they
+   * differ; a qualifier that matches no import's conventional name, or more
+   * than one, is not followed.
+   */
+  private libraryImport(
+    qualifier: string,
+    info: FileInfo,
+  ): { path: string; origin: LibraryOrigin } | undefined {
+    const entity = this.lookupName(qualifier, info.path);
+    if (entity.e !== "pkg" || entity.pkgs.length) return undefined;
+    const entry = info.imports.get(qualifier);
+    if (
+      !entry ||
+      entry.uncertain ||
+      entry.failed ||
+      entry.reach.length ||
+      entry.path !== entity.path
+    )
+      return undefined;
+    const binders = info.fact.imports.filter(
+      (item) =>
+        item.alias === qualifier ||
+        (item.alias === undefined &&
+          this.importNames(info, item.path).includes(qualifier)),
+    );
+    if (binders.length !== 1 || binders[0]!.path !== entry.path)
+      return undefined;
+    const origin = this.origin(info, entry.path);
+    return origin ? { path: entry.path, origin } : undefined;
+  }
+
+  private libraryTarget(
+    origin: LibraryOrigin,
+    unit: string,
+    symbol: string | undefined,
+    evidence: LibraryTarget["evidence"],
+  ): LibraryTarget {
+    return {
+      ecosystem: origin.ecosystem,
+      unit,
+      ...(symbol === undefined ? {} : { symbol }),
+      ...(origin.version !== undefined && origin.versionSource !== undefined
+        ? { version: origin.version, versionSource: origin.versionSource }
+        : {}),
+      evidence,
+    };
+  }
+
+  /**
+   * What the source proves about a link into a library: an import's unit
+   * (`import-path`); a builtin call no declaration shadows
+   * (`declared-builtin`, unit `builtin`); or an exported name selected from
+   * a library package's qualifier, as a call, value or type
+   * (`import-binding`). A member selected on a value of a library type is
+   * not: its declaring owner may be promoted from an embedded type, which
+   * only the library's source shows.
+   */
+  private libraryOf(link: GraphLink): LibraryTarget | undefined {
+    const info = this.files.get(link.file);
+    if (!info) return undefined;
+    const data = (link.data ?? {}) as {
+      expr?: Desc;
+      t?: TypeRef;
+      path?: string;
+      builtinName?: boolean;
+    };
+    if (link.kind === "imports") {
+      if (!data.path) return undefined;
+      const origin = this.origin(info, data.path);
+      return origin
+        ? this.libraryTarget(origin, data.path, undefined, "import-path")
+        : undefined;
+    }
+    if (
+      link.kind === "calls" &&
+      data.builtinName &&
+      data.expr?.k === "name" &&
+      data.expr.n === link.targetName &&
+      BUILTIN_FUNCTIONS.has(link.targetName) &&
+      this.builtins.has(link.id)
+    )
+      return this.libraryTarget(
+        { ecosystem: "go-std" },
+        "builtin",
+        link.targetName,
+        "declared-builtin",
+      );
+    if (!["calls", "references", "embeds"].includes(link.kind))
+      return undefined;
+    let qualifier: string;
+    let name: string;
+    if (data.t) {
+      if (!data.t.q || data.t.l !== undefined) return undefined;
+      qualifier = data.t.q;
+      name = data.t.n;
+    } else if (data.expr) {
+      const expr = data.expr.k === "inst" ? data.expr.x : data.expr;
+      if (expr.k !== "sel" || expr.x.k !== "name") return undefined;
+      qualifier = expr.x.n;
+      name = expr.n;
+    } else return undefined;
+    // Another package's unexported name is not accessible.
+    if (!exported(name)) return undefined;
+    const bound = this.libraryImport(qualifier, info);
+    return bound
+      ? this.libraryTarget(bound.origin, bound.path, name, "import-binding")
+      : undefined;
+  }
+
+  /**
+   * A member selected on a value whose type is outside the checkout and
+   * comes from a library package (`buf.Write` on a `bytes.Buffer`, a field
+   * of `os.Stdout`, a method on a library call's result): unresolved, with
+   * its reason.
+   */
+  private libraryMember(link: GraphLink): boolean {
+    let desc = (link.data as { expr?: Desc } | undefined)?.expr;
+    if (desc?.k === "inst") desc = desc.x;
+    if (desc?.k !== "sel") return false;
+    const info = this.files.get(link.file);
+    if (!info) return false;
+    const base = this.denote(staticDesc(desc.x), link.file, 0);
+    let type: TypeValue | undefined;
+    if (base.e === "value") type = base.type;
+    else if (base.e === "external")
+      type = { kind: "external", name: base.name };
+    else if (base.e === "syms" && !base.syms.every(isTypeSymbol))
+      type = this.sameType(
+        base.syms.map((symbol) => this.valueType(symbol, 1)),
+      );
+    if (type?.kind !== "external") return false;
+    const name = type.name.replace(/(\(\))+$/, "");
+    const dot = name.lastIndexOf(".");
+    return dot > 0 && !!this.origin(info, name.slice(0, dot));
+  }
+
+  /**
+   * The toolchain route's library target (W3-L facts, C-14): a builtin, or
+   * the standard-library or dependency object go/types selected. A member
+   * gets `declaring-owner` with the declaring named type go/types reports
+   * (after promotion); an interface method (dispatch) or a member without a
+   * named owner gets none.
+   */
+  private toolchainLibrary(link: GraphLink): LibraryTarget | undefined {
+    const data = link.data as
+      | { tc?: ToolchainFact; builtinName?: boolean }
+      | undefined;
+    const fact = data?.tc;
+    if (!fact) return undefined;
+    if (fact.b)
+      return link.kind === "calls" &&
+        data?.builtinName &&
+        BUILTIN_FUNCTIONS.has(link.targetName)
+        ? this.libraryTarget(
+            { ecosystem: "go-std" },
+            "builtin",
+            link.targetName,
+            "declared-builtin",
+          )
+        : undefined;
+    if (!fact.l || fact.c === "iface" || fact.c === "typeparam")
+      return undefined;
+    const [unit, symbol, cls] = fact.l;
+    if (!symbol || !unit) return undefined;
+    const info = this.files.get(link.file);
+    const origin: LibraryOrigin =
+      cls === "std"
+        ? { ecosystem: "go-std" }
+        : ((info && this.origin(info, unit)) ?? { ecosystem: "go" });
+    if (origin.ecosystem !== (cls === "std" ? "go-std" : "go"))
+      return undefined;
+    return this.libraryTarget(
+      origin,
+      unit,
+      symbol,
+      symbol.includes(".") ? "declaring-owner" : "import-binding",
+    );
   }
 
   /**
@@ -651,7 +924,16 @@ class GoResolver {
     return out;
   }
 
+  /** Directories with a `vendor/` directory holding captured files (C-14). */
+  private vendorRoots = new Set<string>();
+
   private index(): void {
+    for (const file of this.context.files) {
+      const parts = file.path.split("/");
+      for (let index = 0; index < parts.length - 1; index++)
+        if (parts[index] === "vendor")
+          this.vendorRoots.add(parts.slice(0, index).join("/"));
+    }
     const untrusted = this.untrustedMembership();
     // Files that failed (a file that cannot be read is not valid code): nothing
     // in them is a target; their directory's packages may hold unseen

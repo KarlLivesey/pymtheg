@@ -4,6 +4,7 @@
 //   basic, config: `go build ./... && go vet ./...` pass (config also with
 //     CGO_ENABLED=1 and with GOOS=windows);
 //   conversion: `go build ./... && go vet ./...` pass;
+//   library: `go build ./... && go vet ./...` pass (standard library only);
 //   typeerror: `go build ./...` fails in package bad only ("cannot use
 //     "three" (untyped string constant) as int value"), `go build ./good` passes.
 // These tests need the user's `go` (the toolchain route's own requirement);
@@ -59,6 +60,12 @@ async function index(fixture, options = {}, scratch) {
         target: name(link.targetId),
         candidates: link.candidates.map((c) => name(c.id)).sort(),
         data: link.data ?? null,
+        ...(link.libraries
+          ? {
+              resolution: link.resolution,
+              libraries: link.libraries.map(({ id: _id, ...rest }) => rest),
+            }
+          : {}),
       }))
       .sort((a, b) =>
         `${a.file}\u0000${a.start}\u0000${a.kind}` <
@@ -417,5 +424,67 @@ test(
       assert.equal(item.data.toolchain.from, "definite");
       assert.equal(item.data.toolchain.sourceOnly, undefined);
     }
+  },
+);
+
+test(
+  "C-14: library members get their declaring owner from go/types; source-only they stay unresolved",
+  needsGo,
+  async () => {
+    const off = await index("library");
+    const dump = await index("library", on);
+    assert.equal(note(dump.report, "available")?.universeClean, true);
+    const file = "app/app.go";
+    const owner = (unit, symbol) => ({
+      ecosystem: "go-std",
+      unit,
+      symbol,
+      evidence: "declaring-owner",
+    });
+    const members = [
+      ["buf.Write", "calls", owner("bytes", "Buffer.Write")],
+      ["buf.String", "calls", owner("bytes", "Buffer.String")],
+      // Promoted from the embedded sync.Mutex of a checkout struct.
+      ["g.Lock", "calls", owner("sync", "Mutex.Lock")],
+      // Promoted from *os.ProcessState: another unit than the receiver's.
+      ["exitErr.ExitCode", "calls", owner("os", "ProcessState.ExitCode")],
+      ['exec.Command("true").Run', "calls", owner("os/exec", "Cmd.Run")],
+      ["resp.Body", "references", owner("net/http", "Response.Body")],
+    ];
+    for (const [at, kind, target] of members) {
+      const before = link(off, file, at, kind);
+      assert.equal(before.libraries, undefined, at);
+      // A member promoted from a library type embedded in a checkout struct
+      // has no reason yet: only a library-typed receiver does.
+      assert.equal(
+        before.data?.uncertainty,
+        at === "g.Lock" ? undefined : "library-member-unproven",
+        at,
+      );
+      const after = link(dump, file, at, kind);
+      assert.equal(after.resolution, "library", at);
+      assert.deepEqual(after.libraries, [target], at);
+      assert.equal(after.data.toolchain.upgrade, "library", at);
+    }
+    // Interface methods are dispatch: no library symbol either way.
+    for (const at of ["r.Read", "resp.Body.Close"]) {
+      assert.equal(link(dump, file, at).libraries, undefined, at);
+      assert.equal(link(off, file, at).libraries, undefined, at);
+    }
+    // Qualified names and builtins are the same with and without it.
+    for (const at of ["strings.Count", "len", "errors.As"])
+      assert.deepEqual(
+        link(dump, file, at).libraries,
+        link(off, file, at).libraries,
+        at,
+      );
+    assert.deepEqual(link(off, file, "strings.Count").libraries, [
+      {
+        ecosystem: "go-std",
+        unit: "strings",
+        symbol: "Count",
+        evidence: "import-binding",
+      },
+    ]);
   },
 );

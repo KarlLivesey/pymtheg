@@ -357,6 +357,20 @@ test("Rust library coverage credits recorded evidence and leaves historical reco
   });
 });
 
+test("Go library coverage uses stored targets from module 30 and the reconstruction before it", () => {
+  const released = { resolution: "unresolved", module: "go", kind: "calls", file: "src/main", targetName: "strconv.Quote",
+    data: { expr: { ...selector("strconv").expr, n: "Quote" } } };
+  assert.equal(externalIdentity(released, evidence, project, "outside").level, 2);
+  // A module-30 graph left this site unresolved: no rebuilt credit.
+  const stored = { ...evidence, goStoredTargets: true };
+  assert.equal(externalIdentity(released, stored, project, "outside").level, 0);
+  assert.deepEqual(externalIdentity({ ...released, resolution: "library", library: {
+    ecosystem: "go-std", unit: "strconv", symbol: "Quote", evidence: "import-binding",
+  } }, stored, project, "outside"), {
+    level: 2, unit: "strconv", symbol: "Quote", evidence: "import-binding", gap: null,
+  });
+});
+
 test("coverage accepts stored library rows and rejects a library row without a named unit", () => {
   const scratch = mkdtempSync(join(tmpdir(), "coverage-library-"));
   try {

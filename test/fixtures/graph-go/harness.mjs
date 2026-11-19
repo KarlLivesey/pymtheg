@@ -62,6 +62,13 @@ export async function project(files, steps = []) {
           target: name(link.targetId),
           candidates: link.candidates.map((item) => name(item.id)).sort(),
           data: link.data,
+          // Library targets (C-14), without their content-derived ids.
+          ...(link.libraries
+            ? {
+                resolution: link.resolution,
+                libraries: link.libraries.map(({ id: _id, ...rest }) => rest),
+              }
+            : {}),
         }));
       snapshots.push({ report, symbols, links });
     }

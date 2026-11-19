@@ -1,0 +1,64 @@
+$ pymtheg graph uses fmt Errorf --no-sync --limit 3
+Graph uses: ok
+559 files, 8092 symbols, 64165 links; 6350 unresolved, 1459 candidate sets, 13977 to libraries outside the project
+Sync: disabled
+Failed files (0):
+Warning [unresolved-coverage]: Unresolved links may hide additional callers or paths; returned routes are observations, not a completeness proof.
+Warning [query-bound]: Result reached a reported depth or result/node bound; omitted facts may exist.
+Uses of library "fmt" symbol "Errorf" (outside this project): {"library":222,"candidateSet":0}
+  library calls: "GPGVerify" (function) internal/selfupdate/verify.go:174:1-186:2 [UTF-16 10333..10705] symbol:7f148e1c62cefd0c1078cd9135e57f8af8e02deafccc14bbeee0a1feffd68244 -> library go-std "fmt" symbol "Errorf" (outside this project; import-binding) at internal/selfupdate/verify.go:177:17-177:27 [UTF-16 10488..10498]
+    Stored details: {"expr":{"k":"sel","x":{"k":"name","n":"fmt"},"n":"Errorf"}}
+  library calls: "DefaultDir" (function) internal/backend/cache/dir.go:16:1-28:2 [UTF-16 283..574] symbol:d3cb51c42aec50e5e5c18bc6a835965f8d23f86bdaf249973185a97fca1da3a6 -> library go-std "fmt" symbol "Errorf" (outside this project; import-binding) at internal/backend/cache/dir.go:24:14-24:24 [UTF-16 466..476]
+    Stored details: {"expr":{"k":"sel","x":{"k":"name","n":"fmt"},"n":"Errorf"}}
+  library calls: "nodeFromFileInfo" [(*Archiver).nodeFromFileInfo] (method) internal/archiver/archiver.go:251:1-279:2 [UTF-16 7605..8849] symbol:d1e85d7d899282c654883a7cc740c624a4c30743e737cb81d01ecc9f2299eb7c -> library go-std "fmt" symbol "Errorf" (outside this project; import-binding) at internal/archiver/archiver.go:275:9-275:19 [UTF-16 8726..8736]
+    Stored details: {"expr":{"k":"sel","x":{"k":"name","n":"fmt"},"n":"Errorf"}}
+Truncated: returned 0 matches, 0 symbols, 3 links, 0 callers, 0 observed links (limit 3; traversal bounds above).
+
+$ pymtheg graph uses github.com/spf13/cobra --no-sync --limit 3
+Graph uses: ok
+559 files, 8092 symbols, 64165 links; 6350 unresolved, 1459 candidate sets, 13977 to libraries outside the project
+Sync: disabled
+Failed files (0):
+Warning [unresolved-coverage]: Unresolved links may hide additional callers or paths; returned routes are observations, not a completeness proof.
+Warning [query-bound]: Result reached a reported depth or result/node bound; omitted facts may exist.
+Uses of library "github.com/spf13/cobra" (outside this project): {"library":186,"candidateSet":0}
+  library references: "newSelfUpdateCommand" (function) cmd/restic/cmd_self_update.go:25:1-51:2 [UTF-16 507..1283] symbol:8595680eb119061ac0b2ec3e0f83267bc49214414e7ff5c9ec7cef2910d39def -> library go "github.com/spf13/cobra" symbol "Command" version "v1.10.2" from "go.mod" (outside this project; import-binding) at cmd/restic/cmd_self_update.go:44:19-44:32 [UTF-16 1108..1121]
+    Stored details: {"t":{"q":"cobra","n":"Command"}}
+  library references: "newTagCommand" (function) cmd/restic/cmd_tag.go:19:1-52:2 [UTF-16 445..1507] symbol:47c6e782bf69219913f9821e2d6adf9403f9aa02e1ba13fc93fbc0300981c0f1 -> library go "github.com/spf13/cobra" symbol "Command" version "v1.10.2" from "go.mod" (outside this project; import-binding) at cmd/restic/cmd_tag.go:19:52-19:65 [UTF-16 496..509]
+    Stored details: {"t":{"q":"cobra","n":"Command"}}
+  library references: "newKeyCommand" (function) cmd/restic/cmd_key.go:8:1-27:2 [UTF-16 96..588] symbol:955ea1a18f4711fe1deb60aabf04869a90255099597fc145ea95845103529d3d -> library go "github.com/spf13/cobra" symbol "Command" version "v1.10.2" from "go.mod" (outside this project; import-binding) at cmd/restic/cmd_key.go:8:52-8:65 [UTF-16 147..160]
+    Stored details: {"t":{"q":"cobra","n":"Command"}}
+Truncated: returned 0 matches, 0 symbols, 3 links, 0 callers, 0 observed links (limit 3; traversal bounds above).
+
+$ pymtheg graph uses builtin append --no-sync --limit 3
+Graph uses: ok
+559 files, 8092 symbols, 64165 links; 6350 unresolved, 1459 candidate sets, 13977 to libraries outside the project
+Sync: disabled
+Failed files (0):
+Warning [unresolved-coverage]: Unresolved links may hide additional callers or paths; returned routes are observations, not a completeness proof.
+Warning [query-bound]: Result reached a reported depth or result/node bound; omitted facts may exist.
+Uses of library "builtin" symbol "append" (outside this project): {"library":421,"candidateSet":0}
+  library calls: "Warmup" [(*warmupBackend).Warmup] (method) internal/repository/checker_test.go:236:1-239:2 [UTF-16 8244..8414] symbol:482784179a18e3ef0b5755f55a662cbded0d2dc2409de28db1bdc9366e049957 -> library go-std "builtin" symbol "append" (outside this project; declared-builtin) at internal/repository/checker_test.go:237:23-237:29 [UTF-16 8365..8371]
+    Stored details: {"expr":{"k":"name","n":"append"},"builtinName":true,"builtin":true}
+  library calls: "loadSnapshotTreeIDs" (function) internal/checker/checker.go:101:1-117:2 [UTF-16 2295..2824] symbol:e1618f9df739f285366a8fc3d12e38661414a42d63b57feb0a93a6070dc7b6a1 -> library go-std "builtin" symbol "append" (outside this project; declared-builtin) at internal/checker/checker.go:104:11-104:17 [UTF-16 2562..2568]
+    Stored details: {"expr":{"k":"name","n":"append"},"builtinName":true,"builtin":true}
+  library calls: "createRandomIndex" (function) internal/repository/index/index_test.go:429:1-465:2 [UTF-16 10455..11408] symbol:ef4a689fc17433278af83abda1f63151742cafcc1a9d8fdf1f29749217fe49d1 -> library go-std "builtin" symbol "append" (outside this project; declared-builtin) at internal/repository/index/index_test.go:442:12-442:18 [UTF-16 10971..10977]
+    Stored details: {"expr":{"k":"name","n":"append"},"builtinName":true,"builtin":true}
+Truncated: returned 0 matches, 0 symbols, 3 links, 0 callers, 0 observed links (limit 3; traversal bounds above).
+
+$ pymtheg graph uses github.com/spf13/cobra Command --no-sync --limit 3
+Graph uses: ok
+559 files, 8092 symbols, 64165 links; 6350 unresolved, 1459 candidate sets, 13977 to libraries outside the project
+Sync: disabled
+Failed files (0):
+Warning [unresolved-coverage]: Unresolved links may hide additional callers or paths; returned routes are observations, not a completeness proof.
+Warning [query-bound]: Result reached a reported depth or result/node bound; omitted facts may exist.
+Uses of library "github.com/spf13/cobra" symbol "Command" (outside this project): {"library":134,"candidateSet":0}
+  library references: "newSelfUpdateCommand" (function) cmd/restic/cmd_self_update.go:25:1-51:2 [UTF-16 507..1283] symbol:8595680eb119061ac0b2ec3e0f83267bc49214414e7ff5c9ec7cef2910d39def -> library go "github.com/spf13/cobra" symbol "Command" version "v1.10.2" from "go.mod" (outside this project; import-binding) at cmd/restic/cmd_self_update.go:44:19-44:32 [UTF-16 1108..1121]
+    Stored details: {"t":{"q":"cobra","n":"Command"}}
+  library references: "newTagCommand" (function) cmd/restic/cmd_tag.go:19:1-52:2 [UTF-16 445..1507] symbol:47c6e782bf69219913f9821e2d6adf9403f9aa02e1ba13fc93fbc0300981c0f1 -> library go "github.com/spf13/cobra" symbol "Command" version "v1.10.2" from "go.mod" (outside this project; import-binding) at cmd/restic/cmd_tag.go:19:52-19:65 [UTF-16 496..509]
+    Stored details: {"t":{"q":"cobra","n":"Command"}}
+  library references: "newKeyCommand" (function) cmd/restic/cmd_key.go:8:1-27:2 [UTF-16 96..588] symbol:955ea1a18f4711fe1deb60aabf04869a90255099597fc145ea95845103529d3d -> library go "github.com/spf13/cobra" symbol "Command" version "v1.10.2" from "go.mod" (outside this project; import-binding) at cmd/restic/cmd_key.go:8:52-8:65 [UTF-16 147..160]
+    Stored details: {"t":{"q":"cobra","n":"Command"}}
+Truncated: returned 0 matches, 0 symbols, 3 links, 0 callers, 0 observed links (limit 3; traversal bounds above).
+
