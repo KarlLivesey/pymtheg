@@ -117,6 +117,7 @@ export interface ProjectModel {
     specifier: string,
     from: string,
     lookups: readonly string[],
+    includeInstalled?: boolean,
   ) => string | undefined;
   workspaceBoundaryKnown: (from: string) => boolean;
   hasDenoImports: boolean;
@@ -1193,8 +1194,9 @@ export function projectModel(
       return true;
     },
     host,
-    workspaceReason: (specifier, from, lookups) =>
+    workspaceReason: (specifier, from, lookups, includeInstalled = true) =>
       fs.workspaceReason(specifier, from, lookups, (link) => {
+        if (!includeInstalled) return undefined;
         const physical = dependencies?.realpath(dependencyPath(link));
         if (physical === undefined) return undefined;
         if (hasNodeModulesSegment(physical)) return false;

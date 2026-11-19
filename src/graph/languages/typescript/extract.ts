@@ -68,6 +68,7 @@ export interface RenameContext {
     specifier: string,
     from: string,
     lookups: readonly string[],
+    includeInstalled?: boolean,
   ) => string | undefined;
   workspaceBoundaryKnown: (from: string) => boolean;
   /** Nodes (and warm-up steps) whose checker lookups overflowed before. */
@@ -1658,12 +1659,18 @@ export function extractFile(
     return units;
   }
 
-  function outsideRoutes(specifier: ts.StringLiteralLike, declared: boolean) {
+  function outsideRoutes(
+    specifier: ts.StringLiteralLike,
+    declared: boolean,
+    includeInstalledWorkspaces = true,
+  ) {
     const selection = selectedSpecifier(specifier);
     if (!selection || (incompleteConfig && !selection.startsWith("node:")))
       return [];
     const reader = importerOf(specifier);
-    const reason = moduleReason(specifier);
+    const reason = includeInstalledWorkspaces
+      ? moduleReason(specifier)
+      : readModuleReason(specifier, false);
     if (reason === "external-package") {
       const routes = reader.importUnits(selection);
       return routes.some((unit) => reader.localPackage(unit)) ? [] : routes;
@@ -2192,6 +2199,7 @@ export function extractFile(
   }
   function readModuleReason(
     specifier: ts.StringLiteralLike,
+    includeInstalledWorkspaces = true,
   ): string | undefined {
     const text = selectedSpecifier(specifier);
     if (text === undefined || /^https?:/i.test(text))
@@ -2216,7 +2224,12 @@ export function extractFile(
         }));
     const importer = fromVirtual(specifier.getSourceFile().fileName) ?? path;
     if (aliased) return "unresolved-alias";
-    const workspace = context.workspaceReason(text, importer, lookups);
+    const workspace = context.workspaceReason(
+      text,
+      importer,
+      lookups,
+      includeInstalledWorkspaces,
+    );
     if (workspace) return workspace;
     if (!context.workspaceBoundaryKnown(importer)) {
       const unit = packageUnit(text);
@@ -3235,13 +3248,16 @@ export function extractFile(
               if (
                 unit &&
                 probe(source, specifier, () => {
+                  // A missing dependency can still bring Node types once its
+                  // workspace is built. Keep that possibility in C-11's probe.
                   if (unit.ecosystem === "node") {
-                    const units = missingUnits(specifier, true);
+                    const units = outsideRoutes(specifier, true, false);
                     if (units.length === 1 && units[0]!.ecosystem === "node")
                       return true;
                   }
                   return (
-                    declared && moduleReason(specifier) === "external-package"
+                    declared &&
+                    readModuleReason(specifier, false) === "external-package"
                   );
                 })
               )

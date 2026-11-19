@@ -4,10 +4,11 @@ import { join } from "node:path";
 import { measured } from "../../scripts/sweep/run.mjs";
 
 const [scratch, receipt, ...pins] = process.argv.slice(2);
+const candidate = process.env.C23_BUILD ?? "candidate-build";
 const { repos } = JSON.parse(await readFile(receipt, "utf8"));
 const env = { ...process.env };
 delete env.NODE_OPTIONS;
-const output = join(scratch, "cold-comparison");
+const output = join(scratch, "cold-comparison-" + candidate);
 await mkdir(output);
 
 for (const pin of pins) {
@@ -23,7 +24,7 @@ for (const pin of pins) {
   try {
     for (const [label, build] of [
       ["main", "main-build"],
-      ["candidate", "candidate-build"],
+      ["candidate", candidate],
       ["main-repeat", "main-build"],
     ]) {
       const log = join(logs, label);

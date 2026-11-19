@@ -309,13 +309,20 @@ test("a physical workspace link with an unbuilt entry names the missing output",
   await write("packages/ui/src/index.ts", "export const button = 1;");
   await write(
     "packages/app/package.json",
-    '{"name":"fixture-app","dependencies":{"fixture-ui":"^1"}}',
+    '{"name":"fixture-app","dependencies":{"fixture-ui":"^1"},"devDependencies":{"@types/node":"^24"}}',
   );
-  await write("packages/app/main.ts", 'import { button } from "fixture-ui";');
+  await write(
+    "packages/app/tsconfig.json",
+    '{"compilerOptions":{"types":[],"lib":["ES2022","DOM"]},"files":["main.ts"]}',
+  );
+  await write(
+    "packages/app/main.ts",
+    'import { button } from "fixture-ui"; console.log(button);',
+  );
   await mkdir(join(root, "node_modules"));
   await symlink("../packages/ui", join(root, "node_modules/fixture-ui"), "dir");
   await request("index");
-  read((store) => {
+  read((store, call) => {
     const link = store
       .links()
       .find(
@@ -323,6 +330,12 @@ test("a physical workspace link with an unbuilt entry names the missing output",
       );
     assert.equal(link.resolution, "unresolved");
     assert.equal(link.data.reason, "workspace-build-output-missing");
+    const log = call("packages/app/main.ts", "console.log");
+    assert.equal(log.resolution, "ambiguous");
+    assert.deepEqual(log.libraries.map(({ ecosystem }) => ecosystem).sort(), [
+      "dom",
+      "node",
+    ]);
   });
 });
 
