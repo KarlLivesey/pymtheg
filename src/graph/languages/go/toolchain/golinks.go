@@ -35,8 +35,10 @@
 //	F  file id clean                         a main-module file in this configuration
 //	X  file id reason                        a main-module file go list left out (ignored, invalid)
 //	E  id where message                      first errors (at most 20 in all)
-//	C  file funEnd nameEnd cat class defFile defOff pkg name   call expression
-//	U  file identEnd kind class defFile defOff pkg name        identifier use (not local, not universe)
+//	C  file funEnd nameEnd cat class defFile defOff pkg name member   call expression
+//	U  file identEnd kind class defFile defOff pkg name member        identifier use (not local, not universe)
+//	   member (C-14): "=" not a selection; Owner.Name a field or concrete method
+//	   with its declaring named type; "?" no named owner, or an interface method
 //	M  file pathEnd dir                      import of a package whose directory is in the project
 //	FP sha256                                with -fingerprint only: every input of the facts (see fingerprint)
 //	D  file funEnd ext defFile:defOff,...    interface call: main-module methods reached ("?": incomplete, a generic
@@ -474,6 +476,7 @@ func main() {
 		info := infos[p.ImportPath]
 		plain := p.ForTest == "" && !strings.HasSuffix(p.ImportPath, "_test")
 		for _, af := range files[p.ImportPath] {
+			selOf := map[*ast.Ident]*ast.SelectorExpr{}
 			ast.Inspect(af, func(n ast.Node) bool {
 				switch n := n.(type) {
 				case *ast.CallExpr:
@@ -496,7 +499,7 @@ func main() {
 					if cat == "builtin" || (obj != nil && obj.Pkg() == nil) {
 						dclass = "builtin"
 					}
-					rec("C", file, fmt.Sprint(funEnd), fmt.Sprint(nameEnd), cat, dclass, df, fmt.Sprint(do), dpkg, dname)
+					rec("C", file, fmt.Sprint(funEnd), fmt.Sprint(nameEnd), cat, dclass, df, fmt.Sprint(do), dpkg, dname, memberOf(info, stripIndex(unparen(n.Fun)), obj))
 					if (cat == "iface" || cat == "typeparam") && recv != nil && plain {
 						dyn = append(dyn, ifaceCall{file, funEnd, recv, obj.(*types.Func)})
 					}
@@ -516,6 +519,8 @@ func main() {
 							rec("M", file, fmt.Sprint(fset.Position(n.Path.End()).Offset), dir)
 						}
 					}
+				case *ast.SelectorExpr:
+					selOf[n.Sel] = n
 				case *ast.Ident:
 					obj := info.Uses[n]
 					if obj == nil || obj.Parent() == types.Universe {
@@ -534,7 +539,11 @@ func main() {
 					if obj.Pkg() != nil {
 						pk = basePath(obj.Pkg().Path())
 					}
-					rec("U", file, fmt.Sprint(end), objKind(obj), class(df), df, fmt.Sprint(do), pk, obj.Name())
+					member := "="
+					if se := selOf[n]; se != nil {
+						member = memberOf(info, se, obj)
+					}
+					rec("U", file, fmt.Sprint(end), objKind(obj), class(df), df, fmt.Sprint(do), pk, obj.Name(), member)
 				}
 				return true
 			})
@@ -1108,6 +1117,49 @@ func classify(info *types.Info, call *ast.CallExpr) (string, types.Object, types
 		return "funclit", nil, nil
 	}
 	return "dynamic", nil, nil
+}
+
+// memberOf: a C or U record's member field (C-14). "=" when e is no
+// selection (a package-level object, named directly, through a qualifier or
+// a dot import); for a field or method selection, Owner.Name with the
+// declaring named type go/types selected (after promotion through embedded
+// fields); "?" when that owner is not a named type of the object's own
+// package, or is an interface (a call through it is dispatch).
+func memberOf(info *types.Info, e ast.Expr, obj types.Object) string {
+	sel, ok := e.(*ast.SelectorExpr)
+	if !ok {
+		return "="
+	}
+	s, ok := info.Selections[sel]
+	if !ok {
+		return "="
+	}
+	var owner types.Type
+	switch s.Kind() {
+	case types.FieldVal:
+		owner = holder(s)
+	case types.MethodVal, types.MethodExpr:
+		fn, ok := s.Obj().(*types.Func)
+		if !ok {
+			return "?"
+		}
+		recv := fn.Type().(*types.Signature).Recv()
+		if recv == nil {
+			return "?"
+		}
+		owner = recv.Type()
+		if pt, ok := owner.(*types.Pointer); ok {
+			owner = pt.Elem()
+		}
+	}
+	if owner == nil || obj == nil {
+		return "?"
+	}
+	named, ok := types.Unalias(owner).(*types.Named)
+	if !ok || types.IsInterface(named) || named.Obj().Pkg() == nil || named.Obj().Pkg() != obj.Pkg() {
+		return "?"
+	}
+	return named.Origin().Obj().Name() + "." + obj.Name()
 }
 
 func holder(sel *types.Selection) types.Type {

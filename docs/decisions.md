@@ -2786,3 +2786,22 @@ configuration maps registry indexes or Git URLs and ref selectors to a
 directory source. A proven package selection is required to resolve inside it.
 Rust coverage now credits recorded targets on graphs made by the supporting
 module version. See [C-9](changes/C-9.md).
+
+### C-14 Go library targets
+
+Go records a library target where the source proves the package and, for a
+symbol, the name: an import of a package no checkout module provides or may
+provide; an exported name through the one import that binds its qualifier;
+an unshadowed builtin call (unit `builtin`). An unnamed dependency import is
+taken to bind its conventional name (last path element without a major
+version suffix or `go-` prefix), because the package clause is not in the
+checkout; a qualifier that matches no import's conventional name, or more
+than one, is not followed. **Trade:** two unnamed imports whose package
+clauses are each other's conventional names would be crossed; no real
+project writes that, and goimports adds a name wherever clause and path
+differ. A member of a library-typed value is not given the receiver's unit:
+the member may be promoted from an embedded type of another package
+(`*exec.ExitError`'s `ExitCode` is `os`'s), so source-only it is unresolved
+with `library-member-unproven`, and the opt-in toolchain route names its
+declaring owner. Vendored modules are checkout code, never library. See
+[C-14](changes/C-14.md).
