@@ -261,9 +261,9 @@ Link outcomes:
 | Outcome | Meaning |
 |---|---|
 | `resolved` | One definite target in the checkout |
-| `library` | One definite target outside the project: a library unit (level 1) or a symbol in it (level 2), recorded with how the source proves it (see the design section in `runtime-map.md`). Rust records library paths with proven bindings. |
+| `library` | One definite target outside the project: a library unit (level 1) or a symbol in it (level 2), recorded with how the source proves it (see the design section in `runtime-map.md`). Rust records library paths with proven bindings. TypeScript and JavaScript record library targets at existing sites. Go records imports, package-qualified names and builtins (C-14). |
 | `ambiguous` | A candidate set, never a pick. It may mix checkout symbols and library targets. A set is **closed** only when it provably holds every possible target and every member is provably possible. Otherwise it is **open**, and `data.open` gives the reasons (for example a type outside the project could be the target); an open set still lists every project target |
-| `unresolved` | No target; the written name is kept. The reason, when recorded, is in `data` (`reason` in Go and TypeScript, `uncertainty` in Rust). Rust may also list unverified would-be targets in `data.targets` (at most 16, else a count) |
+| `unresolved` | No target; the written name is kept. The reason, when recorded, is in `data` (`reason` in Go and TypeScript, `uncertainty` in Rust; Go's `uncertainty` `library-member-unproven` marks a member of a library-typed value). Rust may also list unverified would-be targets in `data.targets` (at most 16, else a count) |
 | failed (`unresolved`, reason `invalid-code`) | The link depends on a file that could not be read. `data.cause` names the failed file(s). It has no target, no candidates and no would-be targets |
 
 **Unreadable code is failed; the unit is the file.** A file with any syntax error
@@ -325,7 +325,17 @@ toolchain route below. Claims `*.go`; context `go.mod` and
 file (its ID can change when files are added or removed).
 
 - **Definite:** imports of packages in the importing file's module, a `go.work`
-  module or a proven local `replace`; package-qualified references; direct calls;
+  module or a required module's local `replace` whose directory has a go.mod
+  (also `=> ..` and `=> .`), when exactly one module provides the package and
+  it has a file Go can build (`ignore` never set); packages under `testdata`,
+  `_x` or `.x` directories, which Go imports like any other (a module may
+  itself sit under such a directory); package-qualified references; direct
+  calls; conversions, also to a pointer type (`(*T)(x)`, `(*p.T)(nil)` link to
+  `T`; the value is a `*T`, so `(*T)(p).M()` resolves); members of call
+  results of checkout functions and methods (`x := pkg.New(); x.M()`,
+  `v, err := f()`, chains); through a function declared per build variant only
+  when its variants cover every build of the calling file and agree (any name
+  may be a tag: `-tags=freebsd` on Linux);
   calls and selections on a concrete receiver whose type is evident from the
   source, by Go's selector rule including promotion; the same on elements of
   slices, arrays, maps (value, and key for a ranged key) and channels, on range
@@ -337,10 +347,13 @@ file (its ID can change when files are added or removed).
   `mu struct{…}` fields; ranked after named symbols in search) and of
   function-local struct types; field, type, receiver and embedding references;
   `contains`.
-- **Candidates:** a name declared in several build variants (build constraints
-  are not evaluated; a selection on a type declared in several variants is
-  searched per variant and is definite only when all variants agree, otherwise
-  the set of their answers); several equally shallow promotion paths; interface dispatch
+- **Candidates:** a name declared in several build variants (a selection on a
+  type declared in several variants is searched per variant and is definite
+  only when every build of the referencing file gives the same answer,
+  otherwise the set of their answers; any name may be a tag in a build, a
+  GOOS or GOARCH name or `cgo` too, with one of Go's port GOOS and GOARCH
+  values true, and `import "C"` needs cgo enabled); several equally shallow
+  promotion paths; interface dispatch
   (the interface method plus every project type whose method set matches by name
   and parameter/result counts; always open, `structural-match-unverified`);
   calls on a receiver whose type the source does not show (name-only, open,
@@ -351,13 +364,51 @@ file (its ID can change when files are added or removed).
   `data.interfaceId`, `structural-match-unverified`; computed type identity is an
   annotation only). An interface that embeds two provably different
   declarations of one method (invalid Go) has no implementers.
-- **Unresolved:** standard library, third-party and non-local `replace` imports and
-  everything reached through them; imports Go forbids (`internal`, `package main`,
-  `testdata`); unexported names from another package; builtins (`data.builtin`);
+- **Library targets (C-14, module 30):** an import of a package outside the
+  checkout names its unit (the import path; `go-std` for the standard library,
+  `go` for a dependency, with the `go.mod` requirement's version and
+  `versionSource` when one unreplaced module provides it at a proven selected
+  version), evidence `import-path`; an exported name selected from such an
+  import's qualifier, as a call, value, embedded or written type
+  (`strconv.Quote`, `time.Duration`, `require.NoError`), names the unit and
+  the name, evidence `import-binding`; a builtin call no declaration, import
+  or failed file can shadow (`len`, `append`, `min`, …) is unit `builtin`,
+  evidence `declared-builtin`. The qualifier must be bound by exactly one of
+  the file's imports: an explicit import name, a standard-library package's
+  last path element, or a dependency's conventional name (last element
+  without `/vN`, `.vN` or a `go-` prefix); a package clause the checkout
+  cannot show that differs from it is not followed. Never a library: a
+  package the checkout provides or may provide (main or nested module, a
+  local `replace`, an uncertain or ambiguous destination), a module whose
+  `vendor/` directory is captured, `import "C"`, a GOPATH-style test-data
+  import, a dot-imported name (source-only). A name that exists only on some
+  platforms (`syscall.Kill`) is recorded as written: the import proves the
+  unit and the written name.
+- **Library members, source-only:** a field or method selected on a value of
+  a library type (`buf.Write` on a `bytes.Buffer`, a library call's result,
+  `os.Stdout.Write`) is unresolved with `data.uncertainty`
+  `library-member-unproven`: its declaring owner may be promoted from an
+  embedded type the checkout does not show. With the opt-in toolchain route
+  and a clean run, go/types' selection names it: a field or concrete method
+  gets `Owner.Name` with its declaring named type and package, evidence
+  `declaring-owner` (`exitErr.ExitCode` on an `*exec.ExitError` is `os`
+  `ProcessState.ExitCode`); interface methods stay dispatch.
+- **Unresolved:** members of standard-library, third-party and non-local
+  `replace` types (above); imports Go forbids (`internal`,
+  `package main`, a `replace` of a module that is not required, a local
+  replacement without a go.mod, a package with no buildable file); an import
+  two modules provide (Go: "ambiguous import"; reason
+  `import-destination-uncertain`); unexported names from another package;
+  members of `(**T)(x)` or of a conversion to a
+  pointer type's pointer (`(*A)(x)` with `type A = *T`);
   elements of function containers; elements of a generic named container
   (`type L[E any] []E`); a field of an anonymous struct type declared in several
   build variants of its enclosing type; explicit generic-method instantiation
-  `t.Map[C](x)`; `new(variable).M()`.
+  `t.Map[C](x)`; `new(variable).M()`; results of generic type-parameter type
+  (`As[*Int](x)`: type arguments are not extracted); a call through a function
+  declared per build variant whose variants return different named types or
+  do not cover every build of the caller (the receiver's type is then
+  unknown).
 - **Not extracted:** locals, parameters and type parameters as symbols; keys of
   keyed composite literals; generic type arguments (`Stack[int]` methods resolve
   on `Stack`); cgo (`import "C"` is an unresolved import); imports into `vendor/`.
@@ -479,6 +530,17 @@ makes that whole manifest unknown). Private items are ordinary symbols.
   crates.io, alternate registry indexes, and Git URLs with their ref selectors.
   A replacement with an unproven checkout target leaves the link unresolved.
   Receiver calls still require the declaring owner.
+- **Names beside Rust macros.** A withheld path can resolve when every
+  relevant expansion has a bounded set of names and that set excludes the
+  name being looked up. The graph inspects captured `macro_rules!` arms,
+  including reachable macros in the checkout, and recognizes the standard
+  expression and literal-producing macros. Standard `thread_local!`
+  contributes its input names. A proven external function-like macro needs
+  item-identifier input for the `rust-external-macro-name` assumption.
+  Attributes and derives also withhold names formed from whole
+  case-insensitive components of an input item name. Opaque layout
+  expansions, known identifier generators and competing glob imports can
+  still withhold the link. See [C-12](changes/C-12.md).
 - **Clean expansion (both rules below).** A workspace `macro_rules!` arm is
   clean when the code it emits has no attribute anywhere (so no `#[cfg]` can
   remove a call) and no item other than a readable `use` (no `fn`, `mod`,
@@ -602,7 +664,8 @@ Uses the TypeScript compiler over the captured snapshot. The only other input
 is the installed compiler's standard-library declarations. The snapshot host
 models checkout-local package links in a virtual `node_modules`. Claims
 `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs`, `.cjs`; context
-`*tsconfig*.json`, `*jsconfig*.json`, `package.json` and `pnpm-workspace.yaml`. Each file
+`*tsconfig*.json`, `*jsconfig*.json`, `package.json`, `pnpm-workspace.yaml`,
+`deno.json`, `deno.jsonc` and conventional import-map filenames. Each file
 is analysed under its owning config (nearest containing directory, then
 `tsconfig` before `jsconfig`); genuinely tied configs are merged to the weakest
 answer.
@@ -651,13 +714,34 @@ answer.
   still establish its module-file edge. Named bindings use the checker.
   Calls use the same declaration rule for relative imports, workspace imports
   and local aliases, including when TypeScript selects a `types` export.
-- **Candidates:** several graph symbols for one callee (union receivers, merged
-  declarations, duplicate JavaScript functions).
-- **Unresolved:** standard library and `node_modules` packages
+- **Library targets:** checker-proven JavaScript or web declarations, captured
+  dependency declarations with package evidence, and names directly proved
+  by literal outside imports and re-exports. Deno imports use the nearest
+  captured map and its applicable scope. A member of an untyped imported
+  value or a directly rewritten module member names the package only.
+  npm aliases name their registry package. An exact pin in the importing
+  manifest or its captured pnpm or Bun catalog can supply its version.
+  An ambient type request can establish Vitest, Jest or Mocha globals. A
+  receiver explicitly annotated with an unavailable imported type can name
+  its package unit. A named library object can supply checker-selected
+  members through immutable aliases and constant literal selectors.
+  [Library links](changes/C-11.md) · [Members and test globals](changes/C-16.md)
+- **Candidates:** several checkout or library targets for one callee (union
+  receivers, merged declarations, duplicate JavaScript functions). Missing
+  selected Node types can leave both DOM and Node targets possible for a shared
+  global, type name or typed member. Two test frameworks supplying the same
+  global can also produce a candidate set.
+- **Unresolved:** outside members whose receiver or declaration is unverified
   (`external`, `external-package`); computed `require` or `import()` specifiers;
+  bare test globals with an overlapping unmodelled type request
+  (`competing-test-globals`);
   calls through parameters, import shadows, and reassigned local functions;
   member calls without a named target through `any`, `unknown` or an open index
   (`any-receiver`, `unknown-receiver`, `index-signature`);
+  package specifiers whose workspace membership is unreadable
+  (`workspace-manifest-unreadable`);
+  unavailable Deno import maps, unmapped Deno bare imports and remote URL
+  imports (`deno-import-unverified`);
   installed workspace bindings with no captured entry
   (`workspace-entry-unavailable` or `workspace-build-output-missing` when
   TypeScript probed a missing path under a configured output directory).
@@ -676,10 +760,10 @@ answer.
   in one program. Both are failed files under the rule below. A
   `package.json` that starts with a UTF-8 byte-order mark is read.
 - **A program that contains a failed file:** the failed file is absent;
-  `invalid-code` with a cause is best-effort attribution; **every other link in
-  that program carries `assumes: ["no-unseen-declarations"]`, which means
-  unverified** (computed without the failed file). In a program with no failed
-  file no link carries it.
+  `invalid-code` with a cause is best-effort attribution. Links computed
+  without the failed file carry `assumes: ["no-unseen-declarations"]`.
+  A lexical outside binding whose module selection is already established
+  by the snapshot can independently prove its written library identity.
 - Known limits: JavaScript early errors the compiler does not report without
   `checkJs` (`let let = 1`, top-level `return`) leave a file clean; AMD
   `define(…)` modules are not modelled; module augmentation turns imports of the

@@ -289,7 +289,8 @@ async function analyze({
           "reason" in data ||
           "cause" in data ||
           "tc" in data ||
-          "toolchain" in data
+          "toolchain" in data ||
+          "uncertainty" in data
         )
       )
         return link;
@@ -301,6 +302,7 @@ async function analyze({
         cause: _cause,
         tc: _tc,
         toolchain: _toolchain,
+        uncertainty: _uncertainty,
         ...rest
       } = data;
       void _overflow;
@@ -310,6 +312,7 @@ async function analyze({
       void _cause;
       void _tc;
       void _toolchain;
+      void _uncertainty;
       return { ...link, data: rest };
     });
     // A previous run's toolchain record is recomputed too.
@@ -368,6 +371,9 @@ async function analyze({
         data: {
           ...((link.data as { [key: string]: Json } | undefined) ?? {}),
           ...(note.builtin ? { builtin: true } : {}),
+          // A member on a library-typed value: its declaring owner is not
+          // provable from the checkout (C-14).
+          ...(note.library ? { uncertainty: note.library } : {}),
           // A failed link: the code it needs is in failed files (named, never
           // targets).
           ...(note.invalid
@@ -453,7 +459,7 @@ async function analyze({
 
 const go: LanguageModule = {
   id: ID,
-  version: "28",
+  version: "30",
   extensions: [".go"],
   contextFiles: ["go.mod", "go.work"],
   parse,

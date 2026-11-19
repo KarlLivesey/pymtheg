@@ -1,0 +1,158 @@
+[
+ {
+  "project": "mattn__go-sqlite3",
+  "links": [
+   9650,
+   9650
+  ],
+  "definite": [
+   3642,
+   3643
+  ],
+  "newlyDefinite": {
+   "calls": 1
+  },
+  "sitesAdded": 0,
+  "sitesRemoved": 0,
+  "symbols": [
+   1204,
+   1204
+  ],
+  "symbolsMissing": [],
+  "changed": []
+ },
+ {
+  "project": "cilium__ebpf",
+  "links": [
+   50239,
+   50239
+  ],
+  "definite": [
+   33366,
+   33456
+  ],
+  "newlyDefinite": {
+   "calls": 95
+  },
+  "sitesAdded": 0,
+  "sitesRemoved": 0,
+  "symbols": [
+   8314,
+   8314
+  ],
+  "symbolsMissing": [],
+  "changed": [
+   {
+    "file": "rlimit/rlimit_linux.go",
+    "line": 75,
+    "source": "fd.Close()",
+    "kind": "calls",
+    "name": "fd.Close",
+    "before": "internal/sys/fd_other.go:method:(*FD).Close",
+    "after": "ambiguous"
+   },
+   {
+    "file": "internal/sys/fd_linux_test.go",
+    "line": 45,
+    "source": "qt.Assert(t, qt.IsNil(fd.Close()))",
+    "kind": "calls",
+    "name": "fd.Close",
+    "before": "internal/sys/fd_other.go:method:(*FD).Close",
+    "after": "ambiguous"
+   },
+   {
+    "file": "internal/sys/fd_linux_test.go",
+    "line": 56,
+    "source": "file, err := fd.File(\"test\")",
+    "kind": "calls",
+    "name": "fd.File",
+    "before": "internal/sys/fd_other.go:method:(*FD).File",
+    "after": "ambiguous"
+   },
+   {
+    "file": "internal/sys/fd_linux_test.go",
+    "line": 62,
+    "source": "_, err = fd.File(\"closed\")",
+    "kind": "calls",
+    "name": "fd.File",
+    "before": "internal/sys/fd_other.go:method:(*FD).File",
+    "after": "ambiguous"
+   },
+   {
+    "file": "internal/sys/fd_linux_test.go",
+    "line": 65,
+    "source": "_, err = fd.Dup()",
+    "kind": "calls",
+    "name": "fd.Dup",
+    "before": "internal/sys/fd_other.go:method:(*FD).Dup",
+    "after": "ambiguous"
+   }
+  ]
+ },
+ {
+  "project": "etcd-io__bbolt",
+  "links": [
+   16898,
+   16898
+  ],
+  "definite": [
+   10692,
+   10750
+  ],
+  "newlyDefinite": {
+   "calls": 58
+  },
+  "sitesAdded": 0,
+  "sitesRemoved": 0,
+  "symbols": [
+   1905,
+   1905
+  ],
+  "symbolsMissing": [],
+  "changed": []
+ },
+ {
+  "project": "restic__restic",
+  "links": [
+   64165,
+   64165
+  ],
+  "definite": [
+   42347,
+   42379
+  ],
+  "newlyDefinite": {
+   "calls": 32
+  },
+  "sitesAdded": 0,
+  "sitesRemoved": 0,
+  "symbols": [
+   8092,
+   8092
+  ],
+  "symbolsMissing": [],
+  "changed": []
+ },
+ {
+  "project": "cockroachdb__pebble",
+  "links": [
+   200878,
+   200878
+  ],
+  "definite": [
+   144642,
+   144835
+  ],
+  "newlyDefinite": {
+   "calls": 193
+  },
+  "sitesAdded": 0,
+  "sitesRemoved": 0,
+  "symbols": [
+   20080,
+   20080
+  ],
+  "symbolsMissing": [],
+  "changed": []
+ }
+]

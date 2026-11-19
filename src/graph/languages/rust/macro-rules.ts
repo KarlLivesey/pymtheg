@@ -7,6 +7,82 @@ import type { Node } from "web-tree-sitter";
 
 const compact = (s: string) => s.replace(/\s+/g, "").replace(/\br#/g, "");
 
+export type MacroInput = {
+  names: string[];
+  hasItemIdentifier?: true;
+  hasAttributes?: true;
+  itemNames?: string[];
+  mayIntroduceUnknownNames?: true;
+};
+
+/** Rust identifier tokens and possible wildcard imports in the input. */
+export function macroInput(
+  nodes: readonly Node[],
+  attachedItem = false,
+): MacroInput {
+  const pending = [...nodes];
+  const names = new Set<string>();
+  const itemNames = new Set<string>();
+  let star = false;
+  let bang = false;
+  let hasItemIdentifier = false;
+  let hasAttributes = false;
+  while (pending.length) {
+    const node = pending.pop()!;
+    if (/^(?:line_comment|block_comment)$|literal$/.test(node.type)) continue;
+    if (
+      attachedItem &&
+      (node.type.endsWith("_item") ||
+        node.type === "associated_type" ||
+        node.type === "macro_definition")
+    ) {
+      const itemName = node.childForFieldName("name");
+      if (itemName) itemNames.add(compact(itemName.text).normalize());
+    }
+    if (node.childCount) {
+      for (const child of node.children) pending.push(child);
+    } else {
+      star ||= node.type === "*";
+      bang ||= node.type === "!";
+      hasAttributes ||= node.type === "#";
+      const name = /^(?:r#|['$])?([_\p{ID_Start}][_\p{ID_Continue}]*)$/u.exec(
+        node.text,
+      )?.[1];
+      if (name) {
+        names.add(name.normalize());
+        hasItemIdentifier ||= node.type === "identifier" && name !== "_";
+      }
+    }
+  }
+  const mayIntroduceUnknownNames =
+    (star && names.has("use")) ||
+    (names.has("macro_use") && (names.has("mod") || names.has("extern"))) ||
+    (bang &&
+      [
+        "include",
+        "automod",
+        "paste",
+        "pastey",
+        "concat_idents",
+        "seq_macro",
+        "duplicate",
+      ].some((name) => names.has(name)));
+  return {
+    names: [...names].sort(),
+    ...(hasItemIdentifier &&
+    !nodes.every((node) =>
+      /^[\w.-]+(?:[/\\][\w.-]+)+$|^[\w-]+\.[\w.-]+$/.test(
+        node.text.slice(1, -1).trim(),
+      ),
+    )
+      ? { hasItemIdentifier: true }
+      : {}),
+    ...(itemNames.size ? { itemNames: [...itemNames].sort() } : {}),
+    ...(hasAttributes ? { hasAttributes: true } : {}),
+    ...(mayIntroduceUnknownNames ? { mayIntroduceUnknownNames: true } : {}),
+  };
+}
+
 /** Keywords that start an item or a binding when they open a statement. */
 const ITEM_WORDS = new Set([
   "fn",
@@ -24,6 +100,8 @@ const ITEM_WORDS = new Set([
   "macro_rules",
   "macro",
 ]);
+export const isMacroItemKeyword = (name: string): boolean =>
+  ITEM_WORDS.has(name);
 /** Tokens that make an argument's names or call syntax unreadable without parsing. */
 const ARGUMENT_HAZARDS = new Set([
   ...ITEM_WORDS,
@@ -122,42 +200,39 @@ function flat(seq: Node[]): Node[] {
   );
 }
 type PathAt = { start: number; segments: string[]; nodes: Node[] };
+const isPathSegment = (n: Node | undefined): n is Node =>
+  !!n &&
+  ["identifier", "self", "super", "crate", "metavariable"].includes(n.type);
+
 /** The path ending at index i (inclusive) of seq, walking back over `::`. */
-function pathEndingAt(seq: Node[], i: number): PathAt | null {
+function pathEndingAt(
+  seq: Node[],
+  i: number,
+  allowAbsolute = false,
+): PathAt | null {
+  if (!isPathSegment(seq[i])) return null;
   const nodes: Node[] = [];
+  const segments: string[] = [];
   let j = i;
   for (;;) {
-    const n = seq[j];
-    if (
-      !n ||
-      !["identifier", "self", "super", "crate", "metavariable"].includes(n.type)
-    )
-      return null;
+    const n = seq[j]!;
     nodes.unshift(n);
-    if (seq[j - 1]?.type === "::") {
-      nodes.unshift(seq[j - 1]!);
-      j -= 2;
-      continue;
-    }
     if (n.type === "crate" && seq[j - 1]?.type === "$") {
       nodes.unshift(seq[j - 1]!);
+      segments.unshift("$crate");
       j -= 1;
-    }
-    break;
-  }
-  // A leading `::` (global path) belongs to the path too.
-  if (seq[j - 1]?.type === "::" && nodes[0]?.type !== "::") {
+    } else segments.unshift(word(n));
+    if (seq[j - 1]?.type !== "::") break;
     nodes.unshift(seq[j - 1]!);
-    j -= 1;
+    if (!isPathSegment(seq[j - 2])) {
+      if (!allowAbsolute) return null;
+      // The separator has no path segment to its left.
+      segments.unshift("");
+      j -= 1;
+      break;
+    }
+    j -= 2;
   }
-  const segments = nodes
-    .filter((n) => n.type !== "::" && n.type !== "$")
-    .map((n) =>
-      n.type === "crate" && n.previousSibling?.type === "$"
-        ? "$crate"
-        : word(n),
-    );
-  if (nodes[0]?.type === "::") segments.unshift("");
   return { start: j, segments, nodes };
 }
 
@@ -168,12 +243,25 @@ export type MacroCall = {
   group: Node;
 };
 /** Nested invocations `path ! group` in one token sequence. */
-function invocations(seq: Node[]): { at: number; call: MacroCall }[] {
+function invocations(
+  seq: Node[],
+  unreadable?: () => void,
+): { at: number; call: MacroCall }[] {
   const found: { at: number; call: MacroCall }[] = [];
-  for (let i = 1; i + 1 < seq.length; i++) {
+  for (let i = 0; i + 1 < seq.length; i++) {
     if (seq[i]!.type !== "!" || !isGroup(seq[i + 1])) continue;
-    const path = pathEndingAt(seq, i - 1);
-    if (!path) continue;
+    // Scope proofs must account for absolute invocations even when the
+    // existing body and argument scanners do not produce sites for them.
+    const path = pathEndingAt(seq, i - 1, unreadable !== undefined);
+    if (!path) {
+      const previous = seq[i - 1];
+      if (
+        previous &&
+        (previous.type === "::" || previous.hasError || previous.isMissing)
+      )
+        unreadable?.();
+      continue;
+    }
     found.push({
       at: path.start,
       call: {
@@ -196,6 +284,8 @@ export type MacroProfile = {
   itemNeutral: boolean;
   /** Macros invoked at the top level of some arm, as written. */
   nested: string[];
+  /** Upper bound on names introduced into the surrounding scope. */
+  scope: MacroScopeProfile;
   /** Every arm that takes input passes all of it, unchanged and as the tail of
    * an argument list, to one of these macros; null when unproved. */
   forwards: string[] | null;
@@ -236,6 +326,138 @@ export type MacroProfile = {
   /** First segment of every macro name the transcribers invoke. */
   macroHeads: string[];
 };
+
+export type MacroScopeProfile = {
+  names: string[];
+  inputCanBind: boolean;
+  opaque: boolean;
+  keywordFromInput: boolean;
+};
+
+function scopeRepetitionsAreWhole(tokens: Node[]): boolean {
+  return tokens.every((token, index) => {
+    if (token.type !== "token_repetition") return true;
+    const repeated = inner(token);
+    const previous = tokens[index - 1];
+    const last = repeated.at(-1);
+    // An omitted repetition inside a declaration can change the name slot:
+    // `struct $($name)? Option;` can expand to `struct Option;`.
+    return (
+      (!previous || previous.type === ";") &&
+      (last?.type === ";" || opens(last, "{")) &&
+      scopeRepetitionsAreWhole(repeated)
+    );
+  });
+}
+
+function inspectScope(
+  top: Node[],
+  kinds: ReadonlyMap<string, string>,
+  names: Set<string>,
+): Omit<MacroScopeProfile, "names"> {
+  let inputCanBind = false;
+  let keywordFromInput = false;
+  // A top-level attribute or macro definition can change the tokens and
+  // macro lookup of this expansion. Imports can also rebind nested macros.
+  let opaque = false;
+  const emitted = invocations(top, () => {
+    opaque = true;
+  });
+  for (const { call } of emitted) {
+    const input = macroInput([call.group]);
+    for (const name of input.names) names.add(name);
+    if (call.group.descendantsOfType("metavariable").length)
+      inputCanBind = true;
+    // An attribute on a thread-local declaration can rewrite the static.
+    if (call.name.endsWith("::thread_local") && input.hasAttributes)
+      opaque = true;
+    if (
+      call.name
+        .split("::")
+        .some((part) => part.startsWith("$") && part !== "$crate")
+    )
+      opaque = true;
+  }
+  for (let i = 0; i < top.length; i++) {
+    const token = top[i]!,
+      keyword = word(token);
+    if (
+      token.type === "#" ||
+      (token.type === "$" && top[i + 1]?.type !== "crate") ||
+      keyword === "macro" ||
+      keyword === "macro_rules"
+    )
+      opaque = true;
+    if (keyword === "let") inputCanBind = true;
+    if (token.type === "metavariable") {
+      const kind = kinds.get(token.text);
+      if (token.text === "$crate" && top[i + 1]?.type === "::") continue;
+      if (top[i + 1]?.type === "!" || !kind) opaque = true;
+      if (kind === "ident") {
+        // An ident can be a keyword, as in `$kw Option` with `struct`.
+        // Only these positions require the token to be a name.
+        const previous = top[i - 1] ? word(top[i - 1]!) : "";
+        const before = top[i - 2] ? word(top[i - 2]!) : "";
+        if (
+          !ITEM_WORDS.has(previous) &&
+          previous !== "let" &&
+          !(previous === "mut" && ["static", "let"].includes(before))
+        ) {
+          opaque = true;
+          const next = top[i + 1];
+          if (
+            next &&
+            (["identifier", "metavariable", "::"].includes(next.type) ||
+              opens(next, "{") ||
+              opens(next, "["))
+          )
+            keywordFromInput = true;
+        }
+      }
+      if (kind && ["tt", "item", "stmt"].includes(kind)) {
+        // The input may supply the keyword, not just the new item's name.
+        inputCanBind = true;
+        // A raw token or item can introduce an import, macro or attribute.
+        opaque = true;
+      }
+    }
+    if (!ITEM_WORDS.has(keyword) || keyword === "impl") continue;
+    if (keyword === "use" || keyword === "extern") {
+      const end = top.findIndex((n, j) => j > i && n.type === ";");
+      const tokens = top.slice(i + 1, end < 0 ? undefined : end);
+      // Include parent names for `use path::{self, ...}` and both sides
+      // of aliases. Globs and macro-use imports have unbounded exports.
+      if (
+        emitted.length ||
+        // A foreign block can introduce declarations via another macro.
+        (keyword === "extern" &&
+          (opens(top[i + 1], "{") || opens(top[i + 2], "{"))) ||
+        tokens.some(
+          (n) =>
+            n.type === "*" ||
+            n.descendantsOfType("*").length > 0 ||
+            n.type === "metavariable" ||
+            n.descendantsOfType("metavariable").length > 0,
+        )
+      )
+        opaque = true;
+      for (const name of macroInput(tokens).names) names.add(name);
+      continue;
+    }
+    const next =
+      top[i + (keyword === "static" && top[i + 1]?.text === "mut" ? 2 : 1)];
+    if (next?.type === "metavariable") inputCanBind = true;
+    else if (next?.type === "identifier")
+      names.add(compact(next.text).normalize());
+    else if (
+      next &&
+      /^(?:r#)?[_\p{ID_Start}][_\p{ID_Continue}]*$/u.test(next.text)
+    )
+      names.add(compact(next.text).normalize());
+    else if (!next || !["_", "("].includes(next.type)) opaque = true;
+  }
+  return { inputCanBind, opaque, keywordFromInput };
+}
 
 /** Names an item statement in `seq` binds, `*` when not readable. */
 function itemNames(seq: Node[]): string[] {
@@ -333,6 +555,7 @@ export function macroProfile(definition: Node): MacroProfile {
     neutral = true,
     itemNeutral = true;
   const nested = new Set<string>(),
+    scopeNames = new Set<string>(),
     forwardTargets = new Set<string>(),
     forwardShadow = new Set<string>(),
     calls: MacroProfile["calls"] = [],
@@ -340,7 +563,10 @@ export function macroProfile(definition: Node): MacroProfile {
     useNames = new Set<string>(),
     macroHeads = new Set<string>();
   let forwards = true,
-    clean = true;
+    clean = true,
+    scopeInputCanBind = false,
+    scopeOpaque = false,
+    scopeKeywordFromInput = false;
   let blockLocal = false;
   for (let a = definition.parent; a && a.type !== "source_file"; a = a.parent)
     if (a.type === "block") blockLocal = true;
@@ -377,7 +603,12 @@ export function macroProfile(definition: Node): MacroProfile {
     const takesInput = m.length > 0;
     let armForwards = false;
     // Neutrality: inspect the top level of the transcriber.
-    const top = flat(inner(body));
+    const transcriber = inner(body);
+    const top = flat(transcriber);
+    const scope = inspectScope(top, kinds, scopeNames);
+    scopeInputCanBind ||= scope.inputCanBind;
+    scopeOpaque ||= scope.opaque || !scopeRepetitionsAreWhole(transcriber);
+    scopeKeywordFromInput ||= scope.keywordFromInput;
     for (let i = 0; i < top.length; i++) {
       const n = top[i]!,
         w = word(n);
@@ -387,14 +618,19 @@ export function macroProfile(definition: Node): MacroProfile {
         !["if", "while", "&&"].includes(top[i - 1] ? word(top[i - 1]!) : "");
       if (statementLet) neutral = false;
       if (ITEM_WORDS.has(w) || n.type === "#") neutral = itemNeutral = false;
-      if (n.type === "metavariable") {
+      if (
+        n.type === "metavariable" &&
+        !(n.text === "$crate" && top[i + 1]?.type === "::")
+      ) {
         const kind = kinds.get(n.text);
         if (!kind || ["tt", "item", "stmt"].includes(kind))
           neutral = itemNeutral = false;
         if (top[i + 1]?.type === "!") neutral = itemNeutral = false;
       }
     }
-    for (const { call } of invocations(top))
+    for (const { call } of invocations(top, () => {
+      neutral = itemNeutral = false;
+    }))
       if (
         call.name.split("::").some((s) => s.startsWith("$") && s !== "$crate")
       )
@@ -544,6 +780,12 @@ export function macroProfile(definition: Node): MacroProfile {
     neutral,
     itemNeutral,
     nested: [...nested].sort(),
+    scope: {
+      names: [...scopeNames].sort(),
+      inputCanBind: scopeInputCanBind,
+      opaque: !readable || scopeOpaque,
+      keywordFromInput: scopeKeywordFromInput,
+    },
     forwards: readable && forwards ? [...forwardTargets].sort() : null,
     forwardShadow: [...forwardShadow].sort(),
     arms: rules.length,

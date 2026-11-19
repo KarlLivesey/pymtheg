@@ -1,0 +1,496 @@
+{
+ "repos": [
+  {
+   "id": "cli/cli",
+   "linksBefore": 208845,
+   "linksAfter": 208845,
+   "definiteBefore": 133526,
+   "definiteAfter": 134437,
+   "newlyDefiniteExisting": {
+    "imports": 72,
+    "references": 603,
+    "calls": 234,
+    "embeds": 2
+   },
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 27259,
+   "symbolsAfter": 27259,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "cockroachdb/pebble",
+   "linksBefore": 200878,
+   "linksAfter": 200878,
+   "definiteBefore": 144642,
+   "definiteAfter": 144835,
+   "newlyDefiniteExisting": {
+    "calls": 193
+   },
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 20080,
+   "symbolsAfter": 20080,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "golang/tools",
+   "linksBefore": 250351,
+   "linksAfter": 250351,
+   "definiteBefore": 149472,
+   "definiteAfter": 154564,
+   "newlyDefiniteExisting": {
+    "imports": 777,
+    "calls": 1984,
+    "references": 2331
+   },
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 30732,
+   "symbolsAfter": 30732,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "protocolbuffers/protobuf-go",
+   "linksBefore": 216975,
+   "linksAfter": 216975,
+   "definiteBefore": 175091,
+   "definiteAfter": 179186,
+   "newlyDefiniteExisting": {
+    "imports": 60,
+    "references": 238,
+    "calls": 3797
+   },
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 46060,
+   "symbolsAfter": 46060,
+   "symbolsMissing": 0
+  }
+ ],
+ "totals": {
+  "linksBefore": 877049,
+  "linksAfter": 877049,
+  "definiteBefore": 602731,
+  "definiteAfter": 613022,
+  "lost": 0,
+  "retargeted": 0,
+  "removedSites": 0,
+  "symbolsBefore": 124131,
+  "symbolsAfter": 124131,
+  "symbolsMissing": 0
+ },
+ "changed": [],
+ "missingSymbols": [],
+ "sample": [
+  {
+   "repo": "cli/cli",
+   "file": ".github/skills/cli-exercise/tool/internal/evidence/render.go",
+   "line": 302,
+   "kind": "references",
+   "name": "state.Data.Rows",
+   "was": "unresolved",
+   "target": ".github/skills/cli-exercise/tool/internal/recording/models.go:field:TerminalData.Rows",
+   "source": "terminalHeight = max(terminalHeight, state.Data.Rows*raster.fonts.CellHeight)"
+  },
+  {
+   "repo": "golang/tools",
+   "file": "gopls/internal/analysis/deprecated/deprecated.go",
+   "line": 181,
+   "kind": "references",
+   "name": "pass.Pkg",
+   "was": "unresolved",
+   "target": "go/analysis/analysis.go:field:Pass.Pkg",
+   "source": "if pass.Pkg.Path() != \"syscall\" {"
+  },
+  {
+   "repo": "cockroachdb/pebble",
+   "file": "vfs/vfstest/vfstest.go",
+   "line": 13,
+   "kind": "calls",
+   "name": "*discardFile",
+   "was": "unresolved",
+   "target": "vfs/vfstest/vfstest.go:struct:discardFile",
+   "source": "var DiscardFile vfs.File = (*discardFile)(nil)"
+  },
+  {
+   "repo": "cli/cli",
+   "file": ".github/skills/cli-exercise/tool/internal/evidence/render.go",
+   "line": 526,
+   "kind": "references",
+   "name": "raster.fonts.Styles",
+   "was": "unresolved",
+   "target": ".github/skills/cli-exercise/tool/internal/fontutil/font.go:field:Set.Styles",
+   "source": "FontStyles: raster.fonts.Styles, FontFallbacks: raster.fonts.Fallbacks,"
+  },
+  {
+   "repo": "protocolbuffers/protobuf-go",
+   "file": "internal/testprotos/testeditions/testeditions_opaque/test.opaque.pb.go",
+   "line": 7976,
+   "kind": "calls",
+   "name": "*testRequiredForeign_OneofMessage",
+   "was": "unresolved",
+   "target": "internal/testprotos/testeditions/testeditions_opaque/test.opaque.pb.go:struct:testRequiredForeign_OneofMessage",
+   "source": "(*testRequiredForeign_OneofMessage)(nil),"
+  },
+  {
+   "repo": "protocolbuffers/protobuf-go",
+   "file": "cmd/protoc-gen-go/testdata/import_public/a.pb.go",
+   "line": 26,
+   "kind": "references",
+   "name": "sub.E_value",
+   "was": "unresolved",
+   "target": "cmd/protoc-gen-go/testdata/import_public/sub/a.pb.go:var:E_value",
+   "source": "var E_value = sub.E_value"
+  },
+  {
+   "repo": "protocolbuffers/protobuf-go",
+   "file": "types/known/apipb/api.pb.go",
+   "line": 491,
+   "kind": "calls",
+   "name": "*Method",
+   "was": "unresolved",
+   "target": "types/known/apipb/api.pb.go:struct:Method",
+   "source": "(*Method)(nil),                        // 1: google.protobuf.Method"
+  },
+  {
+   "repo": "golang/tools",
+   "file": "gopls/internal/golang/splitpkg/graph.go",
+   "line": 18,
+   "kind": "references",
+   "name": "set.Set",
+   "was": "unresolved",
+   "target": "internal/collection/set/set.go:type:Set",
+   "source": "func addNode(g graph, node int) set.Set[int] {"
+  },
+  {
+   "repo": "protocolbuffers/protobuf-go",
+   "file": "internal/testprotos/test/test.pb.go",
+   "line": 3625,
+   "kind": "calls",
+   "name": "*TestAllExtensions",
+   "was": "unresolved",
+   "target": "internal/testprotos/test/test.pb.go:struct:TestAllExtensions",
+   "source": "ExtendedType:  (*TestAllExtensions)(nil),"
+  },
+  {
+   "repo": "protocolbuffers/protobuf-go",
+   "file": "cmd/protoc-gen-go/name_clash_test/name_clash_test.go",
+   "line": 129,
+   "kind": "calls",
+   "name": "m7.GetBar",
+   "was": "unresolved",
+   "target": "cmd/protoc-gen-go/testdata/nameclash/test_name_clash_open/test_name_clash_open.pb.go:method:(*M7).GetBar",
+   "source": "t.Errorf(\"Proto field 'bar' has unexpected value %v for %T (expected 3)\", m7.GetBar(), m7)"
+  },
+  {
+   "repo": "cli/cli",
+   "file": ".github/skills/cli-exercise/tool/internal/engine/runtime.go",
+   "line": 389,
+   "kind": "references",
+   "name": "event.ExitCode",
+   "was": "unresolved",
+   "target": ".github/skills/cli-exercise/tool/internal/terminal/session.go:field:Event.ExitCode",
+   "source": "runtime.exitCode, runtime.exitSignal = event.ExitCode, event.Signal"
+  },
+  {
+   "repo": "protocolbuffers/protobuf-go",
+   "file": "cmd/protoc-gen-go/testdata/nameclash/test_name_clash_open3/test_name_clash_open3.pb.go",
+   "line": 960,
+   "kind": "calls",
+   "name": "*M5",
+   "was": "unresolved",
+   "target": "cmd/protoc-gen-go/testdata/nameclash/test_name_clash_open3/test_name_clash_open3.pb.go:struct:M5",
+   "source": "(*M5)(nil),  // 5: net.proto2.go.testdata.nameclashopen3.M5"
+  },
+  {
+   "repo": "cli/cli",
+   "file": "internal/barista/observability/telemetry.pb.go",
+   "line": 250,
+   "kind": "calls",
+   "name": "*RecordEventsResponse",
+   "was": "unresolved",
+   "target": "internal/barista/observability/telemetry.pb.go:struct:RecordEventsResponse",
+   "source": "(*RecordEventsResponse)(nil), // 2: clientappsfe.observability.v1.RecordEventsResponse"
+  },
+  {
+   "repo": "protocolbuffers/protobuf-go",
+   "file": "internal/testprotos/legacy/proto2_20180814_aa810b61/test.pb.go",
+   "line": 2673,
+   "kind": "calls",
+   "name": "*Message",
+   "was": "unresolved",
+   "target": "internal/testprotos/legacy/proto2_20180814_aa810b61/test.pb.go:struct:Message",
+   "source": "ExtendedType:  (*Message)(nil),"
+  },
+  {
+   "repo": "golang/tools",
+   "file": "gopls/internal/cache/analysis.go",
+   "line": 994,
+   "kind": "references",
+   "name": "analyzer.Name",
+   "was": "unresolved",
+   "target": "go/analysis/analysis.go:field:Analyzer.Name",
+   "source": "event.Error(ctx, fmt.Sprintf(\"internal error converting diagnostic from analyzer %q\", analyzer.Name), err)"
+  },
+  {
+   "repo": "cli/cli",
+   "file": ".github/skills/cli-exercise/tool/internal/evidence/raster.go",
+   "line": 250,
+   "kind": "references",
+   "name": "raster.fonts.CellHeight",
+   "was": "unresolved",
+   "target": ".github/skills/cli-exercise/tool/internal/fontutil/font.go:field:Set.CellHeight",
+   "source": "offset := len(command) * raster.fonts.CellHeight"
+  },
+  {
+   "repo": "protocolbuffers/protobuf-go",
+   "file": "internal/testprotos/conformance/editionsmigration/test_messages_proto3_editions.pb.go",
+   "line": 2095,
+   "kind": "calls",
+   "name": "*timestamppb.Timestamp",
+   "was": "unresolved",
+   "target": "types/known/timestamppb/timestamp.pb.go:struct:Timestamp",
+   "source": "(*timestamppb.Timestamp)(nil),            // 39: google.protobuf.Timestamp"
+  },
+  {
+   "repo": "cockroachdb/pebble",
+   "file": "internal/keyspan/defragment.go",
+   "line": 182,
+   "kind": "calls",
+   "name": "*DefragmentingIter",
+   "was": "unresolved",
+   "target": "internal/keyspan/defragment.go:struct:DefragmentingIter",
+   "source": "var _ FragmentIterator = (*DefragmentingIter)(nil)"
+  },
+  {
+   "repo": "protocolbuffers/protobuf-go",
+   "file": "internal/impl/message_reflect.go",
+   "line": 422,
+   "kind": "calls",
+   "name": "*messageReflectWrapper",
+   "was": "unresolved",
+   "target": "internal/impl/message_reflect.go:type:messageReflectWrapper",
+   "source": "return (*messageReflectWrapper)(m)"
+  },
+  {
+   "repo": "protocolbuffers/protobuf-go",
+   "file": "cmd/protoc-gen-go/name_clash_test/name_clash_test.go",
+   "line": 671,
+   "kind": "calls",
+   "name": "m10.GetSetFoo",
+   "was": "unresolved",
+   "target": "cmd/protoc-gen-go/testdata/nameclash/test_name_clash_opaque/test_name_clash_opaque.pb.go:method:(*M10).GetSetFoo",
+   "source": "t.Errorf(\"Proto field 'foo' has unexpected value %v for %T (expected 11)\", m10.GetSetFoo(), m10)"
+  },
+  {
+   "repo": "protocolbuffers/protobuf-go",
+   "file": "cmd/protoc-gen-go/feature_resolution_test/feature_resolution_test.go",
+   "line": 704,
+   "kind": "references",
+   "name": "testfeaturespb.TestFeatures_builder",
+   "was": "unresolved",
+   "target": "cmd/protoc-gen-go/testdata/features/test_features.pb.go:struct:TestFeatures_builder",
+   "source": "proto.SetExtension(features2, testfeaturespb.E_TestFeatures, testfeaturespb.TestFeatures_builder{"
+  },
+  {
+   "repo": "golang/tools",
+   "file": "gopls/internal/server/call_hierarchy.go",
+   "line": 33,
+   "kind": "calls",
+   "name": "event.Start",
+   "was": "unresolved",
+   "target": "internal/event/event.go:function:Start",
+   "source": "ctx, done := event.Start(ctx, \"server.IncomingCalls\")"
+  },
+  {
+   "repo": "golang/tools",
+   "file": "gopls/internal/golang/implement_interface.go",
+   "line": 208,
+   "kind": "calls",
+   "name": "cursorutil.FirstEnclosing",
+   "was": "unresolved",
+   "target": "internal/cursorutil/util.go:function:FirstEnclosing",
+   "source": "spec, curSpec := cursorutil.FirstEnclosing[*ast.TypeSpec](cur)"
+  },
+  {
+   "repo": "cli/cli",
+   "file": ".github/skills/cli-exercise/tool/internal/evidence/render.go",
+   "line": 66,
+   "kind": "references",
+   "name": "fontutil.Info",
+   "was": "unresolved",
+   "target": ".github/skills/cli-exercise/tool/internal/fontutil/font.go:struct:Info",
+   "source": "Font                    *fontutil.Info       `json:\"font,omitempty\"`"
+  },
+  {
+   "repo": "protocolbuffers/protobuf-go",
+   "file": "internal/testprotos/legacy/proto3_20180430_b4deda09/test.pb.go",
+   "line": 971,
+   "kind": "calls",
+   "name": "*Message_OneofUint32",
+   "was": "unresolved",
+   "target": "internal/testprotos/legacy/proto3_20180430_b4deda09/test.pb.go:struct:Message_OneofUint32",
+   "source": "(*Message_OneofUint32)(nil),"
+  },
+  {
+   "repo": "golang/tools",
+   "file": "gopls/internal/cache/load.go",
+   "line": 442,
+   "kind": "references",
+   "name": "pkg.Name",
+   "was": "unresolved",
+   "target": "go/packages/packages.go:field:Package.Name",
+   "source": "Name:       PackageName(pkg.Name),"
+  },
+  {
+   "repo": "protocolbuffers/protobuf-go",
+   "file": "internal/testprotos/legacy/proto3_20180125_92554152/test.pb.go",
+   "line": 941,
+   "kind": "calls",
+   "name": "*Message_OneofSfixed64",
+   "was": "unresolved",
+   "target": "internal/testprotos/legacy/proto3_20180125_92554152/test.pb.go:struct:Message_OneofSfixed64",
+   "source": "(*Message_OneofSfixed64)(nil),"
+  },
+  {
+   "repo": "protocolbuffers/protobuf-go",
+   "file": "internal/impl/legacy_test.go",
+   "line": 281,
+   "kind": "calls",
+   "name": "*LegacyTestMessage",
+   "was": "unresolved",
+   "target": "internal/impl/legacy_test.go:struct:LegacyTestMessage",
+   "source": "ExtendedType:  (*LegacyTestMessage)(nil),"
+  },
+  {
+   "repo": "cli/cli",
+   "file": ".github/skills/cli-exercise/tool/internal/evidence/render.go",
+   "line": 500,
+   "kind": "calls",
+   "name": "cliutil.WriteJSON",
+   "was": "unresolved",
+   "target": ".github/skills/cli-exercise/tool/internal/cliutil/io.go:function:WriteJSON",
+   "source": "if err := cliutil.WriteJSON(manifest, map[string]any{"
+  },
+  {
+   "repo": "protocolbuffers/protobuf-go",
+   "file": "cmd/protoc-gen-go/name_clash_test/name_clash_proto3_test.go",
+   "line": 291,
+   "kind": "calls",
+   "name": "m6.GetGetFoo_",
+   "was": "unresolved",
+   "target": "cmd/protoc-gen-go/testdata/nameclash/test_name_clash_hybrid3/test_name_clash_hybrid3.pb.go:method:(*M6).GetGetFoo_",
+   "source": "t.Errorf(\"Proto field 'get_foo' has unexpected value %v for %T (expected 2)\", m6.GetGetFoo_().GetI1(), m6)"
+  },
+  {
+   "repo": "protocolbuffers/protobuf-go",
+   "file": "cmd/protoc-gen-go/testdata/extensions/ext/ext.pb.go",
+   "line": 520,
+   "kind": "calls",
+   "name": "*Message",
+   "was": "unresolved",
+   "target": "cmd/protoc-gen-go/testdata/extensions/ext/ext.pb.go:struct:Message",
+   "source": "ExtensionType: (*Message)(nil),"
+  },
+  {
+   "repo": "golang/tools",
+   "file": "gopls/internal/cache/load.go",
+   "line": 178,
+   "kind": "references",
+   "name": "pkg.ID",
+   "was": "unresolved",
+   "target": "go/packages/packages.go:field:Package.ID",
+   "source": "} else if pkg.ForTest == \"\" && !strings.HasSuffix(pkg.ID, \".test\") {"
+  },
+  {
+   "repo": "protocolbuffers/protobuf-go",
+   "file": "cmd/protoc-gen-go/name_clash_test/name_clash_proto3_test.go",
+   "line": 546,
+   "kind": "calls",
+   "name": "m3.GetFoo().GetI1",
+   "was": "unresolved",
+   "target": "cmd/protoc-gen-go/testdata/nameclash/test_name_clash_opaque3/test_name_clash_opaque3.pb.go:method:(*M0).GetI1",
+   "source": "t.Errorf(\"Proto field 'foo' has unexpected value %v for %T (expected 1)\", m3.GetFoo().GetI1(), m3)"
+  },
+  {
+   "repo": "protocolbuffers/protobuf-go",
+   "file": "cmd/protoc-gen-go/name_clash_test/name_clash_proto3_test.go",
+   "line": 546,
+   "kind": "calls",
+   "name": "m3.GetFoo",
+   "was": "unresolved",
+   "target": "cmd/protoc-gen-go/testdata/nameclash/test_name_clash_opaque3/test_name_clash_opaque3.pb.go:method:(*M3).GetFoo",
+   "source": "t.Errorf(\"Proto field 'foo' has unexpected value %v for %T (expected 1)\", m3.GetFoo().GetI1(), m3)"
+  },
+  {
+   "repo": "protocolbuffers/protobuf-go",
+   "file": "internal/testprotos/lazy/lazy_extension_test.pb.go",
+   "line": 618,
+   "kind": "calls",
+   "name": "*Pipistrelle",
+   "was": "unresolved",
+   "target": "internal/testprotos/lazy/lazy_extension_test.pb.go:struct:Pipistrelle",
+   "source": "(*Pipistrelle)(nil),             // 6: lazy_extension_test.Pipistrelle"
+  },
+  {
+   "repo": "golang/tools",
+   "file": "gopls/internal/analysis/yield/yield.go",
+   "line": 185,
+   "kind": "references",
+   "name": "to.Instrs",
+   "was": "unresolved",
+   "target": "go/ssa/ssa.go:field:BasicBlock.Instrs",
+   "source": "for _, instr := range to.Instrs {"
+  },
+  {
+   "repo": "golang/tools",
+   "file": "gopls/internal/test/integration/misc/imports_test.go",
+   "line": 454,
+   "kind": "references",
+   "name": "ix.Entries",
+   "was": "unresolved",
+   "target": "internal/modindex/index.go:field:Index.Entries",
+   "source": "} else if len(ix.Entries) != 2 {"
+  },
+  {
+   "repo": "protocolbuffers/protobuf-go",
+   "file": "internal/testprotos/registry/test.pb.go",
+   "line": 359,
+   "kind": "calls",
+   "name": "*Message2",
+   "was": "unresolved",
+   "target": "internal/testprotos/registry/test.pb.go:struct:Message2",
+   "source": "ExtensionType: (*Message2)(nil),"
+  },
+  {
+   "repo": "protocolbuffers/protobuf-go",
+   "file": "internal/impl/legacy_test.go",
+   "line": 225,
+   "kind": "calls",
+   "name": "*LegacyTestMessage",
+   "was": "unresolved",
+   "target": "internal/impl/legacy_test.go:struct:LegacyTestMessage",
+   "source": "ExtendedType:  (*LegacyTestMessage)(nil),"
+  },
+  {
+   "repo": "protocolbuffers/protobuf-go",
+   "file": "internal/testprotos/testeditions/testeditions_opaque/test.opaque.pb.go",
+   "line": 7757,
+   "kind": "calls",
+   "name": "*TestAllTypes_OneofGroup",
+   "was": "unresolved",
+   "target": "internal/testprotos/testeditions/testeditions_opaque/test.opaque.pb.go:struct:TestAllTypes_OneofGroup",
+   "source": "(*TestAllTypes_OneofGroup)(nil),      // 33: opaque.goproto.proto.testeditions.TestAllTypes.OneofGroup"
+  }
+ ],
+ "poolSize": 9380
+}

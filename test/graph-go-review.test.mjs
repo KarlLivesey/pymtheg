@@ -216,7 +216,11 @@ test("5: embedded pointers put pointer-receiver methods in the value method set"
 
 test("6: imports resolve in the importing module's context and respect nested modules", async () => {
   const { links } = await project({
-    "go.mod": lines("module example.com/m", "replace example.com/dep => ./one"),
+    "go.mod": lines(
+      "module example.com/m",
+      "require example.com/dep v0.0.0",
+      "replace example.com/dep => ./one",
+    ),
     "sub/go.mod": "module example.com/sub\n",
     "sub/s.go": "package sub\nfunc S() {}\n",
     "nested/go.mod": "module example.com/nest\n",
@@ -225,6 +229,7 @@ test("6: imports resolve in the importing module's context and respect nested mo
     "one/d.go": "package dep\nfunc F() {}\n",
     "other/go.mod": lines(
       "module example.com/other",
+      "require example.com/dep v0.0.0",
       "replace example.com/dep => ./two",
     ),
     "other/two/go.mod": "module example.com/dep\n",
@@ -267,7 +272,9 @@ test("6: go.work makes used modules main modules and its replaces apply", async 
   const { links } = await project({
     "go.work":
       "go 1.22\nuse (\n\t./a\n\t./b\n)\nreplace example.com/w => ./w\n",
-    "a/go.mod": "module example.com/a\n",
+    // A replace applies only to a required module (Go: "replaced but not
+    // required"; evidence/c-8/go-import-rules.sh).
+    "a/go.mod": "module example.com/a\nrequire example.com/w v0.0.0\n",
     "a/a.go":
       'package a\nimport (\n\t"example.com/b"\n\t"example.com/w"\n)\nfunc A() { b.B(); w.W() }\n',
     "b/go.mod": "module example.com/b\n",

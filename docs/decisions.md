@@ -2647,6 +2647,68 @@ level 2. **Open:** once the Go, Rust and TypeScript
 items record library targets, the export's reconstruction can be limited to
 schema-3 graphs. See [C-5](changes/C-5.md).
 
+### C-11 TypeScript and JavaScript library declarations
+
+Library members reached through a checker type name their selected declaration.
+An ECMAScript declaration names unit `es`, and a web declaration names unit
+`dom`. With a missing dependency declaration, lexical bindings prove written
+export names. A member reached through an arbitrary imported value names the
+unit only. The proof does not come from the receiver's package. Existing sites
+and checkout symbols retain their identities. Stored library outcomes replace
+coverage reconstruction for TypeScript module 23 onward. See [C-11](changes/C-11.md).
+
+Review revision 26 applies captured Deno maps before choosing a unit. Installed
+declarations, captured type packages or an importing manifest's external
+dependency can establish that a declaration describes an outside package.
+Lexical outside identity can survive unrelated unreadable declarations.
+Direct writes to a module object in the same file withhold that member's
+symbol while preserving the unit. Module 27 also records written namespace
+selections in qualified import aliases and type-only ambient heritage.
+Module 28 requires positive package-route evidence. An explicitly named
+registry or a dependency up through the workspace boundary can supply
+that evidence. Bare builtins can have a declared npm alternative. The
+program's missing global type declarations limit which bundled globals
+can be definite, using documented Node globals to name alternatives.
+Module 29 extends that proof to type positions and typed receivers. The
+compiler's explicit ambient types selection takes precedence over manifest
+inference. Source type references and positive file-local Node runtime evidence
+count independently. Missing environment types can overlap web declarations.
+Missing test and tooling types affect their own documented globals. An npm
+alias or captured pnpm or Bun catalog supplies the registry name and can supply an
+exact pin with its source path.
+
+### Go imports follow the go command, not its pattern rules (C-8)
+
+**Decided (C-8):** a Go import resolves as the go command resolves it
+(checked with Go 1.27.4, `evidence/c-8/go-import-rules.sh`): the modules
+that may provide the package are the main modules and the modules they
+require, through their replacements; a `replace` of a module that is not
+required does nothing; a local replacement (`./x`, `../x`, `.` and `..`,
+as `modfile.IsDirectoryPath` reads them) counts only when its directory has a
+captured go.mod; a package is there only with a file Go can build (`ignore`
+is never set); two modules that both provide it are an ambiguous import,
+unresolved with `import-destination-uncertain`. A package under a
+`testdata`, `_x` or `.x` directory is imported like any other, and a module
+may sit under such a directory. A conversion to a pointer type (`(*T)(x)`)
+links to `T` as `T(x)` does; its value has type `*T`, so its members are
+`T`'s, and under more than one `*` or when `T` is itself a pointer type it
+has none. A call through a function declared in several build variants has
+one answer only when the variants cover every build of the calling file and
+agree. Every build test (variant calls, C-4's selection over types declared
+in several variants, methods per variant, buildable files) counts every name
+as a free tag (`-tags=freebsd` on Linux, `-tags=cgo` with cgo disabled), with
+one of Go's port GOOS and GOARCH values true and `import "C"` needing cgo
+enabled; C-4's one-GOOS solver is gone. Go module version 29. **Why:** the go command skips those directories only when
+it expands `./...` patterns and builds explicit imports of them; the earlier
+rule called them forbidden, which left protobuf-go's generated test
+packages, cli/cli's `.github` modules and all of gopls
+(`replace golang.org/x/tools => ..`) outside the checkout. **Supersedes:** the
+support matrix's "imports Go forbids (`testdata`)", and the reading that a
+`replace` alone makes a destination. **Rules out:** results of
+type-parameter type without stored type arguments; one definite target for a
+call whose build-variant callees return different named types. See
+[C-8](changes/C-8.md).
+
 ### Rust locals, generic parameters and inferred receivers (C-10)
 
 **Decided (C-10, manager brief):** a Rust reference that the graph already
@@ -2724,6 +2786,54 @@ configuration maps registry indexes or Git URLs and ref selectors to a
 directory source. A proven package selection is required to resolve inside it.
 Rust coverage now credits recorded targets on graphs made by the supporting
 module version. See [C-9](changes/C-9.md).
+
+### C-12 Rust lexical macro scope
+
+The resolver can clear an opaque expansion for one name when captured
+declarative arms and their reachable macro definitions bound the names that
+expansion can introduce. Standard macros with expression or literal outputs
+and recognized built-in derives have documented output bounds. A second pass
+can also resolve using the assumption that a proven external macro
+introduces only input names or, for a derive or attribute, names formed
+from whole case-insensitive components of input item names. Function-like
+macros need an item identifier in their input. The link records
+`rust-external-macro-name` in `data.assumes`. The coverage export counts those
+links separately and includes them in Level 2 when they have a checkout target
+or a named library target. A captured macro definition, a competing glob, an
+unproven macro binding and a layout expansion keep their source requirements.
+See [C-12](changes/C-12.md).
+
+### C-14 Go library targets
+
+Go records a library target where the source proves the package and, for a
+symbol, the name: an import of a package no checkout module provides or may
+provide; an exported name through the one import that binds its qualifier;
+an unshadowed builtin call (unit `builtin`). An unnamed dependency import is
+taken to bind its conventional name (last path element without a major
+version suffix or `go-` prefix), because the package clause is not in the
+checkout; a qualifier that matches no import's conventional name, or more
+than one, is not followed. **Trade:** two unnamed imports whose package
+clauses are each other's conventional names would be crossed; no real
+project writes that, and goimports adds a name wherever clause and path
+differ. A member of a library-typed value is not given the receiver's unit:
+the member may be promoted from an embedded type of another package
+(`*exec.ExitError`'s `ExitCode` is `os`'s), so source-only it is unresolved
+with `library-member-unproven`, and the opt-in toolchain route names its
+declaring owner. Vendored modules are checkout code, never library. See
+[C-14](changes/C-14.md).
+
+### C-16 Ambient test globals and member ownership
+
+A compiler program can identify a supported ambient test global from a
+selected type entry, a source reference or a side-effect import with package
+evidence. An explicit lexical binding wins. Conflicting modelled framework
+providers form a candidate set. A known unmodelled ambient type request leaves
+the shared name unresolved and records the request. For a member, the
+checker-selected declaration is the source of `declaring-owner` evidence.
+When the declaration is unavailable, an annotation that names an imported
+receiver type can establish the package unit. The program-wide Node overlap
+rules also apply to checker-selected members reached through the new aliases
+and selectors. [C-16](changes/C-16.md)
 
 ### C-13 TypeScript program budget and compiler exceptions
 

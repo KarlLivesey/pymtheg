@@ -5,7 +5,14 @@
  * line, and `_GOOS`/`_GOARCH` filename suffixes). Nothing here selects one
  * configuration; an expression it cannot read is unknown.
  */
-import { KNOWN_GOARCH, KNOWN_GOOS, type FileFact } from "./model.js";
+import {
+  KNOWN_GOARCH,
+  KNOWN_GOOS,
+  PORTS,
+  PORT_GOARCH,
+  PORT_GOOS,
+  type FileFact,
+} from "./model.js";
 
 export type Formula =
   | { k: "t" }
@@ -17,29 +24,6 @@ export type Formula =
 const TRUE: Formula = { k: "t" };
 const and = (a: Formula, b: Formula): Formula =>
   a.k === "t" ? b : b.k === "t" ? a : { k: "and", a, b };
-/** GOOS values that imply another GOOS tag. */
-const IMPLIED: { [goos: string]: string } = {
-  android: "linux",
-  ios: "darwin",
-  illumos: "solaris",
-};
-const UNIX = new Set([
-  "aix",
-  "android",
-  "darwin",
-  "dragonfly",
-  "freebsd",
-  "hurd",
-  "illumos",
-  "ios",
-  "linux",
-  "netbsd",
-  "openbsd",
-  "solaris",
-]);
-/** Above this many free tags satisfiability is not computed (unknown). */
-const MAX_FREE_TAGS = 10;
-
 /** A `//go:build` expression; undefined when it cannot be read. */
 function parseExpression(text: string): Formula | undefined {
   const tokens = text.match(/\|\||&&|!|\(|\)|[A-Za-z0-9_.]+|\S/g) ?? [];
@@ -97,6 +81,24 @@ function parseLegacy(text: string): Formula | undefined {
   return any;
 }
 
+/** Real cgo enablement, apart from the `cgo` tag (not a valid tag name). */
+const CGO_ENABLED = "cgo!enabled";
+const withCgo = (formula: Formula): Formula => {
+  switch (formula.k) {
+    case "v":
+      return formula.n === "cgo"
+        ? { k: "or", a: formula, b: { k: "v", n: CGO_ENABLED } }
+        : formula;
+    case "not":
+      return { k: "not", x: withCgo(formula.x) };
+    case "and":
+    case "or":
+      return { k: formula.k, a: withCgo(formula.a), b: withCgo(formula.b) };
+    default:
+      return formula;
+  }
+};
+
 /** The file's constraint (TRUE: none); undefined when it cannot be read. */
 export function fileConstraint(fact: FileFact): Formula | undefined {
   let formula: Formula = TRUE;
@@ -116,9 +118,11 @@ export function fileConstraint(fact: FileFact): Formula | undefined {
       formula = parsed;
     }
   }
-  // A cgo file (`import "C"`) is built only with cgo.
+  // The `cgo` tag holds when cgo is enabled or `-tags=cgo` sets it by hand;
+  // a cgo file (`import "C"`) is built only when cgo is really enabled.
+  formula = withCgo(formula);
   if (fact.imports.some((item) => item.path === "C"))
-    formula = and(formula, { k: "v", n: "cgo" });
+    formula = and(formula, { k: "v", n: CGO_ENABLED });
   if (fact.goos !== undefined) formula = and(formula, { k: "v", n: fact.goos });
   if (fact.goarch !== undefined)
     formula = and(formula, { k: "v", n: fact.goarch });
@@ -135,79 +139,163 @@ function names(formula: Formula, out: Set<string>): Set<string> {
   return out;
 }
 
-function evaluate(formula: Formula, tags: Set<string>): boolean {
-  switch (formula.k) {
-    case "t":
-      return true;
-    case "v":
-      return tags.has(formula.n);
-    case "not":
-      return !evaluate(formula.x, tags);
-    case "and":
-      return evaluate(formula.a, tags) && evaluate(formula.b, tags);
-    case "or":
-      return evaluate(formula.a, tags) || evaluate(formula.b, tags);
-  }
+/**
+ * Is there an assignment of the named tags, each one free (a GOOS or GOARCH
+ * name too: `-tags=freebsd` sets `freebsd` on Linux), in which every formula
+ * holds, with one of Go's port GOOS values and one of its GOARCH values
+ * true (every build has its own)? Every real configuration is such an
+ * assignment, so false proves no build has them all. A backtracking search
+ * over the names, pruned as soon as a formula is decided; undefined when it
+ * takes more than `MAX_STEPS` steps.
+ */
+export function satisfiableAnyTags(given: Formula[]): boolean | undefined {
+  const key = JSON.stringify(given);
+  if (anyTagsMemo.has(key)) return anyTagsMemo.get(key);
+  const answer = searchAnyTags(given);
+  if (anyTagsMemo.size > MAX_MEMO) anyTagsMemo.clear();
+  anyTagsMemo.set(key, answer);
+  return answer;
+}
+const anyTagsMemo = new Map<string, boolean | undefined>();
+const MAX_MEMO = 100_000;
+
+/** Does `a` imply `b` in every build (free tags, ports)? Undefined: not known. */
+export function impliesAnyTags(a: Formula, b: Formula): boolean | undefined {
+  const counter = satisfiableAnyTags([a, { k: "not", x: b }]);
+  return counter === undefined ? undefined : !counter;
+}
+
+function searchAnyTags(given: Formula[]): boolean | undefined {
+  const anyOf = (values: string[]): Formula =>
+    values
+      .map((n): Formula => ({ k: "v", n }))
+      .reduce((a, b) => ({ k: "or", a, b }));
+  return searchWith(
+    [...given, anyOf(PORT_GOOS), anyOf(PORT_GOARCH)],
+    new Map(),
+  );
 }
 
 /**
- * Is there one configuration (one GOOS, one GOARCH, any other tags) in which
- * every formula holds? Undefined when there are too many free tags.
+ * Is there an ordinary build, one that sets reserved names only as Go does
+ * (a real port's GOOS and GOARCH with the names they imply, real cgo on or
+ * off with the `cgo` tag equal to it; release and custom tags free), in which
+ * every formula holds? Used where a build that exists only because a
+ * reserved name is set by hand must not count (a call with no declaration
+ * there does not compile, and no build has another answer).
  */
-export function satisfiable(formulas: Formula[]): boolean | undefined {
-  const all = new Set<string>();
-  for (const formula of formulas) names(formula, all);
-  const goos = [...all].filter((name) => KNOWN_GOOS.has(name));
-  const goarch = [...all].filter((name) => KNOWN_GOARCH.has(name));
-  const free = [...all].filter(
-    (name) => !KNOWN_GOOS.has(name) && !KNOWN_GOARCH.has(name),
-  );
-  // Another GOOS than those named makes each named one false; it may still
-  // be a Unix one (`unix` stays free then).
-  const implied = Object.entries(IMPLIED)
-    .filter(([, base]) => goos.includes(base))
-    .map(([os]) => os);
-  const oses = [...new Set([...goos, ...implied]), undefined];
-  const arches = [...goarch, undefined];
-  const unixFree = free.includes("unix");
-  // Release tags are cumulative: go1.N holds for every Go at least 1.N, so
-  // one release level decides them all (below every named one, or at one).
-  const release = (name: string) => /^go1\.(\d+)$/.exec(name);
-  const releases = free
-    .filter((name) => release(name))
-    .sort((a, b) => Number(release(a)![1]) - Number(release(b)![1]));
-  const levels = [-1, ...releases.map((_, index) => index)];
-  const freeTags = free.filter((name) => name !== "unix" && !release(name));
-  if (freeTags.length > MAX_FREE_TAGS) return undefined;
-  for (const os of oses)
-    for (const arch of arches)
-      for (const level of levels)
-        for (let bits = 0; bits < 1 << freeTags.length; bits++) {
-          const tags = new Set<string>(releases.slice(0, level + 1));
-          if (os) {
-            tags.add(os);
-            if (IMPLIED[os]) tags.add(IMPLIED[os]!);
-          }
-          if (arch) tags.add(arch);
-          freeTags.forEach((name, index) => {
-            if (bits & (1 << index)) tags.add(name);
-          });
-          const unixChoices = os
-            ? [UNIX.has(os)]
-            : unixFree
-              ? [false, true]
-              : [false];
-          for (const unix of unixChoices) {
-            const with_ = unix ? new Set([...tags, "unix"]) : tags;
-            if (formulas.every((formula) => evaluate(formula, with_)))
-              return true;
-          }
-        }
-  return false;
+export function satisfiableOrdinary(given: Formula[]): boolean | undefined {
+  const key = `o\u0000${JSON.stringify(given)}`;
+  if (anyTagsMemo.has(key)) return anyTagsMemo.get(key);
+  let answer: boolean | undefined = false;
+  for (const port of PORTS) {
+    const [goos, goarch] = port.split("/") as [string, string];
+    for (const cgo of [false, true]) {
+      const preset = new Map<string, boolean>();
+      for (const name of KNOWN_GOOS) preset.set(name, false);
+      for (const name of KNOWN_GOARCH) preset.set(name, false);
+      preset.set(goos, true);
+      if (IMPLIED_GOOS[goos]) preset.set(IMPLIED_GOOS[goos]!, true);
+      preset.set(goarch, true);
+      preset.set("unix", UNIX_GOOS.has(goos));
+      preset.set("cgo", cgo);
+      preset.set(CGO_ENABLED, cgo);
+      const found = searchWith(given, preset);
+      if (found) {
+        answer = true;
+        break;
+      }
+      if (found === undefined) answer = undefined;
+    }
+    if (answer === true) break;
+  }
+  if (anyTagsMemo.size > MAX_MEMO) anyTagsMemo.clear();
+  anyTagsMemo.set(key, answer);
+  return answer;
 }
+/** GOOS values whose builds also set another GOOS tag (go/build). */
+const IMPLIED_GOOS: { [goos: string]: string } = {
+  android: "linux",
+  ios: "darwin",
+  illumos: "solaris",
+};
+/** GOOS values that set the `unix` tag (go/build). */
+const UNIX_GOOS = new Set([
+  "aix",
+  "android",
+  "darwin",
+  "dragonfly",
+  "freebsd",
+  "hurd",
+  "illumos",
+  "ios",
+  "linux",
+  "netbsd",
+  "openbsd",
+  "solaris",
+]);
 
-/** Does `a` imply `b` in every configuration? Undefined when not known. */
-export function implies(a: Formula, b: Formula): boolean | undefined {
-  const counter = satisfiable([a, { k: "not", x: b }]);
-  return counter === undefined ? undefined : !counter;
+/** A backtracking search over the names not in `preset`. */
+function searchWith(
+  formulas: Formula[],
+  preset: Map<string, boolean>,
+): boolean | undefined {
+  const all = [
+    ...formulas.reduce((out, f) => names(f, out), new Set<string>()),
+  ].filter((name) => !preset.has(name));
+  const value = new Map<string, boolean>(preset);
+  // Three-valued: undefined while a name it needs is not assigned.
+  const partial = (formula: Formula): boolean | undefined => {
+    switch (formula.k) {
+      case "t":
+        return true;
+      case "v":
+        return value.get(formula.n);
+      case "not": {
+        const inner = partial(formula.x);
+        return inner === undefined ? undefined : !inner;
+      }
+      case "and": {
+        const a = partial(formula.a);
+        if (a === false) return false;
+        const b = partial(formula.b);
+        if (b === false) return false;
+        return a && b ? true : undefined;
+      }
+      case "or": {
+        const a = partial(formula.a);
+        if (a === true) return true;
+        const b = partial(formula.b);
+        if (b === true) return true;
+        return a === false && b === false ? false : undefined;
+      }
+    }
+  };
+  let steps = 0;
+  const search = (at: number): boolean | undefined => {
+    if (++steps > MAX_STEPS) return undefined;
+    let open = false;
+    for (const formula of formulas) {
+      const known = partial(formula);
+      if (known === false) return false;
+      if (known === undefined) open = true;
+    }
+    if (!open) return true;
+    const name = all[at]!;
+    let unknown = false;
+    for (const choice of [true, false]) {
+      value.set(name, choice);
+      const found = search(at + 1);
+      if (found) {
+        value.delete(name);
+        return true;
+      }
+      if (found === undefined) unknown = true;
+    }
+    value.delete(name);
+    return unknown ? undefined : false;
+  };
+  return search(0);
 }
+/** Above this many search steps `satisfiableAnyTags` is not computed (unknown). */
+const MAX_STEPS = 1 << 16;

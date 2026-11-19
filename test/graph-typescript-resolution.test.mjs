@@ -103,6 +103,1428 @@ const clean = (report) => {
   assert.deepEqual(report.resolutionErrors, []);
 };
 
+const libraryTarget = (link) => {
+  assert.equal(
+    link.resolution,
+    "library",
+    `${link.targetName} ${JSON.stringify(link.data)}`,
+  );
+  assert.equal(link.libraries.length, 1);
+  const { id, ...target } = link.libraries[0];
+  return target;
+};
+
+test("bundled declarations prove the owner of an existing runtime use", async () => {
+  await project(
+    {
+      // Vitest packages/vitest/src/node/pools/browser.ts uses Map.delete on openingSessions.
+      "browser.ts": `export class BrowserPool {
+        openingSessions = new Map<string, object>();
+        close(sessionId: string) { this.openingSessions.delete(sessionId); }
+      }
+      declare const value: any;
+      declare const unknownValue: unknown;
+      value.delete('x');
+      unknownValue.delete('x');
+      class Local { local = true; delete(key: string) { return key.length > 0; } }
+      function remove(mixed: Map<string, object> | Local) { mixed.delete('x'); }
+      JSON.parse('null');
+      Promise.all([]);
+      ['a'].map(x => x);
+      document.querySelector('a');
+      fetch('/');
+      export {};`,
+      "script.js": `console.log('ready');\nprocess.cwd();`,
+      "es-only/jsconfig.json": '{"compilerOptions":{"lib":["ES2022"]}}',
+      "es-only/browser.js": `document.querySelector('a');`,
+    },
+    async (graph, report) => {
+      clean(report);
+      const calls = (at) =>
+        graph
+          .links("browser.ts", at, "calls")
+          .sort((a, b) => a.range.start - b.range.start);
+      const [mapDelete, any, unknown, mixed] = calls("delete");
+      assert.deepEqual(libraryTarget(mapDelete), {
+        ecosystem: "typescript-lib",
+        unit: "es",
+        symbol: "Map.prototype.delete",
+        evidence: "declaring-owner",
+      });
+      assert.equal(any.resolution, "unresolved");
+      assert.equal(unknown.resolution, "unresolved");
+      assert.equal(mixed.resolution, "ambiguous");
+      assert.equal(mixed.libraries[0].symbol, "Map.prototype.delete");
+      assert.ok(
+        mixed.candidates.some(
+          ({ id }) => id === graph.symbol("browser.ts", "Local.delete").id,
+        ),
+      );
+      assert.equal(libraryTarget(calls("parse")[0]).symbol, "JSON.parse");
+      assert.equal(libraryTarget(calls("all")[0]).symbol, "Promise.all");
+      assert.equal(
+        libraryTarget(calls("map")[0]).symbol,
+        "Array.prototype.map",
+      );
+      assert.equal(libraryTarget(calls("querySelector")[0]).unit, "dom");
+      assert.equal(
+        libraryTarget(calls("querySelector")[0]).symbol,
+        "ParentNode.prototype.querySelector",
+      );
+      const fetch = calls("fetch")[0];
+      assert.equal(fetch.resolution, "ambiguous");
+      assert.deepEqual(
+        fetch.libraries.map(({ unit, symbol }) => [unit, symbol]).sort(),
+        [
+          ["dom", "fetch"],
+          ["globals", "fetch"],
+        ],
+      );
+      const log = graph.link("script.js", "log", "calls");
+      assert.equal(log.resolution, "ambiguous");
+      assert.deepEqual(
+        log.libraries.map(({ unit, symbol }) => [unit, symbol]).sort(),
+        [
+          ["console", "Console.prototype.log"],
+          ["dom", "Console.prototype.log"],
+        ],
+      );
+      assert.equal(
+        graph.link("script.js", "cwd", "calls").resolution,
+        "unresolved",
+      );
+      assert.equal(
+        graph.link("es-only/browser.js", "querySelector", "calls").resolution,
+        "unresolved",
+      );
+    },
+  );
+});
+
+test("missing packages prove imports and namespace exports at their lexical bindings", async () => {
+  await project(
+    {
+      "package.json": JSON.stringify({
+        dependencies: {
+          zod: "4.4.1",
+          "@scope/pkg": "^2.0.0",
+          "missing-pkg": "^1",
+          "react-router-dom": "^7",
+        },
+      }),
+      "main.ts": `import { z } from 'zod';
+        import fs from 'node:fs';
+        import * as path from 'path';
+        import * as sub from '@scope/pkg/client';
+        import type { compile } from 'missing-pkg';
+        import { renamed } from './barrel';
+        import { getZ } from './nested/bridge';
+        type Compile = typeof compile;
+        z.string();
+        fs.readFileSync('x');
+        path['join']('a', 'b');
+        sub.make();
+        const pathAlias = path;
+        pathAlias.resolve('a');
+        renamed();
+        getZ();
+        compile();
+        function shadow(path: any) { path.join('a'); }`,
+      "barrel.ts": `export { make as renamed } from '@scope/pkg/client';`,
+      "nested/package.json": '{"dependencies":{"zod":"3.26.0"}}',
+      "nested/bridge.ts": `export { z as getZ } from 'zod';`,
+      "jsx.tsx": `import ReactRouterDom = require('react-router-dom');
+        import Link = ReactRouterDom.Link;
+        import Nested = ReactRouterDom.Link.Nested;
+        export const view = <ReactRouterDom.Link />;`,
+      "ambient.d.ts": `import type * as http from 'node:http';
+        export class IncomingMessage extends http.IncomingMessage {}`,
+      "non-ambient.ts": `import type * as http from 'node:http';
+        export class IncomingMessage extends http.IncomingMessage {}`,
+      "common.cjs": `const fs = require('fs');
+        const { join: combine } = require('node:path');
+        fs.readFileSync('x');
+        combine('x', 'y');
+        require('node:fs').existsSync('x');
+        let mutable = require('path');
+        mutable = {};
+        mutable.basename('x');`,
+    },
+    async (graph, report) => {
+      clean(report);
+      const call = (at) => graph.link("main.ts", at, "calls");
+      assert.deepEqual(libraryTarget(graph.link("main.ts", "z", "imports")), {
+        ecosystem: "npm",
+        unit: "zod",
+        symbol: "z",
+        evidence: "import-binding",
+        version: "4.4.1",
+        versionSource: "package.json",
+      });
+      assert.deepEqual(libraryTarget(call("string")), {
+        ecosystem: "npm",
+        unit: "zod",
+        evidence: "import-path",
+        version: "4.4.1",
+        versionSource: "package.json",
+      });
+      assert.deepEqual(libraryTarget(call("readFileSync")), {
+        ecosystem: "node",
+        unit: "fs",
+        symbol: "readFileSync",
+        evidence: "import-binding",
+      });
+      assert.equal(libraryTarget(call("path['join']")).symbol, "join");
+      assert.equal(libraryTarget(call("resolve")).symbol, "resolve");
+      assert.deepEqual(libraryTarget(call("make")), {
+        ecosystem: "npm",
+        unit: "@scope/pkg",
+        symbol: "client:make",
+        evidence: "import-binding",
+      });
+      assert.equal(libraryTarget(call("renamed")).symbol, "client:make");
+      assert.deepEqual(libraryTarget(call("getZ")), {
+        ecosystem: "npm",
+        unit: "zod",
+        symbol: "z",
+        evidence: "import-binding",
+        version: "3.26.0",
+        versionSource: "nested/package.json",
+      });
+      assert.equal(call("compile").resolution, "unresolved");
+      assert.equal(
+        libraryTarget(graph.link("main.ts", "compile", "references")).symbol,
+        "compile",
+      );
+      assert.equal(
+        libraryTarget(graph.link("jsx.tsx", "Link", "calls")).symbol,
+        "Link",
+      );
+      assert.deepEqual(
+        libraryTarget(
+          graph.link("jsx.tsx", "ReactRouterDom.Link", "references"),
+        ),
+        {
+          ecosystem: "npm",
+          unit: "react-router-dom",
+          symbol: "Link",
+          evidence: "import-binding",
+        },
+      );
+      assert.equal(
+        graph.link("jsx.tsx", "ReactRouterDom.Link.Nested", "references")
+          .libraries?.[0]?.symbol,
+        undefined,
+      );
+      assert.deepEqual(
+        libraryTarget(
+          graph.link("ambient.d.ts", "http.IncomingMessage", "extends"),
+        ),
+        {
+          ecosystem: "node",
+          unit: "http",
+          symbol: "IncomingMessage",
+          evidence: "import-binding",
+        },
+      );
+      assert.equal(
+        graph.link("non-ambient.ts", "http.IncomingMessage", "extends")
+          .resolution,
+        "unresolved",
+      );
+      assert.equal(call("join").resolution, "unresolved");
+      const common = (at) => graph.link("common.cjs", at, "calls");
+      assert.equal(
+        libraryTarget(common("readFileSync")).symbol,
+        "readFileSync",
+      );
+      assert.equal(libraryTarget(common("combine")).symbol, "join");
+      assert.equal(libraryTarget(common("existsSync")).symbol, "existsSync");
+      assert.equal(common("basename").resolution, "unresolved");
+    },
+  );
+});
+
+test("bare packages need positive route evidence and builtin polyfills keep both routes", async () => {
+  await project(
+    {
+      "package.json": '{"dependencies":{"url":"^0.11.4","zod":"^4"}}',
+      "pkg/package.json": '{"name":"fixture"}',
+      "pkg/tsconfig.json": '{"compilerOptions":{"baseUrl":"src"}}',
+      "pkg/src/use.ts": `import * as polyfill from 'url';
+        import * as builtin from 'node:url';
+        import * as path from 'path';
+        import { z } from 'zod';
+        import { initialData } from '@site/src/initialData';
+        import * as theme from '@theme-original/MDXComponents';
+        import { Modal } from 'components/Modal';
+        import 'uno.css';
+        polyfill.parse('x'); builtin.format('x');
+        path.join('x'); z(); initialData(); theme.load(); Modal();`,
+      "nested/package.json": '{"workspaces":["pkg"]}',
+      "nested/pkg/package.json": '{"name":"nested-pkg"}',
+      "nested/pkg/use.ts": `import { z } from 'zod'; z();`,
+    },
+    async (graph, report) => {
+      clean(report);
+      const roots = (link) =>
+        link.libraries
+          .map(({ ecosystem, unit, symbol }) => [ecosystem, unit, symbol])
+          .sort();
+      const file = "pkg/src/use.ts";
+      for (const [kind, text, symbol] of [
+        ["imports", "'url'", undefined],
+        ["calls", "parse", "parse"],
+      ]) {
+        const link = graph.link(file, text, kind);
+        assert.equal(link.resolution, "ambiguous");
+        assert.deepEqual(roots(link), [
+          ["node", "url", symbol],
+          ["npm", "url", symbol],
+        ]);
+      }
+      assert.equal(
+        libraryTarget(graph.link(file, "format", "calls")).ecosystem,
+        "node",
+      );
+      assert.equal(
+        libraryTarget(graph.link(file, "join", "calls")).unit,
+        "path",
+      );
+      assert.equal(libraryTarget(graph.link(file, "z", "calls")).unit, "zod");
+      for (const specifier of [
+        "@site/src/initialData",
+        "@theme-original/MDXComponents",
+        "components/Modal",
+        "uno.css",
+      ])
+        assert.equal(
+          graph.link(file, "'" + specifier + "'", "imports").resolution,
+          "unresolved",
+        );
+      assert.equal(
+        graph.link("nested/pkg/use.ts", "z", "calls").resolution,
+        "unresolved",
+      );
+    },
+  );
+});
+
+test("an expected missing global type package keeps overlapping runtime declarations open", async () => {
+  const source = `console.log('x'); setTimeout(() => {}, 1);
+    const urlValue = new URL('https://example.test'); urlValue.toString();
+    const init: RequestInit = {}; new Response().json(); fetch('https://example.test', init);
+    const stream = new ReadableStream(); stream.getReader();
+    const channel = new MessageChannel(); channel.port2.postMessage('x');
+    navigator.vibrate(500); performance.now(); new TextEncoder().encode('x');
+    declare const canvas: HTMLCanvasElement;
+    declare const context: CanvasRenderingContext2D;
+    context.drawImage(canvas, 0, 0);
+    const values = [1]; values.map(String); Promise.resolve(); JSON.parse('{}');`;
+  await project(
+    {
+      "manifest/package.json": '{"devDependencies":{"@types/node":"^24"}}',
+      "manifest/use.ts": source,
+      "options/tsconfig.json":
+        '{"compilerOptions":{"target":"es2022","types":["node","vitest/globals"]},"files":["use.ts"]}',
+      "options/use.ts": source,
+      "reference/tsconfig.json":
+        '{"compilerOptions":{"target":"es2022","types":[]},"files":["use.ts"]}',
+      "reference/use.ts": '/// <reference types="node" />\n' + source,
+      "other/package.json": '{"devDependencies":{"@types/node":"^24"}}',
+      "other/tsconfig.json":
+        '{"compilerOptions":{"target":"es2022","types":["vite/client","vitest/globals","jest","react"]},"files":["use.ts"]}',
+      "other/use.ts": source,
+      "other-browser/tsconfig.json":
+        '{"compilerOptions":{"target":"es2022","types":["vite/client","vitest/globals","jest","react"]},"files":["use.ts"]}',
+      "other-browser/use.ts": source,
+      "browser/package.json": '{"devDependencies":{"@types/node":"^24"}}',
+      "browser/tsconfig.base.json":
+        '{"compilerOptions":{"target":"es2022","types":[]}}',
+      "browser/tsconfig.json":
+        '{"extends":"./tsconfig.base.json","files":["use.ts"]}',
+      "browser/use.ts": source,
+      "web/tsconfig.json":
+        '{"compilerOptions":{"target":"es2022"},"files":["use.ts"]}',
+      "web/use.ts": source,
+      "workers/tsconfig.json":
+        '{"compilerOptions":{"target":"es2022","types":["@cloudflare/workers-types"]},"files":["use.ts"]}',
+      "workers/use.ts": source,
+    },
+    async (graph, report) => {
+      clean(report);
+      for (const root of ["manifest", "options", "reference", "other"]) {
+        const file = root + "/use.ts";
+        for (const [name, node] of [
+          ["log", "console"],
+          ["setTimeout", "timers"],
+          ["URL", "url"],
+          ["fetch", "globals"],
+          ["toString", "url"],
+          ["now", "perf_hooks"],
+          ["encode", "util"],
+          ["postMessage", "worker_threads"],
+        ]) {
+          const call = graph.link(file, name, "calls");
+          assert.equal(call.resolution, "ambiguous");
+          assert.deepEqual(
+            call.libraries.map(({ unit }) => unit).sort(),
+            ["dom", node].sort(),
+          );
+        }
+        for (const [text, kind, dom, node] of [
+          ["RequestInit", "references", "RequestInit", "RequestInit"],
+          ["json", "calls", "Body.prototype.json", "Response.prototype.json"],
+          [
+            "getReader",
+            "calls",
+            "ReadableStream.prototype.getReader",
+            "ReadableStream.prototype.getReader",
+          ],
+        ]) {
+          const link = graph.link(file, text, kind);
+          assert.equal(link.resolution, "ambiguous");
+          assert.deepEqual(
+            link.libraries
+              .map(({ ecosystem, symbol }) => [ecosystem, symbol])
+              .sort(),
+            [
+              ["dom", dom],
+              ["node", node],
+            ],
+          );
+          if (text === "getReader")
+            assert.equal(
+              link.libraries.find(({ ecosystem }) => ecosystem === "node").unit,
+              "stream/web",
+            );
+        }
+        const member = graph.link(file, "vibrate", "calls");
+        assert.equal(member.resolution, "unresolved");
+        assert.equal(member.data.reason, "missing-global-types");
+        for (const name of ["map", "resolve", "parse"])
+          assert.equal(
+            libraryTarget(graph.link(file, name, "calls")).unit,
+            "es",
+          );
+      }
+      for (const root of ["other-browser", "browser", "web"])
+        for (const name of [
+          "log",
+          "setTimeout",
+          "json",
+          "getReader",
+          "drawImage",
+        ])
+          assert.equal(
+            libraryTarget(graph.link(root + "/use.ts", name, "calls")).unit,
+            "dom",
+          );
+      assert.equal(
+        graph.link("workers/use.ts", "json", "calls").data.reason,
+        "missing-global-types",
+      );
+      assert.equal(
+        libraryTarget(graph.link("workers/use.ts", "drawImage", "calls")).unit,
+        "dom",
+      );
+    },
+  );
+});
+
+test("Node runtime evidence in a JavaScript file keeps shared globals open", async () => {
+  const shared = "console.log('start'); setTimeout(() => {}, 10);\n";
+  await project(
+    {
+      "package.json": '{"dependencies":{"lit":"^3.0.0"}}',
+      "scripts/release.js":
+        shared +
+        "const fs = require('fs'); console.info(fs.readFileSync('x', 'utf8'));",
+      "scripts/check.mjs":
+        shared +
+        "import { execSync } from 'node:child_process'; execSync('git status');",
+      "scripts/hashbang.js": "#!/usr/bin/env node\n" + shared,
+      "scripts/working-directory.js": shared + "process.cwd();",
+      "scripts/directory.js": shared + "const current = __dirname;",
+      "scripts/colors.cjs": shared + "require('picocolors');",
+      "scripts/computed.cjs": shared + "require(packageName);",
+      "commonjs/package.json": '{"type":"commonjs"}',
+      "commonjs/colors.js": shared + "require('picocolors');",
+      "commonjs/shadowed/tsconfig.json":
+        '{"compilerOptions":{"allowJs":true},"files":["script.cjs"]}',
+      "commonjs/shadowed/script.cjs":
+        shared + "function use(require) { require('picocolors'); }",
+      "commonjs/esm/package.json": '{"type":"module"}',
+      "commonjs/esm/tsconfig.json":
+        '{"compilerOptions":{"module":"esnext","moduleResolution":"bundler","allowJs":true},"files":["colors.js"]}',
+      "commonjs/esm/colors.js": shared + "require('picocolors'); export {};",
+      "browser/tsconfig.json":
+        '{"compilerOptions":{"allowJs":true},"files":["script.js"]}',
+      "browser/script.js":
+        shared + "export {}; const process = {cwd() {}}; process.cwd();",
+      "polyfill/package.json": '{"dependencies":{"path":"^0.12.0"}}',
+      "polyfill/tsconfig.json":
+        '{"compilerOptions":{"allowJs":true},"files":["browser.js"]}',
+      "polyfill/browser.js":
+        shared + "import * as path from 'path'; path.join('a', 'b');",
+    },
+    async (graph, report) => {
+      clean(report);
+      for (const path of [
+        "scripts/release.js",
+        "scripts/check.mjs",
+        "scripts/hashbang.js",
+        "scripts/working-directory.js",
+        "scripts/directory.js",
+        "scripts/colors.cjs",
+        "scripts/computed.cjs",
+        "commonjs/colors.js",
+      ])
+        for (const [name, unit] of [
+          ["log", "console"],
+          ["setTimeout", "timers"],
+        ]) {
+          const link = graph.link(path, name, "calls");
+          assert.equal(link.resolution, "ambiguous", path + " " + name);
+          assert.deepEqual(
+            link.libraries.map(({ unit }) => unit).sort(),
+            ["dom", unit].sort(),
+          );
+        }
+      assert.equal(
+        libraryTarget(graph.link("scripts/release.js", "readFileSync", "calls"))
+          .symbol,
+        "readFileSync",
+      );
+      for (const path of [
+        "browser/script.js",
+        "polyfill/browser.js",
+        "commonjs/shadowed/script.cjs",
+        "commonjs/esm/colors.js",
+      ])
+        assert.equal(
+          libraryTarget(graph.link(path, "log", "calls")).unit,
+          "dom",
+        );
+    },
+  );
+});
+
+test("require in a JavaScript package without a type field supplies Node evidence", async () => {
+  const shared = "console.log('start'); setTimeout(() => {}, 10);";
+  await project(
+    {
+      "package.json": "{}",
+      "direct/tsconfig.json": '{"files":["entry.js"]}',
+      "direct/entry.js": "require('./dep.cjs'); " + shared,
+      "direct/dep.cjs": "module.exports = {};",
+      "parenthesised/tsconfig.json": '{"files":["entry.js"]}',
+      "parenthesised/entry.js": "(require)('./dep.cjs'); " + shared,
+      "parenthesised/dep.cjs": "module.exports = {};",
+    },
+    async (graph, report) => {
+      clean(report);
+      for (const file of ["direct/entry.js", "parenthesised/entry.js"])
+        for (const name of ["log", "setTimeout"]) {
+          const link = graph.link(file, name, "calls");
+          assert.equal(link.resolution, "ambiguous");
+          assert.deepEqual(
+            link.libraries.map(({ ecosystem }) => ecosystem).sort(),
+            ["dom", "node"],
+          );
+        }
+    },
+  );
+});
+
+test("Node evidence from sibling files and missing package types applies to the compiler program", async () => {
+  const shared = "new URL('https://example.test'); structuredClone({});";
+  const isolated =
+    '{"compilerOptions":{"types":[]},"files":["browser.ts","entry.ts"]}';
+  const importVite = "import { build } from 'vite'; export { build };";
+  await project(
+    {
+      "missing/package.json":
+        '{"devDependencies":{"@types/node":"^24","vite":"^8"}}',
+      "missing/tsconfig.json": isolated,
+      "missing/entry.ts": importVite,
+      "missing/browser.ts": shared,
+      "twin/tsconfig.json": isolated,
+      "twin/entry.ts": importVite,
+      "twin/browser.ts": shared,
+      "captured/package.json":
+        '{"devDependencies":{"@types/node":"^24","vite":"^8"}}',
+      "captured/tsconfig.json":
+        '{"compilerOptions":{"types":[],"paths":{"vite":["./vite.d.ts"]}},"files":["browser.ts","entry.ts"]}',
+      "captured/entry.ts": importVite,
+      "captured/browser.ts": shared,
+      "captured/vite.d.ts": "export declare function build(): void;",
+      "referenced/tsconfig.json":
+        '{"compilerOptions":{"types":[],"paths":{"vite":["./vite.d.ts"]}},"files":["browser.ts","entry.ts"]}',
+      "referenced/entry.ts": importVite,
+      "referenced/browser.ts": shared,
+      "referenced/vite.d.ts":
+        '/// <reference types="node" />\nexport declare function build(): void;',
+      "runtime/tsconfig.json": isolated,
+      "runtime/entry.ts":
+        "import { readFileSync } from 'node:fs'; export { readFileSync };",
+      "runtime/browser.ts": shared,
+      "bun/tsconfig.json":
+        '{"compilerOptions":{"allowJs":true},"files":["script.js"]}',
+      "bun/script.js": "#!/usr/bin/env bun\n" + shared,
+      "deno/tsconfig.json":
+        '{"compilerOptions":{"allowJs":true},"files":["script.js"]}',
+      "deno/script.js": "#!/usr/bin/env deno\n" + shared,
+    },
+    async (graph, report) => {
+      clean(report);
+      for (const root of ["missing", "referenced", "runtime"])
+        for (const name of ["URL", "structuredClone"])
+          assert.deepEqual(
+            graph
+              .link(root + "/browser.ts", name, "calls")
+              .libraries.map(({ ecosystem }) => ecosystem)
+              .sort(),
+            ["dom", "node"],
+          );
+      for (const root of ["twin", "captured"])
+        assert.equal(
+          libraryTarget(graph.link(root + "/browser.ts", "URL", "calls")).unit,
+          "dom",
+        );
+      for (const root of ["bun", "deno"])
+        assert.equal(
+          graph.link(root + "/script.js", "URL", "calls").data.reason,
+          "missing-global-types",
+        );
+    },
+  );
+});
+
+test("inherited Web API members keep Node candidates through checkout heritage", async () => {
+  const source = `class AppResponse<T> extends Response {
+    data() { return this.json(); }
+  }
+  class PageResponse extends AppResponse<string> {}
+  interface TypedResponse extends Response {}
+  declare const typed: TypedResponse;
+  new PageResponse().json();
+  typed.json();
+  type Key = CryptoKey;
+  export {};`;
+  await project(
+    {
+      "node/tsconfig.json": '{"compilerOptions":{"types":["node"]}}',
+      "node/response.ts": source,
+      "web/tsconfig.json": '{"compilerOptions":{"types":[]}}',
+      "web/response.ts": source,
+    },
+    async (graph, report) => {
+      clean(report);
+      const calls = graph.links("node/response.ts", "json", "calls");
+      assert.equal(calls.length, 3);
+      for (const link of calls) {
+        assert.equal(link.resolution, "ambiguous");
+        assert.deepEqual(
+          link.libraries.map(({ unit, symbol }) => [unit, symbol]).sort(),
+          [
+            ["dom", "Body.prototype.json"],
+            ["globals", "Response.prototype.json"],
+          ],
+        );
+      }
+      for (const link of graph.links("web/response.ts", "json", "calls"))
+        assert.equal(libraryTarget(link).symbol, "Body.prototype.json");
+      assert.equal(
+        libraryTarget(graph.link("node/response.ts", "CryptoKey", "references"))
+          .ecosystem,
+        "dom",
+      );
+    },
+  );
+});
+
+test("npm aliases and captured workspace catalogs prove the registry name and exact pin", async () => {
+  await project(
+    {
+      "package.json": '{"packageManager":"pnpm@10.0.0"}',
+      "pnpm-workspace.yaml": `packages:
+  - 'packages/*'
+catalog:
+  'default-alias': 'npm:real-default@2.0.1'
+catalogs:
+  named:
+    'scoped-alias': 'npm:@scope/real@3.1.0'
+`,
+      "packages/pretty-format/package.json": JSON.stringify({
+        name: "@sample/pretty-format",
+        dependencies: {
+          "react-is-18": "npm:react-is@18.3.1",
+          "range-alias": "npm:@scope/range@^4",
+          "local-name-alias": "npm:@sample/local@3.0.0",
+          "git-alias": "github:example/fixture",
+          "tar-alias": "https://example.test/archive.tgz",
+          "default-alias": "catalog:",
+          "scoped-alias": "catalog:named",
+          "absent-alias": "catalog:absent",
+          "linked-alias": "portal:../local",
+        },
+      }),
+      "packages/local/package.json":
+        '{"name":"@sample/local","main":"index.ts"}',
+      "packages/local/index.ts": "export function local() {}",
+      "bun/package.json": JSON.stringify({
+        packageManager: "bun@1.3.11",
+        workspaces: {
+          packages: ["apps/*"],
+          catalog: { effect: "4.0.0-beta.59" },
+        },
+      }),
+      "bun/apps/server/package.json":
+        '{"name":"@sample/server","dependencies":{"effect":"catalog:"}}',
+      "bun/apps/server/use.ts": "import { run } from 'effect'; run();",
+      "packages/pretty-format/use.ts": `import * as ReactIs18 from 'react-is-18';
+        import { run as nested } from 'range-alias/sub';
+        import { local as installed } from 'local-name-alias';
+        import { run as fromGit } from 'git-alias';
+        import { run as fromTar } from 'tar-alias';
+        import { run as fromDefault } from 'default-alias';
+        import { run as fromNamed } from 'scoped-alias';
+        import { run as fromAbsent } from 'absent-alias';
+        import { local } from 'linked-alias';
+        ReactIs18.isElement({}); nested(); fromGit(); fromTar(); installed();
+        fromDefault(); fromNamed(); fromAbsent(); local();`,
+    },
+    async (graph, report) => {
+      clean(report);
+      const file = "packages/pretty-format/use.ts";
+      const call = (name) => graph.link(file, name, "calls");
+      assert.deepEqual(
+        libraryTarget(graph.link(file, "'react-is-18'", "imports")),
+        {
+          ecosystem: "npm",
+          unit: "react-is",
+          evidence: "import-path",
+          version: "18.3.1",
+          versionSource: "packages/pretty-format/package.json",
+        },
+      );
+      assert.equal(libraryTarget(call("isElement")).symbol, "isElement");
+      assert.deepEqual(libraryTarget(call("nested")), {
+        ecosystem: "npm",
+        unit: "@scope/range",
+        symbol: "sub:run",
+        evidence: "import-binding",
+      });
+      assert.deepEqual(libraryTarget(call("installed")), {
+        ecosystem: "npm",
+        unit: "@sample/local",
+        symbol: "local",
+        evidence: "import-binding",
+        version: "3.0.0",
+        versionSource: "packages/pretty-format/package.json",
+      });
+      assert.deepEqual(
+        libraryTarget(graph.link("bun/apps/server/use.ts", "run", "calls")),
+        {
+          ecosystem: "npm",
+          unit: "effect",
+          symbol: "run",
+          evidence: "import-binding",
+          version: "4.0.0-beta.59",
+          versionSource: "bun/package.json",
+        },
+      );
+      for (const [name, unit, version] of [
+        ["fromDefault", "real-default", "2.0.1"],
+        ["fromNamed", "@scope/real", "3.1.0"],
+      ]) {
+        assert.deepEqual(libraryTarget(call(name)), {
+          ecosystem: "npm",
+          unit,
+          symbol: "run",
+          evidence: "import-binding",
+          version,
+          versionSource: "pnpm-workspace.yaml",
+        });
+      }
+      for (const name of ["fromGit", "fromTar", "fromAbsent"])
+        assert.equal(call(name).resolution, "unresolved");
+      assert.equal(
+        graph.target(call("local")),
+        "packages/local/index.ts#local",
+      );
+    },
+  );
+});
+
+test("captured declarations prove an inherited package member and preserve project augmentations", async () => {
+  await project(
+    {
+      "package.json":
+        '{"dependencies":{"local-types":"file:packages/local-types","external-kit":"^4.0.0"}}',
+      "tsconfig.json": JSON.stringify({
+        compilerOptions: {
+          typeRoots: ["./types"],
+          types: ["node"],
+          paths: {
+            "external-kit": ["./vendor/kit/index.d.ts"],
+            "our-types": ["./vendor/our/index.d.ts"],
+            "app/*": ["./src/*"],
+          },
+        },
+      }),
+      "types/node/package.json": '{"name":"@types/node","types":"index.d.ts"}',
+      "types/node/index.d.ts": `declare module 'node:fs' { export function readFileSync(path: string): string; }
+      declare namespace NodeJS { interface Process { cwd(): string } }
+      declare var process: NodeJS.Process;`,
+      "vendor/kit/package.json": '{"name":"external-kit","types":"index.d.ts"}',
+      "vendor/kit/index.d.ts": `declare class Directory { list(): string[] }
+      export declare class Store extends Directory {}
+      export declare function open(): Store;`,
+      "vendor/kit/ambient.d.ts":
+        'declare module "kit-ambient-alias" { export function extra(): void }',
+      "vendor/our/package.json": '{"name":"our-types","types":"index.d.ts"}',
+      "vendor/our/index.d.ts": "export declare function own(): void;",
+      "packages/local-types/package.json":
+        '{"name":"@types/local-types","types":"index.d.ts"}',
+      "packages/local-types/index.d.ts":
+        "export declare function localDeclaration(): void;",
+      "src/entry.ts": "export function here() {}",
+      "local.d.ts": `interface Window { __pymthegLocal(): void; }
+      interface Console { log(local: number): void; }`,
+      "main.ts": `import { readFileSync } from 'node:fs';
+      import { open } from 'external-kit';
+      import { extra } from 'kit-ambient-alias';
+      import { own } from 'our-types';
+      import { localDeclaration } from 'local-types';
+      import { here } from 'app/entry';
+      import { missing } from 'app/missing';
+      process.cwd(); readFileSync('x'); open().list(); extra(); own(); here(); missing();
+      window.__pymthegLocal(); console.log(4); localDeclaration();`,
+    },
+    async (graph, report) => {
+      clean(report);
+      const call = (at) => graph.link("main.ts", at, "calls");
+      assert.equal(
+        graph.target(call("cwd")),
+        "types/node/index.d.ts#NodeJS.Process.cwd",
+      );
+      assert.match(
+        graph.target(call("readFileSync")),
+        /^types\/node\/index\.d\.ts#.*readFileSync$/,
+      );
+      assert.deepEqual(libraryTarget(call("open")), {
+        ecosystem: "npm",
+        unit: "external-kit",
+        symbol: "open",
+        evidence: "import-binding",
+      });
+      assert.equal(libraryTarget(call("extra")).unit, "external-kit");
+      assert.equal(
+        libraryTarget(graph.link("main.ts", "'kit-ambient-alias'", "imports"))
+          .unit,
+        "external-kit",
+      );
+      assert.deepEqual(libraryTarget(call("list")), {
+        ecosystem: "npm",
+        unit: "external-kit",
+        symbol: "Directory.prototype.list",
+        evidence: "declaring-owner",
+      });
+      assert.equal(graph.target(call("here")), "src/entry.ts#here");
+      assert.equal(graph.target(call("own")), "vendor/our/index.d.ts#own");
+      assert.equal(
+        graph.target(call("localDeclaration")),
+        "packages/local-types/index.d.ts#localDeclaration",
+      );
+      assert.equal(call("missing").resolution, "unresolved");
+      assert.equal(
+        graph.target(call("__pymthegLocal")),
+        "local.d.ts#Window.__pymthegLocal",
+      );
+      assert.equal(call("log").resolution, "ambiguous");
+      assert.equal(call("log").libraries[0].symbol, "Console.prototype.log");
+    },
+  );
+});
+
+test("test globals require program evidence and respect shadowing", async () => {
+  // tRPC packages/react-query/test/useUtils.test.tsx uses this global call.
+  const trpc = "test('client query sad path', async () => {});";
+  await project(
+    {
+      "vitest/tsconfig.json":
+        '{"compilerOptions":{"types":["vitest/globals"]}}',
+      "vitest/main.ts":
+        trpc +
+        " const x: typeof vi = null!; vi.mock('pkg'); bench('demo', () => {});",
+      "ambiguous/tsconfig.json":
+        '{"compilerOptions":{"types":["vitest/globals","jest"]}}',
+      "ambiguous/main.ts": "expect(1); test('example', () => {});",
+      "shadow/tsconfig.json":
+        '{"compilerOptions":{"types":["jest","vitest/globals"]}}',
+      "shadow/package.json": '{"dependencies":{"other":"^1.0.0"}}',
+      "shadow/main.ts": `import { check as expect } from 'other';
+      declare global { function describe(label: string): void; }
+      describe('mine'); expect(1);
+      function scope() { const test = () => 1; return test(); }
+      export {};`,
+      "setup/tsconfig.json": '{"files":["main.ts","setup.ts"]}',
+      "setup/package.json": '{"dependencies":{"vitest":"^4.0.0"}}',
+      "setup/setup.ts": "import 'vitest/globals';",
+      "setup/main.ts": trpc,
+      "reference/tsconfig.json": '{"files":["main.ts","setup.ts"]}',
+      "reference/main.ts": "suite('mocha', () => {}); expect(1);",
+      "reference/setup.ts": '/// <reference types="mocha" />\nexport {};',
+      "dependency/tsconfig.json": '{"files":["main.ts"]}',
+      "dependency/package.json":
+        '{"devDependencies":{"@types/jest":"^29","vitest":"^4"}}',
+      "dependency/main.ts": trpc,
+      "custom/tsconfig.json":
+        '{"compilerOptions":{"types":["jest"],"typeRoots":["./own"]}}',
+      "custom/main.ts": trpc,
+      "redirected/tsconfig.json":
+        '{"compilerOptions":{"types":["vitest/globals"]}}',
+      "redirected/package.json":
+        '{"devDependencies":{"vitest":"npm:other-test-kit@^1"}}',
+      "redirected/main.ts": trpc,
+      "deno/tsconfig.json": '{"compilerOptions":{"types":["vitest/globals"]}}',
+      "deno/deno.json": '{"imports":{"vitest/globals":"npm:other-test-kit"}}',
+      "deno/main.ts": trpc,
+      "captured/tsconfig.json":
+        '{"compilerOptions":{"types":["jest","mocha"],"typeRoots":["./types"]}}',
+      "captured/package.json":
+        '{"devDependencies":{"jest":"^29","mocha":"^11"}}',
+      "captured/types/jest/package.json":
+        '{"name":"jest","types":"index.d.ts"}',
+      "captured/types/jest/index.d.ts":
+        "declare var test: (name: string, body: () => void) => void;",
+      "captured/types/mocha/package.json":
+        '{"name":"mocha","types":"index.d.ts"}',
+      "captured/types/mocha/index.d.ts":
+        "export {}; declare global { var test: (name: string, body: () => void) => void }",
+      "captured/main.ts": trpc,
+    },
+    async (graph, report) => {
+      clean(report);
+      for (const dir of ["vitest", "setup"])
+        assert.deepEqual(
+          libraryTarget(graph.link(dir + "/main.ts", "test", "calls")),
+          {
+            ecosystem: "npm",
+            unit: "vitest",
+            symbol: "test",
+            evidence: "declared-builtin",
+          },
+        );
+      assert.equal(
+        libraryTarget(graph.link("vitest/main.ts", "vi", "references")).symbol,
+        "vi",
+      );
+      assert.equal(
+        graph.link("vitest/main.ts", "mock", "calls").resolution,
+        "unresolved",
+      );
+      assert.equal(
+        graph.link("vitest/main.ts", "bench", "calls").resolution,
+        "unresolved",
+      );
+      for (const name of ["test", "expect"]) {
+        const link = graph.link("ambiguous/main.ts", name, "calls");
+        assert.equal(link.resolution, "ambiguous");
+        assert.deepEqual(
+          link.libraries.map(({ unit, symbol }) => [unit, symbol]).sort(),
+          [
+            ["jest", name],
+            ["vitest", name],
+          ],
+        );
+      }
+      const captured = graph.link("captured/main.ts", "test", "calls");
+      assert.equal(captured.resolution, "ambiguous");
+      assert.deepEqual(captured.libraries.map(({ unit }) => unit).sort(), [
+        "jest",
+        "mocha",
+      ]);
+      assert.equal(
+        libraryTarget(graph.link("shadow/main.ts", "expect", "calls")).unit,
+        "other",
+      );
+      for (const name of ["describe", "test"])
+        assert.equal(
+          graph.link("shadow/main.ts", name, "calls").resolution,
+          "resolved",
+        );
+      assert.equal(
+        libraryTarget(graph.link("reference/main.ts", "suite", "calls")).unit,
+        "mocha",
+      );
+      for (const [dir, name] of [
+        ["dependency", "test"],
+        ["reference", "expect"],
+        ["custom", "test"],
+        ["redirected", "test"],
+        ["deno", "test"],
+      ])
+        assert.equal(
+          graph.link(dir + "/main.ts", name, "calls").resolution,
+          "unresolved",
+        );
+    },
+  );
+});
+
+test("competing ambient test requests withhold only their declared names", async () => {
+  const config = (...types) => JSON.stringify({ compilerOptions: { types } });
+  const testCode =
+    "expect(true).to.be.true; describe('suite', () => {}); it('case', () => {});";
+  await project(
+    {
+      "cypress/tsconfig.json": config("cypress", "jest"),
+      "cypress/main.ts": testCode + " beforeAll(() => {}); cy();",
+      "mixed/tsconfig.json": config("cypress", "jest", "vitest/globals"),
+      "mixed/main.ts": testCode + " const mock: typeof vi = null!;",
+      "cypress-only/tsconfig.json": config("cypress"),
+      "cypress-only/main.ts": testCode,
+      "jasmine/tsconfig.json": config("jasmine", "jest"),
+      "jasmine/main.ts": testCode + " test('other', () => {});",
+      "reference/tsconfig.json": config("jest"),
+      "reference/main.ts":
+        '/// <reference types="@types/jasmine" />\n' + testCode,
+      "setup/tsconfig.json": config("jest"),
+      "setup/package.json": '{"devDependencies":{"cypress":"^16"}}',
+      "setup/setup.ts": "import 'cypress';",
+      "setup/main.ts": testCode,
+      "assertions/tsconfig.json": config("@types/chai", "vitest/globals"),
+      "assertions/main.ts":
+        "assert(true); expect(true); test('case', () => {});",
+      "wdio/tsconfig.json": config(
+        "@wdio/globals/types",
+        "@types/qunit",
+        "jest",
+      ),
+      "wdio/main.ts":
+        "expect(true); test('case', () => {}); it('other', () => {});",
+      "jest-dom/tsconfig.json": config(
+        "@testing-library/jest-dom",
+        "vitest/globals",
+      ),
+      "jest-dom/main.ts": "expect(true);",
+      "imports-only/tsconfig.json": config(
+        "@playwright/test",
+        "ava",
+        "bun-types",
+        "@types/bun",
+        "node",
+        "jest",
+      ),
+      "imports-only/main.ts": "expect(true);",
+      "shadow/tsconfig.json": config("cypress", "jest"),
+      "shadow/package.json": '{"dependencies":{"other":"^1"}}',
+      "shadow/main.ts": `import { check as expect } from 'other';
+        declare global { function describe(label: string): void; }
+        expect(true); describe('mine');
+        function scope() { const test = () => 1; return test(); }`,
+    },
+    async (graph, report) => {
+      clean(report);
+      const call = (dir, name) => graph.link(dir + "/main.ts", name, "calls");
+      const blocked = (dir, name, ...requests) => {
+        const link = call(dir, name);
+        assert.equal(link.resolution, "unresolved");
+        assert.equal(link.libraries, undefined);
+        assert.equal(link.data.reason, "competing-test-globals");
+        assert.deepEqual(link.data.competingTypes, requests);
+      };
+      for (const name of ["expect", "describe", "it"]) {
+        blocked("cypress", name, "cypress");
+        blocked("mixed", name, "cypress");
+        blocked("jasmine", name, "jasmine");
+        blocked("reference", name, "@types/jasmine");
+        blocked("setup", name, "cypress");
+        assert.equal(call("cypress-only", name).data.reason, "no-symbol");
+      }
+      blocked("assertions", "assert", "@types/chai");
+      blocked("assertions", "expect", "@types/chai");
+      blocked("wdio", "expect", "@types/qunit", "@wdio/globals/types");
+      blocked("wdio", "test", "@types/qunit");
+      blocked("jest-dom", "expect", "@testing-library/jest-dom");
+      assert.equal(libraryTarget(call("cypress", "beforeAll")).unit, "jest");
+      assert.equal(call("cypress", "cy").data.reason, "no-symbol");
+      assert.equal(
+        libraryTarget(graph.link("mixed/main.ts", "vi", "references")).symbol,
+        "vi",
+      );
+      assert.equal(libraryTarget(call("jasmine", "test")).unit, "jest");
+      assert.equal(libraryTarget(call("assertions", "test")).unit, "vitest");
+      assert.equal(libraryTarget(call("wdio", "it")).unit, "jest");
+      assert.equal(libraryTarget(call("imports-only", "expect")).unit, "jest");
+      assert.equal(libraryTarget(call("shadow", "expect")).unit, "other");
+      assert.equal(call("shadow", "describe").resolution, "resolved");
+      assert.equal(call("shadow", "test").resolution, "resolved");
+    },
+  );
+});
+
+test("immutable member aliases preserve the checker owner and overlapping global candidates", async () => {
+  await project(
+    {
+      "tsconfig.json": '{"files":["node.ts","member.ts"]}',
+      "node.ts": "import 'node:fs';",
+      "node-only/tsconfig.json":
+        '{"compilerOptions":{"lib":["es2022"],"types":["node"]}}',
+      "node-only/main.ts":
+        "new URL('https://example.test'); fetch('https://example.test');",
+      "no-node/tsconfig.json":
+        '{"compilerOptions":{"lib":["es2022"],"types":[]}}',
+      "no-node/main.ts": "new URL('https://example.test');",
+      "mixed-runtime/tsconfig.json":
+        '{"compilerOptions":{"lib":["es2022"],"types":["node","bun"]}}',
+      "mixed-runtime/main.ts": "btoa('abc');",
+      "member.ts": `declare const receiver: any;
+      function makeError(): object { return { toString() { return 'custom'; } }; }
+      function example() {
+      const log = console.log;
+      const maximum = (Math.max);
+      const key = 'min';
+      const written = JSON.parse;
+      JSON.parse = () => null;
+      const unsafe = receiver.parse;
+      const error = makeError();
+      const stringify = error.toString;
+      const renderKey = 'toString';
+      log('ready'); maximum(1, 2); Math[key](1, 2); written('{}'); unsafe('{}');
+      stringify(); error[renderKey]();
+      }`,
+    },
+    async (graph, report) => {
+      clean(report);
+      const call = (name) => graph.link("member.ts", name, "calls");
+      assert.deepEqual(libraryTarget(call("maximum")), {
+        ecosystem: "typescript-lib",
+        unit: "es",
+        symbol: "Math.max",
+        evidence: "declaring-owner",
+      });
+      assert.equal(call("log").resolution, "ambiguous");
+      assert.equal(libraryTarget(call("Math[key]")).symbol, "Math.min");
+      assert.deepEqual(
+        libraryTarget(graph.link("node-only/main.ts", "URL", "calls")),
+        {
+          ecosystem: "node",
+          unit: "url",
+          symbol: "URL",
+          evidence: "declared-builtin",
+        },
+      );
+      assert.equal(
+        libraryTarget(graph.link("node-only/main.ts", "fetch", "calls")).unit,
+        "globals",
+      );
+      assert.equal(
+        graph.link("no-node/main.ts", "URL", "calls").resolution,
+        "unresolved",
+      );
+      assert.equal(
+        graph.link("mixed-runtime/main.ts", "btoa", "calls").resolution,
+        "unresolved",
+      );
+      assert.deepEqual(
+        call("log")
+          .libraries.map(({ ecosystem, unit }) => [ecosystem, unit])
+          .sort(),
+        [
+          ["dom", "dom"],
+          ["node", "console"],
+        ],
+      );
+      for (const name of ["written", "unsafe", "stringify", "error[renderKey]"])
+        assert.equal(call(name).resolution, "unresolved");
+    },
+  );
+});
+
+test("package members use their declarations through returns and re-exports", async () => {
+  await project(
+    {
+      "package.json":
+        '{"dependencies":{"browser-kit":"^2","uncaptured-kit":"^1"}}',
+      "tsconfig.json":
+        '{"compilerOptions":{"paths":{"browser-kit":["./vendor/kit/index.d.ts"]}}}',
+      "vendor/kit/package.json": '{"name":"browser-kit","types":"index.d.ts"}',
+      "vendor/kit/index.d.ts": `export interface Page { locator(selector: string): Locator }
+      export type Locator = { click(): void };
+      export interface A { run(): void; one(): void }
+      export interface B { run(): void; two(): void }
+      export declare function page(): Page;`,
+      "barrel.ts": `export { page as open } from 'browser-kit';
+      export type { A, B } from 'browser-kit';
+      export type { Page as UnknownPage } from 'uncaptured-kit';`,
+      "main.ts": `import { open, type A, type B, type UnknownPage } from './barrel';
+      open().locator('input[name="lastName"]').click();
+      declare const union: A | B;
+      declare const both: A & B;
+      declare const page: UnknownPage;
+      declare function fetchPage(): UnknownPage;
+      declare const unknown: any;
+      union.run(); both.run(); both.one(); page.locator('input');
+      fetchPage().locator('input'); unknown.locator('input');`,
+    },
+    async (graph, report) => {
+      clean(report);
+      const call = (name) =>
+        graph.store
+          .links()
+          .find(
+            (link) =>
+              link.file === "main.ts" &&
+              link.kind === "calls" &&
+              link.targetName === name,
+          );
+      assert.deepEqual(libraryTarget(call("(expression).click")), {
+        ecosystem: "npm",
+        unit: "browser-kit",
+        symbol: "Locator.click",
+        evidence: "declaring-owner",
+      });
+      assert.equal(libraryTarget(call("both.one")).symbol, "A.prototype.one");
+      for (const name of ["union.run", "both.run"]) {
+        const match = call(name);
+        assert.equal(match.resolution, "ambiguous");
+        assert.deepEqual(match.libraries.map(({ symbol }) => symbol).sort(), [
+          "A.prototype.run",
+          "B.prototype.run",
+        ]);
+      }
+      for (const text of ["page.locator", "(expression).locator"])
+        assert.deepEqual(libraryTarget(call(text)), {
+          ecosystem: "npm",
+          unit: "uncaptured-kit",
+          evidence: "import-path",
+        });
+      assert.equal(call("unknown.locator").data.reason, "any-receiver");
+    },
+  );
+});
+
+test("Deno package aliases and scoped maps select the actual registry or checkout file", async () => {
+  await project(
+    {
+      // Hono runtime-tests/deno/deno.json uses this registry mapping.
+      "deno/tsconfig.json":
+        '{"compilerOptions":{"module":"esnext","allowImportingTsExtensions":false}}',
+      "deno/deno.jsonc": `{
+        // Deno expands inline package-root aliases to package subpaths.
+        "imports": {
+          "@std/assert": "jsr:@std/assert@^1.0.3",
+          "fs": "node:fs",
+          "helper": "./helper.ts",
+          "remote": "https://example.test/mod.ts"
+        },
+        "scopes": { "./legacy/": { "@std/assert": "npm:assert@^2.0.0" } }
+      }`,
+      "deno/helper.ts": "export function here() {}",
+      "deno/main.ts": `import { assertEquals as equal } from '@std/assert';
+        import { assertRejects } from '@std/assert/assert-rejects';
+        import * as fs from 'fs';
+        import { here } from 'helper';
+        import { go } from 'remote';
+        import { fail } from 'unmapped';
+        equal(1, 1); assertRejects(() => Promise.reject()); fs.readFileSync('x');
+        here(); go(); fail();`,
+      "deno/legacy/main.ts": `import { equal } from '@std/assert'; equal(1, 1);`,
+      "separate/deno.json": '{"importMap":"./maps/import-map.json"}',
+      "separate/maps/import-map.json":
+        '{"imports":{"package/":"npm:@scope/other@2.0.0/"}}',
+      "separate/main.ts": `import { load } from 'package/client'; load();`,
+      "variants/deno.precompile.json":
+        '{"imports":{"@std/assert":"jsr:@std/assert@^1.0.3","only":"node:fs"}}',
+      "variants/deno.react-jsx.json":
+        '{"imports":{"@std/assert":"jsr:@std/assert@^1.0.3","only":"npm:fs"}}',
+      "variants/main.ts": `import { assertEquals } from '@std/assert';
+        import { readFileSync } from 'only';
+        assertEquals(1, 1); readFileSync('x');`,
+      "uncaptured/deno.json": '{"importMap":"../unavailable.json"}',
+      "uncaptured/main.ts": `import { load } from 'package'; load();`,
+    },
+    async (graph, report) => {
+      clean(report);
+      const call = (name) => graph.link("deno/main.ts", name, "calls");
+      assert.deepEqual(libraryTarget(call("equal")), {
+        ecosystem: "jsr",
+        unit: "@std/assert",
+        symbol: "assertEquals",
+        evidence: "import-binding",
+      });
+      assert.equal(
+        libraryTarget(call("assertRejects")).symbol,
+        "assert-rejects:assertRejects",
+      );
+      assert.equal(libraryTarget(call("readFileSync")).ecosystem, "node");
+      assert.equal(graph.target(call("here")), "deno/helper.ts#here");
+      assert.equal(call("go").resolution, "unresolved");
+      assert.equal(call("fail").resolution, "unresolved");
+      assert.deepEqual(
+        libraryTarget(graph.link("deno/legacy/main.ts", "equal", "calls")),
+        {
+          ecosystem: "npm",
+          unit: "assert",
+          symbol: "equal",
+          evidence: "import-binding",
+        },
+      );
+      assert.deepEqual(
+        libraryTarget(graph.link("separate/main.ts", "load", "calls")),
+        {
+          ecosystem: "npm",
+          unit: "@scope/other",
+          symbol: "client:load",
+          evidence: "import-binding",
+        },
+      );
+      assert.equal(
+        libraryTarget(graph.link("variants/main.ts", "assertEquals", "calls"))
+          .ecosystem,
+        "jsr",
+      );
+      assert.equal(
+        graph.link("variants/main.ts", "readFileSync", "calls").resolution,
+        "unresolved",
+      );
+      assert.equal(
+        graph.link("uncaptured/main.ts", "load", "calls").resolution,
+        "unresolved",
+      );
+    },
+  );
+});
+
+test("CommonJS destructuring proves the written export and leaves rest, nesting and defaults open", async () => {
+  await project(
+    {
+      "use.cjs": `const { 'readFileSync': read } = require('node:fs');
+        const { ...rest } = require('node:path');
+        const { posix: { basename: nested } } = require('node:path');
+        const { 'writeFileSync': write = () => 1 } = require('node:fs');
+        read('x'); rest.join('a', 'b'); nested('x'); write('x');`,
+    },
+    async (graph, report) => {
+      clean(report);
+      const at = (text, kind) => graph.link("use.cjs", text, kind);
+      for (const [text, kind] of [
+        ["'readFileSync': read", "imports"],
+        ["read", "calls"],
+      ])
+        assert.equal(libraryTarget(at(text, kind)).symbol, "readFileSync");
+      for (const [text, kind] of [
+        ["...rest", "imports"],
+        ["join", "calls"],
+        ["nested", "calls"],
+      ])
+        assert.deepEqual(libraryTarget(at(text, kind)), {
+          ecosystem: "node",
+          unit: "path",
+          evidence: "import-path",
+        });
+      assert.equal(
+        libraryTarget(at("'writeFileSync': write = () => 1", "imports")).symbol,
+        undefined,
+      );
+      assert.equal(at("write", "calls").resolution, "unresolved");
+    },
+  );
+});
+
+test("writes to a module binding withhold only the affected member names", async () => {
+  await project(
+    {
+      "package.json": '{"dependencies":{"patched-fs":"^1"}}',
+      "use.cjs": `const fs = require('node:fs');
+        const alias = fs;
+        alias.readFileSync('x'); fs.statSync('x'); fs.unlinkSync('x'); fs.existsSync('x');
+        fs.writeFileSync('x');
+        fs.readFileSync = () => 'fake';
+        alias.writeFileSync = () => null;
+        Object.assign(fs, { statSync: () => null });
+        delete fs['unlinkSync'];
+        function unrelated(fs) { fs.existsSync = () => false; }`,
+      "typed.ts": `import * as fs from 'patched-fs';
+        fs.statSync('x'); fs.statSync = () => null;
+        fs.existsSync('x');`,
+      "types/patched-fs/package.json":
+        '{"name":"patched-fs","types":"index.d.ts"}',
+      "types/patched-fs/index.d.ts": `declare module 'patched-fs' {
+        export function statSync(path: string): unknown;
+        export function existsSync(path: string): boolean;
+      }`,
+      "tsconfig.json":
+        '{"compilerOptions":{"typeRoots":["./types"],"types":["patched-fs"]},"files":["typed.ts"]}',
+      "jsconfig.json": '{"files":["use.cjs"]}',
+    },
+    async (graph, report) => {
+      clean(report);
+      const call = (file, name) => graph.link(file, name, "calls");
+      for (const name of [
+        "readFileSync",
+        "statSync",
+        "unlinkSync",
+        "writeFileSync",
+      ])
+        assert.deepEqual(libraryTarget(call("use.cjs", name)), {
+          ecosystem: "node",
+          unit: "fs",
+          evidence: "import-path",
+        });
+      assert.equal(
+        libraryTarget(call("use.cjs", "existsSync")).symbol,
+        "existsSync",
+      );
+      assert.deepEqual(libraryTarget(call("typed.ts", "statSync")), {
+        ecosystem: "npm",
+        unit: "patched-fs",
+        evidence: "import-path",
+      });
+      assert.equal(
+        libraryTarget(call("typed.ts", "existsSync")).symbol,
+        "existsSync",
+      );
+    },
+  );
+});
+
+test("written imports can be independent of source or compiler configuration gaps", async () => {
+  await project(
+    {
+      "package.json": '{"dependencies":{"package":"^1"}}',
+      "broken.ts": "export function broken( {",
+      "use.ts": `import { join } from 'node:path';
+        import { build as run } from 'package';
+        import { broken } from './broken';
+        join('a', 'b'); run(); broken(); Promise.resolve(1);`,
+      "partial/tsconfig.json": '{"extends":"@missing/base"}',
+      "partial/use.ts": `import { readFile } from 'node:fs/promises';
+        import { parse } from 'package'; readFile('x'); parse();`,
+    },
+    async (graph, report) => {
+      clean(report);
+      const call = (file, name) => graph.link(file, name, "calls");
+      assert.equal(libraryTarget(call("use.ts", "join")).symbol, "join");
+      assert.equal(libraryTarget(call("use.ts", "run")).symbol, "build");
+      assert.equal(call("use.ts", "broken").data.reason, "invalid-code");
+      assert.equal(call("use.ts", "resolve").resolution, "unresolved");
+      assert.equal(
+        libraryTarget(call("partial/use.ts", "readFile")).symbol,
+        "readFile",
+      );
+      assert.equal(
+        call("partial/use.ts", "parse").data.reason,
+        "incomplete-config",
+      );
+    },
+  );
+});
+
 test("relative imports resolve to the module; a missing relative file stays unresolved", async () => {
   await project(
     {
@@ -145,11 +1567,14 @@ test("barrel chains resolve to the original declaration, never to a same-named l
   );
 });
 
-test("tsconfig paths aliases resolve; an alias the config does not declare stays unresolved", async () => {
+test("tsconfig paths aliases resolve or stay unresolved when their targets are missing", async () => {
   await project(
     {
       "tsconfig.json": JSON.stringify({
-        compilerOptions: { baseUrl: ".", paths: { "@core/*": ["src/core/*"] } },
+        compilerOptions: {
+          baseUrl: ".",
+          paths: { "@core/*": ["src/core/*"], "@nope/*": ["src/absent/*"] },
+        },
       }),
       "src/core/log.ts": "export function log() {}\n",
       "src/app.ts":
@@ -163,7 +1588,7 @@ test("tsconfig paths aliases resolve; an alias the config does not declare stays
       );
       const unknown = graph.link("src/app.ts", '"@nope/log"');
       assert.equal(unknown.resolution, "unresolved");
-      assert.equal(unknown.data.reason, "external-package");
+      assert.equal(unknown.data.reason, "unresolved-alias");
     },
   );
 });
@@ -356,6 +1781,13 @@ test("checkout member chains use typed declarations and preserve open receivers"
         "use.ts#one.[object].nested.run",
         "use.ts#two.[object].nested.run",
       ]);
+      for (const line of ["fromLib?.trim();", 'fromLib?.["trim"]();'])
+        assert.deepEqual(libraryTarget(callOn(line)), {
+          ecosystem: "typescript-lib",
+          unit: "es",
+          symbol: "String.prototype.trim",
+          evidence: "declaring-owner",
+        });
       for (const [line, reason] of [
         ["openReceiver.run();", "index-signature"],
         ["unchecked.run();", "any-receiver"],
@@ -364,8 +1796,6 @@ test("checkout member chains use typed declarations and preserve open receivers"
         ['dict["literal"]();', "index-signature"],
         ["record.missing();", "index-signature"],
         ["api[key]();", "no-symbol"],
-        ["fromLib?.trim();", "external"],
-        ['fromLib?.["trim"]();', "no-symbol"],
         ["inferred.run();", "local"],
       ]) {
         const call = callOn(line);
@@ -1096,6 +2526,7 @@ test("pnpm subpath exports and checkout path dependencies use TypeScript's resol
           "@pkg/linked": "link:../../loose",
           "@pkg/file": "file:../../loose",
           "@pkg/excluded": "workspace:*",
+          "external-package": "^1",
         },
       }),
       "apps/server/migrate-dev-db.ts": [
@@ -1175,11 +2606,18 @@ test("pnpm subpath exports and checkout path dependencies use TypeScript's resol
         assert.equal(link.resolution, "unresolved");
         assert.equal(link.data.reason, "workspace-build-output-missing");
       }
-      for (const name of ['"@pkg/excluded"', '"external-package"'])
-        assert.equal(
-          graph.link(file, name, "imports").data.reason,
-          "external-package",
-        );
+      assert.equal(
+        graph.link(file, '"@pkg/excluded"', "imports").data.reason,
+        "external-package",
+      );
+      assert.deepEqual(
+        libraryTarget(graph.link(file, '"external-package"', "imports")),
+        {
+          ecosystem: "npm",
+          unit: "external-package",
+          evidence: "import-path",
+        },
+      );
       const require = graph.link(
         "apps/server/require.cts",
         '"@t3tools/shared/devHome"',
@@ -1409,14 +2847,14 @@ test("extension lookup preserves a relative module edge and augmentation leaves 
   );
 });
 
-test("extends and implements resolve; an external base class stays unresolved with its name", async () => {
+test("extends and implements resolve to checkout definitions and named outside imports", async () => {
   await project(
     {
       "types.ts":
         "export interface Shape { area(): number }\nexport class Base {}\nexport interface Named { name: string }\nexport interface Both extends Named, Shape {}\n",
       "impl.ts": [
         'import { Shape, Base } from "./types";',
-        'import { Emitter } from "events";',
+        'import { EventEmitter as Emitter } from "events";',
         "export class Sq extends Base implements Shape { area() { return 1; } }",
         "export class Ev extends Emitter {}",
         "",
@@ -1432,7 +2870,12 @@ test("extends and implements resolve; an external base class stays unresolved wi
         "types.ts#Shape",
       );
       const external = graph.link("impl.ts", "Emitter", "extends");
-      assert.equal(external.resolution, "unresolved");
+      assert.deepEqual(libraryTarget(external), {
+        ecosystem: "node",
+        unit: "events",
+        symbol: "EventEmitter",
+        evidence: "import-binding",
+      });
       assert.equal(external.targetName, "Emitter");
       assert.equal(
         graph.target(graph.link("types.ts", "Named", "extends")),
@@ -1977,7 +3420,7 @@ test("constructor parameter properties are class properties", async () => {
   );
 });
 
-test("an incomplete target set is never narrowed to one definite target", async () => {
+test("a target set combines the known outside declaration with the checkout candidate", async () => {
   await project(
     {
       "foo.ts": [
@@ -1988,13 +3431,9 @@ test("an incomplete target set is never narrowed to one definite target", async 
     },
     async (graph) => {
       const call = graph.link("foo.ts", "toString", "calls");
-      assert.equal(call.resolution, "unresolved");
-      assert.equal(call.data.reason, "external");
-      assert.deepEqual(
-        call.data.targets.map((target) => target.file),
-        ["foo.ts"],
-        "the project target is kept",
-      );
+      assert.equal(call.resolution, "ambiguous");
+      assert.deepEqual(graph.candidates(call), ["foo.ts#Foo.toString"]);
+      assert.equal(call.libraries[0].symbol, "Number.prototype.toString");
     },
   );
   // A target whose file failed (its package config is broken) is lost: the
@@ -2104,13 +3543,14 @@ test("usage meaning selects declarations: calls, types and values", async () => 
 test("unresolved reasons say why", async () => {
   await project(
     {
+      "package.json": '{"dependencies":{"left-pad":"^1"}}',
       "tsconfig.json": JSON.stringify({
         compilerOptions: { baseUrl: ".", paths: { "@app/*": ["src/*"] } },
       }),
       "src/use.ts": [
         'import { gone } from "./missing";',
         'import { nope } from "@app/absent";',
-        'import { pkg } from "left-pad";',
+        'import pkg from "left-pad";',
         'import { sub } from "#internal";',
         "gone(); nope(); pkg(); sub();",
         "",
@@ -2123,10 +3563,21 @@ test("unresolved reasons say why", async () => {
       assert.equal(reason("gone", "imports"), "missing-module");
       assert.equal(reason('"@app/absent"'), "unresolved-alias");
       assert.equal(reason("nope", "imports"), "unresolved-alias");
-      assert.equal(reason('"left-pad"'), "external-package");
-      assert.equal(reason("pkg", "imports"), "external-package");
+      assert.deepEqual(libraryTarget(graph.link("src/use.ts", '"left-pad"')), {
+        ecosystem: "npm",
+        unit: "left-pad",
+        evidence: "import-path",
+      });
+      assert.equal(
+        libraryTarget(graph.link("src/use.ts", "pkg", "imports")).symbol,
+        "default",
+      );
+      assert.equal(
+        libraryTarget(graph.link("src/use.ts", "pkg", "calls")).symbol,
+        "default",
+      );
       assert.equal(reason('"#internal"'), "unresolved-alias");
-      for (const name of ["gone", "nope", "pkg", "sub"]) {
+      for (const name of ["gone", "nope", "sub"]) {
         const call = graph.link("src/use.ts", name, "calls");
         assert.equal(call.resolution, "unresolved");
         assert.equal(call.targetName, name);
@@ -2159,7 +3610,11 @@ test("triple-slash references are import links", async () => {
       const types = graph.link("main.ts", "node");
       assert.equal(types.resolution, "unresolved");
       assert.equal(types.data.reason, "external-package");
-      assert.equal(graph.link("main.ts", "es2020").data.reason, "external");
+      assert.deepEqual(libraryTarget(graph.link("main.ts", "es2020")), {
+        ecosystem: "typescript-lib",
+        unit: "es",
+        evidence: "reference-directive",
+      });
     },
   );
 });
@@ -2180,7 +3635,7 @@ test("a broken workspace root fails only root-package files; members stay analys
       // The workspace list is unknown, so @w/a is not linked rather than guessed.
       const cross = graph.link("packages/b/src/use.ts", '"@w/a"');
       assert.equal(cross.resolution, "unresolved");
-      assert.equal(cross.data.reason, "external-package");
+      assert.equal(cross.data.reason, "workspace-manifest-unreadable");
     },
   );
 });
@@ -2351,9 +3806,12 @@ test("a candidate set never omits a possible target outside the project", async 
       const [withDate, inside] = graph
         .links("u.ts", "toString", "calls")
         .sort((a, b) => a.range.start - b.range.start);
-      assert.equal(withDate.resolution, "unresolved");
-      assert.equal(withDate.data.reason, "external");
-      assert.equal(withDate.data.targets.length, 2);
+      assert.equal(withDate.resolution, "ambiguous");
+      assert.deepEqual(graph.candidates(withDate), [
+        "u.ts#Bar.toString",
+        "u.ts#Foo.toString",
+      ]);
+      assert.equal(withDate.libraries[0].symbol, "Date.prototype.toString");
       assert.deepEqual(graph.candidates(inside), [
         "u.ts#Bar.toString",
         "u.ts#Foo.toString",
@@ -4393,6 +5851,7 @@ async function indexFiles(files) {
         reason: l.data?.reason,
         cause: l.data?.cause,
         assumes: l.data?.assumes,
+        libraries: l.libraries,
         targets:
           l.resolution === "resolved"
             ? [symbols.get(l.targetId)]
@@ -4418,7 +5877,9 @@ async function indexFiles(files) {
  * Indexes `files` clean and with `broken` replacing some of them, for
  * fixtures that exercise the attribution rules. It checks, for every link of
  * a valid file: identical to the clean index (maybe plus the flag), or
- * `invalid-code` naming a broken file with a `via`; and a link whose clean
+ * `invalid-code` naming a broken file with a `via`. Checker-dependent
+ * library links are flagged and unresolved. Source-proved library bindings
+ * retain the exact identity. A link whose clean
  * target is in a broken file fails, naming it. That is STRICTER than the
  * contract (W2-D.md), which requires equality only of unflagged links: a
  * flagged link may differ from the clean index, and the known-limit
@@ -4461,6 +5922,38 @@ async function differential(files, broken, unflaggedFiles = []) {
       problems.push(
         `${key} (${c.text} in ${c.line.trim()}): clean target in ${intoBroken} but broken is ${b.resolution} ${b.reason}`,
       );
+    if (c.resolution === "library" && b.resolution === "library") {
+      assert.deepEqual(
+        b.libraries,
+        c.libraries,
+        `${key}: unchanged library identity`,
+      );
+      assert.ok(
+        b.libraries.every((target) =>
+          ["import-path", "import-binding"].includes(target.evidence),
+        ),
+        `${key}: independent source proof`,
+      );
+      counts.unflagged++;
+      continue;
+    }
+    if (
+      c.resolution === "library" &&
+      b.assumes?.includes("no-unseen-declarations")
+    ) {
+      assert.equal(
+        b.resolution,
+        "unresolved",
+        `${key}: unverified library link`,
+      );
+      assert.deepEqual(
+        b.targets,
+        [],
+        `${key}: unverified library link has no target`,
+      );
+      counts.flagged++;
+      continue;
+    }
     if (JSON.stringify(c.targets) !== JSON.stringify(b.targets)) {
       counts.changedTarget++;
       problems.push(
@@ -4472,8 +5965,7 @@ async function differential(files, broken, unflaggedFiles = []) {
         `${key} (${c.text} in ${c.line.trim()}): reason ${c.reason} -> ${b.reason}`,
       );
     }
-    // K3: in a program that includes a failed file, EVERY link that is not
-    // invalid-code is flagged (resolved or unresolved alike).
+    // K3: the remaining answers depend on the potentially unseen declarations.
     if (b.assumes?.includes("no-unseen-declarations")) counts.flagged++;
     else {
       counts.unflagged++;
@@ -4627,13 +6119,18 @@ const TAINT_BROKEN = {
 };
 
 test("a failure passes through every lookup that depends on it (clean vs broken)", async () => {
-  const { counts, problems, bad } = await differential(
+  const { counts, problems, clean, bad } = await differential(
     TAINT_FILES,
     TAINT_BROKEN,
   );
   assert.deepEqual(problems, []);
   assert.equal(counts.changedTarget, 0);
   assert.equal(counts.changedReason, 0);
+  const pick = (result) =>
+    linkAt(result, "use.ts", "interface J extends Pick", "Pick", "extends");
+  assert.equal(pick(clean).resolution, "library");
+  assert.equal(pick(bad).resolution, "unresolved");
+  assert.deepEqual(pick(bad).assumes, ["no-unseen-declarations"]);
   const one = (file) => ({ file });
   const failedAt = (file, marker, at, cause, kind) =>
     isFailed(linkAt(bad, file, marker, at, kind), one(cause), marker);
@@ -6310,18 +7807,38 @@ test("K3: in a program with a failed file, unresolved links are flagged too", as
       "",
     ].join("\n"),
   };
-  const { bad: broken } = await differential(files, {
+  const { clean: intact, bad: broken } = await differential(files, {
     "bad.ts": bad + "const broken = (;\n",
   });
+  assert.equal(
+    linkAt(intact, "use.ts", "// lib", "floor").resolution,
+    "library",
+  );
+  assert.equal(
+    linkAt(broken, "use.ts", "// lib", "floor").resolution,
+    "unresolved",
+  );
   const seen = new Set();
+  const syntaxProofs = [];
   for (const link of broken.links.values()) {
     if (link.file !== "use.ts" || link.reason === "invalid-code") continue;
+    if (link.resolution === "library") {
+      assert.equal(link.assumes, undefined);
+      assert.equal(link.libraries[0].unit, "fs");
+      syntaxProofs.push(link.libraries[0].symbol ?? "(module)");
+      continue;
+    }
     assert.ok(
       link.assumes?.includes("no-unseen-declarations"),
       `${link.text} (${link.resolution} ${link.reason}) is flagged`,
     );
     if (link.resolution === "unresolved") seen.add(link.reason);
   }
+  assert.deepEqual(syntaxProofs.sort(), [
+    "(module)",
+    "readFileSync",
+    "readFileSync",
+  ]);
   // The unresolved reasons this fixture produces, each flagged.
   for (const reason of ["no-symbol", "external", "local", "missing-module"])
     assert.ok(

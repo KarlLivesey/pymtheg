@@ -1516,7 +1516,7 @@ symbol. Shape (`src/graph/types.ts` `LibraryTarget`, `GraphLibrary`):
 | `unit` | module path, crate, package name or standard-library unit |
 | `symbol` | optional symbol path in the unit, spelled as the unit spells it (level 2); absent for the unit itself (level 1) |
 | `version` | optional; only when the checkout's manifest or lockfile states it |
-| `versionSource` | required with a version, and only then: the project path of that manifest or lockfile. Its file name must be one of the target ecosystem's manifests or lockfiles (`versionFiles` in `src/graph/identity.ts`: npm `package.json`, `package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `yarn.lock`, `bun.lock`, `bun.lockb`, `deno.json`, `deno.lock`; node `package.json`; go `go.mod`, `go.sum`, `go.work`, `go.work.sum`; go-std `go.mod`, `go.work`; cargo `Cargo.toml`, `Cargo.lock`; any other ecosystem takes no version), and the path must be a clean context file in the snapshot (during indexing, one of the module's own declared context files). A `tsconfig.json` or another ecosystem's manifest is refused |
+| `versionSource` | required with a version, and only then: the project path of that manifest or lockfile. Its file name must be one of the target ecosystem's manifests or lockfiles (`versionFiles` in `src/graph/identity.ts`: npm `package.json`, `package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `yarn.lock`, `bun.lock`, `bun.lockb`, `deno.json`, `deno.lock`; node `package.json`; go `go.mod`, `go.sum`, `go.work`, `go.work.sum`; go-std `go.mod`, `go.work`; cargo `Cargo.toml`, `Cargo.lock`; any other ecosystem takes no version), and the path must be a clean context file in the snapshot (during indexing, one of the module's own declared context files). A `tsconfig.json` or another ecosystem's manifest is refused |
 | `evidence` | required: how the source proves it (below) |
 | `id` | `library:` + sha256 of (ecosystem, unit, version, symbol): deterministic and independent of the project and of the evidence |
 
@@ -1630,6 +1630,58 @@ graph links, so Studio is unchanged. The coverage export credits a stored
 library target directly and reconstructs identities only for links without one
 (every link of a 0.1.0 graph).
 
+TypeScript module 23 and later use the checker over the same snapshot to record
+declaring owners. `library.ts` assigns the `es` and `dom` units from bundled
+declarations and identifies captured dependency declaration packages. When
+declarations are missing, `extract.ts` uses lexical imports and literal
+loaders to prove the unit or a selected export. Resolution converts those
+facts to stored targets after the existing failure and project checks. A
+written npm subpath prefixes the export as `subpath:export`. Instance member
+paths use `Owner.prototype.member`. [C-11](changes/C-11.md)
+
+Module 26 selects Deno import-map entries before module and package lookup.
+The captured Deno configurations in the owning directory must agree.
+An extension supplied by a map resolves the file without changing the
+written import's extension diagnostics.
+A captured outside declaration package needs installation, type-package or
+dependency evidence. Literal CommonJS binding names use their written keys.
+Same-file writes to a module object suppress that member's export name.
+Module 27 also recognizes qualified `import =` aliases and ambient class
+heritage through a type-only import as lexical proof.
+Module 28 requires a manifest or explicit registry route for bare package
+identity. A declared npm polyfill and its bare Node builtin form candidates.
+The checker retains checkout `@types/*` declarations outside
+`node_modules`. Missing expected global declarations can leave compiler
+lib links open. Documented Node globals can form a candidate set with a
+bundled declaration.
+Module 29 applies the Node overlap check to type-position names and checker
+receiver types, including inherited DOM members. Explicit compiler `types`
+options control ambient discovery, and source type references remain independent
+inputs. A proven builtin import, Node hashbang or unbound Node runtime name
+can establish Node context for its file. Environment type packages can share
+web globals. Missing test and build-tool types affect their own documented
+globals. Registry aliases and captured pnpm or Bun catalogs can establish an npm
+package's canonical name and exact version provenance. Local dependency
+protocols are checkout routes.
+Module 30 follows checkout class and interface bases for shared Web API
+members and treats an unshadowed `require()` in explicit CommonJS JavaScript
+as file-local Node evidence. Node evidence applies to the compiler program.
+When a program declares `@types/node`, missing imported declarations and
+missing ambient type entries can introduce Node globals even with an
+explicit `types` list. Node's value-only `CryptoKey` is excluded in type
+positions.
+Module 31 also accepts parenthesized `require` and treats `.js` as CommonJS
+for this check unless its nearest manifest sets `"type": "module"`.
+Module 32 reuses the selected compiler program's ambient type requests and
+captured declarations to identify supported test globals. A checker-selected
+or explicitly imported checkout declaration takes precedence. Member identity
+still comes from the declaration, including through a return type, re-export,
+immutable alias or constant literal selector. A named annotation for a missing
+imported receiver type can identify its package at unit level.
+Module 33 leaves shared test globals unresolved when a known competing ambient
+package is requested outside the supported framework inventory.
+[C-16](changes/C-16.md)
+
 Rust records library paths during resolution starting with module 29. Its library lookup uses
 the captured namespace, import, placement and `cfg` facts, with a separate
 lookup cache key for the outside search. `library.ts` supplies edition prelude
@@ -1637,6 +1689,18 @@ entries and the standard paths where a known module, constructor, variant or
 trait provides the named member. Rust coverage for module 29 and later uses
 stored targets for the level 2 numerator. Historical Rust graphs retain the
 original reconstruction.
+
+Go records library targets during resolution starting with module 30
+(C-14, `resolve.ts` `libraryOf`, `gomod.ts` `libraryOrigin`): an import's
+unit (`import-path`), an exported name through a library import's qualifier
+(`import-binding`), and an unshadowed builtin call (`declared-builtin`). Only
+where the link has no checkout target, candidate set or failure. A member of a
+library-typed value stays unresolved (`data.uncertainty`
+`library-member-unproven`) unless the opt-in toolchain route selected it:
+the helper's C and U records carry the member's declaring named type
+(`Owner.Name`, after promotion; none for interface methods), and the resolver
+records it with `declaring-owner`. Go coverage for module 30 and later uses
+stored targets only; older Go graphs keep the reconstruction.
 
 Module 30 recognizes captured Cargo directory source replacements as checkout
 dependencies, limits patch uncertainty to affected package edges, and protects
@@ -1650,3 +1714,17 @@ sources use their index URL. Git sources use the repository URL and the
 branch, tag, or revision selector. For a vendored Git package, the lockfile
 must prove a checkout dependency edge with a precise commit. An applicable
 replacement without a unique captured package stays unresolved.
+
+Module 35 records invocation identifiers, attached item names, and
+declarative macro name bounds from the Rust parse. Empty function-like
+inputs are implicit. The resolver
+memoizes scope effects and runs the ordinary checkout and library lookups
+first. A macro-blocked lookup can retry with proven scope bounds and then
+with the external macro assumption. A pair of flags records which bounds
+can change the visited guards. Stable entries share the ordinary lookup
+cache. Successful links
+from the last pass carry `data.assumes: ["rust-external-macro-name"]` in the
+analyzed facts that the graph stores. The identity and resolution shapes stay
+the same, so library queries and ordinary graph queries can return those
+links. Coverage reports the assumption-backed Level 2 count alongside the
+total and still accepts pre-assumption archives.

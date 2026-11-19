@@ -1,13 +1,46 @@
 // SPDX-License-Identifier: MIT
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, rmdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { aggregate, auditDesign, estimateCoverage, failedRustInfluence, median, stratumShare } from "./coverage.mjs";
 import { classify, columns, externalIdentity, goImports, libraryScore, repositoryScore, reviewQuotas, rustImports, sampleKey, sampleStratum, sourceScope, workspaceNames } from "./coverage-rules.mjs";
+
+test("assumed Level 2 links remain in the total and are counted separately", () => {
+  const score = libraryScore([
+    ["rust", "types", "resolved", null, null, "source", "eligible", 4, 0, null, null, null],
+    ["rust", "calls", "resolved", null, null, "source", "eligible", 2, 0, null, null, null, true],
+    ["rust", "types", "library", null, null, "source", "outside", 3, 0, 2, "declared-builtin", null, true],
+    ["rust", "calls", "unresolved", null, null, "source", "inside", 1, 0, null, null, null],
+  ]);
+  assert.equal(score.total, 10);
+  assert.equal(score.level2, 0.9);
+  assert.equal(score.level2WithoutAssumptions, 0.4);
+  assert.equal(score.assumedLevel2, 5);
+});
+
+test("the plan input regenerates Rust and preserves the other sections", () => {
+  const root = fileURLToPath(new URL("../..", import.meta.url));
+  const checkedIn = readFileSync(join(root, "docs/coverage-plan.md"));
+  const scratch = mkdtempSync(join(tmpdir(), "pymtheg-coverage-plan-"));
+  const plan = join(scratch, "coverage-plan.md");
+  const old = checkedIn.toString("utf8").replace(
+    /^### Rust\n[\s\S]*?(?=^### TypeScript \/ JS\n)/m,
+    "### Rust\n\nPlaceholder\n\n",
+  );
+  assert.notEqual(old, checkedIn.toString("utf8"));
+  writeFileSync(plan, old);
+  try {
+    execFileSync(process.execPath, ["scripts/sweep/coverage.mjs", "--results", "sweep/plan-input.json.gz", "--plan", plan, "--rust-section"], { cwd: root });
+    assert.ok(readFileSync(plan).equals(checkedIn), "regenerated coverage plan differs");
+  } finally {
+    unlinkSync(plan);
+    rmdirSync(scratch);
+  }
+});
 
 import { cargoPathLocations, checkoutLocation, npmPathLocation, yarnArchivePackages } from "./coverage-locations.mjs";
 
@@ -345,6 +378,19 @@ test("a stored library target is credited as stored; a 0.1.0 link is reconstruct
   assert.deepEqual([score.outside, score.total, score.level2, score.level1], [4, 20, 0.45, 0.5]);
 });
 
+test("TypeScript legacy export spelling cannot overwrite a current library decision", () => {
+  const legacy = { module: "typescript", kind: "calls", resolution: "unresolved", file: "src/main.ts",
+    targetName: "fs.readFileSync", data: { reason: "external-package" } };
+  const details = { ...evidence, tsImportMember: () => ({ specifier: "node:fs", member: "default" }) };
+  assert.deepEqual(externalIdentity(legacy, details, project, "outside"),
+    { level: 2, unit: "node:fs", symbol: "default.readFileSync", evidence: "import-binding", gap: null });
+  const current = { ...legacy, moduleVersion: "23+typescript-5.9.3" };
+  assert.equal(externalIdentity(current, details, project, "outside").level, 0);
+  assert.deepEqual(externalIdentity({ ...current, resolution: "library",
+    library: { ecosystem: "node", unit: "fs", evidence: "import-path" } }, details, project, "outside"),
+    { level: 1, unit: "fs", evidence: "import-path", gap: "whole-unit" });
+});
+
 test("Rust library coverage credits recorded evidence and leaves historical reconstruction to old graphs", () => {
   const link = { module: "rust", kind: "calls", file: "src/lib.rs", resolution: "unresolved", targetName: "std::fs::read" };
   assert.equal(externalIdentity(link, evidence, project, "outside").level, 2);
@@ -354,6 +400,20 @@ test("Rust library coverage credits recorded evidence and leaves historical reco
     unit: "std", symbol: "fs::read", evidence: "qualified-path",
   } }, stored, project, "outside"), {
     level: 2, unit: "std", symbol: "fs::read", evidence: "qualified-path", gap: null,
+  });
+});
+
+test("Go library coverage uses stored targets from module 30 and the reconstruction before it", () => {
+  const released = { resolution: "unresolved", module: "go", kind: "calls", file: "src/main", targetName: "strconv.Quote",
+    data: { expr: { ...selector("strconv").expr, n: "Quote" } } };
+  assert.equal(externalIdentity(released, evidence, project, "outside").level, 2);
+  // A module-30 graph left this site unresolved: no rebuilt credit.
+  const stored = { ...evidence, goStoredTargets: true };
+  assert.equal(externalIdentity(released, stored, project, "outside").level, 0);
+  assert.deepEqual(externalIdentity({ ...released, resolution: "library", library: {
+    ecosystem: "go-std", unit: "strconv", symbol: "Quote", evidence: "import-binding",
+  } }, stored, project, "outside"), {
+    level: 2, unit: "strconv", symbol: "Quote", evidence: "import-binding", gap: null,
   });
 });
 

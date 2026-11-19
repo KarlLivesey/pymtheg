@@ -7,6 +7,7 @@ import type {
   GraphLink,
   GraphSymbol,
   Json,
+  LibraryTarget,
   LinkResolution,
   ResolutionContext,
   ResolutionResult,
@@ -14,14 +15,17 @@ import type {
 import {
   directoryOfImport,
   importPathOf,
+  libraryOrigin,
   moduleOf,
   readLayout,
+  type LibraryOrigin,
 } from "./gomod.js";
 import type { GoProjectLayout } from "./gomod.js";
 import {
   fileConstraint,
-  implies,
-  satisfiable,
+  impliesAnyTags,
+  satisfiableAnyTags,
+  satisfiableOrdinary,
   type Formula,
 } from "./constraints.js";
 import {
@@ -174,7 +178,7 @@ export interface Decision {
    * implementer set, or (where the source-only route had a definite project
    * target) an external or builtin callee.
    */
-  toolchain?: "definite" | "verified" | "external";
+  toolchain?: "definite" | "verified" | "external" | "library";
   /** What the source-only route decided, for the report. */
   from?: "definite" | "candidates" | "unresolved" | "invalid";
   /** The source-only route's different definite target (a disagreement). */
@@ -196,6 +200,14 @@ export interface ToolchainFact {
   x?: number;
   /** Import: the imported package's directory in the project (main module or vendor/). */
   dir?: string;
+  /**
+   * A standard-library or dependency object as go/types selected it: the
+   * declaring package's path, the symbol (`Name`, or `Owner.Name` for a
+   * field or concrete method with its declaring named type; absent when the
+   * owner is not a named type of that package, or for an interface method),
+   * and whether the package is in GOROOT (`std`) or a dependency (`dep`).
+   */
+  l?: [string, string | null, "std" | "dep"];
 }
 /** A toolchain `implements` pair on the type's file: type offset, interface file, offset, how. */
 export type ToolchainPair = [number, string, number, "value" | "pointer"];
@@ -222,6 +234,8 @@ export type OpenReason =
   /** Interface dispatch: members match by name and count only, not proven. */
   | "structural-match-unverified";
 const UNRESOLVED: Decision = { ids: [], definite: false };
+/** An import two modules provide (Go: "ambiguous import"). */
+const AMBIGUOUS_IMPORT: Decision = { ids: [], definite: false };
 /**
  * How each property of decisions is combined when their targets together are
  * the answer (a call through several possible function values). Every field of
@@ -281,14 +295,6 @@ const directoryOf = (path: string) => {
 };
 const exported = (name: string) => /^\p{Lu}/u.test(name);
 const unique = <T>(items: T[]) => [...new Set(items)];
-/** Directories the go tool ignores when importing (testdata, _x, .x). */
-const ignoredDirectory = (directory: string) =>
-  directory
-    .split("/")
-    .some(
-      (part) =>
-        part === "testdata" || part.startsWith("_") || part.startsWith("."),
-    );
 /** Package name a non-project import is conventionally referred to by (only used to recognise qualifiers). */
 export function conventionalName(path: string): string {
   const parts = path.split("/");
@@ -297,6 +303,37 @@ export function conventionalName(path: string): string {
   last = last.replace(/\.v\d+$/, "");
   if (last.startsWith("go-")) last = last.slice(3);
   return last.replace(/[.-]/g, "_");
+}
+
+/**
+ * The names an unnamed import of a package whose clause is not in the
+ * checkout may bind (C-14): the last path element, or the one before a
+ * `/vN` suffix, without a `.vN` suffix, a `go-` prefix or a `-go` or
+ * `.go` suffix, with hyphens dropped or written as underscores.
+ */
+export function plausibleNames(path: string): string[] {
+  const parts = path.split("/");
+  const last = parts.at(-1) ?? path;
+  const bases = [last];
+  if (/^v\d+$/.test(last) && parts.length > 1) bases.push(parts.at(-2)!);
+  const seen = new Set<string>();
+  const queue = [...bases];
+  while (queue.length) {
+    const name = queue.pop()!;
+    if (seen.has(name)) continue;
+    seen.add(name);
+    for (const next of [
+      name.replace(/\.v\d+$/, ""),
+      name.replace(/^go-/, ""),
+      name.replace(/(-go|\.go)$/, ""),
+    ])
+      if (next && next !== name) queue.push(next);
+  }
+  const out = new Set<string>();
+  for (const name of seen)
+    for (const form of [name, name.replace(/-/g, ""), name.replace(/-/g, "_")])
+      if (/^[\p{L}_][\p{L}\p{N}_]*$/u.test(form)) out.add(form);
+  return [...out].sort();
 }
 
 export function resolveGo(
@@ -320,9 +357,14 @@ export interface LinkNote {
   builtin?: true;
   /** Failed (`invalid-code`): the code it needs is in these failed files. */
   invalid?: string[];
+  /**
+   * Unresolved, with a member selected on a value of a library type: the
+   * member's declaring owner is not provable from the checkout (C-14).
+   */
+  library?: "library-member-unproven";
   /** Decided by the toolchain route (see Decision.toolchain). */
   toolchain?: {
-    upgrade: "definite" | "verified" | "external";
+    upgrade: "definite" | "verified" | "external" | "library";
     from: "definite" | "candidates" | "unresolved" | "invalid";
     sourceOnly?: string;
   };
@@ -393,6 +435,8 @@ export function linkNotes(
   for (const linkId of resolver.builtins) note(linkId).builtin = true;
   for (const [linkId, reasons] of resolver.open) note(linkId).open = reasons;
   for (const [linkId, files] of resolver.invalid) note(linkId).invalid = files;
+  for (const linkId of resolver.libraryMembers)
+    note(linkId).library = "library-member-unproven";
   for (const [linkId, decided] of resolver.toolchain)
     note(linkId).toolchain = decided;
   return output;
@@ -407,6 +451,8 @@ class GoResolver {
   readonly open = new Map<string, OpenReason[]>();
   /** Links that failed because the code they need is in failed files. */
   readonly invalid = new Map<string, string[]>();
+  /** Members selected on a library-typed value whose owner is unproven (C-14). */
+  readonly libraryMembers = new Set<string>();
   /** Links the toolchain route decided (W3-L), for the link notes. */
   readonly toolchain = new Map<string, NonNullable<LinkNote["toolchain"]>>();
   /** Failed files by directory (a file that cannot be read is not valid code). */
@@ -501,6 +547,7 @@ class GoResolver {
         // example on pathological input) leaves that link unresolved.
         decision = UNRESOLVED;
       }
+      const source = decision;
       // The opt-in toolchain route decides where it has a fact (W3-L).
       const decided = this.toolchainDecision(link, decision);
       if (decided) {
@@ -510,6 +557,51 @@ class GoResolver {
           from: decided.from!,
           ...(decided.sourceOnly ? { sourceOnly: decided.sourceOnly } : {}),
         });
+      }
+      // A target outside the checkout (C-14), only where there is no
+      // checkout target, candidate set or failure: the toolchain's selection
+      // when it has one, else what the source proves.
+      if (!decision.invalid?.length && !decision.ids.length) {
+        let library: LibraryTarget | LibraryTarget[] | undefined;
+        let fromToolchain = false;
+        try {
+          library = this.toolchainLibrary(link);
+          fromToolchain = !!library;
+          library ??= this.libraryOf(link);
+        } catch {
+          library = undefined;
+        }
+        if (library) {
+          if (fromToolchain) {
+            const ids = unique(source.ids);
+            const sourceTarget =
+              ids.length === 1 && source.definite && !source.invalid?.length
+                ? ids[0]
+                : undefined;
+            this.toolchain.set(link.id, {
+              upgrade: "library",
+              from: source.invalid?.length
+                ? "invalid"
+                : sourceTarget
+                  ? "definite"
+                  : ids.length > 1
+                    ? "candidates"
+                    : "unresolved",
+              ...(sourceTarget
+                ? { sourceOnly: this.describe(sourceTarget) }
+                : {}),
+            });
+          }
+          if (Array.isArray(library))
+            // Several imports may declare the qualifier: a set of their units.
+            resolutions.push({
+              linkId: link.id,
+              candidateIds: [],
+              libraries: library,
+            });
+          else resolutions.push({ linkId: link.id, library });
+          continue;
+        }
       }
       const {
         ids,
@@ -566,8 +658,250 @@ class GoResolver {
       else if (decision.unseen)
         // A dispatch with no valid member: unresolved, its members may be unseen.
         this.open.set(link.id, ["declarations-may-be-unseen"]);
+      else if (decision === AMBIGUOUS_IMPORT)
+        // Several modules provide the package: unresolved, with the reason.
+        this.open.set(link.id, ["import-destination-uncertain"]);
+      else if (!distinct.length && this.libraryMember(link))
+        this.libraryMembers.add(link.id);
     }
     return { resolutions, links: added };
+  }
+
+  // ---- library targets (C-14) -------------------------------------------
+
+  private originMemo = new Map<string, LibraryOrigin | null>();
+  /** The library an import path names from this file's directory (see libraryOrigin). */
+  private origin(info: FileInfo, path: string): LibraryOrigin | undefined {
+    const key = `${info.directory}\u0000${path}`;
+    let found = this.originMemo.get(key);
+    if (found === undefined) {
+      found = this.testdataProvides(info.directory, path)
+        ? null
+        : (libraryOrigin(this.layout, info.directory, path, (directory) =>
+            this.vendorRoots.has(directory),
+          ) ?? null);
+      this.originMemo.set(key, found);
+    }
+    return found ?? undefined;
+  }
+
+  /**
+   * A file under a `testdata` directory whose tree supplies the imported
+   * package itself (`testdata/src/<path>`, the GOPATH layout test harnesses
+   * load, such as golang/tools' fake `fmt`): checkout code, never a library.
+   */
+  private testdataProvides(directory: string, path: string): boolean {
+    const parts = directory.split("/");
+    for (let index = parts.length - 1; index >= 0; index--)
+      if (
+        parts[index] === "testdata" &&
+        this.fileDirectories.has(
+          [...parts.slice(0, index + 1), "src", path].join("/"),
+        )
+      )
+        return true;
+    return false;
+  }
+
+  /**
+   * The library packages a qualifier written in `info` may bind: the
+   * qualifier is no package-level or local declaration (locals are bound at
+   * parse), every import of the file that can declare it names a package
+   * outside the checkout, and none of them is checkout code. An explicit
+   * import name binds itself; a standard-library package's name is its last
+   * path element (before a `/vN` suffix); an unnamed dependency import binds
+   * the package clause of a package the checkout does not hold, which may be
+   * any of the path's plausible names (`plausibleNames`). One such import:
+   * the target; several: a candidate set of their units.
+   */
+  private libraryImport(
+    qualifier: string,
+    info: FileInfo,
+  ): { path: string; origin: LibraryOrigin }[] | undefined {
+    const entity = this.lookupName(qualifier, info.path);
+    if (!(entity.e === "none" || (entity.e === "pkg" && !entity.pkgs.length)))
+      return undefined;
+    const bound: { path: string; origin: LibraryOrigin }[] = [];
+    for (const item of info.fact.imports) {
+      if (item.alias === "." || item.alias === "_") continue;
+      let names: string[];
+      let origin: LibraryOrigin | undefined;
+      if (item.alias !== undefined) names = [item.alias];
+      else {
+        const { pkgs } = this.importTargets(info, item.path);
+        origin = pkgs.length ? undefined : this.origin(info, item.path);
+        names = pkgs.length
+          ? pkgs.map((pkg) => pkg.name)
+          : origin?.ecosystem === "go-std"
+            ? [conventionalName(item.path)]
+            : plausibleNames(item.path);
+      }
+      if (!names.includes(qualifier)) continue;
+      origin ??= this.origin(info, item.path);
+      const entry = info.imports.get(qualifier);
+      // A binder that is or may be checkout code: not a library at all.
+      if (
+        !origin ||
+        this.importTargets(info, item.path).pkgs.length ||
+        (entry && entry.path === item.path && (entry.uncertain || entry.failed))
+      )
+        return undefined;
+      if (!bound.some((other) => other.path === item.path))
+        bound.push({ path: item.path, origin });
+    }
+    return bound.length ? bound : undefined;
+  }
+
+  private libraryTarget(
+    origin: LibraryOrigin,
+    unit: string,
+    symbol: string | undefined,
+    evidence: LibraryTarget["evidence"],
+  ): LibraryTarget {
+    return {
+      ecosystem: origin.ecosystem,
+      unit,
+      ...(symbol === undefined ? {} : { symbol }),
+      ...(origin.version !== undefined && origin.versionSource !== undefined
+        ? { version: origin.version, versionSource: origin.versionSource }
+        : {}),
+      evidence,
+    };
+  }
+
+  /**
+   * What the source proves about a link into a library: an import's unit
+   * (`import-path`); a builtin call no declaration shadows
+   * (`declared-builtin`, unit `builtin`); or an exported name selected from
+   * a library package's qualifier, as a call, value or type
+   * (`import-binding`). A member selected on a value of a library type is
+   * not: its declaring owner may be promoted from an embedded type, which
+   * only the library's source shows.
+   */
+  private libraryOf(
+    link: GraphLink,
+  ): LibraryTarget | LibraryTarget[] | undefined {
+    const info = this.files.get(link.file);
+    if (!info) return undefined;
+    const data = (link.data ?? {}) as {
+      expr?: Desc;
+      t?: TypeRef;
+      path?: string;
+      builtinName?: boolean;
+    };
+    if (link.kind === "imports") {
+      if (!data.path) return undefined;
+      const origin = this.origin(info, data.path);
+      return origin
+        ? this.libraryTarget(origin, data.path, undefined, "import-path")
+        : undefined;
+    }
+    if (
+      link.kind === "calls" &&
+      data.builtinName &&
+      data.expr?.k === "name" &&
+      data.expr.n === link.targetName &&
+      BUILTIN_FUNCTIONS.has(link.targetName) &&
+      this.builtins.has(link.id)
+    )
+      return this.libraryTarget(
+        { ecosystem: "go-std" },
+        "builtin",
+        link.targetName,
+        "declared-builtin",
+      );
+    if (!["calls", "references", "embeds"].includes(link.kind))
+      return undefined;
+    let qualifier: string;
+    let name: string;
+    if (data.t) {
+      if (!data.t.q || data.t.l !== undefined) return undefined;
+      qualifier = data.t.q;
+      name = data.t.n;
+    } else if (data.expr) {
+      const expr = data.expr.k === "inst" ? data.expr.x : data.expr;
+      if (expr.k !== "sel" || expr.x.k !== "name") return undefined;
+      qualifier = expr.x.n;
+      name = expr.n;
+    } else return undefined;
+    // Another package's unexported name is not accessible.
+    if (!exported(name)) return undefined;
+    const bound = this.libraryImport(qualifier, info);
+    if (!bound) return undefined;
+    const targets = bound.map((item) =>
+      this.libraryTarget(item.origin, item.path, name, "import-binding"),
+    );
+    return targets.length === 1 ? targets[0]! : targets;
+  }
+
+  /**
+   * A member selected on a value whose type is outside the checkout and
+   * comes from a library package (`buf.Write` on a `bytes.Buffer`, a field
+   * of `os.Stdout`, a method on a library call's result): unresolved, with
+   * its reason.
+   */
+  private libraryMember(link: GraphLink): boolean {
+    let desc = (link.data as { expr?: Desc } | undefined)?.expr;
+    if (desc?.k === "inst") desc = desc.x;
+    if (desc?.k !== "sel") return false;
+    const info = this.files.get(link.file);
+    if (!info) return false;
+    const base = this.denote(staticDesc(desc.x), link.file, 0);
+    let type: TypeValue | undefined;
+    if (base.e === "value") type = base.type;
+    else if (base.e === "external")
+      type = { kind: "external", name: base.name };
+    else if (base.e === "syms" && !base.syms.every(isTypeSymbol))
+      type = this.sameType(
+        base.syms.map((symbol) => this.valueType(symbol, 1)),
+      );
+    if (type?.kind !== "external") return false;
+    const name = type.name.replace(/(\(\))+$/, "");
+    const dot = name.lastIndexOf(".");
+    return dot > 0 && !!this.origin(info, name.slice(0, dot));
+  }
+
+  /**
+   * The toolchain route's library target (W3-L facts, C-14): a builtin, or
+   * the standard-library or dependency object go/types selected. A member
+   * gets `declaring-owner` with the declaring named type go/types reports
+   * (after promotion); an interface method (dispatch) or a member without a
+   * named owner gets none.
+   */
+  private toolchainLibrary(link: GraphLink): LibraryTarget | undefined {
+    const data = link.data as
+      | { tc?: ToolchainFact; builtinName?: boolean }
+      | undefined;
+    const fact = data?.tc;
+    if (!fact) return undefined;
+    if (fact.b)
+      return link.kind === "calls" &&
+        data?.builtinName &&
+        BUILTIN_FUNCTIONS.has(link.targetName)
+        ? this.libraryTarget(
+            { ecosystem: "go-std" },
+            "builtin",
+            link.targetName,
+            "declared-builtin",
+          )
+        : undefined;
+    if (!fact.l || fact.c === "iface" || fact.c === "typeparam")
+      return undefined;
+    const [unit, symbol, cls] = fact.l;
+    if (!symbol || !unit) return undefined;
+    const info = this.files.get(link.file);
+    const origin: LibraryOrigin =
+      cls === "std"
+        ? { ecosystem: "go-std" }
+        : ((info && this.origin(info, unit)) ?? { ecosystem: "go" });
+    if (origin.ecosystem !== (cls === "std" ? "go-std" : "go"))
+      return undefined;
+    return this.libraryTarget(
+      origin,
+      unit,
+      symbol,
+      symbol.includes(".") ? "declaring-owner" : "import-binding",
+    );
   }
 
   /**
@@ -653,7 +987,19 @@ class GoResolver {
     return out;
   }
 
+  /** Directories with a `vendor/` directory holding captured files (C-14). */
+  private vendorRoots = new Set<string>();
+  /** Directories holding captured files (C-14: test-data package trees). */
+  private fileDirectories = new Set<string>();
+
   private index(): void {
+    for (const file of this.context.files) {
+      this.fileDirectories.add(directoryOf(file.path));
+      const parts = file.path.split("/");
+      for (let index = 0; index < parts.length - 1; index++)
+        if (parts[index] === "vendor")
+          this.vendorRoots.add(parts.slice(0, index).join("/"));
+    }
     const untrusted = this.untrustedMembership();
     // Files that failed (a file that cannot be read is not valid code): nothing
     // in them is a target; their directory's packages may hold unseen
@@ -819,18 +1165,37 @@ class GoResolver {
    * outside the project, or a directory has no captured package). Counting the
    * captured candidates is never proof.
    */
+  private importMemo = new Map<
+    string,
+    ReturnType<GoResolver["importTargets"]>
+  >();
   private importTargets(
     from: FileInfo,
     path: string,
-  ): { pkgs: Pkg[]; uncertain: boolean; failed?: string[] } {
-    const destinations = directoryOfImport(this.layout, from.directory, path);
-    const directories = destinations.directories.filter(
-      (directory) => !ignoredDirectory(directory),
-    );
-    const outside =
-      destinations.outside ||
-      directories.length < destinations.directories.length;
-    if (!directories.length) return { pkgs: [], uncertain: false };
+  ): ReturnType<GoResolver["computeImportTargets"]> {
+    // The answer depends on the importing directory (its module) and, for the
+    // failed-file cause, on whether the importer is a test file.
+    const key = `${from.directory}\u0000${from.fact.test}\u0000${path}`;
+    let found = this.importMemo.get(key);
+    if (!found)
+      this.importMemo.set(key, (found = this.computeImportTargets(from, path)));
+    return found;
+  }
+  private computeImportTargets(
+    from: FileInfo,
+    path: string,
+  ): {
+    pkgs: Pkg[];
+    uncertain: boolean;
+    failed?: string[];
+    /** Two modules certainly provide the package: Go rejects the import. */
+    ambiguous?: true;
+  } {
+    // A package under `testdata`, `_x` or `.x` is imported like any other (the
+    // go tool skips those directories only when expanding `./...` patterns),
+    // and a module may itself sit under one (cli/cli's `.github/…/tool`).
+    const { providers } = directoryOfImport(this.layout, from.directory, path);
+    if (!providers.length) return { pkgs: [], uncertain: false };
     const parts = path.split("/");
     const internal = parts.lastIndexOf("internal");
     if (internal >= 0) {
@@ -846,28 +1211,75 @@ class GoResolver {
       )
         return { pkgs: [], uncertain: false };
     }
-    const pkgs = [...this.pkgs.values()].filter(
-      (pkg) =>
-        directories.includes(pkg.directory) &&
-        !pkg.name.endsWith("_test") &&
-        pkg.name !== "main",
+    // A package is there only with a file Go can build ("build constraints
+    // exclude all Go files" otherwise); `ignore` is the conventional tag
+    // that is never set.
+    const found = providers.map((provider) => ({
+      provider,
+      pkgs: [...this.pkgs.values()].filter(
+        (pkg) =>
+          provider.directories.includes(pkg.directory) &&
+          !pkg.name.endsWith("_test") &&
+          pkg.name !== "main" &&
+          pkg.files.some((file) => this.buildable(file)),
+      ),
+    }));
+    // Two modules that certainly have the package: an ambiguous import.
+    const certain = found.filter(
+      (item) =>
+        !item.provider.uncertain &&
+        item.provider.directories.length === 1 &&
+        item.pkgs.length,
     );
-    const captured = new Set(pkgs.map((pkg) => pkg.directory));
-    const possible = directories.length + (outside ? 1 : 0);
-    const uncertain =
-      possible > 1 && (outside || captured.size < directories.length);
+    if (certain.length > 1)
+      return { pkgs: [], uncertain: false, ambiguous: true };
+    const pkgs = unique(found.flatMap((item) => item.pkgs));
+    const possible = found.filter(
+      (item) => item.pkgs.length || item.provider.uncertain,
+    );
+    let uncertain: boolean;
+    if (possible.length > 1) uncertain = true;
+    else {
+      // One module: certain unless the package may come from outside, or
+      // from one of several replacements of which some are not captured.
+      const { provider, pkgs: own } = possible[0] ?? found[0]!;
+      const captured = new Set(own.map((pkg) => pkg.directory));
+      const count = provider.directories.length + (provider.uncertain ? 1 : 0);
+      uncertain =
+        count > 1 &&
+        (provider.uncertain || captured.size < provider.directories.length);
+    }
     // Every file of the package failed (nothing valid there): the import needs
     // code in those files, so it is failed with them as the cause.
-    if (!pkgs.length && !outside) {
-      const cause = directories.flatMap((directory) =>
-        this.failedCause(
-          directory,
-          from.fact.test && from.directory === directory,
-        ),
-      );
+    if (!pkgs.length && !providers.some((provider) => provider.uncertain)) {
+      const cause = providers
+        .flatMap((provider) => provider.directories)
+        .flatMap((directory) =>
+          this.failedCause(
+            directory,
+            from.fact.test && from.directory === directory,
+          ),
+        );
       if (cause.length) return { pkgs, uncertain: false, failed: cause };
     }
     return { pkgs, uncertain };
+  }
+
+  private buildableMemo = new Map<string, boolean>();
+  /** Can Go build this file in some configuration (`ignore` never set)? */
+  private buildable(path: string): boolean {
+    let answer = this.buildableMemo.get(path);
+    if (answer === undefined) {
+      const constraint = this.constraintOf(path);
+      answer =
+        !constraint ||
+        satisfiableAnyTags([
+          constraint,
+          { k: "not", x: { k: "v", n: "ignore" } },
+        ]) !== false;
+      this.buildableMemo.set(path, answer);
+    }
+    return answer;
   }
 
   private pkgOf(symbol: GraphSymbol): Pkg | undefined {
@@ -1270,6 +1682,27 @@ class GoResolver {
       }
       case "sel":
         return this.select(desc, from, depth);
+      case "unknown": {
+        // A call whose callee is not described (`(*p.T)(x)`, `(<-fc)()`):
+        // the value of calling what is written, as the backstop reads it.
+        if (desc.m?.length !== 1) return { e: "value", type: UNKNOWN };
+        const written = desc.m[0]!;
+        if (desc.p !== undefined) {
+          // A conversion `(*T)(x)` is a `*T`: its members are T's. Under more
+          // than one `*`, or when T is itself a pointer type (`type A = *T`,
+          // `type P *T`), the value has no members to follow.
+          const named = this.denote(written, from, depth + 1);
+          if (named.e === "syms" && named.syms.every(isTypeSymbol))
+            return {
+              e: "value",
+              type:
+                desc.p === 1 && !this.pointerTypeName(written, named.syms, from)
+                  ? this.typeSyms(named.syms, depth + 1)
+                  : UNKNOWN,
+            };
+        }
+        return this.denote({ k: "call", f: written, i: 0 }, from, depth + 1);
+      }
       default:
         return { e: "value", type: UNKNOWN };
     }
@@ -1319,7 +1752,9 @@ class GoResolver {
     if (callee.e !== "syms") return UNKNOWN;
     if (callee.syms.every(isTypeSymbol))
       return this.typeSyms(callee.syms, depth + 1);
-    const results = callee.syms.map((symbol) => {
+    const callees = this.calledVariants(callee.syms, from);
+    if (!callees) return UNKNOWN;
+    const results = callees.map((symbol) => {
       if (symbol.kind === "function" || symbol.kind === "method") {
         const data = (symbol.data ?? {}) as { results?: Desc[] };
         const result = data.results?.[desc.i];
@@ -1329,6 +1764,71 @@ class GoResolver {
       return this.funcResult(this.valueType(symbol, depth + 1), desc.i, depth);
     });
     return this.sameType(results);
+  }
+
+  /**
+   * The declarations a call of a name declared in several build variants can
+   * reach from `from`: each one that is the only declaration of the name in
+   * some build of `from` (two in one build do not compile), every name a free
+   * tag (`-tags=freebsd` on Linux), so false is proof. Undefined unless some
+   * declaration is built in every ordinary build of `from` (a real port,
+   * real cgo on or off, any custom tags: one without would not have this
+   * call) and every constraint is readable.
+   * The caller's answer is definite only when the results then agree.
+   */
+  private calledVariants(
+    syms: GraphSymbol[],
+    from: string,
+  ): GraphSymbol[] | undefined {
+    // Several declarations of one name in one package are build variants;
+    // anything else (the values a reassigned func local may hold) is not.
+    const pkg = this.pkgOf(syms[0]!)?.key;
+    if (
+      syms.length < 2 ||
+      !syms.every(
+        (symbol) =>
+          symbol.name === syms[0]!.name && this.pkgOf(symbol)?.key === pkg,
+      )
+    )
+      return syms;
+    const key = `${syms
+      .map((symbol) => symbol.id)
+      .sort()
+      .join(",")}\u0000${JSON.stringify(this.constraintOf(from) ?? null)}`;
+    if (this.variantMemo.has(key)) return this.variantMemo.get(key);
+    const answer = this.computeCalledVariants(syms, from);
+    this.variantMemo.set(key, answer);
+    return answer;
+  }
+  private variantMemo = new Map<string, GraphSymbol[] | undefined>();
+  private computeCalledVariants(
+    syms: GraphSymbol[],
+    from: string,
+  ): GraphSymbol[] | undefined {
+    const caller = this.constraintOf(from);
+    const declared = syms.map((symbol) => this.constraintOf(symbol.file));
+    if (!caller || declared.some((item) => !item)) return undefined;
+    const not = (formula: Formula): Formula => ({ k: "not", x: formula });
+    // Coverage counts ordinary builds of the caller only: a build that
+    // exists only because a reserved name (a GOOS or GOARCH name, `cgo`) is
+    // set by hand, and has no declaration, does not compile there, so no
+    // build has another answer (pebble's `manual.New` with `-tags=cgo` and
+    // cgo disabled). Which declarations are reached counts every build.
+    const covered =
+      satisfiableOrdinary([caller, ...declared.map((item) => not(item!))]) ===
+      false;
+    if (!covered) return undefined;
+    const reached = syms.filter(
+      (_, index) =>
+        satisfiableAnyTags([
+          caller,
+          declared[index]!,
+          ...declared
+            .filter((_, other) => other !== index)
+            .map((item) => not(item!)),
+        ]) !== false,
+    );
+    return reached.length ? reached : undefined;
   }
 
   /** Result `i` of calling a value of this type: a literal or a named func type. */
@@ -1436,6 +1936,30 @@ class GoResolver {
    * Does this written type name, followed through its chain of aliases, denote
    * a pointer type (`type A = *T`, `type B = A`)? Cycle-safe.
    */
+  /** Does this written type name (a name or `q.Name`) denote a pointer type? */
+  private pointerTypeName(
+    written: Desc,
+    syms: GraphSymbol[],
+    from: string,
+  ): boolean {
+    if (
+      syms.some(
+        (symbol) =>
+          (symbol.data as { underlyingPointer?: boolean } | undefined)
+            ?.underlyingPointer,
+      )
+    )
+      return true;
+    const ref: TypeRef | undefined =
+      written.k === "name"
+        ? { n: written.n }
+        : written.k === "sel" && written.x.k === "name"
+          ? { q: written.x.n, n: written.n }
+          : undefined;
+    // Not a name the alias chain can be followed from: not proven otherwise.
+    return ref ? this.aliasPointer(ref, from) : true;
+  }
+
   private aliasPointer(ref: TypeRef, from: string): boolean {
     if (ref.l !== undefined || ref.q === "") return false;
     let term: TypeTerm =
@@ -1487,10 +2011,15 @@ class GoResolver {
     // A type declared in several build variants: each declaration has its
     // own fields, and a method belongs to it only when its file can be built
     // with the declaration's file (`buildsWith`).
-    const variants =
-      !!pkg &&
-      (this.decls.get(pkg.key)?.get(type.name) ?? []).filter(isTypeSymbol)
-        .length > 1;
+    const siblings = pkg
+      ? (this.decls.get(pkg.key)?.get(type.name) ?? []).filter(isTypeSymbol)
+      : [];
+    const variants = siblings.length > 1;
+    // Two declarations of the type are never in one valid build: a method
+    // belongs to this variant only in builds without the others' files.
+    const others = siblings
+      .filter((symbol) => symbol.id !== type.id)
+      .map((symbol) => symbol.file);
     const all = (name: string) =>
       pkg
         ? (this.members.get(`${pkg.key}\u0000${type.name}\u0000${name}`) ?? [])
@@ -1499,7 +2028,9 @@ class GoResolver {
       all(name).filter((symbol) =>
         symbol.kind === "field"
           ? symbol.file === type.file
-          : !variants || this.buildsWith(symbol.file, type.file) !== false,
+          : !variants ||
+            this.buildsWith(symbol.file, type.file, undefined, others) !==
+              false,
       );
     // The methods of this name that may or may not be part of this variant
     // in the referencing file's builds.
@@ -1507,7 +2038,7 @@ class GoResolver {
       variants
         ? own(name).flatMap((method) => {
             if (method.kind === "field") return [];
-            const built = this.buildsWith(method.file, type.file, from);
+            const built = this.buildsWith(method.file, type.file, from, others);
             return built === true ? [] : [{ method, built }];
           })
         : [];
@@ -1863,10 +2394,44 @@ class GoResolver {
   /** A file's build constraint (TRUE: none); undefined when not readable. */
   private constraintOf(path: string): Formula | undefined {
     if (!this.constraints.has(path)) {
-      const fact = this.files.get(path)?.fact;
-      this.constraints.set(path, fact ? fileConstraint(fact) : undefined);
+      const info = this.files.get(path);
+      const formula = info ? fileConstraint(info.fact) : undefined;
+      this.constraints.set(
+        path,
+        formula && info ? this.releaseFloor(formula, info.directory) : formula,
+      );
     }
     return this.constraints.get(path);
+  }
+  /**
+   * Since Go 1.21 a toolchain builds a module only when it is at least the
+   * module's `go` version, so every build of its files has the release tags
+   * up to that version (a release tag set by hand with `-tags` adds to them,
+   * it never removes one). Added for the release tags the constraint names.
+   */
+  private releaseFloor(formula: Formula, directory: string): Formula {
+    const version = /^1\.(\d+)/.exec(
+      moduleOf(this.layout, directory)?.go ?? "",
+    );
+    const minor = version ? Number(version[1]) : 0;
+    if (minor < 21) return formula;
+    const named = new Set<string>();
+    const walk = (item: Formula): void => {
+      if (item.k === "v") named.add(item.n);
+      else if (item.k === "not") walk(item.x);
+      else if (item.k === "and" || item.k === "or") {
+        walk(item.a);
+        walk(item.b);
+      }
+    };
+    walk(formula);
+    let out = formula;
+    for (const name of [...named].sort()) {
+      const release = /^go1\.(\d+)$/.exec(name);
+      if (release && Number(release[1]) <= minor)
+        out = { k: "and", a: out, b: { k: "v", n: name } };
+    }
+    return out;
   }
   /**
    * Is a method declared in `path` part of the type declared in `type`'s
@@ -1879,6 +2444,7 @@ class GoResolver {
     path: string,
     type: string,
     from?: string,
+    others: string[] = [],
   ): boolean | undefined {
     if (path === type) return true;
     const method = this.constraintOf(path);
@@ -1889,22 +2455,30 @@ class GoResolver {
       const context = this.constraintOf(from);
       declared = context ? { k: "and", a: declared, b: context } : undefined;
     }
+    // Without the files of the type's other declarations.
+    for (const other of others) {
+      if (!declared || other === type) continue;
+      const excluded = this.constraintOf(other);
+      declared = excluded
+        ? { k: "and", a: declared, b: { k: "not", x: excluded } }
+        : undefined;
+    }
     if (!method || !declared) return undefined;
-    if (implies(declared, method) === true) return true;
-    return satisfiable([declared, method]) === false ? false : undefined;
+    if (impliesAnyTags(declared, method) === true) return true;
+    return satisfiableAnyTags([declared, method]) === false ? false : undefined;
   }
   /** Is `path` in every build that includes `from`? */
   private includedWith(from: string, path: string): boolean {
     if (from === path) return true;
     const x = this.constraintOf(from);
     const y = this.constraintOf(path);
-    return !!x && !!y && implies(x, y) === true;
+    return !!x && !!y && impliesAnyTags(x, y) === true;
   }
   /** Can these two files be in one build (false only when proved not)? */
   private buildTogether(a: string, b: string): boolean | undefined {
     const x = this.constraintOf(a);
     const y = this.constraintOf(b);
-    return x && y ? satisfiable([x, y]) : undefined;
+    return x && y ? satisfiableAnyTags([x, y]) : undefined;
   }
 
   /** Interface methods named `name` through interface embedding (cycle-safe by path). */
@@ -2711,8 +3285,11 @@ class GoResolver {
           pkgs,
           uncertain,
           failed: cause,
+          ambiguous,
         } = this.importTargets(info, data.path);
         if (cause) return failed(cause);
+        // Several modules provide the package: Go rejects the import.
+        if (ambiguous) return AMBIGUOUS_IMPORT;
         const symbols = pkgs
           .map((pkg) => pkg.symbol)
           .filter((symbol): symbol is GraphSymbol => !!symbol);
@@ -3216,6 +3793,14 @@ class GoResolver {
   }
 
   private resolveExpression(desc: Desc, link: GraphLink): Decision {
+    if (desc.k === "unknown" && desc.m?.length === 1 && link.kind === "calls") {
+      // A callee not described is a conversion when what is written in it
+      // names a type: `(*T)(x)`, `(*p.T)(nil)` call T as `T(x)` does.
+      const written = this.denote(desc.m[0]!, link.file, 0);
+      if (written.e === "syms" && written.syms.every(isTypeSymbol))
+        return this.resolveExpression(desc.m[0]!, link);
+      return UNRESOLVED;
+    }
     if (desc.k === "sel") {
       const base = this.denote(staticDesc(desc.x), link.file, 0);
       if (base.e === "unknown" && base.cause) return failed(base.cause);
