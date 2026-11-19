@@ -2663,3 +2663,56 @@ dependency can establish that a declaration describes an outside package.
 Lexical outside identity can survive unrelated unreadable declarations.
 Direct writes to a module object in the same file withhold that member's
 symbol while preserving the unit.
+
+### Graph writes use a write-ahead log on local disks (C-6)
+
+**Decided (C-6):** from its first write, a writable graph connection on a Linux
+local filesystem, running a SQLite that has the write-ahead-log reset fix
+(3.51.3, 3.53.0 or later, or the backports 3.50.7 and 3.44.6: Node 24.15.0+,
+25.9.0+, 26), switches the file to SQLite's write-ahead log with
+`synchronous=NORMAL` and a checkpoint every 10,000 pages. Writes keep one
+commit per file; commits are not synced. The completion record is committed
+with `synchronous=FULL`. When its last writer closes, the file returns to the
+rollback journal, with a full sync. If a reader or another connection that has
+read since the log started is still open at that moment, the file stays in
+log format until the next index that closes alone. If another connection prevents the switch in, the
+connection keeps the rollback journal with a full sync per commit, as before,
+without waiting. Elsewhere, including an unknown SQLite version, a writer
+never writes in a write-ahead log: it first folds a left-over log back
+(retrying for up to the 30-second writer wait, since SQLite does not wait for
+this switch), and otherwise fails as "database is locked". **Why:** synced
+commits, one per file, dominated cold indexing; Embassy and swc ran out of the
+sweep's 60 minutes writing analysed facts. A write-ahead log also lets readers
+read while a writer commits. **Safety argument:** after a crash or power loss,
+a database in a write-ahead log is the state after some prefix of its commits.
+The log is append-only and checksummed, it is synced before a checkpoint
+copies it into the database, and the database is synced before the log is
+reused. Every graph write deletes the completion record (triggers), an index
+deletes it before its first write, and writes it last. So any surviving prefix
+either ends before the index started (the previous completed index, trusted
+only for the inputs it records) or has no completion record (reported
+incomplete; the next sync rebuilds it), or the index completed. **Trade:** an
+index cut short by a power loss loses its unsynced writes, which it would
+redo anyway. A store whose writer was killed stays in write-ahead-log format
+until a writer closes it normally. A reader in a directory it cannot write
+cannot open it in that state. **Rules out:** more writes per commit (batches
+or one transaction per phase: W3-P1 measured readers and second writers locked
+out, and under a write-ahead log batches of 64 were no faster), and
+`synchronous=OFF` (the database itself may be corrupted by a power loss).
+See [C-6](changes/C-6.md).
+
+### C-9 Rust library paths
+
+Rust records the final written path through a proven import, qualified crate
+path or edition prelude binding as a library target. A Cargo alias names the
+package from the manifest. A lockfile version needs the owning package's
+dependency edge, or an exact requirement can name the manifest version.
+The resolver keeps the named export when a dependency re-exports it. For an
+associated call it needs a named trait or proof of the declaring member.
+An explicit `use` in a module protects a proven namespace binding from
+opaque items in that module, since rustc rejects duplicate bindings there.
+Captured Cargo directory-source replacements use checkout resolution. The
+configuration maps registry indexes or Git URLs and ref selectors to a
+directory source. A proven package selection is required to resolve inside it.
+Rust coverage now credits recorded targets on graphs made by the supporting
+module version. See [C-9](changes/C-9.md).

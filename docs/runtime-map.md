@@ -40,9 +40,9 @@ The language is a bounded design tool, not a universal proof engine.
 | Reporting `src/reporting/report.ts`, `publish.ts` | AnalysisResult[] -> same Report -> text/JSON; atomicWrite | no independent renderer verdict; JSON v1 schema; same-directory stage, fsync, rename, finally unlink |
 | Shared semantics `src/shared/` | identity, scalar operators, evidence/purity/hoist policies | pure CLI name/extension values in identity-values.ts, re-exported by identity.ts (+ package bin/wrapper); no global current project/cache |
 | Built-in engines `src/behaviour/explore.ts`, `explore-worker.ts`, `explore-runner.ts` | `GeneratedModel` (+ `ProjectIR` for flow replay) -> `ExploreResult` (per-property verdicts, `state-domains`, measurements) | exhaustive BFS (`stateBudget`, default 1,000,000) or seeded sampler; runs in an owned worker with a readiness handshake, signal and timeout; the runner awaits worker termination on every exit; uses the existing `initial`/`step`/`replay` semantics, never reparses |
-| Storage boundary `src/storage/local.ts`, `layout.ts`, `graph.ts` | `storagePath(root, item, create?)`, `openDatabase`, `findProjectRoot`, `openProjectGraph` | only module that chooses project paths and opens SQLite; refuses old layouts and symlinked storage; creates `.pymtheg/rebuildable/.gitignore`; feature stores keep their schemas and transactions |
+| Storage boundary `src/storage/local.ts`, `layout.ts`, `graph.ts` | `storagePath(root, item, create?)`, `openDatabase`, `findProjectRoot`, `openProjectGraph`, `writeAheadLogSafe`, `openWriteAheadLog`, `closeWriteAheadLog` | only module that chooses project paths and opens SQLite; refuses old layouts and symlinked storage; creates `.pymtheg/rebuildable/.gitignore`; decides where a write-ahead log is safe (Linux local filesystems) and switches a connection into and out of it without waiting; feature stores keep their schemas and transactions |
 | Recorded history `src/storage/recorded-history.ts`, `writer.ts`, `paths.ts` | checkpoint/acknowledgement/withdrawal/draft transactions -> UUID registrations + receipts; `exportRecordedHistory()` | additive tables in the planning database, written inside the feature transaction; writer identity in `.pymtheg/local/writer.json`; order `(sequence, machine, actor, change UUID)` |
-| Graph core `src/graph/` (`indexer.ts`, `store.ts`, `registry.ts`, `analysis.ts`, `identity.ts`, `tree-sitter.ts`, `conformance.ts`) | `indexProject(root, registry, store)` -> `IndexReport`; queries `findSymbols`, `outgoing`, `incoming`, `links`, `unresolved`, `ambiguous`, `neighbourhood` | language-neutral; strict UTF-8 capture; per-file atomic replacement; validates every module result before writing; SQLite schema 4 (library targets, below) |
+| Graph core `src/graph/` (`indexer.ts`, `store.ts`, `registry.ts`, `analysis.ts`, `identity.ts`, `tree-sitter.ts`, `conformance.ts`) | `indexProject(root, registry, store)` -> `IndexReport`; queries `findSymbols`, `outgoing`, `incoming`, `links`, `unresolved`, `ambiguous`, `neighbourhood` | language-neutral; strict UTF-8 capture; per-file atomic replacement (one commit per file; from the first write a writable store uses a write-ahead log with unsynced commits on a local disk, a fully synced completion record, and the rollback journal again when its last writer closes: C-6); validates every module result before writing; SQLite schema 4 (library targets, below) |
 | Language modules `src/graph/languages/{go,rust,typescript}/` | default-exported `LanguageModule`: claims, context files, `parse`/`analyze`/`resolve` | discovered from the folder, no core list; Go and Rust parse with tree-sitter WASM grammars, TypeScript with the compiler over the captured snapshot; none runs a toolchain or project code |
 | Vendored grammars `grammars/<lang>/` | `manifest.json`, patches, built `.wasm`, licence; `grammars/build.mjs` | Go only so far; the module loads the `.wasm` relative to its compiled file; `test/grammar-vendored.test.mjs` checks sha256, ABI and licence; rebuilding is a maintainer step |
 
@@ -1569,8 +1569,12 @@ has one spelling across languages and versions:
   language's way (Go `Time.Equal`, Rust `fs::read`, `Result::unwrap`,
   TypeScript `Map.prototype.delete` for an instance member, `string` for an
   export).
-- **Rust macros** end in `!` (`env!`), so `std::env` (module) and `std::env!`
-  (macro) stay distinct.
+- **Rust function-like macros** end in `!` (`env!`), so `std::env` (module)
+  and `std::env!` (macro) stay distinct. Derive and attribute macros use
+  `#[derive(path)]` and `#[path]` respectively, where `path` is the export path
+  within the named crate. An import uses the same spelling as an invocation
+  when its namespace is proven. An import gets no symbol target when its
+  namespace is unknown or its simultaneous bindings need different spellings.
 - **Rust re-exports**: record the declaring crate (`core`, `alloc`) only when
   the declaration is proven to be there; otherwise record the path as written
   in the source (`std::...`). Never rewrite `std` to `core` by name.
@@ -1639,3 +1643,24 @@ Module 24 selects Deno import-map entries before module and package lookup.
 A captured outside declaration package needs installation, type-package or
 dependency evidence. Literal CommonJS binding names use their written keys.
 Same-file writes to a module object suppress that member's export name.
+
+Rust records library paths during resolution starting with module 29. Its library lookup uses
+the captured namespace, import, placement and `cfg` facts, with a separate
+lookup cache key for the outside search. `library.ts` supplies edition prelude
+entries and the standard paths where a known module, constructor, variant or
+trait provides the named member. Rust coverage for module 29 and later uses
+stored targets for the level 2 numerator. Historical Rust graphs retain the
+original reconstruction.
+
+Module 30 recognizes captured Cargo directory source replacements as checkout
+dependencies, limits patch uncertainty to affected package edges, and protects
+explicit module imports with a proven namespace from opaque items in that same
+module. A type segment and its associated member can name different declarations.
+The type gets its own target where a type link already exists. The associated
+site needs its own proof before it can name a unit or symbol.
+
+Module 31 matches directory replacements by Cargo source identity. Registry
+sources use their index URL. Git sources use the repository URL and the
+branch, tag, or revision selector. For a vendored Git package, the lockfile
+must prove a checkout dependency edge with a precise commit. An applicable
+replacement without a unique captured package stays unresolved.

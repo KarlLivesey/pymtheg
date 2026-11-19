@@ -301,7 +301,8 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys, pre
     // library identities are reconstructed from link facts.
     const storedLibrary = graphSchema === "4" ? db.prepare(`SELECT ecosystem,unit,symbol,version,evidence
       FROM graph_library_targets WHERE link=? AND role='target'`) : null;
-    const files = db.prepare(`SELECT path,status,json_extract(body,'$.module') AS module,json_extract(body,'$.version') AS version,
+    const files = db.prepare(`SELECT path,status,json_extract(body,'$.module') AS module,
+      json_extract(body,'$.version') AS moduleVersion,
       json_extract(body,'$.result.data.go.package') AS package FROM graph_files ORDER BY path`).all();
     const getFile = db.prepare(`SELECT json_extract(body,'$.text') AS text,
       json_extract(body,'$.result.diagnostics[0].message') AS reason,
@@ -404,7 +405,7 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys, pre
         ...JSON.parse(row.body), kind: row.kind, module: row.module, resolution: row.resolution,
       }));
       const sharedKeys = previousLinks && new Set(previousLinks.map((link) => sampleKey(repo, link)));
-      const compareLegacy = legacyComparison && file.module === "typescript" && Number.parseInt(file.version, 10) >= 23;
+      const compareLegacy = legacyComparison && file.module === "typescript" && Number.parseInt(file.moduleVersion, 10) >= 23;
       const candidateSites = compareLegacy ? new Map() : undefined;
       const snapshot = getFile.get(file.path);
       const source = snapshot.text ?? "";
@@ -446,6 +447,7 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys, pre
         goExplicitAliases: new Set(records.map((link) => link.data?.alias).filter(Boolean)),
         goReturned: (desc) => goReturned(file.path, desc),
         rustImports: file.module === "rust" ? rustImports(records) : new Map(),
+        rustStoredTargets: file.module === "rust" && graphSchema === "4" && Number(file.moduleVersion) >= 29,
         tsSpecifiers: new Set(records.map((link) => link.data?.specifier).filter(Boolean)),
         tsImports: () => tsSourceBindings().imports,
         tsImportMember: (name) => {
@@ -464,7 +466,7 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys, pre
         },
       };
       for (const row of getLinks.iterate(file.path)) {
-        const link = { ...JSON.parse(row.body), module: row.module, moduleVersion: file.version, kind: row.kind, resolution: row.resolution };
+        const link = { ...JSON.parse(row.body), module: row.module, moduleVersion: file.moduleVersion, kind: row.kind, resolution: row.resolution };
         if (row.resolution === "library") link.library = storedLibrary?.get(row.id);
         if (quotas && link.range && !["contains", "receiver"].includes(link.kind)) {
           if (link.kind !== "calls" || file.module === "typescript") observedSites.add(link.range.start);

@@ -150,6 +150,58 @@ the recent-run cache, and deleting it loses nothing that cannot be regenerated.
 All features open their SQLite databases through one storage boundary
 (`src/storage/`). Local storage only; no synchronization.
 
+**Graph writes (C-6).** An index writes through SQLite's write-ahead log when
+both of these hold:
+
+- **A fixed SQLite.** `process.versions.sqlite` is a version with the fix for
+  SQLite's write-ahead-log reset bug: 3.51.3, 3.53.0 or later, or the
+  backports 3.50.7 and 3.44.6. An unknown version counts as not fixed. The
+  check reads the SQLite actually running, so a Node linked to a system SQLite
+  is judged by that SQLite. Node's own bundled SQLite qualifies from Node
+  24.15.0 in the 24 line, from 25.9.0 in the 25 line, and in Node 26
+  ([table](https://github.com/KarlLivesey/pymtheg/blob/main/evidence/c-6/sqlite-versions.md)).
+- **A Linux local filesystem:** ext2/3/4, XFS, Btrfs, tmpfs, ZFS, F2FS,
+  bcachefs, overlayfs container layers, JFS or ReiserFS.
+
+What that gives:
+
+- **Commits** are not synced one by one; the completion record is written
+  last with a full sync.
+- **Readers** (CLI queries, MCP, Studio) are not locked out by an index in
+  progress, provided the index switched to the log. If another connection
+  was reading at the moment it tried, it keeps the rollback journal for that
+  run, and readers wait during its commits as before. A second writer waits
+  up to 30 seconds either way.
+- **Interruptions.** An index cut short by a kill or a power loss leaves
+  either the previous completed index or a store that reports incomplete. The
+  next sync rebuilds it.
+- **At rest.** When the last connection using the log is a writer of this
+  build and it closes, the file returns to SQLite's rollback journal, the
+  format readers in a read-only directory expect.
+- **When the log stays.** The file stays in log format, with `-wal` and
+  `-shm` beside it, in two cases: the writer was killed, or a reader or
+  another connection that has read since the log started is still open when
+  the writer closes. Every open reads the same rows in that state, including
+  a reader in a read-only directory while `-wal` and `-shm` exist. The next
+  index that closes alone returns the file to the rollback journal.
+
+Everywhere else the graph keeps the rollback journal with a full sync per
+commit, exactly as before. That covers:
+
+- Node 24.0.0 to 24.14.x and 25.0.0 to 25.8.x with their bundled SQLite, and
+  any SQLite without the fix;
+- macOS and Windows;
+- NFS, SMB, FUSE, 9p and virtiofs mounts, including WSL drive mounts and
+  Docker Desktop bind mounts;
+- any filesystem whose type cannot be read.
+
+A write-ahead log needs memory shared by every process that opens the file,
+which these filesystems do not guarantee. There, a writer never writes in a
+write-ahead log. If a killed run left one, the writer first folds it back into
+the database and removes it, waiting for other connections for up to 30
+seconds; otherwise the write fails as "database is locked".
+
+
 Old layouts (`.pymtheg.json`, `.pymtheg-architecture/`, `.pymtheg-studio/` and
 the old top-level `.pymtheg-*.json` files) are unused dead data: never read,
 migrated or deleted, and their presence refuses no command. `init` and `doctor`
@@ -209,7 +261,7 @@ Link outcomes:
 | Outcome | Meaning |
 |---|---|
 | `resolved` | One definite target in the checkout |
-| `library` | One definite target outside the project: a library unit (level 1) or a symbol in it (level 2), recorded with how the source proves it (never the receiver's type alone; see the design section in `runtime-map.md`). TypeScript and JavaScript record library targets at existing sites. |
+| `library` | One definite target outside the project: a library unit (level 1) or a symbol in it (level 2), recorded with how the source proves it (see the design section in `runtime-map.md`). Rust records library paths with proven bindings. TypeScript and JavaScript record library targets at existing sites. |
 | `ambiguous` | A candidate set, never a pick. It may mix checkout symbols and library targets. A set is **closed** only when it provably holds every possible target and every member is provably possible. Otherwise it is **open**, and `data.open` gives the reasons (for example a type outside the project could be the target); an open set still lists every project target |
 | `unresolved` | No target; the written name is kept. The reason, when recorded, is in `data` (`reason` in Go and TypeScript, `uncertainty` in Rust). Rust may also list unverified would-be targets in `data.targets` (at most 16, else a count) |
 | failed (`unresolved`, reason `invalid-code`) | The link depends on a file that could not be read. `data.cause` names the failed file(s). It has no target, no candidates and no would-be targets |
@@ -325,9 +377,10 @@ character in a comment or string there is read). Sources: [W2-B](https://github.
 #### Rust
 
 No-toolchain module; nothing runs `cargo` or `rustc`, and macros are not expanded.
-Claims `*.rs`; context `Cargo.toml`, read by a snapshot-only TOML reader (an
-unsupported or invalid manifest, including any TOML datetime, makes that whole
-manifest unknown). Private items are ordinary symbols.
+Claims `*.rs`; captures `Cargo.toml`, `Cargo.lock` and `.cargo/config.toml`
+or `.cargo/config` as context, read by a snapshot-only
+TOML reader (an unsupported or invalid manifest, including any TOML datetime,
+makes that whole manifest unknown). Private items are ordinary symbols.
 
 - **Cancellation:** the graph CLI can interrupt Rust analysis and resolution
   with SIGINT or SIGTERM. Interrupted syncs leave an incomplete index and can
@@ -339,6 +392,14 @@ manifest unknown). Private items are ordinary symbols.
   `A::new` on a proven inherent impl; written `impl Trait for Type` links;
   `contains` (structure as written, not a claim that an item survives macro
   expansion).
+- **Library paths** identify a sysroot or Cargo library unit
+  and a symbol exported by that unit. The resolver follows proven imports,
+  Cargo renames, inherited workspace dependencies, and written type, trait,
+  and macro paths. Prelude links require an edition and a clear namespace.
+  Associated calls require a proven declaring member or an explicit trait
+  qualification. An exact manifest requirement or a lockfile entry selected
+  by the dependency edge can supply a version. `graph uses` can query the
+  recorded unit or symbol.
 - **Dot calls** (`recv.m()`) are definite only for a unique inherent method at the
   first probe step of a proven receiver type (owned `T` with `self`, `&T` with
   `&self`, `&mut T` with `&mut self`). Every other dot call is unresolved with
@@ -380,9 +441,18 @@ manifest unknown). Private items are ordinary symbols.
   A child module file inherits its parent's textual macros at its `mod child;`
   declaration, so `#[macro_use] mod macros;` macros used in later child files
   resolve. A `#[macro_export]` macro of another crate in the project resolves
-  (by path, `use` or `#[macro_use] extern crate`); macros of crates outside
-  the project are unresolved. Standard-library and external items are
-  unresolved.
+  (by path, `use` or `#[macro_use] extern crate`). Written library macro paths
+  and proven prelude macros can produce library targets.
+- **Outside Rust paths.** Written paths resolve through explicit imports,
+  qualified names and unshadowed edition preludes. A module-level expansion
+  cannot replace a definite explicit import in that module and namespace.
+  Glob imports, prelude names, `#[macro_use]` and block-level expansions
+  still need independent shadowing proof. A directory-source replacement
+  from Cargo configuration uses a captured vendored crate as a checkout
+  dependency when the source and selected version are proven. This covers
+  crates.io, alternate registry indexes, and Git URLs with their ref selectors.
+  A replacement with an unproven checkout target leaves the link unresolved.
+  Receiver calls still require the declaring owner.
 - **Clean expansion (both rules below).** A workspace `macro_rules!` arm is
   clean when the code it emits has no attribute anywhere (so no `#[cfg]` can
   remove a call) and no item other than a readable `use` (no `fn`, `mod`,
