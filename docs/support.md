@@ -209,7 +209,7 @@ Link outcomes:
 | Outcome | Meaning |
 |---|---|
 | `resolved` | One definite target in the checkout |
-| `library` | One definite target outside the project: a library unit (level 1) or a symbol in it (level 2), recorded with how the source proves it (never the receiver's type alone; see the design section in `runtime-map.md`). Never a local symbol. **No production module records one yet** (C-5 is the core; the Go, Rust and TypeScript items follow) |
+| `library` | One definite target outside the project: a library unit (level 1) or a symbol in it (level 2), recorded with how the source proves it (never the receiver's type alone; see the design section in `runtime-map.md`). TypeScript and JavaScript record library targets at existing sites. |
 | `ambiguous` | A candidate set, never a pick. It may mix checkout symbols and library targets. A set is **closed** only when it provably holds every possible target and every member is provably possible. Otherwise it is **open**, and `data.open` gives the reasons (for example a type outside the project could be the target); an open set still lists every project target |
 | `unresolved` | No target; the written name is kept. The reason, when recorded, is in `data` (`reason` in Go and TypeScript, `uncertainty` in Rust). Rust may also list unverified would-be targets in `data.targets` (at most 16, else a count) |
 | failed (`unresolved`, reason `invalid-code`) | The link depends on a file that could not be read. `data.cause` names the failed file(s). It has no target, no candidates and no would-be targets |
@@ -555,9 +555,14 @@ answer.
   still establish its module-file edge. Named bindings use the checker.
   Calls use the same declaration rule for relative imports, workspace imports
   and local aliases, including when TypeScript selects a `types` export.
-- **Candidates:** several graph symbols for one callee (union receivers, merged
-  declarations, duplicate JavaScript functions).
-- **Unresolved:** standard library and `node_modules` packages
+- **Library targets:** checker-proven JavaScript or web declarations, captured
+  dependency declarations, and names directly proved by literal outside
+  imports and re-exports. A member of an untyped imported value names the
+  package only. An exact version pin in the importing package's manifest can
+  supply the version. [TypeScript and JavaScript library links](changes/C-11.md)
+- **Candidates:** several checkout or library targets for one callee (union
+  receivers, merged declarations, duplicate JavaScript functions).
+- **Unresolved:** outside members whose receiver or declaration is unverified
   (`external`, `external-package`); computed `require` or `import()` specifiers;
   calls through parameters, import shadows, and reassigned local functions;
   member calls without a named target through `any`, `unknown` or an open index

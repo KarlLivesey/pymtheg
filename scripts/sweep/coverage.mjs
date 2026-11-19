@@ -476,8 +476,11 @@ function renderPlan(repos, baseline, items, samples, isProgress) {
       const row = { ...item, inside: remaining.inside, outside: remaining.outside + exactOutside,
         links: number(remaining.inside + remaining.outside + exactOutside), repos: `≥${affected.size}`, status: "open" };
       if (item.representation) {
-        row.links = `${number(measured.identifiedUnit)} named links`;
-        row.repos = String([...active.values()].filter((repo) => metric(repo, module, scopes).identifiedUnit).length);
+        const stored = [...active.values()].map((repo) => (repo.breakdown ?? []).reduce((sum, row) =>
+          sum + (row[0] === module && row[2] === "library" ? row[7] : 0), 0)).filter(Boolean);
+        row.links = stored.length ? `${number(stored.reduce((a, b) => a + b))} stored links` : `${number(measured.identifiedUnit)} named links`;
+        row.repos = String(stored.length || [...active.values()].filter((repo) => metric(repo, module, scopes).identifiedUnit).length);
+        if (stored.length) row.status = "stored targets available";
       }
       if (verified) {
         row.status = verified === reviewed.length ? `all ${verified} reference sites settled`

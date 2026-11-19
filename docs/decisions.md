@@ -2646,3 +2646,13 @@ with evidence `declared-builtin` count as identified library targets at
 level 2. **Open:** once the Go, Rust and TypeScript
 items record library targets, the export's reconstruction can be limited to
 schema-3 graphs. See [C-5](changes/C-5.md).
+
+### C-11 TypeScript and JavaScript library declarations
+
+Library members reached through a checker type name their selected declaration.
+An ECMAScript declaration names unit `es`, and a web declaration names unit
+`dom`. With a missing dependency declaration, lexical bindings prove written
+export names. A member reached through an arbitrary imported value names the
+unit only. The proof does not come from the receiver's package. Existing sites
+and checkout symbols retain their identities. Stored library outcomes replace
+coverage reconstruction for TypeScript module 23 onward. See [C-11](changes/C-11.md).

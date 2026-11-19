@@ -1625,3 +1625,12 @@ Path and impact traversals do not enter library targets. No Studio screen shows
 graph links, so Studio is unchanged. The coverage export credits a stored
 library target directly and reconstructs identities only for links without one
 (every link of a 0.1.0 graph).
+
+TypeScript module 23 uses the checker over the same snapshot to record
+declaring owners. `library.ts` assigns the `es` and `dom` units from bundled
+declarations and identifies captured dependency declaration packages. When
+declarations are missing, `extract.ts` uses lexical imports and literal
+loaders to prove the unit or a selected export. Resolution converts those
+facts to stored targets after the existing failure and project checks. A
+written npm subpath prefixes the export as `subpath:export`. Instance member
+paths use `Owner.prototype.member`. [C-11](changes/C-11.md)

@@ -67,6 +67,8 @@ export interface ProjectGroup {
 }
 export interface ProjectModel {
   groups: ProjectGroup[];
+  manifests: readonly Manifest[];
+  workspaceRoots: ReadonlySet<string>;
   hasWorkspacePackages: boolean;
   owner: Map<string, ProjectGroup>;
   /**
@@ -316,15 +318,15 @@ function forced(options: ts.CompilerOptions): ts.CompilerOptions {
     allowJs: true,
     noEmit: true,
     skipLibCheck: true,
-    // Type packages live under node_modules, which is never captured.
-    types: [],
+    // The host still excludes installed node_modules. Explicit local type
+    // roots can supply declarations from the captured snapshot.
+    ...(!options.types && !options.typeRoots ? { types: [] } : {}),
     maxNodeModuleJsDepth: 0,
   };
   for (const key of [
     "composite",
     "incremental",
     "tsBuildInfoFile",
-    "typeRoots",
     "plugins",
     "declarationDir",
     "outDir",
@@ -984,6 +986,10 @@ export function projectModel(
   };
   return {
     groups,
+    manifests,
+    workspaceRoots: new Set(
+      [...fs.links.values()].map((path) => fromVirtual(path) || "."),
+    ),
     hasWorkspacePackages: fs.links.size > 0,
     owner,
     ties,

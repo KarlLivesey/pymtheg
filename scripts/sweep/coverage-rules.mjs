@@ -444,7 +444,8 @@ export function externalIdentity(link, evidence, project, disposition) {
   if (data.cause || link.module === "typescript" && workspaceEntryMissing(underlyingReason(data))) return null;
   const observed = link.module === "go" ? goExternalIdentity(link, evidence, project)
     : link.module === "rust" ? rustExternalIdentity(link, evidence, project)
-      : tsExternalIdentity(link, evidence, project, disposition);
+      : Number.parseInt(link.moduleVersion, 10) >= 23 ? null
+        : tsExternalIdentity(link, evidence, project, disposition);
   if (observed || disposition !== "outside") return observed;
   let gap = "unknown";
   if (link.module === "go") {

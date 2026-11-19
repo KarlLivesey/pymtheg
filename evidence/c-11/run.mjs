@@ -1,0 +1,112 @@
+// SPDX-License-Identifier: MIT
+// Run from the mirrored project on the dev server with PYM_SCRATCH set.
+import { spawnSync } from "node:child_process";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { join, resolve } from "node:path";
+
+const scratch = process.env.PYM_SCRATCH;
+const [mode, other, output] = process.argv.slice(2);
+const repos = JSON.parse(readFileSync("sweep/repos.json", "utf8"));
+const baseline = JSON.parse(readFileSync("evidence/sw-1/results.json", "utf8"));
+const finished = new Set(
+  baseline.repos
+    .filter((row) => row.outcome === "finished")
+    .map((row) => row.id),
+);
+const pins = repos.filter((repo) => repo.language === "typescript");
+const auditPins = new Set([
+  "dexie/Dexie.js",
+  "honojs/hono",
+  "oclif/core",
+  "pmndrs/zustand",
+  "yargs/yargs",
+]);
+const preservationPins = new Set(["pingdotgg/t3code", "nestjs/nest", "excalidraw/excalidraw"]);
+const manifest = join(scratch, `${mode}-manifest.json`);
+const run = (args) => {
+  const result = spawnSync(process.execPath, args, { stdio: "inherit" });
+  if (result.status !== 0)
+    throw Error(`${args[0]} exited ${result.status ?? result.signal}`);
+};
+const sweep = (target, parallel, build) =>
+  run([
+    "scripts/sweep/run.mjs",
+    "--manifest",
+    manifest,
+    "--scratch",
+    target,
+    "--parallel",
+    String(parallel),
+    "--output",
+    join(target, `${mode}-run.json`),
+    ...(build ? ["--local-build", build] : []),
+  ]);
+const main = join(scratch, "main");
+function unpackMain() {
+  if (existsSync(join(main, "dist/cli/main.js"))) return;
+  mkdirSync(main, { recursive: true });
+  const result = spawnSync(
+    "tar",
+    ["-xf", join(scratch, "main.tgz"), "-C", main, "--strip-components=1"],
+    { stdio: "inherit" },
+  );
+  if (result.status !== 0)
+    throw Error(`Main archive extraction exited ${result.status}`);
+  symlinkSync(
+    join(scratch, "release/node_modules"),
+    join(main, "node_modules"),
+  );
+}
+const coverage = (target, previous) =>
+  run([
+    "scripts/sweep/coverage-export.mjs",
+    "--scratch",
+    scratch,
+    "--results",
+    join(scratch, `${target}-run.json`),
+    "--output",
+    join(scratch, `${output ?? target}-coverage.json`),
+    "--reference-samples",
+    "evidence/sw-3/samples.json.gz",
+    ...(previous
+      ? ["--shared-with", join(scratch, `${previous}-run.json`)]
+      : []),
+  ]);
+
+if (mode === "release") {
+  writeFileSync(
+    manifest,
+    JSON.stringify(pins.filter((repo) => finished.has(repo.id))),
+  );
+  sweep(scratch, 4);
+} else if (mode === "main") {
+  unpackMain();
+  writeFileSync(
+    manifest,
+    JSON.stringify(
+      pins.filter((repo) => preservationPins.has(repo.id)),
+    ),
+  );
+  sweep(scratch, 3, main);
+} else if (["candidate", "candidate-audit", "candidate-others"].includes(mode)) {
+  writeFileSync(
+    manifest,
+    JSON.stringify(
+      mode === "candidate"
+        ? pins
+        : pins.filter((repo) => auditPins.has(repo.id) === (mode === "candidate-audit")),
+    ),
+  );
+  sweep(scratch, Number(other ?? 4), resolve("."));
+} else if (
+  ["release", "main", "candidate"].includes(other) &&
+  mode.endsWith("-export")
+)
+  coverage(mode.replace(/-export$/, ""), other);
+else throw Error(`Unknown C-11 run ${mode}`);

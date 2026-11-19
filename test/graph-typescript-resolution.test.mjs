@@ -103,6 +103,250 @@ const clean = (report) => {
   assert.deepEqual(report.resolutionErrors, []);
 };
 
+const libraryTarget = (link) => {
+  assert.equal(
+    link.resolution,
+    "library",
+    `${link.targetName} ${JSON.stringify(link.data)}`,
+  );
+  assert.equal(link.libraries.length, 1);
+  const { id, ...target } = link.libraries[0];
+  return target;
+};
+
+test("bundled declarations prove the owner of an existing runtime use", async () => {
+  await project(
+    {
+      // Vitest packages/vitest/src/node/pools/browser.ts uses Map.delete on openingSessions.
+      "browser.ts": `export class BrowserPool {
+        openingSessions = new Map<string, object>();
+        close(sessionId: string) { this.openingSessions.delete(sessionId); }
+      }
+      declare const value: any;
+      declare const unknownValue: unknown;
+      value.delete('x');
+      unknownValue.delete('x');
+      class Local { local = true; delete(key: string) { return key.length > 0; } }
+      function remove(mixed: Map<string, object> | Local) { mixed.delete('x'); }
+      JSON.parse('null');
+      Promise.all([]);
+      ['a'].map(x => x);
+      document.querySelector('a');
+      fetch('/');
+      export {};`,
+      "script.js": `console.log('ready');\nprocess.cwd();`,
+      "es-only/jsconfig.json": '{"compilerOptions":{"lib":["ES2022"]}}',
+      "es-only/browser.js": `document.querySelector('a');`,
+    },
+    async (graph, report) => {
+      clean(report);
+      const calls = (at) =>
+        graph
+          .links("browser.ts", at, "calls")
+          .sort((a, b) => a.range.start - b.range.start);
+      const [mapDelete, any, unknown, mixed] = calls("delete");
+      assert.deepEqual(libraryTarget(mapDelete), {
+        ecosystem: "typescript-lib",
+        unit: "es",
+        symbol: "Map.prototype.delete",
+        evidence: "declaring-owner",
+      });
+      assert.equal(any.resolution, "unresolved");
+      assert.equal(unknown.resolution, "unresolved");
+      assert.equal(mixed.resolution, "ambiguous");
+      assert.equal(mixed.libraries[0].symbol, "Map.prototype.delete");
+      assert.ok(
+        mixed.candidates.some(
+          ({ id }) => id === graph.symbol("browser.ts", "Local.delete").id,
+        ),
+      );
+      assert.equal(libraryTarget(calls("parse")[0]).symbol, "JSON.parse");
+      assert.equal(libraryTarget(calls("all")[0]).symbol, "Promise.all");
+      assert.equal(
+        libraryTarget(calls("map")[0]).symbol,
+        "Array.prototype.map",
+      );
+      assert.equal(libraryTarget(calls("querySelector")[0]).unit, "dom");
+      assert.equal(
+        libraryTarget(calls("querySelector")[0]).symbol,
+        "ParentNode.prototype.querySelector",
+      );
+      assert.deepEqual(libraryTarget(calls("fetch")[0]), {
+        ecosystem: "dom",
+        unit: "dom",
+        symbol: "fetch",
+        evidence: "declared-builtin",
+      });
+      assert.equal(
+        libraryTarget(graph.link("script.js", "log", "calls")).symbol,
+        "Console.prototype.log",
+      );
+      assert.equal(
+        graph.link("script.js", "cwd", "calls").resolution,
+        "unresolved",
+      );
+      assert.equal(
+        graph.link("es-only/browser.js", "querySelector", "calls").resolution,
+        "unresolved",
+      );
+    },
+  );
+});
+
+test("missing packages prove imports and namespace exports at their lexical bindings", async () => {
+  await project(
+    {
+      "package.json": JSON.stringify({
+        dependencies: { zod: "4.4.1", "@scope/pkg": "^2.0.0" },
+      }),
+      "main.ts": `import { z } from 'zod';
+        import fs from 'node:fs';
+        import * as path from 'path';
+        import * as sub from '@scope/pkg/client';
+        import type { compile } from 'missing-pkg';
+        import { renamed } from './barrel';
+        import { getZ } from './nested/bridge';
+        z.string();
+        fs.readFileSync('x');
+        path['join']('a', 'b');
+        sub.make();
+        const pathAlias = path;
+        pathAlias.resolve('a');
+        renamed();
+        getZ();
+        compile();
+        function shadow(path: any) { path.join('a'); }`,
+      "barrel.ts": `export { make as renamed } from '@scope/pkg/client';`,
+      "nested/package.json": '{"dependencies":{"zod":"3.26.0"}}',
+      "nested/bridge.ts": `export { z as getZ } from 'zod';`,
+      "common.cjs": `const fs = require('fs');
+        const { join: combine } = require('node:path');
+        fs.readFileSync('x');
+        combine('x', 'y');
+        require('node:fs').existsSync('x');
+        let mutable = require('path');
+        mutable = {};
+        mutable.basename('x');`,
+    },
+    async (graph, report) => {
+      clean(report);
+      const call = (at) => graph.link("main.ts", at, "calls");
+      assert.deepEqual(libraryTarget(graph.link("main.ts", "z", "imports")), {
+        ecosystem: "npm",
+        unit: "zod",
+        symbol: "z",
+        evidence: "import-binding",
+        version: "4.4.1",
+        versionSource: "package.json",
+      });
+      assert.deepEqual(libraryTarget(call("string")), {
+        ecosystem: "npm",
+        unit: "zod",
+        evidence: "import-path",
+        version: "4.4.1",
+        versionSource: "package.json",
+      });
+      assert.deepEqual(libraryTarget(call("readFileSync")), {
+        ecosystem: "node",
+        unit: "fs",
+        symbol: "readFileSync",
+        evidence: "import-binding",
+      });
+      assert.equal(libraryTarget(call("path['join']")).symbol, "join");
+      assert.equal(libraryTarget(call("resolve")).symbol, "resolve");
+      assert.deepEqual(libraryTarget(call("make")), {
+        ecosystem: "npm",
+        unit: "@scope/pkg",
+        symbol: "client:make",
+        evidence: "import-binding",
+      });
+      assert.equal(libraryTarget(call("renamed")).symbol, "client:make");
+      assert.deepEqual(libraryTarget(call("getZ")), {
+        ecosystem: "npm",
+        unit: "zod",
+        symbol: "z",
+        evidence: "import-binding",
+        version: "3.26.0",
+        versionSource: "nested/package.json",
+      });
+      assert.equal(call("compile").resolution, "unresolved");
+      assert.equal(call("join").resolution, "unresolved");
+      const common = (at) => graph.link("common.cjs", at, "calls");
+      assert.equal(
+        libraryTarget(common("readFileSync")).symbol,
+        "readFileSync",
+      );
+      assert.equal(libraryTarget(common("combine")).symbol, "join");
+      assert.equal(libraryTarget(common("existsSync")).symbol, "existsSync");
+      assert.equal(common("basename").resolution, "unresolved");
+    },
+  );
+});
+
+test("captured declarations prove an inherited package member and preserve project augmentations", async () => {
+  await project(
+    {
+      "tsconfig.json": JSON.stringify({
+        compilerOptions: {
+          typeRoots: ["./types"],
+          types: ["node"],
+          paths: {
+            "external-kit": ["./vendor/kit/index.d.ts"],
+            "app/*": ["./src/*"],
+          },
+        },
+      }),
+      "types/node/package.json": '{"name":"@types/node","types":"index.d.ts"}',
+      "types/node/index.d.ts": `declare module 'node:fs' { export function readFileSync(path: string): string; }
+      declare namespace NodeJS { interface Process { cwd(): string } }
+      declare var process: NodeJS.Process;`,
+      "vendor/kit/package.json": '{"name":"external-kit","types":"index.d.ts"}',
+      "vendor/kit/index.d.ts": `declare class Directory { list(): string[] }
+      export declare class Store extends Directory {}
+      export declare function open(): Store;`,
+      "src/entry.ts": "export function here() {}",
+      "local.d.ts": `interface Window { __pymthegLocal(): void; }
+      interface Console { log(local: number): void; }`,
+      "main.ts": `import { readFileSync } from 'node:fs';
+      import { open } from 'external-kit';
+      import { here } from 'app/entry';
+      import { missing } from 'app/missing';
+      process.cwd(); readFileSync('x'); open().list(); here(); missing();
+      window.__pymthegLocal(); console.log(4);`,
+    },
+    async (graph, report) => {
+      clean(report);
+      const call = (at) => graph.link("main.ts", at, "calls");
+      assert.deepEqual(libraryTarget(call("cwd")), {
+        ecosystem: "node",
+        unit: "globals",
+        symbol: "NodeJS.Process.prototype.cwd",
+        evidence: "declaring-owner",
+      });
+      assert.deepEqual(libraryTarget(call("readFileSync")), {
+        ecosystem: "node",
+        unit: "fs",
+        symbol: "readFileSync",
+        evidence: "declaring-owner",
+      });
+      assert.deepEqual(libraryTarget(call("list")), {
+        ecosystem: "npm",
+        unit: "external-kit",
+        symbol: "Directory.prototype.list",
+        evidence: "declaring-owner",
+      });
+      assert.equal(graph.target(call("here")), "src/entry.ts#here");
+      assert.equal(call("missing").resolution, "unresolved");
+      assert.equal(
+        graph.target(call("__pymthegLocal")),
+        "local.d.ts#Window.__pymthegLocal",
+      );
+      assert.equal(call("log").resolution, "ambiguous");
+      assert.equal(call("log").libraries[0].symbol, "Console.prototype.log");
+    },
+  );
+});
+
 test("relative imports resolve to the module; a missing relative file stays unresolved", async () => {
   await project(
     {
@@ -145,11 +389,14 @@ test("barrel chains resolve to the original declaration, never to a same-named l
   );
 });
 
-test("tsconfig paths aliases resolve; an alias the config does not declare stays unresolved", async () => {
+test("tsconfig paths aliases resolve or stay unresolved when their targets are missing", async () => {
   await project(
     {
       "tsconfig.json": JSON.stringify({
-        compilerOptions: { baseUrl: ".", paths: { "@core/*": ["src/core/*"] } },
+        compilerOptions: {
+          baseUrl: ".",
+          paths: { "@core/*": ["src/core/*"], "@nope/*": ["src/absent/*"] },
+        },
       }),
       "src/core/log.ts": "export function log() {}\n",
       "src/app.ts":
@@ -163,7 +410,7 @@ test("tsconfig paths aliases resolve; an alias the config does not declare stays
       );
       const unknown = graph.link("src/app.ts", '"@nope/log"');
       assert.equal(unknown.resolution, "unresolved");
-      assert.equal(unknown.data.reason, "external-package");
+      assert.equal(unknown.data.reason, "unresolved-alias");
     },
   );
 });
@@ -356,6 +603,13 @@ test("checkout member chains use typed declarations and preserve open receivers"
         "use.ts#one.[object].nested.run",
         "use.ts#two.[object].nested.run",
       ]);
+      for (const line of ["fromLib?.trim();", 'fromLib?.["trim"]();'])
+        assert.deepEqual(libraryTarget(callOn(line)), {
+          ecosystem: "typescript-lib",
+          unit: "es",
+          symbol: "String.prototype.trim",
+          evidence: "declaring-owner",
+        });
       for (const [line, reason] of [
         ["openReceiver.run();", "index-signature"],
         ["unchecked.run();", "any-receiver"],
@@ -364,8 +618,6 @@ test("checkout member chains use typed declarations and preserve open receivers"
         ['dict["literal"]();', "index-signature"],
         ["record.missing();", "index-signature"],
         ["api[key]();", "no-symbol"],
-        ["fromLib?.trim();", "external"],
-        ['fromLib?.["trim"]();', "no-symbol"],
         ["inferred.run();", "local"],
       ]) {
         const call = callOn(line);
@@ -1175,11 +1427,18 @@ test("pnpm subpath exports and checkout path dependencies use TypeScript's resol
         assert.equal(link.resolution, "unresolved");
         assert.equal(link.data.reason, "workspace-build-output-missing");
       }
-      for (const name of ['"@pkg/excluded"', '"external-package"'])
-        assert.equal(
-          graph.link(file, name, "imports").data.reason,
-          "external-package",
-        );
+      assert.equal(
+        graph.link(file, '"@pkg/excluded"', "imports").data.reason,
+        "external-package",
+      );
+      assert.deepEqual(
+        libraryTarget(graph.link(file, '"external-package"', "imports")),
+        {
+          ecosystem: "npm",
+          unit: "external-package",
+          evidence: "import-path",
+        },
+      );
       const require = graph.link(
         "apps/server/require.cts",
         '"@t3tools/shared/devHome"',
@@ -1409,14 +1668,14 @@ test("extension lookup preserves a relative module edge and augmentation leaves 
   );
 });
 
-test("extends and implements resolve; an external base class stays unresolved with its name", async () => {
+test("extends and implements resolve to checkout definitions and named outside imports", async () => {
   await project(
     {
       "types.ts":
         "export interface Shape { area(): number }\nexport class Base {}\nexport interface Named { name: string }\nexport interface Both extends Named, Shape {}\n",
       "impl.ts": [
         'import { Shape, Base } from "./types";',
-        'import { Emitter } from "events";',
+        'import { EventEmitter as Emitter } from "events";',
         "export class Sq extends Base implements Shape { area() { return 1; } }",
         "export class Ev extends Emitter {}",
         "",
@@ -1432,7 +1691,12 @@ test("extends and implements resolve; an external base class stays unresolved wi
         "types.ts#Shape",
       );
       const external = graph.link("impl.ts", "Emitter", "extends");
-      assert.equal(external.resolution, "unresolved");
+      assert.deepEqual(libraryTarget(external), {
+        ecosystem: "node",
+        unit: "events",
+        symbol: "EventEmitter",
+        evidence: "import-binding",
+      });
       assert.equal(external.targetName, "Emitter");
       assert.equal(
         graph.target(graph.link("types.ts", "Named", "extends")),
@@ -1977,7 +2241,7 @@ test("constructor parameter properties are class properties", async () => {
   );
 });
 
-test("an incomplete target set is never narrowed to one definite target", async () => {
+test("a target set combines the known outside declaration with the checkout candidate", async () => {
   await project(
     {
       "foo.ts": [
@@ -1988,13 +2252,9 @@ test("an incomplete target set is never narrowed to one definite target", async 
     },
     async (graph) => {
       const call = graph.link("foo.ts", "toString", "calls");
-      assert.equal(call.resolution, "unresolved");
-      assert.equal(call.data.reason, "external");
-      assert.deepEqual(
-        call.data.targets.map((target) => target.file),
-        ["foo.ts"],
-        "the project target is kept",
-      );
+      assert.equal(call.resolution, "ambiguous");
+      assert.deepEqual(graph.candidates(call), ["foo.ts#Foo.toString"]);
+      assert.equal(call.libraries[0].symbol, "Number.prototype.toString");
     },
   );
   // A target whose file failed (its package config is broken) is lost: the
@@ -2110,7 +2370,7 @@ test("unresolved reasons say why", async () => {
       "src/use.ts": [
         'import { gone } from "./missing";',
         'import { nope } from "@app/absent";',
-        'import { pkg } from "left-pad";',
+        'import pkg from "left-pad";',
         'import { sub } from "#internal";',
         "gone(); nope(); pkg(); sub();",
         "",
@@ -2123,10 +2383,21 @@ test("unresolved reasons say why", async () => {
       assert.equal(reason("gone", "imports"), "missing-module");
       assert.equal(reason('"@app/absent"'), "unresolved-alias");
       assert.equal(reason("nope", "imports"), "unresolved-alias");
-      assert.equal(reason('"left-pad"'), "external-package");
-      assert.equal(reason("pkg", "imports"), "external-package");
+      assert.deepEqual(libraryTarget(graph.link("src/use.ts", '"left-pad"')), {
+        ecosystem: "npm",
+        unit: "left-pad",
+        evidence: "import-path",
+      });
+      assert.equal(
+        libraryTarget(graph.link("src/use.ts", "pkg", "imports")).symbol,
+        "default",
+      );
+      assert.equal(
+        libraryTarget(graph.link("src/use.ts", "pkg", "calls")).symbol,
+        "default",
+      );
       assert.equal(reason('"#internal"'), "unresolved-alias");
-      for (const name of ["gone", "nope", "pkg", "sub"]) {
+      for (const name of ["gone", "nope", "sub"]) {
         const call = graph.link("src/use.ts", name, "calls");
         assert.equal(call.resolution, "unresolved");
         assert.equal(call.targetName, name);
@@ -2159,7 +2430,11 @@ test("triple-slash references are import links", async () => {
       const types = graph.link("main.ts", "node");
       assert.equal(types.resolution, "unresolved");
       assert.equal(types.data.reason, "external-package");
-      assert.equal(graph.link("main.ts", "es2020").data.reason, "external");
+      assert.deepEqual(libraryTarget(graph.link("main.ts", "es2020")), {
+        ecosystem: "typescript-lib",
+        unit: "es",
+        evidence: "reference-directive",
+      });
     },
   );
 });
@@ -2351,9 +2626,12 @@ test("a candidate set never omits a possible target outside the project", async 
       const [withDate, inside] = graph
         .links("u.ts", "toString", "calls")
         .sort((a, b) => a.range.start - b.range.start);
-      assert.equal(withDate.resolution, "unresolved");
-      assert.equal(withDate.data.reason, "external");
-      assert.equal(withDate.data.targets.length, 2);
+      assert.equal(withDate.resolution, "ambiguous");
+      assert.deepEqual(graph.candidates(withDate), [
+        "u.ts#Bar.toString",
+        "u.ts#Foo.toString",
+      ]);
+      assert.equal(withDate.libraries[0].symbol, "Date.prototype.toString");
       assert.deepEqual(graph.candidates(inside), [
         "u.ts#Bar.toString",
         "u.ts#Foo.toString",
@@ -2919,9 +3197,8 @@ for (const [label, text] of [
 // Round 6: exact scope, dynamic scope, createRequire origin, spelling,
 // cross-file names, containment and labels.
 const freshFor = async (files) => {
-  const { freshNames } = await import(
-    "../dist/graph/languages/typescript/rename.js"
-  );
+  const { freshNames } =
+    await import("../dist/graph/languages/typescript/rename.js");
   return freshNames(Object.values(files).map(String));
 };
 /** No compiler-only name may appear in any stored fact, identity or diagnostic. */
@@ -4214,9 +4491,8 @@ test("the program flag and the bundler assumption together", async () => {
 });
 
 test("tied configs: six orders of three variants merge to identical output", async () => {
-  const { mergeTied } = await import(
-    "../dist/graph/languages/typescript/index.js"
-  );
+  const { mergeTied } =
+    await import("../dist/graph/languages/typescript/index.js");
   const variant = (config, extra) => ({
     status: "clean",
     diagnostics: [],
@@ -4740,9 +5016,8 @@ test("tied configs: a variant that failed makes the merged link failed with the 
 
 test("a failed file is served to programs as absent, not as empty text", async () => {
   const ts = (await import("typescript")).default;
-  const { projectModel } = await import(
-    "../dist/graph/languages/typescript/project.js"
-  );
+  const { projectModel } =
+    await import("../dist/graph/languages/typescript/project.js");
   const files = [
     { path: "bad.ts", text: "export const a = (;\n" },
     { path: "use.ts", text: 'import { a } from "./bad";\n' },
@@ -5873,9 +6148,8 @@ test("default-deny: each default branch fails a kind it does not handle", async 
 
 test("default-deny: the handled kinds of each switch are listed", async () => {
   await indexFiles({ "a.ts": "export const a = 1;\n" });
-  const { HANDLED } = await import(
-    "../dist/graph/languages/typescript/judge.js"
-  );
+  const { HANDLED } =
+    await import("../dist/graph/languages/typescript/judge.js");
   // Only kinds with an explicit case; everything else is FAILED.
   assert.deepEqual(HANDLED, {
     types: [
@@ -6310,9 +6584,17 @@ test("K3: in a program with a failed file, unresolved links are flagged too", as
       "",
     ].join("\n"),
   };
-  const { bad: broken } = await differential(files, {
+  const { clean: intact, bad: broken } = await differential(files, {
     "bad.ts": bad + "const broken = (;\n",
   });
+  assert.equal(
+    linkAt(intact, "use.ts", "// lib", "floor").resolution,
+    "library",
+  );
+  assert.equal(
+    linkAt(broken, "use.ts", "// lib", "floor").resolution,
+    "unresolved",
+  );
   const seen = new Set();
   for (const link of broken.links.values()) {
     if (link.file !== "use.ts" || link.reason === "invalid-code") continue;
