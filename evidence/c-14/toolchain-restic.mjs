@@ -105,6 +105,8 @@ const out = {
   toolchainNotes: on.notes.map((item) => ({ status: item.note?.status, universeClean: item.note?.universeClean, configuration: item.note?.configuration, decided: item.note?.decided })),
   bothLibrary: 0,
   agree: 0,
+  toolchainDecided: 0,
+  agreeToolchainDecided: 0,
   disagreements: [],
   sourceOnlyLibraryWithoutToolchainLibrary: {},
   toolchainOwnerWhereSourceUnresolved: { "go-std": 0, go: 0 },
@@ -124,7 +126,14 @@ for (const [key, link] of off.links) {
   }
   if (link.library && other.library) {
     out.bothLibrary++;
-    if (link.library.unit === other.library.unit && (link.library.symbol ?? null) === (other.library.symbol ?? null)) out.agree++;
+    // Provenance as recorded: go/types decided it (data.toolchain.origin), or
+    // the toolchain run fell back to the source-only decision.
+    const decided = other.toolchain?.origin === "toolchain";
+    if (decided) out.toolchainDecided++;
+    if (link.library.unit === other.library.unit && (link.library.symbol ?? null) === (other.library.symbol ?? null)) {
+      out.agree++;
+      if (decided) out.agreeToolchainDecided++;
+    }
     else out.disagreements.push({ file: link.file, kind: link.kind, start: link.start, name: link.name, sourceOnly: link.library, toolchain: other.library });
   } else if (link.library) {
     const why = other.resolution === "resolved" ? "toolchain: checkout target" : `toolchain: ${other.resolution}`;

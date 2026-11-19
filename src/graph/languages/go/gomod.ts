@@ -19,6 +19,8 @@ export interface GoReplacement {
   path: string;
   version?: string;
   directory?: string;
+  /** The destination is a filesystem path (relative or absolute), not a module path. */
+  filesystem?: true;
 }
 /** A go.mod in the snapshot, with its requirements and `replace` directives. */
 export interface GoModule extends GoModuleRoot {
@@ -103,10 +105,18 @@ function replacement(
     toPath.startsWith("../");
   // A module path, or a directory leaving the project: outside (no directory).
   const target = local ? joinDirectory(directory, toPath) : undefined;
+  // Any filesystem path, relative or absolute (`/src/x`, `C:\x`): the
+  // package may be checkout code, so never a library target (C-14).
+  const filesystem =
+    local ||
+    toPath.startsWith("/") ||
+    /^[A-Za-z]:[\\/]/.test(toPath) ||
+    toPath.startsWith("\\");
   return {
     path: fromPath,
     ...(version ? { version } : {}),
     ...(target === undefined ? {} : { directory: target }),
+    ...(filesystem ? { filesystem: true as const } : {}),
   };
 }
 
@@ -351,10 +361,22 @@ export function directoryOfImport(
     const roots = replaced.length ? replaced : [cache(path)];
     const directories: string[] = [];
     let uncertain = !required;
-    const local = roots.some((root) => root.directory !== undefined);
+    const local = roots.some(
+      (root) => root.directory !== undefined || root.filesystem,
+    );
     let version: string | undefined;
     let versionSource: string | undefined;
-    if (required && !replaced.length) {
+    // In a workspace another module's requirement can raise the selected
+    // version: only one that every requiring workspace module names is proven.
+    const agreed =
+      !workspace ||
+      new Set(
+        layout.modules
+          .filter((module) => workspace.uses.includes(module.directory))
+          .map((module) => module.requires.get(path))
+          .filter((version) => version !== undefined),
+      ).size <= 1;
+    if (required && !replaced.length && agreed) {
       version = selectedVersion(path);
       const main = mains.find(
         (item) => version !== undefined && item.requires.get(path) === version,

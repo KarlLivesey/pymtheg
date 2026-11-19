@@ -305,6 +305,37 @@ export function conventionalName(path: string): string {
   return last.replace(/[.-]/g, "_");
 }
 
+/**
+ * The names an unnamed import of a package whose clause is not in the
+ * checkout may bind (C-14): the last path element, or the one before a
+ * `/vN` suffix, without a `.vN` suffix, a `go-` prefix or a `-go` or
+ * `.go` suffix, with hyphens dropped or written as underscores.
+ */
+export function plausibleNames(path: string): string[] {
+  const parts = path.split("/");
+  const last = parts.at(-1) ?? path;
+  const bases = [last];
+  if (/^v\d+$/.test(last) && parts.length > 1) bases.push(parts.at(-2)!);
+  const seen = new Set<string>();
+  const queue = [...bases];
+  while (queue.length) {
+    const name = queue.pop()!;
+    if (seen.has(name)) continue;
+    seen.add(name);
+    for (const next of [
+      name.replace(/\.v\d+$/, ""),
+      name.replace(/^go-/, ""),
+      name.replace(/(-go|\.go)$/, ""),
+    ])
+      if (next && next !== name) queue.push(next);
+  }
+  const out = new Set<string>();
+  for (const name of seen)
+    for (const form of [name, name.replace(/-/g, ""), name.replace(/-/g, "_")])
+      if (/^[\p{L}_][\p{L}\p{N}_]*$/u.test(form)) out.add(form);
+  return [...out].sort();
+}
+
 export function resolveGo(
   moduleId: string,
   context: ResolutionContext,
@@ -531,7 +562,7 @@ class GoResolver {
       // checkout target, candidate set or failure: the toolchain's selection
       // when it has one, else what the source proves.
       if (!decision.invalid?.length && !decision.ids.length) {
-        let library: LibraryTarget | undefined;
+        let library: LibraryTarget | LibraryTarget[] | undefined;
         let fromToolchain = false;
         try {
           library = this.toolchainLibrary(link);
@@ -561,7 +592,14 @@ class GoResolver {
                 : {}),
             });
           }
-          resolutions.push({ linkId: link.id, library });
+          if (Array.isArray(library))
+            // Several imports may declare the qualifier: a set of their units.
+            resolutions.push({
+              linkId: link.id,
+              candidateIds: [],
+              libraries: library,
+            });
+          else resolutions.push({ linkId: link.id, library });
           continue;
         }
       }
@@ -637,60 +675,81 @@ class GoResolver {
     const key = `${info.directory}\u0000${path}`;
     let found = this.originMemo.get(key);
     if (found === undefined) {
-      found =
-        libraryOrigin(this.layout, info.directory, path, (directory) =>
-          this.vendorRoots.has(directory),
-        ) ?? null;
+      found = this.testdataProvides(info.directory, path)
+        ? null
+        : (libraryOrigin(this.layout, info.directory, path, (directory) =>
+            this.vendorRoots.has(directory),
+          ) ?? null);
       this.originMemo.set(key, found);
     }
     return found ?? undefined;
   }
 
-  /** The names an import written without a name may bind in this file. */
-  private importNames(info: FileInfo, path: string): string[] {
-    const { pkgs } = this.importTargets(info, path);
-    return pkgs.length
-      ? unique(pkgs.map((pkg) => pkg.name))
-      : [conventionalName(path)];
+  /**
+   * A file under a `testdata` directory whose tree supplies the imported
+   * package itself (`testdata/src/<path>`, the GOPATH layout test harnesses
+   * load, such as golang/tools' fake `fmt`): checkout code, never a library.
+   */
+  private testdataProvides(directory: string, path: string): boolean {
+    const parts = directory.split("/");
+    for (let index = parts.length - 1; index >= 0; index--)
+      if (
+        parts[index] === "testdata" &&
+        this.fileDirectories.has(
+          [...parts.slice(0, index + 1), "src", path].join("/"),
+        )
+      )
+        return true;
+    return false;
   }
 
   /**
-   * The library package a qualifier written in `info` binds: the qualifier
-   * is no package-level or local declaration (locals are bound at parse),
-   * exactly one of the file's imports can bind it, and that import names a
-   * package outside the checkout. An explicit import name binds itself; a
-   * standard-library package's name is its last path element (before a
-   * `/vN` suffix). An unnamed dependency import binds the package clause of
-   * a package the checkout does not hold: taken as its conventional name
-   * (`conventionalName`), as goimports writes an explicit name whenever they
-   * differ; a qualifier that matches no import's conventional name, or more
-   * than one, is not followed.
+   * The library packages a qualifier written in `info` may bind: the
+   * qualifier is no package-level or local declaration (locals are bound at
+   * parse), every import of the file that can declare it names a package
+   * outside the checkout, and none of them is checkout code. An explicit
+   * import name binds itself; a standard-library package's name is its last
+   * path element (before a `/vN` suffix); an unnamed dependency import binds
+   * the package clause of a package the checkout does not hold, which may be
+   * any of the path's plausible names (`plausibleNames`). One such import:
+   * the target; several: a candidate set of their units.
    */
   private libraryImport(
     qualifier: string,
     info: FileInfo,
-  ): { path: string; origin: LibraryOrigin } | undefined {
+  ): { path: string; origin: LibraryOrigin }[] | undefined {
     const entity = this.lookupName(qualifier, info.path);
-    if (entity.e !== "pkg" || entity.pkgs.length) return undefined;
-    const entry = info.imports.get(qualifier);
-    if (
-      !entry ||
-      entry.uncertain ||
-      entry.failed ||
-      entry.reach.length ||
-      entry.path !== entity.path
-    )
+    if (!(entity.e === "none" || (entity.e === "pkg" && !entity.pkgs.length)))
       return undefined;
-    const binders = info.fact.imports.filter(
-      (item) =>
-        item.alias === qualifier ||
-        (item.alias === undefined &&
-          this.importNames(info, item.path).includes(qualifier)),
-    );
-    if (binders.length !== 1 || binders[0]!.path !== entry.path)
-      return undefined;
-    const origin = this.origin(info, entry.path);
-    return origin ? { path: entry.path, origin } : undefined;
+    const bound: { path: string; origin: LibraryOrigin }[] = [];
+    for (const item of info.fact.imports) {
+      if (item.alias === "." || item.alias === "_") continue;
+      let names: string[];
+      let origin: LibraryOrigin | undefined;
+      if (item.alias !== undefined) names = [item.alias];
+      else {
+        const { pkgs } = this.importTargets(info, item.path);
+        origin = pkgs.length ? undefined : this.origin(info, item.path);
+        names = pkgs.length
+          ? pkgs.map((pkg) => pkg.name)
+          : origin?.ecosystem === "go-std"
+            ? [conventionalName(item.path)]
+            : plausibleNames(item.path);
+      }
+      if (!names.includes(qualifier)) continue;
+      origin ??= this.origin(info, item.path);
+      const entry = info.imports.get(qualifier);
+      // A binder that is or may be checkout code: not a library at all.
+      if (
+        !origin ||
+        this.importTargets(info, item.path).pkgs.length ||
+        (entry && entry.path === item.path && (entry.uncertain || entry.failed))
+      )
+        return undefined;
+      if (!bound.some((other) => other.path === item.path))
+        bound.push({ path: item.path, origin });
+    }
+    return bound.length ? bound : undefined;
   }
 
   private libraryTarget(
@@ -719,7 +778,9 @@ class GoResolver {
    * not: its declaring owner may be promoted from an embedded type, which
    * only the library's source shows.
    */
-  private libraryOf(link: GraphLink): LibraryTarget | undefined {
+  private libraryOf(
+    link: GraphLink,
+  ): LibraryTarget | LibraryTarget[] | undefined {
     const info = this.files.get(link.file);
     if (!info) return undefined;
     const data = (link.data ?? {}) as {
@@ -766,9 +827,11 @@ class GoResolver {
     // Another package's unexported name is not accessible.
     if (!exported(name)) return undefined;
     const bound = this.libraryImport(qualifier, info);
-    return bound
-      ? this.libraryTarget(bound.origin, bound.path, name, "import-binding")
-      : undefined;
+    if (!bound) return undefined;
+    const targets = bound.map((item) =>
+      this.libraryTarget(item.origin, item.path, name, "import-binding"),
+    );
+    return targets.length === 1 ? targets[0]! : targets;
   }
 
   /**
@@ -926,9 +989,12 @@ class GoResolver {
 
   /** Directories with a `vendor/` directory holding captured files (C-14). */
   private vendorRoots = new Set<string>();
+  /** Directories holding captured files (C-14: test-data package trees). */
+  private fileDirectories = new Set<string>();
 
   private index(): void {
     for (const file of this.context.files) {
+      this.fileDirectories.add(directoryOf(file.path));
       const parts = file.path.split("/");
       for (let index = 0; index < parts.length - 1; index++)
         if (parts[index] === "vendor")

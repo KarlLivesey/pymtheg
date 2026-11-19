@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 // C-14 evidence: compares every Go link and symbol of two sweep runs (a build
 // of main and this branch) site by site. A site is (file, kind, start, end,
-// target name). Per repository: checkout-definite links kept, lost or
+// target name); a site may hold several stored rows (distinct `implements`
+// links), each counted, and identified by its relation: the checkout target,
+// the candidate set's members, or the library targets. Per repository: checkout-definite links kept, lost or
 // retargeted; sites added or removed; symbols missing; library links by
 // evidence kind; unresolved links with the library-member reason; and the
 // sites main's coverage reconstruction credited at level 2 (a selector or
@@ -62,8 +64,14 @@ function load(record) {
     schema === "4"
       ? db.prepare("SELECT ecosystem, unit, symbol, version, evidence FROM graph_library_targets WHERE link=? AND role='target'")
       : null;
+  const candidates = db.prepare("SELECT symbol FROM graph_candidates WHERE link=? ORDER BY symbol");
+  const libraryCandidates =
+    schema === "4"
+      ? db.prepare("SELECT unit, symbol FROM graph_library_targets WHERE link=? AND role='candidate' ORDER BY unit, symbol")
+      : null;
   const links = new Map();
   const imports = new Map();
+  let rows = 0;
   for (const row of db
     .prepare("SELECT id, file, kind, target, resolution, body FROM graph_links WHERE module='go'")
     .iterate()) {
@@ -79,7 +87,24 @@ function load(record) {
       target: row.target ? symbols.get(row.target) : null,
       ...(row.resolution === "library" ? { library: library.get(row.id) } : {}),
     };
-    links.set(key, link);
+    const members =
+      row.resolution === "ambiguous"
+        ? [
+            ...candidates.all(row.id).map((item) => symbols.get(item.symbol)),
+            ...(libraryCandidates?.all(row.id) ?? []).map((item) => `lib:${item.unit}:${item.symbol}`),
+          ]
+        : [];
+    link.relation = link.target
+      ? `target:${link.target}`
+      : link.library
+        ? `library:${link.library.unit}:${link.library.symbol ?? ""}`
+        : members.length
+          ? `set:${members.join(",")}`
+          : "none";
+    rows++;
+    const list = links.get(key) ?? [];
+    list.push(link);
+    links.set(key, list);
     if (row.kind === "imports") {
       const list = imports.get(row.file) ?? [];
       list.push(link);
@@ -87,7 +112,7 @@ function load(record) {
     }
   }
   db.close();
-  return { links, keys, imports };
+  return { links, keys, imports, rows };
 }
 
 /** What main's reconstruction credits at level 2: the qualifier's import path, or null. */
@@ -140,8 +165,11 @@ for (const [id, cand] of [...candidate].sort()) {
   }
   const row = {
     id,
-    linksBefore: before.links.size,
-    linksAfter: after.links.size,
+    linksBefore: 0,
+    linksAfter: 0,
+    sitesBefore: 0,
+    sitesAfter: 0,
+    librarySetsAfter: 0,
     definiteBefore: 0,
     definiteAfter: 0,
     libraryAfter: 0,
@@ -159,49 +187,63 @@ for (const [id, cand] of [...candidate].sort()) {
     symbolsBefore: before.keys.size,
     symbolsMissing: missingSymbols.length,
   };
-  for (const [key, link] of after.links) {
-    const old = before.links.get(key);
-    if (!old) row.addedSites++;
-    if (link.target) row.definiteAfter++;
-    if (link.data.uncertainty === "library-member-unproven") row.memberReason++;
-    if (link.library) {
-      row.libraryAfter++;
-      if (link.library.symbol) row.librarySymbolAfter++;
-      const group =
-        link.library.evidence === "declared-builtin" ? "builtin" : link.library.evidence;
-      add(row.byEvidence, `${group}:${link.library.ecosystem}`);
-      if (link.library.symbol && (!sampleRepos.size || sampleRepos.has(id)))
-        pool.push({ id, record: cand, link });
+  row.linksBefore = before.rows;
+  row.linksAfter = after.rows;
+  row.sitesBefore = before.links.size;
+  row.sitesAfter = after.links.size;
+  for (const [key, news] of after.links) {
+    const olds = before.links.get(key) ?? [];
+    if (!before.links.has(key)) row.addedSites++;
+    const remaining = news.map((link) => link.relation);
+    for (const old of olds) {
+      const index = remaining.indexOf(old.relation);
+      if (index >= 0) {
+        remaining.splice(index, 1);
+        continue;
+      }
+      const now = news.find((link) => !olds.some((other) => other.relation === link.relation));
+      if (old.target) {
+        if (now?.target) row.retargeted++;
+        else row.lost++;
+        out.changed.push({ id, file: old.file, kind: old.kind, name: old.name, ...lineOf(cand, old.file, old.start), before: old.relation, after: now?.relation ?? "row removed" });
+      } else if (old.resolution === "ambiguous") {
+        row.candidateSetChanged++;
+        out.changed.push({ id, file: old.file, kind: old.kind, name: old.name, ...lineOf(cand, old.file, old.start), before: old.relation, after: now?.relation ?? "row removed" });
+      }
     }
-    if (old?.target && link.target !== old.target) {
-      if (link.target) row.retargeted++;
-      else row.lost++;
-      out.changed.push({ id, file: link.file, kind: link.kind, name: link.name, ...lineOf(cand, link.file, link.start), before: old.target, after: link.target ?? link.resolution });
+    for (const link of news) {
+      if (link.target) row.definiteAfter++;
+      if (link.data.uncertainty === "library-member-unproven") row.memberReason++;
+      if (link.resolution === "ambiguous" && link.relation.includes("lib:")) row.librarySetsAfter++;
+      if (link.library) {
+        row.libraryAfter++;
+        if (link.library.symbol) row.librarySymbolAfter++;
+        const group = link.library.evidence === "declared-builtin" ? "builtin" : link.library.evidence;
+        add(row.byEvidence, `${group}:${link.library.ecosystem}`);
+        if (link.library.symbol && (!sampleRepos.size || sampleRepos.has(id))) pool.push({ id, record: cand, link });
+      }
     }
-    if (old?.resolution === "ambiguous" && link.resolution !== "ambiguous") {
-      row.candidateSetChanged++;
-      out.changed.push({ id, file: link.file, kind: link.kind, name: link.name, ...lineOf(cand, link.file, link.start), before: "candidate set", after: link.resolution });
-    }
-    if (old) {
+    for (const old of olds) {
       const path = reconstructed(old, before.imports.get(old.file));
-      if (path) {
-        row.reconstructedBefore++;
-        if (link.target || link.library?.symbol) row.reconstructedKept++;
-        else {
-          row.reconstructedWithheld++;
-          const reason = `${link.resolution}:${link.data.uncertainty ?? link.data.reason ?? link.data.open?.reason ?? "-"}:${path.split("/")[0].includes(".") ? "dependency" : "std"}`;
-          add(out.withheld, reason);
-          if (out.withheldExamples.length < 60)
-            out.withheldExamples.push({ id, file: link.file, kind: link.kind, name: link.name, path, ...lineOf(cand, link.file, link.start), now: link.resolution });
-        }
+      if (!path) continue;
+      row.reconstructedBefore++;
+      if (news.some((link) => link.target || link.library?.symbol)) row.reconstructedKept++;
+      else {
+        row.reconstructedWithheld++;
+        const link = news[0];
+        const reason = `${link.resolution}:${link.data.uncertainty ?? link.data.reason ?? link.data.open?.reason ?? "-"}:${path.split("/")[0].includes(".") ? "dependency" : "std"}`;
+        add(out.withheld, reason);
+        if (out.withheldExamples.length < 60)
+          out.withheldExamples.push({ id, file: link.file, kind: link.kind, name: link.name, path, ...lineOf(cand, link.file, link.start), now: link.relation });
       }
     }
   }
-  for (const [key, old] of before.links) {
-    if (old.target) row.definiteBefore++;
+  for (const [key, olds] of before.links) {
+    for (const old of olds) if (old.target) row.definiteBefore++;
     if (!after.links.has(key)) {
       row.removedSites++;
-      if (old.target) out.changed.push({ id, file: old.file, kind: old.kind, name: old.name, before: old.target, after: "site removed" });
+      for (const old of olds)
+        if (old.target) out.changed.push({ id, file: old.file, kind: old.kind, name: old.name, before: old.relation, after: "site removed" });
     }
   }
   out.repos.push(row);

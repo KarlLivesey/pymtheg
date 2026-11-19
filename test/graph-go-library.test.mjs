@@ -26,7 +26,7 @@ const outcome = (link) =>
   link.libraries
     ? link.resolution === "library"
       ? link.libraries[0]
-      : { set: link.libraries }
+      : { set: [...link.libraries].sort((a, b) => (a.unit < b.unit ? -1 : 1)) }
     : link.target
       ? { checkout: link.target }
       : link.candidates.length
@@ -199,9 +199,14 @@ test("package-qualified selectors name the import's unit and the selected symbol
     symbol: "Run",
     evidence: "import-binding",
   });
-  // The package clause `minio` is not the path's conventional name.
+  // `minio` is a plausible name of `minio-go/v7` and of no other import.
   assert.deepEqual(outcome(at(links, file, "minio.New")), {
-    unresolved: null,
+    ecosystem: "go",
+    unit: "github.com/minio/minio-go/v7",
+    symbol: "New",
+    version: "v7.0.70",
+    versionSource: "go.mod",
+    evidence: "import-binding",
   });
   // Replaced by a directory of the checkout: checkout code.
   assert.deepEqual(outcome(at(links, file, "local.Do")), {
@@ -356,7 +361,7 @@ test("members on values of library types stay unresolved with their reason; the 
   });
 });
 
-test("two imports that could bind one qualifier, or a dot import, prove nothing", async () => {
+test("two imports that could bind one qualifier are a set; a dot import proves nothing", async () => {
   const { links } = await project({
     "go.mod": lines(
       "module example.com/m",
@@ -381,10 +386,166 @@ test("two imports that could bind one qualifier, or a dot import, prove nothing"
       "}",
     ),
   });
+  // Both may declare `errors`: a candidate set of the two units.
+  const both = (unit) => ({
+    ecosystem: "go",
+    unit,
+    symbol: "New",
+    version: "v1.0.0",
+    versionSource: "go.mod",
+    evidence: "import-binding",
+  });
   assert.deepEqual(outcome(at(links, "d/d.go", "errors.New")), {
-    unresolved: null,
+    set: [both("github.com/a/errors"), both("github.com/b/go-errors")],
   });
   assert.deepEqual(outcome(at(links, "d/d.go", "ToUpper")), {
     unresolved: null,
+  });
+});
+
+test("review: a replace to any filesystem path is never a library", async () => {
+  const { links } = await project({
+    "go.mod": lines(
+      "module example.com/m",
+      "",
+      "go 1.22",
+      "",
+      "require (",
+      "\tgithub.com/abs/mod v1.0.0",
+      "\tgithub.com/up/mod v1.0.0",
+      "\tgithub.com/ok/mod v1.0.0",
+      ")",
+      "",
+      "replace github.com/abs/mod => /src/mod",
+      "replace github.com/up/mod => ../up",
+    ),
+    "a/a.go": lines(
+      "package a",
+      'import "github.com/abs/mod"',
+      'import up "github.com/up/mod"',
+      'import "github.com/ok/mod"',
+      "func use() { mod.F(); up.G() }",
+    ),
+  });
+  assert.deepEqual(outcome(at(links, "a/a.go", "mod.F")), { unresolved: null });
+  assert.deepEqual(outcome(at(links, "a/a.go", "up.G")), { unresolved: null });
+  for (const path of ["github.com/abs/mod", "github.com/up/mod"])
+    assert.equal(
+      links.find((link) => link.kind === "imports" && link.data?.path === path)
+        ?.libraries,
+      undefined,
+      path,
+    );
+  assert.equal(
+    links.find(
+      (link) =>
+        link.kind === "imports" && link.data?.path === "github.com/ok/mod",
+    ).resolution,
+    "library",
+  );
+});
+
+test("review: in a workspace a version is recorded only when every requiring module names it", async () => {
+  const workspace = (b) => ({
+    "go.work": lines("go 1.22", "", "use (", "\t./a", "\t./b", ")"),
+    "a/go.mod": lines(
+      "module example.com/a",
+      "",
+      "go 1.22",
+      "",
+      "require github.com/d/dep v1.0.0",
+    ),
+    "b/go.mod": lines(
+      "module example.com/b",
+      "",
+      "go 1.22",
+      "",
+      `require github.com/d/dep ${b}`,
+    ),
+    "a/a.go": lines(
+      "package a",
+      'import "github.com/d/dep"',
+      "func use() { dep.F() }",
+    ),
+    "b/b.go": lines(
+      "package b",
+      'import "github.com/d/dep"',
+      "func use() { dep.F() }",
+    ),
+  });
+  const raised = await project(workspace("v1.2.0"));
+  assert.deepEqual(outcome(at(raised.links, "a/a.go", "dep.F")), {
+    ecosystem: "go",
+    unit: "github.com/d/dep",
+    symbol: "F",
+    evidence: "import-binding",
+  });
+  const same = await project(workspace("v1.0.0"));
+  const target = outcome(at(same.links, "a/a.go", "dep.F"));
+  assert.equal(target.version, "v1.0.0");
+  assert.match(target.versionSource, /^[ab]\/go\.mod$/);
+});
+
+test("review: a qualifier two unnamed imports may declare is a set of both units", async () => {
+  const { links } = await project({
+    "go.mod": lines(
+      "module example.com/m",
+      "",
+      "go 1.22",
+      "",
+      "require (",
+      "\texample.org/client-go v1.0.0",
+      "\texample.net/client v1.0.0",
+      "\tgithub.com/hashicorp/golang-lru/v2 v2.0.7",
+      ")",
+    ),
+    "c/c.go": lines(
+      "package c",
+      "import (",
+      '\t"example.org/client-go"',
+      '\t"example.net/client"',
+      '\t"github.com/hashicorp/golang-lru/v2"',
+      ")",
+      "func use() { client.New(); _ = lru.New }",
+    ),
+  });
+  const unit = (name) => ({
+    ecosystem: "go",
+    unit: name,
+    symbol: "New",
+    version: "v1.0.0",
+    versionSource: "go.mod",
+    evidence: "import-binding",
+  });
+  assert.deepEqual(outcome(at(links, "c/c.go", "client.New")), {
+    set: [unit("example.net/client"), unit("example.org/client-go")],
+  });
+  // `lru` is no plausible name of `golang-lru/v2`: not followed.
+  assert.deepEqual(outcome(at(links, "c/c.go", "lru.New")), {
+    unresolved: null,
+  });
+});
+
+test("review: a test-data tree that supplies the imported package is checkout code", async () => {
+  const { links } = await project({
+    "go.mod": "module golang.org/x/tools\n\ngo 1.22\n",
+    "go/ssa/interp/testdata/src/fmt/fmt.go": lines(
+      "package fmt",
+      "func Println(...any) {}",
+    ),
+    "go/ssa/interp/testdata/boundmeth.go": lines(
+      "package main",
+      'import "fmt"',
+      'import "strings"',
+      'func main() { fmt.Println(strings.ToUpper("x")) }',
+    ),
+  });
+  const file = "go/ssa/interp/testdata/boundmeth.go";
+  assert.equal(at(links, file, "fmt.Println").libraries, undefined);
+  assert.deepEqual(outcome(at(links, file, "strings.ToUpper")), {
+    ecosystem: "go-std",
+    unit: "strings",
+    symbol: "ToUpper",
+    evidence: "import-binding",
   });
 });
