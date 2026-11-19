@@ -3,8 +3,10 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { measured } from "../../scripts/sweep/run.mjs";
 
-const [scratchArgument, location, build, result, parallelText, ...selected] =
+const [scratchArgument, location, build, result, parallelText, ...selection] =
   process.argv.slice(2);
+const coldOnly = selection.includes("--cold-only");
+const selected = selection.filter((value) => value !== "--cold-only");
 const scratch = resolve(scratchArgument);
 const attempts = JSON.parse(await readFile(location, "utf8"));
 const parallel = Number(parallelText);
@@ -14,7 +16,9 @@ if (
   parallel > 6 ||
   !/^[\w-]+$/.test(result)
 )
-  throw Error("Expected SCRATCH RECEIPT BUILD RESULT PARALLEL [PIN…]");
+  throw Error(
+    "Expected SCRATCH RECEIPT BUILD RESULT PARALLEL [--cold-only] [PIN…]",
+  );
 const env = { ...process.env };
 delete env.NODE_OPTIONS;
 const pending = attempts.repos.filter(
@@ -62,7 +66,7 @@ async function replay(repo) {
   };
   try {
     const cold = await run("cold");
-    const warm = await run("warm");
+    const warm = coldOnly ? undefined : await run("warm");
     await rename(state, join(saved, "rebuildable"));
     return { ...repo, sourceAttempt: repo.attempt, attempt, cold, warm };
   } catch (error) {
@@ -89,5 +93,5 @@ await Promise.all(
 repos.sort((a, b) => a.id.localeCompare(b.id));
 await writeFile(
   join(scratch, `${result}-run.json`),
-  JSON.stringify({ ...attempts, repos }),
+  JSON.stringify({ ...attempts, coldOnly, repos }),
 );

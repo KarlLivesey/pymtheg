@@ -68,6 +68,7 @@ function noteOf(link) {
     : undefined;
 }
 const saved = [];
+const secondary = [];
 const changes = [];
 const stats = [];
 
@@ -159,8 +160,20 @@ for (const repo of read(beforePath).repos) {
       const note = noteOf(updated);
       const proof = note?.proof ?? "unmarked";
       count.gainsByProof[proof] = (count.gainsByProof[proof] ?? 0) + 1;
-      if (!note) continue;
-      const line = text.slice(0, old.range.start).split("\n").length;
+      const line = text.slice(0, old.range?.start ?? 0).split("\n").length;
+      if (!note) {
+        secondary.push({
+          pin: repo.id,
+          file,
+          line,
+          kind: old.kind,
+          name: old.name,
+          prior: old.data?.reason ?? old.resolution,
+          target: updated.target,
+          libraries: updated.libraries,
+        });
+        continue;
+      }
       const declaration = files.get(updated.target[0]);
       const targetLine = declaration
         ?.slice(0, updated.targetStart)
@@ -211,3 +224,4 @@ for (let i = 0; draw.length < size && pools.some((pool) => pool[i]); i++) {
 writeFileSync(`${prefix}-stats.json`, JSON.stringify(stats, null, 2) + "\n");
 writeFileSync(`${prefix}-draw.json`, JSON.stringify(draw, null, 2) + "\n");
 writeFileSync(`${prefix}-changes.json.gz`, gzipSync(JSON.stringify(changes)));
+writeFileSync(`${prefix}-unmarked.json.gz`, gzipSync(JSON.stringify(secondary)));

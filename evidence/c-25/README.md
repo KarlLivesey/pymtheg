@@ -21,9 +21,11 @@ or plugin. It records when a compiler build could supply no matching output.
 `convention-build.mjs BUILD` modifies a separate copy of the compiled
 analyzer in scratch for the experiment. The candidate and packaged analyzer
 keep their proof requirements. `replay.mjs SCRATCH RECEIPT BUILD RESULT
-PARALLEL [PIN…]` runs cold and warm indexing on the same retained checkout and
-installation, saves the experimental graph separately, and restores the
-sweep store. The ordinary and experimental outputs keep separate receipts.
+PARALLEL [--cold-only] [PIN…]` runs indexing on the same retained checkout
+and installation, saves the experimental graph separately, and restores
+the sweep store. The ordinary and experimental outputs keep separate
+receipts. Use `--cold-only` to compare fresh tRPC stores independently of
+the warm declaration-input replay.
 
 Export the candidate's bare and installed experiments with
 `scripts/sweep/coverage-export.mjs` and the SW-3 reference samples. Merge the
@@ -31,3 +33,8 @@ candidate TypeScript exports into the earlier cumulative input with
 `plan-input.mjs BASE BARE INSTALLED OUTPUT.gz`. Run `coverage.mjs` with the
 SW-3 baseline, then use `evidence/c-11/plan.mjs` to replace the generated
 TypeScript section of the plan.
+
+The compact audit archives list public checkout paths, source destinations,
+compiler output names, and verdicts. The full declaration text stays in
+scratch. The change archives preserve each old and new destination for
+review, including unit-only links whose stored attribution changed.
