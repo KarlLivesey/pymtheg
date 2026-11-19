@@ -158,7 +158,8 @@ test("S3: a replace for another version does not apply; the unversioned one does
 
 test("S3: an unprovable selected version keeps both directories as candidates", async () => {
   const both = ["fallback/lib.go:function:F", "specific/lib.go:function:F"];
-  // No requirement at all.
+  // No requirement at all: Go uses neither replacement ("replaced but not
+  // required"; evidence/c-8/go-import-rules.sh).
   let { links } = await project(
     libProject(
       lines(
@@ -171,7 +172,7 @@ test("S3: an unprovable selected version keeps both directories as candidates", 
   );
   let link = call(links, "p/p.go", "lib.F");
   assert.equal(link.target, null);
-  assert.deepEqual(link.candidates, both);
+  assert.deepEqual(link.candidates, []);
   // Another captured module requires a higher version: the main requirement may
   // be stale, so selection is not proven.
   ({ links } = await project(

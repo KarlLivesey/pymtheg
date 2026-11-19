@@ -47,7 +47,7 @@ test("build-variant duplicates become candidates, never a chosen file", async ()
   ]);
 });
 
-test("imports resolve by go.mod module path; stdlib, foreign prefixes, internal violations, main and testdata do not", async () => {
+test("imports resolve by go.mod module path, also into testdata; stdlib, foreign prefixes, internal violations and main do not", async () => {
   const { links, symbols } = await project({
     "go.mod": MOD,
     "lib/x/x.go": "package xpkg\nfunc F() {}\n",
@@ -81,10 +81,15 @@ test("imports resolve by go.mod module path; stdlib, foreign prefixes, internal 
     "other.com/m/lib/x",
     "example.com/m/lib/internal/sec",
     "example.com/m/tool",
-    "example.com/m/lib/testdata/fix",
     "example.com/m/nothing",
   ])
     assert.equal(imp("app/app.go", path).target, null, path);
+  // The go tool imports a package under testdata like any other (it skips
+  // testdata only when expanding ./... patterns).
+  assert.equal(
+    imp("app/app.go", "example.com/m/lib/testdata/fix").target,
+    "lib/testdata/fix/fix.go:package:fix",
+  );
   assert.equal(
     imp("lib/use.go", "example.com/m/lib/internal/sec").target,
     "lib/internal/sec/sec.go:package:sec",

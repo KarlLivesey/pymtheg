@@ -1,0 +1,163 @@
+{
+ "newlyDefinite": 32,
+ "confirmed": 10,
+ "disagreements": [],
+ "noDecision": 22,
+ "noDecisionSample": [
+  {
+   "file": "internal/fs/vss_windows.go",
+   "kind": "calls",
+   "start": 15021,
+   "name": "*IVssBackupComponentsVTable",
+   "target": "internal/fs/vss_windows.go:struct:IVssBackupComponentsVTable"
+  },
+  {
+   "file": "internal/fs/vss_windows.go",
+   "kind": "calls",
+   "start": 16790,
+   "name": "*IVSSAsync",
+   "target": "internal/fs/vss_windows.go:struct:IVSSAsync"
+  },
+  {
+   "file": "internal/fs/vss_windows.go",
+   "kind": "calls",
+   "start": 25396,
+   "name": "*IVSSAsyncVTable",
+   "target": "internal/fs/vss_windows.go:struct:IVSSAsyncVTable"
+  },
+  {
+   "file": "internal/fs/vss_windows.go",
+   "kind": "calls",
+   "start": 27894,
+   "name": "*IVSSAdminVTable",
+   "target": "internal/fs/vss_windows.go:struct:IVSSAdminVTable"
+  },
+  {
+   "file": "internal/fs/vss_windows.go",
+   "kind": "calls",
+   "start": 28736,
+   "name": "*IVssEnumObjectVTable",
+   "target": "internal/fs/vss_windows.go:struct:IVssEnumObjectVTable"
+  },
+  {
+   "file": "internal/fs/vss_windows.go",
+   "kind": "calls",
+   "start": 34956,
+   "name": "*IVssBackupComponents",
+   "target": "internal/fs/vss_windows.go:struct:IVssBackupComponents"
+  },
+  {
+   "file": "internal/fs/vss_windows.go",
+   "kind": "calls",
+   "start": 35147,
+   "name": "iVssBackupComponents.InitializeForBackup",
+   "target": "internal/fs/vss_windows.go:method:(*IVssBackupComponents).InitializeForBackup"
+  },
+  {
+   "file": "internal/fs/vss_windows.go",
+   "kind": "calls",
+   "start": 35280,
+   "name": "iVssBackupComponents.SetContext",
+   "target": "internal/fs/vss_windows.go:method:(*IVssBackupComponents).SetContext"
+  },
+  {
+   "file": "internal/fs/vss_windows.go",
+   "kind": "calls",
+   "start": 35559,
+   "name": "iVssBackupComponents.SetBackupState",
+   "target": "internal/fs/vss_windows.go:method:(*IVssBackupComponents).SetBackupState"
+  },
+  {
+   "file": "internal/fs/vss_windows.go",
+   "kind": "calls",
+   "start": 35925,
+   "name": "iVssBackupComponents.IsVolumeSupported",
+   "target": "internal/fs/vss_windows.go:method:(*IVssBackupComponents).IsVolumeSupported"
+  },
+  {
+   "file": "internal/fs/vss_windows.go",
+   "kind": "calls",
+   "start": 36361,
+   "name": "iVssBackupComponents.StartSnapshotSet",
+   "target": "internal/fs/vss_windows.go:method:(*IVssBackupComponents).StartSnapshotSet"
+  },
+  {
+   "file": "internal/fs/vss_windows.go",
+   "kind": "calls",
+   "start": 36762,
+   "name": "iVssBackupComponents.AddToSnapshotSet",
+   "target": "internal/fs/vss_windows.go:method:(*IVssBackupComponents).AddToSnapshotSet"
+  },
+  {
+   "file": "internal/fs/vss_windows.go",
+   "kind": "calls",
+   "start": 37588,
+   "name": "iVssBackupComponents.IsVolumeSupported",
+   "target": "internal/fs/vss_windows.go:method:(*IVssBackupComponents).IsVolumeSupported"
+  },
+  {
+   "file": "internal/fs/vss_windows.go",
+   "kind": "calls",
+   "start": 37767,
+   "name": "iVssBackupComponents.AddToSnapshotSet",
+   "target": "internal/fs/vss_windows.go:method:(*IVssBackupComponents).AddToSnapshotSet"
+  },
+  {
+   "file": "internal/fs/vss_windows.go",
+   "kind": "calls",
+   "start": 38399,
+   "name": "iVssBackupComponents.AbortBackup",
+   "target": "internal/fs/vss_windows.go:method:(*IVssBackupComponents).AbortBackup"
+  },
+  {
+   "file": "internal/fs/vss_windows.go",
+   "kind": "calls",
+   "start": 38619,
+   "name": "iVssBackupComponents.AbortBackup",
+   "target": "internal/fs/vss_windows.go:method:(*IVssBackupComponents).AbortBackup"
+  },
+  {
+   "file": "internal/fs/vss_windows.go",
+   "kind": "calls",
+   "start": 38772,
+   "name": "iVssBackupComponents.GetSnapshotProperties",
+   "target": "internal/fs/vss_windows.go:method:(*IVssBackupComponents).GetSnapshotProperties"
+  },
+  {
+   "file": "internal/fs/vss_windows.go",
+   "kind": "calls",
+   "start": 38874,
+   "name": "iVssBackupComponents.AbortBackup",
+   "target": "internal/fs/vss_windows.go:method:(*IVssBackupComponents).AbortBackup"
+  },
+  {
+   "file": "internal/fs/vss_windows.go",
+   "kind": "calls",
+   "start": 39075,
+   "name": "iVssBackupComponents.GetSnapshotProperties",
+   "target": "internal/fs/vss_windows.go:method:(*IVssBackupComponents).GetSnapshotProperties"
+  },
+  {
+   "file": "internal/fs/vss_windows.go",
+   "kind": "calls",
+   "start": 40981,
+   "name": "*IVSSAdmin",
+   "target": "internal/fs/vss_windows.go:struct:IVSSAdmin"
+  },
+  {
+   "file": "internal/fs/vss_windows.go",
+   "kind": "calls",
+   "start": 41038,
+   "name": "vssAdmin.QueryProviders",
+   "target": "internal/fs/vss_windows.go:method:(*IVSSAdmin).QueryProviders"
+  },
+  {
+   "file": "internal/fs/vss_windows.go",
+   "kind": "calls",
+   "start": 41256,
+   "name": "enum.Next",
+   "target": "internal/fs/vss_windows.go:method:(*IVssEnumObject).Next"
+  }
+ ],
+ "baseDefiniteLost": 0
+}
