@@ -38,6 +38,11 @@ const stamp = (path: string, stat: BigIntStats) =>
   ].join("\0");
 const MAX_FILE = 4 * 1024 * 1024;
 const CACHE_SIZE = 24 * 1024 * 1024;
+/**
+ * Recorded for a file whose bytes on disk no longer match the bytes this run
+ * used: no lstat stamp equals it, so the next run sees the input as changed.
+ */
+const STALE = "\0stale";
 // Retain text, not compiler nodes. An unchanged file can be shared by several
 // programs or by the next index in the same process.
 const textCache = new Map<
@@ -114,6 +119,14 @@ export function changedDependencyInputs(
 export class DependencyInputs {
   private readonly paths: Paths;
   private readonly entries = new Map<string, ContextFile>();
+  /**
+   * The bytes this run used, by installed location: the first read wins for
+   * the whole run, so every program sees the same text (C-22).
+   */
+  private readonly used = new Map<
+    string,
+    { text: string; hash: string; stamp: string; paths: Set<string> }
+  >();
 
   constructor(
     root: string,
@@ -124,7 +137,29 @@ export class DependencyInputs {
 
   refreshed = false;
 
+  /**
+   * Every probed input with the identity of what this run used. A file read
+   * this run whose stamp on disk is no longer the one of the bytes used is
+   * recorded as stale, so the next run analyses it again.
+   */
   records(): ContextFile[] {
+    for (const [location, used] of this.used) {
+      let now = "";
+      try {
+        now = stamp(
+          location,
+          lstatSync(join(this.paths.root, location), { bigint: true }),
+        );
+      } catch {
+        // Gone: no longer what was used.
+      }
+      if (now !== used.stamp)
+        for (const path of used.paths)
+          this.entries.get(path)!.dependency = {
+            module: this.module,
+            stamp: STALE,
+          };
+    }
     return [...this.entries.values()];
   }
 
@@ -196,6 +231,15 @@ export class DependencyInputs {
       location.stat.size > MAX_FILE
     )
       return undefined;
+    const record = this.entries.get(path)!;
+    const used = this.used.get(location.path);
+    if (used) {
+      used.paths.add(path);
+      record.hash = used.hash;
+      record.dependency = { module: this.module, stamp: used.stamp };
+      if (path.endsWith("/package.json")) record.text = used.text;
+      return used.text;
+    }
     const absolute = join(this.paths.root, location.path);
     const mark = stamp(location.path, location.stat);
     let captured = textCache.get(absolute);
@@ -204,7 +248,7 @@ export class DependencyInputs {
       // lstat of the run: a link added by another install sharing the
       // package store changes the inode's ctime, not its bytes, and must not
       // make a present declaration absent (C-22). The stamp recorded is the
-      // one of the bytes read, so a later run still sees any change.
+      // one of the bytes read, taken from the same handle.
       captured = undefined;
       for (let attempt = 0; attempt < 2 && !captured; attempt++)
         try {
@@ -243,10 +287,15 @@ export class DependencyInputs {
         textCache.delete(oldest);
       }
     }
-    const record = this.entries.get(path)!;
     record.hash = captured.hash;
     record.dependency = { module: this.module, stamp: captured.stamp };
     if (path.endsWith("/package.json")) record.text = captured.text;
+    this.used.set(location.path, {
+      text: captured.text,
+      hash: captured.hash,
+      stamp: captured.stamp,
+      paths: new Set([path]),
+    });
     return captured.text;
   }
 }

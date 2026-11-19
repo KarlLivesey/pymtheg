@@ -15,9 +15,15 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { test } from "node:test";
 import { DependencyInputs } from "../dist/graph/dependency-inputs.js";
+import {
+  discoverLanguages,
+  indexProject,
+  SqliteGraphStore,
+} from "../dist/graph/index.js";
+import { compareRows, storeRows } from "../scripts/reindex/dump.mjs";
 
 const fixture = () => {
   const root = mkdtempSync(join(tmpdir(), "c22-dependency-"));
@@ -73,6 +79,93 @@ test("a declaration that is not installed is not read", () => {
     writeFileSync(join(root, "local.d.ts"), "export {};\n");
     assert.equal(inputs.read("local.d.ts"), undefined);
   } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// The review's reproduction: two programs (two tsconfig files) use one
+// installed declaration. Its metadata changes before the run's first read
+// and its bytes after it. Every read in the run must return the same bytes,
+// and the run must leave a record that makes the next re-index look again,
+// so that one more re-index equals a cold index of the tree as it now is.
+test("two programs in one run see the same installed bytes, and the next run catches up", async () => {
+  const root = mkdtempSync(join(tmpdir(), "c22-two-programs-"));
+  const original = DependencyInputs.prototype.read;
+  const kit = "node_modules/kit/index.d.ts";
+  try {
+    const files = {
+      "package.json": JSON.stringify({
+        name: "fixture",
+        private: true,
+        dependencies: { kit: "1.0.0" },
+      }),
+      "node_modules/kit/package.json": JSON.stringify({
+        name: "kit",
+        version: "1.0.0",
+        types: "index.d.ts",
+      }),
+      [kit]:
+        "export declare class Page {\n  locate(): string;\n}\nexport declare function open(): Page;\n",
+      "packages/a/tsconfig.json": JSON.stringify({
+        compilerOptions: { strict: true },
+        include: ["."],
+      }),
+      "packages/a/a.ts": 'import { open } from "kit";\n\nopen().locate();\n',
+      "packages/b/tsconfig.json": JSON.stringify({
+        compilerOptions: { strict: true },
+        include: ["."],
+      }),
+      "packages/b/b.ts": 'import { open } from "kit";\n\nopen().locate();\n',
+    };
+    for (const [path, text] of Object.entries(files)) {
+      mkdirSync(dirname(join(root, path)), { recursive: true });
+      writeFileSync(join(root, path), text);
+    }
+    const registry = await discoverLanguages();
+    const incremental = new SqliteGraphStore(
+      join(root, "..", `${basename(root)}.sqlite`),
+    );
+    const seen = [];
+    let reads = 0;
+    DependencyInputs.prototype.read = function (path) {
+      const first = path === kit && reads++ === 0;
+      if (first) chmodSync(join(root, kit), 0o600);
+      const text = original.call(this, path);
+      if (path === kit) seen.push(text);
+      if (first)
+        writeFileSync(
+          join(root, kit),
+          "export declare class View {\n  locate(): number;\n}\nexport declare function open(): View;\n",
+        );
+      return text;
+    };
+    try {
+      await indexProject(root, registry, incremental);
+    } finally {
+      DependencyInputs.prototype.read = original;
+    }
+    assert.ok(seen.length >= 2, "both programs read the declaration");
+    assert.equal(new Set(seen).size, 1, "one run, one text");
+    // One normal re-index, no edit: equal to a cold index of the tree now.
+    await indexProject(root, registry, incremental);
+    const coldPath = join(root, "..", `${basename(root)}-cold.sqlite`);
+    const cold = new SqliteGraphStore(coldPath, incremental.projectId);
+    try {
+      await indexProject(root, registry, cold);
+    } finally {
+      cold.close();
+    }
+    const incrementalPath = join(root, "..", `${basename(root)}.sqlite`);
+    incremental.close();
+    assert.deepEqual(
+      compareRows(storeRows(incrementalPath), storeRows(coldPath)),
+      [],
+    );
+    for (const path of [incrementalPath, coldPath])
+      for (const suffix of ["", "-wal", "-shm"])
+        rmSync(path + suffix, { force: true });
+  } finally {
+    DependencyInputs.prototype.read = original;
     rmSync(root, { recursive: true, force: true });
   }
 });

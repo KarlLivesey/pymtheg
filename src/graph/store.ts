@@ -857,8 +857,11 @@ export class SqliteGraphStore implements GraphStorage {
   }
   graphCommandState(): unknown {
     try {
+      // An index run that did not finish leaves no complete graph (C-22).
       const row = this.db
-        .prepare("SELECT value FROM graph_meta WHERE key='command-complete'")
+        .prepare(
+          "SELECT value FROM graph_meta WHERE key='command-complete' AND NOT EXISTS(SELECT 1 FROM graph_meta WHERE key='index-run')",
+        )
         .get();
       return row ? JSON.parse(row.value as string) : null;
     } catch {
@@ -870,6 +873,38 @@ export class SqliteGraphStore implements GraphStorage {
     this.db
       .prepare("DELETE FROM graph_meta WHERE key='command-complete'")
       .run();
+  }
+  /**
+   * C-22: whether an index run began writing and did not finish. Its writes
+   * may have replaced some files' records and not others.
+   */
+  unfinishedIndexRun(): boolean {
+    return !!this.db
+      .prepare("SELECT 1 FROM graph_meta WHERE key='index-run'")
+      .get();
+  }
+  /**
+   * Marks an index run as begun, in a commit before the run's first write.
+   * Commits survive a crash only as a prefix, so any write of the run that
+   * survives has the mark with it. Removes the completion record with it.
+   */
+  beginIndexRun(): void {
+    this.transaction(() => {
+      this.db
+        .prepare(
+          "INSERT INTO graph_meta VALUES ('index-run','unfinished') ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+        )
+        .run();
+      this.db
+        .prepare("DELETE FROM graph_meta WHERE key='command-complete'")
+        .run();
+    });
+  }
+  /** Clears the mark, in the run's last commit. */
+  finishIndexRun(): void {
+    this.transaction(() => {
+      this.db.prepare("DELETE FROM graph_meta WHERE key='index-run'").run();
+    });
   }
   commandDataVersion(): number {
     return Number(this.db.prepare("PRAGMA data_version").get()!.data_version);

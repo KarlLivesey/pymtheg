@@ -133,6 +133,10 @@ export async function indexProject(
   // Storage reads are deliberately outside all source/module error catches, before any writes.
   const oldFiles = await stage("index.previous", () => summaries(store));
   const oldContexts = await stage("index.previous", () => store.contexts());
+  // A run that began writing and did not finish may have replaced some
+  // files' records and not others, while each still matches its source hash:
+  // nothing it touched can be trusted as unchanged (C-22).
+  const unfinished = (await store.unfinishedIndexRun?.()) === true;
   const claims = new Map<string, LanguageModule>();
   // Only what the cache check needs: never every previous record at once.
   const previous = new Map<string, Previous | undefined>();
@@ -220,8 +224,9 @@ export async function indexProject(
   ]
     .filter(
       (path) =>
+        unfinished ||
         JSON.stringify(oldContextByPath.get(path)) !==
-        JSON.stringify(contextByPath.get(path)),
+          JSON.stringify(contextByPath.get(path)),
     )
     .sort(compare);
   const updates: GraphFile[] = [];
@@ -269,6 +274,11 @@ export async function indexProject(
     });
     changed.add(path);
   }
+  // After an unfinished run every claimed file counts as changed, so no
+  // module reuses an earlier analysis; parse results stay valid per hash.
+  if (unfinished) for (const path of claims.keys()) changed.add(path);
+  // Marked before the first write, cleared by the last one.
+  await store.beginIndexRun?.();
   await stage("store.writeParsed", async () => {
     await store.replaceContexts([
       ...contexts,
@@ -518,6 +528,7 @@ export async function indexProject(
   // The modules that own at least one stored file, after analysis.
   const modules = new Set((await summaries(store)).map((file) => file.module));
   for (const module of registry.modules) await resolveModule(module);
+  await store.finishIndexRun?.();
   return await stage("index.report", () =>
     finishReport(store, report, contexts),
   );

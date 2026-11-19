@@ -5,12 +5,7 @@ export interface SourceRange {
   end: number;
 }
 export type Json =
-  | null
-  | boolean
-  | number
-  | string
-  | Json[]
-  | { [key: string]: Json };
+  null | boolean | number | string | Json[] | { [key: string]: Json };
 export type ParseStatus = "clean" | "partial" | "failed";
 export interface Diagnostic {
   message: string;
@@ -325,6 +320,14 @@ export interface GraphStorage {
   replaceContexts(files: readonly ContextFile[]): StorageResult<void>;
   /** Optional capability for backends predating failed-parse caching. */
   isParseFailure?(path: string): StorageResult<boolean>;
+  /**
+   * Optional (C-22): an index run marks the store before its first write
+   * and clears the mark with its last. A mark found at the start means the
+   * previous run did not finish; no stored analysis is then reused.
+   */
+  unfinishedIndexRun?(): StorageResult<boolean>;
+  beginIndexRun?(): StorageResult<void>;
+  finishIndexRun?(): StorageResult<void>;
   failedFiles?(): StorageResult<FailedFile[]>;
   /** parseFailure distinguishes cacheable parser failures from retryable project failures. */
   replaceFile(file: GraphFile, parseFailure?: boolean): StorageResult<void>;
