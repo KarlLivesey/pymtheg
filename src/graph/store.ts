@@ -594,6 +594,12 @@ export class SqliteGraphStore implements GraphStorage {
     const byId = new Map(current.map((link) => [link.id, link]));
     for (const link of desired) {
       const before = byId.get(link.id);
+      // An unresolved link has no target rows. The library insert triggers
+      // the class update, so there are no old relationships to clear.
+      if (before?.resolution === "unresolved" && link.resolution === "library") {
+        this.insertLibraries(link, sql);
+        continue;
+      }
       if (
         before?.targetId === link.targetId &&
         JSON.stringify(before.candidates.map((item) => item.id)) ===
