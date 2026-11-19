@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 import type { DatabaseSync, StatementSync } from "node:sqlite";
-import { openDatabase } from "../storage/local.js";
+import {
+  closeWriteAheadLog,
+  openDatabase,
+  openWriteAheadLog,
+} from "../storage/local.js";
 import { randomUUID } from "node:crypto";
 import { compare, fileFacts, validateResult } from "./identity.js";
 import { LinkDecider, resolutionFacts } from "./analysis.js";
@@ -30,6 +34,29 @@ export class SqliteGraphStore implements GraphStorage {
    * The planner does not choose the index on its own, so link reads name it.
    * Read-only opens of a graph written before the index existed keep the plain plan. */
   private fileStatusIndex = "";
+  /** This writable connection uses a write-ahead log (see openWriteAheadLog). */
+  private writeAheadLog = false;
+  /** A writable connection's file, until its first graph write chooses the journal. */
+  private path: string | undefined;
+  /** A SQLite version a test supplies instead of the engine's own. */
+  private readonly sqliteVersion: string | undefined;
+  /**
+   * Before the first graph write: commits without a sync on a local disk
+   * (C-6). Trust comes only from the completion record: every write after it
+   * deletes it (the triggers made at open) and it is written last, with a full sync.
+   * A store cut short is some prefix of its commits, so it is either the
+   * previous completed state or reports incomplete; the next run repairs it.
+   * Chosen at the first write, not at open: a query that writes nothing
+   * leaves the file's bytes and journal mode as they were.
+   */
+  private beforeWrite(): void {
+    if (this.path === undefined || this.db.isTransaction) return;
+    this.writeAheadLog =
+      this.sqliteVersion === undefined
+        ? openWriteAheadLog(this.db, this.path)
+        : openWriteAheadLog(this.db, this.path, this.sqliteVersion);
+    this.path = undefined;
+  }
   /**
    * Known to have library targets (schema 4). A graph never returns to
    * schema 3, so once true it stays true; a writable store migrates on open.
@@ -84,8 +111,9 @@ export class SqliteGraphStore implements GraphStorage {
   constructor(
     path: string,
     projectId?: string,
-    options: { readOnly?: boolean } = {},
+    options: { readOnly?: boolean; sqliteVersion?: string } = {},
   ) {
+    this.sqliteVersion = options.sqliteVersion;
     this.db = openDatabase(path, { readOnly: options.readOnly ?? false });
     try {
       if (options.readOnly) {
@@ -110,6 +138,7 @@ export class SqliteGraphStore implements GraphStorage {
         this.libraryKnown = schema === "4";
         return;
       }
+      this.path = path;
       this.db.exec(`PRAGMA foreign_keys=ON;
         CREATE TABLE IF NOT EXISTS graph_meta(key TEXT PRIMARY KEY,value TEXT NOT NULL);`);
       this.db
@@ -218,6 +247,7 @@ export class SqliteGraphStore implements GraphStorage {
     };
   }
   private transaction(action: () => void): void {
+    this.beforeWrite();
     this.db.exec("BEGIN IMMEDIATE");
     try {
       action();
@@ -436,6 +466,7 @@ export class SqliteGraphStore implements GraphStorage {
       );
   }
   removeFile(path: string): void {
+    this.beforeWrite();
     this.db.prepare("DELETE FROM graph_files WHERE path=?").run(path);
   }
   findSymbols(query: SymbolQuery = {}): GraphSymbol[] {
@@ -750,6 +781,7 @@ export class SqliteGraphStore implements GraphStorage {
     }
   }
   invalidateGraphCommandState(): void {
+    this.beforeWrite();
     this.db
       .prepare("DELETE FROM graph_meta WHERE key='command-complete'")
       .run();
@@ -758,21 +790,32 @@ export class SqliteGraphStore implements GraphStorage {
     return Number(this.db.prepare("PRAGMA data_version").get()!.data_version);
   }
   completeGraphCommandState(state: unknown, expectedVersion?: number): boolean {
+    this.beforeWrite();
     let written = false;
-    // Lock publication so another connection cannot commit between validation and publication.
-    this.transaction(() => {
-      if (
-        expectedVersion !== undefined &&
-        this.commandDataVersion() !== expectedVersion
-      )
-        return;
-      this.db
-        .prepare(
-          "INSERT INTO graph_meta VALUES ('command-complete',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+    // The completion record is durable when this returns: its commit is
+    // synced, and with it every earlier commit in the log.
+    const sync = Number(
+      this.db.prepare("PRAGMA synchronous").get()!.synchronous,
+    );
+    this.db.exec("PRAGMA synchronous=FULL");
+    try {
+      // Lock publication so another connection cannot commit between validation and publication.
+      this.transaction(() => {
+        if (
+          expectedVersion !== undefined &&
+          this.commandDataVersion() !== expectedVersion
         )
-        .run(JSON.stringify(state));
-      written = true;
-    });
+          return;
+        this.db
+          .prepare(
+            "INSERT INTO graph_meta VALUES ('command-complete',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+          )
+          .run(JSON.stringify(state));
+        written = true;
+      });
+    } finally {
+      this.db.exec(`PRAGMA synchronous=${sync}`);
+    }
     return written;
   }
   /** Command preflight reads metadata without returning source text or parse facts. */
@@ -981,7 +1024,13 @@ export class SqliteGraphStore implements GraphStorage {
       yield this.selectLinks("l.id=?", [row.id as string])[0]!;
   }
   close(): void {
-    this.db.close();
+    try {
+      // The last connection checkpoints the log into the database (synced)
+      // and the store is left with a rollback journal, as at rest before C-6.
+      if (this.writeAheadLog && this.db.isOpen) closeWriteAheadLog(this.db);
+    } finally {
+      this.db.close();
+    }
   }
 }
 
