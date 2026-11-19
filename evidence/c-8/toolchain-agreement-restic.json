@@ -143,6 +143,20 @@
    "start": 40981,
    "name": "*IVSSAdmin",
    "target": "internal/fs/vss_windows.go:struct:IVSSAdmin"
+  },
+  {
+   "file": "internal/fs/vss_windows.go",
+   "kind": "calls",
+   "start": 41038,
+   "name": "vssAdmin.QueryProviders",
+   "target": "internal/fs/vss_windows.go:method:(*IVSSAdmin).QueryProviders"
+  },
+  {
+   "file": "internal/fs/vss_windows.go",
+   "kind": "calls",
+   "start": 41256,
+   "name": "enum.Next",
+   "target": "internal/fs/vss_windows.go:method:(*IVssEnumObject).Next"
   }
  ],
  "baseDefiniteLost": 0

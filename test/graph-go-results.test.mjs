@@ -163,6 +163,36 @@ test("gopls: a nested module joined by `replace … => ..` resolves the parent m
   );
 });
 
+test("bubbletea: `replace … => ../` from a nested module names the checkout root", async () => {
+  const { links } = await project({
+    "go.mod": lines("module charm.land/bubbletea/v2", "", "go 1.22"),
+    "tea.go": lines(
+      "package tea",
+      "type Model interface{ Init() }",
+      "func NewProgram() {}",
+    ),
+    "examples/go.mod": lines(
+      "module examples",
+      "",
+      "go 1.22",
+      "",
+      "replace charm.land/bubbletea/v2 => ../",
+      "",
+      "require charm.land/bubbletea/v2 v2.0.2",
+    ),
+    "examples/simple/main.go": lines(
+      "package main",
+      'import tea "charm.land/bubbletea/v2"',
+      "var _ tea.Model",
+      "func main() { tea.NewProgram() }",
+    ),
+  });
+  assert.equal(
+    at(links, "examples/simple/main.go", "tea.NewProgram").target,
+    "tea.go:function:NewProgram",
+  );
+});
+
 test("a replace to a directory outside the checkout, or to a module path, stays outside", async () => {
   const { links } = await project({
     "go.mod": lines(
@@ -360,6 +390,83 @@ test("build variants: a function declared per variant gives each variant's resul
   const any = at(links, "v/any.go", "New().M");
   assert.equal(any.target, null);
   assert.equal(any.data.open.reason, "receiver-type-unknown");
+});
+
+test("cilium: bpf2go loaders declared per byte order, called from their own file, resolve however many tags the constraint names", async () => {
+  const el =
+    "//go:build (386 || amd64 || arm || arm64 || loong64 || mips64le || mipsle || ppc64le || riscv64 || wasm) && linux";
+  const eb = "//go:build (mips || mips64 || ppc64 || s390x) && linux";
+  const loader = (constraint) =>
+    lines(
+      constraint,
+      "",
+      "package kprobe",
+      "type Spec struct{}",
+      "func (s *Spec) LoadAndAssign() error { return nil }",
+      "func loadBpf() (*Spec, error) { return &Spec{}, nil }",
+      "func loadBpfObjects() error {",
+      "	spec, err := loadBpf()",
+      "	if err != nil {",
+      "		return err",
+      "	}",
+      "	return spec.LoadAndAssign()",
+      "}",
+    );
+  const { links } = await project({
+    "go.mod": MOD,
+    "kprobe/bpf_bpfel.go": loader(el),
+    "kprobe/bpf_bpfeb.go": loader(eb),
+  });
+  assert.equal(
+    at(links, "kprobe/bpf_bpfel.go", "spec.LoadAndAssign").target,
+    "kprobe/bpf_bpfel.go:method:(*Spec).LoadAndAssign",
+  );
+  assert.equal(
+    at(links, "kprobe/bpf_bpfeb.go", "spec.LoadAndAssign").target,
+    "kprobe/bpf_bpfeb.go:method:(*Spec).LoadAndAssign",
+  );
+});
+
+test("cilium: loaders declared for every port GOARCH cover an unconstrained caller; linux-only ones do not", async () => {
+  const el =
+    "386 || amd64 || arm || arm64 || loong64 || mips64le || mipsle || ppc64le || riscv64 || wasm";
+  const eb = "mips || mips64 || ppc64 || s390x";
+  const loader = (constraint, pkg) =>
+    lines(
+      `//go:build ${constraint}`,
+      "",
+      `package ${pkg}`,
+      'import "example.com/m/ebpf"',
+      "func load() (*ebpf.CollectionSpec, error) { return nil, nil }",
+    );
+  const caller = (pkg) =>
+    lines(
+      `package ${pkg}`,
+      "func use() {",
+      "	spec, _ := load()",
+      "	_ = spec.Maps",
+      "}",
+    );
+  const { links } = await project({
+    "go.mod": MOD,
+    "ebpf/collection.go": lines(
+      "package ebpf",
+      "type CollectionSpec struct{ Maps map[string]int }",
+    ),
+    // docs/examples/variables: the two lists name every port GOARCH.
+    "variables/variables_bpfel.go": loader(el, "main"),
+    "variables/variables_bpfeb.go": loader(eb, "main"),
+    "variables/main.go": caller("main"),
+    // cmd/bpf2go/test: also `&& linux`; the darwin build has no loader.
+    "test/test_bpfel.go": loader(`(${el}) && linux`, "test"),
+    "test/test_bpfeb.go": loader(`(${eb}) && linux`, "test"),
+    "test/api_test.go": caller("test"),
+  });
+  assert.equal(
+    at(links, "variables/main.go", "spec.Maps").target,
+    "ebpf/collection.go:field:CollectionSpec.Maps",
+  );
+  assert.equal(at(links, "test/api_test.go", "spec.Maps").target, null);
 });
 
 // The two fixtures of evidence/c-8/go-variant-configs.sh, checked with Go

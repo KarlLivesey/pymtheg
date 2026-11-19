@@ -5,7 +5,13 @@
  * line, and `_GOOS`/`_GOARCH` filename suffixes). Nothing here selects one
  * configuration; an expression it cannot read is unknown.
  */
-import { KNOWN_GOARCH, KNOWN_GOOS, type FileFact } from "./model.js";
+import {
+  KNOWN_GOARCH,
+  KNOWN_GOOS,
+  PORT_GOARCH,
+  PORT_GOOS,
+  type FileFact,
+} from "./model.js";
 
 export type Formula =
   | { k: "t" }
@@ -215,19 +221,74 @@ export function implies(a: Formula, b: Formula): boolean | undefined {
 /**
  * Is there an assignment of the named tags, each one free (a GOOS or GOARCH
  * name too: `-tags=freebsd` sets `freebsd` on Linux), in which every formula
- * holds? Every real configuration is such an assignment, so false proves no
- * build has them all. Undefined when there are too many names.
+ * holds, with one of Go's port GOOS values and one of its GOARCH values
+ * true (every build has its own)? Every real configuration is such an
+ * assignment, so false proves no build has them all. A backtracking search
+ * over the names, pruned as soon as a formula is decided; undefined when it
+ * takes more than `MAX_STEPS` steps.
  */
-export function satisfiableAnyTags(formulas: Formula[]): boolean | undefined {
+export function satisfiableAnyTags(given: Formula[]): boolean | undefined {
+  const anyOf = (values: string[]): Formula =>
+    values
+      .map((n): Formula => ({ k: "v", n }))
+      .reduce((a, b) => ({ k: "or", a, b }));
+  const formulas = [...given, anyOf(PORT_GOOS), anyOf(PORT_GOARCH)];
   const all = [
     ...formulas.reduce((out, f) => names(f, out), new Set<string>()),
   ];
-  if (all.length > MAX_ANY_TAGS) return undefined;
-  for (let bits = 0; bits < 1 << all.length; bits++) {
-    const tags = new Set(all.filter((_, index) => bits & (1 << index)));
-    if (formulas.every((formula) => evaluate(formula, tags))) return true;
-  }
-  return false;
+  const value = new Map<string, boolean>();
+  // Three-valued: undefined while a name it needs is not assigned.
+  const partial = (formula: Formula): boolean | undefined => {
+    switch (formula.k) {
+      case "t":
+        return true;
+      case "v":
+        return value.get(formula.n);
+      case "not": {
+        const inner = partial(formula.x);
+        return inner === undefined ? undefined : !inner;
+      }
+      case "and": {
+        const a = partial(formula.a);
+        if (a === false) return false;
+        const b = partial(formula.b);
+        if (b === false) return false;
+        return a && b ? true : undefined;
+      }
+      case "or": {
+        const a = partial(formula.a);
+        if (a === true) return true;
+        const b = partial(formula.b);
+        if (b === true) return true;
+        return a === false && b === false ? false : undefined;
+      }
+    }
+  };
+  let steps = 0;
+  const search = (at: number): boolean | undefined => {
+    if (++steps > MAX_STEPS) return undefined;
+    let open = false;
+    for (const formula of formulas) {
+      const known = partial(formula);
+      if (known === false) return false;
+      if (known === undefined) open = true;
+    }
+    if (!open) return true;
+    const name = all[at]!;
+    let unknown = false;
+    for (const choice of [true, false]) {
+      value.set(name, choice);
+      const found = search(at + 1);
+      if (found) {
+        value.delete(name);
+        return true;
+      }
+      if (found === undefined) unknown = true;
+    }
+    value.delete(name);
+    return unknown ? undefined : false;
+  };
+  return search(0);
 }
-/** Above this many names `satisfiableAnyTags` is not computed (unknown). */
-const MAX_ANY_TAGS = 14;
+/** Above this many search steps `satisfiableAnyTags` is not computed (unknown). */
+const MAX_STEPS = 1 << 16;

@@ -80,7 +80,7 @@ const add = (bucket, key, n = 1) => (bucket[key] = (bucket[key] ?? 0) + n);
 const pool = [];
 for (const [id, cand] of [...candidate].sort()) {
   const was = base.get(id);
-  if (!was) continue;
+  if (!was || was.outcome !== "finished" || cand.outcome !== "finished") continue;
   const { links: before, keys: keysBefore } = load(was);
   const { links: after, keys: keysAfter } = load(cand);
   // Every symbol of the base graph keeps its identity (0.1.0 anchors).

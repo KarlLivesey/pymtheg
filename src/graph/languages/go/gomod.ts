@@ -72,10 +72,13 @@ export function joinDirectory(
   base: string,
   relative: string,
 ): string | undefined {
-  const joined = posix.normalize(posix.join(base || ".", relative));
+  // `examples/../` normalizes to `./`: the project root, "" like `.`.
+  const joined = posix
+    .normalize(posix.join(base || ".", relative))
+    .replace(/(.)\/$/, "$1");
   if (joined === ".." || joined.startsWith("../") || posix.isAbsolute(joined))
     return undefined;
-  return joined === "." ? "" : joined.replace(/\/$/, "");
+  return joined === "." ? "" : joined;
 }
 /** `directory` is `root` or below it. */
 export const within = (directory: string, root: string): boolean =>

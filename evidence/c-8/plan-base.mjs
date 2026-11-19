@@ -21,7 +21,8 @@ const read = (path) => {
   const bytes = readFileSync(path);
   return JSON.parse((path.endsWith(".gz") ? gunzipSync(bytes) : bytes).toString("utf8"));
 };
-let merged = read(values.into);
+// The starting input's own fields (release, mode) are kept; only records change.
+const merged = read(values.into);
 const repos = new Map(merged.repos.map((row) => [row.id, row]));
 for (const path of values.overlay ?? []) {
   const overlay = read(path);
@@ -30,7 +31,6 @@ for (const path of values.overlay ?? []) {
     if (previous && previous.commit !== row.commit) throw Error(`Overlay does not match ${row.id}`);
     repos.set(row.id, row);
   }
-  merged = { ...overlay, repos: [] };
 }
 const ids = [...repos.keys()].sort();
 writeFileSync(values.output, JSON.stringify({ ...merged, repos: ids.map((id) => repos.get(id)) }));
