@@ -16,7 +16,8 @@ for checkout in "$@"; do
     git -c advice.detachedHead=false clone -q --no-hardlinks "$checkout" "$dir"
     root=$([ "$build" = main ] && echo "$main" || echo "$branch")
     (cd "$dir" && node "$root/dist/cli/main.js" init . --name cost --format json > /dev/null)
-    stats=$(cd "$dir" && /usr/bin/time -f "%e %U %M" node "$root/dist/cli/main.js" graph index --root . --json 2>&1 > /dev/null | tail -1 || true)
+    (cd "$dir" && /usr/bin/time -o "$dir.time" -f "%e %U %M" node "$root/dist/cli/main.js" graph index --root . --json > /dev/null 2>&1 || true)
+    stats=$(tail -1 "$dir.time")
     echo "$(basename "$(dirname "$(dirname "$(dirname "$checkout")")")") $build $stats"
   done
 done

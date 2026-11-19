@@ -21,14 +21,35 @@ only to bound what a failed file can withhold (not committed).
   build.
 - [`audit.md`](audit.md), [`audit-sample.json`](audit-sample.json): the hand
   audit.
-- [`merge-exports.mjs`](merge-exports.mjs), [`plan.mjs`](plan.mjs): join
-  the `coverage-export.mjs` outputs of one build and regenerate only the
-  plan's Rust section; [`coverage-plan-input.json.gz`](coverage-plan-input.json.gz)
-  is the Rust input it wrote for this branch. `plan.mjs` with C-10's input
-  reproduces main's Rust section byte for byte.
+- [`merge-exports.mjs`](merge-exports.mjs): joins `coverage-export.mjs`
+  outputs of one build (first round).
+- [`plan.mjs`](plan.mjs): puts an export's rows into the committed Rust plan
+  input, `sweep/plan-input.json.gz` (C-12's archive; main's archive
+  reproduces main's plan byte for byte). The committed archive is this
+  branch's; the plan's Rust section comes from
+  `coverage.mjs --results sweep/plan-input.json.gz --rust-section`.
+- [`compare-summary-review.json`](compare-summary-review.json): the review
+  round, current main against the merged branch.
 - [`cost.sh`](cost.sh): the cost observation.
 - [`embassy-main-twice.json`](embassy-main-twice.json): two runs of main on
   embassy, compared.
+
+## Review round (final figures)
+
+Main `450d6be` (C-12; C-16 after it changed no Rust code) and the merged
+branch, both built from source on memory-backed scratch, on the five
+repositories with failed Rust files. Every stored link compared: all
+310,479 definite links kept, symbol keys, sites, candidates and library
+rows identical, no outcome change. Failed-file reason 308,770 → 143,724
+(165,046 dropped, none added). Plan row 268,557 → 113,243; Rust Level 2
+in the regenerated section 43.65% on both builds (main's committed 36.90%
+takes turborepo's rows from the release 0.1.0 comparison base; with only
+the four Rust pins replaced both builds give 36.90%). Rust tests 1,190
+pass, sweep tests 21 pass, full suite 3,109 pass, build, type check and
+format check pass. Cost is in the change note: alacritty +0.6% and rustls
+−6.3% user CPU against the mean of two main runs.
+
+The sections below are the first round, against main `5ec4baa`.
 
 ## Runs
 
