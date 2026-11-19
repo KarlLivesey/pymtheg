@@ -2889,3 +2889,25 @@ over inferred workspace links. A captured competing test type request is
 settled by the checker's declarations for the selected symbol. The C-16 guard
 still covers missing requests made by checkout code or its compiler config.
 Installed declarations contribute only via the checker. [C-20](changes/C-20.md)
+
+### Re-index cost is measured by operation counts; one read per module write (C-22)
+
+**Decided (C-22):** re-index speed is judged by deterministic work counts
+(files hashed, parsed and extracted, programs built, links presented to a
+resolver, links compared, rows written, records decoded, SQL statements),
+recorded by observation-only counters in `src/graph/work.ts`; timings on the
+shared dev server are observations. A sound incremental index must leave the
+store identical, row for row, to a cold index of the same tree (same project
+id); `test/graph-reindex-equality.test.mjs` and `scripts/reindex/` check that.
+The resolve phase now reads a module's links once after its resolver returns
+and the store writes from that validated result (`writeAnalysis`), where it
+read them three times and derived the result twice; the resolver's own input
+reads only the parsed link records it receives unresolved, and analysis reads
+only its own module's files. **Why:** these reads were the largest
+repository-proportional cost of a Go or Rust one-file edit that could be removed
+without changing what any phase computes. **Trade:** the store's write trusts
+that `desired` came from `resolutionFacts` over the `current` it is given; the
+indexer is the only caller. **Not done:** language analysis is still
+whole-program on every run (TypeScript rebuilds every program; Go and Rust
+resolve the whole project twice); the change note sketches what an
+edit-proportional route needs. [C-22](changes/C-22.md)

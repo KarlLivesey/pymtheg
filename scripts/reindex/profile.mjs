@@ -20,7 +20,7 @@ for (let i = 0; i < profile.samples.length; i++)
   );
 const label = (node) => {
   const frame = node.callFrame;
-  const url = frame.url.replace(/^.*\/(dist|node_modules)\//, "$1/");
+  const url = frame.url.replace(/^.*\/(dist|node_modules|scripts)\//, "$1/").replace(/^file:\/\/.*\//, "");
   return `${frame.functionName || "(anonymous)"} ${url}:${frame.lineNumber + 1}`;
 };
 const bySelf = new Map();

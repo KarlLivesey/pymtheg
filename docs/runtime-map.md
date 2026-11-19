@@ -1474,7 +1474,14 @@ hash, module and version), `analyze` over the whole snapshot on every run, and
 `resolve` over all symbols and files and this module's parsed links, decoded
 afresh from storage for each module (independent records, nothing kept between
 modules), plus a deep copy of the context files. The store caches no decoded
-file records (C-2). `failedFiles()` reads the failed source
+file records (C-2). `analyze` receives only its own module's records. The
+resolver's links are read as it receives them (unresolved), without their
+previous target, candidate or library rows; after it returns, the module's
+links are read once, validated with `resolutionFacts`, and the store writes
+from that validated result (`writeAnalysis`) instead of reading and deriving
+it again (C-22). Observation-only work counters and stage times
+(`src/graph/work.ts`) record each stage's operations; nothing reads them to
+decide anything. `failedFiles()` reads the failed source
 files back; derived links are compared and written per row. Results are validated before any write;
 module exceptions are reported in `errors`, `analysisErrors` or
 `resolutionErrors` and leave earlier valid facts in place; storage failures
