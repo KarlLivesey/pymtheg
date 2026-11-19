@@ -2937,12 +2937,14 @@ edit-proportional route needs. **Also decided (C-22):** a re-index with no
 edit must store exactly what a cold index stores, bare and with dependencies
 installed. Within one run every read of an installed file returns the
 bytes of its first read, recorded by those bytes' hash and the stamp of the
-handle that read them; a file that no longer has them at the end of the run
-is recorded with a stamp that cannot match, so the next run re-analyses
+handle that read them; whether a file changed is decided by its content,
+the stamp being only the cheap first check; a file whose bytes on disk
+differ at the end of the run is recorded with a stamp that cannot match, so
+the next run re-analyses
 (another install hard-linking the same pnpm store file changed its ctime and
 made it absent, so a warm sweep index lost `expect-type` declarations; a
 first fix let two programs of one run see different bytes). An index run
-marks the store before its first write and clears the mark in its last
+marks the store in its first write's commit and clears the mark in its last
 commit; a run that finds the mark reuses no stored analysis, and the graph
 is not complete while it is set. **Trade:** after a crash or kill the next
 index re-analyses every module in full once (today's cost of a changed

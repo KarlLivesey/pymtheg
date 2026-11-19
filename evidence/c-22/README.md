@@ -13,6 +13,8 @@ stores are kept here.
 | `same-cold/<pin>.json` | a cold index of each pin by the before and the after build into stores with the same project id: row counts and differences (none) |
 | `no-edit/<case>.json` | re-index with no edit: two warm stores and a second cold store, each compared with the first cold store (trpc bare and installed, before and after the fix; hono installed; restic and ripgrep bare) |
 | `installed-race/churn-main-code.json`, `churn-fixed.json` | trpc installed: a warm re-index while another hard link to each `expect-type` declaration is added and removed (inode metadata only), compared with the cold store, on main's `dependency-inputs` code and with the fix |
+| `final/<pin>.summary.json` | the six pins re-measured on the final build after both reviews (counts identical to `after/` except SQL statements: the run mark) |
+| `final/noedit.trpc-installed.json`, `final/churn.trpc.json`, `final/same-cold-main.*.json` | final build: trpc installed no-edit equality, hard-link churn on every `expect-type` declaration during a warm re-index (only 14 observed stamps differ), and cold equals main row for row on restic and hono |
 | `cold-cost.json` | cold-index time and peak memory, main and after alternating, one run at a time |
 | `profiles/body-edit.*.txt` | CPU profile summaries (main thread) of the two slowest edits, trpc and cli/cli body edits, before and after |
 

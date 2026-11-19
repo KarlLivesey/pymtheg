@@ -1628,17 +1628,20 @@ files under the checkout's `node_modules` on demand. The dependency inputs
 are recorded as module-owned context, so the version validator accepts an
 installed `package.json` whose text was captured. Installed implementations
 and network access are outside this path. Within one run every read of an
-installed file returns the bytes of its first read, checked against the
-reading handle; the record holds those bytes' content hash and the stamp
-(device, inode, mode, size, mtime, ctime) from that same handle. A link
-added by another install sharing the package store therefore does not make
-a present file absent. At the end of the run a file whose stamp on disk is
-no longer that of the bytes used is recorded with a stamp no file can have,
-so the next run analyses it again (C-22).
+installed file returns the bytes of its first read; the record holds those
+bytes' content hash and the stamp (device, inode, mode, size, mtime, ctime)
+from the reading handle. A change is decided by content: a stamp that moves
+during a read or between runs leads to a re-hash, and the same bytes count
+as unchanged (between runs the record takes the stamp the file now has), so
+a link added by another install sharing the package store never makes a
+present file absent. A file read this run whose bytes on disk differ at the
+end of the run is recorded with a stamp no file can have, so the next run
+analyses it again (C-22).
 
 **Unfinished runs (C-22).** `indexProject` marks the store (`graph_meta`
-`index-run`) in a commit before its first write, together with removing the
-completion record, and clears the mark in its last commit. Commits survive a
+`index-run`) in the same commit as its first write, together with removing
+the completion record, and clears the mark in its last commit; a run that
+writes nothing writes no mark. Commits survive a
 crash only as a prefix, so any surviving write of a run has the mark with
 it. A run that finds the mark counts every claimed file and every context
 file as changed, so no module reuses stored analysis; parse results stay
