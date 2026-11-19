@@ -2,6 +2,7 @@ pub mod aliases;
 pub mod builder;
 pub mod db;
 pub mod negative;
+pub mod variant;
 
 pub struct Inner {
     count: u32,

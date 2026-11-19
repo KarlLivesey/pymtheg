@@ -391,6 +391,26 @@ test("review: aliases keep reference depth and parameter defaults", async () => 
   assert.equal(get?.file, file);
 });
 
+test("review: struct-literal variants, unit values and library-type notes", async () => {
+  const g = await graph("receivers");
+  const file = "src/variant.rs";
+  // `use super::E::V`: the literal is the variant, so `V::m` is wrong.
+  for (const marker of ["e.m()", "V { x: 2 }.m()"]) {
+    assert.equal(g.target(g.call(file, marker, "m")), undefined, marker);
+  }
+  // A path to the struct still types the literal.
+  const own = g.target(g.call(file, "s.m()", "m"));
+  assert.equal(own?.name, "m");
+  // A unit struct used as a value types the binding.
+  assert.equal(g.target(g.call(file, "a.size()", "size"))?.name, "size");
+  // A generic parameter is not recorded as a library receiver type.
+  const generic = g.call(file, "u.clone()", "clone");
+  assert.equal(generic.data.receiverTyping?.outside, undefined);
+  // A standard type still is.
+  const text = g.call("src/lib.rs", "literal.name.clone()", "clone");
+  assert.deepEqual(text.data.receiverTyping, { outside: "String" });
+});
+
 test("review: macro patterns and generic parameter namespaces", async () => {
   const g = await graph("locals");
   const file = "src/lib.rs";
@@ -412,6 +432,10 @@ test("review: macro patterns and generic parameter namespaces", async () => {
   const typ = g.at(file, "types", "N", "-> N {");
   assert.notEqual(g.target(typ)?.name, "typ");
   assert.equal(typ.data.typeParameter, undefined);
+  // A block-level const shadows a const parameter of the same name.
+  const shadowed = g.at(file, "values", "M", "= M;");
+  assert.notEqual(g.target(shadowed)?.name, "shadowed");
+  assert.equal(shadowed.data.typeParameter, undefined);
   // Each namespace still finds its own parameter.
   assert.equal(g.target(g.at(file, "values", "N", "[0; N]")).name, "sized");
   assert.equal(g.target(g.at(file, "types", "U", "-> U {")).name, "ident");

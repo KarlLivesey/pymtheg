@@ -1215,7 +1215,26 @@ async function createHelper(): Promise<Helper> {
           )
           .flatMap(patternNames);
       }
+      // C-10: references at one node ask the same question more than once.
+      const bindingAnswers = new Map<
+        string,
+        ReturnType<typeof bindingsUncached>
+      >();
       function bindings(
+        root: Node,
+        at: Node,
+        name: string,
+        conservative = false,
+      ): ReturnType<typeof bindingsUncached> {
+        const key = `${root.id}|${at.id}|${compact(name)}|${conservative}`;
+        let answer = bindingAnswers.get(key);
+        if (!answer) {
+          answer = bindingsUncached(root, at, name, conservative);
+          bindingAnswers.set(key, answer);
+        }
+        return answer;
+      }
+      function bindingsUncached(
         root: Node,
         at: Node,
         name: string,
@@ -1642,6 +1661,28 @@ async function createHelper(): Promise<Helper> {
         }
         return false;
       }
+      // C-10: whether a macro statement sits in a block around `at`; only
+      // then can the conservative binding facts differ from the others.
+      const macroBlocks = new Map<number, boolean>();
+      function macroAround(at: Node, fn: Node): boolean {
+        for (let a: Node | null = at.parent; a; a = a.parent) {
+          if (a.type === "block") {
+            let found = macroBlocks.get(a.id);
+            if (found === undefined) {
+              found = a.namedChildren.some(
+                (c) =>
+                  c.type === "macro_invocation" ||
+                  (c.type === "expression_statement" &&
+                    c.namedChildren.some((x) => x.type === "macro_invocation")),
+              );
+              macroBlocks.set(a.id, found);
+            }
+            if (found) return true;
+          }
+          if (a.id === fn.id) break;
+        }
+        return false;
+      }
       /**
        * C-10: a reference whose head is a plain local binding or parameter of
        * the enclosing function. The reference targets that function, with the
@@ -1680,7 +1721,26 @@ async function createHelper(): Promise<Helper> {
           x = b.binding;
         if (!x?.node || x.macro || b.invalidated || b.conditional.has(name))
           return {};
-        const old = bindings(fn, at, name, true);
+        // A block item or import of the same name could make the pattern a
+        // path; the resolver checks only module-level items.
+        for (let a: Node | null = at.parent; a && a.id !== fn.id; a = a.parent)
+          if (
+            a.type === "block" &&
+            a.namedChildren.some(
+              (c) =>
+                c.type === "use_declaration" ||
+                ([
+                  "const_item",
+                  "static_item",
+                  "struct_item",
+                  "enum_item",
+                ].includes(c.type) &&
+                  compact(field(c, "name")?.text ?? "") === name),
+            )
+          )
+            return {};
+        // The conservative binding facts differ only under a macro statement.
+        const old = macroAround(at, fn) ? bindings(fn, at, name, true) : b;
         const stable =
           old.binding?.node?.id === x.node.id &&
           !old.invalidated &&
@@ -1733,6 +1793,10 @@ async function createHelper(): Promise<Helper> {
                   "union_item",
                   "type_item",
                   "trait_item",
+                  // Value items shadow a const parameter of the same name.
+                  "const_item",
+                  "static_item",
+                  "function_item",
                 ].includes(c.type) &&
                   compact(field(c, "name")?.text ?? "") === name),
             )
@@ -1852,6 +1916,16 @@ async function createHelper(): Promise<Helper> {
             const name = compact(n.text);
             const b = bindings(fn, n, name, conservative),
               x = b.binding;
+            // A capitalised name that is no local may be a unit struct value
+            // (`let a = A;`); a block-level item that shadows a parameter is not
+            // typed this way.
+            if (
+              /^[A-Z]/.test(name) &&
+              !b.blocked.has(name) &&
+              !b.invalidated &&
+              !genericShadow(n, name)
+            )
+              return { k: "u", p: name, s: sc };
             if (!b.blocked.has(name) || !x) return gap("non-local-value");
             if (!x.node || x.macro || b.invalidated || b.conditional.has(name))
               return gap("binding-unproved");
@@ -2010,6 +2084,17 @@ async function createHelper(): Promise<Helper> {
             return gap(n.type.replace(/_expression$/, ""));
         }
       }
+      /** Stored recipes omit empty fields; the resolver reads them as empty. */
+      function trimRecipe(r: Recipe): Recipe {
+        const out: Recipe = {};
+        for (const [k, v] of Object.entries(r))
+          if (v !== "")
+            out[k] =
+              k === "e" && v && typeof v === "object"
+                ? trimRecipe(v as Recipe)
+                : v;
+        return out;
+      }
       /** Receiver recipe data for a method call link with no written type. */
       function receiverData(
         receiver: Node,
@@ -2019,9 +2104,12 @@ async function createHelper(): Promise<Helper> {
       ): Record<string, Json> {
         const r = recipe(receiver, fn, scope, impl, false, { nodes: 48 });
         if (r.k === "?") return { receiverGap: String(r.w) };
-        const old = recipe(receiver, fn, scope, impl, true, { nodes: 48 });
+        const old =
+          fn && macroAround(receiver, fn)
+            ? recipe(receiver, fn, scope, impl, true, { nodes: 48 })
+            : r;
         return {
-          receiverExpr: r,
+          receiverExpr: trimRecipe(r),
           ...(JSON.stringify(old) === JSON.stringify(r)
             ? {}
             : { stdFallbackReceiverExprUnknown: true }),
@@ -2671,6 +2759,9 @@ async function createHelper(): Promise<Helper> {
                 blocked:
                   !receiverType ||
                   genericShadow(n, receiverType.split("::")[0]!),
+                ...(receiver.type === "struct_expression"
+                  ? { receiverStructLiteral: true }
+                  : {}),
                 ...(receiverType
                   ? {}
                   : receiverData(receiver, fn, scope, {

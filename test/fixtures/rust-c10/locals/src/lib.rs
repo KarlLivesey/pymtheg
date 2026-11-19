@@ -141,4 +141,12 @@ pub mod namespaces {
     pub fn typ<const N: usize>() -> N {
         N {}
     }
+
+    // A block-level const shadows the const parameter.
+    #[allow(dead_code)]
+    pub fn shadowed<const M: usize>() -> u8 {
+        const M: u8 = 3;
+        let x: u8 = M;
+        x
+    }
 }

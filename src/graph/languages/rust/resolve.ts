@@ -4958,7 +4958,21 @@ export function resolveRust(
    * The traits a type implements outside the checkout's own traits: written
    * impls, derives, and (for an attribute that can generate code) unknown.
    */
+  const outsideCache = new Map<
+    string,
+    { names: Set<string>; unknown: boolean }
+  >();
   function implementedOutside(t: GraphSymbol): {
+    names: Set<string>;
+    unknown: boolean;
+  } {
+    const cached = outsideCache.get(t.id);
+    if (cached) return cached;
+    const answer = implementedOutsideUncached(t);
+    outsideCache.set(t.id, answer);
+    return answer;
+  }
+  function implementedOutsideUncached(t: GraphSymbol): {
     names: Set<string>;
     unknown: boolean;
   } {
@@ -5086,13 +5100,17 @@ export function resolveRust(
   };
   type Typing = Typed | { gap: string };
   const isGap = (t: Typing): t is { gap: string } => "gap" in t;
-  const placeIds = new WeakMap<Place, number>();
-  let placeCount = 0;
-  const placeId = (p: Place) => {
-    let id = placeIds.get(p);
-    if (id === undefined) placeIds.set(p, (id = placeCount++));
-    return id;
-  };
+  // A call site's place is a copy of its module place with the link's
+  // conditions; key it by content so lookups are shared across links.
+  const placeId = (p: Place) =>
+    JSON.stringify([
+      p.crate.root,
+      p.file,
+      p.local,
+      p.scope,
+      p.directory,
+      [...(p.conditions ?? [])].sort(),
+    ]);
   const typingCache = new Map<string, Typing>();
   /** Split one leading reference; a second reference level is not typed. */
   function splitReference(
@@ -5327,7 +5345,8 @@ export function resolveRust(
     return (
       places.length > 0 &&
       places.every((loc) => {
-        const f = find(name, loc, str(d.scope), "value");
+        // Block items are checked by the parser; one lookup per module.
+        const f = find(name, loc, loc.local, "value");
         return (
           f.complete &&
           !f.failedFiles?.length &&
@@ -5344,8 +5363,82 @@ export function resolveRust(
       })
     );
   }
+  /**
+   * C-10: a struct literal's name is looked up where struct-like variants are
+   * visible too (`use E::V; V { x }` is the variant). It types the receiver
+   * only when it names exactly one struct or alias.
+   */
+  function structLiteralType(name: string, loc: Place, scope: string): boolean {
+    const f = find(name, loc, scope, "importType");
+    return (
+      f.complete &&
+      !f.failedFiles?.length &&
+      unique(f.symbols).length === 1 &&
+      (f.symbols[0]!.kind === "struct" || f.symbols[0]!.kind === "type")
+    );
+  }
+  /**
+   * C-10: a receiver type proven to be outside the checkout: a plain path
+   * (no projection, `Self` or generic parameter at its head) that names no
+   * checkout type, struct-like variant or other item.
+   */
+  function outsideType(t: Typed): boolean {
+    const text = withoutLifetimes(t.text);
+    if (
+      !/^(?:::)?[_\p{ID_Start}][_\p{ID_Continue}]*(?:::[_\p{ID_Start}][_\p{ID_Continue}]*)*(?:<[\s\S]*>)?$/u.test(
+        text,
+      ) ||
+      /\bSelf\b|\bas\b/.test(text)
+    )
+      return false;
+    const head = base(text).replace(/^::/, "").split("::")[0]!;
+    if (t.generics.split(",").includes(head)) return false;
+    return (["type", "importType", "value"] as Namespace[]).every((ns) => {
+      const f = find(text, t.loc, t.scope, ns);
+      return f.complete && !f.failedFiles?.length && !f.symbols.length;
+    });
+  }
+  const pathCallCache = new Map<string, Found>();
   /** A path call's callable targets: a value name or an associated item. */
   function pathCallTargets(
+    name: string,
+    selfPath: boolean,
+    scope: string,
+    d: Data,
+    targetName: string,
+    file: string,
+    loc: Place,
+  ): Found {
+    const key = JSON.stringify([
+      placeId(loc),
+      file,
+      scope,
+      name,
+      selfPath,
+      str(d.pathSyntax) || targetName,
+      str(d.implType),
+      str(d.implKey),
+      d.argumentCount ?? null,
+      d.argumentMinimum ?? null,
+      str(d.genericBindings),
+      str(d.pathArgumentSyntax),
+      str(d.implArgumentSyntax),
+    ]);
+    const cached = pathCallCache.get(key);
+    if (cached) return cached;
+    const answer = pathCallTargetsUncached(
+      name,
+      selfPath,
+      scope,
+      d,
+      targetName,
+      file,
+      loc,
+    );
+    pathCallCache.set(key, answer);
+    return answer;
+  }
+  function pathCallTargetsUncached(
     name: string,
     selfPath: boolean,
     scope: string,
@@ -5409,7 +5502,10 @@ export function resolveRust(
     site: { file: string; scope: string },
     depth = 0,
   ): Typing {
-    const key = `${site.file}|${site.scope}|${placeId(loc)}|${JSON.stringify(r)}`;
+    // The call site's scope matters only to an inner method call's autoref
+    // check; other recipes carry their own scopes.
+    const text = JSON.stringify(r);
+    const key = `${site.file}|${text.includes(`"k":"m"`) ? site.scope : ""}|${placeId(loc)}|${text}`;
     const cached = typingCache.get(key);
     if (cached) return cached;
     let result: Typing;
@@ -5422,15 +5518,18 @@ export function resolveRust(
         const ref = splitReference(str(r.t));
         result = !ref
           ? { gap: "reference-to-reference" }
-          : {
-              text: ref.text,
-              loc,
-              scope: str(r.s),
-              generics: str(r.g),
-              borrow: ref.borrow !== "owned" ? ref.borrow : str(r.b) || "owned",
-              mutable: r.mu !== false,
-              syntax: str(r.a),
-            };
+          : r.lit === true && !structLiteralType(ref.text, loc, str(r.s))
+            ? { gap: "struct-literal-owner" }
+            : {
+                text: ref.text,
+                loc,
+                scope: str(r.s),
+                generics: str(r.g),
+                borrow:
+                  ref.borrow !== "owned" ? ref.borrow : str(r.b) || "owned",
+                mutable: r.mu !== false,
+                syntax: str(r.a),
+              };
         break;
       }
       case "p": {
@@ -5459,6 +5558,29 @@ export function resolveRust(
           ),
         );
         result = s ? resultOf(s) : { gap: "callee-unresolved" };
+        break;
+      }
+      case "u": {
+        // A unit struct used as a value; its own declaration types it.
+        const f = find(str(r.p), loc, str(r.s), "value");
+        const s = single(f);
+        const place = s && declarationPlace(s);
+        result =
+          s &&
+          place &&
+          s.kind === "struct" &&
+          data(s).constructorForm === "unit" &&
+          !itemPresence(s).length
+            ? {
+                text: s.name,
+                loc: place,
+                scope: str(data(s).scope),
+                generics: "",
+                borrow: "owned",
+                mutable: true,
+                syntax: "",
+              }
+            : { gap: "non-local-value" };
         break;
       }
       case "m": {
@@ -5957,8 +6079,7 @@ export function resolveRust(
                   },
                 };
               } else {
-                const own = find(t.text, t.loc, t.scope, "type");
-                if (own.complete && !own.symbols.length)
+                if (outsideType(t))
                   note ??= { receiverTyping: { outside: compact(t.text) } };
                 return guard(
                   methods(
@@ -5982,7 +6103,11 @@ export function resolveRust(
             }
             return guard(
               methods(
-                str(d.receiverType),
+                // C-10: a struct literal can name an imported variant.
+                d.receiverStructLiteral &&
+                  !structLiteralType(str(d.receiverType), loc, str(d.typeScope))
+                  ? ""
+                  : str(d.receiverType),
                 str(d.method),
                 loc,
                 str(d.typeScope),

@@ -44,6 +44,19 @@ function load(scratch, repo) {
       list.push(symbols.get(symbol)?.key ?? symbol);
       candidates.set(link, list);
     }
+    // Library targets (graph schema 4): every row, by role and identity.
+    const libraries = new Map();
+    const hasLibraries = db
+      .prepare("SELECT name FROM sqlite_master WHERE name = 'graph_library_targets'")
+      .get();
+    if (hasLibraries)
+      for (const r of db
+        .prepare("SELECT link, role, id, unit, symbol, evidence FROM graph_library_targets")
+        .iterate()) {
+        const list = libraries.get(r.link) ?? [];
+        list.push(JSON.stringify([r.role, r.id, r.unit, r.symbol, r.evidence]));
+        libraries.set(r.link, list);
+      }
     const links = new Map();
     for (const row of db
       .prepare("SELECT id, target, resolution, body FROM graph_links")
@@ -61,6 +74,7 @@ function load(scratch, repo) {
         target: row.target ? (symbols.get(row.target)?.key ?? row.target) : null,
         targetSymbol: row.target ? symbols.get(row.target) : undefined,
         candidates: (candidates.get(row.id) ?? []).sort(),
+        libraries: (libraries.get(row.id) ?? []).sort(),
         data: l.data ?? {},
       });
     }
@@ -116,6 +130,9 @@ for (const [id, b] of base) {
     rust: { before: 0, after: 0, total: 0 },
     receiverGaps: {},
     outsideReceivers: 0,
+    outsideChanged: 0,
+    libraryTargetLinks: 0,
+    libraryTargetsChanged: [],
   };
   for (const [site, l] of before.links) {
     const a = after.links.get(site);
@@ -147,6 +164,17 @@ for (const [id, b] of base) {
       )
         row.ambiguousChanged++;
     }
+    // Library target rows are compared exactly, whatever the outcome.
+    if (l.libraries.length || a.libraries.length) {
+      if (l.libraries.length) row.libraryTargetLinks++;
+      if (JSON.stringify(l.libraries) !== JSON.stringify(a.libraries))
+        row.libraryTargetsChanged.push({ site, before: l.libraries, after: a.libraries });
+    }
+    // A call whose receiver has a proven library type keeps its outcome.
+    if (a.data.receiverTyping?.outside &&
+      (a.resolution !== l.resolution || a.target !== l.target ||
+        JSON.stringify(a.candidates) !== JSON.stringify(l.candidates)))
+      row.outsideChanged++;
     if (l.resolution !== "resolved" && a.resolution === "resolved") {
       const m = mechanism(a);
       row.newDefinite[m] = (row.newDefinite[m] ?? 0) + 1;
@@ -165,6 +193,7 @@ for (const [id, b] of base) {
   for (const site of after.links.keys())
     if (!before.links.has(site)) row.sitesOnlyAfter++;
   row.definiteChanged = row.definiteChanged.slice(0, 50);
+  row.libraryTargetsChanged = row.libraryTargetsChanged.slice(0, 50);
   summary.push(row);
   console.error(id, JSON.stringify({ kept: row.definiteKept, of: row.definiteBefore, changed: row.definiteChanged.length, newDefinite: row.newDefinite }));
 }
