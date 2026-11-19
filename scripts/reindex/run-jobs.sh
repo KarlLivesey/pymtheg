@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
 # Runs scripts/reindex/jobs.txt on the dev server, at most 4 at a time.
 #   scripts/reindex/run-jobs.sh <before dist> <after dist> <main dist> <out root>
 set -u

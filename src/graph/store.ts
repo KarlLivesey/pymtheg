@@ -18,6 +18,7 @@ import type {
   GraphLink,
   GraphSymbol,
   SymbolQuery,
+  ValidatedAnalysis,
   LinkResolution,
   Neighbourhood,
   ResolutionResult,
@@ -706,7 +707,13 @@ export class SqliteGraphStore implements GraphStorage {
         this.writeTargets(current, desired, this.writer()),
       );
   }
-  replaceAnalysis(module: string, result: ResolutionResult): void {
+  replaceAnalysis(
+    module: string,
+    result: ResolutionResult,
+    validated?: ValidatedAnalysis,
+  ): void {
+    if (validated)
+      return this.writeAnalysis(validated.current, validated.desired);
     const current = this.analysisLinks(module);
     const desired = resolutionFacts(
       this.projectId,
@@ -755,12 +762,8 @@ export class SqliteGraphStore implements GraphStorage {
         };
       });
   }
-  /**
-   * Writes one module's resolution: `current` is analysisLinks(module) and
-   * `desired` is resolutionFacts over it, both from the present state. Only
-   * rows that differ are written.
-   */
-  writeAnalysis(
+  /** Writes only the rows of `desired` that differ from `current`. */
+  private writeAnalysis(
     current: readonly GraphLink[],
     desired: readonly GraphLink[],
   ): void {

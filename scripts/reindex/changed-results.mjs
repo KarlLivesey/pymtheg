@@ -26,7 +26,10 @@ const differences = (x, y, path, out) => {
   if (x && y && typeof x === "object" && typeof y === "object") {
     for (const key of new Set([...Object.keys(x), ...Object.keys(y)]))
       differences(x[key], y[key], `${path}.${key}`, out);
-  } else out.push(`${path}: ${JSON.stringify(x)?.slice(0, 120)} → ${JSON.stringify(y)?.slice(0, 120)}`);
+  } else
+    out.push(
+      `${path}: ${JSON.stringify(x)?.slice(0, 120)} → ${JSON.stringify(y)?.slice(0, 120)}`,
+    );
 };
 const changed = [...a.keys()].filter(
   (path) => JSON.stringify(a.get(path)) !== JSON.stringify(b.get(path)),

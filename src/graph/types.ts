@@ -269,6 +269,15 @@ export interface FailedFile {
   reason: string;
   range?: SourceRange;
 }
+/**
+ * One module's resolution as the store writes it, validated from the present
+ * state (C-22): `current` is analysisLinks(module), `desired` is
+ * resolutionFacts over the same links and the present symbols.
+ */
+export interface ValidatedAnalysis {
+  current: readonly GraphLink[];
+  desired: readonly GraphLink[];
+}
 export interface GraphStorage {
   readonly projectId: string;
   /**
@@ -299,19 +308,11 @@ export interface GraphStorage {
    */
   moduleInputLinks?(module: string): StorageResult<GraphLink[]>;
   /**
-   * Optional (C-22), together with writeAnalysis: every link of one module,
-   * parsed and added, as links() reports them.
+   * Optional (C-22): every link of one module, parsed and added, as links()
+   * reports them. With it, the indexer validates once and hands
+   * replaceAnalysis the result (ValidatedAnalysis).
    */
   analysisLinks?(module: string): StorageResult<GraphLink[]>;
-  /**
-   * Optional (C-22): what replaceAnalysis writes, given its two inputs
-   * already computed from the present state: `current` from analysisLinks
-   * and `desired` from resolutionFacts over the same links and symbols.
-   */
-  writeAnalysis?(
-    current: readonly GraphLink[],
-    desired: readonly GraphLink[],
-  ): StorageResult<void>;
   /** Optional row counts; the indexer otherwise counts decoded reads. */
   counts?(): StorageResult<{
     symbols: number;
@@ -336,10 +337,15 @@ export interface GraphStorage {
   unresolved(): StorageResult<GraphLink[]>;
   ambiguous(): StorageResult<GraphLink[]>;
   resolveLinks(resolutions: readonly LinkResolution[]): StorageResult<void>;
-  /** Atomically replace this module's derived links and all its target decisions. */
+  /**
+   * Atomically replace this module's derived links and all its target
+   * decisions. `validated`, when given, is what the store would derive from
+   * `result` (C-22); a store may ignore it and derive its own.
+   */
   replaceAnalysis(
     module: string,
     result: ResolutionResult,
+    validated?: ValidatedAnalysis,
   ): StorageResult<void>;
   neighbourhood(
     id: string,

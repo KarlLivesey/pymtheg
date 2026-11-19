@@ -13,7 +13,6 @@ import type {
   AnalyzedFile,
   ContextFile,
   GraphFile,
-  GraphLink,
   GraphStorage,
   Json,
   LanguageModule,
@@ -21,6 +20,7 @@ import type {
   ParseResult,
   ResolutionResult,
   ToolchainRequest,
+  ValidatedAnalysis,
 } from "./types.js";
 
 export interface IndexReport {
@@ -441,9 +441,7 @@ export async function indexProject(
     );
     // The validated write, when the store takes one: the links read once
     // for validation are the links the write compares against.
-    let prepared:
-      | { current: readonly GraphLink[]; desired: readonly GraphLink[] }
-      | undefined;
+    let prepared: ValidatedAnalysis | undefined;
     try {
       if (
         ownContexts.some((file) => file.status === "failed") ||
@@ -480,9 +478,9 @@ export async function indexProject(
         for (const file of await read(() => filesAt(store, [...wanted])))
           needed.set(file.path, file);
       const symbols = owns ? await read(() => store.findSymbols()) : [];
-      // Every link of the module when the store can write a validated
+      // Every link of the module when the store can take a validated
       // result; resolutionFacts reads only the parsed ones.
-      const whole = !!(store.analysisLinks && store.writeAnalysis);
+      const whole = !!store.analysisLinks;
       const current = await read(() =>
         whole ? store.analysisLinks!(module.id) : parsedLinks(store, module.id),
       );
@@ -513,7 +511,7 @@ export async function indexProject(
     }
     await stage(`resolve.${module.id}.write`, () =>
       prepared
-        ? store.writeAnalysis!(prepared.current, prepared.desired)
+        ? store.replaceAnalysis(module.id, result, prepared)
         : store.replaceAnalysis(module.id, result),
     );
   };
@@ -589,32 +587,40 @@ async function runResolve(
   // records with itself or with the next module; any other gets a deep copy.
   const own = <T>(value: T): T =>
     store.independentReads === true ? value : structuredClone(value);
-  const input = await stage(`resolve.${module.id}.input`, async () => ({
-    files: own(await read(() => store.files())),
-    symbols: own(await read(() => store.findSymbols())),
-    // Only the parsed link records: their targets are cleared below anyway.
-    links: own(
-      await read(
-        async () =>
-          (await store.moduleInputLinks?.(module.id)) ??
-          (await parsedLinks(store, module.id)),
-      ),
-    ),
-  }));
-  count(`resolve.${module.id}.inputFiles`, input.files.length);
-  count(`resolve.${module.id}.inputSymbols`, input.symbols.length);
-  count(`resolve.${module.id}.inputLinks`, input.links.length);
+  // Each read is staged and counted, and evaluated as an argument: records
+  // held in a named local of this frame outlived the module (C-2 memory test).
+  const input = async <T>(what: string, load: () => Promise<T[]>) =>
+    stage(`resolve.${module.id}.input`, async () => {
+      const list = await load();
+      count(`resolve.${module.id}.input${what}`, list.length);
+      return list;
+    });
   return (
-    (await stage(`resolve.${module.id}`, () =>
+    (await stage(`resolve.${module.id}.withInput`, async () =>
       module.resolve!({
         projectId: store.projectId,
         ...(signal ? { signal } : {}),
-        files: input.files,
+        files: await input("Files", async () =>
+          own(await read(() => store.files())),
+        ),
         contextFiles: structuredClone(contexts),
-        symbols: input.symbols,
+        symbols: await input("Symbols", async () =>
+          own(await read(() => store.findSymbols())),
+        ),
+        // Only the parsed link records: their targets are cleared below anyway.
         // Presented unresolved: no target, candidates or library targets
         // from the previous run.
-        links: input.links.map(({ libraries: _previous, ...link }) => ({
+        links: (
+          await input("Links", async () =>
+            own(
+              await read(
+                async () =>
+                  (await store.moduleInputLinks?.(module.id)) ??
+                  (await parsedLinks(store, module.id)),
+              ),
+            ),
+          )
+        ).map(({ libraries: _previous, ...link }) => ({
           ...link,
           targetId: null,
           targetStatus: null,

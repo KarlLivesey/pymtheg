@@ -36,7 +36,10 @@ export const work = (r) => ({
   sql: r.counts?.["store.sqlStatements"] ?? 0,
 });
 const groups = [
-  ["hash every source (inventory ×2, capture)", (n) => n === "command.inventory" || /^index\.(walk|read|hash)$/.test(n)],
+  [
+    "hash every source (inventory ×2, capture)",
+    (n) => n === "command.inventory" || /^index\.(walk|read|hash)$/.test(n),
+  ],
   ["decode each stored record for its hash", (n) => n === "index.previous"],
   ["parse changed files", (n) => n.startsWith("parse.")],
   ["write parsed files", (n) => n === "store.writeParsed"],
@@ -44,26 +47,51 @@ const groups = [
   ["language analysis", (n) => /^analyze\.[^.]+$/.test(n)],
   ["write changed analysis results", (n) => /^analyze\.[^.]+\.write$/.test(n)],
   ["read resolver input", (n) => /^resolve\.[^.]+\.input$/.test(n)],
-  ["language resolution", (n) => /^resolve\.[^.]+$/.test(n)],
+  // Builds after C-22 stage the resolver call with its input reads
+  // (`.withInput`); the reads are subtracted below.
+  ["language resolution", (n) => /^resolve\.[^.]+(\.withInput)?$/.test(n)],
   ["validate resolution", (n) => /^resolve\.[^.]+\.validate$/.test(n)],
   ["compare and write links", (n) => /^resolve\.[^.]+\.write$/.test(n)],
-  ["report and metadata", (n) => n === "index.report" || n === "command.metadata"],
+  [
+    "report and metadata",
+    (n) => n === "index.report" || n === "command.metadata",
+  ],
 ];
 if (mode === "groups") {
   const [step, after] = rest;
   const cell = (r) => {
     const values = groups.map(([, test]) =>
-      Object.entries(r.stages).filter(([name]) => test(name)).reduce((t, [, v]) => t + v.cpuMs, 0),
+      Object.entries(r.stages)
+        .filter(([name]) => test(name))
+        .reduce((t, [, v]) => t + v.cpuMs, 0),
     );
+    // A `.withInput` stage contains its module's `.input` reads.
+    const resolution = groups.findIndex(
+      ([name]) => name === "language resolution",
+    );
+    for (const name of Object.keys(r.stages))
+      if (name.endsWith(".withInput"))
+        values[resolution] -=
+          r.stages[name.replace(/\.withInput$/, ".input")]?.cpuMs ?? 0;
     return [...values, r.cpuMs - values.reduce((t, v) => t + v, 0), r.cpuMs];
   };
-  console.log(`| stage (CPU s, ${step} edit${after ? ", before → after" : ""}) | ${pins.join(" | ")} |\n|---|${pins.map(() => "--:").join("|")}|`);
+  console.log(
+    `| stage (CPU s, ${step} edit${after ? ", before → after" : ""}) | ${pins.join(" | ")} |\n|---|${pins.map(() => "--:").join("|")}|`,
+  );
   const columns = pins.map((pin) => {
     const x = cell(load(dir, pin).results[step]);
     const y = after ? cell(load(after, pin).results[step]) : undefined;
-    return x.map((v, i) => (y ? `${(v / 1000).toFixed(1)} → ${(y[i] / 1000).toFixed(1)}` : (v / 1000).toFixed(1)));
+    return x.map((v, i) =>
+      y
+        ? `${(v / 1000).toFixed(1)} → ${(y[i] / 1000).toFixed(1)}`
+        : (v / 1000).toFixed(1),
+    );
   });
-  [...groups.map(([name]) => name), "other: validation reads (unstaged), process start, store open, checkpoint", "**total**"].forEach((name, i) =>
+  [
+    ...groups.map(([name]) => name),
+    "other: validation reads (unstaged), process start, store open, checkpoint",
+    "**total**",
+  ].forEach((name, i) =>
     console.log(`| ${name} | ${columns.map((c) => c[i]).join(" | ")} |`),
   );
 } else if (mode === "stages") {

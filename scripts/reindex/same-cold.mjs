@@ -30,7 +30,11 @@ const rows = Object.fromEntries(
 );
 writeFileSync(
   out,
-  JSON.stringify({ root, rows, equal: !differences.length, differences }, null, 1),
+  JSON.stringify(
+    { root, rows, equal: !differences.length, differences },
+    null,
+    1,
+  ),
 );
 console.log(
   `${root}: ${differences.length ? "DIFFERENT " + JSON.stringify(differences).slice(0, 1500) : "identical"} ${JSON.stringify(rows)}`,
