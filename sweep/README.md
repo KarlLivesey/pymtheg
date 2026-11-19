@@ -171,7 +171,7 @@ These estimates prioritise work. They do not add definite score credit.
 
 ### Reproduce the committed plan
 
-Run from the repository root:
+Run this command from the repository root.
 
 ```sh
 node scripts/sweep/coverage.mjs --results sweep/plan-input.json.gz --plan docs/coverage-plan.md

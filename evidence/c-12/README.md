@@ -2,12 +2,12 @@
 
 ## Pinned coverage
 
-The original 18 finished Rust pins completed on both builds. The sweep used
-main `4766795` as the Rust reference and replayed the candidate after merging
-the C-6 SQLite write changes. Both runs used memory-backed storage. The final
+The original 18 finished Rust pins completed on both builds. The final sweep
+compared main `8ca29ac` with the C-10-integrated C-12 build on memory-backed
+storage. Each pair used a project ID derived from the pin and a fixed seed,
+so both indexes visited the same source sites in the same order. The final
 candidate keeps macro-input globs, uncertain item headers, and foreign
-declaration blocks opaque. Its comparison report and audit draw matched the
-previous candidate's byte for byte. [Change note](../../docs/changes/C-12.md)
+declaration blocks opaque. [Change note](../../docs/changes/C-12.md)
 
 Level 2 counts checkout targets and named library targets. Each retry tests
 the proven rule first, so excluding sites with `rust-external-macro-name`
@@ -16,31 +16,35 @@ the same 947,018 sites. The like-for-like and all-site rates are identical.
 
 | Pin | Sites on main | Main L2 | Proven pass | A+B | Assumed checkout | Assumed library |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| BurntSushi/ripgrep | 39,819 | 53.97% | 54.65% | 54.65% | 0 | 1 |
-| DioxusLabs/dioxus | 149,592 | 33.98% | 33.98% | 35.95% | 238 | 2,703 |
-| RustCrypto/hashes | 12,911 | 32.44% | 32.44% | 33.20% | 18 | 80 |
-| actix/actix-web | 86,640 | 29.26% | 29.30% | 32.23% | 309 | 2,233 |
-| alacritty/alacritty | 30,965 | 35.62% | 35.84% | 36.36% | 4 | 159 |
-| cberner/redb | 73,731 | 30.96% | 31.15% | 31.29% | 12 | 90 |
-| clap-rs/clap | 52,417 | 30.08% | 30.14% | 30.21% | 5 | 35 |
-| crossbeam-rs/crossbeam | 34,081 | 34.30% | 34.55% | 34.55% | 0 | 0 |
-| fjall-rs/fjall | 13,361 | 36.80% | 36.80% | 37.56% | 14 | 87 |
-| helix-editor/helix | 90,583 | 33.59% | 33.61% | 35.86% | 700 | 1,341 |
-| ratatui/ratatui | 60,424 | 28.68% | 28.70% | 31.62% | 1,386 | 383 |
-| rust-embedded/cortex-m | 5,531 | 48.89% | 49.00% | 49.14% | 1 | 7 |
-| rust-lang/mdBook | 12,557 | 39.71% | 40.35% | 43.53% | 97 | 302 |
-| rustls/rustls | 69,929 | 22.42% | 22.44% | 22.87% | 36 | 263 |
-| serde-rs/serde | 30,714 | 19.00% | 19.00% | 19.00% | 0 | 0 |
-| tauri-apps/tauri | 88,051 | 35.75% | 35.77% | 39.46% | 501 | 2,745 |
-| tokio-rs/axum | 41,067 | 27.14% | 27.14% | 29.66% | 115 | 920 |
-| tree-sitter/tree-sitter | 54,645 | 30.40% | 30.42% | 34.47% | 187 | 2,024 |
-| **All matched pins** | **947,018** | **32.13%** | **32.21%** | **34.01%** | **3,623** | **13,373** |
+| BurntSushi/ripgrep | 39,819 | 64.74% | 65.42% | 65.43% | 0 | 1 |
+| DioxusLabs/dioxus | 149,592 | 42.18% | 42.18% | 44.15% | 238 | 2,703 |
+| RustCrypto/hashes | 12,911 | 45.28% | 45.28% | 46.04% | 18 | 80 |
+| actix/actix-web | 86,640 | 36.26% | 36.30% | 39.24% | 309 | 2,233 |
+| alacritty/alacritty | 30,965 | 44.73% | 44.95% | 45.47% | 4 | 159 |
+| cberner/redb | 73,731 | 40.99% | 41.18% | 41.32% | 12 | 90 |
+| clap-rs/clap | 52,417 | 35.68% | 35.74% | 35.82% | 5 | 35 |
+| crossbeam-rs/crossbeam | 34,081 | 50.93% | 51.18% | 51.18% | 0 | 0 |
+| fjall-rs/fjall | 13,361 | 44.32% | 44.32% | 45.07% | 14 | 87 |
+| helix-editor/helix | 90,583 | 41.08% | 41.10% | 43.35% | 700 | 1,341 |
+| ratatui/ratatui | 60,424 | 36.25% | 36.26% | 39.19% | 1,386 | 383 |
+| rust-embedded/cortex-m | 5,531 | 54.62% | 54.73% | 54.87% | 1 | 7 |
+| rust-lang/mdBook | 12,557 | 49.15% | 49.80% | 52.97% | 97 | 302 |
+| rustls/rustls | 69,929 | 27.13% | 27.16% | 27.58% | 36 | 263 |
+| serde-rs/serde | 30,714 | 26.96% | 26.96% | 26.96% | 0 | 0 |
+| tauri-apps/tauri | 88,051 | 43.53% | 43.55% | 47.23% | 501 | 2,745 |
+| tokio-rs/axum | 41,067 | 35.19% | 35.20% | 37.72% | 115 | 920 |
+| tree-sitter/tree-sitter | 54,645 | 36.32% | 36.33% | 40.38% | 187 | 2,024 |
+| **All matched pins** | **947,018** | **40.17%** | **40.25%** | **42.04%** | **3,623** | **13,373** |
 
-The numerators are 304,296 on main, 305,081 with A, and 322,077 with A+B. A
+The numerators are 380,384 on main, 381,169 with A, and 398,165 with A+B. A
 recovers 427 checkout links and 358 named library links. The 16,996 links that
 carry the new assumption account for the remaining increase. The comparison
-matched all 304,520 existing definite targets and all 223,849 receiver-call
+matched all 380,608 existing definite targets and all 223,849 receiver-call
 decisions. Every Rust symbol key and link site matched. [Database comparison](compare.mjs)
+
+Before C-10 merged, the same 18 pins scored 32.13%, 32.21%, and 34.01%
+respectively. Both comparisons recovered 785 proven and 16,996 assumed
+Level 2 links, with the same fixed-seed audit draw.
 
 ### Stored unresolved links by primary reason
 
@@ -50,15 +54,15 @@ puts links from the assumption-backed retry in their original reason groups.
 
 | Reason | Main | Proven only | A+B |
 | --- | ---: | ---: | ---: |
-| Receiver | 180,332 | 180,332 | 180,332 |
-| Opaque macro scope | 175,292 | 174,647 | 159,969 |
-| Lexical or generic binding | 136,668 | 136,668 | 136,668 |
-| No recorded reason | 60,433 | 60,301 | 58,308 |
-| Unread or failed file | 29,607 | 29,603 | 29,550 |
-| Other recorded reason | 28,694 | 28,694 | 28,694 |
-| Competing import, glob or binding | 26,061 | 26,057 | 25,785 |
-| Cargo edge | 3,800 | 3,800 | 3,800 |
-| Item under opaque attribute | 814 | 814 | 814 |
+| Opaque macro scope | 182,322 | 181,677 | 166,999 |
+| Receiver | 163,377 | 163,377 | 163,377 |
+| Lexical or generic binding | 72,226 | 72,226 | 72,226 |
+| No recorded reason | 60,442 | 60,310 | 58,317 |
+| Competing import, glob or binding | 29,362 | 29,358 | 29,086 |
+| Other recorded reason | 28,680 | 28,680 | 28,680 |
+| Unread or failed file | 23,198 | 23,194 | 23,141 |
+| Cargo edge | 3,945 | 3,945 | 3,945 |
+| Item under opaque attribute | 2,061 | 2,061 | 2,061 |
 
 The unread-file row includes the general `failed-file-unseen-declarations`
 diagnostic that a checkout lookup can attach when it still has no target.
@@ -99,7 +103,7 @@ failures. [Source and macro output audit](source-audit.md)
 ## Validation
 
 The full build, type check and format check passed on merged main. The full
-`npm test` run passed all 3,036 tests with both `TMPDIR` and `PYM_SCRATCH` on
+`npm test` run passed all 3,062 tests with both `TMPDIR` and `PYM_SCRATCH` on
 tmpfs. Scoring the archived 0.1.0 graph data reproduced the committed All
 files figures, including 33.27% for Rust and 55.79% overall.
 [Committed baseline](../sw-3/scoreboard.md)
@@ -117,8 +121,10 @@ time and peak RSS.
 
 The index retains invocation names and bounded effects. The resolver also
 keeps separate lookup cache entries for the baseline, proved, and assumed
-passes. Helix's peak RSS rose 19–32%. Serde's cold wall time rose 15–27%,
-and it completed cold, warm, and query steps in 88.2 seconds.
+passes. Helix's peak RSS rose 19–32% and C-12 recovered 2,058 Level 2 links,
+including 17 with a proof. Serde's cold wall time rose 15–27% and C-12
+recovered zero links. Serde completed cold, warm, and query steps in 88.2
+seconds.
 
 A cold Serde CPU profile of the pre-C-10 build attributed 14.8 sampled seconds to
 `retryMacroScope` across the two Rust graph phases. Macro input and body
@@ -127,8 +133,9 @@ repeating lookups, even on a pin where those retries recover no targets.
 
 ## Coverage plan
 
-The cumulative archive contains the accepted reference rows and the latest
-candidate rows. The regeneration test reproduced the entire committed plan
+The 266,766-byte cumulative archive contains the accepted reference rows,
+the C-8 Go rows, the accepted TypeScript rows, and the final Rust candidate
+rows. The regeneration test reproduced the entire committed plan
 byte for byte. All 19 sweep-tool tests passed. The plan's language totals
 include that language's links from mixed-language pins, while the first table
 here follows the original 18 Rust pins. [Plan input](../../sweep/plan-input.json.gz) · [Regeneration command](../../sweep/README.md#reproduce-the-committed-plan)
