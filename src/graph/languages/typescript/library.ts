@@ -15,6 +15,10 @@ interface Unit {
 export function packageUnit(specifier: string): Unit | undefined {
   if (isBuiltin(specifier))
     return { ecosystem: "node", unit: specifier.replace(/^node:/, "") };
+  return registryUnit(specifier);
+}
+
+function registryUnit(specifier: string): Unit | undefined {
   const match =
     /^((?:npm|jsr):)?((?:@[\w.-]+\/)?[\w.-]+)(?:@([\w.^~*+-]+))?(?:\/([\w./-]+))?$/.exec(
       specifier,
@@ -147,11 +151,27 @@ export function libraryReader(
   manifests: readonly Manifest[],
   files: readonly GraphFile[],
   workspaceRoots: ReadonlySet<string>,
+  workspaceBoundaries: ReadonlySet<string>,
 ) {
   const directories = new Map(
     manifests.map((item) => [posix.dirname(item.path), item]),
   );
   const packageNames = new Set(manifests.map(({ json }) => json.name));
+  const chains = new Map<string, readonly Manifest[]>();
+  const manifestChain = (directory: string): readonly Manifest[] => {
+    const previous = chains.get(directory);
+    if (previous) return previous;
+    const here = directories.get(directory);
+    const parent =
+      directory === "." ||
+      directory === "/" ||
+      workspaceBoundaries.has(directory)
+        ? []
+        : manifestChain(posix.dirname(directory));
+    const result = here ? [here, ...parent] : parent;
+    chains.set(directory, result);
+    return result;
+  };
   const nearest = (path: string) => {
     for (
       let directory = posix.dirname(path);
@@ -192,6 +212,7 @@ export function libraryReader(
       typeof declared === "string" &&
       manifest.path !== "package.json" &&
       !workspaceRoots.has(posix.dirname(manifest.path)) &&
+      manifest.path.split("/").includes("node_modules") &&
       declared.startsWith("@types/")
     ) {
       const name = declared
@@ -204,6 +225,7 @@ export function libraryReader(
     } else if (
       manifest &&
       typeof declared === "string" &&
+      !declared.startsWith("@types/") &&
       manifest.path !== "package.json" &&
       !implemented.has(manifest) &&
       !workspaceRoots.has(posix.dirname(manifest.path))
@@ -246,11 +268,12 @@ export function libraryReader(
                 ? builtin.unit
                 : unit.unit,
             symbol: identity.symbol,
-            evidence:
-              identity.member ||
-              (!bundled &&
-                (!!ambient || ts.isExternalModule(declaration.getSourceFile())))
-                ? "declaring-owner"
+            evidence: identity.member
+              ? "declaring-owner"
+              : !bundled &&
+                  (!!ambient ||
+                    ts.isExternalModule(declaration.getSourceFile()))
+                ? "import-binding"
                 : "declared-builtin",
           }
         : undefined;
@@ -259,8 +282,21 @@ export function libraryReader(
   }
 
   return {
+    isNodeTypeFile(path: string) {
+      return nearest(path)?.json.name === "@types/node";
+    },
     forImporter(path: string) {
       const manifest = nearest(path);
+      const chain = manifestChain(posix.dirname(path));
+      const dependency = (name: string) => {
+        for (const owner of chain) {
+          const values = dependencyValues(owner, name);
+          if (values.some((value) => typeof value === "string" && value.length))
+            return { owner, values };
+        }
+        return undefined;
+      };
+      const routes = new Map<string, readonly Unit[]>();
       const declaredDependencies = new Map<Manifest, boolean>();
       function declarationUnit(source: ts.SourceFile): Unit | undefined {
         const identity = sourceUnit(source);
@@ -269,7 +305,9 @@ export function libraryReader(
         const dependency = identity.dependency;
         let outside = declaredDependencies.get(dependency);
         if (outside === undefined) {
-          const values = dependencyValues(manifest, identity.unit.unit);
+          const values = chain.flatMap((owner) =>
+            dependencyValues(owner, identity.unit.unit),
+          );
           outside =
             values.length > 0 &&
             values.every(
@@ -289,24 +327,44 @@ export function libraryReader(
       return {
         declarationUnit,
         targetOf,
+        expectsNode: () => dependency("@types/node") !== undefined,
+        importUnits(specifier: string): readonly Unit[] {
+          if (routes.has(specifier)) return routes.get(specifier)!;
+          const unit = packageUnit(specifier);
+          let result: Unit[] = [];
+          if (unit) {
+            const explicit = /^(?:node|npm|jsr):/.test(specifier);
+            if (explicit) result = [unit];
+            else if (unit.ecosystem === "node") {
+              const npm = registryUnit(specifier);
+              result = npm && dependency(npm.unit) ? [unit, npm] : [unit];
+            } else if (dependency(unit.unit)) result = [unit];
+          }
+          routes.set(specifier, result);
+          return result;
+        },
         localPackage(unit: Unit) {
           return (
             unit.ecosystem !== "node" &&
             (packageNames.has(unit.unit) ||
-              dependencyValues(manifest, unit.unit).some(localDependency))
+              chain.some((owner) =>
+                dependencyValues(owner, unit.unit).some(localDependency),
+              ))
           );
         },
         withVersion(target: LibraryTarget): LibraryTarget {
-          if (target.ecosystem !== "npm" || !manifest) return target;
+          if (target.ecosystem !== "npm") return target;
           let pin = versions.get(target.unit);
           if (!pin) {
-            const [first, ...rest] = dependencyValues(manifest, target.unit);
+            const declared = dependency(target.unit);
+            const [first, ...rest] = declared?.values ?? [];
             pin =
+              declared &&
               typeof first === "string" &&
               first.length <= 256 &&
               exactVersion.test(first) &&
               rest.every((value) => value === first)
-                ? { version: first, versionSource: manifest.path }
+                ? { version: first, versionSource: declared.owner.path }
                 : {};
             versions.set(target.unit, pin);
           }

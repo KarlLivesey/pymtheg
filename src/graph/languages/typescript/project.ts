@@ -70,6 +70,7 @@ export interface ProjectModel {
   groups: ProjectGroup[];
   manifests: readonly Manifest[];
   workspaceRoots: ReadonlySet<string>;
+  workspaceBoundaries: ReadonlySet<string>;
   hasWorkspacePackages: boolean;
   owner: Map<string, ProjectGroup>;
   /**
@@ -1033,6 +1034,7 @@ export function projectModel(
     workspaceRoots: new Set(
       [...fs.links.values()].map((path) => fromVirtual(path) || "."),
     ),
+    workspaceBoundaries: workspace.boundaries,
     hasWorkspacePackages: fs.links.size > 0,
     hasDenoImports: deno.active,
     selectSpecifier: deno.select,

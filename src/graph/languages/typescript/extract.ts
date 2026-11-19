@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 import { posix } from "node:path";
 import ts from "typescript";
+import {
+  globalTypeAvailability,
+  nodeCanDeclare,
+  nodeGlobalTarget,
+} from "./global-types.js";
 import type {
   Diagnostic,
   Json,
@@ -269,6 +274,9 @@ export function extractFile(
   const freshExportNames = new Set(Object.values(context.fresh.local));
   const path = file.fileName.slice(1);
   const importer = library.forImporter(path);
+  const globals = globalTypeAvailability(program, library.isNodeTypeFile);
+  const missingNode =
+    !globals.hasNode && (globals.expectsNode || importer.expectsNode());
   const importers = new WeakMap<ts.SourceFile, typeof importer>();
   const importerOf = (node: ts.Node) => {
     const source = node.getSourceFile();
@@ -464,9 +472,24 @@ export function extractFile(
       if (fact)
         result = {
           targets: [],
-          libraryFacts: [fact],
+          libraryFacts: fact,
           lexicalLibrary: true,
           receiver: found.receiver,
+        };
+    }
+    const outside = result.libraryFacts?.[0];
+    if (
+      !result.lexicalLibrary &&
+      !result.targets.length &&
+      result.libraryFacts?.length === 1 &&
+      (outside?.ecosystem === "npm" || outside?.ecosystem === "node")
+    ) {
+      const alternatives = missingBinding(found, meaning, 0, true);
+      if (alternatives && alternatives.length > 1)
+        result = {
+          ...result,
+          libraryFacts: alternatives,
+          lexicalLibrary: true,
         };
     }
     if (!found.receiver) return result;
@@ -484,7 +507,7 @@ export function extractFile(
       return fact
         ? {
             targets: [],
-            libraryFacts: [fact],
+            libraryFacts: fact,
             lexicalLibrary: true,
             receiver: found.receiver,
           }
@@ -507,6 +530,7 @@ export function extractFile(
     let viaAlias = false;
     let firstAlias: ts.Symbol | undefined;
     let declaredSomewhere = false;
+    let missingGlobalTypes = false;
     let verifyObjectProducers = false;
     const declarations: ts.Declaration[] = [];
     const usableLocalCall = (
@@ -629,6 +653,27 @@ export function extractFile(
             !context.anyFailed &&
             importer.targetOf(declaration, unit);
           if (proved) {
+            if (
+              (missingNode || globals.otherMissing) &&
+              source.fileName.startsWith(LIB_ROOT + "/") &&
+              proved.symbol
+            ) {
+              const dot = proved.symbol.indexOf(".");
+              const owner =
+                dot < 0 ? proved.symbol : proved.symbol.slice(0, dot);
+              if (globals.otherMissing && proved.ecosystem === "dom") {
+                missingGlobalTypes = true;
+                continue;
+              }
+              if (missingNode && nodeCanDeclare(owner)) {
+                const node = nodeGlobalTarget(proved.symbol);
+                if (!node) {
+                  missingGlobalTypes = true;
+                  continue;
+                }
+                (libraryFacts ??= new Map()).set(libraryKey(node), node);
+              }
+            }
             // A selected declaration can arrive through another package or a
             // typed return. The use site's manifest does not pin that route.
             (libraryFacts ??= new Map()).set(libraryKey(proved), proved);
@@ -715,13 +760,14 @@ export function extractFile(
         };
     }
     const targets = [...facts.values()];
-    if (!external && !local)
+    if (!external && !local && (!missingGlobalTypes || facts.size))
       return {
         targets,
         viaAlias,
         receiver,
         declarations,
-        ...(libraryFacts && { libraryFacts: [...libraryFacts.values()] }),
+        ...(libraryFacts &&
+          !missingGlobalTypes && { libraryFacts: [...libraryFacts.values()] }),
       };
     // An alias whose module did not resolve keeps that module's reason.
     const moduleFailure =
@@ -731,7 +777,11 @@ export function extractFile(
         (receiver && receiverReason(receiver)));
     const result: Targets = {
       targets,
-      reason: local ? "local" : moduleFailure || "external",
+      reason: local
+        ? "local"
+        : missingGlobalTypes
+          ? "missing-global-types"
+          : moduleFailure || "external",
       viaAlias,
       receiver,
       ...(!targets.length && !declaredSomewhere ? { noAnswer: true } : {}),
@@ -1138,32 +1188,33 @@ export function extractFile(
 
   const outsideUnits = new Map<
     ts.StringLiteralLike,
-    ReturnType<typeof packageUnit>
+    ReturnType<typeof importer.importUnits>
   >();
-  function missingUnit(specifier: ts.Expression | undefined, declared = false) {
-    if (!specifier || !ts.isStringLiteralLike(specifier)) return undefined;
+  function missingUnits(
+    specifier: ts.Expression | undefined,
+    declared = false,
+  ) {
+    if (!specifier || !ts.isStringLiteralLike(specifier)) return [];
     if (!declared && outsideUnits.has(specifier))
-      return outsideUnits.get(specifier);
-    const unit = outsideUnit(specifier, declared);
-    if (!declared && !limited) outsideUnits.set(specifier, unit);
-    return unit;
+      return outsideUnits.get(specifier)!;
+    const units = outsideRoutes(specifier, declared);
+    if (!declared && !limited) outsideUnits.set(specifier, units);
+    return units;
   }
 
-  function outsideUnit(specifier: ts.StringLiteralLike, declared: boolean) {
+  function outsideRoutes(specifier: ts.StringLiteralLike, declared: boolean) {
     const selection = selectedSpecifier(specifier);
-    if (!selection) return undefined;
-    const unit = packageUnit(selection);
-    if (!unit || (incompleteConfig && !selection.startsWith("node:")))
-      return undefined;
+    if (!selection || (incompleteConfig && !selection.startsWith("node:")))
+      return [];
+    const reader = importerOf(specifier);
     const reason = moduleReason(specifier);
-    if (
-      reason === "external-package" &&
-      !importerOf(specifier).localPackage(unit)
-    )
-      return unit;
+    if (reason === "external-package") {
+      const routes = reader.importUnits(selection);
+      return routes.some((unit) => reader.localPackage(unit)) ? [] : routes;
+    }
     if (declared && reason === undefined && declaredModuleFact(specifier))
-      return unit;
-    return undefined;
+      return reader.importUnits(selection);
+    return [];
   }
 
   function importFact(
@@ -1172,12 +1223,13 @@ export function extractFile(
     declared = false,
   ): Targets | undefined {
     if (!specifier) return undefined;
-    const unit = missingUnit(specifier, declared);
-    if (!unit) return undefined;
-    const target = writtenLibrary(specifier, unit, symbol);
-    return (
-      target && { targets: [], libraryFacts: [target], lexicalLibrary: true }
+    const units = missingUnits(specifier, declared);
+    const targets = units.map((unit) =>
+      writtenLibrary(specifier, unit, symbol),
     );
+    return targets.length && targets.every((target) => target !== undefined)
+      ? { targets: [], libraryFacts: targets, lexicalLibrary: true }
+      : undefined;
   }
 
   function writtenLibrary(
@@ -1219,10 +1271,11 @@ export function extractFile(
     )
       return undefined;
     const selection = selectedSpecifier(specifier);
-    const unit = selection && packageUnit(selection);
-    if (!unit || !storableName(unit.unit)) return undefined;
-    const target = writtenLibrary(specifier, unit);
-    return target && { targets: [], libraryFacts: [target] };
+    const units = selection ? importerOf(specifier).importUnits(selection) : [];
+    const targets = units.map((unit) => writtenLibrary(specifier, unit));
+    return targets.length && targets.every((target) => target !== undefined)
+      ? { targets: [], libraryFacts: targets }
+      : undefined;
   }
 
   /** Follow a lexical import or immutable bindings back to a literal loader. */
@@ -1231,7 +1284,7 @@ export function extractFile(
     meaning: Meaning,
     depth = 0,
     declared = false,
-  ): LibraryTarget | undefined {
+  ): LibraryTarget[] | undefined {
     if (depth >= 16 || (found.at && insideWith(found.at))) return undefined;
     const transparent = (expression: ts.Expression) => {
       while (
@@ -1273,7 +1326,7 @@ export function extractFile(
       const base = transparent(found.receiver);
       if (!ts.isIdentifier(base)) {
         const specifier = requireSpecifier(base);
-        return importFact(specifier, found.name, declared)?.libraryFacts?.[0];
+        return importFact(specifier, found.name, declared)?.libraryFacts;
       }
       present = symbolOf(base);
       if (
@@ -1371,19 +1424,29 @@ export function extractFile(
         )
           exported = requiredProperty(declaration);
       }
-      const unit = missingUnit(specifier, declared);
-      if (!unit || !specifier) continue;
+      const units = missingUnits(specifier, declared);
+      if (!units.length || !specifier) continue;
       // Node's ESM wrapper exposes the CommonJS export object as the default.
       // For an arbitrary imported value the selected member has no proven name.
-      const symbol = found.receiver
-        ? (moduleObject ||
-            (unit.ecosystem === "node" && exported === "default")) &&
-          found.name !== undefined &&
-          !memberWritten(found.receiver, found.name)
+      const member =
+        found.receiver &&
+        found.name !== undefined &&
+        !memberWritten(found.receiver, found.name)
           ? found.name
-          : undefined
-        : exported;
-      return writtenLibrary(specifier, unit, symbol);
+          : undefined;
+      const targets = units.map((unit) =>
+        writtenLibrary(
+          specifier,
+          unit,
+          found.receiver
+            ? moduleObject ||
+              (unit.ecosystem === "node" && exported === "default")
+              ? member
+              : undefined
+            : exported,
+        ),
+      );
+      if (targets.every((target) => target !== undefined)) return targets;
     }
     return undefined;
   }

@@ -9,6 +9,7 @@ const queries = [
   ["fs", "readFileSync"],
   ["dom", "ParentNode.prototype.querySelector"],
   ["es", "Map.prototype.delete"],
+  ["@std/assert"],
 ];
 const scratch = process.env.PYM_SCRATCH;
 const [build = "candidate"] = process.argv.slice(2);
@@ -16,7 +17,7 @@ const summary = JSON.parse(
   readFileSync(join(scratch, `${build}-run.json`), "utf8"),
 );
 const cli = resolve("dist/cli/main.js");
-const maximum = queries.map(() => ({ count: 0 }));
+const maximum = queries.map(() => ({ library: 0 }));
 
 for (const repo of summary.repos) {
   if (repo.outcome !== "finished") continue;
@@ -26,24 +27,23 @@ for (const repo of summary.repos) {
   });
   try {
     const countByUnit = db.prepare(
-      "SELECT count(*) AS count FROM graph_library_targets WHERE unit=? AND role='target'",
+      "SELECT count(DISTINCT CASE WHEN role='target' THEN link END) AS library, count(DISTINCT CASE WHEN role='candidate' THEN link END) AS candidateSet FROM graph_library_targets WHERE unit=?",
     );
     const countBySymbol = db.prepare(
-      "SELECT count(*) AS count FROM graph_library_targets WHERE unit=? AND symbol=? AND role='target'",
+      "SELECT count(DISTINCT CASE WHEN role='target' THEN link END) AS library, count(DISTINCT CASE WHEN role='candidate' THEN link END) AS candidateSet FROM graph_library_targets WHERE unit=? AND symbol=?",
     );
     queries.forEach((query, i) => {
-      const { count } = (query.length > 1 ? countBySymbol : countByUnit).get(
-        ...query,
-      );
-      if (count > maximum[i].count) maximum[i] = { count, id: repo.id, root };
+      const counts = (query.length > 1 ? countBySymbol : countByUnit).get(...query);
+      if (counts.library > maximum[i].library)
+        maximum[i] = { ...counts, id: repo.id, root };
     });
   } finally {
     db.close();
   }
 }
 queries.forEach((query, i) => {
-  const { count, id, root } = maximum[i];
-  if (!count) throw Error(`No definite uses of ${query.join(" ")}`);
+  const { library, candidateSet, id, root } = maximum[i];
+  if (!library) throw Error(`No definite uses of ${query.join(" ")}`);
   const result = spawnSync(
     process.execPath,
     [
@@ -64,7 +64,7 @@ queries.forEach((query, i) => {
     throw result.error ?? Error(`Query exited ${result.status ?? result.signal}`);
   const { status, data } = JSON.parse(result.stdout);
   const { classCounts } = data;
-  if (classCounts.library !== count)
+  if (classCounts.library !== library || classCounts.candidateSet !== candidateSet)
     throw Error(`Unexpected CLI count for ${query.join(" ")}`);
   console.log(JSON.stringify({ repo: id, query, status, classCounts }));
 });

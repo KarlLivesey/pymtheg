@@ -1648,6 +1648,12 @@ dependency evidence. Literal CommonJS binding names use their written keys.
 Same-file writes to a module object suppress that member's export name.
 Module 27 also recognizes qualified `import =` aliases and ambient class
 heritage through a type-only import as lexical proof.
+Module 28 requires a manifest or explicit registry route for bare package
+identity. A declared npm polyfill and its bare Node builtin form candidates.
+The checker retains checkout `@types/*` declarations outside
+`node_modules`. Missing expected global declarations can leave compiler
+lib links open. Documented Node globals can form a candidate set with a
+bundled declaration.
 
 Rust records library paths during resolution starting with module 29. Its library lookup uses
 the captured namespace, import, placement and `cfg` facts, with a separate

@@ -258,5 +258,9 @@ export function workspaceLinks(
         )
           add(root, name, target);
       }
-  return { links, incompleteRoots };
+  return {
+    links,
+    incompleteRoots,
+    boundaries: new Set([...roots.keys(), ...pnpmFiles]),
+  };
 }

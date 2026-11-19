@@ -197,7 +197,12 @@ test("missing packages prove imports and namespace exports at their lexical bind
   await project(
     {
       "package.json": JSON.stringify({
-        dependencies: { zod: "4.4.1", "@scope/pkg": "^2.0.0" },
+        dependencies: {
+          zod: "4.4.1",
+          "@scope/pkg": "^2.0.0",
+          "missing-pkg": "^1",
+          "react-router-dom": "^7",
+        },
       }),
       "main.ts": `import { z } from 'zod';
         import fs from 'node:fs';
@@ -332,6 +337,129 @@ test("missing packages prove imports and namespace exports at their lexical bind
   );
 });
 
+test("bare packages need positive route evidence and builtin polyfills keep both routes", async () => {
+  await project(
+    {
+      "package.json": '{"dependencies":{"url":"^0.11.4","zod":"^4"}}',
+      "pkg/package.json": '{"name":"fixture"}',
+      "pkg/tsconfig.json": '{"compilerOptions":{"baseUrl":"src"}}',
+      "pkg/src/use.ts": `import * as polyfill from 'url';
+        import * as builtin from 'node:url';
+        import * as path from 'path';
+        import { z } from 'zod';
+        import { initialData } from '@site/src/initialData';
+        import * as theme from '@theme-original/MDXComponents';
+        import { Modal } from 'components/Modal';
+        import 'uno.css';
+        polyfill.parse('x'); builtin.format('x');
+        path.join('x'); z(); initialData(); theme.load(); Modal();`,
+      "nested/package.json": '{"workspaces":["pkg"]}',
+      "nested/pkg/package.json": '{"name":"nested-pkg"}',
+      "nested/pkg/use.ts": `import { z } from 'zod'; z();`,
+    },
+    async (graph, report) => {
+      clean(report);
+      const roots = (link) =>
+        link.libraries
+          .map(({ ecosystem, unit, symbol }) => [ecosystem, unit, symbol])
+          .sort();
+      const file = "pkg/src/use.ts";
+      for (const [kind, text, symbol] of [
+        ["imports", "'url'", undefined],
+        ["calls", "parse", "parse"],
+      ]) {
+        const link = graph.link(file, text, kind);
+        assert.equal(link.resolution, "ambiguous");
+        assert.deepEqual(roots(link), [
+          ["node", "url", symbol],
+          ["npm", "url", symbol],
+        ]);
+      }
+      assert.equal(
+        libraryTarget(graph.link(file, "format", "calls")).ecosystem,
+        "node",
+      );
+      assert.equal(
+        libraryTarget(graph.link(file, "join", "calls")).unit,
+        "path",
+      );
+      assert.equal(libraryTarget(graph.link(file, "z", "calls")).unit, "zod");
+      for (const specifier of [
+        "@site/src/initialData",
+        "@theme-original/MDXComponents",
+        "components/Modal",
+        "uno.css",
+      ])
+        assert.equal(
+          graph.link(file, "'" + specifier + "'", "imports").resolution,
+          "unresolved",
+        );
+      assert.equal(
+        graph.link("nested/pkg/use.ts", "z", "calls").resolution,
+        "unresolved",
+      );
+    },
+  );
+});
+
+test("an expected missing global type package keeps overlapping runtime declarations open", async () => {
+  const source = `console.log('x'); setTimeout(() => {}, 1);
+    const urlValue = new URL('https://example.test'); urlValue.toString();
+    const values = [1]; values.map(String); Promise.resolve(); JSON.parse('{}');`;
+  await project(
+    {
+      "manifest/package.json": '{"devDependencies":{"@types/node":"^24"}}',
+      "manifest/use.ts": source,
+      "options/tsconfig.json":
+        '{"compilerOptions":{"target":"es2022","types":["node"]},"files":["use.ts"]}',
+      "options/use.ts": source,
+      "reference/tsconfig.json":
+        '{"compilerOptions":{"target":"es2022"},"files":["use.ts"]}',
+      "reference/use.ts": '/// <reference types="node" />\n' + source,
+      "other/tsconfig.json":
+        '{"compilerOptions":{"target":"es2022","types":["custom-globals"]},"files":["use.ts"]}',
+      "other/use.ts": source,
+      "web/tsconfig.json":
+        '{"compilerOptions":{"target":"es2022"},"files":["use.ts"]}',
+      "web/use.ts": source,
+    },
+    async (graph, report) => {
+      clean(report);
+      for (const root of ["manifest", "options", "reference"]) {
+        const file = root + "/use.ts";
+        for (const [name, node] of [
+          ["log", "console"],
+          ["setTimeout", "timers"],
+          ["URL", "globals"],
+        ]) {
+          const call = graph.link(file, name, "calls");
+          assert.equal(call.resolution, "ambiguous");
+          assert.deepEqual(
+            call.libraries.map(({ unit }) => unit).sort(),
+            ["dom", node].sort(),
+          );
+        }
+        const member = graph.link(file, "toString", "calls");
+        assert.equal(member.resolution, "unresolved");
+        assert.equal(member.data.reason, "missing-global-types");
+        for (const name of ["map", "resolve", "parse"])
+          assert.equal(
+            libraryTarget(graph.link(file, name, "calls")).unit,
+            "es",
+          );
+      }
+      assert.equal(
+        graph.link("other/use.ts", "log", "calls").data.reason,
+        "missing-global-types",
+      );
+      assert.equal(
+        libraryTarget(graph.link("web/use.ts", "log", "calls")).unit,
+        "dom",
+      );
+    },
+  );
+});
+
 test("captured declarations prove an inherited package member and preserve project augmentations", async () => {
   await project(
     {
@@ -356,6 +484,8 @@ test("captured declarations prove an inherited package member and preserve proje
       "vendor/kit/index.d.ts": `declare class Directory { list(): string[] }
       export declare class Store extends Directory {}
       export declare function open(): Store;`,
+      "vendor/kit/ambient.d.ts":
+        'declare module "kit-ambient-alias" { export function extra(): void }',
       "vendor/our/package.json": '{"name":"our-types","types":"index.d.ts"}',
       "vendor/our/index.d.ts": "export declare function own(): void;",
       "packages/local-types/package.json":
@@ -367,28 +497,37 @@ test("captured declarations prove an inherited package member and preserve proje
       interface Console { log(local: number): void; }`,
       "main.ts": `import { readFileSync } from 'node:fs';
       import { open } from 'external-kit';
+      import { extra } from 'kit-ambient-alias';
       import { own } from 'our-types';
       import { localDeclaration } from 'local-types';
       import { here } from 'app/entry';
       import { missing } from 'app/missing';
-      process.cwd(); readFileSync('x'); open().list(); own(); here(); missing();
+      process.cwd(); readFileSync('x'); open().list(); extra(); own(); here(); missing();
       window.__pymthegLocal(); console.log(4); localDeclaration();`,
     },
     async (graph, report) => {
       clean(report);
       const call = (at) => graph.link("main.ts", at, "calls");
-      assert.deepEqual(libraryTarget(call("cwd")), {
-        ecosystem: "node",
-        unit: "globals",
-        symbol: "NodeJS.Process.prototype.cwd",
-        evidence: "declaring-owner",
+      assert.equal(
+        graph.target(call("cwd")),
+        "types/node/index.d.ts#NodeJS.Process.cwd",
+      );
+      assert.match(
+        graph.target(call("readFileSync")),
+        /^types\/node\/index\.d\.ts#.*readFileSync$/,
+      );
+      assert.deepEqual(libraryTarget(call("open")), {
+        ecosystem: "npm",
+        unit: "external-kit",
+        symbol: "open",
+        evidence: "import-binding",
       });
-      assert.deepEqual(libraryTarget(call("readFileSync")), {
-        ecosystem: "node",
-        unit: "fs",
-        symbol: "readFileSync",
-        evidence: "declaring-owner",
-      });
+      assert.equal(libraryTarget(call("extra")).unit, "external-kit");
+      assert.equal(
+        libraryTarget(graph.link("main.ts", "'kit-ambient-alias'", "imports"))
+          .unit,
+        "external-kit",
+      );
       assert.deepEqual(libraryTarget(call("list")), {
         ecosystem: "npm",
         unit: "external-kit",
@@ -543,6 +682,7 @@ test("CommonJS destructuring proves the written export and leaves rest, nesting 
 test("writes to a module binding withhold only the affected member names", async () => {
   await project(
     {
+      "package.json": '{"dependencies":{"patched-fs":"^1"}}',
       "use.cjs": `const fs = require('node:fs');
         const alias = fs;
         alias.readFileSync('x'); fs.statSync('x'); fs.unlinkSync('x'); fs.existsSync('x');
@@ -552,16 +692,17 @@ test("writes to a module binding withhold only the affected member names", async
         Object.assign(fs, { statSync: () => null });
         delete fs['unlinkSync'];
         function unrelated(fs) { fs.existsSync = () => false; }`,
-      "typed.ts": `import * as fs from 'node:fs';
+      "typed.ts": `import * as fs from 'patched-fs';
         fs.statSync('x'); fs.statSync = () => null;
         fs.existsSync('x');`,
-      "types/node/package.json": '{"name":"@types/node","types":"index.d.ts"}',
-      "types/node/index.d.ts": `declare module 'node:fs' {
+      "types/patched-fs/package.json":
+        '{"name":"patched-fs","types":"index.d.ts"}',
+      "types/patched-fs/index.d.ts": `declare module 'patched-fs' {
         export function statSync(path: string): unknown;
         export function existsSync(path: string): boolean;
       }`,
       "tsconfig.json":
-        '{"compilerOptions":{"typeRoots":["./types"],"types":["node"]},"files":["typed.ts"]}',
+        '{"compilerOptions":{"typeRoots":["./types"],"types":["patched-fs"]},"files":["typed.ts"]}',
       "jsconfig.json": '{"files":["use.cjs"]}',
     },
     async (graph, report) => {
@@ -583,8 +724,8 @@ test("writes to a module binding withhold only the affected member names", async
         "existsSync",
       );
       assert.deepEqual(libraryTarget(call("typed.ts", "statSync")), {
-        ecosystem: "node",
-        unit: "fs",
+        ecosystem: "npm",
+        unit: "patched-fs",
         evidence: "import-path",
       });
       assert.equal(
@@ -598,6 +739,7 @@ test("writes to a module binding withhold only the affected member names", async
 test("written imports can be independent of source or compiler configuration gaps", async () => {
   await project(
     {
+      "package.json": '{"dependencies":{"package":"^1"}}',
       "broken.ts": "export function broken( {",
       "use.ts": `import { join } from 'node:path';
         import { build as run } from 'package';
@@ -1627,6 +1769,7 @@ test("pnpm subpath exports and checkout path dependencies use TypeScript's resol
           "@pkg/linked": "link:../../loose",
           "@pkg/file": "file:../../loose",
           "@pkg/excluded": "workspace:*",
+          "external-package": "^1",
         },
       }),
       "apps/server/migrate-dev-db.ts": [
@@ -2643,6 +2786,7 @@ test("usage meaning selects declarations: calls, types and values", async () => 
 test("unresolved reasons say why", async () => {
   await project(
     {
+      "package.json": '{"dependencies":{"left-pad":"^1"}}',
       "tsconfig.json": JSON.stringify({
         compilerOptions: { baseUrl: ".", paths: { "@app/*": ["src/*"] } },
       }),

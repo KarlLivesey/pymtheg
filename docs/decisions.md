@@ -2662,7 +2662,13 @@ declarations, captured type packages or an importing manifest's external
 dependency can establish that a declaration describes an outside package.
 Lexical outside identity can survive unrelated unreadable declarations.
 Direct writes to a module object in the same file withhold that member's
-symbol while preserving the unit.
+symbol while preserving the unit. Module 27 also records written namespace
+selections in qualified import aliases and type-only ambient heritage.
+Module 28 requires positive package-route evidence. An explicitly named
+registry or a dependency up through the workspace boundary can supply
+that evidence. Bare builtins can have a declared npm alternative. The
+program's missing global type declarations limit which bundled globals
+can be definite, using documented Node globals to name alternatives.
 
 ### Graph writes use a write-ahead log on local disks (C-6)
 
