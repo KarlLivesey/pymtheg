@@ -299,6 +299,7 @@ export function classify(link, evidence, project) {
   }
   if (module === "typescript") {
     if (workspaceEntryMissing(underlyingReason(data))) return "inside";
+    if (underlyingReason(data) === "workspace-manifest-unreadable") return "unclassified";
     const path = tsSpecifier(link, evidence);
     if (path && (link.data?.specifier || evidence.tsSpecifiers.has(path))) return tsPath(path, project, link.file);
     if (data.reference === "lib") return "outside";

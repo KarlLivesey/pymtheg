@@ -107,6 +107,7 @@ export interface ProjectModel {
     from: string,
     lookups: readonly string[],
   ) => string | undefined;
+  workspaceBoundaryKnown: (from: string) => boolean;
 }
 
 const INFERRED: ts.CompilerOptions = {
@@ -551,7 +552,10 @@ export function projectModel(
       renames.set(file.path, renamed);
     fs.add(file.path, renamed.error ? file.text : renamed.text);
   }
-  for (const [link, target] of workspaceLinks(manifests, contexts))
+  const workspace = workspaceLinks(manifests, contexts, [
+    ...brokenManifests.keys(),
+  ]);
+  for (const [link, target] of workspace.links)
     fs.link(toVirtual(link), target === "." ? "/" : toVirtual(target));
   const matchFiles = (
     ts as unknown as {
@@ -1013,5 +1017,10 @@ export function projectModel(
     host,
     workspaceReason: (specifier, from, lookups) =>
       fs.workspaceReason(specifier, from, lookups),
+    workspaceBoundaryKnown: (from) => {
+      for (const root of workspace.incompleteRoots)
+        if (underDirectory(from, root)) return false;
+      return true;
+    },
   };
 }

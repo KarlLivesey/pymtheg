@@ -74,6 +74,27 @@ function pnpmSettings(text: string) {
   return { patterns, linkVersions };
 }
 
+function workspaceMember(
+  root: string,
+  patterns: readonly string[],
+  directory: string,
+): boolean {
+  const relative = posix.relative(root, directory);
+  if (relative === ".." || relative.startsWith("../")) return false;
+  if (!relative) return true;
+  const matches = (pattern: string) =>
+    posix.matchesGlob(
+      relative,
+      pattern.replace(/^\.\//, "").replace(/\/$/, ""),
+    );
+  return (
+    patterns.some((pattern) => !pattern.startsWith("!") && matches(pattern)) &&
+    !patterns.some(
+      (pattern) => pattern.startsWith("!") && matches(pattern.slice(1)),
+    )
+  );
+}
+
 function members(
   root: string,
   patterns: readonly string[],
@@ -84,25 +105,9 @@ function members(
   const paths = new Set<string>();
   for (const { path, json } of manifests) {
     const local = posix.dirname(path);
-    const relative = posix.relative(root, local);
-    if (relative === ".." || relative.startsWith("../")) continue;
-    const matches = (pattern: string) =>
-      posix.matchesGlob(
-        relative,
-        pattern.replace(/^\.\//, "").replace(/\/$/, ""),
-      );
-    if (
-      relative &&
-      (!patterns.some(
-        (pattern) => !pattern.startsWith("!") && matches(pattern),
-      ) ||
-        patterns.some(
-          (pattern) => pattern.startsWith("!") && matches(pattern.slice(1)),
-        ))
-    )
-      continue;
+    if (!workspaceMember(root, patterns, local)) continue;
     paths.add(local);
-    if (!relative && !includeRootPackage) continue;
+    if (local === root && !includeRootPackage) continue;
     const name = json.name;
     if (typeof name === "string" && validPackageName(name))
       packages.set(name, packages.has(name) ? undefined : local);
@@ -110,12 +115,20 @@ function members(
   return { packages, paths };
 }
 
-/** Build virtual install links only. TypeScript interprets the package entries. */
+/** Model workspace installs and roots whose package membership is unreadable. */
 export function workspaceLinks(
   manifests: readonly Manifest[],
   contexts: readonly ContextFile[],
-): Iterable<readonly [string, string]> {
+  unreadable: readonly string[],
+) {
   const links = new Map<string, string>();
+  const incompleteRoots = new Set(unreadable);
+  const noteIncomplete = (root: string, patterns: readonly string[]) => {
+    if (
+      unreadable.some((directory) => workspaceMember(root, patterns, directory))
+    )
+      incompleteRoots.add(root);
+  };
   const byDirectory = new Map(
     manifests.map(({ path, json }) => [posix.dirname(path), json]),
   );
@@ -135,13 +148,15 @@ export function workspaceLinks(
     const root = posix.dirname(file.path);
     pnpmFiles.add(root);
     const settings = pnpmSettings(file.text);
-    if (settings)
+    if (settings) {
+      noteIncomplete(root, settings.patterns);
       roots.set(root, {
         ...members(root, settings.patterns, manifests, true),
         pnpm: true,
         hoist: false,
         linkVersions: settings.linkVersions,
       });
+    }
   }
   for (const [root, json] of byDirectory) {
     if (pnpmFiles.has(root) || /^pnpm@/.test(String(json.packageManager)))
@@ -155,6 +170,7 @@ export function workspaceLinks(
       patterns.every((pattern) => typeof pattern === "string")
     ) {
       const yarnMajor = /^yarn@(\d+)/.exec(String(json.packageManager))?.[1];
+      noteIncomplete(root, patterns);
       roots.set(root, {
         ...members(root, patterns, manifests),
         pnpm: false,
@@ -242,5 +258,5 @@ export function workspaceLinks(
         )
           add(root, name, target);
       }
-  return links;
+  return { links, incompleteRoots };
 }

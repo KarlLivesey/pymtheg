@@ -745,6 +745,7 @@ const module: LanguageModule = {
                 ...(renamed ? { renamed } : {}),
                 resolveModule,
                 workspaceReason: model.workspaceReason,
+                workspaceBoundaryKnown: model.workspaceBoundaryKnown,
                 skip,
                 moduleKind,
                 anyFailed: unseen.size > 0,

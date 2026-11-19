@@ -46,6 +46,7 @@ export interface RenameContext {
     from: string,
     lookups: readonly string[],
   ) => string | undefined;
+  workspaceBoundaryKnown: (from: string) => boolean;
   /** Nodes (and warm-up steps) whose checker lookups overflowed before. */
   skip: ReadonlySet<string>;
   /**
@@ -1398,13 +1399,16 @@ export function extractFile(
               text.startsWith(pattern.slice(0, star)) &&
               text.endsWith(pattern.slice(star + 1));
       });
-    return aliased
-      ? "unresolved-alias"
-      : (context.workspaceReason(
-          text,
-          fromVirtual(specifier.getSourceFile().fileName) ?? path,
-          lookups,
-        ) ?? "external-package");
+    const importer = fromVirtual(specifier.getSourceFile().fileName) ?? path;
+    if (aliased) return "unresolved-alias";
+    const workspace = context.workspaceReason(text, importer, lookups);
+    if (workspace) return workspace;
+    if (!context.workspaceBoundaryKnown(importer)) {
+      const unit = packageUnit(text);
+      if (unit && unit.ecosystem !== "node")
+        return "workspace-manifest-unreadable";
+    }
+    return "external-package";
   }
   function moduleLink(
     owner: string,

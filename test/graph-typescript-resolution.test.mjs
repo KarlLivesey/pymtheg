@@ -2455,7 +2455,7 @@ test("a broken workspace root fails only root-package files; members stay analys
       // The workspace list is unknown, so @w/a is not linked rather than guessed.
       const cross = graph.link("packages/b/src/use.ts", '"@w/a"');
       assert.equal(cross.resolution, "unresolved");
-      assert.equal(cross.data.reason, "external-package");
+      assert.equal(cross.data.reason, "workspace-manifest-unreadable");
     },
   );
 });
