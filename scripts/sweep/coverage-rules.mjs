@@ -9,7 +9,7 @@ export const scopes = ["source", "bundle", "broken-fixture", "template"];
 export const outcomes = ["resolved", "ambiguous", "unresolved", "library"];
 export const dispositions = ["eligible", "outside", "inside", "unclassified"];
 export const columns = ["module", "kind", "outcome", "reason", "uncertainty", "scope", "disposition", "count", "blocked",
-  "externalLevel", "externalEvidence", "externalGap"];
+  "externalLevel", "externalEvidence", "externalGap", "assumed"];
 export const sampleSeed = 0x7c8a59bd2e41;
 export const sampleSize = (stratum) => ["go:empty", "rust:empty", "rust:receiver", "typescript:no-symbol"].includes(stratum) ? 96 : 32;
 const standardGo = new Set(`archive bufio bytes cmp compress container context crypto database debug embed encoding errors expvar flag fmt go hash html image index io iter log maps math mime net os path plugin reflect regexp runtime slices sort strconv strings sync syscall testing text time unicode unique unsafe weak`.split(" "));
@@ -544,8 +544,15 @@ export function libraryScore(rows, filter = () => true) {
   const score = repositoryScore(rows, filter);
   const levels = [0, 0, 0];
   const gaps = new Map();
-  for (const [module, kind, , , , scope, , count, , level, , gap] of rows) {
-    if (level == null || !filter(module, scope, kind)) continue;
+  let assumed = 0;
+  let assumedLevel2 = 0;
+  for (const [module, kind, outcome, , , scope, , count, , level, , gap, usesAssumption] of rows) {
+    if (!filter(module, scope, kind)) continue;
+    if (usesAssumption && (outcome === "resolved" || outcome === "library")) {
+      assumed += count;
+      if (outcome === "resolved" || level === 2) assumedLevel2 += count;
+    }
+    if (level == null) continue;
     levels[level] += count;
     if (gap) gaps.set(gap, (gaps.get(gap) ?? 0) + count);
   }
@@ -554,9 +561,10 @@ export function libraryScore(rows, filter = () => true) {
   const provenOutside = neither + identifiedUnit;
   const strictDenominator = score.total - provenOutside;
   return {
-    ...score, neither, unitOnly, symbol, identifiedUnit, provenOutside, gaps,
+    ...score, neither, unitOnly, symbol, identifiedUnit, provenOutside, gaps, assumed, assumedLevel2,
     adjusted: strictDenominator ? score.resolved / strictDenominator : null,
     level1: score.total ? (score.resolved + identifiedUnit) / score.total : null,
     level2: score.total ? (score.resolved + symbol) / score.total : null,
+    level2WithoutAssumptions: score.total ? (score.resolved + symbol - assumedLevel2) / score.total : null,
   };
 }

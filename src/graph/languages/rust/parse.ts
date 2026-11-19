@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: MIT
 import { implies, possible } from "./cfg.js";
-import { argumentCalls, macroProfile } from "./macro-rules.js";
+import {
+  argumentCalls,
+  isMacroItemKeyword,
+  macroInput,
+  macroProfile,
+  type MacroInput,
+} from "./macro-rules.js";
 import type { Node } from "web-tree-sitter";
 import { fileURLToPath } from "node:url";
 import { createTagsParser } from "../../tree-sitter.js";
@@ -324,6 +330,7 @@ async function createHelper(): Promise<Helper> {
         name: string;
         scope: string;
         start: number;
+        input?: MacroInput;
         block?: true;
       }[] = [];
       // Every statement-level invocation is a candidate: the non-conservative
@@ -2639,11 +2646,21 @@ async function createHelper(): Promise<Helper> {
         if (n.type === "macro_definition") return;
         if (n.type === "macro_invocation") {
           const m = field(n, "macro");
+          const group = n.namedChildren.find((c) => c.type === "token_tree");
+          const container =
+            n.parent?.type === "expression_statement"
+              ? n.parent.parent
+              : n.parent;
+          const itemPosition = !tailMacro(n) && lexicalItemContainer(container);
+          const input =
+            itemPosition && group ? macroInput([group]) : { names: [] };
           if (m)
             link(m, owner, scope, "macros", compact(m.text), {
               genericBindings: genericBindings(fn ?? n),
+              ...(input.names.some(isMacroItemKeyword)
+                ? { macroInputCanSupplyItemKeyword: true }
+                : {}),
             });
-          const group = n.namedChildren.find((c) => c.type === "token_tree");
           if (m && group)
             for (const call of argumentCalls({
               name: compact(m.text),
@@ -2651,27 +2668,18 @@ async function createHelper(): Promise<Helper> {
               group,
             }))
               tokenCall(call, owner, scope, fn, implType, implNode, implScope);
-          if (
-            !tailMacro(n) &&
-            lexicalItemContainer(
-              n.parent?.type === "expression_statement"
-                ? n.parent.parent
-                : n.parent,
-            )
-          )
+          if (itemPosition)
             if (neutralMacro(n))
               standardMacroScopes.push({
                 name: compact(m!.text),
                 scope,
                 start: m!.startIndex,
+                ...(input.names.length || "mayIntroduceUnknownNames" in input
+                  ? { input }
+                  : {}),
                 // Only a block statement can bind locals that the
                 // conservative binding facts (stdFallback*) describe.
-                ...((n.parent?.type === "expression_statement"
-                  ? n.parent.parent
-                  : n.parent
-                )?.type === "block"
-                  ? { block: true }
-                  : {}),
+                ...(container?.type === "block" ? { block: true } : {}),
               });
             else opaqueItemScopes.add(scope);
           return;
@@ -2905,9 +2913,12 @@ async function createHelper(): Promise<Helper> {
         start: number;
         module: string;
         conditions: string[];
+        input?: number;
         helper?: true;
         nested?: boolean;
       }[] = [];
+      const attributeInputs: MacroInput[] = [];
+      const attributeInputByItem = new Map<number, number>();
       const declarationKeys = new Set(
         result.symbols.map((symbol) => symbol.key),
       );
@@ -2931,6 +2942,29 @@ async function createHelper(): Promise<Helper> {
             for (const app of applications(meta(n), item)) {
               const scope = lexicalScopes.get(item.id) ?? "";
               const helper = deriveHelper(app.meta, item, app.guards);
+              // The attribute receives the attached item, including any
+              // remaining stacked attributes. Include the whole stack as
+              // an upper bound, even when this invocation receives less.
+              let input: number | undefined;
+              const rule = attributeRules.get(app.meta.name.split("::")[0]!);
+              if (!rule || rule.category === "prelude") {
+                input = attributeInputByItem.get(item.id);
+                if (input === undefined) {
+                  const nodes = [item, n];
+                  for (
+                    let prev = item.previousNamedSibling;
+                    prev;
+                    prev = prev.previousNamedSibling
+                  ) {
+                    if (["line_comment", "block_comment"].includes(prev.type))
+                      continue;
+                    if (prev.type !== "attribute_item") break;
+                    nodes.push(prev);
+                  }
+                  input = attributeInputs.push(macroInput(nodes, true)) - 1;
+                  attributeInputByItem.set(item.id, input);
+                }
+              }
               opaqueAttributes.push({
                 scope,
                 name: app.meta.name,
@@ -2938,6 +2972,7 @@ async function createHelper(): Promise<Helper> {
                 ...(helper ?? {}),
                 raw: `#[${app.meta.name}${app.meta.args?.text ?? (app.meta.value ? "=" + app.meta.value.text : "")}]`,
                 conditions: app.guards,
+                ...(input === undefined ? {} : { input }),
                 module:
                   item.type === "mod_item"
                     ? compact(field(item, "name")?.text ?? "")
@@ -2999,6 +3034,7 @@ async function createHelper(): Promise<Helper> {
         opaqueItemScopes: [...opaqueItemScopes],
         standardMacroScopes,
         opaqueAttributes,
+        attributeInputs,
       };
     },
   });

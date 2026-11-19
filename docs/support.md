@@ -551,6 +551,17 @@ makes that whole manifest unknown). Private items are ordinary symbols.
   crates.io, alternate registry indexes, and Git URLs with their ref selectors.
   A replacement with an unproven checkout target leaves the link unresolved.
   Receiver calls still require the declaring owner.
+- **Names beside Rust macros.** A withheld path can resolve when every
+  relevant expansion has a bounded set of names and that set excludes the
+  name being looked up. The graph inspects captured `macro_rules!` arms,
+  including reachable macros in the checkout, and recognizes the standard
+  expression and literal-producing macros. Standard `thread_local!`
+  contributes its input names. A proven external function-like macro needs
+  item-identifier input for the `rust-external-macro-name` assumption.
+  Attributes and derives also withhold names formed from whole
+  case-insensitive components of an input item name. Opaque layout
+  expansions, known identifier generators and competing glob imports can
+  still withhold the link. See [C-12](changes/C-12.md).
 - **Clean expansion (both rules below).** A workspace `macro_rules!` arm is
   clean when the code it emits has no attribute anywhere (so no `#[cfg]` can
   remove a call) and no item other than a readable `use` (no `fn`, `mod`,
@@ -731,13 +742,20 @@ answer.
   value or a directly rewritten module member names the package only.
   npm aliases name their registry package. An exact pin in the importing
   manifest or its captured pnpm or Bun catalog can supply its version.
-  [TypeScript and JavaScript library links](changes/C-11.md)
+  An ambient type request can establish Vitest, Jest or Mocha globals. A
+  receiver explicitly annotated with an unavailable imported type can name
+  its package unit. A named library object can supply checker-selected
+  members through immutable aliases and constant literal selectors.
+  [Library links](changes/C-11.md) · [Members and test globals](changes/C-16.md)
 - **Candidates:** several checkout or library targets for one callee (union
   receivers, merged declarations, duplicate JavaScript functions). Missing
   selected Node types can leave both DOM and Node targets possible for a shared
-  global, type name or typed member.
+  global, type name or typed member. Two test frameworks supplying the same
+  global can also produce a candidate set.
 - **Unresolved:** outside members whose receiver or declaration is unverified
   (`external`, `external-package`); computed `require` or `import()` specifiers;
+  bare test globals with an overlapping unmodelled type request
+  (`competing-test-globals`);
   calls through parameters, import shadows, and reassigned local functions;
   member calls without a named target through `any`, `unknown` or an open index
   (`any-receiver`, `unknown-receiver`, `index-signature`);

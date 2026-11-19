@@ -119,6 +119,14 @@ for (const c of cases)
         assert.equal(targets.length, c.closed.count);
     if (c.absent) g.unknown(c.absent, c.kind ?? "calls");
     if (c.unknown) g.unverified(c.unknown, c.would, c.kind ?? "calls");
+    if (c.assumed) {
+      const kind = c.kind ?? "calls";
+      g.one(c.assumed, c.would, kind);
+      for (const link of g.links.filter(
+        (l) => l.kind === kind && l.targetName === c.assumed,
+      ))
+        assert.deepEqual(link.data?.assumes, ["rust-external-macro-name"]);
+    }
     if (c.targetFile)
       for (const targets of g.targets(c.definite.name, c.definite.kind))
         for (const target of targets) assert.equal(target.file, c.targetFile);

@@ -459,7 +459,15 @@ test("opaque module items cannot replace a known explicit import in its namespac
     null,
     null,
   ]);
-  assert.deepEqual(lookup("types", "String"), [null, null]);
+  assert.deepEqual(
+    lookup("types", "String"),
+    Array(2).fill({
+      ecosystem: "rust-std",
+      unit: "std",
+      symbol: "string::String",
+      evidence: "declared-builtin",
+    }),
+  );
 });
 
 test("a directory source resolves a versioned vendor crate and withholds an uncaptured one", async (t) => {

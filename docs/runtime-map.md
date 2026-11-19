@@ -1672,6 +1672,15 @@ explicit `types` list. Node's value-only `CryptoKey` is excluded in type
 positions.
 Module 31 also accepts parenthesized `require` and treats `.js` as CommonJS
 for this check unless its nearest manifest sets `"type": "module"`.
+Module 32 reuses the selected compiler program's ambient type requests and
+captured declarations to identify supported test globals. A checker-selected
+or explicitly imported checkout declaration takes precedence. Member identity
+still comes from the declaration, including through a return type, re-export,
+immutable alias or constant literal selector. A named annotation for a missing
+imported receiver type can identify its package at unit level.
+Module 33 leaves shared test globals unresolved when a known competing ambient
+package is requested outside the supported framework inventory.
+[C-16](changes/C-16.md)
 
 Rust records library paths during resolution starting with module 29. Its library lookup uses
 the captured namespace, import, placement and `cfg` facts, with a separate
@@ -1716,3 +1725,17 @@ sources use their index URL. Git sources use the repository URL and the
 branch, tag, or revision selector. For a vendored Git package, the lockfile
 must prove a checkout dependency edge with a precise commit. An applicable
 replacement without a unique captured package stays unresolved.
+
+Module 35 records invocation identifiers, attached item names, and
+declarative macro name bounds from the Rust parse. Empty function-like
+inputs are implicit. The resolver
+memoizes scope effects and runs the ordinary checkout and library lookups
+first. A macro-blocked lookup can retry with proven scope bounds and then
+with the external macro assumption. A pair of flags records which bounds
+can change the visited guards. Stable entries share the ordinary lookup
+cache. Successful links
+from the last pass carry `data.assumes: ["rust-external-macro-name"]` in the
+analyzed facts that the graph stores. The identity and resolution shapes stay
+the same, so library queries and ordinary graph queries can return those
+links. Coverage reports the assumption-backed Level 2 count alongside the
+total and still accepts pre-assumption archives.

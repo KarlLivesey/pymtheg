@@ -2,12 +2,18 @@
 import { posix } from "node:path";
 import ts from "typescript";
 import {
+  competingTestNames,
   globalTypeAvailability,
+  isTestFramework,
+  isTestGlobal,
   nodeCanDeclare,
+  nodeGlobalCall,
   nodeGlobalTarget,
   nodeMemberTarget,
   nodeReceiverTypes,
   runtimeHashbang,
+  testGlobalTargets,
+  testSetupFramework,
 } from "./global-types.js";
 import type {
   Diagnostic,
@@ -82,6 +88,10 @@ export interface RenameContext {
 /** One structural judgement per program (its checker), shared by its files. */
 const judges = new WeakMap<ts.TypeChecker, Judge>();
 const programNodeEvidence = new WeakMap<ts.Program, boolean>();
+const programTestSetups = new WeakMap<
+  ts.Program,
+  { units: ReadonlySet<string>; competitors: ReadonlySet<string> }
+>();
 const producerReaders = new WeakMap<
   ts.Program,
   ReturnType<typeof objectProducers>
@@ -147,6 +157,7 @@ interface Targets {
   declarations?: readonly ts.Node[];
   /** Unresolved with no declaration found anywhere (not even outside the project). */
   noAnswer?: boolean;
+  competingTypes?: readonly string[];
   /**
    * Why there is no complete target set: external, local, no-symbol,
    * missing-module, external-package, unresolved-alias, computed-specifier.
@@ -279,7 +290,17 @@ export function extractFile(
   const freshExportNames = new Set(Object.values(context.fresh.local));
   const path = file.fileName.slice(1);
   const importer = library.forImporter(path);
-  const globals = globalTypeAvailability(program, library.isNodeTypeFile);
+  const globals = globalTypeAvailability(
+    program,
+    library.isNodeTypeFile,
+    (name, source) => {
+      const from = fromVirtual(source) ?? path;
+      return (
+        context.selectSpecifier(name, from) === name &&
+        library.forImporter(from).typePackageUnredirected(name)
+      );
+    },
+  );
   let missingNode =
     !globals.hasNode &&
     (globals.expectsNode ||
@@ -483,7 +504,23 @@ export function extractFile(
           lexicalLibrary: true,
           receiver: found.receiver,
         };
+      else if (!incompleteConfig && !context.anyFailed) {
+        if (found.receiver) {
+          const imported = typedReceiverUnit(found);
+          if (imported)
+            result = {
+              targets: [],
+              receiver: found.receiver,
+              libraryFacts: imported,
+            };
+        } else if (meaning === "call" && result.reason === "local") {
+          const alias = selectedMemberAlias(found);
+          if (alias) result = alias;
+        }
+      }
     }
+    const ambient = ambientGlobal(found, result, meaning);
+    if (ambient) return ambient;
     const outside = result.libraryFacts?.[0];
     if (
       !result.lexicalLibrary &&
@@ -525,6 +562,272 @@ export function extractFile(
           };
     }
     return result;
+  }
+  function ambientGlobal(
+    found: Lookup,
+    result: Targets,
+    meaning: Meaning,
+  ): Targets | undefined {
+    const { at, symbol } = found;
+    if (
+      !at ||
+      !ts.isIdentifier(at) ||
+      found.receiver ||
+      (meaning !== "call" && !found.typeQuery) ||
+      incompleteConfig ||
+      context.anyFailed ||
+      result.targets.length ||
+      result.lexicalLibrary ||
+      result.receiver
+    )
+      return undefined;
+    const existing = result.libraryFacts ?? [];
+    // A local binding or an explicit import wins. An already captured
+    // ambient framework can coexist with another requested type package.
+    if (
+      symbol &&
+      (!symbol.declarations?.length ||
+        !existing.length ||
+        existing.some(
+          (target) =>
+            target.ecosystem !== "npm" ||
+            target.symbol !== at.text ||
+            !isTestFramework(target.unit),
+        ) ||
+        symbol.flags & ts.SymbolFlags.Alias)
+    )
+      return undefined;
+    if (!isTestGlobal(at.text)) {
+      const target =
+        !symbol && meaning === "call" && globals.expectsNode
+          ? nodeGlobalCall(at.text, found.construct === true)
+          : undefined;
+      if (
+        target &&
+        !globals.hasNode &&
+        !globals.otherRuntime &&
+        !program.getCompilerOptions().typeRoots &&
+        context.selectSpecifier("node", path) === "node" &&
+        !globals.otherGlobals.has(at.text) &&
+        !insideWith(at) &&
+        importer.typePackageUnredirected("@types/node")
+      )
+        return { targets: [], libraryFacts: [target] };
+      return undefined;
+    }
+    if (found.construct || insideWith(at)) return undefined;
+    let setups = programTestSetups.get(program);
+    if (!setups) {
+      const units = new Set(globals.missingTestFrameworks);
+      const competitors = new Set(globals.competingTestRequests);
+      for (const source of program.getSourceFiles()) {
+        if (fromVirtual(source.fileName) === undefined) continue;
+        for (const statement of source.statements) {
+          if (
+            !ts.isImportDeclaration(statement) ||
+            statement.importClause ||
+            !ts.isStringLiteralLike(statement.moduleSpecifier)
+          )
+            continue;
+          const specifier = statement.moduleSpecifier;
+          const provider = testSetupFramework(specifier.text);
+          const competitor = competingTestNames(specifier.text);
+          const unit =
+            provider ?? (competitor && packageUnit(specifier.text)?.unit);
+          if (!unit) continue;
+          const routes = missingUnits(specifier, competitor !== undefined);
+          if (
+            routes.length === 1 &&
+            routes[0]!.ecosystem === "npm" &&
+            (routes[0]!.unit === unit || routes[0]!.unit === specifier.text)
+          ) {
+            if (provider) units.add(provider);
+            else competitors.add(specifier.text);
+          }
+        }
+      }
+      programTestSetups.set(program, (setups = { units, competitors }));
+    }
+    const alternatives = new Map(
+      existing.map((target) => [target.unit, target]),
+    );
+    if (existing.length)
+      for (const target of capturedTestGlobals(at.text))
+        alternatives.set(target.unit, target);
+    for (const target of testGlobalTargets(
+      at.text,
+      setups.units,
+      meaning === "call",
+    ))
+      if (!alternatives.has(target.unit)) alternatives.set(target.unit, target);
+    if (alternatives.size && setups.competitors.size) {
+      const competing = [...setups.competitors].filter(
+        (request) =>
+          competingTestNames(request)?.includes(at.text) &&
+          (request !== "@testing-library/jest-dom" ||
+            !alternatives.has("jest")),
+      );
+      if (competing.length)
+        return {
+          targets: [],
+          reason: "competing-test-globals",
+          competingTypes: competing.sort(),
+        };
+    }
+    if (alternatives.size > existing.length)
+      return { targets: [], libraryFacts: [...alternatives.values()] };
+    return undefined;
+  }
+  let capturedFrameworkGlobals: Map<string, LibraryTarget[]> | undefined;
+  function capturedTestGlobals(name: string): readonly LibraryTarget[] {
+    // Duplicate globals from two captured type packages may remain separate
+    // compiler symbols, with an unqualified lookup selecting only the first.
+    if (!capturedFrameworkGlobals) {
+      const globals = new Map<string, LibraryTarget[]>();
+      for (const source of program.getSourceFiles()) {
+        const unit = importer.declarationUnit(source);
+        if (unit?.ecosystem !== "npm" || !isTestFramework(unit.unit)) continue;
+        const record = (declaration: ts.Declaration) => {
+          const name = (declaration as ts.NamedDeclaration).name;
+          if (!name || !ts.isIdentifier(name) || !isTestGlobal(name.text))
+            return;
+          const symbol = checker.getSymbolAtLocation(name);
+          if (!symbol?.declarations?.includes(declaration)) return;
+          const target = importer.targetOf(declaration, unit);
+          if (!target) return;
+          const list = globals.get(name.text) ?? [];
+          list.push(target);
+          globals.set(name.text, list);
+        };
+        const visit = (node: ts.Statement) => {
+          if (ts.isFunctionDeclaration(node)) record(node);
+          else if (ts.isVariableStatement(node))
+            node.declarationList.declarations.forEach(record);
+        };
+        for (const statement of source.statements) {
+          if (
+            ts.isModuleDeclaration(statement) &&
+            statement.flags & ts.NodeFlags.GlobalAugmentation &&
+            statement.body &&
+            ts.isModuleBlock(statement.body)
+          )
+            statement.body.statements.forEach(visit);
+          else if (!ts.isExternalModule(source)) visit(statement);
+        }
+      }
+      capturedFrameworkGlobals = globals;
+    }
+    return capturedFrameworkGlobals.get(name) ?? [];
+  }
+  /** The selected property in a same-file, immutable function alias. */
+  function selectedMemberAlias(found: Lookup): Targets | undefined {
+    const declaration = found.symbol?.valueDeclaration;
+    if (
+      !declaration ||
+      !ts.isVariableDeclaration(declaration) ||
+      declaration.getSourceFile() !== file ||
+      !(declaration.parent.flags & ts.NodeFlags.Const) ||
+      declaration.type ||
+      !declaration.initializer ||
+      !found.at ||
+      insideWith(found.at)
+    )
+      return undefined;
+    let value = declaration.initializer;
+    while (ts.isParenthesizedExpression(value)) value = value.expression;
+    if (!ts.isPropertyAccessExpression(value) || ts.isOptionalChain(value))
+      return undefined;
+    const alias = resolveTargets(
+      { ...lookup(value.name), at: value.name },
+      "call",
+    );
+    return alias.libraryFacts?.length &&
+      !alias.targets.length &&
+      (alias.lexicalLibrary || namedLibraryObject(value.expression))
+      ? alias
+      : undefined;
+  }
+  /** A namespace binding or bundled global supplies a fixed library object. */
+  function namedLibraryObject(expression: ts.Expression): boolean {
+    if (!ts.isIdentifier(expression)) return false;
+    const declarations = checker.getSymbolAtLocation(expression)?.declarations;
+    return (
+      !!declarations?.length &&
+      declarations.every(
+        (declaration) =>
+          ts.isNamespaceImport(declaration) ||
+          declaration.getSourceFile().fileName.startsWith(LIB_ROOT + "/"),
+      )
+    );
+  }
+  /** An unavailable imported type establishes only the receiver's unit. */
+  function typedReceiverUnit(found: Lookup): LibraryTarget[] | undefined {
+    if (found.name === undefined || found.symbol?.declarations?.length)
+      return undefined;
+    const receiver = found.receiver!;
+    let expression = receiver;
+    while (ts.isParenthesizedExpression(expression))
+      expression = expression.expression;
+    let annotation: ts.TypeNode | undefined;
+    if (
+      ts.isAsExpression(expression) ||
+      ts.isTypeAssertionExpression(expression)
+    )
+      annotation = expression.type;
+    else if (ts.isCallExpression(expression)) {
+      const declaration = checker.getResolvedSignature(expression)?.declaration;
+      // A selected overload does not prove the only return annotation.
+      const name = declaration && (declaration as ts.NamedDeclaration).name;
+      if (
+        declaration?.type &&
+        ts.isTypeNode(declaration.type) &&
+        name &&
+        checker.getSymbolAtLocation(name)?.declarations?.length === 1
+      )
+        annotation = declaration.type;
+    } else {
+      const declaration =
+        checker.getSymbolAtLocation(expression)?.valueDeclaration;
+      if (
+        declaration &&
+        (ts.isParameter(declaration) ||
+          ts.isVariableDeclaration(declaration) ||
+          ts.isPropertyDeclaration(declaration) ||
+          ts.isPropertySignature(declaration))
+      )
+        annotation = declaration.type;
+    }
+    if (!annotation || !ts.isTypeReferenceNode(annotation)) return undefined;
+    const type = checker.getTypeAtLocation(receiver);
+    if (!(type.flags & ts.TypeFlags.Any) || type === checker.getAnyType())
+      return undefined;
+    for (
+      let depth = 0;
+      depth < 8 && ts.isTypeReferenceNode(annotation);
+      depth++
+    ) {
+      const name = annotation.typeName;
+      const at = ts.isQualifiedName(name) ? name.right : name;
+      const query = lookup(at);
+      const units = missingBinding({ ...query, at }, "type");
+      if (units?.every(({ symbol }) => symbol !== undefined))
+        return units.map(({ symbol: _symbol, ...unit }) => ({
+          ...unit,
+          evidence: "import-path",
+        }));
+      const symbol = query.symbol;
+      if (!symbol || symbol === LIMIT) return undefined;
+      const target =
+        symbol.flags & ts.SymbolFlags.Alias
+          ? checker.getAliasedSymbol(symbol)
+          : symbol;
+      const declaration =
+        target.declarations?.length === 1 && target.declarations[0];
+      if (!declaration || !ts.isTypeAliasDeclaration(declaration))
+        return undefined;
+      annotation = declaration.type;
+    }
+    return undefined;
   }
   function resolveChecked(found: Lookup, meaning: Meaning): Targets {
     const receiver = found.receiver;
@@ -1565,6 +1868,7 @@ export function extractFile(
         }));
     }
     if (reason) facts.reason = reason;
+    if (found.competingTypes) facts.competingTypes = [...found.competingTypes];
     links.push({
       sourceKey,
       kind,
@@ -2031,7 +2335,7 @@ export function extractFile(
         symbol:
           ts.isStringLiteralLike(key) || ts.isNumericLiteral(key)
             ? memberCallLookup(expression, key)
-            : {},
+            : computedLibraryMember(expression),
       };
     }
     if (
@@ -2040,6 +2344,41 @@ export function extractFile(
     )
       return { at: expression, symbol: { symbol: symbolOf(expression) } };
     return { at: callee, symbol: {} };
+  }
+  /** A computed selector can still be one checker-proven library property. */
+  function computedLibraryMember(access: ts.ElementAccessExpression): Lookup {
+    const key = access.argumentExpression;
+    if (
+      limited ||
+      incompleteConfig ||
+      context.anyFailed ||
+      !ts.isIdentifier(key) ||
+      insideWith(key) ||
+      !namedLibraryObject(access.expression)
+    )
+      return {};
+    const declaration = checker.getSymbolAtLocation(key)?.valueDeclaration;
+    if (
+      !declaration ||
+      !ts.isVariableDeclaration(declaration) ||
+      !(declaration.parent.flags & ts.NodeFlags.Const) ||
+      !declaration.initializer ||
+      (!ts.isStringLiteralLike(declaration.initializer) &&
+        !ts.isNumericLiteral(declaration.initializer))
+    )
+      return {};
+    const receiver = access.expression;
+    const type = checker.getTypeAtLocation(receiver);
+    const name = declaration.initializer.text;
+    const symbol = checker.getPropertyOfType(
+      ts.isOptionalChain(access) ? checker.getNonNullableType(type) : type,
+      name,
+    );
+    return symbol?.declarations?.some((declaration) =>
+      importer.declarationUnit(declaration.getSourceFile()),
+    )
+      ? { symbol, receiver, name }
+      : {};
   }
   function callLink(
     owner: string,
