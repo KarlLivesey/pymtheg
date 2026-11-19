@@ -1,0 +1,74 @@
+{
+ "links": 947018,
+ "toolchainAnswerByLink": {
+  "checkout": 472191,
+  "library": 355725,
+  "none": 86605,
+  "generated": 17363,
+  "checkout-unmapped": 8169,
+  "collision": 6847,
+  "library-crate-only": 118
+ },
+ "toolchainNoAnswer": {
+  "file-not-indexed:src": 30365,
+  "no-occurrence-named-so": 15880,
+  "cfg-conditional": 15742,
+  "file-not-indexed:tests": 10820,
+  "file-not-indexed:examples": 9315,
+  "no-occurrence-in-range": 2824,
+  "local-without-definition": 868,
+  "file-not-indexed:build-script": 791
+ },
+ "notIndexedTopDirectories": {
+  "axum/axum-extra/src": 4608,
+  "helix/helix-term/tests": 3271,
+  "tauri/crates/tauri-cli": 3025,
+  "tauri/crates/tauri-bundler": 2683,
+  "axum/axum-macros/tests": 2328,
+  "clap/clap_complete/src": 2063,
+  "redb/fuzz/fuzz_targets": 1976,
+  "hashes/sha2/src": 1946,
+  "tree-sitter/lib/binding_rust": 1655,
+  "axum/axum/src": 1420,
+  "actix-web/actix-web-actors/src": 1336,
+  "actix-web/actix-web/src": 1217,
+  "alacritty/alacritty_terminal/src": 968,
+  "tauri/crates/tauri": 867,
+  "clap/clap_complete/tests": 791
+ },
+ "gainTraitDeclaration": 17219,
+ "gainUnderNonTestCfg": 47226,
+ "generatedNotCredited": 9150,
+ "gainByKind": {
+  "calls | library": 158220,
+  "calls | checkout": 107686,
+  "values | checkout": 58156,
+  "macros | library": 38504,
+  "types | library": 35591,
+  "types | checkout": 23731,
+  "imports | library": 13672,
+  "imports | checkout": 12992,
+  "values | library": 10084,
+  "patterns | library": 7750,
+  "macros | checkout": 4850,
+  "patterns | checkout": 3466,
+  "implements | library": 2287,
+  "implements | checkout": 1045,
+  "modules | checkout": 94
+ },
+ "libraryAnswerShapes": {
+  "rust-std version:url": 171601,
+  "rust-std version:url impl-block": 87514,
+  "cargo version:semver": 53409,
+  "cargo version:semver impl-block": 21487,
+  "rust-std version:url via-trait-impl impl-block": 16764,
+  "cargo version:semver via-trait-impl impl-block": 5065,
+  "cargo version:url": 3
+ },
+ "candidateSets": {
+  "toolchain-answer-in-set": 657,
+  "toolchain-answer-outside-set:collision": 80,
+  "toolchain-answer-outside-set:generated": 18,
+  "toolchain-answer-outside-set:checkout": 1
+ }
+}

@@ -1,0 +1,18 @@
+{"pin":"dioxus","counts":{"re-export of the name found":389,"re-export of the path's module found":58,"only a glob re-export (possible)":106},"notFound":[]}
+{"pin":"tauri","counts":{"re-export of the name found":137,"re-export of the path's module found":25,"only a glob re-export (possible)":49},"notFound":[]}
+{"pin":"helix","counts":{"re-export of the name found":133,"only a glob re-export (possible)":13,"re-export of the path's module found":9},"notFound":[]}
+{"pin":"actix-web","counts":{"re-export of the name found":232,"only a glob re-export (possible)":27,"re-export of the path's module found":18},"notFound":[]}
+{"pin":"ratatui","counts":{"re-export of the name found":28,"only a glob re-export (possible)":34,"re-export of the path's module found":2},"notFound":[]}
+{"pin":"rustls","counts":{"only a glob re-export (possible)":3,"re-export of the name found":5},"notFound":[]}
+{"pin":"clap","counts":{"re-export of the name found":20},"notFound":[]}
+{"pin":"redb","counts":{"re-export of the path's module found":2,"re-export of the name found":17},"notFound":[]}
+{"pin":"tree-sitter","counts":{"only a glob re-export (possible)":34,"re-export of the name found":27},"notFound":[]}
+{"pin":"ripgrep","counts":{"re-export of the name found":37},"notFound":[]}
+{"pin":"axum","counts":{"re-export of the name found":22,"only a glob re-export (possible)":2},"notFound":[]}
+{"pin":"crossbeam","counts":{"re-export of the name found":9},"notFound":[]}
+{"pin":"serde","counts":{"re-export of the name found":2},"notFound":[]}
+{"pin":"alacritty","counts":{"re-export of the name found":122,"re-export of the path's module found":10,"only a glob re-export (possible)":4},"notFound":[]}
+{"pin":"hashes","counts":{"re-export of the path's module found":148,"re-export of the name found":326},"notFound":[]}
+{"pin":"mdbook","counts":{"only a glob re-export (possible)":28,"re-export of the name found":29},"notFound":[]}
+{"pin":"fjall","counts":{"re-export of the name found":4},"notFound":[]}
+{"pin":"cortex-m","counts":{"re-export of the name found":1},"notFound":[]}
