@@ -361,8 +361,20 @@ async function createHelper(): Promise<Helper> {
         range?: { start: number; end: number },
       ) => {
         if (
+          targetName.includes("<") &&
+          ["calls", "values", "types", "implements"].includes(kind)
+        ) {
+          const libraryPath = libraryNamePath(n);
+          extra = {
+            ...extra,
+            ...(libraryPath ? { libraryPath } : {}),
+            ...qualifiedTrait(n),
+          };
+        }
+        if (
           !["contains", "modules", "imports"].includes(kind) &&
-          !extra.macroArguments
+          !extra.macroArguments &&
+          !extra.libraryMacroFlavor
         ) {
           const position = referencePosition(n);
           if (!position) extra = { ...extra, namespaceUnknown: true };
@@ -479,6 +491,33 @@ async function createHelper(): Promise<Helper> {
           else groups.at(-1)!.push(c);
         }
         return groups.filter((g) => g.length).map(parts);
+      }
+      function libraryNamePath(n: Node | null): string {
+        if (!n) return "";
+        if (n.type === "generic_type") return libraryNamePath(field(n, "type"));
+        if (
+          n.type === "scoped_identifier" ||
+          n.type === "scoped_type_identifier"
+        ) {
+          const path = field(n, "path"),
+            prefix = libraryNamePath(path);
+          if (path && !prefix) return "";
+          return prefix + "::" + compact(field(n, "name")?.text ?? "");
+        }
+        return /^[\p{ID_Start}_][\p{ID_Continue}_]*$/u.test(compact(n.text))
+          ? compact(n.text)
+          : "";
+      }
+      function qualifiedTrait(n: Node): Record<string, Json> {
+        const qualifier = field(n, "path")?.namedChildren[0];
+        if (qualifier?.type !== "qualified_type") return {};
+        const libraryTrait = libraryNamePath(field(qualifier, "alias"));
+        return libraryTrait && !genericShadow(n, libraryTrait.split("::")[0]!)
+          ? {
+              libraryTrait,
+              libraryTraitMember: compact(field(n, "name")?.text ?? ""),
+            }
+          : {};
       }
       // Compare cfg predicates by syntax tokens, preserving literal contents.
       const cfgText = (n: Node): string =>
@@ -2772,11 +2811,15 @@ async function createHelper(): Promise<Helper> {
         scope: string;
         raw: string;
         name: string;
+        start: number;
         module: string;
         conditions: string[];
         helper?: true;
         nested?: boolean;
       }[] = [];
+      const declarationKeys = new Set(
+        result.symbols.map((symbol) => symbol.key),
+      );
       function attributes(n: Node): void {
         if (["attribute_item", "inner_attribute_item"].includes(n.type)) {
           let item =
@@ -2794,11 +2837,14 @@ async function createHelper(): Promise<Helper> {
               n.type === "inner_attribute_item" ? item : item.parent,
             )
           )
-            for (const app of applications(meta(n), item))
+            for (const app of applications(meta(n), item)) {
+              const scope = lexicalScopes.get(item.id) ?? "";
+              const helper = deriveHelper(app.meta, item, app.guards);
               opaqueAttributes.push({
-                scope: lexicalScopes.get(item.id) ?? "",
+                scope,
                 name: app.meta.name,
-                ...(deriveHelper(app.meta, item, app.guards) ?? {}),
+                start: app.meta.start,
+                ...(helper ?? {}),
                 raw: `#[${app.meta.name}${app.meta.args?.text ?? (app.meta.value ? "=" + app.meta.value.text : "")}]`,
                 conditions: app.guards,
                 module:
@@ -2806,6 +2852,41 @@ async function createHelper(): Promise<Helper> {
                     ? compact(field(item, "name")?.text ?? "")
                     : "",
               });
+              const name = app.meta.name;
+              const names =
+                name === "derive" && app.meta.args
+                  ? payloads(app.meta.args)
+                  : !attributeRules.has(name.split("::")[0]!) && !helper
+                    ? [app.meta]
+                    : [];
+              const key = `item:${item.startIndex}`;
+              const owner = declarationKeys.has(key) ? key : "file";
+              activeConditions = [...conditionsOn(item), ...app.guards];
+              for (const target of names) {
+                if (
+                  !/^(?:::)?[_\p{ID_Start}][_\p{ID_Continue}]*(?:::[_\p{ID_Start}][_\p{ID_Continue}]*)*$/u.test(
+                    target.name,
+                  )
+                )
+                  continue;
+                link(
+                  item,
+                  owner,
+                  scope,
+                  "macros",
+                  target.name,
+                  {
+                    libraryMacroFlavor:
+                      name === "derive" ? "derive" : "attribute",
+                    libraryAttributeStart: app.meta.start,
+                  },
+                  {
+                    start: target.start,
+                    end: target.start + target.name.length,
+                  },
+                );
+              }
+            }
         }
         for (const c of n.namedChildren) attributes(c);
       }

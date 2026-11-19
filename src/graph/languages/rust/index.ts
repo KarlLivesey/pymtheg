@@ -136,6 +136,7 @@ export const rustPhases = {
       },
       (link, gates) => conditions.set(link.id, gates),
       undefined,
+      undefined,
       (link, extra) => notes.set(link.id, extra),
     );
     for (let i = 0; i < updated.length; i++) {
@@ -216,9 +217,14 @@ export const rustPhases = {
 
 const rust: LanguageModule = {
   id: "rust",
-  version: "29",
+  version: "32",
   extensions: [".rs"],
-  contextFiles: ["Cargo.toml", "Cargo.lock"],
+  contextFiles: [
+    "Cargo.toml",
+    "Cargo.lock",
+    "**/.cargo/config.toml",
+    "**/.cargo/config",
+  ],
   parse: parseRust,
   analyze({ projectId, files, contextFiles, signal }) {
     if (!files.length) return [];

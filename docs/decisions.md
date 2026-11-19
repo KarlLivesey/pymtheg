@@ -2671,3 +2671,19 @@ associated types; trait-method targets (even of checkout traits); `Box`,
 `Rc`, `Arc` and `Deref` receivers; library method owners (a later chunk).
 Several reviewed tests that pinned the old first-step-only outcome now expect
 the method rustc selects; [C-10](changes/C-10.md) lists each.
+
+### C-9 Rust library paths
+
+Rust records the final written path through a proven import, qualified crate
+path or edition prelude binding as a library target. A Cargo alias names the
+package from the manifest. A lockfile version needs the owning package's
+dependency edge, or an exact requirement can name the manifest version.
+The resolver keeps the named export when a dependency re-exports it. For an
+associated call it needs a named trait or proof of the declaring member.
+An explicit `use` in a module protects a proven namespace binding from
+opaque items in that module, since rustc rejects duplicate bindings there.
+Captured Cargo directory-source replacements use checkout resolution. The
+configuration maps registry indexes or Git URLs and ref selectors to a
+directory source. A proven package selection is required to resolve inside it.
+Rust coverage now credits recorded targets on graphs made by the supporting
+module version. See [C-9](changes/C-9.md).
