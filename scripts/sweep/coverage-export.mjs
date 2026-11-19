@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync, renameSync } from "node:fs";
+import { isBuiltin } from "node:module";
 import { dirname, join, posix, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
@@ -216,6 +217,19 @@ function addObservation(observations, identity, make) {
     observations.set(identity, entry);
   }
   entry.links++;
+}
+
+// Classify a lost legacy credit without changing its historical score. A
+// path beyond a written export needs a declaring member from the checker.
+function legacyTypeScriptProof(link, evidence) {
+  if (["imports", "exports"].includes(link.kind)) return "written-name";
+  const [head, ...tail] = link.targetName.replace(/^new\s+/, "").replaceAll("?.", ".").split(".");
+  const binding = evidence.tsImportMember(head);
+  if (binding && (tail.length === 0 || tail.length === 1 &&
+      (binding.member === "*" || binding.member === "default" && isBuiltin(binding.specifier)))) {
+    return "written-name";
+  }
+  return "unproved-member";
 }
 
 function sourceClues(source, at, names) {
@@ -593,7 +607,7 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys, pre
         if (current?.score === 2) continue;
         const reason = current?.score === 1 ? "unit-only" : current?.link.data?.assumes?.join("+") ||
           current?.link.data?.reason || current?.link.resolution || "site-absent";
-        const reasonKey = `${previous.kind}:${reason}`;
+        const reasonKey = `${legacyTypeScriptProof(previous, evidence)}:${previous.kind}:${reason}`;
         const loss = legacyTypeScriptLosses[reasonKey] ??= { count: 0, examples: [] };
         loss.count++;
         if (loss.examples.length < 3) loss.examples.push({ file: file.path,

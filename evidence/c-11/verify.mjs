@@ -27,7 +27,8 @@ for (const entry of readdirSync(".")) {
 }
 symlinkSync(resolve("node_modules"), join(checkout, "node_modules"));
 
-for (const [command, ...args] of [
+const filter = process.argv[2];
+const full = [
   ["npm", "run", "build"],
   [process.execPath, "node_modules/typescript/bin/tsc", "--noEmit"],
   ["npm", "run", "format:check"],
@@ -38,7 +39,18 @@ for (const [command, ...args] of [
     "scripts/sweep/coverage.test.mjs",
     "scripts/sweep/run.test.mjs",
   ],
-]) {
+];
+const focused = [
+  ["npm", "run", "build:core"],
+  [
+    process.execPath,
+    "--test",
+    "--test-name-pattern",
+    filter,
+    "test/graph-typescript-resolution.test.mjs",
+  ],
+];
+for (const [command, ...args] of filter ? focused : full) {
   const result = spawnSync(command, args, { cwd: checkout, stdio: "inherit" });
   if (result.status !== 0)
     throw (

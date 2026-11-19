@@ -11,7 +11,8 @@ import {
 import { join, resolve } from "node:path";
 
 const scratch = process.env.PYM_SCRATCH;
-const [mode, other, output] = process.argv.slice(2);
+const [mode, other, ...args] = process.argv.slice(2);
+const [output] = args;
 const repos = JSON.parse(readFileSync("sweep/repos.json", "utf8"));
 const baseline = JSON.parse(readFileSync("evidence/sw-1/results.json", "utf8"));
 const finished = new Set(
@@ -95,15 +96,35 @@ if (mode === "release") {
     JSON.stringify(pins.filter((repo) => preservationPins.has(repo.id))),
   );
   sweep(scratch, 3, main);
-} else if (["candidate", "candidate-audit", "candidate-core"].includes(mode)) {
+} else if (mode === "collect") {
+  const packets = [other, ...args].map((name) =>
+    JSON.parse(readFileSync(join(scratch, `${name}-run.json`), "utf8")),
+  );
+  const [first] = packets;
+  if (packets.some((packet) => packet.release.sha256 !== first.release.sha256))
+    throw Error("Candidate shards must use one build");
+  const byId = new Map(
+    packets.flatMap((packet) => packet.repos.map((row) => [row.id, row])),
+  );
+  writeFileSync(
+    join(scratch, "candidate-run.json"),
+    JSON.stringify({ ...first, repos: [...byId.values()] }),
+  );
+} else if (
+  ["candidate", "candidate-audit", "candidate-core", "candidate-pick"].includes(
+    mode,
+  )
+) {
   writeFileSync(
     manifest,
     JSON.stringify(
       mode === "candidate"
         ? pins
-        : pins.filter(
-            (repo) => auditPins.has(repo.id) === (mode === "candidate-audit"),
-          ),
+        : mode === "candidate-pick"
+          ? args.map((id) => pins.find((repo) => repo.id === id))
+          : pins.filter(
+              (repo) => auditPins.has(repo.id) === (mode === "candidate-audit"),
+            ),
     ),
   );
   sweep(scratch, Number(other ?? 4), resolve("."));

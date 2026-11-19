@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Preserve the completed overlays already incorporated into main's plan.
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { gzipSync, gunzipSync } from "node:zlib";
 
@@ -10,44 +10,28 @@ const load = (path) =>
       ? gunzipSync(readFileSync(path))
       : readFileSync(path, "utf8"),
   );
-const baseline = load("evidence/sw-3/breakdown.json.gz");
-const inputs = new Map();
-const chunks = new Set(readdirSync("evidence"));
-function overlay(packet, keepFinished = false) {
-  for (const row of packet.repos) {
-    const previous = inputs.get(row.id);
-    if (
-      keepFinished &&
-      previous?.outcome === "finished" &&
-      row.outcome !== "finished"
-    )
-      continue;
-    inputs.set(row.id, row);
-  }
-}
-for (const [chunk, name] of [
-  ["c-1", "coverage-plan-input"],
-  ["c-4", "coverage-plan-input"],
-  ["c-7", "coverage-plan-input"],
-  ["c-8", "coverage-plan-input"],
-  ["c-9", "coverage-plan-input"],
-]) {
-  if (
-    !chunks.has(chunk) ||
-    !readdirSync(`evidence/${chunk}`).includes(`${name}.json.gz`)
-  )
-    continue;
-  overlay(load(`evidence/${chunk}/${name}.json.gz`), true);
-}
-const packet = load(join(process.env.PYM_SCRATCH, "candidate-coverage.json"));
-overlay(packet);
+const overlay = (earlier, later) => ({
+  ...later,
+  repos: [
+    ...new Map(
+      [...earlier.repos, ...later.repos].map((row) => [row.id, row]),
+    ).values(),
+  ],
+});
+const scratch = process.env.PYM_SCRATCH;
+const baseline = overlay(
+  load("evidence/sw-3/breakdown.json.gz"),
+  load("evidence/c-4/coverage-plan-input.json.gz"),
+);
+const main = load("evidence/c-7/review-2/coverage-plan-input.json.gz");
+const source = process.argv[2] ?? "candidate-coverage.json";
+const result =
+  source === "main" ? main : overlay(main, load(join(scratch, source)));
 writeFileSync(
-  join(process.env.PYM_SCRATCH, "c11-plan-input.json.gz"),
-  gzipSync(
-    JSON.stringify({
-      ...baseline,
-      release: packet.release,
-      repos: [...inputs.values()],
-    }),
-  ),
+  join(scratch, "c11-plan-base.json.gz"),
+  gzipSync(JSON.stringify(baseline)),
+);
+writeFileSync(
+  join(scratch, "c11-plan-input.json.gz"),
+  gzipSync(JSON.stringify(result)),
 );

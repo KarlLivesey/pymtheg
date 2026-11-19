@@ -13,8 +13,8 @@ const attempts = (name) =>
     ).repos.map((repo) => [repo.id, repo]),
   );
 const main = attempts("main");
-const candidate = attempts("candidate");
-const selected = process.argv.slice(2);
+const [build, ...selected] = process.argv.slice(2);
+const candidate = attempts(build);
 const database = (repo) =>
   new DatabaseSync(
     join(scratch, repo.attempt, "checkout/.pymtheg/rebuildable/graph.sqlite"),
@@ -33,7 +33,7 @@ const inventory = (db) =>
 const links = (db) =>
   db.prepare(`SELECT l.body,l.kind,l.module,l.resolution,
   json_array(s.file,json_extract(s.body,'$.key'),json_extract(s.body,'$.ordinal')) AS target
-  FROM graph_links l LEFT JOIN graph_symbols s ON s.id=l.target
+  FROM graph_links l INDEXED BY graph_link_file LEFT JOIN graph_symbols s ON s.id=l.target
   WHERE l.module='typescript' AND l.file=?`);
 const symbols = (db) =>
   db.prepare(
