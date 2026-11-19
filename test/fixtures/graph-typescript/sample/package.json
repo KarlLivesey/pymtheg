@@ -1,1 +1,1 @@
-{ "name": "sample", "private": true, "workspaces": ["packages/*"] }
+{ "name": "sample", "private": true, "workspaces": ["packages/*"], "dependencies": { "chalk": "^5" } }

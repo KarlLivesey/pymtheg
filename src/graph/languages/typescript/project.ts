@@ -5,7 +5,12 @@ import { dirname, posix } from "node:path";
 import ts from "typescript";
 import { compare, matchesPattern } from "../../index.js";
 import type { ContextFile, Diagnostic, GraphFile } from "../../types.js";
-import { workspaceLinks, type Manifest } from "./workspace.js";
+import { denoConfigPatterns, denoImports, importMapNames } from "./deno.js";
+import {
+  workspaceLinks,
+  type Manifest,
+  type WorkspaceCatalogs,
+} from "./workspace.js";
 import {
   freshNames,
   renameShadowed,
@@ -54,6 +59,8 @@ export interface ProjectGroup {
   /** Owning config path, or null for the inferred project (no config includes the file). */
   config: string | null;
   options: ts.CompilerOptions;
+  /** The parsed config selected ambient packages before the snapshot host forced defaults. */
+  explicitTypes?: boolean;
   references?: readonly ts.ProjectReference[];
   roots: string[];
   /** Limitations that make every owned file's facts partial. */
@@ -67,6 +74,10 @@ export interface ProjectGroup {
 }
 export interface ProjectModel {
   groups: ProjectGroup[];
+  manifests: readonly Manifest[];
+  workspaceRoots: ReadonlySet<string>;
+  workspaceBoundaries: ReadonlySet<string>;
+  workspaceCatalogs: WorkspaceCatalogs;
   hasWorkspacePackages: boolean;
   owner: Map<string, ProjectGroup>;
   /**
@@ -105,6 +116,9 @@ export interface ProjectModel {
     from: string,
     lookups: readonly string[],
   ) => string | undefined;
+  workspaceBoundaryKnown: (from: string) => boolean;
+  hasDenoImports: boolean;
+  selectSpecifier: (specifier: string, from: string) => string | undefined;
 }
 
 const INFERRED: ts.CompilerOptions = {
@@ -316,15 +330,15 @@ function forced(options: ts.CompilerOptions): ts.CompilerOptions {
     allowJs: true,
     noEmit: true,
     skipLibCheck: true,
-    // Type packages live under node_modules, which is never captured.
-    types: [],
+    // The host still excludes installed node_modules. Explicit local type
+    // roots can supply declarations from the captured snapshot.
+    ...(!options.types && !options.typeRoots ? { types: [] } : {}),
     maxNodeModuleJsDepth: 0,
   };
   for (const key of [
     "composite",
     "incremental",
     "tsBuildInfoFile",
-    "typeRoots",
     "plugins",
     "declarationDir",
     "outDir",
@@ -463,6 +477,8 @@ export const CONTEXT_PATTERNS = [
   "*jsconfig*.json",
   "package.json",
   "pnpm-workspace.yaml",
+  ...denoConfigPatterns,
+  ...importMapNames,
 ] as const;
 const isContextPath = (path: string) =>
   CONTEXT_PATTERNS.some((pattern) => matchesPattern(path, pattern));
@@ -485,6 +501,7 @@ export function projectModel(
   contexts: readonly ContextFile[],
 ): ProjectModel {
   const fs = new VirtualFileSystem();
+  const deno = denoImports(contexts);
   for (const file of contexts) fs.add(file.path, file.text);
   const manifests: Manifest[] = [];
   /** Package directory -> why its manifest is unreadable. */
@@ -549,7 +566,10 @@ export function projectModel(
       renames.set(file.path, renamed);
     fs.add(file.path, renamed.error ? file.text : renamed.text);
   }
-  for (const [link, target] of workspaceLinks(manifests, contexts))
+  const workspace = workspaceLinks(manifests, contexts, [
+    ...brokenManifests.keys(),
+  ]);
+  for (const [link, target] of workspace.links)
     fs.link(toVirtual(link), target === "." ? "/" : toVirtual(target));
   const matchFiles = (
     ts as unknown as {
@@ -785,6 +805,7 @@ export function projectModel(
             ),
         );
         group.options = forced(parsed.options);
+        group.explicitTypes = parsed.options.types !== undefined;
         if (!group.limitations.length)
           for (const output of [
             parsed.options.outDir,
@@ -978,13 +999,54 @@ export function projectModel(
       getParsedCommandLine: (name) => parsedConfigs.get(fs.real(name)),
       realpath: (name) => fs.real(name),
     };
+    if (deno.active) {
+      created.resolveModuleNameLiterals = (
+        literals,
+        containingFile,
+        redirected,
+        options,
+        source,
+      ) =>
+        literals.map((literal) => {
+          const selected = deno.select(
+            literal.text,
+            fromVirtual(containingFile) ?? ".",
+          );
+          if (selected === undefined) return { resolvedModule: undefined };
+          const result = ts.resolveModuleName(
+            selected,
+            containingFile,
+            options,
+            created,
+            undefined,
+            redirected,
+            ts.getModeForUsageLocation(source, literal, options),
+          );
+          // The checker uses this flag to diagnose a TypeScript extension in
+          // the written literal. A map can supply an extension the literal lacks.
+          if (
+            selected !== literal.text &&
+            result.resolvedModule?.resolvedUsingTsExtension
+          )
+            result.resolvedModule.resolvedUsingTsExtension = false;
+          return result;
+        });
+    }
     caches.set(created, sources);
     asked.set(created, requested);
     return created;
   };
   return {
     groups,
+    manifests,
+    workspaceRoots: new Set(
+      [...fs.links.values()].map((path) => fromVirtual(path) || "."),
+    ),
+    workspaceBoundaries: workspace.boundaries,
+    workspaceCatalogs: workspace.catalogs,
     hasWorkspacePackages: fs.links.size > 0,
+    hasDenoImports: deno.active,
+    selectSpecifier: deno.select,
     owner,
     ties,
     failures,
@@ -1007,5 +1069,10 @@ export function projectModel(
     host,
     workspaceReason: (specifier, from, lookups) =>
       fs.workspaceReason(specifier, from, lookups),
+    workspaceBoundaryKnown: (from) => {
+      for (const root of workspace.incompleteRoots)
+        if (underDirectory(from, root)) return false;
+      return true;
+    },
   };
 }
