@@ -126,13 +126,17 @@ test("external macros recover unrelated names with an assumption, but keep compe
       automod::dir!("src/modules");
       fn missing() -> Option<u8> { None } // layout
     }
+    mod forwarded_glob {
+      cfg_if::cfg_if! { if #[cfg(unix)] { use slotmap::*; } }
+      fn missing() -> Option<u8> { None } // input glob
+    }
     mod generated_names {
       use paste::paste as build;
       build! { struct [<Opt ion>]; }
       fn missing() -> Option { Option } // pasted
     }
   `,
-    'slotmap="1"\nautomod="1"\npaste="1"',
+    'slotmap="1"\nautomod="1"\npaste="1"\ncfg-if="1"',
   );
   assert.deepEqual(at("calls", "outside", "// checkout"), assumed("outside"));
   assert.deepEqual(
@@ -142,6 +146,7 @@ test("external macros recover unrelated names with an assumption, but keep compe
   assert.deepEqual(at("types", "Option", "// input"), proved(null));
   assert.deepEqual(at("types", "Option", "// glob"), proved(null));
   assert.deepEqual(at("types", "Option", "// layout"), proved(null));
+  assert.deepEqual(at("types", "Option", "// input glob"), proved(null));
   assert.deepEqual(at("types", "Option", "// pasted"), proved(null));
 });
 

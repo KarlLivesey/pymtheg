@@ -7,14 +7,6 @@ import { DatabaseSync } from "node:sqlite";
 
 const scratch = process.env.PYM_SCRATCH;
 const seed = "c12-rust-macro-scope-2026-11-19";
-const auditPins = new Set([
-  "actix/actix-web",
-  "alacritty/alacritty",
-  "helix-editor/helix",
-  "ratatui/ratatui",
-  "serde-rs/serde",
-  "tokio-rs/axum",
-]);
 const read = (name) => JSON.parse(readFileSync(join(scratch, name), "utf8"));
 const main = new Map(
   read("main-run.json").repos.map((repo) => [repo.id, repo]),
@@ -22,6 +14,8 @@ const main = new Map(
 const checkout = (repo) => join(scratch, repo.attempt, "checkout");
 const bump = (obj, key) => (obj[key] = (obj[key] ?? 0) + 1);
 const sortKeys = (a, b) => (a.rank < b.rank ? -1 : a.rank > b.rank ? 1 : 0);
+const rankOf = (parts) =>
+  createHash("sha256").update(JSON.stringify([seed, ...parts])).digest("hex");
 
 function graph(repo) {
   const db = new DatabaseSync(
@@ -178,10 +172,7 @@ function compare(previous, current) {
       } else bump(counters, "addedSites");
       if (!s.level2 || prior?.level2) continue;
       if (!s.assumed) bump(counters, `newProven:${s.outcome}`);
-      if (s.assumed && !auditPins.has(current.id)) continue;
-      const rank = createHash("sha256")
-        .update(JSON.stringify([seed, current.id, current.commit, s.key]))
-        .digest("hex");
+      const rank = rankOf([current.id, current.commit, s.key]);
       const sample = s.assumed ? assumedSample : provenSample;
       const limit = s.assumed ? 10 : 20;
       if (
@@ -275,6 +266,16 @@ const results = read("candidate-run.json").repos.map((repo) => {
   }
   return { id: repo.id, commit: repo.commit, ...compare(previous, repo) };
 });
+const sampledPins = new Set(
+  results
+    .filter((row) => row.assumedSample?.length === 10)
+    .map((row) => ({ id: row.id, rank: rankOf([row.id, row.commit]) }))
+    .sort(sortKeys)
+    .slice(0, 6)
+    .map((row) => row.id),
+);
+for (const row of results)
+  if (!sampledPins.has(row.id)) delete row.assumedSample;
 writeFileSync(
   join(scratch, "compare.json"),
   JSON.stringify({ seed, results }, null, 2),

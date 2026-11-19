@@ -18,6 +18,7 @@ import {
   consumingBuiltins,
   formatStandardMacros,
   standardFormatName,
+  type MacroInput,
   type MacroProfile,
 } from "./macro-rules.js";
 import { posix as p } from "node:path";
@@ -3869,7 +3870,7 @@ export function resolveRust(
     name: string;
     scope: string;
     start: number;
-    inputNames?: string[] | undefined;
+    input?: MacroInput | undefined;
     attribute?: true;
   };
   const opaqueOrigins = new Map<string, OpaqueOrigin[]>();
@@ -3908,7 +3909,7 @@ export function resolveRust(
         name: string;
         scope: string;
         start?: number;
-        inputNames?: string[];
+        input?: MacroInput;
         block?: true;
       }[])
         if (
@@ -3961,8 +3962,8 @@ export function resolveRust(
               ...(e.input === undefined
                 ? {}
                 : {
-                    inputNames: (
-                      (data(f.result).attributeInputs ?? []) as string[][]
+                    input: (
+                      (data(f.result).attributeInputs ?? []) as MacroInput[]
                     )[e.input],
                   }),
               attribute: true,
@@ -5069,8 +5070,8 @@ export function resolveRust(
   function macroScopeEffect(
     origin: OpaqueOrigin,
   ): MacroScopeEffect | undefined {
-    const { loc, name, scope, start, inputNames } = origin;
-    if (!inputNames || loc.uncertain || loc.directoryUnverified) return;
+    const { loc, name, scope, start, input } = origin;
+    if (!input || loc.uncertain || loc.directoryUnverified) return;
     const sites = origin.attribute
       ? (attributesByStart.get(`${loc.file}|${start}`) ?? [])
       : [macroSites.get(`${loc.file}|${start}`)].filter(
@@ -5106,7 +5107,7 @@ export function resolveRust(
           // An input identifier may become an item name deep in a nested
           // expansion, or a block binding passed through a metavariable.
           if (introduced.takesName)
-            for (const binding of inputNames) names.add(binding);
+            for (const binding of input.names) names.add(binding);
           continue;
         }
       }
@@ -5130,11 +5131,12 @@ export function resolveRust(
         continue;
       if (
         macro.ecosystem !== "cargo" ||
+        input.mayIntroduceUnknownNames ||
         !canAssumeMacroScope(macro.unit, macro.symbol)
       )
         return;
       assumed = true;
-      for (const binding of inputNames) names.add(binding);
+      for (const binding of input.names) names.add(binding);
     }
     return {
       names: names.size ? names : noMacroNames,

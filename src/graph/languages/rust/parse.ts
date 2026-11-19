@@ -3,8 +3,9 @@ import { implies, possible } from "./cfg.js";
 import {
   argumentCalls,
   isMacroItemKeyword,
-  macroInputNames,
+  macroInput,
   macroProfile,
+  type MacroInput,
 } from "./macro-rules.js";
 import type { Node } from "web-tree-sitter";
 import { fileURLToPath } from "node:url";
@@ -329,7 +330,7 @@ async function createHelper(): Promise<Helper> {
         name: string;
         scope: string;
         start: number;
-        inputNames: string[];
+        input: MacroInput;
         block?: true;
       }[] = [];
       // Every statement-level invocation is a candidate: the non-conservative
@@ -2072,12 +2073,12 @@ async function createHelper(): Promise<Helper> {
               ? n.parent.parent
               : n.parent;
           const itemPosition = !tailMacro(n) && lexicalItemContainer(container);
-          const inputNames =
-            itemPosition && group ? macroInputNames([group]) : [];
+          const input =
+            itemPosition && group ? macroInput([group]) : { names: [] };
           if (m)
             link(m, owner, scope, "macros", compact(m.text), {
               genericBindings: genericBindings(fn ?? n),
-              ...(inputNames.some(isMacroItemKeyword)
+              ...(input.names.some(isMacroItemKeyword)
                 ? { macroInputCanSupplyItemKeyword: true }
                 : {}),
             });
@@ -2094,7 +2095,7 @@ async function createHelper(): Promise<Helper> {
                 name: compact(m!.text),
                 scope,
                 start: m!.startIndex,
-                inputNames,
+                input,
                 // Only a block statement can bind locals that the
                 // conservative binding facts (stdFallback*) describe.
                 ...(container?.type === "block" ? { block: true } : {}),
@@ -2309,7 +2310,7 @@ async function createHelper(): Promise<Helper> {
         helper?: true;
         nested?: boolean;
       }[] = [];
-      const attributeInputs: string[][] = [];
+      const attributeInputs: MacroInput[] = [];
       const attributeInputByItem = new Map<number, number>();
       const declarationKeys = new Set(
         result.symbols.map((symbol) => symbol.key),
@@ -2353,7 +2354,7 @@ async function createHelper(): Promise<Helper> {
                     if (prev.type !== "attribute_item") break;
                     nodes.push(prev);
                   }
-                  input = attributeInputs.push(macroInputNames(nodes)) - 1;
+                  input = attributeInputs.push(macroInput(nodes)) - 1;
                   attributeInputByItem.set(item.id, input);
                 }
               }

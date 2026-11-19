@@ -7,23 +7,45 @@ import type { Node } from "web-tree-sitter";
 
 const compact = (s: string) => s.replace(/\s+/g, "").replace(/\br#/g, "");
 
-/** Rust identifier tokens, including identifiers in nested token groups. */
-export function macroInputNames(nodes: readonly Node[]): string[] {
+export type MacroInput = { names: string[]; mayIntroduceUnknownNames?: true };
+
+/** Rust identifier tokens and possible wildcard imports in the input. */
+export function macroInput(nodes: readonly Node[]): MacroInput {
   const pending = [...nodes];
   const names = new Set<string>();
+  let star = false;
+  let bang = false;
   while (pending.length) {
     const node = pending.pop()!;
     if (/^(?:line_comment|block_comment)$|literal$/.test(node.type)) continue;
     if (node.childCount) {
       for (const child of node.children) pending.push(child);
     } else {
+      star ||= node.type === "*";
+      bang ||= node.type === "!";
       const name = /^(?:r#|['$])?([_\p{ID_Start}][_\p{ID_Continue}]*)$/u.exec(
         node.text,
       )?.[1];
       if (name) names.add(name.normalize());
     }
   }
-  return [...names].sort();
+  const mayIntroduceUnknownNames =
+    (star && names.has("use")) ||
+    (names.has("macro_use") && (names.has("mod") || names.has("extern"))) ||
+    (bang &&
+      [
+        "include",
+        "automod",
+        "paste",
+        "pastey",
+        "concat_idents",
+        "seq_macro",
+        "duplicate",
+      ].some((name) => names.has(name)));
+  return {
+    names: [...names].sort(),
+    ...(mayIntroduceUnknownNames ? { mayIntroduceUnknownNames: true } : {}),
+  };
 }
 
 /** Keywords that start an item or a binding when they open a statement. */
@@ -279,7 +301,7 @@ function inspectScope(
   let opaque = false;
   const emitted = invocations(top);
   for (const { call } of emitted)
-    for (const name of macroInputNames([call.group])) names.add(name);
+    for (const name of macroInput([call.group]).names) names.add(name);
   for (let i = 0; i < top.length; i++) {
     const token = top[i]!,
       keyword = word(token);
@@ -338,7 +360,7 @@ function inspectScope(
         )
       )
         opaque = true;
-      for (const name of macroInputNames(tokens)) names.add(name);
+      for (const name of macroInput(tokens).names) names.add(name);
       continue;
     }
     const next =
