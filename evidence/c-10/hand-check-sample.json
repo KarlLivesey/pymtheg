@@ -1,0 +1,1342 @@
+[
+  {
+    "mechanism": "local-binding",
+    "repo": "cberner/redb",
+    "file": "src/tree_store/page_store/page_manager.rs",
+    "line": 1984,
+    "code": "let mem = self.storage.read(range.start, len, hint)?;",
+    "targetName": "hint",
+    "target": "src/tree_store/page_store/page_manager.rs:1975 method get_page",
+    "targetLine": "pub(crate) fn get_page(&self, page_number: PageNumber, hint: PageHint) -> Result<PageImpl> {",
+    "binding": {
+      "name": "hint",
+      "start": 81666,
+      "end": 81670
+    }
+  },
+  {
+    "mechanism": "local-binding",
+    "repo": "helix-editor/helix",
+    "file": "helix-core/tests/indent.rs",
+    "line": 200,
+    "code": "treesitter_indent_for_pos(query, &syntax, &loader, 4, 4, doc.slice(..), 0, 11, true)",
+    "targetName": "syntax",
+    "target": "helix-core/tests/indent.rs:190 function test_new_line_after_trailing_comment_with_crlf",
+    "targetLine": "fn test_new_line_after_trailing_comment_with_crlf() {",
+    "binding": {
+      "name": "syntax",
+      "start": 7431,
+      "end": 7437
+    }
+  },
+  {
+    "mechanism": "local-binding",
+    "repo": "helix-editor/helix",
+    "file": "helix-stdx/src/path.rs",
+    "line": 241,
+    "code": "let sep = if windows { r\"[/\\\\]\" } else { \"/\" };",
+    "targetName": "windows",
+    "target": "helix-stdx/src/path.rs:226 function compile_path_regex",
+    "targetLine": "fn compile_path_regex(",
+    "binding": {
+      "name": "windows",
+      "start": 7596,
+      "end": 7603
+    }
+  },
+  {
+    "mechanism": "local-binding",
+    "repo": "clap-rs/clap",
+    "file": "clap_complete_nushell/src/lib.rs",
+    "line": 52,
+    "code": "generate_completion(&mut completions, cmd, false);",
+    "targetName": "completions",
+    "target": "clap_complete_nushell/src/lib.rs:43 method try_generate",
+    "targetLine": "fn try_generate(",
+    "binding": {
+      "name": "completions",
+      "start": 1388,
+      "end": 1399
+    }
+  },
+  {
+    "mechanism": "local-binding",
+    "repo": "helix-editor/helix",
+    "file": "helix-term/src/application.rs",
+    "line": 759,
+    "code": ".handle_event(&Event::Resize(width, height), &mut cx)",
+    "targetName": "cx",
+    "target": "helix-term/src/application.rs:700 method handle_terminal_events",
+    "targetLine": "pub async fn handle_terminal_events(&mut self, event: std::io::Result<TerminalEvent>) {",
+    "binding": {
+      "name": "cx",
+      "start": 26477,
+      "end": 26479
+    }
+  },
+  {
+    "mechanism": "local-binding",
+    "repo": "helix-editor/helix",
+    "file": "helix-term/src/ui/markdown.rs",
+    "line": 199,
+    "code": "let text_style = get_theme(Self::TEXT_STYLE);",
+    "targetName": "get_theme",
+    "target": "helix-term/src/ui/markdown.rs:172 method parse",
+    "targetLine": "pub fn parse(&self, theme: Option<&Theme>) -> tui::text::Text<'_> {",
+    "binding": {
+      "name": "get_theme",
+      "start": 6546,
+      "end": 6555
+    }
+  },
+  {
+    "mechanism": "local-binding",
+    "repo": "ratatui/ratatui",
+    "file": "examples/apps/demo2/src/destroy.rs",
+    "line": 92,
+    "code": "let area = centered_rect(area, logo_text.width() as u16, logo_text.height() as u16);",
+    "targetName": "area",
+    "target": "examples/apps/demo2/src/destroy.rs:78 function text",
+    "targetLine": "fn text(frame_count: usize, area: Rect, buf: &mut Buffer) {",
+    "binding": {
+      "name": "area",
+      "start": 3024,
+      "end": 3028
+    }
+  },
+  {
+    "mechanism": "local-binding",
+    "repo": "helix-editor/helix",
+    "file": "helix-core/src/uri.rs",
+    "line": 29,
+    "code": "Self::File(path) => Some(path),",
+    "targetName": "path",
+    "target": "helix-core/src/uri.rs:27 method as_path",
+    "targetLine": "pub fn as_path(&self) -> Option<&Path> {",
+    "binding": {
+      "name": "path",
+      "start": 731,
+      "end": 735
+    }
+  },
+  {
+    "mechanism": "local-binding",
+    "repo": "clap-rs/clap",
+    "file": "clap_builder/src/builder/command.rs",
+    "line": 1055,
+    "code": "let usage = Usage::new(self);",
+    "targetName": "self",
+    "target": "clap_builder/src/builder/command.rs:1051 method write_help",
+    "targetLine": "pub fn write_help<W: io::Write>(&mut self, w: &mut W) -> io::Result<()> {",
+    "binding": {
+      "name": "self",
+      "start": 35109,
+      "end": 35113
+    }
+  },
+  {
+    "mechanism": "local-binding",
+    "repo": "helix-editor/helix",
+    "file": "helix-term/src/ui/completion.rs",
+    "line": 330,
+    "code": "pattern,",
+    "targetName": "pattern",
+    "target": "helix-term/src/ui/completion.rs:323 method score",
+    "targetLine": "fn score(&mut self, incremental: bool) {",
+    "binding": {
+      "name": "pattern",
+      "start": 14837,
+      "end": 14844
+    }
+  },
+  {
+    "mechanism": "local-binding",
+    "repo": "ratatui/ratatui",
+    "file": "ratatui/tests/terminal.rs",
+    "line": 43,
+    "code": "let mut terminal = Terminal::new(backend)?;",
+    "targetName": "backend",
+    "target": "ratatui/tests/terminal.rs:41 function terminal_draw_increments_frame_count",
+    "targetLine": "fn terminal_draw_increments_frame_count() -> Result<(), Box<dyn Error>> {",
+    "binding": {
+      "name": "backend",
+      "start": 1437,
+      "end": 1444
+    }
+  },
+  {
+    "mechanism": "local-binding",
+    "repo": "helix-editor/helix",
+    "file": "helix-core/src/match_brackets.rs",
+    "line": 226,
+    "code": ".find(|(open, close)| *open == ch || *close == ch)",
+    "targetName": "ch",
+    "target": "helix-core/src/match_brackets.rs:223 function get_pair",
+    "targetLine": "pub fn get_pair(ch: char) -> (char, char) {",
+    "binding": {
+      "name": "ch",
+      "start": 7446,
+      "end": 7448
+    }
+  },
+  {
+    "mechanism": "local-binding",
+    "repo": "ratatui/ratatui",
+    "file": "ratatui-widgets/examples/block.rs",
+    "line": 75,
+    "code": "frame.render_widget(block, area);",
+    "targetName": "area",
+    "target": "ratatui-widgets/examples/block.rs:70 function render_custom_bordered_block",
+    "targetLine": "pub fn render_custom_bordered_block(frame: &mut Frame, area: Rect) {",
+    "binding": {
+      "name": "area",
+      "start": 2462,
+      "end": 2466
+    }
+  },
+  {
+    "mechanism": "local-binding",
+    "repo": "cberner/redb",
+    "file": "src/tree_store/btree_cursor.rs",
+    "line": 2358,
+    "code": "match direction {",
+    "targetName": "direction",
+    "target": "src/tree_store/btree_cursor.rs:2346 method entry_in_range",
+    "targetLine": "fn entry_in_range(&self, direction: Direction) -> bool {",
+    "binding": {
+      "name": "direction",
+      "start": 88820,
+      "end": 88829
+    }
+  },
+  {
+    "mechanism": "local-binding",
+    "repo": "cberner/redb",
+    "file": "src/tree_store/btree_base.rs",
+    "line": 1503,
+    "code": "let key_end = accessor.key_end(i).unwrap();",
+    "targetName": "i",
+    "target": "src/tree_store/btree_base.rs:1497 method remove",
+    "targetLine": "pub(super) fn remove(&mut self, i: usize) {",
+    "binding": {
+      "name": "i",
+      "start": 51893,
+      "end": 51894
+    }
+  },
+  {
+    "mechanism": "local-binding",
+    "repo": "fjall-rs/fjall",
+    "file": "examples_disabled/tx-blob-cas/src/main.rs",
+    "line": 247,
+    "code": "cas.insert(b\"b\", &big_blob_3)?;",
+    "targetName": "big_blob_3",
+    "target": "examples_disabled/tx-blob-cas/src/main.rs:166 function main",
+    "targetLine": "fn main() -> fjall::Result<()> {",
+    "binding": {
+      "name": "big_blob_3",
+      "start": 5009,
+      "end": 5019
+    }
+  },
+  {
+    "mechanism": "local-binding",
+    "repo": "helix-editor/helix",
+    "file": "helix-view/src/handlers/word_index.rs",
+    "line": 312,
+    "code": "this.update_document(&old_text, &text, &changes, &cancel);",
+    "targetName": "old_text",
+    "target": "helix-view/src/handlers/word_index.rs:292 method run",
+    "targetLine": "async fn run(self, mut events: mpsc::UnboundedReceiver<Event>, cancel: TaskHandle) {",
+    "binding": {
+      "name": "old_text",
+      "start": 11152,
+      "end": 11160
+    }
+  },
+  {
+    "mechanism": "local-binding",
+    "repo": "helix-editor/helix",
+    "file": "helix-core/src/transaction.rs",
+    "line": 650,
+    "code": "let tendril = process_change(from, to, data);",
+    "targetName": "data",
+    "target": "helix-core/src/transaction.rs:640 method change_ignore_overlapping",
+    "targetLine": "pub fn change_ignore_overlapping<T>(",
+    "binding": {
+      "name": "data",
+      "start": 22824,
+      "end": 22828
+    }
+  },
+  {
+    "mechanism": "local-binding",
+    "repo": "helix-editor/helix",
+    "file": "helix-view/src/input.rs",
+    "line": 516,
+    "code": "match button {",
+    "targetName": "button",
+    "target": "helix-view/src/input.rs:515 method from",
+    "targetLine": "fn from(button: termina::event::MouseButton) -> Self {",
+    "binding": {
+      "name": "button",
+      "start": 23334,
+      "end": 23340
+    }
+  },
+  {
+    "mechanism": "local-binding",
+    "repo": "helix-editor/helix",
+    "file": "helix-loader/src/lib.rs",
+    "line": 228,
+    "code": "if merge_depth > 0 {",
+    "targetName": "merge_depth",
+    "target": "helix-loader/src/lib.rs:199 function merge_toml_values",
+    "targetLine": "pub fn merge_toml_values(left: toml::Value, right: toml::Value, merge_depth: usize) -> toml::Value {",
+    "binding": {
+      "name": "merge_depth",
+      "start": 6620,
+      "end": 6631
+    }
+  },
+  {
+    "mechanism": "local-binding",
+    "repo": "cberner/redb",
+    "file": "src/tree_store/page_store/active_transactions.rs",
+    "line": 19,
+    "code": "if query(bytes(low, low))? {",
+    "targetName": "low",
+    "target": "src/tree_store/page_store/active_transactions.rs:11 function lowest_held",
+    "targetLine": "pub(super) fn lowest_held<E>(",
+    "binding": {
+      "name": "low",
+      "start": 699,
+      "end": 702
+    }
+  },
+  {
+    "mechanism": "local-binding",
+    "repo": "cberner/redb",
+    "file": "src/tree_store/table_tree.rs",
+    "line": 495,
+    "code": "&name,",
+    "targetName": "name",
+    "target": "src/tree_store/table_tree.rs:465 method create_table_and_flush_table_root",
+    "targetLine": "pub(crate) fn create_table_and_flush_table_root<K: Key + 'static, V: Value + 'static>(",
+    "binding": {
+      "name": "name",
+      "start": 16466,
+      "end": 16470
+    }
+  },
+  {
+    "mechanism": "local-binding",
+    "repo": "cberner/redb",
+    "file": "src/tree_store/page_store/layout.rs",
+    "line": 160,
+    "code": "let full_region_layout = RegionLayout::new(page_capacity, region_header_pages, page_size);",
+    "targetName": "region_header_pages",
+    "target": "src/tree_store/page_store/layout.rs:154 method calculate",
+    "targetLine": "pub(super) fn calculate(",
+    "binding": {
+      "name": "region_header_pages",
+      "start": 4863,
+      "end": 4882
+    }
+  },
+  {
+    "mechanism": "local-binding",
+    "repo": "helix-editor/helix",
+    "file": "helix-view/src/view.rs",
+    "line": 510,
+    "code": "let config = config.inline_diagnostics.prepare(width, enable_cursor_line);",
+    "targetName": "width",
+    "target": "helix-view/src/view.rs:452 method text_annotations",
+    "targetLine": "pub fn text_annotations<'a>(",
+    "binding": {
+      "name": "width",
+      "start": 17913,
+      "end": 17918
+    }
+  },
+  {
+    "mechanism": "local-binding",
+    "repo": "tokio-rs/axum",
+    "file": "axum/src/routing/path_router.rs",
+    "line": 265,
+    "code": ".map(|endpoint| match endpoint {",
+    "targetName": "endpoint",
+    "target": "axum/src/routing/path_router.rs:261 method with_state",
+    "targetLine": "pub(super) fn with_state<S2>(self, state: S) -> PathRouter<S2> {",
+    "binding": {
+      "name": "endpoint",
+      "start": 8217,
+      "end": 8225
+    }
+  },
+  {
+    "mechanism": "local-binding",
+    "repo": "cberner/redb",
+    "file": "src/multimap_table.rs",
+    "line": 1033,
+    "code": "self.range_in_bounds(lower, upper)",
+    "targetName": "upper",
+    "target": "src/multimap_table.rs:1028 method range",
+    "targetLine": "fn range<'a, KR>(&self, range: impl RangeBounds<KR> + 'a) -> Result<MultimapRange<'_, K, V>>",
+    "binding": {
+      "name": "upper",
+      "start": 39827,
+      "end": 39832
+    }
+  },
+  {
+    "mechanism": "local-binding",
+    "repo": "serde-rs/serde",
+    "file": "serde_derive/src/internals/receiver.rs",
+    "line": 123,
+    "code": "self.visit_type_param_bound_mut(bound);",
+    "targetName": "bound",
+    "target": "serde_derive/src/internals/receiver.rs:107 method visit_type_mut_impl",
+    "targetLine": "fn visit_type_mut_impl(&mut self, ty: &mut Type) {",
+    "binding": {
+      "name": "bound",
+      "start": 4197,
+      "end": 4202
+    }
+  },
+  {
+    "mechanism": "local-binding",
+    "repo": "clap-rs/clap",
+    "file": "clap_builder/src/builder/arg_group.rs",
+    "line": 93,
+    "code": "Self::default().id(id)",
+    "targetName": "id",
+    "target": "clap_builder/src/builder/arg_group.rs:92 method new",
+    "targetLine": "pub fn new(id: impl Into<Id>) -> Self {",
+    "binding": {
+      "name": "id",
+      "start": 3332,
+      "end": 3334
+    }
+  },
+  {
+    "mechanism": "local-binding",
+    "repo": "fjall-rs/fjall",
+    "file": "src/keyspace/mod.rs",
+    "line": 1190,
+    "code": "self.maintenance(memtable_size);",
+    "targetName": "memtable_size",
+    "target": "src/keyspace/mod.rs:1142 method remove_weak",
+    "targetLine": "pub fn remove_weak<K: Into<UserKey>>(&self, key: K) -> crate::Result<()> {",
+    "binding": {
+      "name": "memtable_size",
+      "start": 36916,
+      "end": 36929
+    }
+  },
+  {
+    "mechanism": "local-binding",
+    "repo": "clap-rs/clap",
+    "file": "clap_builder/src/builder/str.rs",
+    "line": 325,
+    "code": "self.as_str().hash(state);",
+    "targetName": "state",
+    "target": "clap_builder/src/builder/str.rs:324 method hash",
+    "targetLine": "fn hash<H: std::hash::Hasher>(&self, state: &mut H) {",
+    "binding": {
+      "name": "state",
+      "start": 6782,
+      "end": 6787
+    }
+  },
+  {
+    "mechanism": "type-parameter",
+    "repo": "crossbeam-rs/crossbeam",
+    "file": "crossbeam-skiplist/src/base.rs",
+    "line": 1019,
+    "code": ") -> RefEntry<'_, K, V, C>",
+    "targetName": "C",
+    "target": "crossbeam-skiplist/src/base.rs:533 impl impl<K,V,C> SkipList<K,V,C>",
+    "targetLine": "impl<K, V, C> SkipList<K, V, C>",
+    "binding": {
+      "name": "C",
+      "start": 16600,
+      "end": 16601
+    }
+  },
+  {
+    "mechanism": "type-parameter",
+    "repo": "cberner/redb",
+    "file": "src/tree_store/btree_base.rs",
+    "line": 473,
+    "code": "impl<V: MutInPlaceValue + 'static> AsMut<V::BaseRefType> for AccessGuardMutInPlace<'_, V> {",
+    "targetName": "V",
+    "target": "src/tree_store/btree_base.rs:473 impl impl<V:MutInPlaceValue+'static> AsMut<V::BaseRefType> for AccessGuardMutInPlace<'_,V>",
+    "targetLine": "impl<V: MutInPlaceValue + 'static> AsMut<V::BaseRefType> for AccessGuardMutInPlace<'_, V> {",
+    "binding": {
+      "name": "V",
+      "start": 15743,
+      "end": 15744
+    }
+  },
+  {
+    "mechanism": "type-parameter",
+    "repo": "tokio-rs/axum",
+    "file": "axum/src/extract/ws.rs",
+    "line": 949,
+    "code": "B: Into<Bytes>,",
+    "targetName": "B",
+    "target": "axum/src/extract/ws.rs:947 method binary",
+    "targetLine": "pub fn binary<B>(bin: B) -> Self",
+    "binding": {
+      "name": "B",
+      "start": 31344,
+      "end": 31345
+    }
+  },
+  {
+    "mechanism": "type-parameter",
+    "repo": "tokio-rs/axum",
+    "file": "axum/src/boxed.rs",
+    "line": 148,
+    "code": "E: 'static,",
+    "targetName": "E",
+    "target": "axum/src/boxed.rs:145 impl impl<S,E,E2> ErasedIntoRoute<S,E2> for Map<S,E,E2>",
+    "targetLine": "impl<S, E, E2> ErasedIntoRoute<S, E2> for Map<S, E, E2>",
+    "binding": {
+      "name": "E",
+      "start": 3494,
+      "end": 3495
+    }
+  },
+  {
+    "mechanism": "type-parameter",
+    "repo": "cberner/redb",
+    "file": "src/tree_store/btree_cursor.rs",
+    "line": 2118,
+    "code": "fn peek(&mut self, direction: Direction) -> Result<Option<EntryRef<'_, K, V>>> {",
+    "targetName": "K",
+    "target": "src/tree_store/btree_cursor.rs:2027 impl impl<'a,K:Key+'static,V:Value+'static> RangeMut<'a,K,V>",
+    "targetLine": "impl<'a, K: Key + 'static, V: Value + 'static> RangeMut<'a, K, V> {",
+    "binding": {
+      "name": "K",
+      "start": 76395,
+      "end": 76396
+    }
+  },
+  {
+    "mechanism": "type-parameter",
+    "repo": "crossbeam-rs/crossbeam",
+    "file": "crossbeam-skiplist/src/set.rs",
+    "line": 639,
+    "code": "R: RangeBounds<Q>,",
+    "targetName": "R",
+    "target": "crossbeam-skiplist/src/set.rs:636 impl impl<Q,R,T,C> DoubleEndedIterator for Range<'_,Q,R,T,C>",
+    "targetLine": "impl<Q, R, T, C> DoubleEndedIterator for Range<'_, Q, R, T, C>",
+    "binding": {
+      "name": "R",
+      "start": 15310,
+      "end": 15311
+    }
+  },
+  {
+    "mechanism": "type-parameter",
+    "repo": "serde-rs/serde",
+    "file": "test_suite/tests/test_gen.rs",
+    "line": 179,
+    "code": "T(T),",
+    "targetName": "T",
+    "target": "test_suite/tests/test_gen.rs:178 enum RecursiveGenericB",
+    "targetLine": "enum RecursiveGenericB<T> {",
+    "binding": {
+      "name": "T",
+      "start": 4534,
+      "end": 4535
+    }
+  },
+  {
+    "mechanism": "type-parameter",
+    "repo": "ratatui/ratatui",
+    "file": "ratatui/src/init.rs",
+    "line": 325,
+    "code": "F: FnOnce(&mut DefaultTerminal) -> R,",
+    "targetName": "R",
+    "target": "ratatui/src/init.rs:323 function run",
+    "targetLine": "pub fn run<F, R>(f: F) -> R",
+    "binding": {
+      "name": "R",
+      "start": 12737,
+      "end": 12738
+    }
+  },
+  {
+    "mechanism": "type-parameter",
+    "repo": "cberner/redb",
+    "file": "fuzz/fuzz_targets/common.rs",
+    "line": 36,
+    "code": "impl<const MIN: u64, const MAX: u64> Arbitrary<'_> for U64Between<MIN, MAX> {",
+    "targetName": "MAX",
+    "target": "fuzz/fuzz_targets/common.rs:36 impl impl<constMIN:u64,constMAX:u64> Arbitrary<'_> for U64Between<MIN,MAX>",
+    "targetLine": "impl<const MIN: u64, const MAX: u64> Arbitrary<'_> for U64Between<MIN, MAX> {",
+    "binding": {
+      "name": "MAX",
+      "start": 968,
+      "end": 971
+    }
+  },
+  {
+    "mechanism": "type-parameter",
+    "repo": "tokio-rs/axum",
+    "file": "axum-extra/src/handler/or.rs",
+    "line": 25,
+    "code": "L: HandlerCallWithExtractors<Lt, S> + Send + 'static,",
+    "targetName": "Lt",
+    "target": "axum-extra/src/handler/or.rs:23 impl impl<S,L,R,Lt,Rt> HandlerCallWithExtractors<Either<Lt,Rt>,S> for Or<L,R,Lt,Rt,S>",
+    "targetLine": "impl<S, L, R, Lt, Rt> HandlerCallWithExtractors<Either<Lt, Rt>, S> for Or<L, R, Lt, Rt, S>",
+    "binding": {
+      "name": "Lt",
+      "start": 744,
+      "end": 746
+    }
+  },
+  {
+    "mechanism": "type-parameter",
+    "repo": "serde-rs/serde",
+    "file": "serde/src/private/ser.rs",
+    "line": 802,
+    "code": "impl<E> ser::SerializeTuple for SerializeTuple<E>",
+    "targetName": "E",
+    "target": "serde/src/private/ser.rs:802 impl impl<E> ser::SerializeTuple for SerializeTuple<E>",
+    "targetLine": "impl<E> ser::SerializeTuple for SerializeTuple<E>",
+    "binding": {
+      "name": "E",
+      "start": 25187,
+      "end": 25188
+    }
+  },
+  {
+    "mechanism": "type-parameter",
+    "repo": "cberner/redb",
+    "file": "src/tree_store/btree.rs",
+    "line": 776,
+    "code": "mut predicate: F,",
+    "targetName": "F",
+    "target": "src/tree_store/btree.rs:774 method retain_in_bounds",
+    "targetLine": "pub(crate) fn retain_in_bounds<F: for<'f> FnMut(K::SelfType<'f>, V::SelfType<'f>) -> bool>(",
+    "binding": {
+      "name": "F",
+      "start": 26594,
+      "end": 26595
+    }
+  },
+  {
+    "mechanism": "type-parameter",
+    "repo": "cberner/redb",
+    "file": "src/table.rs",
+    "line": 1061,
+    "code": ") -> Result<Cursor<'_, K, V>> {",
+    "targetName": "V",
+    "target": "src/table.rs:1020 impl impl<K:Key+'static,V:Value+'static> ReadableTable<K,V> for ReadOnlyTable<K,V>",
+    "targetLine": "impl<K: Key + 'static, V: Value + 'static> ReadableTable<K, V> for ReadOnlyTable<K, V> {",
+    "binding": {
+      "name": "V",
+      "start": 36446,
+      "end": 36447
+    }
+  },
+  {
+    "mechanism": "type-parameter",
+    "repo": "crossbeam-rs/crossbeam",
+    "file": "crossbeam-skiplist/src/map.rs",
+    "line": 634,
+    "code": "C: Comparator<K>,",
+    "targetName": "C",
+    "target": "crossbeam-skiplist/src/map.rs:632 impl impl<K,V,C> Entry<'_,K,V,C>",
+    "targetLine": "impl<K, V, C> Entry<'_, K, V, C>",
+    "binding": {
+      "name": "C",
+      "start": 18559,
+      "end": 18560
+    }
+  },
+  {
+    "mechanism": "type-parameter",
+    "repo": "crossbeam-rs/crossbeam",
+    "file": "crossbeam-skiplist/src/map.rs",
+    "line": 614,
+    "code": "pub fn value(&self) -> &V {",
+    "targetName": "V",
+    "target": "crossbeam-skiplist/src/map.rs:601 impl impl<'a,K,V,C> Entry<'a,K,V,C>",
+    "targetLine": "impl<'a, K, V, C> Entry<'a, K, V, C> {",
+    "binding": {
+      "name": "V",
+      "start": 17840,
+      "end": 17841
+    }
+  },
+  {
+    "mechanism": "type-parameter",
+    "repo": "tokio-rs/axum",
+    "file": "axum/src/middleware/from_extractor.rs",
+    "line": 111,
+    "code": "state: S,",
+    "targetName": "S",
+    "target": "axum/src/middleware/from_extractor.rs:110 struct FromExtractorLayer",
+    "targetLine": "pub struct FromExtractorLayer<E, S> {",
+    "binding": {
+      "name": "S",
+      "start": 3131,
+      "end": 3132
+    }
+  },
+  {
+    "mechanism": "type-parameter",
+    "repo": "cberner/redb",
+    "file": "tests/cursor_tests.rs",
+    "line": 687,
+    "code": "fn nearest_below<T: ReadableTable<u64, u64>>(table: &T, key: u64) -> Option<u64> {",
+    "targetName": "T",
+    "target": "tests/cursor_tests.rs:687 function nearest_below",
+    "targetLine": "fn nearest_below<T: ReadableTable<u64, u64>>(table: &T, key: u64) -> Option<u64> {",
+    "binding": {
+      "name": "T",
+      "start": 25163,
+      "end": 25164
+    }
+  },
+  {
+    "mechanism": "type-parameter",
+    "repo": "tokio-rs/axum",
+    "file": "examples/diesel-postgres/src/main.rs",
+    "line": 126,
+    "code": "E: std::error::Error,",
+    "targetName": "E",
+    "target": "examples/diesel-postgres/src/main.rs:124 function internal_error",
+    "targetLine": "fn internal_error<E>(err: E) -> (StatusCode, String)",
+    "binding": {
+      "name": "E",
+      "start": 3573,
+      "end": 3574
+    }
+  },
+  {
+    "mechanism": "type-parameter",
+    "repo": "helix-editor/helix",
+    "file": "helix-term/src/ui/statusline.rs",
+    "line": 448,
+    "code": "F: Fn(&mut RenderContext<'a>, Span<'a>) + Copy,",
+    "targetName": "F",
+    "target": "helix-term/src/ui/statusline.rs:446 function render_file_name",
+    "targetLine": "fn render_file_name<'a, F>(context: &mut RenderContext<'a>, write: F)",
+    "binding": {
+      "name": "F",
+      "start": 15142,
+      "end": 15143
+    }
+  },
+  {
+    "mechanism": "type-parameter",
+    "repo": "serde-rs/serde",
+    "file": "serde_core/src/de/value.rs",
+    "line": 152,
+    "code": "impl<'de, E> de::Deserializer<'de> for UnitDeserializer<E>",
+    "targetName": "E",
+    "target": "serde_core/src/de/value.rs:152 impl impl<'de,E> de::Deserializer<'de> for UnitDeserializer<E>",
+    "targetLine": "impl<'de, E> de::Deserializer<'de> for UnitDeserializer<E>",
+    "binding": {
+      "name": "E",
+      "start": 3619,
+      "end": 3620
+    }
+  },
+  {
+    "mechanism": "type-parameter",
+    "repo": "cberner/redb",
+    "file": "src/tree_store/btree_cursor.rs",
+    "line": 1892,
+    "code": "pub(crate) fn prev(&mut self) -> Result<Option<(AccessGuard<'_, K>, AccessGuard<'_, V>)>> {",
+    "targetName": "K",
+    "target": "src/tree_store/btree_cursor.rs:1773 impl impl<'a,K:Key+'static,V:Value+'static> BtreeCursorMut<'a,K,V>",
+    "targetLine": "impl<'a, K: Key + 'static, V: Value + 'static> BtreeCursorMut<'a, K, V> {",
+    "binding": {
+      "name": "K",
+      "start": 65383,
+      "end": 65384
+    }
+  },
+  {
+    "mechanism": "type-parameter",
+    "repo": "helix-editor/helix",
+    "file": "helix-term/src/commands.rs",
+    "line": 1195,
+    "code": "fn move_word_impl<F>(cx: &mut Context, move_fn: F)",
+    "targetName": "F",
+    "target": "helix-term/src/commands.rs:1195 function move_word_impl",
+    "targetLine": "fn move_word_impl<F>(cx: &mut Context, move_fn: F)",
+    "binding": {
+      "name": "F",
+      "start": 43930,
+      "end": 43931
+    }
+  },
+  {
+    "mechanism": "type-parameter",
+    "repo": "serde-rs/serde",
+    "file": "serde_core/src/de/value.rs",
+    "line": 1514,
+    "code": "fn deserialize_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>",
+    "targetName": "V",
+    "target": "serde_core/src/de/value.rs:1514 method deserialize_tuple",
+    "targetLine": "fn deserialize_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>",
+    "binding": {
+      "name": "V",
+      "start": 39083,
+      "end": 39084
+    }
+  },
+  {
+    "mechanism": "type-parameter",
+    "repo": "crossbeam-rs/crossbeam",
+    "file": "crossbeam-epoch/src/atomic.rs",
+    "line": 161,
+    "code": "impl<T> Pointable for T {",
+    "targetName": "T",
+    "target": "crossbeam-epoch/src/atomic.rs:161 impl impl<T> Pointable for T",
+    "targetLine": "impl<T> Pointable for T {",
+    "binding": {
+      "name": "T",
+      "start": 5559,
+      "end": 5560
+    }
+  },
+  {
+    "mechanism": "type-parameter",
+    "repo": "cberner/redb",
+    "file": "src/table.rs",
+    "line": 224,
+    "code": "KR: Borrow<K::SelfType<'a>> + 'a,",
+    "targetName": "KR",
+    "target": "src/table.rs:218 method extract_from_if",
+    "targetLine": "pub fn extract_from_if<'a, KR, F: for<'f> FnMut(K::SelfType<'f>, V::SelfType<'f>) -> bool>(",
+    "binding": {
+      "name": "KR",
+      "start": 7868,
+      "end": 7870
+    }
+  },
+  {
+    "mechanism": "type-parameter",
+    "repo": "ratatui/ratatui",
+    "file": "ratatui-core/src/backend/test.rs",
+    "line": 88,
+    "code": "pub fn with_lines<'line, Lines>(lines: Lines) -> Self",
+    "targetName": "Lines",
+    "target": "ratatui-core/src/backend/test.rs:88 method with_lines",
+    "targetLine": "pub fn with_lines<'line, Lines>(lines: Lines) -> Self",
+    "binding": {
+      "name": "Lines",
+      "start": 3213,
+      "end": 3218
+    }
+  },
+  {
+    "mechanism": "type-parameter",
+    "repo": "serde-rs/serde",
+    "file": "test_suite/tests/test_macros.rs",
+    "line": 55,
+    "code": "_Map2 { a: i8, b: B, c: &'a C, d: &'a mut D },",
+    "targetName": "C",
+    "target": "test_suite/tests/test_macros.rs:44 enum SerEnum",
+    "targetLine": "enum SerEnum<'a, B: 'a, C: 'a, D>",
+    "binding": {
+      "name": "C",
+      "start": 1117,
+      "end": 1118
+    }
+  },
+  {
+    "mechanism": "type-parameter",
+    "repo": "serde-rs/serde",
+    "file": "serde_core/src/de/value.rs",
+    "line": 473,
+    "code": "impl<'de, 'a, E> de::Deserializer<'de> for StrDeserializer<'a, E>",
+    "targetName": "E",
+    "target": "serde_core/src/de/value.rs:473 impl impl<'de,'a,E> de::Deserializer<'de> for StrDeserializer<'a,E>",
+    "targetLine": "impl<'de, 'a, E> de::Deserializer<'de> for StrDeserializer<'a, E>",
+    "binding": {
+      "name": "E",
+      "start": 11973,
+      "end": 11974
+    }
+  },
+  {
+    "mechanism": "type-parameter",
+    "repo": "serde-rs/serde",
+    "file": "serde_core/src/ser/impossible.rs",
+    "line": 204,
+    "code": "fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<(), Error>",
+    "targetName": "T",
+    "target": "serde_core/src/ser/impossible.rs:204 method serialize_field",
+    "targetLine": "fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<(), Error>",
+    "binding": {
+      "name": "T",
+      "start": 5043,
+      "end": 5044
+    }
+  },
+  {
+    "mechanism": "type-parameter",
+    "repo": "tokio-rs/axum",
+    "file": "axum/src/middleware/map_response.rs",
+    "line": 159,
+    "code": "impl<F, S, T> Clone for MapResponseLayer<F, S, T>",
+    "targetName": "T",
+    "target": "axum/src/middleware/map_response.rs:159 impl impl<F,S,T> Clone for MapResponseLayer<F,S,T>",
+    "targetLine": "impl<F, S, T> Clone for MapResponseLayer<F, S, T>",
+    "binding": {
+      "name": "T",
+      "start": 4095,
+      "end": 4096
+    }
+  },
+  {
+    "mechanism": "method-inferred-receiver",
+    "repo": "ratatui/ratatui",
+    "file": "examples/apps/demo2/src/tabs/weather.rs",
+    "line": 128,
+    "code": ".bar_style(Style::new().fg(bg))",
+    "targetName": "Style::new().fg",
+    "target": "ratatui-core/src/style.rs:416 method fg",
+    "targetLine": "pub const fn fg(mut self, color: Color) -> Self {",
+    "binding": null
+  },
+  {
+    "mechanism": "method-inferred-receiver",
+    "repo": "clap-rs/clap",
+    "file": "clap_builder/src/output/help_template.rs",
+    "line": 724,
+    "code": "self.writer.push_styled(&help);",
+    "targetName": "self.writer.push_styled",
+    "target": "clap_builder/src/builder/styled_str.rs:143 method push_styled",
+    "targetLine": "pub(crate) fn push_styled(&mut self, other: &Self) {",
+    "binding": null
+  },
+  {
+    "mechanism": "method-inferred-receiver",
+    "repo": "helix-editor/helix",
+    "file": "helix-view/src/view.rs",
+    "line": 539,
+    "code": "if row < inner.top() || row >= inner.bottom() {",
+    "targetName": "inner.top",
+    "target": "helix-view/src/graphics.rs:152 method top",
+    "targetLine": "pub fn top(self) -> u16 {",
+    "binding": null
+  },
+  {
+    "mechanism": "method-inferred-receiver",
+    "repo": "BurntSushi/ripgrep",
+    "file": "crates/ignore/src/dir.rs",
+    "line": 1681,
+    "code": "let (ignore, err) = ib.add_child(td.path().join(\"linked-worktree\"));",
+    "targetName": "td.path",
+    "target": "crates/ignore/src/lib.rs:545 method path",
+    "targetLine": "pub fn path(&self) -> &Path {",
+    "binding": null
+  },
+  {
+    "mechanism": "method-inferred-receiver",
+    "repo": "BurntSushi/ripgrep",
+    "file": "crates/ignore/src/walk.rs",
+    "line": 2613,
+    "code": "wfile(td.path().join(\"a/b/foo\"), \"\");",
+    "targetName": "td.path",
+    "target": "crates/ignore/src/lib.rs:545 method path",
+    "targetLine": "pub fn path(&self) -> &Path {",
+    "binding": null
+  },
+  {
+    "mechanism": "method-inferred-receiver",
+    "repo": "BurntSushi/ripgrep",
+    "file": "crates/searcher/src/searcher/glue.rs",
+    "line": 950,
+    "code": "SearcherTester::new(SHERLOCK, \" a \")",
+    "targetName": "SearcherTester::new(SHERLOCK, \" a \")\n            .after_context(1)\n            .before_context(1)\n            .line_number(true)\n            .expected_no_line_number",
+    "target": "crates/searcher/src/testutil.rs:322 method expected_no_line_number",
+    "targetLine": "pub(crate) fn expected_no_line_number(",
+    "binding": null
+  },
+  {
+    "mechanism": "method-inferred-receiver",
+    "repo": "BurntSushi/ripgrep",
+    "file": "crates/ignore/src/dir.rs",
+    "line": 1471,
+    "code": "wfile(td.path().join(name), \"blocked\\n!allowed\");",
+    "targetName": "td.path",
+    "target": "crates/ignore/src/lib.rs:545 method path",
+    "targetLine": "pub fn path(&self) -> &Path {",
+    "binding": null
+  },
+  {
+    "mechanism": "method-inferred-receiver",
+    "repo": "clap-rs/clap",
+    "file": "clap_builder/src/output/help_template.rs",
+    "line": 659,
+    "code": "self.writer.push_styled(&help);",
+    "targetName": "self.writer.push_styled",
+    "target": "clap_builder/src/builder/styled_str.rs:143 method push_styled",
+    "targetLine": "pub(crate) fn push_styled(&mut self, other: &Self) {",
+    "binding": null
+  },
+  {
+    "mechanism": "method-inferred-receiver",
+    "repo": "clap-rs/clap",
+    "file": "clap_complete/src/engine/complete.rs",
+    "line": 605,
+    "code": "candidate",
+    "targetName": "candidate\n        .help(subcommand.get_about().cloned())\n        .id(Some(format!(\"command::{}\", subcommand.get_name())))\n        .tag",
+    "target": "clap_complete/src/engine/candidate.rs:44 method tag",
+    "targetLine": "pub fn tag(mut self, tag: Option<StyledStr>) -> Self {",
+    "binding": null
+  },
+  {
+    "mechanism": "method-inferred-receiver",
+    "repo": "helix-editor/helix",
+    "file": "helix-tui/src/buffer.rs",
+    "line": 694,
+    "code": "self.content.resize(area.area(), cell.clone());",
+    "targetName": "area.area",
+    "target": "helix-view/src/graphics.rs:137 method area",
+    "targetLine": "pub fn area(self) -> usize {",
+    "binding": null
+  },
+  {
+    "mechanism": "method-inferred-receiver",
+    "repo": "BurntSushi/ripgrep",
+    "file": "crates/ignore/src/walk.rs",
+    "line": 2316,
+    "code": "wfile(td.path().join(custom_ignore), \"foo\");",
+    "targetName": "td.path",
+    "target": "crates/ignore/src/lib.rs:545 method path",
+    "targetLine": "pub fn path(&self) -> &Path {",
+    "binding": null
+  },
+  {
+    "mechanism": "method-inferred-receiver",
+    "repo": "clap-rs/clap",
+    "file": "clap_builder/src/builder/command.rs",
+    "line": 1324,
+    "code": "let cmd = self",
+    "targetName": "self\n            .unset_global_setting(AppSettings::ColorAuto)\n            .unset_global_setting",
+    "target": "clap_builder/src/builder/command.rs:2342 method unset_global_setting",
+    "targetLine": "pub(crate) fn unset_global_setting(mut self, setting: AppSettings) -> Self {",
+    "binding": null
+  },
+  {
+    "mechanism": "method-inferred-receiver",
+    "repo": "BurntSushi/ripgrep",
+    "file": "crates/ignore/src/walk.rs",
+    "line": 2374,
+    "code": "wfile(td.path().join(\"a/bar\"), \"\");",
+    "targetName": "td.path",
+    "target": "crates/ignore/src/lib.rs:545 method path",
+    "targetLine": "pub fn path(&self) -> &Path {",
+    "binding": null
+  },
+  {
+    "mechanism": "method-inferred-receiver",
+    "repo": "clap-rs/clap",
+    "file": "clap_builder/src/parser/parser.rs",
+    "line": 727,
+    "code": "if let Some(sc) = self.cmd._build_subcommand(sc_name) {",
+    "targetName": "self.cmd._build_subcommand",
+    "target": "clap_builder/src/builder/command.rs:4491 method _build_subcommand",
+    "targetLine": "pub(crate) fn _build_subcommand(&mut self, name: &str) -> Option<&mut Self> {",
+    "binding": null
+  },
+  {
+    "mechanism": "method-inferred-receiver",
+    "repo": "ratatui/ratatui",
+    "file": "ratatui-core/tests/rect.rs",
+    "line": 100,
+    "code": "let inter = a.intersection(b);",
+    "targetName": "a.intersection",
+    "target": "ratatui-core/src/layout/rect.rs:322 method intersection",
+    "targetLine": "pub fn intersection(self, other: Self) -> Self {",
+    "binding": null
+  },
+  {
+    "mechanism": "method-inferred-receiver",
+    "repo": "tree-sitter/tree-sitter",
+    "file": "crates/generate/src/build_tables/build_parse_table.rs",
+    "line": 1278,
+    "code": "let variable_name = self",
+    "targetName": "self\n                    .str_pool\n                    .resolve",
+    "target": "crates/generate/src/strpool.rs:118 method resolve",
+    "targetLine": "pub fn resolve(&self, id: StrId) -> &str {",
+    "binding": null
+  },
+  {
+    "mechanism": "method-inferred-receiver",
+    "repo": "clap-rs/clap",
+    "file": "clap_builder/src/output/usage.rs",
+    "line": 106,
+    "code": "if self.cmd.has_visible_subcommands() && self.cmd.is_flatten_help_set() {",
+    "targetName": "self.cmd.is_flatten_help_set",
+    "target": "clap_builder/src/builder/command.rs:3835 method is_flatten_help_set",
+    "targetLine": "pub fn is_flatten_help_set(&self) -> bool {",
+    "binding": null
+  },
+  {
+    "mechanism": "method-inferred-receiver",
+    "repo": "crossbeam-rs/crossbeam",
+    "file": "crossbeam-skiplist/src/base.rs",
+    "line": 1762,
+    "code": ".next_node(n.as_tower(), Bound::Excluded(&n.key), guard)?;",
+    "targetName": "n.as_tower",
+    "target": "crossbeam-skiplist/src/base.rs:365 method as_tower",
+    "targetLine": "fn as_tower(self) -> TowerRef<'a, K, V> {",
+    "binding": null
+  },
+  {
+    "mechanism": "method-inferred-receiver",
+    "repo": "cberner/redb",
+    "file": "tests/integration_tests.rs",
+    "line": 1480,
+    "code": "txn.commit().unwrap();",
+    "targetName": "txn.commit",
+    "target": "src/transactions.rs:1755 method commit",
+    "targetLine": "pub fn commit(self) -> Result<(), CommitError> {",
+    "binding": null
+  },
+  {
+    "mechanism": "method-inferred-receiver",
+    "repo": "ratatui/ratatui",
+    "file": "ratatui-core/src/symbols/merge.rs",
+    "line": 429,
+    "code": "self.down.merge(other.down),",
+    "targetName": "self.down.merge",
+    "target": "ratatui-core/src/symbols/merge.rs:494 method merge",
+    "targetLine": "pub fn merge(self, other: Self) -> Self {",
+    "binding": null
+  },
+  {
+    "mechanism": "method-inferred-receiver",
+    "repo": "BurntSushi/ripgrep",
+    "file": "crates/ignore/src/overrides.rs",
+    "line": 181,
+    "code": "self.builder.allow_unclosed_class(yes);",
+    "targetName": "self.builder.allow_unclosed_class",
+    "target": "crates/ignore/src/gitignore.rs:574 method allow_unclosed_class",
+    "targetLine": "pub fn allow_unclosed_class(",
+    "binding": null
+  },
+  {
+    "mechanism": "method-inferred-receiver",
+    "repo": "cberner/redb",
+    "file": "src/transactions.rs",
+    "line": 2205,
+    "code": "free_until = free_until.min(TransactionId::new(savepoint_horizon).next());",
+    "targetName": "TransactionId::new(savepoint_horizon).next",
+    "target": "src/transaction_tracker.rs:28 method next",
+    "targetLine": "pub(crate) fn next(self) -> TransactionId {",
+    "binding": null
+  },
+  {
+    "mechanism": "method-inferred-receiver",
+    "repo": "BurntSushi/ripgrep",
+    "file": "crates/ignore/src/dir.rs",
+    "line": 1220,
+    "code": "wfile(td.path().join(\".gitignore\"), \"foo\\n!bar\");",
+    "targetName": "td.path",
+    "target": "crates/ignore/src/lib.rs:545 method path",
+    "targetLine": "pub fn path(&self) -> &Path {",
+    "binding": null
+  },
+  {
+    "mechanism": "method-inferred-receiver",
+    "repo": "BurntSushi/ripgrep",
+    "file": "crates/searcher/src/searcher/glue.rs",
+    "line": 1020,
+    "code": "SearcherTester::new(SHERLOCK, \" a \")",
+    "targetName": "SearcherTester::new(SHERLOCK, \" a \")\n            .before_context(1)\n            .line_number(false)\n            .invert_match",
+    "target": "crates/searcher/src/testutil.rs:392 method invert_match",
+    "targetLine": "pub(crate) fn invert_match(&mut self, yes: bool) -> &mut SearcherTester {",
+    "binding": null
+  },
+  {
+    "mechanism": "method-inferred-receiver",
+    "repo": "clap-rs/clap",
+    "file": "clap_builder/src/output/usage.rs",
+    "line": 291,
+    "code": "if self.cmd.find_group(req).is_some() {",
+    "targetName": "self.cmd.find_group",
+    "target": "clap_builder/src/builder/command.rs:5022 method find_group",
+    "targetLine": "pub(crate) fn find_group(&self, group_id: &Id) -> Option<&ArgGroup> {",
+    "binding": null
+  },
+  {
+    "mechanism": "method-inferred-receiver",
+    "repo": "ratatui/ratatui",
+    "file": "ratatui-core/src/style.rs",
+    "line": 750,
+    "code": "Self::new().fg(fg).add_modifier(modifier)",
+    "targetName": "Self::new().fg",
+    "target": "ratatui-core/src/style.rs:416 method fg",
+    "targetLine": "pub const fn fg(mut self, color: Color) -> Self {",
+    "binding": null
+  },
+  {
+    "mechanism": "method-inferred-receiver",
+    "repo": "clap-rs/clap",
+    "file": "clap_builder/src/output/help_template.rs",
+    "line": 899,
+    "code": "self.writer.push_str(\"\\n\\n\");",
+    "targetName": "self.writer.push_str",
+    "target": "clap_builder/src/builder/styled_str.rs:46 method push_str",
+    "targetLine": "pub fn push_str(&mut self, msg: &str) {",
+    "binding": null
+  },
+  {
+    "mechanism": "method-inferred-receiver",
+    "repo": "clap-rs/clap",
+    "file": "clap_builder/src/parser/validator.rs",
+    "line": 139,
+    "code": "self.cmd.unroll_args_in_group(c_id)",
+    "targetName": "self.cmd.unroll_args_in_group",
+    "target": "clap_builder/src/builder/command.rs:5053 method unroll_args_in_group",
+    "targetLine": "pub(crate) fn unroll_args_in_group(&self, group: &Id) -> Vec<Id> {",
+    "binding": null
+  },
+  {
+    "mechanism": "method-inferred-receiver",
+    "repo": "ratatui/ratatui",
+    "file": "examples/apps/custom-widget/src/main.rs",
+    "line": 105,
+    "code": "buf.set_style(area, Style::new().bg(background).fg(text));",
+    "targetName": "Style::new().bg(background).fg",
+    "target": "ratatui-core/src/style.rs:416 method fg",
+    "targetLine": "pub const fn fg(mut self, color: Color) -> Self {",
+    "binding": null
+  },
+  {
+    "mechanism": "method-inferred-receiver",
+    "repo": "cberner/redb",
+    "file": "tests/integration_tests.rs",
+    "line": 1253,
+    "code": "txn.commit().unwrap();",
+    "targetName": "txn.commit",
+    "target": "src/transactions.rs:1755 method commit",
+    "targetLine": "pub fn commit(self) -> Result<(), CommitError> {",
+    "binding": null
+  },
+  {
+    "mechanism": "method-written-receiver",
+    "repo": "BurntSushi/ripgrep",
+    "file": "crates/searcher/src/searcher/glue.rs",
+    "line": 128,
+    "code": "let byte_count = self.byte_count();",
+    "targetName": "self.byte_count",
+    "target": "crates/searcher/src/searcher/glue.rs:133 method byte_count",
+    "targetLine": "fn byte_count(&mut self) -> u64 {",
+    "binding": null
+  },
+  {
+    "mechanism": "method-written-receiver",
+    "repo": "BurntSushi/ripgrep",
+    "file": "crates/searcher/src/searcher/glue.rs",
+    "line": 181,
+    "code": "self.sink_matched(&last_match)?;",
+    "targetName": "self.sink_matched",
+    "target": "crates/searcher/src/searcher/glue.rs:299 method sink_matched",
+    "targetLine": "fn sink_matched(&mut self, range: &Range) -> Result<bool, S::Error> {",
+    "binding": null
+  },
+  {
+    "mechanism": "method-written-receiver",
+    "repo": "BurntSushi/ripgrep",
+    "file": "crates/searcher/src/searcher/glue.rs",
+    "line": 42,
+    "code": "self.consume_remaining();",
+    "targetName": "self.consume_remaining",
+    "target": "crates/searcher/src/searcher/glue.rs:53 method consume_remaining",
+    "targetLine": "fn consume_remaining(&mut self) {",
+    "binding": null
+  },
+  {
+    "mechanism": "method-written-receiver",
+    "repo": "BurntSushi/ripgrep",
+    "file": "crates/ignore/src/incremental.rs",
+    "line": 518,
+    "code": "let should_descend = is_dir && !mat.is_ignore();",
+    "targetName": "mat.is_ignore",
+    "target": "crates/ignore/src/lib.rs:437 method is_ignore",
+    "targetLine": "pub fn is_ignore(&self) -> bool {",
+    "binding": null
+  },
+  {
+    "mechanism": "method-written-receiver",
+    "repo": "BurntSushi/ripgrep",
+    "file": "crates/ignore/src/lib.rs",
+    "line": 381,
+    "code": "if !err.is_io() {",
+    "targetName": "err.is_io",
+    "target": "crates/ignore/src/lib.rs:173 method is_io",
+    "targetLine": "pub fn is_io(&self) -> bool {",
+    "binding": null
+  },
+  {
+    "mechanism": "method-written-receiver",
+    "repo": "BurntSushi/ripgrep",
+    "file": "crates/searcher/src/searcher/glue.rs",
+    "line": 40,
+    "code": "while self.fill()? {",
+    "targetName": "self.fill",
+    "target": "crates/searcher/src/searcher/glue.rs:58 method fill",
+    "targetLine": "fn fill(&mut self) -> Result<bool, S::Error> {",
+    "binding": null
+  },
+  {
+    "mechanism": "method-written-receiver",
+    "repo": "BurntSushi/ripgrep",
+    "file": "crates/searcher/src/searcher/glue.rs",
+    "line": 180,
+    "code": "if self.sink_context(&last_match)? {",
+    "targetName": "self.sink_context",
+    "target": "crates/searcher/src/searcher/glue.rs:311 method sink_context",
+    "targetLine": "fn sink_context(&mut self, range: &Range) -> Result<bool, S::Error> {",
+    "binding": null
+  },
+  {
+    "mechanism": "method-written-receiver",
+    "repo": "BurntSushi/ripgrep",
+    "file": "crates/ignore/src/lib.rs",
+    "line": 485,
+    "code": "if self.is_none() { other } else { self }",
+    "targetName": "self.is_none",
+    "target": "crates/ignore/src/lib.rs:429 method is_none",
+    "targetLine": "pub fn is_none(&self) -> bool {",
+    "binding": null
+  },
+  {
+    "mechanism": "method-written-receiver",
+    "repo": "BurntSushi/ripgrep",
+    "file": "crates/searcher/src/searcher/glue.rs",
+    "line": 174,
+    "code": "keepgoing = self.sink()?;",
+    "targetName": "self.sink",
+    "target": "crates/searcher/src/searcher/glue.rs:208 method sink",
+    "targetLine": "fn sink(&mut self) -> Result<bool, S::Error> {",
+    "binding": null
+  },
+  {
+    "mechanism": "method-written-receiver",
+    "repo": "BurntSushi/ripgrep",
+    "file": "crates/searcher/src/searcher/glue.rs",
+    "line": 203,
+    "code": "let byte_count = self.byte_count();",
+    "targetName": "self.byte_count",
+    "target": "crates/searcher/src/searcher/glue.rs:345 method byte_count",
+    "targetLine": "fn byte_count(&mut self) -> u64 {",
+    "binding": null
+  }
+]

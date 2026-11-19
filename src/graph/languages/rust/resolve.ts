@@ -58,6 +58,147 @@ const withoutLifetimes = (s: string) =>
     )
     .replace(/,\s*>/g, ">")
     .replace(/<\s*>/g, "");
+/** `std::fmt::Display<X>` → `Display`. */
+const lastSegment = (s: string) =>
+  compact(s)
+    .replace(/<[\s\S]*$/, "")
+    .split("::")
+    .at(-1)!;
+/**
+ * C-10: method names of the standard prelude traits (all editions), split by
+ * whether a candidate can precede an autoref'd `&self` inherent method (by
+ * value) or only a `&mut self` one (by `&self`). A trait in this table counts
+ * for a type only when the type implements it in the checkout or derives it;
+ * the blanket entries apply to every type. Lists are deliberately broad:
+ * a `&mut self` method listed as by-value only blocks more links.
+ */
+const iteratorMethods =
+  "next next_chunk size_hint count last advance_by nth step_by chain zip intersperse intersperse_with map for_each filter filter_map enumerate peekable skip_while take_while map_while skip take scan flat_map flatten map_windows fuse inspect by_ref collect try_collect collect_into partition partition_in_place is_partitioned try_fold try_for_each fold reduce try_reduce all any find find_map try_find position rposition max min max_by_key max_by min_by_key min_by rev unzip copied cloned cycle array_chunks sum product cmp cmp_by partial_cmp partial_cmp_by eq eq_by ne lt le gt ge is_sorted is_sorted_by is_sorted_by_key next_back advance_back_by nth_back try_rfold rfold rfind into_iter";
+const preludeTraitMethods: Record<string, { value: string; ref: string }> = {
+  Clone: { value: "", ref: "clone clone_from" },
+  Copy: { value: "", ref: "" },
+  PartialEq: { value: "", ref: "eq ne" },
+  Eq: {
+    value: "",
+    ref: "eq ne assert_receiver_is_total_eq assert_fields_are_eq",
+  },
+  PartialOrd: {
+    value: "",
+    ref: "partial_cmp lt le gt ge __chaining_lt __chaining_le __chaining_gt __chaining_ge",
+  },
+  Ord: {
+    value: "max min clamp",
+    ref: "cmp partial_cmp lt le gt ge __chaining_lt __chaining_le __chaining_gt __chaining_ge",
+  },
+  Default: { value: "", ref: "" },
+  Drop: { value: "", ref: "drop" },
+  AsRef: { value: "", ref: "as_ref" },
+  AsMut: { value: "", ref: "as_mut" },
+  Iterator: {
+    value: iteratorMethods + " __iterator_get_unchecked",
+    ref: "size_hint len is_empty",
+  },
+  DoubleEndedIterator: { value: iteratorMethods, ref: "" },
+  ExactSizeIterator: { value: iteratorMethods, ref: "len is_empty" },
+  IntoIterator: { value: "into_iter", ref: "" },
+  Extend: { value: "", ref: "extend extend_one extend_reserve" },
+  Future: { value: "into_future poll", ref: "poll" },
+  IntoFuture: { value: "into_future", ref: "" },
+  Fn: { value: "call call_mut call_once", ref: "call" },
+  FnMut: { value: "call_mut call_once", ref: "call_mut" },
+  FnOnce: { value: "call_once", ref: "" },
+};
+/** Non-prelude standard traits whose complete method sets are known. */
+const standardTraitMethods: Record<string, { value: string; ref: string }> = {
+  Hash: { value: "", ref: "hash" },
+  Debug: { value: "", ref: "fmt" },
+  Display: { value: "", ref: "fmt to_string" },
+  Error: { value: "", ref: "source description cause provide" },
+  Deref: { value: "", ref: "deref" },
+  DerefMut: { value: "", ref: "deref_mut" },
+  Borrow: { value: "", ref: "borrow" },
+  BorrowMut: { value: "", ref: "borrow_mut" },
+  Any: { value: "", ref: "type_id" },
+  FromStr: { value: "", ref: "" },
+  From: { value: "", ref: "" },
+  TryFrom: { value: "", ref: "" },
+  Into: { value: "into", ref: "" },
+  TryInto: { value: "try_into", ref: "" },
+  ToString: { value: "", ref: "to_string" },
+  ToOwned: { value: "", ref: "to_owned clone_into" },
+  Send: { value: "", ref: "" },
+  Sync: { value: "", ref: "" },
+  Unpin: { value: "", ref: "" },
+  Sized: { value: "", ref: "" },
+  Index: { value: "", ref: "index" },
+  IndexMut: { value: "", ref: "index_mut" },
+  Add: { value: "add", ref: "" },
+  Sub: { value: "sub", ref: "" },
+  Mul: { value: "mul", ref: "" },
+  Div: { value: "div", ref: "" },
+  Rem: { value: "rem", ref: "" },
+  Neg: { value: "neg", ref: "" },
+  Not: { value: "not", ref: "" },
+  BitAnd: { value: "bitand", ref: "" },
+  BitOr: { value: "bitor", ref: "" },
+  BitXor: { value: "bitxor", ref: "" },
+  Shl: { value: "shl", ref: "" },
+  Shr: { value: "shr", ref: "" },
+  // `&mut self` methods never precede an autoref'd inherent method.
+  AddAssign: { value: "", ref: "" },
+  SubAssign: { value: "", ref: "" },
+  MulAssign: { value: "", ref: "" },
+  DivAssign: { value: "", ref: "" },
+  RemAssign: { value: "", ref: "" },
+  BitAndAssign: { value: "", ref: "" },
+  BitOrAssign: { value: "", ref: "" },
+  BitXorAssign: { value: "", ref: "" },
+  ShlAssign: { value: "", ref: "" },
+  ShrAssign: { value: "", ref: "" },
+  FromIterator: { value: "", ref: "" },
+  Sum: { value: "", ref: "" },
+  Product: { value: "", ref: "" },
+  Binary: { value: "", ref: "fmt" },
+  Octal: { value: "", ref: "fmt" },
+  LowerHex: { value: "", ref: "fmt" },
+  UpperHex: { value: "", ref: "fmt" },
+  LowerExp: { value: "", ref: "fmt" },
+  UpperExp: { value: "", ref: "fmt" },
+  Pointer: { value: "", ref: "fmt" },
+  Termination: { value: "report", ref: "" },
+  UnwindSafe: { value: "", ref: "" },
+  RefUnwindSafe: { value: "", ref: "" },
+};
+const blanketValueMethods = new Set(["into", "try_into"]);
+const blanketRefMethods = new Set([
+  "to_owned",
+  "clone_into",
+  "to_string",
+  "borrow",
+  "borrow_mut",
+  "type_id",
+]);
+/** Attributes that cannot add a trait impl to the item they annotate. */
+const inertItemAttributes = new Set([
+  "derive",
+  "cfg",
+  "cfg_attr",
+  "doc",
+  "allow",
+  "warn",
+  "deny",
+  "forbid",
+  "expect",
+  "must_use",
+  "repr",
+  "non_exhaustive",
+  "deprecated",
+  "automatically_derived",
+  "rustfmt",
+  "clippy",
+  "serde",
+  "default",
+]);
 type Namespace = "type" | "value" | "macro" | "any" | "import" | "importType";
 type AttributeOrigin = {
   name: string;
@@ -157,6 +298,8 @@ export function resolveRust(
   markConditions?: (link: GraphLink, conditions: string[]) => void,
   /** Derived links (R1-K: calls written in macro bodies, at each invocation). */
   derived?: (link: AddedLink) => void,
+  /** C-10: analysis notes merged into a link's data (receiver typing). */
+  annotate?: (link: GraphLink, extra: Record<string, Json>) => void,
 ): LinkResolution[] {
   // Cache only unproved import namespaces, never targets or positive proofs.
   // Facts are immutable for this run; caller conditions and placement are in
@@ -3618,6 +3761,8 @@ export function resolveRust(
   const allMembers = new Map<string, GraphSymbol[]>();
   const defaultMembers = new Map<string, GraphSymbol[]>();
   const unknownTraitRoots = new Set<string>();
+  const foreignTraits = new Map<string, Set<string>>();
+  const unknownForeignTraits = new Set<string>();
   for (const owner of symbols.filter((s) => ["impl", "trait"].includes(s.kind)))
     for (const m of scopedMembers(owner)) {
       memberOwners.set(m.id, owner);
@@ -3702,6 +3847,23 @@ export function resolveRust(
         (!!data(impl).trait && (!trait.complete || !trait.symbols.length));
       if (uncertain || ex.externalShape)
         retainUnknown(loc.crate.root, methods, !data(impl).trait);
+      // C-10: impls of traits declared outside the checkout, by self type.
+      if (
+        data(impl).trait &&
+        (!trait.complete || !trait.symbols.some((t) => t.kind === "trait"))
+      ) {
+        const traitName = lastSegment(str(data(impl).trait));
+        const owners = targets.symbols.filter((t) =>
+          ["struct", "enum"].includes(t.kind),
+        );
+        if (ex.unknown || !targets.complete || !owners.length)
+          unknownForeignTraits.add(traitName);
+        for (const t of owners)
+          foreignTraits.set(
+            t.id,
+            new Set([...(foreignTraits.get(t.id) ?? []), traitName]),
+          );
+      }
       for (const t of targets.symbols.filter((t) =>
         ["struct", "enum", "type"].includes(t.kind),
       ))
@@ -3991,6 +4153,10 @@ export function resolveRust(
     argumentMinimum = argumentCount,
     callerGenerics = "",
     receiverSyntax = "",
+    /** C-10: where the receiver type is written, when not at the call. */
+    typeLoc: Place = loc,
+    /** C-10: the call site, which enables the autoref probe step. */
+    site?: { file: string; scope: string },
   ): Found {
     name = compact(name);
     if (instance && !typeName.trim())
@@ -4005,7 +4171,7 @@ export function resolveRust(
       };
     const ex = expandType(
       typeName,
-      loc,
+      typeLoc,
       scope,
       new Set(),
       new Set(callerGenerics.split(",")),
@@ -4084,7 +4250,7 @@ export function resolveRust(
                 typeName,
                 m.implType,
                 m.generics,
-                loc,
+                typeLoc,
                 scope,
                 m.argumentPlace,
                 m.argumentScope,
@@ -4192,7 +4358,7 @@ export function resolveRust(
         (c) =>
           m.ownerRoot !== loc.crate.root || !implies(loc.conditions ?? [], c),
       );
-    const firstStep =
+    const stepBase =
       instance &&
       ["owned", "shared", "mutable"].includes(borrow) &&
       proven.length === inherent.length &&
@@ -4209,10 +4375,31 @@ export function resolveRust(
           proven.includes(m),
         ),
       ) &&
-      !unknownInherentExists &&
+      !unknownInherentExists;
+    const firstStep =
+      stepBase &&
       proven.every((m) => form(m) === borrow && !conditions(m).length);
+    // C-10: an owned receiver reaches a `&self`/`&mut self` inherent method
+    // at the autoref step, after every by-value (and, for `&mut self`, every
+    // `&self`) candidate of a trait in scope. Definite only when no such trait
+    // candidate can exist at the call site.
+    const autoref =
+      !firstStep &&
+      !!site &&
+      stepBase &&
+      borrow === "owned" &&
+      unique(proven.map((m) => m.symbol)).length === 1 &&
+      proven.every(
+        (m) =>
+          (form(m) === "shared" || form(m) === "mutable") &&
+          !conditions(m).length,
+      ) &&
+      autorefClear(name, form(proven[0]!), type.symbols, loc, site);
     if (instance) {
-      if (firstStep && unique(proven.map((m) => m.symbol)).length === 1)
+      if (
+        (firstStep || autoref) &&
+        unique(proven.map((m) => m.symbol)).length === 1
+      )
         return { symbols: unique(proven.map((m) => m.symbol)), complete: true };
       if (borrow === "unknown" || inherent.some((m) => form(m) === "unknown"))
         return unverified("receiver-type-unverified");
@@ -4259,6 +4446,697 @@ export function resolveRust(
     return unverified(
       inherent.length ? "inherent-applicability-unverified" : "trait-dispatch",
     );
+  }
+  // C-10: imports that could bring a trait into scope at a call site.
+  const importsInScope = new Map<string, GraphLink[]>();
+  for (const l of ctx.links)
+    if (l.kind === "imports") {
+      const k = `${l.file}|${str(data(l).scope)}`;
+      const list = importsInScope.get(k) ?? [];
+      list.push(l);
+      importsInScope.set(k, list);
+    }
+  const parentScope = (s: string) =>
+    s.includes("::") ? s.slice(0, s.lastIndexOf("::")) : "";
+  function standardPath(path: string, loc: Place, scope: string): boolean {
+    const head = path.replace(/^::/, "").split("::")[0]!;
+    return (
+      ["std", "core", "alloc"].includes(head) &&
+      !loc.crate.deps.has(head) &&
+      !opaqueStandardRoots.get(loc.crate.root)?.has(head) &&
+      !find(head, loc, scope, "type").symbols.length
+    );
+  }
+  type TraitRisk = {
+    other: boolean;
+    standard: Set<string>;
+    standardGlob: boolean;
+    glob: boolean;
+  };
+  const riskCache = new Map<string, TraitRisk>();
+  /**
+   * Traits a `use` could bring into scope from `scope` up to its module:
+   * standard traits by name, any checkout-resolved name (whose traits are
+   * known), and anything else as an unknown trait source.
+   */
+  function traitRisk(scope: string, place: Place, depth = 0): TraitRisk {
+    const key = `${place.file}|${place.crate.root}|${place.local}|${scope}`;
+    const cached = riskCache.get(key);
+    if (cached) return cached;
+    const risk: TraitRisk = {
+      other: false,
+      standard: new Set(),
+      standardGlob: false,
+      glob: false,
+    };
+    // A glob cycle is not proved here; the provisional entry says so.
+    riskCache.set(key, { ...risk, other: true });
+    let s = scope;
+    while (true) {
+      if (opaqueScopes.has(`${place.crate.root}|${qualified(place, s)}`))
+        risk.other = true;
+      for (const l of importsInScope.get(`${place.file}|${s}`) ?? []) {
+        const d = data(l);
+        if (d.externCrate) continue;
+        const raw = compact(l.targetName).replace(/::\*$/, "");
+        if (d.glob) risk.glob = true;
+        if (standardPath(raw, place, s)) {
+          if (d.glob) risk.standardGlob = true;
+          else risk.standard.add(lastSegment(raw));
+          continue;
+        }
+        if (d.glob) {
+          const target = find(raw, place, s, "type");
+          if (
+            depth >= 3 ||
+            !target.complete ||
+            !target.symbols.length ||
+            target.failedFiles?.length
+          ) {
+            risk.other = true;
+            continue;
+          }
+          for (const m of target.symbols) {
+            if (m.kind === "enum") continue;
+            const bodies =
+              m.kind !== "module"
+                ? []
+                : data(m).unit
+                  ? [roots.get(m.file)!].filter(Boolean)
+                  : (modulePlaces.get(m.id) ?? []);
+            if (!bodies.length) risk.other = true;
+            for (const body of bodies) {
+              const inner = traitRisk(body.local, body, depth + 1);
+              risk.other ||= inner.other;
+              risk.standardGlob ||= inner.standardGlob;
+              risk.glob ||= inner.glob;
+              for (const n of inner.standard) risk.standard.add(n);
+            }
+          }
+          continue;
+        }
+        const name = compact(l.targetName);
+        activeMacroImports.push(l);
+        let r: Found;
+        try {
+          r = findUsePath(
+            name,
+            place,
+            s,
+            "import",
+            new Set(),
+            true,
+            false,
+            !name.includes("::") && d.alias === name,
+          );
+        } finally {
+          activeMacroImports.pop();
+        }
+        if (
+          !r.complete ||
+          !r.symbols.length ||
+          r.failedFiles?.length ||
+          r.possibleImportNames?.length
+        )
+          risk.other = true;
+      }
+      if (!s || s === place.local || !s.startsWith(place.local)) break;
+      s = parentScope(s);
+    }
+    riskCache.set(key, risk);
+    return risk;
+  }
+  let checkoutTraitMethodNames: Set<string> | undefined;
+  /**
+   * The traits a type implements outside the checkout's own traits: written
+   * impls, derives, and (for an attribute that can generate code) unknown.
+   */
+  function implementedOutside(t: GraphSymbol): {
+    names: Set<string>;
+    unknown: boolean;
+  } {
+    const names = new Set([
+      ...(foreignTraits.get(t.id) ?? []),
+      ...unknownForeignTraits,
+    ]);
+    let unknown = false;
+    for (const a of (data(t).attributes ?? []) as string[]) {
+      const head = /^#!?\[\s*([\w]+)/.exec(a)?.[1] ?? "";
+      if (head === "cfg_attr") {
+        const inner = a.replace(/^#!?\[\s*cfg_attr\s*\(/, "");
+        const parts = inner.slice(inner.indexOf(",") + 1);
+        if (
+          /\b(?!derive\b|serde\b|doc\b|allow\b)[A-Za-z_]\w*\s*[([\]]/.test(
+            parts.replace(/derive\s*\([^()]*\)/g, ""),
+          ) ||
+          !/\(/.test(parts)
+        )
+          unknown = true;
+      } else if (!inertItemAttributes.has(head)) unknown = true;
+      for (const m of a.matchAll(/\bderive\s*\(([^()]*)\)/g))
+        for (const x of m[1]!.split(","))
+          if (x.trim()) {
+            names.add(lastSegment(x));
+            if (!standardDerives.has(lastSegment(x))) unknown = true;
+          }
+    }
+    return { names, unknown };
+  }
+  /** C-10: no by-value (or, for `&mut self`, `&self`) trait candidate. */
+  function autorefClear(
+    name: string,
+    form: string,
+    types: GraphSymbol[],
+    loc: Place,
+    site: { file: string; scope: string },
+  ): boolean {
+    if (blanketValueMethods.has(name)) return false;
+    if (form === "mutable" && blanketRefMethods.has(name)) return false;
+    checkoutTraitMethodNames ??= new Set(
+      symbols
+        .filter((s) => s.kind === "trait")
+        .flatMap(scopedMembers)
+        .map((m) => m.name),
+    );
+    if (checkoutTraitMethodNames.has(name)) return false;
+    if (unknownMethods(loc.crate.root, name).length) return false;
+    // Unreadable code in reach could declare or import a candidate.
+    if (relevantFailures(loc.crate.root).length) return false;
+    if (loc.file !== site.file) return false;
+    const risk = traitRisk(site.scope, loc);
+    if (risk.other) return false;
+    for (const t of types) {
+      // A written impl of a trait whose methods are not known (it resolves
+      // neither to the checkout nor to a known standard trait) is unproved.
+      for (const trait of [
+        ...(foreignTraits.get(t.id) ?? []),
+        ...unknownForeignTraits,
+      ])
+        if (!preludeTraitMethods[trait] && !standardTraitMethods[trait])
+          return false;
+      const { names, unknown } = implementedOutside(t);
+      if (unknown && (risk.standardGlob || risk.standard.size)) return false;
+      // Code generated next to the type can declare a trait in its module.
+      if (unknown && (t.file === site.file || risk.glob)) return false;
+      const value = new Set<string>(),
+        ref = new Set<string>();
+      const add = (table: { value: string; ref: string }) => {
+        for (const x of table.value.split(" ")) if (x) value.add(x);
+        for (const x of table.ref.split(" ")) if (x) ref.add(x);
+      };
+      if (unknown)
+        for (const k in preludeTraitMethods) add(preludeTraitMethods[k]!);
+      for (const trait of names) {
+        const prelude = preludeTraitMethods[trait];
+        if (prelude) {
+          add(prelude);
+          continue;
+        }
+        if (!risk.standardGlob && !risk.standard.has(trait)) continue;
+        const standard = standardTraitMethods[trait];
+        if (!standard) return false;
+        add(standard);
+      }
+      if (value.has(name)) return false;
+      if (form === "mutable" && ref.has(name)) return false;
+    }
+    return true;
+  }
+  /** A bare standard prelude type name not rebound at this scope. */
+  function preludeType(name: string, loc: Place, scope: string): boolean {
+    if (loc.noImplicitPrelude) return false;
+    const f = find(name, loc, scope, "type");
+    if (
+      !f.complete ||
+      f.symbols.length ||
+      f.failedFiles?.length ||
+      f.possibleImportNames?.length
+    )
+      return false;
+    let s = scope;
+    while (true) {
+      for (const l of importsInScope.get(`${loc.file}|${s}`) ?? [])
+        if (
+          data(l).glob ||
+          compact(str(data(l).alias)) === name ||
+          lastSegment(l.targetName) === name
+        )
+          return false;
+      if (!s || s === loc.local || !s.startsWith(loc.local)) break;
+      s = parentScope(s);
+    }
+    return true;
+  }
+  type Typed = {
+    text: string;
+    loc: Place;
+    scope: string;
+    generics: string;
+    borrow: string;
+    mutable: boolean;
+    syntax: string;
+    future?: boolean;
+  };
+  type Typing = Typed | { gap: string };
+  const isGap = (t: Typing): t is { gap: string } => "gap" in t;
+  const placeIds = new WeakMap<Place, number>();
+  let placeCount = 0;
+  const placeId = (p: Place) => {
+    let id = placeIds.get(p);
+    if (id === undefined) placeIds.set(p, (id = placeCount++));
+    return id;
+  };
+  const typingCache = new Map<string, Typing>();
+  /** Split one leading reference; a second reference level is not typed. */
+  function splitReference(
+    text: string,
+  ): { text: string; borrow: string } | null {
+    text = text.trim();
+    const m = text.match(
+      /^&\s*(?:'[_\p{ID_Start}][_\p{ID_Continue}]*\s*)?(mut\b\s*)?/u,
+    );
+    if (!m) return { text, borrow: "owned" };
+    const rest = text.slice(m[0].length).trim();
+    return rest.startsWith("&")
+      ? null
+      : { text: rest, borrow: m[1] ? "mutable" : "shared" };
+  }
+  /** Shapes the method lookup can name; others report their gap. */
+  function shapeGap(text: string, generics: string): string | undefined {
+    const t = text.trim();
+    if (!t) return "unit-return";
+    if (/^impl\b/.test(t)) return "impl-trait";
+    if (/^dyn\b/.test(t)) return "trait-object";
+    if (/^[([*!_]|^fn\b|^unsafe\b|^extern\b/.test(t)) return "aggregate";
+    if (generics.split(",").includes(compact(t))) return "generic";
+    if (/^Self::|<\s*Self\b|\bSelf::/.test(t)) return "associated-type";
+    if (
+      /^(?:[\w]+::)*[A-Z]\w*::[A-Z]\w*$/.test(t) &&
+      generics.split(",").includes(t.split("::")[0]!)
+    )
+      return "associated-type";
+    return undefined;
+  }
+  function declarationPlace(s: GraphSymbol): Place | undefined {
+    const places = ownerPlace(s.file, str(data(s).scope));
+    return places.length === 1 ? places[0] : undefined;
+  }
+  /** The written result type of a definite callee. */
+  function resultOf(s: GraphSymbol): Typing {
+    if (failedFiles.has(s.file) || itemPresence(s).length)
+      return { gap: "callee-unverified" };
+    const place = declarationPlace(s);
+    if (!place) return { gap: "declaration-placement" };
+    if (s.kind === "struct")
+      return data(s).constructorForm === "tuple"
+        ? {
+            text: s.name,
+            loc: place,
+            scope: str(data(s).scope),
+            generics: "",
+            borrow: "owned",
+            mutable: true,
+            syntax: "",
+          }
+        : { gap: "callee-kind" };
+    if (!["function", "method"].includes(s.kind) || !("returnType" in data(s)))
+      return { gap: "callee-kind" };
+    let text = str(data(s).returnType);
+    const generics = str(data(s).signatureGenerics);
+    if (/\bSelf\b/.test(text)) {
+      const owner = memberOwners.get(s.id);
+      if (owner?.kind !== "impl" || !str(data(owner).implType))
+        return { gap: "trait-self" };
+      if (/\bSelf\s*::/.test(text)) return { gap: "associated-type" };
+      text = text.replace(/\bSelf\b/g, str(data(owner).implType));
+    }
+    const ref = splitReference(text);
+    if (!ref) return { gap: "reference-to-reference" };
+    const gap = shapeGap(ref.text, generics);
+    if (gap) return { gap: gap === "generic" ? "generic-return" : gap };
+    return {
+      text: ref.text,
+      loc: place,
+      scope: str(data(s).scope),
+      generics,
+      borrow: ref.borrow,
+      mutable: true,
+      syntax: "",
+      ...(data(s).async === true ? { future: true } : {}),
+    };
+  }
+  /** A written standard `Result<T, E>` or `Option<T>`: its first argument. */
+  function standardWrapper(
+    raw: string,
+    loc: Place,
+    scope: string,
+  ): string | undefined {
+    const text = withoutLifetimes(raw);
+    const m =
+      /^((?:::)?(?:std|core)::(?:result|option)::)?(Result|Option)\s*</.exec(
+        text,
+      );
+    if (
+      !m ||
+      (m[1] ? !standardPath(text, loc, scope) : !preludeType(m[2]!, loc, scope))
+    )
+      return undefined;
+    const args = splitArguments(text.slice(text.indexOf("<")));
+    return args && args.length === (m[2] === "Result" ? 2 : 1)
+      ? args[0]!
+      : undefined;
+  }
+  function payload(
+    raw: string,
+    loc: Place,
+    scope: string,
+    generics: string,
+  ): Typing {
+    const ref = splitReference(raw);
+    if (!ref) return { gap: "reference-to-reference" };
+    const gap = shapeGap(ref.text, generics);
+    if (gap) return { gap: gap === "generic" ? "generic-return" : gap };
+    return {
+      text: ref.text,
+      loc,
+      scope,
+      generics,
+      borrow: ref.borrow,
+      mutable: true,
+      syntax: "",
+    };
+  }
+  /**
+   * `?` on a standard `Result`/`Option` written directly or through one
+   * checkout alias (`type Result<T = ()> = std::result::Result<T, Error>`).
+   * An alias argument keeps the scope it is written in.
+   */
+  function unwrapTry(t: Typed): Typing {
+    if (t.future || t.borrow !== "owned") return { gap: "try-wrapper" };
+    const direct = standardWrapper(t.text, t.loc, t.scope);
+    if (direct !== undefined)
+      return payload(direct, t.loc, t.scope, t.generics);
+    const text = withoutLifetimes(t.text);
+    const found = find(text, t.loc, t.scope, "type");
+    const alias = found.symbols[0];
+    const place = alias && declarationPlace(alias);
+    if (
+      !found.complete ||
+      found.failedFiles?.length ||
+      found.symbols.length !== 1 ||
+      alias?.kind !== "type" ||
+      itemPresence(alias).length ||
+      !place
+    )
+      return { gap: "try-wrapper" };
+    const aliasScope = str(data(alias).scope);
+    const first = standardWrapper(
+      str(data(alias).aliasType),
+      place,
+      aliasScope,
+    );
+    if (first === undefined) return { gap: "try-wrapper" };
+    const defaults = (data(alias).genericDefaults ?? []) as (string | null)[];
+    const params = ((data(alias).generics ?? []) as string[])
+      .map((p, i) => [p.split("=")[0]!.trim(), defaults[i] ?? null] as const)
+      .filter(([p]) => !p.startsWith("'"));
+    const args = text.includes("<")
+      ? splitArguments(text.slice(text.indexOf("<")))
+      : [];
+    if (!args || args.length > params.length) return { gap: "try-wrapper" };
+    const index = params.findIndex(([p]) => p === compact(first));
+    if (index >= 0)
+      return index < args.length
+        ? payload(args[index]!, t.loc, t.scope, t.generics)
+        : params[index]![1] !== null
+          ? payload(params[index]![1]!, place, aliasScope, "")
+          : { gap: "try-wrapper" };
+    if (identifiers(first).some((x) => params.some(([p]) => p === x)))
+      return { gap: "try-wrapper" };
+    return payload(first, place, aliasScope, "");
+  }
+  /** The declared type of a named field of a checkout struct. */
+  function fieldOf(t: Typed, name: string, loc: Place): Typing {
+    if (t.future) return { gap: "future-receiver" };
+    const ex = expandType(
+      t.text,
+      t.loc,
+      t.scope,
+      new Set(),
+      new Set(t.generics.split(",").filter(Boolean)),
+    );
+    if (ex.unknown || ex.externalShape) return { gap: "field-owner" };
+    const found = find(ex.text, ex.loc, ex.scope, "type");
+    const s = found.symbols[0];
+    if (
+      !found.complete ||
+      found.symbols.length !== 1 ||
+      found.failedFiles?.length ||
+      s?.kind !== "struct" ||
+      itemPresence(s).length ||
+      !Array.isArray(data(s).fields)
+    )
+      return { gap: "field-owner" };
+    const entry = (data(s).fields as string[][]).find((f) => f[0] === name);
+    if (!entry) return { gap: "field-unknown" };
+    const place = declarationPlace(s);
+    if (!place) return { gap: "declaration-placement" };
+    if (!visible(entry[2]!, place, loc)) return { gap: "field-private" };
+    const ref = splitReference(entry[1]!);
+    if (!ref) return { gap: "reference-to-reference" };
+    const generics = ((data(s).typeGenerics ?? []) as string[]).join(",");
+    const gap = shapeGap(ref.text, generics);
+    if (gap) return { gap: gap === "generic" ? "generic-field" : gap };
+    const scope = str(data(s).scope);
+    return {
+      text: ref.text,
+      loc: place,
+      scope: scope ? `${scope}::${s.name}` : s.name,
+      generics,
+      borrow: ref.borrow,
+      mutable: t.borrow !== "shared" && t.mutable,
+      syntax: "",
+    };
+  }
+  /**
+   * C-10: an identifier pattern is a path pattern, not a binding, when the
+   * name resolves to a constant, unit struct or unit variant. The binding is
+   * proved only when the lookup completes with no such item and no import
+   * spelling that could supply one.
+   */
+  function bindsLocally(l: GraphLink, d: Data): boolean {
+    const name = str((d.localBinding as Data | undefined)?.name);
+    if (name === "self") return true;
+    if (!name || name === "None") return false;
+    const places = ownerPlace(l.file, str(d.scope));
+    return (
+      places.length > 0 &&
+      places.every((loc) => {
+        const f = find(name, loc, str(d.scope), "value");
+        return (
+          f.complete &&
+          !f.failedFiles?.length &&
+          !f.possibleImportNames?.length &&
+          !f.symbols.some(
+            (s) =>
+              s.kind === "const" ||
+              s.kind === "static" ||
+              ((s.kind === "struct" || s.kind === "variant") &&
+                data(s).constructorForm !== "tuple" &&
+                data(s).constructorForm !== "named"),
+          )
+        );
+      })
+    );
+  }
+  /** A path call's callable targets: a value name or an associated item. */
+  function pathCallTargets(
+    name: string,
+    selfPath: boolean,
+    scope: string,
+    d: Data,
+    targetName: string,
+    file: string,
+    loc: Place,
+  ): Found {
+    let result = find(name, loc, scope, "value");
+    const callableFound = result.symbols.some((s) =>
+      ["function", "method", "struct", "variant"].includes(s.kind),
+    );
+    if (
+      (!callableFound || !result.complete) &&
+      !result.failedFiles?.length &&
+      name.includes("::")
+    ) {
+      const pathSyntax = selfPath
+        ? name
+        : (str(d.pathSyntax) || targetName).replace(/\br#/g, "");
+      const split = pathSyntax.lastIndexOf("::");
+      const associated = methods(
+        selfPath ? str(d.implType) : pathSyntax.slice(0, split).trim(),
+        pathSyntax.slice(split + 2).trim(),
+        loc,
+        scope,
+        false,
+        "owned",
+        true,
+        Number(d.argumentCount),
+        selfPath ? `${file}|${str(d.implKey)}` : "",
+        Number(d.argumentMinimum ?? d.argumentCount),
+        str(d.genericBindings),
+        str(selfPath ? d.implArgumentSyntax : d.pathArgumentSyntax),
+      );
+      result = callableFound ? merge([result, associated]) : associated;
+    }
+    return {
+      ...result,
+      symbols: result.symbols.filter(
+        (s) =>
+          s.kind === "function" ||
+          s.kind === "method" ||
+          (s.kind === "struct" && data(s).constructorForm !== "named") ||
+          (s.kind === "variant" && data(s).constructorForm === "tuple"),
+      ),
+    };
+  }
+  /** One definite target or the reason there is none. */
+  const single = (f: Found): GraphSymbol | undefined =>
+    f.complete && !f.failedFiles?.length && unique(f.symbols).length === 1
+      ? f.symbols[0]
+      : undefined;
+  /**
+   * C-10: the type of a receiver recipe from written declarations only. A
+   * method or path call in the chain must itself have one definite target.
+   */
+  function typing(
+    r: Data,
+    loc: Place,
+    site: { file: string; scope: string },
+    depth = 0,
+  ): Typing {
+    const key = `${site.file}|${site.scope}|${placeId(loc)}|${JSON.stringify(r)}`;
+    const cached = typingCache.get(key);
+    if (cached) return cached;
+    let result: Typing;
+    const inner = () =>
+      depth > 32
+        ? { gap: "receiver-too-long" }
+        : typing((r.e ?? {}) as Data, loc, site, depth + 1);
+    switch (str(r.k)) {
+      case "type": {
+        const ref = splitReference(str(r.t));
+        result = !ref
+          ? { gap: "reference-to-reference" }
+          : {
+              text: ref.text,
+              loc,
+              scope: str(r.s),
+              generics: str(r.g),
+              borrow: ref.borrow !== "owned" ? ref.borrow : str(r.b) || "owned",
+              mutable: r.mu !== false,
+              syntax: str(r.a),
+            };
+        break;
+      }
+      case "p": {
+        let name = compact(str(r.p));
+        const selfPath = name === "Self" || name.startsWith("Self::");
+        if (selfPath && r.it) name = base(str(r.it)) + name.slice(4);
+        const d: Data = {
+          pathSyntax: str(r.p),
+          pathArgumentSyntax: str(r.pa) || "[]",
+          implType: str(r.it),
+          implKey: str(r.ik),
+          implArgumentSyntax: str(r.ia) || "[]",
+          argumentCount: Number(r.c),
+          argumentMinimum: Number(r.cm),
+          genericBindings: str(r.g),
+        };
+        const s = single(
+          pathCallTargets(
+            name,
+            selfPath,
+            selfPath ? str(r.is) : str(r.s),
+            d,
+            str(r.p),
+            site.file,
+            loc,
+          ),
+        );
+        result = s ? resultOf(s) : { gap: "callee-unresolved" };
+        break;
+      }
+      case "m": {
+        const t = inner();
+        if (isGap(t)) result = t;
+        else if (t.future) result = { gap: "future-receiver" };
+        else {
+          const s = single(
+            methods(
+              t.text,
+              str(r.n),
+              loc,
+              t.scope,
+              true,
+              t.borrow,
+              t.mutable,
+              Number(r.c),
+              "",
+              Number(r.cm),
+              t.generics,
+              t.syntax,
+              t.loc,
+              site,
+            ),
+          );
+          result = s ? resultOf(s) : { gap: "receiver-method-unresolved" };
+        }
+        break;
+      }
+      case "f": {
+        const t = inner();
+        result = isGap(t) ? t : fieldOf(t, str(r.n), loc);
+        break;
+      }
+      case "ref": {
+        const t = inner();
+        result = isGap(t)
+          ? t
+          : t.borrow !== "owned" || t.future
+            ? { gap: "reference-to-reference" }
+            : { ...t, borrow: r.m === true ? "mutable" : "shared" };
+        break;
+      }
+      case "deref": {
+        const t = inner();
+        result = isGap(t)
+          ? t
+          : t.borrow === "owned" || t.future
+            ? { gap: "deref-owned" }
+            : { ...t, mutable: t.borrow === "mutable", borrow: "owned" };
+        break;
+      }
+      case "try": {
+        const t = inner();
+        result = isGap(t) ? t : unwrapTry(t);
+        break;
+      }
+      case "await": {
+        const t = inner();
+        result = isGap(t)
+          ? t
+          : t.future
+            ? { ...t, future: false }
+            : { gap: "await-non-async" };
+        break;
+      }
+      default:
+        result = { gap: str(r.w) || "syntax" };
+    }
+    if (!isGap(result) && r.im === true && result.borrow === "owned")
+      result = { ...result, mutable: false };
+    typingCache.set(key, result);
+    return result;
   }
   /**
    * Calls read from a macro invocation's argument tokens count only when the
@@ -4321,6 +5199,7 @@ export function resolveRust(
           : (d.receiverType ?? ""),
       };
     let found: Found = empty();
+    let note: Record<string, Json> | undefined;
     if (l.kind === "contains")
       found = {
         symbols: [byLocalKey.get(`${l.file}|${str(d.key)}`)!].filter(Boolean),
@@ -4339,6 +5218,24 @@ export function resolveRust(
           };
     } else if (d.namespaceUnknown) {
       found = { ...empty(false), reason: "namespace-position-unverified" };
+    } else if (
+      // C-10: a proved local binding or generic parameter. The reference
+      // targets the declaring function or generic item.
+      d.blocked &&
+      !d.method &&
+      !d.conditionalBinding &&
+      ((["values", "calls"].includes(l.kind) &&
+        !!d.localBinding &&
+        !(unsafe && d.stdFallbackLocalUnknown)) ||
+        (["values", "types"].includes(l.kind) && !!d.typeParameter))
+    ) {
+      const target = d.localBinding
+        ? byLocalKey.get(`${l.file}|${l.sourceKey ?? ""}`)
+        : byLocalKey.get(`${l.file}|${str(d.typeParameterOwner)}`);
+      found =
+        target && (!d.localBinding || bindsLocally(l, d))
+          ? { symbols: [target], complete: true }
+          : empty();
     } else if (
       (!d.blocked || !!d.method || !!d.conditionalBinding) &&
       !(l.kind === "imports" && d.glob)
@@ -4374,7 +5271,44 @@ export function resolveRust(
                     ),
                   ].join("; "),
                 };
-          if (d.method)
+          if (d.method) {
+            const site = { file: l.file, scope: str(d.scope) };
+            if (
+              !str(d.receiverType) &&
+              d.receiverExpr &&
+              !(unsafe && d.stdFallbackReceiverExprUnknown)
+            ) {
+              const t = typing(d.receiverExpr as Data, loc, site);
+              if (isGap(t) || t.future) {
+                note ??= {
+                  receiverTyping: {
+                    gap: isGap(t) ? t.gap : "future-receiver",
+                  },
+                };
+              } else {
+                const own = find(t.text, t.loc, t.scope, "type");
+                if (own.complete && !own.symbols.length)
+                  note ??= { receiverTyping: { outside: compact(t.text) } };
+                return guard(
+                  methods(
+                    t.text,
+                    str(d.method),
+                    loc,
+                    t.scope,
+                    true,
+                    t.borrow,
+                    t.mutable,
+                    Number(d.argumentCount),
+                    "",
+                    Number(d.argumentMinimum ?? d.argumentCount),
+                    t.generics,
+                    t.syntax,
+                    t.loc,
+                    site,
+                  ),
+                );
+              }
+            }
             return guard(
               methods(
                 str(d.receiverType),
@@ -4391,8 +5325,11 @@ export function resolveRust(
                 Number(d.argumentMinimum ?? d.argumentCount),
                 str(d.genericBindings),
                 str(d.receiverArgumentSyntax),
+                loc,
+                site,
               ),
             );
+          }
           const ns: Namespace = ["calls", "values"].includes(l.kind)
             ? "value"
             : l.kind === "macros"
@@ -4406,6 +5343,18 @@ export function resolveRust(
                   : ["types", "implements"].includes(l.kind)
                     ? "type"
                     : "import";
+          if (l.kind === "calls")
+            return guard(
+              pathCallTargets(
+                name,
+                selfPath,
+                scope,
+                d,
+                l.targetName,
+                l.file,
+                loc,
+              ),
+            );
           let result =
             l.kind === "imports"
               ? (() => {
@@ -4428,35 +5377,6 @@ export function resolveRust(
               : l.kind === "macros"
                 ? macroLookup(name, l, loc, scope)
                 : find(name, loc, scope, ns);
-          const callableFound = result.symbols.some((s) =>
-            ["function", "method", "struct", "variant"].includes(s.kind),
-          );
-          if (
-            l.kind === "calls" &&
-            (!callableFound || !result.complete) &&
-            !result.failedFiles?.length &&
-            name.includes("::")
-          ) {
-            const pathSyntax = selfPath
-              ? name
-              : (str(d.pathSyntax) || l.targetName).replace(/\br#/g, "");
-            const split = pathSyntax.lastIndexOf("::");
-            const associated = methods(
-              selfPath ? str(d.implType) : pathSyntax.slice(0, split).trim(),
-              pathSyntax.slice(split + 2).trim(),
-              loc,
-              scope,
-              false,
-              "owned",
-              true,
-              Number(d.argumentCount),
-              selfPath ? `${l.file}|${str(d.implKey)}` : "",
-              Number(d.argumentMinimum ?? d.argumentCount),
-              str(d.genericBindings),
-              str(selfPath ? d.implArgumentSyntax : d.pathArgumentSyntax),
-            );
-            result = callableFound ? merge([result, associated]) : associated;
-          }
           if (l.kind === "patterns")
             result = {
               ...result,
@@ -4466,22 +5386,11 @@ export function resolveRust(
                 ),
               ),
             };
-          if (l.kind === "calls")
-            result = {
-              ...result,
-              symbols: result.symbols.filter(
-                (s) =>
-                  s.kind === "function" ||
-                  s.kind === "method" ||
-                  (s.kind === "struct" &&
-                    data(s).constructorForm !== "named") ||
-                  (s.kind === "variant" && data(s).constructorForm === "tuple"),
-              ),
-            };
           return guard(result);
         }),
       );
     }
+    if (note) annotate?.(l, note);
     if (["imports", "modules"].includes(l.kind) && itemPresence(l).length) {
       const { failedFiles: ignored, ...rest } = found;
       found = {

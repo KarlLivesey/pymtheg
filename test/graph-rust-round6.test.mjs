@@ -311,11 +311,8 @@ test("D16: first probes alone prove dot calls; trait and cfg choices never close
   const later = await graph(
     lib(`struct A;impl A{fn f(&self){}}fn r(a:A){a.f();}`),
   );
-  later.unverified("a.f", "impl A::f");
-  assert.equal(
-    later.links.find((l) => l.targetName === "a.f").data.uncertainty,
-    "later-probe-step",
-  );
+  // C-10: the autoref step is definite when no trait candidate can precede it.
+  later.one("a.f", "impl A::f");
   const trait = await graph(
     lib(`struct A;trait Tr{fn f(&self){}}impl Tr for A{}fn r(a:&A){a.f();}`),
   );
@@ -708,7 +705,7 @@ test("ambiguous manifest edges cannot accuse an unproven failed dependency crate
     },
   );
   assert.doesNotMatch(
-    g.links.find((l) => l.targetName === "a.f").data.uncertainty,
+    g.links.find((l) => l.targetName === "a.f").data.uncertainty ?? "",
     /failed-file/,
   );
   assert.equal(g.targets("a.f")[1][0].identity, "impl A::f");
@@ -827,9 +824,9 @@ test("opaque nested blocks never expose outer functions through local value bind
       "fn lower_bound()->u8{1}macro_rules! m{()=>{}}fn run(){let mut lower_bound=2;while lower_bound<3{m!();let _=lower_bound;lower_bound+=1;}}",
     ),
   );
-  g.unknown("lower_bound", "values");
-  for (const targets of g.would("lower_bound", "values"))
-    assert.equal(targets.length, 0);
+  // C-10: the local binding targets run with its declaration, never the
+  // outer function.
+  g.one("lower_bound", "run", "values");
 });
 
 test("cfg complement proof preserves string literal contents", async () => {
@@ -885,7 +882,10 @@ test("overflow: retain at most sixteen hints, otherwise count with no truncated 
       (_, i) => `struct A${i};impl A${i}{fn f(&self){}}`,
     ).join("");
     const g = await graph(
-      lib(declarations + "fn run(a:A0){a.f();}fn first(p:&A0){p.f();}"),
+      lib(
+        declarations +
+          "fn run(v:Option<A0>){if let Some(a)=v{a.f();}}fn first(p:&A0){p.f();}",
+      ),
     );
     g.unknown("a.f");
     g.one("p.f", "impl A0::f");

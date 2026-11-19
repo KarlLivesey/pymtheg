@@ -339,15 +339,38 @@ manifest unknown). Private items are ordinary symbols.
   `A::new` on a proven inherent impl; written `impl Trait for Type` links;
   `contains` (structure as written, not a claim that an item survives macro
   expansion).
-- **Dot calls** (`recv.m()`) are definite only for a unique inherent method at the
-  first probe step of a proven receiver type (owned `T` with `self`, `&T` with
-  `&self`, `&mut T` with `&mut self`). Every other dot call is unresolved with
+- **Local bindings and generic parameters:** a value or call reference to a
+  proven local binding, parameter or `self` targets the enclosing function, with
+  the binding's name and declaration span in `data.localBinding` (the TypeScript
+  form). A bare type or const parameter targets the item that declares it, with
+  `data.typeParameter`. They add no symbols and no link sites. A binding is not
+  proved when a macro could introduce it, a cfg alternative chooses it, an
+  unknown statement macro precedes it in its block, or the name could be a
+  constant, unit struct or unit variant (then the pattern is a path, not a
+  binding).
+- **Dot calls** (`recv.m()`) are definite only for a unique inherent method of a
+  proven receiver type, at the first probe step (owned `T` with `self`, `&T`
+  with `&self`, `&mut T` with `&mut self`) or, for an owned `T`, at the autoref
+  step (`&self`, `&mut self`) when no trait candidate can come first: the
+  method name is not a by-value method of a prelude or blanket standard trait,
+  of a trait the type implements or derives, or of any checkout trait; every
+  import in scope resolves into the checkout or names a standard trait whose
+  methods are known; no unknown macro, failed file, non-standard derive or
+  attribute macro can add one. Every other dot call is unresolved with
   would-be targets and a reason (`later-probe-step`, `trait-dispatch`,
   `receiver-type-unverified`, …); no dot call has a closed candidate set.
-  A receiver's type comes from a parameter or an annotated `let`; an
-  unannotated `let a = A::new();` is not given a type. Even with an annotated
-  `let b: A = A;`, a call of a `&self` method (`b.r()`) is a later probe step and
-  stays unresolved.
+  Trait methods (even of a checkout trait implemented for the type), `Box`,
+  `Rc` and `Arc` receivers and `Deref` targets stay unresolved.
+- **Receiver types** come from written declarations only: a parameter or an
+  annotated `let`; a `let` initialised by a struct literal, by a call with one
+  definite checkout callee whose return type is written (`Self` resolved
+  through its impl), by a definite method in a chain, or by a declared field of
+  a checkout struct; `&`, `*` on a reference, `?` on a written `Result`/`Option`
+  (directly or through one checkout alias), and `.await` on an `async fn`.
+  Generic results, closures, iterator items, pattern bindings and macros stay
+  unresolved; the gap is recorded in `data.receiverGap` or
+  `data.receiverTyping.gap`. A proven standard or dependency receiver type is
+  recorded as `data.receiverTyping.outside`; its method has no library target.
 - **Non-builtin attributes:** a link whose **target** is an item under a
   non-builtin attribute, or inside an item with one, is not definite (the
   attribute may replace the item; `item-under-opaque-attribute`, target kept as a

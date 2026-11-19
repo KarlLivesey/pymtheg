@@ -128,7 +128,17 @@ test("Rust sample: module layouts, private sibling calls, imports, distinct impl
     unresolved(store, "A::new");
     unresolved(store, "B::new");
     resolved(store, "sample_app::A::new", "impl A::new", "app/src/lib.rs");
-    unresolved(store, "a.own");
+    // C-10: flat.rs proves an owned A at the autoref step; run() has an
+    // opaque statement macro in its block.
+    assert.deepEqual(
+      calls(store, "a.own")
+        .map((l) => [l.file, l.resolution])
+        .sort(),
+      [
+        ["app/src/flat.rs", "resolved"],
+        ["app/src/lib.rs", "unresolved"],
+      ],
+    );
     unresolved(store, "foreign");
     unresolved(store, "globbed");
     unresolved(store, "unknown.speak");
@@ -237,17 +247,19 @@ fn unknown() { missing::T::new(); std::f(); }
           .length,
         1,
       );
-      unresolved(store, "imported");
-      unresolved(store, "y.f");
+      // Local bindings target caller, never the outer function.
+      for (const l of calls(store, "imported"))
+        assert.equal(selector(store, l)?.identity, "caller");
+      resolved(store, "y.f", "impl T::f");
       unresolved(store, "missing::T::new");
       unresolved(store, "std::f");
       assert.equal(
         calls(store, "x.f").filter((l) => l.resolution === "resolved").length,
-        0,
+        2, // C-10: caller(x: T) twice; the generic and the shadowing integer stay unresolved
       );
       assert.equal(
         calls(store, "x.f").filter((l) => l.resolution === "unresolved").length,
-        4,
+        2,
       );
       assert.deepEqual(
         calls(store, "scoped")
