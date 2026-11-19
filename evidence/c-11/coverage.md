@@ -23,9 +23,20 @@ The release credited 244,402 of 440,572 links. C-11 credits 301,058 of
 denominators compare the released graph with a build that includes the
 earlier TypeScript changes in C-3 and C-7.
 
-On the T3 Code sweep pin, C-11 preserved all 30,346 main symbol keys,
-all 162,711 existing sites and all 63,481 definite checkout destinations.
-This sweep pin is separate from the `b387e3a1` default-heap check.
+## Checkout identity
+
+The exact comparisons matched every symbol key and existing link site by
+source location, and every definite checkout destination by file and symbol
+key. All additions, removals, and changed destinations were zero.
+
+| Repository | Symbol keys | Link sites | Definite checkout links |
+| --- | ---: | ---: | ---: |
+| T3 Code | 30,346 | 162,711 | 63,481 |
+| Astro | 26,243 | 152,561 | 65,124 |
+| Excalidraw | 13,405 | 104,519 | 61,330 |
+| NestJS | 19,464 | 165,330 | 79,114 |
+
+The T3 Code sweep pin is separate from the `b387e3a1` default-heap check.
 
 ## Previous symbol credit
 

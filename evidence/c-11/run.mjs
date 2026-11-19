@@ -34,6 +34,8 @@ const preservationPins = new Set([
   "pingdotgg/t3code",
   "nestjs/nest",
   "excalidraw/excalidraw",
+  "withastro/astro",
+  "vitejs/vite",
 ]);
 const manifest = join(scratch, `${mode}-manifest.json`);
 const picked = /^candidate-pick(?:-[a-z0-9-]+)?$/.test(mode);
@@ -97,16 +99,26 @@ if (mode === "release") {
     JSON.stringify(pins.filter((repo) => preservationPins.has(repo.id))),
   );
   sweep(scratch, 3, main);
-} else if (mode === "collect") {
+} else if (mode === "collect" || mode === "replace") {
   const packets = [other, ...args].map((name) =>
     JSON.parse(readFileSync(join(scratch, `${name}-run.json`), "utf8")),
   );
   const [first] = packets;
-  if (packets.some((packet) => packet.release.sha256 !== first.release.sha256))
+  if (
+    mode === "collect" &&
+    packets.some((packet) => packet.release.sha256 !== first.release.sha256)
+  )
     throw Error("Candidate shards must use one build");
-  const byId = new Map(
-    packets.flatMap((packet) => packet.repos.map((row) => [row.id, row])),
-  );
+  const byId = new Map(first.repos.map((row) => [row.id, row]));
+  for (const packet of packets.slice(1))
+    for (const row of packet.repos) {
+      if (mode === "replace" && byId.get(row.id)?.commit !== row.commit)
+        throw Error(`Replacement must replay an existing pin: ${row.id}`);
+      byId.set(
+        row.id,
+        mode === "replace" ? { ...row, build: packet.release.sha256 } : row,
+      );
+    }
   writeFileSync(
     join(scratch, "candidate-run.json"),
     JSON.stringify({ ...first, repos: [...byId.values()] }),
@@ -126,7 +138,10 @@ if (mode === "release") {
             ),
     ),
   );
-  sweep(scratch, Number(other ?? 4), resolve("."));
+  const build = process.env.C11_BUILD
+    ? join(scratch, process.env.C11_BUILD)
+    : resolve(".");
+  sweep(scratch, Number(other ?? 4), build);
 } else if (
   ["release", "main", "candidate"].includes(other) &&
   mode.endsWith("-export")

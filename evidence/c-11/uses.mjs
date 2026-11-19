@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-import { execFileSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -44,7 +44,7 @@ for (const repo of summary.repos) {
 queries.forEach((query, i) => {
   const { count, id, root } = maximum[i];
   if (!count) throw Error(`No definite uses of ${query.join(" ")}`);
-  const raw = execFileSync(
+  const result = spawnSync(
     process.execPath,
     [
       cli,
@@ -60,8 +60,11 @@ queries.forEach((query, i) => {
     ],
     { encoding: "utf8" },
   );
-  const { classCounts } = JSON.parse(raw).data;
+  if (result.status !== 0 && result.status !== 2)
+    throw result.error ?? Error(`Query exited ${result.status ?? result.signal}`);
+  const { status, data } = JSON.parse(result.stdout);
+  const { classCounts } = data;
   if (classCounts.library !== count)
     throw Error(`Unexpected CLI count for ${query.join(" ")}`);
-  console.log(JSON.stringify({ repo: id, query, classCounts }));
+  console.log(JSON.stringify({ repo: id, query, status, classCounts }));
 });

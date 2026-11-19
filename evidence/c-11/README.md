@@ -6,21 +6,25 @@ each published checkout without dependency installation, then repeats the
 index and queries the store. The score uses all stored TypeScript-module link
 kinds. A library target with a symbol earns Level 2. A unit alone earns Level 1.
 
-[Change note](../../docs/changes/C-11.md) · [Pinned source audit](audit.md) · [Source-audit pin coverage](coverage.md)
+[Change note](../../docs/changes/C-11.md) · [Pinned source audit](audit.md) · [Coverage comparison](coverage.md) · [Cold indexing and heap](resources.md)
 
 The current plan input contains nine completed C-11 graphs. [Plan input](coverage-plan-input.json.gz)
 
+The 0.1.0 replay reproduced the archived SW-3 TypeScript and JavaScript
+coverage counts on each of the 18 released pins.
+
 ## Library queries
 
-These Hono queries use a result bound of two. The reported class counts are
-independent of the result bound.
+Each query used a result bound of two. The full class counts matched the
+stored targets. Astro and T3 Code returned their incomplete-source status
+alongside the counts.
 
-| Command | Library | Candidate sets |
-| --- | ---: | ---: |
-| `graph uses zod` | 31 | 0 |
-| `graph uses fs readFileSync` | 7 | 0 |
-| `graph uses dom ParentNode.prototype.querySelector` | 138 | 0 |
-| `graph uses es Map.prototype.delete` | 1 | 0 |
+| Repository | Command | Library | Candidate sets |
+| --- | --- | ---: | ---: |
+| Astro | `graph uses zod` | 1,227 | 0 |
+| Astro | `graph uses fs readFileSync` | 106 | 0 |
+| Hono | `graph uses dom ParentNode.prototype.querySelector` | 138 | 0 |
+| T3 Code | `graph uses es Map.prototype.delete` | 84 | 0 |
 
 ## How to reproduce
 

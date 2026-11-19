@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Compare every TypeScript symbol and link in three corpus checkouts.
+// Compare every TypeScript symbol and link in the selected corpus checkouts.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -61,6 +61,8 @@ for (const id of selected) {
     linksRemoved: 0,
     definite: 0,
     changed: [],
+    gained: 0,
+    gainedExamples: [],
   };
   try {
     const files = new Set([...inventory(before), ...inventory(after)]);
@@ -120,6 +122,18 @@ for (const id of selected) {
                 reason: data?.reason,
               })),
             });
+        }
+        result.gained += nextTargets.length;
+        for (const target of nextTargets) {
+          if (result.gainedExamples.length === 5) break;
+          const { range, targetName, resolution, data } = values[0];
+          result.gainedExamples.push({
+            file,
+            range,
+            targetName,
+            previous: data?.reason ?? resolution,
+            target: JSON.parse(target),
+          });
         }
       }
     }
