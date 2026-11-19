@@ -12,9 +12,19 @@ if (args[0] === "--relax-provenance") {
   const text = readFileSync(path, "utf8");
   const check =
     /registry\.some\(\(\{ macroRegistry \}\) => !macroRegistry \|\|\s*\(spec\?\.implementation && !macroRegistry\.includes\(spec\.implementation\)\)\)/g;
-  if ([...text.matchAll(check)].length !== 1)
-    throw Error("Cannot isolate the registry macro provenance check");
-  writeFileSync(path, text.replace(check, "false"));
+  const sourceCheck =
+    /export function cargoMacroSourceKnown\(path\) \{[\s\S]*?^\}/gm;
+  if ([...text.matchAll(sourceCheck)].length === 1)
+    writeFileSync(
+      path,
+      text.replace(
+        sourceCheck,
+        "export function cargoMacroSourceKnown() { return true; }",
+      ),
+    );
+  else if ([...text.matchAll(check)].length === 1)
+    writeFileSync(path, text.replace(check, "false"));
+  else throw Error("Cannot isolate the registry macro provenance check");
 } else {
   const affectedOnly = args[0] === "--affected";
   if (affectedOnly) args.shift();

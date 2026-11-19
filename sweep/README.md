@@ -175,11 +175,11 @@ Run this command from the repository root.
 
 ```sh
 node scripts/sweep/coverage.mjs --results evidence/c-18/coverage-plan-input.json.gz \
-  --base evidence/sw-3/breakdown.json.gz --plan docs/coverage-plan.md --rust-section
+  --plan docs/coverage-plan.md --rust-section
 ```
 
-The archive contains the measured Rust rows and their sampled sites. The
-command overlays them on the SW-3 baseline and replaces the Rust section.
+The archive overlays the 18 measured pins on the C-15 plan input and
+keeps its embedded SW-3 comparison base. The command replaces the Rust section.
 It preserves the Go and TypeScript sections from main verbatim. The
 regression test covers both parts of that contract.
 
