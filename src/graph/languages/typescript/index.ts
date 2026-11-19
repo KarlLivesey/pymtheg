@@ -21,6 +21,51 @@ const MAX_LIMIT_RETRIES = 25;
 const MAX_PROGRAM_REBUILDS = 200;
 const isStackLimit = (error: unknown) =>
   error instanceof RangeError && /call stack/i.test(error.message);
+/** Files a session fails for compiler exceptions before failing the rest. */
+const MAX_COMPILER_FAILURES = 100;
+/**
+ * The start of the reason recorded for a file the TypeScript compiler threw
+ * on (an assertion such as "Debug Failure. False expression."), followed by
+ * the compiler's message.
+ */
+export const COMPILER_FAILURE =
+  "The TypeScript compiler failed while analysing this file";
+const compilerFailure = (error: unknown) =>
+  `${COMPILER_FAILURE}: ${error instanceof Error ? error.message : String(error)}`;
+/** The compiler's own assertion failures (`Debug.fail`, `Debug.assert`). */
+const isCompilerAssertion = (error: unknown) =>
+  error instanceof Error && error.message.startsWith("Debug Failure");
+/** The node the module last passed to a checker method (see `attributed`). */
+let lastAsked: ts.Node | undefined;
+/**
+ * The checker, with every method recording the node it is asked about. A
+ * compiler exception is then attributed to the file of the last node asked
+ * about: a whole-program walk (taint.ts reads every file's declarations at a
+ * file's first lookup) throws while reading another file's declaration, and
+ * that file, not the one being extracted, is what the compiler cannot read.
+ */
+function attributed(checker: ts.TypeChecker): ts.TypeChecker {
+  const wrapped: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(checker))
+    wrapped[key] =
+      typeof value === "function"
+        ? (...args: unknown[]) => {
+            const first = args[0] as { kind?: unknown } | undefined;
+            if (first && typeof first.kind === "number")
+              lastAsked = first as ts.Node;
+            return (value as (...inner: unknown[]) => unknown).apply(
+              checker,
+              args,
+            );
+          }
+        : value;
+  return wrapped as unknown as ts.TypeChecker;
+}
+/** The captured file of the node last asked about, if any. */
+const askedFile = (): string | undefined => {
+  const file = lastAsked?.getSourceFile()?.fileName;
+  return file === undefined ? undefined : fromVirtual(file);
+};
 import {
   CONTEXT_PATTERNS,
   fromVirtual,
@@ -36,7 +81,7 @@ import {
  * facts; resolve maps those facts to symbol IDs. See docs/changes/W2-D.md.
  */
 // Bump the leading number whenever extraction or resolution semantics change.
-const MODULE_VERSION = `22+typescript-${ts.version}`;
+const MODULE_VERSION = `23+typescript-${ts.version}`;
 
 /** Observation counters for tests (programs built, files extracted). Not a correctness input. */
 export const statistics = {
@@ -63,6 +108,11 @@ interface Session {
   rebuilds: number;
   /** Build a fresh checker. True when this also enables full dependency warm-up. */
   rebuild(): boolean;
+  /**
+   * The compiler threw on this file: it fails with `message`, and the
+   * program is rebuilt without it, resuming the warm-up.
+   */
+  drop(path: string, message: string): void;
 }
 
 /**
@@ -88,12 +138,31 @@ function openSession(
   validate?: (program: ts.Program) => boolean,
 ): Session {
   let host = makeHost();
+  /**
+   * The host's own realpath. Building a program replaces `host.realpath`
+   * with a wrapper over that program and never restores it, so every
+   * program built on a reused host would wrap the previous program's
+   * wrapper and keep that program alive. Each build starts from this.
+   */
+  let ownRealpath = host.realpath;
+  const replaceHost = () => {
+    host = makeHost();
+    ownRealpath = host.realpath;
+  };
   let fullWarmup = !lazyDependencies;
   /** Captured files whose warm-up overflowed: never warmed again. */
   const warmSkip = new Set<string>();
+  /**
+   * Files an earlier checker of this session warmed. A program rebuilt
+   * because the compiler threw on a file resumes the warm-up with the files
+   * not yet warmed: repeating it from the start would cost a whole warm-up
+   * per failing file. Any other rebuild warms from the start (cleared).
+   */
+  const warmed = new Set<string>();
   let lastProgram: ts.Program | undefined;
   const compile = () => {
     statistics.programs++;
+    if (ownRealpath) host.realpath = ownRealpath;
     const program = ts.createProgram({
       rootNames: roots(),
       options,
@@ -101,16 +170,37 @@ function openSession(
       ...(projectReferences?.length ? { projectReferences } : {}),
     });
     try {
-      return { program, checker: program.getTypeChecker() };
+      return { program, checker: attributed(program.getTypeChecker()) };
     } catch (error) {
       lastProgram = program;
       throw error;
     }
   };
+  /**
+   * A build's exception, as its kind and message only: the exception holds
+   * the compiler's stack frames and through them its checker, which must
+   * not outlive the build.
+   */
+  type Thrown = { limit: boolean; message: string };
+  const thrown = (error: unknown): Thrown => ({
+    limit: isStackLimit(error),
+    message: compilerFailure(error),
+  });
+  /** Builds a program and its checker, or says what was thrown. */
+  const attempt = ():
+    | { program: ts.Program; checker: ts.TypeChecker }
+    | Thrown => {
+    try {
+      return compile();
+    } catch (error) {
+      return thrown(error);
+    }
+  };
+  /** The file whose warm-up threw, with what was thrown. */
   const warmProgram = (
     program: ts.Program,
     checker: ts.TypeChecker,
-  ): string | undefined => {
+  ): ({ path: string; blame: string | undefined } & Thrown) | undefined => {
     const owned = fullWarmup ? undefined : new Set(program.getRootFileNames());
     for (const source of program.getSourceFiles()) {
       const path = fromVirtual(source.fileName);
@@ -118,6 +208,7 @@ function openSession(
         path === undefined ||
         !captured.has(path) ||
         warmSkip.has(path) ||
+        warmed.has(path) ||
         (owned && !owned.has(source.fileName))
       )
         continue;
@@ -133,25 +224,71 @@ function openSession(
         }
         ts.forEachChild(node, warm);
       };
+      lastAsked = undefined;
       try {
         warm(source);
       } catch (error) {
-        if (!isStackLimit(error)) throw error;
-        return path;
+        return { path, blame: askedFile(), ...thrown(error) };
       }
+      warmed.add(path);
     }
     return undefined;
   };
+  /** Files this session failed for compiler exceptions. */
+  let compilerFailures = 0;
+  /**
+   * Fails a file the compiler threw on: it is absent from every later
+   * program. Past MAX_COMPILER_FAILURES, every remaining root fails too.
+   */
+  const failCompiler = (path: string, message: string) => {
+    failures.set(path, message);
+    if (++compilerFailures < MAX_COMPILER_FAILURES) return;
+    for (const root of roots()) {
+      const other = root.slice(1);
+      if (!failures.has(other))
+        failures.set(
+          other,
+          `${COMPILER_FAILURE}: the compiler threw on ${MAX_COMPILER_FAILURES} files of this project, so the rest were not analysed`,
+        );
+    }
+  };
+  /**
+   * The root whose addition makes building the program throw (not a stack
+   * limit), by bisecting the root list: the shortest prefix that throws ends
+   * with it. Deterministic; a fresh host per attempt.
+   */
+  const firstThrowing = (): string[] => {
+    const list = roots();
+    const throws = (count: number) => {
+      try {
+        ts.createProgram({
+          rootNames: list.slice(0, count),
+          options,
+          host: makeHost(),
+          ...(projectReferences?.length ? { projectReferences } : {}),
+        }).getTypeChecker();
+        return false;
+      } catch (inner) {
+        return !isStackLimit(inner);
+      }
+    };
+    let low = 0;
+    let high = list.length;
+    while (high - low > 1) {
+      const middle = (low + high) >> 1;
+      if (throws(middle)) high = middle;
+      else low = middle;
+    }
+    return high > 0 ? [list[high - 1]!.slice(1)] : [];
+  };
   const build = (): { program: ts.Program; checker: ts.TypeChecker } => {
     for (;;) {
-      let compiled: { program: ts.Program; checker: ts.TypeChecker };
-      try {
-        compiled = compile();
-      } catch (error) {
-        if (!isStackLimit(error)) throw error;
+      const compiled = attempt();
+      if ("message" in compiled) {
+        const limit = compiled.limit;
         // The binder completes a file by setting classifiableNames; the
-        // file it was inside when the stack ran out has locals but not
-        // that. Otherwise, reproduce file by file.
+        // file it was inside when the stack ran out (or the compiler
+        // threw) has locals but not that. Otherwise, reproduce file by file.
         const unfinished = (lastProgram?.getSourceFiles() ?? [])
           .filter((source) => {
             const state = source as ts.SourceFile & {
@@ -164,50 +301,68 @@ function openSession(
           .filter(
             (path): path is string => path !== undefined && captured.has(path),
           );
+        lastProgram = undefined;
         const culprits = unfinished.length
           ? unfinished
-          : roots()
-              .map((root) => root.slice(1))
-              .filter((path) => {
-                try {
-                  // A fresh host per candidate: a fresh parse, a fresh bind.
-                  ts.createProgram({
-                    rootNames: [toVirtual(path)],
-                    options: { ...options, noResolve: true, noLib: true },
-                    host: makeHost(),
-                  }).getTypeChecker();
-                  return false;
-                } catch (inner) {
-                  if (!isStackLimit(inner)) throw inner;
-                  return true;
-                }
-              });
+          : limit
+            ? roots()
+                .map((root) => root.slice(1))
+                .filter((path) => {
+                  try {
+                    // A fresh host per candidate: a fresh parse, a fresh bind.
+                    ts.createProgram({
+                      rootNames: [toVirtual(path)],
+                      options: { ...options, noResolve: true, noLib: true },
+                      host: makeHost(),
+                    }).getTypeChecker();
+                    return false;
+                  } catch (inner) {
+                    if (!isStackLimit(inner)) throw inner;
+                    return true;
+                  }
+                })
+            : firstThrowing();
         // Not reproducible file by file: fail this config's files only.
         if (!culprits.length)
           culprits.push(...roots().map((root) => root.slice(1)));
         for (const path of culprits)
-          failures.set(
-            path,
-            "The TypeScript binder exhausted its stack on this file",
-          );
-        host = makeHost();
+          if (limit)
+            failures.set(
+              path,
+              "The TypeScript binder exhausted its stack on this file",
+            );
+          else failCompiler(path, compiled.message);
+        replaceHost();
         continue;
       }
       // A file failed by the syntax phase is absent from the next build.
       if (validate?.(compiled.program)) continue;
       const failedWarm = warmProgram(compiled.program, compiled.checker);
       if (failedWarm === undefined) return compiled;
-      if (fullWarmup) warmSkip.add(failedWarm);
+      // The compiler threw while checking this file: the checker is
+      // untrustworthy; the file fails and the program is built without it.
+      if (!failedWarm.limit) {
+        const blamed = failedWarm.blame;
+        failCompiler(
+          blamed !== undefined && captured.has(blamed)
+            ? blamed
+            : failedWarm.path,
+          failedWarm.message,
+        );
+        continue;
+      }
+      if (fullWarmup) warmSkip.add(failedWarm.path);
       fullWarmup = true;
+      warmed.clear();
     }
   };
-  let current = build();
+  let current: ReturnType<typeof build> | undefined = build();
   const session: Session = {
     get program() {
-      return current.program;
+      return current!.program;
     },
     get checker() {
-      return current.checker;
+      return current!.checker;
     },
     get host() {
       return host;
@@ -218,8 +373,17 @@ function openSession(
       const broadened = !fullWarmup;
       fullWarmup = true;
       session.rebuilds++;
+      warmed.clear();
+      // The old program is not needed while the next one is built.
+      current = undefined;
       current = build();
       return broadened;
+    },
+    drop(path, message) {
+      failCompiler(path, message);
+      session.rebuilds++;
+      current = undefined;
+      current = build();
     },
   };
   return session;
@@ -618,7 +782,16 @@ const module: LanguageModule = {
           for (const source of program.getSourceFiles()) {
             const path = fromVirtual(source.fileName);
             if (path === undefined || !captured.has(path)) continue;
-            const extra = program.getSyntacticDiagnostics(source);
+            let extra: readonly ts.Diagnostic[];
+            try {
+              extra = program.getSyntacticDiagnostics(source);
+            } catch (error) {
+              // The compiler threw on this file: it fails, absent from the
+              // next build like a syntax failure.
+              model.parseFailures.set(path, compilerFailure(error));
+              failedAny = true;
+              continue;
+            }
             if (extra.length && model.failSyntax(path, extra)) failedAny = true;
           }
           return failedAny;
@@ -667,6 +840,77 @@ const module: LanguageModule = {
           return "module";
         return "script";
       };
+      /**
+       * One extraction attempt. An exception becomes plain data: it holds
+       * the compiler's stack frames and through them the checker, which a
+       * rebuild must be free to release.
+       */
+      const extractOnce = (
+        session: Session,
+        path: string,
+        data: { [key: string]: Json },
+        diagnostics: Diagnostic[],
+        renamed: Renamed | undefined,
+        skip: Set<string>,
+      ):
+        | { result: ParseResult }
+        | { limit: string }
+        | { assertion: string; blame: string | undefined }
+        | { internal: string } => {
+        lastAsked = undefined;
+        try {
+          if (injectedExtractionFaults.has(path))
+            throw new TypeError("injected internal fault (test)");
+          const source = session.program.getSourceFile(toVirtual(path));
+          if (!source) {
+            const failure = session.failures.get(path);
+            // The parser or binder exhausted its stack on this file: an
+            // environment limit, like the checker's, not invalid code.
+            if (failure?.includes("exhausted its stack"))
+              return {
+                result: operationalFailure(
+                  `${failure} (a resource limit of the TypeScript compiler in this environment, not a defect in the file; it is retried on the next index)`,
+                ),
+              };
+            // The compiler threw on it, or its project is too large: a
+            // failed file with that reason.
+            if (
+              failure?.startsWith(COMPILER_FAILURE) ||
+              model.omitted.has(path)
+            )
+              return { result: failed(failure!) };
+            // Anything else the compiler threw is an internal error.
+            throw Error(failure ?? "The compiler did not load this source");
+          }
+          const result = extractFile(
+            source,
+            session.checker,
+            session.program,
+            captured,
+            diagnostics.map((item) => ({ ...item })),
+            { ...data },
+            // Settings from an uncaptured base are missing: see extract.ts.
+            group.limitations.length > 0,
+            {
+              fresh: model.fresh,
+              ...(renamed ? { renamed } : {}),
+              resolveModule,
+              workspaceReason: model.workspaceReason,
+              skip,
+              moduleKind,
+              anyFailed: unseen.size > 0,
+              failedNames,
+            },
+          );
+          statistics.extracted++;
+          return { result };
+        } catch (error) {
+          if (error instanceof CheckerLimit) return { limit: error.key };
+          if (isCompilerAssertion(error))
+            return { assertion: compilerFailure(error), blame: askedFile() };
+          return { internal: internalErrorMessage(path, error) };
+        }
+      };
       /** Extracts one file, rebuilding the session after checker overflows. */
       const extractWith = (
         session: Session,
@@ -681,62 +925,46 @@ const module: LanguageModule = {
           );
         const skip = new Set<string>();
         for (let attempt = 0; ; attempt++) {
-          try {
-            if (injectedExtractionFaults.has(path))
-              throw new TypeError("injected internal fault (test)");
-            const source = session.program.getSourceFile(toVirtual(path));
-            if (!source) {
-              const failure = session.failures.get(path);
-              // The parser or binder exhausted its stack on this file: an
-              // environment limit, like the checker's, not invalid code.
-              if (failure?.includes("exhausted its stack"))
-                return operationalFailure(
-                  `${failure} (a resource limit of the TypeScript compiler in this environment, not a defect in the file; it is retried on the next index)`,
-                );
-              // Anything else the compiler threw is an internal error.
-              throw Error(failure ?? "The compiler did not load this source");
-            }
-            const result = extractFile(
-              source,
-              session.checker,
-              session.program,
-              captured,
-              diagnostics.map((item) => ({ ...item })),
-              { ...data },
-              // Settings from an uncaptured base are missing: see extract.ts.
-              group.limitations.length > 0,
-              {
-                fresh: model.fresh,
-                ...(renamed ? { renamed } : {}),
-                resolveModule,
-                workspaceReason: model.workspaceReason,
-                skip,
-                moduleKind,
-                anyFailed: unseen.size > 0,
-                failedNames,
-              },
-            );
-            statistics.extracted++;
-            return result;
-          } catch (error) {
+          const outcome = extractOnce(
+            session,
+            path,
+            data,
+            diagnostics,
+            renamed,
+            skip,
+          );
+          if ("result" in outcome) return outcome.result;
+          if ("limit" in outcome) {
             if (
-              error instanceof CheckerLimit &&
               attempt < MAX_LIMIT_RETRIES &&
               session.rebuilds <= MAX_PROGRAM_REBUILDS
             ) {
               // The checker's state is untrustworthy after an overflow:
               // retry with dependencies warmed before omitting a lookup.
-              if (!session.rebuild()) skip.add(error.key);
+              if (!session.rebuild()) skip.add(outcome.limit);
               continue;
             }
             // Never leave an overflowed checker in use for the next file.
-            if (error instanceof CheckerLimit) session.rebuild();
+            session.rebuild();
             return operationalFailure(
-              error instanceof CheckerLimit
-                ? `The TypeScript checker exhausted its stack more than ${MAX_LIMIT_RETRIES} times in this file`
-                : internalErrorMessage(path, error),
+              `The TypeScript checker exhausted its stack more than ${MAX_LIMIT_RETRIES} times in this file`,
             );
           }
+          if ("assertion" in outcome) {
+            // The compiler's own assertion: the file it was reading fails
+            // with the compiler's message, and the program is rebuilt
+            // without it (its checker is untrustworthy). When that was
+            // another file, this one is extracted again.
+            const blamed =
+              outcome.blame !== undefined && captured.has(outcome.blame)
+                ? outcome.blame
+                : path;
+            session.drop(blamed, outcome.assertion);
+            if (session === normal) markUnseen(blamed);
+            if (blamed !== path) continue;
+            return failed(outcome.assertion);
+          }
+          return operationalFailure(outcome.internal);
         }
       };
       // Failed files this program would include (roots, or imported): any of
@@ -748,9 +976,28 @@ const module: LanguageModule = {
           .filter((path) => model.parseFailures.has(path)),
       ]);
       const failedNames = new Map<string, string[]>();
+      // The global names a failed file declares: as far as the parser read
+      // it, or, for a readable file left out (the compiler threw on it, or
+      // its project is too large), all of them.
+      const namesOf = (path: string): readonly string[] =>
+        model.syntaxFailures.get(path)?.names ??
+        (model.omitted.has(path) ||
+        model.parseFailures.get(path)?.startsWith(COMPILER_FAILURE)
+          ? model.globalNames(path)
+          : []);
       for (const path of [...unseen].sort())
-        for (const name of model.syntaxFailures.get(path)?.names ?? [])
+        for (const name of namesOf(path))
           failedNames.set(name, [...(failedNames.get(name) ?? []), path]);
+      /** A file the compiler threw on while extracting: unseen from now on. */
+      const markUnseen = (path: string) => {
+        if (unseen.has(path)) return;
+        unseen.add(path);
+        for (const name of namesOf(path))
+          failedNames.set(
+            name,
+            [...(failedNames.get(name) ?? []), path].sort(),
+          );
+      };
       const analysed: [string, ParseResult][] = [];
       for (const root of group.roots) {
         const path = root.slice(1);

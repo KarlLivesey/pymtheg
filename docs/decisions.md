@@ -2724,3 +2724,23 @@ configuration maps registry indexes or Git URLs and ref selectors to a
 directory source. A proven package selection is required to resolve inside it.
 Rust coverage now credits recorded targets on graphs made by the supporting
 module version. See [C-9](changes/C-9.md).
+
+### C-13 TypeScript program budget and compiler exceptions
+
+**Decided (C-13):** one TypeScript program is given at most 50,000,000
+characters of captured source (a fixed number, so the outcome depends on the
+snapshot only). A project with more leaves out its largest files, then by
+path, until the rest fits; each is a failed file with the reason, absent
+from every program, and its global names count as a failed file's names.
+Files with no config still form one program within the budget: loose
+scripts share one global scope, so no split of that program keeps every
+link (on swc the shared names alone join 44,933 of its 50,117 loose files).
+A file the compiler throws on (not a stack limit) fails alone with the
+compiler's message; its program is rebuilt without it and resumes the
+warm-up after the files already warmed; past 100 such files in a program the
+rest fail with that reason. **Trade:** a project over the budget loses its
+largest files' links, explicitly; a file that trips a compiler assertion
+loses its own. **Rules out:** raising the heap inside the tool, splitting
+the no-config program by import components (it would narrow candidate sets
+that span loose scripts), and failing the whole module on one compiler
+exception. See [C-13](changes/C-13.md).
