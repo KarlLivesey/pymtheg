@@ -426,7 +426,8 @@ function tsExternalIdentity(link, evidence, project, disposition) {
 /**
  * A stored library target (graph schema 4) is credited as stored: level 2
  * with a symbol, level 1 for the unit alone. Links without one, which is
- * every link in a 0.1.0 graph, fall back to reconstruction from stored facts.
+ * every link in a 0.1.0 graph, can fall back to reconstruction from stored
+ * facts. Rust module 29 and newer make their own library decisions.
  */
 export function storedLibraryIdentity(link) {
   const target = link.library;
@@ -443,7 +444,7 @@ export function externalIdentity(link, evidence, project, disposition) {
   const data = link.data ?? {};
   if (data.cause || link.module === "typescript" && workspaceEntryMissing(underlyingReason(data))) return null;
   const observed = link.module === "go" ? goExternalIdentity(link, evidence, project)
-    : link.module === "rust" ? rustExternalIdentity(link, evidence, project)
+    : link.module === "rust" ? evidence.rustStoredTargets ? null : rustExternalIdentity(link, evidence, project)
       : tsExternalIdentity(link, evidence, project, disposition);
   if (observed || disposition !== "outside") return observed;
   let gap = "unknown";

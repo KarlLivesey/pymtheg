@@ -3,6 +3,26 @@ import { posix as p } from "node:path";
 import type { ContextFile } from "../../types.js";
 import { readToml, table, type TomlTable, type TomlValue } from "./toml.js";
 import { matchesVersion } from "./macro-catalog.js";
+import { cargoSources, lockSource } from "./cargo-sources.js";
+
+function replacementPackage(id: string): string | undefined {
+  const named = /^([\w-]+)[:@]\d+\./.exec(id);
+  if (named) return named[1];
+  if (!id.includes("://")) return;
+  try {
+    const source = new URL(id);
+    const fragment = source.hash.slice(1);
+    const name =
+      /^([\w-]+)[:@]\d+\./.exec(fragment)?.[1] ??
+      (/^\d+\./.test(fragment)
+        ? p.basename(source.pathname).replace(/\.git$/, "")
+        : undefined);
+    return name && /^[\w-]+$/.test(name) ? name : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export type Edition = "2015" | "2018" | "2021" | "2024";
 export interface Dependency {
   name: string;
@@ -12,6 +32,8 @@ export interface Dependency {
   packageName?: string;
   registryVersion?: string | undefined;
   registryRequirement?: string;
+  libraryVersion?: string;
+  libraryVersionSource?: string;
 }
 export interface Crate {
   root: string;
@@ -21,7 +43,9 @@ export interface Crate {
   deps: Map<string, string>;
   workspace: string | null;
   dependencyGraphKnown?: boolean;
+  libraryDependencyGraphKnown?: boolean;
   edition?: Edition | null;
+  procMacro?: boolean;
   dependencies?: Dependency[];
 }
 const string = (v: TomlValue | undefined): string | undefined =>
@@ -36,6 +60,10 @@ const edition = (v: TomlValue | undefined): Edition | null =>
     : typeof v === "string" && ["2015", "2018", "2021", "2024"].includes(v)
       ? (v as Edition)
       : null;
+const exactVersion = (requirement: string | undefined): string | undefined =>
+  /^=\s*((?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?)$/.exec(
+    requirement?.trim() ?? "",
+  )?.[1];
 // Only absent keys get Cargo defaults. A present value of an unexpected type
 // has no default and cannot establish a root, name, activation or edition.
 const defaultString = (
@@ -93,46 +121,54 @@ export function crates(
       value: c.status === "clean" ? readToml(c.text) : null,
     }));
   const byPath = new Map(docs.map((d) => [d.path, d]));
+  const directorySource = cargoSources(contexts);
   const locks = new Map(
     contexts
       .filter((c) => p.basename(c.path) === "Cargo.lock")
       .map((c) => [c.path, c.status === "clean" ? readToml(c.text) : null]),
   );
-  function registrySelection(
-    manifest: string,
-    workspace: string | undefined,
+  function lockedVersion(
+    lockPath: string,
     owner: string,
     name: string,
     requirement: string | undefined,
-  ): Pick<Dependency, "registryVersion" | "registryRequirement"> {
-    if (!requirement) return {};
-    const lockPath = p.join(p.dirname(workspace ?? manifest), "Cargo.lock");
-    // Without a lock, retain the requirement for the semver-family proof.
-    if (!locks.has(lockPath)) return { registryRequirement: requirement };
+    identity: string | undefined,
+  ): string | undefined {
+    if (!identity) return;
     const packages = locks.get(lockPath)?.package;
-    if (!Array.isArray(packages)) return {};
+    if (!Array.isArray(packages)) return;
     const rows = packages.map(table).filter((t): t is TomlTable => !!t);
     const owners = rows.filter(
       (t) => t.name === owner && t.source === undefined,
     );
-    if (owners.length !== 1) return {};
+    if (owners.length !== 1) return;
     const deps = strings(owners[0]!.dependencies);
-    if (!deps) return {};
-    const descriptors = deps.filter((d) => d.split(" ")[0] === name);
+    if (!deps) return;
+    const descriptors = deps
+      .map((edge) => /^(\S+)(?: (\S+)(?: \((.+)\))?)?$/.exec(edge))
+      .filter((edge): edge is RegExpExecArray => edge?.[1] === name);
     const candidates = rows.filter(
       (t) =>
         t.name === name &&
         typeof t.version === "string" &&
-        matchesVersion(requirement, t.version) &&
-        descriptors.some((d) => d === name || d.split(" ")[1] === t.version),
+        lockSource(t.source) === identity &&
+        (!requirement ||
+          exactVersion(requirement) === t.version ||
+          matchesVersion(requirement, t.version)) &&
+        descriptors.some(
+          (edge) =>
+            (!edge[2] || edge[2] === t.version) &&
+            (!edge[3] || lockSource(edge[3]) === identity),
+        ),
     );
+    const selected = candidates[0];
+    if (candidates.length !== 1) return;
     if (
-      candidates.length !== 1 ||
-      candidates[0]!.source !==
-        "registry+https://github.com/rust-lang/crates.io-index"
+      identity.startsWith("git:") &&
+      !/#(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(string(selected?.source) ?? "")
     )
-      return {};
-    return { registryVersion: string(candidates[0]!.version) };
+      return;
+    return string(selected?.version);
   }
   function workspaceFor(doc: (typeof docs)[number]): {
     doc?: typeof doc | undefined;
@@ -271,6 +307,15 @@ export function crates(
         : edition(table(ws?.package)!.edition)
       : edition(pkg.edition);
     let known = workspace.known;
+    let libraryKnown = workspace.known;
+    // Configs are searched from the invocation directory. When the member
+    // and workspace see different directory sources, leave that edge open.
+    const memberSource = directorySource(doc.dir);
+    const workspaceSource = directorySource(workspace.doc?.dir ?? doc.dir);
+    const lockPath = p.join(
+      p.dirname(workspace.doc?.path ?? doc.path),
+      "Cargo.lock",
+    );
     const maps = {
         normal: new Map<string, string>(),
         build: new Map<string, string>(),
@@ -281,6 +326,16 @@ export function crates(
       doc,
       ...(workspace.doc && workspace.doc !== doc ? [workspace.doc] : []),
     ]) {
+      if (
+        source.value?.patch !== undefined &&
+        (!table(source.value.patch) ||
+          Object.values(table(source.value.patch)!).some(
+            (group) => !table(group),
+          ))
+      )
+        libraryKnown = false;
+      if (source.value?.replace !== undefined && !table(source.value.replace))
+        libraryKnown = false;
       for (const entries of Object.values(table(source.value?.patch) ?? {}))
         for (const [alias, v] of Object.entries(table(entries) ?? {}))
           overrides.push({
@@ -290,14 +345,22 @@ export function crates(
                 ? undefined
                 : p.join(source.dir, string(table(v)!.path)!, "Cargo.toml"),
           });
-      for (const [id, v] of Object.entries(table(source.value?.replace) ?? {}))
+      for (const [id, v] of Object.entries(
+        table(source.value?.replace) ?? {},
+      )) {
+        const name = replacementPackage(id);
+        if (!name) {
+          libraryKnown = false;
+          continue;
+        }
         overrides.push({
-          name: id.split(":")[0]!,
+          name,
           path:
             string(table(v)?.path) === undefined
               ? undefined
               : p.join(source.dir, string(table(v)!.path)!, "Cargo.toml"),
         });
+      }
       if (
         source.value?.patch !== undefined ||
         source.value?.replace !== undefined
@@ -375,7 +438,7 @@ export function crates(
             depPath === undefined
               ? ""
               : p.join(origin.dir, depPath, "Cargo.toml");
-        const targets = [
+        let targets = [
           ...new Set([
             direct,
             ...alternatives.flatMap((o) => (o.path ? [o.path] : [])),
@@ -389,6 +452,75 @@ export function crates(
               : []),
           ]),
         ];
+        const defaultRegistry =
+          workspace.known &&
+          (fields?.package === undefined ||
+            typeof fields.package === "string") &&
+          !["path", "git", "registry", "registry-index"].some(
+            (k) => fields?.[k] !== undefined,
+          );
+        const member = memberSource(fields),
+          root =
+            workspaceSource === memberSource ? member : workspaceSource(fields);
+        const vendor =
+          member.directory === undefined && root.directory === undefined
+            ? undefined
+            : member.directory === root.directory &&
+                member.identity === root.identity
+              ? member.directory
+              : null;
+        const exact = exactVersion(requirement);
+        const selected =
+          !alternatives.length &&
+          (vendor || (defaultRegistry && requirement && vendor === undefined))
+            ? lockedVersion(
+                lockPath,
+                name,
+                packageName,
+                requirement,
+                member.identity ?? (defaultRegistry ? "crates-io" : undefined),
+              )
+            : undefined;
+        const registry =
+          defaultRegistry && !alternatives.length && vendor === undefined
+            ? selected
+              ? {
+                  registryVersion: selected,
+                  libraryVersion: selected,
+                  libraryVersionSource: lockPath,
+                }
+              : requirement && !locks.has(lockPath)
+                ? { registryRequirement: requirement }
+                : {}
+            : {};
+        if (vendor !== undefined) {
+          const version =
+            selected ??
+            (!locks.has(lockPath) && fields?.git === undefined
+              ? exact
+              : undefined);
+          const candidates =
+            typeof vendor === "string" && !p.isAbsolute(vendor) && version
+              ? docs.filter((d) => {
+                  const relative = p.relative(vendor, d.dir);
+                  const pkg = table(d.value?.package);
+                  return (
+                    !!relative &&
+                    relative !== ".." &&
+                    !relative.includes("/") &&
+                    pkg?.name === packageName &&
+                    pkg.version === version
+                  );
+                })
+              : [];
+          if (candidates.length === 1 && !alternatives.length)
+            targets = [candidates[0]!.path];
+          else conditions.push("?directory-source");
+        }
+        const version =
+          !registry.libraryVersion && exact && !alternatives.length
+            ? { libraryVersion: exact, libraryVersionSource: origin.path }
+            : {};
         for (const path of targets) {
           const target = byPath.get(path);
           if (path && !target?.value) {
@@ -422,23 +554,7 @@ export function crates(
             kind: group.kind,
             conditions: [...conditions],
             packageName,
-            ...(!alternatives.length &&
-            workspace.known &&
-            (fields?.package === undefined ||
-              typeof fields.package === "string") &&
-            !["path", "git", "registry", "registry-index"].some(
-              (k) => fields?.[k] !== undefined,
-            )
-              ? {
-                  ...registrySelection(
-                    doc.path,
-                    workspace.doc?.path,
-                    name!,
-                    packageName,
-                    requirement,
-                  ),
-                }
-              : {}),
+            ...(vendor !== undefined ? {} : { ...registry, ...version }),
           });
         }
       }
@@ -453,7 +569,7 @@ export function crates(
         "replace",
       ].some((k) => value[k] !== undefined && !table(value[k]))
     )
-      known = false;
+      known = libraryKnown = false;
     const lib = table(value.lib),
       libPath =
         value.lib === undefined || lib
@@ -481,6 +597,10 @@ export function crates(
         edition:
           targetEdition === undefined ? pkgEdition : edition(targetEdition),
         dependencyGraphKnown: known,
+        libraryDependencyGraphKnown: libraryKnown,
+        ...(kind === "lib" && lib?.["proc-macro"] === true
+          ? { procMacro: true }
+          : {}),
         deps,
         dependencies: [
           ...edges

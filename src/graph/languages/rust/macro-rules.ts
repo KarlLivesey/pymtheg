@@ -192,6 +192,8 @@ export type MacroProfile = {
   /** No arm emits an item or a `let` into the caller's scope, provided every
    * name in `nested` is itself neutral where the macro is invoked. */
   neutral: boolean;
+  /** No caller-scope item, with the same condition on nested macros. */
+  itemNeutral: boolean;
   /** Macros invoked at the top level of some arm, as written. */
   nested: string[];
   /** Every arm that takes input passes all of it, unchanged and as the tail of
@@ -328,7 +330,8 @@ const matchArmsGroup = (seq: Node[], i: number): boolean => {
 export function macroProfile(definition: Node): MacroProfile {
   const rules = definition.namedChildren.filter((c) => c.type === "macro_rule");
   let readable = rules.length > 0,
-    neutral = true;
+    neutral = true,
+    itemNeutral = true;
   const nested = new Set<string>(),
     forwardTargets = new Set<string>(),
     forwardShadow = new Set<string>(),
@@ -382,18 +385,20 @@ export function macroProfile(definition: Node): MacroProfile {
       const statementLet =
         w === "let" &&
         !["if", "while", "&&"].includes(top[i - 1] ? word(top[i - 1]!) : "");
-      if (ITEM_WORDS.has(w) || statementLet || n.type === "#") neutral = false;
+      if (statementLet) neutral = false;
+      if (ITEM_WORDS.has(w) || n.type === "#") neutral = itemNeutral = false;
       if (n.type === "metavariable") {
         const kind = kinds.get(n.text);
-        if (!kind || ["tt", "item", "stmt"].includes(kind)) neutral = false;
-        if (top[i + 1]?.type === "!") neutral = false;
+        if (!kind || ["tt", "item", "stmt"].includes(kind))
+          neutral = itemNeutral = false;
+        if (top[i + 1]?.type === "!") neutral = itemNeutral = false;
       }
     }
     for (const { call } of invocations(top))
       if (
         call.name.split("::").some((s) => s.startsWith("$") && s !== "$crate")
       )
-        neutral = false;
+        neutral = itemNeutral = false;
       else nested.add(call.name);
     // Code positions: walk groups, skipping nested invocations other than the
     // standard format macros (their arguments are expressions).
@@ -529,7 +534,7 @@ export function macroProfile(definition: Node): MacroProfile {
     calls.push(...armCalls);
     bodyMacros.push(...armMacros);
   }
-  if (!readable) neutral = false;
+  if (!readable) neutral = itemNeutral = false;
   // A `use` in the expansion that could rebind a macro name the expansion
   // invokes (or any name, for a glob) leaves the expansion unclean.
   if (useNames.has("*") || [...useNames].some((x) => macroHeads.has(x)))
@@ -537,6 +542,7 @@ export function macroProfile(definition: Node): MacroProfile {
   return {
     readable,
     neutral,
+    itemNeutral,
     nested: [...nested].sort(),
     forwards: readable && forwards ? [...forwardTargets].sort() : null,
     forwardShadow: [...forwardShadow].sort(),
