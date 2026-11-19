@@ -13,6 +13,7 @@ export type MacroScopeBlocker = {
   name: string;
   construct?: string;
   definition?: GraphSymbol;
+  origin?: { file: string; start: number; scope: string; cause?: string };
 };
 
 export type MacroScopeAudit = {

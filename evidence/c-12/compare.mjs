@@ -8,7 +8,7 @@ import { DatabaseSync } from "node:sqlite";
 const scratch = process.env.PYM_SCRATCH;
 const exact = process.argv.includes("--exact");
 const survivors = process.argv.includes("--assumption-survivors");
-const seed = "c12-rust-macro-scope-2026-11-19";
+const seed = process.env.PYM_COMPARISON_SEED ?? "c12-rust-macro-scope-2026-11-19";
 const read = (name) => JSON.parse(readFileSync(join(scratch, name), "utf8"));
 const main = new Map(
   read(process.env.C12_BASELINE_RUN ?? "main-run.json").repos.map((repo) => [

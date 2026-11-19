@@ -32,6 +32,7 @@ export interface Dependency {
   packageName?: string;
   registryVersion?: string | undefined;
   registryRequirement?: string;
+  features?: string[];
   libraryVersion?: string;
   libraryVersionSource?: string;
 }
@@ -374,6 +375,7 @@ export function crates(
             typeof raw === "string" ? raw : string(table(raw)?.version),
           origin = doc,
           conditions = group.condition ? [group.condition] : [];
+        const memberFeatures = strings(fields?.features) ?? [];
         if (typeof raw !== "string" && !fields) {
           known = false;
           conditions.push("?dependency");
@@ -521,6 +523,7 @@ export function crates(
           !registry.libraryVersion && exact && !alternatives.length
             ? { libraryVersion: exact, libraryVersionSource: origin.path }
             : {};
+        const features = [...new Set([...memberFeatures, ...(strings(fields?.features) ?? [])])];
         for (const path of targets) {
           const target = byPath.get(path);
           if (path && !target?.value) {
@@ -554,6 +557,7 @@ export function crates(
             kind: group.kind,
             conditions: [...conditions],
             packageName,
+            ...(features.length ? { features } : {}),
             ...(vendor !== undefined ? {} : { ...registry, ...version }),
           });
         }

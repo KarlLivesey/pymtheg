@@ -6,33 +6,35 @@ import { contentHash, fileFacts, validateResult } from "../dist/graph/index.js";
 import rust from "../dist/graph/languages/rust/index.js";
 import { GraphView } from "../dist/mcp/graph-view.js";
 
-async function observations(text, dependencies = "") {
+async function observations(text, dependencies = "", support = {}) {
   const path = "src/lib.rs";
   const projectId = "macro-scope";
-  const result = await rust.parse({ path, text });
-  validateResult(text, result);
-  assert.equal(result.status, "clean", JSON.stringify(result.diagnostics));
-  const file = {
-    path,
-    text,
-    result,
-    module: "rust",
-    version: rust.version,
-    hash: contentHash(text),
-  };
+  const parts = Object.entries(support);
+  const files = await Promise.all(
+    [[path, text], ...parts.filter(([name]) => name.endsWith(".rs"))].map(
+      async ([path, text]) => {
+        const result = await rust.parse({ path, text });
+        validateResult(text, result);
+        assert.equal(result.status, "clean", JSON.stringify(result.diagnostics));
+        return { path, text, result, module: "rust", version: rust.version, hash: contentHash(text) };
+      },
+    ),
+  );
   const manifest = `[package]\nname="app"\nversion="0.0.0"\nedition="2021"\n[dependencies]\n${dependencies}`;
-  const contextFiles = [
-    {
-      path: "Cargo.toml",
-      text: manifest,
+  const contextFiles = [["Cargo.toml", manifest], ...parts.filter(([name]) => name.endsWith(".toml"))]
+    .map(([path, text]) => ({
+      path,
+      text,
       status: "clean",
-      hash: contentHash(manifest),
+      hash: contentHash(text),
       diagnostics: [],
-    },
-  ];
-  const ctx = { projectId, files: [file], contextFiles };
-  [file.result] = (await rust.analyze(ctx)).map((f) => f.result);
-  const { links, symbols } = fileFacts(projectId, file);
+    }));
+  const ctx = { projectId, files, contextFiles };
+  const analyzed = new Map((await rust.analyze(ctx)).map((file) => [file.path, file.result]));
+  for (const file of files) file.result = analyzed.get(file.path) ?? file.result;
+  const facts = files.map((file) => fileFacts(projectId, file));
+  const links = facts.flatMap((file) => file.links);
+  const symbols = facts.flatMap((file) => file.symbols);
   const resultSet = await rust.resolve({ ...ctx, links, symbols });
   const decisions = new Map(
     (Array.isArray(resultSet) ? resultSet : resultSet.resolutions).map((d) => [
@@ -46,6 +48,7 @@ async function observations(text, dependencies = "") {
     const link = links.find(
       (l) =>
         l.kind === kind &&
+        l.file === path &&
         l.targetName === target &&
         l.range.start >= lineStart &&
         l.range.start < lineEnd,
@@ -64,6 +67,156 @@ async function observations(text, dependencies = "") {
 
 const proved = (target) => ({ target, assumes: [] });
 const assumed = (target) => ({ target, assumes: ["rust-external-macro-name"] });
+
+test("Rust derive identity follows the macro namespace and its imports", async () => {
+  const at = await observations(
+    `
+    mod trait_import {
+      use std::fmt::Debug;
+      #[derive(Debug)]
+      struct Item;
+      fn sibling() -> Option<u8> { None } // trait and derive
+    }
+    mod type_import {
+      mod export { pub struct Debug; }
+      use export::Debug;
+      #[derive(Debug)]
+      struct Item;
+      fn sibling() -> Option<u8> { None } // type only
+    }
+    mod local_glob {
+      mod export { pub struct Debug; }
+      use export::*;
+      #[derive(Debug)]
+      struct Item;
+      fn sibling() -> Option<u8> { None } // glob has type only
+    }
+    mod external_import {
+      use facade::Debug;
+      #[derive(Debug)]
+      struct Item;
+      fn sibling() -> Option<u8> { None } // foreign explicit derive
+    }
+  `,
+    'facade = "1"',
+  );
+  for (const marker of ["// trait and derive", "// type only", "// glob has type only"])
+    assert.deepEqual(at("types", "Option", marker), proved("option::Option"));
+  assert.deepEqual(at("types", "Option", "// foreign explicit derive"), proved(null));
+});
+
+test("standard test and tool attributes have their own lookup rules", async () => {
+  const at = await observations(
+    `
+    mod test_binding {
+      macro_rules! test { () => {} }
+      #[test]
+      fn case() {}
+      fn sibling() -> Option<u8> { None } // bang macro named test
+    }
+    mod test_import {
+      use facade::test;
+      #[test]
+      fn case() {}
+      fn sibling() -> Option<u8> { None } // possible external attribute
+    }
+    mod tool_binding {
+      macro_rules! bounded { () => { const OTHER: u8 = 0; } }
+      bounded!();
+      #[rustfmt::skip]
+      struct Item;
+      fn sibling() -> Option<u8> { None } // tool name
+    }
+    mod tool_import {
+      use facade as rustfmt;
+      #[rustfmt::skip]
+      struct Item;
+      fn sibling() -> Option<u8> { None } // rebound tool name
+    }
+  `,
+    'facade = "1"',
+  );
+  assert.deepEqual(at("types", "Option", "// bang macro named test"), proved("option::Option"));
+  assert.deepEqual(at("types", "Option", "// possible external attribute"), proved(null));
+  assert.deepEqual(at("types", "Option", "// tool name"), proved("option::Option"));
+  assert.deepEqual(at("types", "Option", "// rebound tool name"), proved(null));
+});
+
+test("qualified macros keep the Cargo identity through unrelated globs", async () => {
+  const at = await observations(
+    `
+    mod qualified {
+      mod export { pub struct Extra; }
+      use export::*;
+      fn caller() {
+        #[derive(::renamed::Serialize)]
+        struct Item;
+        let _: Option<u8> = None; // derive across glob
+        let _: ItemBuilder; // retains derived-name guard
+      }
+      fn attribute() {
+        #[runtime::test]
+        async fn inner() {}
+        let _: Option<u8> = None; // attribute across glob
+      }
+      fn bang() {
+        registry::make!(Item);
+        let _: Option<u8> = None; // bang across glob
+      }
+    }
+    mod local_prefix {
+      mod renamed { pub struct Serialize; }
+      #[derive(renamed::Serialize)]
+      struct Item;
+      fn sibling() -> Option<u8> { None } // local crate spelling
+    }
+    mod typo {
+      #[derive(::typo::Serialize)]
+      struct Item;
+      fn sibling() -> Option<u8> { None } // absent Cargo edge
+    }
+  `,
+    'renamed = { package = "serde", version = "1", features = ["derive"] }\nruntime = { package = "tokio", version = "1", features = ["macros"] }\nregistry = "1"',
+  );
+  for (const marker of ["// derive across glob", "// attribute across glob", "// bang across glob"])
+    assert.deepEqual(at("types", "Option", marker), assumed("option::Option"));
+  for (const marker of ["// local crate spelling", "// absent Cargo edge"])
+    assert.deepEqual(at("types", "Option", marker), proved(null));
+  assert.deepEqual(at("types", "ItemBuilder", "// retains derived-name guard"), proved(null));
+});
+
+test("a captured macro-use reexport has to compete in the attribute namespace", async () => {
+  const source = `
+    #[macro_use]
+    extern crate exports;
+    use std::fmt::Debug;
+    #[derive(Debug)]
+    struct Item;
+    fn sibling() -> Option<u8> { None } // beside derive
+  `;
+  const manifest = '[package]\nname="exports"\nversion="0.0.0"\nedition="2021"\n';
+  const captured = await observations(source, 'exports = { path = "exports" }', {
+    "exports/Cargo.toml": manifest,
+    "exports/src/lib.rs": "#[macro_export] macro_rules! Debug { () => {} }",
+  });
+  const unknown = await observations(source, 'exports = "1"');
+  assert.deepEqual(captured("types", "Option", "// beside derive"), proved("option::Option"));
+  assert.deepEqual(unknown("types", "Option", "// beside derive"), proved(null));
+});
+
+test("the Ratatui bitflags import identifies the namespace of its invocation", async () => {
+  const at = await observations(`
+    use bitflags::bitflags;
+    bitflags! {
+      #[derive(Default, Clone, Copy, Eq, PartialEq, Hash)]
+      pub struct Borders: u8 { const TOP = 1; }
+    }
+    fn sibling() -> Option<u8> { None } // named bang import
+    fn from_macro(_: Borders) {} // name from input
+  `, 'bitflags = "=2.13.2"');
+  assert.deepEqual(at("types", "Option", "// named bang import"), assumed("option::Option"));
+  assert.deepEqual(at("types", "Borders", "// name from input"), proved(null));
+});
 
 test("the MCP legend describes the restricted Rust macro assumption", () => {
   const view = new GraphView({

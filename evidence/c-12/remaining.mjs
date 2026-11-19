@@ -1,12 +1,21 @@
 // SPDX-License-Identifier: MIT
 // Attribute stored opacity to the resolver's observed macro-scope guards.
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 
 const [build, runFile, work, output, lane] = process.argv.slice(2);
+const seed = process.env.PYM_MACRO_CENSUS_SEED;
+const sampleKinds = new Set(["derive", "attribute", "other"]);
+function keepSample(samples, kind, sample) {
+  const group = (samples[kind] ??= []);
+  group.push(sample);
+  group.sort((a, b) => a.rank.localeCompare(b.rank));
+  if (group.length > 50) group.pop();
+}
 const lanes = ["0", "1", "2"];
 const read = (file) => JSON.parse(readFileSync(file, "utf8"));
 const repos = read(runFile).repos.sort((a, b) =>
@@ -72,7 +81,12 @@ if (lane === undefined) {
       addCounts(totals[kind].names, pin.kinds[kind].names);
       addCounts(totals[kind].constructs, pin.kinds[kind].constructs);
     }
-  writeFileSync(output, JSON.stringify({ totals, pins }, null, 2));
+  const sample = {};
+  if (seed)
+    for (const pin of pins)
+      for (const [kind, group] of Object.entries(pin.sample))
+        for (const link of group) keepSample(sample, kind, link);
+  writeFileSync(output, JSON.stringify({ totals, pins, ...(seed && { seed, sample }) }, null, 2));
   const sorted = (counts) =>
     Object.entries(counts).sort(
       ([a, n], [b, m]) => m - n || a.localeCompare(b),
@@ -109,18 +123,30 @@ for (const [index, repo] of repos.entries()) {
   const store = new SqliteGraphStore(graphPath, undefined, { readOnly: true });
   const database = new DatabaseSync(graphPath, { readOnly: true });
   const totals = rows();
+  const sample = {};
   try {
-    const selected = new Set(
+    const selected = new Map(
       database
         .prepare(
-          `SELECT id FROM graph_links
+          `SELECT id, body FROM graph_links
       WHERE module='rust' AND resolution='unresolved' AND
       (json_extract(body, '$.data.reason') LIKE '%opaque-item-may-shadow-name%' OR
        json_extract(body, '$.data.uncertainty') LIKE '%opaque-item-may-shadow-name%')`,
         )
         .all()
-        .map(({ id }) => id),
+        .map(({ id, body }) => [id, seed ? JSON.parse(body) : undefined]),
     );
+    function recordSample(kind, link, blocker) {
+      if (!seed || !sampleKinds.has(kind)) return;
+      const { id, file, range, targetName, data } = link;
+      const rank = createHash("sha256").update(`${seed}|${repo.id}|${id}`).digest("hex");
+      keepSample(sample, kind, {
+        rank, repo: repo.id, file, range, targetName,
+        reason: data?.reason ?? data?.uncertainty,
+        macroBody: data?.macroBody,
+        blocker: blocker && { name: blocker.name, construct: blocker.construct, origin: blocker.origin },
+      });
+    }
     const visited = new Set();
     const constructs = new Map();
     function localConstruct(blocker) {
@@ -193,6 +219,7 @@ for (const [index, repo] of repos.entries()) {
               ? localConstruct(primary)
               : primary.construct);
           if (construct) tally(row.constructs, construct);
+          recordSample(primary?.kind ?? "other", selected.get(link.id) ?? link, primary);
         },
       },
     );
@@ -200,8 +227,11 @@ for (const [index, repo] of repos.entries()) {
     if (unvisited) {
       totals.other.links += unvisited;
       tally(totals.other.names, "non-parse link", unvisited);
+      if (seed)
+        for (const [id, link] of selected)
+          if (!visited.has(id)) recordSample("other", link, { name: "non-parse link" });
     }
-    report.push({ id: repo.id, kinds: totals });
+    report.push({ id: repo.id, kinds: totals, ...(seed && { sample }) });
   } finally {
     store.close();
     database.close();

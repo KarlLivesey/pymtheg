@@ -8,7 +8,7 @@ import {
 } from "./macro-catalog.js";
 
 export type LibraryUnit = Omit<LibraryTarget, "evidence" | "symbol">;
-type RegistryRelease = { version?: string; requirement?: string };
+type RegistryRelease = { version?: string; requirement?: string; features?: readonly string[] };
 export type LibraryPath = {
   unit: LibraryUnit;
   parts: string[];
@@ -62,13 +62,14 @@ export function dependencyUnit(
         ? { version, versionSource }
         : {}),
     },
-    registry: edges.map((edge) =>
-      edge.registryVersion !== undefined
+    registry: edges.map((edge) => ({
+      ...(edge.registryVersion !== undefined
         ? { version: edge.registryVersion }
         : edge.registryRequirement !== undefined
           ? { requirement: edge.registryRequirement }
-          : {},
-    ),
+          : {}),
+      ...(edge.features ? { features: edge.features } : {}),
+    })),
   };
 }
 
@@ -194,6 +195,33 @@ type ExportNamespace =
   | "derive"
   | "attribute"
   | "multiple";
+
+/** Names whose namespace the macro expansion lookup can check in Cargo. */
+export function scopeMacroExport(path: LibraryPath): ExportNamespace | undefined {
+  const { unit, parts } = path;
+  if (unit.ecosystem === "cargo" && parts.length === 1) {
+    const name = parts[0]!;
+    const feature = (name: string) => path.registry?.every((release) => release.features?.includes(name));
+    switch (unit.unit) {
+      case "bitflags":
+        if (name === "bitflags" && registryFamily(path, "2.0.0")) return "bang";
+        break;
+      case "rstest":
+        if (["rstest", "fixture"].includes(name) && registryFamily(path, "0.28.0")) return "attribute";
+        break;
+      case "serde":
+        if (["Serialize", "Deserialize"].includes(name) && registryFamily(path, "1.0.0") && feature("derive")) return "multiple";
+        break;
+      case "clap":
+        if (["Parser", "Args", "Subcommand", "ValueEnum"].includes(name) && registryFamily(path, "4.0.0") && feature("derive")) return "multiple";
+        break;
+      case "tokio":
+        if (["test", "main"].includes(name) && !feature("macros") && !feature("full")) return undefined;
+        break;
+    }
+  }
+  return exportNamespace(path);
+}
 
 // Public declaration paths whose import namespace is known. A capital letter
 // does not distinguish a type, a tuple constructor and a derive macro.
