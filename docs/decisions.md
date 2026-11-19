@@ -2818,6 +2818,20 @@ or a named library target. A captured macro definition, a competing glob, an
 unproven macro binding and a layout expansion keep their source requirements.
 See [C-12](changes/C-12.md).
 
+### C-18 Rust macro identity
+
+The lexical scope retry checks the binding that Rust would use during macro
+expansion. A type or bang macro cannot take an attribute-sub-namespace name.
+A competing glob requires either a readable lookup or an established outer
+binding for which rustc would reject the ambiguity. Qualified external names
+follow existing Cargo dependency edges through aliases and named exports.
+Qualified paths and named imports identify the export in compiling code
+with verified registry provenance. Positive feature facts can identify
+namespace facets. A re-export needs registry provenance for both the
+facade and its implementation. Unverified implementations leave the
+expansion opaque without a supported output proof. Verified identities feed the C-12 effect rules and its existing
+external effect assumption. [C-18](changes/C-18.md)
+
 ### C-14 Go library targets
 
 Go records a library target where the source proves the package and, for a
