@@ -154,8 +154,18 @@ function declaredSymbol(declaration: ts.Declaration, bundled: boolean) {
         symbol = `${owner.name.text}.${symbol}`;
         member = true;
       }
+    } else if (ts.isTypeLiteralNode(owner)) {
+      const parent = owner.parent;
+      const prefix =
+        (ts.isTypeAliasDeclaration(parent) ||
+          (ts.isVariableDeclaration(parent) &&
+            parent.parent.flags & ts.NodeFlags.Const)) &&
+        nameOf(parent);
+      if (!prefix) return undefined;
+      symbol = `${prefix}.${symbol}`;
+      owner = parent;
+      member = true;
     } else if (
-      ts.isTypeLiteralNode(owner) ||
       ts.isMappedTypeNode(owner) ||
       ts.isFunctionLike(owner) ||
       ts.isObjectLiteralExpression(owner)
@@ -399,6 +409,12 @@ export function libraryReader(
           (path.endsWith(".js") && manifest?.json.type !== "module"),
         declarationUnit,
         targetOf,
+        typePackageUnredirected(specifier: string) {
+          const unit = registryUnit(specifier);
+          if (!unit) return false;
+          const declared = dependency(unit.unit);
+          return !declared || npmRoute(unit, declared)?.unit === unit.unit;
+        },
         importUnits(specifier: string): readonly Unit[] {
           if (routes.has(specifier)) return routes.get(specifier)!;
           const unit = packageUnit(specifier);
