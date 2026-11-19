@@ -1184,6 +1184,8 @@ async function createHelper(): Promise<Helper> {
         macro?: boolean;
         item?: boolean;
         conditions?: string[];
+        /** The binding's own identifier in its pattern. */
+        node?: Node;
       };
       type BindingScopes = Map<number, Map<string, Binding[]>>;
       const bindingCache = new Map<string, BindingScopes>();
@@ -1213,7 +1215,26 @@ async function createHelper(): Promise<Helper> {
           )
           .flatMap(patternNames);
       }
+      // C-10: references at one node ask the same question more than once.
+      const bindingAnswers = new Map<
+        string,
+        ReturnType<typeof bindingsUncached>
+      >();
       function bindings(
+        root: Node,
+        at: Node,
+        name: string,
+        conservative = false,
+      ): ReturnType<typeof bindingsUncached> {
+        const key = `${root.id}|${at.id}|${compact(name)}|${conservative}`;
+        let answer = bindingAnswers.get(key);
+        if (!answer) {
+          answer = bindingsUncached(root, at, name, conservative);
+          bindingAnswers.set(key, answer);
+        }
+        return answer;
+      }
+      function bindingsUncached(
         root: Node,
         at: Node,
         name: string,
@@ -1223,6 +1244,7 @@ async function createHelper(): Promise<Helper> {
         types: Map<string, ReceiverType>;
         invalidated: boolean;
         conditional: Set<string>;
+        binding?: Binding | undefined;
       } {
         name = compact(name);
         let scopes = bindingCache.get(`${root.id}|${conservative}`);
@@ -1237,9 +1259,24 @@ async function createHelper(): Promise<Helper> {
             macro = false,
           ) => {
             if (!pattern) return;
-            const ids = patternNames(pattern);
             const names =
               scopes!.get(region.id) ?? new Map<string, Binding[]>();
+            // C-10: a macro in a pattern can bind any name (or none): its
+            // whole region is unproved, as after an unknown statement macro.
+            if (pattern.descendantsOfType("macro_invocation").length) {
+              const list = names.get("*") ?? [];
+              list.push({
+                pattern,
+                type: null,
+                start: 0,
+                order: order++,
+                item: true,
+              });
+              names.set("*", list);
+              scopes!.set(region.id, names);
+              return;
+            }
+            const ids = patternNames(pattern);
             for (const id of ids) {
               if (
                 id.text === "_" ||
@@ -1255,6 +1292,7 @@ async function createHelper(): Promise<Helper> {
                 order: order++,
                 macro,
                 conditions: conditionsOn(pattern),
+                node: id,
               });
               names.set(compact(id.text), list);
             }
@@ -1411,6 +1449,7 @@ async function createHelper(): Promise<Helper> {
           bindingCache.set(`${root.id}|${conservative}`, scopes);
         }
         let invalidated = false;
+        let binding: Binding | undefined;
         const blocked = new Set<string>();
         const conditional = new Set<string>();
         const callerConditions = conditionsOn(at);
@@ -1449,6 +1488,7 @@ async function createHelper(): Promise<Helper> {
                 invalidated = true;
               }
               if (!item.item) blocked.add(name);
+              if (!item.item) binding = item;
               invalidated ||= item.macro === true;
               const { pattern, type } = item;
               const nominal =
@@ -1487,7 +1527,7 @@ async function createHelper(): Promise<Helper> {
           if (ancestor.id === root.id) break;
           ancestor = ancestor.parent;
         }
-        return { blocked, types, invalidated, conditional };
+        return { blocked, types, invalidated, conditional, binding };
       }
       function arity(list: Node | null) {
         let minimum = 0,
@@ -1620,6 +1660,460 @@ async function createHelper(): Promise<Helper> {
           parent = parent.parent;
         }
         return false;
+      }
+      // C-10: whether a macro statement sits in a block around `at`; only
+      // then can the conservative binding facts differ from the others.
+      const macroBlocks = new Map<number, boolean>();
+      function macroAround(at: Node, fn: Node): boolean {
+        for (let a: Node | null = at.parent; a; a = a.parent) {
+          if (a.type === "block") {
+            let found = macroBlocks.get(a.id);
+            if (found === undefined) {
+              found = a.namedChildren.some(
+                (c) =>
+                  c.type === "macro_invocation" ||
+                  (c.type === "expression_statement" &&
+                    c.namedChildren.some((x) => x.type === "macro_invocation")),
+              );
+              macroBlocks.set(a.id, found);
+            }
+            if (found) return true;
+          }
+          if (a.id === fn.id) break;
+        }
+        return false;
+      }
+      /**
+       * C-10: a reference whose head is a plain local binding or parameter of
+       * the enclosing function. The reference targets that function, with the
+       * binding's name and declaration span. A binding that a macro, an
+       * unknown block item or a cfg alternative could introduce is unproved.
+       */
+      function localData(
+        fn: Node | null,
+        owner: string,
+        at: Node,
+        raw: string,
+      ): Record<string, Json> {
+        if (!fn || owner !== `item:${fn.startIndex}`) return {};
+        // Only references in the body; a signature cannot use its parameters.
+        const body = field(fn, "body");
+        if (!body || at.startIndex < body.startIndex) return {};
+        // Nor a closure's own parameter list (its types are not in scope).
+        for (let a: Node | null = at.parent; a && a.id !== fn.id; a = a.parent)
+          if (a.type === "closure_parameters") return {};
+        const name = compact(raw);
+        if (name === "self") {
+          const p = field(fn, "parameters")?.namedChildren.find(
+            (c) =>
+              c.type === "self_parameter" ||
+              field(c, "pattern")?.type === "self",
+          );
+          const token =
+            p?.type === "self_parameter"
+              ? p.namedChildren.find((c) => c.type === "self")
+              : p && field(p, "pattern");
+          return token && !conditionsOn(p!).length
+            ? { localBinding: { name, ...span(token) } }
+            : {};
+        }
+        const b = bindings(fn, at, name),
+          x = b.binding;
+        if (!x?.node || x.macro || b.invalidated || b.conditional.has(name))
+          return {};
+        // A block item or import of the same name could make the pattern a
+        // path; the resolver checks only module-level items.
+        for (let a: Node | null = at.parent; a && a.id !== fn.id; a = a.parent)
+          if (
+            a.type === "block" &&
+            a.namedChildren.some(
+              (c) =>
+                c.type === "use_declaration" ||
+                ([
+                  "const_item",
+                  "static_item",
+                  "struct_item",
+                  "enum_item",
+                ].includes(c.type) &&
+                  compact(field(c, "name")?.text ?? "") === name),
+            )
+          )
+            return {};
+        // The conservative binding facts differ only under a macro statement.
+        const old = macroAround(at, fn) ? bindings(fn, at, name, true) : b;
+        const stable =
+          old.binding?.node?.id === x.node.id &&
+          !old.invalidated &&
+          !old.conditional.has(name);
+        return {
+          localBinding: { name, ...span(x.node) },
+          ...(stable ? {} : { stdFallbackLocalUnknown: true }),
+        };
+      }
+      const itemTypes = new Set([
+        "function_item",
+        "function_signature_item",
+        "struct_item",
+        "enum_item",
+        "union_item",
+        "trait_item",
+        "impl_item",
+        "type_item",
+        "const_item",
+        "static_item",
+        "mod_item",
+        "associated_type",
+      ]);
+      /**
+       * C-10: a bare type or const parameter name declared by an enclosing
+       * generic item that is a graph symbol. Outer generics are not visible
+       * inside a nested non-associated item; a block that declares a type of
+       * the same name, imports or expands a statement macro is not proved.
+       */
+      function typeParameterData(
+        n: Node,
+        raw: string,
+        namespace: "type" | "value",
+      ): Record<string, Json> {
+        const name = compact(raw);
+        if (!name || name.includes("::") || name === "Self") return {};
+        for (let a: Node | null = n.parent; a; a = a.parent) {
+          if (
+            a.type === "block" &&
+            a.namedChildren.some(
+              (c) =>
+                c.type === "use_declaration" ||
+                c.type === "macro_invocation" ||
+                c.type === "macro_definition" ||
+                (c.type === "expression_statement" &&
+                  c.namedChildren.some((x) => x.type === "macro_invocation")) ||
+                ([
+                  "struct_item",
+                  "enum_item",
+                  "union_item",
+                  "type_item",
+                  "trait_item",
+                  // Value items shadow a const parameter of the same name.
+                  "const_item",
+                  "static_item",
+                  "function_item",
+                ].includes(c.type) &&
+                  compact(field(c, "name")?.text ?? "") === name),
+            )
+          )
+            return {};
+          const parameter = field(a, "type_parameters")?.namedChildren.find(
+            (p) => {
+              const id =
+                field(p, "name") ??
+                field(p, "left") ??
+                (p.type === "type_identifier" ? p : null);
+              // A const parameter is a value, a type parameter a type; the
+              // other namespace does not see it.
+              return (
+                !!id &&
+                compact(id.text) === name &&
+                (p.type === "const_parameter") === (namespace === "value")
+              );
+            },
+          );
+          if (parameter) {
+            const id =
+              field(parameter, "name") ?? field(parameter, "left") ?? parameter;
+            return kinds[a.type] &&
+              (a.type === "impl_item" || field(a, "name")) &&
+              !attributesOn(parameter).length &&
+              !parameter.namedChildren.some((c) => c.type === "attribute_item")
+              ? {
+                  typeParameter: { name, ...span(id) },
+                  typeParameterOwner: `item:${a.startIndex}`,
+                  typeParameterNamespace: namespace,
+                }
+              : {};
+          }
+          if (
+            itemTypes.has(a.type) &&
+            !(
+              a.parent?.type === "declaration_list" &&
+              ["impl_item", "trait_item"].includes(a.parent.parent?.type ?? "")
+            )
+          )
+            return {};
+        }
+        return {};
+      }
+      type Recipe = Record<string, Json>;
+      const gap = (w: string): Recipe => ({ k: "?", w });
+      /**
+       * C-10: a receiver expression as a small typed recipe that the resolver
+       * evaluates against declarations. Only syntax whose type follows from
+       * written declarations is described; anything else names its gap.
+       */
+      function recipe(
+        n: Node,
+        fn: Node | null,
+        sc: string,
+        impl: { type: string; node: Node | null; scope: string },
+        conservative: boolean,
+        budget: { nodes: number },
+        depth = 0,
+      ): Recipe {
+        if (--budget.nodes < 0 || depth > 24) return gap("receiver-too-long");
+        const next = (x: Node | null | undefined, s = sc) =>
+          x
+            ? recipe(x, fn, s, impl, conservative, budget, depth + 1)
+            : gap("syntax");
+        switch (n.type) {
+          case "parenthesized_expression":
+            return next(
+              n.namedChildren.find((c) => !c.type.endsWith("comment")),
+            );
+          case "reference_expression": {
+            const inner = next(field(n, "value"));
+            return inner.k === "?"
+              ? inner
+              : {
+                  k: "ref",
+                  m: n.namedChildren.some(
+                    (c) => c.type === "mutable_specifier",
+                  ),
+                  e: inner,
+                };
+          }
+          case "unary_expression": {
+            if (n.children[0]?.type !== "*") return gap("operator");
+            const inner = next(n.namedChildren[0]);
+            return inner.k === "?" ? inner : { k: "deref", e: inner };
+          }
+          case "try_expression":
+          case "await_expression": {
+            const inner = next(n.namedChildren[0]);
+            return inner.k === "?"
+              ? inner
+              : { k: n.type === "try_expression" ? "try" : "await", e: inner };
+          }
+          case "self": {
+            if (!fn) return gap("syntax");
+            const info = receiverInfo(fn);
+            if (
+              !impl.type ||
+              bindings(fn, n, "self", conservative).invalidated ||
+              !["owned", "shared", "mutable"].includes(info.borrow)
+            )
+              return gap("self-type");
+            return {
+              k: "type",
+              t: impl.type,
+              s: impl.scope,
+              a: argumentSyntax(impl.node && field(impl.node, "type")),
+              b: info.borrow,
+              mu: info.mutable || info.borrow !== "owned",
+              g: genericBindings(fn),
+            };
+          }
+          case "identifier": {
+            if (!fn) return gap("non-local-value");
+            const name = compact(n.text);
+            const b = bindings(fn, n, name, conservative),
+              x = b.binding;
+            // A capitalised name that is no local may be a unit struct value
+            // (`let a = A;`); a block-level item that shadows a parameter is not
+            // typed this way.
+            if (
+              /^[A-Z]/.test(name) &&
+              !b.blocked.has(name) &&
+              !b.invalidated &&
+              !genericShadow(n, name)
+            )
+              return { k: "u", p: name, s: sc };
+            if (!b.blocked.has(name) || !x) return gap("non-local-value");
+            if (!x.node || x.macro || b.invalidated || b.conditional.has(name))
+              return gap("binding-unproved");
+            const typed = b.types.get(name);
+            if (typed) {
+              if (
+                typed.name.includes("<") &&
+                /\bimpl\b|\bdyn\b/.test(typed.name)
+              )
+                return gap("annotation-shape");
+              return {
+                k: "type",
+                t: typed.name,
+                s: typed.scope,
+                a: typed.argumentSyntax,
+                b: typed.borrow,
+                mu: typed.mutable || typed.borrow === "mutable",
+                g: genericBindings(fn),
+              };
+            }
+            if (x.type) return gap("annotation-shape");
+            const owner = x.pattern.parent;
+            if (x.pattern.type !== "identifier")
+              return gap(
+                owner?.type === "let_declaration"
+                  ? "destructured"
+                  : "pattern-binding",
+              );
+            if (owner?.type === "parameter")
+              return gap(
+                owner.parent?.parent?.type === "closure_expression"
+                  ? "closure-parameter"
+                  : "parameter-shape",
+              );
+            if (owner?.type === "closure_parameters")
+              return gap("closure-parameter");
+            if (owner?.type === "for_expression") return gap("iterator-item");
+            if (owner?.type !== "let_declaration")
+              return gap("pattern-binding");
+            const value = field(owner, "value");
+            if (!value) return gap("uninitialized");
+            const inner = next(value, lexicalScopes.get(value.id) ?? sc);
+            if (inner.k === "?") return inner;
+            return {
+              ...inner,
+              ...(owner.namedChildren.some(
+                (c) => c.type === "mutable_specifier",
+              )
+                ? {}
+                : { im: true }),
+            };
+          }
+          case "field_expression": {
+            const name = field(n, "field");
+            const inner = next(field(n, "value"));
+            if (inner.k === "?") return inner;
+            return name
+              ? { k: "f", e: inner, n: compact(name.text) }
+              : gap("syntax");
+          }
+          case "struct_expression": {
+            const name = field(n, "name");
+            if (!name) return gap("syntax");
+            if (compact(name.text) === "Self")
+              return impl.type
+                ? {
+                    k: "type",
+                    t: impl.type,
+                    s: impl.scope,
+                    a: argumentSyntax(impl.node && field(impl.node, "type")),
+                    b: "owned",
+                    g: fn ? genericBindings(fn) : "",
+                  }
+                : gap("self-type");
+            if (name.type === "generic_type_with_turbofish")
+              return gap("generic-call");
+            return {
+              k: "type",
+              t: compact(name.text),
+              s: sc,
+              a: argumentSyntax(name),
+              b: "owned",
+              g: fn ? genericBindings(fn) : "",
+              lit: true,
+            };
+          }
+          case "call_expression": {
+            const f = field(n, "function");
+            const args = arity(field(n, "arguments"));
+            if (!f) return gap("syntax");
+            if (f.type === "generic_function") return gap("generic-call");
+            if (f.type === "field_expression") {
+              const inner = next(field(f, "value"));
+              if (inner.k === "?") return inner;
+              const method = field(f, "field");
+              return method
+                ? {
+                    k: "m",
+                    e: inner,
+                    n: compact(method.text),
+                    c: args.maximum,
+                    cm: args.minimum,
+                    g: fn ? genericBindings(fn) : "",
+                  }
+                : gap("syntax");
+            }
+            if (!["identifier", "scoped_identifier"].includes(f.type))
+              return gap("call-expression");
+            const head = compact(f.text.split("::")[0]!);
+            if (
+              fn &&
+              (bindings(fn, n, head, conservative).blocked.has(head) ||
+                bindings(fn, n, head, conservative).conditional.has(head))
+            )
+              return gap("closure-call");
+            if (genericShadow(n, head)) return gap("generic-call");
+            return {
+              k: "p",
+              p: compact(f.text),
+              s: sc,
+              pa: argumentSyntax(field(f, "path")),
+              c: args.maximum,
+              cm: args.minimum,
+              g: fn ? genericBindings(fn) : "",
+              it: impl.type,
+              is: impl.scope,
+              ik: impl.node ? `item:${impl.node.startIndex}` : "",
+              ia: argumentSyntax(impl.node && field(impl.node, "type")),
+            };
+          }
+          case "macro_invocation":
+            return gap("macro");
+          case "index_expression":
+            return gap("index");
+          case "closure_expression":
+            return gap("closure");
+          case "string_literal":
+          case "raw_string_literal":
+          case "integer_literal":
+          case "float_literal":
+          case "boolean_literal":
+          case "char_literal":
+          case "array_expression":
+          case "tuple_expression":
+            return gap("literal");
+          case "if_expression":
+          case "match_expression":
+          case "block":
+          case "loop_expression":
+          case "unsafe_block":
+          case "async_block":
+            return gap("control-flow");
+          case "scoped_identifier":
+            return gap("path-value");
+          default:
+            return gap(n.type.replace(/_expression$/, ""));
+        }
+      }
+      /** Stored recipes omit empty fields; the resolver reads them as empty. */
+      function trimRecipe(r: Recipe): Recipe {
+        const out: Recipe = {};
+        for (const [k, v] of Object.entries(r))
+          if (v !== "")
+            out[k] =
+              k === "e" && v && typeof v === "object"
+                ? trimRecipe(v as Recipe)
+                : v;
+        return out;
+      }
+      /** Receiver recipe data for a method call link with no written type. */
+      function receiverData(
+        receiver: Node,
+        fn: Node | null,
+        scope: string,
+        impl: { type: string; node: Node | null; scope: string },
+      ): Record<string, Json> {
+        const r = recipe(receiver, fn, scope, impl, false, { nodes: 48 });
+        if (r.k === "?") return { receiverGap: String(r.w) };
+        const old =
+          fn && macroAround(receiver, fn)
+            ? recipe(receiver, fn, scope, impl, true, { nodes: 48 })
+            : r;
+        return {
+          receiverExpr: trimRecipe(r),
+          ...(JSON.stringify(old) === JSON.stringify(r)
+            ? {}
+            : { stdFallbackReceiverExprUnknown: true }),
+        };
       }
       /**
        * A call written in a macro invocation's argument tokens. The link data
@@ -1847,6 +2341,84 @@ async function createHelper(): Promise<Helper> {
                           : "unit",
                     }
                   : {}),
+                // C-10: written signature and field types for receiver typing.
+                ...(actualKind === "function" || actualKind === "method"
+                  ? {
+                      returnType: field(n, "return_type")?.text ?? "",
+                      signatureGenerics: genericBindings(n),
+                      ...(n.namedChildren.some(
+                        (c) =>
+                          c.type === "function_modifiers" &&
+                          c.children.some((x) => x.type === "async"),
+                      )
+                        ? { async: true }
+                        : {}),
+                    }
+                  : {}),
+                ...(n.type === "struct_item"
+                  ? (() => {
+                      const named = n.namedChildren.find(
+                          (c) => c.type === "field_declaration_list",
+                        ),
+                        ordered = n.namedChildren.find(
+                          (c) => c.type === "ordered_field_declaration_list",
+                        );
+                      const gated = (c: Node) =>
+                        attributesOn(c).some((a) => /\bcfg/.test(a.text));
+                      const visibility = (c: Node) =>
+                        c.namedChildren.find(
+                          (x) => x.type === "visibility_modifier",
+                        )?.text ?? "private";
+                      const fields: Json[] = named
+                        ? named.namedChildren
+                            .filter(
+                              (c) =>
+                                c.type === "field_declaration" &&
+                                !gated(c) &&
+                                field(c, "name") &&
+                                field(c, "type"),
+                            )
+                            .map((c) => [
+                              compact(field(c, "name")!.text),
+                              field(c, "type")!.text,
+                              visibility(c),
+                            ])
+                        : [];
+                      if (ordered) {
+                        let index = 0,
+                          blocked = false;
+                        let pending: Node[] = [];
+                        for (const c of ordered.namedChildren) {
+                          if (c.type === "attribute_item") {
+                            blocked ||= /\bcfg/.test(c.text);
+                            continue;
+                          }
+                          if (c.type === "visibility_modifier") {
+                            pending.push(c);
+                            continue;
+                          }
+                          if (c.type.endsWith("comment")) continue;
+                          // A cfg-gated tuple field shifts later indices.
+                          if (blocked) break;
+                          fields.push([
+                            String(index++),
+                            c.text,
+                            pending[0]?.text ?? "private",
+                          ]);
+                          pending = [];
+                        }
+                      }
+                      return {
+                        fields,
+                        typeGenerics:
+                          field(n, "type_parameters")?.namedChildren.map((p) =>
+                            compact(
+                              (field(p, "name") ?? field(p, "left") ?? p).text,
+                            ),
+                          ) ?? [],
+                      };
+                    })()
+                  : {}),
                 ...(actualKind === "method"
                   ? {
                       arity: arity(field(n, "parameters")).maximum,
@@ -1954,6 +2526,13 @@ async function createHelper(): Promise<Helper> {
                       generics:
                         field(n, "type_parameters")?.namedChildren.map((p) =>
                           compact(field(p, "name")?.text ?? p.text),
+                        ) ?? [],
+                      // C-10: written defaults (`type Result<T = ()>`).
+                      genericDefaults:
+                        field(n, "type_parameters")?.namedChildren.map(
+                          (p) =>
+                            (field(p, "default_type") ?? field(p, "value"))
+                              ?.text ?? null,
                         ) ?? [],
                     }
                   : {}),
@@ -2180,6 +2759,16 @@ async function createHelper(): Promise<Helper> {
                 blocked:
                   !receiverType ||
                   genericShadow(n, receiverType.split("::")[0]!),
+                ...(receiver.type === "struct_expression"
+                  ? { receiverStructLiteral: true }
+                  : {}),
+                ...(receiverType
+                  ? {}
+                  : receiverData(receiver, fn, scope, {
+                      type: implType,
+                      node: implNode,
+                      scope: implScope,
+                    })),
               });
             } else
               link(f, owner, scope, "calls", compact(f.text), {
@@ -2208,6 +2797,9 @@ async function createHelper(): Promise<Helper> {
                 implType,
                 implScope,
                 implKey: implNode ? `item:${implNode.startIndex}` : "",
+                ...(f.type === "identifier"
+                  ? localData(fn, owner, n, f.text)
+                  : {}),
               });
           }
         }
@@ -2252,6 +2844,16 @@ async function createHelper(): Promise<Helper> {
               n.type === "self" ||
               !!b?.blocked.has(compact(n.text.split("::")[0]!)) ||
               genericShadow(n, n.text.split("::")[0]!),
+            ...(n.type === "scoped_identifier"
+              ? {}
+              : (() => {
+                  const local = localData(fn, owner, n, n.text);
+                  return local.localBinding ||
+                    b?.blocked.has(compact(n.text)) ||
+                    !genericShadow(n, n.text)
+                    ? local
+                    : typeParameterData(n, n.text, "value");
+                })()),
           });
         }
         // Outermost type paths only; don't treat declaration names as references.
@@ -2278,6 +2880,9 @@ async function createHelper(): Promise<Helper> {
             implType: nextImpl,
             implScope,
             blocked: genericShadow(n, n.text.split("::")[0]!),
+            ...(n.type === "type_identifier" && genericShadow(n, n.text)
+              ? typeParameterData(n, n.text, "type")
+              : {}),
           });
         }
         for (const c of n.namedChildren)

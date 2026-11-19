@@ -113,16 +113,16 @@ test("round 4 R1: every structural binding masks a free call", async () => {
     ["(f,_)", "s"],
     ["[f,..]", "s"],
     ["Some(f)", "s"],
-    ["Some(f)|None", "s"],
+    ["(S{f}|S{f})", "s"], // an or-pattern binds f in every alternative (E0408)
   ]) {
     const g = await graph(
       lib(`fn f(){}struct S{f:fn()}fn run(${pattern}:S){f();}`),
     );
-    g.unknown("f");
+    g.one("f", "run");
     const l = await graph(
       lib(`fn f(){}struct S{f:fn()}fn run(s:S){let ${pattern}=${expr};f();}`),
     );
-    l.unknown("f");
+    l.one("f", "run");
   }
   for (const body of [
     "let c=|S{f}|f();",
@@ -132,8 +132,9 @@ test("round 4 R1: every structural binding masks a free call", async () => {
     "match s{S{f}=>f()}",
     "for S{f} in xs{f();}",
   ])
-    (await graph(lib(`fn f(){}struct S{f:fn()}fn run(s:S){${body}}`))).unknown(
+    (await graph(lib(`fn f(){}struct S{f:fn()}fn run(s:S){${body}}`))).one(
       "f",
+      "run",
     );
   const clean = await graph(
     lib(`fn f(){}struct S{f:fn()}fn run(s:S){if let S{f}=s{}else{f();}f();}`),
@@ -163,7 +164,7 @@ test("round 4 R2: alias blankets and chains cannot disappear", async () => {
   const aliases = await graph(
     lib(`struct A;impl A{fn f(&self){}}type B=A;type C=B;fn run(x:C){x.f();}`),
   );
-  aliases.unverified("x.f", "impl A::f");
+  aliases.one("x.f", "impl A::f");
   const ref = await graph(
     lib(
       `struct A;impl A{fn f(&self){}}type Ref<'a>=&'a A;fn run(x:Ref<'_>){x.f();}`,
@@ -202,11 +203,17 @@ test("round 4 R3: standard blanket choices are unresolved with known targets", a
         `use std::borrow::{Borrow,BorrowMut};use std::any::Any;struct A;impl A{fn ${name}(&self){}}fn run(a:A){a.${name}();A::${name}(&a);}`,
       ),
     );
-    g.unknown(`a.${name}`);
     g.one(`A::${name}`, `impl A::${name}`);
-    const l = g.links.find((l) => l.targetName === `a.${name}`);
-    assert.equal(l.data.targets.length, 1);
-    assert.ok(l.data.uncertainty);
+    // C-10: `Into::into` and `TryInto::try_into` take `self` by value and
+    // precede the autoref'd inherent method; the others are associated
+    // functions, `&self` methods found after the inherent one, or traits A
+    // does not implement.
+    if (["into", "try_into"].includes(name)) {
+      g.unknown(`a.${name}`);
+      const l = g.links.find((l) => l.targetName === `a.${name}`);
+      assert.equal(l.data.targets.length, 1);
+      assert.ok(l.data.uncertainty);
+    } else g.one(`a.${name}`, `impl A::${name}`);
   }
   for (const name of ["from", "try_from"]) {
     const g = await graph(
@@ -223,7 +230,7 @@ test("round 4 R3: standard blanket choices are unresolved with known targets", a
   const ordinary = await graph(
     lib(`struct A;impl A{fn ordinary(&self){}}fn r(a:A){a.ordinary();}`),
   );
-  ordinary.unverified("a.ordinary", "impl A::ordinary");
+  ordinary.one("a.ordinary", "impl A::ordinary");
 });
 test("round 4 R4: opaque statement macros invalidate binding evidence in order", async () => {
   const g = await graph(
@@ -286,7 +293,7 @@ test("round 4 R5: fully generic inherent impls apply to all instantiations", asy
       "W::new",
       `${impl.includes("Copy>") ? "impl<T:Copy>" : "impl<T>"} W<T>::new`,
     );
-    if (impl === "impl<T>W<T>") g.unverified("x.get", "impl<T> W<T>::get");
+    if (impl === "impl<T>W<T>") g.one("x.get", "impl<T> W<T>::get");
     else g.unknown("x.get");
   }
   for (const specialised of ["impl<T>W<Vec<T>>", "impl W<u8>"]) {
@@ -337,12 +344,12 @@ test("round 4 structural bindings start at their actual scope", async () => {
   const ts = g.targets("f");
   assert.equal(ts[0].length, 0); // rustc: parameter is visible in its signature value expression.
   assert.equal(ts[1].length, 1);
-  assert.equal(ts[2].length, 0);
+  assert.equal(ts[2][0].identity, "r"); // the for binding, not the function
   assert.equal(ts[3].length, 1);
 });
 test("round 4 value self is a binding, not a module path", async () => {
   const g = await graph(lib(`struct A;impl A{fn f(self)->Self{self}}`));
-  g.unknown("self", "values");
+  g.one("self", "impl A::f", "values");
 });
 test("round 4 generic inherent shared receiver precedes nominal trait adjustments", async () => {
   const g = await graph(
@@ -400,7 +407,7 @@ test("round 4 alias applicability cannot poison a shared namespace cache", async
     ),
   );
   g.unknown("x.f");
-  g.unverified("a.f", "impl A::f");
+  g.one("a.f", "impl A::f");
   const reverse = await rust.resolve({
     projectId: "review",
     files: g.files,
@@ -425,6 +432,6 @@ test("round 4 generic alias and reference Self do not capture same-named project
   );
   const ts = g.targets("x.f");
   assert.equal(ts[0].length, 0);
-  g.unverified("x.g", "impl T::g");
+  g.one("x.g", "impl T::g");
   g.unknown("self.g");
 });

@@ -124,13 +124,14 @@ fn r(mut a:A,h:&mut std::collections::hash_map::DefaultHasher,formatter:&mut std
       ),
     );
     g.unknown(`a.${name}`);
+    // Importing Hash and Debug can rebind those derive names: not proved.
     g.unverified("a.safe", "impl A::safe");
     const isolated = await graph(
       lib(
         `#[derive(${derive})]struct A;impl A{fn safe(&self){}}fn r(a:A){a.safe();}`,
       ),
     );
-    isolated.unverified("a.safe", "impl A::safe");
+    isolated.one("a.safe", "impl A::safe");
   }
   const g = await graph(
     lib(
@@ -157,7 +158,7 @@ fn r(mut a:A,h:&mut std::collections::hash_map::DefaultHasher,formatter:&mut std
     const g = await graph(
       lib(`${attr}struct A;impl A{fn f(&self){}}fn r(a:A){a.f();}`),
     );
-    g.unverified("a.f", "impl A::f");
+    g.one("a.f", "impl A::f");
   }
 });
 test("round 5 A: first probe inherent beats ALL unseen alternatives", async () => {
@@ -307,7 +308,7 @@ test("round 5 A: self retains its signature type across opaque statements", asyn
       `mod a{pub struct A;impl A{fn f(&self){}fn run(&self){m!(self);self.f();}}}mod b{pub struct A;impl A{pub fn f(&self){}}}fn r(x:b::A){x.f();}`,
     ),
   );
-  unrelated.unverified("x.f", "b::impl A::f");
+  unrelated.one("x.f", "b::impl A::f");
 });
 
 test("round 5 A: sole path lookup cannot bypass unknown explicit specialisation", async () => {

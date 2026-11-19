@@ -52,6 +52,7 @@ export const rustPhases = {
                 uncertainty,
                 cause,
                 opaqueAttributes,
+                receiverTyping,
                 ...rest
               } = (l.data ?? {}) as Record<string, Json>;
               return {
@@ -104,6 +105,7 @@ export const rustPhases = {
     >();
     const presence = new Map<string, string[]>();
     const conditions = new Map<string, string[]>();
+    const notes = new Map<string, Record<string, Json>>();
     resolveRust(
       {
         projectId,
@@ -133,6 +135,9 @@ export const rustPhases = {
         conditions.set(symbol.id, gates);
       },
       (link, gates) => conditions.set(link.id, gates),
+      undefined,
+      undefined,
+      (link, extra) => notes.set(link.id, extra),
     );
     for (let i = 0; i < updated.length; i++) {
       const f = updated[i]!,
@@ -166,11 +171,17 @@ export const rustPhases = {
         a.result.links = a.result.links.map((l, j) => {
           const id = facts[i]!.links[j]!.id,
             u = unknown.get(id),
-            gates = conditions.get(id);
+            gates = conditions.get(id),
+            note = notes.get(id);
           if (gates)
             l = {
               ...l,
               data: { ...(l.data as Record<string, Json>), conditions: gates },
+            };
+          if (note)
+            l = {
+              ...l,
+              data: { ...(l.data as Record<string, Json>), ...note },
             };
           return u
             ? {
@@ -206,7 +217,7 @@ export const rustPhases = {
 
 const rust: LanguageModule = {
   id: "rust",
-  version: "31",
+  version: "32",
   extensions: [".rs"],
   contextFiles: [
     "Cargo.toml",

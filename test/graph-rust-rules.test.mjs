@@ -81,7 +81,7 @@ fn run(a: A, b: B, t: &dyn Speak) { A::new(); B::new(); A::missing(); a.method()
   });
   assert.equal(g.target("A::new"), "impl A::new");
   assert.equal(g.target("B::new"), "impl B::new");
-  assert.equal(g.target("a.method"), null);
+  assert.equal(g.target("a.method"), "impl A::method");
   assert.equal(g.target("b.method"), null);
   assert.equal(g.target("t.f"), null);
   assert.equal(g.target("A::missing"), null);
@@ -211,5 +211,6 @@ test("Rust parameter receiver types keep their annotation scope under local type
   fn run(x: A) { struct A; impl A { fn f(&self) {} } x.f(); }
   `,
   });
-  assert.equal(g.target("x.f"), null);
+  // The annotation names the outer A; the block's A cannot capture it.
+  assert.equal(g.target("x.f"), "impl A::f");
 });

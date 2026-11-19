@@ -745,7 +745,11 @@
         "name": "Wrap",
         "kind": "struct"
       },
-      "target": null,
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "Wrap",
+        "kind": "struct"
+      },
       "at": "T",
       "range": {
         "start": 308,
@@ -904,7 +908,11 @@
         "name": "generic",
         "kind": "function"
       },
-      "target": null,
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "generic",
+        "kind": "function"
+      },
       "at": "T",
       "range": {
         "start": 764,
@@ -1678,7 +1686,11 @@
         "name": "sibling",
         "kind": "function"
       },
-      "target": null,
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "own",
+        "kind": "method"
+      },
       "at": "a.own",
       "range": {
         "start": 201,
@@ -2057,7 +2069,11 @@
         "name": "generic",
         "kind": "function"
       },
-      "target": null,
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "generic",
+        "kind": "function"
+      },
       "at": "T",
       "range": {
         "start": 770,
@@ -2789,7 +2805,11 @@
         "name": "impl<T> Wrap<T>",
         "kind": "impl"
       },
-      "target": null,
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "impl<T> Wrap<T>",
+        "kind": "impl"
+      },
       "at": "T",
       "range": {
         "start": 573,
@@ -2823,7 +2843,11 @@
         "name": "new",
         "kind": "method"
       },
-      "target": null,
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "impl<T> Wrap<T>",
+        "kind": "impl"
+      },
       "at": "T",
       "range": {
         "start": 596,
@@ -2948,7 +2972,11 @@
         "name": "new",
         "kind": "method"
       },
-      "target": null,
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "new",
+        "kind": "method"
+      },
       "range": {
         "start": 614,
         "end": 619
@@ -3035,7 +3063,11 @@
         "name": "generic",
         "kind": "function"
       },
-      "target": null,
+      "target": {
+        "file": "app/src/lib.rs",
+        "name": "generic",
+        "kind": "function"
+      },
       "range": {
         "start": 774,
         "end": 779

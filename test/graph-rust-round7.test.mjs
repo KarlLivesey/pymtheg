@@ -173,8 +173,8 @@ test("round 7 B2 binding scopes cover guards closures labels loops and let-else"
   }`),
   );
   assert.deepEqual(
-    g.targets("f").map((ts) => ts.length),
-    [0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 0],
+    g.targets("f").map((ts) => ts.map((s) => s.identity).join()),
+    ["r", "r", "f", "r", "f", "r", "f", "r", "f", "f", "r"],
   );
 });
 const workspace = {
@@ -377,7 +377,7 @@ test("round 7 B2 nested or patterns and if-let match guards bind within the arm"
     g.targets("a.f").map((t) => t.length),
     [0, 0, 1],
   );
-  g.unknown("f");
+  g.one("f", "r");
 });
 for (const visibility of ["pub(super)", "pub(in crate::m)"]) {
   test(`round 7 B1 ${visibility} excludes callers outside its boundary`, async () => {
@@ -490,7 +490,7 @@ test("round 7 B2 safety: signature constants cannot acquire a shadowed outer fun
   );
   assert.deepEqual(
     g.targets("f").map((ts) => ts.map((s) => s.identity)),
-    [[], [], [], ["f"]],
+    [[], [], ["s"], ["f"]],
   );
 });
 test("round 7 B3 workspace dependency definitions do not create unused root edges", async () => {

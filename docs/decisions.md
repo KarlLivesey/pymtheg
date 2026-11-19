@@ -2677,6 +2677,31 @@ Missing test and tooling types affect their own documented globals. An npm
 alias or captured pnpm catalog supplies the registry name and can supply an
 exact pin with its source path.
 
+### Rust locals, generic parameters and inferred receivers (C-10)
+
+**Decided (C-10, manager brief):** a Rust reference that the graph already
+records to a proven local binding, parameter or `self` targets the enclosing
+function, with the binding's name and declaration span in `data.localBinding`,
+as TypeScript does since C-3; a bare generic type or const parameter targets
+its declaring item. No symbols or link sites are added. A dot call on an owned
+receiver may now be definite at the autoref step (`&self`, `&mut self`), not
+only at the first probe step, when every trait that could supply an earlier
+candidate is known not to: the standard prelude and blanket traits by their
+complete method lists (hidden methods included), checkout traits by name, the
+traits the type implements or derives, and every import in scope; anything the
+module cannot see (an import outside the checkout and the standard library, an
+unknown macro, a non-standard derive or attribute macro in reach, a failed
+file) leaves the call unresolved. Receiver types come from written
+declarations only (annotations, struct literals, written return and field
+types, `?` on a written standard wrapper, `.await` on `async fn`).
+**Why:** most Rust links on locals and owned receivers were unresolved although
+the source proves them; the brief asked for them under the never-wrong rule.
+**Rules out:** inference through generics, closures, iterator adaptors or
+associated types; trait-method targets (even of checkout traits); `Box`,
+`Rc`, `Arc` and `Deref` receivers; library method owners (a later chunk).
+Several reviewed tests that pinned the old first-step-only outcome now expect
+the method rustc selects; [C-10](changes/C-10.md) lists each.
+
 ### Graph writes use a write-ahead log on local disks (C-6)
 
 **Decided (C-6):** from its first write, a writable graph connection on a Linux
