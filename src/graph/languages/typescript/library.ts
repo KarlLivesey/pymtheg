@@ -18,6 +18,7 @@ interface Unit {
   subpath?: string;
   registry?: true;
   pin?: { version: string; versionSource: string };
+  installedRoot?: string;
 }
 
 export function packageUnit(specifier: string): Unit | undefined {
@@ -78,6 +79,39 @@ export const libraryKey = (target: LibraryTarget): string =>
     target.version,
   ]);
 
+/** A named member written directly in a named installed factory's return type. */
+function returnedMemberName(
+  declaration: ts.Declaration,
+  checker: ts.TypeChecker,
+): string | undefined {
+  if (
+    !ts.isPropertySignature(declaration) &&
+    !ts.isMethodSignature(declaration)
+  )
+    return undefined;
+  const type = declaration.parent;
+  const factory = type.parent;
+  if (
+    !ts.isTypeLiteralNode(type) ||
+    !ts.isFunctionDeclaration(factory) ||
+    type !== factory.type ||
+    !factory.name ||
+    !ts.isSourceFile(factory.parent) ||
+    !(ts.getCombinedModifierFlags(factory) & ts.ModifierFlags.Export)
+  )
+    return undefined;
+  const member = nameOf(declaration);
+  const owner = checker.getSymbolAtLocation(factory.name);
+  const property = checker.getSymbolAtLocation(declaration.name);
+  if (
+    !member ||
+    owner?.declarations?.length !== 1 ||
+    property?.declarations?.length !== 1
+  )
+    return undefined;
+  return `ReturnType<typeof ${factory.name.text}>.${member}`;
+}
+
 const exactVersion =
   /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[\da-z-]+(?:\.[\da-z-]+)*)?(?:\+[\da-z-]+(?:\.[\da-z-]+)*)?$/i;
 const dependencyFields = [
@@ -131,6 +165,8 @@ function declaredSymbol(declaration: ts.Declaration, bundled: boolean) {
   if (name === undefined) return undefined;
   let symbol = name;
   let member = false;
+  let namedOwner: ts.NamedDeclaration | undefined;
+  let literal = false;
   for (let owner = declaration.parent; owner; owner = owner.parent) {
     if (ts.isInterfaceDeclaration(owner) || ts.isClassDeclaration(owner)) {
       const prefix = nameOf(owner);
@@ -144,9 +180,11 @@ function declaredSymbol(declaration: ts.Declaration, bundled: boolean) {
         symbol = `${prefix}.${symbol}`;
       else symbol = `${prefix}${staticMember ? "" : ".prototype"}.${symbol}`;
       member = true;
+      namedOwner = owner;
     } else if (ts.isEnumDeclaration(owner)) {
       symbol = `${owner.name.text}.${symbol}`;
       member = true;
+      namedOwner = owner;
     } else if (ts.isModuleDeclaration(owner)) {
       if (
         ts.isIdentifier(owner.name) &&
@@ -154,6 +192,7 @@ function declaredSymbol(declaration: ts.Declaration, bundled: boolean) {
       ) {
         symbol = `${owner.name.text}.${symbol}`;
         member = true;
+        namedOwner = owner;
       }
     } else if (ts.isTypeLiteralNode(owner)) {
       const parent = owner.parent;
@@ -166,6 +205,7 @@ function declaredSymbol(declaration: ts.Declaration, bundled: boolean) {
       symbol = `${prefix}.${symbol}`;
       owner = parent;
       member = true;
+      literal = true;
     } else if (
       ts.isMappedTypeNode(owner) ||
       ts.isFunctionLike(owner) ||
@@ -173,7 +213,7 @@ function declaredSymbol(declaration: ts.Declaration, bundled: boolean) {
     )
       return undefined;
   }
-  return { symbol, member };
+  return { symbol, member, namedOwner, literal };
 }
 
 /** Declaration ownership and importer version facts, shared across programs. */
@@ -235,6 +275,11 @@ export function libraryReader(
     { unit: Unit; dependency?: Manifest } | null
   >();
   const declarations = new WeakMap<ts.Declaration, LibraryTarget | null>();
+  const qualifiedKeys = new WeakMap<
+    LibraryTarget,
+    ts.Symbol | ts.Declaration
+  >();
+  const exportedOwners = new WeakMap<ts.SourceFile, ReadonlySet<string>>();
   const installedUnits = new Map<string, Unit | undefined>();
   function installedUnit(path: string): Unit | undefined {
     if (!inputs || !path.split("/").includes("node_modules")) return undefined;
@@ -264,8 +309,11 @@ export function libraryReader(
             name === "@types/node"
               ? { ecosystem: "node", unit: "globals" }
               : registryUnit(`npm:${canonical}`);
-          if (unit && typeof version === "string" && storableName(version))
-            unit.pin = { version, versionSource };
+          if (unit) {
+            unit.installedRoot = root;
+            if (typeof version === "string" && storableName(version))
+              unit.pin = { version, versionSource };
+          }
         }
       } catch {
         // An installed declaration without a readable package identity cannot name a unit.
@@ -328,6 +376,7 @@ export function libraryReader(
   function targetOf(
     declaration: ts.Declaration,
     unit: Unit,
+    checker: ts.TypeChecker,
   ): LibraryTarget | undefined {
     if (declarations.has(declaration))
       return declarations.get(declaration) ?? undefined;
@@ -339,9 +388,20 @@ export function libraryReader(
     ) as ts.ModuleDeclaration | undefined;
     const builtin =
       unit.ecosystem === "node" && ambient && packageUnit(ambient.name.text);
+    const source = declaration.getSourceFile();
     const identity = declaredSymbol(declaration, bundled);
-    const target: LibraryTarget | undefined =
-      identity && storableName(identity.symbol)
+    const qualify =
+      unit.installedRoot &&
+      unit.ecosystem === "npm" &&
+      !ambient &&
+      ts.isExternalModule(source) &&
+      identity?.member &&
+      (identity.literal ||
+        (identity.namedOwner?.parent === source &&
+          !moduleExportsOwner(checker, source, identity.namedOwner)));
+    const target: LibraryTarget | undefined = qualify
+      ? qualifiedTarget(declaration, unit, identity.symbol, checker)
+      : identity && storableName(identity.symbol)
         ? {
             ecosystem: unit.ecosystem,
             unit:
@@ -360,6 +420,81 @@ export function libraryReader(
           }
         : undefined;
     declarations.set(declaration, target ?? null);
+    return target;
+  }
+
+  function moduleExportsOwner(
+    checker: ts.TypeChecker,
+    source: ts.SourceFile,
+    owner: ts.NamedDeclaration,
+  ) {
+    if (ts.getCombinedModifierFlags(owner) & ts.ModifierFlags.Export)
+      return true;
+    const name = nameOf(owner);
+    if (name === undefined) return false;
+    let owners = exportedOwners.get(source);
+    if (!owners) {
+      const names = new Set<string>();
+      for (const statement of source.statements) {
+        // Local names may be exposed by an alias or by `export = Namespace`.
+        if (
+          ts.isExportDeclaration(statement) &&
+          !statement.moduleSpecifier &&
+          statement.exportClause &&
+          ts.isNamedExports(statement.exportClause)
+        )
+          for (const binding of statement.exportClause.elements)
+            names.add((binding.propertyName ?? binding.name).text);
+        else if (
+          ts.isExportAssignment(statement) &&
+          ts.isIdentifier(statement.expression)
+        )
+          names.add(statement.expression.text);
+      }
+      for (const exported of checker
+        .getSymbolAtLocation(source)
+        ?.exports?.values() ?? []) {
+        if (exported.flags & ts.SymbolFlags.Alias) continue;
+        for (const declaration of exported.declarations ?? []) {
+          if (declaration.getSourceFile() !== source) continue;
+          const local = nameOf(declaration);
+          if (local !== undefined) names.add(local);
+        }
+      }
+      owners = names;
+      exportedOwners.set(source, owners);
+    }
+    return owners.has(name);
+  }
+
+  function qualifiedTarget(
+    declaration: ts.Declaration,
+    unit: Unit,
+    name: string,
+    checker: ts.TypeChecker,
+  ): LibraryTarget | undefined {
+    const path = fromVirtual(declaration.getSourceFile().fileName);
+    const physical = path && inputs?.realpath(path);
+    const root = unit.installedRoot;
+    if (!physical || !root || !physical.startsWith(root)) return undefined;
+    const module = physical
+      .slice(root.length)
+      .replaceAll("%", "%25")
+      .replaceAll(":", "%3A");
+    const symbol = `${module}:${name}`;
+    if (!module || !storableName(symbol)) return undefined;
+    const target: LibraryTarget = {
+      ecosystem: unit.ecosystem,
+      unit: unit.unit,
+      symbol,
+      ...unit.pin,
+      evidence: "declaring-owner",
+    };
+    const member = (declaration as ts.NamedDeclaration).name;
+    qualifiedKeys.set(
+      target,
+      (member && checker.getSymbolAtLocation(member)) ?? declaration,
+    );
     return target;
   }
 
@@ -460,6 +595,18 @@ export function libraryReader(
           return path === undefined ? undefined : installedUnit(path);
         },
         targetOf,
+        returnedMemberTarget(
+          declaration: ts.Declaration,
+          unit: Unit,
+          checker: ts.TypeChecker,
+        ) {
+          if (!unit.installedRoot) return undefined;
+          const name = returnedMemberName(declaration, checker);
+          return name && qualifiedTarget(declaration, unit, name, checker);
+        },
+        targetKey(target: LibraryTarget) {
+          return qualifiedKeys.get(target) ?? libraryKey(target);
+        },
         typePackageUnredirected(specifier: string) {
           const unit = registryUnit(specifier);
           if (!unit) return false;
