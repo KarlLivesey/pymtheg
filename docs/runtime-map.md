@@ -1478,7 +1478,7 @@ file records (C-2). `analyze` receives only its own module's records. The
 resolver's links are read as it receives them (unresolved), without their
 previous target, candidate or library rows; after it returns, the module's
 links are read once, validated with `resolutionFacts`, and the store writes
-from that validated result (`writeAnalysis`) instead of reading and deriving
+from that validated result (`replaceAnalysis` given the validated links) instead of reading and deriving
 it again (C-22). Observation-only work counters and stage times
 (`src/graph/work.ts`) record each stage's operations; nothing reads them to
 decide anything. `failedFiles()` reads the failed source
@@ -1627,11 +1627,23 @@ The TypeScript module can read installed declaration and resolution metadata
 files under the checkout's `node_modules` on demand. The dependency inputs
 are recorded as module-owned context, so the version validator accepts an
 installed `package.json` whose text was captured. Installed implementations
-and network access are outside this path. A file found present stays present for the run: its
-read is checked against its own open handle, and the stamp recorded
-(device, inode, mode, size, mtime, ctime) is that of the bytes read, so a
-link added by another install sharing the package store does not make it
-absent (C-22).
+and network access are outside this path. Within one run every read of an
+installed file returns the bytes of its first read, checked against the
+reading handle; the record holds those bytes' content hash and the stamp
+(device, inode, mode, size, mtime, ctime) from that same handle. A link
+added by another install sharing the package store therefore does not make
+a present file absent. At the end of the run a file whose stamp on disk is
+no longer that of the bytes used is recorded with a stamp no file can have,
+so the next run analyses it again (C-22).
+
+**Unfinished runs (C-22).** `indexProject` marks the store (`graph_meta`
+`index-run`) in a commit before its first write, together with removing the
+completion record, and clears the mark in its last commit. Commits survive a
+crash only as a prefix, so any surviving write of a run has the mark with
+it. A run that finds the mark counts every claimed file and every context
+file as changed, so no module reuses stored analysis; parse results stay
+cached by content hash. `graphCommandState()` returns nothing while the
+mark is set, so `graph status` does not report complete.
 
 Queries: `pymtheg graph uses UNIT [SYMBOL]` and MCP `code_graph` action `uses`
 (`query`, optional `symbol`). Every link answer shows certainty `library` and

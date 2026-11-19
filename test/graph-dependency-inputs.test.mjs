@@ -17,7 +17,12 @@ import {
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { test } from "node:test";
-import { DependencyInputs } from "../dist/graph/dependency-inputs.js";
+import fs from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
+import {
+  changedDependencyInputs,
+  DependencyInputs,
+} from "../dist/graph/dependency-inputs.js";
 import {
   discoverLanguages,
   indexProject,
@@ -166,6 +171,70 @@ test("two programs in one run see the same installed bytes, and the next run cat
         rmSync(path + suffix, { force: true });
   } finally {
     DependencyInputs.prototype.read = original;
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// The second review: a hard link added and removed between the read and the
+// handle's last fstat, on both attempts, must not drop an unchanged file.
+// Metadata moves on every read here (a mode change stands for the link);
+// the bytes never do.
+test("metadata that moves during every read of a file does not make it absent", () => {
+  const root = fixture();
+  const readFileSync = fs.readFileSync;
+  let moves = 0;
+  try {
+    const inputs = new DependencyInputs(root, "typescript");
+    assert.equal(inputs.fileExists(path), true);
+    fs.readFileSync = function (target, ...rest) {
+      const bytes = readFileSync.call(this, target, ...rest);
+      // Reading through a handle: move the inode's metadata before its fstat.
+      if (typeof target === "number")
+        chmodSync(join(root, path), moves++ % 2 ? 0o644 : 0o600);
+      return bytes;
+    };
+    syncBuiltinESMExports();
+    assert.equal(inputs.read(path), "export declare function kit(): string;\n");
+    fs.readFileSync = readFileSync;
+    syncBuiltinESMExports();
+    assert.ok(moves >= 1);
+    // The bytes on disk are the bytes used: recorded as usable, not stale,
+    // and a later metadata-only change is no change for the next run.
+    const records = inputs.records();
+    assert.deepEqual(changedDependencyInputs(root, records), []);
+    chmodSync(join(root, path), 0o640);
+    assert.deepEqual(changedDependencyInputs(root, records), []);
+    // A content change is.
+    writeFileSync(join(root, path), "export declare const other: 2;\n");
+    assert.deepEqual(changedDependencyInputs(root, records), [path]);
+  } finally {
+    fs.readFileSync = readFileSync;
+    syncBuiltinESMExports();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a file whose bytes change during every read is treated as absent", () => {
+  const root = fixture();
+  const readFileSync = fs.readFileSync;
+  let writes = 0;
+  try {
+    const inputs = new DependencyInputs(root, "typescript");
+    assert.equal(inputs.fileExists(path), true);
+    fs.readFileSync = function (target, ...rest) {
+      const bytes = readFileSync.call(this, target, ...rest);
+      if (typeof target === "number")
+        fs.writeFileSync(
+          join(root, path),
+          `export declare const v${writes++}: 1;\n`,
+        );
+      return bytes;
+    };
+    syncBuiltinESMExports();
+    assert.equal(inputs.read(path), undefined);
+  } finally {
+    fs.readFileSync = readFileSync;
+    syncBuiltinESMExports();
     rmSync(root, { recursive: true, force: true });
   }
 });

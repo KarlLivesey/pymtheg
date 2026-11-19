@@ -4,7 +4,7 @@ import { join, resolve } from "node:path";
 import { compare, contentHash, validateResult } from "./identity.js";
 import { resolutionFacts } from "./analysis.js";
 import {
-  changedDependencyInputs,
+  checkDependencyInputs,
   DependencyInputs,
 } from "./dependency-inputs.js";
 import { matchesPattern, type LanguageRegistry } from "./registry.js";
@@ -277,7 +277,7 @@ export async function indexProject(
   // After an unfinished run every claimed file counts as changed, so no
   // module reuses an earlier analysis; parse results stay valid per hash.
   if (unfinished) for (const path of claims.keys()) changed.add(path);
-  // Marked before the first write, cleared by the last one.
+  // Marked with the first write, cleared by the last one.
   await store.beginIndexRun?.();
   await stage("store.writeParsed", async () => {
     await store.replaceContexts([
@@ -333,6 +333,9 @@ export async function indexProject(
       ? new DependencyInputs(root, module.id)
       : undefined;
     const previousInputs = dependencies.get(module.id) ?? [];
+    // Inputs whose bytes are unchanged keep counting as unchanged however
+    // their metadata moved; their records take the stamps they have now.
+    const checkedInputs = checkDependencyInputs(root, previousInputs);
     let analysisFailed = false;
     try {
       if (ownContexts.some((file) => file.status === "failed"))
@@ -365,7 +368,7 @@ export async function indexProject(
             .sort(compare),
           changedContextFiles: [
             ...changedContexts.filter((path) => needsContext(module, path)),
-            ...changedDependencyInputs(root, previousInputs),
+            ...checkedInputs.changed,
           ],
         }),
       );
@@ -401,6 +404,8 @@ export async function indexProject(
     }
     if (inputs?.refreshed)
       dependencies.set(module.id, analysisFailed ? [] : inputs.records());
+    else if (checkedInputs.restamped)
+      dependencies.set(module.id, checkedInputs.current);
     await stage(`analyze.${module.id}.write`, async () => {
       for (const item of results) {
         const file = filesByPath.get(item.path)!;

@@ -37,6 +37,29 @@ const stamp = (path: string, stat: BigIntStats) =>
     stat.ctimeNs,
   ].join("\0");
 const MAX_FILE = 4 * 1024 * 1024;
+/**
+ * The content hash of the regular file at `absolute` now, or undefined.
+ * Used only where a stamp moved: metadata alone (a hard link added by
+ * another install sharing the package store changes ctime and nlink) never
+ * decides whether bytes changed (C-22).
+ */
+function hashNow(absolute: string): string | undefined {
+  try {
+    const fd = openSync(
+      absolute,
+      constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
+    );
+    try {
+      const stat = fstatSync(fd, { bigint: true });
+      if (!stat.isFile() || stat.size > MAX_FILE) return undefined;
+      return contentHash(readFileSync(fd));
+    } finally {
+      closeSync(fd);
+    }
+  } catch {
+    return undefined;
+  }
+}
 const CACHE_SIZE = 24 * 1024 * 1024;
 /**
  * Recorded for a file whose bytes on disk no longer match the bytes this run
@@ -102,18 +125,56 @@ class Paths {
   }
 }
 
-export function changedDependencyInputs(
+/**
+ * The recorded inputs that changed since they were recorded, and the records
+ * as they now are. The stamp is the cheap first check; when it moved, a file
+ * whose bytes were read is changed only if its content hash now differs from
+ * the one recorded. Metadata that another install moved is no change: such a
+ * record is returned with the stamp it has now, which a cold index would
+ * record too.
+ */
+export function checkDependencyInputs<
+  T extends { path: string; hash?: string; dependency?: DependencyStamp },
+>(
   root: string,
-  inputs: readonly { path: string; dependency?: DependencyStamp }[],
-): string[] {
-  const watched = inputs.filter((entry) => entry.dependency);
-  if (!watched.length) return [];
+  inputs: readonly T[],
+): { changed: string[]; current: T[]; restamped: boolean } {
+  const changed: string[] = [];
+  let restamped = false;
+  if (!inputs.some((entry) => entry.dependency))
+    return { changed, current: [...inputs], restamped };
   const paths = new Paths(root);
-  return watched.flatMap(({ path, dependency }) => {
+  const current = inputs.map((entry) => {
+    const { path, hash, dependency } = entry;
+    if (!dependency) return entry;
     const location = installed(path) ? paths.location(path) : undefined;
     const actual = location ? stamp(location.path, location.stat) : "";
-    return actual === dependency!.stamp ? [] : [path];
+    if (actual === dependency.stamp) return entry;
+    if (
+      hash &&
+      actual &&
+      location!.stat.isFile() &&
+      hashNow(join(paths.root, location!.path)) === hash
+    ) {
+      restamped = true;
+      return { ...entry, dependency: { ...dependency, stamp: actual } };
+    }
+    changed.push(path);
+    return entry;
   });
+  return { changed, current, restamped };
+}
+
+/** The recorded inputs that changed since they were recorded (see above). */
+export function changedDependencyInputs(
+  root: string,
+  inputs: readonly {
+    path: string;
+    hash?: string;
+    dependency?: DependencyStamp;
+  }[],
+): string[] {
+  return checkDependencyInputs(root, inputs).changed;
 }
 
 export class DependencyInputs {
@@ -138,27 +199,27 @@ export class DependencyInputs {
   refreshed = false;
 
   /**
-   * Every probed input with the identity of what this run used. A file read
-   * this run whose stamp on disk is no longer the one of the bytes used is
-   * recorded as stale, so the next run analyses it again.
+   * Every probed input with the identity of what this run used. For a file
+   * read this run whose stamp on disk moved, the content decides: the same
+   * bytes are recorded with the stamp they have now; different bytes (or
+   * none) are recorded as stale, so the next run analyses again.
    */
   records(): ContextFile[] {
     for (const [location, used] of this.used) {
+      const absolute = join(this.paths.root, location);
       let now = "";
       try {
-        now = stamp(
-          location,
-          lstatSync(join(this.paths.root, location), { bigint: true }),
-        );
+        now = stamp(location, lstatSync(absolute, { bigint: true }));
       } catch {
         // Gone: no longer what was used.
       }
-      if (now !== used.stamp)
-        for (const path of used.paths)
-          this.entries.get(path)!.dependency = {
-            module: this.module,
-            stamp: STALE,
-          };
+      if (now === used.stamp) continue;
+      const same = now !== "" && hashNow(absolute) === used.hash;
+      for (const path of used.paths)
+        this.entries.get(path)!.dependency = {
+          module: this.module,
+          stamp: same ? now : STALE,
+        };
     }
     return [...this.entries.values()];
   }
@@ -244,11 +305,14 @@ export class DependencyInputs {
     const mark = stamp(location.path, location.stat);
     let captured = textCache.get(absolute);
     if (captured?.stamp !== mark) {
-      // The read is checked against its own handle, not against the first
-      // lstat of the run: a link added by another install sharing the
-      // package store changes the inode's ctime, not its bytes, and must not
-      // make a present declaration absent (C-22). The stamp recorded is the
-      // one of the bytes read, taken from the same handle.
+      // Checked against its own handle, and decided by content: a link added
+      // by another install sharing the package store moves the inode's
+      // ctime and nlink, not its bytes, and must not make a present
+      // declaration absent (C-22). When the handle's stamp moved during the
+      // read, the file is read again: the same bytes are used as they are;
+      // different bytes mean it is being written, so it is tried once more
+      // and then treated as absent. The stamp recorded is the handle's
+      // after the read.
       captured = undefined;
       for (let attempt = 0; attempt < 2 && !captured; attempt++)
         try {
@@ -261,12 +325,16 @@ export class DependencyInputs {
             if (!before.isFile() || before.size > MAX_FILE) return undefined;
             const bytes = readFileSync(fd);
             const after = stamp(location.path, fstatSync(fd, { bigint: true }));
-            // Written while it was read: try once more, then treat it as absent.
-            if (stamp(location.path, before) !== after) continue;
+            const hash = contentHash(bytes);
+            if (
+              stamp(location.path, before) !== after &&
+              hashNow(absolute) !== hash
+            )
+              continue;
             captured = {
               stamp: after,
               text: new TextDecoder("utf-8", { fatal: true }).decode(bytes),
-              hash: contentHash(bytes),
+              hash,
               size: bytes.length,
             };
           } finally {

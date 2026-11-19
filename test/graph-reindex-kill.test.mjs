@@ -104,7 +104,7 @@ export function other(): number {
   return 1;
 }
 `;
-test("TypeScript: a re-index killed after any write is repaired by the next one", async () => {
+test("TypeScript: a re-index killed after any write is repaired by the next one", async (t) => {
   const tried = await everyKillPoint(
     {
       "package.json": JSON.stringify({ name: "fixture", private: true }),
@@ -122,9 +122,10 @@ test("TypeScript: a re-index killed after any write is repaired by the next one"
     { "src/a.ts": "// moved\n" + tsA },
   );
   assert.ok(tried >= 6, `write boundaries tried: ${tried}`);
+  t.diagnostic(`write boundaries: ${tried}`);
 });
 
-test("Go: a re-index killed after any write is repaired by the next one", async () => {
+test("Go: a re-index killed after any write is repaired by the next one", async (t) => {
   const tried = await everyKillPoint(
     {
       "go.mod": "module example.com/m\n\ngo 1.22\n",
@@ -137,9 +138,10 @@ test("Go: a re-index killed after any write is repaired by the next one", async 
     { "b/shadow.go": "package b\n\ntype error = int\n" },
   );
   assert.ok(tried >= 6, `write boundaries tried: ${tried}`);
+  t.diagnostic(`write boundaries: ${tried}`);
 });
 
-test("Rust: a re-index killed after any write is repaired by the next one", async () => {
+test("Rust: a re-index killed after any write is repaired by the next one", async (t) => {
   const tried = await everyKillPoint(
     {
       "Cargo.toml":
@@ -157,4 +159,5 @@ test("Rust: a re-index killed after any write is repaired by the next one", asyn
     },
   );
   assert.ok(tried >= 6, `write boundaries tried: ${tried}`);
+  t.diagnostic(`write boundaries: ${tried}`);
 });

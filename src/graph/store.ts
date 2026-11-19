@@ -251,12 +251,26 @@ export class SqliteGraphStore implements GraphStorage {
       return statement;
     };
   }
+  /** An index run's mark (C-22): to write with its first write, or written. */
+  private indexRun: "idle" | "pending" | "written" = "idle";
   private transaction(action: () => void): void {
     this.beforeWrite();
     this.db.exec("BEGIN IMMEDIATE");
     try {
+      const marking = this.indexRun === "pending";
+      if (marking) {
+        this.db
+          .prepare(
+            "INSERT INTO graph_meta VALUES ('index-run','unfinished') ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+          )
+          .run();
+        this.db
+          .prepare("DELETE FROM graph_meta WHERE key='command-complete'")
+          .run();
+      }
       action();
       this.db.exec("COMMIT");
+      if (marking) this.indexRun = "written";
     } catch (error) {
       this.db.exec("ROLLBACK");
       throw error;
@@ -479,9 +493,15 @@ export class SqliteGraphStore implements GraphStorage {
       );
   }
   removeFile(path: string): void {
-    this.beforeWrite();
     count("store.filesRemoved");
-    this.db.prepare("DELETE FROM graph_files WHERE path=?").run(path);
+    const remove = () =>
+      this.db.prepare("DELETE FROM graph_files WHERE path=?").run(path);
+    // The first write of an index run carries its mark.
+    if (this.indexRun === "pending") this.transaction(remove);
+    else {
+      this.beforeWrite();
+      remove();
+    }
   }
   findSymbols(query: SymbolQuery = {}): GraphSymbol[] {
     const conditions: string[] = [];
@@ -884,27 +904,23 @@ export class SqliteGraphStore implements GraphStorage {
       .get();
   }
   /**
-   * Marks an index run as begun, in a commit before the run's first write.
-   * Commits survive a crash only as a prefix, so any write of the run that
-   * survives has the mark with it. Removes the completion record with it.
+   * Begins an index run. The mark is written in the same commit as the
+   * run's first write, with the completion record's removal, so a run that
+   * writes nothing leaves the file as it was, and any write of the run that
+   * survives a crash has the mark with it.
    */
   beginIndexRun(): void {
-    this.transaction(() => {
-      this.db
-        .prepare(
-          "INSERT INTO graph_meta VALUES ('index-run','unfinished') ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-        )
-        .run();
-      this.db
-        .prepare("DELETE FROM graph_meta WHERE key='command-complete'")
-        .run();
-    });
+    // A mark left by an unfinished run is this run's to clear.
+    this.indexRun = this.unfinishedIndexRun() ? "written" : "pending";
   }
-  /** Clears the mark, in the run's last commit. */
+  /** Clears the mark, in the run's last commit, if the run wrote it. */
   finishIndexRun(): void {
-    this.transaction(() => {
-      this.db.prepare("DELETE FROM graph_meta WHERE key='index-run'").run();
-    });
+    const written = this.indexRun === "written";
+    this.indexRun = "idle";
+    if (written)
+      this.transaction(() => {
+        this.db.prepare("DELETE FROM graph_meta WHERE key='index-run'").run();
+      });
   }
   commandDataVersion(): number {
     return Number(this.db.prepare("PRAGMA data_version").get()!.data_version);
