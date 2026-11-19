@@ -59,9 +59,14 @@ const nameBuildingPackages = new Set([
   "automod",
   "concat-idents",
   "duplicate",
+  "error-chain",
   "paste",
   "pastey",
   "seq-macro",
+  "slint",
+  "tonic",
+  "uniffi",
+  "wit-bindgen",
 ]);
 const opaqueMacroNames = new Set([
   "concat_idents",

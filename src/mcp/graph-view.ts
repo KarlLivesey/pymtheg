@@ -378,14 +378,8 @@ export class GraphView {
           this.tables.legend!.push({
             code,
             field,
-            value: clip(
-              description
-                ? `${v}. ${description}`
-                : typeof v === "string"
-                  ? v
-                  : JSON.stringify(v),
-              400,
-            ),
+            value: clip(typeof v === "string" ? v : JSON.stringify(v), 400),
+            ...(description ? { description } : {}),
             detailRef: this.detail(code, {
               field,
               value: v,

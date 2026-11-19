@@ -67,7 +67,7 @@ test("Rust ecosystem macro identity: captured lock changes re-resolve cached sou
     );
     await writeFile(
       join(root, "src/lib.rs"),
-      '#[cfg(feature="x")]pub mod child;pub fn helper()->u32{11}pub fn run()->u32{tracing::info!("x");helper()}',
+      '#[cfg(feature="x")]pub mod child;pub fn helper()->u32{11}pub fn run()->u32{let value=1;tracing::info!("{}",value);helper()}',
     );
     await writeFile(
       join(root, "src/child.rs"),

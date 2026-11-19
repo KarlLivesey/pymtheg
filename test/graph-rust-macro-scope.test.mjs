@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import { contentHash, fileFacts, validateResult } from "../dist/graph/index.js";
 import rust from "../dist/graph/languages/rust/index.js";
+import { GraphView } from "../dist/mcp/graph-view.js";
 
 async function observations(text, dependencies = "") {
   const path = "src/lib.rs";
@@ -63,6 +64,23 @@ async function observations(text, dependencies = "") {
 
 const proved = (target) => ({ target, assumes: [] });
 const assumed = (target) => ({ target, assumes: ["rust-external-macro-name"] });
+
+test("the MCP legend describes the restricted Rust macro assumption", () => {
+  const view = new GraphView({
+    data: {
+      links: [{ id: "link", data: { assumes: assumed("outside").assumes } }],
+    },
+    failedFiles: [],
+    staleFiles: [],
+    warnings: [],
+    modules: [],
+    sync: {},
+  });
+  const [entry] = view.page("legend", 0, 1).items;
+  assert.equal(entry.value, "rust-external-macro-name");
+  assert.match(entry.description, /must receive an item-name identifier/);
+  assert.match(entry.description, /whole case-insensitive components/);
+});
 
 test("local macro item names include literal and forwarded metavariable names", async () => {
   const at = await observations(
@@ -131,6 +149,38 @@ test("a file or literal-only external macro input supplies no item-name evidence
   );
   for (const marker of ["// proto", "// sql", "// path", "// literal"])
     assert.deepEqual(at("types", "Option", marker), proved(null));
+});
+
+test("external generator packages stay opaque even with identifier input", async () => {
+  const at = await observations(
+    `
+    mod errors {
+      error_chain::error_chain! { errors { BadPath {} } }
+      fn generated() -> Result<()> { Ok(()) } // error chain
+    }
+    mod scaffold {
+      uniffi::setup_scaffolding!(Library);
+      fn generated() -> Option<u8> { None } // uniffi
+    }
+    mod bindings {
+      wit_bindgen::generate!({ world: Library });
+      fn generated() -> Option<u8> { None } // wit
+    }
+    mod ui {
+      slint::include_modules!(Library);
+      fn generated() -> Option<u8> { None } // slint
+    }
+    mod rpc {
+      tonic::include_proto!(Library);
+      fn generated() -> Option<u8> { None } // tonic
+    }
+  `,
+    'error-chain="0.12"\nuniffi="0.29"\nwit-bindgen="0.51"\nslint="1"\ntonic="0.14"',
+  );
+  assert.deepEqual(at("types", "Result", "// error chain"), proved(null));
+  for (const marker of ["// uniffi", "// wit", "// slint", "// tonic"]) {
+    assert.deepEqual(at("types", "Option", marker), proved(null));
+  }
 });
 
 test("attribute and derive inputs bound whole components of item names", async () => {

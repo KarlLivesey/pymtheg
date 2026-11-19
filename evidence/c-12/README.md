@@ -1,5 +1,8 @@
 # C-12 Rust macro scope evidence
 
+The tables below record the earlier C-12 comparison. The review replay
+records the tightened proof and assumption rules. [Review measurements](review-3.md)
+
 ## Pinned coverage
 
 The original 18 finished Rust pins completed on both builds. The final sweep
@@ -186,13 +189,10 @@ type check, format check, all 3,076 tests on memory-backed scratch, and all
 
 ## Coverage plan
 
-The 286,986-byte cumulative archive contains the accepted reference rows,
-the C-8 Go rows, the 18 final C-11 TypeScript rows, and the C-12 Rust
-candidate rows. The regeneration test reproduced the entire committed plan
-byte for byte. The plan's language totals include links from mixed-language
-pins, so its TypeScript total also reflects the Go and Rust rows in this
-archive. The first table here follows the original 18 Rust pins.
-[Plan input](../../sweep/plan-input.json.gz) · [Regeneration command](../../sweep/README.md#reproduce-the-committed-plan)
+The archive supplies the Rust section of the plan. The regeneration test
+checks that section and preserves the Go and TypeScript sections byte for
+byte. The first table here follows the original 18 Rust pins.
+[Plan input](../../sweep/plan-input.json.gz) · [Regeneration command](../../sweep/README.md#reproduce-the-committed-rust-plan)
 
 ## Supplemental pins
 
