@@ -682,14 +682,18 @@ makes that whole manifest unknown). Private items are ordinary symbols.
 
 Grammar: the module loads `grammars/rust/tree-sitter-rust.wasm`, built by
 Pymtheg from upstream `tree-sitter-rust` v0.24.2 plus six upstream pull requests
-and two patches of its own (`grammars/README.md`). It reads `&raw` borrows and a
-variable named `raw`, `unsafe extern "C" { … }` with `safe fn`, and `#[cfg]` on
-a struct-pattern field. It still rejects some valid Rust, which fails the whole
-file (3 files of Vector): two or more attributes on one parameter or an
-attribute on a closure parameter (a single attribute on a function or method
-parameter parses), a turbofish on a function named like a primitive
-(`char::<_, E>(…)`), and `impl A + for<'a> B<'a>`. Sources:
-[W2-C](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-C.md), [W2-P](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-P.md), [W2-V](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-V.md).
+and eight patches of its own (`grammars/README.md`). It reads `&raw` borrows and a
+variable named `raw`, `unsafe extern "C" { … }` with `safe fn`, `#[cfg]` on
+a struct-pattern field, macros named like primitives (`str![[r#"…"#]]`), a
+lifetime first in `dyn` bounds (`dyn 'a + Display`), any number of attributes
+on function and closure parameters, nightly `box` patterns, `where dyn Trait:`,
+and a turbofish in a struct pattern. It still rejects some valid Rust, which
+fails the whole file: a turbofish on a function named like a primitive
+(`char::<_, E>(…)`), `impl A + for<'a> B<'a>` (2 files of Vector), a
+numbered field in a struct pattern (`S { 0: x }`, 5 generated swc files), an
+attribute on a later tuple element, a `()` type in a where clause, and the
+other shapes in `test/fixtures/rust-grammar/remaining/`. Sources:
+[W2-C](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-C.md), [W2-P](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-P.md), [W2-V](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-V.md), [C-21](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/C-21.md).
 
 #### TypeScript and JavaScript
 

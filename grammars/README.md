@@ -75,11 +75,32 @@ not upstream):
    function signature or a static item. `safe` stays an ordinary identifier
    everywhere else, unlike upstream PR #256, which reserves it.
 
-Both patches carry their own `test/corpus` cases, which run with upstream's in
-the build. v0.24.2 itself already reads `&raw` on a variable named `raw` and
+Then six more of our own from C-21 (`docs/changes/C-21.md`), each for valid
+Rust the grammar rejected in the sweep pins; each patch file starts with a
+header naming the Rust reference section and any upstream issue or pull
+request:
+
+9. `0009-own-primitive-named-macros.patch`: a macro named like a primitive
+   type (`str![[r#"…"#]]`, snapbox; upstream issue #322), and a primitive type
+   name with generic arguments as a type path (`&str<u8, el>` in proc-macro
+   input).
+10. `0010-own-dyn-lifetime-first.patch`: a lifetime first in `dyn` bounds
+    (`dyn 'a + Display`), read as `dynamic_type(trait: bounded_type(lifetime,
+…))` as upstream #258 does for `impl`.
+11. `0011-own-parameter-attributes.patch`: several attributes on a function
+    parameter (upstream issue #276) and attributes on closure parameters.
+12. `0012-own-box-patterns.patch`: nightly `box` patterns (`box_patterns`), as
+    a `box_pattern` node around the inner pattern (upstream #14, closed PR #83).
+13. `0013-own-where-dyn.patch`: `where dyn Trait: Bound`.
+14. `0014-own-struct-pattern-turbofish.patch`: a turbofish in a struct pattern
+    (`let S::<T> { .. } = ..`), the struct-pattern line of upstream PR #301.
+
+All eight own patches carry their own `test/corpus` cases, which run with
+upstream's in the build. v0.24.2 itself already reads `&raw` on a variable named `raw` and
 `unsafe extern` blocks. Not taken: PR #256 (it makes `safe` a reserved word,
 and 29 registry files that use `safe` as a parameter, field or macro name
 break) and PR #297 (it breaks `macro_rules` used as an identifier; W2-P).
-Built with the same tools as Go. Three builds from these inputs gave the same
-bytes: the scratch build the corpus scans used, the `--write` build and the
-verify run in `evidence/w2-v/build-verify.txt`.
+Built with the same tools as Go. W2-V's three builds of patches 0001–0008 gave
+the same bytes (`evidence/w2-v/build-verify.txt`). With 0009–0014 the
+`--write` build and the verify run gave the same bytes, sha256 `421c975a…`
+(`evidence/c-21/build-verify.txt`); the corpus scans used that file.
