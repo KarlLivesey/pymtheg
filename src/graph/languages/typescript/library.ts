@@ -15,6 +15,7 @@ interface Unit {
   ecosystem: string;
   unit: string;
   subpath?: string;
+  registry?: true;
   pin?: { version: string; versionSource: string };
 }
 
@@ -41,6 +42,7 @@ function registryUnit(specifier: string): Unit | undefined {
   return {
     ecosystem: match[1] === "jsr:" ? "jsr" : "npm",
     unit: match[2]!,
+    ...(match[1] && { registry: true }),
     ...(match[4] ? { subpath: match[4] } : {}),
   };
 }
@@ -99,7 +101,9 @@ function registryDependency(name: string, value: string) {
   const actual = alias ? alias[1]! : name;
   const range = alias ? (alias[2] ?? "*") : value;
   const unit = registryUnit(actual);
-  return unit && registryRange(range) ? { unit: unit.unit, range } : undefined;
+  return unit && registryRange(range)
+    ? { unit: unit.unit, range, alias: !!alias }
+    : undefined;
 }
 
 export function bundledLibraryUnit(filename: string): Unit {
@@ -332,7 +336,7 @@ export function libraryReader(
           if (!route) return undefined;
           const source =
             typeof raw === "string" && raw.startsWith("catalog:")
-              ? posix.join(root, "pnpm-workspace.yaml")
+              ? catalog!.source
               : declared.owner.path;
           return { ...route, source };
         });
@@ -348,7 +352,13 @@ export function libraryReader(
           )
             ? { version: first.range, versionSource: first.source }
             : undefined;
-        return { ...unit, unit: first.unit, ...(pin && { pin }) };
+        return {
+          ...unit,
+          unit: first.unit,
+          ...(first.alias &&
+            rest.every((entry) => entry?.alias) && { registry: true as const }),
+          ...(pin && { pin }),
+        };
       };
       const routes = new Map<string, readonly Unit[]>();
       const declaredDependencies = new Map<Manifest, boolean>();
@@ -404,6 +414,7 @@ export function libraryReader(
         localPackage(unit: Unit) {
           return (
             unit.ecosystem !== "node" &&
+            !unit.registry &&
             (packageNames.has(unit.unit) ||
               chain.some((owner) =>
                 dependencyValues(owner, unit.unit).some((value) =>

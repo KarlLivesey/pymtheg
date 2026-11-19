@@ -578,7 +578,7 @@ test("Node runtime evidence in a JavaScript file keeps shared globals open", asy
   );
 });
 
-test("npm aliases and captured pnpm catalogs prove the registry name and exact pin", async () => {
+test("npm aliases and captured workspace catalogs prove the registry name and exact pin", async () => {
   await project(
     {
       "package.json": '{"packageManager":"pnpm@10.0.0"}',
@@ -595,6 +595,7 @@ catalogs:
         dependencies: {
           "react-is-18": "npm:react-is@18.3.1",
           "range-alias": "npm:@scope/range@^4",
+          "local-name-alias": "npm:@sample/local@3.0.0",
           "git-alias": "github:example/fixture",
           "tar-alias": "https://example.test/archive.tgz",
           "default-alias": "catalog:",
@@ -606,15 +607,26 @@ catalogs:
       "packages/local/package.json":
         '{"name":"@sample/local","main":"index.ts"}',
       "packages/local/index.ts": "export function local() {}",
+      "bun/package.json": JSON.stringify({
+        packageManager: "bun@1.3.11",
+        workspaces: {
+          packages: ["apps/*"],
+          catalog: { effect: "4.0.0-beta.59" },
+        },
+      }),
+      "bun/apps/server/package.json":
+        '{"name":"@sample/server","dependencies":{"effect":"catalog:"}}',
+      "bun/apps/server/use.ts": "import { run } from 'effect'; run();",
       "packages/pretty-format/use.ts": `import * as ReactIs18 from 'react-is-18';
         import { run as nested } from 'range-alias/sub';
+        import { local as installed } from 'local-name-alias';
         import { run as fromGit } from 'git-alias';
         import { run as fromTar } from 'tar-alias';
         import { run as fromDefault } from 'default-alias';
         import { run as fromNamed } from 'scoped-alias';
         import { run as fromAbsent } from 'absent-alias';
         import { local } from 'linked-alias';
-        ReactIs18.isElement({}); nested(); fromGit(); fromTar();
+        ReactIs18.isElement({}); nested(); fromGit(); fromTar(); installed();
         fromDefault(); fromNamed(); fromAbsent(); local();`,
     },
     async (graph, report) => {
@@ -638,6 +650,25 @@ catalogs:
         symbol: "sub:run",
         evidence: "import-binding",
       });
+      assert.deepEqual(libraryTarget(call("installed")), {
+        ecosystem: "npm",
+        unit: "@sample/local",
+        symbol: "local",
+        evidence: "import-binding",
+        version: "3.0.0",
+        versionSource: "packages/pretty-format/package.json",
+      });
+      assert.deepEqual(
+        libraryTarget(graph.link("bun/apps/server/use.ts", "run", "calls")),
+        {
+          ecosystem: "npm",
+          unit: "effect",
+          symbol: "run",
+          evidence: "import-binding",
+          version: "4.0.0-beta.59",
+          versionSource: "bun/package.json",
+        },
+      );
       for (const [name, unit, version] of [
         ["fromDefault", "real-default", "2.0.1"],
         ["fromNamed", "@scope/real", "3.1.0"],

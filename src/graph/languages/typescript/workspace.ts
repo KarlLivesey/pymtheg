@@ -32,7 +32,11 @@ export const registryRange = (value: string): boolean =>
   /^[a-z][\w.-]*$/i.test(value) || !!semver.VersionRange.tryParse(value);
 
 type Catalog = ReadonlyMap<string, ReadonlyMap<string, string>>;
-export type WorkspaceCatalogs = ReadonlyMap<string, Catalog>;
+interface WorkspaceCatalog {
+  source: string;
+  entries: Catalog;
+}
+export type WorkspaceCatalogs = ReadonlyMap<string, WorkspaceCatalog>;
 
 /** Capture plain block catalogs. Indirection or duplicate keys leave the catalog unverified. */
 function readCatalogs(text: string): Catalog {
@@ -95,12 +99,31 @@ function readCatalogs(text: string): Catalog {
 }
 
 export function dependencyFromCatalog(
-  catalog: Catalog | undefined,
+  catalog: WorkspaceCatalog | undefined,
   name: string,
   value: string,
 ): string | undefined {
   if (!value.startsWith("catalog:")) return value;
-  return catalog?.get(value.slice("catalog:".length) || "default")?.get(name);
+  return catalog?.entries
+    .get(value.slice("catalog:".length) || "default")
+    ?.get(name);
+}
+
+/** Bun records default and named catalogs in the root workspace manifest. */
+function bunCatalogs(workspaces: unknown): Catalog {
+  const { catalog, catalogs } = record(workspaces);
+  const named = Object.entries(record(catalogs));
+  if (catalog !== undefined) named.push(["default", catalog]);
+  const result = new Map<string, Map<string, string>>();
+  for (const [name, raw] of named) {
+    if (result.has(name)) return new Map();
+    const entries = new Map<string, string>();
+    for (const [key, value] of Object.entries(record(raw)))
+      if (validPackageName(key) && typeof value === "string" && value)
+        entries.set(key, value);
+    result.set(name, entries);
+  }
+  return result;
 }
 const checkoutPath = (directory: string, path: string): string | undefined => {
   if (!path || path.startsWith("/") || path.includes("\\")) return undefined;
@@ -217,12 +240,12 @@ export function workspaceLinks(
     }
   >();
   const pnpmFiles = new Set<string>();
-  const catalogs = new Map<string, Catalog>();
+  const catalogs = new Map<string, WorkspaceCatalog>();
   for (const file of contexts) {
     if (posix.basename(file.path) !== "pnpm-workspace.yaml") continue;
     const root = posix.dirname(file.path);
     pnpmFiles.add(root);
-    catalogs.set(root, readCatalogs(file.text));
+    catalogs.set(root, { source: file.path, entries: readCatalogs(file.text) });
     const settings = pnpmSettings(file.text);
     if (settings) {
       noteIncomplete(root, settings.patterns);
@@ -254,6 +277,11 @@ export function workspaceLinks(
         hoist: yarnMajor === undefined || Number(yarnMajor) < 2,
         linkVersions: false,
       });
+      if (/^bun@/.test(String(json.packageManager)))
+        catalogs.set(root, {
+          source: posix.join(root, "package.json"),
+          entries: bunCatalogs(declared),
+        });
     }
   }
   const add = (directory: string, name: string, target: string) =>

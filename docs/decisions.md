@@ -2674,7 +2674,7 @@ compiler's explicit ambient types selection takes precedence over manifest
 inference. Source type references and positive file-local Node runtime evidence
 count independently. Missing environment types can overlap web declarations.
 Missing test and tooling types affect their own documented globals. An npm
-alias or captured pnpm catalog supplies the registry name and can supply an
+alias or captured pnpm or Bun catalog supplies the registry name and can supply an
 exact pin with its source path.
 
 ### Rust locals, generic parameters and inferred receivers (C-10)
