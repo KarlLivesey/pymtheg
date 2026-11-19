@@ -6,7 +6,8 @@ A trait object's bounds may list the lifetime before the trait. Read as
 PR #258 gives `impl 'a + Trait`. `dyn Trait + 'a` keeps its old tree.
 Reference: https://doc.rust-lang.org/reference/types/trait-object.html
 Upstream: no issue or pull request for `dyn`; PR #258 (merged) did `impl`:
-https://github.com/tree-sitter/tree-sitter-rust/pull/258
+https://github.com/tree-sitter/tree-sitter-rust/pull/258 (fixing issue #234,
+https://github.com/tree-sitter/tree-sitter-rust/issues/234).
 
 diff --git a/grammar.js b/grammar.js
 index eda28f1..36770d8 100644

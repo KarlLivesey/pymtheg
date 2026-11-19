@@ -119,7 +119,8 @@
       "author": "Pymtheg C-21 (not upstream)",
       "what": "A lifetime first in a trait object's bounds (`dyn 'a + Display`, `dyn 'static + for<'a> FnMut(..)`), read as `dynamic_type(trait: bounded_type(lifetime, ..))` like upstream #258 does for `impl`; `dyn T + 'a` keeps its old tree",
       "upstreamReferences": [
-        "https://github.com/tree-sitter/tree-sitter-rust/pull/258"
+        "https://github.com/tree-sitter/tree-sitter-rust/pull/258",
+        "https://github.com/tree-sitter/tree-sitter-rust/issues/234"
       ],
       "paths": [
         "grammar.js",
@@ -132,7 +133,8 @@
       "author": "Pymtheg C-21 (not upstream)",
       "what": "Any number of outer attributes on a function parameter (`#[rustfmt::skip] #[cfg(..)] x: T`), and outer attributes on closure parameters (`|#[allow(unused)] x| ..`)",
       "upstreamReferences": [
-        "https://github.com/tree-sitter/tree-sitter-rust/issues/276"
+        "https://github.com/tree-sitter/tree-sitter-rust/issues/276",
+        "https://github.com/tree-sitter/tree-sitter-rust/issues/229"
       ],
       "paths": [
         "grammar.js",
@@ -143,7 +145,7 @@
       "file": "patches/0012-own-box-patterns.patch",
       "origin": "pymtheg",
       "author": "Pymtheg C-21 (not upstream)",
-      "what": "Nightly `box` patterns (`box_patterns` feature: `Err(box E::A { .. })`) as a `box_pattern` node holding the inner pattern",
+      "what": "Nightly `box` patterns (`box_patterns` feature: `Err(box E::A { .. })`) as a `box_pattern` node holding the inner pattern; written independently of upstream's closed PR #83",
       "upstreamReferences": [
         "https://github.com/tree-sitter/tree-sitter-rust/issues/14",
         "https://github.com/tree-sitter/tree-sitter-rust/pull/83"
@@ -158,7 +160,9 @@
       "origin": "pymtheg",
       "author": "Pymtheg C-21 (not upstream)",
       "what": "A trait object on the left of a where predicate (`where dyn Trait: Bound`)",
-      "upstreamReferences": [],
+      "upstreamReferences": [
+        "https://github.com/tree-sitter/tree-sitter-rust/issues/229"
+      ],
       "paths": [
         "grammar.js",
         "test/corpus/pymtheg_where_dyn.txt"
@@ -170,7 +174,8 @@
       "author": "Pymtheg C-21 (not upstream)",
       "what": "A turbofish in a struct pattern's path (`let S::<T> { .. } = ..`), as tuple-struct patterns already allow; the grammar part of upstream PR #301 (not taken whole: its attribute change overlaps PR #319)",
       "upstreamReferences": [
-        "https://github.com/tree-sitter/tree-sitter-rust/pull/301"
+        "https://github.com/tree-sitter/tree-sitter-rust/pull/301",
+        "https://github.com/tree-sitter/tree-sitter-rust/pull/254"
       ],
       "paths": [
         "grammar.js",

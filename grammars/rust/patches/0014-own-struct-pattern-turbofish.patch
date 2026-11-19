@@ -7,7 +7,8 @@ pattern's already may (upstream PR #254). Read as
 Reference: https://doc.rust-lang.org/reference/patterns.html#struct-patterns
 Upstream pull request: https://github.com/tree-sitter/tree-sitter-rust/pull/301
 (open; this is its struct-pattern grammar line only; its attribute change
-overlaps PR #319, already taken as patch 0001).
+overlaps PR #319, already taken as patch 0001). Tuple-struct patterns got
+the turbofish in https://github.com/tree-sitter/tree-sitter-rust/pull/254.
 
 diff --git a/grammar.js b/grammar.js
 index f812aa8..0cb98dc 100644

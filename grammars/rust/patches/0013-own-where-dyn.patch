@@ -4,7 +4,10 @@ Accepts valid Rust: a trait object type on the left of a where predicate
 (`where dyn CipherSuiteSelector: VersionSuiteSelector<T>,`). Any type may be
 bounded there; this adds `dynamic_type` to the types upstream lists.
 Reference: https://doc.rust-lang.org/reference/items/generics.html#where-clauses
-Upstream: no issue or pull request found.
+Upstream: no issue or pull request for this shape. The open meta issue
+https://github.com/tree-sitter/tree-sitter-rust/issues/229 lists rustc's
+tests/ui/trivial-bounds/trivial-bounds-object.rs, whose `where dyn A + 'static: A`
+(a bounded trait object on the left) this patch does not cover.
 
 diff --git a/grammar.js b/grammar.js
 index 3e5e0e0..f812aa8 100644

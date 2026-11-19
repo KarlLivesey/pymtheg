@@ -90,7 +90,8 @@ request:
 11. `0011-own-parameter-attributes.patch`: several attributes on a function
     parameter (upstream issue #276) and attributes on closure parameters.
 12. `0012-own-box-patterns.patch`: nightly `box` patterns (`box_patterns`), as
-    a `box_pattern` node around the inner pattern (upstream #14, closed PR #83).
+    a `box_pattern` node around the inner pattern (upstream #14; written
+    independently of the closed, unmerged PR #83 "Add box patterns").
 13. `0013-own-where-dyn.patch`: `where dyn Trait: Bound`.
 14. `0014-own-struct-pattern-turbofish.patch`: a turbofish in a struct pattern
     (`let S::<T> { .. } = ..`), the struct-pattern line of upstream PR #301.

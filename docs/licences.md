@@ -135,7 +135,7 @@ built bundle's source maps independently, so emitted code from an unlisted origi
   - `patches/0009-own-primitive-named-macros.patch` — own patch (Pymtheg): A macro named like a primitive type (`str![...]`, `u8!(...)`; macros have their own namespace), and a primitive type name with generic arguments as a type path (`&str<u8, el>`, valid syntax in proc-macro input)
   - `patches/0010-own-dyn-lifetime-first.patch` — own patch (Pymtheg): A lifetime first in a trait object's bounds (`dyn 'a + Display`, `dyn 'static + for<'a> FnMut(..)`), read as `dynamic_type(trait: bounded_type(lifetime, ..))` like upstream #258 does for `impl`; `dyn T + 'a` keeps its old tree
   - `patches/0011-own-parameter-attributes.patch` — own patch (Pymtheg): Any number of outer attributes on a function parameter (`#[rustfmt::skip] #[cfg(..)] x: T`), and outer attributes on closure parameters (`|#[allow(unused)] x| ..`)
-  - `patches/0012-own-box-patterns.patch` — own patch (Pymtheg): Nightly `box` patterns (`box_patterns` feature: `Err(box E::A { .. })`) as a `box_pattern` node holding the inner pattern
+  - `patches/0012-own-box-patterns.patch` — own patch (Pymtheg): Nightly `box` patterns (`box_patterns` feature: `Err(box E::A { .. })`) as a `box_pattern` node holding the inner pattern; written independently of upstream's closed PR #83
   - `patches/0013-own-where-dyn.patch` — own patch (Pymtheg): A trait object on the left of a where predicate (`where dyn Trait: Bound`)
   - `patches/0014-own-struct-pattern-turbofish.patch` — own patch (Pymtheg): A turbofish in a struct pattern's path (`let S::<T> { .. } = ..`), as tuple-struct patterns already allow; the grammar part of upstream PR #301 (not taken whole: its attribute change overlaps PR #319)
 

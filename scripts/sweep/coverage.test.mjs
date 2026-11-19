@@ -34,7 +34,7 @@ test("the plan input regenerates Rust and preserves the other sections", () => {
   assert.notEqual(old, checkedIn.toString("utf8"));
   writeFileSync(plan, old);
   try {
-    execFileSync(process.execPath, ["scripts/sweep/coverage.mjs", "--results", "evidence/c-18/coverage-plan-input.json.gz",
+    execFileSync(process.execPath, ["scripts/sweep/coverage.mjs", "--results", "sweep/plan-input.json.gz",
       "--plan", plan, "--rust-section"], { cwd: root });
     assert.ok(readFileSync(plan).equals(checkedIn), "regenerated coverage plan differs");
   } finally {

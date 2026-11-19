@@ -2879,7 +2879,13 @@ async function createHelper(): Promise<Helper> {
               ? ["identifier"]
               : []),
             ...(n.type === "scoped_identifier" &&
-            /pattern/.test(n.parent?.type ?? "")
+            (/pattern/.test(n.parent?.type ?? "") ||
+              // C-21: a qualified turbofish pattern head (`a::S::<T> { .. }`,
+              // `a::S::<T>(..)`) sits under the pattern's generic_type.
+              (n.parent?.type === "generic_type" &&
+                field(n.parent, "type")?.id === n.id &&
+                /pattern/.test(n.parent.parent?.type ?? "") &&
+                field(n.parent.parent!, "type")?.id === n.parent.id))
               ? ["scoped_identifier"]
               : []),
           ].includes(n.type) &&

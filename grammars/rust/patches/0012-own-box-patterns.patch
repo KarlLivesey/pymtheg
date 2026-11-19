@@ -6,9 +6,10 @@ is the inner pattern. Not stable Rust; real crates built on nightly write it.
 `box` is a reserved keyword in every edition, so no valid code binds it.
 Reference: https://doc.rust-lang.org/unstable-book/language-features/box-patterns.html
            https://doc.rust-lang.org/reference/keywords.html#reserved-keywords
-Upstream issue: https://github.com/tree-sitter/tree-sitter-rust/issues/14
-(closed); pull request https://github.com/tree-sitter/tree-sitter-rust/pull/83
-(closed without merge, 2024).
+Written independently of upstream's closed pull request "Add box patterns",
+https://github.com/tree-sitter/tree-sitter-rust/pull/83 (closed without merge,
+2024; same node name), for issue
+https://github.com/tree-sitter/tree-sitter-rust/issues/14 (closed).
 
 diff --git a/grammar.js b/grammar.js
 index 84b41ee..3e5e0e0 100644

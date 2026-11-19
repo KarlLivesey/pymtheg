@@ -8,7 +8,10 @@ directly before their parameter, as a single attribute already was.
 Reference: https://doc.rust-lang.org/reference/items/functions.html#attributes-on-function-parameters
            https://doc.rust-lang.org/reference/expressions/closure-expr.html#attributes-on-closure-parameters
 Upstream issue: https://github.com/tree-sitter/tree-sitter-rust/issues/276
-(open, function parameters). No upstream pull request.
+(open, function parameters); the open meta issue
+https://github.com/tree-sitter/tree-sitter-rust/issues/229 lists rustc's
+tests/ui/rfcs/rfc-2565-param-attrs/param-attrs-allowed.rs. No upstream pull
+request.
 
 diff --git a/grammar.js b/grammar.js
 index 36770d8..84b41ee 100644
