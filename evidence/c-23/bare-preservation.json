@@ -1,0 +1,52 @@
+[
+  {
+    "pin": "colinhacks/zod",
+    "allLinks": 81042,
+    "definite": 68565,
+    "symbols": 12135,
+    "symbolChanges": 0,
+    "changedOutcomes": 0,
+    "lostSites": 0,
+    "addedSites": 0
+  },
+  {
+    "pin": "nestjs/nest",
+    "allLinks": 165330,
+    "definite": 126116,
+    "symbols": 19464,
+    "symbolChanges": 0,
+    "changedOutcomes": 0,
+    "lostSites": 0,
+    "addedSites": 0
+  },
+  {
+    "pin": "pingdotgg/t3code",
+    "allLinks": 162711,
+    "definite": 129914,
+    "symbols": 30346,
+    "symbolChanges": 0,
+    "changedOutcomes": 0,
+    "lostSites": 0,
+    "addedSites": 0
+  },
+  {
+    "pin": "pmndrs/zustand",
+    "allLinks": 7099,
+    "definite": 5147,
+    "symbols": 598,
+    "symbolChanges": 0,
+    "changedOutcomes": 0,
+    "lostSites": 0,
+    "addedSites": 0
+  },
+  {
+    "pin": "yargs/yargs",
+    "allLinks": 12205,
+    "definite": 5286,
+    "symbols": 1180,
+    "symbolChanges": 0,
+    "changedOutcomes": 0,
+    "lostSites": 0,
+    "addedSites": 0
+  }
+]
