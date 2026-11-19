@@ -814,6 +814,23 @@ answer.
   such as `@tsconfig/node20` leaves most cross-file links unresolved), compiler
   stack limits on some lookups, or `require`/`module`/`exports` uses that cannot
   be decided statically.
+- **Files the compiler or memory cannot take (C-13):** a file the TypeScript
+  compiler throws on while analysing it (an assertion such as "Debug Failure.
+  False expression.") fails alone, with the compiler's message as the reason,
+  and its program is rebuilt without it; after 100 such files a program's
+  remaining files fail with that reason. A project (a config's files, or the
+  files no config includes) with more than 50,000,000 characters of source
+  leaves out its largest files, failed with the reason, until the rest fits
+  in one program. Both are failed files under the rule below. A
+  `package.json` that starts with a UTF-8 byte-order mark is read. Finding
+  which links depend on a program's failed files has a deterministic budget
+  of 8,000,000 steps. When it is reached, every link of that program that
+  could have a target is unresolved with `taint-budget-exhausted`, except
+  links that bind a failed file directly, which stay `invalid-code`; no pin
+  outside microsoft/TypeScript comes near it. The program budget counts
+  every checkout file a program loads, imported files included; a file past
+  it is left out of that program only (installed declarations have their
+  own budget).
 - **A program that contains a failed file:** the failed file is absent;
   `invalid-code` with a cause is best-effort attribution. Links computed
   without the failed file carry `assumes: ["no-unseen-declarations"]`.
