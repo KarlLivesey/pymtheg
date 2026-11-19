@@ -24,7 +24,8 @@ const wrap = (name, after, when = () => true) => {
   };
 };
 let files = 0;
-if (point === "open") wrap("invalidateGraphCommandState", false);
+// Opened and about to index: the data version is read before any write.
+if (point === "open") wrap("commandDataVersion", false);
 else if (point === "file") {
   wrap("replaceFile", false, () => {
     files++;

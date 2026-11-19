@@ -2944,8 +2944,10 @@ the next run re-analyses
 (another install hard-linking the same pnpm store file changed its ctime and
 made it absent, so a warm sweep index lost `expect-type` declarations; a
 first fix let two programs of one run see different bytes). An index run
-marks the store in its first write's commit and clears the mark in its last
-commit; a run that finds the mark reuses no stored analysis, and the graph
+marks the store with its own identifier in its first write's commit, proves
+at every later commit that the mark is still its own (an overtaken run stops
+without writing), and clears only its own mark in its last commit; a no-edit
+`graph index` through the command path writes nothing; a run that finds the mark reuses no stored analysis, and the graph
 is not complete while it is set. **Trade:** after a crash or kill the next
 index re-analyses every module in full once (today's cost of a changed
 `tsconfig.json`); a per-file record of which snapshot its analysis came

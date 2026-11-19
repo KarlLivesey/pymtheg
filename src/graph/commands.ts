@@ -244,8 +244,12 @@ export async function executeGraph(
     let durationMs: number | null = null;
     if (shouldIndex) {
       store ??= new SqliteGraphStore(storagePath(root, "graph", true));
-      store.invalidateGraphCommandState();
-      const dataVersion = store.commandDataVersion();
+      // No completion is removed up front: an index run removes it in the
+      // same commit as its first write, so a run that changes nothing
+      // writes nothing (C-6, C-22). A run that ends without completing
+      // removes it below. The store refuses a completion if another index
+      // run has begun writing since this one began; the data version, read
+      // when the run has finished, covers writes after it.
       const currentStore = store;
       let captured = 0,
         parsed = 0;
@@ -364,6 +368,7 @@ export async function executeGraph(
           : {}),
       });
       signal.throwIfAborted();
+      const dataVersion = store.commandDataVersion();
       durationMs = performance.now() - started;
       exists = true;
       // A second hash check reports edits made during a long index instead of claiming freshness.
@@ -397,6 +402,7 @@ export async function executeGraph(
           },
           dataVersion,
         );
+      else store.invalidateGraphCommandState();
       options.progress?.({ phase: "complete", done: total, total });
     }
     const finish = (): GraphResponse => {

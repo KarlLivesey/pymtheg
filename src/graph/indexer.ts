@@ -130,13 +130,15 @@ export async function indexProject(
   }
   await stage("index.walk", () => walk(""));
   paths.sort(compare);
+  // The run begins before it reads the store, so that any other run's write
+  // from here on stops this one before it writes (C-22). A mark found here
+  // belongs to a run that did not finish or is still running: it may have
+  // replaced some files' records and not others, while each still matches
+  // its source hash, so nothing it touched can be trusted as unchanged.
+  const unfinished = (await store.beginIndexRun?.()) === true;
   // Storage reads are deliberately outside all source/module error catches, before any writes.
   const oldFiles = await stage("index.previous", () => summaries(store));
   const oldContexts = await stage("index.previous", () => store.contexts());
-  // A run that began writing and did not finish may have replaced some
-  // files' records and not others, while each still matches its source hash:
-  // nothing it touched can be trusted as unchanged (C-22).
-  const unfinished = (await store.unfinishedIndexRun?.()) === true;
   const claims = new Map<string, LanguageModule>();
   // Only what the cache check needs: never every previous record at once.
   const previous = new Map<string, Previous | undefined>();
@@ -277,8 +279,6 @@ export async function indexProject(
   // After an unfinished run every claimed file counts as changed, so no
   // module reuses an earlier analysis; parse results stay valid per hash.
   if (unfinished) for (const path of claims.keys()) changed.add(path);
-  // Marked with the first write, cleared by the last one.
-  await store.beginIndexRun?.();
   await stage("store.writeParsed", async () => {
     await store.replaceContexts([
       ...contexts,

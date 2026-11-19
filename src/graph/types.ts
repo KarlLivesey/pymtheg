@@ -331,7 +331,12 @@ export interface GraphStorage {
    * previous run did not finish; no stored analysis is then reused.
    */
   unfinishedIndexRun?(): StorageResult<boolean>;
-  beginIndexRun?(): StorageResult<void>;
+  /**
+   * Begins a run owned by this call; true when a mark of another run was
+   * found (and taken over). Each later write of the run proves it still owns
+   * the store, or throws without writing.
+   */
+  beginIndexRun?(): StorageResult<boolean>;
   finishIndexRun?(): StorageResult<void>;
   failedFiles?(): StorageResult<FailedFile[]>;
   /** parseFailure distinguishes cacheable parser failures from retryable project failures. */

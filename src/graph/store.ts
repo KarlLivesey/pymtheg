@@ -53,11 +53,29 @@ export class SqliteGraphStore implements GraphStorage {
    */
   private beforeWrite(): void {
     if (this.path === undefined || this.db.isTransaction) return;
+    // Choosing the journal changes this connection's data version without
+    // any other connection committing: the value just before stands for the
+    // value just after (C-22, `sameVersion`).
+    const before = this.commandDataVersion();
     this.writeAheadLog =
       this.sqliteVersion === undefined
         ? openWriteAheadLog(this.db, this.path)
         : openWriteAheadLog(this.db, this.path, this.sqliteVersion);
     this.path = undefined;
+    const after = this.commandDataVersion();
+    if (after !== before) this.versionAlias = { from: before, to: after };
+  }
+  private versionAlias: { from: number; to: number } | undefined;
+  /**
+   * Whether no other connection has committed since this connection read
+   * data version `expected` (its own journal choice aside).
+   */
+  private sameVersion(expected: number): boolean {
+    const now = this.commandDataVersion();
+    return (
+      now === expected ||
+      (this.versionAlias?.from === expected && now === this.versionAlias.to)
+    );
   }
   /**
    * Known to have library targets (schema 4). A graph never returns to
@@ -251,30 +269,69 @@ export class SqliteGraphStore implements GraphStorage {
       return statement;
     };
   }
-  /** An index run's mark (C-22): to write with its first write, or written. */
-  private indexRun: "idle" | "pending" | "written" = "idle";
+  /**
+   * This connection's index run (C-22): its identifier, the store's data
+   * version when it began, whether it takes over a mark found then, and
+   * whether its own mark is written yet.
+   */
+  private indexRun:
+    | { state: "idle" }
+    | {
+        state: "pending" | "written";
+        id: string;
+        /** The data version after its last commit (or at its beginning). */
+        version: number;
+        takeOver: boolean;
+        /** Another connection committed between two of its commits. */
+        interleaved: boolean;
+      } = {
+    state: "idle",
+  };
   private transaction(action: () => void): void {
     this.beforeWrite();
     this.db.exec("BEGIN IMMEDIATE");
     try {
-      const marking = this.indexRun === "pending";
-      if (marking) {
+      const run = this.indexRun;
+      // Every commit of an index run first proves, under the write lock,
+      // that no other run has written since it began: its first commit that
+      // no other connection has committed at all since it began reading;
+      // each later one that the mark is still its own. Otherwise it writes
+      // nothing more.
+      if (run.state === "pending") {
+        if (
+          !this.sameVersion(run.version) ||
+          (!run.takeOver && this.indexRunMark() !== undefined)
+        )
+          throw new GraphIndexTakenOver();
         this.db
           .prepare(
-            "INSERT INTO graph_meta VALUES ('index-run','unfinished') ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            "INSERT INTO graph_meta VALUES ('index-run',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
           )
-          .run();
+          .run(run.id);
         this.db
           .prepare("DELETE FROM graph_meta WHERE key='command-complete'")
           .run();
+      } else if (run.state === "written") {
+        if (this.indexRunMark() !== run.id) throw new GraphIndexTakenOver();
+        // A writer that is not an index run: this run's result is no longer
+        // its own, so it publishes no completion.
+        if (!this.sameVersion(run.version)) run.interleaved = true;
       }
       action();
       this.db.exec("COMMIT");
-      if (marking) this.indexRun = "written";
+      if (run.state !== "idle") {
+        run.state = "written";
+        run.version = this.commandDataVersion();
+      }
     } catch (error) {
       this.db.exec("ROLLBACK");
       throw error;
     }
+  }
+  private indexRunMark(): string | undefined {
+    return this.db
+      .prepare("SELECT value FROM graph_meta WHERE key='index-run'")
+      .get()?.value as string | undefined;
   }
   files(): GraphFile[] {
     // One stored body at a time: never every body string and its decoding at once.
@@ -496,8 +553,8 @@ export class SqliteGraphStore implements GraphStorage {
     count("store.filesRemoved");
     const remove = () =>
       this.db.prepare("DELETE FROM graph_files WHERE path=?").run(path);
-    // The first write of an index run carries its mark.
-    if (this.indexRun === "pending") this.transaction(remove);
+    // A write of an index run carries or checks its mark.
+    if (this.indexRun.state !== "idle") this.transaction(remove);
     else {
       this.beforeWrite();
       remove();
@@ -889,6 +946,13 @@ export class SqliteGraphStore implements GraphStorage {
     }
   }
   invalidateGraphCommandState(): void {
+    // Nothing to remove is no write (C-6).
+    if (
+      !this.db
+        .prepare("SELECT 1 FROM graph_meta WHERE key='command-complete'")
+        .get()
+    )
+      return;
     this.beforeWrite();
     this.db
       .prepare("DELETE FROM graph_meta WHERE key='command-complete'")
@@ -899,33 +963,78 @@ export class SqliteGraphStore implements GraphStorage {
    * may have replaced some files' records and not others.
    */
   unfinishedIndexRun(): boolean {
-    return !!this.db
-      .prepare("SELECT 1 FROM graph_meta WHERE key='index-run'")
-      .get();
+    return this.indexRunMark() !== undefined;
   }
   /**
-   * Begins an index run. The mark is written in the same commit as the
-   * run's first write, with the completion record's removal, so a run that
-   * writes nothing leaves the file as it was, and any write of the run that
-   * survives a crash has the mark with it.
+   * Begins an index run with its own identifier. Its mark is written in the
+   * same commit as its first write, with the completion record's removal,
+   * so a run that writes nothing leaves the file as it was, and any write of
+   * the run that survives a crash has the mark with it. A mark already there
+   * belongs to a run that did not finish or is still running: this run
+   * takes it over at once (that run then writes nothing more) and returns
+   * true, and must treat everything as changed.
    */
-  beginIndexRun(): void {
-    // A mark left by an unfinished run is this run's to clear.
-    this.indexRun = this.unfinishedIndexRun() ? "written" : "pending";
+  beginIndexRun(): boolean {
+    const takeOver = this.unfinishedIndexRun();
+    this.indexRun = {
+      state: "pending",
+      id: randomUUID(),
+      version: this.commandDataVersion(),
+      takeOver,
+      interleaved: false,
+    };
+    if (!takeOver) return false;
+    this.transaction(() => {});
+    return true;
   }
-  /** Clears the mark, in the run's last commit, if the run wrote it. */
+  /** Clears the mark in the run's last commit, if this run still owns it. */
   finishIndexRun(): void {
-    const written = this.indexRun === "written";
-    this.indexRun = "idle";
-    if (written)
-      this.transaction(() => {
-        this.db.prepare("DELETE FROM graph_meta WHERE key='index-run'").run();
-      });
+    const run = this.indexRun;
+    try {
+      if (run.state === "written")
+        this.transaction(() => {
+          this.db.prepare("DELETE FROM graph_meta WHERE key='index-run'").run();
+        });
+      // What the run read and wrote is current while no other connection
+      // commits: from its beginning if it wrote nothing, else from its end.
+      if (run.state !== "idle")
+        this.finishedVersion =
+          run.interleaved || !this.sameVersion(run.version)
+            ? Number.NaN
+            : this.commandDataVersion();
+    } finally {
+      this.indexRun = { state: "idle" };
+    }
+  }
+  /**
+   * The data version at which this connection's last finished run was
+   * current. A completion record is written only while it still is (C-22).
+   */
+  private finishedVersion: number | undefined;
+  private finishedRunCurrent(): boolean {
+    return (
+      this.finishedVersion === undefined ||
+      this.sameVersion(this.finishedVersion)
+    );
   }
   commandDataVersion(): number {
     return Number(this.db.prepare("PRAGMA data_version").get()!.data_version);
   }
   completeGraphCommandState(state: unknown, expectedVersion?: number): boolean {
+    // An index that changed nothing writes nothing (C-6): the same record,
+    // over the same data and with no run unfinished, is left as it is.
+    const body = JSON.stringify(state);
+    const same = this.db
+      .prepare(
+        "SELECT 1 FROM graph_meta WHERE key='command-complete' AND value=? AND NOT EXISTS(SELECT 1 FROM graph_meta WHERE key='index-run')",
+      )
+      .get(body);
+    if (
+      same &&
+      this.finishedRunCurrent() &&
+      (expectedVersion === undefined || this.sameVersion(expectedVersion))
+    )
+      return true;
     this.beforeWrite();
     let written = false;
     // The completion record is durable when this returns: its commit is
@@ -938,8 +1047,8 @@ export class SqliteGraphStore implements GraphStorage {
       // Lock publication so another connection cannot commit between validation and publication.
       this.transaction(() => {
         if (
-          expectedVersion !== undefined &&
-          this.commandDataVersion() !== expectedVersion
+          !this.finishedRunCurrent() ||
+          (expectedVersion !== undefined && !this.sameVersion(expectedVersion))
         )
           return;
         this.db
@@ -1167,6 +1276,16 @@ export class SqliteGraphStore implements GraphStorage {
   }
   close(): void {
     try {
+      // A writable connection that wrote nothing but found a log left by a
+      // killed run still leaves the store at rest (C-6): a healthy store is
+      // not touched.
+      if (
+        !this.writeAheadLog &&
+        this.path !== undefined &&
+        this.db.isOpen &&
+        this.db.prepare("PRAGMA journal_mode").get()?.journal_mode === "wal"
+      )
+        this.beforeWrite();
       // The last connection checkpoints the log into the database (synced)
       // and the store is left with a rollback journal, as at rest before C-6.
       if (this.writeAheadLog && this.db.isOpen) closeWriteAheadLog(this.db);
@@ -1251,4 +1370,17 @@ function countStatements(db: DatabaseSync): DatabaseSync {
     return statement;
   }) as DatabaseSync["prepare"];
   return db;
+}
+
+/**
+ * Another graph index run started on the same store and took it over (C-22):
+ * this run stopped before writing anything more.
+ */
+export class GraphIndexTakenOver extends Error {
+  constructor() {
+    super(
+      "Another graph index run started on this store and took it over (or the store changed while this run was reading it); this run stopped without writing more. Run `pymtheg graph index` again if the other run did not finish.",
+    );
+    this.name = "GraphIndexTakenOver";
+  }
 }
