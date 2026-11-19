@@ -7,11 +7,13 @@ import type {
   GraphFile,
   Json,
   LanguageModule,
+  LibraryTarget,
   LinkDraft,
   LinkResolution,
   ParseResult,
 } from "../../types.js";
 import { CheckerLimit, extractFile, type TargetFact } from "./extract.js";
+import { libraryKey, libraryReader } from "./library.js";
 import type { Renamed } from "./rename.js";
 import { neutralizeAssumed } from "./untrusted.js";
 
@@ -36,7 +38,7 @@ import {
  * facts; resolve maps those facts to symbol IDs. See docs/changes/W2-D.md.
  */
 // Bump the leading number whenever extraction or resolution semantics change.
-const MODULE_VERSION = `22+typescript-${ts.version}`;
+const MODULE_VERSION = `31+typescript-${ts.version}`;
 
 /** Observation counters for tests (programs built, files extracted). Not a correctness input. */
 export const statistics = {
@@ -242,11 +244,19 @@ function assume(data: { [key: string]: Json }, ...names: string[]) {
 
 /** A link's comparable outcome: its target set and reason. */
 const outcomeOf = (link: LinkDraft): string => {
-  const data = (link.data ?? {}) as { targets?: TargetFact[]; reason?: string };
+  const data = (link.data ?? {}) as {
+    targets?: TargetFact[];
+    libraryFacts?: LibraryTarget[];
+    reason?: string;
+  };
   const targets = (data.targets ?? [])
     .map((target) => `${target.file}\0${target.key}`)
     .sort();
-  return JSON.stringify([targets, data.reason ?? null]);
+  return JSON.stringify([
+    targets,
+    data.libraryFacts?.map(libraryKey).sort(),
+    data.reason ?? null,
+  ]);
 };
 const siteOf = (link: LinkDraft) =>
   `${link.kind}\0${link.range.start}\0${link.range.end}`;
@@ -455,6 +465,7 @@ export function mergeTied(
       }
       const merged = mergeFields(datas, [
         "targets",
+        "libraryFacts",
         "reason",
         "assumes",
         "cause",
@@ -469,13 +480,23 @@ export function mergeTied(
       return { ...link, data: merged };
     }
     const keyed = (data: { [key: string]: Json }) =>
-      ((data.targets ?? []) as unknown as TargetFact[])
-        .map((t) => `${t.file}\0${t.key}`)
-        .sort();
+      [
+        ...((data.targets ?? []) as unknown as TargetFact[]).map(
+          (t) => `${t.file}\0${t.key}`,
+        ),
+        ...((data.libraryFacts ?? []) as unknown as LibraryTarget[]).map(
+          libraryKey,
+        ),
+      ].sort();
     const targets = new Map<string, TargetFact>();
+    const libraries = new Map<string, LibraryTarget>();
     for (const data of datas)
       for (const target of (data.targets ?? []) as unknown as TargetFact[])
         targets.set(`${target.file}\0${target.key}`, { ...target });
+    for (const data of datas)
+      for (const target of (data.libraryFacts ??
+        []) as unknown as LibraryTarget[])
+        libraries.set(libraryKey(target), target);
     const reasons = [
       ...new Set(
         datas
@@ -486,11 +507,20 @@ export function mergeTied(
     const sameTargets = datas.every((data) =>
       same(keyed(data), keyed(datas[0]!)),
     );
-    const merged = mergeFields(datas, ["targets", "reason", "assumes"]);
+    const merged = mergeFields(datas, [
+      "targets",
+      "libraryFacts",
+      "reason",
+      "assumes",
+    ]);
     if (targets.size)
       merged.targets = byKey([...targets.entries()]).map(([, t]) => ({
         ...t,
       }));
+    if (!reasons.length && libraries.size)
+      merged.libraryFacts = byKey([...libraries.entries()]).map(
+        ([, target]) => ({ ...target }),
+      );
     if (reasons.length) {
       const everyVariantSame =
         sameTargets &&
@@ -587,6 +617,13 @@ const module: LanguageModule = {
       }
     }
     const model = projectModel(files, context.contextFiles);
+    const libraries = libraryReader(
+      model.manifests,
+      files,
+      model.workspaceRoots,
+      model.workspaceBoundaries,
+      model.workspaceCatalogs,
+    );
     const captured = new Set(files.map((file) => file.path));
     const results: AnalyzedFile[] = [];
     // A broken config or manifest fails only the files it governs, not the module.
@@ -627,8 +664,10 @@ const module: LanguageModule = {
       let baseHost = normal.host;
       const hostOfNormal = () => normal?.host ?? baseHost;
       const resolveModule = (specifier: string, from: string) => {
+        const selected = model.selectSpecifier(specifier, from);
+        if (selected === undefined) return undefined;
         const resolved = ts.resolveModuleName(
-          specifier,
+          selected,
           toVirtual(from),
           group.options,
           hostOfNormal(),
@@ -707,14 +746,19 @@ const module: LanguageModule = {
               group.limitations.length > 0,
               {
                 fresh: model.fresh,
+                explicitTypes: group.explicitTypes === true,
                 ...(renamed ? { renamed } : {}),
                 resolveModule,
+                hasDenoImports: model.hasDenoImports,
+                selectSpecifier: model.selectSpecifier,
                 workspaceReason: model.workspaceReason,
+                workspaceBoundaryKnown: model.workspaceBoundaryKnown,
                 skip,
                 moduleKind,
                 anyFailed: unseen.size > 0,
                 failedNames,
               },
+              libraries,
             );
             statistics.extracted++;
             return result;
@@ -853,7 +897,19 @@ const module: LanguageModule = {
               const data = {
                 ...((link.data ?? {}) as { [key: string]: Json }),
               };
-              if (data.reason === "invalid-code") return link;
+              const outside = data.libraryFacts as unknown as
+                | LibraryTarget[]
+                | undefined;
+              if (
+                data.reason === "invalid-code" ||
+                (outside?.length &&
+                  outside.every(
+                    (fact) =>
+                      fact.evidence === "import-path" ||
+                      fact.evidence === "import-binding",
+                  ))
+              )
+                return link;
               assume(data, "no-unseen-declarations");
               return { ...link, data };
             }),
@@ -916,7 +972,12 @@ const module: LanguageModule = {
     const resolutions: LinkResolution[] = [];
     for (const link of links) {
       const data = link.data as
-        | { targets?: TargetFact[]; reason?: string }
+        | {
+            targets?: TargetFact[];
+            libraryFacts?: LibraryTarget[];
+            reason?: string;
+            assumes?: string[];
+          }
         | undefined;
       const facts = data?.targets ?? [];
       const ids = [
@@ -931,7 +992,14 @@ const module: LanguageModule = {
       // one definite target nor to a candidate set that omits a possibility.
       const complete = ids.length === facts.length && !data?.reason;
       if (!complete) continue;
-      if (ids.length === 1)
+      const libraries = data?.libraryFacts ?? [];
+      if (libraries.length) {
+        if (data?.assumes?.length) continue;
+        if (ids.length + libraries.length === 1)
+          resolutions.push({ linkId: link.id, library: libraries[0]! });
+        else
+          resolutions.push({ linkId: link.id, candidateIds: ids, libraries });
+      } else if (ids.length === 1)
         resolutions.push({ linkId: link.id, targetId: ids[0]! });
       else if (ids.length >= 2)
         resolutions.push({ linkId: link.id, candidateIds: ids });

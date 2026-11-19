@@ -261,7 +261,7 @@ Link outcomes:
 | Outcome | Meaning |
 |---|---|
 | `resolved` | One definite target in the checkout |
-| `library` | One definite target outside the project: a library unit (level 1) or a symbol in it (level 2), recorded with how the source proves it (see the design section in `runtime-map.md`). Rust records library paths with proven bindings; Go records imports, package-qualified names and builtins (C-14). |
+| `library` | One definite target outside the project: a library unit (level 1) or a symbol in it (level 2), recorded with how the source proves it (see the design section in `runtime-map.md`). Rust records library paths with proven bindings. TypeScript and JavaScript record library targets at existing sites. Go records imports, package-qualified names and builtins (C-14). |
 | `ambiguous` | A candidate set, never a pick. It may mix checkout symbols and library targets. A set is **closed** only when it provably holds every possible target and every member is provably possible. Otherwise it is **open**, and `data.open` gives the reasons (for example a type outside the project could be the target); an open set still lists every project target |
 | `unresolved` | No target; the written name is kept. The reason, when recorded, is in `data` (`reason` in Go and TypeScript, `uncertainty` in Rust; Go's `uncertainty` `library-member-unproven` marks a member of a library-typed value). Rust may also list unverified would-be targets in `data.targets` (at most 16, else a count) |
 | failed (`unresolved`, reason `invalid-code`) | The link depends on a file that could not be read. `data.cause` names the failed file(s). It has no target, no candidates and no would-be targets |
@@ -653,7 +653,8 @@ Uses the TypeScript compiler over the captured snapshot. The only other input
 is the installed compiler's standard-library declarations. The snapshot host
 models checkout-local package links in a virtual `node_modules`. Claims
 `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs`, `.cjs`; context
-`*tsconfig*.json`, `*jsconfig*.json`, `package.json` and `pnpm-workspace.yaml`. Each file
+`*tsconfig*.json`, `*jsconfig*.json`, `package.json`, `pnpm-workspace.yaml`,
+`deno.json`, `deno.jsonc` and conventional import-map filenames. Each file
 is analysed under its owning config (nearest containing directory, then
 `tsconfig` before `jsconfig`); genuinely tied configs are merged to the weakest
 answer.
@@ -702,13 +703,27 @@ answer.
   still establish its module-file edge. Named bindings use the checker.
   Calls use the same declaration rule for relative imports, workspace imports
   and local aliases, including when TypeScript selects a `types` export.
-- **Candidates:** several graph symbols for one callee (union receivers, merged
-  declarations, duplicate JavaScript functions).
-- **Unresolved:** standard library and `node_modules` packages
+- **Library targets:** checker-proven JavaScript or web declarations, captured
+  dependency declarations with package evidence, and names directly proved
+  by literal outside imports and re-exports. Deno imports use the nearest
+  captured map and its applicable scope. A member of an untyped imported
+  value or a directly rewritten module member names the package only.
+  npm aliases name their registry package. An exact pin in the importing
+  manifest or its captured pnpm or Bun catalog can supply its version.
+  [TypeScript and JavaScript library links](changes/C-11.md)
+- **Candidates:** several checkout or library targets for one callee (union
+  receivers, merged declarations, duplicate JavaScript functions). Missing
+  selected Node types can leave both DOM and Node targets possible for a shared
+  global, type name or typed member.
+- **Unresolved:** outside members whose receiver or declaration is unverified
   (`external`, `external-package`); computed `require` or `import()` specifiers;
   calls through parameters, import shadows, and reassigned local functions;
   member calls without a named target through `any`, `unknown` or an open index
   (`any-receiver`, `unknown-receiver`, `index-signature`);
+  package specifiers whose workspace membership is unreadable
+  (`workspace-manifest-unreadable`);
+  unavailable Deno import maps, unmapped Deno bare imports and remote URL
+  imports (`deno-import-unverified`);
   installed workspace bindings with no captured entry
   (`workspace-entry-unavailable` or `workspace-build-output-missing` when
   TypeScript probed a missing path under a configured output directory).
@@ -718,10 +733,10 @@ answer.
   stack limits on some lookups, or `require`/`module`/`exports` uses that cannot
   be decided statically.
 - **A program that contains a failed file:** the failed file is absent;
-  `invalid-code` with a cause is best-effort attribution; **every other link in
-  that program carries `assumes: ["no-unseen-declarations"]`, which means
-  unverified** (computed without the failed file). In a program with no failed
-  file no link carries it.
+  `invalid-code` with a cause is best-effort attribution. Links computed
+  without the failed file carry `assumes: ["no-unseen-declarations"]`.
+  A lexical outside binding whose module selection is already established
+  by the snapshot can independently prove its written library identity.
 - Known limits: JavaScript early errors the compiler does not report without
   `checkJs` (`let let = 1`, top-level `return`) leave a file clean; AMD
   `define(…)` modules are not modelled; module augmentation turns imports of the

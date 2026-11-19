@@ -493,8 +493,10 @@ const links = [
     target(UTIL, "helper", "function"),
     nth(MAIN, "helper", 0),
   ),
-  // External package: unresolved, specifier kept.
-  link(MAIN, "imports", "chalk", fileSource(MAIN), null, '"chalk"'),
+  // The specifier proves the unit and the default binding proves the export.
+  link(MAIN, "imports", "chalk", fileSource(MAIN), null, '"chalk"', {
+    libraries: [{ ecosystem: "npm", unit: "chalk", evidence: "import-path" }],
+  }),
   link(
     MAIN,
     "imports",
@@ -502,6 +504,16 @@ const links = [
     fileSource(MAIN),
     null,
     nth(MAIN, "chalk", 0),
+    {
+      libraries: [
+        {
+          ecosystem: "npm",
+          unit: "chalk",
+          symbol: "default",
+          evidence: "import-binding",
+        },
+      ],
+    },
   ),
   // In a type position the merged name means the interface.
   link(
@@ -572,7 +584,16 @@ const links = [
     target(UTIL, "helper", "function"),
     nth(MAIN, "helper", 1),
   ),
-  link(MAIN, "calls", "chalk", mainFn, null, nth(MAIN, "chalk", 2)),
+  link(MAIN, "calls", "chalk", mainFn, null, nth(MAIN, "chalk", 2), {
+    libraries: [
+      {
+        ecosystem: "npm",
+        unit: "chalk",
+        symbol: "default",
+        evidence: "import-binding",
+      },
+    ],
+  }),
   // Dynamic import with a literal specifier.
   link(
     MAIN,

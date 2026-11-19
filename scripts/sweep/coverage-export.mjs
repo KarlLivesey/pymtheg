@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync, renameSync } from "node:fs";
+import { isBuiltin } from "node:module";
 import { dirname, join, posix, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
@@ -218,6 +219,19 @@ function addObservation(observations, identity, make) {
   entry.links++;
 }
 
+// Classify a lost legacy credit without changing its historical score. A
+// path beyond a written export needs a declaring member from the checker.
+function legacyTypeScriptProof(link, evidence) {
+  if (["imports", "exports"].includes(link.kind)) return "written-name";
+  const [head, ...tail] = link.targetName.replace(/^new\s+/, "").replaceAll("?.", ".").split(".");
+  const binding = evidence.tsImportMember(head);
+  if (binding && (tail.length === 0 || tail.length === 1 &&
+      (binding.member === "*" || binding.member === "default" && isBuiltin(binding.specifier)))) {
+    return "written-name";
+  }
+  return "unproved-member";
+}
+
 function sourceClues(source, at, names) {
   if (!names.length) return [];
   const pattern = new RegExp(`\\b(?:${names.join("|")})\\b`);
@@ -277,8 +291,10 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys, pre
   try {
     if (previous)
       other = new DatabaseSync(join(selectAttempt(scratch, previous), "checkout/.pymtheg/rebuildable/graph.sqlite"), { readOnly: true });
-    const otherLinks = other?.prepare("SELECT body,kind,module FROM graph_links WHERE file=?");
+    const otherLinks = other?.prepare("SELECT body,kind,module,resolution FROM graph_links WHERE file=?");
     const shared = {};
+    const legacyComparison = other?.prepare("SELECT value FROM graph_meta WHERE key='schema'").get()?.value === "3";
+    const legacyTypeScriptLosses = {};
     const graphSchema = db.prepare("SELECT value FROM graph_meta WHERE key='schema'").get()?.value;
     if (graphSchema !== "3" && graphSchema !== "4") throw Error("Coverage export supports graph schemas 3 and 4");
     // Schema 4 stores library targets; schema 3 (0.1.0) has none, so its
@@ -385,8 +401,12 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys, pre
     const sourceFiles = new Map();
     const checks = {};
     for (const file of files) {
-      const sharedKeys = otherLinks && new Set(otherLinks.all(file.path).map((row) =>
-        sampleKey(repo, { ...JSON.parse(row.body), kind: row.kind, module: row.module })));
+      const previousLinks = otherLinks?.all(file.path).map((row) => ({
+        ...JSON.parse(row.body), kind: row.kind, module: row.module, resolution: row.resolution,
+      }));
+      const sharedKeys = previousLinks && new Set(previousLinks.map((link) => sampleKey(repo, link)));
+      const compareLegacy = legacyComparison && file.module === "typescript" && Number.parseInt(file.moduleVersion, 10) >= 23;
+      const candidateSites = compareLegacy ? new Map() : undefined;
       const snapshot = getFile.get(file.path);
       const source = snapshot.text ?? "";
       const scope = sourceScope(repo.id, file.path, source);
@@ -448,7 +468,7 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys, pre
         },
       };
       for (const row of getLinks.iterate(file.path)) {
-        const link = { ...JSON.parse(row.body), module: row.module, kind: row.kind, resolution: row.resolution };
+        const link = { ...JSON.parse(row.body), module: row.module, moduleVersion: file.moduleVersion, kind: row.kind, resolution: row.resolution };
         if (row.resolution === "library") link.library = storedLibrary?.get(row.id);
         if (quotas && link.range && !["contains", "receiver"].includes(link.kind)) {
           if (link.kind !== "calls" || file.module === "typescript") observedSites.add(link.range.start);
@@ -499,6 +519,11 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys, pre
         const bucket = stratum ? reviewBucket(stratum, scope, disposition) : null;
         const references = referenceFiles?.get(file.path);
         const rank = stratum || references || sharedKeys ? sampleKey(repo, link) : null;
+        if (candidateSites && rank) {
+          const previous = candidateSites.get(rank);
+          const score = link.resolution === "resolved" ? 2 : library?.level ?? 0;
+          if (!previous || score > previous.score) candidateSites.set(rank, { score, link });
+        }
         if (sharedKeys?.has(rank)) {
           const score = shared[link.module] ??= { links: 0, level2: 0 };
           score.links++;
@@ -578,6 +603,22 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys, pre
             ...(link.module === "typescript" ? { jsx: data.jsx, specifier: data.specifier ?? evidence.tsImports().get(targetRoot) } : {}) };
         }, quotas?.get(sampleBucket) ?? (quotas ? 6 : sampleSize(sampleBucket)));
       }
+      if (candidateSites) for (const previous of previousLinks) {
+        if (previous.module !== "typescript" || previous.resolution !== "unresolved") continue;
+        const old = externalIdentity(previous, evidence, project, classify(previous, evidence, project));
+        if (old?.level !== 2) continue;
+        const current = candidateSites.get(sampleKey(repo, previous));
+        if (current?.score === 2) continue;
+        const data = current?.link.data;
+        const reason = current?.score === 1 ? "unit-only" :
+          data?.reason === "workspace-manifest-unreadable" ? data.reason :
+            data?.assumes?.join("+") || data?.reason || current?.link.resolution || "site-absent";
+        const reasonKey = `${legacyTypeScriptProof(previous, evidence)}:${previous.kind}:${reason}`;
+        const loss = legacyTypeScriptLosses[reasonKey] ??= { count: 0, examples: [] };
+        loss.count++;
+        if (loss.examples.length < 3) loss.examples.push({ file: file.path,
+          line: location(source, previous.range?.start).line, name: previous.targetName, old });
+      }
       const strataBySite = new Map();
       for (const [bucket, ranks] of reviewByBucket) {
         const eligible = [...ranks.values()].filter((observations) =>
@@ -619,6 +660,7 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys, pre
       trackedSource: repo.trackedSource, breakdown: rows, sourceFiles: [...sourceFiles.values()],
       failedSources: [...failed.values()].map(({ examples, ...record }) => record), strata, reviewSites,
       ...(other ? { shared } : {}),
+      ...(Object.keys(legacyTypeScriptLosses).length ? { legacyTypeScriptLosses } : {}),
       ...(reviewOverlap.size ? { reviewOverlap: [...reviewOverlap].sort(compare).map((key) => JSON.parse(key)) } : {}),
       ...(librarySites.size ? { libraryExamples: [...librarySites.values()] } : {}),
       ...(omissions.size ? { sourceOmissions: [...omissions.values()] } : {}),

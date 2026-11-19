@@ -299,6 +299,7 @@ export function classify(link, evidence, project) {
   }
   if (module === "typescript") {
     if (workspaceEntryMissing(underlyingReason(data))) return "inside";
+    if (["workspace-manifest-unreadable", "deno-import-unverified"].includes(underlyingReason(data))) return "unclassified";
     const path = tsSpecifier(link, evidence);
     if (path && (link.data?.specifier || evidence.tsSpecifiers.has(path))) return tsPath(path, project, link.file);
     if (data.reference === "lib") return "outside";
@@ -445,7 +446,8 @@ export function externalIdentity(link, evidence, project, disposition) {
   if (data.cause || link.module === "typescript" && workspaceEntryMissing(underlyingReason(data))) return null;
   const observed = link.module === "go" ? evidence.goStoredTargets ? null : goExternalIdentity(link, evidence, project)
     : link.module === "rust" ? evidence.rustStoredTargets ? null : rustExternalIdentity(link, evidence, project)
-      : tsExternalIdentity(link, evidence, project, disposition);
+      : Number.parseInt(link.moduleVersion, 10) >= 23 ? null
+        : tsExternalIdentity(link, evidence, project, disposition);
   if (observed || disposition !== "outside") return observed;
   let gap = "unknown";
   if (link.module === "go") {
