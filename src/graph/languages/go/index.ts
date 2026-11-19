@@ -459,7 +459,7 @@ async function analyze({
 
 const go: LanguageModule = {
   id: ID,
-  version: "30",
+  version: "31",
   extensions: [".go"],
   contextFiles: ["go.mod", "go.work"],
   parse,
