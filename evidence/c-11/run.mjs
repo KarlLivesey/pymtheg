@@ -5,6 +5,7 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  realpathSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -35,6 +36,7 @@ const preservationPins = new Set([
   "nestjs/nest",
   "excalidraw/excalidraw",
   "withastro/astro",
+  "honojs/hono",
   "vitejs/vite",
 ]);
 const manifest = join(scratch, `${mode}-manifest.json`);
@@ -98,7 +100,7 @@ if (mode === "release") {
     manifest,
     JSON.stringify(pins.filter((repo) => preservationPins.has(repo.id))),
   );
-  sweep(scratch, 3, main);
+  sweep(scratch, 3, realpathSync(main));
 } else if (mode === "collect" || mode === "replace") {
   const packets = [other, ...args].map((name) =>
     JSON.parse(readFileSync(join(scratch, `${name}-run.json`), "utf8")),
@@ -124,7 +126,8 @@ if (mode === "release") {
     JSON.stringify({ ...first, repos: [...byId.values()] }),
   );
 } else if (
-  picked || ["candidate", "candidate-audit", "candidate-core"].includes(mode)
+  picked ||
+  ["candidate", "candidate-audit", "candidate-core"].includes(mode)
 ) {
   writeFileSync(
     manifest,

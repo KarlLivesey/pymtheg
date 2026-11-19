@@ -38,7 +38,7 @@ import {
  * facts; resolve maps those facts to symbol IDs. See docs/changes/W2-D.md.
  */
 // Bump the leading number whenever extraction or resolution semantics change.
-const MODULE_VERSION = `23+typescript-${ts.version}`;
+const MODULE_VERSION = `24+typescript-${ts.version}`;
 
 /** Observation counters for tests (programs built, files extracted). Not a correctness input. */
 export const statistics = {
@@ -662,8 +662,10 @@ const module: LanguageModule = {
       let baseHost = normal.host;
       const hostOfNormal = () => normal?.host ?? baseHost;
       const resolveModule = (specifier: string, from: string) => {
+        const selected = model.selectSpecifier(specifier, from);
+        if (selected === undefined) return undefined;
         const resolved = ts.resolveModuleName(
-          specifier,
+          selected,
           toVirtual(from),
           group.options,
           hostOfNormal(),
@@ -744,6 +746,8 @@ const module: LanguageModule = {
                 fresh: model.fresh,
                 ...(renamed ? { renamed } : {}),
                 resolveModule,
+                hasDenoImports: model.hasDenoImports,
+                selectSpecifier: model.selectSpecifier,
                 workspaceReason: model.workspaceReason,
                 workspaceBoundaryKnown: model.workspaceBoundaryKnown,
                 skip,
@@ -890,7 +894,11 @@ const module: LanguageModule = {
               const data = {
                 ...((link.data ?? {}) as { [key: string]: Json }),
               };
-              if (data.reason === "invalid-code") return link;
+              if (
+                data.reason === "invalid-code" ||
+                data.lexicalLibrary === true
+              )
+                return link;
               assume(data, "no-unseen-declarations");
               return { ...link, data };
             }),

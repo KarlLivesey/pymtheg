@@ -506,7 +506,8 @@ Uses the TypeScript compiler over the captured snapshot. The only other input
 is the installed compiler's standard-library declarations. The snapshot host
 models checkout-local package links in a virtual `node_modules`. Claims
 `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs`, `.cjs`; context
-`*tsconfig*.json`, `*jsconfig*.json`, `package.json` and `pnpm-workspace.yaml`. Each file
+`*tsconfig*.json`, `*jsconfig*.json`, `package.json`, `pnpm-workspace.yaml`,
+`deno.json`, `deno.jsonc` and conventional import-map filenames. Each file
 is analysed under its owning config (nearest containing directory, then
 `tsconfig` before `jsconfig`); genuinely tied configs are merged to the weakest
 answer.
@@ -556,10 +557,12 @@ answer.
   Calls use the same declaration rule for relative imports, workspace imports
   and local aliases, including when TypeScript selects a `types` export.
 - **Library targets:** checker-proven JavaScript or web declarations, captured
-  dependency declarations, and names directly proved by literal outside
-  imports and re-exports. A member of an untyped imported value names the
-  package only. An exact version pin in the importing package's manifest can
-  supply the version. [TypeScript and JavaScript library links](changes/C-11.md)
+  dependency declarations with package evidence, and names directly proved
+  by literal outside imports and re-exports. Deno imports use the nearest
+  captured map and its applicable scope. A member of an untyped imported
+  value or a directly rewritten module member names the package only.
+  An exact version pin in the importing package's npm manifest can supply
+  the version. [TypeScript and JavaScript library links](changes/C-11.md)
 - **Candidates:** several checkout or library targets for one callee (union
   receivers, merged declarations, duplicate JavaScript functions).
 - **Unresolved:** outside members whose receiver or declaration is unverified
@@ -569,6 +572,8 @@ answer.
   (`any-receiver`, `unknown-receiver`, `index-signature`);
   package specifiers whose workspace membership is unreadable
   (`workspace-manifest-unreadable`);
+  unavailable Deno import maps, unmapped Deno bare imports and remote URL
+  imports (`deno-import-unverified`);
   installed workspace bindings with no captured entry
   (`workspace-entry-unavailable` or `workspace-build-output-missing` when
   TypeScript probed a missing path under a configured output directory).
@@ -578,10 +583,10 @@ answer.
   stack limits on some lookups, or `require`/`module`/`exports` uses that cannot
   be decided statically.
 - **A program that contains a failed file:** the failed file is absent;
-  `invalid-code` with a cause is best-effort attribution; **every other link in
-  that program carries `assumes: ["no-unseen-declarations"]`, which means
-  unverified** (computed without the failed file). In a program with no failed
-  file no link carries it.
+  `invalid-code` with a cause is best-effort attribution. Links computed
+  without the failed file carry `assumes: ["no-unseen-declarations"]`.
+  A lexical outside binding whose module selection is already established
+  by the snapshot can independently prove its written library identity.
 - Known limits: JavaScript early errors the compiler does not report without
   `checkJs` (`let let = 1`, top-level `return`) leave a file clean; AMD
   `define(…)` modules are not modelled; module augmentation turns imports of the

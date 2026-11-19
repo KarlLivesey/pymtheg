@@ -16,21 +16,22 @@ export function packageUnit(specifier: string): Unit | undefined {
   if (isBuiltin(specifier))
     return { ecosystem: "node", unit: specifier.replace(/^node:/, "") };
   const match =
-    /^((?:npm|jsr):)?((?:@[\w.-]+\/)?[\w.-]+)(?:\/([\w./-]+))?$/.exec(
+    /^((?:npm|jsr):)?((?:@[\w.-]+\/)?[\w.-]+)(?:@([\w.^~*+-]+))?(?:\/([\w./-]+))?$/.exec(
       specifier,
     );
   if (
     !match ||
     !storableName(match[2]!) ||
-    (match[3] &&
-      !match[3].split("/").every((part) => part && !/^\.{1,2}$/.test(part))) ||
+    (match[3] && !match[1]) ||
+    (match[4] &&
+      !match[4].split("/").every((part) => part && !/^\.{1,2}$/.test(part))) ||
     /^\.{1,2}$/.test(match[2]!)
   )
     return undefined;
   return {
     ecosystem: match[1] === "jsr:" ? "jsr" : "npm",
     unit: match[2]!,
-    ...(match[3] ? { subpath: match[3] } : {}),
+    ...(match[4] ? { subpath: match[4] } : {}),
   };
 }
 
@@ -78,6 +79,9 @@ const dependencyValues = (manifest: Manifest | undefined, name: string) =>
       ? [(value as Record<string, unknown>)[name]]
       : [];
   });
+const localDependency = (value: unknown): boolean =>
+  typeof value === "string" &&
+  /^(?:workspace:|file:|link:|portal:|\.{1,2}\/|\/)/.test(value);
 
 export function bundledLibraryUnit(filename: string): Unit {
   const name = posix.basename(filename);
@@ -159,17 +163,20 @@ export function libraryReader(
     }
   };
   // A captured implementation remains project code. A declaration-only
-  // dependency under an explicit vendor directory can describe outside code.
+  // package needs installation, type-package or importer dependency evidence.
   const implemented = new Set<Manifest>();
   for (const { path } of files) {
     if (/\.d\.(?:ts|mts|cts)$/.test(path)) continue;
     const manifest = nearest(path);
     if (manifest) implemented.add(manifest);
   }
-  const declarationUnits = new WeakMap<ts.SourceFile, Unit | null>();
+  const declarationUnits = new WeakMap<
+    ts.SourceFile,
+    { unit: Unit; dependency?: Manifest } | null
+  >();
   const declarations = new WeakMap<ts.Declaration, LibraryTarget | null>();
 
-  function declarationUnit(source: ts.SourceFile): Unit | undefined {
+  function sourceUnit(source: ts.SourceFile) {
     if (!source.isDeclarationFile) return undefined;
     if (declarationUnits.has(source))
       return declarationUnits.get(source) ?? undefined;
@@ -177,6 +184,7 @@ export function libraryReader(
     const manifest = path !== undefined ? nearest(path) : undefined;
     const declared = manifest?.json.name;
     let result: Unit | undefined;
+    let dependency: Manifest | undefined;
     if (source.fileName.startsWith(`${LIB_ROOT}/`))
       result = bundledLibraryUnit(source.fileName);
     else if (
@@ -196,21 +204,28 @@ export function libraryReader(
     } else if (
       manifest &&
       typeof declared === "string" &&
+      manifest.path !== "package.json" &&
       !implemented.has(manifest) &&
-      !workspaceRoots.has(posix.dirname(manifest.path)) &&
-      /(?:^|\/)(?:vendor|third_party|\.deno)(?:\/|$)/.test(manifest.path)
+      !workspaceRoots.has(posix.dirname(manifest.path))
     ) {
+      const segments = manifest.path.split("/");
+      const installed = segments.includes("node_modules");
       result = packageUnit(
-        `${manifest.path.split("/").includes("jsr.io") ? "jsr" : "npm"}:${declared}`,
+        `${installed && segments.includes("jsr.io") ? "jsr" : "npm"}:${declared}`,
       );
+      dependency = installed ? undefined : manifest;
     }
-    declarationUnits.set(source, result ?? null);
-    return result;
+    const identity = result
+      ? { unit: result, ...(dependency && { dependency }) }
+      : undefined;
+    declarationUnits.set(source, identity ?? null);
+    return identity;
   }
 
-  function targetOf(declaration: ts.Declaration): LibraryTarget | undefined {
-    const unit = declarationUnit(declaration.getSourceFile());
-    if (!unit) return undefined;
+  function targetOf(
+    declaration: ts.Declaration,
+    unit: Unit,
+  ): LibraryTarget | undefined {
     if (declarations.has(declaration))
       return declarations.get(declaration) ?? undefined;
     const bundled =
@@ -244,24 +259,41 @@ export function libraryReader(
   }
 
   return {
-    declarationUnit,
-    targetOf,
     forImporter(path: string) {
       const manifest = nearest(path);
+      const declaredDependencies = new Map<Manifest, boolean>();
+      function declarationUnit(source: ts.SourceFile): Unit | undefined {
+        const identity = sourceUnit(source);
+        if (!identity?.dependency) return identity?.unit;
+        if (manifest === identity.dependency) return undefined;
+        const dependency = identity.dependency;
+        let outside = declaredDependencies.get(dependency);
+        if (outside === undefined) {
+          const values = dependencyValues(manifest, identity.unit.unit);
+          outside =
+            values.length > 0 &&
+            values.every(
+              (value) =>
+                typeof value === "string" &&
+                value.length > 0 &&
+                !localDependency(value),
+            );
+          declaredDependencies.set(dependency, outside);
+        }
+        return outside ? identity.unit : undefined;
+      }
       const versions = new Map<
         string,
         Pick<LibraryTarget, "version" | "versionSource">
       >();
       return {
+        declarationUnit,
+        targetOf,
         localPackage(unit: Unit) {
           return (
             unit.ecosystem !== "node" &&
             (packageNames.has(unit.unit) ||
-              dependencyValues(manifest, unit.unit).some(
-                (value) =>
-                  typeof value === "string" &&
-                  /^(?:workspace|file|link|portal):/.test(value),
-              ))
+              dependencyValues(manifest, unit.unit).some(localDependency))
           );
         },
         withVersion(target: LibraryTarget): LibraryTarget {

@@ -5,6 +5,7 @@ import { dirname, posix } from "node:path";
 import ts from "typescript";
 import { compare, matchesPattern } from "../../index.js";
 import type { ContextFile, Diagnostic, GraphFile } from "../../types.js";
+import { denoConfigNames, denoImports, importMapNames } from "./deno.js";
 import { workspaceLinks, type Manifest } from "./workspace.js";
 import {
   freshNames,
@@ -108,6 +109,8 @@ export interface ProjectModel {
     lookups: readonly string[],
   ) => string | undefined;
   workspaceBoundaryKnown: (from: string) => boolean;
+  hasDenoImports: boolean;
+  selectSpecifier: (specifier: string, from: string) => string | undefined;
 }
 
 const INFERRED: ts.CompilerOptions = {
@@ -466,6 +469,8 @@ export const CONTEXT_PATTERNS = [
   "*jsconfig*.json",
   "package.json",
   "pnpm-workspace.yaml",
+  ...denoConfigNames,
+  ...importMapNames,
 ] as const;
 const isContextPath = (path: string) =>
   CONTEXT_PATTERNS.some((pattern) => matchesPattern(path, pattern));
@@ -488,6 +493,7 @@ export function projectModel(
   contexts: readonly ContextFile[],
 ): ProjectModel {
   const fs = new VirtualFileSystem();
+  const deno = denoImports(contexts);
   for (const file of contexts) fs.add(file.path, file.text);
   const manifests: Manifest[] = [];
   /** Package directory -> why its manifest is unreadable. */
@@ -984,6 +990,32 @@ export function projectModel(
       getParsedCommandLine: (name) => parsedConfigs.get(fs.real(name)),
       realpath: (name) => fs.real(name),
     };
+    if (deno.active) {
+      created.resolveModuleNameLiterals = (
+        literals,
+        containingFile,
+        redirected,
+        options,
+        source,
+      ) =>
+        literals.map((literal) => {
+          const selected = deno.select(
+            literal.text,
+            fromVirtual(containingFile) ?? ".",
+          );
+          return selected === undefined
+            ? { resolvedModule: undefined }
+            : ts.resolveModuleName(
+                selected,
+                containingFile,
+                options,
+                created,
+                undefined,
+                redirected,
+                ts.getModeForUsageLocation(source, literal, options),
+              );
+        });
+    }
     caches.set(created, sources);
     asked.set(created, requested);
     return created;
@@ -995,6 +1027,8 @@ export function projectModel(
       [...fs.links.values()].map((path) => fromVirtual(path) || "."),
     ),
     hasWorkspacePackages: fs.links.size > 0,
+    hasDenoImports: deno.active,
+    selectSpecifier: deno.select,
     owner,
     ties,
     failures,

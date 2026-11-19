@@ -1626,7 +1626,7 @@ graph links, so Studio is unchanged. The coverage export credits a stored
 library target directly and reconstructs identities only for links without one
 (every link of a 0.1.0 graph).
 
-TypeScript module 23 uses the checker over the same snapshot to record
+TypeScript module 23 and later use the checker over the same snapshot to record
 declaring owners. `library.ts` assigns the `es` and `dom` units from bundled
 declarations and identifies captured dependency declaration packages. When
 declarations are missing, `extract.ts` uses lexical imports and literal
@@ -1634,3 +1634,8 @@ loaders to prove the unit or a selected export. Resolution converts those
 facts to stored targets after the existing failure and project checks. A
 written npm subpath prefixes the export as `subpath:export`. Instance member
 paths use `Owner.prototype.member`. [C-11](changes/C-11.md)
+
+Module 24 selects Deno import-map entries before module and package lookup.
+A captured outside declaration package needs installation, type-package or
+dependency evidence. Literal CommonJS binding names use their written keys.
+Same-file writes to a module object suppress that member's export name.

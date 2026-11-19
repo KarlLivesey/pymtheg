@@ -206,6 +206,7 @@ test("missing packages prove imports and namespace exports at their lexical bind
         import type { compile } from 'missing-pkg';
         import { renamed } from './barrel';
         import { getZ } from './nested/bridge';
+        type Compile = typeof compile;
         z.string();
         fs.readFileSync('x');
         path['join']('a', 'b');
@@ -219,6 +220,8 @@ test("missing packages prove imports and namespace exports at their lexical bind
       "barrel.ts": `export { make as renamed } from '@scope/pkg/client';`,
       "nested/package.json": '{"dependencies":{"zod":"3.26.0"}}',
       "nested/bridge.ts": `export { z as getZ } from 'zod';`,
+      "jsx.tsx": `import ReactRouterDom = require('react-router-dom');
+        export const view = <ReactRouterDom.Link />;`,
       "common.cjs": `const fs = require('fs');
         const { join: combine } = require('node:path');
         fs.readFileSync('x');
@@ -270,6 +273,14 @@ test("missing packages prove imports and namespace exports at their lexical bind
         versionSource: "nested/package.json",
       });
       assert.equal(call("compile").resolution, "unresolved");
+      assert.equal(
+        libraryTarget(graph.link("main.ts", "compile", "references")).symbol,
+        "compile",
+      );
+      assert.equal(
+        libraryTarget(graph.link("jsx.tsx", "Link", "calls")).symbol,
+        "Link",
+      );
       assert.equal(call("join").resolution, "unresolved");
       const common = (at) => graph.link("common.cjs", at, "calls");
       assert.equal(
@@ -287,13 +298,14 @@ test("captured declarations prove an inherited package member and preserve proje
   await project(
     {
       "package.json":
-        '{"dependencies":{"local-types":"file:packages/local-types"}}',
+        '{"dependencies":{"local-types":"file:packages/local-types","external-kit":"^4.0.0"}}',
       "tsconfig.json": JSON.stringify({
         compilerOptions: {
           typeRoots: ["./types"],
           types: ["node"],
           paths: {
             "external-kit": ["./vendor/kit/index.d.ts"],
+            "our-types": ["./vendor/our/index.d.ts"],
             "app/*": ["./src/*"],
           },
         },
@@ -306,6 +318,8 @@ test("captured declarations prove an inherited package member and preserve proje
       "vendor/kit/index.d.ts": `declare class Directory { list(): string[] }
       export declare class Store extends Directory {}
       export declare function open(): Store;`,
+      "vendor/our/package.json": '{"name":"our-types","types":"index.d.ts"}',
+      "vendor/our/index.d.ts": "export declare function own(): void;",
       "packages/local-types/package.json":
         '{"name":"@types/local-types","types":"index.d.ts"}',
       "packages/local-types/index.d.ts":
@@ -315,10 +329,11 @@ test("captured declarations prove an inherited package member and preserve proje
       interface Console { log(local: number): void; }`,
       "main.ts": `import { readFileSync } from 'node:fs';
       import { open } from 'external-kit';
+      import { own } from 'our-types';
       import { localDeclaration } from 'local-types';
       import { here } from 'app/entry';
       import { missing } from 'app/missing';
-      process.cwd(); readFileSync('x'); open().list(); here(); missing();
+      process.cwd(); readFileSync('x'); open().list(); own(); here(); missing();
       window.__pymthegLocal(); console.log(4); localDeclaration();`,
     },
     async (graph, report) => {
@@ -343,6 +358,7 @@ test("captured declarations prove an inherited package member and preserve proje
         evidence: "declaring-owner",
       });
       assert.equal(graph.target(call("here")), "src/entry.ts#here");
+      assert.equal(graph.target(call("own")), "vendor/our/index.d.ts#own");
       assert.equal(
         graph.target(call("localDeclaration")),
         "packages/local-types/index.d.ts#localDeclaration",
@@ -354,6 +370,202 @@ test("captured declarations prove an inherited package member and preserve proje
       );
       assert.equal(call("log").resolution, "ambiguous");
       assert.equal(call("log").libraries[0].symbol, "Console.prototype.log");
+    },
+  );
+});
+
+test("Deno package aliases and scoped maps select the actual registry or checkout file", async () => {
+  await project(
+    {
+      // Hono runtime-tests/deno/deno.json uses this registry mapping.
+      "deno/deno.jsonc": `{
+        // Deno expands inline package-root aliases to package subpaths.
+        "imports": {
+          "@std/assert": "jsr:@std/assert@^1.0.3",
+          "fs": "node:fs",
+          "helper": "./helper.ts",
+          "remote": "https://example.test/mod.ts"
+        },
+        "scopes": { "./legacy/": { "@std/assert": "npm:assert@^2.0.0" } }
+      }`,
+      "deno/helper.ts": "export function here() {}",
+      "deno/main.ts": `import { assertEquals as equal } from '@std/assert';
+        import { assertRejects } from '@std/assert/assert-rejects';
+        import * as fs from 'fs';
+        import { here } from 'helper';
+        import { go } from 'remote';
+        import { fail } from 'unmapped';
+        equal(1, 1); assertRejects(() => Promise.reject()); fs.readFileSync('x');
+        here(); go(); fail();`,
+      "deno/legacy/main.ts": `import { equal } from '@std/assert'; equal(1, 1);`,
+      "separate/deno.json": '{"importMap":"./maps/import-map.json"}',
+      "separate/maps/import-map.json":
+        '{"imports":{"package/":"npm:@scope/other@2.0.0/"}}',
+      "separate/main.ts": `import { load } from 'package/client'; load();`,
+      "uncaptured/deno.json": '{"importMap":"../unavailable.json"}',
+      "uncaptured/main.ts": `import { load } from 'package'; load();`,
+    },
+    async (graph, report) => {
+      clean(report);
+      const call = (name) => graph.link("deno/main.ts", name, "calls");
+      assert.deepEqual(libraryTarget(call("equal")), {
+        ecosystem: "jsr",
+        unit: "@std/assert",
+        symbol: "assertEquals",
+        evidence: "import-binding",
+      });
+      assert.equal(
+        libraryTarget(call("assertRejects")).symbol,
+        "assert-rejects:assertRejects",
+      );
+      assert.equal(libraryTarget(call("readFileSync")).ecosystem, "node");
+      assert.equal(graph.target(call("here")), "deno/helper.ts#here");
+      assert.equal(call("go").resolution, "unresolved");
+      assert.equal(call("fail").resolution, "unresolved");
+      assert.deepEqual(
+        libraryTarget(graph.link("deno/legacy/main.ts", "equal", "calls")),
+        {
+          ecosystem: "npm",
+          unit: "assert",
+          symbol: "equal",
+          evidence: "import-binding",
+        },
+      );
+      assert.deepEqual(
+        libraryTarget(graph.link("separate/main.ts", "load", "calls")),
+        {
+          ecosystem: "npm",
+          unit: "@scope/other",
+          symbol: "client:load",
+          evidence: "import-binding",
+        },
+      );
+      assert.equal(
+        graph.link("uncaptured/main.ts", "load", "calls").resolution,
+        "unresolved",
+      );
+    },
+  );
+});
+
+test("CommonJS destructuring proves the written export and leaves rest, nesting and defaults open", async () => {
+  await project(
+    {
+      "use.cjs": `const { 'readFileSync': read } = require('node:fs');
+        const { ...rest } = require('node:path');
+        const { posix: { basename: nested } } = require('node:path');
+        const { 'writeFileSync': write = () => 1 } = require('node:fs');
+        read('x'); rest.join('a', 'b'); nested('x'); write('x');`,
+    },
+    async (graph, report) => {
+      clean(report);
+      const at = (text, kind) => graph.link("use.cjs", text, kind);
+      for (const [text, kind] of [
+        ["'readFileSync': read", "imports"],
+        ["read", "calls"],
+      ])
+        assert.equal(libraryTarget(at(text, kind)).symbol, "readFileSync");
+      for (const [text, kind] of [
+        ["...rest", "imports"],
+        ["join", "calls"],
+        ["nested", "calls"],
+      ])
+        assert.deepEqual(libraryTarget(at(text, kind)), {
+          ecosystem: "node",
+          unit: "path",
+          evidence: "import-path",
+        });
+      assert.equal(
+        libraryTarget(at("'writeFileSync': write = () => 1", "imports")).symbol,
+        undefined,
+      );
+      assert.equal(at("write", "calls").resolution, "unresolved");
+    },
+  );
+});
+
+test("writes to a module binding withhold only the affected member names", async () => {
+  await project(
+    {
+      "use.cjs": `const fs = require('node:fs');
+        const alias = fs;
+        alias.readFileSync('x'); fs.statSync('x'); fs.unlinkSync('x'); fs.existsSync('x');
+        fs.writeFileSync('x');
+        fs.readFileSync = () => 'fake';
+        alias.writeFileSync = () => null;
+        Object.assign(fs, { statSync: () => null });
+        delete fs['unlinkSync'];
+        function unrelated(fs) { fs.existsSync = () => false; }`,
+      "typed.ts": `import * as fs from 'node:fs';
+        fs.statSync('x'); fs.statSync = () => null;
+        fs.existsSync('x');`,
+      "types/node/package.json": '{"name":"@types/node","types":"index.d.ts"}',
+      "types/node/index.d.ts": `declare module 'node:fs' {
+        export function statSync(path: string): unknown;
+        export function existsSync(path: string): boolean;
+      }`,
+      "tsconfig.json":
+        '{"compilerOptions":{"typeRoots":["./types"],"types":["node"]},"files":["typed.ts"]}',
+      "jsconfig.json": '{"files":["use.cjs"]}',
+    },
+    async (graph, report) => {
+      clean(report);
+      const call = (file, name) => graph.link(file, name, "calls");
+      for (const name of [
+        "readFileSync",
+        "statSync",
+        "unlinkSync",
+        "writeFileSync",
+      ])
+        assert.deepEqual(libraryTarget(call("use.cjs", name)), {
+          ecosystem: "node",
+          unit: "fs",
+          evidence: "import-path",
+        });
+      assert.equal(
+        libraryTarget(call("use.cjs", "existsSync")).symbol,
+        "existsSync",
+      );
+      assert.deepEqual(libraryTarget(call("typed.ts", "statSync")), {
+        ecosystem: "node",
+        unit: "fs",
+        evidence: "import-path",
+      });
+      assert.equal(
+        libraryTarget(call("typed.ts", "existsSync")).symbol,
+        "existsSync",
+      );
+    },
+  );
+});
+
+test("written imports can be independent of source or compiler configuration gaps", async () => {
+  await project(
+    {
+      "broken.ts": "export function broken( {",
+      "use.ts": `import { join } from 'node:path';
+        import { build as run } from 'package';
+        import { broken } from './broken';
+        join('a', 'b'); run(); broken(); Promise.resolve(1);`,
+      "partial/tsconfig.json": '{"extends":"@missing/base"}',
+      "partial/use.ts": `import { readFile } from 'node:fs/promises';
+        import { parse } from 'package'; readFile('x'); parse();`,
+    },
+    async (graph, report) => {
+      clean(report);
+      const call = (file, name) => graph.link(file, name, "calls");
+      assert.equal(libraryTarget(call("use.ts", "join")).symbol, "join");
+      assert.equal(libraryTarget(call("use.ts", "run")).symbol, "build");
+      assert.equal(call("use.ts", "broken").data.reason, "invalid-code");
+      assert.equal(call("use.ts", "resolve").resolution, "unresolved");
+      assert.equal(
+        libraryTarget(call("partial/use.ts", "readFile")).symbol,
+        "readFile",
+      );
+      assert.equal(
+        call("partial/use.ts", "parse").data.reason,
+        "incomplete-config",
+      );
     },
   );
 });
@@ -4682,6 +4894,7 @@ async function indexFiles(files) {
         reason: l.data?.reason,
         cause: l.data?.cause,
         assumes: l.data?.assumes,
+        libraries: l.libraries,
         targets:
           l.resolution === "resolved"
             ? [symbols.get(l.targetId)]
@@ -4707,8 +4920,9 @@ async function indexFiles(files) {
  * Indexes `files` clean and with `broken` replacing some of them, for
  * fixtures that exercise the attribution rules. It checks, for every link of
  * a valid file: identical to the clean index (maybe plus the flag), or
- * `invalid-code` naming a broken file with a `via`. A library link with
- * unseen declarations must be flagged and unresolved. A link whose clean
+ * `invalid-code` naming a broken file with a `via`. Checker-dependent
+ * library links are flagged and unresolved. Source-proved library bindings
+ * retain the exact identity. A link whose clean
  * target is in a broken file fails, naming it. That is STRICTER than the
  * contract (W2-D.md), which requires equality only of unflagged links: a
  * flagged link may differ from the clean index, and the known-limit
@@ -4751,6 +4965,21 @@ async function differential(files, broken, unflaggedFiles = []) {
       problems.push(
         `${key} (${c.text} in ${c.line.trim()}): clean target in ${intoBroken} but broken is ${b.resolution} ${b.reason}`,
       );
+    if (c.resolution === "library" && b.resolution === "library") {
+      assert.deepEqual(
+        b.libraries,
+        c.libraries,
+        `${key}: unchanged library identity`,
+      );
+      assert.ok(
+        b.libraries.every((target) =>
+          ["import-path", "import-binding"].includes(target.evidence),
+        ),
+        `${key}: independent source proof`,
+      );
+      counts.unflagged++;
+      continue;
+    }
     if (
       c.resolution === "library" &&
       b.assumes?.includes("no-unseen-declarations")
@@ -4779,8 +5008,7 @@ async function differential(files, broken, unflaggedFiles = []) {
         `${key} (${c.text} in ${c.line.trim()}): reason ${c.reason} -> ${b.reason}`,
       );
     }
-    // K3: in a program that includes a failed file, EVERY link that is not
-    // invalid-code is flagged (resolved or unresolved alike).
+    // K3: the remaining answers depend on the potentially unseen declarations.
     if (b.assumes?.includes("no-unseen-declarations")) counts.flagged++;
     else {
       counts.unflagged++;
@@ -6634,14 +6862,26 @@ test("K3: in a program with a failed file, unresolved links are flagged too", as
     "unresolved",
   );
   const seen = new Set();
+  const syntaxProofs = [];
   for (const link of broken.links.values()) {
     if (link.file !== "use.ts" || link.reason === "invalid-code") continue;
+    if (link.resolution === "library") {
+      assert.equal(link.assumes, undefined);
+      assert.equal(link.libraries[0].unit, "fs");
+      syntaxProofs.push(link.libraries[0].symbol ?? "(module)");
+      continue;
+    }
     assert.ok(
       link.assumes?.includes("no-unseen-declarations"),
       `${link.text} (${link.resolution} ${link.reason}) is flagged`,
     );
     if (link.resolution === "unresolved") seen.add(link.reason);
   }
+  assert.deepEqual(syntaxProofs.sort(), [
+    "(module)",
+    "readFileSync",
+    "readFileSync",
+  ]);
   // The unresolved reasons this fixture produces, each flagged.
   for (const reason of ["no-symbol", "external", "local", "missing-module"])
     assert.ok(
