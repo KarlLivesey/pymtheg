@@ -1,16 +1,16 @@
 == no-require
-fails: cmd/main.go:6:2: module example.com/dep provides package example.com/dep and is replaced but not required; to add it: 	go get example.com/dep 
+fails: cmd/main.go:6:2: module example.com/dep provides package example.com/dep and is replaced but not required; to add it: 	go get example.com/dep
 == testdata-unused-replace
 builds; uses package returning 1
 == testdata-required-replace
-fails: cmd/main.go:6:2: ambiguous import: found package example.com/app/testdata/p in multiple modules: 	example.com/app (WORK/testdata-required-replace/testdata/p) 
+fails: cmd/main.go:6:2: ambiguous import: found package example.com/app/testdata/p in multiple modules: 	example.com/app (WORK/testdata-required-replace/testdata/p)
 == parent-without-gomod
-fails: cmd/main.go:6:2: module ..: reading ../go.mod: open WORK/parent-without-gomod/go.mod: no such file or directory 
+fails: cmd/main.go:6:2: module ..: reading ../go.mod: open WORK/parent-without-gomod/go.mod: no such file or directory
 == parent-with-gomod
 builds; uses package returning 1
 == path-mismatch
 builds; uses package returning 1
 == ignore-only
-fails: package example.com/app/cmd 	imports example.com/app/p: build constraints exclude all Go files in WORK/ignore-only/p 
+fails: package example.com/app/cmd 	imports example.com/app/p: build constraints exclude all Go files in WORK/ignore-only/p
 == unpruned-no-require
-fails: cmd/main.go:6:2: module example.com/dep provides package example.com/dep and is replaced but not required; to add it: 	go get example.com/dep 
+fails: cmd/main.go:6:2: module example.com/dep provides package example.com/dep and is replaced but not required; to add it: 	go get example.com/dep
