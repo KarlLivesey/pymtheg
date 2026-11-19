@@ -261,9 +261,9 @@ Link outcomes:
 | Outcome | Meaning |
 |---|---|
 | `resolved` | One definite target in the checkout |
-| `library` | One definite target outside the project: a library unit (level 1) or a symbol in it (level 2), recorded with how the source proves it (see the design section in `runtime-map.md`). Rust records library paths with proven bindings. TypeScript and JavaScript record library targets at existing sites. |
+| `library` | One definite target outside the project: a library unit (level 1) or a symbol in it (level 2), recorded with how the source proves it (see the design section in `runtime-map.md`). Rust records library paths with proven bindings. TypeScript and JavaScript record library targets at existing sites. Go records imports, package-qualified names and builtins (C-14). |
 | `ambiguous` | A candidate set, never a pick. It may mix checkout symbols and library targets. A set is **closed** only when it provably holds every possible target and every member is provably possible. Otherwise it is **open**, and `data.open` gives the reasons (for example a type outside the project could be the target); an open set still lists every project target |
-| `unresolved` | No target; the written name is kept. The reason, when recorded, is in `data` (`reason` in Go and TypeScript, `uncertainty` in Rust). Rust may also list unverified would-be targets in `data.targets` (at most 16, else a count) |
+| `unresolved` | No target; the written name is kept. The reason, when recorded, is in `data` (`reason` in Go and TypeScript, `uncertainty` in Rust; Go's `uncertainty` `library-member-unproven` marks a member of a library-typed value). Rust may also list unverified would-be targets in `data.targets` (at most 16, else a count) |
 | failed (`unresolved`, reason `invalid-code`) | The link depends on a file that could not be read. `data.cause` names the failed file(s). It has no target, no candidates and no would-be targets |
 
 **Unreadable code is failed; the unit is the file.** A file with any syntax error
@@ -364,13 +364,42 @@ file (its ID can change when files are added or removed).
   `data.interfaceId`, `structural-match-unverified`; computed type identity is an
   annotation only). An interface that embeds two provably different
   declarations of one method (invalid Go) has no implementers.
-- **Unresolved:** standard library, third-party and non-local `replace` imports and
-  everything reached through them; imports Go forbids (`internal`,
+- **Library targets (C-14, module 30):** an import of a package outside the
+  checkout names its unit (the import path; `go-std` for the standard library,
+  `go` for a dependency, with the `go.mod` requirement's version and
+  `versionSource` when one unreplaced module provides it at a proven selected
+  version), evidence `import-path`; an exported name selected from such an
+  import's qualifier, as a call, value, embedded or written type
+  (`strconv.Quote`, `time.Duration`, `require.NoError`), names the unit and
+  the name, evidence `import-binding`; a builtin call no declaration, import
+  or failed file can shadow (`len`, `append`, `min`, …) is unit `builtin`,
+  evidence `declared-builtin`. The qualifier must be bound by exactly one of
+  the file's imports: an explicit import name, a standard-library package's
+  last path element, or a dependency's conventional name (last element
+  without `/vN`, `.vN` or a `go-` prefix); a package clause the checkout
+  cannot show that differs from it is not followed. Never a library: a
+  package the checkout provides or may provide (main or nested module, a
+  local `replace`, an uncertain or ambiguous destination), a module whose
+  `vendor/` directory is captured, `import "C"`, a GOPATH-style test-data
+  import, a dot-imported name (source-only). A name that exists only on some
+  platforms (`syscall.Kill`) is recorded as written: the import proves the
+  unit and the written name.
+- **Library members, source-only:** a field or method selected on a value of
+  a library type (`buf.Write` on a `bytes.Buffer`, a library call's result,
+  `os.Stdout.Write`) is unresolved with `data.uncertainty`
+  `library-member-unproven`: its declaring owner may be promoted from an
+  embedded type the checkout does not show. With the opt-in toolchain route
+  and a clean run, go/types' selection names it: a field or concrete method
+  gets `Owner.Name` with its declaring named type and package, evidence
+  `declaring-owner` (`exitErr.ExitCode` on an `*exec.ExitError` is `os`
+  `ProcessState.ExitCode`); interface methods stay dispatch.
+- **Unresolved:** members of standard-library, third-party and non-local
+  `replace` types (above); imports Go forbids (`internal`,
   `package main`, a `replace` of a module that is not required, a local
   replacement without a go.mod, a package with no buildable file); an import
   two modules provide (Go: "ambiguous import"; reason
   `import-destination-uncertain`); unexported names from another package;
-  builtins (`data.builtin`); members of `(**T)(x)` or of a conversion to a
+  members of `(**T)(x)` or of a conversion to a
   pointer type's pointer (`(*A)(x)` with `type A = *T`);
   elements of function containers; elements of a generic named container
   (`type L[E any] []E`); a field of an anonymous struct type declared in several
