@@ -1377,6 +1377,11 @@ function countStatements(db: DatabaseSync): DatabaseSync {
  * this run stopped before writing anything more.
  */
 export class GraphIndexTakenOver extends Error {
+  /** As MCP and other callers present it: another writer, retry later. */
+  readonly code = "concurrent-update";
+  readonly retryable = true;
+  readonly action =
+    "Wait for the other graph index run to finish, then retry if its result is not complete. No complete answer is claimed.";
   constructor() {
     super(
       "Another graph index run started on this store and took it over (or the store changed while this run was reading it); this run stopped without writing more. Run `pymtheg graph index` again if the other run did not finish.",
