@@ -1,5 +1,7 @@
 # C-11 TypeScript and JavaScript library targets
 
+The module 24 review runs are recorded separately. [First review evidence](review-1.md)
+
 The sweep cohort is the 18 TypeScript pins that returned a graph in
 release 0.1.0. The sweep uses the dev server's Node 24 toolchain. It runs
 each published checkout without dependency installation, then repeats the
