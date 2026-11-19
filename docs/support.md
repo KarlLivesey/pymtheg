@@ -372,15 +372,17 @@ makes that whole manifest unknown). Private items are ordinary symbols.
   Trait methods (even of a checkout trait implemented for the type), `Box`,
   `Rc` and `Arc` receivers and `Deref` targets stay unresolved.
 - **Receiver types** come from written declarations only: a parameter or an
-  annotated `let`; a `let` initialised by a struct literal, by a call with one
-  definite checkout callee whose return type is written (`Self` resolved
-  through its impl), by a definite method in a chain, or by a declared field of
-  a checkout struct; `&`, `*` on a reference, `?` on a written `Result`/`Option`
-  (directly or through one checkout alias), and `.await` on an `async fn`.
-  Generic results, closures, iterator items, pattern bindings and macros stay
-  unresolved; the gap is recorded in `data.receiverGap` or
+  annotated `let`; a `let` initialised by a struct literal naming exactly one
+  struct or alias (not an imported struct-like variant), by a unit struct value,
+  by a call with one definite checkout callee whose return type is written
+  (`Self` resolved through its impl), by a definite method in a chain, or by a
+  declared field of a checkout struct; `&`, `*` on a reference, `?` on a written
+  `Result`/`Option` (directly or through one checkout alias), and `.await` on an
+  `async fn`. Generic results, closures, iterator items, pattern bindings and
+  macros stay unresolved; the gap is recorded in `data.receiverGap` or
   `data.receiverTyping.gap`. A proven standard or dependency receiver type is
-  recorded as `data.receiverTyping.outside`; its method has no library target.
+  recorded as `data.receiverTyping.outside` (never a generic parameter,
+  projection, `Self` path or variant); its method has no library target.
 - **Non-builtin attributes:** a link whose **target** is an item under a
   non-builtin attribute, or inside an item with one, is not definite (the
   attribute may replace the item; `item-under-opaque-attribute`, target kept as a

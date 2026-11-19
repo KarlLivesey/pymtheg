@@ -8,8 +8,8 @@
     "symbolKeysRemoved": 0,
     "symbolKeysAdded": 0,
     "links": {
-      "before": 39086,
-      "after": 39086
+      "before": 39819,
+      "after": 39819
     },
     "sitesOnlyBefore": 0,
     "sitesOnlyAfter": 0,
@@ -20,34 +20,34 @@
     "ambiguousBefore": 12,
     "ambiguousChanged": 0,
     "newDefinite": {
-      "local-binding": 3366,
+      "local-binding": 3194,
       "type-parameter": 525,
       "method-inferred-receiver": 560,
       "method-written-receiver": 10
     },
     "rust": {
       "before": 13719,
-      "after": 18180,
-      "total": 39086
+      "after": 18008,
+      "total": 39819
     },
     "receiverGaps": {
       "destructured": 101,
       "callee-unresolved": 1380,
       "control-flow": 109,
-      "no-recipe": 2934,
+      "no-recipe": 3031,
       "macro": 114,
       "iterator-item": 174,
       "receiver-method-unresolved": 1132,
       "written-type": 676,
       "closure-parameter": 190,
-      "outside-type": 882,
+      "outside-type": 856,
       "pattern-binding": 355,
       "annotation-shape": 141,
       "index": 84,
       "generic-call": 13,
       "literal": 121,
       "field-owner": 44,
-      "non-local-value": 178,
+      "non-local-value": 106,
       "path-value": 7,
       "binary": 7,
       "try-wrapper": 20,
@@ -55,6 +55,7 @@
       "binding-unproved": 39,
       "aggregate": 16,
       "callee-kind": 23,
+      "struct-literal-owner": 1,
       "field-unknown": 2,
       "deref-owned": 18,
       "self-type": 27,
@@ -62,74 +63,10 @@
       "generic-return": 8,
       "range": 2
     },
-    "outsideReceivers": 882
-  },
-  {
-    "id": "cberner/redb",
-    "symbols": {
-      "before": 5523,
-      "after": 5523
-    },
-    "symbolKeysRemoved": 0,
-    "symbolKeysAdded": 0,
-    "links": {
-      "before": 73191,
-      "after": 73191
-    },
-    "sitesOnlyBefore": 0,
-    "sitesOnlyAfter": 0,
-    "definiteBefore": 18330,
-    "definiteKept": 18330,
-    "definiteChanged": [],
-    "libraryChanged": 0,
-    "ambiguousBefore": 260,
-    "ambiguousChanged": 0,
-    "newDefinite": {
-      "type-parameter": 1387,
-      "local-binding": 5940,
-      "method-inferred-receiver": 174
-    },
-    "rust": {
-      "before": 18330,
-      "after": 25831,
-      "total": 73191
-    },
-    "receiverGaps": {
-      "callee-unresolved": 8221,
-      "receiver-method-unresolved": 4171,
-      "written-type": 1316,
-      "declaration-placement": 199,
-      "control-flow": 110,
-      "iterator-item": 138,
-      "destructured": 597,
-      "pattern-binding": 423,
-      "closure-parameter": 278,
-      "generic-call": 168,
-      "macro": 376,
-      "no-recipe": 7061,
-      "literal": 245,
-      "index": 366,
-      "type_cast": 42,
-      "non-local-value": 69,
-      "range": 158,
-      "outside-type": 623,
-      "annotation-shape": 450,
-      "self-type": 6,
-      "field-owner": 78,
-      "path-value": 13,
-      "try-wrapper": 4,
-      "binary": 110,
-      "call-expression": 4,
-      "closure-call": 34,
-      "callee-kind": 9,
-      "aggregate": 27,
-      "generic-field": 21,
-      "impl-trait": 1,
-      "field-unknown": 57,
-      "operator": 1,
-      "binding-unproved": 40
-    },
-    "outsideReceivers": 623
+    "outsideReceivers": 856,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 7774,
+    "libraryTargetsChanged": []
   },
   {
     "id": "clap-rs/clap",
@@ -140,8 +77,8 @@
     "symbolKeysRemoved": 0,
     "symbolKeysAdded": 0,
     "links": {
-      "before": 50949,
-      "after": 50949
+      "before": 52417,
+      "after": 52417
     },
     "sitesOnlyBefore": 0,
     "sitesOnlyAfter": 0,
@@ -153,19 +90,19 @@
     "ambiguousChanged": 0,
     "newDefinite": {
       "type-parameter": 611,
-      "local-binding": 2102,
+      "local-binding": 2152,
       "method-inferred-receiver": 176
     },
     "rust": {
       "before": 11133,
-      "after": 14022,
-      "total": 50949
+      "after": 14072,
+      "total": 52417
     },
     "receiverGaps": {
       "macro": 741,
       "written-type": 1231,
       "receiver-method-unresolved": 659,
-      "no-recipe": 8228,
+      "no-recipe": 8238,
       "callee-unresolved": 1984,
       "closure-call": 83,
       "receiver-too-long": 47,
@@ -191,7 +128,8 @@
       "aggregate": 17,
       "path-value": 54,
       "generic-field": 7,
-      "non-local-value": 24,
+      "struct-literal-owner": 2,
+      "non-local-value": 12,
       "uninitialized": 3,
       "binary": 1,
       "call-expression": 1,
@@ -200,7 +138,10 @@
       "try-wrapper": 2,
       "binding-unproved": 54
     },
-    "outsideReceivers": 325
+    "outsideReceivers": 325,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 4637,
+    "libraryTargetsChanged": []
   },
   {
     "id": "crossbeam-rs/crossbeam",
@@ -211,8 +152,8 @@
     "symbolKeysRemoved": 0,
     "symbolKeysAdded": 0,
     "links": {
-      "before": 34043,
-      "after": 34043
+      "before": 34220,
+      "after": 34220
     },
     "sitesOnlyBefore": 0,
     "sitesOnlyAfter": 0,
@@ -223,14 +164,14 @@
     "ambiguousBefore": 81,
     "ambiguousChanged": 0,
     "newDefinite": {
-      "local-binding": 3589,
+      "local-binding": 3605,
       "type-parameter": 2022,
       "method-inferred-receiver": 42
     },
     "rust": {
       "before": 7674,
-      "after": 13327,
-      "total": 33904
+      "after": 13343,
+      "total": 34081
     },
     "receiverGaps": {
       "callee-unresolved": 2236,
@@ -240,18 +181,18 @@
       "range": 58,
       "pattern-binding": 358,
       "annotation-shape": 67,
-      "non-local-value": 88,
+      "no-recipe": 2605,
       "type_cast": 22,
       "generic-call": 127,
       "receiver-method-unresolved": 432,
-      "no-recipe": 2594,
       "control-flow": 96,
       "outside-type": 33,
       "path-value": 4,
-      "field-owner": 190,
+      "field-owner": 188,
       "literal": 105,
       "binary": 23,
       "aggregate": 28,
+      "non-local-value": 77,
       "field-unknown": 237,
       "deref-owned": 13,
       "generic-return": 1,
@@ -259,115 +200,58 @@
       "index": 83,
       "binding-unproved": 46,
       "macro": 37,
+      "struct-literal-owner": 2,
       "uninitialized": 40,
       "closure-call": 5,
       "generic-field": 19,
       "call-expression": 1,
       "impl-trait": 1
     },
-    "outsideReceivers": 33
-  },
-  {
-    "id": "fjall-rs/fjall",
-    "symbols": {
-      "before": 1179,
-      "after": 1179
-    },
-    "symbolKeysRemoved": 0,
-    "symbolKeysAdded": 0,
-    "links": {
-      "before": 13275,
-      "after": 13275
-    },
-    "sitesOnlyBefore": 0,
-    "sitesOnlyAfter": 0,
-    "definiteBefore": 2962,
-    "definiteKept": 2962,
-    "definiteChanged": [],
-    "libraryChanged": 0,
-    "ambiguousBefore": 7,
-    "ambiguousChanged": 0,
-    "newDefinite": {
-      "local-binding": 977,
-      "type-parameter": 139,
-      "method-inferred-receiver": 19
-    },
-    "rust": {
-      "before": 2961,
-      "after": 4096,
-      "total": 13235
-    },
-    "receiverGaps": {
-      "callee-unresolved": 1025,
-      "no-recipe": 1094,
-      "iterator-item": 146,
-      "written-type": 223,
-      "literal": 101,
-      "generic-call": 26,
-      "macro": 63,
-      "receiver-method-unresolved": 520,
-      "pattern-binding": 59,
-      "path-value": 14,
-      "destructured": 35,
-      "outside-type": 92,
-      "binary": 13,
-      "closure-parameter": 43,
-      "control-flow": 19,
-      "range": 19,
-      "field-unknown": 315,
-      "annotation-shape": 65,
-      "closure-call": 3,
-      "non-local-value": 2,
-      "field-owner": 4,
-      "callee-kind": 1,
-      "index": 17,
-      "self-type": 5,
-      "assignment": 1,
-      "try-wrapper": 199,
-      "generic-field": 1
-    },
-    "outsideReceivers": 92
+    "outsideReceivers": 33,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 4038,
+    "libraryTargetsChanged": []
   },
   {
     "id": "helix-editor/helix",
     "symbols": {
-      "before": 8453,
-      "after": 8453
+      "before": 8461,
+      "after": 8461
     },
     "symbolKeysRemoved": 0,
     "symbolKeysAdded": 0,
     "links": {
-      "before": 86285,
-      "after": 86285
+      "before": 90780,
+      "after": 90780
     },
     "sitesOnlyBefore": 0,
     "sitesOnlyAfter": 0,
-    "definiteBefore": 22869,
-    "definiteKept": 22869,
+    "definiteBefore": 22872,
+    "definiteKept": 22872,
     "definiteChanged": [],
     "libraryChanged": 0,
     "ambiguousBefore": 30,
     "ambiguousChanged": 0,
     "newDefinite": {
-      "local-binding": 6482,
+      "local-binding": 5915,
       "type-parameter": 761,
       "method-inferred-receiver": 108
     },
     "rust": {
       "before": 22770,
-      "after": 30121,
-      "total": 86088
+      "after": 29554,
+      "total": 90583
     },
     "receiverGaps": {
       "written-type": 2477,
-      "receiver-method-unresolved": 1903,
-      "closure-parameter": 1198,
-      "outside-type": 419,
+      "receiver-method-unresolved": 1901,
+      "closure-parameter": 1197,
+      "outside-type": 416,
       "iterator-item": 336,
       "callee-unresolved": 2698,
-      "no-recipe": 2569,
-      "non-local-value": 244,
-      "pattern-binding": 1221,
+      "no-recipe": 2565,
+      "non-local-value": 247,
+      "pattern-binding": 1215,
       "literal": 328,
       "range": 21,
       "destructured": 1725,
@@ -375,11 +259,11 @@
       "index": 286,
       "aggregate": 49,
       "binary": 118,
-      "field-owner": 532,
+      "field-owner": 531,
       "macro": 472,
       "control-flow": 366,
       "generic-call": 101,
-      "binding-unproved": 223,
+      "binding-unproved": 232,
       "type_cast": 27,
       "impl-trait": 26,
       "operator": 3,
@@ -394,74 +278,13 @@
       "deref-owned": 3,
       "reference-to-reference": 3,
       "uninitialized": 10,
+      "struct-literal-owner": 5,
       "await-non-async": 1
     },
-    "outsideReceivers": 419
-  },
-  {
-    "id": "ratatui/ratatui",
-    "symbols": {
-      "before": 5802,
-      "after": 5802
-    },
-    "symbolKeysRemoved": 0,
-    "symbolKeysAdded": 0,
-    "links": {
-      "before": 57390,
-      "after": 57390
-    },
-    "sitesOnlyBefore": 0,
-    "sitesOnlyAfter": 0,
-    "definiteBefore": 15606,
-    "definiteKept": 15606,
-    "definiteChanged": [],
-    "libraryChanged": 0,
-    "ambiguousBefore": 4,
-    "ambiguousChanged": 0,
-    "newDefinite": {
-      "local-binding": 3832,
-      "type-parameter": 544,
-      "method-inferred-receiver": 289
-    },
-    "rust": {
-      "before": 15606,
-      "after": 20271,
-      "total": 57390
-    },
-    "receiverGaps": {
-      "callee-unresolved": 4240,
-      "written-type": 1257,
-      "closure-parameter": 434,
-      "no-recipe": 2529,
-      "macro": 131,
-      "receiver-method-unresolved": 1184,
-      "outside-type": 213,
-      "pattern-binding": 257,
-      "index": 248,
-      "field-owner": 91,
-      "path-value": 114,
-      "literal": 255,
-      "destructured": 113,
-      "binary": 133,
-      "non-local-value": 120,
-      "range": 91,
-      "impl-trait": 23,
-      "control-flow": 23,
-      "type_cast": 15,
-      "annotation-shape": 147,
-      "generic-field": 72,
-      "generic-call": 24,
-      "iterator-item": 67,
-      "operator": 5,
-      "self-type": 2,
-      "aggregate": 14,
-      "parameter-shape": 39,
-      "binding-unproved": 36,
-      "field-unknown": 23,
-      "callee-kind": 1,
-      "closure-call": 1
-    },
-    "outsideReceivers": 213
+    "outsideReceivers": 416,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 7671,
+    "libraryTargetsChanged": []
   },
   {
     "id": "serde-rs/serde",
@@ -472,8 +295,8 @@
     "symbolKeysRemoved": 0,
     "symbolKeysAdded": 0,
     "links": {
-      "before": 29641,
-      "after": 29641
+      "before": 30714,
+      "after": 30714
     },
     "sitesOnlyBefore": 0,
     "sitesOnlyAfter": 0,
@@ -484,13 +307,13 @@
     "ambiguousBefore": 0,
     "ambiguousChanged": 0,
     "newDefinite": {
-      "local-binding": 778,
+      "local-binding": 807,
       "type-parameter": 1636
     },
     "rust": {
       "before": 5120,
-      "after": 7534,
-      "total": 29641
+      "after": 7563,
+      "total": 30714
     },
     "receiverGaps": {
       "callee-unresolved": 383,
@@ -501,7 +324,7 @@
       "receiver-method-unresolved": 102,
       "annotation-shape": 160,
       "no-recipe": 216,
-      "field-owner": 310,
+      "field-owner": 302,
       "macro": 31,
       "generic-call": 31,
       "control-flow": 25,
@@ -514,146 +337,13 @@
       "outside-type": 1,
       "destructured": 38,
       "range": 13,
+      "struct-literal-owner": 8,
       "closure-call": 3,
       "path-value": 4
     },
-    "outsideReceivers": 1
-  },
-  {
-    "id": "tokio-rs/axum",
-    "symbols": {
-      "before": 4561,
-      "after": 4561
-    },
-    "symbolKeysRemoved": 0,
-    "symbolKeysAdded": 0,
-    "links": {
-      "before": 39950,
-      "after": 39950
-    },
-    "sitesOnlyBefore": 0,
-    "sitesOnlyAfter": 0,
-    "definiteBefore": 8672,
-    "definiteKept": 8672,
-    "definiteChanged": [],
-    "libraryChanged": 0,
-    "ambiguousBefore": 13,
-    "ambiguousChanged": 0,
-    "newDefinite": {
-      "type-parameter": 2398,
-      "local-binding": 886,
-      "method-inferred-receiver": 17
-    },
-    "rust": {
-      "before": 8668,
-      "after": 11969,
-      "total": 39918
-    },
-    "receiverGaps": {
-      "no-recipe": 1355,
-      "closure-parameter": 92,
-      "pattern-binding": 436,
-      "callee-unresolved": 3029,
-      "self-type": 47,
-      "written-type": 667,
-      "receiver-method-unresolved": 505,
-      "annotation-shape": 56,
-      "destructured": 163,
-      "generic-call": 109,
-      "literal": 172,
-      "generic-field": 99,
-      "field-owner": 120,
-      "binding-unproved": 138,
-      "unit": 22,
-      "path-value": 28,
-      "macro": 110,
-      "non-local-value": 86,
-      "outside-type": 64,
-      "iterator-item": 11,
-      "control-flow": 31,
-      "try-wrapper": 22,
-      "index": 25,
-      "type_cast": 2,
-      "closure-call": 3,
-      "uninitialized": 1,
-      "binary": 1,
-      "impl-trait": 13,
-      "call-expression": 3,
-      "aggregate": 10,
-      "closure": 21,
-      "callee-kind": 2,
-      "generic-return": 2,
-      "range": 2
-    },
-    "outsideReceivers": 64
-  },
-  {
-    "id": "tree-sitter/tree-sitter",
-    "symbols": {
-      "before": 4916,
-      "after": 4916
-    },
-    "symbolKeysRemoved": 0,
-    "symbolKeysAdded": 0,
-    "links": {
-      "before": 58872,
-      "after": 58872
-    },
-    "sitesOnlyBefore": 0,
-    "sitesOnlyAfter": 0,
-    "definiteBefore": 14984,
-    "definiteKept": 14984,
-    "definiteChanged": [],
-    "libraryChanged": 0,
-    "ambiguousBefore": 6,
-    "ambiguousChanged": 0,
-    "newDefinite": {
-      "local-binding": 2857,
-      "type-parameter": 319,
-      "method-inferred-receiver": 63
-    },
-    "rust": {
-      "before": 12347,
-      "after": 15586,
-      "total": 53585
-    },
-    "receiverGaps": {
-      "callee-unresolved": 4481,
-      "generic-call": 307,
-      "non-local-value": 202,
-      "receiver-method-unresolved": 1062,
-      "written-type": 895,
-      "destructured": 251,
-      "pattern-binding": 753,
-      "closure-parameter": 763,
-      "iterator-item": 318,
-      "no-recipe": 3344,
-      "annotation-shape": 207,
-      "binary": 21,
-      "literal": 431,
-      "operator": 13,
-      "outside-type": 204,
-      "index": 390,
-      "closure-call": 16,
-      "macro": 189,
-      "impl-trait": 32,
-      "type_cast": 7,
-      "field-owner": 68,
-      "range": 50,
-      "control-flow": 147,
-      "try-wrapper": 49,
-      "field-unknown": 29,
-      "binding-unproved": 58,
-      "generic-field": 10,
-      "path-value": 7,
-      "aggregate": 102,
-      "declaration-placement": 266,
-      "uninitialized": 6,
-      "generic-return": 27,
-      "call-expression": 1,
-      "callee-kind": 1,
-      "await-non-async": 10
-    },
-    "outsideReceivers": 204
+    "outsideReceivers": 1,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 726,
+    "libraryTargetsChanged": []
   }
 ]
