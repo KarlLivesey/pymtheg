@@ -1,0 +1,6 @@
+unlocked       tokio         1.54.1   registry+https://github.com/rust-lang/crates.io-index
+unlocked       tokio-macros  2.7.2    registry+https://github.com/rust-lang/crates.io-index
+patched        tokio         1.54.1   registry+https://github.com/rust-lang/crates.io-index
+patched        tokio-macros  2.7.2    path patched/macros/Cargo.toml
+config-patch   tokio         1.54.1   registry+https://github.com/rust-lang/crates.io-index
+config-patch   tokio-macros  2.7.2    path config-paths/macros/Cargo.toml

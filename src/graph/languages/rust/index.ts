@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 import type { ContextFile, GraphFile, LanguageModule } from "../../types.js";
 import { crates } from "./cargo.js";
-import type { AddedLink, Json } from "../../types.js";
+import type { AddedLink, GraphLink, GraphSymbol, Json } from "../../types.js";
 import { parseRust } from "./parse.js";
-import { fileFacts } from "../../identity.js";
+import { compare, fileFacts } from "../../identity.js";
 import { resolveRust } from "./resolve.js";
 import { macroScopeAssumption } from "./macro-scope.js";
 import { runRustPhase } from "./phase-runner.js";
@@ -19,8 +19,49 @@ type RustAnalysisInput = {
 const cargoInputs = (files: readonly ContextFile[]) =>
   files.map(({ path, status, text }) => ({ path, status, text }));
 
+// C-24: stores list rows by id, and every id includes the project's random
+// id, so two indexes of one snapshot list the same rows in different orders.
+// Lookups through glob cycles can depend on which lookup ran first, so the
+// Rust phases take their inputs in an order the snapshot alone fixes: path,
+// then position, then what is written there.
+const pathOrder = <T extends { path: string }>(items: readonly T[]): T[] =>
+  [...items].sort((a, b) => compare(a.path, b.path));
+const bySite = <
+  T extends {
+    file: string;
+    range: { start: number; end: number };
+    kind: string;
+    data?: Json | undefined;
+  },
+>(
+  items: readonly T[],
+  written: (item: T) => string[],
+): T[] =>
+  [...items].sort(
+    (a, b) =>
+      compare(a.file, b.file) ||
+      a.range.start - b.range.start ||
+      a.range.end - b.range.end ||
+      compare(a.kind, b.kind) ||
+      written(a).reduce(
+        (order, part, i) => order || compare(part, written(b)[i]!),
+        0,
+      ) ||
+      compare(JSON.stringify(a.data ?? null), JSON.stringify(b.data ?? null)),
+  );
+const symbolOrder = (symbols: readonly GraphSymbol[]) =>
+  bySite(symbols, (s) => [s.key, s.identity, s.name]);
+const linkOrder = (links: readonly GraphLink[]) =>
+  bySite(links, (l) => [l.origin, l.targetName, l.sourceKey ?? ""]);
+
 export const rustPhases = {
-  analyze({ projectId, files, contextFiles }: RustAnalysisInput) {
+  analyze({
+    projectId,
+    files: listed,
+    contextFiles: contexts,
+  }: RustAnalysisInput) {
+    const files = pathOrder(listed),
+      contextFiles = pathOrder(contexts);
     const roots = new Map(
       crates(contextFiles, new Set(files.map((f) => f.path))).map((c) => [
         c.root,
@@ -114,8 +155,8 @@ export const rustPhases = {
         projectId,
         files: updated,
         contextFiles,
-        symbols: facts.flatMap((f) => f.symbols),
-        links: facts.flatMap((f) => f.links),
+        symbols: symbolOrder(facts.flatMap((f) => f.symbols)),
+        links: linkOrder(facts.flatMap((f) => f.links)),
       },
       (l, targets, reason, files, attributes) =>
         unknown.set(l.id, {
@@ -221,7 +262,14 @@ export const rustPhases = {
   },
   // Derived links (calls in macro bodies) are returned only when present, so
   // a project without them keeps the plain resolution list.
-  resolve(ctx: Parameters<typeof resolveRust>[0]) {
+  resolve(input: Parameters<typeof resolveRust>[0]) {
+    const ctx = {
+      ...input,
+      files: pathOrder(input.files),
+      contextFiles: pathOrder(input.contextFiles),
+      symbols: symbolOrder(input.symbols),
+      links: linkOrder(input.links),
+    };
     const links: AddedLink[] = [];
     const resolutions = resolveRust(ctx, undefined, undefined, undefined, (l) =>
       links.push(l),
@@ -232,7 +280,7 @@ export const rustPhases = {
 
 const rust: LanguageModule = {
   id: "rust",
-  version: "38",
+  version: "40",
   extensions: [".rs"],
   contextFiles: [
     "Cargo.toml",
