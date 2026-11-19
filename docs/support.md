@@ -4,31 +4,31 @@
 fail, or remain incomplete; there is no global verified badge. No external
 backend exists; `check` starts no other program.
 
-| Construct | Parsing/typing | Local analysis | Behaviour |
-|---|---|---|---|
-| Bool, mathematical Int/Nat, String, Unit | implemented | implemented | flows: explicit finite domains; machines: Bool/Int/Nat |
-| Nominal records, tagged unions/payloads, List<T>, Result<T,E> | implemented | field/tag/signature/outcome checks | finite flow values supported; explicit lists/scalar domains required |
-| Imports, duplicate/ambiguous names, cycles | implemented; cycles diagnosed unsupported | deterministic single parse/file | selected explicit machine only |
-| Pure typed rules/calls | implemented; rule recursion rejected | exact alpha copies, effects, explicit cost overhead | flow evaluation with pre/postconditions; machine expressions exclude calls |
-| Abstract op signatures/effects/cost/settles/stable | implemented | contracts are visible assumptions | finite contract results or linked explicit provider protocol |
-| Structured flow call/let/if/match/return/propagate/assert | implemented | types, effects, costs, ownership | finite source graph; built-in search/sampler; replay |
-| Cardinality and List iteration, bounded retry | implemented | work upper bounds; loop-local ownership | bounded loops/retry execute; initial attempt included |
-| Single-owner resources/take/read borrow | implemented | states, moves, local exits, explicit cancellation | creation, transfer, terminal exits, cancellation |
-| Fresh direct/Result resource return | implemented via creates result | per-outcome ownership through match | supported; owned collections/shared mutation unsupported |
-| Unknown expression/statement | legal, dependencies retained | affected results incomplete; independent claims usable | affected entry incomplete |
-| Scalar conjunctive entry constraints | implemented | integer interval/Bool witness or contradiction | machine initial state explicit |
-| Call preconditions | implemented | branch-sensitive scalar/affine facts; supported abstract returns carry assumptions to consumers; other calls retain obligations | evaluated in finite flow execution |
-| Concrete postconditions | parsed/typed | scalar/affine fragment; unsupported reasoning stays pending | evaluated on finite flow returns |
-| Explicit finite machine/event/invariant | implemented | type checks; initial domain preflight | built-in exhaustive search and seeded sampler (CLI, Studio, MCP) |
-| Machine recursion/parallel calls/records/strings | outside behavioural expression subset | local supported constructs remain usable | preflight rejects |
-| Near-duplicate rule suggestions | deferred | exact copies only | not applicable |
-| Latency/peak live memory | reserved metric names rejected | no additive-work pretence | unsupported |
-| SMT/proof, liveness/fairness, code extraction/conformance, LSP, caches | deferred | no claims | no claims |
-| Agent-facing MCP | implemented local stdio | same worker, root-confined reads, paged explanations/evidence | built-in search (verify) and sampler (simulate), source-mapped trace steps |
-| Code graph and requirement links (Go, Rust, TypeScript/JavaScript) | `pymtheg graph`, `pymtheg link`; MCP `code_graph`, `graph_result`, `requirement_links`, `link_result` | definite, candidate-set and unresolved links with possible callers; source-only unless the Go toolchain route is turned on | not applicable; links record reviewed intent, never proof |
-| TypeScript / Rust / Go scaffolds | one normalized contract document from checked IR | fail-fast stubs by default; optional empty bodies; arbitrary precision, explicit dependencies/omissions | no runtime implementation or conformance claim |
-| Language emitter plugins | explicitly registered local module; versioned API | bounded process, validated output/identities; JavaScript example | trusted executable code; registered launch targets work in CLI/MCP/GUI; no automatic discovery |
-| Local Studio | implemented | real compiler workers, typed scenario forms, source/durable-draft conflict saves | built-in search (verify) and sampler (simulate), same scopes; replay player; three cached runs |
+| Construct                                                              | Parsing/typing                                                                                        | Local analysis                                                                                                                  | Behaviour                                                                                      |
+| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Bool, mathematical Int/Nat, String, Unit                               | implemented                                                                                           | implemented                                                                                                                     | flows: explicit finite domains; machines: Bool/Int/Nat                                         |
+| Nominal records, tagged unions/payloads, List<T>, Result<T,E>          | implemented                                                                                           | field/tag/signature/outcome checks                                                                                              | finite flow values supported; explicit lists/scalar domains required                           |
+| Imports, duplicate/ambiguous names, cycles                             | implemented; cycles diagnosed unsupported                                                             | deterministic single parse/file                                                                                                 | selected explicit machine only                                                                 |
+| Pure typed rules/calls                                                 | implemented; rule recursion rejected                                                                  | exact alpha copies, effects, explicit cost overhead                                                                             | flow evaluation with pre/postconditions; machine expressions exclude calls                     |
+| Abstract op signatures/effects/cost/settles/stable                     | implemented                                                                                           | contracts are visible assumptions                                                                                               | finite contract results or linked explicit provider protocol                                   |
+| Structured flow call/let/if/match/return/propagate/assert              | implemented                                                                                           | types, effects, costs, ownership                                                                                                | finite source graph; built-in search/sampler; replay                                           |
+| Cardinality and List iteration, bounded retry                          | implemented                                                                                           | work upper bounds; loop-local ownership                                                                                         | bounded loops/retry execute; initial attempt included                                          |
+| Single-owner resources/take/read borrow                                | implemented                                                                                           | states, moves, local exits, explicit cancellation                                                                               | creation, transfer, terminal exits, cancellation                                               |
+| Fresh direct/Result resource return                                    | implemented via creates result                                                                        | per-outcome ownership through match                                                                                             | supported; owned collections/shared mutation unsupported                                       |
+| Unknown expression/statement                                           | legal, dependencies retained                                                                          | affected results incomplete; independent claims usable                                                                          | affected entry incomplete                                                                      |
+| Scalar conjunctive entry constraints                                   | implemented                                                                                           | integer interval/Bool witness or contradiction                                                                                  | machine initial state explicit                                                                 |
+| Call preconditions                                                     | implemented                                                                                           | branch-sensitive scalar/affine facts; supported abstract returns carry assumptions to consumers; other calls retain obligations | evaluated in finite flow execution                                                             |
+| Concrete postconditions                                                | parsed/typed                                                                                          | scalar/affine fragment; unsupported reasoning stays pending                                                                     | evaluated on finite flow returns                                                               |
+| Explicit finite machine/event/invariant                                | implemented                                                                                           | type checks; initial domain preflight                                                                                           | built-in exhaustive search and seeded sampler (CLI, Studio, MCP)                               |
+| Machine recursion/parallel calls/records/strings                       | outside behavioural expression subset                                                                 | local supported constructs remain usable                                                                                        | preflight rejects                                                                              |
+| Near-duplicate rule suggestions                                        | deferred                                                                                              | exact copies only                                                                                                               | not applicable                                                                                 |
+| Latency/peak live memory                                               | reserved metric names rejected                                                                        | no additive-work pretence                                                                                                       | unsupported                                                                                    |
+| SMT/proof, liveness/fairness, code extraction/conformance, LSP, caches | deferred                                                                                              | no claims                                                                                                                       | no claims                                                                                      |
+| Agent-facing MCP                                                       | implemented local stdio                                                                               | same worker, root-confined reads, paged explanations/evidence                                                                   | built-in search (verify) and sampler (simulate), source-mapped trace steps                     |
+| Code graph and requirement links (Go, Rust, TypeScript/JavaScript)     | `pymtheg graph`, `pymtheg link`; MCP `code_graph`, `graph_result`, `requirement_links`, `link_result` | definite, candidate-set and unresolved links with possible callers; source-only unless the Go toolchain route is turned on      | not applicable; links record reviewed intent, never proof                                      |
+| TypeScript / Rust / Go scaffolds                                       | one normalized contract document from checked IR                                                      | fail-fast stubs by default; optional empty bodies; arbitrary precision, explicit dependencies/omissions                         | no runtime implementation or conformance claim                                                 |
+| Language emitter plugins                                               | explicitly registered local module; versioned API                                                     | bounded process, validated output/identities; JavaScript example                                                                | trusted executable code; registered launch targets work in CLI/MCP/GUI; no automatic discovery |
+| Local Studio                                                           | implemented                                                                                           | real compiler workers, typed scenario forms, source/durable-draft conflict saves                                                | built-in search (verify) and sampler (simulate), same scopes; replay player; three cached runs |
 
 The [grammar](grammar.md) is normative for accepted source syntax. Historical
 `checkout.s15` remains an aspirational, incomplete sketch and is not accepted input.
@@ -54,7 +54,7 @@ Costs count the described operations, not host execution time. Concrete `overhea
 is added once per invocation. Abstract `cost` is the total summary; a concrete
 body cannot also declare a total. `budget` constrains the inferred total only.
 Absent abstract summaries for a requested metric remain unknown. Primitive
-expressions have zero *declared counter ticks* unless overhead is annotated;
+expressions have zero _declared counter ticks_ unless overhead is annotated;
 this does not mean they execute in zero CPU time. Metrics are independent additive
 user counters; only metrics declared in the project are requested locally.
 
@@ -104,11 +104,11 @@ current.
 
 ### Built-in behaviour engines (CLI)
 
-| Command | Engine | Result |
-|---|---|---|
-| `verify FILE --entry NAME [--state-budget N]` | Built-in exhaustive breadth-first search | One result per invariant plus `state-domains`; a violation has a shortest, source-replayed trace; `no_counterexample (finite_model_check, complete)` with `exhaustive: true` otherwise |
-| `simulate FILE --entry NAME [--seed --max-steps --max-samples]` | Built-in seeded sampler | `no_counterexample` at best, with `exhaustive: false` in JSON (text output: `simulation, sampled, not exhaustive`), never an exhaustive pass; traces are replayed but need not be shortest; same seed and limits give the same result |
-| `emit FILE --entry NAME --target json --out MODEL.json` | none (lowering only) | The lowered model the engines check: machine, source mapping, bounds, assumptions and, for flows, the finite source-state graph |
+| Command                                                         | Engine                                   | Result                                                                                                                                                                                                                                |
+| --------------------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `verify FILE --entry NAME [--state-budget N]`                   | Built-in exhaustive breadth-first search | One result per invariant plus `state-domains`; a violation has a shortest, source-replayed trace; `no_counterexample (finite_model_check, complete)` with `exhaustive: true` otherwise                                                |
+| `simulate FILE --entry NAME [--seed --max-steps --max-samples]` | Built-in seeded sampler                  | `no_counterexample` at best, with `exhaustive: false` in JSON (text output: `simulation, sampled, not exhaustive`), never an exhaustive pass; traces are replayed but need not be shortest; same seed and limits give the same result |
+| `emit FILE --entry NAME --target json --out MODEL.json`         | none (lowering only)                     | The lowered model the engines check: machine, source mapping, bounds, assumptions and, for flows, the finite source-state graph                                                                                                       |
 
 These are the only behavioural engines; the CLI, Studio and MCP all use them and
 no external program, runtime or download is needed. TLC, Quint and every Java
@@ -201,7 +201,6 @@ write-ahead log. If a killed run left one, the writer first folds it back into
 the database and removes it, waiting for other connections for up to 30
 seconds; otherwise the write fails as "database is locked".
 
-
 Old layouts (`.pymtheg.json`, `.pymtheg-architecture/`, `.pymtheg-studio/` and
 the old top-level `.pymtheg-*.json` files) are unused dead data: never read,
 migrated or deleted, and their presence refuses no command. `init` and `doctor`
@@ -258,13 +257,13 @@ MCP section `modules`); a changed module version makes the next query sync the i
 
 Link outcomes:
 
-| Outcome | Meaning |
-|---|---|
-| `resolved` | One definite target in the checkout |
-| `library` | One definite target outside the project: a library unit (level 1) or a symbol in it (level 2), recorded with how the source proves it (see the design section in `runtime-map.md`). Rust records library paths with proven bindings. TypeScript and JavaScript record library targets at existing sites. Go records imports, package-qualified names and builtins (C-14), and members of standard-library types with their declaring owner (C-17). |
-| `ambiguous` | A candidate set, never a pick. It may mix checkout symbols and library targets. A set is **closed** only when it provably holds every possible target and every member is provably possible. Otherwise it is **open**, and `data.open` gives the reasons (for example a type outside the project could be the target); an open set still lists every project target |
-| `unresolved` | No target; the written name is kept. The reason, when recorded, is in `data` (`reason` in Go and TypeScript, `uncertainty` in Rust; Go's `uncertainty` `library-member-unproven` marks a member of a library-typed value). Rust may also list unverified would-be targets in `data.targets` (at most 16, else a count) |
-| failed (`unresolved`, reason `invalid-code`) | The link depends on a file that could not be read. `data.cause` names the failed file(s). It has no target, no candidates and no would-be targets |
+| Outcome                                      | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `resolved`                                   | One definite target in the checkout                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `library`                                    | One definite target outside the project: a library unit (level 1) or a symbol in it (level 2), recorded with how the source proves it (see the design section in `runtime-map.md`). Rust records library paths with proven bindings. TypeScript and JavaScript record library targets at existing sites. Go records imports, package-qualified names and builtins (C-14), and members of standard-library types with their declaring owner (C-17). |
+| `ambiguous`                                  | A candidate set, never a pick. It may mix checkout symbols and library targets. A set is **closed** only when it provably holds every possible target and every member is provably possible. Otherwise it is **open**, and `data.open` gives the reasons (for example a type outside the project could be the target); an open set still lists every project target                                                                                |
+| `unresolved`                                 | No target; the written name is kept. The reason, when recorded, is in `data` (`reason` in Go and TypeScript, `uncertainty` in Rust; Go's `uncertainty` `library-member-unproven` marks a member of a library-typed value). Rust may also list unverified would-be targets in `data.targets` (at most 16, else a count)                                                                                                                             |
+| failed (`unresolved`, reason `invalid-code`) | The link depends on a file that could not be read. `data.cause` names the failed file(s). It has no target, no candidates and no would-be targets                                                                                                                                                                                                                                                                                                  |
 
 **Unreadable code is failed; the unit is the file.** A file with any syntax error
 is reported in the index report's `failed` list with its syntax error located,
@@ -616,13 +615,14 @@ makes that whole manifest unknown). Private items are ordinary symbols.
 
   Globs are not consulted: one that brings in a std-named macro is an
   ambiguity error (E0659) in rustc. A crate that does `#[macro_use] extern
-  crate tracing;` therefore gets no proven standard names, so its argument
+crate tracing;` therefore gets no proven standard names, so its argument
   and body calls through format macros stay unresolved. For standard-named
   macros, ruling E4 (Assumption E4 below) governs only whether a statement
   macro withholds its sibling names, not these proofs; E4 also covers
   `derive` and `global_allocator`, as stated there. A macro exported with
   `#[macro_export(local_inner_macros)]` that invokes any macro by a bare name
   proves nothing: rustc resolves those names at its own crate root.
+
 - **Calls in macro arguments:** calls written in an invocation's argument
   tokens are links, read as a format-style list: pieces separated by `,`
   (and `;` for `vec!`), each an expression or `name = expression`; only the
@@ -694,14 +694,18 @@ makes that whole manifest unknown). Private items are ordinary symbols.
 
 Grammar: the module loads `grammars/rust/tree-sitter-rust.wasm`, built by
 Pymtheg from upstream `tree-sitter-rust` v0.24.2 plus six upstream pull requests
-and two patches of its own (`grammars/README.md`). It reads `&raw` borrows and a
-variable named `raw`, `unsafe extern "C" { … }` with `safe fn`, and `#[cfg]` on
-a struct-pattern field. It still rejects some valid Rust, which fails the whole
-file (3 files of Vector): two or more attributes on one parameter or an
-attribute on a closure parameter (a single attribute on a function or method
-parameter parses), a turbofish on a function named like a primitive
-(`char::<_, E>(…)`), and `impl A + for<'a> B<'a>`. Sources:
-[W2-C](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-C.md), [W2-P](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-P.md), [W2-V](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-V.md).
+and eight patches of its own (`grammars/README.md`). It reads `&raw` borrows and a
+variable named `raw`, `unsafe extern "C" { … }` with `safe fn`, `#[cfg]` on
+a struct-pattern field, macros named like primitives (`str![[r#"…"#]]`), a
+lifetime first in `dyn` bounds (`dyn 'a + Display`), any number of attributes
+on function and closure parameters, nightly `box` patterns, `where dyn Trait:`,
+and a turbofish in a struct pattern. It still rejects some valid Rust, which
+fails the whole file: a turbofish on a function named like a primitive
+(`char::<_, E>(…)`), `impl A + for<'a> B<'a>` (2 files of Vector), a
+numbered field in a struct pattern (`S { 0: x }`, 5 generated swc files), an
+attribute on a later tuple element, a `()` type in a where clause, and the
+other shapes in `test/fixtures/rust-grammar/remaining/`. Sources:
+[W2-C](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-C.md), [W2-P](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-P.md), [W2-V](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-V.md), [C-21](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/C-21.md).
 
 #### TypeScript and JavaScript
 
@@ -1318,7 +1322,6 @@ properties cannot pass while that scope issue remains. Safe graphs with unused
 entries and invalid used values are still refused; plain emission publishes no
 artifact for the invalid scope.
 
-
 ### Local use of assumed scalar returns (after sixteenth freeze)
 
 Local call checking retains declared scalar result types and narrows an abstract
@@ -1402,8 +1405,8 @@ focus journey without changing limits, desktop settings or browser security.
   Code capture uses 512–1024 MiB child-process heaps based on input bytes. The 32 MiB
   source, 16 MiB part, 64 MiB snapshot/archive and 512 MiB retained limits remain.
   Resource exhaustion is explicit; source count alone cannot guarantee completion.
-Component work-summary rows edit `overhead`, not abstract-operation `cost`.
-They are additional work, while budget rows constrain the calculated total.
+  Component work-summary rows edit `overhead`, not abstract-operation `cost`.
+  They are additional work, while budget rows constrain the calculated total.
 
 ### Nineteenth-review repair boundary
 
@@ -1456,7 +1459,6 @@ the exclusions visible to its transport. A refresh with only this audit differen
 preserves the prior inventory bytes; it does not create a planning revision.
 Actual documentation changes and explicit source relocation remain visible.
 
-
 ## Twenty-first review: process isolation and import preflight
 
 Code capture owns a bounded child process rather than a worker thread. Input is
@@ -1487,7 +1489,6 @@ transports. Hidden content retained by an older folder import is preserved on
 refresh rather than interpreted as deleted. Individual explicit file imports and
 ordinary document editing remain available. Runtime exclusion metadata is normalized
 at every path segment; visible document edits/removals remain reviewable.
-
 
 ## Twenty-second review: source witnesses and capture ownership
 
@@ -1524,13 +1525,11 @@ labels use retained record/declaration names while keeping stable IDs as data.
 Malformed requests remain 400, export quota refusal is 413 with narrowing guidance,
 and store contention is 503. Validator locations are retained without raw Zod arrays.
 
-
 The same bounded replay also confirms return-guarantee failures as C005. Its
 finding points to the exact failing guarantee, with source inputs and assumptions;
 it does not attribute an unexecuted return to another path's witness. Unreachable
 returns remain qualified. A previous failing assertion or call cannot confirm a
 return guarantee that execution never reaches.
-
 
 Report comparisons also inspect session completion, and Studio comparisons inspect
 the containing run status. A cancelled typed-only report is incomplete even when
@@ -1543,7 +1542,6 @@ render, preserving a field rename when its type changes next. Committed parent
 values and the existing source/conflict checks remain authoritative. The dedicated
 pending-render regression exercises the actual form and generated source; this
 does not change the supported language or make incomplete designs complete.
-
 
 ## Twenty-fourth review follow-up boundary
 
@@ -1581,7 +1579,6 @@ invalid search bounds return 400. Capture memory attribution requires a native
 abort plus a fatal V8 out-of-memory banner. A filename containing `heap` does not
 trigger fallback, and an unexplained signal keeps its unknown cause.
 
-
 ### Bounded import recovery and lossless code-part storage
 
 Partition reader v4 resolves explicit named/default/namespace ES module imports
@@ -1607,7 +1604,6 @@ bounds are enforced before decoding. This is lossless storage, not raised quotas
 Lexical references retain only their first source site per owner/target pair;
 call-site counts remain separate from these dependency-pair counts.
 
-
 Receiver annotations and casts are not runtime target identities. Their method
 calls, typed spreads, getter-returned functions, replacement constructors and
 virtual/inherited receivers remain conservative where the actual callable cannot
@@ -1615,7 +1611,6 @@ be established. An isolated parse partition does not assume a `this` receiver ha
 no overriding class elsewhere. Static function initializers and ordinary concrete
 object/class calls retain their controls. These limits affect relationship coverage,
 not retained declaration/source completeness.
-
 
 ## Review 25: mutation provenance, scoped partitions and witness priorities
 
@@ -1664,7 +1659,6 @@ connects its dependency baseline to the captured writer. Top-level write excerpt
 remain separate from unrelated module source. Global collision checks remain
 conservative; private module names do not become global merely through partitioning.
 
-
 ## Review 26: escaped receivers and canonical source-witness priorities
 
 The review-26 observations used reader `typescript-ast/v11` and partition reader v6.
@@ -1712,7 +1706,6 @@ These are sampling bounds, independent of machine speed; they grant no proof
 when exhausted. Related boundary propagation is bounded by those dimensions.
 The original 12 numeric choices per input and source-trial limits are unchanged.
 
-
 ## Review 27: classified object uses and resolved guard facts
 
 Reader v12 classifies every runtime expression use: only recognized local reads,
@@ -1751,7 +1744,6 @@ require consumers. An escaped import lacking a retained export identity withhold
 that source's callables conservatively. Class expressions remain unknown instead
 of borrowing an enclosing class's this identity. These limits are independent of
 method body presence and remain visible as unresolved relationships.
-
 
 ## Review 28: implicit mutation channels and CommonJS barrels
 
@@ -1793,7 +1785,6 @@ call/reference target; the combiner uses it to withhold affected methods when
 the namespace escapes in another part. This includes API and consumer files
 sharing one partition while the patching import belongs to another.
 
-
 ## Review 29: shared CommonJS exports objects and decorator dependencies
 
 Reader v15 records captured whole-module forwarding via literal require calls,
@@ -1821,7 +1812,6 @@ bodies have exact retained dependency excerpts. Other classes stay separate.
 Within the decorated class, a sibling edit may conservatively flag more than
 one member. Class expressions remain outside this dependency reconstruction.
 
-
 ## Capture startup cleanup across PID namespaces
 
 Capture-owner markers v2 retain the Linux boot identity and PID namespace as well
@@ -1845,7 +1835,6 @@ not restricted to textual member assignments: Object.assign, Reflect.set and
 passing the shared object to a helper must qualify direct source consumers too.
 The retained probe exposed those neighbours; executable full/grouped/split
 regressions cover all three, without resolving uncertain calls.
-
 
 ## Review 30: CommonJS writes outside a parse partition
 
@@ -1873,7 +1862,6 @@ withheld control fixtures remain withheld. Dynamic/nonliteral loaders and mutati
 outside captured source remain unknown; this repair adds no general claim of
 cross-partition call-resolution completeness. Partial captures remain labelled.
 No Pymtheg language analysis, witness search, evaluator or emitter changed.
-
 
 ## Review 31: scoped CommonJS mutation provenance and stable analysis tabs
 
@@ -1917,7 +1905,6 @@ uncertain during partition merging. This exceptional budget state can also
 withhold private helpers. Ordinary known export mutations retain their narrower
 export-root scope. No wall-clock threshold decides correctness or raises limits.
 
-
 ## Review 32: one qualifier for default and partitioned observations
 
 Reader `typescript-ast/v18` and partition reader v12 share the captured-origin
@@ -1945,7 +1932,6 @@ the bar fixed. Historical incident causes remain unproven.
 Current repair evidence is in review-32-follow-up, including every set partition,
 production full/fallback cases, conservative controls and resolved-call deltas.
 No language semantics, witness search, evaluator or capture lifecycle changed.
-
 
 ## Review 33: visible mobile activation and explicit default-reader cost
 
@@ -1979,7 +1965,6 @@ local callable, and incomplete-origin limitation text can be duplicated. No
 confidently wrong target is claimed repaired by these UI-only changes. Current
 evidence lives in review-33-follow-up; semantic differential and capture/graph
 scale evidence are explicitly carried when the implementation is unchanged.
-
 
 ## Review 34: usable editing surfaces and instance-field provenance
 
@@ -2026,7 +2011,6 @@ Object-literal holder over-qualification, conservative full/split differences,
 duplicate limitations and earlier documented semantic limits remain.
 
 The final constructor-return guard also covers unnamed default-exported and expression classes using the class type symbol. A constructor returning a different object cannot lend its original method target. Two additional runtime controls cover TypeScript and JavaScript. The initial thirty-fifth seal is preserved as superseded evidence; the corrected review input is thirty-fifth-final.
-
 
 ## Review 35: conservative write provenance and bounded comparison working sets
 
@@ -2077,7 +2061,6 @@ The earlier instance-field regression count was 23, not 21. Review-35 evidence,
 failed/insensitive diagnostics and subsequent checks live in review-35-follow-up.
 Known semantic, conservative graph, SQLite-busy and native-selection limitations
 remain. No manual-later project pilot or real-software descriptor test was started.
-
 
 ## Review 36 repair: inherited prototype uncertainty
 

@@ -2923,6 +2923,12 @@ Patch: patches/0005-pr283-unicode-escape-underscore.patch (https://github.com/tr
 Patch: patches/0006-pr281-extern-types.patch (https://github.com/tree-sitter/tree-sitter-rust/pull/281)
 Patch: patches/0007-own-raw-contextual-identifier.patch (own patch (Pymtheg))
 Patch: patches/0008-own-safe-qualifier.patch (own patch (Pymtheg))
+Patch: patches/0009-own-primitive-named-macros.patch (own patch (Pymtheg))
+Patch: patches/0010-own-dyn-lifetime-first.patch (own patch (Pymtheg))
+Patch: patches/0011-own-parameter-attributes.patch (own patch (Pymtheg))
+Patch: patches/0012-own-box-patterns.patch (own patch (Pymtheg))
+Patch: patches/0013-own-where-dyn.patch (own patch (Pymtheg))
+Patch: patches/0014-own-struct-pattern-turbofish.patch (own patch (Pymtheg))
 
 --- LICENSE ---
 The MIT License (MIT)

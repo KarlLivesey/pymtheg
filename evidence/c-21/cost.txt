@@ -1,0 +1,22 @@
+C-21 cost observation: cold `graph index` of fresh clones, evidence/c-15/cost.sh,
+builds main 920dc47 and the merged branch, one session, main / branch / main.
+Columns: repository, build, wall s, user CPU s, peak RSS KiB. Wall time on the
+shared server is not compared.
+
+alacritty main   40.17  33.17   748736
+alacritty branch 45.34  33.73   791760
+alacritty main   43.18  34.05   790240
+rustls    main  154.33 140.73  1302784
+rustls    branch 188.28 145.73 1506488
+rustls    main  208.50 137.48  1559560
+
+Against the mean of the two main runs: alacritty user CPU +0.4%, peak RSS
++2.9%; rustls user CPU +4.8%, peak RSS +5.3%. Both branch figures lie inside
+or next to the spread of the two main runs (rustls peak RSS: 1.30-1.56 GB on
+main). Each repository reads one more file on the branch (alacritty +428
+links, rustls +873).
+
+Grammar: tree-sitter-rust.wasm 1,209,161 -> 1,234,549 bytes (+2.1%).
+Parse time, every .rs file of turborepo (1,393 files, 27.7 MB), one process,
+old / new / old / new: 7,725 / 7,487 / 7,535 / 7,759 ms
+(parse-cost-turborepo.txt, parse-cost.mjs). No measurable difference.

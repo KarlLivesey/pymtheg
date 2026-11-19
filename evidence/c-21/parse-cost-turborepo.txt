@@ -1,0 +1,5 @@
+1393 files, 27742962 bytes
+A 1209161 bytes wasm, parse 7725 ms
+B 1234549 bytes wasm, parse 7487 ms
+A 1209161 bytes wasm, parse 7535 ms
+B 1234549 bytes wasm, parse 7759 ms

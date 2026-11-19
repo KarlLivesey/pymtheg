@@ -278,7 +278,8 @@ function parser(): Promise<Helper> {
 }
 /**
  * The vendored, patched grammar (grammars/rust: upstream v0.24.2 + PRs #319,
- * #271, #317, #312, #283, #281; see its manifest.json and docs/changes/W2-V.md).
+ * #271, #317, #312, #283, #281 and our patches 0007-0014; see its manifest.json,
+ * docs/changes/W2-V.md and docs/changes/C-21.md).
  * Resolved from this file so it works from dist/ and from the installed package.
  */
 const GRAMMAR = fileURLToPath(
@@ -1197,6 +1198,9 @@ async function createHelper(): Promise<Helper> {
       type BindingScopes = Map<number, Map<string, Binding[]>>;
       const bindingCache = new Map<string, BindingScopes>();
       function patternNames(n: Node): Node[] {
+        // C-21: closure parameters may carry outer attributes
+        // (`|#[allow(unused)] x|`); an attribute's tokens bind nothing.
+        if (n.type === "attribute_item") return [];
         if (
           ["identifier", "shorthand_field_identifier", "self"].includes(n.type)
         )
@@ -2875,7 +2879,13 @@ async function createHelper(): Promise<Helper> {
               ? ["identifier"]
               : []),
             ...(n.type === "scoped_identifier" &&
-            /pattern/.test(n.parent?.type ?? "")
+            (/pattern/.test(n.parent?.type ?? "") ||
+              // C-21: a qualified turbofish pattern head (`a::S::<T> { .. }`,
+              // `a::S::<T>(..)`) sits under the pattern's generic_type.
+              (n.parent?.type === "generic_type" &&
+                field(n.parent, "type")?.id === n.id &&
+                /pattern/.test(n.parent.parent?.type ?? "") &&
+                field(n.parent.parent!, "type")?.id === n.parent.id))
               ? ["scoped_identifier"]
               : []),
           ].includes(n.type) &&

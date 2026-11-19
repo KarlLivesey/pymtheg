@@ -1,0 +1,10 @@
+[
+  {
+    "id": "DioxusLabs/dioxus",
+    "language": "rust",
+    "url": "https://github.com/DioxusLabs/dioxus.git",
+    "commit": "97adf7915e1adfef4e2da436c9bd0b6add0dfa39",
+    "category": "UI / app framework",
+    "why": "UI workspace with proc macros and macro-heavy RSX examples."
+  }
+]

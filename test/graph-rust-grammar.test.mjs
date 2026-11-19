@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: MIT
-// W2-V: Rust shapes the vendored grammar (tree-sitter-rust v0.24.2 + PRs
-// #319, #271, #317, #312, #283, #281 + our patches 0007 `raw` and 0008 `safe`)
-// reads, and the ones it still cannot read. Every fixture is valid Rust: checked
-// with rustc below when the toolchain is installed (edition from the
-// fixture's first line; output also in evidence/w2-v/fixtures-rustc.txt).
+// W2-V, C-21: Rust shapes the vendored grammar (tree-sitter-rust v0.24.2 + PRs
+// #319, #271, #317, #312, #283, #281 + our patches 0007 `raw`, 0008 `safe`
+// and 0009-0014 from C-21) reads, and the ones it still cannot read. Every
+// fixture is valid Rust: checked with rustc below when the toolchain is
+// installed (edition from the fixture's first line; a fixture marked
+// "nightly" is checked with RUSTC_BOOTSTRAP=1 for its feature gate).
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { createRequire } from "node:module";
 import {
   mkdirSync,
   mkdtempSync,
@@ -17,6 +20,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { Language, Parser } from "web-tree-sitter";
 import {
   LanguageRegistry,
   SqliteGraphStore,
@@ -82,9 +86,12 @@ test(
   () => {
     const out = mkdtempSync(join(tmpdir(), "pymtheg-rustc-"));
     try {
-      for (const dir of ["fixed", "remaining"])
+      for (const dir of ["fixed", "remaining", "ordinary"])
         for (const name of files(dir)) {
           const path = join(fixture, dir, name);
+          const nightly = /^\/\/ [^\n]*\bnightly\b/.test(
+            readFileSync(path, "utf8"),
+          );
           const run = spawnSync(
             "rustc",
             [
@@ -101,7 +108,12 @@ test(
               out,
               path,
             ],
-            { encoding: "utf8" },
+            {
+              encoding: "utf8",
+              env: nightly
+                ? { ...process.env, RUSTC_BOOTSTRAP: "1" }
+                : process.env,
+            },
           );
           assert.equal(run.status, 0, `${dir}/${name}: ${run.stderr}`);
         }
@@ -233,6 +245,216 @@ test("patch 0008: `safe fn` / `safe static` in unsafe extern blocks; `safe` stay
     "function:strlen",
     "static:errno",
   ]);
+});
+
+test("patch 0009: `str![…]` is an ordinary macro invocation; `str<…>` in macro input", async () => {
+  const { report, symbols, links } = await index(
+    "fixed",
+    "primitive_named_macro.rs",
+  );
+  assert.deepEqual(report.failed, []);
+  assert.deepEqual(own(symbols), [
+    "function:check",
+    "function:expected",
+    "macro:keep",
+    "macro:str",
+  ]);
+  // Both invocations reach the local macro named `str`, not the type.
+  assert.deepEqual(targets(links, "macros", "str"), ["macro:str", "macro:str"]);
+  assert.deepEqual(targets(links, "calls", "expected"), ["function:expected"]);
+  assert.deepEqual(targets(links, "macros", "keep"), ["macro:keep"]);
+});
+
+test("patch 0010: a lifetime first in dyn bounds keeps the trait reference", async () => {
+  const { report, symbols, links } = await index(
+    "fixed",
+    "dyn_lifetime_first.rs",
+  );
+  assert.deepEqual(report.failed, []);
+  assert.deepEqual(own(symbols), [
+    "function:boxed",
+    "function:run",
+    "impl:impl Code for Diagnostic",
+    "method:Code::code",
+    "method:impl Code for Diagnostic::code",
+    "struct:Diagnostic",
+    "trait:Code",
+    "type:Handler",
+  ]);
+  // `dyn 'a + Code` and the impl's trait both name the trait.
+  assert.deepEqual(targets(links, "types", "Code"), [
+    "trait:Code",
+    "trait:Code",
+  ]);
+  assert.deepEqual(targets(links, "calls", "boxed"), ["function:boxed"]);
+  assert.deepEqual(targets(links, "types", "Handler"), ["type:Handler"]);
+});
+
+test("patch 0011: attributes on parameters hide neither pattern nor type", async () => {
+  const two = await index("fixed", "param_two_attributes.rs");
+  assert.deepEqual(two.report.failed, []);
+  assert.deepEqual(own(two.symbols), [
+    "function:depth_of",
+    "function:f",
+    "struct:Visual",
+  ]);
+  assert.deepEqual(targets(two.links, "types", "Visual"), [
+    "struct:Visual",
+    "struct:Visual",
+  ]);
+  assert.deepEqual(targets(two.links, "calls", "depth_of"), [
+    "function:depth_of",
+  ]);
+  // Parameters behind stacked attributes are bindings of the function.
+  assert.deepEqual(targets(two.links, "values", "visual"), ["function:f"]);
+  assert.deepEqual(targets(two.links, "values", "extra"), ["function:f"]);
+
+  const closure = await index("fixed", "attr_closure_param.rs");
+  assert.deepEqual(closure.report.failed, []);
+  // `unused_variables` inside `#[allow(unused_variables)]` binds nothing: the
+  // call in the closure body reaches the function, not a closure parameter.
+  assert.deepEqual(targets(closure.links, "calls", "unused_variables"), [
+    "function:unused_variables",
+  ]);
+  // The attributed closure parameter keeps its type and binding.
+  assert.deepEqual(targets(closure.links, "types", "Client"), [
+    "struct:Client",
+    "struct:Client",
+    "struct:Client",
+  ]);
+  assert.deepEqual(targets(closure.links, "calls", "c.native"), [
+    "method:impl Client::native",
+  ]);
+  assert.deepEqual(targets(closure.links, "values", "redirects"), [
+    "function:build",
+  ]);
+});
+
+test("patch 0012 (nightly): box patterns bind their inner pattern", async () => {
+  const { report, symbols, links } = await index("fixed", "box_patterns.rs");
+  assert.deepEqual(report.failed, []);
+  assert.deepEqual(own(symbols), [
+    "enum:ApiError",
+    "enum:CacheError",
+    "function:handle",
+    "function:message",
+    "function:report",
+    "variant:ApiError::CacheDisabled",
+    "variant:ApiError::Other",
+    "variant:CacheError::ApiClientError",
+    "variant:CacheError::Mismatch",
+  ]);
+  // Constructors inside `box` resolve as patterns.
+  assert.deepEqual(targets(links, "patterns", "ApiError::CacheDisabled"), [
+    "variant:ApiError::CacheDisabled",
+  ]);
+  assert.deepEqual(targets(links, "patterns", "ApiError::Other"), [
+    "variant:ApiError::Other",
+  ]);
+  assert.deepEqual(targets(links, "calls", "report"), [
+    "function:report",
+    "function:report",
+  ]);
+  // `box message` binds `message` in its arm: the receiver is that binding,
+  // never the function `message` called in the arm before.
+  assert.deepEqual(targets(links, "calls", "message"), ["function:message"]);
+  assert.deepEqual(targets(links, "calls", "message.len"), [null]);
+});
+
+test("patch 0013: `where dyn Trait: Bound` reads both traits", async () => {
+  const { report, symbols, links } = await index("fixed", "where_dyn.rs");
+  assert.deepEqual(report.failed, []);
+  assert.deepEqual(own(symbols), [
+    "function:choose",
+    "function:select",
+    "method:VersionSelector::pick",
+    "trait:Selector",
+    "trait:VersionSelector",
+  ]);
+  assert.deepEqual(targets(links, "types", "Selector"), [
+    "trait:Selector",
+    "trait:Selector",
+  ]);
+  assert.deepEqual(targets(links, "types", "VersionSelector"), [
+    "trait:VersionSelector",
+  ]);
+  assert.deepEqual(targets(links, "calls", "choose"), ["function:choose"]);
+});
+
+test("patch 0014: a turbofish struct pattern names the struct and binds its fields", async () => {
+  const { report, symbols, links } = await index(
+    "fixed",
+    "turbofish_struct_pattern.rs",
+  );
+  assert.deepEqual(report.failed, []);
+  assert.deepEqual(own(symbols), [
+    "enum:E",
+    "enum:En",
+    "function:describe",
+    "function:f",
+    "function:g",
+    "struct:Payload",
+    "struct:inner::S",
+    "struct:inner::W",
+    "variant:E::V",
+    "variant:En::W",
+  ]);
+  assert.deepEqual(targets(links, "patterns", "Payload"), ["struct:Payload"]);
+  // Behind a path the turbofish head still names its struct or variant.
+  assert.deepEqual(targets(links, "patterns", "inner::S"), ["struct:inner::S"]);
+  assert.deepEqual(targets(links, "patterns", "E::V"), ["variant:E::V"]);
+  assert.deepEqual(targets(links, "patterns", "inner::W"), ["struct:inner::W"]);
+  assert.deepEqual(targets(links, "patterns", "En::W"), ["variant:En::W"]);
+  assert.deepEqual(targets(links, "values", "x"), ["function:g"]);
+  assert.deepEqual(targets(links, "values", "a"), ["function:g"]);
+  assert.deepEqual(targets(links, "calls", "describe"), ["function:describe"]);
+  // `code` in `describe(code)` is the pattern's binding in f.
+  assert.deepEqual(targets(links, "values", "code").sort(), [
+    "function:describe",
+    "function:f",
+  ]);
+});
+
+test("ordinary Rust keeps exactly the tree the grammar before C-21 gave", async () => {
+  // Digests of every node (type, field, named, byte range) written with the
+  // grammar before C-21 (sha256 66a1d357…) by evidence/c-21/tree-digests.mjs.
+  const golden = JSON.parse(
+    readFileSync(join(fixture, "ordinary-trees.json"), "utf8"),
+  );
+  const require = createRequire(import.meta.url);
+  await Parser.init({
+    locateFile: () => require.resolve("web-tree-sitter/web-tree-sitter.wasm"),
+  });
+  const parser = new Parser();
+  parser.setLanguage(
+    await Language.load(
+      new URL("../grammars/rust/tree-sitter-rust.wasm", import.meta.url)
+        .pathname,
+    ),
+  );
+  const actual = {};
+  try {
+    for (const file of Object.keys(golden)) {
+      const tree = parser.parse(readFileSync(join(fixture, file), "utf8"));
+      const hash = createHash("sha256");
+      const c = tree.walk();
+      walk: for (;;) {
+        const n = c.currentNode;
+        hash.update(
+          `${c.currentFieldName ?? ""}:${n.type}:${n.isNamed ? 1 : 0}:${n.startIndex}:${n.endIndex};`,
+        );
+        if (c.gotoFirstChild()) continue;
+        while (!c.gotoNextSibling()) if (!c.gotoParent()) break walk;
+      }
+      c.delete();
+      tree.delete();
+      actual[file] = hash.digest("hex");
+    }
+  } finally {
+    parser.delete();
+  }
+  assert.ok(Object.keys(golden).includes("ordinary/adjacent.rs"));
+  assert.deepEqual(actual, golden);
 });
 
 for (const [dir, label] of [
