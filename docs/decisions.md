@@ -2843,16 +2843,6 @@ receiver type can establish the package unit. The program-wide Node overlap
 rules also apply to checker-selected members reached through the new aliases
 and selectors. [C-16](changes/C-16.md)
 
-### C-20 Installed TypeScript declaration inputs
-
-The TypeScript compiler host can read the installed declarations it selects
-under the checkout boundary. These inputs never enter the checkout symbol
-inventory. A selected declaration identifies its package and member. The
-installed package manifest supplies the version and its provenance. Merged
-Node and DOM declarations retain both candidates when both are possible.
-Resolver probes include absent inputs so a new installation invalidates a
-bare cache. [C-20](changes/C-20.md)
-
 ### C-17 Go standard-library members
 
 Go resolves members of standard-library types source-only from a table of
@@ -2871,3 +2861,13 @@ directive stay unresolved even where the project's own build constraint
 would allow them. A standard-library interface value's method is recorded
 as the interface's method (the static callee): the source-only route cannot
 list implementers outside the checkout. See [C-17](changes/C-17.md).
+
+### C-20 Installed TypeScript declaration inputs
+
+The TypeScript compiler host can read the installed declarations it selects
+under the checkout boundary. These inputs never enter the checkout symbol
+inventory. A selected declaration identifies its package and member. The
+installed package manifest supplies the version and its provenance. Merged
+Node and DOM declarations retain both candidates when both are possible.
+Resolver probes include absent inputs so a new installation invalidates a
+bare cache. [C-20](changes/C-20.md)

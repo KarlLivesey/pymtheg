@@ -763,7 +763,8 @@ answer.
   Installed files supply library targets and are excluded from checkout
   symbols and link sources. Standard in-checkout pnpm, npm and Yarn
   `node_modules` layouts are supported.
-  [Library links](changes/C-11.md) · [Members and test globals](changes/C-16.md)
+  [Library links](changes/C-11.md) · [Members and test globals](changes/C-16.md) ·
+  [Installed declarations](changes/C-20.md)
 - **Candidates:** several checkout or library targets for one callee (union
   receivers, merged declarations, duplicate JavaScript functions). Missing
   selected Node types can leave both DOM and Node targets possible for a shared

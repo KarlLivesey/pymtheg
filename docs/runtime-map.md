@@ -1516,7 +1516,7 @@ symbol. Shape (`src/graph/types.ts` `LibraryTarget`, `GraphLibrary`):
 | `unit` | module path, crate, package name or standard-library unit |
 | `symbol` | optional symbol path in the unit, spelled as the unit spells it (level 2); absent for the unit itself (level 1) |
 | `version` | optional; a captured manifest or lockfile must state it |
-| `versionSource` | required with a version, and only then: the project path of that manifest or lockfile. Its file name must be one of the target ecosystem's manifests or lockfiles (`versionFiles` in `src/graph/identity.ts`: npm `package.json`, `package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `yarn.lock`, `bun.lock`, `bun.lockb`, `deno.json`, `deno.lock`; node `package.json`; go `go.mod`, `go.sum`, `go.work`, `go.work.sum`; go-std `go.mod`, `go.work`; cargo `Cargo.toml`, `Cargo.lock`; any other ecosystem takes no version), and the path must be a clean context file in the snapshot (during indexing, one of the module's own declared context files). A `tsconfig.json` or another ecosystem's manifest is refused |
+| `versionSource` | required with a version, and only then: the project path of that manifest or lockfile. Its file name must be one of the target ecosystem's manifests or lockfiles (`versionFiles` in `src/graph/identity.ts`: npm `package.json`, `package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `yarn.lock`, `bun.lock`, `bun.lockb`, `deno.json`, `deno.lock`; node `package.json`; go `go.mod`, `go.sum`, `go.work`, `go.work.sum`; go-std `go.mod`, `go.work`; cargo `Cargo.toml`, `Cargo.lock`; any other ecosystem takes no version). The path must be a clean context file captured by the indexing module. A `tsconfig.json` or another ecosystem's manifest is refused |
 | `evidence` | required: how the source proves it (below) |
 | `id` | `library:` + sha256 of (ecosystem, unit, version, symbol): deterministic and independent of the project and of the evidence |
 
@@ -1613,9 +1613,8 @@ database state per read: counts and rows agree.
 What each language chunk supplies: in `resolve` (or as an added link), a
 `LinkResolution` with `library: {ecosystem, unit, symbol?, version?, evidence}`
 for a definite library target, or `candidateIds` plus `libraries` for a mixed
-set; the ecosystem names it uses; the manifest/lockfile reading, if any, that
-supplies `version` and `versionSource` (declared in the module's
-`contextFiles`); and a module version bump. Nothing else in the core changes.
+set, the ecosystem names it uses, any captured manifests or lockfiles that
+supply `version` and `versionSource`, and a module version bump.
 
 The TypeScript module can read installed declaration and resolution metadata
 files under the checkout's `node_modules` on demand. The dependency inputs

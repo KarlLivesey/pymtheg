@@ -6,6 +6,12 @@ then run C-20 with `scripts/sweep/run.mjs --installed` on the same manifest.
 Store the main and C-20 bare results as `main-run.json` and `bare-run.json`.
 The analysis uses the pinned TypeScript 5.9.3 compiler on Node 24.
 
+- [Bare preservation counts](bare-preservation.json)
+- [Paired per-pin results](comparison.md)
+- [Changed definite targets](definite-changes.json.gz)
+- [Hand audit](audit.md)
+- [Cold cost observations](cost.jsonl)
+
 `reindex.mjs` recovers a cold graph after an interrupted attempt without
 reinstalling the packages. It moves the interrupted store out of the checkout
 and checks the new cold receipt against a read-only status query. The result
@@ -45,4 +51,6 @@ SW-3 reference samples. `plan.mjs BARE-EXPORT INSTALLED-EXPORT OUTPUT.gz`
 overlays the bare TypeScript graphs on C-16's cumulative archive and embeds
 the installed results for the paired plan figure. Use `coverage.mjs --base
 evidence/sw-3/breakdown.json.gz` and `evidence/c-11/plan.mjs` to replace the
-TypeScript section alone.
+TypeScript section alone. The Go and Rust sections use the existing results
+on main. The cumulative input retains C-16's TypeScript observations for
+mixed-language pins outside the paired sweep.

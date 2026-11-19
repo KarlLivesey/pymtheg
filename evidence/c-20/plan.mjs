@@ -10,6 +10,8 @@ const read = (path) =>
 const previous = read("evidence/c-16/coverage-plan-input.json.gz");
 const bare = read(barePath);
 const installedCoverage = read(installedPath);
+// The plan also counts TypeScript files from Go and Rust pins. Keep their
+// existing TypeScript observations because the paired sweep did not run them.
 const repos = new Map(previous.repos.map((row) => [row.id, row]));
 for (const row of bare.repos) {
   if (

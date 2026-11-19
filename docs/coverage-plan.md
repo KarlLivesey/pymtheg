@@ -175,6 +175,8 @@ The previous strict-inside plan assigned about 22 pp to local binding anchors an
 
 **Bundle scope** 67.69% including bundles and 69.81% without them. Should checked-in minified bundles count toward the release target?
 
+**Paired dependency sweep** 70.42% bare · 80.06% with installed declarations · 15/18 pins installed and indexed. Pins without a completed installed graph use their bare figure.
+
 | Support item | Kind | Links | Repositories | Points | Running total | Examples | Status |
 | --- | --- | ---: | ---: | ---: | ---: | --- | --- |
 | Identify JavaScript standard and DOM symbols | Library target | 69,936 | ≥26 | 4.41 pp | 72.09% | vitest-dev/vitest ` packages/vitest/src/node/pools/browser.ts:571 ` ` this.openingSessions.delete(sessionId) `<br>trpc/trpc ` www/build/og-cards.ts:142 ` ` ...cloudModules.map((file) => path.join(www, file)), ` | open · 49/95 reference sites settled |
