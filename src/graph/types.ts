@@ -52,6 +52,7 @@ export interface ContextFile extends SourceInput {
   hash: string;
   status: "clean" | "failed";
   diagnostics: Diagnostic[];
+  dependency?: import("./dependency-inputs.js").DependencyStamp;
 }
 export interface GraphFile extends SourceInput {
   hash: string;
@@ -211,6 +212,7 @@ export interface ProjectAnalysisContext {
   signal?: AbortSignal;
   /** Present only when the project opted in for this module's toolchain. */
   toolchain?: ToolchainRequest;
+  dependencyInputs?: import("./dependency-inputs.js").DependencyInputs;
   /** All this module's captured sources, including unchanged/reopened files. */
   files: readonly GraphFile[];
   /** All matching declared context files, including unchanged ones. Missing files are absent. */
@@ -236,6 +238,8 @@ export interface LanguageModule {
   accepts?: (path: string) => boolean;
   /** Snapshot-only project context. Same glob rules as patterns, independent of source claims. */
   contextFiles?: readonly string[];
+  /** Requests a read-only, resolver-driven snapshot of installed declarations. */
+  dependencyInputs?: true;
   parse?: (source: SourceInput) => ParseResult | Promise<ParseResult>;
   /** Explicit whole-program phase. May construct a compiler program from the supplied snapshot. */
   analyze?: (

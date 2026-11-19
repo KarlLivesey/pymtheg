@@ -1,0 +1,28 @@
+[
+  {
+    "pin": "pmndrs/zustand",
+    "before": 7099,
+    "after": 7099,
+    "beforeL2": 4741,
+    "afterL2": 4741,
+    "definite": 5147,
+    "changedOutcomes": 0,
+    "symbols": 598,
+    "symbolChanges": 0,
+    "addedSites": 0,
+    "lostSites": 0
+  },
+  {
+    "pin": "yargs/yargs",
+    "before": 12205,
+    "after": 12205,
+    "beforeL2": 5181,
+    "afterL2": 5181,
+    "definite": 5286,
+    "changedOutcomes": 0,
+    "symbols": 1180,
+    "symbolChanges": 0,
+    "addedSites": 0,
+    "lostSites": 0
+  }
+]

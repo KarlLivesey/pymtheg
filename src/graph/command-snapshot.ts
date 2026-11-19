@@ -116,7 +116,9 @@ export function changedFiles(
   registry: LanguageRegistry,
 ): StaleFile[] {
   const sources = new Map(metadata.files.map((f) => [f.path, f]));
-  const contexts = new Map(metadata.contexts.map((f) => [f.path, f]));
+  const contexts = new Map(
+    metadata.contexts.filter((f) => !f.dependency).map((f) => [f.path, f]),
+  );
   const changes = new Map<string, StaleFile>();
   const versions = new Map(registry.modules.map((m) => [m.id, m.version]));
   for (const file of current) {

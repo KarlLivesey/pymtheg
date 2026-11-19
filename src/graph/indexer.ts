@@ -3,6 +3,10 @@ import { readdir, readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { compare, contentHash, validateResult } from "./identity.js";
 import { resolutionFacts } from "./analysis.js";
+import {
+  changedDependencyInputs,
+  DependencyInputs,
+} from "./dependency-inputs.js";
 import { matchesPattern, type LanguageRegistry } from "./registry.js";
 import { count, stage } from "./work.js";
 import type {
@@ -192,12 +196,25 @@ export async function indexProject(
     registry.modules.some((module) => needsContext(module, file.path)),
   );
   const oldContextByPath = new Map(
-    oldContexts.map((file) => [file.path, file]),
+    oldContexts
+      .filter((file) => !file.dependency)
+      .map((file) => [file.path, file]),
+  );
+  const dependencies = new Map(
+    registry.modules
+      .filter((module) => module.dependencyInputs)
+      .map(
+        (module) =>
+          [
+            module.id,
+            oldContexts.filter((file) => file.dependency?.module === module.id),
+          ] as const,
+      ),
   );
   const contextByPath = new Map(contexts.map((file) => [file.path, file]));
   const changedContexts = [
     ...new Set([
-      ...oldContexts.map((file) => file.path),
+      ...oldContextByPath.keys(),
       ...contexts.map((file) => file.path),
     ]),
   ]
@@ -253,7 +270,10 @@ export async function indexProject(
     changed.add(path);
   }
   await stage("store.writeParsed", async () => {
-    await store.replaceContexts(contexts);
+    await store.replaceContexts([
+      ...contexts,
+      ...[...dependencies.values()].flat(),
+    ]);
     for (const file of updates) {
       await store.replaceFile(file, cacheableFailures.has(file.path));
       report.indexed++;
@@ -299,6 +319,10 @@ export async function indexProject(
       needsContext(module, file.path),
     );
     let results: readonly AnalyzedFile[];
+    const inputs = module.dependencyInputs
+      ? new DependencyInputs(root, module.id)
+      : undefined;
+    const previousInputs = dependencies.get(module.id) ?? [];
     let analysisFailed = false;
     try {
       if (ownContexts.some((file) => file.status === "failed"))
@@ -323,14 +347,16 @@ export async function indexProject(
           projectId: store.projectId,
           ...(options.signal ? { signal: options.signal } : {}),
           ...(toolchain ? { toolchain } : {}),
+          ...(inputs && { dependencyInputs: inputs }),
           files,
           contextFiles: ownContexts,
           changedFiles: [...changed]
             .filter((path) => filesByPath.has(path) || oldPaths.has(path))
             .sort(compare),
-          changedContextFiles: changedContexts.filter((path) =>
-            needsContext(module, path),
-          ),
+          changedContextFiles: [
+            ...changedContexts.filter((path) => needsContext(module, path)),
+            ...changedDependencyInputs(root, previousInputs),
+          ],
         }),
       );
       const seen = new Set<string>();
@@ -363,7 +389,9 @@ export async function indexProject(
         result: failure(detail),
       }));
     }
-    const write = stage(`analyze.${module.id}.write`, async () => {
+    if (inputs?.refreshed)
+      dependencies.set(module.id, analysisFailed ? [] : inputs.records());
+    await stage(`analyze.${module.id}.write`, async () => {
       for (const item of results) {
         const file = filesByPath.get(item.path)!;
         if (JSON.stringify(file.result) !== JSON.stringify(item.result)) {
@@ -383,10 +411,14 @@ export async function indexProject(
         report.analyzed++;
       }
     });
-    await write;
   };
   for (const module of registry.modules)
     if (module.analyze) await analyzeModule(module);
+  if (dependencies.size)
+    await store.replaceContexts([
+      ...contexts,
+      ...[...dependencies.values()].flat(),
+    ]);
   // Resolution reads the graph afresh for each module and keeps nothing
   // between modules: no whole-graph copy outlives the module that needs it.
   // A module's input is its own: records from a store that declares
@@ -397,6 +429,16 @@ export async function indexProject(
       needsContext(module, file.path),
     );
     let result: ResolutionResult = { resolutions: [], links: [] };
+    const versionSources = new Set(
+      [
+        ...ownContexts,
+        ...(dependencies.get(module.id) ?? []).filter(
+          (file) => file.hash && file.path.endsWith("/package.json"),
+        ),
+      ]
+        .filter((file) => file.status === "clean")
+        .map((file) => file.path),
+    );
     // The validated write, when the store takes one: the links read once
     // for validation are the links the write compares against.
     let prepared:
@@ -452,10 +494,7 @@ export async function indexProject(
           symbols,
           current,
           // A library version must come from a context file this module read.
-          (path) =>
-            ownContexts.some(
-              (file) => file.path === path && file.status === "clean",
-            ),
+          (path) => versionSources.has(path),
         ),
       );
       if (whole) prepared = { current, desired };

@@ -6,6 +6,7 @@ import {
   readMetadata,
   fingerprint,
 } from "./command-checkpoint.js";
+import { changedDependencyInputs } from "./dependency-inputs.js";
 import { performance } from "node:perf_hooks";
 import { findProjectRoot, storagePath } from "../storage/local.js";
 import {
@@ -167,7 +168,14 @@ export async function executeGraph(
     );
     const previousState = readCheckpoint(store);
     let metadata = previousState ?? readMetadata(store);
-    let stale = changedFiles(inventory, metadata, registry);
+    const staleFiles = () => [
+      ...changedFiles(inventory, metadata, registry),
+      ...changedDependencyInputs(root, metadata.contexts).map((path) => ({
+        path,
+        change: "context" as const,
+      })),
+    ];
+    let stale = staleFiles();
     const retryable = metadata.files.some(
       (file) => file.status === "failed" && !file.cacheable,
     );
@@ -363,7 +371,7 @@ export async function executeGraph(
         captureInventory(root, registry, signal),
       );
       metadata = await stage("command.metadata", () => readMetadata(store!));
-      stale = changedFiles(inventory, metadata, registry);
+      stale = staleFiles();
       const pending = metadata.files.some(
         (f) => f.status === "failed" && !f.cacheable,
       );
