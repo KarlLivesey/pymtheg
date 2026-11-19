@@ -7,7 +7,7 @@ A measurement, no product change. Every Rust pin that finished in the sweep
 (18 of the 20 in `sweep/repos.json`; swc and embassy are still open at the
 wall limit) is indexed twice from the same clean pinned checkout:
 
-1. by Pymtheg `main` (a merge of `e003342`), source-only, default settings
+1. by Pymtheg `main` (a merge of `6cc2753`, Rust module version 36), source-only, default settings
    (`pym-index.sh`); and
 2. by `rust-analyzer scip` from the pinned stable toolchain (Rust 1.98.1,
    the rustup component `rust-analyzer 1.98.1 (48a229c 2026-09-01)`, with
