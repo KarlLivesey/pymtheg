@@ -1,0 +1,31 @@
+diff --git a/grammar.js b/grammar.js
+index 36770d8..84b41ee 100644
+--- a/grammar.js
++++ b/grammar.js
+@@ -674,7 +674,8 @@ module.exports = grammar({
+     parameters: $ => seq(
+       '(',
+       sepBy(',', seq(
+-        optional($.attribute_item),
++        // Pymtheg patch 0011 (issue #276): any number of outer attributes.
++        repeat($.attribute_item),
+         choice(
+           $.parameter,
+           $.self_parameter,
+@@ -1349,9 +1350,13 @@ module.exports = grammar({
+ 
+     closure_parameters: $ => seq(
+       '|',
+-      sepBy(',', choice(
+-        $._pattern,
+-        $.parameter,
++      // Pymtheg patch 0011: closure parameters take outer attributes too.
++      sepBy(',', seq(
++        repeat($.attribute_item),
++        choice(
++          $._pattern,
++          $.parameter,
++        ),
+       )),
+       '|',
+     ),

@@ -1,0 +1,24 @@
+diff --git a/grammar.js b/grammar.js
+index 314d60a..eda28f1 100644
+--- a/grammar.js
++++ b/grammar.js
+@@ -833,6 +833,9 @@ module.exports = grammar({
+         $._type_identifier,
+         $._reserved_identifier,
+         $.scoped_type_identifier,
++        // Pymtheg patch 0009: a primitive type name with generic arguments is
++        // still a valid type path (`&str<u8, el>` in a proc-macro DSL).
++        alias(choice(...primitiveTypes), $.primitive_type),
+       )),
+       field('type_arguments', $.type_arguments),
+     )),
+@@ -991,6 +994,9 @@ module.exports = grammar({
+       field('macro', choice(
+         $.scoped_identifier,
+         $.identifier,
++        // Pymtheg patch 0009 (issue #322): macros have their own namespace, so
++        // a macro may be named like a primitive type (`str![...]`, snapbox).
++        alias(choice(...primitiveTypes), $.identifier),
+         $._reserved_identifier,
+       )),
+       '!',

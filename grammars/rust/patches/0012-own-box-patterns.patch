@@ -1,0 +1,21 @@
+diff --git a/grammar.js b/grammar.js
+index 84b41ee..3e5e0e0 100644
+--- a/grammar.js
++++ b/grammar.js
+@@ -1436,9 +1436,16 @@ module.exports = grammar({
+       $.or_pattern,
+       $.const_block,
+       $.macro_invocation,
++      $.box_pattern,
+       '_',
+     ),
+ 
++    // Pymtheg patch 0012 (nightly `box_patterns`; upstream #14, closed PR #83).
++    box_pattern: $ => seq(
++      'box',
++      $._pattern,
++    ),
++
+     generic_pattern: $ => seq(
+       choice(
+         $.identifier,

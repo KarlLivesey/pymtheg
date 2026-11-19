@@ -1,0 +1,14 @@
+diff --git a/grammar.js b/grammar.js
+index f812aa8..0cb98dc 100644
+--- a/grammar.js
++++ b/grammar.js
+@@ -1487,6 +1487,9 @@ module.exports = grammar({
+       field('type', choice(
+         $._type_identifier,
+         $.scoped_type_identifier,
++        // Pymtheg patch 0014 (from upstream PR #301): a turbofish, as
++        // tuple_struct_pattern already allows (`S::<T> { .. }`).
++        alias($.generic_type_with_turbofish, $.generic_type),
+       )),
+       '{',
+       sepBy(',', choice($.field_pattern, $.remaining_field_pattern)),

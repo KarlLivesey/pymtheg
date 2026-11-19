@@ -99,6 +99,83 @@
         "grammar.js",
         "test/corpus/pymtheg_safe.txt"
       ]
+    },
+    {
+      "file": "patches/0009-own-primitive-named-macros.patch",
+      "origin": "pymtheg",
+      "author": "Pymtheg C-21 (not upstream)",
+      "what": "A macro named like a primitive type (`str![...]`, `u8!(...)`; macros have their own namespace), and a primitive type name with generic arguments as a type path (`&str<u8, el>`, valid syntax in proc-macro input)",
+      "upstreamReferences": [
+        "https://github.com/tree-sitter/tree-sitter-rust/issues/322"
+      ],
+      "paths": [
+        "grammar.js",
+        "test/corpus/pymtheg_primitive_macros.txt"
+      ]
+    },
+    {
+      "file": "patches/0010-own-dyn-lifetime-first.patch",
+      "origin": "pymtheg",
+      "author": "Pymtheg C-21 (not upstream)",
+      "what": "A lifetime first in a trait object's bounds (`dyn 'a + Display`, `dyn 'static + for<'a> FnMut(..)`), read as `dynamic_type(trait: bounded_type(lifetime, ..))` like upstream #258 does for `impl`; `dyn T + 'a` keeps its old tree",
+      "upstreamReferences": [
+        "https://github.com/tree-sitter/tree-sitter-rust/pull/258"
+      ],
+      "paths": [
+        "grammar.js",
+        "test/corpus/pymtheg_dyn_lifetime.txt"
+      ]
+    },
+    {
+      "file": "patches/0011-own-parameter-attributes.patch",
+      "origin": "pymtheg",
+      "author": "Pymtheg C-21 (not upstream)",
+      "what": "Any number of outer attributes on a function parameter (`#[rustfmt::skip] #[cfg(..)] x: T`), and outer attributes on closure parameters (`|#[allow(unused)] x| ..`)",
+      "upstreamReferences": [
+        "https://github.com/tree-sitter/tree-sitter-rust/issues/276"
+      ],
+      "paths": [
+        "grammar.js",
+        "test/corpus/pymtheg_parameter_attributes.txt"
+      ]
+    },
+    {
+      "file": "patches/0012-own-box-patterns.patch",
+      "origin": "pymtheg",
+      "author": "Pymtheg C-21 (not upstream)",
+      "what": "Nightly `box` patterns (`box_patterns` feature: `Err(box E::A { .. })`) as a `box_pattern` node holding the inner pattern",
+      "upstreamReferences": [
+        "https://github.com/tree-sitter/tree-sitter-rust/issues/14",
+        "https://github.com/tree-sitter/tree-sitter-rust/pull/83"
+      ],
+      "paths": [
+        "grammar.js",
+        "test/corpus/pymtheg_box_patterns.txt"
+      ]
+    },
+    {
+      "file": "patches/0013-own-where-dyn.patch",
+      "origin": "pymtheg",
+      "author": "Pymtheg C-21 (not upstream)",
+      "what": "A trait object on the left of a where predicate (`where dyn Trait: Bound`)",
+      "upstreamReferences": [],
+      "paths": [
+        "grammar.js",
+        "test/corpus/pymtheg_where_dyn.txt"
+      ]
+    },
+    {
+      "file": "patches/0014-own-struct-pattern-turbofish.patch",
+      "origin": "pymtheg",
+      "author": "Pymtheg C-21 (not upstream)",
+      "what": "A turbofish in a struct pattern's path (`let S::<T> { .. } = ..`), as tuple-struct patterns already allow; the grammar part of upstream PR #301 (not taken whole: its attribute change overlaps PR #319)",
+      "upstreamReferences": [
+        "https://github.com/tree-sitter/tree-sitter-rust/pull/301"
+      ],
+      "paths": [
+        "grammar.js",
+        "test/corpus/pymtheg_struct_pattern_turbofish.txt"
+      ]
     }
   ],
   "tools": {

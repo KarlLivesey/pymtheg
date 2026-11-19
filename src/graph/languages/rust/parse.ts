@@ -1197,6 +1197,9 @@ async function createHelper(): Promise<Helper> {
       type BindingScopes = Map<number, Map<string, Binding[]>>;
       const bindingCache = new Map<string, BindingScopes>();
       function patternNames(n: Node): Node[] {
+        // C-21: closure parameters may carry outer attributes
+        // (`|#[allow(unused)] x|`); an attribute's tokens bind nothing.
+        if (n.type === "attribute_item") return [];
         if (
           ["identifier", "shorthand_field_identifier", "self"].includes(n.type)
         )

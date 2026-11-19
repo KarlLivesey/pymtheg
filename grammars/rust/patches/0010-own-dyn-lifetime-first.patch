@@ -1,0 +1,30 @@
+diff --git a/grammar.js b/grammar.js
+index eda28f1..36770d8 100644
+--- a/grammar.js
++++ b/grammar.js
+@@ -930,9 +930,25 @@ module.exports = grammar({
+         $.generic_type,
+         $.function_type,
+         $.tuple_type,
++        // Pymtheg patch 0010: a lifetime may come first in a trait object's
++        // bounds (`dyn 'a + Display`), as upstream #258 allows for `impl`.
++        alias($._dynamic_lifetime_first, $.bounded_type),
+       )),
+     ),
+ 
++    _dynamic_lifetime_first: $ => seq(
++      $.lifetime,
++      '+',
++      choice(
++        $.higher_ranked_trait_bound,
++        $._type_identifier,
++        $.scoped_type_identifier,
++        $.generic_type,
++        $.function_type,
++        $.tuple_type,
++      ),
++    ),
++
+     mutable_specifier: _ => 'mut',
+ 
+     // Section - Expressions

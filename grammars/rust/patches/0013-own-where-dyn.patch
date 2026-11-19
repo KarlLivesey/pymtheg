@@ -1,0 +1,13 @@
+diff --git a/grammar.js b/grammar.js
+index 3e5e0e0..f812aa8 100644
+--- a/grammar.js
++++ b/grammar.js
+@@ -497,6 +497,8 @@ module.exports = grammar({
+         $.array_type,
+         $.higher_ranked_trait_bound,
+         alias(choice(...primitiveTypes), $.primitive_type),
++        // Pymtheg patch 0013: a trait object on the left (`where dyn T: U`).
++        $.dynamic_type,
+       )),
+       field('bounds', $.trait_bounds),
+     ),
