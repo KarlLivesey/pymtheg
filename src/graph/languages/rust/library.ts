@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 import type { LibraryTarget } from "../../types.js";
-import type { Crate, Edition } from "./cargo.js";
+import type { Crate, Edition, MacroRegistry } from "./cargo.js";
 import {
   auditedMacro,
   compatibleRelease,
@@ -8,7 +8,12 @@ import {
 } from "./macro-catalog.js";
 
 export type LibraryUnit = Omit<LibraryTarget, "evidence" | "symbol">;
-type RegistryRelease = { version?: string; requirement?: string };
+type RegistryRelease = {
+  version?: string;
+  requirement?: string;
+  features?: readonly string[];
+  macroRegistry?: MacroRegistry;
+};
 export type LibraryPath = {
   unit: LibraryUnit;
   parts: string[];
@@ -34,16 +39,15 @@ export function dependencyUnit(
       edge.name === name && possible([...conditions, ...edge.conditions]),
   );
   const unit = edges[0]?.packageName;
+  const present = edges.filter((edge) =>
+    edge.conditions.every((condition) => implies(conditions, condition)),
+  );
   if (
     !unit ||
     edges.some(
       (edge) => (edge.manifest && !probe) || edge.packageName !== unit,
     ) ||
-    !edges.some(
-      (edge) =>
-        !edge.manifest &&
-        (probe || edge.conditions.every((c) => implies(conditions, c))),
-    )
+    !(probe ? edges : present).some((edge) => !edge.manifest)
   )
     return;
   const { libraryVersion: version, libraryVersionSource: versionSource } =
@@ -62,13 +66,35 @@ export function dependencyUnit(
         ? { version, versionSource }
         : {}),
     },
-    registry: edges.map((edge) =>
-      edge.registryVersion !== undefined
-        ? { version: edge.registryVersion }
-        : edge.registryRequirement !== undefined
-          ? { requirement: edge.registryRequirement }
-          : {},
-    ),
+    registry: edges.map((edge) => {
+      // Cargo unifies features for the same locked registry package. A
+      // conditional edge can add features only where its activation is known.
+      const active =
+        edge.registryVersion && edge.macroRegistry
+          ? [
+              edge,
+              ...present.filter(
+                (other) =>
+                  other !== edge &&
+                  other.macroRegistry &&
+                  other.registryVersion === edge.registryVersion,
+              ),
+            ]
+          : [edge];
+      const features =
+        active.length === 1
+          ? edge.features
+          : active.flatMap((other) => other.features ?? []);
+      return {
+        ...(edge.registryVersion !== undefined
+          ? { version: edge.registryVersion }
+          : edge.registryRequirement !== undefined
+            ? { requirement: edge.registryRequirement }
+            : {}),
+        ...(features ? { features } : {}),
+        ...(edge.macroRegistry ? { macroRegistry: edge.macroRegistry } : {}),
+      };
+    }),
   };
 }
 
@@ -195,6 +221,176 @@ type ExportNamespace =
   | "attribute"
   | "multiple";
 
+type RegistryMacro = {
+  names: readonly string[];
+  namespace: "bang" | "derive" | "attribute";
+  families: readonly string[];
+  implementation?: string;
+};
+
+// Published macro facets and the implementing packages behind re-exports.
+const registryMacros: Record<string, readonly RegistryMacro[]> = {
+  tokio: [
+    {
+      names: ["main", "test"],
+      namespace: "attribute",
+      families: ["1.0.0"],
+      implementation: "tokio-macros",
+    },
+    {
+      names: ["select"],
+      namespace: "bang",
+      families: ["1.0.0"],
+    },
+  ],
+  serde: [
+    {
+      names: ["Serialize", "Deserialize"],
+      namespace: "derive",
+      families: ["1.0.0"],
+      implementation: "serde_derive",
+    },
+  ],
+  clap: [
+    {
+      names: ["Parser", "Args", "Subcommand", "ValueEnum"],
+      namespace: "derive",
+      families: ["4.0.0"],
+      implementation: "clap_derive",
+    },
+  ],
+  rstest: [
+    {
+      names: ["rstest", "fixture"],
+      namespace: "attribute",
+      families: ["0.28.0"],
+      implementation: "rstest_macros",
+    },
+  ],
+  thiserror: [
+    {
+      names: ["Error"],
+      namespace: "derive",
+      families: ["1.0.0", "2.0.0"],
+      implementation: "thiserror-impl",
+    },
+  ],
+  derive_builder: [
+    {
+      names: ["Builder"],
+      namespace: "derive",
+      families: ["0.20.0"],
+      implementation: "derive_builder_macro",
+    },
+  ],
+  serde_with: [
+    {
+      names: ["serde_as"],
+      namespace: "attribute",
+      families: ["3.0.0"],
+      implementation: "serde_with_macros",
+    },
+  ],
+  schemars: [
+    {
+      names: ["JsonSchema"],
+      namespace: "derive",
+      families: ["0.8.0", "1.0.0"],
+      implementation: "schemars_derive",
+    },
+  ],
+  "pin-project": [
+    {
+      names: ["pin_project", "pinned_drop"],
+      namespace: "attribute",
+      families: ["1.0.0"],
+      implementation: "pin-project-internal",
+    },
+  ],
+  "pin-project-lite": [
+    { names: ["pin_project"], namespace: "bang", families: ["0.2.0"] },
+  ],
+  bitflags: [{ names: ["bitflags"], namespace: "bang", families: ["2.0.0"] }],
+  syn: [
+    {
+      names: ["parse_macro_input"],
+      namespace: "bang",
+      families: ["1.0.0", "2.0.0", "3.0.0"],
+    },
+  ],
+  slotmap: [
+    { names: ["new_key_type"], namespace: "bang", families: ["1.0.0"] },
+  ],
+  digest: [
+    {
+      names: ["new_test", "hash_serialization_test"],
+      namespace: "bang",
+      families: ["0.11.0"],
+    },
+  ],
+};
+
+function registryMacro(path: LibraryPath): RegistryMacro | undefined {
+  const unit = path.unit.unit;
+  const name = path.parts.join("::");
+  return Object.hasOwn(registryMacros, unit)
+    ? registryMacros[unit]!.find((entry) => entry.names.includes(name))
+    : undefined;
+}
+
+export function cargoMacroSourceKnown(path: LibraryPath): boolean {
+  const spec = registryMacro(path);
+  const implementation = spec?.implementation;
+  const direct =
+    spec?.families.some((family) => registryFamily(path, family)) ||
+    path.registry?.every(({ version, requirement }) =>
+      auditedMacro(path.unit.unit, version, path.parts.join("::"), requirement),
+    );
+  return (
+    !!path.registry?.length &&
+    path.registry.every(
+      ({ macroRegistry }) =>
+        !!macroRegistry &&
+        (implementation
+          ? macroRegistry.implementations.includes(implementation)
+          : !!direct || macroRegistry.registryOnly),
+    )
+  );
+}
+
+export function cargoMacroReexport(path: LibraryPath): boolean {
+  return registryMacro(path)?.implementation !== undefined;
+}
+
+function macroNamespace(path: LibraryPath): ExportNamespace | undefined {
+  if (!cargoMacroSourceKnown(path)) return;
+  const spec = registryMacro(path);
+  if (spec?.families.some((family) => registryFamily(path, family))) {
+    if (["serde", "clap"].includes(path.unit.unit))
+      return path.registry?.every(({ features }) =>
+        features?.includes("derive"),
+      )
+        ? "multiple"
+        : undefined;
+    return spec.namespace;
+  }
+  if (
+    path.registry?.every(({ version, requirement }) =>
+      auditedMacro(path.unit.unit, version, path.parts.join("::"), requirement),
+    )
+  )
+    return "bang";
+}
+
+/** Known macro facets for the expansion-time probe. */
+export function scopeMacroExport(
+  path: LibraryPath,
+): ExportNamespace | undefined {
+  return path.unit.ecosystem === "cargo"
+    ? (macroNamespace(path) ?? exportNamespace(path))
+    : exportNamespace(path);
+}
+
 // Public declaration paths whose import namespace is known. A capital letter
 // does not distinguish a type, a tuple constructor and a derive macro.
 const standardTypes = new Set([
@@ -239,32 +435,17 @@ export function exportNamespace(
   const name = parts.join("::");
   if (ecosystem === "cargo") {
     if (
-      path.registry?.length &&
-      path.registry.every(({ version, requirement }) =>
-        auditedMacro(unit, version, name, requirement),
-      )
+      auditedMacro(
+        unit,
+        path.registry?.[0]?.version,
+        name,
+        path.registry?.[0]?.requirement,
+      ) ||
+      (unit === "thiserror" && name === "Error") ||
+      (unit === "syn" && name === "parse_macro_input") ||
+      (unit === "tokio" && ["test", "main"].includes(name))
     )
-      return "bang";
-    if (
-      unit === "thiserror" &&
-      name === "Error" &&
-      (registryFamily(path, "1.0.0") || registryFamily(path, "2.0.0"))
-    )
-      return "derive";
-    if (
-      unit === "syn" &&
-      name === "parse_macro_input" &&
-      (registryFamily(path, "1.0.0") ||
-        registryFamily(path, "2.0.0") ||
-        registryFamily(path, "3.0.0"))
-    )
-      return "bang";
-    if (
-      unit === "tokio" &&
-      ["main", "test"].includes(name) &&
-      registryFamily(path, "1.0.0")
-    )
-      return "attribute";
+      return macroNamespace(path);
     if (
       unit === "regex-automata" &&
       name === "meta::Regex" &&

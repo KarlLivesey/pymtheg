@@ -8,6 +8,10 @@ type DependencySource = {
   identity?: string | undefined;
   directory?: string | null | undefined;
 };
+type ResolveSource = (
+  fields: TomlTable | undefined,
+  macroPackage?: string | null,
+) => DependencySource;
 const text = (value: TomlValue | undefined) =>
   typeof value === "string" && value ? value : undefined;
 const cratesIo = "https://github.com/rust-lang/crates.io-index";
@@ -79,7 +83,7 @@ export function lockSource(raw: TomlValue | undefined): string | undefined {
  * is a replacement whose location cannot be established from the snapshot. */
 export function cargoSources(
   contexts: readonly Pick<ContextFile, "path" | "status" | "text">[],
-): (dir: string) => (fields: TomlTable | undefined) => DependencySource {
+): (dir: string) => ResolveSource {
   const configs = new Map<
     string,
     { canonical: boolean; value: TomlTable | null }
@@ -94,13 +98,8 @@ export function cargoSources(
       value: c.status === "clean" ? readToml(c.text) : null,
     });
   }
-  const cache = new Map<
-    string,
-    (fields: TomlTable | undefined) => DependencySource
-  >();
-  function readSources(
-    dir: string,
-  ): (fields: TomlTable | undefined) => DependencySource {
+  const cache = new Map<string, ResolveSource>();
+  function readSources(dir: string): ResolveSource {
     const unknown = (fields: TomlTable | undefined): DependencySource =>
       fields?.path === undefined ? { directory: null } : {};
     const ancestry = [dir];
@@ -110,10 +109,23 @@ export function cargoSources(
     }
     const sources = new Map<string, Source>();
     const registries = new Map<string, string | undefined>();
+    const patched = new Set<string>();
+    let unknownOverride = false;
     for (const base of ancestry.reverse()) {
       const config = configs.get(base);
       if (!config) continue;
       if (!config.value) return unknown;
+      const paths = config.value.paths;
+      if (paths !== undefined && (!Array.isArray(paths) || paths.length > 0))
+        unknownOverride = true;
+      const patch = table(config.value.patch);
+      if (config.value.patch !== undefined && !patch) unknownOverride = true;
+      for (const group of Object.values(patch ?? {})) {
+        const entries = table(group);
+        if (!entries) unknownOverride = true;
+        for (const [alias, entry] of Object.entries(entries ?? {}))
+          patched.add(text(table(entry)?.package) ?? alias);
+      }
       const indexes = table(config.value.registries);
       if (config.value.registries !== undefined && !indexes) return unknown;
       for (const [name, value] of Object.entries(indexes ?? {})) {
@@ -173,7 +185,15 @@ export function cargoSources(
         (name === "crates-io" || fields.registry !== undefined) &&
         fields["replace-with"] !== undefined,
     );
-    return (fields) => {
+    return (fields, macroPackage) => {
+      if (
+        macroPackage !== undefined &&
+        (unknownOverride ||
+          (macroPackage === null
+            ? patched.size > 0
+            : patched.has(macroPackage)))
+      )
+        return { directory: null };
       if (fields?.path !== undefined) return {};
       const registry =
         text(fields?.["registry-index"]) ??

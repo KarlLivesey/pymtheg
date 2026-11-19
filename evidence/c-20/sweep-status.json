@@ -1,0 +1,1057 @@
+{
+  "builds": {
+    "initial": {
+      "package": "pymtheg@0.1.0",
+      "source": "local build",
+      "sha256": "2cbfb551ad1edf7a2a00c5c95ec8ae5416c1e9c22848f40692d5e56d6f49b2c4",
+      "node": "v24.21.0"
+    },
+    "verified": {
+      "package": "pymtheg@0.1.0",
+      "source": "local build",
+      "sha256": "b5a7309f1110cb6f26ea084928a3f141c215a8dae5a8c79c0328ec84b3462aa5",
+      "node": "v24.21.0"
+    }
+  },
+  "budgets": {
+    "overFileCap": 0,
+    "programBudgetDiagnostics": 0
+  },
+  "repos": [
+    {
+      "id": "changesets/changesets",
+      "commit": "9a035ec36045aeb6141dd0bbac9ab9e3c69ac0bc",
+      "build": "verified",
+      "install": {
+        "manager": "pnpm",
+        "status": "installed",
+        "exitCode": 0
+      },
+      "outcome": "finished",
+      "limitSeconds": 3600,
+      "wallSeconds": 27.082,
+      "peakRssKiB": 1720580,
+      "cold": {
+        "wallSeconds": 14.395,
+        "cpuSeconds": 26.14,
+        "peakRssKiB": 896888,
+        "exitCode": 0,
+        "status": "ok"
+      },
+      "warm": {
+        "wallSeconds": 3.762,
+        "cpuSeconds": 4.75,
+        "peakRssKiB": 337264,
+        "exitCode": 0,
+        "status": "ok",
+        "unchanged": 164
+      },
+      "queries": [
+        {
+          "command": "status",
+          "status": "ok",
+          "exitCode": 0
+        },
+        {
+          "command": "search",
+          "status": "ok",
+          "exitCode": 0
+        },
+        {
+          "command": "callees",
+          "status": "ok",
+          "exitCode": 0
+        },
+        {
+          "command": "file",
+          "status": "ok",
+          "exitCode": 0
+        }
+      ],
+      "failedSources": [],
+      "partialFiles": 0
+    },
+    {
+      "id": "colinhacks/zod",
+      "commit": "90bf57b8e96a3729d766fff3185d39b2ab3ba016",
+      "build": "initial",
+      "install": {
+        "status": "unsupported",
+        "reason": "unsupported-package-manager"
+      },
+      "outcome": "install-unavailable",
+      "limitSeconds": 3600,
+      "wallSeconds": 1.127,
+      "peakRssKiB": 14800,
+      "queries": []
+    },
+    {
+      "id": "dexie/Dexie.js",
+      "commit": "95666bf5370a222a21d7f53130d87b42e9b7bac7",
+      "build": "verified",
+      "install": {
+        "manager": "pnpm",
+        "status": "installed",
+        "exitCode": 0
+      },
+      "outcome": "finished",
+      "limitSeconds": 3600,
+      "wallSeconds": 52.42,
+      "peakRssKiB": 1545188,
+      "cold": {
+        "wallSeconds": 33.761,
+        "cpuSeconds": 57.129999999999995,
+        "peakRssKiB": 1093796,
+        "exitCode": 0,
+        "status": "ok"
+      },
+      "warm": {
+        "wallSeconds": 7.016,
+        "cpuSeconds": 9.15,
+        "peakRssKiB": 563292,
+        "exitCode": 0,
+        "status": "ok",
+        "unchanged": 655
+      },
+      "queries": [
+        {
+          "command": "status",
+          "status": "ok",
+          "exitCode": 0
+        },
+        {
+          "command": "search",
+          "status": "ok",
+          "exitCode": 0
+        },
+        {
+          "command": "callees",
+          "status": "ok",
+          "exitCode": 0
+        },
+        {
+          "command": "file",
+          "status": "ok",
+          "exitCode": 0
+        }
+      ],
+      "failedSources": [],
+      "partialFiles": 0
+    },
+    {
+      "id": "excalidraw/excalidraw",
+      "commit": "680f58ccfdaa1ae5b7f606ad4568f6df46acacb5",
+      "build": "verified",
+      "install": {
+        "manager": "yarn",
+        "status": "installed",
+        "exitCode": 0
+      },
+      "outcome": "finished",
+      "limitSeconds": 3600,
+      "wallSeconds": 150.582,
+      "peakRssKiB": 2952984,
+      "cold": {
+        "wallSeconds": 110.683,
+        "cpuSeconds": 165.68,
+        "peakRssKiB": 2952984,
+        "exitCode": 2,
+        "status": "incomplete"
+      },
+      "warm": {
+        "wallSeconds": 19.257,
+        "cpuSeconds": 24.35,
+        "peakRssKiB": 945692,
+        "exitCode": 2,
+        "status": "incomplete",
+        "unchanged": 733
+      },
+      "queries": [
+        {
+          "command": "status",
+          "status": "incomplete",
+          "exitCode": 2
+        },
+        {
+          "command": "search",
+          "status": "incomplete",
+          "exitCode": 2
+        },
+        {
+          "command": "callees",
+          "status": "incomplete",
+          "exitCode": 2
+        },
+        {
+          "command": "file",
+          "status": "incomplete",
+          "exitCode": 2
+        }
+      ],
+      "failedSources": [],
+      "partialFiles": 2
+    },
+    {
+      "id": "honojs/hono",
+      "commit": "676c8f80fcafc49e6e74c847a8f0d9c44cc7faee",
+      "build": "verified",
+      "install": {
+        "manager": "pnpm",
+        "status": "installed",
+        "exitCode": 0
+      },
+      "outcome": "finished",
+      "limitSeconds": 3600,
+      "wallSeconds": 85.541,
+      "peakRssKiB": 1599524,
+      "cold": {
+        "wallSeconds": 66.887,
+        "cpuSeconds": 105.8,
+        "peakRssKiB": 1599524,
+        "exitCode": 0,
+        "status": "ok"
+      },
+      "warm": {
+        "wallSeconds": 10.463,
+        "cpuSeconds": 13.73,
+        "peakRssKiB": 665144,
+        "exitCode": 0,
+        "status": "ok",
+        "unchanged": 460
+      },
+      "queries": [
+        {
+          "command": "status",
+          "status": "ok",
+          "exitCode": 0
+        },
+        {
+          "command": "search",
+          "status": "ok",
+          "exitCode": 0
+        },
+        {
+          "command": "callees",
+          "status": "ok",
+          "exitCode": 0
+        },
+        {
+          "command": "file",
+          "status": "ok",
+          "exitCode": 0
+        }
+      ],
+      "failedSources": [],
+      "partialFiles": 0
+    },
+    {
+      "id": "mermaid-js/mermaid",
+      "commit": "e5fdf81d222d9e011ca75d9e4363f3bd7bf99616",
+      "build": "initial",
+      "install": {
+        "manager": "pnpm",
+        "status": "installed",
+        "exitCode": 0
+      },
+      "outcome": "finished",
+      "limitSeconds": 3600,
+      "wallSeconds": 145.095,
+      "peakRssKiB": 2908880,
+      "cold": {
+        "wallSeconds": 101.804,
+        "cpuSeconds": 151,
+        "peakRssKiB": 2908880,
+        "exitCode": 0,
+        "status": "ok"
+      },
+      "warm": {
+        "wallSeconds": 23.792,
+        "cpuSeconds": 30.95,
+        "peakRssKiB": 1597356,
+        "exitCode": 0,
+        "status": "ok",
+        "unchanged": 1240
+      },
+      "queries": [
+        {
+          "command": "status",
+          "status": "ok",
+          "exitCode": 0
+        },
+        {
+          "command": "search",
+          "status": "ok",
+          "exitCode": 0
+        },
+        {
+          "command": "callees",
+          "status": "ok",
+          "exitCode": 0
+        },
+        {
+          "command": "file",
+          "status": "ok",
+          "exitCode": 0
+        }
+      ],
+      "failedSources": [],
+      "partialFiles": 0
+    },
+    {
+      "id": "nestjs/nest",
+      "commit": "085f83a168e9edbedfe9560428dcfd270073ae00",
+      "build": "initial",
+      "install": {
+        "manager": "npm",
+        "status": "failed",
+        "exitCode": 1
+      },
+      "outcome": "install-unavailable",
+      "limitSeconds": 3600,
+      "wallSeconds": 3.409,
+      "peakRssKiB": 182192,
+      "queries": []
+    },
+    {
+      "id": "oclif/core",
+      "commit": "50a4bc0ecd123733cd974866f8db0f1cb5a6a06f",
+      "build": "verified",
+      "install": {
+        "manager": "yarn",
+        "status": "installed",
+        "exitCode": 0
+      },
+      "outcome": "finished",
+      "limitSeconds": 3600,
+      "wallSeconds": 31.208,
+      "peakRssKiB": 901452,
+      "cold": {
+        "wallSeconds": 17.424,
+        "cpuSeconds": 33.04,
+        "peakRssKiB": 901452,
+        "exitCode": 0,
+        "status": "ok"
+      },
+      "warm": {
+        "wallSeconds": 3.021,
+        "cpuSeconds": 3.9499999999999997,
+        "peakRssKiB": 327224,
+        "exitCode": 0,
+        "status": "ok",
+        "unchanged": 196
+      },
+      "queries": [
+        {
+          "command": "status",
+          "status": "ok",
+          "exitCode": 0
+        },
+        {
+          "command": "search",
+          "status": "ok",
+          "exitCode": 0
+        },
+        {
+          "command": "callees",
+          "status": "ok",
+          "exitCode": 0
+        },
+        {
+          "command": "file",
+          "status": "ok",
+          "exitCode": 0
+        }
+      ],
+      "failedSources": [],
+      "partialFiles": 0
+    },
+    {
+      "id": "pingdotgg/t3code",
+      "commit": "ea20e800216417c8d3b5dfc54a863bbd9e0b3e20",
+      "build": "initial",
+      "install": {
+        "status": "unsupported",
+        "reason": "unsupported-package-manager"
+      },
+      "outcome": "install-unavailable",
+      "limitSeconds": 3600,
+      "wallSeconds": 2.624,
+      "peakRssKiB": 41880,
+      "queries": []
+    },
+    {
+      "id": "pmndrs/zustand",
+      "commit": "9fed2eb2f3af672da9f7bf694b996df3831fc207",
+      "build": "verified",
+      "install": {
+        "manager": "pnpm",
+        "status": "installed",
+        "exitCode": 0
+      },
+      "outcome": "finished",
+      "limitSeconds": 3600,
+      "wallSeconds": 17.861,
+      "peakRssKiB": 1676024,
+      "cold": {
+        "wallSeconds": 8.29,
+        "cpuSeconds": 17.2,
+        "peakRssKiB": 669120,
+        "exitCode": 0,
+        "status": "ok"
+      },
+      "warm": {
+        "wallSeconds": 2.275,
+        "cpuSeconds": 2.94,
+        "peakRssKiB": 265664,
+        "exitCode": 0,
+        "status": "ok",
+        "unchanged": 52
+      },
+      "queries": [
+        {
+          "command": "status",
+          "status": "ok",
+          "exitCode": 0
+        },
+        {
+          "command": "search",
+          "status": "ok",
+          "exitCode": 0
+        },
+        {
+          "command": "callees",
+          "status": "ok",
+          "exitCode": 0
+        },
+        {
+          "command": "file",
+          "status": "ok",
+          "exitCode": 0
+        }
+      ],
+      "failedSources": [],
+      "partialFiles": 0
+    },
+    {
+      "id": "puppeteer/puppeteer",
+      "commit": "e82d656004488cc2f635f878da7cede1b4631235",
+      "build": "initial",
+      "install": {
+        "manager": "npm",
+        "status": "installed",
+        "exitCode": 0
+      },
+      "outcome": "finished",
+      "limitSeconds": 3600,
+      "wallSeconds": 103.8,
+      "peakRssKiB": 2172208,
+      "cold": {
+        "wallSeconds": 47.144,
+        "cpuSeconds": 74.75,
+        "peakRssKiB": 2172208,
+        "exitCode": 2,
+        "status": "incomplete"
+      },
+      "warm": {
+        "wallSeconds": 11.306,
+        "cpuSeconds": 14.370000000000001,
+        "peakRssKiB": 661396,
+        "exitCode": 2,
+        "status": "incomplete",
+        "unchanged": 509
+      },
+      "queries": [
+        {
+          "command": "status",
+          "status": "incomplete",
+          "exitCode": 2
+        },
+        {
+          "command": "search",
+          "status": "incomplete",
+          "exitCode": 2
+        },
+        {
+          "command": "callees",
+          "status": "incomplete",
+          "exitCode": 2
+        },
+        {
+          "command": "file",
+          "status": "incomplete",
+          "exitCode": 2
+        }
+      ],
+      "failedSources": [
+        {
+          "language": "typescript",
+          "reason": "Syntax error: Variable declaration expected.",
+          "count": 1,
+          "files": [
+            "test/assets/syntax-error.js"
+          ],
+          "examples": [
+            {
+              "file": "test/assets/syntax-error.js",
+              "line": 3,
+              "message": "Syntax error at line 3, column 7: Variable declaration expected. Found: \"=\"."
+            }
+          ]
+        }
+      ],
+      "partialFiles": 0
+    },
+    {
+      "id": "react-hook-form/react-hook-form",
+      "commit": "66f4d72b8c66627d5542dd13e15070227d84d4a2",
+      "build": "verified",
+      "install": {
+        "manager": "pnpm",
+        "status": "installed",
+        "exitCode": 0
+      },
+      "outcome": "finished",
+      "limitSeconds": 3600,
+      "wallSeconds": 71.612,
+      "peakRssKiB": 1373292,
+      "cold": {
+        "wallSeconds": 34.456,
+        "cpuSeconds": 56.27,
+        "peakRssKiB": 1335452,
+        "exitCode": 2,
+        "status": "incomplete"
+      },
+      "warm": {
+        "wallSeconds": 28.216,
+        "cpuSeconds": 48.690000000000005,
+        "peakRssKiB": 1373292,
+        "exitCode": 0,
+        "status": "ok",
+        "unchanged": 436
+      },
+      "queries": [
+        {
+          "command": "status",
+          "status": "ok",
+          "exitCode": 0
+        },
+        {
+          "command": "search",
+          "status": "ok",
+          "exitCode": 0
+        },
+        {
+          "command": "callees",
+          "status": "ok",
+          "exitCode": 0
+        },
+        {
+          "command": "file",
+          "status": "ok",
+          "exitCode": 0
+        }
+      ],
+      "failedSources": [],
+      "partialFiles": 0
+    },
+    {
+      "id": "reduxjs/redux-toolkit",
+      "commit": "1a7d3b5251ceda61b77928e357a22086b45aaab1",
+      "build": "verified",
+      "install": {
+        "manager": "pnpm",
+        "status": "installed",
+        "exitCode": 0
+      },
+      "outcome": "finished",
+      "limitSeconds": 3600,
+      "wallSeconds": 142.59,
+      "peakRssKiB": 2535480,
+      "cold": {
+        "wallSeconds": 67.558,
+        "cpuSeconds": 109.03,
+        "peakRssKiB": 2313956,
+        "exitCode": 2,
+        "status": "incomplete"
+      },
+      "warm": {
+        "wallSeconds": 63.023,
+        "cpuSeconds": 105.71,
+        "peakRssKiB": 2013244,
+        "exitCode": 2,
+        "status": "incomplete",
+        "unchanged": 647
+      },
+      "queries": [
+        {
+          "command": "status",
+          "status": "incomplete",
+          "exitCode": 2
+        },
+        {
+          "command": "search",
+          "status": "incomplete",
+          "exitCode": 2
+        },
+        {
+          "command": "callees",
+          "status": "incomplete",
+          "exitCode": 2
+        },
+        {
+          "command": "file",
+          "status": "incomplete",
+          "exitCode": 2
+        }
+      ],
+      "failedSources": [],
+      "partialFiles": 47
+    },
+    {
+      "id": "trpc/trpc",
+      "commit": "1abda6cc6cd9ac149e474936f5dfcb679a983fb3",
+      "build": "verified",
+      "install": {
+        "manager": "pnpm",
+        "status": "installed",
+        "exitCode": 0
+      },
+      "outcome": "finished",
+      "limitSeconds": 3600,
+      "wallSeconds": 436.003,
+      "peakRssKiB": 3060124,
+      "cold": {
+        "wallSeconds": 208.772,
+        "cpuSeconds": 289.84000000000003,
+        "peakRssKiB": 2845052,
+        "exitCode": 2,
+        "status": "incomplete"
+      },
+      "warm": {
+        "wallSeconds": 207.059,
+        "cpuSeconds": 288.12,
+        "peakRssKiB": 3060124,
+        "exitCode": 2,
+        "status": "incomplete",
+        "unchanged": 1347
+      },
+      "queries": [
+        {
+          "command": "status",
+          "status": "incomplete",
+          "exitCode": 2
+        },
+        {
+          "command": "search",
+          "status": "incomplete",
+          "exitCode": 2
+        },
+        {
+          "command": "callees",
+          "status": "incomplete",
+          "exitCode": 2
+        },
+        {
+          "command": "file",
+          "status": "incomplete",
+          "exitCode": 2
+        }
+      ],
+      "failedSources": [
+        {
+          "language": "typescript",
+          "reason": "TypeScript config examples/nuxt/tsconfig.json extends \"./.nuxt/tsconfig.json\", which is missing from the snapshot",
+          "count": 4,
+          "files": [
+            "examples/nuxt/nuxt.config.ts",
+            "examples/nuxt/playwright.config.ts",
+            "examples/nuxt/plugins/trpc.ts",
+            "examples/nuxt/test/smoke.test.ts"
+          ],
+          "examples": [
+            {
+              "file": "examples/nuxt/nuxt.config.ts",
+              "line": null,
+              "message": "TypeScript config examples/nuxt/tsconfig.json extends \"./.nuxt/tsconfig.json\", which is missing from the snapshot"
+            },
+            {
+              "file": "examples/nuxt/playwright.config.ts",
+              "line": null,
+              "message": "TypeScript config examples/nuxt/tsconfig.json extends \"./.nuxt/tsconfig.json\", which is missing from the snapshot"
+            }
+          ]
+        },
+        {
+          "language": "typescript",
+          "reason": "TypeScript config examples/nuxt/server/tsconfig.json extends \"../.nuxt/tsconfig.server.json\", which is missing from the snapshot",
+          "count": 2,
+          "files": [
+            "examples/nuxt/server/api/trpc/[trpc].ts",
+            "examples/nuxt/server/trpc/init.ts"
+          ],
+          "examples": [
+            {
+              "file": "examples/nuxt/server/api/trpc/[trpc].ts",
+              "line": null,
+              "message": "TypeScript config examples/nuxt/server/tsconfig.json extends \"../.nuxt/tsconfig.server.json\", which is missing from the snapshot"
+            },
+            {
+              "file": "examples/nuxt/server/trpc/init.ts",
+              "line": null,
+              "message": "TypeScript config examples/nuxt/server/tsconfig.json extends \"../.nuxt/tsconfig.server.json\", which is missing from the snapshot"
+            }
+          ]
+        }
+      ],
+      "partialFiles": 7
+    },
+    {
+      "id": "vitejs/vite",
+      "commit": "60c260dea1fa9f628c22e32b14dddf6ca3088f2b",
+      "build": "verified",
+      "install": {
+        "manager": "pnpm",
+        "status": "installed",
+        "exitCode": 0
+      },
+      "outcome": "finished",
+      "limitSeconds": 3600,
+      "wallSeconds": 133.279,
+      "peakRssKiB": 2270400,
+      "cold": {
+        "wallSeconds": 64.297,
+        "cpuSeconds": 100.53,
+        "peakRssKiB": 2270400,
+        "exitCode": 2,
+        "status": "incomplete"
+      },
+      "warm": {
+        "wallSeconds": 55.748,
+        "cpuSeconds": 92.94,
+        "peakRssKiB": 2227100,
+        "exitCode": 2,
+        "status": "incomplete",
+        "unchanged": 1695
+      },
+      "queries": [
+        {
+          "command": "status",
+          "status": "incomplete",
+          "exitCode": 2
+        },
+        {
+          "command": "search",
+          "status": "incomplete",
+          "exitCode": 2
+        },
+        {
+          "command": "callees",
+          "status": "incomplete",
+          "exitCode": 2
+        },
+        {
+          "command": "file",
+          "status": "incomplete",
+          "exitCode": 2
+        }
+      ],
+      "failedSources": [
+        {
+          "language": "typescript",
+          "reason": "Syntax error: Unexpected keyword or identifier.",
+          "count": 2,
+          "files": [
+            "packages/vite/src/node/ssr/__tests__/fixtures/errors/syntax-error.js",
+            "packages/vite/src/node/ssr/__tests__/fixtures/errors/syntax-error.ts"
+          ],
+          "examples": [
+            {
+              "file": "packages/vite/src/node/ssr/__tests__/fixtures/errors/syntax-error.js",
+              "line": 1,
+              "message": "Syntax error at line 1, column 1: Unexpected keyword or identifier. Found: \"invalid\"."
+            },
+            {
+              "file": "packages/vite/src/node/ssr/__tests__/fixtures/errors/syntax-error.ts",
+              "line": 1,
+              "message": "Syntax error at line 1, column 1: Unexpected keyword or identifier. Found: \"invalid\"."
+            }
+          ]
+        },
+        {
+          "language": "typescript",
+          "reason": "Unreadable TypeScript config playground/tsconfig-json-load-error/has-error/tsconfig.json: Expression expected.",
+          "count": 1,
+          "files": [
+            "playground/tsconfig-json-load-error/has-error/main.ts"
+          ],
+          "examples": [
+            {
+              "file": "playground/tsconfig-json-load-error/has-error/main.ts",
+              "line": null,
+              "message": "Unreadable TypeScript config playground/tsconfig-json-load-error/has-error/tsconfig.json: Expression expected."
+            }
+          ]
+        },
+        {
+          "language": "typescript",
+          "reason": "Unreadable package manifest playground/resolve/utf8-bom-package/package.json: Unexpected token '﻿', \"﻿{\n  \"name\"... is not valid JSON",
+          "count": 1,
+          "files": [
+            "playground/resolve/utf8-bom-package/index.mjs"
+          ],
+          "examples": [
+            {
+              "file": "playground/resolve/utf8-bom-package/index.mjs",
+              "line": null,
+              "message": "Unreadable package manifest playground/resolve/utf8-bom-package/package.json: Unexpected token '﻿', \"﻿{\n  \"name\"... is not valid JSON"
+            }
+          ]
+        }
+      ],
+      "partialFiles": 2
+    },
+    {
+      "id": "vitest-dev/vitest",
+      "commit": "161e25f663a838f6a30890f8a6827ff83ff1b3c7",
+      "build": "verified",
+      "install": {
+        "manager": "pnpm",
+        "status": "installed",
+        "exitCode": 0
+      },
+      "outcome": "finished",
+      "limitSeconds": 3600,
+      "wallSeconds": 329.47,
+      "peakRssKiB": 3681884,
+      "cold": {
+        "wallSeconds": 164.634,
+        "cpuSeconds": 250.48,
+        "peakRssKiB": 3673520,
+        "exitCode": 2,
+        "status": "incomplete"
+      },
+      "warm": {
+        "wallSeconds": 142.79,
+        "cpuSeconds": 225.58,
+        "peakRssKiB": 3681884,
+        "exitCode": 2,
+        "status": "incomplete",
+        "unchanged": 2490
+      },
+      "queries": [
+        {
+          "command": "status",
+          "status": "incomplete",
+          "exitCode": 2
+        },
+        {
+          "command": "search",
+          "status": "incomplete",
+          "exitCode": 2
+        },
+        {
+          "command": "callees",
+          "status": "incomplete",
+          "exitCode": 2
+        },
+        {
+          "command": "file",
+          "status": "incomplete",
+          "exitCode": 2
+        }
+      ],
+      "failedSources": [
+        {
+          "language": "typescript",
+          "reason": "Syntax error: '}' expected.",
+          "count": 1,
+          "files": [
+            "test/e2e/fixtures/list-parse-error/broken.test.ts"
+          ],
+          "examples": [
+            {
+              "file": "test/e2e/fixtures/list-parse-error/broken.test.ts",
+              "line": 5,
+              "message": "Syntax error at line 5, column 1: '}' expected."
+            }
+          ]
+        },
+        {
+          "language": "typescript",
+          "reason": "Syntax error: Declaration or statement expected.",
+          "count": 1,
+          "files": [
+            "test/e2e/fixtures/reporters/with-syntax-error.test.js"
+          ],
+          "examples": [
+            {
+              "file": "test/e2e/fixtures/reporters/with-syntax-error.test.js",
+              "line": 4,
+              "message": "Syntax error at line 4, column 1: Declaration or statement expected. Found: \")\"."
+            }
+          ]
+        },
+        {
+          "language": "typescript",
+          "reason": "Syntax error: Property or signature expected.",
+          "count": 1,
+          "files": [
+            "test/e2e/deps/optimizer/unparsable/index.js"
+          ],
+          "examples": [
+            {
+              "file": "test/e2e/deps/optimizer/unparsable/index.js",
+              "line": 3,
+              "message": "Syntax error at line 3, column 40: Property or signature expected. Found: \"|\"."
+            }
+          ]
+        }
+      ],
+      "partialFiles": 0
+    },
+    {
+      "id": "withastro/astro",
+      "commit": "3ac5ad3ae05ddc461bcc7748f0c55fd6da056652",
+      "build": "verified",
+      "install": {
+        "manager": "pnpm",
+        "status": "installed",
+        "exitCode": 0
+      },
+      "outcome": "finished",
+      "limitSeconds": 3600,
+      "wallSeconds": 633.632,
+      "peakRssKiB": 3327092,
+      "cold": {
+        "wallSeconds": 325.088,
+        "cpuSeconds": 471.39,
+        "peakRssKiB": 3327092,
+        "exitCode": 2,
+        "status": "incomplete"
+      },
+      "warm": {
+        "wallSeconds": 276.915,
+        "cpuSeconds": 420.62,
+        "peakRssKiB": 3219932,
+        "exitCode": 2,
+        "status": "incomplete",
+        "unchanged": 3362
+      },
+      "queries": [
+        {
+          "command": "status",
+          "status": "incomplete",
+          "exitCode": 2
+        },
+        {
+          "command": "search",
+          "status": "incomplete",
+          "exitCode": 2
+        },
+        {
+          "command": "callees",
+          "status": "incomplete",
+          "exitCode": 2
+        },
+        {
+          "command": "file",
+          "status": "incomplete",
+          "exitCode": 2
+        }
+      ],
+      "failedSources": [
+        {
+          "language": "typescript",
+          "reason": "Syntax error: ')' expected.",
+          "count": 3,
+          "files": [
+            "packages/astro/e2e/fixtures/errors/src/components/preact/PreactSyntaxError.jsx",
+            "packages/astro/e2e/fixtures/errors/src/components/react/ReactSyntaxError.jsx",
+            "packages/astro/e2e/fixtures/errors/src/components/solid/SolidSyntaxError.jsx"
+          ],
+          "examples": [
+            {
+              "file": "packages/astro/e2e/fixtures/errors/src/components/preact/PreactSyntaxError.jsx",
+              "line": 4,
+              "message": "Syntax error at line 4, column 22: ')' expected. Found: \"</\"."
+            },
+            {
+              "file": "packages/astro/e2e/fixtures/errors/src/components/react/ReactSyntaxError.jsx",
+              "line": 4,
+              "message": "Syntax error at line 4, column 22: ')' expected. Found: \"</\"."
+            }
+          ]
+        },
+        {
+          "language": "typescript",
+          "reason": "Syntax error: Variable declaration expected.",
+          "count": 1,
+          "files": [
+            "packages/astro/e2e/fixtures/errors/src/components/JSSyntaxError.js"
+          ],
+          "examples": [
+            {
+              "file": "packages/astro/e2e/fixtures/errors/src/components/JSSyntaxError.js",
+              "line": 2,
+              "message": "Syntax error at line 2, column 9: Variable declaration expected. Found: \"1\"."
+            }
+          ]
+        }
+      ],
+      "partialFiles": 118
+    },
+    {
+      "id": "yargs/yargs",
+      "commit": "9588a764365c0fd9a6b5dd2f76f2e1be805c5426",
+      "build": "initial",
+      "install": {
+        "manager": "npm",
+        "status": "installed",
+        "exitCode": 0
+      },
+      "outcome": "finished",
+      "limitSeconds": 3600,
+      "wallSeconds": 17.601,
+      "peakRssKiB": 530716,
+      "cold": {
+        "wallSeconds": 7.889,
+        "cpuSeconds": 15.709999999999999,
+        "peakRssKiB": 530716,
+        "exitCode": 0,
+        "status": "ok"
+      },
+      "warm": {
+        "wallSeconds": 2.166,
+        "cpuSeconds": 2.7800000000000002,
+        "peakRssKiB": 311632,
+        "exitCode": 0,
+        "status": "ok",
+        "unchanged": 101
+      },
+      "queries": [
+        {
+          "command": "status",
+          "status": "ok",
+          "exitCode": 0
+        },
+        {
+          "command": "search",
+          "status": "ok",
+          "exitCode": 0
+        },
+        {
+          "command": "callees",
+          "status": "ok",
+          "exitCode": 0
+        },
+        {
+          "command": "file",
+          "status": "ok",
+          "exitCode": 0
+        }
+      ],
+      "failedSources": [],
+      "partialFiles": 0
+    }
+  ]
+}

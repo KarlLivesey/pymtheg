@@ -5,6 +5,7 @@ import { dirname, posix } from "node:path";
 import ts from "typescript";
 import { compare, matchesPattern } from "../../index.js";
 import type { ContextFile, Diagnostic, GraphFile } from "../../types.js";
+import type { DependencyInputs } from "../../dependency-inputs.js";
 import { denoConfigPatterns, denoImports, importMapNames } from "./deno.js";
 import {
   workspaceLinks,
@@ -73,6 +74,7 @@ export interface ProjectGroup {
   failure?: string;
 }
 export interface ProjectModel {
+  dependencyLimit(group: ProjectGroup): boolean;
   groups: ProjectGroup[];
   manifests: readonly Manifest[];
   workspaceRoots: ReadonlySet<string>;
@@ -548,6 +550,7 @@ const hasNodeModulesSegment = (path: string) =>
 export function projectModel(
   files: readonly GraphFile[],
   contexts: readonly ContextFile[],
+  dependencies?: DependencyInputs,
 ): ProjectModel {
   const fs = new VirtualFileSystem();
   const deno = denoImports(contexts);
@@ -620,8 +623,21 @@ export function projectModel(
   const workspace = workspaceLinks(manifests, contexts, [
     ...brokenManifests.keys(),
   ]);
-  for (const [link, target] of workspace.links)
-    fs.link(toVirtual(link), target === "." ? "/" : toVirtual(target));
+  for (const [link, target] of workspace.links) {
+    const separation = link.lastIndexOf("node_modules/");
+    const name = link.slice(separation + "node_modules/".length);
+    let directory = link.slice(0, separation).replace(/\/$/, "") || ".";
+    const supplied = () =>
+      dependencies?.directoryExists(
+        posix.join(directory, "node_modules", name),
+      );
+    // An install can override a declared workspace dependency, including
+    // through a hoisted copy. Keep synthetic links only for absent packages.
+    while (directory !== "." && !supplied())
+      directory = posix.dirname(directory);
+    if (!supplied())
+      fs.link(toVirtual(link), target === "." ? "/" : toVirtual(target));
+  }
   const matchFiles = (
     ts as unknown as {
       matchFiles?: (
@@ -642,10 +658,42 @@ export function projectModel(
   ).matchFiles;
   if (typeof matchFiles !== "function")
     throw Error("The pinned TypeScript compiler no longer exposes matchFiles");
+  const dependencyPath = (name: string) => fromVirtual(name) ?? "";
+  const declarationPath = (name: string) => /\.d\.(?:ts|mts|cts)$/.test(name);
+  const dependencyFile = (name: string) =>
+    declarationPath(name) || name.endsWith(".json");
+  const real = (name: string) => {
+    if (fs.files.has(name) || fs.directories.has(name)) return name;
+    const installed = dependencies?.realpath(dependencyPath(name));
+    if (installed !== undefined) return toVirtual(installed);
+    return fs.real(name);
+  };
+  const fileExists = (name: string) =>
+    fs.files.has(real(name)) ||
+    (dependencyFile(name) &&
+      (dependencies?.fileExists(dependencyPath(name)) ?? false));
+  const readFile = (name: string) =>
+    fs.files.get(real(name)) ??
+    (dependencyFile(name)
+      ? dependencies?.read(dependencyPath(name))
+      : undefined);
+  const directoryExists = (name: string) =>
+    fs.directoryExists(name) ||
+    (dependencies?.directoryExists(dependencyPath(name)) ?? false);
+  let installedConfigRead = false;
   const parseHost: ts.ParseConfigHost = {
     useCaseSensitiveFileNames: true,
-    fileExists: fs.fileExists,
-    readFile: fs.readFile,
+    fileExists,
+    readFile(name) {
+      const text = readFile(name);
+      if (
+        text !== undefined &&
+        !fs.files.has(real(name)) &&
+        hasNodeModulesSegment(name)
+      )
+        installedConfigRead = true;
+      return text;
+    },
     readDirectory: (root, extensions, excludes, includes, depth) =>
       matchFiles(
         root,
@@ -823,6 +871,7 @@ export function projectModel(
         );
     }
     if (!syntax) {
+      installedConfigRead = false;
       const jsconfig = posix.basename(config.path).startsWith("jsconfig");
       const parsed = ts.parseJsonSourceFileConfigFileContent(
         source,
@@ -838,6 +887,16 @@ export function projectModel(
         toVirtual(config.path),
       );
       if (!group.failure) {
+        if (
+          installedConfigRead &&
+          !parsed.errors.some(({ code }) => code === 6053 || code === 5083)
+        )
+          group.limitations = group.limitations.filter(
+            (note) =>
+              !note.endsWith(
+                "node_modules is never captured, so those settings are missing",
+              ),
+          );
         if (!group.limitations.length)
           parsedConfigs.set(toVirtual(config.path), parsed);
         group.notes.push(
@@ -955,6 +1014,30 @@ export function projectModel(
     } else group.roots.push(toVirtual(file.path));
   }
   if (inferred) groups.push(inferred);
+  if (dependencies)
+    for (const group of groups) {
+      if (group.explicitTypes || group.options.typeRoots || !group.roots.length)
+        continue;
+      for (
+        let directory = group.config ? posix.dirname(group.config) : ".";
+        ;
+        directory = posix.dirname(directory)
+      ) {
+        if (
+          dependencies.directoryExists(
+            posix.join(directory, "node_modules/@types"),
+          )
+        ) {
+          delete group.options.types;
+          break;
+        }
+        if (directory === ".") break;
+      }
+    }
+  const budgets = new Map<
+    ProjectGroup,
+    { bytes: number; names: Set<string>; limited: boolean }
+  >();
   const parseFailures = new Map<string, string>();
   const originals = new Map(files.map((file) => [file.path, file.text]));
   // A project with more source than one program may hold: its largest
@@ -986,6 +1069,12 @@ export function projectModel(
     group: ProjectGroup,
     variant?: HostVariant,
   ): ts.CompilerHost => {
+    const budget = budgets.get(group) ?? {
+      bytes: 0,
+      names: new Set<string>(),
+      limited: false,
+    };
+    budgets.set(group, budget);
     const sources = new Map<string, ts.SourceFile>();
     const failures = variant?.failures ?? parseFailures;
     const shared = variant?.base && caches.get(variant.base);
@@ -996,55 +1085,79 @@ export function projectModel(
       useSourceOfProjectReferenceRedirect: () => true,
       getSourceFile(name, languageVersion) {
         if (name.startsWith(LIB_ROOT + "/")) return libFile(name);
-        const real = fs.real(name);
-        const override = variant?.texts.get(real.slice(1));
-        const text = override ?? fs.files.get(real);
+        const path = real(name);
+        const override = variant?.texts.get(path.slice(1));
+        const captured = override ?? fs.files.get(path);
+        if (captured === undefined && dependencies && declarationPath(name)) {
+          const cached = sources.get(name) ?? shared?.get(name);
+          if (cached) return cached;
+          if (budget.limited) return undefined;
+          const text = dependencies.read(dependencyPath(name));
+          if (text === undefined) return undefined;
+          if (!budget.names.has(path)) {
+            budget.names.add(path);
+            budget.bytes += Buffer.byteLength(text);
+            if (budget.bytes > 32 * 1024 * 1024 || budget.names.size > 8_000) {
+              budget.limited = true;
+              return undefined;
+            }
+          }
+          const source = ts.createSourceFile(name, text, languageVersion, true);
+          if (
+            (source as ts.SourceFile & { parseDiagnostics?: unknown[] })
+              .parseDiagnostics?.length
+          )
+            return undefined;
+          sources.set(name, source);
+          return source;
+        }
+        const text = captured;
         if (text === undefined) return undefined;
         // A file the parser or binder could not handle, or with a syntax
         // error, stays out of every program: it is absent, not empty.
-        if (failures.has(real.slice(1))) {
-          requested.add(real.slice(1));
+        if (failures.has(path.slice(1))) {
+          requested.add(path.slice(1));
           return undefined;
         }
         // An unchanged file reuses the base host's parse (and binding).
         let file =
-          sources.get(real) ??
-          (override === undefined ? shared?.get(real) : undefined);
+          sources.get(path) ??
+          (override === undefined ? shared?.get(path) : undefined);
         if (!file) {
           // Each file parses in its own guard: a parser stack overflow (e.g.
           // thousands of nested parentheses) fails that file only.
           try {
-            file = ts.createSourceFile(real, text, languageVersion, true);
+            file = ts.createSourceFile(path, text, languageVersion, true);
           } catch (error) {
             failures.set(
-              real.slice(1),
+              path.slice(1),
               error instanceof RangeError && /call stack/i.test(error.message)
                 ? "The TypeScript parser exhausted its stack on this file"
                 : `The TypeScript parser threw on this file: ${error instanceof Error ? error.message : String(error)}`,
             );
-            requested.add(real.slice(1));
+            requested.add(path.slice(1));
             return undefined;
           }
           // A file that cannot be read is not valid code: it has failed.
-          const path = real.slice(1);
+          const relative = path.slice(1);
           const errors =
             ((file as ts.SourceFile & { parseDiagnostics?: unknown[] })
               .parseDiagnostics?.length ?? 0) > 0 ||
             heritageErrors(file).length > 0;
           const failure = errors
-            ? syntaxFailure(path, originals.get(path) ?? text)
+            ? syntaxFailure(relative, originals.get(relative) ?? text)
             : undefined;
           if (failure) {
-            syntaxFailures.set(path, failure);
+            syntaxFailures.set(relative, failure);
             failures.set(
-              path,
+              relative,
               "This file has a syntax error: it is not valid code",
             );
-            requested.add(path);
+            requested.add(relative);
             return undefined;
           }
         }
-        sources.set(real, file);
+        sources.set(path, file);
         return file;
       },
       getDefaultLibLocation: () => LIB_ROOT,
@@ -1061,16 +1174,20 @@ export function projectModel(
       fileExists: (name) =>
         name.startsWith(LIB_ROOT + "/")
           ? libFile(name) !== undefined
-          : fs.fileExists(name),
+          : fileExists(name),
       readFile: (name) =>
-        name.startsWith(LIB_ROOT + "/")
-          ? libFile(name)?.text
-          : fs.readFile(name),
-      directoryExists: (name) => name === LIB_ROOT || fs.directoryExists(name),
-      getDirectories: (name) => fs.entries(fs.real(name)).directories,
+        name.startsWith(LIB_ROOT + "/") ? libFile(name)?.text : readFile(name),
+      directoryExists: (name) => name === LIB_ROOT || directoryExists(name),
+      getDirectories: (name) => {
+        const captured = fs.entries(fs.real(name)).directories;
+        const installed = dependencies?.directories(dependencyPath(name)) ?? [];
+        return installed.length
+          ? [...new Set([...captured, ...installed])]
+          : captured;
+      },
       readDirectory: (...args) => [...parseHost.readDirectory(...args)],
       getParsedCommandLine: (name) => parsedConfigs.get(fs.real(name)),
-      realpath: (name) => fs.real(name),
+      realpath: real,
     };
     if (deno.active) {
       created.resolveModuleNameLiterals = (
@@ -1110,11 +1227,10 @@ export function projectModel(
     return created;
   };
   return {
+    dependencyLimit: (group) => budgets.get(group)?.limited ?? false,
     groups,
     manifests,
-    workspaceRoots: new Set(
-      [...fs.links.values()].map((path) => fromVirtual(path) || "."),
-    ),
+    workspaceRoots: new Set(workspace.links.values()),
     workspaceBoundaries: workspace.boundaries,
     workspaceCatalogs: workspace.catalogs,
     hasWorkspacePackages: fs.links.size > 0,

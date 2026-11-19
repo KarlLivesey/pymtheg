@@ -174,15 +174,33 @@ These estimates prioritise work. They do not add definite score credit.
 Run this command from the repository root.
 
 ```sh
-node scripts/sweep/coverage.mjs --results sweep/plan-input.json.gz --plan docs/coverage-plan.md --rust-section
+node scripts/sweep/coverage.mjs --results evidence/c-18/coverage-plan-input.json.gz \
+  --plan docs/coverage-plan.md --rust-section
 ```
 
-The archive contains the measured Rust rows and their comparison data.
-The command replaces the Rust section and preserves the Go and
-TypeScript sections from main verbatim. The regression test covers both
-parts of that contract.
+The archive overlays the 18 measured pins on the C-15 plan input and
+keeps its embedded SW-3 comparison base. The command replaces the Rust section.
+It preserves the Go and TypeScript sections from main verbatim. The
+regression test covers both parts of that contract.
 
 ### Recompute after a candidate run
+
+For paired TypeScript coverage, run the same pinned manifest a second time
+with `scripts/sweep/run.mjs --installed`. Give that run a distinct `--output`
+and use one memory-backed scratch directory. The runner uses a root lockfile
+and runs npm `ci --ignore-scripts`, pnpm `install --frozen-lockfile
+--ignore-scripts`, or Yarn `install --immutable --mode=skip-build`. Yarn 1
+uses `--frozen-lockfile --ignore-scripts`. The runner disables pnpm hooks
+and project Yarn plugins and keeps caches in the scratch directory. Git
+dependencies and unsupported or absent lockfiles are recorded as unavailable.
+Installed-mode graph commands enter an unprivileged Linux network namespace
+after installation. The runner needs `unshare` with user namespaces enabled.
+
+Export the bare and installed result files separately with `coverage-export.mjs`.
+Pass the two exports to `coverage.mjs --results BARE --installed INSTALLED`
+for per-pin and aggregate Level 2. When an installed attempt finishes without
+an indexed graph, the paired report uses that pin's bare result. The stored
+attempt records distinguish a failed install from an index failure.
 
 Use one dev-server scratch directory for the npm baseline and candidate runs
 so the export can use the same released metadata readers and npm cache. A local

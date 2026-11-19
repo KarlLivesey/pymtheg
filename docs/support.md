@@ -574,6 +574,18 @@ makes that whole manifest unknown). Private items are ordinary symbols.
   case-insensitive components of an input item name. Opaque layout
   expansions, known identifier generators and competing glob imports can
   still withhold the link. See [C-12](changes/C-12.md).
+- **Macro identity for scope retries.** Derives and procedural attributes
+  use their attribute macro sub-namespace, and tool attributes use a
+  type-namespace prefix. The lookup follows named imports and verified
+  Cargo paths, including renamed dependencies. Written qualified paths
+  and named imports establish the export for compiling code when registry
+  provenance is verified. Feature facts can identify namespace facets.
+  A registry re-export needs a verified registry edge to the implementing
+  crate. Checkout implementations need an output proof. A glob which could only
+  compete with an established outer macro or path head does not prevent
+  the proof, since rustc rejects that ambiguity. An uncaptured macro-use
+  import and a glob without an established competing binding can still
+  withhold the name. [C-18](changes/C-18.md)
 - **Clean expansion (both rules below).** A workspace `macro_rules!` arm is
   clean when the code it emits has no attribute anywhere (so no `#[cfg]` can
   remove a call) and no item other than a readable `use` (no `fn`, `mod`,
@@ -758,7 +770,14 @@ answer.
   receiver explicitly annotated with an unavailable imported type can name
   its package unit. A named library object can supply checker-selected
   members through immutable aliases and constant literal selectors.
-  [Library links](changes/C-11.md) · [Members and test globals](changes/C-16.md)
+  The TypeScript compiler can use installed package declarations for named
+  targets and reads the declaring package's own manifest for its version.
+  Installed files supply library targets and are excluded from checkout
+  symbols and link sources. Standard in-checkout pnpm, npm and Yarn
+  `node_modules` layouts are supported. The compiler follows the package the
+  install exposes to that importer, including overrides and workspace links.
+  [Library links](changes/C-11.md) · [Members and test globals](changes/C-16.md) ·
+  [Installed declarations](changes/C-20.md)
 - **Candidates:** several checkout or library targets for one callee (union
   receivers, merged declarations, duplicate JavaScript functions). Missing
   selected Node types can leave both DOM and Node targets possible for a shared

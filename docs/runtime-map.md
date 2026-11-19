@@ -1515,8 +1515,8 @@ symbol. Shape (`src/graph/types.ts` `LibraryTarget`, `GraphLibrary`):
 | `ecosystem` | lowercase id: `go`, `go-std`, `cargo`, `rust-std`, `npm`, `node`, `dom`, `typescript-lib`, … |
 | `unit` | module path, crate, package name or standard-library unit |
 | `symbol` | optional symbol path in the unit, spelled as the unit spells it (level 2); absent for the unit itself (level 1) |
-| `version` | optional; only when the checkout's manifest or lockfile states it |
-| `versionSource` | required with a version, and only then: the project path of that manifest or lockfile. Its file name must be one of the target ecosystem's manifests or lockfiles (`versionFiles` in `src/graph/identity.ts`: npm `package.json`, `package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `yarn.lock`, `bun.lock`, `bun.lockb`, `deno.json`, `deno.lock`; node `package.json`; go `go.mod`, `go.sum`, `go.work`, `go.work.sum`; go-std `go.mod`, `go.work`; cargo `Cargo.toml`, `Cargo.lock`; any other ecosystem takes no version), and the path must be a clean context file in the snapshot (during indexing, one of the module's own declared context files). A `tsconfig.json` or another ecosystem's manifest is refused |
+| `version` | optional; a captured manifest or lockfile must state it |
+| `versionSource` | required with a version, and only then: the project path of that manifest or lockfile. Its file name must be one of the target ecosystem's manifests or lockfiles (`versionFiles` in `src/graph/identity.ts`: npm `package.json`, `package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `yarn.lock`, `bun.lock`, `bun.lockb`, `deno.json`, `deno.lock`; node `package.json`; go `go.mod`, `go.sum`, `go.work`, `go.work.sum`; go-std `go.mod`, `go.work`; cargo `Cargo.toml`, `Cargo.lock`; any other ecosystem takes no version). The path must be a clean context file captured by the indexing module. A `tsconfig.json` or another ecosystem's manifest is refused |
 | `evidence` | required: how the source proves it (below) |
 | `id` | `library:` + sha256 of (ecosystem, unit, version, symbol): deterministic and independent of the project and of the evidence |
 
@@ -1613,13 +1613,14 @@ database state per read: counts and rows agree.
 What each language chunk supplies: in `resolve` (or as an added link), a
 `LinkResolution` with `library: {ecosystem, unit, symbol?, version?, evidence}`
 for a definite library target, or `candidateIds` plus `libraries` for a mixed
-set; the ecosystem names it uses; the manifest/lockfile reading, if any, that
-supplies `version` and `versionSource` (declared in the module's
-`contextFiles`); and a module version bump. Nothing else in the core changes.
+set, the ecosystem names it uses, any captured manifests or lockfiles that
+supply `version` and `versionSource`, and a module version bump.
 
-Out of scope by design: reading dependency sources, any network access, and
-resolving versions beyond what the checkout's manifest states. A library target
-says where the use points, never that the library declares the symbol.
+The TypeScript module can read installed declaration and resolution metadata
+files under the checkout's `node_modules` on demand. The dependency inputs
+are recorded as module-owned context, so the version validator accepts an
+installed `package.json` whose text was captured. Installed implementations
+and network access are outside this path.
 
 Queries: `pymtheg graph uses UNIT [SYMBOL]` and MCP `code_graph` action `uses`
 (`query`, optional `symbol`). Every link answer shows certainty `library` and
@@ -1682,6 +1683,16 @@ Module 33 leaves shared test globals unresolved when a known competing ambient
 package is requested outside the supported framework inventory.
 [C-16](changes/C-16.md)
 
+Module 35 extends the virtual compiler host with resolver-driven installed
+inputs. The host records filesystem stamps for positive and negative probes
+and hashes the contents it reads. The graph checkpoint revalidates the
+stamps without loading declaration bodies. A changed probe triggers TypeScript
+analysis, and a bounded text cache can reuse unchanged inputs in the same
+process. An installed file can only supply a library declaration or resolution
+metadata. The physical package exposed to the importer supersedes an inferred
+workspace link. The checker supplies test-global owners when the competing
+type requests were captured. [C-20](changes/C-20.md)
+
 Rust records library paths during resolution starting with module 29. Its library lookup uses
 the captured namespace, import, placement and `cfg` facts, with a separate
 lookup cache key for the outside search. `library.ts` supplies edition prelude
@@ -1739,3 +1750,17 @@ analyzed facts that the graph stores. The identity and resolution shapes stay
 the same, so library queries and ordinary graph queries can return those
 links. Coverage reports the assumption-backed Level 2 count alongside the
 total and still accepts pre-assumption archives.
+
+Module 38 uses the same captured facts to identify macros during scope
+preparation. It looks up the attribute and bang sub-namespaces and checks
+tool names in the type namespace. The identity lookup uses an isolated
+cache and applies Rust's expansion-time glob ambiguity rule only where an
+outer binding is established. Cargo paths and named imports use existing
+dependency evidence and assume written qualified paths and named imports
+compile. The catalogue uses release and positive feature facts to identify
+namespace facets. For a catalogued re-export, the facade's lock row
+must identify the implementing package as a registry dependency. For
+an uncatalogued export, the reachable dependency packages must have
+verified registry sources. Applicable manifest or Cargo configuration
+overrides withhold that evidence. The ordinary link lookup retains its
+scope guards.

@@ -84,7 +84,7 @@ import {
  * facts; resolve maps those facts to symbol IDs. See docs/changes/W2-D.md.
  */
 // Bump the leading number whenever extraction or resolution semantics change.
-const MODULE_VERSION = `34+typescript-${ts.version}`;
+const MODULE_VERSION = `36+typescript-${ts.version}`;
 
 /** Observation counters for tests (programs built, files extracted). Not a correctness input. */
 export const statistics = {
@@ -758,6 +758,7 @@ const module: LanguageModule = {
   // `.d.ts`, `.d.mts` and `.d.cts` are covered by the `.ts`, `.mts` and `.cts` claims.
   extensions: [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"],
   contextFiles: CONTEXT_PATTERNS,
+  dependencyInputs: true,
   analyze(context) {
     const files = context.files.filter(readable);
     // Unchanged snapshot: stored facts came from a complete analysis of these
@@ -804,13 +805,19 @@ const module: LanguageModule = {
         ];
       }
     }
-    const model = projectModel(files, context.contextFiles);
+    if (context.dependencyInputs) context.dependencyInputs.refreshed = true;
+    const model = projectModel(
+      files,
+      context.contextFiles,
+      context.dependencyInputs,
+    );
     const libraries = libraryReader(
       model.manifests,
       files,
       model.workspaceRoots,
       model.workspaceBoundaries,
       model.workspaceCatalogs,
+      context.dependencyInputs,
     );
     const captured = new Set(files.map((file) => file.path));
     const results: AnalyzedFile[] = [];
@@ -858,6 +865,16 @@ const module: LanguageModule = {
           return failedAny;
         },
       );
+      if (model.dependencyLimit(group)) {
+        for (const root of group.roots)
+          deliver(
+            root.slice(1),
+            operationalFailure(
+              "Installed declarations exceed the TypeScript program's input budget",
+            ),
+          );
+        continue;
+      }
       let baseHost = normal.host;
       const hostOfNormal = () => normal?.host ?? baseHost;
       const resolveModule = (specifier: string, from: string) => {

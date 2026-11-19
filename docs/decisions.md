@@ -2811,6 +2811,20 @@ or a named library target. A captured macro definition, a competing glob, an
 unproven macro binding and a layout expansion keep their source requirements.
 See [C-12](changes/C-12.md).
 
+### C-18 Rust macro identity
+
+The lexical scope retry checks the binding that Rust would use during macro
+expansion. A type or bang macro cannot take an attribute-sub-namespace name.
+A competing glob requires either a readable lookup or an established outer
+binding for which rustc would reject the ambiguity. Qualified external names
+follow existing Cargo dependency edges through aliases and named exports.
+Qualified paths and named imports identify the export in compiling code
+with verified registry provenance. Positive feature facts can identify
+namespace facets. A re-export needs registry provenance for both the
+facade and its implementation. Unverified implementations leave the
+expansion opaque without a supported output proof. Verified identities feed the C-12 effect rules and its existing
+external effect assumption. [C-18](changes/C-18.md)
+
 ### C-14 Go library targets
 
 Go records a library target where the source proves the package and, for a
@@ -2861,6 +2875,20 @@ directive stay unresolved even where the project's own build constraint
 would allow them. A standard-library interface value's method is recorded
 as the interface's method (the static callee): the source-only route cannot
 list implementers outside the checkout. See [C-17](changes/C-17.md).
+
+### C-20 Installed TypeScript declaration inputs
+
+The TypeScript compiler host can read the installed declarations it selects
+under the checkout boundary. These inputs never enter the checkout symbol
+inventory. A selected declaration identifies its package and member. The
+installed package manifest supplies the version and its provenance. Merged
+Node and DOM declarations retain both candidates when both are possible.
+Resolver probes include absent inputs so a new installation invalidates a
+bare cache. A package exposed by the physical installation takes precedence
+over inferred workspace links. A captured competing test type request is
+settled by the checker's declarations for the selected symbol. The C-16 guard
+still covers missing requests made by checkout code or its compiler config.
+Installed declarations contribute only via the checker. [C-20](changes/C-20.md)
 
 ### C-13 TypeScript program budget and compiler exceptions
 

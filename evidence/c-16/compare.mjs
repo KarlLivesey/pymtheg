@@ -18,6 +18,9 @@ const open = (repo) =>
   );
 const candidate = selected[0] === "--candidate";
 if (candidate) selected.shift();
+const verify = process.env.PYM_COMPARE_ALL_LINKS === "1";
+const detailed = process.env.PYM_COMPARE_CANDIDATES === "1";
+const candidateKeys = verify || detailed;
 const old = read(process.env.C16_BASELINE ?? "main");
 const next = new Map(
   candidate
@@ -121,7 +124,17 @@ const queries = (db) => ({
     l.resolution, (
       SELECT json_group_array(json_object('ecosystem',ecosystem,'unit',unit,'symbol',symbol,
         'evidence',evidence,'version',version,'versionSource',version_source)) FROM graph_library_targets WHERE link=l.id
-    ) AS libraries FROM graph_links l INDEXED BY graph_link_file
+    ) AS libraries${
+      candidateKeys
+        ? `, (
+      SELECT json_group_array(json_array(file,key,ordinal,kind)) FROM (
+        SELECT c.kind,cs.file,json_extract(cs.body,'$.key') AS key,json_extract(cs.body,'$.ordinal') AS ordinal
+        FROM graph_candidates c JOIN graph_symbols cs ON cs.id=c.symbol WHERE c.link=l.id
+        ORDER BY cs.file,key,ordinal,c.kind
+      )
+    ) AS candidateKeys`
+        : ""
+    } FROM graph_links l INDEXED BY graph_link_file
     LEFT JOIN graph_symbols s ON s.id=l.source LEFT JOIN graph_symbols t ON t.id=l.target
     WHERE l.file=? ORDER BY l.id`),
 });
@@ -140,7 +153,7 @@ const locate = (source, offset) => source.slice(0, offset).split("\n").length;
 const reason = (link) => link.data?.reason ?? link.resolution;
 const rank = (repo, link) =>
   createHash("sha256")
-    .update("pymtheg-c16-2026\0")
+    .update((process.env.PYM_COMPARE_SEED ?? "pymtheg-c16-2026") + "\0")
     .update(sampleKey(repo, link))
     .update(identity(link))
     .digest("hex");
@@ -179,6 +192,8 @@ for (const repo of old) {
     shared: 0,
     sharedBeforeL2: 0,
     sharedAfterL2: 0,
+    gainedL2: 0,
+    withdrawnL2: 0,
     allLinks: 0,
     allLinksAfter: 0,
     symbols: 0,
@@ -191,6 +206,7 @@ for (const repo of old) {
     newMemberForms: 0,
     unitUpgrades: 0,
     changedDefinite: [],
+    ...(verify && { changedOutcomes: 0, changedOutcomeExamples: [] }),
     rows: Object.fromEntries(
       rows.map((id) => [
         id,
@@ -261,9 +277,17 @@ for (const repo of old) {
         (other) =>
           other.resolution === link.resolution &&
           other.target === link.target &&
-          JSON.stringify(other.libraries) === JSON.stringify(link.libraries),
+          JSON.stringify(other.libraries) === JSON.stringify(link.libraries) &&
+          (!verify ||
+            (other.candidateKeys === link.candidateKeys &&
+              JSON.stringify(other.data) === JSON.stringify(link.data))),
       );
       const [updated] = choices?.splice(exact >= 0 ? exact : 0, 1) ?? [];
+      if (verify && b && !(exact >= 0)) {
+        count.changedOutcomes++;
+        if (count.changedOutcomeExamples.length < 10)
+          count.changedOutcomeExamples.push(site(link, updated));
+      }
       const wasLevel2 = isLevel2(link);
       const isNowLevel2 = updated && isLevel2(updated);
       if (
@@ -289,6 +313,8 @@ for (const repo of old) {
         count.newNodeGlobals++;
       const typescript = link.module === "typescript";
       if (typescript && wasLevel2) count.beforeL2++;
+      if (typescript && b && !wasLevel2 && isNowLevel2) count.gainedL2++;
+      if (typescript && b && wasLevel2 && !isNowLevel2) count.withdrawnL2++;
       if (typescript && updated) {
         count.shared++;
         if (wasLevel2) count.sharedBeforeL2++;
@@ -300,17 +326,16 @@ for (const repo of old) {
         if (b && (exact ?? -1) < 0) {
           const priorUnit = link.libraries[0];
           const newUnit = updated?.libraries[0];
-          if (
+          const refined =
             link.resolution === "library" &&
             updated?.resolution === "library" &&
             priorUnit.symbol === null &&
             newUnit.symbol !== null &&
             priorUnit.ecosystem === newUnit.ecosystem &&
             priorUnit.unit === newUnit.unit &&
-            priorUnit.version === newUnit.version
-          )
-            count.unitUpgrades++;
-          else
+            priorUnit.version === newUnit.version;
+          if (refined) count.unitUpgrades++;
+          if (!refined || detailed)
             count.changedDefinite.push({
               file,
               range: link.range,
@@ -396,7 +421,12 @@ for (const repo of old) {
         if (fromPin.length >= 20) draw.splice(high, 1);
       }
     }
-    for (const links of current.values()) count.addedSites += links.length;
+    for (const links of current.values()) {
+      count.addedSites += links.length;
+      count.gainedL2 += links.filter(
+        (link) => link.module === "typescript" && isLevel2(link),
+      ).length;
+    }
   }
   before.close();
   after?.close();
