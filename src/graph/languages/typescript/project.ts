@@ -13,6 +13,11 @@ import {
   type WorkspaceCatalogs,
 } from "./workspace.js";
 import {
+  workspaceEntries,
+  type OutputProof,
+  type UnbuiltEntry,
+} from "./workspace-entries.js";
+import {
   freshNames,
   renameShadowed,
   type FreshNames,
@@ -55,6 +60,16 @@ export const fromVirtual = (path: string): string | undefined =>
   path.startsWith(LIB_ROOT + "/") || !path.startsWith("/")
     ? undefined
     : path.slice(1);
+
+export const matchesPathAlias = (text: string, patterns: readonly string[]) =>
+  patterns.some((pattern) => {
+    const star = pattern.indexOf("*");
+    return star < 0
+      ? pattern === text
+      : text.length >= pattern.length - 1 &&
+          text.startsWith(pattern.slice(0, star)) &&
+          text.endsWith(pattern.slice(star + 1));
+  });
 
 export interface ProjectGroup {
   /** Owning config path, or null for the inferred project (no config includes the file). */
@@ -113,6 +128,9 @@ export interface ProjectModel {
   requested: (host: ts.CompilerHost) => ReadonlySet<string>;
   /** A compiler host over the snapshot; a variant replaces some files' text. */
   host: (group: ProjectGroup, variant?: HostVariant) => ts.CompilerHost;
+  unbuiltEntries: (
+    host: ts.CompilerHost,
+  ) => ReadonlyMap<ts.ResolvedModuleFull, UnbuiltEntry> | undefined;
   workspaceReason: (
     specifier: string,
     from: string,
@@ -420,10 +438,9 @@ class VirtualFileSystem {
   readFile = (path: string) => this.files.get(this.real(path));
   directoryExists = (path: string) =>
     this.directories.has(this.real(path)) || this.linkDirectories.has(path);
-  workspaceReason(
+  workspaceRoute(
     specifier: string,
     from: string,
-    lookups: readonly string[],
     physicalWorkspace: (link: string) => string | false | undefined,
   ) {
     const name = /^(@[^/]+\/[^/]+|[^/@#.][^/]*)/.exec(specifier)?.[1];
@@ -437,30 +454,8 @@ class VirtualFileSystem {
       const physical = physicalWorkspace(link);
       if (physical === false) return undefined;
       const target = physical ?? this.links.get(link);
-      if (target !== undefined) {
-        const built = lookups.some((lookup) => {
-          if (
-            !lookup.startsWith(link + "/") &&
-            !lookup.startsWith(target + "/")
-          )
-            return false;
-          const resolved =
-            physical && lookup.startsWith(link + "/")
-              ? target + lookup.slice(link.length)
-              : this.real(lookup);
-          if (this.files.has(resolved)) return false;
-          for (
-            let dir = posix.dirname(resolved);
-            dir !== target && dir !== "/";
-            dir = posix.dirname(dir)
-          )
-            if (this.outputs.has(dir)) return true;
-          return false;
-        });
-        return built
-          ? "workspace-build-output-missing"
-          : "workspace-entry-unavailable";
-      }
+      if (target !== undefined)
+        return { link, target, installed: physical !== undefined };
       if (directory === "/") return undefined;
     }
   }
@@ -489,6 +484,7 @@ export const CONTEXT_PATTERNS = [
   "*tsconfig*.json",
   "*jsconfig*.json",
   "package.json",
+  "tsup.config.json",
   "pnpm-workspace.yaml",
   ...denoConfigPatterns,
   ...importMapNames,
@@ -1003,6 +999,33 @@ export function projectModel(
   const caches = new WeakMap<ts.CompilerHost, Map<string, ts.SourceFile>>();
   const asked = new WeakMap<ts.CompilerHost, Set<string>>();
   const originals = new Map(files.map((file) => [file.path, file.text]));
+  const entries = workspaceEntries(
+    manifests,
+    parsedConfigs,
+    fs.files,
+    originals,
+  );
+  const redirects = new WeakMap<
+    ts.CompilerHost,
+    Map<ts.ResolvedModuleFull, UnbuiltEntry>
+  >();
+  const physicalWorkspace = (link: string): string | false | undefined => {
+    const physical = dependencies?.realpath(dependencyPath(link));
+    if (physical === undefined) return undefined;
+    if (hasNodeModulesSegment(physical)) return false;
+    const path = toVirtual(physical);
+    return fs.files.has(posix.join(path, "package.json")) ? path : false;
+  };
+  function workspaceOutput(
+    lookup: string,
+    route: { link: string; target: string },
+  ) {
+    if (lookup.startsWith(route.link + "/"))
+      return posix.join(route.target, lookup.slice(route.link.length));
+    if (lookup.startsWith(route.target === "/" ? "/" : route.target + "/"))
+      return lookup;
+    return undefined;
+  }
   const host = (
     group: ProjectGroup,
     variant?: HostVariant,
@@ -1124,10 +1147,20 @@ export function projectModel(
           : captured;
       },
       readDirectory: (...args) => [...parseHost.readDirectory(...args)],
-      getParsedCommandLine: (name) => parsedConfigs.get(fs.real(name)),
+      getParsedCommandLine(name) {
+        const parsed = parsedConfigs.get(fs.real(name));
+        return parsed && entries.forReference(parsed);
+      },
       realpath: real,
     };
-    if (deno.active) {
+    const workspaceRecovery = entries.available && !group.limitations.length;
+    if (deno.active || workspaceRecovery) {
+      const cache = ts.createModuleResolutionCache(
+        created.getCurrentDirectory(),
+        (name) => name,
+        group.options,
+      );
+      if (!deno.active) created.getModuleResolutionCache = () => cache;
       created.resolveModuleNameLiterals = (
         literals,
         containingFile,
@@ -1141,14 +1174,20 @@ export function projectModel(
             fromVirtual(containingFile) ?? ".",
           );
           if (selected === undefined) return { resolvedModule: undefined };
+          const importingOptions = redirected?.commandLine.options ?? options;
+          const mode = ts.getModeForUsageLocation(
+            source,
+            literal,
+            deno.active ? options : importingOptions,
+          );
           const result = ts.resolveModuleName(
             selected,
             containingFile,
             options,
             created,
-            undefined,
+            deno.active ? undefined : cache,
             redirected,
-            ts.getModeForUsageLocation(source, literal, options),
+            mode,
           );
           // The checker uses this flag to diagnose a TypeScript extension in
           // the written literal. A map can supply an extension the literal lacks.
@@ -1157,7 +1196,105 @@ export function projectModel(
             result.resolvedModule?.resolvedUsingTsExtension
           )
             result.resolvedModule.resolvedUsingTsExtension = false;
-          return result;
+          if (!workspaceRecovery || selected !== literal.text) return result;
+          const resolved = result.resolvedModule;
+          if (
+            resolved &&
+            (fileExists(resolved.resolvedFileName) || !group.references?.length)
+          )
+            return result;
+          const from = fromVirtual(containingFile);
+          if (from === undefined) return result;
+          const route = fs.workspaceRoute(selected, from, physicalWorkspace);
+          if (!route) return result;
+          const lookups = (
+            result as ts.ResolvedModuleWithFailedLookupLocations & {
+              failedLookupLocations?: readonly string[];
+            }
+          ).failedLookupLocations;
+          const remember = (
+            target: ts.ResolvedModuleFull,
+            proof: UnbuiltEntry,
+          ) => {
+            let notes = redirects.get(created);
+            if (!notes) redirects.set(created, (notes = new Map()));
+            notes.set(target, proof);
+          };
+          if (resolved) {
+            const output = workspaceOutput(resolved.resolvedFileName, route);
+            const proof = output && entries.proof(route.target, output);
+            if (proof === "conflicting")
+              return {
+                ...result,
+                resolvedModule: undefined,
+                failedLookupLocations: [
+                  resolved.resolvedFileName,
+                  ...(lookups ?? []),
+                ],
+              };
+            if (proof && typeof proof === "object")
+              remember(resolved, { ...proof, proof: "project-reference" });
+            return result;
+          }
+          if (
+            matchesPathAlias(
+              selected,
+              Object.keys(importingOptions.paths ?? {}),
+            )
+          )
+            return result;
+          const candidates = new Map<string, OutputProof>();
+          const directories = new Set<string>();
+          for (const lookup of lookups ?? []) {
+            // Only failed probes through the selected package link, never a
+            // missing paths alias or an unrelated relative import.
+            if (!lookup.startsWith(route.link + "/")) continue;
+            const output = workspaceOutput(lookup, route)!;
+            if (
+              route.installed &&
+              dependencies?.realpath(dependencyPath(lookup)) !== undefined
+            )
+              continue;
+            const proof = entries.proof(route.target, output);
+            if (proof === undefined) continue;
+            candidates.set(lookup, proof);
+            for (
+              let dir = posix.dirname(lookup);
+              dir !== route.link;
+              dir = posix.dirname(dir)
+            )
+              directories.add(dir);
+          }
+          if (!candidates.size) return result;
+          // Let TypeScript choose the entry and condition in the original
+          // mode. The overlay is scoped to this lookup and has no file bodies.
+          const retry = ts.resolveModuleName(
+            selected,
+            containingFile,
+            options,
+            {
+              ...created,
+              fileExists: (name) =>
+                candidates.has(name) || created.fileExists(name),
+              directoryExists: (name) =>
+                directories.has(name) || created.directoryExists!(name),
+              realpath: (name) =>
+                candidates.has(name) ? name : created.realpath!(name),
+            },
+            undefined,
+            redirected,
+            mode,
+          );
+          const chosen = retry.resolvedModule;
+          const proof = chosen && candidates.get(chosen.resolvedFileName);
+          if (!chosen || !proof || typeof proof !== "object") return result;
+          const target: ts.ResolvedModuleFull = {
+            resolvedFileName: toVirtual(proof.source),
+            isExternalLibraryImport: false,
+            extension: posix.extname(proof.source),
+          };
+          remember(target, proof);
+          return { ...retry, resolvedModule: target };
         });
     }
     caches.set(created, sources);
@@ -1194,15 +1331,29 @@ export function projectModel(
       return true;
     },
     host,
-    workspaceReason: (specifier, from, lookups, includeInstalled = true) =>
-      fs.workspaceReason(specifier, from, lookups, (link) => {
-        if (!includeInstalled) return undefined;
-        const physical = dependencies?.realpath(dependencyPath(link));
-        if (physical === undefined) return undefined;
-        if (hasNodeModulesSegment(physical)) return false;
-        const path = toVirtual(physical);
-        return fs.files.has(posix.join(path, "package.json")) ? path : false;
-      }),
+    unbuiltEntries: (host) => redirects.get(host),
+    workspaceReason(specifier, from, lookups, includeInstalled = true) {
+      const route = fs.workspaceRoute(
+        specifier,
+        from,
+        includeInstalled ? physicalWorkspace : () => undefined,
+      );
+      if (!route) return undefined;
+      const missingOutput = lookups.some((lookup) => {
+        const output = workspaceOutput(lookup, route);
+        if (!output || fs.files.has(output)) return false;
+        for (
+          let dir = posix.dirname(output);
+          dir !== route.target && dir !== "/";
+          dir = posix.dirname(dir)
+        )
+          if (fs.outputs.has(dir)) return true;
+        return false;
+      });
+      return missingOutput
+        ? "workspace-build-output-missing"
+        : "workspace-entry-unavailable";
+    },
     workspaceBoundaryKnown: (from) => {
       for (const root of workspace.incompleteRoots)
         if (underDirectory(from, root)) return false;

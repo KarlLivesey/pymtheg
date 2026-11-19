@@ -16,6 +16,7 @@ import { CheckerLimit, extractFile, type TargetFact } from "./extract.js";
 import { libraryKey, libraryReader } from "./library.js";
 import type { Renamed } from "./rename.js";
 import { neutralizeAssumed } from "./untrusted.js";
+import { entryProvenance } from "./workspace-entries.js";
 
 /** Program rebuilds per file after checker stack overflows before giving up. */
 const MAX_LIMIT_RETRIES = 25;
@@ -38,7 +39,7 @@ import {
  * facts; resolve maps those facts to symbol IDs. See docs/changes/W2-D.md.
  */
 // Bump the leading number whenever extraction or resolution semantics change.
-const MODULE_VERSION = `37+typescript-${ts.version}`;
+const MODULE_VERSION = `38+typescript-${ts.version}`;
 
 /** Observation counters for tests (programs built, files extracted). Not a correctness input. */
 export const statistics = {
@@ -679,6 +680,10 @@ const module: LanguageModule = {
         continue;
       }
       let baseHost = normal.host;
+      const provenance = new WeakMap<
+        ts.Program,
+        ReturnType<typeof entryProvenance>
+      >();
       const hostOfNormal = () => normal?.host ?? baseHost;
       const resolveModule = (specifier: string, from: string) => {
         const selected = model.selectSpecifier(specifier, from);
@@ -752,6 +757,15 @@ const module: LanguageModule = {
               // Anything else the compiler threw is an internal error.
               throw Error(failure ?? "The compiler did not load this source");
             }
+            if (!provenance.has(session.program))
+              provenance.set(
+                session.program,
+                entryProvenance(
+                  session.program,
+                  model.unbuiltEntries(session.host),
+                  captured,
+                ),
+              );
             const result = extractFile(
               source,
               session.checker,
@@ -769,6 +783,7 @@ const module: LanguageModule = {
                 hasDenoImports: model.hasDenoImports,
                 selectSpecifier: model.selectSpecifier,
                 workspaceReason: model.workspaceReason,
+                unbuilt: provenance.get(session.program),
                 workspaceBoundaryKnown: model.workspaceBoundaryKnown,
                 skip,
                 moduleKind,

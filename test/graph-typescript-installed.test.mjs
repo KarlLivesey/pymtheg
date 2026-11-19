@@ -373,6 +373,48 @@ test("a dependency linked to the checkout root reports the missing workspace ent
   });
 });
 
+test("a physical workspace link follows Astro's declaration-only subpath layout", async () => {
+  const { root, request, read, write } = await project();
+  await write("package.json", '{"type":"module"}');
+  await write(
+    "main.ts",
+    'import { prependForwardSlash } from "@astrojs/internal-helpers/path"; prependForwardSlash("docs");',
+  );
+  await write(
+    "checkout-helpers/package.json",
+    '{"name":"@astrojs/internal-helpers","type":"module","exports":{"./path":"./dist/path.js"}}',
+  );
+  await write(
+    "checkout-helpers/tsconfig.build.json",
+    '{"compilerOptions":{"module":"NodeNext","rootDir":"src","outDir":"dist","declaration":true,"emitDeclarationOnly":true},"include":["src"]}',
+  );
+  await write(
+    "checkout-helpers/src/path.ts",
+    'export function prependForwardSlash(path: string) { return "/" + path; }',
+  );
+  await mkdir(join(root, "node_modules/@astrojs"), { recursive: true });
+  await symlink(
+    "../../checkout-helpers",
+    join(root, "node_modules/@astrojs/internal-helpers"),
+    "dir",
+  );
+  await request("index");
+  read((store, call) => {
+    const link = call("main.ts", "prependForwardSlash");
+    assert.equal(link.resolution, "resolved");
+    assert.equal(
+      store.findSymbols().find(({ id }) => id === link.targetId)?.file,
+      "checkout-helpers/src/path.ts",
+    );
+    assert.deepEqual(link.data.unbuiltEntry, {
+      proof: "tsconfig-emit",
+      config: "checkout-helpers/tsconfig.build.json",
+      output: "checkout-helpers/dist/path.d.ts",
+      source: "checkout-helpers/src/path.ts",
+    });
+  });
+});
+
 test("captured competing test types use the compiler's global symbol", async () => {
   const { request, read, write } = await project();
   await write(

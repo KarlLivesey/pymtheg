@@ -2911,3 +2911,17 @@ The checker distinguishes the declarations behind those names. A workspace
 entry with a physical link to a captured package retains the missing
 build-output reason.
 [C-23](changes/C-23.md)
+
+### C-25 Source producers for missing TypeScript entries
+
+A missing entry reached through a proved checkout workspace link can use
+its unique configured source producer. TypeScript selects the package and
+condition in the importing program. Source-of-project-reference redirects
+use TypeScript's reference host mechanism. Other TypeScript emit paths
+come from `getOutputFileNames` over the captured configuration, with a
+proved source root. A literal unbundled ESM tsup entry can establish its
+input and output from `package.json`. The checker reads the selected
+source's exports and declares the ordinary checkout targets. The link
+records the unbuilt entry as provenance. Competing producers and mere
+path conventions earn no target.
+[C-25](changes/C-25.md)

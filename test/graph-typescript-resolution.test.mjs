@@ -2549,7 +2549,7 @@ test("pnpm subpath exports and checkout path dependencies use TypeScript's resol
         exports,
       }),
       "packages/nested/shared/tsconfig.json": JSON.stringify({
-        compilerOptions: { outDir: "dist" },
+        compilerOptions: { outDir: "dist", rootDir: "src" },
       }),
       "packages/nested/shared/src/devHome.ts": [
         "export function resolveWorktreeT3Home() {}",
@@ -2603,8 +2603,13 @@ test("pnpm subpath exports and checkout path dependencies use TypeScript's resol
           name,
           name.startsWith('"') ? "imports" : "calls",
         );
-        assert.equal(link.resolution, "unresolved");
-        assert.equal(link.data.reason, "workspace-build-output-missing");
+        assert.equal(link.resolution, "resolved");
+        assert.deepEqual(link.data.unbuiltEntry, {
+          proof: "tsconfig-emit",
+          config: "packages/nested/shared/tsconfig.json",
+          output: "packages/nested/shared/dist/missing.js",
+          source: "packages/nested/shared/src/missing.ts",
+        });
       }
       assert.equal(
         graph.link(file, '"@pkg/excluded"', "imports").data.reason,
@@ -2701,10 +2706,199 @@ test("a TypeScript project reference can redirect a missing workspace declaratio
     },
     async (graph, report) => {
       clean(report);
+      const call = graph.link("packages/app/index.ts", "helper", "calls");
+      assert.equal(graph.target(call), "packages/library/src/index.ts#helper");
+      assert.deepEqual(call.data.unbuiltEntry, {
+        proof: "project-reference",
+        config: "packages/library/tsconfig.json",
+        output: "packages/library/dist/index.d.ts",
+        source: "packages/library/src/index.ts",
+      });
+    },
+  );
+});
+
+test("a missing declaration follows its exact emit path and the barrel's renamed exports", async () => {
+  await project(
+    {
+      "package.json": '{"workspaces":["packages/*"],"type":"module"}',
+      "packages/lib/package.json": JSON.stringify({
+        name: "fixture-library",
+        type: "module",
+        exports: {
+          types: "./definitions/start.d.mts",
+          default: "./dist/start.mjs",
+        },
+      }),
+      "packages/lib/tsconfig.build.json": JSON.stringify({
+        compilerOptions: {
+          module: "NodeNext",
+          composite: true,
+          emitDeclarationOnly: true,
+          outDir: "dist",
+          declarationDir: "definitions",
+          rootDir: "source",
+          tsBuildInfoFile: "tmp/metadata",
+        },
+        include: ["source"],
+      }),
+      "packages/lib/source/start.mts":
+        'export { create as open } from "./build.mjs";',
+      "packages/lib/source/build.mts":
+        "class Session { ping() {} } export function create() { return new Session(); }",
+      "use.ts": 'import { open } from "fixture-library"; open().ping();',
+    },
+    async (graph, report) => {
+      clean(report);
+      for (const [name, target] of [
+        ["open", "create"],
+        ["ping", "Session.ping"],
+      ]) {
+        const call = graph.link("use.ts", name, "calls");
+        assert.equal(
+          graph.target(call),
+          `packages/lib/source/build.mts#${target}`,
+        );
+        assert.deepEqual(call.data.unbuiltEntry, {
+          proof: "tsconfig-emit",
+          config: "packages/lib/tsconfig.build.json",
+          output: "packages/lib/definitions/start.d.mts",
+          source: "packages/lib/source/start.mts",
+        });
+      }
+    },
+  );
+});
+
+test("the importer selects source conditions and existing outputs before considering emit proofs", async () => {
+  await project(
+    {
+      "package.json": '{"workspaces":["packages/*"],"type":"module"}',
+      "packages/lib/package.json": JSON.stringify({
+        name: "fixture-library",
+        type: "module",
+        exports: {
+          ".": {
+            "@fixture/source": "./src/development.ts",
+            default: "./dist/index.js",
+          },
+          "./only": { development: "./src/development.ts" },
+        },
+      }),
+      "packages/lib/tsconfig.json":
+        '{"compilerOptions":{"rootDir":"src","outDir":"dist","composite":true,"module":"NodeNext"},"include":["src"]}',
+      "packages/lib/src/index.ts": "export function open() {}",
+      "packages/lib/src/development.ts": "export function open() {}",
+      "packages/lib/dist/index.d.ts": "export declare function open(): number;",
+      "packages/ordinary/tsconfig.json":
+        '{"compilerOptions":{"module":"NodeNext"},"references":[{"path":"../lib"}]}',
+      "packages/ordinary/use.ts":
+        'import { open } from "fixture-library"; import "fixture-library/only"; open();',
+      "packages/dev/tsconfig.json":
+        '{"compilerOptions":{"module":"NodeNext","customConditions":["@fixture/source","development"]}}',
+      "packages/dev/use.ts":
+        'import { open } from "fixture-library"; import "fixture-library/only"; open();',
+    },
+    async (graph, report) => {
+      clean(report);
+      for (const [folder, target] of [
+        ["ordinary", "dist/index.d.ts"],
+        ["dev", "src/development.ts"],
+      ]) {
+        const call = graph.link(`packages/${folder}/use.ts`, "open", "calls");
+        assert.equal(graph.target(call), `packages/lib/${target}#open`);
+        assert.equal(call.data.unbuiltEntry, undefined);
+      }
       assert.equal(
-        graph.target(graph.link("packages/app/index.ts", "helper", "calls")),
-        "packages/library/src/index.ts#helper",
+        graph.link(
+          "packages/ordinary/use.ts",
+          '"fixture-library/only"',
+          "imports",
+        ).resolution,
+        "unresolved",
       );
+      assert.equal(
+        graph.link("packages/dev/use.ts", '"fixture-library/only"', "imports")
+          .resolution,
+        "resolved",
+      );
+    },
+  );
+});
+
+test("conflicting emit configurations leave the missing package entry unresolved", async () => {
+  await project(
+    {
+      "package.json": '{"workspaces":["packages/*"]}',
+      "packages/lib/package.json":
+        '{"name":"fixture-library","types":"./dist/index.d.ts"}',
+      "packages/lib/tsconfig.one.json":
+        '{"compilerOptions":{"rootDir":"one","composite":true,"outDir":"dist"},"files":["one/index.ts"]}',
+      "packages/lib/tsconfig.two.json":
+        '{"compilerOptions":{"rootDir":"two","composite":true,"outDir":"dist"},"files":["two/index.ts"]}',
+      "packages/lib/one/index.ts": "export function run() {}",
+      "packages/lib/two/index.ts": "export function run() {}",
+      "use.ts": 'import { run } from "fixture-library"; run();',
+      "packages/app/tsconfig.json":
+        '{"references":[{"path":"../lib/tsconfig.one.json"},{"path":"../lib/tsconfig.two.json"}]}',
+      "packages/app/use.ts": 'import { run } from "fixture-library"; run();',
+    },
+    async (graph, report) => {
+      clean(report);
+      for (const file of ["use.ts", "packages/app/use.ts"]) {
+        const call = graph.link(file, "run", "calls");
+        assert.equal(call.resolution, "unresolved");
+        assert.equal(call.data.reason, "workspace-build-output-missing");
+      }
+    },
+  );
+});
+
+test("a literal tsup output name follows its named source entry", async () => {
+  await project(
+    {
+      "package.json": '{"workspaces":["packages/*"],"type":"module"}',
+      "packages/lib/package.json": JSON.stringify({
+        name: "fixture-library",
+        type: "module",
+        exports: "./generated/public.js",
+        tsup: {
+          entry: { public: "src/private.ts" },
+          outDir: "generated",
+          format: ["esm"],
+          bundle: false,
+        },
+      }),
+      "packages/lib/src/private.ts": "export function open() {}",
+      "use.ts": 'import { open } from "fixture-library"; open();',
+    },
+    async (graph, report) => {
+      clean(report);
+      const call = graph.link("use.ts", "open", "calls");
+      assert.equal(graph.target(call), "packages/lib/src/private.ts#open");
+      assert.equal(call.data.unbuiltEntry.proof, "tsup-entry");
+    },
+  );
+});
+
+test("a declaration build that strips a re-exported input cannot lend its hidden source exports", async () => {
+  await project(
+    {
+      "package.json": '{"workspaces":["packages/*"]}',
+      "packages/lib/package.json":
+        '{"name":"fixture-library","types":"./dist/index.d.ts"}',
+      "packages/lib/tsconfig.build.json":
+        '{"compilerOptions":{"outDir":"dist","rootDir":"src","declaration":true,"stripInternal":true},"files":["src/index.ts"]}',
+      "packages/lib/src/index.ts": 'export { secret } from "./other";',
+      "packages/lib/src/other.ts":
+        "/** @internal */ export function secret() {}",
+      "use.ts": 'import { secret } from "fixture-library"; secret();',
+    },
+    async (graph, report) => {
+      clean(report);
+      const call = graph.link("use.ts", "secret", "calls");
+      assert.equal(call.resolution, "unresolved");
+      assert.equal(call.data.reason, "workspace-build-output-missing");
     },
   );
 });

@@ -795,6 +795,13 @@ answer.
   selected Node types can leave both DOM and Node targets possible for a shared
   global, type name or typed member. Two test frameworks supplying the same
   global can also produce a candidate set.
+- **Unbuilt checkout packages:** TypeScript can follow a selected missing
+  entry to the unique source file proved by project references, a captured
+  TypeScript emit configuration, or a literal unbundled ESM entry in
+  `package.json`'s `tsup` settings. Normal compiler lookup handles `paths`,
+  export conditions and built entries first. Followed links expose
+  `data.unbuiltEntry` with the proof, config, output and source.
+  [C-25](changes/C-25.md)
 - **Unresolved:** outside members whose receiver or declaration is unverified
   (`external`, `external-package`); computed `require` or `import()` specifiers;
   bare test globals with an overlapping unmodelled type request
@@ -806,7 +813,7 @@ answer.
   (`workspace-manifest-unreadable`);
   unavailable Deno import maps, unmapped Deno bare imports and remote URL
   imports (`deno-import-unverified`);
-  installed workspace bindings with no captured entry
+  workspace bindings with no usable entry or proven producer
   (`workspace-entry-unavailable` or `workspace-build-output-missing` when
   TypeScript probed a missing path under a configured output directory).
 - **`partial` files** have complete but qualified facts, never syntax errors: an

@@ -1693,6 +1693,14 @@ metadata. The physical package exposed to the importer supersedes an inferred
 workspace link. The checker supplies test-global owners when the competing
 type requests were captured. [C-20](changes/C-20.md)
 
+Module 38 can replay a failed checkout package lookup using the same
+TypeScript resolver and a scoped set of configured output names. Only a
+unique producer can supply the source behind the selected name. The host
+serves that captured source in the existing compiler program and records
+the unbuilt-entry proof from its selected resolutions. Installed registry
+packages and existing outputs stay on the ordinary route.
+[C-25](changes/C-25.md)
+
 Rust records library paths during resolution starting with module 29. Its library lookup uses
 the captured namespace, import, placement and `cfg` facts, with a separate
 lookup cache key for the outside search. `library.ts` supplies edition prelude
