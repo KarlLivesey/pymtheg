@@ -1,0 +1,558 @@
+{
+ "seed": "c24-rust-determinism-2026-11-19",
+ "pins": [
+  {
+   "id": "BurntSushi/ripgrep",
+   "candidateSites": 39819,
+   "candidateLevel2": 26104,
+   "mainSites": [
+    39819,
+    39819
+   ],
+   "mainLevel2": [
+    26104,
+    26104
+   ],
+   "likeForLikeSites": 39819,
+   "likeForLikeCandidateLevel2": 26104,
+   "likeForLikeMainLevel2": [
+    26104,
+    26104
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 26108,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "DioxusLabs/dioxus",
+   "candidateSites": 150404,
+   "candidateLevel2": 69284,
+   "mainSites": [
+    150404,
+    150404
+   ],
+   "mainLevel2": [
+    69285,
+    69283
+   ],
+   "likeForLikeSites": 150404,
+   "likeForLikeCandidateLevel2": 69284,
+   "likeForLikeMainLevel2": [
+    69285,
+    69283
+   ],
+   "mainUnstableSites": 2,
+   "unionDefinite": 69312,
+   "lostStable": [],
+   "lostUnstable": 1,
+   "lostUnstableSamples": [
+    {
+     "file": "packages/fullstack/src/payloads/sse.rs",
+     "start": 12850,
+     "kind": "implements",
+     "name": "std::ops::Deref",
+     "main": [
+      "[\"library\",\"[\\\"rust-std\\\",\\\"std\\\",\\\"ops::Deref\\\",null,null,\\\"qualified-path\\\"]\",[]]",
+      "[\"unresolved\",null,[]]"
+     ],
+     "candidate": "[\"unresolved\",null,[]]"
+    }
+   ],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "RustCrypto/hashes",
+   "candidateSites": 12911,
+   "candidateLevel2": 6160,
+   "mainSites": [
+    12911,
+    12911
+   ],
+   "mainLevel2": [
+    6160,
+    6160
+   ],
+   "likeForLikeSites": 12911,
+   "likeForLikeCandidateLevel2": 6160,
+   "likeForLikeMainLevel2": [
+    6160,
+    6160
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 6206,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "actix/actix-web",
+   "candidateSites": 86640,
+   "candidateLevel2": 34923,
+   "mainSites": [
+    86640,
+    86640
+   ],
+   "mainLevel2": [
+    34923,
+    34923
+   ],
+   "likeForLikeSites": 86640,
+   "likeForLikeCandidateLevel2": 34923,
+   "likeForLikeMainLevel2": [
+    34923,
+    34923
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 34936,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "alacritty/alacritty",
+   "candidateSites": 31393,
+   "candidateLevel2": 15047,
+   "mainSites": [
+    31393,
+    31393
+   ],
+   "mainLevel2": [
+    15047,
+    15047
+   ],
+   "likeForLikeSites": 31393,
+   "likeForLikeCandidateLevel2": 15047,
+   "likeForLikeMainLevel2": [
+    15047,
+    15047
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 15050,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "cberner/redb",
+   "candidateSites": 73731,
+   "candidateLevel2": 31261,
+   "mainSites": [
+    73731,
+    73731
+   ],
+   "mainLevel2": [
+    31261,
+    31261
+   ],
+   "likeForLikeSites": 73731,
+   "likeForLikeCandidateLevel2": 31261,
+   "likeForLikeMainLevel2": [
+    31261,
+    31261
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 31262,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "clap-rs/clap",
+   "candidateSites": 60489,
+   "candidateLevel2": 20330,
+   "mainSites": [
+    60489,
+    60489
+   ],
+   "mainLevel2": [
+    20330,
+    20330
+   ],
+   "likeForLikeSites": 60489,
+   "likeForLikeCandidateLevel2": 20330,
+   "likeForLikeMainLevel2": [
+    20330,
+    20330
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 20334,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "crossbeam-rs/crossbeam",
+   "candidateSites": 34081,
+   "candidateLevel2": 17452,
+   "mainSites": [
+    34081,
+    34081
+   ],
+   "mainLevel2": [
+    17452,
+    17452
+   ],
+   "likeForLikeSites": 34081,
+   "likeForLikeCandidateLevel2": 17452,
+   "likeForLikeMainLevel2": [
+    17452,
+    17452
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 17474,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "candidateSites": 13361,
+   "candidateLevel2": 5916,
+   "mainSites": [
+    13361,
+    13361
+   ],
+   "mainLevel2": [
+    5916,
+    5916
+   ],
+   "likeForLikeSites": 13361,
+   "likeForLikeCandidateLevel2": 5916,
+   "likeForLikeMainLevel2": [
+    5916,
+    5916
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 5916,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "helix-editor/helix",
+   "candidateSites": 90583,
+   "candidateLevel2": 40237,
+   "mainSites": [
+    90583,
+    90583
+   ],
+   "mainLevel2": [
+    40237,
+    40237
+   ],
+   "likeForLikeSites": 90583,
+   "likeForLikeCandidateLevel2": 40237,
+   "likeForLikeMainLevel2": [
+    40237,
+    40237
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 40250,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "ratatui/ratatui",
+   "candidateSites": 60424,
+   "candidateLevel2": 23853,
+   "mainSites": [
+    60424,
+    60424
+   ],
+   "mainLevel2": [
+    23853,
+    23853
+   ],
+   "likeForLikeSites": 60424,
+   "likeForLikeCandidateLevel2": 23853,
+   "likeForLikeMainLevel2": [
+    23853,
+    23853
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 23871,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "rust-embedded/cortex-m",
+   "candidateSites": 5531,
+   "candidateLevel2": 3047,
+   "mainSites": [
+    5531,
+    5531
+   ],
+   "mainLevel2": [
+    3047,
+    3047
+   ],
+   "likeForLikeSites": 5531,
+   "likeForLikeCandidateLevel2": 3047,
+   "likeForLikeMainLevel2": [
+    3047,
+    3047
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 3075,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "rust-lang/mdBook",
+   "candidateSites": 13866,
+   "candidateLevel2": 7176,
+   "mainSites": [
+    13866,
+    13866
+   ],
+   "mainLevel2": [
+    7176,
+    7176
+   ],
+   "likeForLikeSites": 13866,
+   "likeForLikeCandidateLevel2": 7176,
+   "likeForLikeMainLevel2": [
+    7176,
+    7176
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 7181,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "rustls/rustls",
+   "candidateSites": 70802,
+   "candidateLevel2": 20276,
+   "mainSites": [
+    70802,
+    70802
+   ],
+   "mainLevel2": [
+    20276,
+    20276
+   ],
+   "likeForLikeSites": 70802,
+   "likeForLikeCandidateLevel2": 20276,
+   "likeForLikeMainLevel2": [
+    20276,
+    20276
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 20294,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "serde-rs/serde",
+   "candidateSites": 30714,
+   "candidateLevel2": 8282,
+   "mainSites": [
+    30714,
+    30714
+   ],
+   "mainLevel2": [
+    8282,
+    8282
+   ],
+   "likeForLikeSites": 30714,
+   "likeForLikeCandidateLevel2": 8282,
+   "likeForLikeMainLevel2": [
+    8282,
+    8282
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 8291,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "tauri-apps/tauri",
+   "candidateSites": 88113,
+   "candidateLevel2": 41940,
+   "mainSites": [
+    88113,
+    88113
+   ],
+   "mainLevel2": [
+    41940,
+    41940
+   ],
+   "likeForLikeSites": 88113,
+   "likeForLikeCandidateLevel2": 41940,
+   "likeForLikeMainLevel2": [
+    41940,
+    41940
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 41949,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "tokio-rs/axum",
+   "candidateSites": 41067,
+   "candidateLevel2": 16213,
+   "mainSites": [
+    41067,
+    41067
+   ],
+   "mainLevel2": [
+    16213,
+    16213
+   ],
+   "likeForLikeSites": 41067,
+   "likeForLikeCandidateLevel2": 16213,
+   "likeForLikeMainLevel2": [
+    16213,
+    16213
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 16218,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "tree-sitter/tree-sitter",
+   "candidateSites": 54645,
+   "candidateLevel2": 23682,
+   "mainSites": [
+    54645,
+    54645
+   ],
+   "mainLevel2": [
+    23682,
+    23682
+   ],
+   "likeForLikeSites": 54645,
+   "likeForLikeCandidateLevel2": 23682,
+   "likeForLikeMainLevel2": [
+    23682,
+    23682
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 23683,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  }
+ ],
+ "audit": []
+}

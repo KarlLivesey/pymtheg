@@ -1,0 +1,1093 @@
+{
+ "seed": "c24-rust-determinism-2026-11-19",
+ "pins": [
+  {
+   "id": "BurntSushi/ripgrep",
+   "candidateSites": 39819,
+   "candidateLevel2": 26104,
+   "mainSites": [
+    39819
+   ],
+   "mainLevel2": [
+    26104
+   ],
+   "likeForLikeSites": 39819,
+   "likeForLikeCandidateLevel2": 26104,
+   "likeForLikeMainLevel2": [
+    26104
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 26108,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "DioxusLabs/dioxus",
+   "candidateSites": 149592,
+   "candidateLevel2": 68527,
+   "mainSites": [
+    149592
+   ],
+   "mainLevel2": [
+    68527
+   ],
+   "likeForLikeSites": 149592,
+   "likeForLikeCandidateLevel2": 68527,
+   "likeForLikeMainLevel2": [
+    68527
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 68552,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "RustCrypto/hashes",
+   "candidateSites": 12911,
+   "candidateLevel2": 6160,
+   "mainSites": [
+    12911
+   ],
+   "mainLevel2": [
+    6160
+   ],
+   "likeForLikeSites": 12911,
+   "likeForLikeCandidateLevel2": 6160,
+   "likeForLikeMainLevel2": [
+    6160
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 6206,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "actix/actix-web",
+   "candidateSites": 86640,
+   "candidateLevel2": 34923,
+   "mainSites": [
+    86640
+   ],
+   "mainLevel2": [
+    34923
+   ],
+   "likeForLikeSites": 86640,
+   "likeForLikeCandidateLevel2": 34923,
+   "likeForLikeMainLevel2": [
+    34923
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 34936,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "alacritty/alacritty",
+   "candidateSites": 30965,
+   "candidateLevel2": 14852,
+   "mainSites": [
+    30965
+   ],
+   "mainLevel2": [
+    14852
+   ],
+   "likeForLikeSites": 30965,
+   "likeForLikeCandidateLevel2": 14852,
+   "likeForLikeMainLevel2": [
+    14852
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 14855,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "cberner/redb",
+   "candidateSites": 73731,
+   "candidateLevel2": 31261,
+   "mainSites": [
+    73731
+   ],
+   "mainLevel2": [
+    31261
+   ],
+   "likeForLikeSites": 73731,
+   "likeForLikeCandidateLevel2": 31261,
+   "likeForLikeMainLevel2": [
+    31261
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 31262,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "clap-rs/clap",
+   "candidateSites": 52417,
+   "candidateLevel2": 19785,
+   "mainSites": [
+    52417
+   ],
+   "mainLevel2": [
+    19785
+   ],
+   "likeForLikeSites": 52417,
+   "likeForLikeCandidateLevel2": 19785,
+   "likeForLikeMainLevel2": [
+    19785
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 19789,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "crossbeam-rs/crossbeam",
+   "candidateSites": 34081,
+   "candidateLevel2": 17452,
+   "mainSites": [
+    34081
+   ],
+   "mainLevel2": [
+    17452
+   ],
+   "likeForLikeSites": 34081,
+   "likeForLikeCandidateLevel2": 17452,
+   "likeForLikeMainLevel2": [
+    17452
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 17474,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "candidateSites": 13361,
+   "candidateLevel2": 6018,
+   "mainSites": [
+    13361
+   ],
+   "mainLevel2": [
+    5916
+   ],
+   "likeForLikeSites": 13361,
+   "likeForLikeCandidateLevel2": 6018,
+   "likeForLikeMainLevel2": [
+    5916
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 5916,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 102,
+   "newLevel2Stable": 102,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "helix-editor/helix",
+   "candidateSites": 90583,
+   "candidateLevel2": 40237,
+   "mainSites": [
+    90583
+   ],
+   "mainLevel2": [
+    40237
+   ],
+   "likeForLikeSites": 90583,
+   "likeForLikeCandidateLevel2": 40237,
+   "likeForLikeMainLevel2": [
+    40237
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 40250,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "ratatui/ratatui",
+   "candidateSites": 60424,
+   "candidateLevel2": 23853,
+   "mainSites": [
+    60424
+   ],
+   "mainLevel2": [
+    23853
+   ],
+   "likeForLikeSites": 60424,
+   "likeForLikeCandidateLevel2": 23853,
+   "likeForLikeMainLevel2": [
+    23853
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 23871,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "rust-embedded/cortex-m",
+   "candidateSites": 5531,
+   "candidateLevel2": 3047,
+   "mainSites": [
+    5531
+   ],
+   "mainLevel2": [
+    3047
+   ],
+   "likeForLikeSites": 5531,
+   "likeForLikeCandidateLevel2": 3047,
+   "likeForLikeMainLevel2": [
+    3047
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 3075,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "rust-lang/mdBook",
+   "candidateSites": 12557,
+   "candidateLevel2": 6705,
+   "mainSites": [
+    12557
+   ],
+   "mainLevel2": [
+    6705
+   ],
+   "likeForLikeSites": 12557,
+   "likeForLikeCandidateLevel2": 6705,
+   "likeForLikeMainLevel2": [
+    6705
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 6710,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "rustls/rustls",
+   "candidateSites": 69929,
+   "candidateLevel2": 19809,
+   "mainSites": [
+    69929
+   ],
+   "mainLevel2": [
+    19809
+   ],
+   "likeForLikeSites": 69929,
+   "likeForLikeCandidateLevel2": 19809,
+   "likeForLikeMainLevel2": [
+    19809
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 19827,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "serde-rs/serde",
+   "candidateSites": 30714,
+   "candidateLevel2": 8282,
+   "mainSites": [
+    30714
+   ],
+   "mainLevel2": [
+    8282
+   ],
+   "likeForLikeSites": 30714,
+   "likeForLikeCandidateLevel2": 8282,
+   "likeForLikeMainLevel2": [
+    8282
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 8291,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "tauri-apps/tauri",
+   "candidateSites": 88051,
+   "candidateLevel2": 41918,
+   "mainSites": [
+    88051
+   ],
+   "mainLevel2": [
+    41918
+   ],
+   "likeForLikeSites": 88051,
+   "likeForLikeCandidateLevel2": 41918,
+   "likeForLikeMainLevel2": [
+    41918
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 41927,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "tokio-rs/axum",
+   "candidateSites": 41067,
+   "candidateLevel2": 16213,
+   "mainSites": [
+    41067
+   ],
+   "mainLevel2": [
+    16213
+   ],
+   "likeForLikeSites": 41067,
+   "likeForLikeCandidateLevel2": 16213,
+   "likeForLikeMainLevel2": [
+    16213
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 16218,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "tree-sitter/tree-sitter",
+   "candidateSites": 54645,
+   "candidateLevel2": 23682,
+   "mainSites": [
+    54645
+   ],
+   "mainLevel2": [
+    23682
+   ],
+   "likeForLikeSites": 54645,
+   "likeForLikeCandidateLevel2": 23682,
+   "likeForLikeMainLevel2": [
+    23682
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 23683,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  }
+ ],
+ "audit": [
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"library\",\"[\\\"rust-std\\\",\\\"std\\\",\\\"str::from_utf8\\\",null,null,\\\"qualified-path\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples/structured/src/main.rs",
+   "start": 593,
+   "kind": "calls",
+   "name": "std::str::from_utf8",
+   "target": "[\"rust-std\",\"std\",\"str::from_utf8\",null,null,\"qualified-path\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"library\",\"[\\\"rust-std\\\",\\\"std\\\",\\\"vec!\\\",null,null,\\\"declared-builtin\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples/structured/src/main.rs",
+   "start": 1993,
+   "kind": "macros",
+   "name": "vec",
+   "target": "[\"rust-std\",\"std\",\"vec!\",null,null,\"declared-builtin\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"library\",\"[\\\"rust-std\\\",\\\"std\\\",\\\"option::Option::Some\\\",null,null,\\\"declared-builtin\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples/structured/src/main.rs",
+   "start": 1424,
+   "kind": "calls",
+   "name": "Some",
+   "target": "[\"rust-std\",\"std\",\"option::Option::Some\",null,null,\"declared-builtin\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"library\",\"[\\\"cargo\\\",\\\"rmp-serde\\\",\\\"to_vec\\\",null,null,\\\"qualified-path\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples_disabled/migration/src/main.rs",
+   "start": 1422,
+   "kind": "calls",
+   "name": "rmp_serde::to_vec",
+   "target": "[\"cargo\",\"rmp-serde\",\"to_vec\",null,null,\"qualified-path\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"library\",\"[\\\"cargo\\\",\\\"axum\\\",\\\"response::IntoResponse\\\",null,null,\\\"import-binding\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples/axum-kv/src/error.rs",
+   "start": 294,
+   "kind": "types",
+   "name": "IntoResponse",
+   "target": "[\"cargo\",\"axum\",\"response::IntoResponse\",null,null,\"import-binding\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"resolved\",\"[\\\"src/keyspace/mod.rs\\\",\\\"struct\\\",\\\"item:5571\\\",0,\\\"Keyspace\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples/structured/src/main.rs",
+   "start": 1094,
+   "kind": "types",
+   "name": "Keyspace",
+   "target": "[\"src/keyspace/mod.rs\",\"struct\",\"item:5571\",0,\"Keyspace\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"library\",\"[\\\"cargo\\\",\\\"axum\\\",\\\"response::IntoResponse\\\",null,null,\\\"import-binding\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples/axum-kv/src/error.rs",
+   "start": 294,
+   "kind": "implements",
+   "name": "IntoResponse",
+   "target": "[\"cargo\",\"axum\",\"response::IntoResponse\",null,null,\"import-binding\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"library\",\"[\\\"rust-std\\\",\\\"std\\\",\\\"option::Option\\\",null,null,\\\"declared-builtin\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples/structured/src/main.rs",
+   "start": 1177,
+   "kind": "types",
+   "name": "Option",
+   "target": "[\"rust-std\",\"std\",\"option::Option\",null,null,\"declared-builtin\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"library\",\"[\\\"cargo\\\",\\\"lsm-tree\\\",\\\"UserKey\\\",null,null,\\\"import-binding\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples/structured/src/main.rs",
+   "start": 544,
+   "kind": "types",
+   "name": "UserKey",
+   "target": "[\"cargo\",\"lsm-tree\",\"UserKey\",null,null,\"import-binding\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"library\",\"[\\\"rust-std\\\",\\\"std\\\",\\\"convert::From\\\",null,null,\\\"declared-builtin\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples/structured/src/main.rs",
+   "start": 479,
+   "kind": "implements",
+   "name": "From<(UserKey,UserValue)>",
+   "target": "[\"rust-std\",\"std\",\"convert::From\",null,null,\"declared-builtin\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"library\",\"[\\\"rust-std\\\",\\\"std\\\",\\\"fmt::Formatter\\\",null,null,\\\"qualified-path\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples_disabled/migration/src/main.rs",
+   "start": 772,
+   "kind": "types",
+   "name": "std::fmt::Formatter",
+   "target": "[\"rust-std\",\"std\",\"fmt::Formatter\",null,null,\"qualified-path\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"library\",\"[\\\"rust-std\\\",\\\"std\\\",\\\"result::Result::Ok\\\",null,null,\\\"declared-builtin\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples/structured/src/main.rs",
+   "start": 1264,
+   "kind": "calls",
+   "name": "Ok",
+   "target": "[\"rust-std\",\"std\",\"result::Result::Ok\",null,null,\"declared-builtin\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"resolved\",\"[\\\"src/db.rs\\\",\\\"struct\\\",\\\"item:3633\\\",0,\\\"Database\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples/structured/src/main.rs",
+   "start": 1073,
+   "kind": "types",
+   "name": "Database",
+   "target": "[\"src/db.rs\",\"struct\",\"item:3633\",0,\"Database\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"library\",\"[\\\"cargo\\\",\\\"actix-web\\\",\\\"#[post]\\\",null,null,\\\"import-binding\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples/actix-kv/src/main.rs",
+   "start": 544,
+   "kind": "macros",
+   "name": "post",
+   "target": "[\"cargo\",\"actix-web\",\"#[post]\",null,null,\"import-binding\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"resolved\",\"[\\\"src/error.rs\\\",\\\"type\\\",\\\"item:2148\\\",0,\\\"Result\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples/structured/src/main.rs",
+   "start": 1652,
+   "kind": "types",
+   "name": "fjall::Result",
+   "target": "[\"src/error.rs\",\"type\",\"item:2148\",0,\"Result\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"library\",\"[\\\"rust-std\\\",\\\"std\\\",\\\"result::Result::Ok\\\",null,null,\\\"declared-builtin\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples_disabled/migration/src/main.rs",
+   "start": 2679,
+   "kind": "calls",
+   "name": "Ok",
+   "target": "[\"rust-std\",\"std\",\"result::Result::Ok\",null,null,\"declared-builtin\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"library\",\"[\\\"cargo\\\",\\\"lsm-tree\\\",\\\"UserValue\\\",null,null,\\\"import-binding\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples/structured/src/main.rs",
+   "start": 553,
+   "kind": "types",
+   "name": "UserValue",
+   "target": "[\"cargo\",\"lsm-tree\",\"UserValue\",null,null,\"import-binding\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"library\",\"[\\\"rust-std\\\",\\\"std\\\",\\\"fmt::Formatter\\\",null,null,\\\"qualified-path\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples/structured/src/main.rs",
+   "start": 838,
+   "kind": "types",
+   "name": "std::fmt::Formatter",
+   "target": "[\"rust-std\",\"std\",\"fmt::Formatter\",null,null,\"qualified-path\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"library\",\"[\\\"cargo\\\",\\\"axum\\\",\\\"extract::State\\\",null,null,\\\"import-binding\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples/axum-kv/src/main.rs",
+   "start": 610,
+   "kind": "types",
+   "name": "extract::State",
+   "target": "[\"cargo\",\"axum\",\"extract::State\",null,null,\"import-binding\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"library\",\"[\\\"rust-std\\\",\\\"std\\\",\\\"assert_eq!\\\",null,null,\\\"declared-builtin\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples/structured/src/main.rs",
+   "start": 3380,
+   "kind": "macros",
+   "name": "assert_eq",
+   "target": "[\"rust-std\",\"std\",\"assert_eq!\",null,null,\"declared-builtin\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"library\",\"[\\\"rust-std\\\",\\\"std\\\",\\\"unreachable!\\\",null,null,\\\"declared-builtin\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples_disabled/migration/src/main.rs",
+   "start": 2257,
+   "kind": "macros",
+   "name": "unreachable",
+   "target": "[\"rust-std\",\"std\",\"unreachable!\",null,null,\"declared-builtin\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"resolved\",\"[\\\"src/error.rs\\\",\\\"type\\\",\\\"item:2148\\\",0,\\\"Result\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples/structured/src/main.rs",
+   "start": 1484,
+   "kind": "types",
+   "name": "fjall::Result",
+   "target": "[\"src/error.rs\",\"type\",\"item:2148\",0,\"Result\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"library\",\"[\\\"cargo\\\",\\\"lsm-tree\\\",\\\"UserValue\\\",null,null,\\\"import-binding\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples/structured/src/main.rs",
+   "start": 494,
+   "kind": "types",
+   "name": "UserValue",
+   "target": "[\"cargo\",\"lsm-tree\",\"UserValue\",null,null,\"import-binding\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"resolved\",\"[\\\"src/error.rs\\\",\\\"type\\\",\\\"item:2148\\\",0,\\\"Result\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples/structured/src/main.rs",
+   "start": 1904,
+   "kind": "types",
+   "name": "fjall::Result",
+   "target": "[\"src/error.rs\",\"type\",\"item:2148\",0,\"Result\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"library\",\"[\\\"cargo\\\",\\\"rmp-serde\\\",\\\"from_slice\\\",null,null,\\\"qualified-path\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples_disabled/migration/src/main.rs",
+   "start": 2473,
+   "kind": "calls",
+   "name": "rmp_serde::from_slice",
+   "target": "[\"cargo\",\"rmp-serde\",\"from_slice\",null,null,\"qualified-path\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"library\",\"[\\\"cargo\\\",\\\"axum\\\",\\\"extract::Json\\\",null,null,\\\"import-binding\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples/axum-kv/src/main.rs",
+   "start": 658,
+   "kind": "types",
+   "name": "extract::Json",
+   "target": "[\"cargo\",\"axum\",\"extract::Json\",null,null,\"import-binding\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"resolved\",\"[\\\"src/error.rs\\\",\\\"type\\\",\\\"item:2148\\\",0,\\\"Result\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples/structured/src/main.rs",
+   "start": 1163,
+   "kind": "types",
+   "name": "fjall::Result",
+   "target": "[\"src/error.rs\",\"type\",\"item:2148\",0,\"Result\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"resolved\",\"[\\\"src/guard.rs\\\",\\\"struct\\\",\\\"item:257\\\",0,\\\"Guard\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples/structured/src/main.rs",
+   "start": 22,
+   "kind": "imports",
+   "name": "fjall::Guard",
+   "target": "[\"src/guard.rs\",\"struct\",\"item:257\",0,\"Guard\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"library\",\"[\\\"rust-std\\\",\\\"std\\\",\\\"convert::From\\\",null,null,\\\"declared-builtin\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples_disabled/migration/src/main.rs",
+   "start": 403,
+   "kind": "implements",
+   "name": "From<PlanetV1>",
+   "target": "[\"rust-std\",\"std\",\"convert::From\",null,null,\"declared-builtin\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"library\",\"[\\\"cargo\\\",\\\"actix-web\\\",\\\"#[delete]\\\",null,null,\\\"import-binding\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples/actix-kv/src/main.rs",
+   "start": 1515,
+   "kind": "macros",
+   "name": "delete",
+   "target": "[\"cargo\",\"actix-web\",\"#[delete]\",null,null,\"import-binding\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"library\",\"[\\\"rust-std\\\",\\\"std\\\",\\\"fmt::Result\\\",null,null,\\\"qualified-path\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples_disabled/migration/src/main.rs",
+   "start": 800,
+   "kind": "types",
+   "name": "std::fmt::Result",
+   "target": "[\"rust-std\",\"std\",\"fmt::Result\",null,null,\"qualified-path\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"resolved\",\"[\\\"src/guard.rs\\\",\\\"struct\\\",\\\"item:257\\\",0,\\\"Guard\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples_disabled/migration/src/main.rs",
+   "start": 22,
+   "kind": "imports",
+   "name": "fjall::Guard",
+   "target": "[\"src/guard.rs\",\"struct\",\"item:257\",0,\"Guard\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"library\",\"[\\\"rust-std\\\",\\\"std\\\",\\\"println!\\\",null,null,\\\"declared-builtin\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples/structured/src/main.rs",
+   "start": 3879,
+   "kind": "macros",
+   "name": "println",
+   "target": "[\"rust-std\",\"std\",\"println!\",null,null,\"declared-builtin\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"resolved\",\"[\\\"src/error.rs\\\",\\\"type\\\",\\\"item:2148\\\",0,\\\"Result\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples_disabled/migration/src/main.rs",
+   "start": 873,
+   "kind": "types",
+   "name": "fjall::Result",
+   "target": "[\"src/error.rs\",\"type\",\"item:2148\",0,\"Result\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"library\",\"[\\\"cargo\\\",\\\"axum\\\",\\\"http::header::HeaderName\\\",null,null,\\\"import-binding\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples/axum-kv/src/main.rs",
+   "start": 2491,
+   "kind": "types",
+   "name": "HeaderName",
+   "target": "[\"cargo\",\"axum\",\"http::header::HeaderName\",null,null,\"import-binding\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"library\",\"[\\\"rust-std\\\",\\\"std\\\",\\\"assert_eq!\\\",null,null,\\\"declared-builtin\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples/structured/src/main.rs",
+   "start": 3926,
+   "kind": "macros",
+   "name": "assert_eq",
+   "target": "[\"rust-std\",\"std\",\"assert_eq!\",null,null,\"declared-builtin\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"library\",\"[\\\"cargo\\\",\\\"rmp-serde\\\",\\\"to_vec\\\",null,null,\\\"qualified-path\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples_disabled/migration/src/main.rs",
+   "start": 2195,
+   "kind": "calls",
+   "name": "rmp_serde::to_vec",
+   "target": "[\"cargo\",\"rmp-serde\",\"to_vec\",null,null,\"qualified-path\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"library\",\"[\\\"rust-std\\\",\\\"std\\\",\\\"fmt::Display\\\",null,null,\\\"qualified-path\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples/structured/src/main.rs",
+   "start": 783,
+   "kind": "implements",
+   "name": "std::fmt::Display",
+   "target": "[\"rust-std\",\"std\",\"fmt::Display\",null,null,\"qualified-path\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"library\",\"[\\\"rust-std\\\",\\\"std\\\",\\\"option::Option::Some\\\",null,null,\\\"declared-builtin\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples/structured/src/main.rs",
+   "start": 3043,
+   "kind": "patterns",
+   "name": "Some",
+   "target": "[\"rust-std\",\"std\",\"option::Option::Some\",null,null,\"declared-builtin\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"library\",\"[\\\"cargo\\\",\\\"axum\\\",\\\"extract::Path\\\",null,null,\\\"import-binding\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples/axum-kv/src/main.rs",
+   "start": 1710,
+   "kind": "types",
+   "name": "extract::Path",
+   "target": "[\"cargo\",\"axum\",\"extract::Path\",null,null,\"import-binding\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  }
+ ]
+}
