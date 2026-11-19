@@ -1627,7 +1627,11 @@ The TypeScript module can read installed declaration and resolution metadata
 files under the checkout's `node_modules` on demand. The dependency inputs
 are recorded as module-owned context, so the version validator accepts an
 installed `package.json` whose text was captured. Installed implementations
-and network access are outside this path.
+and network access are outside this path. A file found present stays present for the run: its
+read is checked against its own open handle, and the stamp recorded
+(device, inode, mode, size, mtime, ctime) is that of the bytes read, so a
+link added by another install sharing the package store does not make it
+absent (C-22).
 
 Queries: `pymtheg graph uses UNIT [SYMBOL]` and MCP `code_graph` action `uses`
 (`query`, optional `symbol`). Every link answer shows certainty `library` and

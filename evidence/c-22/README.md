@@ -11,6 +11,8 @@ stores are kept here.
 | `main-1/`, `main-2/` | main itself (no counters), run twice on restic and hono: times and reports only |
 | `random-ripgrep.json`, `random-restic.json` | 20 seeded single-file edits each, incremental store against a cold store of the same tree after every edit |
 | `same-cold/<pin>.json` | a cold index of each pin by the before and the after build into stores with the same project id: row counts and differences (none) |
+| `no-edit/<case>.json` | re-index with no edit: two warm stores and a second cold store, each compared with the first cold store (trpc bare and installed, before and after the fix; hono installed; restic and ripgrep bare) |
+| `installed-race/churn-main-code.json`, `churn-fixed.json` | trpc installed: a warm re-index while another hard link to each `expect-type` declaration is added and removed (inode metadata only), compared with the cold store, on main's `dependency-inputs` code and with the fix |
 | `cold-cost.json` | cold-index time and peak memory, main and after alternating, one run at a time |
 | `profiles/body-edit.*.txt` | CPU profile summaries (main thread) of the two slowest edits, trpc and cli/cli body edits, before and after |
 

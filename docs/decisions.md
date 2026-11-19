@@ -2910,4 +2910,9 @@ that `desired` came from `resolutionFacts` over the `current` it is given; the
 indexer is the only caller. **Not done:** language analysis is still
 whole-program on every run (TypeScript rebuilds every program; Go and Rust
 resolve the whole project twice); the change note sketches what an
-edit-proportional route needs. [C-22](changes/C-22.md)
+edit-proportional route needs. **Also decided (C-22):** a re-index with no
+edit must store exactly what a cold index stores, bare and with dependencies
+installed; an installed file found present is read against its own handle
+and stays present when only its inode metadata changes (another install
+hard-linking the same pnpm store file changed its ctime and made it absent,
+so a warm sweep index lost `expect-type` declarations). [C-22](changes/C-22.md)

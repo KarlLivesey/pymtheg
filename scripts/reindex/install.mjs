@@ -9,7 +9,8 @@ import { installation } from "../sweep/install.mjs";
 const [root, scratch] = process.argv.slice(2);
 if (!root || !scratch) throw Error("usage: install.mjs <checkout> <scratch>");
 const setup = await installation(root, scratch);
-if (!setup.command) throw Error(`install unavailable: ${JSON.stringify(setup)}`);
+if (!setup.command)
+  throw Error(`install unavailable: ${JSON.stringify(setup)}`);
 const result = spawnSync(setup.command, setup.args, {
   cwd: root,
   env: setup.env,

@@ -1,0 +1,19 @@
+{
+ "root": "trpc2",
+ "warm": [
+  {
+   "run": 1,
+   "equal": true,
+   "differences": []
+  },
+  {
+   "run": 2,
+   "equal": true,
+   "differences": []
+  }
+ ],
+ "coldAgain": {
+  "equal": true,
+  "differences": []
+ }
+}

@@ -23,7 +23,15 @@ const graph = join(root, ".pymtheg/rebuildable/graph.sqlite");
 if (!existsSync(join(root, ".pymtheg")))
   execFileSync(
     process.execPath,
-    [join(dist, "cli/main.js"), "init", ".", "--name", "c22", "--format", "json"],
+    [
+      join(dist, "cli/main.js"),
+      "init",
+      ".",
+      "--name",
+      "c22",
+      "--format",
+      "json",
+    ],
     { cwd: root, stdio: ["ignore", "ignore", "inherit"] },
   );
 if (existsSync(graph)) throw Error(`${graph} exists: start from no graph`);
