@@ -295,7 +295,10 @@ test("review: a type name aliased differently in build variants proves no owner"
       'import "strings"',
       "type Buffer = strings.Reader",
     ),
-    "a/use.go": lines("package a", "func use(b *Buffer) int { return b.Len() }"),
+    "a/use.go": lines(
+      "package a",
+      "func use(b *Buffer) int { return b.Len() }",
+    ),
     // Every variant aliases the same type: its owner holds in every build.
     "b/alias_linux.go": lines(
       "package b",
@@ -309,10 +312,19 @@ test("review: a type name aliased differently in build variants proves no owner"
       'import "bytes"',
       "type Buffer = bytes.Buffer",
     ),
-    "b/use.go": lines("package b", "func use(b *Buffer) int { return b.Len() }"),
+    "b/use.go": lines(
+      "package b",
+      "func use(b *Buffer) int { return b.Len() }",
+    ),
   });
-  assert.equal(outcome(at(links, "a/use.go", "b.Len")), "unresolved");
-  assert.equal(outcome(at(links, "b/use.go", "b.Len")), std("bytes", "Buffer.Len"));
+  assert.equal(
+    outcome(at(links, "a/use.go", "b.Len")),
+    "unresolved library-member-unproven",
+  );
+  assert.equal(
+    outcome(at(links, "b/use.go", "b.Len")),
+    std("bytes", "Buffer.Len"),
+  );
 });
 
 test("review: graph uses leaves another ecosystem's unit as written", async () => {

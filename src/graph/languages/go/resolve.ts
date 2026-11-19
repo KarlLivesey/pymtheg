@@ -1777,7 +1777,9 @@ class GoResolver {
           this.aliasesFollowed.delete(symbol.id);
         }
         if (target.kind !== "project")
-          return syms.length > 1 ? this.variantsStd(target, syms, depth) : target;
+          return syms.length > 1
+            ? this.variantsStd(target, syms, depth)
+            : target;
         out.push(...target.syms);
       } else out.push(symbol);
     }
