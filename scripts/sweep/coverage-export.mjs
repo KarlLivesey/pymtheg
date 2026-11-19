@@ -286,6 +286,7 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys, pre
     const storedLibrary = graphSchema === "4" ? db.prepare(`SELECT ecosystem,unit,symbol,version,evidence
       FROM graph_library_targets WHERE link=? AND role='target'`) : null;
     const files = db.prepare(`SELECT path,status,json_extract(body,'$.module') AS module,
+      json_extract(body,'$.version') AS moduleVersion,
       json_extract(body,'$.result.data.go.package') AS package FROM graph_files ORDER BY path`).all();
     const getFile = db.prepare(`SELECT json_extract(body,'$.text') AS text,
       json_extract(body,'$.result.diagnostics[0].message') AS reason,
@@ -426,6 +427,7 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys, pre
         goExplicitAliases: new Set(records.map((link) => link.data?.alias).filter(Boolean)),
         goReturned: (desc) => goReturned(file.path, desc),
         rustImports: file.module === "rust" ? rustImports(records) : new Map(),
+        rustStoredTargets: file.module === "rust" && graphSchema === "4" && Number(file.moduleVersion) >= 29,
         tsSpecifiers: new Set(records.map((link) => link.data?.specifier).filter(Boolean)),
         tsImports: () => tsSourceBindings().imports,
         tsImportMember: (name) => {

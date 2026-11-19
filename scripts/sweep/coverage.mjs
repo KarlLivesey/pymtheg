@@ -69,6 +69,9 @@ function checkResult(input) {
 const metric = (repo, module, allowed) => libraryScore(repo.breakdown ?? [], (language, scope) =>
   (module === "overall" || module === language) && allowed.includes(scope));
 
+const storedLibraryLinks = (repo, module, kind) => (repo.breakdown ?? []).reduce((total, row) =>
+  total + (row[0] === module && row[2] === "library" && (!kind || row[1] === kind) ? row[7] : 0), 0);
+
 export function failedRustInfluence(repo, allowed = scopes) {
   const result = { total: 0, eligible: 0, missing: 0, blocked: 0, receivers: 0, allBlocked: 0 };
   for (const [module, , outcome, reason, uncertainty, scope, disposition, count, blocked, level] of repo.breakdown ?? []) {
@@ -476,12 +479,18 @@ function renderPlan(repos, baseline, items, samples, isProgress) {
       const row = { ...item, inside: remaining.inside, outside: remaining.outside + exactOutside,
         links: number(remaining.inside + remaining.outside + exactOutside), repos: `≥${affected.size}`, status: "open" };
       if (item.representation) {
-        row.links = `${number(measured.identifiedUnit)} named links`;
-        row.repos = String([...active.values()].filter((repo) => metric(repo, module, scopes).identifiedUnit).length);
+        const stored = [...active.values()].map((repo) => storedLibraryLinks(repo, module)).filter(Boolean);
+        row.links = stored.length ? `${number(stored.reduce((a, b) => a + b))} stored links` : `${number(measured.identifiedUnit)} named links`;
+        row.repos = String(stored.length || [...active.values()].filter((repo) => metric(repo, module, scopes).identifiedUnit).length);
+        if (stored.length) row.status = "stored targets available";
       }
       if (verified) {
         row.status = verified === reviewed.length ? `all ${verified} reference sites settled`
           : `open · ${verified}/${reviewed.length} reference sites settled`;
+      }
+      if (item.libraryLinkKind) {
+        const stored = [...active.values()].reduce((total, repo) => total + storedLibraryLinks(repo, module, item.libraryLinkKind), 0);
+        if (stored) row.status += ` · ${number(stored)} stored library links by path`;
       }
       if (item.exact) {
         row.links = `${number(tainted.reduce((sum, entry) => sum + entry.missing, 0))} exact L2 misses`;

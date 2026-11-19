@@ -345,6 +345,18 @@ test("a stored library target is credited as stored; a 0.1.0 link is reconstruct
   assert.deepEqual([score.outside, score.total, score.level2, score.level1], [4, 20, 0.45, 0.5]);
 });
 
+test("Rust library coverage credits recorded evidence and leaves historical reconstruction to old graphs", () => {
+  const link = { module: "rust", kind: "calls", file: "src/lib.rs", resolution: "unresolved", targetName: "std::fs::read" };
+  assert.equal(externalIdentity(link, evidence, project, "outside").level, 2);
+  const stored = { ...evidence, rustStoredTargets: true };
+  assert.equal(externalIdentity(link, stored, project, "outside").level, 0);
+  assert.deepEqual(externalIdentity({ ...link, resolution: "library", library: {
+    unit: "std", symbol: "fs::read", evidence: "qualified-path",
+  } }, stored, project, "outside"), {
+    level: 2, unit: "std", symbol: "fs::read", evidence: "qualified-path", gap: null,
+  });
+});
+
 test("coverage accepts stored library rows and rejects a library row without a named unit", () => {
   const scratch = mkdtempSync(join(tmpdir(), "coverage-library-"));
   try {
