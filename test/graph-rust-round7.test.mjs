@@ -273,8 +273,9 @@ test("round 7 S2 real indexer parses a 2500-file project twice without internal 
   const { mkdtemp, mkdir, writeFile, rm } = await import("node:fs/promises");
   const { tmpdir } = await import("node:os");
   const { join } = await import("node:path");
-  const { indexProject, LanguageRegistry, SqliteGraphStore } =
-    await import("../dist/graph/index.js");
+  const { indexProject, LanguageRegistry, SqliteGraphStore } = await import(
+    "../dist/graph/index.js"
+  );
   const root = await mkdtemp(join(tmpdir(), "rust-parser-reuse-"));
   const store = new SqliteGraphStore(":memory:", "reuse");
   try {

@@ -15,7 +15,7 @@ hold an inherent impl of the type). **Wrong** means it could. **Cannot tell**
 means the source does not settle it.
 
 Every one of the 60 was also checked mechanically, as was every dropped
-reason in the five repositories (37,000+ links): none changes outcome in the
+reason in the five repositories (182,431 links): none changes outcome in the
 diagnostic build that empties the failed files (`cross-check.mjs`).
 
 Result: **60 right, 0 wrong, 0 cannot tell.**
@@ -88,4 +88,19 @@ Result: **60 right, 0 wrong, 0 cannot tell.**
 | `web/src/history.rs:401` | type `History` | namespace binding | `web_sys` import |
 | `fullstack/src/magic.rs:398` | pattern `Ok` | opaque macro | `request::*` is glob-imported at the crate root, not in `magic`, whose imports name items explicitly |
 
-TURBOREPO
+## vercel/turborepo (failed: `turborepo-api-client/src/lib.rs` and `turborepo-lsp/src/lib.rs`, both crate roots; `turborepo-cache/src/multiplexer.rs`; `turborepo-wax/src/{encode,rule}.rs`)
+
+| Site | Link | Remaining reason | Why |
+| --- | --- | --- | --- |
+| `crates/turborepo-filewatch/src/fsevent.rs:274` | `flags.contains` | receiver, opaque macro | `StreamFlags` comes from a `bitflags!` macro: visible doubt |
+| `crates/turborepo-cli/src/commands/query.rs:166` | `signal` | (none) | local binding; its constant check met no failed file (a glob of a failed crate root would have been recorded) |
+| `crates/turborepo-setup/src/source_policy/test_support.rs:48` | `zip` | (none) | local binding, as above |
+| `crates/turborepo-cli/src/commands/setup/tests.rs:639` | `f` | (none) | local binding, as above |
+| `crates/turborepo-lockfiles/src/berry/resolution.rs:172` | `Some` | opaque macro | prelude variant; visible macro doubt |
+| `crates/turborepo-engine/src/builder/test/core.rs:1127` | `package_graph` | (none) | local binding, as above |
+| `crates/turborepo-microfrontends-config/src/lib.rs:917` | `HashMap::new` | path type, opaque macro | `std` type; visible macro doubt |
+| `crates/turborepo-cli/src/commands/link.rs:94` | `Ok` | opaque macro | prelude variant |
+| `crates/turborepo-setup/src/lock/io/snapshot.rs:96` | `Ecosystems::default` | trait dispatch | `turborepo-setup` has no failed file, so no unseen inherent `default` |
+| `crates/turborepo-scope/src/target_selector.rs:297` | type `String` | opaque macro | prelude type |
+| `crates/turborepo-analytics/src/lib.rs:323` | `rx` | (none) | local binding, as above |
+| `crates/turborepo-process/src/child/io.rs:201` | type `Write` | namespace binding | explicit `std::io` import |
