@@ -389,6 +389,7 @@ test("patch 0014: a turbofish struct pattern names the struct and binds its fiel
   assert.deepEqual(report.failed, []);
   assert.deepEqual(own(symbols), [
     "enum:E",
+    "enum:En",
     "function:describe",
     "function:f",
     "function:g",
@@ -396,12 +397,14 @@ test("patch 0014: a turbofish struct pattern names the struct and binds its fiel
     "struct:inner::S",
     "struct:inner::W",
     "variant:E::V",
+    "variant:En::W",
   ]);
   assert.deepEqual(targets(links, "patterns", "Payload"), ["struct:Payload"]);
   // Behind a path the turbofish head still names its struct or variant.
   assert.deepEqual(targets(links, "patterns", "inner::S"), ["struct:inner::S"]);
   assert.deepEqual(targets(links, "patterns", "E::V"), ["variant:E::V"]);
   assert.deepEqual(targets(links, "patterns", "inner::W"), ["struct:inner::W"]);
+  assert.deepEqual(targets(links, "patterns", "En::W"), ["variant:En::W"]);
   assert.deepEqual(targets(links, "values", "x"), ["function:g"]);
   assert.deepEqual(targets(links, "values", "a"), ["function:g"]);
   assert.deepEqual(targets(links, "calls", "describe"), ["function:describe"]);
