@@ -168,19 +168,20 @@ including stored assumptions. Every field matched. [Comparison script](compare.m
 | Serde | 30,714 | 8,280 |
 | **Total** | **181,721** | **71,228** |
 
-The [remaining macro opacity census](remaining.md) attributes all 166,999
-stored unresolved links with the macro-scope diagnostic.
+The census attributes all 166,999 stored unresolved links with the
+macro-scope diagnostic. [Remaining macro opacity](remaining.md)
 The follow-up passed the build, type check, format check, all 3,062 tests
 on memory-backed scratch, and all 19 sweep tests.
 
 ## Coverage plan
 
-The 266,766-byte cumulative archive contains the accepted reference rows,
-the C-8 Go rows, the accepted TypeScript rows, and the final Rust candidate
-rows. The regeneration test reproduced the entire committed plan
-byte for byte. All 19 sweep-tool tests passed. The plan's language totals
-include that language's links from mixed-language pins, while the first table
-here follows the original 18 Rust pins. [Plan input](../../sweep/plan-input.json.gz) · [Regeneration command](../../sweep/README.md#reproduce-the-committed-plan)
+The 286,986-byte cumulative archive contains the accepted reference rows,
+the C-8 Go rows, the 18 final C-11 TypeScript rows, and the C-12 Rust
+candidate rows. The regeneration test reproduced the entire committed plan
+byte for byte. The plan's language totals include links from mixed-language
+pins, so its TypeScript total also reflects the Go and Rust rows in this
+archive. The first table here follows the original 18 Rust pins.
+[Plan input](../../sweep/plan-input.json.gz) · [Regeneration command](../../sweep/README.md#reproduce-the-committed-plan)
 
 ## Supplemental pins
 

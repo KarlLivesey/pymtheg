@@ -373,6 +373,19 @@ test("a stored library target is credited as stored; a 0.1.0 link is reconstruct
   assert.deepEqual([score.outside, score.total, score.level2, score.level1], [4, 20, 0.45, 0.5]);
 });
 
+test("TypeScript legacy export spelling cannot overwrite a current library decision", () => {
+  const legacy = { module: "typescript", kind: "calls", resolution: "unresolved", file: "src/main.ts",
+    targetName: "fs.readFileSync", data: { reason: "external-package" } };
+  const details = { ...evidence, tsImportMember: () => ({ specifier: "node:fs", member: "default" }) };
+  assert.deepEqual(externalIdentity(legacy, details, project, "outside"),
+    { level: 2, unit: "node:fs", symbol: "default.readFileSync", evidence: "import-binding", gap: null });
+  const current = { ...legacy, moduleVersion: "23+typescript-5.9.3" };
+  assert.equal(externalIdentity(current, details, project, "outside").level, 0);
+  assert.deepEqual(externalIdentity({ ...current, resolution: "library",
+    library: { ecosystem: "node", unit: "fs", evidence: "import-path" } }, details, project, "outside"),
+    { level: 1, unit: "fs", evidence: "import-path", gap: "whole-unit" });
+});
+
 test("Rust library coverage credits recorded evidence and leaves historical reconstruction to old graphs", () => {
   const link = { module: "rust", kind: "calls", file: "src/lib.rs", resolution: "unresolved", targetName: "std::fs::read" };
   assert.equal(externalIdentity(link, evidence, project, "outside").level, 2);

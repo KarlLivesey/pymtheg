@@ -2647,6 +2647,36 @@ level 2. **Open:** once the Go, Rust and TypeScript
 items record library targets, the export's reconstruction can be limited to
 schema-3 graphs. See [C-5](changes/C-5.md).
 
+### C-11 TypeScript and JavaScript library declarations
+
+Library members reached through a checker type name their selected declaration.
+An ECMAScript declaration names unit `es`, and a web declaration names unit
+`dom`. With a missing dependency declaration, lexical bindings prove written
+export names. A member reached through an arbitrary imported value names the
+unit only. The proof does not come from the receiver's package. Existing sites
+and checkout symbols retain their identities. Stored library outcomes replace
+coverage reconstruction for TypeScript module 23 onward. See [C-11](changes/C-11.md).
+
+Review revision 26 applies captured Deno maps before choosing a unit. Installed
+declarations, captured type packages or an importing manifest's external
+dependency can establish that a declaration describes an outside package.
+Lexical outside identity can survive unrelated unreadable declarations.
+Direct writes to a module object in the same file withhold that member's
+symbol while preserving the unit. Module 27 also records written namespace
+selections in qualified import aliases and type-only ambient heritage.
+Module 28 requires positive package-route evidence. An explicitly named
+registry or a dependency up through the workspace boundary can supply
+that evidence. Bare builtins can have a declared npm alternative. The
+program's missing global type declarations limit which bundled globals
+can be definite, using documented Node globals to name alternatives.
+Module 29 extends that proof to type positions and typed receivers. The
+compiler's explicit ambient types selection takes precedence over manifest
+inference. Source type references and positive file-local Node runtime evidence
+count independently. Missing environment types can overlap web declarations.
+Missing test and tooling types affect their own documented globals. An npm
+alias or captured pnpm or Bun catalog supplies the registry name and can supply an
+exact pin with its source path.
+
 ### Go imports follow the go command, not its pattern rules (C-8)
 
 **Decided (C-8):** a Go import resolves as the go command resolves it
