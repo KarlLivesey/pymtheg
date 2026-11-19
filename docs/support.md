@@ -542,6 +542,28 @@ answer.
   symbol and record the binding name and declaration span in `data.localBinding`.
   Plain locals add zero symbol rows and zero new reference sites. Name lookup
   lists top-level and exported declarations ahead of scoped ones.
+- **Generic references:** a recorded type reference to a type parameter links
+  to its enclosing graph symbol. `data.localBinding` gives the parameter's name
+  and declaration span, including when an inner signature shadows an outer
+  parameter. Each reference uses the checker's binding.
+- **Member chains:** the checker follows checkout receiver types through
+  selections, factory results, `await`, optional access and literal element
+  keys. Named object-literal members can be targets even inside a local binding
+  or a returned object. Their identities use their enclosing declaration and
+  member path, and search ranks them after named top-level declarations.
+  A newly supported literal member needs a provable receiver producer.
+  Multiple visible producers supply candidate declarations when each has a
+  graph anchor. Opaque producers stay unresolved (`object-producer-unverified`).
+  Several visible producers with missing anchors stay unresolved
+  (`multiple-object-producers`).
+  Factory fallthrough and bare returns can contribute `undefined`, including
+  after `await`. Static object destructuring follows named properties,
+  renames, nested patterns, and defaults that can run. Passing a produced
+  object as a call argument preserves static links. A direct binding or
+  property reassignment can change or withhold them. An indirect write through
+  an open index signature or `Object.assign` in another function can leave
+  the original member link in place. The graph uses static declarations and
+  leaves interprocedural aliasing writes untracked, as it does for class fields.
 - **Checkout packages:** npm, Yarn and Bun workspace lists, pnpm workspace
   member links, and checkout-local `file:` and `link:` dependencies expose
   manifests to the compiler. TypeScript applies its own package export
@@ -557,6 +579,8 @@ answer.
 - **Unresolved:** standard library and `node_modules` packages
   (`external`, `external-package`); computed `require` or `import()` specifiers;
   calls through parameters, import shadows, and reassigned local functions;
+  member calls without a named target through `any`, `unknown` or an open index
+  (`any-receiver`, `unknown-receiver`, `index-signature`);
   installed workspace bindings with no captured entry
   (`workspace-entry-unavailable` or `workspace-build-output-missing` when
   TypeScript probed a missing path under a configured output directory).

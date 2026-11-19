@@ -267,6 +267,470 @@ test("calls follow the checker: locals shadow imports, unions give candidates, a
   );
 });
 
+test("checkout member chains use typed declarations and preserve open receivers", async () => {
+  const source = [
+    "class A { run() {} }",
+    "class B { run() {} }",
+    "class Holder { x = { y: new A() }; use() { this.x.y.run(); } }",
+    "const chain = { b: { c() {} } };",
+    'const one = { nested: { run: () => "one" as const } };',
+    'const two = { nested: { run: () => "two" as const } };',
+    "declare const choose: boolean;",
+    "const either = choose ? one : two;",
+    "function make() { return { nested: { run() {} } }; }",
+    "async function later() { return new A(); }",
+    "function save() {}",
+    "const api = { load() {}, save, [7]() {} };",
+    "function local() {",
+    "  const write = () => {};",
+    "  const ops = { write };",
+    "  ops.write();",
+    "}",
+    "declare const maybe: { b: A } | undefined;",
+    "declare const variant: { b: A | B };",
+    "declare const openReceiver: A | Record<string, () => void>;",
+    "declare const unchecked: any;",
+    "declare const opaque: unknown;",
+    "declare const dict: { [key: string]: () => void };",
+    "declare const record: Record<string, () => void>;",
+    "declare const fromLib: string | undefined;",
+    "declare const key: string;",
+    "declare const inferred: { run: () => void };",
+    "type Run = typeof inferred.run;",
+    "inferred.run();",
+    "chain.b.c();",
+    "either.nested.run();",
+    "make().nested.run();",
+    "async function then() { (await later()).run(); }",
+    'maybe?.b["run"]();',
+    'maybe?.["b"]["run"]();',
+    "variant.b.run();",
+    "openReceiver.run();",
+    "unchecked.run();",
+    "opaque.run();",
+    "dict.missing();",
+    'dict["literal"]();',
+    "record.missing();",
+    "api.load();",
+    "api.save();",
+    "api[7]();",
+    "api[key]();",
+    "fromLib?.trim();",
+    'fromLib?.["trim"]();',
+  ].join("\n");
+  await project(
+    {
+      "tsconfig.json": JSON.stringify({
+        compilerOptions: { strict: true, target: "es2022" },
+      }),
+      "use.ts": source,
+    },
+    async (graph, report) => {
+      clean(report);
+      const calls = graph.store.links().filter((link) => link.kind === "calls");
+      const callOn = (line) => {
+        const start = source.indexOf(line);
+        const end = start + line.length;
+        return calls
+          .filter((link) => link.range.start >= start && link.range.end <= end)
+          .sort((a, b) => b.range.end - a.range.end)[0];
+      };
+      for (const [line, identity] of [
+        ["this.x.y.run();", "A.run"],
+        ["chain.b.c();", "chain.[object].b.c"],
+        ["make().nested.run();", "make.[return].[object].nested.run"],
+        ["(await later()).run();", "A.run"],
+        ['maybe?.b["run"]();', "A.run"],
+        ['maybe?.["b"]["run"]();', "A.run"],
+        ["api.load();", "api.load"],
+        ["api.save();", "save"],
+        ["api[7]();", "api.[7]"],
+        ["ops.write();", "local.[local].ops.[object].write"],
+      ])
+        assert.equal(graph.target(callOn(line)), `use.ts#${identity}`, line);
+      assert.deepEqual(graph.candidates(callOn("variant.b.run();")), [
+        "use.ts#A.run",
+        "use.ts#B.run",
+      ]);
+      assert.deepEqual(graph.candidates(callOn("either.nested.run();")), [
+        "use.ts#one.[object].nested.run",
+        "use.ts#two.[object].nested.run",
+      ]);
+      for (const [line, reason] of [
+        ["openReceiver.run();", "index-signature"],
+        ["unchecked.run();", "any-receiver"],
+        ["opaque.run();", "unknown-receiver"],
+        ["dict.missing();", "index-signature"],
+        ['dict["literal"]();', "index-signature"],
+        ["record.missing();", "index-signature"],
+        ["api[key]();", "no-symbol"],
+        ["fromLib?.trim();", "external"],
+        ['fromLib?.["trim"]();', "no-symbol"],
+        ["inferred.run();", "local"],
+      ]) {
+        const call = callOn(line);
+        assert.equal(call.resolution, "unresolved", line);
+        assert.equal(call.data.reason, reason, line);
+        assert.deepEqual(call.candidates, [], line);
+      }
+      assert.equal(
+        graph.target(graph.link("use.ts", "inferred.run", "references")),
+        "use.ts#inferred.[type].run",
+      );
+    },
+  );
+});
+
+test("object-member calls account for every explicit producer and withhold opaque ones", async () => {
+  const source = [
+    "declare const flag: boolean, key: number;",
+    "function createLogger(on: boolean) {",
+    "  if (!on) return { log() {} };",
+    "  return { log(m: string) { console.log(m); } };",
+    "}",
+    'createLogger(true).log("x");',
+    "function make(flag) { if (flag) return { run() { return 1 } }; return { run() { return 2 } } }",
+    "make(flag).run()",
+    "function readMode(mode: number) {",
+    "  switch (mode) {",
+    '    case 0: return { read() { return "first"; } };',
+    '    default: return { read() { return "second"; } };',
+    "  }",
+    "}",
+    "readMode(key).read();",
+    // Redux Toolkit's anySignal returns a no-op clear for the empty input
+    // and a cleanup function otherwise (query/utils/signals.ts:25,37).
+    "function anySignal(signals: AbortSignal[]) {",
+    "  const controller = new AbortController();",
+    "  const signal = controller.signal;",
+    "  if (!signals.length) return { signal, clear: () => {} };",
+    "  return { signal, clear: () => controller.abort() };",
+    "}",
+    "const composedSignal = anySignal([]);",
+    "composedSignal?.clear();",
+    "const choice = flag ? { take() { return 1; } } : { take() { return 2; } };",
+    "choice.take();",
+    "const nullable = flag ? { pick() { return 1; } } : null;",
+    "const otherwise = nullable ?? { pick() { return 2; } };",
+    "otherwise.pick();",
+    "const viaOr = nullable || { pick() { return 3; } };",
+    "viaOr.pick();",
+    "function reassigned() {",
+    "  let lr = { run() { return 1; } };",
+    "  lr = { run() { return 2; } };",
+    "  lr.run();",
+    "}",
+    "function mutateAlias() {",
+    "  const holder = { inner: { next() { return 1; } } };",
+    "  const alias = holder;",
+    "  alias.inner = { next() { return 2; } };",
+    "  holder.inner.next();",
+    "}",
+    "class Changing {",
+    "  state = { update() { return 1; } };",
+    "  set() { this.state = { update() { return 2; } }; }",
+    "  call() { this.state.update(); }",
+    "}",
+    "function values(index: number) {",
+    "  const first = { item() { return 1; } };",
+    "  const second = { item() { return 2; } };",
+    "  const list = [first, second];",
+    "  list[index]!.item();",
+    "  list[0]!.item();",
+    "  const direct = [{ item() { return 1; } }, { item() { return 2; } }];",
+    "  direct[index]!.item();",
+    "}",
+    "let legacy = { old() { return 1; } };",
+    "legacy = { old() { return 2; } };",
+    "legacy.old();",
+    "const legacyFirst = { inspect() { return 1; } };",
+    "const legacySecond = { inspect() { return 2; } };",
+    "const legacyList = [legacyFirst, legacySecond];",
+    "legacyList[key].inspect();",
+    "const legacyChoice = flag ? legacyFirst : legacySecond;",
+    "legacyChoice.inspect();",
+  ].join("\n");
+  await project(
+    {
+      "use.ts": source,
+      "tsconfig.json": '{"compilerOptions":{"strict":true}}',
+    },
+    async (graph, report) => {
+      clean(report);
+      const calls = graph.store.links().filter((link) => link.kind === "calls");
+      const symbols = new Map(
+        graph.store.findSymbols().map((symbol) => [symbol.id, symbol]),
+      );
+      const callOn = (line) => {
+        const start = source.indexOf(line);
+        const end = start + line.length;
+        return calls
+          .filter((link) => link.range.start >= start && link.range.end <= end)
+          .sort((a, b) => b.range.end - a.range.end)[0];
+      };
+      for (const [line, expected] of [
+        [
+          'createLogger(true).log("x");',
+          ["log() {}", "log(m: string) { console.log(m); }"],
+        ],
+        ["make(flag).run()", ["run() { return 1 }", "run() { return 2 }"]],
+        [
+          "readMode(key).read();",
+          ['read() { return "first"; }', 'read() { return "second"; }'],
+        ],
+        [
+          "composedSignal?.clear();",
+          ["clear: () => {}", "clear: () => controller.abort()"],
+        ],
+        ["choice.take();", ["take() { return 1; }", "take() { return 2; }"]],
+        ["otherwise.pick();", ["pick() { return 1; }", "pick() { return 2; }"]],
+        ["viaOr.pick();", ["pick() { return 1; }", "pick() { return 3; }"]],
+      ]) {
+        const call = callOn(line);
+        assert.equal(call.resolution, "ambiguous", line);
+        const declarations = call.candidates
+          .map(({ id }) => symbols.get(id).range)
+          .map(({ start, end }) => source.slice(start, end))
+          .sort();
+        assert.deepEqual(declarations, expected.sort(), line);
+      }
+      for (const [line, reason] of [
+        ["lr.run();", "multiple-object-producers"],
+        ["holder.inner.next();", "object-producer-unverified"],
+        ["this.state.update();", "object-producer-unverified"],
+        ["list[index]!.item();", "object-producer-unverified"],
+        ["list[0]!.item();", "object-producer-unverified"],
+      ]) {
+        const call = callOn(line);
+        assert.equal(call.resolution, "unresolved", line);
+        assert.equal(call.data.reason, reason, line);
+      }
+      assert.equal(callOn("direct[index]!.item();").resolution, "unresolved");
+      // Main already targets the initializer's existing symbol for this shape.
+      assert.equal(graph.target(callOn("legacy.old();")), "use.ts#legacy.old");
+      for (const line of [
+        "legacyList[key].inspect();",
+        "legacyChoice.inspect();",
+      ])
+        assert.equal(
+          graph.target(callOn(line)),
+          "use.ts#legacyFirst.inspect",
+          line,
+        );
+    },
+  );
+});
+
+test("factory fallthrough and bare returns contribute undefined", async () => {
+  const source = `
+    declare const flag: boolean;
+    function maybe() { if (flag) return { run() { return 1; } }; }
+    function fallback() { return { run() { return 2; } }; }
+    function bare() { if (!flag) return; return { run() { return 3; } }; }
+    async function asyncMaybe() { if (flag) return { run() { return 4; } }; }
+    function always() { if (!flag) throw new Error(); return { run() { return 5; } }; }
+    async function asyncFallback() { return { run() { return 6; } }; }
+    function wrapped() { if (flag) return { next: maybe }; }
+    (maybe() ?? fallback()).run();
+    (bare() || fallback()).run();
+    (wrapped()?.next() ?? fallback()).run();
+    (flag ? (maybe() ?? fallback()) : always()).run();
+    async function use() { ((await asyncMaybe()) ?? fallback()).run(); }
+    async function promiseFirst() { (await (asyncMaybe() ?? asyncFallback()))?.run(); }
+    (always() ?? fallback()).run();
+  `;
+  await project(
+    {
+      "use.ts": source,
+      "tsconfig.json": '{"compilerOptions":{"strict":true}}',
+    },
+    async (graph, report) => {
+      clean(report);
+      const methods = (link) => {
+        const ids = link.candidates.map(({ id }) => id);
+        if (link.targetId) ids.push(link.targetId);
+        return ids
+          .map(
+            (id) =>
+              graph.store.findSymbols().find((symbol) => symbol.id === id)
+                .range,
+          )
+          .map(({ start, end }) => source.slice(start, end))
+          .sort();
+      };
+      for (const [callee, expected] of [
+        ["(maybe() ?? fallback()).run", [1, 2]],
+        ["(bare() || fallback()).run", [2, 3]],
+        ["(wrapped()?.next() ?? fallback()).run", [1, 2]],
+        ["(flag ? (maybe() ?? fallback()) : always()).run", [1, 2, 5]],
+        ["((await asyncMaybe()) ?? fallback()).run", [2, 4]],
+        ["(always() ?? fallback()).run", [5]],
+        ["(await (asyncMaybe() ?? asyncFallback()))?.run", [4]],
+      ]) {
+        const end = source.indexOf(callee) + callee.length;
+        const call = graph.store
+          .links()
+          .find((link) => link.kind === "calls" && link.range.end === end);
+        assert.ok(call, callee);
+        assert.equal(
+          call.resolution,
+          expected.length === 1 ? "resolved" : "ambiguous",
+        );
+        assert.deepEqual(
+          methods(call),
+          expected.map((n) => `run() { return ${n}; }`),
+        );
+      }
+    },
+  );
+});
+
+test("static object destructuring follows factory members and reachable defaults", async () => {
+  // Redux Toolkit's ownRequestResult tests take gate from setup().
+  const source = `
+    import { serviceKey } from "./keys";
+    declare const flag: boolean;
+    declare function submit(value: unknown): void;
+    declare const service: Function & { gate: unknown };
+    Object.defineProperty(service, "name", { value: "service" });
+    Object.defineProperty(service, serviceKey, { value: "service metadata" });
+    function createDeferredQueue() { return { resolveOldest() {} }; }
+    function setup() { const gate = createDeferredQueue(); return { gate }; }
+    function nested() { return { layer: { item: createDeferredQueue() } }; }
+    function maybeQueue() { return { gate: flag ? createDeferredQueue() : undefined }; }
+    function maybeMissing() { return flag ? { gate: createDeferredQueue() } : {}; }
+    function nullableQueue() { return { gate: flag ? createDeferredQueue() : null }; }
+    function backup() { return { resolveOldest() { return 2; } }; }
+    const other = { resolveOldest() {} };
+    other.resolveOldest = () => {};
+    const { gate } = setup();
+    submit(gate);
+    gate.resolveOldest();
+    const { layer: { item: renamed } } = nested();
+    renamed.resolveOldest();
+    const { gate: defaulted = backup() } = maybeQueue();
+    defaulted.resolveOldest();
+    const { gate: missing = backup() } = maybeMissing();
+    missing.resolveOldest();
+    const { gate: nullable = backup() } = nullableQueue();
+    nullable?.resolveOldest();
+    let { gate: reassigned } = setup();
+    reassigned = backup();
+    reassigned.resolveOldest();
+    function mutable() { return { changing: createDeferredQueue() }; }
+    const holder = mutable();
+    holder.changing = backup();
+    const { changing } = holder;
+    changing.resolveOldest();
+    function reflectiveSetup() { return { reflected: createDeferredQueue() }; }
+    const reflective = reflectiveSetup();
+    Reflect.set({ reflected: createDeferredQueue() }, "reflected", backup(), reflective);
+    const { reflected } = reflective;
+    reflected.resolveOldest();
+    const extended = {};
+    Object.assign(extended, { added: backup() });
+    const { added = createDeferredQueue() } = extended as { added?: ReturnType<typeof createDeferredQueue> };
+    added.resolveOldest();
+  `;
+  await project(
+    {
+      "keys.ts": 'export const serviceKey = "metadata";',
+      "use.ts": source,
+      "tsconfig.json": '{"compilerOptions":{"strict":true}}',
+    },
+    async (graph, report) => {
+      clean(report);
+      const primary =
+        "use.ts#createDeferredQueue.[return].[object].resolveOldest";
+      const backup = "use.ts#backup.[return].[object].resolveOldest";
+      const callAt = (expression) => {
+        const end = source.indexOf(`${expression}();`) + expression.length;
+        const call = graph.store
+          .links()
+          .find((link) => link.kind === "calls" && link.range.end === end);
+        assert.ok(call, expression);
+        return call;
+      };
+      for (const at of [
+        "gate.resolveOldest",
+        "renamed.resolveOldest",
+        "nullable?.resolveOldest",
+      ]) {
+        const call = callAt(at);
+        assert.equal(call.resolution, "resolved", at);
+        assert.equal(graph.target(call), primary, at);
+      }
+      for (const at of [
+        "defaulted.resolveOldest",
+        "missing.resolveOldest",
+        "reassigned.resolveOldest",
+      ]) {
+        const call = callAt(at);
+        assert.equal(call.resolution, "ambiguous", at);
+        assert.deepEqual(graph.candidates(call), [backup, primary], at);
+      }
+      for (const at of [
+        "changing.resolveOldest",
+        "reflected.resolveOldest",
+        "added.resolveOldest",
+      ]) {
+        const call = callAt(at);
+        assert.equal(call.resolution, "unresolved", at);
+        assert.equal(call.data.reason, "object-producer-unverified", at);
+      }
+    },
+  );
+});
+
+test("recorded generic references identify their owner and the precise binding", async () => {
+  // Hono's HandlerInterface overload defaults I3 to I & I2 (src/types.ts:659).
+  const source = [
+    "type Input = { value?: string };",
+    "interface HandlerInterface {",
+    "  <I extends Input, I2 extends Input = I, I3 extends Input = I & I2>(fn: (input: I3) => void): void;",
+    "}",
+    "function identity<T extends Input>(value: T): T {",
+    "  function inner<T>(value: T): T { return value; }",
+    "  const result: T = inner(value);",
+    "  return result;",
+    "}",
+  ].join("\n");
+  await project({ "generics.ts": source }, async (graph, report) => {
+    clean(report);
+    const i = source.indexOf("I extends");
+    const t = source.indexOf("T extends");
+    const inner = source.indexOf("T>(value", t + 1);
+    const refs = graph
+      .links("generics.ts", "T", "references")
+      .sort((a, b) => a.range.start - b.range.start);
+    assert.deepEqual(
+      refs.map((ref) => [
+        graph.target(ref),
+        ref.data.localBinding?.name,
+        ref.data.localBinding?.start,
+        ref.data.localBinding?.end,
+      ]),
+      [
+        ["generics.ts#identity", "T", t, t + 1],
+        ["generics.ts#identity", "T", t, t + 1],
+        ["generics.ts#identity.[local].inner", "T", inner, inner + 1],
+        ["generics.ts#identity.[local].inner", "T", inner, inner + 1],
+        ["generics.ts#identity", "T", t, t + 1],
+      ],
+    );
+    assert.equal(graph.store.findSymbols({ name: "T" }).length, 0);
+    assert.deepEqual(
+      graph
+        .links("generics.ts", "I", "references")
+        .map((ref) => [graph.target(ref), ref.data.localBinding]),
+      [
+        ["generics.ts#HandlerInterface", { name: "I", start: i, end: i + 1 }],
+        ["generics.ts#HandlerInterface", { name: "I", start: i, end: i + 1 }],
+      ],
+    );
+  });
+});
+
 test("overloads are one symbol with a definite target; repeated JS declarations keep ordinals", async () => {
   await project(
     {
@@ -1041,6 +1505,8 @@ test("symbols cover the declaration kinds with scoped identities and exact UTF-1
         "property Shape.count",
         "property Shape.handler",
         "property Shape.static count",
+        "property api.[object].data",
+        "property default.[object].anonymous",
         "property global.Window.extra",
         "setter Shape.size",
         "type Id",
