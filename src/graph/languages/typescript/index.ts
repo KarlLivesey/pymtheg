@@ -15,7 +15,7 @@ import type {
 import { CheckerLimit, extractFile, type TargetFact } from "./extract.js";
 import { libraryKey, libraryReader } from "./library.js";
 import type { Renamed } from "./rename.js";
-import { taintExhausted } from "./taint.js";
+import { markTaintExhausted, taintExhausted } from "./taint.js";
 import { neutralizeAssumed } from "./untrusted.js";
 
 /** Program rebuilds per file after checker stack overflows before giving up. */
@@ -38,6 +38,8 @@ const compilerFailure = (error: unknown) =>
 /** The compiler's own assertion failures (`Debug.fail`, `Debug.assert`). */
 const isCompilerAssertion = (error: unknown) =>
   error instanceof Error && error.message.startsWith("Debug Failure");
+/** Sessions whose taint walk reached its budget (see `markTaintExhausted`). */
+const exhaustedSessions = new WeakSet<object>();
 /** The node the module last passed to a checker method (see `attributed`). */
 let lastAsked: ts.Node | undefined;
 /**
@@ -938,6 +940,7 @@ const module: LanguageModule = {
         | { assertion: string; blame: string | undefined }
         | { internal: string } => {
         lastAsked = undefined;
+        if (exhaustedSessions.has(session)) markTaintExhausted(session.checker);
         try {
           if (injectedExtractionFaults.has(path))
             throw new TypeError("injected internal fault (test)");
@@ -988,11 +991,14 @@ const module: LanguageModule = {
             libraries,
           );
           statistics.extracted++;
-          return {
-            result: taintExhausted(session.checker)
-              ? withoutTaint(result)
-              : result,
-          };
+          if (taintExhausted(session.checker)) {
+            // Later checkers of this session (rebuilt from this program,
+            // one file fewer at most) skip the walk: a rebuild per failing
+            // file would otherwise repeat it to the budget each time.
+            exhaustedSessions.add(session);
+            return { result: withoutTaint(result) };
+          }
+          return { result };
         } catch (error) {
           if (error instanceof CheckerLimit) return { limit: error.key };
           if (isCompilerAssertion(error))

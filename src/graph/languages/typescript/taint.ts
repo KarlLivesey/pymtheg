@@ -49,14 +49,14 @@ export interface TaintInput {
 const memo = new WeakMap<ts.TypeChecker, Taint>();
 /**
  * The most steps one program's taint walk may take: a node visited while
- * looking for seeds or reading a declaration's parts, and an edge followed
- * to the fixpoint. A count, never a time or memory reading, so the outcome
+ * looking for seeds or reading a declaration's parts, an edge followed to
+ * the fixpoint, and a cause stored, compared or copied. A count, never a time or memory reading, so the outcome
  * depends only on the snapshot. Far above every measured pin
  * (docs/changes/C-13.md). A walk that reaches it stops: its program's taint
  * is unknown, and the module reports every link that would have consulted
  * it as unresolved (`taint-budget-exhausted`), never as untainted.
  */
-export const TAINT_BUDGET = 20_000_000;
+export const TAINT_BUDGET = 8_000_000;
 /** Test hook: the budget in force (TAINT_BUDGET in normal use). */
 export const taintLimits = { steps: TAINT_BUDGET };
 /** Observation counters for evidence and tests: walks, the most steps one took, walks stopped. */
@@ -66,6 +66,16 @@ const exhaustedFor = new WeakSet<ts.TypeChecker>();
 /** Whether this checker's taint walk stopped at the budget (its taint is unknown). */
 export const taintExhausted = (checker: ts.TypeChecker) =>
   exhaustedFor.has(checker);
+/**
+ * Treats this checker's taint as unknown without walking: for a program
+ * rebuilt from one whose walk reached the budget (the same files, or one
+ * fewer). Only ever more conservative: its links are reported
+ * `taint-budget-exhausted`.
+ */
+export function markTaintExhausted(checker: ts.TypeChecker): void {
+  exhaustedFor.add(checker);
+  memo.set(checker, EMPTY);
+}
 const BUDGET_REACHED = Symbol("taint budget reached");
 /** A destructured binding depends on the property it takes. */
 const DESTRUCTURED = true;
@@ -405,16 +415,61 @@ function computeTaint(input: TaintInput, step: () => void): Taint {
   const seeds = new Map<ts.Symbol, Set<string>>();
   const all = new Map<ts.Symbol, Set<string>>();
   const weak = new Map<ts.Symbol, Set<string>>();
+  /**
+   * Cause sets held by more than one symbol: each is copied before it grows.
+   * The fixpoint hands a symbol's whole set to each dependent. Copying it
+   * every time made memory grow with symbols times causes: on
+   * microsoft/TypeScript, about 12,000 failed files, the walk exhausted the
+   * heap (docs/changes/C-13.md). The contents are the same.
+   */
+  const shared = new WeakSet<Set<string>>();
   const add = (
     map: Map<ts.Symbol, Set<string>>,
     symbol: ts.Symbol,
     causes: Iterable<string>,
   ): boolean => {
-    const set = map.get(symbol) ?? new Set<string>();
-    const before = set.size;
-    for (const cause of causes) set.add(cause);
-    map.set(symbol, set);
-    return set.size > before;
+    // Every cause stored or copied is a step: the budget bounds what the
+    // walk holds, not only what it visits.
+    const set = map.get(symbol);
+    if (!set) {
+      if (causes instanceof Set && causes.size) {
+        step();
+        shared.add(causes);
+        map.set(symbol, causes);
+        return true;
+      }
+      const fresh = new Set<string>();
+      for (const cause of causes) {
+        step();
+        fresh.add(cause);
+      }
+      map.set(symbol, fresh);
+      return fresh.size > 0;
+    }
+    if (set === causes) return false;
+    let grows = false;
+    for (const cause of causes) {
+      step();
+      if (!set.has(cause)) {
+        grows = true;
+        break;
+      }
+    }
+    if (!grows) return false;
+    let target = set;
+    if (shared.has(set)) {
+      target = new Set<string>();
+      for (const cause of set) {
+        step();
+        target.add(cause);
+      }
+    }
+    for (const cause of causes) {
+      step();
+      target.add(cause);
+    }
+    if (target !== set) map.set(symbol, target);
+    return true;
   };
   /** The failed module itself, or the failed modules of its `export *` closure. */
   const failedIn = (module: string, seen: Set<string>): string[] => {
