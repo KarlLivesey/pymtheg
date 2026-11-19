@@ -1,0 +1,402 @@
+[
+  {
+    "id": "DioxusLabs/dioxus",
+    "failedRustFiles": {
+      "before": [
+        "packages/desktop/src/config.rs",
+        "packages/fullstack/src/request.rs",
+        "packages/interpreter/src/unified_bindings.rs"
+      ],
+      "after": []
+    },
+    "newlyRead": [
+      "packages/desktop/src/config.rs",
+      "packages/fullstack/src/request.rs",
+      "packages/interpreter/src/unified_bindings.rs"
+    ],
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 145,
+    "symbolKeysAddedOutsideNewlyRead": 0,
+    "rustAllSites": {
+      "before": {
+        "links": 149592,
+        "level2": 68526,
+        "taint": 4628
+      },
+      "after": {
+        "links": 150404,
+        "level2": 69283,
+        "taint": 0
+      }
+    },
+    "rustLikeForLike": {
+      "links": 149592,
+      "level2Before": 68526,
+      "level2After": 68678
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 812,
+    "sitesOnlyAfterInNewlyRead": 812,
+    "definiteBefore": 51913,
+    "definiteKept": 51912,
+    "definiteChanged": 1,
+    "level2Lost": 2,
+    "newlyResolvedOldSites": 71,
+    "newlyResolvedNewSites": 263,
+    "transitions": {
+      "unresolved->resolved": 71,
+      "unresolved->library": 85,
+      "library->unresolved": 1,
+      "resolved->unresolved": 1
+    }
+  },
+  {
+    "id": "alacritty/alacritty",
+    "failedRustFiles": {
+      "before": [
+        "alacritty/src/display/window.rs"
+      ],
+      "after": []
+    },
+    "newlyRead": [
+      "alacritty/src/display/window.rs"
+    ],
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 57,
+    "symbolKeysAddedOutsideNewlyRead": 0,
+    "rustAllSites": {
+      "before": {
+        "links": 30965,
+        "level2": 14852,
+        "taint": 3629
+      },
+      "after": {
+        "links": 31393,
+        "level2": 15047,
+        "taint": 0
+      }
+    },
+    "rustLikeForLike": {
+      "links": 30965,
+      "level2Before": 14852,
+      "level2After": 14873
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 428,
+    "sitesOnlyAfterInNewlyRead": 428,
+    "definiteBefore": 11626,
+    "definiteKept": 11626,
+    "definiteChanged": 0,
+    "level2Lost": 0,
+    "newlyResolvedOldSites": 13,
+    "newlyResolvedNewSites": 46,
+    "transitions": {
+      "unresolved->library": 8,
+      "unresolved->resolved": 13
+    }
+  },
+  {
+    "id": "clap-rs/clap",
+    "failedRustFiles": {
+      "before": [
+        "tests/builder/cargo.rs",
+        "tests/builder/default_vals.rs",
+        "tests/builder/double_require.rs",
+        "tests/builder/error.rs",
+        "tests/builder/groups.rs",
+        "tests/builder/help.rs",
+        "tests/builder/ignore_errors.rs",
+        "tests/builder/multiple_values.rs",
+        "tests/builder/subcommands.rs",
+        "tests/builder/version.rs",
+        "tests/derive/doc_comments_help.rs",
+        "tests/derive/groups.rs",
+        "tests/derive/help.rs"
+      ],
+      "after": []
+    },
+    "newlyRead": [
+      "tests/builder/cargo.rs",
+      "tests/builder/default_vals.rs",
+      "tests/builder/double_require.rs",
+      "tests/builder/error.rs",
+      "tests/builder/groups.rs",
+      "tests/builder/help.rs",
+      "tests/builder/ignore_errors.rs",
+      "tests/builder/multiple_values.rs",
+      "tests/builder/subcommands.rs",
+      "tests/builder/version.rs",
+      "tests/derive/doc_comments_help.rs",
+      "tests/derive/groups.rs",
+      "tests/derive/help.rs"
+    ],
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 554,
+    "symbolKeysAddedOutsideNewlyRead": 0,
+    "rustAllSites": {
+      "before": {
+        "links": 52417,
+        "level2": 19785,
+        "taint": 0
+      },
+      "after": {
+        "links": 60489,
+        "level2": 20330,
+        "taint": 0
+      }
+    },
+    "rustLikeForLike": {
+      "links": 52417,
+      "level2Before": 19785,
+      "level2After": 19785
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 8072,
+    "sitesOnlyAfterInNewlyRead": 8072,
+    "definiteBefore": 14156,
+    "definiteKept": 14156,
+    "definiteChanged": 0,
+    "level2Lost": 0,
+    "newlyResolvedOldSites": 0,
+    "newlyResolvedNewSites": 4,
+    "transitions": {}
+  },
+  {
+    "id": "rust-lang/mdBook",
+    "failedRustFiles": {
+      "before": [
+        "guide/src/format/example.rs",
+        "tests/testsuite/build.rs",
+        "tests/testsuite/cli.rs",
+        "tests/testsuite/config.rs",
+        "tests/testsuite/includes.rs",
+        "tests/testsuite/includes/all_includes/src/example.rs",
+        "tests/testsuite/index.rs",
+        "tests/testsuite/init.rs",
+        "tests/testsuite/markdown.rs",
+        "tests/testsuite/playground.rs",
+        "tests/testsuite/preprocessor.rs",
+        "tests/testsuite/redirects.rs",
+        "tests/testsuite/renderer.rs",
+        "tests/testsuite/rendering.rs",
+        "tests/testsuite/search.rs",
+        "tests/testsuite/sidebar_logo.rs",
+        "tests/testsuite/test.rs",
+        "tests/testsuite/theme.rs",
+        "tests/testsuite/toc.rs"
+      ],
+      "after": [
+        "guide/src/format/example.rs",
+        "tests/testsuite/includes/all_includes/src/example.rs"
+      ]
+    },
+    "newlyRead": [
+      "tests/testsuite/build.rs",
+      "tests/testsuite/cli.rs",
+      "tests/testsuite/config.rs",
+      "tests/testsuite/includes.rs",
+      "tests/testsuite/index.rs",
+      "tests/testsuite/init.rs",
+      "tests/testsuite/markdown.rs",
+      "tests/testsuite/playground.rs",
+      "tests/testsuite/preprocessor.rs",
+      "tests/testsuite/redirects.rs",
+      "tests/testsuite/renderer.rs",
+      "tests/testsuite/rendering.rs",
+      "tests/testsuite/search.rs",
+      "tests/testsuite/sidebar_logo.rs",
+      "tests/testsuite/test.rs",
+      "tests/testsuite/theme.rs",
+      "tests/testsuite/toc.rs"
+    ],
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 158,
+    "symbolKeysAddedOutsideNewlyRead": 0,
+    "rustAllSites": {
+      "before": {
+        "links": 12557,
+        "level2": 6705,
+        "taint": 232
+      },
+      "after": {
+        "links": 13866,
+        "level2": 7176,
+        "taint": 0
+      }
+    },
+    "rustLikeForLike": {
+      "links": 12557,
+      "level2Before": 6705,
+      "level2After": 6727
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 1309,
+    "sitesOnlyAfterInNewlyRead": 1309,
+    "definiteBefore": 4962,
+    "definiteKept": 4962,
+    "definiteChanged": 0,
+    "level2Lost": 0,
+    "newlyResolvedOldSites": 17,
+    "newlyResolvedNewSites": 196,
+    "transitions": {
+      "unresolved->library": 5,
+      "unresolved->resolved": 17
+    }
+  },
+  {
+    "id": "rustls/rustls",
+    "failedRustFiles": {
+      "before": [
+        "rustls/src/server/hs.rs"
+      ],
+      "after": []
+    },
+    "newlyRead": [
+      "rustls/src/server/hs.rs"
+    ],
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 76,
+    "symbolKeysAddedOutsideNewlyRead": 0,
+    "rustAllSites": {
+      "before": {
+        "links": 69929,
+        "level2": 19809,
+        "taint": 8060
+      },
+      "after": {
+        "links": 70802,
+        "level2": 20276,
+        "taint": 0
+      }
+    },
+    "rustLikeForLike": {
+      "links": 69929,
+      "level2Before": 19809,
+      "level2After": 19851
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 873,
+    "sitesOnlyAfterInNewlyRead": 873,
+    "definiteBefore": 17564,
+    "definiteKept": 17564,
+    "definiteChanged": 0,
+    "level2Lost": 0,
+    "newlyResolvedOldSites": 42,
+    "newlyResolvedNewSites": 346,
+    "transitions": {
+      "unresolved->resolved": 42
+    }
+  },
+  {
+    "id": "tauri-apps/tauri",
+    "failedRustFiles": {
+      "before": [
+        "crates/tauri-cli/templates/plugin/__example-api/tauri-app/src-tauri/src/lib.rs",
+        "crates/tauri-cli/templates/plugin/__example-basic/vanilla/src-tauri/src/lib.rs",
+        "crates/tauri-cli/templates/plugin/src/commands.rs",
+        "crates/tauri-cli/templates/plugin/src/desktop.rs",
+        "crates/tauri-cli/templates/plugin/src/error.rs",
+        "crates/tauri-cli/templates/plugin/src/lib.rs",
+        "crates/tauri-cli/templates/plugin/src/mobile.rs",
+        "crates/tauri-cli/templates/plugin/src/models.rs",
+        "examples/file-associations/src-tauri/src/main.rs"
+      ],
+      "after": [
+        "crates/tauri-cli/templates/plugin/__example-api/tauri-app/src-tauri/src/lib.rs",
+        "crates/tauri-cli/templates/plugin/__example-basic/vanilla/src-tauri/src/lib.rs",
+        "crates/tauri-cli/templates/plugin/src/commands.rs",
+        "crates/tauri-cli/templates/plugin/src/desktop.rs",
+        "crates/tauri-cli/templates/plugin/src/error.rs",
+        "crates/tauri-cli/templates/plugin/src/lib.rs",
+        "crates/tauri-cli/templates/plugin/src/mobile.rs",
+        "crates/tauri-cli/templates/plugin/src/models.rs"
+      ]
+    },
+    "newlyRead": [
+      "examples/file-associations/src-tauri/src/main.rs"
+    ],
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 3,
+    "symbolKeysAddedOutsideNewlyRead": 0,
+    "rustAllSites": {
+      "before": {
+        "links": 88051,
+        "level2": 41918,
+        "taint": 0
+      },
+      "after": {
+        "links": 88113,
+        "level2": 41940,
+        "taint": 0
+      }
+    },
+    "rustLikeForLike": {
+      "links": 88051,
+      "level2Before": 41918,
+      "level2After": 41918
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 62,
+    "sitesOnlyAfterInNewlyRead": 62,
+    "definiteBefore": 32317,
+    "definiteKept": 32317,
+    "definiteChanged": 0,
+    "level2Lost": 0,
+    "newlyResolvedOldSites": 0,
+    "newlyResolvedNewSites": 10,
+    "transitions": {}
+  },
+  {
+    "id": "vercel/turborepo",
+    "failedRustFiles": {
+      "before": [
+        "crates/turborepo-api-client/src/lib.rs",
+        "crates/turborepo-cache/src/multiplexer.rs",
+        "crates/turborepo-lsp/src/lib.rs",
+        "crates/turborepo-wax/src/encode.rs",
+        "crates/turborepo-wax/src/rule.rs"
+      ],
+      "after": []
+    },
+    "newlyRead": [
+      "crates/turborepo-api-client/src/lib.rs",
+      "crates/turborepo-cache/src/multiplexer.rs",
+      "crates/turborepo-lsp/src/lib.rs",
+      "crates/turborepo-wax/src/encode.rs",
+      "crates/turborepo-wax/src/rule.rs"
+    ],
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 379,
+    "symbolKeysAddedOutsideNewlyRead": 0,
+    "rustAllSites": {
+      "before": {
+        "links": 683560,
+        "level2": 320958,
+        "taint": 123945
+      },
+      "after": {
+        "links": 689591,
+        "level2": 323847,
+        "taint": 0
+      }
+    },
+    "rustLikeForLike": {
+      "links": 683560,
+      "level2Before": 320958,
+      "level2After": 321945
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 6031,
+    "sitesOnlyAfterInNewlyRead": 6031,
+    "definiteBefore": 227641,
+    "definiteKept": 227641,
+    "definiteChanged": 0,
+    "level2Lost": 0,
+    "newlyResolvedOldSites": 483,
+    "newlyResolvedNewSites": 970,
+    "transitions": {
+      "unresolved->resolved": 483,
+      "unresolved->library": 505
+    }
+  }
+]

@@ -1,0 +1,59 @@
+Pymtheg patch 0013 (C-21, not upstream): `where dyn Trait: Bound`.
+
+Accepts valid Rust: a trait object type on the left of a where predicate
+(`where dyn CipherSuiteSelector: VersionSuiteSelector<T>,`). Any type may be
+bounded there; this adds `dynamic_type` to the types upstream lists.
+Reference: https://doc.rust-lang.org/reference/items/generics.html#where-clauses
+Upstream: no issue or pull request for this shape. The open meta issue
+https://github.com/tree-sitter/tree-sitter-rust/issues/229 lists rustc's
+tests/ui/trivial-bounds/trivial-bounds-object.rs, whose `where dyn A + 'static: A`
+(a bounded trait object on the left) this patch does not cover.
+
+diff --git a/grammar.js b/grammar.js
+index 3e5e0e0..f812aa8 100644
+--- a/grammar.js
++++ b/grammar.js
+@@ -497,6 +497,8 @@ module.exports = grammar({
+         $.array_type,
+         $.higher_ranked_trait_bound,
+         alias(choice(...primitiveTypes), $.primitive_type),
++        // Pymtheg patch 0013: a trait object on the left (`where dyn T: U`).
++        $.dynamic_type,
+       )),
+       field('bounds', $.trait_bounds),
+     ),
+diff --git a/test/corpus/pymtheg_where_dyn.txt b/test/corpus/pymtheg_where_dyn.txt
+new file mode 100644
+index 0000000..99c25cc
+--- /dev/null
++++ b/test/corpus/pymtheg_where_dyn.txt
+@@ -0,0 +1,29 @@
++================================================================================
++A trait object on the left of a where predicate
++================================================================================
++
++fn m<T>()
++where
++    dyn CipherSuiteSelector: VersionSuiteSelector<T>,
++{
++}
++
++--------------------------------------------------------------------------------
++
++(source_file
++  (function_item
++    name: (identifier)
++    type_parameters: (type_parameters
++      (type_parameter
++        name: (type_identifier)))
++    parameters: (parameters)
++    (where_clause
++      (where_predicate
++        left: (dynamic_type
++          trait: (type_identifier))
++        bounds: (trait_bounds
++          (generic_type
++            type: (type_identifier)
++            type_arguments: (type_arguments
++              (type_identifier))))))
++    body: (block)))
