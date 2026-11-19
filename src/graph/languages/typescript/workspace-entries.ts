@@ -190,26 +190,21 @@ export function workspaceEntries(
       return match;
     },
     forReference(parsed: ts.ParsedCommandLine) {
-      if (!parsed.options.composite) return parsed;
+      if (!parsed.options.composite || parsed.options.outFile) return parsed;
       let result = nativeConfigs.get(parsed);
       if (!result) {
         // The IDE redirect always prefers source, even over a real .d.ts.
         // Composite fixes the common root, so removing a built input from the
         // redirect inventory cannot change the remaining output names.
-        const strip = parsed.options.stripInternal && mayStrip();
-        if (parsed.options.outFile && !strip) return parsed;
         const fileNames = parsed.fileNames.filter(
           (file) =>
             declaration.test(file) ||
-            (!strip &&
-              (!declarationsByStem.has(
-                posix.basename(file, posix.extname(file)),
-              ) ||
-                !ts
-                  .getOutputFileNames(parsed, file, false)
-                  .some(
-                    (output) => declaration.test(output) && files.has(output),
-                  ))),
+            !declarationsByStem.has(
+              posix.basename(file, posix.extname(file)),
+            ) ||
+            !ts
+              .getOutputFileNames(parsed, file, false)
+              .some((output) => declaration.test(output) && files.has(output)),
         );
         result =
           fileNames.length === parsed.fileNames.length
@@ -359,7 +354,6 @@ export function entryProvenance(
   notes: ReadonlyMap<ts.ResolvedModuleFull, UnbuiltEntry> | undefined,
   captured: ReadonlySet<string>,
 ) {
-  if (!notes?.size) return undefined;
   const compiler = program as ts.Program & {
     forEachResolvedModule(
       callback: (
@@ -372,22 +366,55 @@ export function entryProvenance(
     getResolvedModuleFromModuleSpecifier(
       literal: ts.StringLiteralLike,
     ): ts.ResolvedModuleWithFailedLookupLocations | undefined;
+    forEachResolvedProjectReference(
+      callback: (ref: ts.ResolvedProjectReference) => void,
+    ): void;
+    getRedirectFromOutput(
+      path: string,
+    ): { resolvedRef: ts.ResolvedProjectReference } | undefined;
+    realpath?(path: string): string;
   };
-  const incoming = new Map<string, { from: string; entry?: UnbuiltEntry }[]>();
+  let stripReferences = false;
+  compiler.forEachResolvedProjectReference(({ commandLine }) => {
+    if (commandLine.options.stripInternal) stripReferences = true;
+  });
+  if (!notes?.size && !stripReferences) return undefined;
+  function strips(resolved: ts.ResolvedModuleFull, file: string) {
+    const output = resolved.resolvedFileName;
+    if (!stripReferences || !declaration.test(output) || file === output)
+      return false;
+    const ref =
+      compiler.getRedirectFromOutput(output) ??
+      compiler.getRedirectFromOutput(compiler.realpath?.(output) ?? output);
+    return ref?.resolvedRef.commandLine.options.stripInternal === true;
+  }
+  const incoming = new Map<
+    string,
+    { from: string; entry?: UnbuiltEntry; stripped: boolean }[]
+  >();
   const outgoing = new Map<string, string[]>();
   const reachable = new Set<string>();
   compiler.forEachResolvedModule(
     ({ resolvedModule: resolved }, _name, _mode, from) => {
       const file =
         resolved && program.getSourceFile(resolved.resolvedFileName)?.fileName;
-      if (!file || !captured.has(file.slice(1)) || !captured.has(from.slice(1)))
+      if (
+        !file ||
+        !resolved ||
+        !captured.has(file.slice(1)) ||
+        !captured.has(from.slice(1))
+      )
         return;
       const to = file.slice(1);
       const origin = from.slice(1);
-      const note = notes.get(resolved);
+      const note = notes?.get(resolved);
       const entry = note?.source === to ? note : undefined;
       const before = incoming.get(to) ?? [];
-      before.push({ from: origin, ...(entry && { entry }) });
+      before.push({
+        from: origin,
+        ...(entry && { entry }),
+        stripped: strips(resolved, file),
+      });
       incoming.set(to, before);
       const after = outgoing.get(origin) ?? [];
       after.push(to);
@@ -398,16 +425,74 @@ export function entryProvenance(
   for (const file of reachable)
     for (const child of outgoing.get(file) ?? []) reachable.add(child);
   const byTarget = new Map<string, Map<string, UnbuiltEntry>>();
+  const strippedByTarget = new Map<string, Set<string>>();
+  const internal = ts as typeof ts & {
+    isInternalDeclaration(node: ts.Node, file: ts.SourceFile): boolean;
+  };
+  const internalNodes = new WeakMap<ts.Node, boolean>();
+  const hasInternal = new WeakMap<ts.SourceFile, boolean>();
+  function marked(node: ts.Node, file: ts.SourceFile): boolean {
+    if (ts.isSourceFile(node)) return false;
+    const cached = internalNodes.get(node);
+    if (cached !== undefined) return cached;
+    const hidden =
+      internal.isInternalDeclaration(node, file) || marked(node.parent, file);
+    internalNodes.set(node, hidden);
+    return hidden;
+  }
   return {
     forSpecifier(literal: ts.StringLiteralLike) {
       const resolved =
         compiler.getResolvedModuleFromModuleSpecifier(literal)?.resolvedModule;
-      const note = resolved && notes.get(resolved);
+      const note = resolved && notes?.get(resolved);
       return note &&
         program.getSourceFile(resolved.resolvedFileName)?.fileName ===
           "/" + note.source
         ? note
         : undefined;
+    },
+    isStripped(from: string, node: ts.Node, specifier?: ts.StringLiteralLike) {
+      if (!stripReferences || ts.isSourceFile(node)) return false;
+      const file = node.getSourceFile();
+      const target = file.fileName.slice(1);
+      if (from === target) return false;
+      let annotated = hasInternal.get(file);
+      if (annotated === undefined) {
+        annotated = file.text.includes("@internal");
+        hasInternal.set(file, annotated);
+      }
+      if (!annotated || !marked(node, file)) return false;
+      const resolved =
+        specifier &&
+        compiler.getResolvedModuleFromModuleSpecifier(specifier)
+          ?.resolvedModule;
+      if (resolved) {
+        const source = program.getSourceFile(
+          resolved.resolvedFileName,
+        )?.fileName;
+        if (source) {
+          if (strips(resolved, source)) return true;
+          if (source === file.fileName) return false;
+          from = source.slice(1);
+        }
+      }
+      let stripped = strippedByTarget.get(target);
+      if (!stripped) {
+        stripped = new Set();
+        const ordinary = new Set([target]);
+        const pending = [{ file: target, stripped: false }];
+        for (const step of pending) {
+          for (const edge of incoming.get(step.file) ?? []) {
+            const viaStrip = step.stripped || edge.stripped;
+            const seen = viaStrip ? stripped : ordinary;
+            if (seen.has(edge.from)) continue;
+            seen.add(edge.from);
+            pending.push({ file: edge.from, stripped: viaStrip });
+          }
+        }
+        strippedByTarget.set(target, stripped);
+      }
+      return stripped.has(from);
     },
     forTarget(from: string, target: string) {
       if (from === target || !reachable.has(target)) return undefined;

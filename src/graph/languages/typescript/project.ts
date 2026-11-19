@@ -1316,9 +1316,7 @@ export function projectModel(
       },
       realpath: real,
     };
-    const workspaceRecovery =
-      (entries.available || !!group.references?.length) &&
-      !group.limitations.length;
+    const workspaceRecovery = entries.available && !group.limitations.length;
     if (deno.active || workspaceRecovery) {
       const cache = ts.createModuleResolutionCache(
         created.getCurrentDirectory(),
@@ -1392,7 +1390,7 @@ export function projectModel(
             const output = workspaceOutput(resolved.resolvedFileName, route);
             if (!output) return result;
             const proof = entries.proof(route.target, output);
-            if (!proof || typeof proof !== "object")
+            if (proof === "conflicting")
               return {
                 ...result,
                 resolvedModule: undefined,
@@ -1401,6 +1399,9 @@ export function projectModel(
                   ...(lookups ?? []),
                 ],
               };
+            // Native references already give the checker its source program.
+            // Only the plain-build proof earns new unbuilt-entry provenance.
+            if (!proof) return result;
             return {
               ...result,
               resolvedModule: redirect({

@@ -3102,15 +3102,19 @@ test("a declaration build that strips a re-exported input cannot lend its hidden
         '{"name":"fixture-library","types":"./dist/index.d.ts","scripts":{"build":"tsc -p tsconfig.build.json"}}',
       "packages/lib/tsconfig.build.json":
         '{"compilerOptions":{"outDir":"dist","rootDir":"src","composite":true,"stripInternal":true},"files":["src/index.ts","src/other.ts"]}',
-      "packages/lib/src/index.ts": 'export { secret } from "./other";',
+      "packages/lib/src/index.ts":
+        'export { secret, publicHelper } from "./other";',
       "packages/lib/src/other.ts":
-        "/** @internal */ export function secret() {}",
+        "/** @internal */ export function secret() {}\nexport function publicHelper() {}",
       "use.ts": 'import { secret } from "fixture-library"; secret();',
       "app/tsconfig.json":
         '{"references":[{"path":"../packages/lib/tsconfig.build.json"}]}',
-      "app/use.ts": 'import { secret } from "fixture-library"; secret();',
+      "app/use.ts":
+        'import { secret, publicHelper } from "fixture-library"; secret(); publicHelper();',
       "app/relative.ts":
         'import { secret } from "../packages/lib/dist/index"; secret();',
+      "app/source.ts":
+        'import { secret } from "../packages/lib/src/other"; secret();',
     },
     async (graph, report) => {
       clean(report);
@@ -3122,6 +3126,14 @@ test("a declaration build that strips a re-exported input cannot lend its hidden
           graph.link(file, "secret", "calls").resolution,
           "unresolved",
         );
+      assert.equal(
+        graph.target(graph.link("app/use.ts", "publicHelper", "calls")),
+        "packages/lib/src/other.ts#publicHelper",
+      );
+      assert.equal(
+        graph.target(graph.link("app/source.ts", "secret", "calls")),
+        "packages/lib/src/other.ts#secret",
+      );
     },
   );
 });

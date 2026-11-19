@@ -802,7 +802,8 @@ answer.
   script of its own. Normal compiler lookup handles `paths`, export
   conditions and built entries first. A missing JavaScript-only emit stays
   unresolved. A `stripInternal` build with captured internal annotations
-  cannot supply a source redirect, including through project references.
+  supplies no new projection. Existing compiler-native references keep their
+  source program and withhold annotations that their declaration emit strips.
   Followed links expose `data.unbuiltEntry` with the proof, manifest, config,
   output and source.
   [C-25](changes/C-25.md)

@@ -151,6 +151,7 @@ type Meaning = "call" | "value" | "type" | "any";
 interface Targets {
   targets: TargetFact[];
   unbuiltEntry?: UnbuiltEntry;
+  viaSpecifier?: ts.StringLiteralLike;
   libraryFacts?: LibraryTarget[];
   /** Written outside identity independent of missing checker declarations. */
   lexicalLibrary?: boolean;
@@ -1244,10 +1245,10 @@ export function extractFile(
     if (!external && !local && !missingGlobalTypes) {
       const specifier =
         context.unbuilt && firstAlias && bindingSpecifier(firstAlias);
+      const viaSpecifier =
+        specifier && ts.isStringLiteralLike(specifier) ? specifier : undefined;
       const unbuiltEntry =
-        specifier && ts.isStringLiteralLike(specifier)
-          ? context.unbuilt?.forSpecifier(specifier)
-          : undefined;
+        viaSpecifier && context.unbuilt?.forSpecifier(viaSpecifier);
       return {
         targets,
         viaAlias,
@@ -1255,6 +1256,7 @@ export function extractFile(
         declarations,
         ...(libraries && { libraryFacts: libraries }),
         ...(unbuiltEntry && { unbuiltEntry }),
+        ...(viaSpecifier && { viaSpecifier }),
       };
     }
     // An alias whose module did not resolve keeps that module's reason.
@@ -2091,6 +2093,13 @@ export function extractFile(
     found: Targets,
     extra: { [key: string]: Json } = {},
   ) {
+    if (
+      !found.reason &&
+      found.declarations?.some((declaration) =>
+        context.unbuilt?.isStripped(path, declaration, found.viaSpecifier),
+      )
+    )
+      found = { targets: [], reason: "workspace-build-output-missing" };
     // An unresolved bare name that a failed file of this program declares:
     // that file is why there is no answer (a global, a `declare global`,
     // a namespace). A member name through an untainted receiver never is.
