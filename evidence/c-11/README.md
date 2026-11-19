@@ -18,7 +18,7 @@ each pin. [Plan input](coverage-plan-input.json.gz)
 
 ## Build provenance
 
-All 18 final review graphs use TypeScript module 29. Thirteen use build
+The module 29 review graphs cover all 18 pins. Thirteen use build
 `46ef120b1fca4c32caeb0fc0dff333e7bebc8a5cebd6625e8a55e88e0a959697`.
 The messaging candidate change affects only member names open for missing
 global types. The 18-pin scan of those reasons and names selected Dexie,
@@ -29,6 +29,14 @@ The previous review head `3d8dea94` uses module 28 with digest
 The checkout comparisons use main at `595ec7b`. The full replay includes
 C-10 at `8ca29ac`. Main then advanced to `5ec4baa` with C-8's Go analysis.
 The TypeScript and graph-store inputs stay equivalent through that merge.
+
+The module 30 recheck used build
+`65937006ff7060e96770311becef1dbf01c31955e372f856e3af822eab1e3ba8` for the
+15 pins with an overlapping bundled target lacking a Node alternative. The
+prior captures for oclif, Zustand and yargs had zero such targets and were
+retained. The separate
+heritage and CommonJS replay supplies the baseline for the per-pin
+program-rule counts. [Outcome comparison](coverage.md)
 
 The first sweep build had digest
 `015c000df99defbd55bf03ffea9fb9e7da306e07b9629f5ddc8c6fe736173274`.
@@ -56,8 +64,12 @@ status alongside the counts. The Hono query returned `ok`.
 
 ## Validation
 
-The merged dev-server build, no-emit check and format check passed. On tmpfs,
-`npm test` passed all 3,069 tests. The repository initialization test took
+The module 30 build, no-emit check and format check passed, along with all
+168 tests in the C-11 test files. Hono preserved all 34,618 definite checkout
+destinations from main and all 5,773 symbol keys and 72,340 link sites.
+
+The module 29 merged dev-server build, no-emit check and format check passed.
+On tmpfs, `npm test` passed all 3,069 tests. The repository initialization test took
 70.39 seconds in that suite. All 18 sweep-tool tests passed. The
 [self-index bracket](review-1.md) records the three isolated samples from
 each side of the earlier review.

@@ -8,36 +8,40 @@ links in C-11.
 
 | Repository | 0.1.0 all sites | Main all sites | C-11 all sites | 0.1.0 → C-11 shared sites | Stored symbol | Stored unit only |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| changesets/changesets | 39.87% | 40.87% | 20.19% | 39.87% → 19.95% | 743 | 154 |
-| colinhacks/zod | 71.00% | 76.77% | 84.03% | 71.00% → 83.91% | 18,373 | 602 |
-| dexie/Dexie.js | 34.91% | 41.68% | 54.07% | 34.91% → 53.36% | 5,618 | 371 |
-| excalidraw/excalidraw | 57.79% | 61.55% | 72.67% | 57.79% → 72.37% | 14,626 | 1,325 |
-| honojs/hono | 36.00% | 49.91% | 57.43% | 36.00% → 56.48% | 6,893 | 337 |
-| mermaid-js/mermaid | 54.56% | 56.99% | 70.47% | 54.56% → 70.25% | 34,335 | 2,182 |
-| nestjs/nest | 47.92% | 52.91% | 59.84% | 47.92% → 58.81% | 19,821 | 1,948 |
+| changesets/changesets | 39.87% | 40.87% | 20.15% | 39.87% → 19.91% | 738 | 154 |
+| colinhacks/zod | 71.00% | 76.77% | 83.86% | 71.00% → 83.75% | 18,237 | 602 |
+| dexie/Dexie.js | 34.91% | 41.68% | 53.67% | 34.91% → 52.95% | 5,470 | 371 |
+| excalidraw/excalidraw | 57.79% | 61.55% | 71.93% | 57.79% → 71.62% | 13,852 | 1,325 |
+| honojs/hono | 36.00% | 49.91% | 57.45% | 36.00% → 56.50% | 6,902 | 337 |
+| mermaid-js/mermaid | 54.56% | 56.99% | 70.30% | 54.56% → 70.09% | 34,126 | 2,182 |
+| nestjs/nest | 47.92% | 52.91% | 59.84% | 47.92% → 58.81% | 19,817 | 1,948 |
 | oclif/core | 63.11% | 67.84% | 78.23% | 63.11% → 77.98% | 3,604 | 397 |
-| pingdotgg/t3code | 67.21% | 68.99% | 72.57% | 67.21% → 72.37% | 54,604 | 12,005 |
+| pingdotgg/t3code | 67.21% | 68.99% | 72.34% | 67.21% → 72.14% | 54,224 | 12,005 |
 | pmndrs/zustand | 54.38% | 64.15% | 66.78% | 54.38% → 65.43% | 2,016 | 385 |
-| puppeteer/puppeteer | 50.75% | 53.97% | 64.56% | 50.75% → 64.39% | 14,201 | 1,029 |
-| react-hook-form/react-hook-form | 41.14% | 50.67% | 44.97% | 41.14% → 41.66% | 6,691 | 5,693 |
-| reduxjs/redux-toolkit | 39.34% | 48.94% | 54.30% | 39.34% → 53.24% | 7,072 | 1,484 |
-| trpc/trpc | 53.31% | 61.94% | 69.54% | 53.31% → 69.07% | 21,675 | 5,365 |
-| vitejs/vite | 59.87% | 62.79% | 56.75% | 59.87% → 56.32% | 8,277 | 599 |
-| vitest-dev/vitest | 36.13% | 67.89% | 77.35% | 36.13% → 77.18% | 17,285 | 2,335 |
-| withastro/astro | 52.89% | 66.15% | 76.97% | 52.89% → 76.79% | 52,297 | 6,203 |
+| puppeteer/puppeteer | 50.75% | 53.97% | 64.56% | 50.75% → 64.38% | 14,200 | 1,029 |
+| react-hook-form/react-hook-form | 41.14% | 50.67% | 44.92% | 41.14% → 41.62% | 6,669 | 5,693 |
+| reduxjs/redux-toolkit | 39.34% | 48.94% | 54.16% | 39.34% → 53.09% | 6,989 | 1,484 |
+| trpc/trpc | 53.31% | 61.94% | 69.49% | 53.31% → 69.02% | 21,618 | 5,365 |
+| vitejs/vite | 59.87% | 62.79% | 56.64% | 59.87% → 56.21% | 8,217 | 599 |
+| vitest-dev/vitest | 36.13% | 67.89% | 77.19% | 36.13% → 77.01% | 17,095 | 2,335 |
+| withastro/astro | 52.89% | 66.15% | 76.97% | 52.89% → 76.79% | 52,306 | 6,203 |
 | yargs/yargs | 33.41% | 35.12% | 42.45% | 33.41% → 42.19% | 1,214 | 105 |
-| **Total** | **51.92%** | **60.29%** | **67.51%** | **51.92% → 67.06%** | **289,345** | **42,519** |
+| **Total** | **51.92%** | **60.29%** | **67.36%** | **51.92% → 66.91%** | **287,294** | **42,519** |
 
-C-11 credits 938,787 of 1,390,561 links at Level 2. The 289,345 stored
-library links with symbols contribute 20.81 percentage points. The 42,519
+C-11 credits 936,736 of 1,390,561 links at Level 2. The 287,294 stored
+library links with symbols contribute 20.66 percentage points. The 42,519
 unit-only links account for 3.06% of all sites and earn Level 1. Release
-0.1.0 credited 711,979 of 1,371,373 links. C-11 credits 919,599 on those same sites.
+0.1.0 credited 711,979 of 1,371,373 links. C-11 credits 917,548 on those same sites.
 The difference in the all-sites denominators comes from TypeScript changes
 merged before C-11.
 
+The module 29 review head at `dfc36b3` credited 938,787 links overall and
+919,599 on the release's same sites. Module 30 credits 2,051 fewer links in
+both comparisons.
+
 ## Checkout identity
 
-The comparison against main at `595ec7b` matched all 123,219 symbol keys
+The module 29 comparison against main at `595ec7b` matched all 123,219 symbol keys
 and 820,506 link sites across seven repositories. It preserved 379,852
 definite checkout destinations, identified by file and symbol key. The
 18 corrected destinations are in tRPC's Deno example. Level 2 rose from
@@ -52,6 +56,8 @@ definite checkout destinations, identified by file and symbol key. The
 | NestJS | 19,464 | 165,330 | 79,114 |
 | Vite | 10,184 | 55,575 | 23,126 |
 | tRPC | 17,804 | 107,470 | 53,059 |
+
+Module 30 repeated the Hono comparison and preserved these counts.
 
 Hono gains 36 checkout links. The `hono` route in
 `adapters/deno/test/deno.json:11` points to `src/index.ts`. The checker
@@ -121,29 +127,68 @@ Excalidraw's `scripts/release.js:38` pairs DOM and Node console targets for
 `console.info`. Its `child_process` route independently proves the Node
 `execSync` target at line 159.
 
-An explicit `types: []` or a list without Node recovers browser declarations
-from the compiler's configured libs. An explicit Node reference still opens
-the shared declarations. Missing Vite, Vitest, Jest and React types affect
-their own documented globals. Documented Node alternatives for URL, encoding,
+An explicit `types` list narrows automatic ambient discovery. Transitive
+package references and Node evidence in sibling files can still open shared
+globals. Missing Vite, Vitest, Jest and React types affect their own
+documented globals. Documented Node alternatives for URL, encoding,
 performance, streams and messaging use `url`, `util`, `perf_hooks`, `stream/web`
 and `worker_threads`.
 [Outcome comparison](round3-transitions.mjs)
 
 The paired comparison covers sites with missing-global evidence or a bundled
 and Node pair in either graph, plus sites whose bundled outcome or identity
-changed. It covers all 18 pins. The previous graph is module 28 at `3d8dea94`.
+changed. It covers all 18 pins, comparing module 28 at `3d8dea94` with the
+module 30 revision.
 
 | Overlapping globals | Definite library | Candidate set | Unresolved |
 | --- | ---: | ---: | ---: |
-| Before | 531 | 2,786 | 23,326 |
-| After | 9,052 | 17,213 | 378 |
+| Before | 747 | 2,796 | 23,326 |
+| After | 7,217 | 19,260 | 392 |
 
-Of the unresolved sites, 8,971 gained definite targets and 13,977 gained
-candidate sets. A further 531 formerly definite sites gained alternatives.
+Of the unresolved sites, 7,208 gained definite targets and 15,734 gained
+candidate sets. A further 739 formerly definite sites gained alternatives.
 The alias and catalog changes revised 43,003 package target identities or
 versions and settled 670 unresolved links. Two package links in Dexie's
 `addons/dexie-export-import/src/json-stream.ts:1` stay open because
 `addons/dexie-export-import/package.json:41` names a Git repository for `clarinet`.
+
+## Program-wide Node evidence
+
+Module 30 follows checkout class and interface bases to shared runtime
+declarations. An unshadowed `require()` in explicit CommonJS supplies local
+Node evidence. Node evidence applies to all files in the compiler program.
+An imported package or configured type package whose declarations are
+absent can introduce Node globals when the program declares `@types/node`.
+
+The counts below compare against the replay with the heritage, CommonJS and
+`CryptoKey` fixes in place. The program-wide rule moved 2,053 definite links
+to candidate sets. The `ImportMeta` overlap adds two further candidate sets
+in Vitest. The CommonJS fix moves four Redux Toolkit links to candidate sets.
+Mermaid's `.vite/jsonSchemaPlugin.ts:13` (`URL`) and
+`packages/mermaid/src/rendering-util/layout-algorithms/grid/edgeLabels.spec.ts:810`
+(`structuredClone`) both gained Node candidates.
+
+| Pin | Program rule: definite → candidate set |
+| --- | ---: |
+| changesets/changesets | 5 |
+| colinhacks/zod | 133 |
+| dexie/Dexie.js | 150 |
+| excalidraw/excalidraw | 772 |
+| honojs/hono | 1 |
+| mermaid-js/mermaid | 207 |
+| nestjs/nest | 3 |
+| oclif/core | 0 |
+| pingdotgg/t3code | 380 |
+| pmndrs/zustand | 0 |
+| puppeteer/puppeteer | 0 |
+| react-hook-form/react-hook-form | 22 |
+| reduxjs/redux-toolkit | 78 |
+| trpc/trpc | 57 |
+| vitejs/vite | 57 |
+| vitest-dev/vitest | 188 |
+| withastro/astro | 0 |
+| yargs/yargs | 0 |
+| **Total** | **2,053** |
 
 ## Previously credited library symbols
 
