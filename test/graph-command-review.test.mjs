@@ -299,7 +299,7 @@ test("real Rust and TypeScript stored unresolved target hints are visible as pos
     await mkdir(join(root, "src"));
     await writeFile(
       join(root, "src/lib.rs"),
-      "pub struct Engine; impl Engine { pub fn new() -> Self { Engine } pub fn step(&self) {} } pub fn caller() { let e = Engine::new(); e.step(); }",
+      "pub struct Engine; impl Engine { pub fn new() -> Self { Engine } pub fn step(&self) {} } pub fn caller(v: Option<Engine>) { if let Some(e) = v { e.step(); } }",
     );
     await writeFile(
       join(root, "code.ts"),

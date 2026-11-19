@@ -1,0 +1,26 @@
+[
+  {
+    "id": "helix-editor/helix",
+    "language": "rust",
+    "url": "https://github.com/helix-editor/helix.git",
+    "commit": "872b240251876e56787ad7ec312cefae70e3e28e",
+    "category": "UI / app",
+    "why": "Editor workspace with terminal UI and build.rs."
+  },
+  {
+    "id": "BurntSushi/ripgrep",
+    "language": "rust",
+    "url": "https://github.com/BurntSushi/ripgrep.git",
+    "commit": "178cc027e283fd965cb72d0a7395b219eada170c",
+    "category": "CLI tool",
+    "why": "Search CLI with multiple crates and platform dispatch."
+  },
+  {
+    "id": "serde-rs/serde",
+    "language": "rust",
+    "url": "https://github.com/serde-rs/serde.git",
+    "commit": "e306b0c7c40ad21d5bdf52bcd20da513904682ae",
+    "category": "library",
+    "why": "Serialization trait library with derive proc macros and macro_rules-heavy internals."
+  }
+]

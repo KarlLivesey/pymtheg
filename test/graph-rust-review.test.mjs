@@ -341,7 +341,7 @@ test("review raw receiver types and method names resolve canonically", async () 
       `struct r#Type;impl r#Type{fn r#match(&self){}}fn run(x:r#Type){x.r#match();}`,
     ),
   );
-  g.unverified("x.match", "impl Type::match");
+  g.one("x.match", "impl Type::match");
 });
 
 test("review self imports preserve the inline module namespace", async () => {
@@ -426,11 +426,14 @@ test("review raw local bindings shadow and type-check under either identifier sp
   const g = await graph(
     lib(`fn f(){}fn run(){let r#f=||{};f();}fn other(){let f=||{};r#f();}`),
   );
-  g.unknown("f");
+  assert.deepEqual(
+    g.targets("f").map((ts) => ts.map((s) => s.identity)),
+    [["run"], ["other"]],
+  );
   const yes = await graph(
     lib(`struct A;impl A{fn f(&self){}}fn run(r#x:A){x.f();}`),
   );
-  yes.unverified("x.f", "impl A::f");
+  yes.one("x.f", "impl A::f");
 });
 
 test("review borrow preference: different autoref forms never imply inherent dominance", async () => {
@@ -516,7 +519,7 @@ test("round 3.2: blanket impls cannot disappear from method choices", async () =
       `struct A;impl A{fn f(&self){}}trait Tr{fn other(self){}}impl<T> Tr for T{}fn run(a:A){a.f();}`,
     ),
   );
-  other.unverified("a.f", "impl A::f");
+  other.one("a.f", "impl A::f");
   const bounded = await graph(
     lib(
       `struct A;impl A{fn f(&self){}}trait Tr{fn f(self){}}impl<T:Copy> Tr for T{}fn run(a:A){a.f();}`,
@@ -547,7 +550,8 @@ test("round 3.3: all self receiver forms are parsed structurally", async () => {
     const method = g.symbols.find((s) => s.identity === "impl A::run");
     assert.equal(method.data.receiverKind, kind, form);
     assert.equal(method.data.receiverSyntax, form);
-    if (kind === "&mut self") g.one("self.f", "impl A::f");
+    if (kind === "&mut self" || form === "mut self")
+      g.one("self.f", "impl A::f");
     else g.unknown("self.f");
   }
   const g = await graph(
@@ -597,7 +601,7 @@ test("round 3.5: lifetimes never select between impls", async () => {
     ),
   );
   g.one("A::new", "impl<'a> A<'a>::new");
-  g.unverified("x.f", "impl<'a> A<'a>::f");
+  g.one("x.f", "impl<'a> A<'a>::f");
   const generic = await graph(
     lib(`struct A<T>(T);impl<T>A<T>{fn new(){}}fn run(){A::new();}`),
   );
@@ -616,7 +620,7 @@ test("round 3.6: Self variants and members in the same generic impl", async () =
   const outside = await graph(
     lib(`struct A<T>(T);impl<T>A<T>{fn m(&self){}}fn run(x:A<u8>){x.m();}`),
   );
-  outside.unverified("x.m", "impl<T> A<T>::m");
+  outside.one("x.m", "impl<T> A<T>::m");
 });
 test("round 3.7: glob reexports compose and cycles terminate", async () => {
   const g = await graph(
@@ -646,7 +650,7 @@ test("round 3.8: reference impl uncertainty is limited to supplied names", async
       `struct A;impl A{fn f(&self){}}trait Tr{fn g(self){}}impl Tr for &A{}fn run(a:A){a.f();a.g();A::f(&a);}`,
     ),
   );
-  g.unverified("a.f", "impl A::f");
+  g.one("a.f", "impl A::f");
   g.unknown("a.g");
   g.one("A::f", "impl A::f");
   const opaque = await graph(
@@ -665,7 +669,18 @@ test("round 3.9: conditional patterns bind only within their actual regions", as
   );
   assert.deepEqual(
     g.targets("f").map((ts) => ts.map((s) => s.identity)),
-    [[], ["f"], ["f"], [], ["f"], ["f"], [], [], ["f"], ["f"]],
+    [
+      ["run"],
+      ["f"],
+      ["f"],
+      ["run"],
+      ["f"],
+      ["f"],
+      ["run"],
+      ["arms"],
+      ["f"],
+      ["f"],
+    ],
   );
 });
 test("round 3.10: macro_export has public visibility", async () => {
@@ -698,7 +713,9 @@ test("round 6: an unresolved trait keeps later receiver applicability unknown", 
       `struct W<T>(T);impl<T> External for W<T>{}struct A;impl A{fn f(&self){}}fn run(a:A,w:W<u8>){a.f();w.f();}`,
     ),
   );
-  g.unknown("a.f"); // ROOT 3: an unresolved trait's defaults cannot establish exclusions.
+  // C-10: the unresolved trait's impl is for W; no trait is in scope at the
+  // call, so A's inherent method is the one rustc selects.
+  g.one("a.f", "impl A::f");
   g.unknown("w.f");
 });
 
@@ -886,7 +903,7 @@ test("round 3 R3: equal type-argument spelling is not equal namespace binding", 
       `struct F<T>(T);mod a{use super::F;pub type X=u8;impl F<X>{pub fn f(&self){}}}use a::X as Y;fn run(x:F<Y>){x.f();}`,
     ),
   );
-  same.unverified("x.f", "a::impl F<X>::f");
+  same.one("x.f", "a::impl F<X>::f");
   const generic = await graph(
     lib(
       `struct F<T>(T);type X=u8;impl F<X>{fn f(&self){}}fn run<X>(x:F<X>){x.f();}`,
@@ -944,7 +961,7 @@ test("round 3 argument binding proof includes explicit standard imports", async 
       `struct F<T>(T);impl F<::std::string::String>{fn f(&self){}}fn run(x:F<String>){x.f();}`,
     ),
   );
-  same.unverified("x.f", "impl F<::std::string::String>::f");
+  same.one("x.f", "impl F<::std::string::String>::f");
 });
 
 test("round 3 binding identity: shared module type views cannot collapse dispatch", async () => {

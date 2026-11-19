@@ -1,0 +1,10 @@
+[package]
+name = "locals"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+x = []
+
+[lib]
+path = "src/lib.rs"
