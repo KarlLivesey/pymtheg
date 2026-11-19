@@ -1,0 +1,71 @@
+{
+  "pin": "trpc/trpc",
+  "before": 107470,
+  "after": 107470,
+  "beforeL2": 95508,
+  "afterL2": 95508,
+  "shared": 107470,
+  "sharedBeforeL2": 95508,
+  "sharedAfterL2": 95508,
+  "gainedL2": 0,
+  "withdrawnL2": 0,
+  "symbolChanges": 0,
+  "symbols": 17804,
+  "lostSites": 0,
+  "addedSites": 0,
+  "changedOutcomes": 244,
+  "namedTargets": {
+    "pin": "trpc/trpc",
+    "distinctNamesQualified": 69,
+    "unchanged": 46201,
+    "priorNamesQualified": 368,
+    "qualifiedRows": 368,
+    "qualifiedSites": 240,
+    "factoryRows": 10,
+    "otherRemoved": 0,
+    "otherAdded": 0,
+    "splits": 0
+  },
+  "timings": [
+    {
+      "label": "cold",
+      "status": "incomplete",
+      "code": 2,
+      "wallSeconds": 297,
+      "peakRssKiB": 2982116,
+      "cpuSeconds": 355.12
+    },
+    {
+      "label": "warm",
+      "status": "incomplete",
+      "code": 2,
+      "wallSeconds": 229.886,
+      "peakRssKiB": 3296380,
+      "cpuSeconds": 317.19
+    },
+    {
+      "label": "status",
+      "status": "incomplete",
+      "code": 2,
+      "wallSeconds": 4.306,
+      "peakRssKiB": 321044,
+      "cpuSeconds": 5.19
+    },
+    {
+      "label": "search",
+      "status": "incomplete",
+      "code": 2,
+      "wallSeconds": 4.272,
+      "peakRssKiB": 327872,
+      "cpuSeconds": 5.1
+    },
+    {
+      "label": "file",
+      "status": "incomplete",
+      "code": 2,
+      "wallSeconds": 4.675,
+      "peakRssKiB": 315168,
+      "cpuSeconds": 5.49
+    }
+  ]
+}

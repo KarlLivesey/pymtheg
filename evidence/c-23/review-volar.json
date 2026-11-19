@@ -1,0 +1,67 @@
+{
+  "before": {
+    "symbol": "ReturnType<typeof register>.onDidChange",
+    "counts": {
+      "library": 3,
+      "candidateSet": 0
+    },
+    "links": [
+      {
+        "targetName": "(expression).onDidChange",
+        "certainty": "library"
+      },
+      {
+        "targetName": "configuration.onDidChange",
+        "certainty": "library"
+      },
+      {
+        "targetName": "folders.onDidChange",
+        "certainty": "library"
+      }
+    ]
+  },
+  "after": [
+    {
+      "symbol": "lib/features/configurations.d.ts:ReturnType<typeof register>.onDidChange",
+      "counts": {
+        "library": 1,
+        "candidateSet": 1
+      },
+      "links": [
+        {
+          "targetName": "(expression).onDidChange",
+          "certainty": "candidate-set"
+        },
+        {
+          "targetName": "configuration.onDidChange",
+          "certainty": "library"
+        }
+      ]
+    },
+    {
+      "symbol": "lib/features/workspaceFolders.d.ts:ReturnType<typeof register>.onDidChange",
+      "counts": {
+        "library": 1,
+        "candidateSet": 1
+      },
+      "links": [
+        {
+          "targetName": "(expression).onDidChange",
+          "certainty": "candidate-set"
+        },
+        {
+          "targetName": "folders.onDidChange",
+          "certainty": "library"
+        }
+      ]
+    },
+    {
+      "symbol": "ReturnType<typeof register>.onDidChange",
+      "counts": {
+        "library": 0,
+        "candidateSet": 0
+      },
+      "links": []
+    }
+  ]
+}

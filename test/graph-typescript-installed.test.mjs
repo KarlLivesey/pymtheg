@@ -295,6 +295,84 @@ test("an installed override wins over an inferred workspace package", async () =
   local();
 });
 
+test("a physical workspace link with an unbuilt entry names the missing output", async () => {
+  const { root, request, read, write } = await project();
+  await write("package.json", '{"workspaces":["packages/*"]}');
+  await write(
+    "packages/ui/package.json",
+    '{"name":"fixture-ui","version":"1.0.0","types":"dist/index.d.ts"}',
+  );
+  await write(
+    "packages/ui/tsconfig.json",
+    '{"compilerOptions":{"rootDir":"src","outDir":"dist"},"files":["src/index.ts"]}',
+  );
+  await write("packages/ui/src/index.ts", "export const button = 1;");
+  await write(
+    "packages/app/package.json",
+    '{"name":"fixture-app","dependencies":{"fixture-ui":"^1"},"devDependencies":{"@types/node":"^24"}}',
+  );
+  await write(
+    "packages/app/tsconfig.json",
+    '{"compilerOptions":{"types":[],"lib":["ES2022","DOM"]},"files":["main.ts"]}',
+  );
+  await write(
+    "packages/app/main.ts",
+    'import { button } from "./ui"; import "typed"; console.log(button);',
+  );
+  await write("packages/app/ui.ts", 'export { button } from "fixture-ui";');
+  await write("node_modules/typed/package.json", manifest("typed", "1.0.0"));
+  await write("node_modules/typed/index.d.ts", "export {};");
+  await symlink("../packages/ui", join(root, "node_modules/fixture-ui"), "dir");
+  await request("index");
+  read((store, call) => {
+    const link = store
+      .links()
+      .find(
+        (link) => link.kind === "imports" && link.targetName === "fixture-ui",
+      );
+    assert.equal(link.resolution, "unresolved");
+    assert.equal(link.data.reason, "workspace-build-output-missing");
+    const imported = store
+      .links()
+      .find(
+        (link) =>
+          link.file === "packages/app/main.ts" &&
+          link.kind === "imports" &&
+          link.targetName === "button",
+      );
+    assert.equal(imported.resolution, "unresolved");
+    assert.equal(imported.data.reason, "workspace-build-output-missing");
+    const log = call("packages/app/main.ts", "console.log");
+    assert.equal(log.resolution, "ambiguous");
+    assert.deepEqual(log.libraries.map(({ ecosystem }) => ecosystem).sort(), [
+      "dom",
+      "node",
+    ]);
+  });
+});
+
+test("a dependency linked to the checkout root reports the missing workspace entry", async () => {
+  const { root, request, read, write } = await project();
+  await write(
+    "package.json",
+    '{"name":"fixture-root","typings":"dist/index.d.ts"}',
+  );
+  await write("src/index.ts", "export const member = 1;");
+  await write("sample/main.ts", 'import { member } from "fixture-root";');
+  await mkdir(join(root, "sample/node_modules"));
+  await symlink("../..", join(root, "sample/node_modules/fixture-root"), "dir");
+  await request("index");
+  read((store) => {
+    const link = store
+      .links()
+      .find(
+        (link) => link.kind === "imports" && link.targetName === "fixture-root",
+      );
+    assert.equal(link.resolution, "unresolved");
+    assert.equal(link.data.reason, "workspace-entry-unavailable");
+  });
+});
+
 test("captured competing test types use the compiler's global symbol", async () => {
   const { request, read, write } = await project();
   await write(
@@ -422,6 +500,102 @@ test("a qualified installed type uses its declaration without a runtime receiver
   });
 });
 
+test("an augmentation does not own a synthetic default export", async () => {
+  const { request, read, write } = await project();
+  await write("tsconfig.json", '{"compilerOptions":{"esModuleInterop":true}}');
+  await write(
+    "main.ts",
+    'import React from "react"; import "fixture-augment"; React.open();',
+  );
+  await write("node_modules/react/package.json", manifest("react", "1.2.3"));
+  await write(
+    "node_modules/react/index.d.ts",
+    "export = React; declare namespace React { function open(): void; }",
+  );
+  await write(
+    "node_modules/fixture-augment/package.json",
+    manifest("fixture-augment", "1.0.0"),
+  );
+  await write(
+    "node_modules/fixture-augment/index.d.ts",
+    'import "react"; declare module "react" { interface Extra { value: boolean } }',
+  );
+  await request("index");
+  read((store, call) => {
+    const binding = store
+      .links()
+      .find((link) => link.file === "main.ts" && link.targetName === "default");
+    assert.equal(target(binding).unit, "react");
+    assert.equal(target(binding).version, "1.2.3");
+    assert.equal(target(call("main.ts", "React.open")).unit, "react");
+  });
+});
+
+test("identical DOM heritage in an installed stub leaves the native type as owner", async () => {
+  const { request, read, write } = await project();
+  await write(
+    "main.ts",
+    'import "fixture-dom"; export type Input = HTMLInputElement; export type Label = HTMLLabelElement;',
+  );
+  await write(
+    "node_modules/fixture-dom/package.json",
+    manifest("fixture-dom", "1.0.0"),
+  );
+  await write(
+    "node_modules/fixture-dom/index.d.ts",
+    "export {}; declare global { interface HTMLInputElement extends HTMLElement {} interface Extra { fixtureOnly: boolean } interface HTMLLabelElement extends Extra {} }",
+  );
+  await request("index");
+  read((store) => {
+    const reference = (name) =>
+      store
+        .links()
+        .find((link) => link.targetName === name && link.kind === "references");
+    assert.equal(target(reference("HTMLInputElement")).ecosystem, "dom");
+    assert.equal(reference("HTMLLabelElement").resolution, "ambiguous");
+  });
+});
+
+test("a named re-exported namespace keeps its installed binding even beside a failed source", async () => {
+  const { request, read, write } = await project();
+  await write("tsconfig.json", '{"files":["main.ts","broken.ts"]}');
+  await write(
+    "main.ts",
+    'import { z, missing } from "zod"; export const spec = z;',
+  );
+  await write("broken.ts", "export const fail = ;");
+  await write("node_modules/zod/package.json", manifest("zod", "4.6.6"));
+  await write(
+    "node_modules/zod/index.d.ts",
+    'export * as z from "./namespace";',
+  );
+  await write(
+    "node_modules/zod/namespace.d.ts",
+    "export declare function string(): string;",
+  );
+  await request("index");
+  read((store) => {
+    const binding = (name) =>
+      store
+        .links()
+        .find(
+          (link) =>
+            link.kind === "imports" &&
+            link.file === "main.ts" &&
+            link.targetName === name,
+        );
+    assert.deepEqual(target(binding("z")), {
+      ecosystem: "npm",
+      unit: "zod",
+      symbol: "z",
+      evidence: "import-binding",
+      version: "4.6.6",
+      versionSource: "node_modules/zod/package.json",
+    });
+    assert.equal(binding("missing").resolution, "unresolved");
+  });
+});
+
 test("a failed file does not withdraw an independently written installed import binding", async () => {
   const { request, read, write } = await project();
   await write("tsconfig.json", '{"files":["main.ts","broken.ts"]}');
@@ -471,4 +645,141 @@ test("a mapped member keeps the proven package without inventing a declaring nam
       versionSource: "node_modules/query-kit/package.json",
     }),
   );
+});
+
+test("a named installed factory proves a member of its explicit return type", async () => {
+  const { request, read, write } = await project();
+  await write("package.json", '{"dependencies":{"fixture-checker":"^1"}}');
+  await write(
+    "main.ts",
+    'import { createTypeScriptChecker, choose } from "fixture-checker"; const linter = createTypeScriptChecker(); linter.getRootFileNames(); const result = choose("a"); result.pick();',
+  );
+  await write(
+    "node_modules/fixture-checker/package.json",
+    manifest("fixture-checker", "1.0.0"),
+  );
+  await write(
+    "node_modules/fixture-checker/index.d.ts",
+    'export declare function createTypeScriptChecker(): { getRootFileNames: () => string[] }; export declare function choose(mode: "a"): { pick(): string }; export declare function choose(mode: "b"): { pick(): number };',
+  );
+  await request("index");
+  read((_, call) => {
+    assert.deepEqual(target(call("main.ts", "linter.getRootFileNames")), {
+      ecosystem: "npm",
+      unit: "fixture-checker",
+      symbol:
+        "index.d.ts:ReturnType<typeof createTypeScriptChecker>.getRootFileNames",
+      evidence: "declaring-owner",
+      version: "1.0.0",
+      versionSource: "node_modules/fixture-checker/package.json",
+    });
+    assert.equal(call("main.ts", "result.pick").resolution, "unresolved");
+  });
+});
+
+test("same-named installed factory declarations keep separate direct and union targets", async () => {
+  const { request, read, write } = await project();
+  await write(
+    "main.ts",
+    `import { register as configure, publicApi, exportedApi } from "fixture-server/configuration";
+import { register as registerFolders } from "fixture-server/folders";
+import support = require("fixture-server/support");
+declare const useConfiguration: boolean;
+const configuration = configure();
+const folders = registerFolders();
+configuration.onDidChange(() => {});
+folders.onDidChange(() => {});
+(useConfiguration ? configuration : folders).onDidChange(() => {});
+configuration.local.change();
+folders.local.change();
+configuration.detail.refresh();
+folders.detail.refresh();
+publicApi.open();
+exportedApi.read();
+support.list();
+`,
+  );
+  await write(
+    "node_modules/fixture-server/package.json",
+    manifest("fixture-server", "1.0.0"),
+  );
+  await write(
+    "node_modules/fixture-server/support.d.ts",
+    "export = Support; declare namespace Support { function list(): string[] }",
+  );
+  for (const name of ["configuration", "folders"])
+    await write(
+      `node_modules/fixture-server/${name}.d.ts`,
+      `export {};
+interface Local { change(): void }
+export type Detail = { refresh(): void };
+export declare function register(): {
+  readonly source: "${name}";
+  onDidChange(action: () => void): void;
+  local: Local;
+  detail: Detail;
+};
+` +
+        (name === "configuration"
+          ? `interface PublicApi { open(): void }
+export { PublicApi as p };
+export declare const publicApi: PublicApi;
+export interface ExportedApi { read(): void }
+export declare const exportedApi: ExportedApi;
+`
+          : ""),
+    );
+  await request("index");
+  const symbols = ["configuration", "folders"].map(
+    (module) => `${module}.d.ts:ReturnType<typeof register>.onDidChange`,
+  );
+  read((_, call) => {
+    const main = (name) => call("main.ts", name);
+    assert.equal(target(main("configuration.onDidChange")).symbol, symbols[0]);
+    assert.equal(target(main("folders.onDidChange")).symbol, symbols[1]);
+    const union = main("(expression).onDidChange");
+    assert.equal(union.resolution, "ambiguous");
+    assert.deepEqual(
+      union.libraries.map(({ symbol }) => symbol).sort(),
+      symbols,
+    );
+    assert.equal(
+      target(main("configuration.local.change")).symbol,
+      "configuration.d.ts:Local.prototype.change",
+    );
+    assert.equal(
+      target(main("folders.local.change")).symbol,
+      "folders.d.ts:Local.prototype.change",
+    );
+    assert.equal(
+      target(main("configuration.detail.refresh")).symbol,
+      "configuration.d.ts:Detail.refresh",
+    );
+    assert.equal(
+      target(main("folders.detail.refresh")).symbol,
+      "folders.d.ts:Detail.refresh",
+    );
+    assert.equal(
+      target(main("publicApi.open")).symbol,
+      "PublicApi.prototype.open",
+    );
+    assert.equal(
+      target(main("exportedApi.read")).symbol,
+      "ExportedApi.prototype.read",
+    );
+    assert.equal(target(main("support.list")).symbol, "Support.list");
+  });
+  for (const [index, symbol] of symbols.entries()) {
+    const { data } = await request("uses", ["fixture-server", symbol]);
+    assert.deepEqual(data.classCounts, { library: 1, candidateSet: 1 });
+    assert.deepEqual(data.links.map(({ targetName }) => targetName).sort(), [
+      "(expression).onDidChange",
+      index === 0 ? "configuration.onDidChange" : "folders.onDidChange",
+    ]);
+  }
+  const { data } = await request("uses", [
+    "fixture-server",
+    "ReturnType<typeof register>.onDidChange",
+  ]);
+  assert.deepEqual(data.links, []);
 });

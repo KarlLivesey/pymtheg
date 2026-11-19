@@ -1,0 +1,6 @@
+{"pin":"excalidraw/excalidraw","label":"main","status":"incomplete","code":2,"wallSeconds":235.791,"peakRssKiB":2880564,"cpuSeconds":239.69}
+{"pin":"excalidraw/excalidraw","label":"candidate","status":"incomplete","code":2,"wallSeconds":176.652,"peakRssKiB":2433744,"cpuSeconds":215.82}
+{"pin":"excalidraw/excalidraw","label":"main-repeat","status":"incomplete","code":2,"wallSeconds":207.151,"peakRssKiB":2394376,"cpuSeconds":241.20999999999998}
+{"pin":"pmndrs/zustand","label":"main","status":"ok","code":0,"wallSeconds":12.028,"peakRssKiB":639616,"cpuSeconds":20.29}
+{"pin":"pmndrs/zustand","label":"candidate","status":"ok","code":0,"wallSeconds":12.628,"peakRssKiB":662704,"cpuSeconds":20.830000000000002}
+{"pin":"pmndrs/zustand","label":"main-repeat","status":"ok","code":0,"wallSeconds":11.638,"peakRssKiB":608248,"cpuSeconds":20.630000000000003}

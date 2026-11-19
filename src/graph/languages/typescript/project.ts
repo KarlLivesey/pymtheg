@@ -117,6 +117,7 @@ export interface ProjectModel {
     specifier: string,
     from: string,
     lookups: readonly string[],
+    includeInstalled?: boolean,
   ) => string | undefined;
   workspaceBoundaryKnown: (from: string) => boolean;
   hasDenoImports: boolean;
@@ -419,7 +420,12 @@ class VirtualFileSystem {
   readFile = (path: string) => this.files.get(this.real(path));
   directoryExists = (path: string) =>
     this.directories.has(this.real(path)) || this.linkDirectories.has(path);
-  workspaceReason(specifier: string, from: string, lookups: readonly string[]) {
+  workspaceReason(
+    specifier: string,
+    from: string,
+    lookups: readonly string[],
+    physicalWorkspace: (link: string) => string | false | undefined,
+  ) {
     const name = /^(@[^/]+\/[^/]+|[^/@#.][^/]*)/.exec(specifier)?.[1];
     if (!name) return undefined;
     for (
@@ -428,7 +434,9 @@ class VirtualFileSystem {
       directory = posix.dirname(directory)
     ) {
       const link = posix.join(directory, "node_modules", name);
-      const target = this.links.get(link);
+      const physical = physicalWorkspace(link);
+      if (physical === false) return undefined;
+      const target = physical ?? this.links.get(link);
       if (target !== undefined) {
         const built = lookups.some((lookup) => {
           if (
@@ -436,7 +444,10 @@ class VirtualFileSystem {
             !lookup.startsWith(target + "/")
           )
             return false;
-          const resolved = this.real(lookup);
+          const resolved =
+            physical && lookup.startsWith(link + "/")
+              ? target + lookup.slice(link.length)
+              : this.real(lookup);
           if (this.files.has(resolved)) return false;
           for (
             let dir = posix.dirname(resolved);
@@ -1183,8 +1194,15 @@ export function projectModel(
       return true;
     },
     host,
-    workspaceReason: (specifier, from, lookups) =>
-      fs.workspaceReason(specifier, from, lookups),
+    workspaceReason: (specifier, from, lookups, includeInstalled = true) =>
+      fs.workspaceReason(specifier, from, lookups, (link) => {
+        if (!includeInstalled) return undefined;
+        const physical = dependencies?.realpath(dependencyPath(link));
+        if (physical === undefined) return undefined;
+        if (hasNodeModulesSegment(physical)) return false;
+        const path = toVirtual(physical);
+        return fs.files.has(posix.join(path, "package.json")) ? path : false;
+      }),
     workspaceBoundaryKnown: (from) => {
       for (const root of workspace.incompleteRoots)
         if (underDirectory(from, root)) return false;

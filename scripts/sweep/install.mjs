@@ -9,7 +9,7 @@ const lockfiles = {
   yarn: ["yarn.lock"],
 };
 
-export async function installation(root, scratch) {
+export async function installation(root, scratch, { legacyPeerDeps = false } = {}) {
   const read = (name) =>
     readFile(join(root, name), "utf8").catch(() => undefined);
   const text = await read("package.json");
@@ -77,6 +77,7 @@ export async function installation(root, scratch) {
       command: "npm",
       args: [
         "ci",
+        ...(legacyPeerDeps ? ["--legacy-peer-deps"] : []),
         "--ignore-scripts",
         "--script-shell=/bin/false",
         "--no-audit",
