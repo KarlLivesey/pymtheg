@@ -1,5 +1,20 @@
 # Cold indexing and default heap
 
+## Module 29 cold bracket on tmpfs
+
+Each pin used the same source copy and fresh stores. Main at `595ec7b`
+bracketed the runtime-evidence build. The server also ran corpus and test
+jobs during these measurements. [Runner](bench.mjs)
+
+| Repository | Main 1 seconds / KiB | C-11 seconds / KiB | Main 2 seconds / KiB |
+| --- | ---: | ---: | ---: |
+| Vitest | 164.22 / 2,859,764 | 147.29 / 2,775,320 | 144.79 / 2,486,368 |
+| Astro | 136.32 / 1,775,044 | 147.43 / 1,850,776 | 127.03 / 2,880,572 |
+| Hono | 156.95 / 1,246,340 | 64.58 / 1,639,112 | 60.75 / 1,717,364 |
+
+Vitest's candidate was within the main bracket. Astro was 12.0% above
+the main mean. Hono's two main observations differed by a factor of 2.58.
+
 ## Review cold bracket on tmpfs
 
 Main at `595ec7b` ran before and after the module 26 candidate on the same
@@ -67,3 +82,8 @@ The module 28 second-review build completed the same default-heap check
 in 738.89 seconds with 4,574,312 KiB peak RSS. It indexed 7,214 files,
 181,778 symbols and 1,164,293 links, with 407,320 definite library links,
 1,488 partial analyses and zero failed files.
+
+The module 29 runtime-evidence build completed the same pin in 1,134.60
+seconds with 4,513,932 KiB peak RSS. It preserved the file, symbol, link and
+partial counts and recorded 412,953 definite library links and zero failed
+files. This bracket and default-heap run preceded the final catalog replay.

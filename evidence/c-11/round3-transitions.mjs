@@ -6,27 +6,42 @@ import { DatabaseSync } from "node:sqlite";
 import { sampleKey } from "../../scripts/sweep/coverage-rules.mjs";
 
 const scratch = process.env.PYM_SCRATCH;
+const [beforeName = "previous", afterName = "candidate"] =
+  process.argv.slice(2);
 const pins = (name) =>
   JSON.parse(readFileSync(join(scratch, `${name}-run.json`))).repos;
-const after = new Map(pins("candidate").map((pin) => [pin.id, pin]));
+const after = new Map(pins(afterName).map((pin) => [pin.id, pin]));
 const database = (pin) =>
   new DatabaseSync(
     join(scratch, pin.attempt, "checkout/.pymtheg/rebuildable/graph.sqlite"),
     { readOnly: true },
   );
 
-const bundled = (link) =>
-  link.libraries.some(
-    ([kind]) => kind === "typescript-lib" || kind === "dom",
-  ) ||
+const hasBundle = (link) =>
+  link.libraries.some(([kind]) => kind === "typescript-lib" || kind === "dom");
+const globalReason = (link) =>
   link.data?.reason === "missing-global-types" ||
   link.data?.tiedReasons?.includes("missing-global-types");
+const bundled = (link) => hasBundle(link) || globalReason(link);
+const openGlobal = (link) =>
+  globalReason(link) ||
+  (hasBundle(link) && link.libraries.some(([kind]) => kind === "node"));
 const packageLink = (link) =>
   link.libraries.some(([kind]) => kind === "npm" || kind === "jsr") ||
   link.data?.specifier !== undefined;
 const identity = (link) => JSON.stringify([link.outcome, link.libraries]);
 const summaries = {};
-for (const pin of pins("previous")) {
+const globalScope = { before: {}, after: {}, transitions: {} };
+function count(summary, before, after) {
+  for (const [histogram, outcome] of [
+    [summary.before, before.outcome],
+    [summary.after, after.outcome],
+  ])
+    histogram[outcome] = (histogram[outcome] ?? 0) + 1;
+  const transition = `${before.outcome} -> ${after.outcome}`;
+  summary.transitions[transition] = (summary.transitions[transition] ?? 0) + 1;
+}
+for (const pin of pins(beforeName)) {
   const next = after.get(pin.id);
   if (
     pin.outcome !== "finished" ||
@@ -84,8 +99,11 @@ for (const pin of pins("previous")) {
           const match = present.findIndex(
             (row) => identity(row) === identity(link),
           );
-          if (match >= 0) present.splice(match, 1);
-          else changed.push(link);
+          if (match >= 0) {
+            const [current] = present.splice(match, 1);
+            if (openGlobal(link) || openGlobal(current))
+              count(globalScope, link, current);
+          } else changed.push(link);
         }
         for (const [i, before] of changed.entries()) {
           const after = present[i];
@@ -100,17 +118,17 @@ for (const pin of pins("previous")) {
             after: {},
             transitions: {},
             examples: [],
+            reopened: [],
           });
-          for (const [histogram, outcome] of [
-            [summary.before, before.outcome],
-            [summary.after, after.outcome],
-          ])
-            histogram[outcome] = (histogram[outcome] ?? 0) + 1;
-          const transition = `${before.outcome} -> ${after.outcome}`;
-          summary.transitions[transition] =
-            (summary.transitions[transition] ?? 0) + 1;
-          if (summary.examples.length < 5)
-            summary.examples.push({
+          count(summary, before, after);
+          if (category === "global-types") count(globalScope, before, after);
+          const reopened =
+            before.outcome === "library" && after.outcome === "unresolved";
+          if (
+            summary.examples.length < 5 ||
+            (reopened && summary.reopened.length < 5)
+          ) {
+            const example = {
               repo: pin.id,
               path,
               line: source
@@ -120,7 +138,12 @@ for (const pin of pins("previous")) {
               target: before.targetName,
               before: identity(before),
               after: identity(after),
-            });
+              reason: after.data?.reason,
+            };
+            if (summary.examples.length < 5) summary.examples.push(example);
+            if (reopened && summary.reopened.length < 5)
+              summary.reopened.push(example);
+          }
         }
         current.delete(site);
       }
@@ -131,4 +154,4 @@ for (const pin of pins("previous")) {
     revised.close();
   }
 }
-console.log(JSON.stringify(summaries, null, 2));
+console.log(JSON.stringify({ globalScope, ...summaries }, null, 2));

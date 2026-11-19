@@ -18,9 +18,17 @@ each pin. [Plan input](coverage-plan-input.json.gz)
 
 ## Build provenance
 
-All 18 final review graphs use the module 28 build with digest
+All 18 final review graphs use TypeScript module 29. Thirteen use build
+`46ef120b1fca4c32caeb0fc0dff333e7bebc8a5cebd6625e8a55e88e0a959697`.
+The messaging candidate change affects only member names open for missing
+global types. The 18-pin scan of those reasons and names selected Dexie,
+Excalidraw, Puppeteer, Vitest and Astro for replay with build
+`f0f03a3d1394dbcb2c000f3a607a786d89352194cb7a3f21301e6e71f3c8c10f`.
+The previous review head `3d8dea94` uses module 28 with digest
 `416b5f81027c76a32e848116575a4b42d58f8710eb93fbc44db4fc61ddc550df`.
-The six exact checkout comparisons use main at `595ec7b`.
+The checkout comparisons use main at `595ec7b`. The full replay includes
+C-10 at `8ca29ac`. Main then advanced to `5ec4baa` with C-8's Go analysis.
+The TypeScript and graph-store inputs stay equivalent through that merge.
 
 The first sweep build had digest
 `015c000df99defbd55bf03ffea9fb9e7da306e07b9629f5ddc8c6fe736173274`.
@@ -31,29 +39,28 @@ checkout `@types/*` packages. Vite's unreadable UTF-8 BOM fixture can
 hide a workspace member. Its graph was replaced by a replay with both
 fixes and build digest
 `04428ad0d1030316914504c305d0216796e7195a421f30c5d2e34bc77a932350`.
-The final source draw reproduced all 40 hand-checked targets.
 
 ## Library queries
 
 Each query used a result bound of two. The full class counts matched the
-stored targets. The first five queries returned their incomplete-source
-status alongside the counts. Hono returned `ok`.
+stored targets. The first four queries carried their incomplete-source
+status alongside the counts. The Hono query returned `ok`.
 
 | Repository | Command | Library | Candidate sets |
 | --- | --- | ---: | ---: |
 | tRPC | `graph uses zod` | 1,648 | 0 |
 | Vitest | `graph uses fs readFileSync` | 236 | 0 |
-| Excalidraw | `graph uses dom ParentNode.prototype.querySelector` | 199 | 0 |
+| Excalidraw | `graph uses dom ParentNode.prototype.querySelector` | 230 | 0 |
 | T3 Code | `graph uses es Map.prototype.delete` | 84 | 0 |
-| Vitest | `graph uses url` | 334 | 6 |
 | Hono | `graph uses @std/assert` | 65 | 0 |
 
 ## Validation
 
-The dev-server build, no-emit check and format check passed. On tmpfs,
-`npm test` passed all 3,041 tests, including repository initialization.
-All 18 sweep-tool tests passed. The [self-index bracket](review-1.md)
-also records isolated measurements for the repository initialization test.
+The merged dev-server build, no-emit check and format check passed. On tmpfs,
+`npm test` passed all 3,069 tests. The repository initialization test took
+70.39 seconds in that suite. All 18 sweep-tool tests passed. The
+[self-index bracket](review-1.md) records the three isolated samples from
+each side of the earlier review.
 
 ## How to reproduce
 
@@ -66,7 +73,14 @@ and `candidate-export main candidate-main` to export both directions of the
 shared-site comparison. `metrics.mjs` reads those four exports.
 Save the module 27 run as `review1-run.json` before replaying module 28.
 `review-transitions.mjs review1 candidate` compares the stored outcomes on
-the same source spans.
+the same source spans for those modules. For the final revision, build
+`3d8dea94` in another scratch directory and run `run.mjs previous` with
+`C11_BUILD` set to that directory's name. `round3-transitions.mjs` compares
+its outcomes and stored identities with the module 29 graphs.
+The complete cohort can be replayed with the final executable. To reproduce
+the targeted messaging replay, retain the full module 29 run as
+`before-ports-run.json`, replay the five pins and use `run.mjs replace` to
+update those attempts before exporting coverage.
 
 `compare.mjs candidate REPO …` checks symbol keys and existing link sites in the specified
 repositories, and compares every resolved checkout destination by its file

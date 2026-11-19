@@ -8,39 +8,40 @@ links in C-11.
 
 | Repository | 0.1.0 all sites | Main all sites | C-11 all sites | 0.1.0 → C-11 shared sites | Stored symbol | Stored unit only |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| changesets/changesets | 39.87% | 40.87% | 20.03% | 39.87% → 19.80% | 723 | 154 |
-| colinhacks/zod | 71.00% | 76.77% | 83.90% | 71.00% → 83.79% | 18,272 | 602 |
-| dexie/Dexie.js | 34.91% | 41.68% | 53.30% | 34.91% → 52.57% | 5,336 | 372 |
-| excalidraw/excalidraw | 57.79% | 61.55% | 70.56% | 57.79% → 70.23% | 12,416 | 1,325 |
-| honojs/hono | 36.00% | 49.91% | 56.47% | 36.00% → 55.50% | 6,198 | 337 |
-| mermaid-js/mermaid | 54.56% | 56.99% | 69.37% | 54.56% → 69.16% | 32,963 | 2,182 |
-| nestjs/nest | 47.92% | 52.91% | 59.84% | 47.92% → 58.81% | 19,822 | 1,948 |
+| changesets/changesets | 39.87% | 40.87% | 20.19% | 39.87% → 19.95% | 743 | 154 |
+| colinhacks/zod | 71.00% | 76.77% | 84.03% | 71.00% → 83.91% | 18,373 | 602 |
+| dexie/Dexie.js | 34.91% | 41.68% | 54.07% | 34.91% → 53.36% | 5,618 | 371 |
+| excalidraw/excalidraw | 57.79% | 61.55% | 72.67% | 57.79% → 72.37% | 14,626 | 1,325 |
+| honojs/hono | 36.00% | 49.91% | 57.43% | 36.00% → 56.48% | 6,893 | 337 |
+| mermaid-js/mermaid | 54.56% | 56.99% | 70.47% | 54.56% → 70.25% | 34,335 | 2,182 |
+| nestjs/nest | 47.92% | 52.91% | 59.84% | 47.92% → 58.81% | 19,821 | 1,948 |
 | oclif/core | 63.11% | 67.84% | 78.23% | 63.11% → 77.98% | 3,604 | 397 |
-| pingdotgg/t3code | 67.21% | 68.99% | 71.93% | 67.21% → 71.72% | 53,555 | 12,005 |
-| pmndrs/zustand | 54.38% | 64.15% | 66.63% | 54.38% → 65.27% | 2,005 | 385 |
-| puppeteer/puppeteer | 50.75% | 53.97% | 63.18% | 50.75% → 63.00% | 13,396 | 1,029 |
-| react-hook-form/react-hook-form | 41.14% | 50.67% | 44.85% | 41.14% → 41.54% | 6,635 | 5,693 |
-| reduxjs/redux-toolkit | 39.34% | 48.94% | 54.20% | 39.34% → 53.14% | 7,016 | 1,484 |
-| trpc/trpc | 53.31% | 61.94% | 68.80% | 53.31% → 68.32% | 20,877 | 5,151 |
-| vitejs/vite | 59.87% | 62.79% | 56.70% | 59.87% → 56.27% | 8,250 | 599 |
-| vitest-dev/vitest | 36.13% | 67.89% | 76.43% | 36.13% → 76.25% | 16,213 | 2,335 |
-| withastro/astro | 52.89% | 66.15% | 76.69% | 52.89% → 76.51% | 51,874 | 6,203 |
+| pingdotgg/t3code | 67.21% | 68.99% | 72.57% | 67.21% → 72.37% | 54,604 | 12,005 |
+| pmndrs/zustand | 54.38% | 64.15% | 66.78% | 54.38% → 65.43% | 2,016 | 385 |
+| puppeteer/puppeteer | 50.75% | 53.97% | 64.56% | 50.75% → 64.39% | 14,201 | 1,029 |
+| react-hook-form/react-hook-form | 41.14% | 50.67% | 44.97% | 41.14% → 41.66% | 6,691 | 5,693 |
+| reduxjs/redux-toolkit | 39.34% | 48.94% | 54.30% | 39.34% → 53.24% | 7,072 | 1,484 |
+| trpc/trpc | 53.31% | 61.94% | 69.54% | 53.31% → 69.07% | 21,675 | 5,365 |
+| vitejs/vite | 59.87% | 62.79% | 56.75% | 59.87% → 56.32% | 8,277 | 599 |
+| vitest-dev/vitest | 36.13% | 67.89% | 77.35% | 36.13% → 77.18% | 17,285 | 2,335 |
+| withastro/astro | 52.89% | 66.15% | 76.97% | 52.89% → 76.79% | 52,297 | 6,203 |
 | yargs/yargs | 33.41% | 35.12% | 42.45% | 33.41% → 42.19% | 1,214 | 105 |
-| **Total** | **51.92%** | **60.29%** | **66.87%** | **51.92% → 66.40%** | **280,369** | **42,306** |
+| **Total** | **51.92%** | **60.29%** | **67.51%** | **51.92% → 67.06%** | **289,345** | **42,519** |
 
-C-11 credits 929,811 of 1,390,561 links at Level 2. The 280,369 stored
-library links with symbols contribute 20.16 percentage points. The 42,306
-unit-only links account for 3.04% of all sites and earn Level 1. Release
-0.1.0 credited 711,979 of 1,371,373 links. C-11 credits 910,623 on those same sites.
+C-11 credits 938,787 of 1,390,561 links at Level 2. The 289,345 stored
+library links with symbols contribute 20.81 percentage points. The 42,519
+unit-only links account for 3.06% of all sites and earn Level 1. Release
+0.1.0 credited 711,979 of 1,371,373 links. C-11 credits 919,599 on those same sites.
 The difference in the all-sites denominators comes from TypeScript changes
 merged before C-11.
 
 ## Checkout identity
 
-The comparison against main at `595ec7b` matched all 105,415 symbol keys,
-713,036 link sites and 326,793 definite checkout destinations across six
-repositories. It identified each destination by file and symbol key. Level
-2 rose from 61.14% to 67.19% on the same 713,036 sites.
+The comparison against main at `595ec7b` matched all 123,219 symbol keys
+and 820,506 link sites across seven repositories. It preserved 379,852
+definite checkout destinations, identified by file and symbol key. The
+18 corrected destinations are in tRPC's Deno example. Level 2 rose from
+61.25% to 68.03% on the same 820,506 sites.
 
 | Repository | Symbol keys | Link sites | Definite checkout destinations preserved |
 | --- | ---: | ---: | ---: |
@@ -50,6 +51,7 @@ repositories. It identified each destination by file and symbol key. Level
 | Excalidraw | 13,405 | 104,519 | 61,330 |
 | NestJS | 19,464 | 165,330 | 79,114 |
 | Vite | 10,184 | 55,575 | 23,126 |
+| tRPC | 17,804 | 107,470 | 53,059 |
 
 Hono gains 36 checkout links. The `hono` route in
 `adapters/deno/test/deno.json:11` points to `src/index.ts`. The checker
@@ -62,6 +64,12 @@ the existing asset module declarations in `packages/vite/client.d.ts`
 visible at 68 of those sites, and the hot-reload declarations in
 `packages/vite/types/hot.d.ts` visible at the other 68. The module uses
 its existing rule for checkout declarations at those sites.
+
+tRPC preserves all 17,804 symbol keys, all 107,470 sites and 53,059 definite
+checkout links. The 18 changed checkout links come from
+`examples/deno-deploy/src/{client,index,router}.ts`. Main selected checkout v11.
+`examples/deno-deploy/deno.json:5–7` selects remote 10.32.0 routes, so those
+calls and import bindings stay `deno-import-unverified`.
 
 The T3 Code sweep pin is separate from the `b387e3a1` default-heap check.
 
@@ -86,9 +94,60 @@ module stay unresolved. Vitest's `test/browser/test/polyfill-lib.test.ts:2`
 stores both the Node and npm `url` candidates.
 [Paired outcome counter](review-transitions.mjs)
 
+## Node overlap and package alias revision
+
+The Node overlap inventory uses the Node 24 globals documentation and the
+project's pinned `@types/node` 24.13.3. Compare the TypeScript 5.9.3 symbols
+from an ES+DOM program with their counterparts in an ES+Node program. Read
+`@types/node/web-globals/fetch.d.ts` and `undici-types/fetch.d.ts` for the
+global fetch types and inherited body members. This supplies the Node names
+for candidate pairs. The receiver's checker identity ties inherited `Body`
+members to `Request` or `Response` when the type is available.
+[Node 24 globals](https://nodejs.org/docs/latest-v24.x/api/globals.html)
+
+Hono's `src/adapter/aws-lambda/handler.ts:357` now shows `dom RequestInit` and
+`node globals RequestInit` as candidates. Its
+`src/adapter/cloudflare-pages/handler.test.ts:160` shows DOM
+`Body.prototype.json` and Node `Response.prototype.json` for `res.json()`.
+Vitest's `packages/pretty-format/src/plugins/ReactElement.ts:11` names
+`npm react-is` at `18.3.1`, pinned in `packages/pretty-format/package.json`,
+from its written `react-is-18` alias.
+T3 Code's Bun workspace catalog in `package.json` supplies `effect` at
+`4.0.0-beta.59` for 15,226 definite library links in `apps/server`.
+Zod's `packages/bench/package.json:15` supplies `zod` at `4.0.8` for the
+written `zod4` binding. The checkout also declares a workspace package
+named `zod`.
+Excalidraw's `scripts/release.js:38` pairs DOM and Node console targets for
+`console.info`. Its `child_process` route independently proves the Node
+`execSync` target at line 159.
+
+An explicit `types: []` or a list without Node recovers browser declarations
+from the compiler's configured libs. An explicit Node reference still opens
+the shared declarations. Missing Vite, Vitest, Jest and React types affect
+their own documented globals. Documented Node alternatives for URL, encoding,
+performance, streams and messaging use `url`, `util`, `perf_hooks`, `stream/web`
+and `worker_threads`.
+[Outcome comparison](round3-transitions.mjs)
+
+The paired comparison covers sites with missing-global evidence or a bundled
+and Node pair in either graph, plus sites whose bundled outcome or identity
+changed. It covers all 18 pins. The previous graph is module 28 at `3d8dea94`.
+
+| Overlapping globals | Definite library | Candidate set | Unresolved |
+| --- | ---: | ---: | ---: |
+| Before | 531 | 2,786 | 23,326 |
+| After | 9,052 | 17,213 | 378 |
+
+Of the unresolved sites, 8,971 gained definite targets and 13,977 gained
+candidate sets. A further 531 formerly definite sites gained alternatives.
+The alias and catalog changes revised 43,003 package target identities or
+versions and settled 670 unresolved links. Two package links in Dexie's
+`addons/dexie-export-import/src/json-stream.ts:1` stay open because
+`addons/dexie-export-import/package.json:41` names a Git repository for `clarinet`.
+
 ## Previously credited library symbols
 
-The paired export found 35,601 released Level 2 library credits that C-11
+The paired export found 35,602 released Level 2 library credits that C-11
 withholds, down from 39,645 in the first review build. Explicit Node routes
 survive incomplete compiler configuration when the route is independently
 known. Unrelated unreadable source no longer suppresses a written outside
@@ -100,7 +159,7 @@ type-only ambient heritage recover 19 previous credits in the last replay.
 | Unsupported legacy member attribution | 24,788 | The old reconstruction took an imported value's property spelling as an export path. Of these sites, 19,685 now earn unit-only credit. |
 | Legacy credit for a bundler transform | 5 | T3 Code constructs a `?worker` wrapper at `apps/web/src/components/DiffWorkerPoolProvider.tsx:43`. The default export depends on the transform. |
 | Legacy credit for a name omitted by a captured module | 1 | Dexie imports `config` from `qunit` at `addons/y-dexie/test/unit/dexie-unittest-utils.js:2`. The captured declaration at `addons/y-dexie/test/qunit.d.ts:1` omits that export. |
-| Written name without evidence of an external package route | 167 | A bare name can select a framework alias, virtual module or missing workspace entry. |
+| Written name without evidence of an external package route | 168 | A bare name can select a framework alias, virtual module, tarball dependency or missing workspace entry. |
 | Written name with competing Node and npm routes | 3 | Vite imports `URL` from a declared bare `url` polyfill at `playground/cli-module/vite.config.js:2`. |
 | Written name with incomplete compiler configuration | 2,655 | Changesets names `vitest`'s `expect` and `it` in `packages/apply-release-plan/src/edit-json.test.ts:1`. Its missing base config leaves module resolution open. |
 | Written name with an unreadable workspace manifest | 7,974 | The manifest in Vite's `playground/resolve/utf8-bom-package` fixture leaves the workspace package inventory incomplete. This includes cases also carrying the `no-unseen-declarations` assumption. |
@@ -122,7 +181,7 @@ original manifest bytes.
 
 | Support item | Newly settled reference sites | Recorded example |
 | --- | ---: | --- |
-| `ts-runtime` | 40 | Astro's `packages/astro/src/assets/utils/vendor/image-size/detector.ts:22` names `es Map.prototype.get`. |
+| `ts-runtime` | 48 | Astro's `packages/astro/src/assets/utils/vendor/image-size/detector.ts:22` names `es Map.prototype.get`. |
 | `ts-package` | 2 | Astro's `packages/integrations/markdoc/src/runtime-assets-config.ts:6` names `@markdoc/markdoc Config`. |
 | `ts-package-chain` | 0 | A missing dependency declaration or package route still leaves the sampled chains open. |
 

@@ -5,7 +5,8 @@ It takes six bundled declaration targets and two package or Node targets per
 repository. The library line numbers refer to TypeScript 5.9.3.
 The second-review replay kept 33 of the original sites in the draw. The
 seven replacement sites were checked against the pinned sources and the
-bundled declarations below.
+bundled declarations. The final draw retained 38 of those sites. Two browser
+declarations re-entered the draw after refining the missing-type guard.
 
 ## honojs/hono
 
@@ -18,7 +19,7 @@ Commit `676c8f80fcafc49e6e74c847a8f0d9c44cc7faee`.
 | `src/types.test.ts:2495` | `es ReturnType` | The type reference applies the global utility to `typeof okHelper`. `lib.es5.d.ts:1650` |
 | `src/jsx/context.ts:106` | `es Array.prototype.at` | Line 105 gives `values` type `T[] \| undefined`. The length check narrows the receiver to the array. `lib.es2022.array.d.ts:24` |
 | `src/middleware/body-limit/index.test.ts:87` | `es String` | The call converts the request body's length with the global `String` value. `lib.es5.d.ts:544` |
-| `src/middleware/compress/index.test.ts:36` | `es String.prototype.repeat` | The receiver is the string literal `'a'`. `lib.es2015.core.d.ts:449` |
+| `src/jsx/dom/intrinsic-element/components.ts:153` | `dom ParentNode.prototype.querySelectorAll` | Line 74 takes `document.head`. `HTMLHeadElement` inherits the overload through `HTMLElement` and `Element`. `lib.dom.d.ts:22724` |
 | `src/types.test.ts:1875` | `vitest expectTypeOf` | Named import at `src/types.test.ts:2`. |
 | `src/jsx/dom/index.test.tsx:2` | `jsdom JSDOM` | The import itself selects the named export. |
 
@@ -63,7 +64,7 @@ Commit `9fed2eb2f3af672da9f7bf694b996df3831fc207`.
 | `src/middleware/devtools.ts:609` | `es Object.keys` | The call uses the global `Object` constructor's `keys` method after the plain-object guard. `lib.es5.d.ts:264` |
 | `src/middleware/devtools.ts:620` | `es Map.prototype.set` | `walked` defaults to `new Map<unknown, StateFunction[]>()` on line 601. `lib.es2015.collection.d.ts:41` |
 | `tests/vanilla/subscribe.test.tsx:100` | `es Math.abs` | The local comparator calls the global `Math` object. `lib.es5.d.ts:682` |
-| `tests/shallow.test.tsx:129` | `es Array.prototype.sort` | `Object.keys(state)` returns a string array. `lib.es5.d.ts:1395` |
+| `src/middleware/devtools.ts:154` | `dom Window` | The indexed access type starts from the configured DOM `Window` interface. `lib.dom.d.ts:36358` |
 | `tests/devtools.test.tsx:2712` | `vitest it` | Named import on line 1. |
 | `examples/demo/src/components/Scene.jsx:131` | `react useRef` | Named import on line 2. |
 
