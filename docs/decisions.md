@@ -2650,13 +2650,18 @@ schema-3 graphs. See [C-5](changes/C-5.md).
 ### Graph writes use a write-ahead log on local disks (C-6)
 
 **Decided (C-6):** from its first write, a writable graph connection on a Linux
-local filesystem switches the file to SQLite's write-ahead log with
+local filesystem, running a SQLite that has the write-ahead-log reset fix
+(3.51.3, 3.53.0 or later, or the backports 3.50.7 and 3.44.6: Node 24.15.0+,
+25.9.0+, 26), switches the file to SQLite's write-ahead log with
 `synchronous=NORMAL` and a checkpoint every 10,000 pages. Writes keep one
 commit per file; commits are not synced. The completion record is committed
 with `synchronous=FULL`. When its last writer closes, the file returns to the
-rollback journal. Elsewhere, and whenever another connection prevents the
-switch, the connection keeps the rollback journal with a full sync per commit,
-as before. The switch never waits on another connection. **Why:** synced
+rollback journal. If another connection prevents the switch in, the
+connection keeps the rollback journal with a full sync per commit, as before,
+without waiting. Elsewhere, including an unknown SQLite version, a writer
+never writes in a write-ahead log: it first folds a left-over log back
+(retrying for up to the 30-second writer wait, since SQLite does not wait for
+this switch), and otherwise fails as "database is locked". **Why:** synced
 commits, one per file, dominated cold indexing; Embassy and swc ran out of the
 sweep's 60 minutes writing analysed facts. A write-ahead log also lets readers
 read while a writer commits. **Safety argument:** after a crash or power loss,

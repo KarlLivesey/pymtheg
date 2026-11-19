@@ -150,24 +150,46 @@ the recent-run cache, and deleting it loses nothing that cannot be regenerated.
 All features open their SQLite databases through one storage boundary
 (`src/storage/`). Local storage only; no synchronization.
 
-**Graph writes (C-6).** On Linux, when the graph is on a local filesystem
-(ext2/3/4, XFS, Btrfs, tmpfs, ZFS, F2FS, bcachefs, overlayfs container
-layers, JFS, ReiserFS), an index writes through SQLite's write-ahead log. Its
-commits are not synced one by one; the completion record is written last with
-a full sync. Readers (CLI queries, MCP, Studio) are not locked out by an index
-in progress, and a second writer waits up to 30 seconds as before. An index cut
-short by a kill or a power loss leaves either the previous completed index or a
-store that reports incomplete; the next sync rebuilds it. When the last writer
-closes, the file returns to SQLite's rollback journal, the format older builds
-and readers in a read-only directory expect; a writer that was killed leaves
-the log until the next writer closes. Elsewhere (macOS, Windows, NFS, SMB,
-FUSE, 9p and virtiofs mounts, including WSL drive mounts and Docker Desktop
-bind mounts, and any filesystem whose type cannot be read) the graph keeps the
-rollback journal with a full sync per commit, exactly as before: a write-ahead
-log needs memory shared by every process that opens the file, which these do
-not guarantee. A store on such a filesystem may still be in write-ahead-log
-mode from a killed run on a local disk; the next writer switches it back when
-no other connection is open, and otherwise uses it with full syncs.
+**Graph writes (C-6).** An index writes through SQLite's write-ahead log when
+both of these hold:
+
+- **A fixed SQLite.** The Node release's bundled SQLite has the fix for
+  SQLite's write-ahead-log reset bug: Node 24.15.0 or later 24.x, Node 25.9.0
+  or later, or Node 26
+  ([table](https://github.com/KarlLivesey/pymtheg/blob/main/evidence/c-6/sqlite-versions.md)).
+- **A Linux local filesystem:** ext2/3/4, XFS, Btrfs, tmpfs, ZFS, F2FS,
+  bcachefs, overlayfs container layers, JFS or ReiserFS.
+
+What that gives:
+
+- **Commits** are not synced one by one; the completion record is written
+  last with a full sync.
+- **Readers** (CLI queries, MCP, Studio) are not locked out by an index in
+  progress. A second writer waits up to 30 seconds, as before.
+- **Interruptions.** An index cut short by a kill or a power loss leaves
+  either the previous completed index or a store that reports incomplete. The
+  next sync rebuilds it.
+- **At rest.** When the last writer closes, the file returns to SQLite's
+  rollback journal, the format readers in a read-only directory expect.
+- **When the log stays.** A writer that was killed, or that closed while
+  another connection was reading, leaves the log until the next writer closes
+  alone.
+
+Everywhere else the graph keeps the rollback journal with a full sync per
+commit, exactly as before. That covers:
+
+- Node 24.0.0 to 24.14.x and 25.0.0 to 25.8.x;
+- macOS and Windows;
+- NFS, SMB, FUSE, 9p and virtiofs mounts, including WSL drive mounts and
+  Docker Desktop bind mounts;
+- any filesystem whose type cannot be read.
+
+A write-ahead log needs memory shared by every process that opens the file,
+which these filesystems do not guarantee. There, a writer never writes in a
+write-ahead log. If a killed run left one, the writer first folds it back into
+the database and removes it, waiting for other connections for up to 30
+seconds; otherwise the write fails as "database is locked".
+
 
 Old layouts (`.pymtheg.json`, `.pymtheg-architecture/`, `.pymtheg-studio/` and
 the old top-level `.pymtheg-*.json` files) are unused dead data: never read,

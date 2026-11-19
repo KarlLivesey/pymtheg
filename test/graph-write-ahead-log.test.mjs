@@ -25,7 +25,11 @@ import { DatabaseSync } from "node:sqlite";
 import { executeGraph } from "../dist/graph/commands.js";
 import { LanguageRegistry } from "../dist/graph/registry.js";
 import { SqliteGraphStore } from "../dist/graph/store.js";
-import { writeAheadLogSafe } from "../dist/storage/local.js";
+import {
+  openWriteAheadLog,
+  sqliteWalResetFixed,
+  writeAheadLogSafe,
+} from "../dist/storage/local.js";
 import { fixtureFiles, fixtureModule } from "./graph-kill-fixture.mjs";
 
 const child = new URL("graph-kill-child.mjs", import.meta.url).pathname;
@@ -281,6 +285,149 @@ test("a completed index is readable from a storage directory the reader cannot w
     assert.equal(status.data.symbol.name, "f1");
   } finally {
     await chmod(directory, 0o755);
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("the write-ahead-log reset fix is recognised by SQLite version", () => {
+  const cases = {
+    // Affected: 3.7.0 through 3.51.2, and the withdrawn 3.52.0.
+    "3.7.0": false,
+    "3.44.5": false,
+    "3.49.1": false,
+    "3.50.4": false,
+    "3.51.2": false,
+    "3.52.0": false,
+    // Fixed: 3.51.3, 3.53.0 and later, backports 3.50.7 and 3.44.6.
+    "3.44.6": true,
+    "3.50.7": true,
+    "3.51.3": true,
+    "3.53.0": true,
+    "3.54.1": true,
+    "3.100.0": true,
+    // Unknown or unparsable: not fixed.
+    "": false,
+    3.51: false,
+    "3.51.3-beta": false,
+    next: false,
+  };
+  for (const [version, fixed] of Object.entries(cases))
+    assert.equal(sqliteWalResetFixed(version), fixed, version);
+  assert.equal(sqliteWalResetFixed(undefined), false);
+  assert.equal(writeAheadLogSafe(tmpdir(), "3.51.2"), false);
+});
+
+test("with an affected SQLite a writer keeps the rollback journal and first removes a log a killed run left", async () => {
+  const files = fixtureFiles();
+  const root = await project(files);
+  try {
+    assert.equal((await killAt(root, "resolved")).signal, "SIGKILL");
+    const left = await readdir(join(root, ".pymtheg/rebuildable"));
+    const before = rows(root);
+    // Another connection is open: the log cannot be removed, so nothing is written.
+    const other = new DatabaseSync(graphPath(root));
+    other.prepare("SELECT count(*) FROM graph_files").get();
+    const db = new DatabaseSync(graphPath(root), { timeout: 100 });
+    try {
+      db.prepare("SELECT count(*) FROM graph_files").get();
+      if (left.includes("graph.sqlite-wal"))
+        assert.throws(
+          () => openWriteAheadLog(db, graphPath(root), "3.51.2"),
+          /database is locked/,
+        );
+      other.close();
+      assert.equal(openWriteAheadLog(db, graphPath(root), "3.51.2"), false);
+      assert.equal(
+        db.prepare("PRAGMA journal_mode").get().journal_mode,
+        "delete",
+      );
+    } finally {
+      db.close();
+    }
+    assert.deepEqual(await format(root), [1, 1]);
+    assert.deepEqual(await readdir(join(root, ".pymtheg/rebuildable")), [
+      ".gitignore",
+      "graph.sqlite",
+    ]);
+    // The killed run's committed rows survive the switch unchanged.
+    assert.deepEqual(rows(root), before);
+    assert.equal((await run(root)).sync.complete, false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test(
+  "with a fixed SQLite a writer on a local disk uses the write-ahead log",
+  {
+    skip:
+      !writeAheadLogSafe(tmpdir(), "3.53.0") && "not a local Linux filesystem",
+  },
+  async () => {
+    const root = await project();
+    try {
+      await mkdir(join(root, ".pymtheg/rebuildable"), { recursive: true });
+      new SqliteGraphStore(graphPath(root)).close();
+      const db = new DatabaseSync(graphPath(root));
+      try {
+        assert.equal(openWriteAheadLog(db, graphPath(root), "3.53.0"), true);
+        assert.deepEqual(await format(root), [2, 2]);
+      } finally {
+        db.close();
+      }
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  },
+);
+
+test("a reader still open when the last writer closes keeps the log; every later open reads the same rows and the next writer restores the rollback journal", async () => {
+  const root = await project();
+  const directory = join(root, ".pymtheg/rebuildable");
+  try {
+    assert.equal((await run(root, "index")).sync.complete, true);
+    const reader = new SqliteGraphStore(graphPath(root), undefined, {
+      readOnly: true,
+    });
+    try {
+      assert.equal(reader.counts().files, 6);
+      const writer = new SqliteGraphStore(graphPath(root));
+      writer.removeFile("f0.x");
+      // The open reader sees the committed write, reading through the log.
+      assert.equal(reader.counts().files, 5);
+      writer.close();
+      if (wal) {
+        // A connection that has read through the log keeps it in use, and the
+        // switch back needs every other connection closed: the log stays.
+        assert.deepEqual(await format(root), [2, 2]);
+        assert.deepEqual(await readdir(directory), [
+          ".gitignore",
+          "graph.sqlite",
+          "graph.sqlite-shm",
+          "graph.sqlite-wal",
+        ]);
+      }
+      assert.equal(reader.counts().files, 5);
+    } finally {
+      reader.close();
+    }
+    // A read-only connection cannot checkpoint: the log is still there, and
+    // every later open reads it.
+    const status = await run(root);
+    assert.equal(status.counts.files, 5);
+    assert.equal(status.sync.complete, false);
+    // An open as main makes it (no journal-mode change) reads the same rows.
+    const plain = new DatabaseSync(graphPath(root));
+    assert.equal(
+      plain.prepare("SELECT count(*) AS n FROM graph_files").get().n,
+      5,
+    );
+    plain.close();
+    // The next writer of this build that closes alone restores the format.
+    assert.equal((await run(root, "index")).sync.complete, true);
+    assert.deepEqual(await format(root), [1, 1]);
+    assert.deepEqual(await readdir(directory), [".gitignore", "graph.sqlite"]);
+  } finally {
     await rm(root, { recursive: true, force: true });
   }
 });

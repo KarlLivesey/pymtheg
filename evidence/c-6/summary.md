@@ -23,6 +23,8 @@ Files:
   rounds each, on one file. The branch had no errors. (It was added after a
   first version, which switched at open rather than at the first write, failed
   an existing concurrent-writers test.)
+- `sqlite-versions.sh` reads the SQLite bundled with each Node image; the
+  table and the write-ahead-log reset bug are in `sqlite-versions.md`.
 - `fetch-all.sh`, `detach.sh` and `queue.sh` are helpers.
 
 The section 1 repositories are at their sweep commits (`sweep/repos.json`).
