@@ -1,0 +1,687 @@
+{
+ "repos": [
+  {
+   "id": "charmbracelet/bubbletea",
+   "linksBefore": 12533,
+   "linksAfter": 12533,
+   "definiteBefore": 7747,
+   "definiteAfter": 7747,
+   "newlyDefiniteExisting": {},
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 2000,
+   "symbolsAfter": 2000,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "cilium/ebpf",
+   "linksBefore": 50239,
+   "linksAfter": 50239,
+   "definiteBefore": 33366,
+   "definiteAfter": 33461,
+   "newlyDefiniteExisting": {
+    "calls": 95
+   },
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 8314,
+   "symbolsAfter": 8314,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "etcd-io/bbolt",
+   "linksBefore": 16898,
+   "linksAfter": 16898,
+   "definiteBefore": 10692,
+   "definiteAfter": 10750,
+   "newlyDefiniteExisting": {
+    "calls": 58
+   },
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 1905,
+   "symbolsAfter": 1905,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "evanw/esbuild",
+   "linksBefore": 98034,
+   "linksAfter": 98034,
+   "definiteBefore": 88193,
+   "definiteAfter": 88193,
+   "newlyDefiniteExisting": {},
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 8329,
+   "symbolsAfter": 8329,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "gin-gonic/gin",
+   "linksBefore": 21066,
+   "linksAfter": 21066,
+   "definiteBefore": 10901,
+   "definiteAfter": 10948,
+   "newlyDefiniteExisting": {
+    "calls": 33,
+    "imports": 3,
+    "references": 11
+   },
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 2729,
+   "symbolsAfter": 2729,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "go-task/task",
+   "linksBefore": 18333,
+   "linksAfter": 18333,
+   "definiteBefore": 11569,
+   "definiteAfter": 11569,
+   "newlyDefiniteExisting": {},
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 2772,
+   "symbolsAfter": 2772,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "gofiber/fiber",
+   "linksBefore": 143673,
+   "linksAfter": 143673,
+   "definiteBefore": 80435,
+   "definiteAfter": 80460,
+   "newlyDefiniteExisting": {
+    "calls": 25
+   },
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 16070,
+   "symbolsAfter": 16070,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "junegunn/fzf",
+   "linksBefore": 25947,
+   "linksAfter": 25947,
+   "definiteBefore": 18695,
+   "definiteAfter": 18695,
+   "newlyDefiniteExisting": {},
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 2984,
+   "symbolsAfter": 2984,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "labstack/echo",
+   "linksBefore": 31880,
+   "linksAfter": 31880,
+   "definiteBefore": 17275,
+   "definiteAfter": 17276,
+   "newlyDefiniteExisting": {
+    "calls": 1
+   },
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 4168,
+   "symbolsAfter": 4168,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "mattn/go-sqlite3",
+   "linksBefore": 9650,
+   "linksAfter": 9650,
+   "definiteBefore": 3642,
+   "definiteAfter": 3643,
+   "newlyDefiniteExisting": {
+    "calls": 1
+   },
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 1204,
+   "symbolsAfter": 1204,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "pocketbase/pocketbase",
+   "linksBefore": 70628,
+   "linksAfter": 70628,
+   "definiteBefore": 44794,
+   "definiteAfter": 44933,
+   "newlyDefiniteExisting": {
+    "calls": 139
+   },
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 8172,
+   "symbolsAfter": 8172,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "restic/restic",
+   "linksBefore": 64165,
+   "linksAfter": 64165,
+   "definiteBefore": 42347,
+   "definiteAfter": 42379,
+   "newlyDefiniteExisting": {
+    "calls": 32
+   },
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 8092,
+   "symbolsAfter": 8092,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "samber/lo",
+   "linksBefore": 28881,
+   "linksAfter": 28881,
+   "definiteBefore": 12914,
+   "definiteAfter": 12914,
+   "newlyDefiniteExisting": {},
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 4645,
+   "symbolsAfter": 4645,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "spf13/cobra",
+   "linksBefore": 8886,
+   "linksAfter": 8886,
+   "definiteBefore": 5758,
+   "definiteAfter": 5759,
+   "newlyDefiniteExisting": {
+    "calls": 1
+   },
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 926,
+   "symbolsAfter": 926,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "stretchr/testify",
+   "linksBefore": 19828,
+   "linksAfter": 19828,
+   "definiteBefore": 12986,
+   "definiteAfter": 13017,
+   "newlyDefiniteExisting": {
+    "imports": 2,
+    "calls": 27,
+    "references": 2
+   },
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 2542,
+   "symbolsAfter": 2542,
+   "symbolsMissing": 0
+  },
+  {
+   "id": "wagoodman/dive",
+   "linksBefore": 14901,
+   "linksAfter": 14901,
+   "definiteBefore": 8611,
+   "definiteAfter": 8631,
+   "newlyDefiniteExisting": {
+    "calls": 20
+   },
+   "newlyDefiniteNewSite": {},
+   "lost": 0,
+   "retargeted": 0,
+   "removedSites": 0,
+   "symbolsBefore": 1958,
+   "symbolsAfter": 1958,
+   "symbolsMissing": 0
+  }
+ ],
+ "totals": {
+  "linksBefore": 635542,
+  "linksAfter": 635542,
+  "definiteBefore": 409925,
+  "definiteAfter": 410375,
+  "lost": 0,
+  "retargeted": 0,
+  "removedSites": 0,
+  "symbolsBefore": 76810,
+  "symbolsAfter": 76810,
+  "symbolsMissing": 0
+ },
+ "changed": [],
+ "missingSymbols": [],
+ "sample": [
+  {
+   "repo": "pocketbase/pocketbase",
+   "file": "tools/search/filter.go",
+   "line": 683,
+   "kind": "calls",
+   "name": "*manyVsOneExpr",
+   "was": "unresolved",
+   "target": "tools/search/filter.go:struct:manyVsOneExpr",
+   "source": "var _ dbx.Expression = (*manyVsOneExpr)(nil)"
+  },
+  {
+   "repo": "etcd-io/bbolt",
+   "file": "db.go",
+   "line": 1132,
+   "kind": "calls",
+   "name": "*common.Page",
+   "was": "unresolved",
+   "target": "internal/common/page.go:struct:Page",
+   "source": "return (*common.Page)(unsafe.Pointer(&db.data[pos]))"
+  },
+  {
+   "repo": "gin-gonic/gin",
+   "file": "routergroup.go",
+   "line": 85,
+   "kind": "calls",
+   "name": "*RouterGroup",
+   "was": "unresolved",
+   "target": "routergroup.go:struct:RouterGroup",
+   "source": "_ IQueryRoutes = (*RouterGroup)(nil)"
+  },
+  {
+   "repo": "gin-gonic/gin",
+   "file": "render/render_test.go",
+   "line": 390,
+   "kind": "references",
+   "name": "testdata.Test",
+   "was": "unresolved",
+   "target": "testdata/protoexample/test.pb.go:struct:Test",
+   "source": "data := &testdata.Test{}"
+  },
+  {
+   "repo": "cilium/ebpf",
+   "file": "internal/sys/syscall.go",
+   "line": 38,
+   "kind": "calls",
+   "name": "*LinkInfo",
+   "was": "unresolved",
+   "target": "internal/sys/types.go:struct:LinkInfo",
+   "source": "var _ Info = (*LinkInfo)(nil)"
+  },
+  {
+   "repo": "pocketbase/pocketbase",
+   "file": "tools/filesystem/file.go",
+   "line": 142,
+   "kind": "calls",
+   "name": "*PathReader",
+   "was": "unresolved",
+   "target": "tools/filesystem/file.go:struct:PathReader",
+   "source": "var _ FileReader = (*PathReader)(nil)"
+  },
+  {
+   "repo": "gin-gonic/gin",
+   "file": "render/render.go",
+   "line": 32,
+   "kind": "calls",
+   "name": "*ProtoBuf",
+   "was": "unresolved",
+   "target": "render/protobuf.go:struct:ProtoBuf",
+   "source": "_ Render     = (*ProtoBuf)(nil)"
+  },
+  {
+   "repo": "pocketbase/pocketbase",
+   "file": "core/field_select.go",
+   "line": 25,
+   "kind": "calls",
+   "name": "*SelectField",
+   "was": "unresolved",
+   "target": "core/field_select.go:struct:SelectField",
+   "source": "_ SetterFinder = (*SelectField)(nil)"
+  },
+  {
+   "repo": "pocketbase/pocketbase",
+   "file": "core/mfa_model.go",
+   "line": 24,
+   "kind": "calls",
+   "name": "*MFA",
+   "was": "unresolved",
+   "target": "core/mfa_model.go:struct:MFA",
+   "source": "_ RecordProxy  = (*MFA)(nil)"
+  },
+  {
+   "repo": "cilium/ebpf",
+   "file": "btf/types.go",
+   "line": 292,
+   "kind": "calls",
+   "name": "*Struct",
+   "was": "unresolved",
+   "target": "btf/types.go:struct:Struct",
+   "source": "_ composite = (*Struct)(nil)"
+  },
+  {
+   "repo": "pocketbase/pocketbase",
+   "file": "apis/record_auth_with_oauth2_test.go",
+   "line": 21,
+   "kind": "calls",
+   "name": "*oauth2MockProvider",
+   "was": "unresolved",
+   "target": "apis/record_auth_with_oauth2_test.go:struct:oauth2MockProvider",
+   "source": "var _ auth.Provider = (*oauth2MockProvider)(nil)"
+  },
+  {
+   "repo": "etcd-io/bbolt",
+   "file": "db_test.go",
+   "line": 236,
+   "kind": "calls",
+   "name": "*meta",
+   "was": "unresolved",
+   "target": "db_test.go:struct:meta",
+   "source": "meta0 := (*meta)(unsafe.Pointer(&buf[pageHeaderSize]))"
+  },
+  {
+   "repo": "pocketbase/pocketbase",
+   "file": "core/settings_model.go",
+   "line": 117,
+   "kind": "calls",
+   "name": "*Settings",
+   "was": "unresolved",
+   "target": "core/settings_model.go:struct:Settings",
+   "source": "_ Model         = (*Settings)(nil)"
+  },
+  {
+   "repo": "pocketbase/pocketbase",
+   "file": "tools/logger/batch_handler.go",
+   "line": 21,
+   "kind": "calls",
+   "name": "*BatchHandler",
+   "was": "unresolved",
+   "target": "tools/logger/batch_handler.go:struct:BatchHandler",
+   "source": "var _ slog.Handler = (*BatchHandler)(nil)"
+  },
+  {
+   "repo": "wagoodman/dive",
+   "file": "cmd/dive/cli/internal/ui/handler/handle_pull_containerd_image_test.go",
+   "line": 13,
+   "kind": "calls",
+   "name": "*mockContainerdPullStatus",
+   "was": "unresolved",
+   "target": "cmd/dive/cli/internal/ui/handler/handle_pull_containerd_image_test.go:struct:mockContainerdPullStatus",
+   "source": "var _ containerdPullStatus = (*mockContainerdPullStatus)(nil)"
+  },
+  {
+   "repo": "pocketbase/pocketbase",
+   "file": "core/record_model.go",
+   "line": 36,
+   "kind": "calls",
+   "name": "*Record",
+   "was": "unresolved",
+   "target": "core/record_model.go:struct:Record",
+   "source": "_ HookTagger   = (*Record)(nil)"
+  },
+  {
+   "repo": "etcd-io/bbolt",
+   "file": "bucket.go",
+   "line": 165,
+   "kind": "calls",
+   "name": "*common.InBucket",
+   "was": "unresolved",
+   "target": "internal/common/bucket.go:struct:InBucket",
+   "source": "b.InBucket = (*common.InBucket)(unsafe.Pointer(&value[0]))"
+  },
+  {
+   "repo": "pocketbase/pocketbase",
+   "file": "tools/auth/facebook.go",
+   "line": 16,
+   "kind": "calls",
+   "name": "*Facebook",
+   "was": "unresolved",
+   "target": "tools/auth/facebook.go:struct:Facebook",
+   "source": "var _ Provider = (*Facebook)(nil)"
+  },
+  {
+   "repo": "gin-gonic/gin",
+   "file": "render/render.go",
+   "line": 21,
+   "kind": "calls",
+   "name": "*JsonpJSON",
+   "was": "unresolved",
+   "target": "render/json.go:struct:JsonpJSON",
+   "source": "_ Render     = (*JsonpJSON)(nil)"
+  },
+  {
+   "repo": "restic/restic",
+   "file": "internal/fs/vss_windows.go",
+   "line": 979,
+   "kind": "calls",
+   "name": "iVssBackupComponents.StartSnapshotSet",
+   "was": "unresolved",
+   "target": "internal/fs/vss_windows.go:method:(*IVssBackupComponents).StartSnapshotSet",
+   "source": "snapshotSetID, err = iVssBackupComponents.StartSnapshotSet()"
+  },
+  {
+   "repo": "cilium/ebpf",
+   "file": "btf/types.go",
+   "line": 71,
+   "kind": "calls",
+   "name": "*Enum",
+   "was": "unresolved",
+   "target": "btf/types.go:struct:Enum",
+   "source": "_ Type = (*Enum)(nil)"
+  },
+  {
+   "repo": "pocketbase/pocketbase",
+   "file": "core/field_text.go",
+   "line": 29,
+   "kind": "calls",
+   "name": "*TextField",
+   "was": "unresolved",
+   "target": "core/field_text.go:struct:TextField",
+   "source": "_ Field             = (*TextField)(nil)"
+  },
+  {
+   "repo": "gofiber/fiber",
+   "file": "adapter_test.go",
+   "line": 608,
+   "kind": "calls",
+   "name": "*dummyHandler",
+   "was": "unresolved",
+   "target": "adapter_test.go:struct:dummyHandler",
+   "source": "{name: \"typed nil pointer http.Handler\", handler: http.Handler((*dummyHandler)(nil))},"
+  },
+  {
+   "repo": "etcd-io/bbolt",
+   "file": "bucket.go",
+   "line": 170,
+   "kind": "calls",
+   "name": "*common.Page",
+   "was": "unresolved",
+   "target": "internal/common/page.go:struct:Page",
+   "source": "b.page = (*common.Page)(unsafe.Pointer(&value[common.BucketHeaderSize]))"
+  },
+  {
+   "repo": "gin-gonic/gin",
+   "file": "binding/binding_test.go",
+   "line": 715,
+   "kind": "references",
+   "name": "protoexample.Test",
+   "was": "unresolved",
+   "target": "testdata/protoexample/test.pb.go:struct:Test",
+   "source": "test := &protoexample.Test{"
+  },
+  {
+   "repo": "stretchr/testify",
+   "file": "internal/spew/dumpcgo_test.go",
+   "line": 60,
+   "kind": "calls",
+   "name": "testdata.GetCgoUnsignedCharArray",
+   "was": "unresolved",
+   "target": "internal/spew/testdata/dumpcgo.go:function:GetCgoUnsignedCharArray",
+   "source": "v3, v3l, v3c := testdata.GetCgoUnsignedCharArray()"
+  },
+  {
+   "repo": "gin-gonic/gin",
+   "file": "binding/form.go",
+   "line": 59,
+   "kind": "calls",
+   "name": "*multipartRequest",
+   "was": "unresolved",
+   "target": "binding/multipart_form_mapping.go:type:multipartRequest",
+   "source": "if err := mappingByPtr(obj, (*multipartRequest)(req), \"form\"); err != nil {"
+  },
+  {
+   "repo": "etcd-io/bbolt",
+   "file": "db.go",
+   "line": 1137,
+   "kind": "calls",
+   "name": "*common.Page",
+   "was": "unresolved",
+   "target": "internal/common/page.go:struct:Page",
+   "source": "return (*common.Page)(unsafe.Pointer(&b[id*common.Pgid(db.pageSize)]))"
+  },
+  {
+   "repo": "gin-gonic/gin",
+   "file": "render/render_test.go",
+   "line": 146,
+   "kind": "calls",
+   "name": "*errorWriter",
+   "was": "unresolved",
+   "target": "render/render_test.go:struct:errorWriter",
+   "source": "var _ http.ResponseWriter = (*errorWriter)(nil)"
+  },
+  {
+   "repo": "cilium/ebpf",
+   "file": "internal/sys/syscall.go",
+   "line": 114,
+   "kind": "calls",
+   "name": "*TokenInfo",
+   "was": "unresolved",
+   "target": "internal/sys/types.go:struct:TokenInfo",
+   "source": "var _ Info = (*TokenInfo)(nil)"
+  },
+  {
+   "repo": "cilium/ebpf",
+   "file": "ringbuf/reader_other.go",
+   "line": 14,
+   "kind": "calls",
+   "name": "*epollPoller",
+   "was": "unresolved",
+   "target": "ringbuf/reader_other.go:struct:epollPoller",
+   "source": "var _ poller = (*epollPoller)(nil)"
+  },
+  {
+   "repo": "cilium/ebpf",
+   "file": "linker.go",
+   "line": 308,
+   "kind": "calls",
+   "name": "*btf.Func",
+   "was": "unresolved",
+   "target": "btf/types.go:struct:Func",
+   "source": "target := btf.Type((*btf.Func)(nil))"
+  },
+  {
+   "repo": "stretchr/testify",
+   "file": "_codegen/main.go",
+   "line": 129,
+   "kind": "references",
+   "name": "imports.Importer",
+   "was": "unresolved",
+   "target": "_codegen/internal/imports/imports.go:interface:Importer",
+   "source": "func analyzeCode(scope *types.Scope, docs *doc.Package) (imports.Importer, []testFunc, error) {"
+  },
+  {
+   "repo": "cilium/ebpf",
+   "file": "btf/types.go",
+   "line": 78,
+   "kind": "calls",
+   "name": "*declTag",
+   "was": "unresolved",
+   "target": "btf/types.go:struct:declTag",
+   "source": "_ Type = (*declTag)(nil)"
+  },
+  {
+   "repo": "cilium/ebpf",
+   "file": "prog_test.go",
+   "line": 682,
+   "kind": "calls",
+   "name": "(*ProgramSpec)(nil).Copy",
+   "was": "ambiguous",
+   "target": "prog.go:method:(*ProgramSpec).Copy",
+   "source": "qt.Check(t, qt.IsNil((*ProgramSpec)(nil).Copy()))"
+  },
+  {
+   "repo": "pocketbase/pocketbase",
+   "file": "tools/auth/spotify.go",
+   "line": 16,
+   "kind": "calls",
+   "name": "*Spotify",
+   "was": "unresolved",
+   "target": "tools/auth/spotify.go:struct:Spotify",
+   "source": "var _ Provider = (*Spotify)(nil)"
+  },
+  {
+   "repo": "pocketbase/pocketbase",
+   "file": "tools/search/filter.go",
+   "line": 587,
+   "kind": "calls",
+   "name": "*concatExpr",
+   "was": "unresolved",
+   "target": "tools/search/filter.go:struct:concatExpr",
+   "source": "var _ dbx.Expression = (*concatExpr)(nil)"
+  },
+  {
+   "repo": "pocketbase/pocketbase",
+   "file": "core/record_field_resolver_replace_expr.go",
+   "line": 9,
+   "kind": "calls",
+   "name": "*replaceWithExpression",
+   "was": "unresolved",
+   "target": "core/record_field_resolver_replace_expr.go:struct:replaceWithExpression",
+   "source": "var _ dbx.Expression = (*replaceWithExpression)(nil)"
+  },
+  {
+   "repo": "wagoodman/dive",
+   "file": "cmd/dive/cli/internal/ui/line_ui.go",
+   "line": 23,
+   "kind": "calls",
+   "name": "*LineUI",
+   "was": "unresolved",
+   "target": "cmd/dive/cli/internal/ui/line_ui.go:struct:LineUI",
+   "source": "var _ clio.UI = (*LineUI)(nil)"
+  },
+  {
+   "repo": "pocketbase/pocketbase",
+   "file": "core/settings_model.go",
+   "line": 119,
+   "kind": "calls",
+   "name": "*Settings",
+   "was": "unresolved",
+   "target": "core/settings_model.go:struct:Settings",
+   "source": "_ DBExporter    = (*Settings)(nil)"
+  }
+ ],
+ "poolSize": 445
+}
