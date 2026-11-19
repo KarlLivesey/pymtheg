@@ -288,6 +288,26 @@ export interface GraphStorage {
   >;
   /** Optional: one module's parsed links, as links() reports them. */
   moduleLinks?(module: string): StorageResult<GraphLink[]>;
+  /**
+   * Optional (C-22): one module's parsed links as a resolver receives them,
+   * each a moduleLinks() record with no target, candidates or library
+   * targets and resolution "unresolved". Fresh records, as independentReads.
+   */
+  moduleInputLinks?(module: string): StorageResult<GraphLink[]>;
+  /**
+   * Optional (C-22), together with writeAnalysis: every link of one module,
+   * parsed and added, as links() reports them.
+   */
+  analysisLinks?(module: string): StorageResult<GraphLink[]>;
+  /**
+   * Optional (C-22): what replaceAnalysis writes, given its two inputs
+   * already computed from the present state: `current` from analysisLinks
+   * and `desired` from resolutionFacts over the same links and symbols.
+   */
+  writeAnalysis?(
+    current: readonly GraphLink[],
+    desired: readonly GraphLink[],
+  ): StorageResult<void>;
   /** Optional row counts; the indexer otherwise counts decoded reads. */
   counts?(): StorageResult<{
     symbols: number;

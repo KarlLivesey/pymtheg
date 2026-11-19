@@ -707,22 +707,66 @@ export class SqliteGraphStore implements GraphStorage {
       );
   }
   replaceAnalysis(module: string, result: ResolutionResult): void {
-    const current = this.selectLinks("l.module=?", [module]);
-    count("store.linksCompared", current.length);
-    const sql = this.writer();
+    const current = this.analysisLinks(module);
     const desired = resolutionFacts(
       this.projectId,
       module,
       result,
       (path) => {
-        const row = sql("SELECT body FROM graph_files WHERE path=?").get(path);
+        const row = this.db
+          .prepare("SELECT body FROM graph_files WHERE path=?")
+          .get(path);
         return row ? this.decodeFile(row.body as string) : undefined;
       },
       this.findSymbols(),
       current,
       (path) => this.cleanContext(path),
     );
+    this.writeAnalysis(current, desired);
+  }
+  /** Every link of one module, parsed and added, as links() reports them. */
+  analysisLinks(module: string): GraphLink[] {
+    return this.selectLinks("l.module=?", [module]);
+  }
+  /**
+   * One module's parsed links as a resolver receives them: unresolved, with
+   * no target, candidates or library targets, so none of those rows is read.
+   * Each is the record moduleLinks() returns, with those fields cleared.
+   */
+  moduleInputLinks(module: string): GraphLink[] {
+    return this.db
+      .prepare(
+        `SELECT l.body,f.status AS sourceStatus FROM graph_links l JOIN graph_files f${this.fileStatusIndex} ON f.path=l.file
+        WHERE l.module=? AND l.origin='parse' ORDER BY l.id`,
+      )
+      .all(module)
+      .map((row) => {
+        const { libraries: _previous, ...link } = JSON.parse(
+          row.body as string,
+        ) as GraphLink;
+        void _previous;
+        return {
+          ...link,
+          targetId: null,
+          targetStatus: null,
+          sourceStatus: row.sourceStatus as GraphLink["sourceStatus"],
+          candidates: [],
+          resolution: "unresolved" as const,
+        };
+      });
+  }
+  /**
+   * Writes one module's resolution: `current` is analysisLinks(module) and
+   * `desired` is resolutionFacts over it, both from the present state. Only
+   * rows that differ are written.
+   */
+  writeAnalysis(
+    current: readonly GraphLink[],
+    desired: readonly GraphLink[],
+  ): void {
+    count("store.linksCompared", current.length);
     if (sameLinks(current, desired)) return;
+    const sql = this.writer();
     this.transaction(() => {
       const wanted = new Map(desired.map((link) => [link.id, link]));
       const previous = new Map(current.map((link) => [link.id, link]));

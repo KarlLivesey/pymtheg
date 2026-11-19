@@ -9,6 +9,7 @@ import type {
   AnalyzedFile,
   ContextFile,
   GraphFile,
+  GraphLink,
   GraphStorage,
   Json,
   LanguageModule,
@@ -277,8 +278,15 @@ export async function indexProject(
   // results are released when it returns instead of lingering in this
   // function's suspended frame through the remaining phases (C-2).
   const analyzeModule = async (module: LanguageModule): Promise<void> => {
+    // Only this module's records are decoded when the store can list them.
     const files = await stage(`analyze.${module.id}.input`, async () =>
-      (await store.files()).filter((file) => file.module === module.id),
+      store.filesAt && store.fileSummaries
+        ? await store.filesAt(
+            (await store.fileSummaries())
+              .filter((file) => file.module === module.id)
+              .map((file) => file.path),
+          )
+        : (await store.files()).filter((file) => file.module === module.id),
     );
     count(`analyze.${module.id}.inputFiles`, files.length);
     const filesByPath = new Map(files.map((file) => [file.path, file]));
@@ -389,6 +397,11 @@ export async function indexProject(
       needsContext(module, file.path),
     );
     let result: ResolutionResult = { resolutions: [], links: [] };
+    // The validated write, when the store takes one: the links read once
+    // for validation are the links the write compares against.
+    let prepared:
+      | { current: readonly GraphLink[]; desired: readonly GraphLink[] }
+      | undefined;
     try {
       if (
         ownContexts.some((file) => file.status === "failed") ||
@@ -424,8 +437,13 @@ export async function indexProject(
         for (const file of await read(() => filesAt(store, [...wanted])))
           needed.set(file.path, file);
       const symbols = await read(() => store.findSymbols());
-      const current = await read(() => parsedLinks(store, module.id));
-      await stage(`resolve.${module.id}.validate`, () =>
+      // Every link of the module when the store can write a validated
+      // result; resolutionFacts reads only the parsed ones.
+      const whole = !!(store.analysisLinks && store.writeAnalysis);
+      const current = await read(() =>
+        whole ? store.analysisLinks!(module.id) : parsedLinks(store, module.id),
+      );
+      const desired = await stage(`resolve.${module.id}.validate`, () =>
         resolutionFacts(
           store.projectId,
           module.id,
@@ -440,7 +458,9 @@ export async function indexProject(
             ),
         ),
       );
+      if (whole) prepared = { current, desired };
     } catch (error) {
+      prepared = undefined;
       // Storage errors propagate; they are not mislabeled as module failures.
       if (error instanceof StorageRead) throw error.cause;
       if (options.signal?.aborted && Object.is(error, options.signal.reason))
@@ -452,7 +472,9 @@ export async function indexProject(
       result = { resolutions: [], links: [] };
     }
     await stage(`resolve.${module.id}.write`, () =>
-      store.replaceAnalysis(module.id, result),
+      prepared
+        ? store.writeAnalysis!(prepared.current, prepared.desired)
+        : store.replaceAnalysis(module.id, result),
     );
   };
   for (const module of registry.modules) await resolveModule(module);
@@ -528,7 +550,14 @@ async function runResolve(
   const input = await stage(`resolve.${module.id}.input`, async () => ({
     files: own(await read(() => store.files())),
     symbols: own(await read(() => store.findSymbols())),
-    links: own(await read(() => parsedLinks(store, module.id))),
+    // Only the parsed link records: their targets are cleared below anyway.
+    links: own(
+      await read(
+        async () =>
+          (await store.moduleInputLinks?.(module.id)) ??
+          (await parsedLinks(store, module.id)),
+      ),
+    ),
   }));
   count(`resolve.${module.id}.inputFiles`, input.files.length);
   count(`resolve.${module.id}.inputSymbols`, input.symbols.length);
