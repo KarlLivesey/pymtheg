@@ -989,6 +989,9 @@ test("test globals require program evidence and respect shadowing", async () => 
       "redirected/package.json":
         '{"devDependencies":{"vitest":"npm:other-test-kit@^1"}}',
       "redirected/main.ts": trpc,
+      "deno/tsconfig.json": '{"compilerOptions":{"types":["vitest/globals"]}}',
+      "deno/deno.json": '{"imports":{"vitest/globals":"npm:other-test-kit"}}',
+      "deno/main.ts": trpc,
       "captured/tsconfig.json":
         '{"compilerOptions":{"types":["jest","mocha"],"typeRoots":["./types"]}}',
       "captured/package.json":
@@ -1062,6 +1065,7 @@ test("test globals require program evidence and respect shadowing", async () => 
         ["reference", "expect"],
         ["custom", "test"],
         ["redirected", "test"],
+        ["deno", "test"],
       ])
         assert.equal(
           graph.link(dir + "/main.ts", name, "calls").resolution,

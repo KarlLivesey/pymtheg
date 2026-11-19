@@ -288,10 +288,13 @@ export function extractFile(
   const globals = globalTypeAvailability(
     program,
     library.isNodeTypeFile,
-    (name, source) =>
-      library
-        .forImporter(fromVirtual(source) ?? path)
-        .typePackageUnredirected(name),
+    (name, source) => {
+      const from = fromVirtual(source) ?? path;
+      return (
+        context.selectSpecifier(name, from) === name &&
+        library.forImporter(from).typePackageUnredirected(name)
+      );
+    },
   );
   let missingNode =
     !globals.hasNode &&
@@ -568,7 +571,6 @@ export function extractFile(
       (meaning !== "call" && !found.typeQuery) ||
       incompleteConfig ||
       context.anyFailed ||
-      context.hasDenoImports ||
       result.targets.length
     )
       return undefined;
@@ -589,20 +591,21 @@ export function extractFile(
     )
       return undefined;
     if (!isTestGlobal(at.text)) {
+      const target =
+        !symbol && meaning === "call" && globals.expectsNode
+          ? nodeGlobalCall(at.text, found.construct === true)
+          : undefined;
       if (
-        !symbol &&
-        meaning === "call" &&
-        globals.expectsNode &&
+        target &&
         !globals.hasNode &&
         !globals.otherRuntime &&
         !program.getCompilerOptions().typeRoots &&
+        context.selectSpecifier("node", path) === "node" &&
         !globals.otherGlobals.has(at.text) &&
         !insideWith(at) &&
         importer.typePackageUnredirected("@types/node")
-      ) {
-        const target = nodeGlobalCall(at.text, found.construct === true);
-        if (target) return { targets: [], libraryFacts: [target] };
-      }
+      )
+        return { targets: [], libraryFacts: [target] };
       return undefined;
     }
     if (found.construct || insideWith(at)) return undefined;
