@@ -80,6 +80,7 @@
   "files": [
     "dist/",
     "src/graph/languages/go/toolchain/golinks.go",
+    "src/graph/languages/go/stdlib/table.txt.gz",
     "dist-web/",
     "docs/agent-workflow.md",
     "docs/code-guide.md",

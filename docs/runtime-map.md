@@ -1712,6 +1712,17 @@ the helper's C and U records carry the member's declaring named type
 records it with `declaring-owner`. Go coverage for module 30 and later uses
 stored targets only; older Go graphs keep the reconstruction.
 
+From module 31 (C-17, `stdlib.ts`, `resolve.ts` `stdMemberTarget`), the
+source-only route types standard-library values from the shipped table
+`src/graph/languages/go/stdlib/table.txt.gz` (read on first use): an
+external type value carries `std`, the table's type, through declared and
+written types, standard function and method results, fields, variables
+and container elements; `selectName` with `std` expands an embedded
+standard-library type of a project struct by the table's member depths.
+Every other decision ignores `std`, so no checkout target, candidate set or
+reason changes. The toolchain helper names standard-library interface
+methods' owners and `error.Error` too, so both routes can be compared.
+
 Module 30 recognizes captured Cargo directory source replacements as checkout
 dependencies, limits patch uncertainty to affected package edges, and protects
 explicit module imports with a proven namespace from opaque items in that same

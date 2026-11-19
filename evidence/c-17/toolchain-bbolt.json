@@ -1,0 +1,13 @@
+{
+ "project": "etcd-io/bbolt",
+ "toolchainNotes": [],
+ "tableResolved": 1410,
+ "goTypesDecided": 1394,
+ "agree": 1394,
+ "disagreements": [],
+ "notDecidedByGoTypes": {
+  "same table answer (no go/types fact for the link)": 16
+ },
+ "toolchainOwnerWhereTableNone": 17,
+ "disagreementCount": 0
+}

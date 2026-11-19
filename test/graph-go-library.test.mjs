@@ -339,12 +339,23 @@ test("members on values of library types stay unresolved with their reason; the 
     symbol: "Buffer",
     evidence: "import-binding",
   });
-  for (const member of ["buf.Write", "gob.NewDecoder(r).Decode", "is.NoError"])
-    assert.deepEqual(
-      outcome(at(links, file, member)),
-      { unresolved: "library-member-unproven" },
-      member,
-    );
+  // C-17: standard-library members resolve from the shipped table; a
+  // third-party type's member stays unproven.
+  assert.deepEqual(outcome(at(links, file, "buf.Write")), {
+    ecosystem: "go-std",
+    unit: "bytes",
+    symbol: "Buffer.Write",
+    evidence: "declaring-owner",
+  });
+  assert.deepEqual(outcome(at(links, file, "gob.NewDecoder(r).Decode")), {
+    ecosystem: "go-std",
+    unit: "encoding/gob",
+    symbol: "Decoder.Decode",
+    evidence: "declaring-owner",
+  });
+  assert.deepEqual(outcome(at(links, file, "is.NoError")), {
+    unresolved: "library-member-unproven",
+  });
   assert.deepEqual(outcome(at(links, file, "gob.NewDecoder")), {
     ecosystem: "go-std",
     unit: "encoding/gob",
@@ -484,6 +495,78 @@ test("review: in a workspace a version is recorded only when every requiring mod
   const target = outcome(at(same.links, "a/a.go", "dep.F"));
   assert.equal(target.version, "v1.0.0");
   assert.match(target.versionSource, /^[ab]\/go\.mod$/);
+});
+
+test("review 2: a quoted replacement path with spaces is read whole", async () => {
+  const { links } = await project({
+    "go.mod": lines(
+      "module example.com/m",
+      "",
+      "go 1.22",
+      "",
+      "require github.com/sp/mod v1.0.0",
+      "",
+      'replace github.com/sp/mod => "../path with spaces"',
+    ),
+    "a/a.go": lines(
+      "package a",
+      'import "github.com/sp/mod"',
+      "func use() { mod.F() }",
+    ),
+  });
+  // A directory replacement (outside the checkout, so unseen): never a library.
+  assert.deepEqual(outcome(at(links, "a/a.go", "mod.F")), { unresolved: null });
+});
+
+test("review 2: a workspace using a module outside the checkout proves no version", async () => {
+  const { links } = await project({
+    "go.work": lines("go 1.22", "", "use (", "\t./a", "\t../elsewhere", ")"),
+    "a/go.mod": lines(
+      "module example.com/a",
+      "",
+      "go 1.22",
+      "",
+      "require github.com/d/dep v1.0.0",
+    ),
+    "a/a.go": lines(
+      "package a",
+      'import "github.com/d/dep"',
+      "func use() { dep.F() }",
+    ),
+  });
+  // The outside module may require a higher version: unit and symbol only.
+  assert.deepEqual(outcome(at(links, "a/a.go", "dep.F")), {
+    ecosystem: "go",
+    unit: "github.com/d/dep",
+    symbol: "F",
+    evidence: "import-binding",
+  });
+});
+
+test("review 3: a workspace using a module by an absolute path proves no version", async () => {
+  const { links } = await project({
+    "go.work": lines("go 1.22", "", "use (", "\t./a", "\t/src/elsewhere", ")"),
+    "a/go.mod": lines(
+      "module example.com/a",
+      "",
+      "go 1.22",
+      "",
+      "require github.com/d/dep v1.0.0",
+    ),
+    "a/a.go": lines(
+      "package a",
+      'import "github.com/d/dep"',
+      "func use() { dep.F() }",
+    ),
+    // A checkout directory with the same relative name is not that module.
+    "src/elsewhere/go.mod": lines("module example.com/x", "", "go 1.22"),
+  });
+  assert.deepEqual(outcome(at(links, "a/a.go", "dep.F")), {
+    ecosystem: "go",
+    unit: "github.com/d/dep",
+    symbol: "F",
+    evidence: "import-binding",
+  });
 });
 
 test("review: a qualifier two unnamed imports may declare is a set of both units", async () => {

@@ -89,7 +89,11 @@ export function parseFacts(
     name: string,
     member: string | undefined,
   ): Partial<ToolchainFact> => {
-    if (cls === "builtin") return { b: true };
+    // A method of the predeclared `error` interface (C-17): its owner.
+    if (cls === "builtin")
+      return member !== undefined && /^error\.\w+$/.test(member)
+        ? { b: true, l: ["builtin", member, "std"] }
+        : { b: true };
     if (cls === "std" || cls === "dep") {
       if (pkg === "-" || name === "-") return {};
       // The selected object's symbol (C-14): "=" its own name (not a
