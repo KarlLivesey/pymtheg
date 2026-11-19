@@ -2881,6 +2881,41 @@ test("a literal tsup output name follows its named source entry", async () => {
   );
 });
 
+test("a proven JavaScript output cannot replace an unproven types entry", async () => {
+  await project(
+    {
+      "package.json": '{"workspaces":["packages/*"],"type":"module"}',
+      "packages/lib/package.json": JSON.stringify({
+        name: "fixture-library",
+        type: "module",
+        exports: {
+          ".": { types: "./types/custom.d.ts", default: "./dist/entry.js" },
+          "./runtime": "./dist/entry.js",
+        },
+        tsup: {
+          entry: { entry: "src/index.ts" },
+          outDir: "dist",
+          format: ["esm"],
+          bundle: false,
+        },
+      }),
+      "packages/lib/src/index.ts": "export function open() {}",
+      "use.ts":
+        'import { open as declared } from "fixture-library"; import { open as runtime } from "fixture-library/runtime"; declared(); runtime();',
+    },
+    async (graph, report) => {
+      clean(report);
+      const declared = graph.link("use.ts", "declared", "calls");
+      assert.equal(declared.resolution, "unresolved");
+      assert.equal(declared.data.reason, "workspace-entry-unavailable");
+      assert.equal(
+        graph.target(graph.link("use.ts", "runtime", "calls")),
+        "packages/lib/src/index.ts#open",
+      );
+    },
+  );
+});
+
 test("a declaration build that strips a re-exported input cannot lend its hidden source exports", async () => {
   await project(
     {

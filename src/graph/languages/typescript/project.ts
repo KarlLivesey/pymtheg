@@ -1292,20 +1292,38 @@ export function projectModel(
           )
             return result;
           const candidates = new Map<string, OutputProof>();
-          const directories = new Set<string>();
-          for (const lookup of lookups ?? []) {
+          const missingOutput = (lookup: string) => {
             // Only failed probes through the selected package link, never a
             // missing paths alias or an unrelated relative import.
-            if (!lookup.startsWith(route.link + "/")) continue;
-            const output = workspaceOutput(lookup, route)!;
+            if (!lookup.startsWith(route.link + "/")) return undefined;
             if (
               route.installed &&
               dependencies?.realpath(dependencyPath(lookup)) !== undefined
             )
-              continue;
+              return undefined;
+            return workspaceOutput(lookup, route);
+          };
+          for (const lookup of lookups ?? []) {
+            const output = missingOutput(lookup);
+            if (!output) continue;
             const proof = entries.proof(route.target, output);
-            if (proof === undefined) continue;
-            candidates.set(lookup, proof);
+            if (proof !== undefined) candidates.set(lookup, proof);
+          }
+          if (
+            ![...candidates.values()].some((proof) => typeof proof === "object")
+          )
+            return result;
+          // Expose missing explicit entries to the retry even when we have no
+          // source for them. A later condition cannot displace the selected
+          // declaration entry merely because the latter has no proof.
+          for (const lookup of lookups ?? []) {
+            if (candidates.has(lookup)) continue;
+            const output = missingOutput(lookup);
+            if (output && entries.explicitEntry(route.target, output))
+              candidates.set(lookup, false);
+          }
+          const directories = new Set<string>();
+          for (const lookup of candidates.keys()) {
             for (
               let dir = posix.dirname(lookup);
               dir !== route.link;
@@ -1313,7 +1331,6 @@ export function projectModel(
             )
               directories.add(dir);
           }
-          if (!candidates.size) return result;
           // Let TypeScript choose the entry and condition in the original
           // mode. The overlay is scoped to this lookup and has no file bodies.
           const retry = ts.resolveModuleName(

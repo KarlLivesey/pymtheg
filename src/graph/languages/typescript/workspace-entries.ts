@@ -98,6 +98,10 @@ export function workspaceEntries(
     configs.set(root, list);
   }
   const staticEntries = new Map<string, Map<string, string>>();
+  const explicitTargets = new Map<
+    string,
+    { paths: Set<string>; patterns: string[][] }
+  >();
   const internalSources = new Map<string, boolean>();
   const cache = new Map<string, OutputProof | null>();
   const nativeConfigs = new WeakMap<
@@ -111,6 +115,7 @@ export function workspaceEntries(
   );
   return {
     available: configs.size > 0 || manifests.some(({ json }) => !!json.tsup),
+    explicitEntry,
     proof(root: string, output: string) {
       if (!outputExtension.test(output) || files.has(output)) return undefined;
       const key = `${root}\0${output}`;
@@ -145,6 +150,55 @@ export function workspaceEntries(
       return result;
     },
   };
+
+  function explicitEntry(root: string, output: string) {
+    const manifest = packages.get(root);
+    if (!manifest || files.has(output) || packageOf(output) !== root)
+      return false;
+    let targets = explicitTargets.get(root);
+    if (!targets) {
+      const paths = new Set<string>();
+      const patterns: string[][] = [];
+      const pending = [
+        manifest.json.types,
+        manifest.json.typings,
+        manifest.json.main,
+        manifest.json.exports,
+        manifest.json.typesVersions,
+      ];
+      for (const value of pending) {
+        if (value && typeof value === "object") {
+          for (const child of Object.values(value)) pending.push(child);
+          continue;
+        }
+        const path = packagePath(root, value);
+        if (!path) continue;
+        if (path.includes("*")) patterns.push(path.split("*"));
+        else paths.add(path);
+      }
+      explicitTargets.set(root, (targets = { paths, patterns }));
+    }
+    const { paths, patterns } = targets;
+    const matches = (path: string) =>
+      paths.has(path) ||
+      patterns.some((parts) => {
+        const fixed = parts.reduce((n, part) => n + part.length, 0);
+        const length = (path.length - fixed) / (parts.length - 1);
+        const start = parts[0]!.length;
+        return (
+          Number.isInteger(length) &&
+          length >= 0 &&
+          parts.join(path.slice(start, start + length)) === path
+        );
+      });
+    if (matches(output)) return true;
+    if (!outputExtension.test(output)) return false;
+    const stem = output.replace(outputExtension, "");
+    return (
+      matches(stem) ||
+      (posix.basename(stem) === "index" && matches(posix.dirname(stem)))
+    );
+  }
 
   function closedCommonRoot(parsed: ts.ParsedCommandLine) {
     if (parsed.options.noResolve) return true;
