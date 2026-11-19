@@ -1086,7 +1086,8 @@ class GoResolver {
    */
   private toolchainLibrary(link: GraphLink): LibraryTarget | undefined {
     const data = link.data as
-      { tc?: ToolchainFact; builtinName?: boolean } | undefined;
+      | { tc?: ToolchainFact; builtinName?: boolean }
+      | undefined;
     const fact = data?.tc;
     if (!fact) return undefined;
     // A method of the predeclared `error` interface (C-17): its owner.
@@ -2672,11 +2673,13 @@ class GoResolver {
             }
             // An external type cannot declare a project package's unexported name;
             // an unresolvable one could be anything.
-            if (!(
-              item.value.kind === "external" &&
-              !item.value.shadowable &&
-              skipExternal
-            ))
+            if (
+              !(
+                item.value.kind === "external" &&
+                !item.value.shadowable &&
+                skipExternal
+              )
+            )
               externalAt ??= depth + 1;
             continue;
           }
@@ -2842,11 +2845,13 @@ class GoResolver {
       );
       for (const item of this.embedded(iface)) {
         if (item.value.kind !== "project") {
-          if (!(
-            item.value.kind === "external" &&
-            !item.value.shadowable &&
-            skipExternal
-          ))
+          if (
+            !(
+              item.value.kind === "external" &&
+              !item.value.shadowable &&
+              skipExternal
+            )
+          )
             unknown = true;
           continue;
         }
@@ -3337,7 +3342,8 @@ class GoResolver {
   private symbolsByFile?: Map<string, GraphSymbol[]>;
   /** The graph symbol declared at a toolchain position (name inside its range). */
   private symbolAt([file, offset, name]: [string, number, string]):
-    GraphSymbol | undefined {
+    | GraphSymbol
+    | undefined {
     if (!this.symbolsByFile) {
       this.symbolsByFile = new Map();
       for (const symbol of this.symbolsById.values())

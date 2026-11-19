@@ -137,7 +137,7 @@ export function queryGraph(
     let minimumEnd = Infinity,
       maximumStart = -1;
     const inner: GraphSymbol[] = [];
-    for (let i = 0; i < found.length;) {
+    for (let i = 0; i < found.length; ) {
       const value = found[i]!;
       let end = i + 1;
       while (
@@ -146,10 +146,12 @@ export function queryGraph(
         found[end]!.range.end === value.range.end
       )
         end++;
-      if (!(
-        minimumEnd < value.range.end ||
-        (minimumEnd === value.range.end && maximumStart > value.range.start)
-      ))
+      if (
+        !(
+          minimumEnd < value.range.end ||
+          (minimumEnd === value.range.end && maximumStart > value.range.start)
+        )
+      )
         inner.push(...found.slice(i, end));
       if (value.range.end < minimumEnd) {
         minimumEnd = value.range.end;
@@ -176,7 +178,7 @@ export function queryGraph(
     if (/^symbol:/.test(input) || /:\d+(?::\d+)?$/.test(input)) return [];
     const parts = (value: string) => {
       let text = value.trim();
-      for (let before = ""; before !== text;) {
+      for (let before = ""; before !== text; ) {
         before = text;
         text = text.replace(/<[^<>]*>|\[[^[\]]*\]/g, "");
       }

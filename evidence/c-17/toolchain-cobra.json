@@ -1,0 +1,13 @@
+{
+ "project": "spf13/cobra",
+ "toolchainNotes": [],
+ "tableResolved": 889,
+ "goTypesDecided": 758,
+ "agree": 758,
+ "disagreements": [],
+ "notDecidedByGoTypes": {
+  "same table answer (no go/types fact for the link)": 131
+ },
+ "toolchainOwnerWhereTableNone": 0,
+ "disagreementCount": 0
+}

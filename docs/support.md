@@ -261,7 +261,7 @@ Link outcomes:
 | Outcome | Meaning |
 |---|---|
 | `resolved` | One definite target in the checkout |
-| `library` | One definite target outside the project: a library unit (level 1) or a symbol in it (level 2), recorded with how the source proves it (see the design section in `runtime-map.md`). Rust records library paths with proven bindings. TypeScript and JavaScript record library targets at existing sites. Go records imports, package-qualified names and builtins (C-14). |
+| `library` | One definite target outside the project: a library unit (level 1) or a symbol in it (level 2), recorded with how the source proves it (see the design section in `runtime-map.md`). Rust records library paths with proven bindings. TypeScript and JavaScript record library targets at existing sites. Go records imports, package-qualified names and builtins (C-14), and members of standard-library types with their declaring owner (C-17). |
 | `ambiguous` | A candidate set, never a pick. It may mix checkout symbols and library targets. A set is **closed** only when it provably holds every possible target and every member is provably possible. Otherwise it is **open**, and `data.open` gives the reasons (for example a type outside the project could be the target); an open set still lists every project target |
 | `unresolved` | No target; the written name is kept. The reason, when recorded, is in `data` (`reason` in Go and TypeScript, `uncertainty` in Rust; Go's `uncertainty` `library-member-unproven` marks a member of a library-typed value). Rust may also list unverified would-be targets in `data.targets` (at most 16, else a count) |
 | failed (`unresolved`, reason `invalid-code`) | The link depends on a file that could not be read. `data.cause` names the failed file(s). It has no target, no candidates and no would-be targets |
@@ -384,17 +384,38 @@ file (its ID can change when files are added or removed).
   import, a dot-imported name (source-only). A name that exists only on some
   platforms (`syscall.Kill`) is recorded as written: the import proves the
   unit and the written name.
-- **Library members, source-only:** a field or method selected on a value of
-  a library type (`buf.Write` on a `bytes.Buffer`, a library call's result,
-  `os.Stdout.Write`) is unresolved with `data.uncertainty`
-  `library-member-unproven`: its declaring owner may be promoted from an
-  embedded type the checkout does not show. With the opt-in toolchain route
-  and a clean run, go/types' selection names it: a field or concrete method
-  gets `Owner.Name` with its declaring named type and package, evidence
-  `declaring-owner` (`exitErr.ExitCode` on an `*exec.ExitError` is `os`
-  `ProcessState.ExitCode`); interface methods stay dispatch.
-- **Unresolved:** members of standard-library, third-party and non-local
-  `replace` types (above); imports Go forbids (`internal`,
+- **Standard-library members (C-17, module 31):** a field or method selected
+  on a value whose type the source proves is a standard-library type (a
+  declared or written type, a standard function's or method's result, a
+  field, a variable, an element of a standard slice, map or channel result,
+  an alias such as `os.FileMode`) gets its declaring owner from a table of
+  the standard library's exported API shipped with the package (generated
+  from Go 1.27.4 on 47 platforms by `scripts/go-stdlib/generate.go`; no Go
+  needed at run time): `Owner.Name` in the owner's package, evidence
+  `declaring-owner` (`buf.Write` is `bytes` `Buffer.Write`,
+  `exitErr.ExitCode` on an `*exec.ExitError` is `os`
+  `ProcessState.ExitCode`, `t.Fatal` on a `*testing.T` is `testing`
+  `common.Fatal`, the unexported type Go reports). A method of a
+  standard-library interface value is that interface's method (`r.Read` is
+  `io` `Reader.Read`, `err.Error` is `builtin` `error.Error`). A
+  project struct embedding a standard-library type gets the embedded
+  member by Go's depth rule (`g.Lock()` on `struct{ sync.Mutex }`); a
+  project member at a shallower depth wins, one at the same depth is
+  ambiguous and unresolved. Not resolved: a member that is not the same on
+  every platform (`syscall.SysProcAttr` fields) or ambiguous inside the
+  library type, and a member first released after the module's `go`
+  directive (no directive: Go 1.16; outside a module: only Go 1.0 API).
+  `graph uses testing T.Fatal` finds the links stored as `common.Fatal`
+  and says so (`declaredBy`).
+- **Library members, otherwise:** a member of a third-party library type is
+  unresolved with `data.uncertainty` `library-member-unproven`: its
+  declaring owner may be promoted from an embedded type the checkout does
+  not show. With the opt-in toolchain route and a clean run, go/types'
+  selection names it: a field or concrete method gets `Owner.Name` with its
+  declaring named type and package, evidence `declaring-owner`;
+  third-party interface methods stay dispatch.
+- **Unresolved:** members of third-party and non-local `replace` types,
+  and standard-library members the table does not settle (above); imports Go forbids (`internal`,
   `package main`, a `replace` of a module that is not required, a local
   replacement without a go.mod, a package with no buildable file); an import
   two modules provide (Go: "ambiguous import"; reason

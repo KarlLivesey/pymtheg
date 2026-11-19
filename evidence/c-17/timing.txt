@@ -1,0 +1,8 @@
+main round=1 wall=16.92 user=8.08 sys=11.08 maxrss_kib=395300
+branch round=1 wall=15.14 user=8.58 sys=9.07 maxrss_kib=377488
+main round=2 wall=12.78 user=7.78 sys=7.23 maxrss_kib=389500
+branch round=2 wall=13.22 user=8.16 sys=7.48 maxrss_kib=380596
+main round=1 wall=51.30 user=26.96 sys=31.95 maxrss_kib=771324
+branch round=1 wall=50.11 user=27.24 sys=30.27 maxrss_kib=729676
+main round=2 wall=48.62 user=28.68 sys=27.88 maxrss_kib=733620
+branch round=2 wall=52.31 user=29.10 sys=30.32 maxrss_kib=730284
