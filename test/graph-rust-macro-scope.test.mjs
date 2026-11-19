@@ -8,20 +8,32 @@ import { GraphView } from "../dist/mcp/graph-view.js";
 
 async function observations(text, dependencies = "", support = {}) {
   const path = "src/lib.rs";
-  const projectId = "macro-scope";
   const parts = Object.entries(support);
-  const files = await Promise.all(
-    [[path, text], ...parts.filter(([name]) => name.endsWith(".rs"))].map(
-      async ([path, text]) => {
-        const result = await rust.parse({ path, text });
-        validateResult(text, result);
-        assert.equal(result.status, "clean", JSON.stringify(result.diagnostics));
-        return { path, text, result, module: "rust", version: rust.version, hash: contentHash(text) };
-      },
-    ),
-  );
   const manifest = `[package]\nname="app"\nversion="0.0.0"\nedition="2021"\n[dependencies]\n${dependencies}`;
-  const contextFiles = [["Cargo.toml", manifest], ...parts.filter(([name]) => name.endsWith(".toml"))]
+  return (await projectObservations(
+    Object.fromEntries([[path, text], ...parts.filter(([name]) => name.endsWith(".rs"))]),
+    manifest,
+    parts.filter(([name]) => name.endsWith(".toml")),
+  ))(path);
+}
+
+async function projectObservations(sources, manifest, manifests = []) {
+  const projectId = "macro-scope";
+  const files = [];
+  for (const [path, text] of Object.entries(sources)) {
+    const result = await rust.parse({ path, text });
+    validateResult(text, result);
+    assert.equal(result.status, "clean", JSON.stringify(result.diagnostics));
+    files.push({
+      path,
+      text,
+      result,
+      module: "rust",
+      version: rust.version,
+      hash: contentHash(text),
+    });
+  }
+  const contextFiles = [["Cargo.toml", manifest], ...manifests]
     .map(([path, text]) => ({
       path,
       text,
@@ -30,9 +42,11 @@ async function observations(text, dependencies = "", support = {}) {
       diagnostics: [],
     }));
   const ctx = { projectId, files, contextFiles };
-  const analyzed = new Map((await rust.analyze(ctx)).map((file) => [file.path, file.result]));
-  for (const file of files) file.result = analyzed.get(file.path) ?? file.result;
-  const facts = files.map((file) => fileFacts(projectId, file));
+  const analyzed = new Map((await rust.analyze(ctx)).map((f) => [f.path, f]));
+  const facts = files.map((file) => {
+    file.result = analyzed.get(file.path).result;
+    return fileFacts(projectId, file);
+  });
   const links = facts.flatMap((file) => file.links);
   const symbols = facts.flatMap((file) => file.symbols);
   const resultSet = await rust.resolve({ ...ctx, links, symbols });
@@ -42,13 +56,14 @@ async function observations(text, dependencies = "", support = {}) {
       d,
     ]),
   );
-  return (kind, target, lineMarker) => {
+  return (path) => (kind, target, lineMarker) => {
+    const text = sources[path];
     const lineStart = text.lastIndexOf("\n", text.indexOf(lineMarker)) + 1;
     const lineEnd = text.indexOf("\n", text.indexOf(lineMarker));
     const link = links.find(
       (l) =>
-        l.kind === kind &&
         l.file === path &&
+        l.kind === kind &&
         l.targetName === target &&
         l.range.start >= lineStart &&
         l.range.start < lineEnd,
@@ -233,6 +248,57 @@ test("the MCP legend describes the restricted Rust macro assumption", () => {
   assert.equal(entry.value, "rust-external-macro-name");
   assert.match(entry.description, /must receive an item-name identifier/);
   assert.match(entry.description, /whole case-insensitive components/);
+});
+
+async function sharedMacroFixture(name, paths) {
+  const dir = new URL(
+    `fixtures/graph-rust-macro-scope/${name}/`,
+    import.meta.url,
+  );
+  const sources = Object.fromEntries(
+    await Promise.all(
+      paths.map(async (path) => [
+        path,
+        await readFile(new URL(path, dir), "utf8"),
+      ]),
+    ),
+  );
+  const manifest = await readFile(new URL("Cargo.toml", dir), "utf8");
+  return projectObservations(sources, manifest);
+}
+
+test("$crate in a macro in a module shared by the library and binary", async () => {
+  const at = await sharedMacroFixture("lib-and-bin", [
+    "src/lib.rs",
+    "src/main.rs",
+    "src/shared.rs",
+    "src/single_owner.rs",
+  ]);
+  assert.deepEqual(
+    at("src/shared.rs")("types", "Option", "// observed"),
+    proved(null),
+  );
+  assert.deepEqual(
+    at("src/single_owner.rs")("types", "Option", "// observed"),
+    proved("option::Option"),
+  );
+});
+
+test("$crate in a macro shared by two integration-test crates", async () => {
+  const at = await sharedMacroFixture("integration-tests", [
+    "tests/first.rs",
+    "tests/second.rs",
+    "tests/common/mod.rs",
+    "tests/single_owner/mod.rs",
+  ]);
+  assert.deepEqual(
+    at("tests/common/mod.rs")("types", "Option", "// observed"),
+    proved(null),
+  );
+  assert.deepEqual(
+    at("tests/single_owner/mod.rs")("types", "Option", "// observed"),
+    proved("option::Option"),
+  );
 });
 
 test("local macro item names include literal and forwarded metavariable names", async () => {
