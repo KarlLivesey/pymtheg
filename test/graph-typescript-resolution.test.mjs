@@ -2783,6 +2783,39 @@ test("a missing declaration follows its exact emit path and the barrel's renamed
   );
 });
 
+test("plain compiler flags do not prove deleted or out-of-checkout build inputs", async () => {
+  await project(
+    {
+      "package.json":
+        '{"workspaces":["packages/*"],"scripts":{"build":"tsc -b"}}',
+      "tsconfig.json":
+        '{"files":[],"references":[{"path":"../packages/referenced"}]}',
+      "packages/referenced/package.json":
+        '{"name":"referenced","types":"./dist/index.d.ts"}',
+      "packages/referenced/tsconfig.json":
+        '{"compilerOptions":{"rootDir":"src","outDir":"dist","composite":true},"files":["src/index.ts"]}',
+      "packages/referenced/src/index.ts": "export function run() {}",
+      "packages/cleaned/package.json":
+        '{"name":"cleaned","types":"./dist/index.d.ts","scripts":{"build":"rimraf config && tsc"}}',
+      "packages/cleaned/tsconfig.json":
+        '{"extends":"./config/tsconfig.base.json","files":["src/index.ts"]}',
+      "packages/cleaned/config/tsconfig.base.json":
+        '{"compilerOptions":{"rootDir":"../src","outDir":"../dist","declaration":true}}',
+      "packages/cleaned/src/index.ts": "export function run() {}",
+      "consumer/use.ts":
+        'import { run as outside } from "referenced"; import { run as deleted } from "cleaned"; outside(); deleted();',
+    },
+    async (graph, report) => {
+      clean(report);
+      for (const name of ["outside", "deleted"]) {
+        const call = graph.link("consumer/use.ts", name, "calls");
+        assert.equal(call.resolution, "unresolved");
+        assert.equal(call.data.reason, "workspace-build-output-missing");
+      }
+    },
+  );
+});
+
 test("the importer selects source conditions and existing outputs before considering emit proofs", async () => {
   await project(
     {
@@ -2835,6 +2868,49 @@ test("the importer selects source conditions and existing outputs before conside
           .resolution,
         "resolved",
       );
+    },
+  );
+});
+
+test("an implicit emit root stays usable only while all possible inputs fit inside it", async () => {
+  const use = "packages/library/src/consumer/use.ts";
+  const fixture = {
+    "package.json":
+      '{"workspaces":["packages/library","packages/library/src/consumer"]}',
+    "packages/library/package.json":
+      '{"name":"fixture-library","types":"./dist/index.d.ts","scripts":{"build":"tsc -p tsconfig.build.json"}}',
+    "packages/library/tsconfig.build.json":
+      '{"compilerOptions":{"outDir":"dist","declaration":true},"files":["src/index.ts"]}',
+    "packages/library/src/consumer/package.json":
+      '{"name":"fixture-consumer","dependencies":{"fixture-library":"workspace:*"}}',
+    [use]: 'import { helper } from "fixture-library"; helper();',
+  };
+  await project(
+    {
+      ...fixture,
+      "packages/library/src/index.ts": "export function helper() {}",
+    },
+    async (graph, report) => {
+      clean(report);
+      const call = graph.link(use, "helper", "calls");
+      assert.equal(graph.target(call), "packages/library/src/index.ts#helper");
+      assert.equal(
+        call.data.unbuiltEntry.output,
+        "packages/library/dist/index.d.ts",
+      );
+    },
+  );
+  await project(
+    {
+      ...fixture,
+      "packages/library/src/index.ts": 'export { helper } from "../shared";',
+      "packages/library/shared.ts": "export function helper() {}",
+    },
+    async (graph, report) => {
+      clean(report);
+      const call = graph.link(use, "helper", "calls");
+      assert.equal(call.resolution, "unresolved");
+      assert.equal(call.data.reason, "workspace-build-output-missing");
     },
   );
 });
@@ -2931,6 +3007,12 @@ test("only the package's plain compiler build can prove a declaration entry", as
           [`packages/${name}/src/index.ts`, "export function open() {}"],
         ]),
       ),
+      "packages/bundled/src/index.ts":
+        "/** @internal */ export function open() {}",
+      "packages/bundled/api-extractor.json":
+        '{"mainEntryPointFilePath":"<projectFolder>/dist/index.d.ts","dtsRollup":{"enabled":true,"publicTrimmedFilePath":"<projectFolder>/dist/index.d.ts"}}',
+      "packages/rewritten/rewrite.mjs":
+        'import { writeFileSync } from "node:fs"; writeFileSync("dist/index.d.ts", "export declare function other(): void;");',
       "use.ts": Object.keys(variants)
         .map((name) => `import { open as ${name} } from "${name}"; ${name}();`)
         .join("\n"),

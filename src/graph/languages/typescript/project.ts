@@ -921,6 +921,7 @@ export function projectModel(
         group.notes.push(`${config.path}: invalid project reference (ignored)`);
         continue;
       }
+      emitPathsScoped &&= scopedConfigPath(config.path, config.path, value);
       const target = posix.normalize(
         posix.join(posix.dirname(toVirtual(config.path)), value),
       );

@@ -38,3 +38,17 @@ The compact audit archives list public checkout paths, source destinations,
 compiler output names, and verdicts. The full declaration text stays in
 scratch. The change archives preserve each old and new destination for
 review, including unit-only links whose stored attribution changed.
+
+For the review's unbundled-entry study, copy the compiled candidate in
+scratch. Run `bundler-probe.mjs SCRATCH CHECKOUT BUILD HONO_TARBALL` on the
+copy, supplying Hono's pinned checkout and registry archive. It parses the
+pack configuration as syntax and verifies the archive checksum. It limits
+the experimental lookup to declaration paths in the published build.
+Reindex only Hono with the copy and compare against the plain-build
+candidate. Use `emit-check.mjs` and the archive's declarations to inspect
+the drawn destinations. The committed production analyzer uses no
+experimental lookup.
+
+`source-budget.mjs SCRATCH RECEIPT` adds up the bytes of tracked TypeScript
+and JavaScript files. This upper bound also covers workspace source
+imports inside a single program.

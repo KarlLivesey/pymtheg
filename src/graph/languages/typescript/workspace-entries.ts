@@ -112,9 +112,10 @@ export function workspaceEntries(
   for (const [root, manifest] of packages) {
     const build = plainBuild(root, manifest);
     if (!build) continue;
+    const clean = build.clean;
     if (
-      build.clean &&
-      [...captured.keys()].some((file) => below("/" + file, build.clean!))
+      clean &&
+      [...files.keys()].some((file) => file === clean || below(file, clean))
     )
       continue;
     // tsc -b accepts directories as well as JSON files.
@@ -128,12 +129,7 @@ export function workspaceEntries(
       if (
         !parsed ||
         parsed.errors.some(({ code }) => code !== 18003) ||
-        !below(path, root) ||
-        (build.clean &&
-          (below(path, build.clean) ||
-            parsed.fileNames.some(
-              (file) => file === build.clean || below(file, build.clean!),
-            )))
+        !below(path, root)
       ) {
         valid = false;
         break;
