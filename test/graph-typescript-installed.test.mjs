@@ -382,7 +382,7 @@ test("a physical workspace link follows Astro's declaration-only subpath layout"
   );
   await write(
     "checkout-helpers/package.json",
-    '{"name":"@astrojs/internal-helpers","type":"module","exports":{"./path":"./dist/path.js"}}',
+    '{"name":"@astrojs/internal-helpers","type":"module","exports":{"./path":"./dist/path.js"},"scripts":{"build":"tsc -p tsconfig.build.json"}}',
   );
   await write(
     "checkout-helpers/tsconfig.build.json",
@@ -408,6 +408,7 @@ test("a physical workspace link follows Astro's declaration-only subpath layout"
     );
     assert.deepEqual(link.data.unbuiltEntry, {
       proof: "tsconfig-emit",
+      build: "checkout-helpers/package.json",
       config: "checkout-helpers/tsconfig.build.json",
       output: "checkout-helpers/dist/path.d.ts",
       source: "checkout-helpers/src/path.ts",
@@ -419,7 +420,7 @@ test("an output directory outside the checkout supplies no workspace entry proof
   const { root, request, read, write } = await project();
   await write(
     "package.json",
-    '{"name":"fixture-root","types":"./dist/index.d.ts"}',
+    '{"name":"fixture-root","types":"./dist/index.d.ts","scripts":{"build":"tsc -p tsconfig.build.json"}}',
   );
   await write(
     "tsconfig.build.json",

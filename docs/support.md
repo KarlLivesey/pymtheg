@@ -795,12 +795,16 @@ answer.
   selected Node types can leave both DOM and Node targets possible for a shared
   global, type name or typed member. Two test frameworks supplying the same
   global can also produce a candidate set.
-- **Unbuilt checkout packages:** TypeScript can follow a selected missing
-  entry to the unique source file proved by project references, a captured
-  TypeScript emit configuration, or a literal unbundled ESM entry in
-  `package.json`'s `tsup` settings. Normal compiler lookup handles `paths`,
-  export conditions and built entries first. Followed links expose
-  `data.unbuiltEntry` with the proof, config, output and source.
+- **Unbuilt checkout packages:** TypeScript can follow a missing declaration
+  to its unique source when the captured package build is a plain `tsc`
+  command with no additional build, install or pack hooks. A plain root
+  `tsc -b` can establish the build for a referenced package with no build
+  script of its own. Normal compiler lookup handles `paths`, export
+  conditions and built entries first. A missing JavaScript-only emit stays
+  unresolved. A `stripInternal` build with captured internal annotations
+  cannot supply a source redirect, including through project references.
+  Followed links expose `data.unbuiltEntry` with the proof, manifest, config,
+  output and source.
   [C-25](changes/C-25.md)
 - **Unresolved:** outside members whose receiver or declaration is unverified
   (`external`, `external-package`); computed `require` or `import()` specifiers;
@@ -821,6 +825,23 @@ answer.
   such as `@tsconfig/node20` leaves most cross-file links unresolved), compiler
   stack limits on some lookups, or `require`/`module`/`exports` uses that cannot
   be decided statically.
+- **Files the compiler or memory cannot take (C-13):** a file the TypeScript
+  compiler throws on while analysing it (an assertion such as "Debug Failure.
+  False expression.") fails alone, with the compiler's message as the reason,
+  and its program is rebuilt without it; after 100 such files a program's
+  remaining files fail with that reason. A project (a config's files, or the
+  files no config includes) with more than 50,000,000 characters of source
+  leaves out its largest files, failed with the reason, until the rest fits
+  in one program. Both are failed files under the rule below. A
+  `package.json` that starts with a UTF-8 byte-order mark is read. Finding
+  which links depend on a program's failed files has a deterministic budget
+  of 8,000,000 steps. When it is reached, every link of that program that
+  could have a target is unresolved with `taint-budget-exhausted`, except
+  links that bind a failed file directly, which stay `invalid-code`; no pin
+  outside microsoft/TypeScript comes near it. The program budget counts
+  every checkout file a program loads, imported files included; a file past
+  it is left out of that program only (installed declarations have their
+  own budget).
 - **A program that contains a failed file:** the failed file is absent;
   `invalid-code` with a cause is best-effort attribution. Links computed
   without the failed file carry `assumes: ["no-unseen-declarations"]`.

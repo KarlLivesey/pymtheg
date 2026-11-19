@@ -4,7 +4,8 @@ import ts from "typescript";
 import type { Manifest } from "./workspace.js";
 
 export interface UnbuiltEntry {
-  proof: "tsconfig-emit" | "project-reference" | "tsup-entry";
+  proof: "tsconfig-emit" | "project-reference";
+  build: string;
   config: string;
   output: string;
   source: string;
@@ -12,12 +13,9 @@ export interface UnbuiltEntry {
 export type OutputProof = UnbuiltEntry | "conflicting" | false;
 
 const sourceExtension = /\.(?:ts|tsx|mts|cts)$/;
+const inputExtension = /\.[cm]?[jt]sx?$/;
 const declaration = /\.d\.(?:ts|mts|cts)$/;
 const outputExtension = /\.(?:[cm]?js|jsx|d\.[cm]?ts)$/;
-const asObject = (value: unknown): Record<string, unknown> | undefined =>
-  value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : undefined;
 const below = (file: string, root: string) =>
   file.startsWith(root === "/" ? "/" : root + "/");
 
@@ -35,34 +33,61 @@ function packagePath(root: string, path: unknown): string | undefined {
     : undefined;
 }
 
-/** Only tsup's literal named-entry, unbundled ESM emit from package.json. */
-function tsupEntries(root: string, manifest: Manifest) {
-  const result = new Map<string, string>();
-  const config = asObject(manifest.json.tsup);
-  if (
-    !config ||
-    manifest.json.type !== "module" ||
-    config.bundle !== false ||
-    JSON.stringify(config.format) !== '["esm"]' ||
-    Object.keys(config).some(
-      (key) => !["entry", "outDir", "format", "bundle"].includes(key),
-    )
-  )
-    return result;
-  const folder = packagePath(root, config.outDir);
-  const entries = asObject(config.entry);
-  if (!folder || !entries) return result;
-  for (const [name, entry] of Object.entries(entries)) {
-    const source = packagePath(root, entry);
-    const output = packagePath(folder, name + ".js");
-    if (source && output && /^[\w-]+$/.test(name)) result.set(output, source);
-  }
-  return result;
+const lifecycle = [
+  "prebuild",
+  "postbuild",
+  "preinstall",
+  "install",
+  "postinstall",
+  "preprepare",
+  "prepare",
+  "postprepare",
+  "prepack",
+  "postpack",
+  "prepublish",
+  "prepublishOnly",
+];
+const scriptsOf = ({ json }: Manifest) =>
+  json.scripts && typeof json.scripts === "object"
+    ? (json.scripts as Record<string, unknown>)
+    : undefined;
+const hasLifecycle = (scripts: ReturnType<typeof scriptsOf>) =>
+  lifecycle.some((name) => {
+    const script = scripts?.[name];
+    return (
+      script !== undefined && (typeof script !== "string" || !!script.trim())
+    );
+  });
+const literalPath = String.raw`(?:"([\w./-]+)"|'([\w./-]+)'|([\w./-]+))`;
+const compilerScript = new RegExp(
+  String.raw`^(?:(?:rimraf|rm[ \t]+-rf|del)[ \t]+${literalPath}[ \t]*&&[ \t]*)?tsc(?:[ \t]+(-p|--project|-b|--build)(?:[ \t]+${literalPath})?)?$`,
+);
+
+/** Recognize a literal invocation. Build code and lifecycle hooks stay inert. */
+function plainBuild(root: string, manifest: Manifest) {
+  const scripts = scriptsOf(manifest);
+  if (typeof scripts?.build !== "string" || hasLifecycle(scripts)) return;
+  const match = compilerScript.exec(scripts.build.trim());
+  if (!match) return;
+  const [, clean1, clean2, clean3, flag, file1, file2, file3] = match;
+  const build = flag === "-b" || flag === "--build";
+  const target = file1 ?? file2 ?? file3;
+  if ((flag && !build && !target) || target?.startsWith("-")) return;
+  const config =
+    !target || target === "." || target === "./"
+      ? posix.join(root, "tsconfig.json")
+      : packagePath(root, target);
+  if (!config) return;
+  const cleanPath = clean1 ?? clean2 ?? clean3;
+  const clean = cleanPath && packagePath(root, cleanPath);
+  if (cleanPath && (!clean || cleanPath.startsWith("-"))) return;
+  return { config, build, clean: clean || undefined };
 }
 
 interface Config {
   path: string;
   parsed: ts.ParsedCommandLine;
+  build: string;
   byStem?: Map<string, string[]>;
   commonRootProven?: boolean;
 }
@@ -84,25 +109,67 @@ export function workspaceEntries(
     }
   }
   const configs = new Map<string, Config[]>();
-  for (const [path, parsed] of parsedConfigs) {
+  for (const [root, manifest] of packages) {
+    const build = plainBuild(root, manifest);
+    if (!build) continue;
     if (
-      parsed.options.noEmit ||
-      !parsed.fileNames.length ||
-      (!parsed.options.outDir && !parsed.options.declarationDir)
+      build.clean &&
+      [...captured.keys()].some((file) => below("/" + file, build.clean!))
     )
       continue;
-    const root = packageOf(path);
-    if (root === undefined) continue;
-    const list = configs.get(root) ?? [];
-    list.push({ path, parsed });
-    configs.set(root, list);
+    // tsc -b accepts directories as well as JSON files.
+    const configPath = (path: string) =>
+      parsedConfigs.has(path) ? path : posix.join(path, "tsconfig.json");
+    const pending = new Set([configPath(build.config)]);
+    const selected: Config[] = [];
+    let valid = true;
+    for (const path of pending) {
+      const parsed = parsedConfigs.get(path);
+      if (
+        !parsed ||
+        parsed.errors.some(({ code }) => code !== 18003) ||
+        !below(path, root) ||
+        (build.clean &&
+          (below(path, build.clean) ||
+            parsed.fileNames.some(
+              (file) => file === build.clean || below(file, build.clean!),
+            )))
+      ) {
+        valid = false;
+        break;
+      }
+      if (build.build)
+        for (const ref of parsed.projectReferences ?? [])
+          pending.add(ts.resolveProjectReferencePath(ref));
+      if (
+        !parsed.options.noEmit &&
+        (parsed.options.declaration || parsed.options.composite) &&
+        parsed.fileNames.length &&
+        (parsed.options.outDir || parsed.options.declarationDir)
+      )
+        selected.push({ path, parsed, build: manifest.path });
+    }
+    if (!valid) continue;
+    for (const config of selected) {
+      const owner = packageOf(config.path);
+      if (owner === undefined) continue;
+      // A package's own build takes precedence over an ancestor build. A
+      // plain build-mode reference can supply proof for a scriptless child.
+      if (owner !== root) {
+        const child = packages.get(owner)!;
+        const scripts = scriptsOf(child);
+        if (hasLifecycle(scripts) || scripts?.build !== undefined) continue;
+      }
+      const list = configs.get(owner) ?? [];
+      if (!list.some(({ path }) => path === config.path)) list.push(config);
+      configs.set(owner, list);
+    }
   }
-  const staticEntries = new Map<string, Map<string, string>>();
   const explicitTargets = new Map<
     string,
     { paths: Set<string>; patterns: string[][] }
   >();
-  const internalSources = new Map<string, boolean>();
+  let internalSources: boolean | undefined;
   const cache = new Map<string, OutputProof | null>();
   const nativeConfigs = new WeakMap<
     ts.ParsedCommandLine,
@@ -114,10 +181,12 @@ export function workspaceEntries(
       .map((file) => posix.basename(file).replace(declaration, "")),
   );
   return {
-    available: configs.size > 0 || manifests.some(({ json }) => !!json.tsup),
+    available: configs.size > 0,
     explicitEntry,
     proof(root: string, output: string) {
-      if (!outputExtension.test(output) || files.has(output)) return undefined;
+      // A missing JavaScript entry cannot be checked with the options and
+      // types of the TypeScript source that would emit it.
+      if (!declaration.test(output) || files.has(output)) return undefined;
       const key = `${root}\0${output}`;
       if (cache.has(key)) return cache.get(key) ?? undefined;
       const match = find(root, output);
@@ -125,21 +194,26 @@ export function workspaceEntries(
       return match;
     },
     forReference(parsed: ts.ParsedCommandLine) {
-      if (!parsed.options.composite || parsed.options.outFile) return parsed;
+      if (!parsed.options.composite) return parsed;
       let result = nativeConfigs.get(parsed);
       if (!result) {
         // The IDE redirect always prefers source, even over a real .d.ts.
         // Composite fixes the common root, so removing a built input from the
         // redirect inventory cannot change the remaining output names.
+        const strip = parsed.options.stripInternal && mayStrip();
+        if (parsed.options.outFile && !strip) return parsed;
         const fileNames = parsed.fileNames.filter(
           (file) =>
             declaration.test(file) ||
-            !declarationsByStem.has(
-              posix.basename(file, posix.extname(file)),
-            ) ||
-            !ts
-              .getOutputFileNames(parsed, file, false)
-              .some((output) => declaration.test(output) && files.has(output)),
+            (!strip &&
+              (!declarationsByStem.has(
+                posix.basename(file, posix.extname(file)),
+              ) ||
+                !ts
+                  .getOutputFileNames(parsed, file, false)
+                  .some(
+                    (output) => declaration.test(output) && files.has(output),
+                  ))),
         );
         result =
           fileNames.length === parsed.fileNames.length
@@ -218,16 +292,16 @@ export function workspaceEntries(
     return true;
   }
 
-  function mayStrip(root: string) {
-    const previous = internalSources.get(root);
-    if (previous !== undefined) return previous;
-    for (const [path, text] of captured) {
-      if (!below("/" + path, root) || !text.includes("@internal")) continue;
-      internalSources.set(root, true);
-      return true;
+  function mayStrip() {
+    if (internalSources === undefined) {
+      internalSources = false;
+      for (const text of captured.values()) {
+        if (!text.includes("@internal")) continue;
+        internalSources = true;
+        break;
+      }
     }
-    internalSources.set(root, false);
-    return false;
+    return internalSources;
   }
 
   function find(root: string, output: string): OutputProof | undefined {
@@ -238,17 +312,14 @@ export function workspaceEntries(
     for (const config of configs.get(root) ?? []) {
       const { parsed } = config;
       const { options } = parsed;
-      const declarations = declaration.test(output);
-      const folder = declarations
-        ? (options.declarationDir ?? options.outDir)
-        : options.outDir;
+      const folder = options.declarationDir ?? options.outDir;
       if (!folder || !below(output, folder)) continue;
       if (parsed.errors.length || options.outFile) return false;
       if (!config.byStem) {
         config.byStem = new Map();
         for (const file of parsed.fileNames) {
-          if (!sourceExtension.test(file) || declaration.test(file)) continue;
-          const name = posix.basename(file).replace(sourceExtension, "");
+          if (!inputExtension.test(file) || declaration.test(file)) continue;
+          const name = posix.basename(file).replace(inputExtension, "");
           const paths = config.byStem.get(name) ?? [];
           paths.push(file);
           config.byStem.set(name, paths);
@@ -258,6 +329,7 @@ export function workspaceEntries(
         if (!ts.getOutputFileNames(parsed, file, false).includes(output))
           continue;
         if (
+          !sourceExtension.test(file) ||
           !captured.has(file.slice(1)) ||
           packageOf(file) !== root ||
           (options.rootDir && !below(file, options.rootDir))
@@ -267,53 +339,17 @@ export function workspaceEntries(
           config.commonRootProven ??= closedCommonRoot(parsed);
           if (!config.commonRootProven) return false;
         }
-        if (options.stripInternal && declarations) {
-          const sourceRoot =
-            options.rootDir ??
-            (options.composite ? posix.dirname(config.path) : "/");
-          // A re-export can pull in a file outside `include`. Strip checks
-          // must cover the source tree that the compiler can actually emit.
-          if (mayStrip(sourceRoot)) return false;
-        }
+        // A re-export can pull in a source outside the configured input set.
+        if (options.stripInternal && mayStrip()) return false;
         matches.push({
           proof: "tsconfig-emit",
+          build: config.build,
           config: config.path.slice(1),
           output: output.slice(1),
           source: file.slice(1),
         });
       }
     }
-    if (!staticEntries.has(root)) {
-      const separateConfig = [
-        "ts",
-        "js",
-        "mts",
-        "cts",
-        "mjs",
-        "cjs",
-        "json",
-      ].some((extension) =>
-        files.has(posix.join(root, "tsup.config." + extension)),
-      );
-      staticEntries.set(
-        root,
-        separateConfig ? new Map() : tsupEntries(root, manifest),
-      );
-    }
-    const entry = staticEntries.get(root)?.get(output);
-    if (
-      entry &&
-      /\.(?:mts|tsx?)$/.test(entry) &&
-      !declaration.test(entry) &&
-      captured.has(entry.slice(1)) &&
-      packageOf(entry) === root
-    )
-      matches.push({
-        proof: "tsup-entry",
-        config: manifest.path,
-        output: output.slice(1),
-        source: entry.slice(1),
-      });
     return matches.every((match) => match.source === matches[0]?.source)
       ? matches[0]
       : "conflicting";

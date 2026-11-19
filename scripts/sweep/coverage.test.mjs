@@ -97,14 +97,15 @@ test("installed coverage keeps the bare score when an install failed", () => {
     linkRow("typescript", "resolved", "eligible", resolved),
     linkRow("typescript", "unresolved", "inside", 10 - resolved),
   ] });
-  const a = pin("package/a", 5);
-  const b = pin("package/b", 3);
+  const a = { ...pin("package/a", 5), unbuiltWorkspaceLinks: 2 };
+  const b = { ...pin("package/b", 3), unbuiltWorkspaceLinks: 1 };
   const score = installedCoverage([a, b], { repos: [
-    { ...pin(a.id, 9), install: { manager: "pnpm", status: "installed" } },
+    { ...pin(a.id, 9), unbuiltWorkspaceLinks: 4, install: { manager: "pnpm", status: "installed" } },
     { id: b.id, commit: b.commit, outcome: "install-unavailable", install: { manager: "npm", status: "failed" } },
   ] });
   assert.equal(score.totals, "40.00% bare · 60.00% with installed declarations · 1/2 pins installed and indexed");
   assert.match(score.table, /\| package\/b \| 30\.00% \| 30\.00% \| npm · install-unavailable \|/);
+  assert.deepEqual(score.unbuilt, { bare: 3, installed: 5 });
 });
 const bucketFor = (reason) => `typescript:${reason}:source:unclassified`;
 const observed = (bucket, links = 1, state = "unresolved") => [{ bucket, links, state }];

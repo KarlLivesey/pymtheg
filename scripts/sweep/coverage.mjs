@@ -67,7 +67,13 @@ export function installedCoverage(bare, installed) {
       return `| ${repo.id} | ${percent(a.level2)} | ${percent(b.level2)} | ${status} |`;
     }), "",
   ].join("\n");
-  return { totals, table };
+  const unbuilt = rows.every(({ previous }) => previous.unbuiltWorkspaceLinks !== undefined)
+    ? {
+        bare: rows.reduce((sum, { previous }) => sum + previous.unbuiltWorkspaceLinks, 0),
+        installed: rows.reduce((sum, { previous, repo, usable }) => sum + ((usable ? repo : previous).unbuiltWorkspaceLinks ?? 0), 0),
+      }
+    : undefined;
+  return { totals, table, unbuilt };
 }
 
 function checkResult(input) {
@@ -561,6 +567,8 @@ function renderPlan(repos, baseline, items, samples, isProgress, installed) {
     if (module === "typescript") lines.push(`**Bundle scope** ${percent(measured.level2)} including bundles and ${percent(noBundles.level2)} without them. Should checked-in minified bundles count toward the release target?`, "");
     if (module === "typescript" && installed)
       lines.push(`**Paired dependency sweep** ${installed.totals}. Pins without a completed installed graph use their bare figure.`, "");
+    if (module === "typescript" && installed?.unbuilt)
+      lines.push(`**Through an unbuilt workspace entry, plain tsc build** · ${number(installed.unbuilt.bare)} bare · ${number(installed.unbuilt.installed)} installed.`, "");
     lines.push("| Support item | Kind | Links | Repositories | Points | Running total | Examples | Status |",
       "| --- | --- | ---: | ---: | ---: | ---: | --- | --- |");
     const kind = { inside: "Inside target", library: "Library target", both: "Both" };

@@ -1693,11 +1693,12 @@ metadata. The physical package exposed to the importer supersedes an inferred
 workspace link. The checker supplies test-global owners when the competing
 type requests were captured. [C-20](changes/C-20.md)
 
-Module 38 can replay a failed checkout package lookup using the same
-TypeScript resolver and a scoped set of configured output names. Only a
-unique producer can supply the source behind the selected name. The host
-serves that captured source in the existing compiler program and records
-the unbuilt-entry proof from its selected resolutions. Installed registry
+Module 39 can replay a failed checkout package lookup using the same
+TypeScript resolver and a scoped set of declared emit names. The package's
+plain `tsc` script selects the config, and the compiler gives the exact
+declaration path. A build-mode invocation can establish the config for a
+scriptless referenced package. The host serves the uniquely proved source in
+the existing program and records the unbuilt-entry proof. Installed registry
 packages and existing outputs stay on the ordinary route.
 [C-25](changes/C-25.md)
 
