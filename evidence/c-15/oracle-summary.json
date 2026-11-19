@@ -1,0 +1,136 @@
+[
+ {
+  "id": "DioxusLabs/dioxus",
+  "symbolKeysRemoved": 0,
+  "symbolKeysAdded": 0,
+  "links": {
+   "before": 153841,
+   "after": 153841
+  },
+  "sitesOnlyBefore": 0,
+  "sitesOnlyAfter": 0,
+  "rust": {
+   "links": 149592,
+   "level2Before": 63098,
+   "level2After": 63142,
+   "taintBefore": 13298,
+   "taintAfter": 0
+  },
+  "definiteBefore": 51040,
+  "definiteKept": 51040,
+  "definiteChanged": 0,
+  "libraryRowsChanged": 39,
+  "level2Lost": 0,
+  "transitions": {
+   "unresolved->library": 39,
+   "unresolved->resolved": 7
+  }
+ },
+ {
+  "id": "alacritty/alacritty",
+  "symbolKeysRemoved": 0,
+  "symbolKeysAdded": 0,
+  "links": {
+   "before": 30965,
+   "after": 30965
+  },
+  "sitesOnlyBefore": 0,
+  "sitesOnlyAfter": 0,
+  "rust": {
+   "links": 30965,
+   "level2Before": 13851,
+   "level2After": 13852,
+   "taintBefore": 11222,
+   "taintAfter": 0
+  },
+  "definiteBefore": 11397,
+  "definiteKept": 11397,
+  "definiteChanged": 0,
+  "libraryRowsChanged": 1,
+  "level2Lost": 0,
+  "transitions": {
+   "unresolved->library": 1
+  }
+ },
+ {
+  "id": "rust-lang/mdBook",
+  "symbolKeysRemoved": 0,
+  "symbolKeysAdded": 0,
+  "links": {
+   "before": 20253,
+   "after": 20253
+  },
+  "sitesOnlyBefore": 0,
+  "sitesOnlyAfter": 0,
+  "rust": {
+   "links": 12557,
+   "level2Before": 6172,
+   "level2After": 6177,
+   "taintBefore": 347,
+   "taintAfter": 0
+  },
+  "definiteBefore": 4837,
+  "definiteKept": 4837,
+  "definiteChanged": 0,
+  "libraryRowsChanged": 5,
+  "level2Lost": 0,
+  "transitions": {
+   "unresolved->library": 5
+  }
+ },
+ {
+  "id": "rustls/rustls",
+  "symbolKeysRemoved": 0,
+  "symbolKeysAdded": 0,
+  "links": {
+   "before": 69929,
+   "after": 69929
+  },
+  "sitesOnlyBefore": 0,
+  "sitesOnlyAfter": 0,
+  "rust": {
+   "links": 69929,
+   "level2Before": 18972,
+   "level2After": 18982,
+   "taintBefore": 18141,
+   "taintAfter": 0
+  },
+  "definiteBefore": 17183,
+  "definiteKept": 17183,
+  "definiteChanged": 0,
+  "libraryRowsChanged": 0,
+  "level2Lost": 0,
+  "transitions": {
+   "unresolved->resolved": 10
+  }
+ },
+ {
+  "id": "vercel/turborepo",
+  "symbolKeysRemoved": 0,
+  "symbolKeysAdded": 0,
+  "links": {
+   "before": 684202,
+   "after": 684202
+  },
+  "sitesOnlyBefore": 0,
+  "sitesOnlyAfter": 0,
+  "rust": {
+   "links": 683584,
+   "level2Before": 290187,
+   "level2After": 290595,
+   "taintBefore": 280527,
+   "taintAfter": 0
+  },
+  "definiteBefore": 219469,
+  "definiteKept": 219468,
+  "definiteChanged": 1,
+  "libraryRowsChanged": 354,
+  "level2Lost": 1,
+  "transitions": {
+   "resolved->unresolved": 1,
+   "unresolved->library": 354,
+   "unresolved->resolved": 56
+  },
+  "labelDropped": 280173
+ }
+]

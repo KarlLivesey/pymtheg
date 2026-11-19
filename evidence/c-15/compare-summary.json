@@ -1,0 +1,492 @@
+[
+ {
+  "id": "BurntSushi/ripgrep",
+  "symbolKeysRemoved": 0,
+  "symbolKeysAdded": 0,
+  "links": {
+   "before": 39819,
+   "after": 39819
+  },
+  "sitesOnlyBefore": 0,
+  "sitesOnlyAfter": 0,
+  "rust": {
+   "links": 39819,
+   "level2Before": 25778,
+   "level2After": 25778,
+   "taintBefore": 0,
+   "taintAfter": 0
+  },
+  "definiteBefore": 18008,
+  "definiteKept": 18008,
+  "definiteChanged": 0,
+  "libraryRowsChanged": 0,
+  "level2Lost": 0,
+  "transitions": {}
+ },
+ {
+  "id": "DioxusLabs/dioxus",
+  "symbolKeysRemoved": 0,
+  "symbolKeysAdded": 0,
+  "links": {
+   "before": 153841,
+   "after": 153841
+  },
+  "sitesOnlyBefore": 0,
+  "sitesOnlyAfter": 0,
+  "rust": {
+   "links": 149592,
+   "level2Before": 63098,
+   "level2After": 63098,
+   "taintBefore": 13298,
+   "taintAfter": 4570
+  },
+  "definiteBefore": 51040,
+  "definiteKept": 51040,
+  "definiteChanged": 0,
+  "libraryRowsChanged": 0,
+  "level2Lost": 0,
+  "transitions": {},
+  "labelDropped": 8728
+ },
+ {
+  "id": "RustCrypto/hashes",
+  "symbolKeysRemoved": 0,
+  "symbolKeysAdded": 0,
+  "links": {
+   "before": 12911,
+   "after": 12911
+  },
+  "sitesOnlyBefore": 0,
+  "sitesOnlyAfter": 0,
+  "rust": {
+   "links": 12911,
+   "level2Before": 5846,
+   "level2After": 5846,
+   "taintBefore": 0,
+   "taintAfter": 0
+  },
+  "definiteBefore": 4832,
+  "definiteKept": 4832,
+  "definiteChanged": 0,
+  "libraryRowsChanged": 0,
+  "level2Lost": 0,
+  "transitions": {}
+ },
+ {
+  "id": "actix/actix-web",
+  "symbolKeysRemoved": 0,
+  "symbolKeysAdded": 0,
+  "links": {
+   "before": 86640,
+   "after": 86640
+  },
+  "sitesOnlyBefore": 0,
+  "sitesOnlyAfter": 0,
+  "rust": {
+   "links": 86640,
+   "level2Before": 31418,
+   "level2After": 31418,
+   "taintBefore": 0,
+   "taintAfter": 0
+  },
+  "definiteBefore": 24357,
+  "definiteKept": 24357,
+  "definiteChanged": 0,
+  "libraryRowsChanged": 0,
+  "level2Lost": 0,
+  "transitions": {}
+ },
+ {
+  "id": "alacritty/alacritty",
+  "symbolKeysRemoved": 0,
+  "symbolKeysAdded": 0,
+  "links": {
+   "before": 30965,
+   "after": 30965
+  },
+  "sitesOnlyBefore": 0,
+  "sitesOnlyAfter": 0,
+  "rust": {
+   "links": 30965,
+   "level2Before": 13851,
+   "level2After": 13851,
+   "taintBefore": 11222,
+   "taintAfter": 3586
+  },
+  "definiteBefore": 11397,
+  "definiteKept": 11397,
+  "definiteChanged": 0,
+  "libraryRowsChanged": 0,
+  "level2Lost": 0,
+  "transitions": {},
+  "labelDropped": 7636
+ },
+ {
+  "id": "cberner/redb",
+  "symbolKeysRemoved": 0,
+  "symbolKeysAdded": 0,
+  "links": {
+   "before": 73731,
+   "after": 73731
+  },
+  "sitesOnlyBefore": 0,
+  "sitesOnlyAfter": 0,
+  "rust": {
+   "links": 73731,
+   "level2Before": 30223,
+   "level2After": 30223,
+   "taintBefore": 0,
+   "taintAfter": 0
+  },
+  "definiteBefore": 25726,
+  "definiteKept": 25726,
+  "definiteChanged": 0,
+  "libraryRowsChanged": 0,
+  "level2Lost": 0,
+  "transitions": {}
+ },
+ {
+  "id": "clap-rs/clap",
+  "symbolKeysRemoved": 0,
+  "symbolKeysAdded": 0,
+  "links": {
+   "before": 52417,
+   "after": 52417
+  },
+  "sitesOnlyBefore": 0,
+  "sitesOnlyAfter": 0,
+  "rust": {
+   "links": 52417,
+   "level2Before": 18705,
+   "level2After": 18705,
+   "taintBefore": 0,
+   "taintAfter": 0
+  },
+  "definiteBefore": 14072,
+  "definiteKept": 14072,
+  "definiteChanged": 0,
+  "libraryRowsChanged": 0,
+  "level2Lost": 0,
+  "transitions": {}
+ },
+ {
+  "id": "crossbeam-rs/crossbeam",
+  "symbolKeysRemoved": 0,
+  "symbolKeysAdded": 0,
+  "links": {
+   "before": 34220,
+   "after": 34220
+  },
+  "sitesOnlyBefore": 0,
+  "sitesOnlyAfter": 0,
+  "rust": {
+   "links": 34081,
+   "level2Before": 17359,
+   "level2After": 17359,
+   "taintBefore": 0,
+   "taintAfter": 0
+  },
+  "definiteBefore": 13447,
+  "definiteKept": 13447,
+  "definiteChanged": 0,
+  "libraryRowsChanged": 0,
+  "level2Lost": 0,
+  "transitions": {}
+ },
+ {
+  "id": "embassy-rs/embassy",
+  "symbolKeysRemoved": 0,
+  "symbolKeysAdded": 0,
+  "links": {
+   "before": 514539,
+   "after": 514539
+  },
+  "sitesOnlyBefore": 0,
+  "sitesOnlyAfter": 0,
+  "rust": {
+   "links": 514539,
+   "level2Before": 163464,
+   "level2After": 163464,
+   "taintBefore": 0,
+   "taintAfter": 0
+  },
+  "definiteBefore": 149436,
+  "definiteKept": 149432,
+  "definiteChanged": 4,
+  "libraryRowsChanged": 0,
+  "level2Lost": 4,
+  "transitions": {
+   "resolved->unresolved": 4,
+   "unresolved->resolved": 4,
+   "unresolved->ambiguous": 1,
+   "ambiguous->unresolved": 1
+  }
+ },
+ {
+  "id": "fjall-rs/fjall",
+  "symbolKeysRemoved": 0,
+  "symbolKeysAdded": 0,
+  "links": {
+   "before": 13401,
+   "after": 13401
+  },
+  "sitesOnlyBefore": 0,
+  "sitesOnlyAfter": 0,
+  "rust": {
+   "links": 13361,
+   "level2Before": 5921,
+   "level2After": 5921,
+   "taintBefore": 0,
+   "taintAfter": 0
+  },
+  "definiteBefore": 3966,
+  "definiteKept": 3966,
+  "definiteChanged": 0,
+  "libraryRowsChanged": 0,
+  "level2Lost": 0,
+  "transitions": {}
+ },
+ {
+  "id": "helix-editor/helix",
+  "symbolKeysRemoved": 0,
+  "symbolKeysAdded": 0,
+  "links": {
+   "before": 90780,
+   "after": 90780
+  },
+  "sitesOnlyBefore": 0,
+  "sitesOnlyAfter": 0,
+  "rust": {
+   "links": 90583,
+   "level2Before": 37212,
+   "level2After": 37212,
+   "taintBefore": 0,
+   "taintAfter": 0
+  },
+  "definiteBefore": 29656,
+  "definiteKept": 29656,
+  "definiteChanged": 0,
+  "libraryRowsChanged": 0,
+  "level2Lost": 0,
+  "transitions": {}
+ },
+ {
+  "id": "ratatui/ratatui",
+  "symbolKeysRemoved": 0,
+  "symbolKeysAdded": 0,
+  "links": {
+   "before": 60424,
+   "after": 60424
+  },
+  "sitesOnlyBefore": 0,
+  "sitesOnlyAfter": 0,
+  "rust": {
+   "links": 60424,
+   "level2Before": 21901,
+   "level2After": 21901,
+   "taintBefore": 0,
+   "taintAfter": 0
+  },
+  "definiteBefore": 20176,
+  "definiteKept": 20176,
+  "definiteChanged": 0,
+  "libraryRowsChanged": 0,
+  "level2Lost": 0,
+  "transitions": {}
+ },
+ {
+  "id": "rust-embedded/cortex-m",
+  "symbolKeysRemoved": 0,
+  "symbolKeysAdded": 0,
+  "links": {
+   "before": 5531,
+   "after": 5531
+  },
+  "sitesOnlyBefore": 0,
+  "sitesOnlyAfter": 0,
+  "rust": {
+   "links": 5531,
+   "level2Before": 3021,
+   "level2After": 3021,
+   "taintBefore": 0,
+   "taintAfter": 0
+  },
+  "definiteBefore": 2468,
+  "definiteKept": 2468,
+  "definiteChanged": 0,
+  "libraryRowsChanged": 0,
+  "level2Lost": 0,
+  "transitions": {}
+ },
+ {
+  "id": "rust-lang/mdBook",
+  "symbolKeysRemoved": 0,
+  "symbolKeysAdded": 0,
+  "links": {
+   "before": 20253,
+   "after": 20253
+  },
+  "sitesOnlyBefore": 0,
+  "sitesOnlyAfter": 0,
+  "rust": {
+   "links": 12557,
+   "level2Before": 6172,
+   "level2After": 6172,
+   "taintBefore": 347,
+   "taintAfter": 223
+  },
+  "definiteBefore": 4837,
+  "definiteKept": 4837,
+  "definiteChanged": 0,
+  "libraryRowsChanged": 0,
+  "level2Lost": 0,
+  "transitions": {},
+  "labelDropped": 124
+ },
+ {
+  "id": "rustls/rustls",
+  "symbolKeysRemoved": 0,
+  "symbolKeysAdded": 0,
+  "links": {
+   "before": 69929,
+   "after": 69929
+  },
+  "sitesOnlyBefore": 0,
+  "sitesOnlyAfter": 0,
+  "rust": {
+   "links": 69929,
+   "level2Before": 18972,
+   "level2After": 18972,
+   "taintBefore": 18141,
+   "taintAfter": 7641
+  },
+  "definiteBefore": 17183,
+  "definiteKept": 17183,
+  "definiteChanged": 0,
+  "libraryRowsChanged": 0,
+  "level2Lost": 0,
+  "transitions": {},
+  "labelDropped": 10500
+ },
+ {
+  "id": "serde-rs/serde",
+  "symbolKeysRemoved": 0,
+  "symbolKeysAdded": 0,
+  "links": {
+   "before": 30714,
+   "after": 30714
+  },
+  "sitesOnlyBefore": 0,
+  "sitesOnlyAfter": 0,
+  "rust": {
+   "links": 30714,
+   "level2Before": 8280,
+   "level2After": 8280,
+   "taintBefore": 0,
+   "taintAfter": 0
+  },
+  "definiteBefore": 7563,
+  "definiteKept": 7563,
+  "definiteChanged": 0,
+  "libraryRowsChanged": 0,
+  "level2Lost": 0,
+  "transitions": {}
+ },
+ {
+  "id": "tauri-apps/tauri",
+  "symbolKeysRemoved": 0,
+  "symbolKeysAdded": 0,
+  "links": {
+   "before": 93514,
+   "after": 93514
+  },
+  "sitesOnlyBefore": 0,
+  "sitesOnlyAfter": 0,
+  "rust": {
+   "links": 88051,
+   "level2Before": 38329,
+   "level2After": 38329,
+   "taintBefore": 0,
+   "taintAfter": 0
+  },
+  "definiteBefore": 31728,
+  "definiteKept": 31728,
+  "definiteChanged": 0,
+  "libraryRowsChanged": 0,
+  "level2Lost": 0,
+  "transitions": {}
+ },
+ {
+  "id": "tokio-rs/axum",
+  "symbolKeysRemoved": 0,
+  "symbolKeysAdded": 0,
+  "links": {
+   "before": 41099,
+   "after": 41099
+  },
+  "sitesOnlyBefore": 0,
+  "sitesOnlyAfter": 0,
+  "rust": {
+   "links": 41067,
+   "level2Before": 14453,
+   "level2After": 14453,
+   "taintBefore": 0,
+   "taintAfter": 0
+  },
+  "definiteBefore": 11981,
+  "definiteKept": 11981,
+  "definiteChanged": 0,
+  "libraryRowsChanged": 0,
+  "level2Lost": 0,
+  "transitions": {}
+ },
+ {
+  "id": "tree-sitter/tree-sitter",
+  "symbolKeysRemoved": 0,
+  "symbolKeysAdded": 0,
+  "links": {
+   "before": 59932,
+   "after": 59932
+  },
+  "sitesOnlyBefore": 0,
+  "sitesOnlyAfter": 0,
+  "rust": {
+   "links": 54645,
+   "level2Before": 19845,
+   "level2After": 19845,
+   "taintBefore": 0,
+   "taintAfter": 0
+  },
+  "definiteBefore": 18262,
+  "definiteKept": 18262,
+  "definiteChanged": 0,
+  "libraryRowsChanged": 0,
+  "level2Lost": 0,
+  "transitions": {}
+ },
+ {
+  "id": "vercel/turborepo",
+  "symbolKeysRemoved": 0,
+  "symbolKeysAdded": 0,
+  "links": {
+   "before": 684202,
+   "after": 684202
+  },
+  "sitesOnlyBefore": 0,
+  "sitesOnlyAfter": 0,
+  "rust": {
+   "links": 683584,
+   "level2Before": 290187,
+   "level2After": 290187,
+   "taintBefore": 280527,
+   "taintAfter": 125084
+  },
+  "definiteBefore": 219469,
+  "definiteKept": 219469,
+  "definiteChanged": 0,
+  "libraryRowsChanged": 0,
+  "level2Lost": 0,
+  "transitions": {},
+  "labelDropped": 155443
+ }
+]

@@ -1,0 +1,154 @@
+{
+ "summary": [
+  {
+   "id": "embassy-rs/embassy",
+   "symbolKeysRemoved": 0,
+   "symbolKeysAdded": 0,
+   "links": {
+    "before": 514539,
+    "after": 514539
+   },
+   "sitesOnlyBefore": 0,
+   "sitesOnlyAfter": 0,
+   "rust": {
+    "links": 514539,
+    "level2Before": 163464,
+    "level2After": 163465,
+    "taintBefore": 0,
+    "taintAfter": 0
+   },
+   "definiteBefore": 149436,
+   "definiteKept": 149429,
+   "definiteChanged": 7,
+   "libraryRowsChanged": 0,
+   "level2Lost": 7,
+   "transitions": {
+    "resolved->unresolved": 7,
+    "unresolved->resolved": 8,
+    "unresolved->ambiguous": 1,
+    "ambiguous->unresolved": 1
+   }
+  }
+ ],
+ "changes": [
+  {
+   "file": "embassy-nrf/src/ppi/dppi.rs",
+   "line": 3,
+   "targetName": "super::ChannelNumber",
+   "first": "resolved",
+   "second": "unresolved"
+  },
+  {
+   "file": "embassy-nrf/src/ppi/dppi.rs",
+   "line": 3,
+   "targetName": "super::Event",
+   "first": "resolved",
+   "second": "unresolved"
+  },
+  {
+   "file": "embassy-nrf/src/ppi/dppi.rs",
+   "line": 3,
+   "targetName": "super::Ppi",
+   "first": "unresolved",
+   "second": "resolved"
+  },
+  {
+   "file": "embassy-nrf/src/ppi/dppi.rs",
+   "line": 3,
+   "targetName": "super::PpiGroup",
+   "first": "unresolved",
+   "second": "resolved"
+  },
+  {
+   "file": "embassy-nrf/src/ppi/ppi.rs",
+   "line": 3,
+   "targetName": "super::ChannelNumber",
+   "first": "unresolved",
+   "second": "resolved"
+  },
+  {
+   "file": "embassy-nrf/src/ppi/ppi.rs",
+   "line": 3,
+   "targetName": "super::Event",
+   "first": "unresolved",
+   "second": "resolved"
+  },
+  {
+   "file": "embassy-nrf/src/ppi/ppi.rs",
+   "line": 3,
+   "targetName": "super::Ppi",
+   "first": "resolved",
+   "second": "unresolved"
+  },
+  {
+   "file": "embassy-nrf/src/ppi/ppi.rs",
+   "line": 3,
+   "targetName": "super::PpiGroup",
+   "first": "resolved",
+   "second": "unresolved"
+  },
+  {
+   "file": "embassy-stm32/src/can/bxcan/mod.rs",
+   "line": 20,
+   "targetName": "super::util",
+   "first": "unresolved",
+   "second": "resolved"
+  },
+  {
+   "file": "embassy-stm32/src/can/fdcan.rs",
+   "line": 27,
+   "targetName": "super::util",
+   "first": "resolved",
+   "second": "unresolved"
+  },
+  {
+   "file": "embassy-stm32/src/rcc/f247.rs",
+   "line": 15,
+   "targetName": "crate::rcc::dsi",
+   "first": "unresolved",
+   "second": "resolved"
+  },
+  {
+   "file": "embassy-stm32/src/rcc/h.rs",
+   "line": 17,
+   "targetName": "crate::rcc::dsi",
+   "first": "resolved",
+   "second": "unresolved"
+  },
+  {
+   "file": "embassy-stm32/src/rcc/u3.rs",
+   "line": 7,
+   "targetName": "crate::rcc::LSI_FREQ",
+   "first": "unresolved",
+   "second": "ambiguous"
+  },
+  {
+   "file": "embassy-stm32/src/rcc/wba.rs",
+   "line": 13,
+   "targetName": "crate::rcc::LSI_FREQ",
+   "first": "ambiguous",
+   "second": "unresolved"
+  },
+  {
+   "file": "embassy-stm32/src/rtc/v3.rs",
+   "line": 6,
+   "targetName": "crate::rtc::SealedInstance",
+   "first": "unresolved",
+   "second": "resolved"
+  },
+  {
+   "file": "embassy-stm32/src/time_driver/lptim.rs",
+   "line": 17,
+   "targetName": "super::AlarmState",
+   "first": "unresolved",
+   "second": "resolved"
+  },
+  {
+   "file": "embassy-stm32/src/time_driver/tim.rs",
+   "line": 17,
+   "targetName": "super::AlarmState",
+   "first": "resolved",
+   "second": "unresolved"
+  }
+ ]
+}
