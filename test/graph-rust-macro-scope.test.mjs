@@ -5,6 +5,7 @@ import { test } from "node:test";
 import { contentHash, fileFacts, validateResult } from "../dist/graph/index.js";
 import rust from "../dist/graph/languages/rust/index.js";
 import { GraphView } from "../dist/mcp/graph-view.js";
+import { macroLock } from "./graph-rust-macro-lock.mjs";
 
 async function observations(text, dependencies = "", support = {}) {
   const path = "src/lib.rs";
@@ -17,7 +18,7 @@ async function observations(text, dependencies = "", support = {}) {
         ...parts.filter(([name]) => name.endsWith(".rs")),
       ]),
       manifest,
-      parts.filter(([name]) => name.endsWith(".toml")),
+      parts.filter(([name]) => /Cargo\.(?:toml|lock)$/.test(name)),
     )
   )(path);
 }
@@ -189,6 +190,77 @@ test("standard test and tool attributes have their own lookup rules", async () =
   assert.deepEqual(at("types", "Option", "// rebound tool name"), proved(null));
 });
 
+test("the built-in test attribute is established through a parent glob", async () => {
+  const at = await observations(
+    `
+    mod exported { pub use bangs::test; }
+    pub use exported::*;
+    mod tests {
+      use super::*;
+      #[test]
+      fn case() {}
+      fn sibling() -> Option<u8> { None } // parent glob
+    }
+    `,
+    'bangs = "1"',
+  );
+  assert.deepEqual(
+    at("types", "Option", "// parent glob"),
+    proved("option::Option"),
+  );
+  const files = await projectObservations(
+    {
+      "src/lib.rs": "pub use bangs::test; mod tests;",
+      "src/tests.rs": `
+        use super::*;
+        #[test]
+        fn case() {}
+        fn sibling() -> Option<u8> { None } // separate parent glob
+      `,
+    },
+    '[package]\nname="app"\nversion="0.0.0"\nedition="2021"\n[dependencies]\nbangs="1"\n',
+  );
+  assert.deepEqual(
+    files("src/tests.rs")("types", "Option", "// separate parent glob"),
+    proved("option::Option"),
+  );
+});
+
+test("a self-qualified macro can resolve through a captured glob", async () => {
+  const at = await observations(`
+    mod checks {
+      mod exported {
+        macro_rules! bounded { () => { const OTHER: u8 = 0; } }
+        pub(crate) use bounded as Name;
+      }
+      use exported::*;
+      fn caller() -> u8 {
+        self::Name!(); // self-qualified macro
+        OTHER
+      }
+    }
+  `);
+  assert.deepEqual(
+    at("macros", "self::Name", "// self-qualified macro"),
+    proved("checks::exported::bounded"),
+  );
+});
+
+test("an uncaptured glob without an outer macro binding leaves scope open", async () => {
+  const at = await observations(
+    `
+    mod checks {
+      use facade::*;
+      #[derive(Alternative)]
+      struct Item;
+      fn sibling() -> Option<u8> { None } // uncaptured glob
+    }
+  `,
+    'facade = "1"',
+  );
+  assert.deepEqual(at("types", "Option", "// uncaptured glob"), proved(null));
+});
+
 test("qualified macros keep the Cargo identity through unrelated globs", async () => {
   const at = await observations(
     `
@@ -207,7 +279,7 @@ test("qualified macros keep the Cargo identity through unrelated globs", async (
         let _: Option<u8> = None; // attribute across glob
       }
       fn bang() {
-        registry::make!(Item);
+        registry::new_key_type! { struct Item; }
         let _: Option<u8> = None; // bang across glob
       }
     }
@@ -223,7 +295,14 @@ test("qualified macros keep the Cargo identity through unrelated globs", async (
       fn sibling() -> Option<u8> { None } // absent Cargo edge
     }
   `,
-    'renamed = { package = "serde", version = "1", features = ["derive"] }\nruntime = { package = "tokio", version = "1", features = ["macros"] }\nregistry = "1"',
+    'renamed = { package = "serde", version = "1", features = ["derive"] }\nruntime = { package = "tokio", version = "1", features = ["macros", "rt"] }\nregistry = { package = "slotmap", version = "1" }',
+    {
+      "Cargo.lock": macroLock([
+        ["serde", "1.0.229", ["serde_derive", "1.0.229"]],
+        ["tokio", "1.54.1", ["tokio-macros", "2.7.2"]],
+        ["slotmap", "1.0.7"],
+      ]),
+    },
   );
   for (const marker of [
     "// derive across glob",
@@ -265,6 +344,75 @@ test("a captured macro-use reexport has to compete in the attribute namespace", 
   assert.deepEqual(
     unknown("types", "Option", "// beside derive"),
     proved(null),
+  );
+});
+
+async function tokioMacroOrigin(fixture, options = {}) {
+  const directory = new URL(
+    `fixtures/graph-rust-macro-identity/${fixture}/`,
+    import.meta.url,
+  );
+  const load = (file) => readFile(new URL(file, directory), "utf8");
+  const support = [["Cargo.lock", await load("Cargo.lock")]];
+  if (options.config) support.push([".cargo/config.toml", options.config]);
+  const file = options.file ?? "src/lib.rs";
+  const sources = { [file]: await load("src/lib.rs") };
+  if (fixture === "tokio-patched") {
+    support.push(["macros/Cargo.toml", await load("macros/Cargo.toml")]);
+    sources["macros/src/lib.rs"] = await load("macros/src/lib.rs");
+  }
+  const manifest = await load("Cargo.toml");
+  return (
+    await projectObservations(
+      sources,
+      options.features
+        ? manifest.replace('["macros", "rt-multi-thread"]', options.features) +
+            (options.devDependencies ?? "")
+        : manifest,
+      support,
+    )
+  )(file);
+}
+
+test("a renamed Tokio facade needs registry evidence for the macro implementation", async () => {
+  const registry = await tokioMacroOrigin("tokio-registry");
+  const patched = await tokioMacroOrigin("tokio-patched");
+  const configured = await tokioMacroOrigin("tokio-registry", {
+    config:
+      '[patch.crates-io]\nreplacement = { package = "tokio-macros", path = "macros" }\n',
+  });
+  for (const marker of [
+    "// main by path",
+    "// test by import",
+    "// test by path",
+  ]) {
+    assert.deepEqual(
+      registry("types", "Option", marker),
+      assumed("option::Option"),
+    );
+    assert.deepEqual(patched("types", "Option", marker), proved(null));
+    assert.deepEqual(configured("types", "Option", marker), proved(null));
+  }
+});
+
+test("a locked Tokio implementation does not enable a missing export feature", async () => {
+  const at = await tokioMacroOrigin("tokio-registry", { features: '["rt"]' });
+  assert.deepEqual(at("types", "Option", "// test by path"), proved(null));
+  assert.deepEqual(at("types", "Option", "// test by import"), proved(null));
+  const options = {
+    features: '["rt"]',
+    devDependencies:
+      '\n[dev-dependencies]\nruntime = {package="tokio", version="=1.54.1", features=["macros"]}\n',
+  };
+  const normal = await tokioMacroOrigin("tokio-registry", options);
+  const test = await tokioMacroOrigin("tokio-registry", {
+    ...options,
+    file: "tests/runtime.rs",
+  });
+  assert.deepEqual(normal("types", "Option", "// test by path"), proved(null));
+  assert.deepEqual(
+    test("types", "Option", "// test by path"),
+    assumed("option::Option"),
   );
 });
 
@@ -479,13 +627,19 @@ test("attribute and derive inputs bound whole components of item names", async (
       let _: FieldNameBuilder; // field suffix
     }
     fn tagged() {
-      #[external::decorate]
+      #[serde_with::serde_as]
       enum Config { VariantName }
       let _: ConfigBuilder; // attr generated
       let _: VariantNameBuilder; // attr variant suffix
     }
   `,
-    'derive_builder="0.20"\nexternal="1"',
+    'derive_builder="0.20"\nserde_with={version="3",features=["macros"]}',
+    {
+      "Cargo.lock": macroLock([
+        ["derive_builder", "0.20.2", ["derive_builder_macro", "0.20.2"]],
+        ["serde_with", "3.17.0", ["serde_with_macros", "3.17.0"]],
+      ]),
+    },
   );
   assert.deepEqual(at("types", "ConfigBuilder", "// pascal"), proved(null));
   assert.deepEqual(at("types", "config_builder", "// snake"), proved(null));
@@ -595,6 +749,12 @@ test("attribute inputs include the full item and derive inputs include the type"
     }
   `,
     'tokio={version="1",features=["macros","rt-multi-thread"]}\nserde={version="1",features=["derive"]}',
+    {
+      "Cargo.lock": macroLock([
+        ["tokio", "1.54.1", ["tokio-macros", "2.7.2"]],
+        ["serde", "1.0.229", ["serde_derive", "1.0.229"]],
+      ]),
+    },
   );
   assert.deepEqual(at("types", "Option", "// inside"), proved(null));
   assert.deepEqual(

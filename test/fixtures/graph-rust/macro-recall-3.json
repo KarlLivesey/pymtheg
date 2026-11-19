@@ -3236,7 +3236,7 @@
       "src/lib.rs": "pub fn helper()->u32{11} pub async fn run()->u32{tokio::select!(_ = std::future::ready(()) => {});helper()}"
     },
     "manifests": {
-      "Cargo.toml": "[package]\nname=\"app\"\nversion=\"0.0.0\"\nedition=\"2024\"\n[dependencies]\ntokio=\"*\"\n",
+      "Cargo.toml": "[package]\nname=\"app\"\nversion=\"0.0.0\"\nedition=\"2024\"\n[dependencies]\ntokio={version=\"*\",features=[\"macros\"]}\n",
       "Cargo.lock": "version=4\n[[package]]\nname=\"app\"\nversion=\"0.0.0\"\ndependencies=[\"tokio\"]\n[[package]]\nname=\"tokio\"\nversion=\"1.43.0\"\nsource=\"registry+https://github.com/rust-lang/crates.io-index\"\n"
     },
     "definite": {
@@ -3255,7 +3255,7 @@
       "src/lib.rs": "pub fn helper()->u32{11} pub async fn run()->u32{tokio::select!(_ = std::future::ready(()) => {});helper()}"
     },
     "manifests": {
-      "Cargo.toml": "[package]\nname=\"app\"\nversion=\"0.0.0\"\nedition=\"2024\"\n[dependencies]\ntokio=\"*\"\n",
+      "Cargo.toml": "[package]\nname=\"app\"\nversion=\"0.0.0\"\nedition=\"2024\"\n[dependencies]\ntokio={version=\"*\",features=[\"macros\"]}\n",
       "Cargo.lock": "version=4\n[[package]]\nname=\"app\"\nversion=\"0.0.0\"\ndependencies=[\"tokio\"]\n[[package]]\nname=\"tokio\"\nversion=\"2.0.0\"\nsource=\"registry+https://github.com/rust-lang/crates.io-index\"\n"
     },
     "ecosystem": "tokio",
@@ -3263,7 +3263,7 @@
     "route": "qualified",
     "async": true,
     "result": false,
-    "assumed": "helper",
+    "unknown": "helper",
     "would": "helper"
   },
   {
@@ -3272,7 +3272,7 @@
       "src/lib.rs": "pub fn helper()->u32{11} pub async fn run()->u32{tokio::select!(_ = std::future::ready(()) => {});helper()}"
     },
     "manifests": {
-      "Cargo.toml": "[package]\nname=\"app\"\nversion=\"0.0.0\"\nedition=\"2024\"\n[dependencies]\ntokio=\"1\"\n"
+      "Cargo.toml": "[package]\nname=\"app\"\nversion=\"0.0.0\"\nedition=\"2024\"\n[dependencies]\ntokio={version=\"1\",features=[\"macros\"]}\n"
     },
     "definite": {
       "name": "helper",
@@ -3290,7 +3290,7 @@
       "src/lib.rs": "pub fn helper()->u32{11} pub async fn run()->u32{tokio::select!(_ = std::future::ready(()) => {});helper()}"
     },
     "manifests": {
-      "Cargo.toml": "[package]\nname=\"app\"\nversion=\"0.0.0\"\nedition=\"2024\"\n[dependencies]\ntokio=\"^1\"\n"
+      "Cargo.toml": "[package]\nname=\"app\"\nversion=\"0.0.0\"\nedition=\"2024\"\n[dependencies]\ntokio={version=\"^1\",features=[\"macros\"]}\n"
     },
     "definite": {
       "name": "helper",
@@ -3308,7 +3308,7 @@
       "src/lib.rs": "pub fn helper()->u32{11} pub async fn run()->u32{tokio::select!(_ = std::future::ready(()) => {});helper()}"
     },
     "manifests": {
-      "Cargo.toml": "[package]\nname=\"app\"\nversion=\"0.0.0\"\nedition=\"2024\"\n[dependencies]\ntokio=\"~1.43.0\"\n"
+      "Cargo.toml": "[package]\nname=\"app\"\nversion=\"0.0.0\"\nedition=\"2024\"\n[dependencies]\ntokio={version=\"~1.43.0\",features=[\"macros\"]}\n"
     },
     "definite": {
       "name": "helper",
@@ -3326,7 +3326,7 @@
       "src/lib.rs": "pub fn helper()->u32{11} pub async fn run()->u32{tokio::select!(_ = std::future::ready(()) => {});helper()}"
     },
     "manifests": {
-      "Cargo.toml": "[package]\nname=\"app\"\nversion=\"0.0.0\"\nedition=\"2024\"\n[dependencies]\ntokio=\"=1.43.0\"\n"
+      "Cargo.toml": "[package]\nname=\"app\"\nversion=\"0.0.0\"\nedition=\"2024\"\n[dependencies]\ntokio={version=\"=1.43.0\",features=[\"macros\"]}\n"
     },
     "definite": {
       "name": "helper",
@@ -3344,7 +3344,7 @@
       "src/lib.rs": "pub fn helper()->u32{11} pub async fn run()->u32{tokio::select!(_ = std::future::ready(()) => {});helper()}"
     },
     "manifests": {
-      "Cargo.toml": "[package]\nname=\"app\"\nversion=\"0.0.0\"\nedition=\"2024\"\n[dependencies]\ntokio=\"1.*\"\n"
+      "Cargo.toml": "[package]\nname=\"app\"\nversion=\"0.0.0\"\nedition=\"2024\"\n[dependencies]\ntokio={version=\"1.*\",features=[\"macros\"]}\n"
     },
     "definite": {
       "name": "helper",
@@ -3362,14 +3362,14 @@
       "src/lib.rs": "pub fn helper()->u32{11} pub async fn run()->u32{tokio::select!(_ = std::future::ready(()) => {});helper()}"
     },
     "manifests": {
-      "Cargo.toml": "[package]\nname=\"app\"\nversion=\"0.0.0\"\nedition=\"2024\"\n[dependencies]\ntokio=\">=1\"\n"
+      "Cargo.toml": "[package]\nname=\"app\"\nversion=\"0.0.0\"\nedition=\"2024\"\n[dependencies]\ntokio={version=\">=1\",features=[\"macros\"]}\n"
     },
     "ecosystem": "tokio",
     "macro": "select",
     "route": "qualified",
     "async": true,
     "result": false,
-    "assumed": "helper",
+    "unknown": "helper",
     "would": "helper"
   },
   {
@@ -3378,14 +3378,14 @@
       "src/lib.rs": "pub fn helper()->u32{11} pub async fn run()->u32{tokio::select!(_ = std::future::ready(()) => {});helper()}"
     },
     "manifests": {
-      "Cargo.toml": "[package]\nname=\"app\"\nversion=\"0.0.0\"\nedition=\"2024\"\n[dependencies]\ntokio=\"*\"\n"
+      "Cargo.toml": "[package]\nname=\"app\"\nversion=\"0.0.0\"\nedition=\"2024\"\n[dependencies]\ntokio={version=\"*\",features=[\"macros\"]}\n"
     },
     "ecosystem": "tokio",
     "macro": "select",
     "route": "qualified",
     "async": true,
     "result": false,
-    "assumed": "helper",
+    "unknown": "helper",
     "would": "helper"
   },
   {

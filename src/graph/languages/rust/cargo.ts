@@ -32,7 +32,10 @@ export interface Dependency {
   packageName?: string;
   registryVersion?: string | undefined;
   registryRequirement?: string;
+  /** A verified registry edge and its source-checked direct lock dependencies. */
+  macroRegistry?: readonly string[];
   features?: string[];
+  defaultFeatures?: true;
   libraryVersion?: string;
   libraryVersionSource?: string;
 }
@@ -128,29 +131,46 @@ export function crates(
       .filter((c) => p.basename(c.path) === "Cargo.lock")
       .map((c) => [c.path, c.status === "clean" ? readToml(c.text) : null]),
   );
-  function lockedVersion(
+  const lockIndexes = new Map<string, Map<string, TomlTable[]>>();
+  function lockIndex(lockPath: string): Map<string, TomlTable[]> {
+    let result = lockIndexes.get(lockPath);
+    if (result) return result;
+    result = new Map();
+    lockIndexes.set(lockPath, result);
+    const packages = locks.get(lockPath)?.package;
+    if (Array.isArray(packages))
+      for (const row of packages) {
+        const pkg = table(row),
+          name = string(pkg?.name);
+        if (!pkg || !name) continue;
+        const entries = result.get(name) ?? [];
+        entries.push(pkg);
+        result.set(name, entries);
+      }
+    return result;
+  }
+  function lockDescriptors(owner: TomlTable): RegExpExecArray[] {
+    return (strings(owner.dependencies) ?? [])
+      .map((edge) => /^(\S+)(?: (\S+)(?: \((.+)\))?)?$/.exec(edge))
+      .filter((edge): edge is RegExpExecArray => edge !== null);
+  }
+  function lockedPackage(
     lockPath: string,
     owner: string,
     name: string,
     requirement: string | undefined,
     identity: string | undefined,
-  ): string | undefined {
+  ): TomlTable | undefined {
     if (!identity) return;
-    const packages = locks.get(lockPath)?.package;
-    if (!Array.isArray(packages)) return;
-    const rows = packages.map(table).filter((t): t is TomlTable => !!t);
-    const owners = rows.filter(
-      (t) => t.name === owner && t.source === undefined,
+    const owners = (lockIndex(lockPath).get(owner) ?? []).filter(
+      (t) => t.source === undefined,
     );
     if (owners.length !== 1) return;
-    const deps = strings(owners[0]!.dependencies);
-    if (!deps) return;
-    const descriptors = deps
-      .map((edge) => /^(\S+)(?: (\S+)(?: \((.+)\))?)?$/.exec(edge))
-      .filter((edge): edge is RegExpExecArray => edge?.[1] === name);
-    const candidates = rows.filter(
+    const descriptors = lockDescriptors(owners[0]!).filter(
+      (edge) => edge[1] === name,
+    );
+    const candidates = (lockIndex(lockPath).get(name) ?? []).filter(
       (t) =>
-        t.name === name &&
         typeof t.version === "string" &&
         lockSource(t.source) === identity &&
         (!requirement ||
@@ -162,14 +182,14 @@ export function crates(
             (!edge[3] || lockSource(edge[3]) === identity),
         ),
     );
-    const selected = candidates[0];
     if (candidates.length !== 1) return;
+    const selected = candidates[0];
     if (
       identity.startsWith("git:") &&
       !/#(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(string(selected?.source) ?? "")
     )
       return;
-    return string(selected?.version);
+    return selected;
   }
   function workspaceFor(doc: (typeof docs)[number]): {
     doc?: typeof doc | undefined;
@@ -368,6 +388,51 @@ export function crates(
       )
         known = false;
     }
+    function registryPackage(row: TomlTable): boolean {
+      const source = string(row.source);
+      const packageName = string(row.name);
+      const identity = lockSource(source);
+      if (
+        !source ||
+        !packageName ||
+        !(identity === "crates-io" || identity?.startsWith("registry:"))
+      )
+        return false;
+      if (overrides.some((entry) => entry.name === packageName)) return false;
+      const config = { "registry-index": source.replace(/^registry\+/, "") };
+      return [
+        memberSource(config, packageName),
+        workspaceSource(config, packageName),
+      ].every(
+        (resolved) =>
+          resolved.identity === identity && resolved.directory === undefined,
+      );
+    }
+    function registryImplementations(row: TomlTable): string[] | undefined {
+      if (!registryPackage(row)) return;
+      const byName = new Map<string, boolean>();
+      for (const edge of lockDescriptors(row)) {
+        const [, name, version, source] = edge;
+        const candidates = (lockIndex(lockPath).get(name!) ?? []).filter(
+          (dep) =>
+            (!version || version === dep.version) &&
+            (!source ||
+              source === dep.source ||
+              (lockSource(source) !== undefined &&
+                lockSource(source) === lockSource(dep.source))),
+        );
+        byName.set(
+          name!,
+          (byName.get(name!) ?? true) &&
+            candidates.length === 1 &&
+            registryPackage(candidates[0]!),
+        );
+      }
+      return [...byName]
+        .filter(([, registry]) => registry)
+        .map(([name]) => name)
+        .sort();
+    }
     for (const group of dependencyTables(value))
       for (const [alias, raw] of Object.entries(group.values)) {
         let fields = table(raw),
@@ -376,6 +441,7 @@ export function crates(
           origin = doc,
           conditions = group.condition ? [group.condition] : [];
         const memberFeatures = strings(fields?.features) ?? [];
+        const memberDefault = fields?.["default-features"];
         if (typeof raw !== "string" && !fields) {
           known = false;
           conditions.push("?dependency");
@@ -472,10 +538,10 @@ export function crates(
               ? member.directory
               : null;
         const exact = exactVersion(requirement);
-        const selected =
+        const selectedPackage =
           !alternatives.length &&
           (vendor || (defaultRegistry && requirement && vendor === undefined))
-            ? lockedVersion(
+            ? lockedPackage(
                 lockPath,
                 name,
                 packageName,
@@ -483,6 +549,7 @@ export function crates(
                 member.identity ?? (defaultRegistry ? "crates-io" : undefined),
               )
             : undefined;
+        const selected = string(selectedPackage?.version);
         const registry =
           defaultRegistry && !alternatives.length && vendor === undefined
             ? selected
@@ -495,6 +562,19 @@ export function crates(
                 ? { registryRequirement: requirement }
                 : {}
             : {};
+        const macroRegistry = selectedPackage
+          ? registryImplementations(selectedPackage)
+          : registry.registryRequirement &&
+              [
+                memberSource(fields, packageName),
+                workspaceSource(fields, packageName),
+              ].every(
+                (source) =>
+                  source.identity === "crates-io" &&
+                  source.directory === undefined,
+              )
+            ? []
+            : undefined;
         if (vendor !== undefined) {
           const version =
             selected ??
@@ -526,6 +606,10 @@ export function crates(
         const features = [
           ...new Set([...memberFeatures, ...(strings(fields?.features) ?? [])]),
         ];
+        const defaultFeatures = [
+          memberDefault,
+          fields?.["default-features"],
+        ].every((value) => value === undefined || value === true);
         for (const path of targets) {
           const target = byPath.get(path);
           if (path && !target?.value) {
@@ -560,6 +644,8 @@ export function crates(
             conditions: [...conditions],
             packageName,
             ...(features.length ? { features } : {}),
+            ...(defaultFeatures ? { defaultFeatures: true } : {}),
+            ...(macroRegistry ? { macroRegistry } : {}),
             ...(vendor !== undefined ? {} : { ...registry, ...version }),
           });
         }

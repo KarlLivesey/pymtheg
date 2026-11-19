@@ -62,6 +62,48 @@ mod self_derive {
     fn from_external() -> FromDerive { FromDerive }
 }
 
+mod parent_glob_test {
+    mod exported { pub use bangs::test; }
+    pub use exported::*;
+
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn built_in_test() {}
+
+        fn sibling() -> Option<u8> { None }
+    }
+}
+
+mod out_of_line_parent_glob {
+    pub use bangs::test;
+    mod tests;
+}
+
+mod self_qualified_glob {
+    mod exported {
+        macro_rules! bounded { () => { const OTHER: u8 = 0; } }
+        pub(crate) use bounded as Name;
+    }
+    use exported::*;
+
+    fn caller() -> u8 {
+        self::Name!();
+        OTHER
+    }
+}
+
+mod glob_without_prelude_name {
+    mod exported { pub use facade::Alternative; }
+    use exported::*;
+
+    #[derive(Alternative)]
+    struct Item;
+
+    fn from_external() -> FromAlternative { FromAlternative }
+}
+
 mod explicit_test {
     use facade::test;
     #[test]

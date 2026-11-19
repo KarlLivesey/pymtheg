@@ -1,0 +1,7 @@
+[package]
+name = "macro-origin-registry"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+runtime = { package = "tokio", version = "=1.54.1", features = ["macros", "rt-multi-thread"] }

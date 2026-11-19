@@ -84,11 +84,9 @@ test("Rust ecosystem macro identity: captured lock changes re-resolve cached sou
         .links()
         .filter((l) => l.kind === "calls" && l.targetName === "helper");
       assert.equal(helper.length, 1);
-      assert.ok(helper[0].targetId);
-      assert.deepEqual(
-        helper[0].data.assumes ?? [],
-        version === "0.2.0" ? ["rust-external-macro-name"] : [],
-      );
+      if (version === "0.2.0") assert.equal(helper[0].targetId, null);
+      else assert.ok(helper[0].targetId);
+      assert.deepEqual(helper[0].data.assumes ?? [], []);
       const once = snapshot(warm),
         before = parsed;
       r = await indexProject(root, registry, warm);

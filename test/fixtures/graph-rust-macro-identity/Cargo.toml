@@ -27,4 +27,4 @@ no-std = []
 
 [workspace]
 members = ["bangs", "facade", "macros"]
-exclude = ["registry"]
+exclude = ["registry", "tokio-patched", "tokio-registry"]

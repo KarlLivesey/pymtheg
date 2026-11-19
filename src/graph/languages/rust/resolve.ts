@@ -41,6 +41,7 @@ import {
 } from "./library-audit.js";
 import {
   dependencyUnit,
+  cargoMacroExport,
   exportNamespace,
   librarySymbol,
   permitsNamespace,
@@ -3617,24 +3618,20 @@ export function resolveRust(
   // E4: failed/unverified textual entries are unseen code. Assume they do
   // not rebind the standard names; ordinary textual macro lookup stays strict.
   function dependencyMacro(alias: string, name: string, loc: Place): boolean {
-    const edges = (loc.crate.dependencies ?? []).filter(
-      (e) =>
-        e.name === alias &&
-        possible([...(loc.conditions ?? []), ...e.conditions]),
+    const unit = dependencyUnit(
+      loc.crate,
+      alias,
+      loc.conditions ?? [],
+      possible,
+      implies,
     );
     return (
-      edges.length > 0 &&
-      edges.some((e) =>
-        e.conditions.every((c) => implies(loc.conditions ?? [], c)),
+      !!unit &&
+      !!unit.registry?.length &&
+      unit.registry.every(({ version, requirement }) =>
+        auditedMacro(unit.unit.unit, version, name, requirement),
       ) &&
-      edges.every((e) =>
-        auditedMacro(
-          e.packageName ?? "",
-          e.registryVersion,
-          name,
-          e.registryRequirement,
-        ),
-      )
+      cargoMacroExport({ ...unit, parts: [name] }).status === "available"
     );
   }
   function ecosystemPath(path: string, loc: Place, scope: string): boolean {
@@ -6207,6 +6204,19 @@ export function resolveRust(
         return l.kind === "imports"
           ? { ...path.unit, evidence: "import-path" }
           : undefined;
+      if (
+        !libraryProbe &&
+        namespace === "macro" &&
+        path.unit.ecosystem === "cargo"
+      ) {
+        const { status } = cargoMacroExport(path);
+        if (status === "unavailable" || status === "unverified-source")
+          return refuseLibrary(
+            status === "unavailable"
+              ? "macro export unavailable"
+              : "macro implementation source unverified",
+          );
+      }
       const exported = exportNamespace(path);
       if (
         !libraryProbe &&
@@ -6589,6 +6599,11 @@ export function resolveRust(
       return undefined;
     if (flavor === "derive" && standardDerivePath(binding))
       return "standard derive";
+    if (binding.unit.ecosystem === "cargo") {
+      const macro = cargoMacroExport(binding);
+      if (macro.status !== "available" || macro.namespace !== flavor)
+        return undefined;
+    }
     const exported = scopeMacroExport(binding);
     const competingPrelude =
       prelude || (bare && flavor === "attribute" && knownAttributeName(head));
