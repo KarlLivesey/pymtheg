@@ -27,7 +27,11 @@ const auditPins = new Set([
   "pmndrs/zustand",
   "yargs/yargs",
 ]);
-const preservationPins = new Set(["pingdotgg/t3code", "nestjs/nest", "excalidraw/excalidraw"]);
+const preservationPins = new Set([
+  "pingdotgg/t3code",
+  "nestjs/nest",
+  "excalidraw/excalidraw",
+]);
 const manifest = join(scratch, `${mode}-manifest.json`);
 const run = (args) => {
   const result = spawnSync(process.execPath, args, { stdio: "inherit" });
@@ -89,18 +93,20 @@ if (mode === "release") {
   unpackMain();
   writeFileSync(
     manifest,
-    JSON.stringify(
-      pins.filter((repo) => preservationPins.has(repo.id)),
-    ),
+    JSON.stringify(pins.filter((repo) => preservationPins.has(repo.id))),
   );
   sweep(scratch, 3, main);
-} else if (["candidate", "candidate-audit", "candidate-others"].includes(mode)) {
+} else if (
+  ["candidate", "candidate-audit", "candidate-others"].includes(mode)
+) {
   writeFileSync(
     manifest,
     JSON.stringify(
       mode === "candidate"
         ? pins
-        : pins.filter((repo) => auditPins.has(repo.id) === (mode === "candidate-audit")),
+        : pins.filter(
+            (repo) => auditPins.has(repo.id) === (mode === "candidate-audit"),
+          ),
     ),
   );
   sweep(scratch, Number(other ?? 4), resolve("."));

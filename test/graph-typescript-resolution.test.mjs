@@ -3197,8 +3197,9 @@ for (const [label, text] of [
 // Round 6: exact scope, dynamic scope, createRequire origin, spelling,
 // cross-file names, containment and labels.
 const freshFor = async (files) => {
-  const { freshNames } =
-    await import("../dist/graph/languages/typescript/rename.js");
+  const { freshNames } = await import(
+    "../dist/graph/languages/typescript/rename.js"
+  );
   return freshNames(Object.values(files).map(String));
 };
 /** No compiler-only name may appear in any stored fact, identity or diagnostic. */
@@ -4491,8 +4492,9 @@ test("the program flag and the bundler assumption together", async () => {
 });
 
 test("tied configs: six orders of three variants merge to identical output", async () => {
-  const { mergeTied } =
-    await import("../dist/graph/languages/typescript/index.js");
+  const { mergeTied } = await import(
+    "../dist/graph/languages/typescript/index.js"
+  );
   const variant = (config, extra) => ({
     status: "clean",
     diagnostics: [],
@@ -5016,8 +5018,9 @@ test("tied configs: a variant that failed makes the merged link failed with the 
 
 test("a failed file is served to programs as absent, not as empty text", async () => {
   const ts = (await import("typescript")).default;
-  const { projectModel } =
-    await import("../dist/graph/languages/typescript/project.js");
+  const { projectModel } = await import(
+    "../dist/graph/languages/typescript/project.js"
+  );
   const files = [
     { path: "bad.ts", text: "export const a = (;\n" },
     { path: "use.ts", text: 'import { a } from "./bad";\n' },
@@ -6148,8 +6151,9 @@ test("default-deny: each default branch fails a kind it does not handle", async 
 
 test("default-deny: the handled kinds of each switch are listed", async () => {
   await indexFiles({ "a.ts": "export const a = 1;\n" });
-  const { HANDLED } =
-    await import("../dist/graph/languages/typescript/judge.js");
+  const { HANDLED } = await import(
+    "../dist/graph/languages/typescript/judge.js"
+  );
   // Only kinds with an explicit case; everything else is FAILED.
   assert.deepEqual(HANDLED, {
     types: [

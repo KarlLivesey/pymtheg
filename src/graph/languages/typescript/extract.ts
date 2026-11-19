@@ -898,7 +898,7 @@ export function extractFile(
         }
     };
     try {
-      for (let node: ts.Node | undefined = receiver; node;) {
+      for (let node: ts.Node | undefined = receiver; node; ) {
         if (ts.isIdentifier(node) || ts.isPrivateIdentifier(node)) {
           const symbol = checker.getSymbolAtLocation(node);
           symbolCauses(symbol, "receiver");
