@@ -139,7 +139,7 @@ for (const point of ["open", "file", "resolved", "complete"])
 test(
   "power loss: a cold index loses its unsynced log tail mid-frame, reports incomplete and is repaired",
   {
-    skip: !wal && "no write-ahead log on this filesystem",
+    skip: !wal && "no write-ahead log here (filesystem or SQLite version)",
   },
   async () => {
     const files = fixtureFiles();
@@ -170,7 +170,7 @@ test(
 test(
   "power loss: an edit's re-index that loses its whole log returns to the previous complete index, which is reported stale and repaired",
   {
-    skip: !wal && "no write-ahead log on this filesystem",
+    skip: !wal && "no write-ahead log here (filesystem or SQLite version)",
   },
   async () => {
     const files = fixtureFiles();
