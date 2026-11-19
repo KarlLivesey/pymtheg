@@ -5,7 +5,14 @@
  * line, and `_GOOS`/`_GOARCH` filename suffixes). Nothing here selects one
  * configuration; an expression it cannot read is unknown.
  */
-import { PORT_GOARCH, PORT_GOOS, type FileFact } from "./model.js";
+import {
+  KNOWN_GOARCH,
+  KNOWN_GOOS,
+  PORTS,
+  PORT_GOARCH,
+  PORT_GOOS,
+  type FileFact,
+} from "./model.js";
 
 export type Formula =
   | { k: "t" }
@@ -163,11 +170,80 @@ function searchAnyTags(given: Formula[]): boolean | undefined {
     values
       .map((n): Formula => ({ k: "v", n }))
       .reduce((a, b) => ({ k: "or", a, b }));
-  const formulas = [...given, anyOf(PORT_GOOS), anyOf(PORT_GOARCH)];
+  return searchWith(
+    [...given, anyOf(PORT_GOOS), anyOf(PORT_GOARCH)],
+    new Map(),
+  );
+}
+
+/**
+ * Is there an ordinary build, one that sets reserved names only as Go does
+ * (a real port's GOOS and GOARCH with the names they imply, real cgo on or
+ * off with the `cgo` tag equal to it; release and custom tags free), in which
+ * every formula holds? Used where a build that exists only because a
+ * reserved name is set by hand must not count (a call with no declaration
+ * there does not compile, and no build has another answer).
+ */
+export function satisfiableOrdinary(given: Formula[]): boolean | undefined {
+  const key = `o\u0000${JSON.stringify(given)}`;
+  if (anyTagsMemo.has(key)) return anyTagsMemo.get(key);
+  let answer: boolean | undefined = false;
+  for (const port of PORTS) {
+    const [goos, goarch] = port.split("/") as [string, string];
+    for (const cgo of [false, true]) {
+      const preset = new Map<string, boolean>();
+      for (const name of KNOWN_GOOS) preset.set(name, false);
+      for (const name of KNOWN_GOARCH) preset.set(name, false);
+      preset.set(goos, true);
+      if (IMPLIED_GOOS[goos]) preset.set(IMPLIED_GOOS[goos]!, true);
+      preset.set(goarch, true);
+      preset.set("unix", UNIX_GOOS.has(goos));
+      preset.set("cgo", cgo);
+      preset.set(CGO_ENABLED, cgo);
+      const found = searchWith(given, preset);
+      if (found) {
+        answer = true;
+        break;
+      }
+      if (found === undefined) answer = undefined;
+    }
+    if (answer === true) break;
+  }
+  if (anyTagsMemo.size > MAX_MEMO) anyTagsMemo.clear();
+  anyTagsMemo.set(key, answer);
+  return answer;
+}
+/** GOOS values whose builds also set another GOOS tag (go/build). */
+const IMPLIED_GOOS: { [goos: string]: string } = {
+  android: "linux",
+  ios: "darwin",
+  illumos: "solaris",
+};
+/** GOOS values that set the `unix` tag (go/build). */
+const UNIX_GOOS = new Set([
+  "aix",
+  "android",
+  "darwin",
+  "dragonfly",
+  "freebsd",
+  "hurd",
+  "illumos",
+  "ios",
+  "linux",
+  "netbsd",
+  "openbsd",
+  "solaris",
+]);
+
+/** A backtracking search over the names not in `preset`. */
+function searchWith(
+  formulas: Formula[],
+  preset: Map<string, boolean>,
+): boolean | undefined {
   const all = [
     ...formulas.reduce((out, f) => names(f, out), new Set<string>()),
-  ];
-  const value = new Map<string, boolean>();
+  ].filter((name) => !preset.has(name));
+  const value = new Map<string, boolean>(preset);
   // Three-valued: undefined while a name it needs is not assigned.
   const partial = (formula: Formula): boolean | undefined => {
     switch (formula.k) {

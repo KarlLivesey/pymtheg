@@ -17,21 +17,20 @@ of five pins compared with a build of main (`compare-builds-round3.json`):
 | cilium/ebpf | 33,366 → 33,456 | 95 | 5 | 0 | 0 |
 | etcd-io/bbolt | 10,692 → 10,750 | 58 | 0 | 0 | 0 |
 | restic/restic | 42,347 → 42,379 | 32 | 0 | 0 | 0 |
-| cockroachdb/pebble | 144,642 → 144,830 | 193 | 5 | 0 | 0 |
+| cockroachdb/pebble | 144,642 → 144,835 | 193 | 0 | 0 | 0 |
 
-**10 links move from definite to a candidate set**, none is lost outright or
-retargeted. Each is a correction:
+**5 links move from definite to a candidate set**, none is lost outright or
+retargeted; each is a correction. cilium: `fd.Close`, `fd.File`, `fd.Dup` on
+`*sys.FD` from Linux files (`rlimit/rlimit_linux.go:75`,
+`internal/sys/fd_linux_test.go:45, 56, 62, 65`). `FD` is declared in
+`fd_other.go` (`!windows`) and `fd_windows.go`; a Linux build with
+`-tags=windows` selects the Windows `FD` and its methods, which compile.
 
-- cilium (5): `fd.Close`, `fd.File`, `fd.Dup` on `*sys.FD` from Linux files
-  (`rlimit/rlimit_linux.go:75`, `internal/sys/fd_linux_test.go:45, 56, 62,
-  65`). `FD` is declared in `fd_other.go` (`!windows`) and `fd_windows.go`;
-  a Linux build with `-tags=windows` selects the Windows `FD` and its methods.
-- pebble (5): `b.Data()` and `b.Slice()` on `manual.New` results
-  (`internal/cache/block_map.go:32`, `entry.go:255`, `value.go:64, 82, 83`).
-  `New` is declared in `manual_cgo.go` (`import "C"`) and
-  `manual_nocgo.go` (`!cgo`); with `-tags=cgo` and cgo disabled neither is
-  built, so those builds have no `New` (the coverage rule of the first
-  review). Both variants return the same `Buf`.
+Pebble's `manual.Buf` methods on `manual.New` results (`internal/cache`) stay
+definite, by the manager's ruling: `New` is declared for `import "C"` and
+`!cgo`, and the only builds with neither are those that set `cgo` by hand
+with cgo disabled, where the call does not compile at all, so no build has
+another answer (an intermediate build of this round had moved them too).
 
 ## Review round 1: what changed and the final figures
 

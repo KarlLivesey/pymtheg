@@ -22,6 +22,7 @@ import {
   fileConstraint,
   impliesAnyTags,
   satisfiableAnyTags,
+  satisfiableOrdinary,
   type Formula,
 } from "./constraints.js";
 import {
@@ -1420,10 +1421,11 @@ class GoResolver {
   /**
    * The declarations a call of a name declared in several build variants can
    * reach from `from`: each one that is the only declaration of the name in
-   * some build of `from` (two in one build do not compile). Undefined unless
-   * some declaration is built in EVERY build of `from` (a build without one
-   * would not have this call) and every constraint is readable. Every name
-   * counts as a free tag (`-tags=freebsd` on Linux), so false is proof.
+   * some build of `from` (two in one build do not compile), every name a free
+   * tag (`-tags=freebsd` on Linux), so false is proof. Undefined unless some
+   * declaration is built in every ordinary build of `from` (a real port,
+   * real cgo on or off, any custom tags: one without would not have this
+   * call) and every constraint is readable.
    * The caller's answer is definite only when the results then agree.
    */
   private calledVariants(
@@ -1459,8 +1461,13 @@ class GoResolver {
     const declared = syms.map((symbol) => this.constraintOf(symbol.file));
     if (!caller || declared.some((item) => !item)) return undefined;
     const not = (formula: Formula): Formula => ({ k: "not", x: formula });
+    // Coverage counts ordinary builds of the caller only: a build that
+    // exists only because a reserved name (a GOOS or GOARCH name, `cgo`) is
+    // set by hand, and has no declaration, does not compile there, so no
+    // build has another answer (pebble's `manual.New` with `-tags=cgo` and
+    // cgo disabled). Which declarations are reached counts every build.
     const covered =
-      satisfiableAnyTags([caller, ...declared.map((item) => not(item!))]) ===
+      satisfiableOrdinary([caller, ...declared.map((item) => not(item!))]) ===
       false;
     if (!covered) return undefined;
     const reached = syms.filter(

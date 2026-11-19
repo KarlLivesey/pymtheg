@@ -503,6 +503,51 @@ test("cgo: the cgo tag set by hand is not cgo enablement, so an `import C` varia
   assert.equal(at(links, "p/use.go", "New().M").target, null);
 });
 
+// Manager's ruling (review round 2): a build that exists only because a
+// reserved name is set by hand (`-tags=cgo` with cgo disabled) and has no
+// declaration of the callee does not compile, so it is not a counterexample.
+test("pebble: manual.New declared for cgo and !cgo covers its callers, so members of its result are definite", async () => {
+  const { links } = await project({
+    "go.mod": MOD,
+    "internal/manual/manual.go": lines(
+      "package manual",
+      'import "unsafe"',
+      "type Buf struct{ data unsafe.Pointer; n uintptr }",
+      "func (b Buf) Data() unsafe.Pointer { return b.data }",
+      "func (b Buf) Slice() []byte { return nil }",
+    ),
+    "internal/manual/manual_cgo.go": lines(
+      "package manual",
+      'import "C"',
+      "func New(n uintptr) Buf { return Buf{n: n} }",
+    ),
+    "internal/manual/manual_nocgo.go": lines(
+      "//go:build !cgo",
+      "",
+      "package manual",
+      "func New(n uintptr) Buf { return Buf{n: n} }",
+    ),
+    "internal/cache/value.go": lines(
+      "package cache",
+      'import "example.com/m/internal/manual"',
+      "func newValue(n uintptr) []byte {",
+      "	b := manual.New(n)",
+      "	_ = b.Data()",
+      "	return b.Slice()",
+      "}",
+    ),
+  });
+  const file = "internal/cache/value.go";
+  assert.equal(
+    at(links, file, "b.Data").target,
+    "internal/manual/manual.go:method:(Buf).Data",
+  );
+  assert.equal(
+    at(links, file, "b.Slice").target,
+    "internal/manual/manual.go:method:(Buf).Slice",
+  );
+});
+
 test("member selection on build variants: a method declared in only some variants is a candidate, never the definite target", async () => {
   const variant = (constraint, method) =>
     lines(

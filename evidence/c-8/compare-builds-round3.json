@@ -141,7 +141,7 @@
   ],
   "definite": [
    144642,
-   144830
+   144835
   ],
   "newlyDefinite": {
    "calls": 193
@@ -153,52 +153,6 @@
    20080
   ],
   "symbolsMissing": [],
-  "changed": [
-   {
-    "file": "internal/cache/block_map.go",
-    "line": 32,
-    "source": "return unsafe.Slice((*swiss.Group[key, *entry])(buf.Data()), n)",
-    "kind": "calls",
-    "name": "buf.Data",
-    "before": "internal/manual/manual.go:method:(Buf).Data",
-    "after": "ambiguous (receiver-type-unknown)"
-   },
-   {
-    "file": "internal/cache/entry.go",
-    "line": 255,
-    "source": "return (*entry)(b.Data())",
-    "kind": "calls",
-    "name": "b.Data",
-    "before": "internal/manual/manual.go:method:(Buf).Data",
-    "after": "ambiguous (receiver-type-unknown)"
-   },
-   {
-    "file": "internal/cache/value.go",
-    "line": 64,
-    "source": "v := &Value{buf: b.Slice()}",
-    "kind": "calls",
-    "name": "b.Slice",
-    "before": "internal/manual/manual.go:method:(Buf).Slice",
-    "after": "ambiguous (receiver-type-unknown)"
-   },
-   {
-    "file": "internal/cache/value.go",
-    "line": 82,
-    "source": "v := (*Value)(b.Data())",
-    "kind": "calls",
-    "name": "b.Data",
-    "before": "internal/manual/manual.go:method:(Buf).Data",
-    "after": "ambiguous (receiver-type-unknown)"
-   },
-   {
-    "file": "internal/cache/value.go",
-    "line": 83,
-    "source": "v.buf = b.Slice()[ValueMetadataSize:]",
-    "kind": "calls",
-    "name": "b.Slice",
-    "before": "internal/manual/manual.go:method:(Buf).Slice",
-    "after": "ambiguous (receiver-type-unknown)"
-   }
-  ]
+  "changed": []
  }
 ]
