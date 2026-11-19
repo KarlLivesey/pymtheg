@@ -2662,3 +2662,17 @@ configuration maps registry indexes or Git URLs and ref selectors to a
 directory source. A proven package selection is required to resolve inside it.
 Rust coverage now credits recorded targets on graphs made by the supporting
 module version. See [C-9](changes/C-9.md).
+
+### C-12 Rust lexical macro scope
+
+The resolver can clear an opaque expansion for one name when captured
+declarative arms and their reachable macro definitions bound the names that
+expansion can introduce. Standard macros with expression or literal outputs
+and recognized built-in derives have documented output bounds. A second pass
+can also resolve using the assumption that a proven external macro introduces
+no item with a name absent from its input. The link records
+`rust-external-macro-name` in `data.assumes`. The coverage export counts those
+links separately and includes them in Level 2 when they have a checkout target
+or a named library target. A captured macro definition, a competing glob, an
+unproven macro binding and a layout expansion keep their source requirements.
+See [C-12](changes/C-12.md).

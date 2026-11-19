@@ -45,14 +45,19 @@ function merge(base, candidate) {
 }
 
 function checkResult(input) {
-  if (input.schema !== schema || JSON.stringify(input.columns) !== JSON.stringify(columns)) throw Error("Expected a coverage-export results file with v2 columns");
+  const encoded = JSON.stringify(input.columns);
+  if (input.schema !== schema ||
+      (encoded !== JSON.stringify(columns) && encoded !== JSON.stringify(columns.slice(0, -1)))) {
+    throw Error("Expected a coverage-export results file with v2 columns");
+  }
   const ids = new Set();
   for (const repo of input.repos) {
     if (ids.has(repo.id) || !modules.includes(repo.language) || !/^[a-f0-9]{40}$/.test(repo.commit)) throw Error(`Invalid repository row for ${repo.id}`);
     if (finished(repo) && (!Array.isArray(repo.breakdown) || !repo.sourceFiles || !repo.reviewSites || !repo.failedSources)) throw Error(`Missing full breakdown for ${repo.id}`);
-    for (const [module, , outcome, , , scope, disposition, count, blocked, level, encoding, gap] of repo.breakdown ?? []) {
+    for (const [module, , outcome, , , scope, disposition, count, blocked, level, encoding, gap, assumed] of repo.breakdown ?? []) {
       if (!modules.includes(module) || !scopes.includes(scope) || !Number.isSafeInteger(count) || count <= 0 ||
           !Number.isSafeInteger(blocked) || blocked < 0 || blocked > count ||
+          (assumed !== undefined && typeof assumed !== "boolean") ||
           (level === null ? disposition === "outside" || encoding !== null || gap !== null :
             !["unresolved", "library"].includes(outcome) || ![0, 1, 2].includes(level) ||
             (level === 0 ? encoding !== null || outcome === "library" : !externalEvidenceKinds.includes(encoding)) ||
@@ -367,16 +372,16 @@ function renderScore(repos, input, base, baseline, samples) {
   const lines = ["# SW-3 coverage scoreboard", "",
     `Result package ${code(input.release.package)}. ${base ? `Candidate records replace ${input.repos.length} matching baseline pins.` : `The baseline covers ${repos.length} pinned repositories.`}`,
     "", ...completion(repos, baseline), "", "## B. Coverage of finished graphs", "",
-    "Level 2 counts resolved checkout links and named library symbols over all stored links. Level 1 also credits named library units. Strict-inside excludes the proven outside partition. Raw credits only the stored resolved outcome.",
+    "Level 2 counts resolved checkout links and named library symbols over all stored links. The assumed column counts Level 2 links with recorded assumptions. Level 1 also credits named library units. Strict-inside excludes the proven outside partition. Raw credits only the stored resolved outcome.",
     "The closed-set alternative adds the sample estimate for verified complete candidate sets. Candidate evaluations reuse the reference sample.", "",
-    "| Files counted | Module | Graphs | Level 2 | Level 1 | L2 + verified closed sets (95% interval) | L2 median | Strict-inside weighted / median | Raw |",
-    "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"];
+    "| Files counted | Module | Graphs | Level 2 | L2 without assumptions | Assumed L2 links | Level 1 | L2 + verified closed sets (95% interval) | L2 median | Strict-inside weighted / median | Raw |",
+    "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"];
   const design = auditDesign(repos, samples, baseline);
   for (const [label, allowed] of variants) for (const module of [...modules, "overall"]) {
     const a = aggregate(repos, module, allowed);
     const { closedCoverage, intervals } = estimateCoverage(repos, samples, module, allowed, design);
     const closedRange = intervals.closed.map((n) => percent(ratio(a.weighted.resolved + a.weighted.symbol + Math.min(n, a.weighted.ambiguous), a.weighted.total))).join("–");
-    lines.push(`| ${label} | ${names[module]} | ${a.observed} | ${percent(a.weighted.level2)} | ${percent(a.weighted.level1)} | ${percent(closedCoverage)} (${closedRange}) | ${percent(a.median.level2)} | ${percent(a.weighted.adjusted)} / ${percent(a.median.adjusted)} | ${percent(a.weighted.raw)} |`);
+    lines.push(`| ${label} | ${names[module]} | ${a.observed} | ${percent(a.weighted.level2)} | ${percent(a.weighted.level2WithoutAssumptions)} | ${number(a.weighted.assumedLevel2)} | ${percent(a.weighted.level1)} | ${percent(closedCoverage)} (${closedRange}) | ${percent(a.median.level2)} | ${percent(a.weighted.adjusted)} / ${percent(a.median.adjusted)} | ${percent(a.weighted.raw)} |`);
   }
   if (base) {
     lines.push("", "### Candidate sampling", "", "| Module | Remaining reference sites used | Missed links outside the remaining projection |",
@@ -418,11 +423,11 @@ function renderScore(repos, input, base, baseline, samples) {
     lines.push(`| ${names[module]} | ${scope} | ${[score.resolved, score.ambiguous, score.inside, score.outside, score.unclassified, failed].map(number).join(" | ")} |`);
   }
   lines.push("", "## Repository results", "", "Totals include every module in a finished checkout. For each attempt, the archive holds the full link breakdown and the explicit inside, outside and unclassified counts for every file scope.", "",
-    "| Repository | Selected language | Outcome | Links | Proven outside | Level 2 | Level 1 | Strict-inside | Raw | Source-only L2 |",
-    "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
+    "| Repository | Selected language | Outcome | Links | Proven outside | Level 2 | L2 without assumptions | Assumed L2 links | Level 1 | Strict-inside | Raw | Source-only L2 |",
+    "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
   for (const repo of repos.filter(finished)) {
     const a = metric(repo, "overall", scopes), b = metric(repo, "overall", ["source"]);
-    lines.push(`| ${repo.id} | ${names[repo.language]} | ${repo.outcome} | ${number(a.total)} | ${number(a.provenOutside)} | ${percent(a.level2)} | ${percent(a.level1)} | ${percent(a.adjusted)} | ${percent(a.raw)} | ${percent(b.level2)} |`);
+    lines.push(`| ${repo.id} | ${names[repo.language]} | ${repo.outcome} | ${number(a.total)} | ${number(a.provenOutside)} | ${percent(a.level2)} | ${percent(a.level2WithoutAssumptions)} | ${number(a.assumedLevel2)} | ${percent(a.level1)} | ${percent(a.adjusted)} | ${percent(a.raw)} | ${percent(b.level2)} |`);
   }
   lines.push("", "## Rust failed-file influence", "", "These are exact stored unresolved counts. The eligible column uses the earlier audit disposition. The L2 misses column retains tainted library sites whose symbol is unproved. One site with both failure and receiver reasons belongs to the taint item.", "",
     "| Repository | Unresolved with failed-file reason | Earlier eligible | L2 misses | Tainted and blocked | Also receiver-unverified | All unresolved marked blocked |",
@@ -680,15 +685,17 @@ async function main() {
   } });
   if (!values.results) throw Error("Use --results FILE with an optional --base FILE, --scoreboard FILE or --plan FILE");
   const input = checkResult(read(values.results));
-  const base = values.base ? checkResult(read(values.base)) : input;
-  const repos = values.base ? merge(base, input).repos : input.repos;
+  const reference = values.base ? read(values.base) : input.comparisonBase;
+  const base = reference ? checkResult(reference) : input;
+  const isComparison = base !== input;
+  const repos = isComparison ? merge(base, input).repos : input.repos;
   const { items } = read(values.items);
   const { samples } = read(values.samples);
   validateCatalog(items, samples);
-  const scoreboard = renderScore(repos, input, values.base, base.repos, samples);
+  const scoreboard = renderScore(repos, input, isComparison, base.repos, samples);
   if (values.scoreboard) writeFileSync(values.scoreboard, scoreboard);
   if (values.plan) {
-    updatePlan(values.plan, renderPlan(repos, base.repos, items, samples, Boolean(values.base)));
+    updatePlan(values.plan, renderPlan(repos, base.repos, items, samples, isComparison));
   }
   if (values["sampling-report"]) writeFileSync(values["sampling-report"], renderSampling(base.repos, samples));
   if (!values.scoreboard && !values.plan && !values["sampling-report"]) process.stdout.write(scoreboard);

@@ -1835,7 +1835,7 @@
     "manifests": {
       "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntracing=\"wat\"\n"
     },
-    "unknown": "helper",
+    "assumed": "helper",
     "would": "helper"
   },
   {
@@ -1846,7 +1846,7 @@
     "manifests": {
       "Cargo.toml": "[package]\nname=\"app\"\nedition=\"2024\"\n[dependencies]\ntracing=\"=0.2.0\"\n"
     },
-    "unknown": "helper",
+    "assumed": "helper",
     "would": "helper"
   },
   {
@@ -2013,7 +2013,7 @@
     "route": "qualified",
     "async": false,
     "result": false,
-    "unknown": "helper",
+    "assumed": "helper",
     "would": "helper"
   },
   {
@@ -2030,7 +2030,7 @@
     "route": "qualified",
     "async": false,
     "result": false,
-    "unknown": "helper",
+    "assumed": "helper",
     "would": "helper"
   },
   {
@@ -2271,7 +2271,7 @@
     "route": "qualified",
     "async": false,
     "result": false,
-    "unknown": "helper",
+    "assumed": "helper",
     "would": "helper"
   },
   {
@@ -2637,7 +2637,7 @@
     "route": "qualified",
     "async": false,
     "result": false,
-    "unknown": "helper",
+    "assumed": "helper",
     "would": "helper"
   },
   {
@@ -2743,7 +2743,7 @@
     "route": "qualified",
     "async": false,
     "result": false,
-    "unknown": "helper",
+    "assumed": "helper",
     "would": "helper"
   },
   {
@@ -2759,7 +2759,7 @@
     "route": "qualified",
     "async": false,
     "result": false,
-    "unknown": "helper",
+    "assumed": "helper",
     "would": "helper"
   },
   {
@@ -2795,7 +2795,7 @@
     "route": "qualified",
     "async": false,
     "result": false,
-    "unknown": "helper",
+    "assumed": "helper",
     "would": "helper"
   },
   {
@@ -2811,7 +2811,7 @@
     "route": "qualified",
     "async": false,
     "result": false,
-    "unknown": "helper",
+    "assumed": "helper",
     "would": "helper"
   },
   {
@@ -2827,7 +2827,7 @@
     "route": "qualified",
     "async": false,
     "result": false,
-    "unknown": "helper",
+    "assumed": "helper",
     "would": "helper"
   },
   {
@@ -2879,7 +2879,7 @@
     "route": "qualified",
     "async": false,
     "result": false,
-    "unknown": "helper",
+    "assumed": "helper",
     "would": "helper"
   },
   {
@@ -2895,7 +2895,7 @@
     "route": "qualified",
     "async": false,
     "result": false,
-    "unknown": "helper",
+    "assumed": "helper",
     "would": "helper"
   },
   {
@@ -2911,7 +2911,7 @@
     "route": "qualified",
     "async": false,
     "result": false,
-    "unknown": "helper",
+    "assumed": "helper",
     "would": "helper"
   },
   {
@@ -2947,7 +2947,7 @@
     "route": "qualified",
     "async": false,
     "result": false,
-    "unknown": "helper",
+    "assumed": "helper",
     "would": "helper"
   },
   {
@@ -3053,7 +3053,7 @@
     "route": "qualified",
     "async": false,
     "result": false,
-    "unknown": "helper",
+    "assumed": "helper",
     "would": "helper"
   },
   {
@@ -3069,7 +3069,7 @@
     "route": "qualified",
     "async": false,
     "result": false,
-    "unknown": "helper",
+    "assumed": "helper",
     "would": "helper"
   },
   {
@@ -3105,7 +3105,7 @@
     "route": "qualified",
     "async": false,
     "result": true,
-    "unknown": "helper",
+    "assumed": "helper",
     "would": "helper"
   },
   {
@@ -3211,7 +3211,7 @@
     "route": "qualified",
     "async": false,
     "result": true,
-    "unknown": "helper",
+    "assumed": "helper",
     "would": "helper"
   },
   {
@@ -3227,7 +3227,7 @@
     "route": "qualified",
     "async": false,
     "result": true,
-    "unknown": "helper",
+    "assumed": "helper",
     "would": "helper"
   },
   {
@@ -3263,7 +3263,7 @@
     "route": "qualified",
     "async": true,
     "result": false,
-    "unknown": "helper",
+    "assumed": "helper",
     "would": "helper"
   },
   {
@@ -3369,7 +3369,7 @@
     "route": "qualified",
     "async": true,
     "result": false,
-    "unknown": "helper",
+    "assumed": "helper",
     "would": "helper"
   },
   {
@@ -3385,7 +3385,7 @@
     "route": "qualified",
     "async": true,
     "result": false,
-    "unknown": "helper",
+    "assumed": "helper",
     "would": "helper"
   },
   {

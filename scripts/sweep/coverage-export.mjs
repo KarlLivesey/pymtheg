@@ -480,7 +480,8 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys, pre
           workspaceMisses.set(sibling, row);
         }
         const tuple = [link.module, link.kind, link.resolution, link.data?.reason ?? null, link.data?.uncertainty ?? null, scope, disposition];
-        const identity = [library?.level ?? null, library?.evidence ?? null, library?.gap ?? null];
+        const assumed = Array.isArray(link.data?.assumes) && link.data.assumes.length > 0;
+        const identity = [library?.level ?? null, library?.evidence ?? null, library?.gap ?? null, assumed];
         const key = JSON.stringify([...tuple, ...identity]);
         const aggregate = counts.get(key);
         const blocked = Number(link.data?.blocked === true);
@@ -498,9 +499,12 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys, pre
         const references = referenceFiles?.get(file.path);
         const rank = stratum || references || sharedKeys ? sampleKey(repo, link) : null;
         if (sharedKeys?.has(rank)) {
-          const score = shared[link.module] ??= { links: 0, level2: 0 };
+          const score = shared[link.module] ??= { links: 0, level2: 0, assumedLevel2: 0 };
           score.links++;
-          if (link.resolution === "resolved" || library?.level === 2) score.level2++;
+          if (link.resolution === "resolved" || library?.level === 2) {
+            score.level2++;
+            if (assumed && (link.resolution === "resolved" || link.resolution === "library")) score.assumedLevel2++;
+          }
         }
         const state = library ? "outside" : link.resolution;
         const matched = rank && references?.has(rank);

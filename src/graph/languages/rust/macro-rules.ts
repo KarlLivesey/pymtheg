@@ -7,6 +7,25 @@ import type { Node } from "web-tree-sitter";
 
 const compact = (s: string) => s.replace(/\s+/g, "").replace(/\br#/g, "");
 
+/** Rust identifier tokens, including identifiers in nested token groups. */
+export function macroInputNames(nodes: readonly Node[]): string[] {
+  const pending = [...nodes];
+  const names = new Set<string>();
+  while (pending.length) {
+    const node = pending.pop()!;
+    if (/^(?:line_comment|block_comment)$|literal$/.test(node.type)) continue;
+    if (node.childCount) {
+      for (const child of node.children) pending.push(child);
+    } else {
+      const name = /^(?:r#|['$])?([_\p{ID_Start}][_\p{ID_Continue}]*)$/u.exec(
+        node.text,
+      )?.[1];
+      if (name) names.add(name.normalize());
+    }
+  }
+  return [...names].sort();
+}
+
 /** Keywords that start an item or a binding when they open a statement. */
 const ITEM_WORDS = new Set([
   "fn",
@@ -24,6 +43,8 @@ const ITEM_WORDS = new Set([
   "macro_rules",
   "macro",
 ]);
+export const isMacroItemKeyword = (name: string): boolean =>
+  ITEM_WORDS.has(name);
 /** Tokens that make an argument's names or call syntax unreadable without parsing. */
 const ARGUMENT_HAZARDS = new Set([
   ...ITEM_WORDS,
@@ -196,6 +217,8 @@ export type MacroProfile = {
   itemNeutral: boolean;
   /** Macros invoked at the top level of some arm, as written. */
   nested: string[];
+  /** Upper bound on names introduced into the surrounding scope. */
+  scope: MacroScopeProfile;
   /** Every arm that takes input passes all of it, unchanged and as the tail of
    * an argument list, to one of these macros; null when unproved. */
   forwards: string[] | null;
@@ -236,6 +259,102 @@ export type MacroProfile = {
   /** First segment of every macro name the transcribers invoke. */
   macroHeads: string[];
 };
+
+export type MacroScopeProfile = {
+  names: string[];
+  inputCanBind: boolean;
+  opaque: boolean;
+  keywordFromInput: boolean;
+};
+
+function inspectScope(
+  top: Node[],
+  kinds: ReadonlyMap<string, string>,
+  names: Set<string>,
+): Omit<MacroScopeProfile, "names"> {
+  let inputCanBind = false;
+  let keywordFromInput = false;
+  // A top-level attribute or macro definition can change the tokens and
+  // macro lookup of this expansion. Imports can also rebind nested macros.
+  let opaque = false;
+  const emitted = invocations(top);
+  for (const { call } of emitted)
+    for (const name of macroInputNames([call.group])) names.add(name);
+  for (let i = 0; i < top.length; i++) {
+    const token = top[i]!,
+      keyword = word(token);
+    if (
+      ["#", "$"].includes(token.type) ||
+      keyword === "macro" ||
+      keyword === "macro_rules"
+    )
+      opaque = true;
+    if (keyword === "let") inputCanBind = true;
+    if (token.type === "metavariable") {
+      const kind = kinds.get(token.text);
+      if (top[i + 1]?.type === "!" || !kind) opaque = true;
+      if (kind === "ident") {
+        // An ident can be a keyword, as in `$kw Option` with `struct`.
+        // Only these positions require the token to be a name.
+        const previous = top[i - 1] ? word(top[i - 1]!) : "";
+        const before = top[i - 2] ? word(top[i - 2]!) : "";
+        if (
+          !ITEM_WORDS.has(previous) &&
+          previous !== "let" &&
+          !(previous === "mut" && ["static", "let"].includes(before))
+        ) {
+          opaque = true;
+          const next = top[i + 1];
+          if (
+            next &&
+            (["identifier", "metavariable", "::"].includes(next.type) ||
+              opens(next, "{") ||
+              opens(next, "["))
+          )
+            keywordFromInput = true;
+        }
+      }
+      if (kind && ["tt", "item", "stmt"].includes(kind)) {
+        // The input may supply the keyword, not just the new item's name.
+        inputCanBind = true;
+        // A raw token or item can introduce an import, macro or attribute.
+        opaque = true;
+      }
+    }
+    if (!ITEM_WORDS.has(keyword) || keyword === "impl") continue;
+    if (keyword === "use" || keyword === "extern") {
+      const end = top.findIndex((n, j) => j > i && n.type === ";");
+      const tokens = top.slice(i + 1, end < 0 ? undefined : end);
+      // Include parent names for `use path::{self, ...}` and both sides
+      // of aliases. Globs and macro-use imports have unbounded exports.
+      if (
+        emitted.length ||
+        tokens.some(
+          (n) =>
+            n.type === "*" ||
+            n.descendantsOfType("*").length > 0 ||
+            n.type === "metavariable" ||
+            n.descendantsOfType("metavariable").length > 0,
+        )
+      )
+        opaque = true;
+      for (const name of macroInputNames(tokens)) names.add(name);
+      continue;
+    }
+    const next =
+      top[i + (keyword === "static" && top[i + 1]?.text === "mut" ? 2 : 1)];
+    if (next?.type === "metavariable") inputCanBind = true;
+    else if (next?.type === "identifier")
+      names.add(compact(next.text).normalize());
+    else if (
+      next &&
+      /^(?:r#)?[_\p{ID_Start}][_\p{ID_Continue}]*$/u.test(next.text)
+    )
+      names.add(compact(next.text).normalize());
+    else if (!next || !["_", "("].includes(next.type)) opaque = true;
+  }
+  return { inputCanBind, opaque, keywordFromInput };
+}
 
 /** Names an item statement in `seq` binds, `*` when not readable. */
 function itemNames(seq: Node[]): string[] {
@@ -333,6 +452,7 @@ export function macroProfile(definition: Node): MacroProfile {
     neutral = true,
     itemNeutral = true;
   const nested = new Set<string>(),
+    scopeNames = new Set<string>(),
     forwardTargets = new Set<string>(),
     forwardShadow = new Set<string>(),
     calls: MacroProfile["calls"] = [],
@@ -340,7 +460,10 @@ export function macroProfile(definition: Node): MacroProfile {
     useNames = new Set<string>(),
     macroHeads = new Set<string>();
   let forwards = true,
-    clean = true;
+    clean = true,
+    scopeInputCanBind = false,
+    scopeOpaque = false,
+    scopeKeywordFromInput = false;
   let blockLocal = false;
   for (let a = definition.parent; a && a.type !== "source_file"; a = a.parent)
     if (a.type === "block") blockLocal = true;
@@ -378,6 +501,10 @@ export function macroProfile(definition: Node): MacroProfile {
     let armForwards = false;
     // Neutrality: inspect the top level of the transcriber.
     const top = flat(inner(body));
+    const scope = inspectScope(top, kinds, scopeNames);
+    scopeInputCanBind ||= scope.inputCanBind;
+    scopeOpaque ||= scope.opaque;
+    scopeKeywordFromInput ||= scope.keywordFromInput;
     for (let i = 0; i < top.length; i++) {
       const n = top[i]!,
         w = word(n);
@@ -544,6 +671,12 @@ export function macroProfile(definition: Node): MacroProfile {
     neutral,
     itemNeutral,
     nested: [...nested].sort(),
+    scope: {
+      names: [...scopeNames].sort(),
+      inputCanBind: scopeInputCanBind,
+      opaque: !readable || scopeOpaque,
+      keywordFromInput: scopeKeywordFromInput,
+    },
     forwards: readable && forwards ? [...forwardTargets].sort() : null,
     forwardShadow: [...forwardShadow].sort(),
     arms: rules.length,

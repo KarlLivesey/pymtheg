@@ -1650,3 +1650,14 @@ sources use their index URL. Git sources use the repository URL and the
 branch, tag, or revision selector. For a vendored Git package, the lockfile
 must prove a checkout dependency edge with a precise commit. An applicable
 replacement without a unique captured package stays unresolved.
+
+Module 32 records invocation identifiers and declarative macro name bounds
+from the Rust parse. The resolver memoizes the scope effect of each opaque
+origin. It tries the existing checkout and library lookup first, then retries
+blocked lexical paths with the proven scope bounds, then with the external
+macro assumption. Each lookup mode has a separate cache key. Successful links
+from the last pass carry `data.assumes: ["rust-external-macro-name"]` in the
+analyzed facts that the graph stores. The identity and resolution shapes stay
+the same, so library queries and ordinary graph queries can return those
+links. Coverage reports the assumption-backed Level 2 count alongside the
+total and still accepts pre-assumption archives.

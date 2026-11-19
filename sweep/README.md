@@ -108,6 +108,12 @@ use every stored link in the finished graphs. The strict-inside column
 excludes only proved outside targets. Raw uses the released graph's
 resolved count. Completion is a separate checklist.
 
+The scoreboard includes links with recorded assumptions in Level 2 when
+they have a checkout target or a named library target. It also reports
+the count of those links and Level 2 with them excluded from the numerator.
+The optional last v2 breakdown column flags assumption-backed rows. Earlier
+archives retain their original counts.
+
 The released graph has no target-ID representation for a library symbol.
 The export derives an identity only from precise facts already captured.
 
@@ -162,6 +168,19 @@ on the number of sites. A bucket that cannot be sized from a sample is
 visible in the audit. The curated source labels distinguish local
 misses, library misses, legitimate ambiguity and unclassified sites.
 These estimates prioritise work. They do not add definite score credit.
+
+### Reproduce the committed plan
+
+Run from the repository root:
+
+```sh
+node scripts/sweep/coverage.mjs --results sweep/plan-input.json.gz --plan docs/coverage-plan.md
+```
+
+The cumulative archive contains the latest accepted rows for all pins and the
+reference rows used for the comparison. It fixes the exact input for the
+generated plan block. On an update, replace the affected pinned rows and
+regenerate the block with the same command.
 
 ### Recompute after a candidate run
 

@@ -401,6 +401,16 @@ makes that whole manifest unknown). Private items are ordinary symbols.
   crates.io, alternate registry indexes, and Git URLs with their ref selectors.
   A replacement with an unproven checkout target leaves the link unresolved.
   Receiver calls still require the declaring owner.
+- **Names beside Rust macros.** A withheld path can resolve when every
+  relevant expansion has a bounded set of names and that set excludes the
+  name being looked up. The graph inspects captured `macro_rules!` arms,
+  including reachable macros in the checkout, and recognizes the standard
+  expression and literal-producing macros. A proven external macro whose
+  input omits the name can enable a checkout or library target with the
+  recorded `rust-external-macro-name` assumption. Attribute inputs include
+  the whole attached item and derives include their type. Opaque layout
+  expansions, known identifier generators and competing glob imports can
+  still withhold the link. See [C-12](changes/C-12.md).
 - **Clean expansion (both rules below).** A workspace `macro_rules!` arm is
   clean when the code it emits has no attribute anywhere (so no `#[cfg]` can
   remove a call) and no item other than a readable `use` (no `fn`, `mod`,

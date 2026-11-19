@@ -5,6 +5,7 @@ import type { AddedLink, Json } from "../../types.js";
 import { parseRust } from "./parse.js";
 import { fileFacts } from "../../identity.js";
 import { resolveRust } from "./resolve.js";
+import { macroScopeAssumption } from "./macro-scope.js";
 import { runRustPhase } from "./phase-runner.js";
 
 const TARGET_HINT_LIMIT = 16;
@@ -50,6 +51,7 @@ export const rustPhases = {
                 targets,
                 targetCount,
                 uncertainty,
+                assumes,
                 cause,
                 opaqueAttributes,
                 ...rest
@@ -104,6 +106,7 @@ export const rustPhases = {
     >();
     const presence = new Map<string, string[]>();
     const conditions = new Map<string, string[]>();
+    const assumedScope = new Set<string>();
     resolveRust(
       {
         projectId,
@@ -133,6 +136,12 @@ export const rustPhases = {
         conditions.set(symbol.id, gates);
       },
       (link, gates) => conditions.set(link.id, gates),
+      undefined,
+      undefined,
+      (link, assumed) => {
+        unknown.delete(link.id);
+        if (assumed) assumedScope.add(link.id);
+      },
     );
     for (let i = 0; i < updated.length; i++) {
       const f = updated[i]!,
@@ -172,6 +181,14 @@ export const rustPhases = {
               ...l,
               data: { ...(l.data as Record<string, Json>), conditions: gates },
             };
+          if (assumedScope.has(id))
+            l = {
+              ...l,
+              data: {
+                ...(l.data as Record<string, Json>),
+                assumes: [macroScopeAssumption],
+              },
+            };
           return u
             ? {
                 ...l,
@@ -206,7 +223,7 @@ export const rustPhases = {
 
 const rust: LanguageModule = {
   id: "rust",
-  version: "31",
+  version: "32",
   extensions: [".rs"],
   contextFiles: [
     "Cargo.toml",
