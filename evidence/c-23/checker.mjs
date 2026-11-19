@@ -17,12 +17,17 @@ const { DependencyInputs } = await load("dependency-inputs.js");
 const byPin = new Map(read(receipt).repos.map((repo) => [repo.id, repo]));
 const location = (node) => {
   const file = node.getSourceFile();
+  const owner =
+    node.parent && ts.isTypeLiteralNode(node.parent)
+      ? node.parent.parent
+      : node.parent;
   return {
     path: file.fileName.slice(1),
     start: node.getStart(file),
     line: file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1,
     kind: ts.SyntaxKind[node.kind],
     name: node.name?.getText(file)?.slice(0, 100),
+    owner: owner?.name?.getText(file)?.slice(0, 100),
     text: node.getWidth(file) <= 180 ? node.getText(file) : undefined,
   };
 };
@@ -70,8 +75,7 @@ function inspect(program, file, row) {
     ts.isElementAccessExpression(selector)
       ? checker.getTypeAtLocation(selector.expression)
       : undefined;
-  const binding =
-    symbol && symbol !== selected && symbol.declarations?.[0];
+  const binding = symbol && symbol !== selected && symbol.declarations?.[0];
   const importDeclaration =
     binding && ts.findAncestor(binding, ts.isImportDeclaration);
   const boundModule =
@@ -81,14 +85,12 @@ function inspect(program, file, row) {
       : undefined;
   const literal =
     boundModule ??
-    (
-    ts.isStringLiteralLike(use) &&
-    (ts.isImportDeclaration(use.parent) ||
-      ts.isExportDeclaration(use.parent) ||
-      ts.isExternalModuleReference(use.parent) ||
-      ts.isCallExpression(use.parent)) &&
-    use
-    );
+    (ts.isStringLiteralLike(use) &&
+      (ts.isImportDeclaration(use.parent) ||
+        ts.isExportDeclaration(use.parent) ||
+        ts.isExternalModuleReference(use.parent) ||
+        ts.isCallExpression(use.parent)) &&
+      use);
   const modulePath =
     literal &&
     program.getResolvedModuleFromModuleSpecifier(literal, file)?.resolvedModule

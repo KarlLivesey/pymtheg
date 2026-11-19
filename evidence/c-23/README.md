@@ -44,3 +44,19 @@ builds the cumulative input with C-20's
 verified bare input and replaces the nested installed export with this run.
 Regenerate the plan with `scripts/sweep/coverage.mjs` and
 `evidence/c-11/plan.mjs`. The Go and Rust sections are taken verbatim from main.
+
+## PR 30 review replay
+
+Build the original PR head and the review candidate separately. Replay all
+18 pins with `--installed`, plus the candidate's bare sweep. Confirm the
+bare outcomes against main with `PYM_COMPARE_ALL_LINKS=1` on Dexie, Zustand
+and Yargs. Compare both installed builds with the same setting to check
+checkout keys, sites and outcomes by link.
+
+`review-identity.mjs SCRATCH PRIOR CANDIDATE PREFIX [PIN…]` compares every
+named library target at its stored site and reports which prior names acquired
+package-relative declaration paths. It draws up to 60 changed sites by pin at
+seed `pymtheg-c23-qualified-2026` for review with `checker.mjs` and the
+installed declaration files. `review-volar.mjs SCRATCH RECEIPT BASELINE
+CANDIDATE` asks `graph uses` about both members and their old shared name in a
+small checkout using Astro's installed Volar declarations.

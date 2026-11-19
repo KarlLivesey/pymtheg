@@ -175,7 +175,7 @@ The previous strict-inside plan assigned about 22 pp to local binding anchors an
 
 **Bundle scope** 67.69% including bundles and 69.81% without them. Should checked-in minified bundles count toward the release target?
 
-**Paired dependency sweep** 70.42% bare · 82.39% with installed declarations · 16/18 pins installed and indexed. Pins without a completed installed graph use their bare figure.
+**Paired dependency sweep** 70.42% bare · 82.37% with installed declarations · 16/18 pins installed and indexed. Pins without a completed installed graph use their bare figure.
 
 | Support item | Kind | Links | Repositories | Points | Running total | Examples | Status |
 | --- | --- | ---: | ---: | ---: | ---: | --- | --- |

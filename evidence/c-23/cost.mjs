@@ -5,6 +5,7 @@ import { measured } from "../../scripts/sweep/run.mjs";
 
 const [scratch, receipt, ...pins] = process.argv.slice(2);
 const candidate = process.env.C23_BUILD ?? "candidate-build";
+const baseline = process.env.C23_BASE_BUILD ?? "main-build";
 const { repos } = JSON.parse(await readFile(receipt, "utf8"));
 const env = { ...process.env };
 delete env.NODE_OPTIONS;
@@ -23,9 +24,9 @@ for (const pin of pins) {
   await rename(state, backup);
   try {
     for (const [label, build] of [
-      ["main", "main-build"],
+      ["main", baseline],
       ["candidate", candidate],
-      ["main-repeat", "main-build"],
+      ["main-repeat", baseline],
     ]) {
       const log = join(logs, label);
       const result = await measured({
