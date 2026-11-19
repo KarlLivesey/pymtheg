@@ -24,6 +24,10 @@ memory are observations on a shared, loaded machine. The change note,
   and astro differ only in dependency stamps (inode, time, size of
   checked-in `node_modules` paths). Vite differs through its
   byte-order-mark package.
+- [`resolved-rows.jsonl`](resolved-rows.jsonl): per pin, main's stored
+  `resolved` rows and how many carry no recorded assumption
+  (`tools/resolved-rows.mjs`), and which context rows differ only in the
+  dependency stamp.
 - [`taint-steps.txt`](taint-steps.txt): each identity pin's taint walks and
   most steps in one walk, against the 8,000,000-step budget.
 - [`compare-summary.json`](compare-summary.json): every link, with C-10's

@@ -104,7 +104,7 @@ try {
   for (const [reason, count] of [...reasons].sort((a, b) => b[1] - a[1]).slice(0, 15))
     console.log(count, reason);
   const taint = await import(`${build}/dist/graph/languages/typescript/taint.js`);
-  if (taint.taintStatistics) console.log("taint", JSON.stringify({ ...taint.taintStatistics, budget: taint.taintLimits.steps }));
+  if (taint.taintStatistics) console.log("taint", JSON.stringify({ ...taint.taintStatistics, budget: taint.TAINT_BUDGET }));
   let exhausted = 0;
   for (const { result } of results)
     for (const link of result.links ?? []) if (link.data?.reason === "taint-budget-exhausted") exhausted++;

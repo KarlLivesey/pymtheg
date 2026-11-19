@@ -1,0 +1,8 @@
+{"id":"excalidraw/excalidraw","resolved":61330,"withoutAssumption":61330,"contextsDiffer":0,"contextsStampOnly":0}
+{"id":"honojs/hono","resolved":34654,"withoutAssumption":34654,"contextsDiffer":0,"contextsStampOnly":0}
+{"id":"reduxjs/redux-toolkit","resolved":23993,"withoutAssumption":23993,"contextsDiffer":0,"contextsStampOnly":0}
+{"id":"trpc/trpc","resolved":53059,"withoutAssumption":53059,"contextsDiffer":0,"contextsStampOnly":0}
+{"id":"vitejs/vite","resolved":23262,"withoutAssumption":16366,"contextsDiffer":10,"contextsStampOnly":10}
+{"id":"vitest-dev/vitest","resolved":72614,"withoutAssumption":36129,"contextsDiffer":8,"contextsStampOnly":8}
+{"id":"withastro/astro","resolved":65124,"withoutAssumption":60415,"contextsDiffer":4,"contextsStampOnly":4}
+{"resolved":334036,"withoutAssumption":285946}

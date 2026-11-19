@@ -1,7 +1,7 @@
-excalidraw taint {"walks":0,"maxSteps":0,"exhausted":0,"budget":8000000}
-vitest taint {"walks":4,"maxSteps":826220,"exhausted":0,"budget":8000000}
-trpc taint {"walks":0,"maxSteps":0,"exhausted":0,"budget":8000000}
-astro taint {"walks":1,"maxSteps":103765,"exhausted":0,"budget":8000000}
-hono taint {"walks":0,"maxSteps":0,"exhausted":0,"budget":8000000}
-rtk taint {"walks":0,"maxSteps":0,"exhausted":0,"budget":8000000}
-vite taint {"walks":2,"maxSteps":355991,"exhausted":0,"budget":8000000}
+excalidraw taint {"walks":0,"maxSteps":0,"exhausted":0,"budget":8000000} links taint-budget-exhausted 0
+vitest taint {"walks":4,"maxSteps":826220,"exhausted":0,"budget":8000000} links taint-budget-exhausted 0
+trpc taint {"walks":0,"maxSteps":0,"exhausted":0,"budget":8000000} links taint-budget-exhausted 0
+astro taint {"walks":1,"maxSteps":103765,"exhausted":0,"budget":8000000} links taint-budget-exhausted 0
+hono taint {"walks":0,"maxSteps":0,"exhausted":0,"budget":8000000} links taint-budget-exhausted 0
+rtk taint {"walks":0,"maxSteps":0,"exhausted":0,"budget":8000000} links taint-budget-exhausted 0
+vite taint {"walks":2,"maxSteps":355991,"exhausted":0,"budget":8000000} links taint-budget-exhausted 0
