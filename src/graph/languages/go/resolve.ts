@@ -22,6 +22,13 @@ import {
 } from "./gomod.js";
 import type { GoProjectLayout } from "./gomod.js";
 import {
+  releasedBy,
+  stdTable,
+  type StdMember,
+  type StdNamed,
+  type StdType,
+} from "./stdlib.js";
+import {
   fileConstraint,
   impliesAnyTags,
   satisfiableAnyTags,
@@ -90,7 +97,11 @@ interface ImportEntry {
 type TypeValue =
   | { kind: "project"; syms: GraphSymbol[] }
   /** `shadowable`: a predeclared name in a lossy package (an unseen declaration may shadow it). */
-  | { kind: "external"; name: string; shadowable?: true }
+  /**
+   * `std` (C-17): the standard-library type the table proves it to be; only
+   * library targets use it, every other decision treats the value as external.
+   */
+  | { kind: "external"; name: string; shadowable?: true; std?: StdType }
   | { kind: "cont"; e: Desc; key?: Desc; ch?: boolean; file: string }
   | { kind: "func"; r: Desc[]; file: string }
   | { kind: "tparam"; c?: TypeRef; file: string }
@@ -102,8 +113,11 @@ type Entity =
   | { e: "pkg"; pkgs: Pkg[]; path: string }
   | { e: "syms"; syms: GraphSymbol[] }
   | { e: "value"; type: TypeValue }
-  /** Something declared outside the project (function, type or variable). */
-  | { e: "external"; name: string }
+  /**
+   * Something declared outside the project (function, type or variable).
+   * `std` (C-17): what the standard-library table proves it is.
+   */
+  | { e: "external"; name: string; std?: StdEntity }
   /**
    * Not knowable: in a lossy package an unseen declaration may own the name.
    * `cause`: the failed files that might declare it (the link is invalid code).
@@ -124,7 +138,20 @@ type Selection =
   /** An external or unresolvable embedded type could supply or shadow the name. */
   | { kind: "unknown" }
   /** Unknown because of code in failed files (`cause`): links on it fail. */
-  | { kind: "failed"; cause: string[] };
+  | { kind: "failed"; cause: string[] }
+  /**
+   * Only when asked for (C-17): the name is a member of a standard-library
+   * type embedded in a project type, at the shallowest depth and alone there.
+   */
+  | { kind: "library"; member: StdMember };
+/** A standard-library thing an expression denotes (C-17). */
+type StdEntity =
+  /** A value of this type (a variable, constant or field). */
+  | { t: "value"; type: StdType }
+  /** A function or method value with these result types. */
+  | { t: "func"; results: StdType[] }
+  /** A named type (a conversion's result). */
+  | { t: "type"; type: StdType };
 /** The structure of a type, from `view`. */
 interface View {
   /** An interface type: these interfaces' flat method set. */
@@ -568,6 +595,8 @@ class GoResolver {
           library = this.toolchainLibrary(link);
           fromToolchain = !!library;
           library ??= this.libraryOf(link);
+          if (!library && (link.kind === "calls" || link.kind === "references"))
+            library = this.stdMemberTarget(link);
         } catch {
           library = undefined;
         }
@@ -665,6 +694,193 @@ class GoResolver {
         this.libraryMembers.add(link.id);
     }
     return { resolutions, links: added };
+  }
+
+  // ---- the standard-library table (C-17) ---------------------------------
+
+  private directives = new Map<string, string | undefined>();
+  /**
+   * The `go` directive of the module a file belongs to (a go.mod without one
+   * means Go 1.16); undefined outside any module.
+   */
+  private goDirective(from: string | undefined): string | undefined {
+    if (from === undefined) return undefined;
+    const directory = directoryOf(from);
+    if (!this.directives.has(directory)) {
+      const module = moduleOf(this.layout, directory);
+      this.directives.set(
+        directory,
+        module ? (module.go ?? "1.16") : undefined,
+      );
+    }
+    return this.directives.get(directory);
+  }
+
+  private stdPackages = new Map<string, string | null>();
+  /**
+   * The standard-library package a qualifier written in `from` binds, by
+   * C-14's rules (`libraryImport`: one import binds it, and it is the
+   * standard library), when the table has the package.
+   */
+  private stdPackage(qualifier: string, from: string): string | undefined {
+    const key = `${from}\u0000${qualifier}`;
+    let found = this.stdPackages.get(key);
+    if (found === undefined) {
+      found = null;
+      const info = this.files.get(from);
+      try {
+        const bound = info ? this.libraryImport(qualifier, info) : undefined;
+        if (
+          bound?.length === 1 &&
+          bound[0]!.origin.ecosystem === "go-std" &&
+          stdTable().hasPackage(bound[0]!.path)
+        )
+          found = bound[0]!.path;
+      } catch {
+        found = null;
+      }
+      this.stdPackages.set(key, found);
+    }
+    return found ?? undefined;
+  }
+
+  /** The standard-library named type `q.Name` written in `from` denotes. */
+  private stdTypeNamed(
+    qualifier: string,
+    name: string,
+    from: string,
+  ): StdType | undefined {
+    if (!exported(name)) return undefined;
+    const pkg = this.stdPackage(qualifier, from);
+    const named = pkg === undefined ? undefined : stdTable().named(pkg, name);
+    return named ? { k: "named", pkg: named.pkg, name: named.name } : undefined;
+  }
+
+  /** What `q.Name` (a qualified name written in `from`) is in the table. */
+  private stdQualified(
+    desc: Extract<Desc, { k: "sel" }>,
+    from: string,
+    path?: string,
+  ): StdEntity | undefined {
+    if (desc.x.k !== "name" || !exported(desc.n)) return undefined;
+    const pkg = this.stdPackage(desc.x.n, from);
+    if (pkg === undefined || (path !== undefined && path !== pkg))
+      return undefined;
+    const object = stdTable().object(pkg, desc.n);
+    if (!object) return undefined;
+    if (object.k === "type")
+      return {
+        t: "type",
+        type: { k: "named", pkg: object.type.pkg, name: object.type.name },
+      };
+    return object.k === "func"
+      ? { t: "func", results: object.results }
+      : { t: "value", type: object.type };
+  }
+
+  private withStd(
+    entity: Extract<Entity, { e: "external" }>,
+    std: StdEntity | undefined,
+  ): Entity {
+    return std ? { ...entity, std } : entity;
+  }
+
+  /**
+   * The member `name` of a value of a standard-library type: the table's
+   * entry, when it is certain (the same on every platform, not ambiguous)
+   * and in every Go release the referencing module may be built with.
+   */
+  private stdMember(
+    type: StdType,
+    name: string,
+    from: string | undefined,
+  ): StdMember | undefined {
+    const named = stdNamedOf(type);
+    const member = named?.members.get(name);
+    if (!member || member.kind === "uncertain") return undefined;
+    return releasedBy(member.since, this.goDirective(from))
+      ? member
+      : undefined;
+  }
+
+  private stdSelect(
+    type: StdType,
+    name: string,
+    from: string,
+  ): StdEntity | undefined {
+    const member = this.stdMember(type, name, from);
+    if (!member) return undefined;
+    return member.kind === "field"
+      ? { t: "value", type: member.type ?? { k: "unknown" } }
+      : { t: "func", results: member.results ?? [] };
+  }
+
+  /**
+   * An embedded standard-library type, for Go's selector rule on a project
+   * type: its member `name` (and depth inside it), no such member, or
+   * unknown from a depth (an uncertain entry, or one a release the module
+   * may be built with lacks). Undefined when the table does not know the
+   * type (the caller keeps it unknown).
+   */
+  private stdEmbedded(
+    type: StdType,
+    name: string,
+    from: string | undefined,
+  ): { member: StdMember } | { unknownAt?: number } | undefined {
+    if (!stdNamedOf(type)) return undefined;
+    const entry = stdNamedOf(type)!.members.get(name);
+    if (!entry) return {};
+    const member = this.stdMember(type, name, from);
+    return member ? { member } : { unknownAt: entry.depth };
+  }
+
+  /** The library target of a standard-library member: its declaring owner. */
+  private stdTarget(member: StdMember): LibraryTarget {
+    return {
+      ecosystem: "go-std",
+      unit: member.ownerPkg,
+      symbol: `${member.ownerType}.${member.name}`,
+      evidence: "declaring-owner",
+    };
+  }
+
+  /**
+   * A field or method selected on a value whose type the source proves to be
+   * a standard-library type, or a project struct that embeds one where Go's
+   * selector rule picks the embedded type's member (C-17): its declaring
+   * owner from the table.
+   */
+  private stdMemberTarget(link: GraphLink): LibraryTarget | undefined {
+    let desc = (link.data as { expr?: Desc } | undefined)?.expr;
+    if (desc?.k === "inst") desc = desc.x;
+    if (desc?.k !== "sel" || !exported(desc.n)) return undefined;
+    const base = this.denote(staticDesc(desc.x), link.file, 0);
+    let type: TypeValue | undefined;
+    if (base.e === "value") type = base.type;
+    else if (base.e === "external")
+      type = base.std?.t === "value" ? externalValue(base) : undefined;
+    else if (base.e === "syms" && !base.syms.every(isTypeSymbol))
+      type = this.sameType(
+        base.syms.map((symbol) => this.valueType(symbol, 1)),
+      );
+    if (type?.kind === "external" && type.std && !type.shadowable) {
+      const member = this.stdMember(type.std, desc.n, link.file);
+      return member && this.stdTarget(member);
+    }
+    if (type?.kind === "project") {
+      const found = this.selectName(
+        type.syms,
+        desc.n,
+        link.file,
+        undefined,
+        false,
+        true,
+      );
+      return found.kind === "library"
+        ? this.stdTarget(found.member)
+        : undefined;
+    }
+    return undefined;
   }
 
   // ---- library targets (C-14) -------------------------------------------
@@ -874,6 +1090,14 @@ class GoResolver {
       | undefined;
     const fact = data?.tc;
     if (!fact) return undefined;
+    // A method of the predeclared `error` interface (C-17): its owner.
+    if (fact.b && fact.l?.[0] === "builtin" && fact.l[1]?.includes("."))
+      return this.libraryTarget(
+        { ecosystem: "go-std" },
+        "builtin",
+        fact.l[1],
+        "declaring-owner",
+      );
     if (fact.b)
       return link.kind === "calls" &&
         data?.builtinName &&
@@ -885,7 +1109,13 @@ class GoResolver {
             "declared-builtin",
           )
         : undefined;
-    if (!fact.l || fact.c === "iface" || fact.c === "typeparam")
+    // A method of a standard-library interface is its static callee (C-17):
+    // the interface that declares it. Other interfaces' methods are dispatch.
+    if (
+      !fact.l ||
+      (fact.c === "iface" && fact.l[2] !== "std") ||
+      fact.c === "typeparam"
+    )
       return undefined;
     const [unit, symbol, cls] = fact.l;
     if (!symbol || !unit) return undefined;
@@ -1456,7 +1686,13 @@ class GoResolver {
         return { kind: "failed", cause: declared.cause };
       return declared.e === "unknown"
         ? { kind: "external", name: ref.n, shadowable: true }
-        : { kind: "external", name: ref.n };
+        : declared.e === "none" && ref.n === "error"
+          ? {
+              kind: "external",
+              name: ref.n,
+              std: { k: "named", pkg: "builtin", name: "error" },
+            }
+          : { kind: "external", name: ref.n };
     }
     const key = `${from}\u0000${ref.q ?? ""}\u0000${ref.n}`;
     const cached = this.memo.get(key);
@@ -1469,8 +1705,13 @@ class GoResolver {
         const base = this.lookupName(ref.q, from);
         // A qualifier that is no project import can only be an external import
         // (a valid file's imports are all known).
+        const std = this.stdTypeNamed(ref.q, ref.n, from);
         if (base.e === "none" || base.e === "external")
-          value = { kind: "external", name: `${ref.q}.${ref.n}` };
+          value = {
+            kind: "external",
+            name: `${ref.q}.${ref.n}`,
+            ...(std && base.e === "none" ? { std } : {}),
+          };
         else if (base.e === "unknown" && base.cause)
           value = { kind: "failed", cause: base.cause };
         else if (base.e === "pkg") {
@@ -1479,7 +1720,11 @@ class GoResolver {
             ? this.scopeLookup(base.pkgs, ref.n, reader, true)
             : { syms: [], cause: [] };
           value = !base.pkgs.length
-            ? { kind: "external", name: `${base.path}.${ref.n}` }
+            ? {
+                kind: "external",
+                name: `${base.path}.${ref.n}`,
+                ...(std ? { std } : {}),
+              }
             : found.cause.length
               ? { kind: "failed", cause: found.cause }
               : this.typeSyms(found.syms, depth);
@@ -1531,18 +1776,51 @@ class GoResolver {
         } finally {
           this.aliasesFollowed.delete(symbol.id);
         }
-        if (target.kind !== "project") return target;
+        if (target.kind !== "project")
+          return syms.length > 1
+            ? this.variantsStd(target, syms, depth)
+            : target;
         out.push(...target.syms);
       } else out.push(symbol);
     }
     return out.length ? { kind: "project", syms: unique(out) } : UNKNOWN;
   }
 
+  /**
+   * A type name declared in several build variants, one of which is an alias
+   * of an external type (C-17): the standard-library type only when every
+   * variant is an alias of that same standard-library type; otherwise the
+   * value keeps no standard-library type (its members stay unresolved).
+   * Other decisions see the first alias's external target, as before.
+   */
+  private variantsStd(
+    target: TypeValue,
+    syms: GraphSymbol[],
+    depth: number,
+  ): TypeValue {
+    if (target.kind !== "external" || !target.std) return target;
+    const std = JSON.stringify(target.std);
+    const agree = syms.every((symbol) => {
+      const data = (symbol.data ?? {}) as {
+        underlying?: TypeRef;
+        shape?: string;
+      };
+      if (symbol.kind !== "alias" || data.shape || !data.underlying)
+        return false;
+      const other = this.typeFromRef(data.underlying, symbol.file, depth + 1);
+      return other.kind === "external" && JSON.stringify(other.std) === std;
+    });
+    if (agree) return target;
+    const { std: _dropped, ...rest } = target;
+    void _dropped;
+    return rest;
+  }
+
   /** The type of a value description evaluated in `file`. */
   private typeOf(desc: Desc, file: string, depth: number): TypeValue {
     const entity = this.denote(staticDesc(desc), file, depth + 1);
     if (entity.e === "value") return entity.type;
-    if (entity.e === "external") return { kind: "external", name: entity.name };
+    if (entity.e === "external") return externalValue(entity);
     if (entity.e === "unknown" && entity.cause)
       return { kind: "failed", cause: entity.cause };
     if (entity.e === "syms")
@@ -1584,9 +1862,24 @@ class GoResolver {
           ? `x:${value.name}`
           : `${value.kind}:${JSON.stringify(value)}`;
     const first = keyOf(values[0]!);
-    return values.every((value) => keyOf(value) === first)
-      ? values[0]!
-      : UNKNOWN;
+    if (!values.every((value) => keyOf(value) === first)) return UNKNOWN;
+    // The same external name: its standard-library type only when every
+    // alternative proves the same one (C-17).
+    const head = values[0]!;
+    if (head.kind === "external" && head.std) {
+      const std = JSON.stringify(head.std);
+      if (
+        !values.every(
+          (value) =>
+            value.kind === "external" && JSON.stringify(value.std) === std,
+        )
+      ) {
+        const { std: _dropped, ...rest } = head;
+        void _dropped;
+        return rest;
+      }
+    }
+    return head;
   }
 
   /** What an expression denotes: a package, declarations, an external thing, or a typed value. */
@@ -1637,8 +1930,14 @@ class GoResolver {
         // A defined type over a container literal (`type R map[string][]T`).
         if (container.kind === "project")
           container = this.underlyingContainer(container.syms, depth + 1);
-        if (container.kind === "external" || container.kind === "failed")
-          return { e: "value", type: container };
+        if (container.kind === "external") {
+          // A standard-library slice, array, map or channel (C-17): its
+          // element or key; anything else keeps no standard-library type.
+          const { std, ...rest } = container;
+          const item = std && stdItem(std, desc.k === "key");
+          return { e: "value", type: item ? { ...rest, std: item } : rest };
+        }
+        if (container.kind === "failed") return { e: "value", type: container };
         if (container.kind === "cont") {
           // A single range variable over a channel is its element.
           const item =
@@ -1740,8 +2039,21 @@ class GoResolver {
     depth: number,
   ): TypeValue {
     const callee = this.denote(desc.f, from, depth + 1);
-    if (callee.e === "external")
-      return { kind: "external", name: `${callee.name}()` };
+    if (callee.e === "external") {
+      // A standard-library function's or method's result, or a conversion
+      // to a standard-library type (C-17).
+      const std =
+        callee.std?.t === "func"
+          ? callee.std.results[desc.i]
+          : callee.std?.t === "type" && desc.i === 0
+            ? callee.std.type
+            : undefined;
+      return {
+        kind: "external",
+        name: `${callee.name}()`,
+        ...(std && std.k !== "unknown" ? { std } : {}),
+      };
+    }
     if (callee.e === "unknown" && callee.cause)
       return { kind: "failed", cause: callee.cause };
     // The builtin itself (no declaration shadows the name): its evident result.
@@ -1858,7 +2170,10 @@ class GoResolver {
     const base = this.denote(staticDesc(desc.x), from, depth + 1);
     if (base.e === "pkg") {
       if (!base.pkgs.length)
-        return { e: "external", name: `${base.path}.${desc.n}` };
+        return this.withStd(
+          { e: "external", name: `${base.path}.${desc.n}` },
+          this.stdQualified(desc, from, base.path),
+        );
       const reader = this.files.get(from);
       if (!reader) return NONE;
       // Not among the package's valid files, which has failed files: those are
@@ -1868,13 +2183,21 @@ class GoResolver {
       return { e: "syms", syms: found.syms };
     }
     if (base.e === "external")
-      return { e: "external", name: `${base.name}.${desc.n}` };
+      return this.withStd(
+        { e: "external", name: `${base.name}.${desc.n}` },
+        base.std?.t === "value"
+          ? this.stdSelect(base.std.type, desc.n, from)
+          : undefined,
+      );
     if (base.e === "unknown") return base.cause ? base : NONE;
     // `q.X` with q neither local nor declared in the package: q can only be one of
     // this file's imports; not a project import, so it is external.
     if (base.e === "none")
       return desc.x.k === "name"
-        ? { e: "external", name: `${desc.x.n}.${desc.n}` }
+        ? this.withStd(
+            { e: "external", name: `${desc.x.n}.${desc.n}` },
+            this.stdQualified(desc, from),
+          )
         : NONE;
     if (base.e === "syms" && base.syms.every(isTypeSymbol)) {
       // Method expression T.M / (*T).M.
@@ -1894,7 +2217,10 @@ class GoResolver {
             base.syms.map((symbol) => this.valueType(symbol, depth + 1)),
           );
     if (type.kind === "external")
-      return { e: "external", name: `${type.name}.${desc.n}` };
+      return this.withStd(
+        { e: "external", name: `${type.name}.${desc.n}` },
+        type.std ? this.stdSelect(type.std, desc.n, from) : undefined,
+      );
     if (type.kind === "failed") return { e: "unknown", cause: type.cause };
     if (type.kind !== "project") return NONE;
     const found = this.selectName(type.syms, desc.n, from);
@@ -2157,11 +2483,16 @@ class GoResolver {
     from: string | undefined,
     access = from === undefined ? undefined : this.files.get(from)?.pkg?.key,
     ignoreExternal = false,
+    std = false,
   ): Selection {
     // An external type can never declare a project package's unexported name, so
     // for unexported names embedded external types are irrelevant.
     const skipExternal = ignoreExternal || !exported(name);
-    const memoKey = `${skipExternal ? "x" : ""}${types
+    // With `std` (C-17), an embedded standard-library type is expanded from
+    // the table, which depends on the referencing module's `go` directive.
+    const stdKey =
+      std && !skipExternal ? `s:${this.goDirective(from) ?? "-"}` : "";
+    const memoKey = `${stdKey}${skipExternal ? "x" : ""}${types
       .map((type) => type.id)
       .sort()
       .join(
@@ -2189,6 +2520,7 @@ class GoResolver {
         access,
         skipExternal,
         choice,
+        !!stdKey,
       );
       if ("group" in run)
         for (let index = run.size - 1; index >= 0; index--)
@@ -2212,6 +2544,7 @@ class GoResolver {
     access: string | undefined,
     skipExternal: boolean,
     choice: Map<string, number>,
+    std = false,
   ): Selection | { group: string; size: number } {
     let unchosen: { group: string; size: number } | undefined;
     const pick = (set: GraphSymbol[]): GraphSymbol[] => {
@@ -2250,7 +2583,14 @@ class GoResolver {
     let result: Selection = { kind: "none" };
     const causes: string[] = [];
     const reader = from === undefined ? undefined : this.files.get(from);
-    for (let depth = 0; level.length; depth++) {
+    // Members of embedded standard-library types (C-17, with `std`), at the
+    // depth where they occur.
+    const library: { at: number; member: StdMember }[] = [];
+    for (
+      let depth = 0;
+      level.length || library.some((item) => item.at >= depth);
+      depth++
+    ) {
       if (
         depth > MAX_EMBED_DEPTH ||
         level.length > MAX_EMBED_PATHS ||
@@ -2342,6 +2682,28 @@ class GoResolver {
           seen.add(item.key);
           if (item.value.kind !== "project") {
             if (item.value.kind === "failed") causes.push(...item.value.cause);
+            // A standard-library type the table knows: its member of this
+            // name, none, or unknown from the depth an uncertain one is at.
+            const embedded =
+              std &&
+              item.value.kind === "external" &&
+              !item.value.shadowable &&
+              item.value.std
+                ? this.stdEmbedded(item.value.std, name, from)
+                : undefined;
+            if (embedded) {
+              if ("member" in embedded)
+                library.push({
+                  at: depth + 1 + embedded.member.depth,
+                  member: embedded.member,
+                });
+              else if (embedded.unknownAt !== undefined)
+                externalAt = Math.min(
+                  externalAt ?? Infinity,
+                  depth + 1 + embedded.unknownAt,
+                );
+              continue;
+            }
             // An external type cannot declare a project package's unexported name;
             // an unresolvable one could be anything.
             if (
@@ -2365,6 +2727,16 @@ class GoResolver {
       }
       if (externalAt !== undefined && externalAt <= depth) {
         result = { kind: "unknown" };
+        break;
+      }
+      const here = library.filter((item) => item.at === depth);
+      if (here.length) {
+        // Alone at the shallowest depth: that member; with another
+        // occurrence (ambiguous in Go), not represented: unknown.
+        result =
+          here.length === 1 && !occurrences.length
+            ? { kind: "library", member: here[0]!.member }
+            : { kind: "unknown" };
         break;
       }
       // A variant set at the next depth matters only if nothing is found here.
@@ -4413,6 +4785,36 @@ function countsMatch(a: GraphSymbol, b: GraphSymbol): boolean {
 }
 
 /** A reassigned local's static type comes from its declaration. */
+/** The value an external entity denotes, with its standard-library type. */
+function externalValue(entity: Extract<Entity, { e: "external" }>): TypeValue {
+  return entity.std?.t === "value" && entity.std.type.k !== "unknown"
+    ? { kind: "external", name: entity.name, std: entity.std.type }
+    : { kind: "external", name: entity.name };
+}
+
+/** An element (or with `key`, the key) of a standard-library container. */
+function stdItem(type: StdType, key: boolean): StdType | undefined {
+  const item =
+    type.k === "map"
+      ? key
+        ? type.key
+        : type.e
+      : type.k === "chan" || (type.k === "slice" && !key)
+        ? type.e
+        : undefined;
+  return item && item.k !== "unknown" ? item : undefined;
+}
+
+/** The named type whose members a value of this type has (through one pointer). */
+function stdNamedOf(type: StdType): StdNamed | undefined {
+  const pointer = type.k === "ptr";
+  const inner = pointer ? type.e : type;
+  if (inner.k !== "named") return undefined;
+  const named = stdTable().named(inner.pkg, inner.name);
+  // A pointer to an interface has no methods.
+  return named && !(pointer && named.shape === "i") ? named : undefined;
+}
+
 function staticDesc(desc: Desc): Desc {
   return desc.k === "var" ? desc.d : desc;
 }
@@ -4486,6 +4888,19 @@ function combineVariants(all: Selection[]): Selection {
   if (causes.length) return { kind: "failed", cause: unique(causes).sort() };
   if (results.some((item) => item.kind === "unknown"))
     return { kind: "unknown" };
+  // A standard-library member (C-17): only when every configuration selects
+  // the same one.
+  const libraries = results.flatMap((item) =>
+    item.kind === "library" ? [item.member] : [],
+  );
+  if (libraries.length) {
+    const key = (member: StdMember) =>
+      `${member.ownerPkg}\u0000${member.ownerType}\u0000${member.name}`;
+    return libraries.length === results.length &&
+      libraries.every((member) => key(member) === key(libraries[0]!))
+      ? { kind: "library", member: libraries[0]! }
+      : { kind: "unknown" };
+  }
   const syms = unique(
     results.flatMap((item) =>
       item.kind === "found" || item.kind === "ambiguous" ? item.syms : [],

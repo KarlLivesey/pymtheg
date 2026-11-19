@@ -2271,6 +2271,14 @@ Further rulings under this rule, each the manager's:
 - **Only certain causes** (manager, W2-B round 16): `invalid-code` is asserted only
   when dependence on a failed file is certain, because a wrong cause is worse than
   a missing one; otherwise the link stays plain unresolved.
+- **Rust failed-file reason only where it could change the answer** (C-15,
+  19 November 2026): a failed file only adds declarations, so a Rust link
+  stopped by something visible keeps that reason alone;
+  `failed-file-unseen-declarations` is recorded where a lookup reached a
+  failed file, where its impls could supply the answer, or where nothing else
+  explains a miss. No outcome changes. **Why:** the blanket label made the
+  coverage plan count about 300,000 links as failed-file misses that a
+  diagnostic build with the failed files emptied did not release.
 - **TypeScript programs with a failed file** (manager, ruling on W2-D, 12 November
   2026, after round 14): the failed file contributes nothing; `invalid-code` with a
   cause is best-effort attribution; every other link carries
@@ -2834,6 +2842,25 @@ When the declaration is unavailable, an annotation that names an imported
 receiver type can establish the package unit. The program-wide Node overlap
 rules also apply to checker-selected members reached through the new aliases
 and selectors. [C-16](changes/C-16.md)
+
+### C-17 Go standard-library members
+
+Go resolves members of standard-library types source-only from a table of
+the standard library's exported API generated from one pinned Go release
+and shipped with the package, rather than reading GOROOT (which would make
+the default route need Go). A member is recorded with the declaring owner
+Go's selector rule gives (promotion through embedding included; an
+unexported owner such as `testing.common` as Go reports it, and
+`graph uses` maps the exported type to it). The table keeps only what is
+identical on every platform Go supports, and a member is used only when it
+is in every Go release the module may be built with (its `go` directive
+and later): Go's compatibility promise makes later releases supersets, so
+the table answers for older ones. **Trade:** platform-specific members
+(`syscall`, some `os` and `net` fields) and members newer than the
+directive stay unresolved even where the project's own build constraint
+would allow them. A standard-library interface value's method is recorded
+as the interface's method (the static callee): the source-only route cannot
+list implementers outside the checkout. See [C-17](changes/C-17.md).
 
 ### C-13 TypeScript program budget and compiler exceptions
 

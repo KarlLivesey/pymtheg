@@ -1,0 +1,162 @@
+[
+  {
+    "id": "swc-project/swc",
+    "language": "rust",
+    "url": "https://github.com/swc-project/swc.git",
+    "commit": "52efb5cb2c50c8348a7dc54ed42aeb35c675009a",
+    "category": "compiler / dev tool",
+    "why": "Large TypeScript compiler workspace with proc macros and build-time code generation."
+  },
+  {
+    "id": "embassy-rs/embassy",
+    "language": "rust",
+    "url": "https://github.com/embassy-rs/embassy.git",
+    "commit": "41d7b34f69fa530d30439516dced774eedebcd02",
+    "category": "library / workspace",
+    "why": "Large no_std embedded workspace with build scripts and target-specific examples."
+  },
+  {
+    "id": "DioxusLabs/dioxus",
+    "language": "rust",
+    "url": "https://github.com/DioxusLabs/dioxus.git",
+    "commit": "97adf7915e1adfef4e2da436c9bd0b6add0dfa39",
+    "category": "UI / app framework",
+    "why": "UI workspace with proc macros and macro-heavy RSX examples."
+  },
+  {
+    "id": "tauri-apps/tauri",
+    "language": "rust",
+    "url": "https://github.com/tauri-apps/tauri.git",
+    "commit": "f5578bc1e07cc2e87a6b4526bc20299aaba3495e",
+    "category": "UI / app framework",
+    "why": "Desktop app framework with proc macros, platform dependencies and build scripts."
+  },
+  {
+    "id": "helix-editor/helix",
+    "language": "rust",
+    "url": "https://github.com/helix-editor/helix.git",
+    "commit": "872b240251876e56787ad7ec312cefae70e3e28e",
+    "category": "UI / app",
+    "why": "Editor workspace with terminal UI and build.rs."
+  },
+  {
+    "id": "actix/actix-web",
+    "language": "rust",
+    "url": "https://github.com/actix/actix-web.git",
+    "commit": "3c6ea6acf52d9e6f41207222b672774246be7205",
+    "category": "web / server framework",
+    "why": "Web framework workspace with route proc macros and HTTP fixtures."
+  },
+  {
+    "id": "ratatui/ratatui",
+    "language": "rust",
+    "url": "https://github.com/ratatui/ratatui.git",
+    "commit": "60feb0eb09789f4c0ed11c0c532bb605689fbbc0",
+    "category": "UI library",
+    "why": "Terminal UI widgets and multiple workspace crates with examples."
+  },
+  {
+    "id": "rustls/rustls",
+    "language": "rust",
+    "url": "https://github.com/rustls/rustls.git",
+    "commit": "53db4d1398f16d5bac98eacf02f0dff4b242fd92",
+    "category": "library",
+    "why": "TLS library with conditional providers and platform and no_std code."
+  },
+  {
+    "id": "clap-rs/clap",
+    "language": "rust",
+    "url": "https://github.com/clap-rs/clap.git",
+    "commit": "db86ef6eccb2ed5ae16d3035982907692ecb10ef",
+    "category": "CLI library",
+    "why": "Command-line parser with derive proc macros and builder crates."
+  },
+  {
+    "id": "cberner/redb",
+    "language": "rust",
+    "url": "https://github.com/cberner/redb.git",
+    "commit": "357f8bf3f554e85bff1c6c605713ae57c3901006",
+    "category": "database / storage",
+    "why": "Embedded database with typed table APIs, storage and fuzz fixtures."
+  },
+  {
+    "id": "tree-sitter/tree-sitter",
+    "language": "rust",
+    "url": "https://github.com/tree-sitter/tree-sitter.git",
+    "commit": "564fa307125d78d51479b12dc079ac69abe46a30",
+    "category": "compiler / dev tool",
+    "why": "Parser generator and bindings spanning Rust and C with build scripts."
+  },
+  {
+    "id": "BurntSushi/ripgrep",
+    "language": "rust",
+    "url": "https://github.com/BurntSushi/ripgrep.git",
+    "commit": "178cc027e283fd965cb72d0a7395b219eada170c",
+    "category": "CLI tool",
+    "why": "Search CLI with multiple crates and platform dispatch."
+  },
+  {
+    "id": "tokio-rs/axum",
+    "language": "rust",
+    "url": "https://github.com/tokio-rs/axum.git",
+    "commit": "36d38c4cf2766cd7313dd53d808f30546ee36b1e",
+    "category": "web / server framework",
+    "why": "Async web framework using generic handlers and proc macros."
+  },
+  {
+    "id": "crossbeam-rs/crossbeam",
+    "language": "rust",
+    "url": "https://github.com/crossbeam-rs/crossbeam.git",
+    "commit": "a28f40fdddb70bea8e5faf0efad9af0be4b9dbea",
+    "category": "library",
+    "why": "Concurrency workspace and declarative macros across crates."
+  },
+  {
+    "id": "serde-rs/serde",
+    "language": "rust",
+    "url": "https://github.com/serde-rs/serde.git",
+    "commit": "e306b0c7c40ad21d5bdf52bcd20da513904682ae",
+    "category": "library",
+    "why": "Serialization trait library with derive proc macros and macro_rules-heavy internals."
+  },
+  {
+    "id": "alacritty/alacritty",
+    "language": "rust",
+    "url": "https://github.com/alacritty/alacritty.git",
+    "commit": "aa5d942f46c40184a3f214830ff5f7989f4733a1",
+    "category": "UI / app",
+    "why": "Terminal emulator with platform code and a multi-crate workspace."
+  },
+  {
+    "id": "RustCrypto/hashes",
+    "language": "rust",
+    "url": "https://github.com/RustCrypto/hashes.git",
+    "commit": "c50eeb468b26629bbd1177620733a32a084d6f86",
+    "category": "library",
+    "why": "no_std crypto primitives with shared macro_rules and separate crates."
+  },
+  {
+    "id": "rust-lang/mdBook",
+    "language": "rust",
+    "url": "https://github.com/rust-lang/mdBook.git",
+    "commit": "7f307f5e845284f41adeaf7f18f4783f7711343c",
+    "category": "CLI / dev tool",
+    "why": "Documentation compiler with CLI, rendering and preprocessors."
+  },
+  {
+    "id": "fjall-rs/fjall",
+    "language": "rust",
+    "url": "https://github.com/fjall-rs/fjall.git",
+    "commit": "87006048139bfe1b072bbc29a5a92bf1f97628e3",
+    "category": "database / storage",
+    "why": "Small embeddable LSM key-value storage library."
+  },
+  {
+    "id": "rust-embedded/cortex-m",
+    "language": "rust",
+    "url": "https://github.com/rust-embedded/cortex-m.git",
+    "commit": "b79801ce4884fe46105b562f701a7d2fd5c586c7",
+    "category": "library",
+    "why": "Small no_std hardware library with architecture gates and build scripts."
+  }
+]

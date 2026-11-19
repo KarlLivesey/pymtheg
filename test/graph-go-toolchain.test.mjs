@@ -428,7 +428,7 @@ test(
 );
 
 test(
-  "C-14: library members get their declaring owner from go/types; source-only they stay unresolved",
+  "C-14, C-17: library members get their declaring owner from go/types, and source-only from the standard-library table, the same",
   needsGo,
   async () => {
     const off = await index("library");
@@ -450,26 +450,19 @@ test(
       ["exitErr.ExitCode", "calls", owner("os", "ProcessState.ExitCode")],
       ['exec.Command("true").Run', "calls", owner("os/exec", "Cmd.Run")],
       ["resp.Body", "references", owner("net/http", "Response.Body")],
+      // A standard-library interface's method: the interface declaring it.
+      ["r.Read", "calls", owner("io", "Reader.Read")],
+      ["resp.Body.Close", "calls", owner("io", "Closer.Close")],
     ];
     for (const [at, kind, target] of members) {
+      // C-17: the source-only route reaches the same owner from the table.
       const before = link(off, file, at, kind);
-      assert.equal(before.libraries, undefined, at);
-      // A member promoted from a library type embedded in a checkout struct
-      // has no reason yet: only a library-typed receiver does.
-      assert.equal(
-        before.data?.uncertainty,
-        at === "g.Lock" ? undefined : "library-member-unproven",
-        at,
-      );
+      assert.equal(before.resolution, "library", at);
+      assert.deepEqual(before.libraries, [target], at);
       const after = link(dump, file, at, kind);
       assert.equal(after.resolution, "library", at);
       assert.deepEqual(after.libraries, [target], at);
       assert.equal(after.data.toolchain.upgrade, "library", at);
-    }
-    // Interface methods are dispatch: no library symbol either way.
-    for (const at of ["r.Read", "resp.Body.Close"]) {
-      assert.equal(link(dump, file, at).libraries, undefined, at);
-      assert.equal(link(off, file, at).libraries, undefined, at);
     }
     // Qualified names and builtins are the same with and without it.
     for (const at of ["strings.Count", "len", "errors.As"])

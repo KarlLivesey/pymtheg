@@ -597,6 +597,18 @@ export class SqliteGraphStore implements GraphStorage {
           ),
     );
   }
+  /** Whether any link targets library unit `unit` of this ecosystem. */
+  hasLibraryUnit(unit: string, ecosystem: string): boolean {
+    return this.snapshot(
+      () =>
+        this.libraryTable() &&
+        !!this.db
+          .prepare(
+            "SELECT 1 FROM graph_library_targets WHERE unit=? AND ecosystem=? LIMIT 1",
+          )
+          .get(unit, ecosystem),
+    );
+  }
   /** Exact counts of the same links as libraryUses, by class. */
   libraryUseCounts(
     unit: string,
