@@ -61,6 +61,8 @@ import {
   isScopeNeutralMacro,
   type MacroScopeEffect,
   type MacroScopeMode,
+  type MacroScopeAudit,
+  type MacroScopeBlocker,
 } from "./macro-scope.js";
 type Data = Record<string, Json>;
 const data = (x: { data?: Json }) => (x.data ?? {}) as Data;
@@ -263,10 +265,11 @@ interface Found {
   possibleImportNames?: string[];
   library?: LibraryPath;
   libraryScopes?: string[];
+  associatedFallback?: true;
+  scopeChanges?: number;
 }
-const unique = (ss: GraphSymbol[]) => [
-  ...new Map(ss.map((s) => [s.id, s])).values(),
-];
+const unique = (ss: GraphSymbol[]) =>
+  ss.length < 2 ? ss.slice() : [...new Map(ss.map((s) => [s.id, s])).values()];
 const accepts = (s: GraphSymbol, ns: Namespace) => {
   if (ns === "any") return true;
   if (data(s).semanticKind === "macro") return ns === "macro" || ns === "value";
@@ -331,6 +334,7 @@ export function resolveRust(
   /** C-10: analysis notes merged into a link's data (receiver typing). */
   annotate?: (link: GraphLink, extra: Record<string, Json>) => void,
   markScopeResult?: (link: GraphLink, assumed: boolean) => void,
+  scopeAudit?: MacroScopeAudit,
 ): LinkResolution[] {
   // Library proofs use the ordinary scoped lookup with a separate cache key.
   // The analysis pass and existing checkout decisions use the original route.
@@ -344,7 +348,7 @@ export function resolveRust(
   // Cache only unproved import namespaces, never targets or positive proofs.
   // Facts are immutable for this run; caller conditions and placement are in
   // the key. A failed proof keeps alternatives, it never asserts a binding.
-  const unprovedImports = new Set<string>();
+  let unprovedImports = new Map<string, ScopeTrace | null>();
   let cycleCuts = 0;
   const namespaceParents = new WeakMap<Place, number>();
   let nextNamespaceParent = 0;
@@ -1702,13 +1706,88 @@ export function resolveRust(
     list.push(member);
     membersByOwner.set(l.sourceId, list);
   }
-  const memo = new Map<string, Found>();
+  let memo = new Map<string, Found>();
+  const retryMemo = new Map<string, Found>();
+  type ScopeRead = {
+    key: string;
+    name: string;
+    library: boolean;
+    allowAssumption: boolean;
+    attributeStart: number | undefined;
+  };
+  type ScopeTrace = number | ScopeRead[];
+  // A cached ordinary lookup is reusable as long as every macro guard it
+  // visited gives the same answer. Names and origins are needed only for
+  // the offline blocker census.
+  const auditedLookupReads = new WeakMap<Found, ScopeRead[]>();
+  const modeBit = { proven: 1, assumed: 2 } as const;
+  let scopeChanges = 0;
+  const rootScopeReads: ScopeRead[] = [];
+  const internedScopeReads = new Map<string, Map<string, ScopeRead>>();
+  let scopeReads: ScopeRead[] | undefined;
+  function scopeTraceOf(found: Found): ScopeTrace | undefined {
+    return scopeAudit ? auditedLookupReads.get(found) : found.scopeChanges;
+  }
+  function recordReads(trace: ScopeTrace | undefined) {
+    if (typeof trace === "number") {
+      if (scopeMode === "baseline") scopeChanges |= trace;
+    } else if (scopeReads && trace)
+      for (const read of trace) scopeReads.push(read);
+  }
+  function capturedScopeTrace(start: number): ScopeTrace | undefined {
+    if (!scopeAudit) return scopeChanges || undefined;
+    if (scopeReads && scopeReads.length > start) {
+      const uniqueReads = [...new Set(scopeReads.slice(start))];
+      scopeReads.length = start;
+      for (const read of uniqueReads) scopeReads.push(read);
+      return uniqueReads;
+    }
+    return undefined;
+  }
+  function lookupReads<T>(lookup: () => T): { result: T; trace?: ScopeTrace } {
+    const outerChanges = scopeChanges;
+    scopeChanges = 0;
+    const outer = scopeReads;
+    if (scopeAudit) scopeReads ??= rootScopeReads;
+    const start = scopeReads?.length ?? 0;
+    try {
+      const result = lookup();
+      const trace = capturedScopeTrace(start);
+      return trace ? { result, trace } : { result };
+    } finally {
+      scopeChanges |= outerChanges;
+      scopeReads = outer;
+      if (!outer) rootScopeReads.length = 0;
+    }
+  }
+  function lookupWithReads(lookup: () => Found): Found {
+    const { result, trace } = lookupReads(lookup);
+    if (!trace) return result;
+    return attachScopeTrace(result, trace);
+  }
+  function attachScopeTrace(found: Found, trace: ScopeTrace): Found {
+    if (typeof trace === "number") return { ...found, scopeChanges: trace };
+    const captured = { ...found };
+    auditedLookupReads.set(captured, trace);
+    return captured;
+  }
+  function canReuseBaseline(result: Found): boolean {
+    if (scopeMode === "baseline") return true;
+    const trace = scopeTraceOf(result);
+    return (
+      !trace || (typeof trace === "number" && !(trace & modeBit[scopeMode]))
+    );
+  }
+  const retryBits = (trace: ScopeTrace | undefined): number =>
+    typeof trace === "number" ? trace : 0;
+  const auditReads = (trace: ScopeTrace | undefined): ScopeRead[] =>
+    Array.isArray(trace) ? trace : [];
   const importExpansions = new Map<string, number[]>();
   // Incomplete results are reusable only with the same active guards and
   // expansion limits. A cycle cut here can be a real route in another search.
-  const incompleteLookups = new LookupMemo<Found>();
-  const observedIncompleteGuards = new Set<string>();
-  const observedImportProofs = new Set<string>();
+  let incompleteLookups = new LookupMemo<Found>();
+  let observedIncompleteGuards = new Set<string>();
+  let observedImportProofs = new Set<string>();
   let lookupRevision = 0;
   let lookupFactsFinal = false;
   let activeLookup:
@@ -1731,51 +1810,63 @@ export function resolveRust(
     ...(libraryAudit ? { libraryScopes: [scope] } : {}),
   });
   const merge = (xs: Found[]): Found => {
-    const causes = xs.flatMap((x) => x.failedFiles ?? []);
-    const possibleImportNames = [
-      ...new Set(xs.flatMap((x) => x.possibleImportNames ?? [])),
-    ];
-    const alternatives = xs.some(
-      (x) =>
-        !x.failedFiles?.length &&
-        (x.symbols.length || x.library || !x.complete),
-    );
-    const paths = libraryLookup
-      ? xs.flatMap((x) => (x.library ? [x.library] : []))
-      : [];
-    const library = paths[0];
-    const samePath =
-      !library || paths.every((path) => sameLibraryPath(library, path));
-    return causes.length
-      ? {
-          possibleImportNames,
-          ...(alternatives
-            ? { complete: false, reason: "failed-file-unseen-declarations" }
-            : broken(causes)),
-          symbols: unique(xs.flatMap((x) => x.symbols)),
-          opaqueAttributes: [
-            ...new Set(xs.flatMap((x) => x.opaqueAttributes ?? [])),
-          ].sort(),
-        }
-      : {
-          possibleImportNames,
-          symbols: unique(xs.flatMap((x) => x.symbols)),
-          complete: samePath && xs.every((x) => x.complete),
-          ...(library && samePath ? { library } : {}),
-          ...(libraryAudit && libraryLookup
-            ? {
-                libraryScopes: [
-                  ...new Set(xs.flatMap((x) => x.libraryScopes ?? [])),
-                ],
-              }
-            : {}),
-          reason: [...new Set(xs.map((x) => x.reason).filter(Boolean))].join(
-            "; ",
-          ),
-          opaqueAttributes: [
-            ...new Set(xs.flatMap((x) => x.opaqueAttributes ?? [])),
-          ].sort(),
-        };
+    const symbols: GraphSymbol[] = [];
+    let causes: string[] | undefined;
+    let importNames: Set<string> | undefined;
+    let attributes: Set<string> | undefined;
+    let reasons: Set<string> | undefined;
+    let library: LibraryPath | undefined;
+    let samePath = true;
+    let complete = true;
+    let alternatives = false;
+    for (const found of xs) {
+      for (const symbol of found.symbols) symbols.push(symbol);
+      if (found.failedFiles?.length)
+        for (const file of found.failedFiles) (causes ??= []).push(file);
+      else
+        alternatives ||= !!(
+          found.symbols.length ||
+          found.library ||
+          !found.complete
+        );
+      if (found.possibleImportNames?.length)
+        for (const name of found.possibleImportNames)
+          (importNames ??= new Set()).add(name);
+      if (found.opaqueAttributes?.length)
+        for (const attribute of found.opaqueAttributes)
+          (attributes ??= new Set()).add(attribute);
+      if (found.reason) (reasons ??= new Set()).add(found.reason);
+      if (libraryLookup && found.library) {
+        library ??= found.library;
+        samePath &&= sameLibraryPath(library, found.library);
+      }
+      complete &&= found.complete;
+    }
+    const common = {
+      possibleImportNames: importNames ? [...importNames] : [],
+      symbols: symbols.length < 2 ? symbols : unique(symbols),
+      opaqueAttributes: attributes ? [...attributes].sort() : [],
+    };
+    if (causes)
+      return {
+        ...(alternatives
+          ? { complete: false, reason: "failed-file-unseen-declarations" }
+          : broken(causes)),
+        ...common,
+      };
+    return {
+      ...common,
+      complete: samePath && complete,
+      ...(library && samePath ? { library } : {}),
+      ...(libraryAudit && libraryLookup
+        ? {
+            libraryScopes: [
+              ...new Set(xs.flatMap((x) => x.libraryScopes ?? [])),
+            ],
+          }
+        : {}),
+      reason: reasons ? [...reasons].join("; ") : "",
+    };
   };
   const isDescendant = (scope: string, parent: string) =>
     !parent || scope === parent || scope.startsWith(parent + "::");
@@ -2093,11 +2184,10 @@ export function resolveRust(
       // an unknown external namespace. Unknown is not a binding in every ns.
       bindings = bindings.filter((binding) => {
         if (!("targetName" in binding)) return accepts(binding, headNs);
-        const proofKey = JSON.stringify([
+        const baseProofKey = JSON.stringify([
           libraryLookup,
           libraryLookup && libraryProbe,
           libraryLookup && !protectModuleImports,
-          scopeMode,
           macroIdentityProbe,
           parentIdentity(loc),
           loc.symbol?.id,
@@ -2116,15 +2206,32 @@ export function resolveRust(
             ...new Set([...(loc.conditions ?? []), ...conditionsFor(binding)]),
           ].sort(),
         ]);
-        if (unprovedImports.has(proofKey)) return false;
+        const proofKey =
+          scopeMode === "baseline"
+            ? baseProofKey
+            : `${scopeMode}:${baseProofKey}`;
+        const cached = unprovedImports.get(proofKey);
+        const baseline = unprovedImports.get(baseProofKey);
+        const shared =
+          baseline === null ||
+          (scopeMode !== "baseline" &&
+            typeof baseline === "number" &&
+            !(baseline & modeBit[scopeMode]));
+        if (cached !== undefined || shared) {
+          recordReads(cached ?? baseline ?? undefined);
+          return false;
+        }
         const reused = importHeads.get(binding.id);
         const before = cycleCuts;
-        const head = reused?.found ?? resolveUse(binding, [], headNs);
+        const head =
+          reused?.found ??
+          lookupWithReads(() => resolveUse(binding, [], headNs));
+        if (reused) recordReads(scopeTraceOf(head));
         const proven =
           head.complete &&
           (head.library || head.symbols.some((s) => accepts(s, headNs)));
         if (!proven && (reused ? reused.cycleFree : cycleCuts === before)) {
-          unprovedImports.add(proofKey);
+          unprovedImports.set(proofKey, scopeTraceOf(head) ?? null);
           if (observedImportProofs.has(proofKey)) clearIncompleteLookups();
         } else if (activeLookup) observedImportProofs.add(proofKey);
         return proven;
@@ -2274,7 +2381,9 @@ export function resolveRust(
 
     const imported = (l: GraphLink): Found => {
       const before = cycleCuts;
-      const found = resolveUse(l, rest, ns);
+      const found = rest.length
+        ? resolveUse(l, rest, ns)
+        : lookupWithReads(() => resolveUse(l, rest, ns));
       // With no remaining member path this IS the head-namespace lookup.
       // Reuse its exact result, including uncertainty, rather than recursively
       // repeating incomplete reexport chains while proving the same binding.
@@ -2702,8 +2811,7 @@ export function resolveRust(
         accessFrom,
       );
     if (name === "_") return empty();
-    const guard = JSON.stringify([
-      scopeMode,
+    const baselineGuard = JSON.stringify([
       macroIdentityProbe,
       libraryLookup
         ? [
@@ -2727,12 +2835,21 @@ export function resolveRust(
       accessFrom?.scope,
       loc.conditions,
     ]);
-    const cached = memo.get(guard);
-    if (cached) return cached;
+    const guard = baselineGuard;
+    const cacheKey = scopeMode === "baseline" ? guard : `${scopeMode}:${guard}`;
+    const baseline = memo.get(baselineGuard);
+    const cached =
+      scopeMode === "baseline" || (baseline && canReuseBaseline(baseline))
+        ? baseline
+        : retryMemo.get(cacheKey);
+    if (cached) {
+      recordReads(scopeTraceOf(cached));
+      return cached;
+    }
     const outer = activeLookup;
     if (outer && outer.seen !== seen) outer.trace.valid = false;
     if (seen.has(guard)) {
-      if (lookupFactsFinal) observedIncompleteGuards.add(guard);
+      if (lookupFactsFinal) observedIncompleteGuards.add(cacheKey);
       outer?.trace.required.add(guard);
       cycleCuts++;
       return empty(!accessFrom ? false : true);
@@ -2761,44 +2878,71 @@ export function resolveRust(
           helperBusy.size ? [...helperBusy].sort() : undefined,
         ])
       : undefined;
-    const reused =
+    const stateKey =
+      state === undefined || scopeMode === "baseline"
+        ? state
+        : `${scopeMode}:${state}`;
+    const baselineIncomplete =
       state === undefined
         ? undefined
         : incompleteLookups.get(state, seen, importExpansions);
+    const reused =
+      scopeMode === "baseline" ||
+      (baselineIncomplete && canReuseBaseline(baselineIncomplete.result))
+        ? baselineIncomplete
+        : stateKey === undefined
+          ? undefined
+          : incompleteLookups.get(stateKey, seen, importExpansions);
     if (reused) {
       outer?.trace.absorb(reused.trace, outer.expansion);
       if (reused.cut) cycleCuts++;
+      recordReads(scopeTraceOf(reused.result));
       return { ...reused.result };
     }
     const revision = lookupRevision;
     const cutsBefore = cycleCuts;
-    const next = new Set([...seen, guard]);
+    const next = new Set(seen).add(guard);
     const trace = state === undefined ? undefined : new LookupTrace();
     if (!trace && outer) outer.trace.valid = false;
     activeLookup = trace
       ? { trace, seen: next, expansion: undefined }
       : undefined;
     let result: Found;
+    const outerChanges = scopeChanges;
+    scopeChanges = 0;
+    const outerReads = scopeReads;
+    if (scopeAudit && lookupFactsFinal) scopeReads ??= rootScopeReads;
+    const readStart = scopeReads?.length ?? 0;
     try {
       result = lookupPath(name, loc, scope, ns, next, allowGlobs, accessFrom);
+      const scopeTrace = capturedScopeTrace(readStart);
+      if (scopeTrace) result = attachScopeTrace(result, scopeTrace);
     } finally {
+      scopeChanges |= outerChanges;
+      scopeReads = outerReads;
+      if (!outerReads) rootScopeReads.length = 0;
       activeLookup = outer;
     }
     if (result.complete) {
       // A complete entry preempts a previous incomplete result or cycle cut,
       // including when another saved lookup depended on that answer.
-      if (observedIncompleteGuards.has(guard)) clearIncompleteLookups();
-      memo.set(guard, result);
-    } else if (trace && state !== undefined) {
-      observedIncompleteGuards.add(guard);
+      if (observedIncompleteGuards.has(cacheKey)) clearIncompleteLookups();
+      if (scopeMode === "baseline") memo.set(guard, result);
+      else {
+        if (retryMemo.size >= 8192)
+          retryMemo.delete(retryMemo.keys().next().value!);
+        retryMemo.set(cacheKey, result);
+      }
+    } else if (trace && stateKey !== undefined) {
+      observedIncompleteGuards.add(cacheKey);
       // This guard is supplied by the lookup itself, and must be absent on
       // entry. Other observed guards still depend on the caller's stack.
       trace.required.delete(guard);
       trace.excluded.add(guard);
       outer?.trace.absorb(trace, outer.expansion);
       if (trace.fits() && revision === lookupRevision)
-        incompleteLookups.set(state, {
-          result: { ...result },
+        incompleteLookups.set(stateKey, {
+          result,
           cut: cycleCuts !== cutsBefore,
           trace,
         });
@@ -4015,9 +4159,14 @@ export function resolveRust(
     start: number;
     input?: MacroInput | undefined;
     attribute?: true;
+    block?: true;
   };
   const opaqueOrigins = new Map<string, OpaqueOrigin[]>();
   const scopeEffects = new Map<OpaqueOrigin, MacroScopeEffect>();
+  const scopeBounds = new Map<string, MacroScopeEffect>();
+  let scopeEffectsReady = false;
+  let preparingScopes = false;
+  const emptyMacroInput: MacroInput = { names: [] };
   function recordOpaqueOrigin(key: string, origin: OpaqueOrigin): void {
     const origins = opaqueOrigins.get(key) ?? [];
     origins.push(origin);
@@ -4030,18 +4179,98 @@ export function resolveRust(
     allowAssumption: boolean,
   ): boolean {
     const opaque = library ? libraryOpaque(key) : opaqueScopes.has(key);
-    if (!opaque || scopeMode === "baseline") return opaque;
-    if (hardOpaqueScopes.has(key)) return true;
+    if (!opaque) return false;
+    const hard = hardOpaqueScopes.has(key);
+    if (scopeReads && scopeAudit) {
+      let names = internedScopeReads.get(key);
+      if (!names) internedScopeReads.set(key, (names = new Map()));
+      const identity = `${Number(library)}${Number(allowAssumption)}:${libraryAttributeStart ?? ""}:${name}`;
+      let read = names.get(identity);
+      if (!read) {
+        read = {
+          key,
+          name,
+          library,
+          allowAssumption,
+          attributeStart: libraryAttributeStart,
+        };
+        names.set(identity, read);
+      }
+      scopeReads.push(read);
+    }
+    if (
+      !scopeAudit &&
+      !hard &&
+      !preparingScopes &&
+      scopeMode === "baseline" &&
+      lookupFactsFinal &&
+      scopeChanges !== 3 &&
+      opaqueOrigins.has(key)
+    ) {
+      if (!scopeEffectsReady) scopeChanges |= 3;
+      else if (
+        !scopeReadBlocked(
+          key,
+          name,
+          library,
+          allowAssumption,
+          libraryAttributeStart,
+          "assumed",
+        )
+      ) {
+        scopeChanges |= modeBit.assumed;
+        if (
+          !scopeReadBlocked(
+            key,
+            name,
+            library,
+            allowAssumption,
+            libraryAttributeStart,
+            "proven",
+          )
+        )
+          scopeChanges |= modeBit.proven;
+      }
+    }
+    return (
+      hard ||
+      scopeMode === "baseline" ||
+      scopeReadBlocked(
+        key,
+        name,
+        library,
+        allowAssumption,
+        libraryAttributeStart,
+        scopeMode,
+      )
+    );
+  }
+  function scopeReadBlocked(
+    key: string,
+    name: string,
+    library: boolean,
+    allowAssumption: boolean,
+    attributeStart: number | undefined,
+    mode: "proven" | "assumed",
+  ): boolean {
+    if (!library || attributeStart === undefined) {
+      const bound = scopeBounds.get(key);
+      return (
+        !bound ||
+        (bound.assumed && (mode !== "assumed" || !allowAssumption)) ||
+        bound.names.has(name.normalize())
+      );
+    }
     const origins = opaqueOrigins.get(key);
     if (!origins?.length) return true;
     const normalized = name.normalize();
     return origins.some((origin) => {
-      if (library && origin.attribute && origin.start === libraryAttributeStart)
+      if (library && origin.attribute && origin.start === attributeStart)
         return false;
       const effect = scopeEffects.get(origin);
       return (
         !effect ||
-        (effect.assumed && (scopeMode !== "assumed" || !allowAssumption)) ||
+        (effect.assumed && (mode !== "assumed" || !allowAssumption)) ||
         effect.names.has(normalized)
       );
     });
@@ -4065,7 +4294,12 @@ export function resolveRust(
           opaqueScopes.add(q);
           libraryOpaqueScopes.add(q);
           if (entry.start !== undefined)
-            recordOpaqueOrigin(q, { loc, ...entry, start: entry.start });
+            recordOpaqueOrigin(q, {
+              loc,
+              ...entry,
+              start: entry.start,
+              input: entry.input ?? emptyMacroInput,
+            });
           else hardOpaqueScopes.add(q);
           // A module-level macro cannot bind a function's locals; the
           // binding fallback applies only below a block statement (R1-K).
@@ -5465,8 +5699,17 @@ export function resolveRust(
     file: string,
     loc: Place,
   ): Found {
+    if (scopeMode !== "baseline")
+      return pathCallTargetsUncached(
+        name,
+        selfPath,
+        scope,
+        d,
+        targetName,
+        file,
+        loc,
+      );
     const key = JSON.stringify([
-      scopeMode,
       placeId(loc),
       file,
       scope,
@@ -5482,15 +5725,12 @@ export function resolveRust(
       str(d.implArgumentSyntax),
     ]);
     const cached = pathCallCache.get(key);
-    if (cached) return cached;
-    const answer = pathCallTargetsUncached(
-      name,
-      selfPath,
-      scope,
-      d,
-      targetName,
-      file,
-      loc,
+    if (cached) {
+      recordReads(scopeTraceOf(cached));
+      return cached;
+    }
+    const answer = lookupWithReads(() =>
+      pathCallTargetsUncached(name, selfPath, scope, d, targetName, file, loc),
     );
     pathCallCache.set(key, answer);
     return answer;
@@ -5508,12 +5748,12 @@ export function resolveRust(
     const callableFound = result.symbols.some((s) =>
       ["function", "method", "struct", "variant"].includes(s.kind),
     );
-    if (
+    const associatedFallback =
       scopeMode === "baseline" &&
       (!callableFound || !result.complete) &&
       !result.failedFiles?.length &&
-      name.includes("::")
-    ) {
+      name.includes("::");
+    if (associatedFallback) {
       const pathSyntax = selfPath
         ? name
         : (str(d.pathSyntax) || targetName).replace(/\br#/g, "");
@@ -5536,6 +5776,12 @@ export function resolveRust(
     }
     return {
       ...result,
+      // Ordinary call lookup can replace an empty value-path lookup with an
+      // associated candidate. Macro-scope retries use the written path, so
+      // they can still reach the library proof even with unchanged guards.
+      ...(associatedFallback && !callableFound
+        ? { associatedFallback: true }
+        : {}),
       symbols: result.symbols.filter(
         (s) =>
           s.kind === "function" ||
@@ -6171,7 +6417,8 @@ export function resolveRust(
     };
   }
   function prepareMacroScopeEffects() {
-    for (const origins of opaqueOrigins.values()) {
+    for (const [scope, origins] of opaqueOrigins) {
+      if (hardOpaqueScopes.has(scope)) continue;
       const producers = new Map<string, number>();
       for (const origin of origins) {
         const effect = macroScopeEffect(origin);
@@ -6193,7 +6440,181 @@ export function resolveRust(
         )
           scopeEffects.delete(origin);
       }
+      if (origins.every((origin) => scopeEffects.has(origin))) {
+        const effects = origins.map((origin) => scopeEffects.get(origin)!);
+        scopeBounds.set(
+          scope,
+          effects.length === 1
+            ? effects[0]!
+            : {
+                names: new Set(effects.flatMap((effect) => [...effect.names])),
+                ...(effects.some((effect) => effect.assumed)
+                  ? { assumed: true }
+                  : {}),
+              },
+        );
+      }
     }
+  }
+  function prepareIsolatedScopeEffects() {
+    // An identity probe must not populate ordinary lookup caches. In
+    // particular it can traverse a cfg-dependent import cycle in a different order.
+    const ordinary = {
+      memo,
+      unprovedImports,
+      incompleteLookups,
+      observedIncompleteGuards,
+      observedImportProofs,
+      lookupRevision,
+      cycleCuts,
+    };
+    memo = new Map();
+    unprovedImports = new Map();
+    incompleteLookups = new LookupMemo();
+    observedIncompleteGuards = new Set();
+    observedImportProofs = new Set();
+    preparingScopes = true;
+    try {
+      prepareMacroScopeEffects();
+      scopeEffectsReady = true;
+    } finally {
+      ({
+        memo,
+        unprovedImports,
+        incompleteLookups,
+        observedIncompleteGuards,
+        observedImportProofs,
+        lookupRevision,
+        cycleCuts,
+      } = ordinary);
+      preparingScopes = false;
+    }
+  }
+  function auditScopeBlockers(
+    reads: readonly ScopeRead[],
+  ): MacroScopeBlocker[] {
+    const blockers: MacroScopeBlocker[] = [];
+    const encountered = new Set<OpaqueOrigin>();
+    for (const {
+      key,
+      name,
+      library,
+      allowAssumption,
+      attributeStart,
+    } of reads) {
+      const origins = opaqueOrigins.get(key) ?? [];
+      const hard = hardOpaqueScopes.has(key);
+      if (!origins.length)
+        blockers.push({
+          kind: "other",
+          name: "unattributed scope",
+          construct: "layout or helper scope",
+        });
+      for (const origin of origins) {
+        if (
+          encountered.has(origin) ||
+          (library && origin.attribute && origin.start === attributeStart)
+        )
+          continue;
+        const effect = scopeEffects.get(origin);
+        if (
+          !hard &&
+          effect &&
+          (!effect.assumed || allowAssumption) &&
+          !effect.names.has(name.normalize())
+        )
+          continue;
+        encountered.add(origin);
+        blockers.push(...describeScopeOrigin(origin));
+      }
+    }
+    return blockers;
+  }
+  const auditedOrigins = new Map<OpaqueOrigin, MacroScopeBlocker[]>();
+  function auditMacroTarget(site: GraphLink, at: Place, scope: string) {
+    macroIdentityProbe = true;
+    try {
+      return libraryAt(site, data(site), at, scope);
+    } finally {
+      macroIdentityProbe = false;
+    }
+  }
+  function describeScopeOrigin(origin: OpaqueOrigin): MacroScopeBlocker[] {
+    const previous = auditedOrigins.get(origin);
+    if (previous) return previous;
+    const { loc, name, scope, start, attribute } = origin;
+    const sites = attributesByStart.get(`${loc.file}|${start}`) ?? [];
+    let result: MacroScopeBlocker[];
+    if (attribute && name === "derive") {
+      result = sites
+        .filter((site) =>
+          opaqueAttribute(
+            `#[derive(${site.targetName})]`,
+            siteLoc(site, loc),
+            scope,
+            conditionsFor(site),
+          ),
+        )
+        .map((site) => ({ kind: "derive", name: site.targetName }));
+      if (!result.length)
+        result = [
+          { kind: "other", name, construct: "unverified attribute binding" },
+        ];
+    } else if (attribute) {
+      const procAttribute = sites.some((site) => {
+        const at = siteLoc(site, loc);
+        const target = auditMacroTarget(site, at, scope);
+        if (target?.ecosystem === "cargo" && target.symbol) return true;
+        const local = find(site.targetName, at, scope, "macro");
+        return (
+          local.complete &&
+          local.symbols.length === 1 &&
+          data(local.symbols[0]!).semanticKind === "macro" &&
+          (
+            data(local.symbols[0]!).procMacroKinds as string[] | undefined
+          )?.includes("proc_macro_attribute")
+        );
+      });
+      result = procAttribute
+        ? [{ kind: "attribute", name }]
+        : [{ kind: "other", name, construct: "unverified attribute binding" }];
+    } else if (
+      name.replace(/^::/, "").split("::").at(-1) === "include" ||
+      /(?:^|::)automod::/.test(name)
+    ) {
+      result = [{ kind: "other", name, construct: "layout macro" }];
+    } else if (origin.block) {
+      result = [{ kind: "block", name }];
+    } else {
+      const site = macroSites.get(`${loc.file}|${start}`);
+      const at = site && siteLoc(site, loc);
+      const definition = site && at && definiteMacro(name, site, at, scope);
+      if (definition) {
+        const profile = profileOf(definition);
+        const construct = !profile?.readable
+          ? "unread macro arms"
+          : profile.scope.keywordFromInput
+            ? "identifier in a keyword position"
+            : profile.useNames.includes("*")
+              ? "wildcard or token-built import"
+              : profile.scope.opaque
+                ? "opaque transcriber"
+                : scopeEffects.has(origin)
+                  ? "possible emitted name"
+                  : profile.nested.length
+                    ? "unsettled nested expansion"
+                    : "unverified placement or input";
+        result = [{ kind: "local-item", name, construct, definition }];
+      } else {
+        const target = site && at && auditMacroTarget(site, at, scope);
+        result =
+          target?.ecosystem === "cargo"
+            ? [{ kind: "external-item", name }]
+            : [{ kind: "other", name, construct: "unverified macro identity" }];
+      }
+    }
+    auditedOrigins.set(origin, result);
+    return result;
   }
   libraryRefusals = [];
   function adjustBindings(l: GraphLink, d: Data): Data {
@@ -6210,6 +6631,18 @@ export function resolveRust(
       scopeMode === "baseline" ? [] : ownerPlace(l.file, str(d.scope));
     let scope = str(d.scope);
     for (;;) {
+      if (
+        scopeAudit &&
+        scopeReads &&
+        unsafeStandardScopes.has(`${l.file}|${scope}`)
+      )
+        for (const loc of ownerPlace(l.file, str(d.scope)))
+          scopeOpaque(
+            `${loc.crate.root}|${qualified(loc, scope)}`,
+            name,
+            false,
+            !hasScopeGlob(loc, scope),
+          );
       if (
         unsafeStandardScopes.has(`${l.file}|${scope}`) &&
         (scopeMode === "baseline" ||
@@ -6243,6 +6676,7 @@ export function resolveRust(
   function checkoutFound(l: GraphLink, d: Data): Found {
     let found: Found = empty();
     let note: Record<string, Json> | undefined;
+    let associatedFallback = false;
     if (l.kind === "contains")
       found = {
         symbols: [byLocalKey.get(`${l.file}|${str(d.key)}`)!].filter(Boolean),
@@ -6387,18 +6821,19 @@ export function resolveRust(
                   : ["types", "implements"].includes(l.kind)
                     ? "type"
                     : "import";
-          if (l.kind === "calls")
-            return guard(
-              pathCallTargets(
-                name,
-                selfPath,
-                scope,
-                d,
-                l.targetName,
-                l.file,
-                loc,
-              ),
+          if (l.kind === "calls") {
+            const call = pathCallTargets(
+              name,
+              selfPath,
+              scope,
+              d,
+              l.targetName,
+              l.file,
+              loc,
             );
+            associatedFallback ||= call.associatedFallback === true;
+            return guard(call);
+          }
           let result =
             l.kind === "imports"
               ? (() => {
@@ -6470,20 +6905,34 @@ export function resolveRust(
         reason: "conditional-binding-may-shadow-name",
       };
     }
-    return found;
+    return associatedFallback ? { ...found, associatedFallback: true } : found;
   }
   type ScopeRetry = {
     link: GraphLink;
     data: Data;
     libraryEligible: boolean;
     retry: boolean;
+    adjusted: boolean;
+    associatedFallback?: true;
+    trace?: ScopeTrace;
+    selected?: true;
   };
   const resolutions: LinkResolution[] = [];
   const librarySites: ScopeRetry[] = [];
+  if (!scopeAudit && !libraryAudit && opaqueOrigins.size)
+    prepareIsolatedScopeEffects();
   for (const l of ctx.links) {
     const original = data(l);
-    const d = adjustBindings(l, original);
-    let found = checkoutFound(l, d);
+    const selected = scopeAudit?.includes(l);
+    const adjustedBinding = selected
+      ? lookupReads(() => adjustBindings(l, original))
+      : { result: adjustBindings(l, original) };
+    const d = adjustedBinding.result;
+    const captured =
+      selected || (!d.method && !original.blocked)
+        ? lookupReads(() => checkoutFound(l, d))
+        : { result: checkoutFound(l, d) };
+    let found = captured.result;
     const libraryEligible =
       !found.symbols.length &&
       !found.failedFiles?.length &&
@@ -6510,8 +6959,25 @@ export function resolveRust(
                 : "";
             }
           })));
-    if ((libraryEligible && !uncertain) || retry)
-      librarySites.push({ link: l, data: d, libraryEligible, retry });
+    if ((libraryEligible && !uncertain) || retry || selected)
+      librarySites.push({
+        link: l,
+        data: d,
+        libraryEligible,
+        retry,
+        adjusted: d !== original,
+        ...(found.associatedFallback ? { associatedFallback: true } : {}),
+        ...(retry && captured.trace ? { trace: captured.trace } : {}),
+        ...(selected
+          ? {
+              selected: true,
+              trace: [
+                ...auditReads(adjustedBinding.trace),
+                ...auditReads(captured.trace),
+              ],
+            }
+          : {}),
+      });
     if (
       !found.symbols.length &&
       !found.failedFiles?.length &&
@@ -6570,6 +7036,8 @@ export function resolveRust(
       resolutions.push({ linkId: l.id, targetId: targets[0]!.id });
   }
   if (derived) macroBodyCalls(derived);
+  pathCallCache.clear();
+  typingCache.clear();
   const macroAssessments = new Map<OpaqueOrigin, BlockingMacro[]>();
   function assessMacro(origin: OpaqueOrigin): BlockingMacro[] {
     const cached = macroAssessments.get(origin);
@@ -6638,40 +7106,118 @@ export function resolveRust(
       macros,
     };
   }
-  function retryMacroScope(link: GraphLink): boolean {
-    if (link.kind !== "macros" && itemPresence(link).length) return false;
+  type MacroRetry = {
+    link: GraphLink;
+    ordinary: Data;
+    checkoutChanges: number;
+    libraryChanges: number;
+    libraryEligible: boolean;
+    fallbackHidLibrary: boolean;
+  };
+  function retryMacroScope({
+    link,
+    ordinary,
+    checkoutChanges,
+    libraryChanges,
+    libraryEligible,
+    fallbackHidLibrary,
+  }: MacroRetry): void {
+    if (link.kind !== "macros" && itemPresence(link).length) return;
     for (const mode of ["proven", "assumed"] as const) {
       scopeMode = mode;
       try {
         const d = adjustBindings(link, data(link));
-        const found = checkoutFound(link, d);
-        if (found.complete && found.symbols.length === 1) {
-          resolutions.push({ linkId: link.id, targetId: found.symbols[0]!.id });
-        } else if (
-          !found.symbols.length &&
-          !found.failedFiles?.length &&
-          !((d.conditions ?? []) as string[]).some((c) => c.includes("?")) &&
-          (link.kind !== "imports" || !itemPresence(link).length)
+        const bindingChanged =
+          !!d.blocked !== !!ordinary.blocked ||
+          !!d.conditionalBinding !== !!ordinary.conditionalBinding;
+        let canTryLibrary = libraryEligible;
+        if (
+          bindingChanged ||
+          checkoutChanges & modeBit[mode] ||
+          fallbackHidLibrary
         ) {
-          const library = libraryFor(link, d);
-          if (!library) continue;
-          resolutions.push({ linkId: link.id, library });
-        } else continue;
+          const found = checkoutFound(link, d);
+          if (found.complete && found.symbols.length === 1) {
+            resolutions.push({
+              linkId: link.id,
+              targetId: found.symbols[0]!.id,
+            });
+            markScopeResult?.(link, mode === "assumed");
+            return;
+          }
+          canTryLibrary =
+            !found.symbols.length &&
+            !found.failedFiles?.length &&
+            !((d.conditions ?? []) as string[]).some((c) => c.includes("?"));
+        }
+        // The ordinary library lookup already refused this site. When only
+        // the checkout guards changed, that refusal still applies.
+        if (
+          !canTryLibrary ||
+          (libraryEligible &&
+            !bindingChanged &&
+            !(libraryChanges & modeBit[mode]))
+        )
+          continue;
+        const library = libraryFor(link, d);
+        if (!library) continue;
+        resolutions.push({ linkId: link.id, library });
         markScopeResult?.(link, mode === "assumed");
-        return true;
+        return;
       } finally {
         scopeMode = "baseline";
       }
     }
-    return false;
   }
-  const scopeRetries: GraphLink[] = [];
-  for (const { link, data, libraryEligible, retry } of librarySites) {
+  const scopeRetries: MacroRetry[] = [];
+  const auditedSites: { link: GraphLink; reads: ScopeRead[] }[] = [];
+  for (const {
+    link,
+    data,
+    libraryEligible,
+    retry,
+    adjusted,
+    trace,
+    selected,
+    associatedFallback = false,
+  } of librarySites) {
     if (libraryAudit) libraryRefusals = [];
-    const library = libraryEligible ? libraryFor(link, data) : undefined;
+    const captured: {
+      result?: LibraryTarget | undefined;
+      trace?: ScopeTrace;
+    } = libraryEligible
+      ? retry || selected
+        ? lookupReads(() => libraryFor(link, data))
+        : { result: libraryFor(link, data) }
+      : {};
+    const library = captured.result;
+    const checkoutChanges = retryBits(trace);
+    const libraryChanges = retryBits(captured.trace);
+    // An empty ordinary call result already allowed the library lookup.
+    // Skipping the associated fallback matters by itself only when its
+    // checkout candidates prevented that lookup.
+    const fallbackHidLibrary = associatedFallback && !libraryEligible;
     if (library) {
       if (!uncertain) resolutions.push({ linkId: link.id, library });
-    } else if (retry && !libraryAudit) scopeRetries.push(link);
+    } else if (
+      !scopeAudit &&
+      retry &&
+      !libraryAudit &&
+      (checkoutChanges || libraryChanges || adjusted || fallbackHidLibrary)
+    )
+      scopeRetries.push({
+        link,
+        ordinary: data,
+        checkoutChanges,
+        libraryChanges,
+        libraryEligible,
+        fallbackHidLibrary,
+      });
+    if (selected)
+      auditedSites.push({
+        link,
+        reads: [...auditReads(trace), ...auditReads(captured.trace)],
+      });
     if (libraryAudit) {
       const after = libraryRefusals;
       libraryRefusals = [];
@@ -6692,11 +7238,18 @@ export function resolveRust(
       }
     }
   }
-  if (scopeRetries.length) {
-    // Finish ordinary lookup before macro identity probes can populate its
-    // caches through a different traversal of a conditional import cycle.
+  librarySites.length = 0;
+  if (scopeAudit && auditedSites.length) {
     prepareMacroScopeEffects();
-    for (const link of scopeRetries) retryMacroScope(link);
+    for (const { link, reads } of auditedSites)
+      scopeAudit.blocked(link, auditScopeBlockers(reads));
+  }
+  if (scopeRetries.length) {
+    for (const [key, found] of memo)
+      if (found.scopeChanges === 3) memo.delete(key);
+    for (const [key, reads] of unprovedImports)
+      if (reads === 3) unprovedImports.delete(key);
+    for (const retry of scopeRetries) retryMacroScope(retry);
   }
   return resolutions;
 

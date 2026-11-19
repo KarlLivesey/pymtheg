@@ -6,20 +6,33 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
 const scratch = process.env.PYM_SCRATCH;
+const exact = process.argv.includes("--exact");
 const seed = "c12-rust-macro-scope-2026-11-19";
 const read = (name) => JSON.parse(readFileSync(join(scratch, name), "utf8"));
 const main = new Map(
-  read("main-run.json").repos.map((repo) => [repo.id, repo]),
+  read(process.env.C12_BASELINE_RUN ?? "main-run.json").repos.map((repo) => [
+    repo.id,
+    repo,
+  ]),
 );
-const checkout = (repo) => join(scratch, repo.attempt, "checkout");
+const checkout = (repo, baseline = false) =>
+  join(
+    (baseline
+      ? process.env.C12_BASELINE_WORK
+      : process.env.C12_CANDIDATE_WORK) ?? scratch,
+    repo.attempt,
+    "checkout",
+  );
 const bump = (obj, key) => (obj[key] = (obj[key] ?? 0) + 1);
 const sortKeys = (a, b) => (a.rank < b.rank ? -1 : a.rank > b.rank ? 1 : 0);
 const rankOf = (parts) =>
-  createHash("sha256").update(JSON.stringify([seed, ...parts])).digest("hex");
+  createHash("sha256")
+    .update(JSON.stringify([seed, ...parts]))
+    .digest("hex");
 
-function graph(repo) {
+function graph(repo, baseline = false) {
   const db = new DatabaseSync(
-    join(checkout(repo), ".pymtheg/rebuildable/graph.sqlite"),
+    join(checkout(repo, baseline), ".pymtheg/rebuildable/graph.sqlite"),
     { readOnly: true },
   );
   const symbols = new Map(
@@ -41,8 +54,11 @@ function graph(repo) {
   const candidates = db.prepare(
     "SELECT symbol FROM graph_candidates WHERE link=?",
   );
+  const libraryCandidates =
+    db.prepare(`SELECT ecosystem,unit,symbol,version,version_source,evidence
+    FROM graph_library_targets WHERE link=? AND role='candidate' ORDER BY ecosystem,unit,symbol,version,version_source,evidence`);
   const file = db.prepare("SELECT body FROM graph_files WHERE path=?");
-  return { db, symbols, links, candidates, file };
+  return { db, symbols, links, candidates, libraryCandidates, file };
 }
 
 function reason(data) {
@@ -93,11 +109,14 @@ function site(row, store) {
         ]
       : row.target
         ? store.symbols.get(row.target)
-        : row.resolution === "ambiguous" && receiver
-          ? store.candidates
-              .all(row.id)
-              .map(({ symbol }) => store.symbols.get(symbol))
-              .sort()
+        : row.resolution === "ambiguous" && (receiver || exact)
+          ? [
+              store.candidates
+                .all(row.id)
+                .map(({ symbol }) => store.symbols.get(symbol))
+                .sort(),
+              ...(exact ? [store.libraryCandidates.all(row.id)] : []),
+            ]
           : null,
   );
   return {
@@ -110,11 +129,12 @@ function site(row, store) {
     outcome: row.resolution,
     assumed: data.assumes?.includes("rust-external-macro-name") ?? false,
     reason: reason(data),
+    ...(exact ? { metadata: JSON.stringify(data) } : {}),
   };
 }
 
 function compare(previous, current) {
-  const a = graph(previous),
+  const a = graph(previous, true),
     b = graph(current);
   try {
     const counters = {},
@@ -145,7 +165,10 @@ function compare(previous, current) {
         old = oldSites.get(s.key);
       const matching =
         old?.findIndex(
-          (p) => p.outcome === s.outcome && p.target === s.target,
+          (p) =>
+            p.outcome === s.outcome &&
+            p.target === s.target &&
+            p.metadata === s.metadata,
         ) ?? -1;
       const prior = old?.splice(Math.max(0, matching), 1)[0];
       if (old && !old.length) oldSites.delete(s.key);
@@ -163,11 +186,11 @@ function compare(previous, current) {
         if (prior.level2) bump(counters, "sharedMainLevel2");
         if (s.level2) bump(counters, "sharedIncludedLevel2");
         if (s.level2 && !s.assumed) bump(counters, "sharedProvenLevel2");
-        if ((prior.definite || prior.receiver) && matching < 0)
+        if ((exact || prior.definite || prior.receiver) && matching < 0)
           changed.push({
             key: s.key,
-            before: [prior.outcome, prior.target],
-            after: [s.outcome, s.target],
+            before: [prior.outcome, prior.target, prior.metadata],
+            after: [s.outcome, s.target, s.metadata],
           });
       } else bump(counters, "addedSites");
       if (!s.level2 || prior?.level2) continue;
@@ -232,7 +255,7 @@ function compare(previous, current) {
     for (const [key, rows] of oldSites)
       for (const row of rows) {
         bump(counters, "removedSites");
-        if (row.definite || row.receiver)
+        if (exact || row.definite || row.receiver)
           changed.push({ key, before: [row.outcome, row.target], after: null });
       }
     return {
@@ -250,7 +273,9 @@ function compare(previous, current) {
   }
 }
 
-const results = read("candidate-run.json").repos.map((repo) => {
+const results = read(
+  process.env.C12_CANDIDATE_RUN ?? "candidate-run.json",
+).repos.map((repo) => {
   const previous = main.get(repo.id);
   if (
     repo.commit !== previous?.commit ||
@@ -280,3 +305,16 @@ writeFileSync(
   join(scratch, "compare.json"),
   JSON.stringify({ seed, results }, null, 2),
 );
+if (
+  exact &&
+  results.some(
+    (row) =>
+      !row.counters ||
+      row.changed.length ||
+      row.missingSymbols.length ||
+      row.newSymbols.length ||
+      row.counters.addedSites ||
+      row.counters.removedSites,
+  )
+)
+  process.exitCode = 1;

@@ -330,7 +330,7 @@ async function createHelper(): Promise<Helper> {
         name: string;
         scope: string;
         start: number;
-        input: MacroInput;
+        input?: MacroInput;
         block?: true;
       }[] = [];
       // Every statement-level invocation is a candidate: the non-conservative
@@ -2674,7 +2674,9 @@ async function createHelper(): Promise<Helper> {
                 name: compact(m!.text),
                 scope,
                 start: m!.startIndex,
-                input,
+                ...(input.names.length || "mayIntroduceUnknownNames" in input
+                  ? { input }
+                  : {}),
                 // Only a block statement can bind locals that the
                 // conservative binding facts (stdFallback*) describe.
                 ...(container?.type === "block" ? { block: true } : {}),

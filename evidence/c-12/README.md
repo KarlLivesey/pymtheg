@@ -126,10 +126,52 @@ including 17 with a proof. Serde's cold wall time rose 15–27% and C-12
 recovered zero links. Serde completed cold, warm, and query steps in 88.2
 seconds.
 
-A cold Serde CPU profile of the pre-C-10 build attributed 14.8 sampled seconds to
-`retryMacroScope` across the two Rust graph phases. Macro input and body
-profiling accounted for 0.26 sampled seconds. The cost comes primarily from
-repeating lookups, even on a pin where those retries recover no targets.
+A cold Serde CPU profile of the pre-C-10 build attributed 14.8 sampled
+seconds to `retryMacroScope` across the two Rust graph phases. Macro input
+and body profiling accounted for 0.26 sampled seconds.
+
+### Follow-up timing
+
+For each pin, the same memory-backed session ran main `5ec4baa`, the
+follow-up, and then main again, with matching project IDs. Cells show
+cold wall time and peak RSS.
+
+| Pin | Main run 1 | Follow-up | Main run 2 |
+| --- | ---: | ---: | ---: |
+| Helix | 167.1 s / 1,214 MiB | 217.6 s / 1,191 MiB | 205.5 s / 1,077 MiB |
+| Serde | 77.2 s / 847 MiB | 66.7 s / 896 MiB | 85.7 s / 844 MiB |
+
+Compared with the mean of its main controls, Serde used 18.1% less wall
+time and 5.9% more peak RSS. Helix used 16.8% more wall time and 4.0% more
+peak RSS. Helix's two main wall times differed by 38.3 seconds. The full
+sweep processes used 102.7, 107.5, and 96.2 seconds of user CPU and
+87.6, 133.0, and 121.9 seconds of system CPU, in run order.
+
+### Exact comparison after the cost fix
+
+The follow-up uses the ordinary lookup cache when its consulted macro
+guards cannot change. It tracks the checkout and library guards separately
+and repeats only the lookup whose result can change. Qualified call
+lookups still reconsider paths hidden by the ordinary associated-call
+fallback. Scope preparation uses isolated caches so that its import probes
+preserve the ordinary traversal.
+
+The `--exact` comparison with `ca9d20d` matched the full Rust link set in
+each of the following pins. It checks site and symbol keys, resolution
+classes, checkout and library targets, candidates, and link metadata
+including stored assumptions. Every field matched. [Comparison script](compare.mjs)
+
+| Pin | Matched sites | Matched Level 2 links |
+| --- | ---: | ---: |
+| Helix | 90,583 | 39,270 |
+| Ratatui | 60,424 | 23,678 |
+| Serde | 30,714 | 8,280 |
+| **Total** | **181,721** | **71,228** |
+
+The [remaining macro opacity census](remaining.md) attributes all 166,999
+stored unresolved links with the macro-scope diagnostic.
+The follow-up passed the build, type check, format check, all 3,062 tests
+on memory-backed scratch, and all 19 sweep tests.
 
 ## Coverage plan
 

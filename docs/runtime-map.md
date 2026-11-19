@@ -1651,11 +1651,13 @@ branch, tag, or revision selector. For a vendored Git package, the lockfile
 must prove a checkout dependency edge with a precise commit. An applicable
 replacement without a unique captured package stays unresolved.
 
-Module 33 records invocation identifiers and declarative macro name bounds
-from the Rust parse. The resolver memoizes the scope effect of each opaque
-origin. It tries the existing checkout and library lookup first, then retries
-blocked lexical paths with the proven scope bounds, then with the external
-macro assumption. Each lookup mode has a separate cache key. Successful links
+Module 34 records invocation identifiers and declarative macro name bounds
+from the Rust parse. Empty function-like inputs are implicit. The resolver
+memoizes scope effects and runs the ordinary checkout and library lookups
+first. A macro-blocked lookup can retry with proven scope bounds and then
+with the external macro assumption. A pair of flags records which bounds
+can change the visited guards. Stable entries share the ordinary lookup
+cache. Successful links
 from the last pass carry `data.assumes: ["rust-external-macro-name"]` in the
 analyzed facts that the graph stores. The identity and resolution shapes stay
 the same, so library queries and ordinary graph queries can return those

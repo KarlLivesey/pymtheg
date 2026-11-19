@@ -1,5 +1,24 @@
 // SPDX-License-Identifier: MIT
 import { consumingBuiltins, formatStandardMacros } from "./macro-rules.js";
+import type { GraphLink, GraphSymbol } from "../../types.js";
+
+export type MacroScopeBlocker = {
+  kind:
+    | "derive"
+    | "attribute"
+    | "external-item"
+    | "local-item"
+    | "block"
+    | "other";
+  name: string;
+  construct?: string;
+  definition?: GraphSymbol;
+};
+
+export type MacroScopeAudit = {
+  includes(link: GraphLink): boolean;
+  blocked(link: GraphLink, blockers: readonly MacroScopeBlocker[]): void;
+};
 
 export const macroScopeAssumption = "rust-external-macro-name";
 
