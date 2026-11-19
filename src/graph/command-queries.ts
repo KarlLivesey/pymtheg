@@ -3,6 +3,7 @@ import { possibleCalls, type PossibleCall } from "./command-possible.js";
 import type { SqliteGraphStore } from "./store.js";
 import { GraphLocations, type Located } from "./command-locations.js";
 import type { GraphLink, GraphSymbol } from "./types.js";
+import { stdDeclaredBy } from "./languages/go/stdlib.js";
 
 /**
  * Whether the Go toolchain route decided a link: a parsed link it upgraded,
@@ -248,16 +249,28 @@ export function queryGraph(
     const [unit, librarySymbol] = args as [string, string | undefined];
     if (!unit || (librarySymbol !== undefined && !librarySymbol))
       throw Error("Expected a library unit and an optional symbol");
-    const found = store.libraryUses(unit, librarySymbol, limit + 1);
+    // A Go standard-library member declared by an unexported type (C-17:
+    // `testing T.Fatal` is `common.Fatal`): links are stored under that
+    // declaring owner, so they are looked up there and the owner is shown.
+    const declaredBy =
+      // Only where the graph holds Go standard-library targets of that
+      // unit: another ecosystem's `testing` is queried as written, and the
+      // table is not read.
+      librarySymbol === undefined || !store.hasLibraryUnit(unit, "go-std")
+        ? undefined
+        : stdDeclaredBy(unit, librarySymbol);
+    const queried = declaredBy ?? { unit, symbol: librarySymbol };
+    const found = store.libraryUses(queried.unit, queried.symbol, limit + 1);
     return result(
       {
         library: {
           unit,
           ...(librarySymbol === undefined ? {} : { symbol: librarySymbol }),
           place: "outside-project",
+          ...(declaredBy ? { declaredBy } : {}),
         },
         links: links(found.slice(0, limit)),
-        classCounts: store.libraryUseCounts(unit, librarySymbol),
+        classCounts: store.libraryUseCounts(queried.unit, queried.symbol),
         limit,
       },
       found.length > limit,

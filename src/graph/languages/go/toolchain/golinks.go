@@ -38,7 +38,8 @@
 //	C  file funEnd nameEnd cat class defFile defOff pkg name member   call expression
 //	U  file identEnd kind class defFile defOff pkg name member        identifier use (not local, not universe)
 //	   member (C-14): "=" not a selection; Owner.Name a field or concrete method
-//	   with its declaring named type; "?" no named owner, or an interface method
+//	   with its declaring named type (C-17: a standard-library interface's
+//	   method too, and error.Error); "?" no named owner, or another interface method
 //	M  file pathEnd dir                      import of a package whose directory is in the project
 //	FP sha256                                with -fingerprint only: every input of the facts (see fingerprint)
 //	D  file funEnd ext defFile:defOff,...    interface call: main-module methods reached ("?": incomplete, a generic
@@ -1124,7 +1125,8 @@ func classify(info *types.Info, call *ast.CallExpr) (string, types.Object, types
 // a dot import); for a field or method selection, Owner.Name with the
 // declaring named type go/types selected (after promotion through embedded
 // fields); "?" when that owner is not a named type of the object's own
-// package, or is an interface (a call through it is dispatch).
+// package, or is an interface outside the standard library (a call through
+// it is dispatch). C-17: error.Error for the predeclared error interface.
 func memberOf(info *types.Info, e ast.Expr, obj types.Object) string {
 	sel, ok := e.(*ast.SelectorExpr)
 	if !ok {
@@ -1156,8 +1158,24 @@ func memberOf(info *types.Info, e ast.Expr, obj types.Object) string {
 		return "?"
 	}
 	named, ok := types.Unalias(owner).(*types.Named)
-	if !ok || types.IsInterface(named) || named.Obj().Pkg() == nil || named.Obj().Pkg() != obj.Pkg() {
+	if !ok {
 		return "?"
+	}
+	// C-17: a method of the predeclared error interface, and a method of a
+	// standard-library interface, name the interface that declares them.
+	if named.Obj().Pkg() == nil {
+		if named.Obj().Name() == "error" && obj.Pkg() == nil {
+			return "error." + obj.Name()
+		}
+		return "?"
+	}
+	if named.Obj().Pkg() != obj.Pkg() {
+		return "?"
+	}
+	if types.IsInterface(named) {
+		if f, _ := pos(named.Obj().Pos()); class(f) != "std" {
+			return "?"
+		}
 	}
 	return named.Origin().Obj().Name() + "." + obj.Name()
 }

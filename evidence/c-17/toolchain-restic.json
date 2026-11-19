@@ -1,0 +1,13 @@
+{
+ "project": "restic/restic",
+ "toolchainNotes": [],
+ "tableResolved": 4018,
+ "goTypesDecided": 1261,
+ "agree": 1261,
+ "disagreements": [],
+ "notDecidedByGoTypes": {
+  "same table answer (no go/types fact for the link)": 2757
+ },
+ "toolchainOwnerWhereTableNone": 78,
+ "disagreementCount": 0
+}
