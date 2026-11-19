@@ -4,7 +4,7 @@
 # candidate run: the file's import line that binds the qualifier, any local
 # or package-level declaration of the qualifier in the file, the go.mod
 # require line for a dependency, and `go doc` for a standard-library symbol.
-# Usage: verify-sample.sh SCRATCH RUN.json sample.tsv
+# Usage: verify-sample.sh SCRATCH RUN.json sample.tsv ("-" marks an empty field)
 set -u
 scratch="$1"; run="$2"; sample="$3"
 while IFS=$'\t' read -r repo file line qualifier unit symbol version; do
@@ -12,6 +12,7 @@ while IFS=$'\t' read -r repo file line qualifier unit symbol version; do
   root="$scratch/$attempt/checkout"
   echo "== $repo $file:$line -> $unit $symbol $version"
   sed -n "${line}p" "$root/$file" | sed 's/^[[:space:]]*/   source: /'
+  [ "$qualifier" = - ] && qualifier=""
   if [ -n "$qualifier" ]; then
     grep -n -E "^[[:space:]]*(import[[:space:]]+)?($qualifier[[:space:]]+)?\"$unit\"" "$root/$file" | sed 's/^/   import: /'
     grep -n -E "(^|[^.[:alnum:]_])$qualifier[[:space:]]*(:=|,[^=]*:=)|^(var|func|const|type)[[:space:]]+$qualifier\b" "$root/$file" | head -3 | sed 's/^/   shadow?: /'

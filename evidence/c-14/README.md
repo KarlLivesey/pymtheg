@@ -1,5 +1,8 @@
 # C-14 evidence
 
+Figures are those of the review head (after the six review points and the
+merge of main with C-11); the first head's are in the PR history.
+
 Items `go-external-targets`, `go-external-import`, `go-external-result`,
 `go-external-fields`, and the Go builtins decision. Change note:
 `docs/changes/C-14.md`.
@@ -7,10 +10,10 @@ Items `go-external-targets`, `go-external-import`, `go-external-result`,
 All runs used the sweep runner (`scripts/sweep/run.mjs --local-build`) on
 the 20 Go repositories of `sweep/repos.json` at their pinned commits, once
 with a build of `main` at `5ec4baa` (**base**) and once with this branch
-(**candidate**), in one scratch folder on the same storage, three workers
+(**candidate**, the review head's Go code), in one scratch folder on the same storage, three workers
 each. Every repository finished in both. Coverage exports use the base
 build's readers for both (`coverage-base.json.gz`,
-`coverage-candidate.json.gz`); scoreboards are `coverage.mjs` over those
+`coverage-cand.json.gz`); scoreboards are `coverage.mjs` over those
 exports alone (`scoreboard-base.md`, `scoreboard-candidate.md`).
 
 ## Level 2, Go
@@ -20,24 +23,24 @@ exports alone (`scoreboard-base.md`, `scoreboard-candidate.md`).
 | charmbracelet/bubbletea | 12,533 | 71.84% | 81.33% |
 | cilium/ebpf | 50,239 | 78.13% | 87.15% |
 | cli/cli | 218,286 | 75.60% | 84.85% |
-| cockroachdb/pebble | 214,346 | 76.41% | 84.99% |
+| cockroachdb/pebble | 214,346 | 76.41% | 85.00% |
 | etcd-io/bbolt | 16,898 | 76.12% | 84.75% |
 | evanw/esbuild | 118,250 | 87.96% | 90.93% |
 | gin-gonic/gin | 21,081 | 69.92% | 83.01% |
 | go-task/task | 18,984 | 74.65% | 83.43% |
 | gofiber/fiber | 143,673 | 66.17% | 78.12% |
-| golang/tools | 253,517 | 76.15% | 81.07% |
+| golang/tools | 253,517 | 76.15% | 81.02% |
 | junegunn/fzf | 25,947 | 77.94% | 85.74% |
 | labstack/echo | 31,880 | 74.75% | 84.69% |
 | mattn/go-sqlite3 | 9,650 | 56.00% | 59.58% |
 | pocketbase/pocketbase | 197,148 | 56.88% | 58.92% |
 | protocolbuffers/protobuf-go | 217,087 | 84.87% | 86.83% |
-| restic/restic | 64,165 | 79.17% | 84.37% |
+| restic/restic | 64,165 | 79.17% | 84.42% |
 | samber/lo | 29,697 | 62.74% | 73.65% |
 | spf13/cobra | 8,886 | 78.46% | 82.20% |
 | stretchr/testify | 19,868 | 79.38% | 84.44% |
 | wagoodman/dive | 14,901 | 69.23% | 81.91% |
-| **Go module, 20 pins** | 1,512,591 Go links | **77.81%** | **84.88%** |
+| **Go module, 20 pins** | 1,512,998 Go links | **77.81%** | **84.87%** |
 
 Repository rows count every module of the checkout (pocketbase, esbuild and
 cli/cli also hold JavaScript or TypeScript, unchanged here). The Go module
@@ -45,26 +48,32 @@ row counts Go links only; the same figure results with the SW-3 base laid
 under (23 graphs with Go code). The base reproduces C-8's final 77.81%.
 
 **All sites and like-for-like** are the same figure: no site was added or
-removed (1,512,591 Go links in both runs).
+removed (1,512,998 stored Go links at 1,512,591 sites in both runs; a site
+can hold several rows, such as distinct `implements` links).
 
-**Where the +7.07 pp comes from** (`site-comparison.json`):
+**Where the +7.06 pp comes from** (`site-comparison.json`):
 
 | | Links |
 | --- | ---: |
 | Builtin calls (`declared-builtin`, new credit by the owner's decision) | 48,840 |
-| Package-qualified names newly credited (mostly unnamed dependency imports: testify, cobra, cockroachdb/errors, …) | 58,115 |
-| Package-qualified names the reconstruction already credited, now stored | 153,868 |
-| Import units (`import-path`, level 1 only) | 32,563 |
-| Members of library-typed values, unresolved with `library-member-unproven` | 111,415 |
+| Package-qualified names newly credited (mostly unnamed dependency imports: testify, cobra, cockroachdb/errors, …) | 58,152 |
+| Package-qualified names the reconstruction already credited, now stored | 153,749 |
+| Import units (`import-path`, level 1 only) | 32,531 |
+| Members of library-typed values, unresolved with `library-member-unproven` | 111,406 |
 
-Library links by evidence: `import-binding` go-std 152,853 and go 59,130;
-`import-path` go-std 26,966 and go 5,597; builtins 48,840. 293,386 in all,
-260,823 with a symbol.
+Library links by evidence: `import-binding` go-std 152,734 and go 59,167;
+`import-path` go-std 26,936 and go 5,595; builtins 48,840. 293,272 in all,
+260,741 with a symbol. No site gets a library candidate set on the 20 pins
+(two unnamed imports that may declare one qualifier do not occur there).
 
 ## Nothing lost, nothing withheld
 
-`compare.mjs` compares every Go link (keyed by file, kind, range and target
-name) and every Go symbol (file, kind, identity) of all 20 pins:
+`compare.mjs` compares every stored Go row and every Go symbol (file, kind,
+identity) of all 20 pins. A row is identified by its site (file, kind,
+range, target name) and its relation (the checkout target, the candidate
+set's members by name, or the library targets); several rows at one site
+are matched as a multiset. (The first head keyed by site alone and so
+reported 1,512,591 rows; the stores hold 1,512,998.)
 
 | | |
 | --- | ---: |
@@ -73,16 +82,21 @@ name) and every Go symbol (file, kind, identity) of all 20 pins:
 | Candidate sets changed | 0 |
 | Sites added or removed | 0 |
 | Symbols missing | 0 of 200,941 |
+| Stored Go rows before → after | 1,512,998 → 1,512,998 |
+| Sites before → after | 1,512,591 → 1,512,591 |
 | Sites main's reconstruction credited at level 2 | 153,868 |
-| … now level 2 (stored) | 153,868 |
-| … withheld | **0** |
+| … now level 2 (stored) | 153,749 |
+| … withheld | **119** |
 
 The reconstruction replica in `compare.mjs` (a selector or qualified type
 through an explicitly named import, or an unnamed standard-library import,
 of an import left unresolved) counts 153,868 sites, exactly the export's own
 `import-binding` level 2 count for the base (`scoreboard-base.md`, recorded
-identities by encoding). Import units go from 32,530 reconstructed to
-32,563 stored. The chunk adds no symbols, so no requirement link can change
+identities by encoding). All 119 withheld are golang/tools
+`go/ssa/interp/testdata/*.go` imports of `fmt`, `reflect`, `strings` and
+`errors`, which that test harness supplies from the checkout's own
+`testdata/src/<path>` (review point 4): checkout code, not the standard
+library. Import units go from 32,530 reconstructed to 32,531 stored. The chunk adds no symbols, so no requirement link can change
 anchor; symbol keys are unchanged on all 20 pins.
 
 ## Hand-check: 40 library links
@@ -117,10 +131,12 @@ restic with this branch's build, source-only and with
 
 | | Source-only (default) | Toolchain on |
 | --- | ---: | ---: |
-| Go level 2 | 84.36% | **91.08%** |
+| Go level 2 | 84.40% | **91.08%** |
 | `declaring-owner` (std / dependency) | 0 | 2,899 / 720 |
-| Source-only library targets the toolchain also decided | | 13,903 |
-| … agreeing on unit and symbol | | 13,903 (**0 disagreements**) |
+| Sites where both routes record a library target | | 13,930 |
+| … decided independently by go/types (recorded toolchain provenance) | | 10,524 |
+| … of those agreeing on unit and symbol | | 10,524 (**0 disagreements**) |
+| … source-only decision on both routes (no go/types fact for the link) | | 3,406 |
 | Source-only library targets the toolchain put in the checkout | | 0 |
 
 Of the 4,765 links source-only marks `library-member-unproven`, the
@@ -134,7 +150,7 @@ route replaces with its verified pairs (W3-L).
 packages, 1,169 exported named types, 3,236 declared and 362 promoted
 exported methods, 2,525 exported fields; about 200 KB as tab-separated
 text, one table per Go release. On restic 59% of the member-reason links
-are standard-library members (2,806 of 4,765); applied to the 111,415
+are standard-library members (2,806 of 4,765); applied to the 111,406
 member-reason links of the 20 pins that is at most about 66,000 links
 (about 4.4 pp), and only where the receiver's type is written in the
 checkout: a library call's result would also need the functions' result
@@ -145,7 +161,8 @@ dependency, opt-in only.
 
 `timing.sh`: cold index, builds interleaved in one session, project and
 store in memory-backed storage (the shared machine's disk swung wall times
-by 50%). Observations:
+by 50%). Measured at the first head; the review changes touch import
+binding and module layout only. Observations:
 
 | Repository | main user CPU (s) | branch user CPU (s) | main wall (s) | branch wall (s) | Peak RSS |
 | --- | ---: | ---: | ---: | ---: | --- |
@@ -155,15 +172,15 @@ by 50%). Observations:
 User CPU is about +8% on restic and +16% on bbolt; wall time is within the
 noise. A CPU profile of bbolt (both builds) puts the difference in the
 store's link writes (`insertLink` 4.0 → 6.9 s of samples, new
-`insertLibraries` 0.8 s): 293,386 Go links now carry a library target row
+`insertLibraries` 0.8 s): about 293,000 Go links now carry a library target row
 and a larger body. The Go resolver's own functions do not appear among the
-top entries. What it buys: +7.07 pp Go level 2 and `graph uses` for Go.
+top entries. What it buys: +7.06 pp Go level 2 and `graph uses` for Go.
 
 ## Files
 
 - `compare.mjs`, `site-comparison.json`: every link and symbol, both runs.
 - `scoreboard-base.md`, `scoreboard-candidate.md`, `coverage-base.json.gz`,
-  `coverage-candidate.json.gz`.
+  `coverage-cand.json.gz`.
 - `sample.tsv`, `verify-sample.sh`, `verify-sample.txt`: the hand-check.
 - `toolchain-restic.mjs`, `toolchain-restic.json`.
 - `stdtable.go`, `stdtable.txt`.

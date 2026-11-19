@@ -1,16 +1,13 @@
-graph resolve typescript: 0/559
-graph resolve typescript: 559/559
-graph complete: 559/559
 {
  "sourceOnly": {
   "links": 63836,
   "resolved": 42168,
-  "librarySymbol": 11684,
+  "librarySymbol": 11711,
   "libraryUnit": 2219,
-  "level2": 0.8435992230089605,
+  "level2": 0.8440221818409674,
   "byEvidence": {
    "import-path:go": 250,
-   "import-binding:go": 1128,
+   "import-binding:go": 1155,
    "import-path:go-std": 1969,
    "import-binding:go-std": 8317,
    "declared-builtin:go-std": 2239
@@ -33,8 +30,10 @@ graph complete: 559/559
   }
  },
  "toolchainNotes": [],
- "bothLibrary": 13903,
- "agree": 13903,
+ "bothLibrary": 13930,
+ "agree": 13930,
+ "toolchainDecided": 10524,
+ "agreeToolchainDecided": 10524,
  "disagreements": [],
  "sourceOnlyLibraryWithoutToolchainLibrary": {},
  "toolchainOwnerWhereSourceUnresolved": {

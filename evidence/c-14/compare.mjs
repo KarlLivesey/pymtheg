@@ -92,7 +92,7 @@ function load(record) {
         ? [
             ...candidates.all(row.id).map((item) => symbols.get(item.symbol)),
             ...(libraryCandidates?.all(row.id) ?? []).map((item) => `lib:${item.unit}:${item.symbol}`),
-          ]
+          ].sort()
         : [];
     link.relation = link.target
       ? `target:${link.target}`
@@ -231,7 +231,7 @@ for (const [id, cand] of [...candidate].sort()) {
       else {
         row.reconstructedWithheld++;
         const link = news[0];
-        const reason = `${link.resolution}:${link.data.uncertainty ?? link.data.reason ?? link.data.open?.reason ?? "-"}:${path.split("/")[0].includes(".") ? "dependency" : "std"}`;
+        const reason = `${link.resolution}:${link.data.uncertainty ?? link.data.reason ?? link.data.open?.reason ?? "-"}:${path.split("/")[0].includes(".") ? "dependency" : "std"}${link.file.includes("testdata/") ? ":under-testdata" : ""}`;
         add(out.withheld, reason);
         if (out.withheldExamples.length < 60)
           out.withheldExamples.push({ id, file: link.file, kind: link.kind, name: link.name, path, ...lineOf(cand, link.file, link.start), now: link.relation });

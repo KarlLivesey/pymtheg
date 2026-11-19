@@ -1,40 +1,40 @@
 cockroachdb/pebble	db_test.go	987	require	github.com/stretchr/testify/require	NoError	v1.9.0
-cli/cli	git/client_test.go	1737		builtin	append	
+cli/cli	git/client_test.go	1737	-	builtin	append	-
 cli/cli	pkg/cmd/run/download/http_test.go	92	require	github.com/stretchr/testify/require	NoError	v1.12.1
-cli/cli	script/ghmock/gitcmd.go	224		builtin	len	
-cli/cli	pkg/cmd/search/shared/shared.go	148		builtin	len	
+cli/cli	script/ghmock/gitcmd.go	224	-	builtin	len	-
+cli/cli	pkg/cmd/search/shared/shared.go	148	-	builtin	len	-
 cli/cli	pkg/cmd/skills/install/install_test.go	280	heredoc	github.com/MakeNowJust/heredoc	Doc	v1.0.0
 gin-gonic/gin	utils_test.go	62	assert	github.com/stretchr/testify/assert	Panics	v1.12.1
-cli/cli	internal/codespaces/ssh.go	107	exec	os/exec	Cmd	
-cockroachdb/pebble	tool/logs/compaction_test.go	525		builtin	len	
-cockroachdb/pebble	compaction_scheduler_test.go	152	time	time	Time	
-cli/cli	pkg/cmd/browse/browse_test.go	755	filepath	path/filepath	FromSlash	
-restic/restic	cmd/restic/cmd_rewrite_integration_test.go	123		builtin	len	
-cli/cli	pkg/cmd/codespace/create.go	37	time	time	Duration	
+cli/cli	internal/codespaces/ssh.go	107	exec	os/exec	Cmd	-
+cockroachdb/pebble	tool/logs/compaction_test.go	525	-	builtin	len	-
+cockroachdb/pebble	compaction_scheduler_test.go	152	time	time	Time	-
+cli/cli	pkg/cmd/browse/browse_test.go	755	filepath	path/filepath	FromSlash	-
+restic/restic	cmd/restic/cmd_rewrite_integration_test.go	123	-	builtin	len	-
+cli/cli	pkg/cmd/codespace/create.go	37	time	time	Duration	-
 cockroachdb/pebble	commit_test.go	305	leaktest	github.com/cockroachdb/crlib/testutils/leaktest	AfterTest	v0.0.0-20251122031428-fe658a2dbda1
 restic/restic	internal/fs/sd_windows_test_helpers.go	53	windows	golang.org/x/sys/windows	SID	v0.49.0
-gin-gonic/gin	auth.go	93	base64	encoding/base64	StdEncoding	
-cockroachdb/pebble	cockroachkvs/cockroachkvs.go	1153	fmt	fmt	Fprintf	
-samber/lo	it/intersect_test.go	330	iter	iter	Seq	
-cli/cli	pkg/cmd/release/create/http.go	189	fmt	fmt	Sprintf	
+gin-gonic/gin	auth.go	93	base64	encoding/base64	StdEncoding	-
+cockroachdb/pebble	cockroachkvs/cockroachkvs.go	1153	fmt	fmt	Fprintf	-
+samber/lo	it/intersect_test.go	330	iter	iter	Seq	-
+cli/cli	pkg/cmd/release/create/http.go	189	fmt	fmt	Sprintf	-
 cockroachdb/pebble	sstable/blob/handle.go	49	redact	github.com/cockroachdb/redact	SafePrinter	v1.1.5
 gin-gonic/gin	context_test.go	1442	assert	github.com/stretchr/testify/assert	Equal	v1.12.1
-cockroachdb/pebble	internal/randvar/flag.go	18	regexp	regexp	MustCompile	
-cockroachdb/pebble	internal/compact/splitting.go	443		builtin	panic	
+cockroachdb/pebble	internal/randvar/flag.go	18	regexp	regexp	MustCompile	-
+cockroachdb/pebble	internal/compact/splitting.go	443	-	builtin	panic	-
 cockroachdb/pebble	file_cache_test.go	1039	require	github.com/stretchr/testify/require	NoError	v1.9.0
 gin-gonic/gin	gin_test.go	448	assert	github.com/stretchr/testify/assert	NotNil	v1.12.1
-restic/restic	internal/fs/node_test.go	43	time	time	Parse	
+restic/restic	internal/fs/node_test.go	43	time	time	Parse	-
 cockroachdb/pebble	vfs/syncing_file_test.go	27	require	github.com/stretchr/testify/require	NoError	v1.9.0
-cli/cli	internal/skills/frontmatter/frontmatter.go	117		builtin	delete	
-restic/restic	internal/repository/pack/pack.go	243	fmt	fmt	Sprintf	
-cockroachdb/pebble	blob_rewrite_test.go	170	strconv	strconv	ParseUint	
-gin-gonic/gin	render/html.go	74	template	html/template	Template	
+cli/cli	internal/skills/frontmatter/frontmatter.go	117	-	builtin	delete	-
+restic/restic	internal/repository/pack/pack.go	243	fmt	fmt	Sprintf	-
+cockroachdb/pebble	blob_rewrite_test.go	170	strconv	strconv	ParseUint	-
+gin-gonic/gin	render/html.go	74	template	html/template	Template	-
 cockroachdb/pebble	mem_table_test.go	366	errors	github.com/cockroachdb/errors	Errorf	v1.11.3
-restic/restic	internal/repository/checker.go	371	bufio	bufio	Reader	
+restic/restic	internal/repository/checker.go	371	bufio	bufio	Reader	-
 gin-gonic/gin	render/render_test.go	357	assert	github.com/stretchr/testify/assert	Equal	v1.12.1
 cockroachdb/pebble	record/log_writer_test.go	465	require	github.com/stretchr/testify/require	LessOrEqual	v1.9.0
-cli/cli	internal/skills/installer/installer.go	97	sync	sync	WaitGroup	
-cockroachdb/pebble	compaction.go	498	atomic	sync/atomic	Int64	
-cli/cli	pkg/cmd/pr/merge/merge_test.go	1857	testing	testing	T	
+cli/cli	internal/skills/installer/installer.go	97	sync	sync	WaitGroup	-
+cockroachdb/pebble	compaction.go	498	atomic	sync/atomic	Int64	-
+cli/cli	pkg/cmd/pr/merge/merge_test.go	1857	testing	testing	T	-
 cockroachdb/pebble	external_test.go	365	require	github.com/stretchr/testify/require	NoError	v1.9.0
 samber/lo	find_test.go	2003	assert	github.com/stretchr/testify/assert	New	v1.12.1

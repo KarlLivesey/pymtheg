@@ -61,4 +61,3 @@ Uses of library "github.com/spf13/cobra" symbol "Command" (outside this project)
   library references: "newKeyCommand" (function) cmd/restic/cmd_key.go:8:1-27:2 [UTF-16 96..588] symbol:955ea1a18f4711fe1deb60aabf04869a90255099597fc145ea95845103529d3d -> library go "github.com/spf13/cobra" symbol "Command" version "v1.10.2" from "go.mod" (outside this project; import-binding) at cmd/restic/cmd_key.go:8:52-8:65 [UTF-16 147..160]
     Stored details: {"t":{"q":"cobra","n":"Command"}}
 Truncated: returned 0 matches, 0 symbols, 3 links, 0 callers, 0 observed links (limit 3; traversal bounds above).
-
