@@ -4,6 +4,7 @@ import { open, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { compare } from "./identity.js";
+import { count } from "./work.js";
 import { matchesPattern, type LanguageRegistry } from "./registry.js";
 import type { CommandMetadata } from "./command-checkpoint.js";
 
@@ -102,6 +103,7 @@ export async function captureInventory(
         signal.throwIfAborted();
         reason = error instanceof Error ? error.message : String(error);
       }
+      count("inventory.filesHashed");
       output.push({ path, hash, module, context, reason });
     }
   }

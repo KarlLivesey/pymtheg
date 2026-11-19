@@ -4,6 +4,7 @@ import { join, resolve } from "node:path";
 import { compare, contentHash, validateResult } from "./identity.js";
 import { resolutionFacts } from "./analysis.js";
 import { matchesPattern, type LanguageRegistry } from "./registry.js";
+import { count, stage } from "./work.js";
 import type {
   AnalyzedFile,
   ContextFile,
@@ -122,11 +123,11 @@ export async function indexProject(
         paths.push(path);
     }
   }
-  await walk("");
+  await stage("index.walk", () => walk(""));
   paths.sort(compare);
   // Storage reads are deliberately outside all source/module error catches, before any writes.
-  const oldFiles = await summaries(store);
-  const oldContexts = await store.contexts();
+  const oldFiles = await stage("index.previous", () => summaries(store));
+  const oldContexts = await stage("index.previous", () => store.contexts());
   const claims = new Map<string, LanguageModule>();
   // Only what the cache check needs: never every previous record at once.
   const previous = new Map<string, Previous | undefined>();
@@ -142,7 +143,10 @@ export async function indexProject(
     }
     if (module) {
       claims.set(path, module);
-      previous.set(path, await previousOf(store, path));
+      previous.set(
+        path,
+        await stage("index.previous", () => previousOf(store, path)),
+      );
       report.claimed++;
     } else if (!registry.modules.some((module) => needsContext(module, path)))
       report.unclaimed.push(path);
@@ -157,8 +161,12 @@ export async function indexProject(
       let text = "";
       let diagnostic: string | undefined;
       try {
-        const bytes = await readFile(join(root, path));
-        hash = contentHash(bytes);
+        const bytes = await stage("index.read", () =>
+          readFile(join(root, path)),
+        );
+        count("index.filesRead");
+        count("index.bytesRead", bytes.length);
+        hash = await stage("index.hash", () => contentHash(bytes));
         try {
           text = new TextDecoder("utf-8", {
             fatal: true,
@@ -220,7 +228,10 @@ export async function indexProject(
     else if (!module.parse) result = failure("Awaiting project analysis");
     else {
       try {
-        result = await module.parse({ path, text: source.text });
+        count(`parse.${module.id}.files`);
+        result = await stage(`parse.${module.id}`, () =>
+          module.parse!({ path, text: source.text }),
+        );
         validateResult(source.text, result);
         if (result.status === "failed" && result.failureKind !== "transient")
           cacheableFailures.add(path);
@@ -240,11 +251,13 @@ export async function indexProject(
     });
     changed.add(path);
   }
-  await store.replaceContexts(contexts);
-  for (const file of updates) {
-    await store.replaceFile(file, cacheableFailures.has(file.path));
-    report.indexed++;
-  }
+  await stage("store.writeParsed", async () => {
+    await store.replaceContexts(contexts);
+    for (const file of updates) {
+      await store.replaceFile(file, cacheableFailures.has(file.path));
+      report.indexed++;
+    }
+  });
   // Written: release every captured text and parse result (C-2). Only the
   // context files and which captures failed are needed from here on.
   updates.length = 0;
@@ -264,9 +277,10 @@ export async function indexProject(
   // results are released when it returns instead of lingering in this
   // function's suspended frame through the remaining phases (C-2).
   const analyzeModule = async (module: LanguageModule): Promise<void> => {
-    const files = (await store.files()).filter(
-      (file) => file.module === module.id,
+    const files = await stage(`analyze.${module.id}.input`, async () =>
+      (await store.files()).filter((file) => file.module === module.id),
     );
+    count(`analyze.${module.id}.inputFiles`, files.length);
     const filesByPath = new Map(files.map((file) => [file.path, file]));
     const oldPaths = new Set(
       oldFiles
@@ -296,19 +310,21 @@ export async function indexProject(
               note: (note) =>
                 (report.toolchains ??= []).push({ module: module.id, note }),
             };
-      results = await module.analyze!({
-        projectId: store.projectId,
-        ...(options.signal ? { signal: options.signal } : {}),
-        ...(toolchain ? { toolchain } : {}),
-        files,
-        contextFiles: ownContexts,
-        changedFiles: [...changed]
-          .filter((path) => filesByPath.has(path) || oldPaths.has(path))
-          .sort(compare),
-        changedContextFiles: changedContexts.filter((path) =>
-          needsContext(module, path),
-        ),
-      });
+      results = await stage(`analyze.${module.id}`, () =>
+        module.analyze!({
+          projectId: store.projectId,
+          ...(options.signal ? { signal: options.signal } : {}),
+          ...(toolchain ? { toolchain } : {}),
+          files,
+          contextFiles: ownContexts,
+          changedFiles: [...changed]
+            .filter((path) => filesByPath.has(path) || oldPaths.has(path))
+            .sort(compare),
+          changedContextFiles: changedContexts.filter((path) =>
+            needsContext(module, path),
+          ),
+        }),
+      );
       const seen = new Set<string>();
       for (const item of results) {
         const file = filesByPath.get(item.path);
@@ -339,22 +355,27 @@ export async function indexProject(
         result: failure(detail),
       }));
     }
-    for (const item of results) {
-      const file = filesByPath.get(item.path)!;
-      if (JSON.stringify(file.result) !== JSON.stringify(item.result))
-        await store.replaceFile(
-          { ...file, result: item.result },
-          !analysisFailed &&
-            item.result.status === "failed" &&
-            item.result.failureKind !== "transient" &&
-            // Analyze-only modules may explicitly certify a file-local content
-            // failure. Unclassified analysis failures are never cached.
-            (item.result.failureKind === "content" ||
-              (file.result.status === "failed" &&
-                (await store.isParseFailure?.(file.path)) === true)),
-        );
-      report.analyzed++;
-    }
+    const write = stage(`analyze.${module.id}.write`, async () => {
+      for (const item of results) {
+        const file = filesByPath.get(item.path)!;
+        if (JSON.stringify(file.result) !== JSON.stringify(item.result)) {
+          count(`analyze.${module.id}.filesChanged`);
+          await store.replaceFile(
+            { ...file, result: item.result },
+            !analysisFailed &&
+              item.result.status === "failed" &&
+              item.result.failureKind !== "transient" &&
+              // Analyze-only modules may explicitly certify a file-local content
+              // failure. Unclassified analysis failures are never cached.
+              (item.result.failureKind === "content" ||
+                (file.result.status === "failed" &&
+                  (await store.isParseFailure?.(file.path)) === true)),
+          );
+        }
+        report.analyzed++;
+      }
+    });
+    await write;
   };
   for (const module of registry.modules)
     if (module.analyze) await analyzeModule(module);
@@ -380,6 +401,12 @@ export async function indexProject(
         ownContexts,
         options.signal,
       );
+      count(
+        `resolve.${module.id}.resolutions`,
+        Array.isArray(output)
+          ? output.length
+          : ((output as ResolutionResult).resolutions?.length ?? 0),
+      );
       result = Array.isArray(output)
         ? { resolutions: output, links: [] }
         : (output as ResolutionResult);
@@ -396,18 +423,22 @@ export async function indexProject(
       if (wanted.size)
         for (const file of await read(() => filesAt(store, [...wanted])))
           needed.set(file.path, file);
-      resolutionFacts(
-        store.projectId,
-        module.id,
-        result,
-        (path) => needed.get(path),
-        await read(() => store.findSymbols()),
-        await read(() => parsedLinks(store, module.id)),
-        // A library version must come from a context file this module read.
-        (path) =>
-          ownContexts.some(
-            (file) => file.path === path && file.status === "clean",
-          ),
+      const symbols = await read(() => store.findSymbols());
+      const current = await read(() => parsedLinks(store, module.id));
+      await stage(`resolve.${module.id}.validate`, () =>
+        resolutionFacts(
+          store.projectId,
+          module.id,
+          result,
+          (path) => needed.get(path),
+          symbols,
+          current,
+          // A library version must come from a context file this module read.
+          (path) =>
+            ownContexts.some(
+              (file) => file.path === path && file.status === "clean",
+            ),
+        ),
       );
     } catch (error) {
       // Storage errors propagate; they are not mislabeled as module failures.
@@ -420,9 +451,21 @@ export async function indexProject(
       });
       result = { resolutions: [], links: [] };
     }
-    await store.replaceAnalysis(module.id, result);
+    await stage(`resolve.${module.id}.write`, () =>
+      store.replaceAnalysis(module.id, result),
+    );
   };
   for (const module of registry.modules) await resolveModule(module);
+  return await stage("index.report", () =>
+    finishReport(store, report, contexts),
+  );
+}
+
+async function finishReport(
+  store: GraphStorage,
+  report: IndexReport,
+  contexts: readonly ContextFile[],
+): Promise<IndexReport> {
   for (const file of await summaries(store))
     if (file.status !== "clean") report[file.status].push(file.path);
   for (const file of contexts)
@@ -482,25 +525,33 @@ async function runResolve(
   // records with itself or with the next module; any other gets a deep copy.
   const own = <T>(value: T): T =>
     store.independentReads === true ? value : structuredClone(value);
+  const input = await stage(`resolve.${module.id}.input`, async () => ({
+    files: own(await read(() => store.files())),
+    symbols: own(await read(() => store.findSymbols())),
+    links: own(await read(() => parsedLinks(store, module.id))),
+  }));
+  count(`resolve.${module.id}.inputFiles`, input.files.length);
+  count(`resolve.${module.id}.inputSymbols`, input.symbols.length);
+  count(`resolve.${module.id}.inputLinks`, input.links.length);
   return (
-    (await module.resolve({
-      projectId: store.projectId,
-      ...(signal ? { signal } : {}),
-      files: own(await read(() => store.files())),
-      contextFiles: structuredClone(contexts),
-      symbols: own(await read(() => store.findSymbols())),
-      // Presented unresolved: no target, candidates or library targets
-      // from the previous run.
-      links: own(await read(() => parsedLinks(store, module.id))).map(
-        ({ libraries: _previous, ...link }) => ({
+    (await stage(`resolve.${module.id}`, () =>
+      module.resolve!({
+        projectId: store.projectId,
+        ...(signal ? { signal } : {}),
+        files: input.files,
+        contextFiles: structuredClone(contexts),
+        symbols: input.symbols,
+        // Presented unresolved: no target, candidates or library targets
+        // from the previous run.
+        links: input.links.map(({ libraries: _previous, ...link }) => ({
           ...link,
           targetId: null,
           targetStatus: null,
           candidates: [],
           resolution: "unresolved" as const,
-        }),
-      ),
-    })) ?? []
+        })),
+      }),
+    )) ?? []
   );
 }
 /** A storage read inside a module's error boundary; its error propagates. */

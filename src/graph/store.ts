@@ -8,6 +8,7 @@ import {
 import { randomUUID } from "node:crypto";
 import { compare, fileFacts, validateResult } from "./identity.js";
 import { LinkDecider, resolutionFacts } from "./analysis.js";
+import { count } from "./work.js";
 import type {
   ContextFile,
   GraphStorage,
@@ -106,6 +107,7 @@ export class SqliteGraphStore implements GraphStorage {
    * the life of the store (C-2).
    */
   private decodeFile(body: string): GraphFile {
+    count("store.fileRecordsDecoded");
     return JSON.parse(body) as GraphFile;
   }
   constructor(
@@ -114,7 +116,9 @@ export class SqliteGraphStore implements GraphStorage {
     options: { readOnly?: boolean; sqliteVersion?: string } = {},
   ) {
     this.sqliteVersion = options.sqliteVersion;
-    this.db = openDatabase(path, { readOnly: options.readOnly ?? false });
+    this.db = countStatements(
+      openDatabase(path, { readOnly: options.readOnly ?? false }),
+    );
     try {
       if (options.readOnly) {
         const schema = this.db
@@ -383,8 +387,15 @@ export class SqliteGraphStore implements GraphStorage {
     validateResult(file.text, file.result);
     const facts = fileFacts(this.projectId, file);
     const sql = this.writer();
+    count("store.filesWritten");
+    count("store.symbolRowsWritten", facts.symbols.length);
     this.transaction(() => {
-      sql("DELETE FROM graph_links WHERE file=?").run(file.path);
+      count(
+        "store.linkRowsDeleted",
+        Number(
+          sql("DELETE FROM graph_links WHERE file=?").run(file.path).changes,
+        ),
+      );
       sql(
         "INSERT INTO graph_files VALUES (?,?,?) ON CONFLICT(path) DO UPDATE SET body=excluded.body,status=excluded.status",
       ).run(file.path, JSON.stringify(file), file.result.status);
@@ -428,6 +439,7 @@ export class SqliteGraphStore implements GraphStorage {
     link: GraphLink,
     sql: (sql: string) => StatementSync,
   ): void {
+    count("store.linkRowsInserted");
     sql("INSERT INTO graph_links VALUES (?,?,?,?,?,?,?,?,?)").run(
       link.id,
       link.file,
@@ -467,6 +479,7 @@ export class SqliteGraphStore implements GraphStorage {
   }
   removeFile(path: string): void {
     this.beforeWrite();
+    count("store.filesRemoved");
     this.db.prepare("DELETE FROM graph_files WHERE path=?").run(path);
   }
   findSymbols(query: SymbolQuery = {}): GraphSymbol[] {
@@ -655,6 +668,7 @@ export class SqliteGraphStore implements GraphStorage {
           JSON.stringify(link.libraries ?? [])
       )
         continue;
+      count("store.linkTargetsRewritten");
       sql("UPDATE graph_links SET target=? WHERE id=?").run(
         link.targetId,
         link.id,
@@ -694,6 +708,7 @@ export class SqliteGraphStore implements GraphStorage {
   }
   replaceAnalysis(module: string, result: ResolutionResult): void {
     const current = this.selectLinks("l.module=?", [module]);
+    count("store.linksCompared", current.length);
     const sql = this.writer();
     const desired = resolutionFacts(
       this.projectId,
@@ -716,8 +731,10 @@ export class SqliteGraphStore implements GraphStorage {
           link.origin === "analysis" &&
           (!wanted.has(link.id) ||
             JSON.stringify(link) !== JSON.stringify(wanted.get(link.id)))
-        )
+        ) {
+          count("store.linkRowsDeleted");
           sql("DELETE FROM graph_links WHERE id=?").run(link.id);
+        }
       for (const link of desired)
         if (
           link.origin === "analysis" &&
@@ -1099,3 +1116,35 @@ const libraryTables = `CREATE TABLE IF NOT EXISTS graph_library_targets(link TEX
     UPDATE graph_links SET resolution=${resolutionOf("OLD.link", "target")}
       WHERE id=OLD.link AND resolution IS NOT ${resolutionOf("OLD.link", "target")};
   END;`;
+
+/**
+ * Counts every SQL statement this connection executes (C-22 observation:
+ * `store.sqlStatements`). The statements and their results are unchanged.
+ */
+function countStatements(db: DatabaseSync): DatabaseSync {
+  const prepare = db.prepare.bind(db);
+  const exec = db.exec.bind(db);
+  db.exec = (sql: string) => {
+    count("store.sqlStatements");
+    return exec(sql);
+  };
+  db.prepare = ((sql: string, ...rest: unknown[]) => {
+    const statement = (prepare as (...args: unknown[]) => StatementSync)(
+      sql,
+      ...rest,
+    );
+    for (const method of ["run", "get", "all", "iterate"] as const) {
+      const original = statement[method].bind(statement) as (
+        ...args: unknown[]
+      ) => unknown;
+      (statement as unknown as Record<string, unknown>)[method] = (
+        ...args: unknown[]
+      ) => {
+        count("store.sqlStatements");
+        return original(...args);
+      };
+    }
+    return statement;
+  }) as DatabaseSync["prepare"];
+  return db;
+}

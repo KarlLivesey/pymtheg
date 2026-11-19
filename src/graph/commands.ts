@@ -15,6 +15,7 @@ import {
 } from "./registry.js";
 import { SqliteGraphStore } from "./store.js";
 import { indexProject, type IndexReport } from "./indexer.js";
+import { stage } from "./work.js";
 import {
   captureInventory,
   changedFiles,
@@ -161,7 +162,9 @@ export async function executeGraph(
       })
     : null;
   try {
-    let inventory = await captureInventory(root, registry, signal);
+    let inventory = await stage("command.inventory", () =>
+      captureInventory(root, registry, signal),
+    );
     const previousState = readCheckpoint(store);
     let metadata = previousState ?? readMetadata(store);
     let stale = changedFiles(inventory, metadata, registry);
@@ -356,8 +359,10 @@ export async function executeGraph(
       durationMs = performance.now() - started;
       exists = true;
       // A second hash check reports edits made during a long index instead of claiming freshness.
-      inventory = await captureInventory(root, registry, signal);
-      metadata = readMetadata(store);
+      inventory = await stage("command.inventory", () =>
+        captureInventory(root, registry, signal),
+      );
+      metadata = await stage("command.metadata", () => readMetadata(store!));
       stale = changedFiles(inventory, metadata, registry);
       const pending = metadata.files.some(
         (f) => f.status === "failed" && !f.cacheable,
