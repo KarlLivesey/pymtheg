@@ -57,8 +57,12 @@ const memo = new WeakMap<ts.TypeChecker, Taint>();
  * it as unresolved (`taint-budget-exhausted`), never as untainted.
  */
 export const TAINT_BUDGET = 8_000_000;
-/** Test hook: the budget in force (TAINT_BUDGET in normal use). */
-export const taintLimits = { steps: TAINT_BUDGET };
+/** Budgets other than TAINT_BUDGET, per checker (a test passes one in). */
+const budgetFor = new WeakMap<ts.TypeChecker, number>();
+/** Sets this checker's walk budget (tests use a small one; see index.ts). */
+export function setTaintBudget(checker: ts.TypeChecker, steps: number): void {
+  budgetFor.set(checker, steps);
+}
 /** Observation counters for evidence and tests: walks, the most steps one took, walks stopped. */
 export const taintStatistics = { walks: 0, maxSteps: 0, exhausted: 0 };
 /** Checkers whose taint walk reached the budget. */
@@ -66,16 +70,49 @@ const exhaustedFor = new WeakSet<ts.TypeChecker>();
 /** Whether this checker's taint walk stopped at the budget (its taint is unknown). */
 export const taintExhausted = (checker: ts.TypeChecker) =>
   exhaustedFor.has(checker);
+/** Checkers whose walk is skipped: treated as having reached the budget. */
+const skipFor = new WeakSet<ts.TypeChecker>();
 /**
  * Treats this checker's taint as unknown without walking: for a program
  * rebuilt from one whose walk reached the budget (the same files, or one
  * fewer). Only ever more conservative: its links are reported
- * `taint-budget-exhausted`.
+ * `taint-budget-exhausted`, except those that bind a failed file directly.
  */
 export function markTaintExhausted(checker: ts.TypeChecker): void {
-  exhaustedFor.add(checker);
-  memo.set(checker, EMPTY);
+  skipFor.add(checker);
 }
+/**
+ * The causes of one symbol computed on demand: an unknown walk still answers
+ * whether a binding resolves directly into a failed file. Never reports
+ * itself empty (`size`), since consumers skip an empty taint.
+ */
+class DirectCauses extends Map<ts.Symbol, Set<string>> {
+  constructor(private readonly compute: (symbol: ts.Symbol) => string[]) {
+    super();
+    Object.defineProperty(this, "size", { get: () => 1 });
+  }
+  override get(symbol: ts.Symbol): Set<string> | undefined {
+    let set = super.get(symbol);
+    if (!set) {
+      set = new Set(this.compute(symbol));
+      super.set(symbol, set);
+    }
+    return set.size ? set : undefined;
+  }
+  override has(symbol: ts.Symbol): boolean {
+    return this.get(symbol) !== undefined;
+  }
+}
+/**
+ * An exception inside the walk is never a negative answer. A stack limit
+ * leaves the walk unknown, as at the budget; anything else (a compiler
+ * assertion) goes to the module's containment, which fails the file being
+ * read.
+ */
+const unanswered = (error: unknown): never => {
+  if (error instanceof RangeError) throw BUDGET_REACHED;
+  throw error;
+};
 const BUDGET_REACHED = Symbol("taint budget reached");
 /** A destructured binding depends on the property it takes. */
 const DESTRUCTURED = true;
@@ -390,20 +427,15 @@ export function taintOf(input: TaintInput, failed: boolean): Taint {
   const known = memo.get(input.checker);
   if (known) return known;
   let steps = 0;
+  const budget = skipFor.has(input.checker)
+    ? 0
+    : (budgetFor.get(input.checker) ?? TAINT_BUDGET);
   const step = () => {
-    if (++steps > taintLimits.steps) throw BUDGET_REACHED;
+    if (++steps > budget) throw BUDGET_REACHED;
   };
-  taintStatistics.walks++;
+  if (budget) taintStatistics.walks++;
   try {
     return computeTaint(input, step);
-  } catch (error) {
-    if (error !== BUDGET_REACHED) throw error;
-    // Unknown, not empty: the module turns every link of this program
-    // that consults it into `taint-budget-exhausted` (taintExhausted).
-    taintStatistics.exhausted++;
-    exhaustedFor.add(input.checker);
-    memo.set(input.checker, EMPTY);
-    return EMPTY;
   } finally {
     taintStatistics.maxSteps = Math.max(taintStatistics.maxSteps, steps);
   }
@@ -507,322 +539,391 @@ function computeTaint(input: TaintInput, step: () => void): Taint {
   const resolvedAlias = (symbol: ts.Symbol): boolean => {
     try {
       return !!checker.getAliasedSymbol(symbol).declarations?.length;
-    } catch {
-      return false;
+    } catch (error) {
+      return unanswered(error);
     }
   };
-  const sources = program.getSourceFiles().filter((source) => {
-    const path = fromVirtual(source.fileName);
-    return path !== undefined && captured.has(path) && !invalid(path);
-  });
-  // ----- seeds -----
-  const declarations: ts.Node[] = [];
-  for (const source of sources) {
-    const path = fromVirtual(source.fileName)!;
-    const visit = (node: ts.Node): void => {
-      step();
-      const symbol = aliasDeclared(node, checker);
-      if (symbol && symbol.flags & ts.SymbolFlags.Alias) {
-        const causes = moduleCauses(
+  /** Whether a binding resolves directly into a failed file, for one symbol. */
+  const direct = (symbol: ts.Symbol): string[] => {
+    const declaration = symbol.declarations?.[0];
+    const path =
+      declaration && fromVirtual(declaration.getSourceFile().fileName);
+    if (!declaration || path === undefined || !captured.has(path)) return [];
+    try {
+      if (symbol.flags & ts.SymbolFlags.Alias)
+        return moduleCauses(
           bindingSpecifier(symbol),
           path,
           resolvedAlias(symbol),
         );
-        if (causes.length) {
-          add(seeds, symbol, causes);
-          add(all, symbol, causes);
-        }
-      }
       // `const b = require("./bad")`, `module.exports = require("./bad")`,
       // `const m = await import("./bad")`.
-      if (
-        ts.isCallExpression(node) &&
-        ((ts.isIdentifier(node.expression) &&
-          node.expression.text === "require") ||
-          node.expression.kind === ts.SyntaxKind.ImportKeyword) &&
-        node.arguments.length >= 1
-      ) {
-        const causes = moduleCauses(node.arguments[0], path, false);
-        let holder: ts.Node = node.parent;
-        while (
-          ts.isAwaitExpression(holder) ||
-          ts.isParenthesizedExpression(holder)
-        )
-          holder = holder.parent;
-        const target =
-          holder &&
-          (ts.isVariableDeclaration(holder) ||
-            (ts.isBinaryExpression(holder) && holder.left !== node))
-            ? symbolOfDeclaration(holder, checker)
-            : undefined;
-        if (causes.length && target) {
-          add(seeds, target, causes);
-          add(all, target, causes);
-        }
-      }
-      if (
-        Object.values(DEPENDENCIES).some(
-          (parts) => parts(node, checker).length > 0,
-        )
+      let value: ts.Expression | undefined = ts.isVariableDeclaration(
+        declaration,
       )
-        declarations.push(node);
-      // JSDoc `@typedef`/`@callback` tags are declarations too.
-      for (const doc of (node as { jsDoc?: ts.JSDoc[] }).jsDoc ?? [])
-        for (const tag of doc.tags ?? [])
-          if (
-            (ts.isJSDocTypedefTag(tag) || ts.isJSDocCallbackTag(tag)) &&
-            tag.typeExpression
-          )
-            declarations.push(tag);
-      ts.forEachChild(node, visit);
-    };
-    visit(source);
-  }
-
-  // ----- closure -----
-  /**
-   * Whether a node is a type argument (or array element type) that decides
-   * only member types, not which members exist: an argument of a class or
-   * interface (`Promise<Job>`, `QueueGetters<Job>`). An argument of a type
-   * alias (`Pick<BaseI, "m">`, a mapped type) can decide the members.
-   */
-  const isTypeArgument = (node: ts.Node): boolean => {
-    const parent = node.parent;
-    if (
-      ts.isTypeReferenceNode(parent) ||
-      ts.isExpressionWithTypeArguments(parent)
-    ) {
-      const name = ts.isTypeReferenceNode(parent)
-        ? parent.typeName
-        : parent.expression;
-      let referenced: ts.Symbol | undefined;
-      try {
-        referenced = checker.getSymbolAtLocation(
-          ts.isQualifiedName(name) ? name.right : name,
-        );
-        if (referenced && referenced.flags & ts.SymbolFlags.Alias)
-          referenced = checker.getAliasedSymbol(referenced);
-      } catch {
-        referenced = undefined;
-      }
-      if (
-        !referenced ||
-        !(referenced.flags & (ts.SymbolFlags.Class | ts.SymbolFlags.Interface))
-      )
-        return false;
-    }
-    return (
-      ((ts.isTypeReferenceNode(parent) ||
-        ts.isExpressionWithTypeArguments(parent) ||
-        ts.isCallExpression(parent) ||
-        ts.isNewExpression(parent) ||
-        ts.isImportTypeNode(parent)) &&
-        !!parent.typeArguments?.includes(node as ts.TypeNode)) ||
-      (ts.isArrayTypeNode(parent) && parent.elementType === node)
-    );
-  };
-  /** A dependence of one declaration's symbol on another symbol's taint. */
-  interface Edge {
-    target: ts.Symbol;
-    /** How the other symbol's strong taint reaches the target. */
-    fromAll: "strong" | "weak";
-    /** Whether its weak taint reaches the target. */
-    fromWeak: boolean;
-  }
-  const dependents = new Map<ts.Symbol, Edge[]>();
-  const depend = (on: ts.Symbol, edge: Edge) => {
-    // A member of an instantiated generic type depends through its
-    // declaration's own symbol.
-    const keys = new Set<ts.Symbol>([on]);
-    for (const declaration of on.declarations ?? []) {
-      const declared = (declaration as { symbol?: ts.Symbol }).symbol;
-      if (declared) keys.add(declared);
-    }
-    for (const key of keys) {
-      const edges = dependents.get(key);
-      if (edges) edges.push(edge);
-      else dependents.set(key, [edge]);
-    }
-  };
-  /** Only a generic or overloaded callee's result depends on its arguments. */
-  const argumentsMatter = (call: ts.CallExpression | ts.NewExpression) => {
-    try {
-      const type = checker.getTypeAtLocation(call.expression);
-      const signatures = ts.isNewExpression(call)
-        ? type.getConstructSignatures()
-        : type.getCallSignatures();
-      return (
-        signatures.length > 1 ||
-        signatures.some((signature) => !!signature.typeParameters?.length)
-      );
-    } catch {
-      return true;
-    }
-  };
-  /**
-   * Records what a part of a declaration refers to (aliases followed):
-   * strong when a reference decides what the declaration is, weak when it
-   * sits in a type argument; a name no declaration answers that a failed
-   * file declares taints the target directly.
-   */
-  const reference = (target: ts.Symbol, part: ts.Node) => {
-    const visit = (node: ts.Node, inArgument: boolean): void => {
-      step();
-      if (ts.isIdentifier(node) || ts.isPrivateIdentifier(node)) {
-        let symbol: ts.Symbol | undefined;
-        try {
-          symbol = checker.getSymbolAtLocation(node);
-        } catch {
-          symbol = undefined;
-        }
-        // The object of a member access gives the member's value only its
-        // strong taint (which members exist); its type arguments do not
-        // reach a member whose own type does not depend on them.
-        const parent = node.parent;
-        const object =
-          WEAK_THROUGH_VALUE_ONLY &&
-          node !== part &&
-          ts.isPropertyAccessExpression(parent) &&
-          parent.expression === node &&
-          !usesOwnerTypeParameters(
-            checker,
-            checker.getSymbolAtLocation(parent.name),
-          );
-        // An unresolved name (in a type, the compiler's "unknown" symbol).
-        const resolved =
-          symbol &&
-          (symbol.declarations?.length || symbol.flags & ts.SymbolFlags.Alias);
-        if (symbol && resolved)
-          for (const step of aliasChain(checker, symbol))
-            depend(step, {
-              target,
-              fromAll: inArgument ? "weak" : "strong",
-              fromWeak: !object,
-            });
-        else if (UNREAD_NAMES && ts.isIdentifier(node)) {
-          const files = failedNames.get(node.text);
-          if (files?.length) add(inArgument ? weak : all, target, files);
-        }
-      }
-      // `x as T`, `<T>x`: the asserted type replaces the expression's.
-      if (ts.isAsExpression(node) || ts.isTypeAssertionExpression(node)) {
-        visit(node.type, inArgument);
-        return;
-      }
-      // A function literal's type is its signature: its parameters'
-      // annotations (or defaults) and its return type (or what it returns),
-      // never what its body mentions.
-      if (
-        SIGNATURE_ONLY &&
-        (ts.isArrowFunction(node) || ts.isFunctionExpression(node))
-      ) {
-        for (const parameter of node.parameters) {
-          if (parameter.type) visit(parameter.type, true);
-          else if (parameter.initializer) visit(parameter.initializer, true);
-        }
-        if (node.type) visit(node.type, inArgument);
-        else
-          for (const returned of DEPENDENCIES.inferredReturn!(node, checker))
-            visit(returned, inArgument);
-        return;
-      }
-      // `import("./bad")`, `typeof import("./bad")`, `import("./bad").X`.
-      if (
-        IMPORT_TYPES &&
-        ts.isImportTypeNode(node) &&
-        ts.isLiteralTypeNode(node.argument) &&
-        ts.isStringLiteralLike(node.argument.literal)
-      ) {
-        const from = fromVirtual(node.getSourceFile().fileName);
-        const causes =
-          from === undefined
-            ? []
-            : moduleCauses(node.argument.literal, from, false);
-        if (causes.length) add(inArgument ? weak : all, target, causes);
-      }
-      if (
-        CALL_ARGUMENTS &&
-        (ts.isCallExpression(node) || ts.isNewExpression(node))
-      ) {
-        // The callee decides the result; its arguments only through
-        // inferred type arguments (weak), and only when they can.
-        visit(node.expression, inArgument);
-        for (const typeArgument of node.typeArguments ?? [])
-          visit(typeArgument, true);
-        if (argumentsMatter(node))
-          for (const argument of node.arguments ?? []) visit(argument, true);
-        return;
-      }
-      // The parameters of a signature in a type (a function, constructor or
-      // method type) decide only what it accepts: weak, through inference.
-      const signatureParameter =
-        WEAK_SIGNATURE_PARAMETERS &&
-        ts.isParameter(node) &&
-        (ts.isFunctionTypeNode(node.parent) ||
-          ts.isConstructorTypeNode(node.parent) ||
-          ts.isCallSignatureDeclaration(node.parent) ||
-          ts.isConstructSignatureDeclaration(node.parent) ||
-          ts.isMethodSignature(node.parent));
-      ts.forEachChild(node, (child) =>
-        visit(
-          child,
-          inArgument ||
-            signatureParameter ||
-            (WEAK_ARGUMENTS && isTypeArgument(child)),
-        ),
-      );
-    };
-    visit(part, false);
-  };
-  for (const node of declarations) {
-    const symbol = symbolOfDeclaration(node, checker);
-    if (!symbol) continue;
-    for (const parts of Object.values(DEPENDENCIES))
-      for (const part of parts(node, checker)) reference(symbol, part);
-    // `const { job } = tree`: the destructured property's own taint.
-    if (
-      DESTRUCTURED &&
-      ts.isBindingElement(node) &&
-      ts.isObjectBindingPattern(node.parent)
-    ) {
-      const key = node.propertyName ?? node.name;
-      let property: ts.Symbol | undefined;
-      try {
-        property = ts.isIdentifier(key)
-          ? checker.getTypeAtLocation(node.parent).getProperty(key.text)
+        ? declaration.initializer
+        : ts.isBinaryExpression(declaration)
+          ? declaration.right
           : undefined;
-      } catch {
-        property = undefined;
+      while (
+        value &&
+        (ts.isAwaitExpression(value) || ts.isParenthesizedExpression(value))
+      )
+        value = value.expression;
+      if (
+        value &&
+        ts.isCallExpression(value) &&
+        ((ts.isIdentifier(value.expression) &&
+          value.expression.text === "require") ||
+          value.expression.kind === ts.SyntaxKind.ImportKeyword) &&
+        value.arguments.length >= 1
+      )
+        return moduleCauses(value.arguments[0], path, false);
+      return [];
+    } catch (error) {
+      // A stack limit here: not known to bind a failed file, so the link
+      // is reported `taint-budget-exhausted` like the rest.
+      if (error === BUDGET_REACHED) return [];
+      throw error;
+    }
+  };
+  try {
+    return walk();
+  } catch (error) {
+    if (error !== BUDGET_REACHED) throw error;
+    // Unknown, not empty: the module turns every link of this program
+    // that consults it into `taint-budget-exhausted` (taintExhausted),
+    // except a link that binds a failed file directly, which keeps its
+    // cause.
+    if (!skipFor.has(checker)) taintStatistics.exhausted++;
+    exhaustedFor.add(checker);
+    const causes = new DirectCauses(direct);
+    const unknown: Taint = { seeds: causes, all: causes, weak: new Map() };
+    memo.set(checker, unknown);
+    return unknown;
+  }
+  function walk(): Taint {
+    const sources = program.getSourceFiles().filter((source) => {
+      const path = fromVirtual(source.fileName);
+      return path !== undefined && captured.has(path) && !invalid(path);
+    });
+    // ----- seeds -----
+    const declarations: ts.Node[] = [];
+    for (const source of sources) {
+      const path = fromVirtual(source.fileName)!;
+      const visit = (node: ts.Node): void => {
+        step();
+        const symbol = aliasDeclared(node, checker);
+        if (symbol && symbol.flags & ts.SymbolFlags.Alias) {
+          const causes = moduleCauses(
+            bindingSpecifier(symbol),
+            path,
+            resolvedAlias(symbol),
+          );
+          if (causes.length) {
+            add(seeds, symbol, causes);
+            add(all, symbol, causes);
+          }
+        }
+        // `const b = require("./bad")`, `module.exports = require("./bad")`,
+        // `const m = await import("./bad")`.
+        if (
+          ts.isCallExpression(node) &&
+          ((ts.isIdentifier(node.expression) &&
+            node.expression.text === "require") ||
+            node.expression.kind === ts.SyntaxKind.ImportKeyword) &&
+          node.arguments.length >= 1
+        ) {
+          const causes = moduleCauses(node.arguments[0], path, false);
+          let holder: ts.Node = node.parent;
+          while (
+            ts.isAwaitExpression(holder) ||
+            ts.isParenthesizedExpression(holder)
+          )
+            holder = holder.parent;
+          const target =
+            holder &&
+            (ts.isVariableDeclaration(holder) ||
+              (ts.isBinaryExpression(holder) && holder.left !== node))
+              ? symbolOfDeclaration(holder, checker)
+              : undefined;
+          if (causes.length && target) {
+            add(seeds, target, causes);
+            add(all, target, causes);
+          }
+        }
+        if (
+          Object.values(DEPENDENCIES).some(
+            (parts) => parts(node, checker).length > 0,
+          )
+        )
+          declarations.push(node);
+        // JSDoc `@typedef`/`@callback` tags are declarations too.
+        for (const doc of (node as { jsDoc?: ts.JSDoc[] }).jsDoc ?? [])
+          for (const tag of doc.tags ?? [])
+            if (
+              (ts.isJSDocTypedefTag(tag) || ts.isJSDocCallbackTag(tag)) &&
+              tag.typeExpression
+            )
+              declarations.push(tag);
+        ts.forEachChild(node, visit);
+      };
+      visit(source);
+    }
+
+    // ----- closure -----
+    /**
+     * Whether a node is a type argument (or array element type) that decides
+     * only member types, not which members exist: an argument of a class or
+     * interface (`Promise<Job>`, `QueueGetters<Job>`). An argument of a type
+     * alias (`Pick<BaseI, "m">`, a mapped type) can decide the members.
+     */
+    const isTypeArgument = (node: ts.Node): boolean => {
+      const parent = node.parent;
+      if (
+        ts.isTypeReferenceNode(parent) ||
+        ts.isExpressionWithTypeArguments(parent)
+      ) {
+        const name = ts.isTypeReferenceNode(parent)
+          ? parent.typeName
+          : parent.expression;
+        let referenced: ts.Symbol | undefined;
+        try {
+          referenced = checker.getSymbolAtLocation(
+            ts.isQualifiedName(name) ? name.right : name,
+          );
+          if (referenced && referenced.flags & ts.SymbolFlags.Alias)
+            referenced = checker.getAliasedSymbol(referenced);
+        } catch (error) {
+          referenced = unanswered(error);
+        }
+        if (
+          !referenced ||
+          !(
+            referenced.flags &
+            (ts.SymbolFlags.Class | ts.SymbolFlags.Interface)
+          )
+        )
+          return false;
       }
-      if (property)
-        depend(property, { target: symbol, fromAll: "strong", fromWeak: true });
+      return (
+        ((ts.isTypeReferenceNode(parent) ||
+          ts.isExpressionWithTypeArguments(parent) ||
+          ts.isCallExpression(parent) ||
+          ts.isNewExpression(parent) ||
+          ts.isImportTypeNode(parent)) &&
+          !!parent.typeArguments?.includes(node as ts.TypeNode)) ||
+        (ts.isArrayTypeNode(parent) && parent.elementType === node)
+      );
+    };
+    /** A dependence of one declaration's symbol on another symbol's taint. */
+    interface Edge {
+      target: ts.Symbol;
+      /** How the other symbol's strong taint reaches the target. */
+      fromAll: "strong" | "weak";
+      /** Whether its weak taint reaches the target. */
+      fromWeak: boolean;
     }
-  }
-  // Nothing reaches a failed file (no binding, import type or global name).
-  if (!all.size && !weak.size) {
-    memo.set(checker, EMPTY);
-    return EMPTY;
-  }
-  // A worklist to the true fixpoint: taint only grows, over finitely many
-  // symbols and causes, so it ends; there is no pass limit.
-  const queue = [...new Set([...all.keys(), ...weak.keys()])];
-  while (queue.length) {
-    const changed = queue.pop()!;
-    for (const edge of dependents.get(changed) ?? []) {
-      step();
-      let grew = false;
-      const strong = all.get(changed);
-      if (strong?.size)
-        grew =
-          add(edge.fromAll === "strong" ? all : weak, edge.target, strong) ||
-          grew;
-      const weakCauses = weak.get(changed);
-      if (edge.fromWeak && weakCauses?.size)
-        grew = add(weak, edge.target, weakCauses) || grew;
-      if (grew) queue.push(edge.target);
+    const dependents = new Map<ts.Symbol, Edge[]>();
+    const depend = (on: ts.Symbol, edge: Edge) => {
+      // A member of an instantiated generic type depends through its
+      // declaration's own symbol.
+      const keys = new Set<ts.Symbol>([on]);
+      for (const declaration of on.declarations ?? []) {
+        const declared = (declaration as { symbol?: ts.Symbol }).symbol;
+        if (declared) keys.add(declared);
+      }
+      for (const key of keys) {
+        const edges = dependents.get(key);
+        if (edges) edges.push(edge);
+        else dependents.set(key, [edge]);
+      }
+    };
+    /** Only a generic or overloaded callee's result depends on its arguments. */
+    const argumentsMatter = (call: ts.CallExpression | ts.NewExpression) => {
+      try {
+        const type = checker.getTypeAtLocation(call.expression);
+        const signatures = ts.isNewExpression(call)
+          ? type.getConstructSignatures()
+          : type.getCallSignatures();
+        return (
+          signatures.length > 1 ||
+          signatures.some((signature) => !!signature.typeParameters?.length)
+        );
+      } catch (error) {
+        return unanswered(error);
+      }
+    };
+    /**
+     * Records what a part of a declaration refers to (aliases followed):
+     * strong when a reference decides what the declaration is, weak when it
+     * sits in a type argument; a name no declaration answers that a failed
+     * file declares taints the target directly.
+     */
+    const reference = (target: ts.Symbol, part: ts.Node) => {
+      const visit = (node: ts.Node, inArgument: boolean): void => {
+        step();
+        if (ts.isIdentifier(node) || ts.isPrivateIdentifier(node)) {
+          let symbol: ts.Symbol | undefined;
+          try {
+            symbol = checker.getSymbolAtLocation(node);
+          } catch (error) {
+            symbol = unanswered(error);
+          }
+          // The object of a member access gives the member's value only its
+          // strong taint (which members exist); its type arguments do not
+          // reach a member whose own type does not depend on them.
+          const parent = node.parent;
+          const object =
+            WEAK_THROUGH_VALUE_ONLY &&
+            node !== part &&
+            ts.isPropertyAccessExpression(parent) &&
+            parent.expression === node &&
+            !usesOwnerTypeParameters(
+              checker,
+              checker.getSymbolAtLocation(parent.name),
+            );
+          // An unresolved name (in a type, the compiler's "unknown" symbol).
+          const resolved =
+            symbol &&
+            (symbol.declarations?.length ||
+              symbol.flags & ts.SymbolFlags.Alias);
+          if (symbol && resolved)
+            for (const step of aliasChain(checker, symbol))
+              depend(step, {
+                target,
+                fromAll: inArgument ? "weak" : "strong",
+                fromWeak: !object,
+              });
+          else if (UNREAD_NAMES && ts.isIdentifier(node)) {
+            const files = failedNames.get(node.text);
+            if (files?.length) add(inArgument ? weak : all, target, files);
+          }
+        }
+        // `x as T`, `<T>x`: the asserted type replaces the expression's.
+        if (ts.isAsExpression(node) || ts.isTypeAssertionExpression(node)) {
+          visit(node.type, inArgument);
+          return;
+        }
+        // A function literal's type is its signature: its parameters'
+        // annotations (or defaults) and its return type (or what it returns),
+        // never what its body mentions.
+        if (
+          SIGNATURE_ONLY &&
+          (ts.isArrowFunction(node) || ts.isFunctionExpression(node))
+        ) {
+          for (const parameter of node.parameters) {
+            if (parameter.type) visit(parameter.type, true);
+            else if (parameter.initializer) visit(parameter.initializer, true);
+          }
+          if (node.type) visit(node.type, inArgument);
+          else
+            for (const returned of DEPENDENCIES.inferredReturn!(node, checker))
+              visit(returned, inArgument);
+          return;
+        }
+        // `import("./bad")`, `typeof import("./bad")`, `import("./bad").X`.
+        if (
+          IMPORT_TYPES &&
+          ts.isImportTypeNode(node) &&
+          ts.isLiteralTypeNode(node.argument) &&
+          ts.isStringLiteralLike(node.argument.literal)
+        ) {
+          const from = fromVirtual(node.getSourceFile().fileName);
+          const causes =
+            from === undefined
+              ? []
+              : moduleCauses(node.argument.literal, from, false);
+          if (causes.length) add(inArgument ? weak : all, target, causes);
+        }
+        if (
+          CALL_ARGUMENTS &&
+          (ts.isCallExpression(node) || ts.isNewExpression(node))
+        ) {
+          // The callee decides the result; its arguments only through
+          // inferred type arguments (weak), and only when they can.
+          visit(node.expression, inArgument);
+          for (const typeArgument of node.typeArguments ?? [])
+            visit(typeArgument, true);
+          if (argumentsMatter(node))
+            for (const argument of node.arguments ?? []) visit(argument, true);
+          return;
+        }
+        // The parameters of a signature in a type (a function, constructor or
+        // method type) decide only what it accepts: weak, through inference.
+        const signatureParameter =
+          WEAK_SIGNATURE_PARAMETERS &&
+          ts.isParameter(node) &&
+          (ts.isFunctionTypeNode(node.parent) ||
+            ts.isConstructorTypeNode(node.parent) ||
+            ts.isCallSignatureDeclaration(node.parent) ||
+            ts.isConstructSignatureDeclaration(node.parent) ||
+            ts.isMethodSignature(node.parent));
+        ts.forEachChild(node, (child) =>
+          visit(
+            child,
+            inArgument ||
+              signatureParameter ||
+              (WEAK_ARGUMENTS && isTypeArgument(child)),
+          ),
+        );
+      };
+      visit(part, false);
+    };
+    for (const node of declarations) {
+      const symbol = symbolOfDeclaration(node, checker);
+      if (!symbol) continue;
+      for (const parts of Object.values(DEPENDENCIES))
+        for (const part of parts(node, checker)) reference(symbol, part);
+      // `const { job } = tree`: the destructured property's own taint.
+      if (
+        DESTRUCTURED &&
+        ts.isBindingElement(node) &&
+        ts.isObjectBindingPattern(node.parent)
+      ) {
+        const key = node.propertyName ?? node.name;
+        let property: ts.Symbol | undefined;
+        try {
+          property = ts.isIdentifier(key)
+            ? checker.getTypeAtLocation(node.parent).getProperty(key.text)
+            : undefined;
+        } catch (error) {
+          property = unanswered(error);
+        }
+        if (property)
+          depend(property, {
+            target: symbol,
+            fromAll: "strong",
+            fromWeak: true,
+          });
+      }
     }
+    // Nothing reaches a failed file (no binding, import type or global name).
+    if (!all.size && !weak.size) {
+      memo.set(checker, EMPTY);
+      return EMPTY;
+    }
+    // A worklist to the true fixpoint: taint only grows, over finitely many
+    // symbols and causes, so it ends; there is no pass limit.
+    const queue = [...new Set([...all.keys(), ...weak.keys()])];
+    while (queue.length) {
+      const changed = queue.pop()!;
+      for (const edge of dependents.get(changed) ?? []) {
+        step();
+        let grew = false;
+        const strong = all.get(changed);
+        if (strong?.size)
+          grew =
+            add(edge.fromAll === "strong" ? all : weak, edge.target, strong) ||
+            grew;
+        const weakCauses = weak.get(changed);
+        if (edge.fromWeak && weakCauses?.size)
+          grew = add(weak, edge.target, weakCauses) || grew;
+        if (grew) queue.push(edge.target);
+      }
+    }
+    const taint = { seeds, all, weak };
+    memo.set(checker, taint);
+    return taint;
   }
-  const taint = { seeds, all, weak };
-  memo.set(checker, taint);
-  return taint;
 }

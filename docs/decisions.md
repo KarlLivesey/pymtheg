@@ -2937,4 +2937,12 @@ that program that could have a target becomes `taint-budget-exhausted`, and
 later checkers of the session skip the walk. The seed walk reads aliases
 from the binder only, and cause sets are shared until they grow. **Rules
 out:** time or memory readings as limits, and treating a stopped walk as
-finding no dependence. See [C-13](changes/C-13.md).
+finding no dependence. A stopped walk still answers, binding by binding,
+whether a link binds a failed file directly; those links stay
+`invalid-code`. The program budget counts every checkout file a program
+loads (imports too), in the compiler's order. A file past it is left out of
+that program only. Installed declarations keep C-20's budget. Files left
+out, or failed by a compiler exception, are unavailable (as for parse and
+bind failures), not invalid code. One cap of 100 counts every contained
+exception in a program. A file dropped late makes its project be extracted
+again. See [C-13](changes/C-13.md).

@@ -12,8 +12,7 @@ const files = tracked.filter((p) => source.test(p)).map((path) => ({ path, text:
 const contexts = tracked.filter((p) => context.test(p)).map((path) => ({ path, text: read(path), hash: "", status: "clean", diagnostics: [] }));
 const size = new Map(files.map((f) => [f.path, f.text.length]));
 for (const budget of budgets) {
-  project.programBudget.characters = Number(budget);
-  const model = project.projectModel(files, contexts);
+  const model = project.projectModel(files, contexts, undefined, Number(budget));
   let chars = 0;
   for (const path of model.omitted.keys()) chars += size.get(path);
   const kept = model.groups.reduce((n, g) => n + g.roots.length, 0) - model.omitted.size;

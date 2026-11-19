@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { writeHeapSnapshot } from "node:v8";
 const [build, root, ...prefixes] = process.argv.slice(2);
 const { contentHash } = await import(`${build}/dist/graph/index.js`);
-const { default: tsModule, statistics } = await import(
+const { statistics } = await import(
   `${build}/dist/graph/languages/typescript/index.js`
 );
 const tracked = execFileSync("git", ["-C", root, "ls-files", "-z"], {
@@ -47,13 +47,16 @@ const contextFiles = tracked
       diagnostics: [],
     };
   });
-// With BUDGET, the program budget (characters) in force (test hook).
-if (process.env.BUDGET) {
-  const { programBudget } = await import(
-    `${build}/dist/graph/languages/typescript/project.js`
-  );
-  programBudget.characters = Number(process.env.BUDGET);
-}
+// With BUDGET or TAINT_STEPS, a module instance with that program budget
+// (characters) or taint walk budget (steps).
+const loaded = await import(`${build}/dist/graph/languages/typescript/index.js`);
+const tsModule =
+  (process.env.BUDGET || process.env.TAINT_STEPS) && loaded.typescriptModule
+    ? loaded.typescriptModule({
+        ...(process.env.BUDGET ? { programCharacters: Number(process.env.BUDGET) } : {}),
+        ...(process.env.TAINT_STEPS ? { taintSteps: Number(process.env.TAINT_STEPS) } : {}),
+      })
+    : loaded.default;
 const started = Date.now();
 // With HEAPLOG, log live heap after a full GC at every program creation (--expose-gc).
 if (process.env.HEAPLOG) {

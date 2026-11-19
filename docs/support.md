@@ -825,8 +825,12 @@ answer.
   `package.json` that starts with a UTF-8 byte-order mark is read. Finding
   which links depend on a program's failed files has a deterministic budget
   of 8,000,000 steps. When it is reached, every link of that program that
-  could have a target is unresolved with `taint-budget-exhausted`; no pin
-  outside microsoft/TypeScript comes near it.
+  could have a target is unresolved with `taint-budget-exhausted`, except
+  links that bind a failed file directly, which stay `invalid-code`; no pin
+  outside microsoft/TypeScript comes near it. The program budget counts
+  every checkout file a program loads, imported files included; a file past
+  it is left out of that program only (installed declarations have their
+  own budget).
 - **A program that contains a failed file:** the failed file is absent;
   `invalid-code` with a cause is best-effort attribution. Links computed
   without the failed file carry `assumes: ["no-unseen-declarations"]`.

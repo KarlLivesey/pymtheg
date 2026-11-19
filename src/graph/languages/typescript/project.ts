@@ -115,6 +115,13 @@ export interface ProjectModel {
    * They are also in `parseFailures`: served to every program as absent.
    */
   omitted: Map<string, string>;
+  /**
+   * Why this program did not load a checkout file: what it had loaded
+   * already would pass MAX_PROGRAM_SOURCE (files it imports count, not only
+   * its roots). Only in this program; the file's own project may still
+   * read it.
+   */
+  refusedIn: (group: ProjectGroup, path: string) => string | undefined;
   /** The global names a readable file declares (`declaredGlobalNames`), cached. */
   globalNames: (path: string) => readonly string[];
   /** Failed files a host was asked for (roots or imports): unseen declarations. */
@@ -141,11 +148,6 @@ export interface ProjectModel {
  * on the snapshot, never on the machine. See docs/changes/C-13.md.
  */
 export const MAX_PROGRAM_SOURCE = 50_000_000;
-/**
- * Test hook: the budget in force (MAX_PROGRAM_SOURCE in normal use;
- * nothing in the module changes it), so tests can use small projects.
- */
-export const programBudget = { characters: MAX_PROGRAM_SOURCE };
 
 /** 1234567 -> "1,234,567". */
 const grouped = (value: number) =>
@@ -562,7 +564,10 @@ export function projectModel(
   files: readonly GraphFile[],
   contexts: readonly ContextFile[],
   dependencies?: DependencyInputs,
+  /** The program budget (MAX_PROGRAM_SOURCE; tests pass a small one). */
+  budgetCharacters: number = MAX_PROGRAM_SOURCE,
 ): ProjectModel {
+  const programBudget = { characters: budgetCharacters };
   const fs = new VirtualFileSystem();
   const deno = denoImports(contexts);
   for (const file of contexts) fs.add(file.path, file.text);
@@ -1076,10 +1081,24 @@ export function projectModel(
   const syntaxFailures = new Map<string, SyntaxFailure>();
   const caches = new WeakMap<ts.CompilerHost, Map<string, ts.SourceFile>>();
   const asked = new WeakMap<ts.CompilerHost, Set<string>>();
+  /** Checkout source each program has loaded, and the files it refused. */
+  const loads = new Map<
+    ProjectGroup,
+    { characters: number; names: Set<string>; refused: Map<string, string> }
+  >();
+  const loadOf = (group: ProjectGroup) => {
+    let load = loads.get(group);
+    if (!load) {
+      load = { characters: 0, names: new Set(), refused: new Map() };
+      loads.set(group, load);
+    }
+    return load;
+  };
   const host = (
     group: ProjectGroup,
     variant?: HostVariant,
   ): ts.CompilerHost => {
+    const load = loadOf(group);
     const budget = budgets.get(group) ?? {
       bytes: 0,
       names: new Set<string>(),
@@ -1129,6 +1148,29 @@ export function projectModel(
         if (failures.has(path.slice(1))) {
           requested.add(path.slice(1));
           return undefined;
+        }
+        // The program's budget counts every checkout file it loads, in the
+        // order the compiler asks for them; installed declarations have
+        // their own budget (above).
+        {
+          const relative = path.slice(1);
+          const size = originals.get(relative)?.length;
+          if (size !== undefined && !load.names.has(relative)) {
+            if (
+              load.refused.has(relative) ||
+              load.characters + size > programBudget.characters
+            ) {
+              if (!load.refused.has(relative))
+                load.refused.set(
+                  relative,
+                  `Not analysed here: the TypeScript program of ${group.config ?? "the files no tsconfig or jsconfig includes"} would load more than ${grouped(programBudget.characters)} characters of checkout source with this file (${grouped(size)} characters); files past that bound, in the order the compiler loads them, are left out of it`,
+                );
+              requested.add(relative);
+              return undefined;
+            }
+            load.characters += size;
+            load.names.add(relative);
+          }
         }
         // An unchanged file reuses the base host's parse (and binding).
         let file =
@@ -1256,6 +1298,7 @@ export function projectModel(
     syntaxFailures,
     requested: (host) => asked.get(host) ?? new Set(),
     omitted,
+    refusedIn: (group, path) => loads.get(group)?.refused.get(path),
     globalNames: (path) => {
       let names = namesCache.get(path);
       if (!names) {

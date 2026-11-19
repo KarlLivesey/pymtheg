@@ -27,8 +27,8 @@ memory are observations on a shared, loaded machine. The change note,
 - [`taint-steps.txt`](taint-steps.txt): each identity pin's taint walks and
   most steps in one walk, against the 8,000,000-step budget.
 - [`compare-summary.json`](compare-summary.json): every link, with C-10's
-  [`compare.mjs`](compare.mjs) (seed `c13`). All 334,036 links that are
-  definite on main keep their target.
+  [`compare.mjs`](compare.mjs) (seed `c13`). All 334,036 stored `resolved`
+  rows of main (assumption-marked ones included) keep their target.
 - [`vite-transitions.json`](vite-transitions.json): Vite's changed outcomes
   (`tools/transitions.mjs`): 10,558 unresolved → library target and one new
   structural link. It also holds the 20-link hand-check sample (seed `c13`).

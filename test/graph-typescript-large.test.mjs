@@ -13,15 +13,17 @@ import {
 } from "../dist/graph/index.js";
 import typescript, {
   statistics,
+  typescriptModule,
 } from "../dist/graph/languages/typescript/index.js";
-import { programBudget } from "../dist/graph/languages/typescript/project.js";
-import { taintLimits } from "../dist/graph/languages/typescript/taint.js";
 
 /**
  * Indexes `files` (twice when `twice` is set) and returns the report, the
  * stored files and every link with its text, line, outcome and target.
  */
-async function indexFiles(files, { twice = false } = {}) {
+async function indexFiles(
+  files,
+  { twice = false, module: language = typescript } = {},
+) {
   const scratch = await mkdtemp(join(tmpdir(), "pymtheg-ts-large-"));
   const root = join(scratch, "project");
   const store = new SqliteGraphStore(join(scratch, "graph.sqlite"), "large");
@@ -33,7 +35,7 @@ async function indexFiles(files, { twice = false } = {}) {
     const read = async () => {
       const report = await indexProject(
         root,
-        new LanguageRegistry([typescript]),
+        new LanguageRegistry([language]),
         store,
       );
       const symbols = new Map(
@@ -254,30 +256,31 @@ test("a byte-order mark anywhere but the start still makes a manifest unreadable
 });
 
 test("a project with more source than one program may hold leaves out its largest files, failed with the reason", async () => {
-  const saved = programBudget.characters;
   // Budget: the small files fit, the large one does not.
-  programBudget.characters = 2_000;
-  try {
+  {
     const large = [
       "function onlyInLarge() {}",
       "function common() {}",
       "// " + "x".repeat(3_000),
       "",
     ].join("\n");
-    const result = await indexFiles({
-      "large.js": large,
-      "small.js": [
-        "function common() {}",
-        "function local() {}",
-        "local(); // local-call",
-        "common(); // also-in-large",
-        "onlyInLarge(); // only-in-large",
-        "",
-      ].join("\n"),
-      // A project of its own (a config) under the budget is untouched.
-      "app/tsconfig.json": '{ "compilerOptions": { "strict": true } }\n',
-      "app/main.ts": "export function run() {}\nrun(); // config-call\n",
-    });
+    const result = await indexFiles(
+      {
+        "large.js": large,
+        "small.js": [
+          "function common() {}",
+          "function local() {}",
+          "local(); // local-call",
+          "common(); // also-in-large",
+          "onlyInLarge(); // only-in-large",
+          "",
+        ].join("\n"),
+        // A project of its own (a config) under the budget is untouched.
+        "app/tsconfig.json": '{ "compilerOptions": { "strict": true } }\n',
+        "app/main.ts": "export function run() {}\nrun(); // config-call\n",
+      },
+      { module: typescriptModule({ programCharacters: 2_000 }) },
+    );
     assert.deepEqual(Object.keys(failedReasons(result)), ["large.js"]);
     assert.match(
       failedReasons(result)["large.js"],
@@ -294,9 +297,47 @@ test("a project with more source than one program may hold leaves out its larges
     const config = linkOn(result, "app/main.ts", "// config-call", "run");
     assert.equal(config.target, "app/main.ts#run");
     assert.deepEqual(config.assumes, []);
-  } finally {
-    programBudget.characters = saved;
   }
+});
+
+test("the program budget counts the checkout files a program imports, not only its roots", async () => {
+  // Two configured projects: p1 imports p2's file. Each project's roots are
+  // within the budget; p1's program would load both.
+  const big = [
+    "export function bigThing() {}",
+    "// " + "y".repeat(1_400),
+    "",
+  ].join("\n");
+  const result = await indexFiles(
+    {
+      "p1/tsconfig.json": "{}\n",
+      "p1/a.ts": [
+        'import { bigThing } from "../p2/big"; // import-big',
+        "bigThing(); // call-big",
+        "export function own() {}",
+        "own(); // call-own",
+        "// " + "z".repeat(900),
+        "",
+      ].join("\n"),
+      "p2/tsconfig.json": "{}\n",
+      "p2/big.ts": big,
+      "p2/use.ts":
+        'import { bigThing } from "./big";\nbigThing(); // call-in-p2\n',
+    },
+    { module: typescriptModule({ programCharacters: 2_000 }) },
+  );
+  // Nothing fails: p2's own program reads big.ts.
+  assert.deepEqual(result.report.failed, []);
+  const inP2 = linkOn(result, "p2/use.ts", "// call-in-p2", "bigThing");
+  assert.equal(inP2.target, "p2/big.ts#bigThing");
+  // In p1's program big.ts was not loaded: links into it are never
+  // definite, and the rest of the program is flagged.
+  const call = linkOn(result, "p1/a.ts", "// call-big", "bigThing");
+  assert.equal(call.resolution, "unresolved");
+  assert.ok(call.reason, "an unresolved link always has a reason");
+  const own = linkOn(result, "p1/a.ts", "// call-own", "own");
+  assert.equal(own.target, "p1/a.ts#own");
+  assert.ok(own.assumes.includes("no-unseen-declarations"));
 });
 
 test("a project within the budget is analysed whole", async () => {
@@ -313,17 +354,31 @@ test("a project within the budget is analysed whole", async () => {
 // A program with a failed file computes which links depend on it (taint.ts),
 // walking every file. The walk has a step budget; when it is reached the
 // answer is unknown, so links must not resolve as if nothing depended on the
-// failed file.
+// failed file. A link that binds the failed file directly still names it.
 const WITH_FAILED_FILE = {
-  "broken.js": "const = ;\n",
+  "broken.js": "export function value() {}\nconst = ;\n",
   "lib.ts": "export function helper() {}\n",
   "use.ts": [
     'import { helper } from "./lib"; // import-helper',
     "helper(); // call-helper",
     'import { value } from "./broken.js"; // import-broken',
+    "value(); // call-broken",
+    'import * as b from "./broken.js"; // namespace-broken',
+    "b.value(); // member-broken",
     "",
   ].join("\n"),
 };
+const brokenLinks = (result) =>
+  [
+    ["// import-broken", "value"],
+    ["// call-broken", "value"],
+    ["// member-broken", "value"],
+  ].map(([marker, text]) => {
+    const link = linkOn(result, "use.ts", marker, text);
+    assert.equal(link.resolution, "unresolved", marker);
+    assert.equal(link.reason, "invalid-code", marker);
+    return marker;
+  });
 
 test("a program whose failed-file walk stays within its budget resolves as before", async () => {
   const result = await indexFiles(WITH_FAILED_FILE);
@@ -332,15 +387,15 @@ test("a program whose failed-file walk stays within its budget resolves as befor
   assert.equal(call.resolution, "resolved");
   assert.equal(call.target, "lib.ts#helper");
   assert.ok(call.assumes.includes("no-unseen-declarations"));
-  const broken = linkOn(result, "use.ts", "// import-broken", "value");
-  assert.equal(broken.reason, "invalid-code");
+  assert.equal(brokenLinks(result).length, 3);
 });
 
-test("a failed-file walk that reaches its budget leaves the program's links unresolved, never resolved", async () => {
-  const saved = taintLimits.steps;
-  taintLimits.steps = 1;
-  try {
-    const result = await indexFiles(WITH_FAILED_FILE);
+for (const steps of [1, 5])
+  test(`a failed-file walk that reaches its budget (${steps} steps) leaves the program's links unresolved, and links into the failed file keep their cause`, async () => {
+    const result = await indexFiles(WITH_FAILED_FILE, {
+      module: typescriptModule({ taintSteps: steps }),
+    });
+    // No file fails for the budget: the caller is still read.
     assert.deepEqual(Object.keys(failedReasons(result)), ["broken.js"]);
     for (const [marker, text] of [
       ["// call-helper", "helper"],
@@ -351,17 +406,143 @@ test("a failed-file walk that reaches its budget leaves the program's links unre
       assert.equal(link.reason, "taint-budget-exhausted", marker);
       assert.equal(link.target, null, marker);
     }
-    // A link already failed by the failed file keeps that reason.
-    const broken = linkOn(result, "use.ts", "// import-broken", "value");
-    assert.equal(broken.reason, "invalid-code");
-    // A file whose program has no failed file needs no walk.
-    const clean = await indexFiles({
+    // Direct bindings of the failed file: failed with it as the cause.
+    assert.equal(brokenLinks(result).length, 3);
+  });
+
+test("a program with no failed file needs no walk, whatever the budget", async () => {
+  const clean = await indexFiles(
+    {
       "lib.ts": "export function helper() {}\n",
       "use.ts": 'import { helper } from "./lib";\nhelper(); // call-helper\n',
-    });
-    const call = linkOn(clean, "use.ts", "// call-helper", "helper");
-    assert.equal(call.target, "lib.ts#helper");
-  } finally {
-    taintLimits.steps = saved;
+    },
+    { module: typescriptModule({ taintSteps: 1 }) },
+  );
+  const call = linkOn(clean, "use.ts", "// call-helper", "helper");
+  assert.equal(call.target, "lib.ts#helper");
+});
+
+/** An exception that reads like the compiler's own assertion. */
+const assertion = (what) => new Error(`Debug Failure. injected ${what}`);
+const inFile = (node, path) => node?.getSourceFile().fileName === `/${path}`;
+const fromTaint = () => new Error().stack.includes("/taint.js");
+const fromExtraction = () => new Error().stack.includes("/extract.js");
+
+test("an exception inside the failed-file walk is never read as a negative answer", async () => {
+  let thrown = 0;
+  const result = await indexFiles(
+    {
+      "broken.js": "const = ;\n",
+      "d.ts": "export function make() {}\nexport const made = make();\n",
+      "e.ts": 'import { made } from "./d"; // import-made\nmade;\n',
+    },
+    {
+      module: typescriptModule({
+        checkerFault: (method, node) => {
+          if (
+            method === "getSymbolAtLocation" &&
+            inFile(node, "d.ts") &&
+            fromTaint()
+          ) {
+            thrown++;
+            throw assertion("taint");
+          }
+        },
+      }),
+    },
+  );
+  assert.ok(thrown > 0);
+  // The file the walk was reading fails with the compiler's message.
+  assert.equal(
+    failedReasons(result)["d.ts"],
+    "The TypeScript compiler failed while analysing this file: Debug Failure. injected taint",
+  );
+  const made = linkOn(result, "e.ts", "// import-made", "made");
+  assert.equal(made.resolution, "unresolved");
+  assert.ok(made.reason, "an unresolved link always has a reason");
+});
+
+test("a file the compiler throws on after files that used it were extracted fails everywhere, and those files are decided again", async () => {
+  let cFailed = false;
+  const files = {
+    "a.ts": [
+      "export class Other { foo() {} }",
+      "export function mf(): Other { return new Other(); }",
+      "export const mv = new Other();",
+      "",
+    ].join("\n"),
+    "b.ts": [
+      'import { mf, mv } from "./a"; // import-a',
+      "mf(); // direct-call",
+      "mf().foo(); // through-call",
+      "mv.foo(); // through-value",
+      "",
+    ].join("\n"),
+    "broken.js": "const = ;\n",
+    "c.ts": "export function trips() {}\ntrips(); // trips\n",
+  };
+  const result = await indexFiles(files, {
+    module: typescriptModule({
+      checkerFault: (method, node) => {
+        // First c.ts trips the compiler while it is extracted (after a.ts
+        // and b.ts); after that,
+        // the failed-file walk trips on a.ts, which was extracted already.
+        if (
+          !cFailed &&
+          inFile(node, "c.ts") &&
+          fromExtraction() &&
+          !fromTaint()
+        ) {
+          cFailed = true;
+          throw assertion("c");
+        }
+        if (cFailed && inFile(node, "a.ts") && fromTaint())
+          throw assertion("a");
+      },
+    }),
+  });
+  const reasons = failedReasons(result);
+  assert.equal(
+    reasons["a.ts"],
+    "The TypeScript compiler failed while analysing this file: Debug Failure. injected a",
+  );
+  assert.equal(
+    reasons["c.ts"],
+    "The TypeScript compiler failed while analysing this file: Debug Failure. injected c",
+  );
+  // b.ts was extracted before either failure: decided again, every link
+  // through a.ts unresolved with a reason, none still resolved.
+  for (const [marker, text] of [
+    ["// direct-call", "mf"],
+    ["// through-call", "foo"],
+    ["// through-value", "foo"],
+  ]) {
+    const link = linkOn(result, "b.ts", marker, text);
+    assert.equal(link.resolution, "unresolved", marker);
+    assert.ok(link.reason, `${marker} has a reason`);
   }
+});
+
+test("exceptions in the syntax phase count toward the one cap on contained exceptions", async () => {
+  const files = {};
+  for (let i = 0; i < 105; i++)
+    files[`f${String(i).padStart(3, "0")}.ts`] = `export const v${i} = ${i};\n`;
+  const result = await indexFiles(files, {
+    module: typescriptModule({
+      syntaxFault: () => {
+        throw assertion("syntax");
+      },
+    }),
+  });
+  const reasons = Object.values(failedReasons(result));
+  assert.equal(reasons.length, 105);
+  assert.equal(
+    reasons.filter((reason) => reason.endsWith("injected syntax")).length,
+    100,
+  );
+  assert.equal(
+    reasons.filter((reason) => reason.endsWith("so the rest were not analysed"))
+      .length,
+    5,
+  );
 });
