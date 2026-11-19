@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 import type { LibraryTarget } from "../../types.js";
-import type { Crate, Edition } from "./cargo.js";
+import type { Crate, Edition, MacroRegistry } from "./cargo.js";
 import {
   auditedMacro,
   compatibleRelease,
@@ -12,8 +12,7 @@ type RegistryRelease = {
   version?: string;
   requirement?: string;
   features?: readonly string[];
-  defaultFeatures?: true;
-  macroRegistry?: readonly string[];
+  macroRegistry?: MacroRegistry;
 };
 export type LibraryPath = {
   unit: LibraryUnit;
@@ -93,9 +92,6 @@ export function dependencyUnit(
             ? { requirement: edge.registryRequirement }
             : {}),
         ...(features ? { features } : {}),
-        ...(active.some((other) => other.defaultFeatures)
-          ? { defaultFeatures: true }
-          : {}),
         ...(edge.macroRegistry ? { macroRegistry: edge.macroRegistry } : {}),
       };
     }),
@@ -230,10 +226,9 @@ type RegistryMacro = {
   namespace: "bang" | "derive" | "attribute";
   families: readonly string[];
   implementation?: string;
-  features?: readonly (readonly string[])[];
 };
 
-// Features are alternatives of required sets, checked on every possible edge.
+// Published macro facets and the implementing packages behind re-exports.
 const registryMacros: Record<string, readonly RegistryMacro[]> = {
   tokio: [
     {
@@ -241,13 +236,11 @@ const registryMacros: Record<string, readonly RegistryMacro[]> = {
       namespace: "attribute",
       families: ["1.0.0"],
       implementation: "tokio-macros",
-      features: [["full"], ["macros", "rt"], ["macros", "rt-multi-thread"]],
     },
     {
       names: ["select"],
       namespace: "bang",
       families: ["1.0.0"],
-      features: [["full"], ["macros"]],
     },
   ],
   serde: [
@@ -256,7 +249,6 @@ const registryMacros: Record<string, readonly RegistryMacro[]> = {
       namespace: "derive",
       families: ["1.0.0"],
       implementation: "serde_derive",
-      features: [["derive"]],
     },
   ],
   clap: [
@@ -265,7 +257,6 @@ const registryMacros: Record<string, readonly RegistryMacro[]> = {
       namespace: "derive",
       families: ["4.0.0"],
       implementation: "clap_derive",
-      features: [["derive"]],
     },
   ],
   rstest: [
@@ -298,7 +289,14 @@ const registryMacros: Record<string, readonly RegistryMacro[]> = {
       namespace: "attribute",
       families: ["3.0.0"],
       implementation: "serde_with_macros",
-      features: [["default"], ["macros"]],
+    },
+  ],
+  schemars: [
+    {
+      names: ["JsonSchema"],
+      namespace: "derive",
+      families: ["0.8.0", "1.0.0"],
+      implementation: "schemars_derive",
     },
   ],
   "pin-project": [
@@ -318,7 +316,6 @@ const registryMacros: Record<string, readonly RegistryMacro[]> = {
       names: ["parse_macro_input"],
       namespace: "bang",
       families: ["1.0.0", "2.0.0", "3.0.0"],
-      features: [["default"], ["parsing", "proc-macro"]],
     },
   ],
   slotmap: [
@@ -329,66 +326,60 @@ const registryMacros: Record<string, readonly RegistryMacro[]> = {
       names: ["new_test", "hash_serialization_test"],
       namespace: "bang",
       families: ["0.11.0"],
-      features: [["dev"]],
     },
   ],
 };
 
-export type CargoMacroExport =
-  | { status: "available"; namespace: RegistryMacro["namespace"] }
-  | { status: "unverified-source" | "unavailable" | "unknown" };
-
-export function cargoMacroExport(path: LibraryPath): CargoMacroExport {
-  const { unit, parts, registry } = path;
-  const name = parts.join("::");
-  const spec = Object.hasOwn(registryMacros, unit.unit)
-    ? registryMacros[unit.unit]!.find((entry) => entry.names.includes(name))
+function registryMacro(path: LibraryPath): RegistryMacro | undefined {
+  const unit = path.unit.unit;
+  const name = path.parts.join("::");
+  return Object.hasOwn(registryMacros, unit)
+    ? registryMacros[unit]!.find((entry) => entry.names.includes(name))
     : undefined;
-  if (
-    !spec &&
-    !registry?.every(({ version, requirement }) =>
-      auditedMacro(unit.unit, version, name, requirement),
-    )
-  )
-    return { status: "unknown" };
-  const knownRelease =
-    !spec || spec.families.some((family) => registryFamily(path, family));
-  if (
-    knownRelease &&
-    spec?.features &&
-    registry?.some(
-      ({ features, defaultFeatures }) =>
-        !spec.features!.some((required) =>
-          required.every(
-            (feature) =>
-              features?.includes(feature) ||
-              (feature === "default" && defaultFeatures),
-          ),
-        ),
-    )
-  )
-    return { status: "unavailable" };
-  if (
-    !registry?.length ||
-    registry.some(
-      ({ macroRegistry }) =>
-        !macroRegistry ||
-        (spec?.implementation && !macroRegistry.includes(spec.implementation)),
-    )
-  )
-    return { status: "unverified-source" };
-  if (!knownRelease) return { status: "unknown" };
-  return { status: "available", namespace: spec?.namespace ?? "bang" };
 }
 
-function macroNamespace(
-  unit: string,
-  macro: CargoMacroExport,
-): ExportNamespace | undefined {
-  if (macro.status !== "available") return;
-  return macro.namespace === "derive" && ["serde", "clap"].includes(unit)
-    ? "multiple"
-    : macro.namespace;
+export function cargoMacroSourceKnown(path: LibraryPath): boolean {
+  const spec = registryMacro(path);
+  const implementation = spec?.implementation;
+  const direct =
+    spec?.families.some((family) => registryFamily(path, family)) ||
+    path.registry?.every(({ version, requirement }) =>
+      auditedMacro(path.unit.unit, version, path.parts.join("::"), requirement),
+    );
+  return (
+    !!path.registry?.length &&
+    path.registry.every(
+      ({ macroRegistry }) =>
+        !!macroRegistry &&
+        (implementation
+          ? macroRegistry.implementations.includes(implementation)
+          : !!direct || macroRegistry.registryOnly),
+    )
+  );
+}
+
+export function cargoMacroReexport(path: LibraryPath): boolean {
+  return registryMacro(path)?.implementation !== undefined;
+}
+
+function macroNamespace(path: LibraryPath): ExportNamespace | undefined {
+  if (!cargoMacroSourceKnown(path)) return;
+  const spec = registryMacro(path);
+  if (spec?.families.some((family) => registryFamily(path, family))) {
+    if (["serde", "clap"].includes(path.unit.unit))
+      return path.registry?.every(({ features }) =>
+        features?.includes("derive"),
+      )
+        ? "multiple"
+        : undefined;
+    return spec.namespace;
+  }
+  if (
+    path.registry?.every(({ version, requirement }) =>
+      auditedMacro(path.unit.unit, version, path.parts.join("::"), requirement),
+    )
+  )
+    return "bang";
 }
 
 /** Known macro facets for the expansion-time probe. */
@@ -396,8 +387,7 @@ export function scopeMacroExport(
   path: LibraryPath,
 ): ExportNamespace | undefined {
   return path.unit.ecosystem === "cargo"
-    ? (macroNamespace(path.unit.unit, cargoMacroExport(path)) ??
-        exportNamespace(path))
+    ? (macroNamespace(path) ?? exportNamespace(path))
     : exportNamespace(path);
 }
 
@@ -455,7 +445,7 @@ export function exportNamespace(
       (unit === "syn" && name === "parse_macro_input") ||
       (unit === "tokio" && ["test", "main"].includes(name))
     )
-      return macroNamespace(unit, cargoMacroExport(path));
+      return macroNamespace(path);
     if (
       unit === "regex-automata" &&
       name === "meta::Regex" &&

@@ -41,7 +41,8 @@ import {
 } from "./library-audit.js";
 import {
   dependencyUnit,
-  cargoMacroExport,
+  cargoMacroReexport,
+  cargoMacroSourceKnown,
   exportNamespace,
   librarySymbol,
   permitsNamespace,
@@ -3631,7 +3632,7 @@ export function resolveRust(
       unit.registry.every(({ version, requirement }) =>
         auditedMacro(unit.unit.unit, version, name, requirement),
       ) &&
-      cargoMacroExport({ ...unit, parts: [name] }).status === "available"
+      cargoMacroSourceKnown({ ...unit, parts: [name] })
     );
   }
   function ecosystemPath(path: string, loc: Place, scope: string): boolean {
@@ -6207,16 +6208,11 @@ export function resolveRust(
       if (
         !libraryProbe &&
         namespace === "macro" &&
-        path.unit.ecosystem === "cargo"
-      ) {
-        const { status } = cargoMacroExport(path);
-        if (status === "unavailable" || status === "unverified-source")
-          return refuseLibrary(
-            status === "unavailable"
-              ? "macro export unavailable"
-              : "macro implementation source unverified",
-          );
-      }
+        path.unit.ecosystem === "cargo" &&
+        cargoMacroReexport(path) &&
+        !cargoMacroSourceKnown(path)
+      )
+        return refuseLibrary("macro implementation source unverified");
       const exported = exportNamespace(path);
       if (
         !libraryProbe &&
@@ -6599,11 +6595,11 @@ export function resolveRust(
       return undefined;
     if (flavor === "derive" && standardDerivePath(binding))
       return "standard derive";
-    if (binding.unit.ecosystem === "cargo") {
-      const macro = cargoMacroExport(binding);
-      if (macro.status !== "available" || macro.namespace !== flavor)
-        return undefined;
-    }
+    if (
+      binding.unit.ecosystem === "cargo" &&
+      ((bare && !binding.namedImport) || !cargoMacroSourceKnown(binding))
+    )
+      return undefined;
     const exported = scopeMacroExport(binding);
     const competingPrelude =
       prelude || (bare && flavor === "attribute" && knownAttributeName(head));

@@ -10,7 +10,7 @@ type DependencySource = {
 };
 type ResolveSource = (
   fields: TomlTable | undefined,
-  macroPackage?: string,
+  macroPackage?: string | null,
 ) => DependencySource;
 const text = (value: TomlValue | undefined) =>
   typeof value === "string" && value ? value : undefined;
@@ -186,7 +186,13 @@ export function cargoSources(
         fields["replace-with"] !== undefined,
     );
     return (fields, macroPackage) => {
-      if (macroPackage && (unknownOverride || patched.has(macroPackage)))
+      if (
+        macroPackage !== undefined &&
+        (unknownOverride ||
+          (macroPackage === null
+            ? patched.size > 0
+            : patched.has(macroPackage)))
+      )
         return { directory: null };
       if (fields?.path !== undefined) return {};
       const registry =

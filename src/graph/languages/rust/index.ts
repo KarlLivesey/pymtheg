@@ -232,7 +232,7 @@ export const rustPhases = {
 
 const rust: LanguageModule = {
   id: "rust",
-  version: "37",
+  version: "38",
   extensions: [".rs"],
   contextFiles: [
     "Cargo.toml",

@@ -30,9 +30,10 @@ pins. [Database comparison](../c-12/compare.mjs)
 
 ### Review attribution
 
-For the review attribution, copy the corrected build to scratch and run
+For the availability-gated review attribution, copy the build from
+`826af3b` to scratch and run
 `node evidence/c-18/review-withdrawals.mjs --relax-provenance "$copy"`.
-Index the affected pins with that copy, keeping the corrected release,
+Index the affected pins with that copy, keeping its release,
 namespace and export-availability checks. Pass the C-12, original PR,
 corrected PR and provenance-relaxed result/work-directory pairs to the
 same script. Pass `--affected` with the first three pairs to identify the
@@ -40,7 +41,8 @@ pins that need a control. A lost Level 2 link that returns in the
 control is attributed to provenance. A link still missing is attributed to availability,
 including exports whose presence cannot be established. The attribution
 uses availability first when both guards can withhold a site. The
-coverage plan uses the corrected build. [Review attribution script](review-withdrawals.mjs)
+coverage plan uses the final build with the compiling-code rule.
+[Review attribution script](review-withdrawals.mjs)
 
 ### Opacity census and cost
 

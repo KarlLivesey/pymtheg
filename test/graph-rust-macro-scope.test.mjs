@@ -395,10 +395,18 @@ test("a renamed Tokio facade needs registry evidence for the macro implementatio
   }
 });
 
-test("a locked Tokio implementation does not enable a missing export feature", async () => {
+test("written Tokio macro routes retain identity with incomplete feature facts", async () => {
+  // With rt alone, this fixture does not compile. The graph assumes written
+  // macro paths and named imports compile when registry provenance is known.
   const at = await tokioMacroOrigin("tokio-registry", { features: '["rt"]' });
-  assert.deepEqual(at("types", "Option", "// test by path"), proved(null));
-  assert.deepEqual(at("types", "Option", "// test by import"), proved(null));
+  assert.deepEqual(
+    at("types", "Option", "// test by path"),
+    assumed("option::Option"),
+  );
+  assert.deepEqual(
+    at("types", "Option", "// test by import"),
+    assumed("option::Option"),
+  );
   const options = {
     features: '["rt"]',
     devDependencies:
@@ -409,10 +417,40 @@ test("a locked Tokio implementation does not enable a missing export feature", a
     ...options,
     file: "tests/runtime.rs",
   });
-  assert.deepEqual(normal("types", "Option", "// test by path"), proved(null));
+  assert.deepEqual(
+    normal("types", "Option", "// test by path"),
+    assumed("option::Option"),
+  );
   assert.deepEqual(
     test("types", "Option", "// test by path"),
     assumed("option::Option"),
+  );
+});
+
+test("an uncatalogued export needs registry provenance through the dependency chain", async () => {
+  const source = `
+    #[derive(facade::Alternative)]
+    struct Item;
+    fn sibling() -> Option<u8> { None } // uncatalogued export
+  `;
+  const registry =
+    'source="registry+https://github.com/rust-lang/crates.io-index"\n';
+  const lock =
+    macroLock([["facade", "1.0.0", ["bridge", "1.0.0"]]]) +
+    'dependencies=["implementation"]\n[[package]]\nname="implementation"\nversion="1.0.0"\n';
+  const control = await observations(source, 'facade="1"', {
+    "Cargo.lock": lock + registry,
+  });
+  const patched = await observations(source, 'facade="1"', {
+    "Cargo.lock": lock,
+  });
+  assert.deepEqual(
+    control("types", "Option", "// uncatalogued export"),
+    assumed("option::Option"),
+  );
+  assert.deepEqual(
+    patched("types", "Option", "// uncatalogued export"),
+    proved(null),
   );
 });
 
