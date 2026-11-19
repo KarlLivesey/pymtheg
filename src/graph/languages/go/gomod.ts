@@ -35,6 +35,11 @@ export interface GoWorkspace {
   directory: string;
   uses: string[];
   replacements: GoReplacement[];
+  /**
+   * A `use` directory is outside the checkout: that main module's
+   * requirements are not seen, so no selected version is proven.
+   */
+  outside?: true;
 }
 export interface GoProjectLayout {
   /** Deepest directory first, so the first enclosing module is the nearest. */
@@ -86,15 +91,32 @@ export function joinDirectory(
 export const within = (directory: string, root: string): boolean =>
   root === "" || directory === root || directory.startsWith(`${root}/`);
 
+/**
+ * A directive's operands: whitespace-separated (`=>` is its own), a quoted
+ * operand (`"a b"` or a raw string) whole and unquoted.
+ */
+export function operands(args: string): string[] {
+  const out: string[] = [];
+  const pattern = /"((?:[^"\\]|\\.)*)"|`([^`]*)`|(=>|(?:[^\s"`=]|=(?!>))+)/g;
+  for (const match of args.matchAll(pattern))
+    out.push(
+      match[1] !== undefined
+        ? match[1].replace(/\\(.)/g, "$1")
+        : (match[2] ?? match[3]!),
+    );
+  return out;
+}
+
 function replacement(
   directory: string,
   args: string,
 ): GoReplacement | undefined {
-  const [from, to] = args.split("=>").map((part) => part.trim());
-  const fromParts = from?.split(/\s+/) ?? [];
-  const fromPath = unquote(fromParts[0] ?? "");
-  const version = fromParts[1];
-  const toPath = unquote(to?.split(/\s+/)[0] ?? "");
+  const parts = operands(args);
+  const arrow = parts.indexOf("=>");
+  if (arrow < 0) return undefined;
+  const fromPath = parts[0] ?? "";
+  const version = arrow > 1 ? parts[1] : undefined;
+  const toPath = parts[arrow + 1] ?? "";
   if (!fromPath || !toPath) return undefined;
   // A directory path, as Go reads one (modfile.IsDirectoryPath): `.`, `..`,
   // or beginning with `./` or `../` (gopls: `replace golang.org/x/tools => ..`).
@@ -133,6 +155,7 @@ export function readLayout(
     const uses: string[] = [];
     let path: string | undefined;
     let go: string | undefined;
+    let outside = false;
     for (const { verb, args } of directives(file.text)) {
       if (verb === "module" && name === "go.mod")
         path = unquote(args.split(/\s+/)[0] ?? "") || undefined;
@@ -145,8 +168,10 @@ export function readLayout(
         const item = replacement(directory, args);
         if (item) replacements.push(item);
       } else if (verb === "use" && name === "go.work") {
-        const target = joinDirectory(directory, unquote(args));
+        const target = joinDirectory(directory, operands(args)[0] ?? "");
         if (target !== undefined) uses.push(target);
+        // A module outside the checkout: its requirements are unseen.
+        else outside = true;
       }
     }
     if (name === "go.mod" && path !== undefined)
@@ -158,7 +183,12 @@ export function readLayout(
         ...(go === undefined ? {} : { go }),
       });
     if (name === "go.work")
-      layout.workspaces.push({ directory, uses, replacements });
+      layout.workspaces.push({
+        directory,
+        uses,
+        replacements,
+        ...(outside ? { outside: true as const } : {}),
+      });
   }
   const order = (a: { directory: string }, b: { directory: string }) =>
     b.directory.length - a.directory.length ||
@@ -273,7 +303,7 @@ export function directoryOfImport(
   // the main go.mod need not list indirect requirements).
   const pruned = mains.every((main) => prunedGraph(main.go));
   const selectedVersion = (path: string): string | undefined => {
-    if (!pruned) return undefined;
+    if (!pruned || workspace?.outside) return undefined;
     let best: string | undefined;
     for (const main of mains) {
       const version = main.requires.get(path);

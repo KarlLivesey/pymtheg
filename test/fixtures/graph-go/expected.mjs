@@ -131,7 +131,7 @@ export const links = [
   {"file":"geom/geom_ext_test.go","kind":"references","targetName":"testing.T","source":{"name":"TestTotal","kind":"function"},"target":null,"at":"testing.T","libraries":[{"ecosystem":"go-std","unit":"testing","symbol":"T","evidence":"import-binding"}]},
   {"file":"geom/geom_ext_test.go","kind":"references","targetName":"geom.Circle","source":{"name":"TestTotal","kind":"function"},"target":{"file":"geom/area.go","name":"Circle","kind":"struct"},"at":"geom.Circle"},
   {"file":"geom/geom_ext_test.go","kind":"calls","targetName":"geom.Total","source":{"name":"TestTotal","kind":"function"},"target":{"file":"geom/util.go","name":"Total","kind":"function"},"at":"geom.Total"},
-  {"file":"geom/geom_ext_test.go","kind":"calls","targetName":"t.Log","source":{"name":"TestTotal","kind":"function"},"target":null,"at":"t.Log"},
+  {"file":"geom/geom_ext_test.go","kind":"calls","targetName":"t.Log","source":{"name":"TestTotal","kind":"function"},"target":null,"at":"t.Log","libraries":[{"ecosystem":"go-std","unit":"testing","symbol":"common.Log","evidence":"declaring-owner"}]},
   {"file":"geom/geom_ext_test.go","kind":"calls","targetName":"c.Area","source":{"name":"TestTotal","kind":"function"},"target":{"file":"geom/area.go","name":"Area","kind":"method"},"at":"c.Area"},
   {"file":"geom/geom_test.go","kind":"contains","targetName":"helperForTests","source":{"name":"geom_test.go","kind":"file"},"target":{"file":"geom/geom_test.go","name":"helperForTests","kind":"function"},"at":"func helperForTests() float64 { return scale(2) }"},
   {"file":"geom/geom_test.go","kind":"calls","targetName":"scale","source":{"name":"helperForTests","kind":"function"},"target":{"file":"geom/util.go","name":"scale","kind":"function"},"at":"scale"},

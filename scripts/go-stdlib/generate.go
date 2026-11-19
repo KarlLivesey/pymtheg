@@ -33,8 +33,8 @@
 //	F	Name	since	result...                  an exported function
 //	V	Name	since	type                       an exported variable or typed constant
 //
-// owner: "=" the type itself, "Type" a type of the same package, else
-// "path.Type". Types: "path.Name;" a named type (generic types by their
+// owner: "Type" a type of the same package (the type itself included),
+// else "path.Type"; the predeclared error is package "builtin". Types: "path.Name;" a named type (generic types by their
 // origin), "*T" pointer, "[T" slice or array, "MKV" map, "CT" channel, "?"
 // anything else (basic types, functions, type parameters, literals).
 package main
@@ -153,7 +153,7 @@ func dumpPlatform() {
 	emit := func(key, line string) { fmt.Fprintf(w, "%s\x00%s\n", key, line) }
 	emit("builtin", "P\tbuiltin")
 	emit("builtin\x01error", "T\terror\ti")
-	emit("builtin\x01error\x01Error", "m\tError\t=\t0\t?")
+	emit("builtin\x01error\x01Error", "m\tError\terror\t0\t?")
 	for _, path := range strings.Fields(string(list)) {
 		if !importable(path) {
 			continue
@@ -344,8 +344,8 @@ func fieldHolder(t types.Type, index []int) types.Type {
 	return t
 }
 
-// ownerName: "=" for the type itself (callers compare), a same-package
-// type's name, or path.Name; "" when the owner is not a named type.
+// ownerName: a same-package type's name, or path.Name; "" when the owner is
+// not a named type.
 func ownerName(t types.Type, pkg *types.Package) string {
 	if pt, ok := t.(*types.Pointer); ok {
 		t = pt.Elem()

@@ -3,6 +3,7 @@ import { possibleCalls, type PossibleCall } from "./command-possible.js";
 import type { SqliteGraphStore } from "./store.js";
 import { GraphLocations, type Located } from "./command-locations.js";
 import type { GraphLink, GraphSymbol } from "./types.js";
+import { stdDeclaredBy } from "./languages/go/stdlib.js";
 
 /**
  * Whether the Go toolchain route decided a link: a parsed link it upgraded,
@@ -136,7 +137,7 @@ export function queryGraph(
     let minimumEnd = Infinity,
       maximumStart = -1;
     const inner: GraphSymbol[] = [];
-    for (let i = 0; i < found.length; ) {
+    for (let i = 0; i < found.length;) {
       const value = found[i]!;
       let end = i + 1;
       while (
@@ -145,12 +146,10 @@ export function queryGraph(
         found[end]!.range.end === value.range.end
       )
         end++;
-      if (
-        !(
-          minimumEnd < value.range.end ||
-          (minimumEnd === value.range.end && maximumStart > value.range.start)
-        )
-      )
+      if (!(
+        minimumEnd < value.range.end ||
+        (minimumEnd === value.range.end && maximumStart > value.range.start)
+      ))
         inner.push(...found.slice(i, end));
       if (value.range.end < minimumEnd) {
         minimumEnd = value.range.end;
@@ -177,7 +176,7 @@ export function queryGraph(
     if (/^symbol:/.test(input) || /:\d+(?::\d+)?$/.test(input)) return [];
     const parts = (value: string) => {
       let text = value.trim();
-      for (let before = ""; before !== text; ) {
+      for (let before = ""; before !== text;) {
         before = text;
         text = text.replace(/<[^<>]*>|\[[^[\]]*\]/g, "");
       }
@@ -248,16 +247,25 @@ export function queryGraph(
     const [unit, librarySymbol] = args as [string, string | undefined];
     if (!unit || (librarySymbol !== undefined && !librarySymbol))
       throw Error("Expected a library unit and an optional symbol");
-    const found = store.libraryUses(unit, librarySymbol, limit + 1);
+    // A Go standard-library member declared by an unexported type (C-17:
+    // `testing T.Fatal` is `common.Fatal`): links are stored under that
+    // declaring owner, so they are looked up there and the owner is shown.
+    const declaredBy =
+      librarySymbol === undefined
+        ? undefined
+        : stdDeclaredBy(unit, librarySymbol);
+    const queried = declaredBy ?? { unit, symbol: librarySymbol };
+    const found = store.libraryUses(queried.unit, queried.symbol, limit + 1);
     return result(
       {
         library: {
           unit,
           ...(librarySymbol === undefined ? {} : { symbol: librarySymbol }),
           place: "outside-project",
+          ...(declaredBy ? { declaredBy } : {}),
         },
         links: links(found.slice(0, limit)),
-        classCounts: store.libraryUseCounts(unit, librarySymbol),
+        classCounts: store.libraryUseCounts(queried.unit, queried.symbol),
         limit,
       },
       found.length > limit,

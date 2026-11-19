@@ -239,6 +239,30 @@ export function stdTable(): StdTable {
   return loaded;
 }
 
+/**
+ * `graph uses` (C-17): the declaring owner of member `Type.Member` of a
+ * standard-library type when that owner is an unexported type
+ * (`testing T.Fatal` is declared by `common`), so it can be found by the
+ * exported type it is selected through. Undefined otherwise; the table is
+ * read only for a `Type.Member` of a package it has.
+ */
+export function stdDeclaredBy(
+  unit: string,
+  symbol: string,
+): { unit: string; symbol: string } | undefined {
+  const match = /^([A-Z]\w*)\.(\w+)$/.exec(symbol);
+  if (!match || unit.includes(".") || unit === "builtin") return undefined;
+  const table = stdTable();
+  if (!table.hasPackage(unit)) return undefined;
+  const member = table.named(unit, match[1]!)?.members.get(match[2]!);
+  if (!member || member.kind === "uncertain") return undefined;
+  if (/^[A-Z]/.test(member.ownerType)) return undefined;
+  return {
+    unit: member.ownerPkg,
+    symbol: `${member.ownerType}.${member.name}`,
+  };
+}
+
 /** "1.N" or "1.N.P" or "go1.N": [major, minor]; undefined when unreadable. */
 function release(version: string): [number, number] | undefined {
   const match = /^(?:go)?(\d+)\.(\d+)/.exec(version.trim());

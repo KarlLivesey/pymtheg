@@ -798,7 +798,9 @@ class GoResolver {
     const named = stdNamedOf(type);
     const member = named?.members.get(name);
     if (!member || member.kind === "uncertain") return undefined;
-    return releasedBy(member.since, this.goDirective(from)) ? member : undefined;
+    return releasedBy(member.since, this.goDirective(from))
+      ? member
+      : undefined;
   }
 
   private stdSelect(
@@ -874,7 +876,9 @@ class GoResolver {
         false,
         true,
       );
-      return found.kind === "library" ? this.stdTarget(found.member) : undefined;
+      return found.kind === "library"
+        ? this.stdTarget(found.member)
+        : undefined;
     }
     return undefined;
   }
@@ -1082,8 +1086,7 @@ class GoResolver {
    */
   private toolchainLibrary(link: GraphLink): LibraryTarget | undefined {
     const data = link.data as
-      | { tc?: ToolchainFact; builtinName?: boolean }
-      | undefined;
+      { tc?: ToolchainFact; builtinName?: boolean } | undefined;
     const fact = data?.tc;
     if (!fact) return undefined;
     // A method of the predeclared `error` interface (C-17): its owner.
@@ -1900,8 +1903,7 @@ class GoResolver {
           const item = std && stdItem(std, desc.k === "key");
           return { e: "value", type: item ? { ...rest, std: item } : rest };
         }
-        if (container.kind === "failed")
-          return { e: "value", type: container };
+        if (container.kind === "failed") return { e: "value", type: container };
         if (container.kind === "cont") {
           // A single range variable over a channel is its element.
           const item =
@@ -2670,13 +2672,11 @@ class GoResolver {
             }
             // An external type cannot declare a project package's unexported name;
             // an unresolvable one could be anything.
-            if (
-              !(
-                item.value.kind === "external" &&
-                !item.value.shadowable &&
-                skipExternal
-              )
-            )
+            if (!(
+              item.value.kind === "external" &&
+              !item.value.shadowable &&
+              skipExternal
+            ))
               externalAt ??= depth + 1;
             continue;
           }
@@ -2842,13 +2842,11 @@ class GoResolver {
       );
       for (const item of this.embedded(iface)) {
         if (item.value.kind !== "project") {
-          if (
-            !(
-              item.value.kind === "external" &&
-              !item.value.shadowable &&
-              skipExternal
-            )
-          )
+          if (!(
+            item.value.kind === "external" &&
+            !item.value.shadowable &&
+            skipExternal
+          ))
             unknown = true;
           continue;
         }
@@ -3339,8 +3337,7 @@ class GoResolver {
   private symbolsByFile?: Map<string, GraphSymbol[]>;
   /** The graph symbol declared at a toolchain position (name inside its range). */
   private symbolAt([file, offset, name]: [string, number, string]):
-    | GraphSymbol
-    | undefined {
+    GraphSymbol | undefined {
     if (!this.symbolsByFile) {
       this.symbolsByFile = new Map();
       for (const symbol of this.symbolsById.values())
@@ -4750,9 +4747,7 @@ function countsMatch(a: GraphSymbol, b: GraphSymbol): boolean {
 
 /** A reassigned local's static type comes from its declaration. */
 /** The value an external entity denotes, with its standard-library type. */
-function externalValue(
-  entity: Extract<Entity, { e: "external" }>,
-): TypeValue {
+function externalValue(entity: Extract<Entity, { e: "external" }>): TypeValue {
   return entity.std?.t === "value" && entity.std.type.k !== "unknown"
     ? { kind: "external", name: entity.name, std: entity.std.type }
     : { kind: "external", name: entity.name };
