@@ -12,7 +12,6 @@ The fixed-seed draw took 60 newly stored library links across 16 pins. The dispo
 | reduxjs/redux-toolkit `packages/rtk-query-codegen-openapi/test/generateEndpoints.test.ts:950` (`expect`) | `npm vitest · expect` | `packages/rtk-query-codegen-openapi/tsconfig.json` requests `vitest/globals`. The published ambient declaration supplies `expect`. | Right |
 | dexie/Dexie.js `libs/dexie-cloud-common/src/tson/__tests__/TypesonSimplified.test.ts:213` (`expect`) | `npm jest · expect` | `libs/dexie-cloud-common/tsconfig.json` requests `jest`. The published ambient declaration supplies `expect`. | Right |
 | oclif/core `test/config/util.test.ts:5` (`describe`) | `npm mocha · describe` | `test/tsconfig.json` requests `mocha`. The published ambient declaration supplies `describe`. | Right |
-| excalidraw/excalidraw `excalidraw-app/tests/MobileMenu.test.tsx:37` (`expect`) | `npm vitest · expect` | `tsconfig.json` requests `vitest/globals`. The published ambient declaration supplies `expect`. | Right |
 | honojs/hono `adapters/aws-lambda/test/index.test.ts:454` (`expect`) | `npm vitest · expect` | `adapters/aws-lambda/tsconfig.json` requests `vitest/globals`. The published ambient declaration supplies `expect`. | Right |
 | withastro/astro `packages/astro/test/units/fs/empty-dir.test.ts:47` (`realRmdirSync`) | `node fs · rmdirSync` | The const alias saves `fs.rmdirSync` before the test replaces the module function with `mock.method`. The module is imported from `node:fs` on line 2. | Right |
 | vitest-dev/vitest `packages/browser/src/node/rpc.ts:167` (`setInterval`) | `node timers · setInterval` | `packages/browser/tsconfig.json` requests `node`. The published ambient declaration supplies `setInterval`. | Right |
@@ -22,10 +21,11 @@ The fixed-seed draw took 60 newly stored library links across 16 pins. The dispo
 | reduxjs/redux-toolkit `packages/toolkit/src/query/tests/createApi.test.ts:420` (`test`) | `npm vitest · test` | `packages/toolkit/tsconfig.base.json` requests `vitest/globals`. The published ambient declaration supplies `test`. | Right |
 | dexie/Dexie.js `libs/dexie-cloud-common/src/tson/__tests__/TSONRef.test.ts:56` (`expect`) | `npm jest · expect` | `libs/dexie-cloud-common/tsconfig.json` requests `jest`. The published ambient declaration supplies `expect`. | Right |
 | oclif/core `test/help/util.test.ts:118` (`it`) | `npm mocha · it` | `test/tsconfig.json` requests `mocha`. The published ambient declaration supplies `it`. | Right |
-| excalidraw/excalidraw `excalidraw-app/tests/collab.test.tsx:241` (`expect`) | `npm vitest · expect` | `tsconfig.json` requests `vitest/globals`. The published ambient declaration supplies `expect`. | Right |
 | honojs/hono `adapters/aws-lambda/test/index.test.ts:741` (`it`) | `npm vitest · it` | `adapters/aws-lambda/tsconfig.json` requests `vitest/globals`. The published ambient declaration supplies `it`. | Right |
 | withastro/astro `packages/astro/test/units/cli/check.test.ts:55` (`setImmediate`) | `node timers · setImmediate` | `packages/astro/tsconfig.test.json` requests `node`. The published ambient declaration supplies `setImmediate`. | Right |
 | vitest-dev/vitest `packages/browser/src/node/rpc.ts:193` (`clearInterval`) | `node timers · clearInterval` | `packages/browser/tsconfig.json` requests `node`. The published ambient declaration supplies `clearInterval`. | Right |
+| nestjs/nest `integration/injector/e2e/optional-failing-dependency.spec.ts:41` (`describe`) | `npm vitest · describe` | `integration/injector/tsconfig.json` requests `vitest/globals`. The published ambient declaration supplies `describe`. | Right |
+| mermaid-js/mermaid `packages/mermaid/src/diagrams/sequence/sequenceDiagram.spec.js:724` (`expect`) | `npm vitest · expect` | `packages/mermaid/tsconfig.eslint.json` inherits the `vitest/globals` request from `packages/mermaid/tsconfig.json`. The published ambient declaration supplies `expect`. | Right |
 
 ## Standard, DOM and shared Node APIs
 

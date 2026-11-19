@@ -2,6 +2,7 @@
 import { posix } from "node:path";
 import ts from "typescript";
 import {
+  competingTestNames,
   globalTypeAvailability,
   isTestFramework,
   isTestGlobal,
@@ -87,7 +88,10 @@ export interface RenameContext {
 /** One structural judgement per program (its checker), shared by its files. */
 const judges = new WeakMap<ts.TypeChecker, Judge>();
 const programNodeEvidence = new WeakMap<ts.Program, boolean>();
-const programTestSetups = new WeakMap<ts.Program, ReadonlySet<string>>();
+const programTestSetups = new WeakMap<
+  ts.Program,
+  { units: ReadonlySet<string>; competitors: ReadonlySet<string> }
+>();
 const producerReaders = new WeakMap<
   ts.Program,
   ReturnType<typeof objectProducers>
@@ -153,6 +157,7 @@ interface Targets {
   declarations?: readonly ts.Node[];
   /** Unresolved with no declaration found anywhere (not even outside the project). */
   noAnswer?: boolean;
+  competingTypes?: readonly string[];
   /**
    * Why there is no complete target set: external, local, no-symbol,
    * missing-module, external-package, unresolved-alias, computed-specifier.
@@ -571,7 +576,9 @@ export function extractFile(
       (meaning !== "call" && !found.typeQuery) ||
       incompleteConfig ||
       context.anyFailed ||
-      result.targets.length
+      result.targets.length ||
+      result.lexicalLibrary ||
+      result.receiver
     )
       return undefined;
     const existing = result.libraryFacts ?? [];
@@ -612,6 +619,7 @@ export function extractFile(
     let setups = programTestSetups.get(program);
     if (!setups) {
       const units = new Set(globals.missingTestFrameworks);
+      const competitors = new Set(globals.competingTestRequests);
       for (const source of program.getSourceFiles()) {
         if (fromVirtual(source.fileName) === undefined) continue;
         for (const statement of source.statements) {
@@ -623,17 +631,22 @@ export function extractFile(
             continue;
           const specifier = statement.moduleSpecifier;
           const provider = testSetupFramework(specifier.text);
-          if (!provider) continue;
-          const routes = missingUnits(specifier);
+          const competitor = competingTestNames(specifier.text);
+          const unit =
+            provider ?? (competitor && packageUnit(specifier.text)?.unit);
+          if (!unit) continue;
+          const routes = missingUnits(specifier, competitor !== undefined);
           if (
             routes.length === 1 &&
             routes[0]!.ecosystem === "npm" &&
-            (routes[0]!.unit === provider || routes[0]!.unit === specifier.text)
-          )
-            units.add(provider);
+            (routes[0]!.unit === unit || routes[0]!.unit === specifier.text)
+          ) {
+            if (provider) units.add(provider);
+            else competitors.add(specifier.text);
+          }
         }
       }
-      programTestSetups.set(program, (setups = units));
+      programTestSetups.set(program, (setups = { units, competitors }));
     }
     const alternatives = new Map(
       existing.map((target) => [target.unit, target]),
@@ -641,8 +654,26 @@ export function extractFile(
     if (existing.length)
       for (const target of capturedTestGlobals(at.text))
         alternatives.set(target.unit, target);
-    for (const target of testGlobalTargets(at.text, setups, meaning === "call"))
+    for (const target of testGlobalTargets(
+      at.text,
+      setups.units,
+      meaning === "call",
+    ))
       if (!alternatives.has(target.unit)) alternatives.set(target.unit, target);
+    if (alternatives.size && setups.competitors.size) {
+      const competing = [...setups.competitors].filter(
+        (request) =>
+          competingTestNames(request)?.includes(at.text) &&
+          (request !== "@testing-library/jest-dom" ||
+            !alternatives.has("jest")),
+      );
+      if (competing.length)
+        return {
+          targets: [],
+          reason: "competing-test-globals",
+          competingTypes: competing.sort(),
+        };
+    }
     if (alternatives.size > existing.length)
       return { targets: [], libraryFacts: [...alternatives.values()] };
     return undefined;
@@ -1837,6 +1868,7 @@ export function extractFile(
         }));
     }
     if (reason) facts.reason = reason;
+    if (found.competingTypes) facts.competingTypes = [...found.competingTypes];
     links.push({
       sourceKey,
       kind,

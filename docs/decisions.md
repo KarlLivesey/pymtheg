@@ -2810,9 +2810,11 @@ declaring owner. Vendored modules are checkout code, never library. See
 
 A compiler program can identify a supported ambient test global from a
 selected type entry, a source reference or a side-effect import with package
-evidence. An explicit lexical binding wins. Conflicting framework providers
-form a candidate set. For a member, the checker-selected declaration is the
-source of `declaring-owner` evidence. When the declaration is unavailable,
-an annotation that names an imported receiver type can establish the package
-unit. The program-wide Node overlap rules also apply to checker-selected
-members reached through the new aliases and selectors. [C-16](changes/C-16.md)
+evidence. An explicit lexical binding wins. Conflicting modelled framework
+providers form a candidate set. A known unmodelled ambient type request leaves
+the shared name unresolved and records the request. For a member, the
+checker-selected declaration is the source of `declaring-owner` evidence.
+When the declaration is unavailable, an annotation that names an imported
+receiver type can establish the package unit. The program-wide Node overlap
+rules also apply to checker-selected members reached through the new aliases
+and selectors. [C-16](changes/C-16.md)

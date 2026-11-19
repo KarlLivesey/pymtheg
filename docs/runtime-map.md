@@ -1678,6 +1678,8 @@ or explicitly imported checkout declaration takes precedence. Member identity
 still comes from the declaration, including through a return type, re-export,
 immutable alias or constant literal selector. A named annotation for a missing
 imported receiver type can identify its package at unit level.
+Module 33 leaves shared test globals unresolved when a known competing ambient
+package is requested outside the supported framework inventory.
 [C-16](changes/C-16.md)
 
 Rust records library paths during resolution starting with module 29. Its library lookup uses

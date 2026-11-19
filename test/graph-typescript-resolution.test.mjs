@@ -1075,6 +1075,98 @@ test("test globals require program evidence and respect shadowing", async () => 
   );
 });
 
+test("competing ambient test requests withhold only their declared names", async () => {
+  const config = (...types) => JSON.stringify({ compilerOptions: { types } });
+  const testCode =
+    "expect(true).to.be.true; describe('suite', () => {}); it('case', () => {});";
+  await project(
+    {
+      "cypress/tsconfig.json": config("cypress", "jest"),
+      "cypress/main.ts": testCode + " beforeAll(() => {}); cy();",
+      "mixed/tsconfig.json": config("cypress", "jest", "vitest/globals"),
+      "mixed/main.ts": testCode + " const mock: typeof vi = null!;",
+      "cypress-only/tsconfig.json": config("cypress"),
+      "cypress-only/main.ts": testCode,
+      "jasmine/tsconfig.json": config("jasmine", "jest"),
+      "jasmine/main.ts": testCode + " test('other', () => {});",
+      "reference/tsconfig.json": config("jest"),
+      "reference/main.ts":
+        '/// <reference types="@types/jasmine" />\n' + testCode,
+      "setup/tsconfig.json": config("jest"),
+      "setup/package.json": '{"devDependencies":{"cypress":"^16"}}',
+      "setup/setup.ts": "import 'cypress';",
+      "setup/main.ts": testCode,
+      "assertions/tsconfig.json": config("@types/chai", "vitest/globals"),
+      "assertions/main.ts":
+        "assert(true); expect(true); test('case', () => {});",
+      "wdio/tsconfig.json": config(
+        "@wdio/globals/types",
+        "@types/qunit",
+        "jest",
+      ),
+      "wdio/main.ts":
+        "expect(true); test('case', () => {}); it('other', () => {});",
+      "jest-dom/tsconfig.json": config(
+        "@testing-library/jest-dom",
+        "vitest/globals",
+      ),
+      "jest-dom/main.ts": "expect(true);",
+      "imports-only/tsconfig.json": config(
+        "@playwright/test",
+        "ava",
+        "bun-types",
+        "@types/bun",
+        "node",
+        "jest",
+      ),
+      "imports-only/main.ts": "expect(true);",
+      "shadow/tsconfig.json": config("cypress", "jest"),
+      "shadow/package.json": '{"dependencies":{"other":"^1"}}',
+      "shadow/main.ts": `import { check as expect } from 'other';
+        declare global { function describe(label: string): void; }
+        expect(true); describe('mine');
+        function scope() { const test = () => 1; return test(); }`,
+    },
+    async (graph, report) => {
+      clean(report);
+      const call = (dir, name) => graph.link(dir + "/main.ts", name, "calls");
+      const blocked = (dir, name, ...requests) => {
+        const link = call(dir, name);
+        assert.equal(link.resolution, "unresolved");
+        assert.equal(link.libraries, undefined);
+        assert.equal(link.data.reason, "competing-test-globals");
+        assert.deepEqual(link.data.competingTypes, requests);
+      };
+      for (const name of ["expect", "describe", "it"]) {
+        blocked("cypress", name, "cypress");
+        blocked("mixed", name, "cypress");
+        blocked("jasmine", name, "jasmine");
+        blocked("reference", name, "@types/jasmine");
+        blocked("setup", name, "cypress");
+        assert.equal(call("cypress-only", name).data.reason, "no-symbol");
+      }
+      blocked("assertions", "assert", "@types/chai");
+      blocked("assertions", "expect", "@types/chai");
+      blocked("wdio", "expect", "@types/qunit", "@wdio/globals/types");
+      blocked("wdio", "test", "@types/qunit");
+      blocked("jest-dom", "expect", "@testing-library/jest-dom");
+      assert.equal(libraryTarget(call("cypress", "beforeAll")).unit, "jest");
+      assert.equal(call("cypress", "cy").data.reason, "no-symbol");
+      assert.equal(
+        libraryTarget(graph.link("mixed/main.ts", "vi", "references")).symbol,
+        "vi",
+      );
+      assert.equal(libraryTarget(call("jasmine", "test")).unit, "jest");
+      assert.equal(libraryTarget(call("assertions", "test")).unit, "vitest");
+      assert.equal(libraryTarget(call("wdio", "it")).unit, "jest");
+      assert.equal(libraryTarget(call("imports-only", "expect")).unit, "jest");
+      assert.equal(libraryTarget(call("shadow", "expect")).unit, "other");
+      assert.equal(call("shadow", "describe").resolution, "resolved");
+      assert.equal(call("shadow", "test").resolution, "resolved");
+    },
+  );
+});
+
 test("immutable member aliases preserve the checker owner and overlapping global candidates", async () => {
   await project(
     {

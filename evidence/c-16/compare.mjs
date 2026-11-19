@@ -18,7 +18,7 @@ const open = (repo) =>
   );
 const candidate = selected[0] === "--candidate";
 if (candidate) selected.shift();
-const old = read("main");
+const old = read(process.env.C16_BASELINE ?? "main");
 const next = new Map(
   candidate
     ? read(process.env.C16_CANDIDATE ?? "candidate").map((r) => [r.id, r])

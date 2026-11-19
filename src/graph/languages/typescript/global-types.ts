@@ -393,6 +393,7 @@ const programTypes = new WeakMap<
     otherGlobals: ReadonlySet<string>;
     otherRuntime: boolean;
     missingTestFrameworks: ReadonlySet<string>;
+    competingTestRequests: readonly string[];
   }
 >();
 const testGlobals = [
@@ -441,6 +442,30 @@ const frameworkGlobals = new Map<string, readonly string[]>([
     ],
   ],
 ]);
+// These requests may add ambient bindings outside the framework inventory.
+// Cypress bundles Mocha and exposes bare Chai assertions. The default
+// jest-dom entry references Jest types, unlike its Vitest entry.
+const chaiGlobals = ["expect", "assert"];
+const jasmineGlobals = testGlobals
+  .filter((name) => name !== "test")
+  .concat("fit", "xdescribe", "xit");
+const qunitGlobals = ["expect", "test"];
+const competingTestTypes = new Map<string, readonly string[]>([
+  ["cypress", [...frameworkGlobals.get("mocha")!, ...chaiGlobals]],
+  ["chai", chaiGlobals],
+  ["@types/chai", chaiGlobals],
+  ["jasmine", jasmineGlobals],
+  ["@types/jasmine", jasmineGlobals],
+  ["@wdio/globals", ["expect"]],
+  ["@wdio/globals/types", ["expect"]],
+  ["expect-webdriverio", ["expect"]],
+  ["qunit", qunitGlobals],
+  ["@types/qunit", qunitGlobals],
+  ["@testing-library/jest-dom", frameworkGlobals.get("jest")!],
+]);
+export const competingTestNames = (request: string) =>
+  competingTestTypes.get(request);
+
 const testGlobalNames = new Set([...frameworkGlobals.values()].flat());
 export const isTestGlobal = (name: string) => testGlobalNames.has(name);
 const ambientGlobals = new Map<string, readonly string[]>([
@@ -575,6 +600,9 @@ export function globalTypeAvailability(
     otherGlobals: new Set(missing.flatMap(missingAmbientGlobals)),
     otherRuntime: [...expected].some(isEnvironment),
     missingTestFrameworks,
+    competingTestRequests: [...expected].filter((name) =>
+      competingTestTypes.has(name),
+    ),
   };
   programTypes.set(program, result);
   return result;

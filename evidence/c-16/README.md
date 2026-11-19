@@ -58,17 +58,38 @@ finished replay at the same commit.
 | Artifact | Pins in the final comparison | Build digest |
 | --- | --- | --- |
 | Main at `ef149b7` | All 18 baseline graphs | `2841597e7f0f35b9a6ad2420760c666b836d9454ca1353d84c1105d4c237fc79` |
-| Initial candidate | Changesets, Dexie, oclif, Zustand, React Hook Form, yargs | `02858145d0cb7a8aaa432913d8f5d48c970123b0a3ffdfcb9f441cefd9cd7fed` |
+| Initial candidate | Changesets, oclif, Zustand, React Hook Form, yargs | `02858145d0cb7a8aaa432913d8f5d48c970123b0a3ffdfcb9f441cefd9cd7fed` |
 | Mixed-runtime replay | NestJS, T3 Code | `8129c57d69e3353b7df9e89581fac9b7f6ab090d8f4f6e714d6577dd817fd7f8` |
 | Scoped Deno check | Hono | `520e8076be08e0a796ecbc6a3983dcb030a41462b14bd94ceec49d833ddd1665` |
-| Final named-object guard | Astro, Excalidraw, Vitest, Mermaid, Puppeteer, Zod, Vite | `e8e5dc9db553bc9d31b4aa15e12cc998c73f35674880d6f4bd88fe47ea6d8db9` |
-| Post-merge recheck | tRPC, Redux Toolkit | `58f182de2e9fa180d4309e431d478db997ce0feaa618ae9b1874f5b95e840394` |
+| Final named-object guard | Astro, Vitest, Mermaid, Puppeteer, Zod, Vite | `e8e5dc9db553bc9d31b4aa15e12cc998c73f35674880d6f4bd88fe47ea6d8db9` |
+| Post-merge recheck | Redux Toolkit | `58f182de2e9fa180d4309e431d478db997ce0feaa618ae9b1874f5b95e840394` |
+| Competing ambient types review | Dexie, Excalidraw, tRPC | `ffa0028afdd9e8fb3dcf21206db90214b8cfe57168f1bd034358c7f96fcda802` |
 
 C-14 merged into main at `981b20d` during validation. Its analyzer and
 scoring changes apply to Go. The 18 TypeScript pins have zero indexed Go
 files. The merged build replays tRPC and Redux Toolkit and compares the
 resulting 18-pin table and 60 audit records with the preceding run. The
 cumulative plan incorporates the committed C-14 Go export.
+
+## Competing ambient types review
+
+`competitors.mjs MANIFEST SCRATCH OUTPUT` reads the preceding graphs in
+`merged-run.json` and selects the pins with a captured request overlapping a
+stored bare framework name. Selection works at pin scope so inherited and
+shared compiler programs remain eligible. The sweep replays the selected pins.
+`replay.mjs overlay` combines those results with the other 15 graphs.
+Run `compare.mjs` with `C16_CANDIDATE=review-final` on the resulting
+`review-final-run.json`. Set `C16_BASELINE=merged` to inspect withdrawals
+against the preceding PR head.
+
+Cypress's entry references bundled Mocha and its Chai globals. Jasmine's
+ambient declarations include `describe`, `it` and `expect`. The default
+jest-dom type entry references Jest types. Its `/vitest` entry augments
+Vitest instead. WDIO exposes a bare `expect` through its ambient entry, and
+legacy QUnit declarations included bare `test` and `expect`. Chai package
+requests are treated conservatively for the assertion names because the
+declaration forms vary. Bun's `expect` is exported by the `bun:test` module.
+[Cypress](https://unpkg.com/cypress@16.3.0/types/index.d.ts) · [Jasmine](https://unpkg.com/@types/jasmine@7.0.0/index.d.ts) · [jest-dom](https://unpkg.com/@testing-library/jest-dom@6.9.1/types/jest.d.ts) · [WDIO](https://unpkg.com/@wdio/globals@10.2.0/types.d.ts) · [QUnit](https://unpkg.com/@types/qunit@1.16.32/index.d.ts) · [Bun](https://unpkg.com/bun-types@1.4.5/test.d.ts)
 
 ## Cold indexing
 
@@ -93,3 +114,7 @@ The merged branch passed the production build, the TypeScript no-emit
 check and the format check. All 3,085 tests in `npm test` and all 19
 sweep-tool tests passed. The merged tRPC and Redux Toolkit graphs
 reproduced the paired comparison and the audit records byte for byte.
+
+The competing-type review build passed the production build, TypeScript
+no-emit and format checks, all 163 TypeScript graph tests and all 19
+sweep-tool tests.

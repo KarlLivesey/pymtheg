@@ -722,6 +722,8 @@ answer.
   global can also produce a candidate set.
 - **Unresolved:** outside members whose receiver or declaration is unverified
   (`external`, `external-package`); computed `require` or `import()` specifiers;
+  bare test globals with an overlapping unmodelled type request
+  (`competing-test-globals`);
   calls through parameters, import shadows, and reassigned local functions;
   member calls without a named target through `any`, `unknown` or an open index
   (`any-receiver`, `unknown-receiver`, `index-signature`);
