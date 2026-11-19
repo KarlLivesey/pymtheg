@@ -3,7 +3,7 @@ import { posix as p } from "node:path";
 import type { ContextFile } from "../../types.js";
 import { readToml, table, type TomlTable, type TomlValue } from "./toml.js";
 import { matchesVersion } from "./macro-catalog.js";
-import { cargoSources } from "./cargo-sources.js";
+import { cargoSources, lockSource } from "./cargo-sources.js";
 
 function replacementPackage(id: string): string | undefined {
   const named = /^([\w-]+)[:@]\d+\./.exec(id);
@@ -127,52 +127,48 @@ export function crates(
       .filter((c) => p.basename(c.path) === "Cargo.lock")
       .map((c) => [c.path, c.status === "clean" ? readToml(c.text) : null]),
   );
-  function registrySelection(
-    manifest: string,
-    workspace: string | undefined,
+  function lockedVersion(
+    lockPath: string,
     owner: string,
     name: string,
     requirement: string | undefined,
-  ): Pick<
-    Dependency,
-    | "registryVersion"
-    | "registryRequirement"
-    | "libraryVersion"
-    | "libraryVersionSource"
-  > {
-    if (!requirement) return {};
-    const lockPath = p.join(p.dirname(workspace ?? manifest), "Cargo.lock");
-    // Without a lock, retain the requirement for the semver-family proof.
-    if (!locks.has(lockPath)) return { registryRequirement: requirement };
+    identity: string | undefined,
+  ): string | undefined {
+    if (!identity) return;
     const packages = locks.get(lockPath)?.package;
-    if (!Array.isArray(packages)) return {};
+    if (!Array.isArray(packages)) return;
     const rows = packages.map(table).filter((t): t is TomlTable => !!t);
     const owners = rows.filter(
       (t) => t.name === owner && t.source === undefined,
     );
-    if (owners.length !== 1) return {};
+    if (owners.length !== 1) return;
     const deps = strings(owners[0]!.dependencies);
-    if (!deps) return {};
-    const descriptors = deps.filter((d) => d.split(" ")[0] === name);
+    if (!deps) return;
+    const descriptors = deps
+      .map((edge) => /^(\S+)(?: (\S+)(?: \((.+)\))?)?$/.exec(edge))
+      .filter((edge): edge is RegExpExecArray => edge?.[1] === name);
     const candidates = rows.filter(
       (t) =>
         t.name === name &&
         typeof t.version === "string" &&
-        matchesVersion(requirement, t.version) &&
-        descriptors.some((d) => d === name || d.split(" ")[1] === t.version),
+        lockSource(t.source) === identity &&
+        (!requirement ||
+          exactVersion(requirement) === t.version ||
+          matchesVersion(requirement, t.version)) &&
+        descriptors.some(
+          (edge) =>
+            (!edge[2] || edge[2] === t.version) &&
+            (!edge[3] || lockSource(edge[3]) === identity),
+        ),
     );
+    const selected = candidates[0];
+    if (candidates.length !== 1) return;
     if (
-      candidates.length !== 1 ||
-      candidates[0]!.source !==
-        "registry+https://github.com/rust-lang/crates.io-index"
+      identity.startsWith("git:") &&
+      !/#(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(string(selected?.source) ?? "")
     )
-      return {};
-    const version = string(candidates[0]!.version)!;
-    return {
-      registryVersion: version,
-      libraryVersion: version,
-      libraryVersionSource: lockPath,
-    };
+      return;
+    return string(selected?.version);
   }
   function workspaceFor(doc: (typeof docs)[number]): {
     doc?: typeof doc | undefined;
@@ -316,7 +312,10 @@ export function crates(
     // and workspace see different directory sources, leave that edge open.
     const memberSource = directorySource(doc.dir);
     const workspaceSource = directorySource(workspace.doc?.dir ?? doc.dir);
-    const vendor = memberSource === workspaceSource ? memberSource : null;
+    const lockPath = p.join(
+      p.dirname(workspace.doc?.path ?? doc.path),
+      "Cargo.lock",
+    );
     const maps = {
         normal: new Map<string, string>(),
         build: new Map<string, string>(),
@@ -460,30 +459,57 @@ export function crates(
           !["path", "git", "registry", "registry-index"].some(
             (k) => fields?.[k] !== undefined,
           );
-        const registry =
-          defaultRegistry && !alternatives.length
-            ? registrySelection(
-                doc.path,
-                workspace.doc?.path,
+        const member = memberSource(fields),
+          root =
+            workspaceSource === memberSource ? member : workspaceSource(fields);
+        const vendor =
+          member.directory === undefined && root.directory === undefined
+            ? undefined
+            : member.directory === root.directory &&
+                member.identity === root.identity
+              ? member.directory
+              : null;
+        const exact = exactVersion(requirement);
+        const selected =
+          !alternatives.length &&
+          (vendor || (defaultRegistry && requirement && vendor === undefined))
+            ? lockedVersion(
+                lockPath,
                 name,
                 packageName,
                 requirement,
+                member.identity ?? (defaultRegistry ? "crates-io" : undefined),
               )
+            : undefined;
+        const registry =
+          defaultRegistry && !alternatives.length && vendor === undefined
+            ? selected
+              ? {
+                  registryVersion: selected,
+                  libraryVersion: selected,
+                  libraryVersionSource: lockPath,
+                }
+              : requirement && !locks.has(lockPath)
+                ? { registryRequirement: requirement }
+                : {}
             : {};
-        const exact = exactVersion(requirement);
-        if (defaultRegistry && vendor !== undefined) {
-          const selected = registry.libraryVersion ?? exact;
+        if (vendor !== undefined) {
+          const version =
+            selected ??
+            (!locks.has(lockPath) && fields?.git === undefined
+              ? exact
+              : undefined);
           const candidates =
-            typeof vendor === "string" && !p.isAbsolute(vendor) && selected
+            typeof vendor === "string" && !p.isAbsolute(vendor) && version
               ? docs.filter((d) => {
                   const relative = p.relative(vendor, d.dir);
                   const pkg = table(d.value?.package);
                   return (
                     !!relative &&
-                    !relative.startsWith("..") &&
+                    relative !== ".." &&
                     !relative.includes("/") &&
                     pkg?.name === packageName &&
-                    pkg.version === selected
+                    pkg.version === version
                   );
                 })
               : [];
@@ -528,9 +554,7 @@ export function crates(
             kind: group.kind,
             conditions: [...conditions],
             packageName,
-            ...(defaultRegistry && vendor !== undefined
-              ? {}
-              : { ...registry, ...version }),
+            ...(vendor !== undefined ? {} : { ...registry, ...version }),
           });
         }
       }

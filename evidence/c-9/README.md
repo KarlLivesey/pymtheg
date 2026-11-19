@@ -1,6 +1,6 @@
 # C-9 Rust library paths evidence
 
-Across the 18 finished Rust pins, Level 2 went from **33.53% to 32.13%**
+At `2656be3d`, across the 18 finished Rust pins, Level 2 went from **33.53% to 32.13%**
 on all sites and from **33.53% to 32.52%** on the sites already on main.
 The candidate stored 78,048 named library links and preserved all 226,248
 prior definite Rust checkout links and 223,849 receiver-call decisions.
@@ -9,8 +9,8 @@ prior definite Rust checkout links and 223,849 receiver-call decisions.
 ## Checks
 
 The dev-server build, `tsc --noEmit`, and `npm run format:check` passed.
-All 3,016 tests in `npm test` and all 17 sweep-tool tests passed. The Cargo
-context test checks that a cached call switches from a checkout symbol to a
+At `2656be3d`, all 3,016 tests in `npm test` and all 17 sweep-tool tests passed.
+The Cargo context test checks that a cached call switches from a checkout symbol to a
 library target when the manifest replaces its local dependency with a registry
 dependency.
 
@@ -32,6 +32,21 @@ rustc exited 101. It reported E0255 for a macro-generated `HashMap` that
 conflicts with the type import and E0659 for a macro-generated `std` module
 that conflicts with the extern-prelude name during import resolution.
 [Module fixture](../../test/fixtures/graph-rust-library/examples/module_use.rs)
+
+## Cargo source-identity follow-up
+
+The indexed fixtures cover a tagged Git `itoa` under `vendor/itoa`, a remote
+dependency at the same URL with a different selector, and a sparse alternate
+registry with multiple vendored versions. A missing directory, missing lock
+edge, and mismatched lock source each leave the reference unresolved.
+[Graph fixtures](../../test/graph-rust-library.test.mjs)
+
+An isolated dev-server control tagged a local Git package and let Cargo emit
+the source table with `cargo vendor --offline --locked vendor`. With that
+config, `cargo check --offline --locked` passed and the graph resolved
+`itoa::Buffer` to `vendor/itoa/src/lib.rs`. Moving the vendored directory
+outside the captured fixture changed that link to `unresolved` on reindex.
+[Cargo source replacement](https://doc.rust-lang.org/cargo/reference/source-replacement.html)
 
 ## Graph queries
 

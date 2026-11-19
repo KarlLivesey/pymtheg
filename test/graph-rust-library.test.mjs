@@ -497,6 +497,133 @@ test("a directory source resolves a versioned vendor crate and withholds an unca
   );
 });
 
+test("Cargo vendor uses the locked Git source and selector", async (t) => {
+  const git = "https://github.com/dtolnay/itoa";
+  const tag = `git+${git}?tag=1.0.18`;
+  const branch = `git+${git}?branch=other`;
+  const hash = "1234567890abcdef1234567890abcdef12345678";
+  const store = await indexFixture(t, {
+    "Cargo.toml": manifest(
+      "2021",
+      `
+      [dependencies]
+      itoa = { git = "${git}.git/", tag = "1.0.18" }
+      other = { package = "itoa", git = "${git}", branch = "other" }
+      missing = { git = "${git}", tag = "1.0.18" }
+      unlocked = { git = "${git}", tag = "1.0.18", version = "=1.0.18" }
+    `,
+    ),
+    ".cargo/config.toml": `
+      [source."${tag}"]
+      git = "${git}"
+      tag = "1.0.18"
+      replace-with = "vendored-sources"
+      [source.vendored-sources]
+      directory = "vendor"
+    `,
+    "Cargo.lock": `version = 4
+      [[package]]
+      name = "app"
+      version = "0.1.0"
+      dependencies = ["itoa 1.0.18 (${tag})", "itoa 1.0.18 (${branch})", "missing"]
+      [[package]]
+      name = "itoa"
+      version = "1.0.18"
+      source = "${tag}#${hash}"
+      [[package]]
+      name = "itoa"
+      version = "1.0.18"
+      source = "${branch}#${hash}"
+      [[package]]
+      name = "missing"
+      version = "1.0.18"
+      source = "${tag}#${hash}"
+    `,
+    "src/lib.rs":
+      "fn f(_: itoa::Buffer, _: other::Buffer, _: missing::Type, _: unlocked::Type) {}",
+    "vendor/itoa/Cargo.toml":
+      '[package]\nname="itoa"\nversion="1.0.18"\nedition="2021"\n',
+    "vendor/itoa/src/lib.rs": "pub struct Buffer;",
+    "vendor/unlocked/Cargo.toml":
+      '[package]\nname="unlocked"\nversion="1.0.18"\nedition="2021"\n',
+    "vendor/unlocked/src/lib.rs": "pub struct Type;",
+  });
+  const links = new Map(
+    store
+      .links()
+      .filter(({ kind }) => kind === "types")
+      .map((link) => [link.targetName, link]),
+  );
+  assert.equal(
+    links.get("itoa::Buffer").targetId,
+    store.findSymbols({ name: "Buffer" })[0].id,
+  );
+  assert.equal(links.get("other::Buffer").resolution, "library");
+  assert.equal(links.get("missing::Type").resolution, "unresolved");
+  assert.equal(links.get("unlocked::Type").resolution, "unresolved");
+});
+
+test("directory replacement tracks the alternate registry index and lock version", async (t) => {
+  const index = "sparse+https://packages.example/index/";
+  const store = await indexFixture(t, {
+    "Cargo.toml": manifest(
+      "2021",
+      `
+      [dependencies]
+      chosen = { registry = "alternate", version = "1" }
+      missing = { registry = "alternate", version = "1" }
+      external = "1"
+    `,
+    ),
+    ".cargo/config.toml": `
+      [registries.alternate]
+      index = "${index}"
+      [source."${index}"]
+      registry = "${index}"
+      replace-with = "vendored-sources"
+      [source.vendored-sources]
+      directory = "vendor"
+    `,
+    "Cargo.lock": `version = 4
+      [[package]]
+      name = "app"
+      version = "0.1.0"
+      dependencies = ["chosen", "missing"]
+      [[package]]
+      name = "chosen"
+      version = "1.0.2"
+      source = "${index}"
+      [[package]]
+      name = "missing"
+      version = "1.0.2"
+      source = "registry+https://github.com/rust-lang/crates.io-index"
+    `,
+    "src/lib.rs":
+      "fn f(_: chosen::Correct, _: missing::Wrong, _: external::Export) {}",
+    "vendor/chosen/Cargo.toml":
+      '[package]\nname="chosen"\nversion="1.0.2"\nedition="2021"\n',
+    "vendor/chosen/src/lib.rs": "pub struct Correct;",
+    "vendor/chosen-older/Cargo.toml":
+      '[package]\nname="chosen"\nversion="1.0.1"\nedition="2021"\n',
+    "vendor/chosen-older/src/lib.rs": "pub struct Correct;",
+    "vendor/missing/Cargo.toml":
+      '[package]\nname="missing"\nversion="1.0.2"\nedition="2021"\n',
+    "vendor/missing/src/lib.rs": "pub struct Wrong;",
+  });
+  const links = new Map(
+    store
+      .links()
+      .filter(({ kind }) => kind === "types")
+      .map((link) => [link.targetName, link]),
+  );
+  const correct = store
+    .findSymbols({ name: "Correct" })
+    .find(({ file }) => file === "vendor/chosen/src/lib.rs");
+  assert.equal(links.get("chosen::Correct").targetId, correct.id);
+  assert.equal(links.get("missing::Wrong").resolution, "unresolved");
+  assert.equal(links.get("external::Export").resolution, "library");
+});
+
 test("an independent type reference is credited without claiming its unproven associated member", async () => {
   const lookup = await graph(
     {

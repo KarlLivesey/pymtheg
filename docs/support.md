@@ -325,7 +325,8 @@ character in a comment or string there is read). Sources: [W2-B](https://github.
 #### Rust
 
 No-toolchain module; nothing runs `cargo` or `rustc`, and macros are not expanded.
-Claims `*.rs`; context `Cargo.toml` and `Cargo.lock`, read by a snapshot-only
+Claims `*.rs`; captures `Cargo.toml`, `Cargo.lock` and `.cargo/config.toml`
+or `.cargo/config` as context, read by a snapshot-only
 TOML reader (an unsupported or invalid manifest, including any TOML datetime,
 makes that whole manifest unknown). Private items are ordinary symbols.
 
@@ -395,8 +396,11 @@ makes that whole manifest unknown). Private items are ordinary symbols.
   cannot replace a definite explicit import in that module and namespace.
   Glob imports, prelude names, `#[macro_use]` and block-level expansions
   still need independent shadowing proof. A directory-source replacement
-  from Cargo configuration uses the captured vendored crate as a checkout
-  dependency. Receiver calls still require the declaring owner.
+  from Cargo configuration uses a captured vendored crate as a checkout
+  dependency when the source and selected version are proven. This covers
+  crates.io, alternate registry indexes, and Git URLs with their ref selectors.
+  A replacement with an unproven checkout target leaves the link unresolved.
+  Receiver calls still require the declaring owner.
 - **Clean expansion (both rules below).** A workspace `macro_rules!` arm is
   clean when the code it emits has no attribute anywhere (so no `#[cfg]` can
   remove a call) and no item other than a readable `use` (no `fn`, `mod`,

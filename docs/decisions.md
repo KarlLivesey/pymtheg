@@ -2657,6 +2657,8 @@ The resolver keeps the named export when a dependency re-exports it. For an
 associated call it needs a named trait or proof of the declaring member.
 An explicit `use` in a module protects a proven namespace binding from
 opaque items in that module, since rustc rejects duplicate bindings there.
-Captured Cargo directory-source replacements use checkout resolution.
+Captured Cargo directory-source replacements use checkout resolution. The
+configuration maps registry indexes or Git URLs and ref selectors to a
+directory source. A proven package selection is required to resolve inside it.
 Rust coverage now credits recorded targets on graphs made by the supporting
 module version. See [C-9](changes/C-9.md).

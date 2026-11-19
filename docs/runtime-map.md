@@ -1644,3 +1644,9 @@ explicit module imports with a proven namespace from opaque items in that same
 module. A type segment and its associated member can name different declarations.
 The type gets its own target where a type link already exists. The associated
 site needs its own proof before it can name a unit or symbol.
+
+Module 31 matches directory replacements by Cargo source identity. Registry
+sources use their index URL. Git sources use the repository URL and the
+branch, tag, or revision selector. For a vendored Git package, the lockfile
+must prove a checkout dependency edge with a precise commit. An applicable
+replacement without a unique captured package stays unresolved.
