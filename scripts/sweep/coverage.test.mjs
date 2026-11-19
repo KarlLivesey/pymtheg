@@ -22,14 +22,19 @@ test("assumed Level 2 links remain in the total and are counted separately", () 
   assert.equal(score.assumedLevel2, 5);
 });
 
-test("the cumulative plan input regenerates the committed coverage plan", () => {
+test("the plan input regenerates Rust and preserves the other sections", () => {
   const root = fileURLToPath(new URL("../..", import.meta.url));
   const checkedIn = readFileSync(join(root, "docs/coverage-plan.md"));
   const scratch = mkdtempSync(join(tmpdir(), "pymtheg-coverage-plan-"));
   const plan = join(scratch, "coverage-plan.md");
-  writeFileSync(plan, checkedIn);
+  const old = checkedIn.toString("utf8").replace(
+    /^### Rust\n[\s\S]*?(?=^### TypeScript \/ JS\n)/m,
+    "### Rust\n\nPlaceholder\n\n",
+  );
+  assert.notEqual(old, checkedIn.toString("utf8"));
+  writeFileSync(plan, old);
   try {
-    execFileSync(process.execPath, ["scripts/sweep/coverage.mjs", "--results", "sweep/plan-input.json.gz", "--plan", plan], { cwd: root });
+    execFileSync(process.execPath, ["scripts/sweep/coverage.mjs", "--results", "sweep/plan-input.json.gz", "--plan", plan, "--rust-section"], { cwd: root });
     assert.ok(readFileSync(plan).equals(checkedIn), "regenerated coverage plan differs");
   } finally {
     unlinkSync(plan);

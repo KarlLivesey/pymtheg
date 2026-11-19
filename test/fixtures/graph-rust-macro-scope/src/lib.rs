@@ -40,3 +40,49 @@ fn foreign_expansion() {
     foreign_block!();
     let _: bool = unsafe { outside() }; // foreign declaration
 }
+
+mod absolute_include {
+    macro_rules! load {
+        () => { ::core::include!("option.rs"); };
+    }
+    load!();
+    fn use_generated_type() -> Option { Option } // absolute include
+}
+
+static LAZY: u8 = 0;
+
+fn absolute_thread_local() {
+    macro_rules! wrap {
+        ($name:ident) => { ::std::thread_local! { static $name: u8 = 0; } };
+    }
+    wrap!(LAZY);
+    let _: &::std::thread::LocalKey<u8> = &LAZY; // wrapped thread-local
+    let _: Option<u8> = None; // unrelated thread-local
+}
+
+fn direct_thread_local() {
+    ::std::thread_local! { static LAZY: u8 = 0; }
+    let _: &::std::thread::LocalKey<u8> = &LAZY; // direct thread-local
+    let _: Option<u8> = None; // unrelated direct
+}
+
+#[macro_export]
+macro_rules! scoped_item {
+    ($name:ident) => { struct $name; };
+}
+
+fn dollar_crate() {
+    macro_rules! wrap {
+        () => { $crate::scoped_item!(Other); };
+    }
+    wrap!();
+    let _: Option<u8> = None; // explicit defining crate
+}
+
+fn empty_loader() {
+    macro_rules! load {
+        () => { struct Option; };
+    }
+    load!();
+    let _: Option = Option;
+}

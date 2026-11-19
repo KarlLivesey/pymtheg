@@ -7,26 +7,51 @@ import type { Node } from "web-tree-sitter";
 
 const compact = (s: string) => s.replace(/\s+/g, "").replace(/\br#/g, "");
 
-export type MacroInput = { names: string[]; mayIntroduceUnknownNames?: true };
+export type MacroInput = {
+  names: string[];
+  hasItemIdentifier?: true;
+  hasAttributes?: true;
+  itemNames?: string[];
+  mayIntroduceUnknownNames?: true;
+};
 
 /** Rust identifier tokens and possible wildcard imports in the input. */
-export function macroInput(nodes: readonly Node[]): MacroInput {
+export function macroInput(
+  nodes: readonly Node[],
+  attachedItem = false,
+): MacroInput {
   const pending = [...nodes];
   const names = new Set<string>();
+  const itemNames = new Set<string>();
   let star = false;
   let bang = false;
+  let hasItemIdentifier = false;
+  let hasAttributes = false;
   while (pending.length) {
     const node = pending.pop()!;
     if (/^(?:line_comment|block_comment)$|literal$/.test(node.type)) continue;
+    if (
+      attachedItem &&
+      (node.type.endsWith("_item") ||
+        node.type === "associated_type" ||
+        node.type === "macro_definition")
+    ) {
+      const itemName = node.childForFieldName("name");
+      if (itemName) itemNames.add(compact(itemName.text).normalize());
+    }
     if (node.childCount) {
       for (const child of node.children) pending.push(child);
     } else {
       star ||= node.type === "*";
       bang ||= node.type === "!";
+      hasAttributes ||= node.type === "#";
       const name = /^(?:r#|['$])?([_\p{ID_Start}][_\p{ID_Continue}]*)$/u.exec(
         node.text,
       )?.[1];
-      if (name) names.add(name.normalize());
+      if (name) {
+        names.add(name.normalize());
+        hasItemIdentifier ||= node.type === "identifier" && name !== "_";
+      }
     }
   }
   const mayIntroduceUnknownNames =
@@ -44,6 +69,16 @@ export function macroInput(nodes: readonly Node[]): MacroInput {
       ].some((name) => names.has(name)));
   return {
     names: [...names].sort(),
+    ...(hasItemIdentifier &&
+    !nodes.every((node) =>
+      /^[\w.-]+(?:[/\\][\w.-]+)+$|^[\w-]+\.[\w.-]+$/.test(
+        node.text.slice(1, -1).trim(),
+      ),
+    )
+      ? { hasItemIdentifier: true }
+      : {}),
+    ...(itemNames.size ? { itemNames: [...itemNames].sort() } : {}),
+    ...(hasAttributes ? { hasAttributes: true } : {}),
     ...(mayIntroduceUnknownNames ? { mayIntroduceUnknownNames: true } : {}),
   };
 }
@@ -165,42 +200,39 @@ function flat(seq: Node[]): Node[] {
   );
 }
 type PathAt = { start: number; segments: string[]; nodes: Node[] };
+const isPathSegment = (n: Node | undefined): n is Node =>
+  !!n &&
+  ["identifier", "self", "super", "crate", "metavariable"].includes(n.type);
+
 /** The path ending at index i (inclusive) of seq, walking back over `::`. */
-function pathEndingAt(seq: Node[], i: number): PathAt | null {
+function pathEndingAt(
+  seq: Node[],
+  i: number,
+  allowAbsolute = false,
+): PathAt | null {
+  if (!isPathSegment(seq[i])) return null;
   const nodes: Node[] = [];
+  const segments: string[] = [];
   let j = i;
   for (;;) {
-    const n = seq[j];
-    if (
-      !n ||
-      !["identifier", "self", "super", "crate", "metavariable"].includes(n.type)
-    )
-      return null;
+    const n = seq[j]!;
     nodes.unshift(n);
-    if (seq[j - 1]?.type === "::") {
-      nodes.unshift(seq[j - 1]!);
-      j -= 2;
-      continue;
-    }
     if (n.type === "crate" && seq[j - 1]?.type === "$") {
       nodes.unshift(seq[j - 1]!);
+      segments.unshift("$crate");
       j -= 1;
-    }
-    break;
-  }
-  // A leading `::` (global path) belongs to the path too.
-  if (seq[j - 1]?.type === "::" && nodes[0]?.type !== "::") {
+    } else segments.unshift(word(n));
+    if (seq[j - 1]?.type !== "::") break;
     nodes.unshift(seq[j - 1]!);
-    j -= 1;
+    if (!isPathSegment(seq[j - 2])) {
+      if (!allowAbsolute) return null;
+      // The separator has no path segment to its left.
+      segments.unshift("");
+      j -= 1;
+      break;
+    }
+    j -= 2;
   }
-  const segments = nodes
-    .filter((n) => n.type !== "::" && n.type !== "$")
-    .map((n) =>
-      n.type === "crate" && n.previousSibling?.type === "$"
-        ? "$crate"
-        : word(n),
-    );
-  if (nodes[0]?.type === "::") segments.unshift("");
   return { start: j, segments, nodes };
 }
 
@@ -211,12 +243,25 @@ export type MacroCall = {
   group: Node;
 };
 /** Nested invocations `path ! group` in one token sequence. */
-function invocations(seq: Node[]): { at: number; call: MacroCall }[] {
+function invocations(
+  seq: Node[],
+  unreadable?: () => void,
+): { at: number; call: MacroCall }[] {
   const found: { at: number; call: MacroCall }[] = [];
-  for (let i = 1; i + 1 < seq.length; i++) {
+  for (let i = 0; i + 1 < seq.length; i++) {
     if (seq[i]!.type !== "!" || !isGroup(seq[i + 1])) continue;
-    const path = pathEndingAt(seq, i - 1);
-    if (!path) continue;
+    // Scope proofs must account for absolute invocations even when the
+    // existing body and argument scanners do not produce sites for them.
+    const path = pathEndingAt(seq, i - 1, unreadable !== undefined);
+    if (!path) {
+      const previous = seq[i - 1];
+      if (
+        previous &&
+        (previous.type === "::" || previous.hasError || previous.isMissing)
+      )
+        unreadable?.();
+      continue;
+    }
     found.push({
       at: path.start,
       call: {
@@ -315,14 +360,30 @@ function inspectScope(
   // A top-level attribute or macro definition can change the tokens and
   // macro lookup of this expansion. Imports can also rebind nested macros.
   let opaque = false;
-  const emitted = invocations(top);
-  for (const { call } of emitted)
-    for (const name of macroInput([call.group]).names) names.add(name);
+  const emitted = invocations(top, () => {
+    opaque = true;
+  });
+  for (const { call } of emitted) {
+    const input = macroInput([call.group]);
+    for (const name of input.names) names.add(name);
+    if (call.group.descendantsOfType("metavariable").length)
+      inputCanBind = true;
+    // An attribute on a thread-local declaration can rewrite the static.
+    if (call.name.endsWith("::thread_local") && input.hasAttributes)
+      opaque = true;
+    if (
+      call.name
+        .split("::")
+        .some((part) => part.startsWith("$") && part !== "$crate")
+    )
+      opaque = true;
+  }
   for (let i = 0; i < top.length; i++) {
     const token = top[i]!,
       keyword = word(token);
     if (
-      ["#", "$"].includes(token.type) ||
+      token.type === "#" ||
+      (token.type === "$" && top[i + 1]?.type !== "crate") ||
       keyword === "macro" ||
       keyword === "macro_rules"
     )
@@ -330,6 +391,7 @@ function inspectScope(
     if (keyword === "let") inputCanBind = true;
     if (token.type === "metavariable") {
       const kind = kinds.get(token.text);
+      if (token.text === "$crate" && top[i + 1]?.type === "::") continue;
       if (top[i + 1]?.type === "!" || !kind) opaque = true;
       if (kind === "ident") {
         // An ident can be a keyword, as in `$kw Option` with `struct`.
@@ -556,14 +618,19 @@ export function macroProfile(definition: Node): MacroProfile {
         !["if", "while", "&&"].includes(top[i - 1] ? word(top[i - 1]!) : "");
       if (statementLet) neutral = false;
       if (ITEM_WORDS.has(w) || n.type === "#") neutral = itemNeutral = false;
-      if (n.type === "metavariable") {
+      if (
+        n.type === "metavariable" &&
+        !(n.text === "$crate" && top[i + 1]?.type === "::")
+      ) {
         const kind = kinds.get(n.text);
         if (!kind || ["tt", "item", "stmt"].includes(kind))
           neutral = itemNeutral = false;
         if (top[i + 1]?.type === "!") neutral = itemNeutral = false;
       }
     }
-    for (const { call } of invocations(top))
+    for (const { call } of invocations(top, () => {
+      neutral = itemNeutral = false;
+    }))
       if (
         call.name.split("::").some((s) => s.startsWith("$") && s !== "$crate")
       )

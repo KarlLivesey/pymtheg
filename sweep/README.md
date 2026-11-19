@@ -169,18 +169,18 @@ visible in the audit. The curated source labels distinguish local
 misses, library misses, legitimate ambiguity and unclassified sites.
 These estimates prioritise work. They do not add definite score credit.
 
-### Reproduce the committed plan
+### Reproduce the committed Rust plan
 
 Run this command from the repository root.
 
 ```sh
-node scripts/sweep/coverage.mjs --results sweep/plan-input.json.gz --plan docs/coverage-plan.md
+node scripts/sweep/coverage.mjs --results sweep/plan-input.json.gz --plan docs/coverage-plan.md --rust-section
 ```
 
-The cumulative archive contains the latest accepted rows for all pins and the
-reference rows used for the comparison. It fixes the exact input for the
-generated plan block. On an update, replace the affected pinned rows and
-regenerate the block with the same command.
+The archive contains the measured Rust rows and their comparison data.
+The command replaces the Rust section and preserves the Go and
+TypeScript sections from main verbatim. The regression test covers both
+parts of that contract.
 
 ### Recompute after a candidate run
 

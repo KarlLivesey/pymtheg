@@ -58,6 +58,7 @@ import {
 } from "./lookup-memo.js";
 import {
   canAssumeMacroScope,
+  identifierComponents,
   isScopeNeutralMacro,
   type MacroScopeEffect,
   type MacroScopeMode,
@@ -4258,7 +4259,7 @@ export function resolveRust(
       return (
         !bound ||
         (bound.assumed && (mode !== "assumed" || !allowAssumption)) ||
-        bound.names.has(name.normalize())
+        macroEffectNames(bound, name.normalize())
       );
     }
     const origins = opaqueOrigins.get(key);
@@ -4271,9 +4272,24 @@ export function resolveRust(
       return (
         !effect ||
         (effect.assumed && (mode !== "assumed" || !allowAssumption)) ||
-        effect.names.has(normalized)
+        macroEffectNames(effect, normalized)
       );
     });
+  }
+  const foldedMacroNames = new Map<string, string>();
+  function derivesMacroName(effect: MacroScopeEffect, name: string): boolean {
+    if (!effect.derivedNames?.size) return false;
+    let folded = foldedMacroNames.get(name);
+    if (folded === undefined) {
+      folded = identifierComponents(name);
+      foldedMacroNames.set(name, folded);
+    }
+    for (const item of effect.derivedNames)
+      if (folded.includes(item)) return true;
+    return false;
+  }
+  function macroEffectNames(effect: MacroScopeEffect, name: string): boolean {
+    return effect.names.has(name) || derivesMacroName(effect, name);
   }
   for (const f of ctx.files)
     for (const loc of ownerPlace(f.path, "")) {
@@ -6301,6 +6317,15 @@ export function resolveRust(
       standardSafe(name, site, loc, scope)
     );
   }
+  function standardThreadLocal(path: string, loc: Place): boolean {
+    return (
+      /^(?:::)?std::thread_local$/.test(path) &&
+      !(path.startsWith("::") && loc.crate.edition === "2015") &&
+      !loc.crate.deps.has("std") &&
+      !visiblePrefixes.has("std") &&
+      !opaqueStandardRoots.get(loc.crate.root)?.has("std")
+    );
+  }
   function localMacroScope(
     symbol: GraphSymbol,
     site: GraphLink,
@@ -6321,7 +6346,11 @@ export function resolveRust(
       let takesName = profile.scope.inputCanBind;
       for (const path of profile.nested) {
         recordMacroHead(lookups, path);
-        if (standardScopeMacro(path, site, loc, scope)) continue;
+        if (
+          standardScopeMacro(path, site, loc, scope) ||
+          standardThreadLocal(path, loc)
+        )
+          continue;
         const nested = definiteMacro(path, site, loc, scope, s);
         const child = nested && summarize(nested, depth + 1);
         if (!child) return undefined;
@@ -6335,7 +6364,7 @@ export function resolveRust(
     return summarize(symbol, 0);
   }
   function recordMacroHead(lookups: Set<string>, path: string): void {
-    const head = path.split("::", 1)[0]!;
+    const head = path.replace(/^::/, "").split("::", 1)[0]!;
     if (head && !["$crate", "crate", "self", "super"].includes(head))
       lookups.add(head.normalize());
   }
@@ -6352,6 +6381,7 @@ export function resolveRust(
     if (!sites.length) return;
     let assumed = false;
     const names = new Set<string>();
+    const derivedNames = new Set<string>();
     const lookups = new Set<string>();
     for (const site of sites) {
       const at = siteLoc(site, loc);
@@ -6395,6 +6425,16 @@ export function resolveRust(
       }
       if (!macro?.symbol) return;
       if (
+        !origin.attribute &&
+        macro.ecosystem === "rust-std" &&
+        macro.unit === "std" &&
+        macro.symbol === "thread_local!"
+      ) {
+        if (input.hasAttributes) return;
+        for (const binding of input.names) names.add(binding);
+        continue;
+      }
+      if (
         macro.ecosystem === "rust-std" &&
         macro.evidence !== "declared-builtin" &&
         /!$/.test(macro.symbol) &&
@@ -6404,14 +6444,21 @@ export function resolveRust(
       if (
         macro.ecosystem !== "cargo" ||
         input.mayIntroduceUnknownNames ||
+        (!origin.attribute && !input.hasItemIdentifier) ||
         !canAssumeMacroScope(macro.unit, macro.symbol)
       )
         return;
       assumed = true;
       for (const binding of input.names) names.add(binding);
+      if (origin.attribute)
+        for (const item of input.itemNames ?? []) {
+          const components = identifierComponents(item);
+          if (components) derivedNames.add(components);
+        }
     }
     return {
       names: names.size ? names : noMacroNames,
+      ...(derivedNames.size ? { derivedNames } : {}),
       ...(assumed ? { assumed: true } : {}),
       ...(lookups.size ? { lookups } : {}),
     };
@@ -6420,10 +6467,12 @@ export function resolveRust(
     for (const [scope, origins] of opaqueOrigins) {
       if (hardOpaqueScopes.has(scope)) continue;
       const producers = new Map<string, number>();
+      const derivedProducers: MacroScopeEffect[] = [];
       for (const origin of origins) {
         const effect = macroScopeEffect(origin);
         if (!effect) continue;
         scopeEffects.set(origin, effect);
+        if (effect.derivedNames?.size) derivedProducers.push(effect);
         for (const name of effect.names)
           producers.set(name, (producers.get(name) ?? 0) + 1);
       }
@@ -6435,7 +6484,10 @@ export function resolveRust(
           effect &&
           [...(effect.lookups ?? [])].some(
             (name) =>
-              (producers.get(name) ?? 0) > Number(effect.names.has(name)),
+              (producers.get(name) ?? 0) > Number(effect.names.has(name)) ||
+              derivedProducers.some(
+                (other) => other !== effect && derivesMacroName(other, name),
+              ),
           )
         )
           scopeEffects.delete(origin);
@@ -6448,6 +6500,15 @@ export function resolveRust(
             ? effects[0]!
             : {
                 names: new Set(effects.flatMap((effect) => [...effect.names])),
+                ...(derivedProducers.length
+                  ? {
+                      derivedNames: new Set(
+                        effects.flatMap((effect) => [
+                          ...(effect.derivedNames ?? []),
+                        ]),
+                      ),
+                    }
+                  : {}),
                 ...(effects.some((effect) => effect.assumed)
                   ? { assumed: true }
                   : {}),
@@ -6521,7 +6582,7 @@ export function resolveRust(
           !hard &&
           effect &&
           (!effect.assumed || allowAssumption) &&
-          !effect.names.has(name.normalize())
+          !macroEffectNames(effect, name.normalize())
         )
           continue;
         encountered.add(origin);

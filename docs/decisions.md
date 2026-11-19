@@ -2793,8 +2793,10 @@ The resolver can clear an opaque expansion for one name when captured
 declarative arms and their reachable macro definitions bound the names that
 expansion can introduce. Standard macros with expression or literal outputs
 and recognized built-in derives have documented output bounds. A second pass
-can also resolve using the assumption that a proven external macro introduces
-no item with a name absent from its input. The link records
+can also resolve using the assumption that a proven external macro
+introduces only input names or, for a derive or attribute, names formed
+from whole case-insensitive components of input item names. Function-like
+macros need an item identifier in their input. The link records
 `rust-external-macro-name` in `data.assumes`. The coverage export counts those
 links separately and includes them in Level 2 when they have a checkout target
 or a named library target. A captured macro definition, a competing glob, an

@@ -359,11 +359,21 @@ function validateCatalog(items, samples) {
 
 const start = "<!-- sweep:coverage:start -->";
 const end = "<!-- sweep:coverage:end -->";
-function updatePlan(path, block) {
+const rustSection = /^### Rust\n[\s\S]*?(?=^### TypeScript \/ JS\n)/m;
+function updatePlan(path, block, rustOnly) {
   const document = readFileSync(path, "utf8");
   const a = document.indexOf(start), b = document.indexOf(end);
   if (a < 0 || b <= a || document.indexOf(start, a + start.length) !== -1 || document.indexOf(end, b + end.length) !== -1) {
     throw Error("Coverage plan must have one ordered pair of generated-section markers");
+  }
+  if (rustOnly) {
+    const current = document.slice(a + start.length, b);
+    const generated = block.match(rustSection)?.[0];
+    if (!generated || !rustSection.test(current))
+      throw Error("Expected a Rust section in both generated plan blocks");
+    writeFileSync(path, document.slice(0, a + start.length) +
+      current.replace(rustSection, () => generated) + document.slice(b));
+    return;
   }
   writeFileSync(path, `${document.slice(0, a + start.length)}\n\n${block.trim()}\n\n${document.slice(b)}`);
 }
@@ -682,7 +692,7 @@ function renderSampling(repos, samples) {
 async function main() {
   const { values } = parseArgs({ options: {
     results: { type: "string" }, base: { type: "string" }, scoreboard: { type: "string" }, plan: { type: "string" },
-    "sampling-report": { type: "string" },
+    "sampling-report": { type: "string" }, "rust-section": { type: "boolean" },
     items: { type: "string", default: "sweep/support-items.json" },
     samples: { type: "string", default: "evidence/sw-3/samples.json.gz" },
   } });
@@ -698,7 +708,7 @@ async function main() {
   const scoreboard = renderScore(repos, input, isComparison, base.repos, samples);
   if (values.scoreboard) writeFileSync(values.scoreboard, scoreboard);
   if (values.plan) {
-    updatePlan(values.plan, renderPlan(repos, base.repos, items, samples, isComparison));
+    updatePlan(values.plan, renderPlan(repos, base.repos, items, samples, isComparison), values["rust-section"]);
   }
   if (values["sampling-report"]) writeFileSync(values["sampling-report"], renderSampling(base.repos, samples));
   if (!values.scoreboard && !values.plan && !values["sampling-report"]) process.stdout.write(scoreboard);

@@ -84,6 +84,109 @@ test("local macro item names include literal and forwarded metavariable names", 
   assert.deepEqual(at("types", "Option", "generated keyword"), proved(null));
   assert.deepEqual(at("types", "Option", "omitted repetition"), proved(null));
   assert.deepEqual(at("calls", "outside", "foreign declaration"), proved(null));
+  assert.deepEqual(at("types", "Option", "// absolute include"), proved(null));
+  assert.deepEqual(
+    at("values", "LAZY", "// wrapped thread-local"),
+    proved(null),
+  );
+  assert.deepEqual(
+    at("values", "LAZY", "// direct thread-local"),
+    proved(null),
+  );
+  assert.deepEqual(
+    at("types", "Option", "// unrelated thread-local"),
+    proved("option::Option"),
+  );
+  assert.deepEqual(
+    at("types", "Option", "// unrelated direct"),
+    proved("option::Option"),
+  );
+  assert.deepEqual(
+    at("types", "Option", "// explicit defining crate"),
+    proved("option::Option"),
+  );
+});
+
+test("a file or literal-only external macro input supplies no item-name evidence", async () => {
+  const at = await observations(
+    `
+    mod proto {
+      tonic::include_proto!("pkg");
+      fn f() -> Option<u8> { None } // proto
+    }
+    fn sql() {
+      sqlx::migrate!();
+      let _: Option<u8> = None; // sql
+    }
+    fn paths() {
+      loader::load!(relative/source.rs);
+      let _: Option<u8> = None; // path
+    }
+    fn literals() {
+      loader::load!(42, true);
+      let _: Option<u8> = None; // literal
+    }
+  `,
+    'tonic="0.14"\nsqlx="0.8"\nloader="1"',
+  );
+  for (const marker of ["// proto", "// sql", "// path", "// literal"])
+    assert.deepEqual(at("types", "Option", marker), proved(null));
+});
+
+test("attribute and derive inputs bound whole components of item names", async () => {
+  const at = await observations(
+    `
+    struct ConfigBuilder;
+    struct config_builder;
+    struct CONFIG_X;
+    struct Configuration;
+    struct FieldName;
+    struct FieldNameBuilder;
+    struct VariantNameBuilder;
+    fn builders() {
+      #[derive(derive_builder::Builder)]
+      struct Config { FieldName: u8 }
+      let _: ConfigBuilder; // pascal
+      let _: config_builder; // snake
+      let _: CONFIG_X; // screaming
+      let _: Option<u8>; // unrelated
+      let _: Configuration; // partial component
+      let _: FieldName; // field exact
+      let _: FieldNameBuilder; // field suffix
+    }
+    fn tagged() {
+      #[external::decorate]
+      enum Config { VariantName }
+      let _: ConfigBuilder; // attr generated
+      let _: VariantNameBuilder; // attr variant suffix
+    }
+  `,
+    'derive_builder="0.20"\nexternal="1"',
+  );
+  assert.deepEqual(at("types", "ConfigBuilder", "// pascal"), proved(null));
+  assert.deepEqual(at("types", "config_builder", "// snake"), proved(null));
+  assert.deepEqual(at("types", "CONFIG_X", "// screaming"), proved(null));
+  assert.deepEqual(
+    at("types", "Option", "// unrelated"),
+    assumed("option::Option"),
+  );
+  assert.deepEqual(
+    at("types", "Configuration", "// partial component"),
+    assumed("Configuration"),
+  );
+  assert.deepEqual(at("types", "FieldName", "// field exact"), proved(null));
+  assert.deepEqual(
+    at("types", "FieldNameBuilder", "// field suffix"),
+    assumed("FieldNameBuilder"),
+  );
+  assert.deepEqual(
+    at("types", "ConfigBuilder", "// attr generated"),
+    proved(null),
+  );
+  assert.deepEqual(
+    at("types", "VariantNameBuilder", "// attr variant suffix"),
+    assumed("VariantNameBuilder"),
+  );
 });
 
 test("standard expression macros have no output items, but include stays opaque", async () => {

@@ -7,6 +7,7 @@ import { DatabaseSync } from "node:sqlite";
 
 const scratch = process.env.PYM_SCRATCH;
 const exact = process.argv.includes("--exact");
+const survivors = process.argv.includes("--assumption-survivors");
 const seed = "c12-rust-macro-scope-2026-11-19";
 const read = (name) => JSON.parse(readFileSync(join(scratch, name), "utf8"));
 const main = new Map(
@@ -193,7 +194,11 @@ function compare(previous, current) {
             after: [s.outcome, s.target, s.metadata],
           });
       } else bump(counters, "addedSites");
-      if (!s.level2 || prior?.level2) continue;
+      if (
+        !s.level2 ||
+        (survivors ? !s.assumed || !prior?.assumed : prior?.level2)
+      )
+        continue;
       if (!s.assumed) bump(counters, `newProven:${s.outcome}`);
       const rank = rankOf([current.id, current.commit, s.key]);
       const sample = s.assumed ? assumedSample : provenSample;

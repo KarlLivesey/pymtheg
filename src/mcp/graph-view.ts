@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 import { createHash } from "node:crypto";
 import type { GraphResponse } from "../graph/commands.js";
+import {
+  macroScopeAssumption,
+  macroScopeAssumptionText,
+} from "../graph/languages/rust/macro-scope.js";
 import { textPage } from "./text-pages.js";
 
 const record = (v: unknown): Record<string, any> =>
@@ -367,11 +371,26 @@ export class GraphView {
         if (!code) {
           code = `r${this.reasonCodes.size + 1}`;
           this.reasonCodes.set(key, code);
+          const description =
+            field === "assumes" && v === macroScopeAssumption
+              ? macroScopeAssumptionText
+              : undefined;
           this.tables.legend!.push({
             code,
             field,
-            value: clip(typeof v === "string" ? v : JSON.stringify(v), 400),
-            detailRef: this.detail(code, { field, value: v }),
+            value: clip(
+              description
+                ? `${v}. ${description}`
+                : typeof v === "string"
+                  ? v
+                  : JSON.stringify(v),
+              400,
+            ),
+            detailRef: this.detail(code, {
+              field,
+              value: v,
+              ...(description ? { description } : {}),
+            }),
           });
         }
         codes.push(code);

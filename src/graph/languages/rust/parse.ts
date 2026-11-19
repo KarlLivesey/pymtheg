@@ -2961,7 +2961,7 @@ async function createHelper(): Promise<Helper> {
                     if (prev.type !== "attribute_item") break;
                     nodes.push(prev);
                   }
-                  input = attributeInputs.push(macroInput(nodes)) - 1;
+                  input = attributeInputs.push(macroInput(nodes, true)) - 1;
                   attributeInputByItem.set(item.id, input);
                 }
               }
