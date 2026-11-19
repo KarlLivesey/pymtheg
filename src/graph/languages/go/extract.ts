@@ -446,7 +446,7 @@ export class GoExtractor {
             }
           : desc;
       case "unknown":
-        return desc.m ? { k: "unknown", m: desc.m.map(next) } : desc;
+        return desc.m ? { ...desc, m: desc.m.map(next) } : desc;
       case "call":
         return {
           k: "call",
@@ -1410,7 +1410,7 @@ export class GoExtractor {
         const f = this.calleeDesc(callee);
         // A callee not described (a parenthesized conversion type such as
         // `(*p.T)(x)`) keeps what is written in it.
-        if (!f) return { k: "unknown", m: [this.desc(fn)] };
+        if (!f) return this.undescribed(callee);
         return { k: "call", f, i: 0 };
       }
       case "type_conversion_expression": {
@@ -1422,6 +1422,40 @@ export class GoExtractor {
       default:
         return { k: "unknown" };
     }
+  }
+  /**
+   * A callee that is not described: what is written in it, and for a name
+   * under `*` (`(*T)(x)`, `(**p.T)(x)`) how many `*` there are.
+   */
+  private undescribed(callee: Node): Desc {
+    let current = unparen(callee);
+    let stars = 0;
+    for (;;) {
+      if (
+        current.type === "unary_expression" &&
+        current.child(0)?.text === "*"
+      ) {
+        const operand = fieldOf(current, "operand");
+        if (!operand) break;
+        current = unparen(operand);
+      } else if (current.type === "pointer_type") {
+        const inner = named(current)[0];
+        if (!inner) break;
+        current = unparen(inner);
+      } else break;
+      stars++;
+    }
+    const name = [
+      "identifier",
+      "selector_expression",
+      "type_identifier",
+      "qualified_type",
+    ].includes(current.type);
+    return {
+      k: "unknown",
+      m: [this.desc(callee)],
+      ...(stars && name ? { p: stars } : {}),
+    };
   }
   private calleeDesc(callee: Node): Desc | null {
     if (
@@ -1752,7 +1786,7 @@ export class GoExtractor {
       } else {
         // Not described (`(*p.T)(x)`, `f()()`): keeps what is written in it.
         this.link("calls", compact(callee), range(callee), {
-          expr: { k: "unknown", m: [this.desc(callee)] } as unknown as Json,
+          expr: this.undescribed(callee) as unknown as Json,
         });
         this.walk(callee);
       }

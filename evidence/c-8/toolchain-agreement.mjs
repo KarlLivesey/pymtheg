@@ -7,7 +7,7 @@
 // (disagreement), or no decision (the toolchain had no fact for it).
 // Usage: node toolchain-agreement.mjs --base DIR --candidate DIR --project DIR --work DIR
 import { execFileSync } from "node:child_process";
-import { cpSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { parseArgs } from "node:util";
@@ -20,7 +20,8 @@ const { values } = parseArgs({
     work: { type: "string" },
   },
 });
-rmSync(values.work, { recursive: true, force: true });
+// A new folder; nothing is removed (WORK is scratch).
+if (existsSync(values.work)) throw Error(`${values.work} exists: use a new --work`);
 mkdirSync(values.work, { recursive: true });
 
 function index(build, label, toolchain) {
@@ -79,7 +80,7 @@ for (const [key, link] of candidate) {
   else if (t?.origin === "toolchain") out.disagreements.push({ file, kind, start: Number(start), name, sourceOnly: link.target, toolchain: view?.target ?? null });
   else {
     out.noDecision++;
-    if (out.noDecisionSample.length < 20) out.noDecisionSample.push({ file, kind, start: Number(start), name, target: link.target });
+    if (out.noDecisionSample.length < 200) out.noDecisionSample.push({ file, kind, start: Number(start), name, target: link.target });
   }
 }
 console.log(JSON.stringify(out, null, 1));

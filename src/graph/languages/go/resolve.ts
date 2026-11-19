@@ -22,6 +22,7 @@ import {
   fileConstraint,
   implies,
   satisfiable,
+  satisfiableAnyTags,
   type Formula,
 } from "./constraints.js";
 import {
@@ -222,6 +223,8 @@ export type OpenReason =
   /** Interface dispatch: members match by name and count only, not proven. */
   | "structural-match-unverified";
 const UNRESOLVED: Decision = { ids: [], definite: false };
+/** An import two modules provide (Go: "ambiguous import"). */
+const AMBIGUOUS_IMPORT: Decision = { ids: [], definite: false };
 /**
  * How each property of decisions is combined when their targets together are
  * the answer (a call through several possible function values). Every field of
@@ -558,6 +561,9 @@ class GoResolver {
       else if (decision.unseen)
         // A dispatch with no valid member: unresolved, its members may be unseen.
         this.open.set(link.id, ["declarations-may-be-unseen"]);
+      else if (decision === AMBIGUOUS_IMPORT)
+        // Several modules provide the package: unresolved, with the reason.
+        this.open.set(link.id, ["import-destination-uncertain"]);
     }
     return { resolutions, links: added };
   }
@@ -811,19 +817,37 @@ class GoResolver {
    * outside the project, or a directory has no captured package). Counting the
    * captured candidates is never proof.
    */
+  private importMemo = new Map<
+    string,
+    ReturnType<GoResolver["importTargets"]>
+  >();
   private importTargets(
     from: FileInfo,
     path: string,
-  ): { pkgs: Pkg[]; uncertain: boolean; failed?: string[] } {
+  ): ReturnType<GoResolver["computeImportTargets"]> {
+    // The answer depends on the importing directory (its module) and, for the
+    // failed-file cause, on whether the importer is a test file.
+    const key = `${from.directory}\u0000${from.fact.test}\u0000${path}`;
+    let found = this.importMemo.get(key);
+    if (!found)
+      this.importMemo.set(key, (found = this.computeImportTargets(from, path)));
+    return found;
+  }
+  private computeImportTargets(
+    from: FileInfo,
+    path: string,
+  ): {
+    pkgs: Pkg[];
+    uncertain: boolean;
+    failed?: string[];
+    /** Two modules certainly provide the package: Go rejects the import. */
+    ambiguous?: true;
+  } {
     // A package under `testdata`, `_x` or `.x` is imported like any other (the
     // go tool skips those directories only when expanding `./...` patterns),
     // and a module may itself sit under one (cli/cli's `.github/…/tool`).
-    const { directories, outside } = directoryOfImport(
-      this.layout,
-      from.directory,
-      path,
-    );
-    if (!directories.length) return { pkgs: [], uncertain: false };
+    const { providers } = directoryOfImport(this.layout, from.directory, path);
+    if (!providers.length) return { pkgs: [], uncertain: false };
     const parts = path.split("/");
     const internal = parts.lastIndexOf("internal");
     if (internal >= 0) {
@@ -839,28 +863,73 @@ class GoResolver {
       )
         return { pkgs: [], uncertain: false };
     }
-    const pkgs = [...this.pkgs.values()].filter(
-      (pkg) =>
-        directories.includes(pkg.directory) &&
-        !pkg.name.endsWith("_test") &&
-        pkg.name !== "main",
+    // A package is there only with a file Go can build ("build constraints
+    // exclude all Go files" otherwise); `ignore` is the conventional tag
+    // that is never set.
+    const found = providers.map((provider) => ({
+      provider,
+      pkgs: [...this.pkgs.values()].filter(
+        (pkg) =>
+          provider.directories.includes(pkg.directory) &&
+          !pkg.name.endsWith("_test") &&
+          pkg.name !== "main" &&
+          pkg.files.some((file) => this.buildable(file)),
+      ),
+    }));
+    // Two modules that certainly have the package: an ambiguous import.
+    const certain = found.filter(
+      (item) =>
+        !item.provider.uncertain &&
+        item.provider.directories.length === 1 &&
+        item.pkgs.length,
     );
-    const captured = new Set(pkgs.map((pkg) => pkg.directory));
-    const possible = directories.length + (outside ? 1 : 0);
-    const uncertain =
-      possible > 1 && (outside || captured.size < directories.length);
+    if (certain.length > 1)
+      return { pkgs: [], uncertain: false, ambiguous: true };
+    const pkgs = unique(found.flatMap((item) => item.pkgs));
+    const possible = found.filter(
+      (item) => item.pkgs.length || item.provider.uncertain,
+    );
+    let uncertain: boolean;
+    if (possible.length > 1) uncertain = true;
+    else {
+      // One module: certain unless the package may come from outside, or
+      // from one of several replacements of which some are not captured.
+      const { provider, pkgs: own } = possible[0] ?? found[0]!;
+      const captured = new Set(own.map((pkg) => pkg.directory));
+      const count = provider.directories.length + (provider.uncertain ? 1 : 0);
+      uncertain =
+        count > 1 &&
+        (provider.uncertain || captured.size < provider.directories.length);
+    }
     // Every file of the package failed (nothing valid there): the import needs
     // code in those files, so it is failed with them as the cause.
-    if (!pkgs.length && !outside) {
-      const cause = directories.flatMap((directory) =>
-        this.failedCause(
-          directory,
-          from.fact.test && from.directory === directory,
-        ),
-      );
+    if (!pkgs.length && !providers.some((provider) => provider.uncertain)) {
+      const cause = providers
+        .flatMap((provider) => provider.directories)
+        .flatMap((directory) =>
+          this.failedCause(
+            directory,
+            from.fact.test && from.directory === directory,
+          ),
+        );
       if (cause.length) return { pkgs, uncertain: false, failed: cause };
     }
     return { pkgs, uncertain };
+  }
+
+  private buildableMemo = new Map<string, boolean>();
+  /** Can Go build this file in some configuration (`ignore` never set)? */
+  private buildable(path: string): boolean {
+    let answer = this.buildableMemo.get(path);
+    if (answer === undefined) {
+      const constraint = this.constraintOf(path);
+      answer =
+        !constraint ||
+        satisfiable([constraint, { k: "not", x: { k: "v", n: "ignore" } }]) !==
+          false;
+      this.buildableMemo.set(path, answer);
+    }
+    return answer;
   }
 
   private pkgOf(symbol: GraphSymbol): Pkg | undefined {
@@ -1263,12 +1332,27 @@ class GoResolver {
       }
       case "sel":
         return this.select(desc, from, depth);
-      case "unknown":
+      case "unknown": {
         // A call whose callee is not described (`(*p.T)(x)`, `(<-fc)()`):
         // the value of calling what is written, as the backstop reads it.
-        return desc.m?.length === 1
-          ? this.denote({ k: "call", f: desc.m[0]!, i: 0 }, from, depth + 1)
-          : { e: "value", type: UNKNOWN };
+        if (desc.m?.length !== 1) return { e: "value", type: UNKNOWN };
+        const written = desc.m[0]!;
+        if (desc.p !== undefined) {
+          // A conversion `(*T)(x)` is a `*T`: its members are T's. Under more
+          // than one `*`, or when T is itself a pointer type (`type A = *T`,
+          // `type P *T`), the value has no members to follow.
+          const named = this.denote(written, from, depth + 1);
+          if (named.e === "syms" && named.syms.every(isTypeSymbol))
+            return {
+              e: "value",
+              type:
+                desc.p === 1 && !this.pointerTypeName(written, named.syms, from)
+                  ? this.typeSyms(named.syms, depth + 1)
+                  : UNKNOWN,
+            };
+        }
+        return this.denote({ k: "call", f: written, i: 0 }, from, depth + 1);
+      }
       default:
         return { e: "value", type: UNKNOWN };
     }
@@ -1318,13 +1402,8 @@ class GoResolver {
     if (callee.e !== "syms") return UNKNOWN;
     if (callee.syms.every(isTypeSymbol))
       return this.typeSyms(callee.syms, depth + 1);
-    // A function declared in several build variants: only the variants that
-    // can be built with the file the call is written in are called there.
-    const buildable = callee.syms.filter(
-      (symbol) => this.buildTogether(from, symbol.file) !== false,
-    );
-    const callees =
-      callee.syms.length > 1 && buildable.length ? buildable : callee.syms;
+    const callees = this.calledVariants(callee.syms, from);
+    if (!callees) return UNKNOWN;
     const results = callees.map((symbol) => {
       if (symbol.kind === "function" || symbol.kind === "method") {
         const data = (symbol.data ?? {}) as { results?: Desc[] };
@@ -1335,6 +1414,65 @@ class GoResolver {
       return this.funcResult(this.valueType(symbol, depth + 1), desc.i, depth);
     });
     return this.sameType(results);
+  }
+
+  /**
+   * The declarations a call of a name declared in several build variants can
+   * reach from `from`: each one that is the only declaration of the name in
+   * some build of `from` (two in one build do not compile). Undefined unless
+   * some declaration is built in EVERY build of `from` (a build without one
+   * would not have this call) and every constraint is readable. Every name
+   * counts as a free tag (`-tags=freebsd` on Linux), so false is proof.
+   * The caller's answer is definite only when the results then agree.
+   */
+  private calledVariants(
+    syms: GraphSymbol[],
+    from: string,
+  ): GraphSymbol[] | undefined {
+    // Several declarations of one name in one package are build variants;
+    // anything else (the values a reassigned func local may hold) is not.
+    const pkg = this.pkgOf(syms[0]!)?.key;
+    if (
+      syms.length < 2 ||
+      !syms.every(
+        (symbol) =>
+          symbol.name === syms[0]!.name && this.pkgOf(symbol)?.key === pkg,
+      )
+    )
+      return syms;
+    const key = `${syms
+      .map((symbol) => symbol.id)
+      .sort()
+      .join(",")}\u0000${JSON.stringify(this.constraintOf(from) ?? null)}`;
+    if (this.variantMemo.has(key)) return this.variantMemo.get(key);
+    const answer = this.computeCalledVariants(syms, from);
+    this.variantMemo.set(key, answer);
+    return answer;
+  }
+  private variantMemo = new Map<string, GraphSymbol[] | undefined>();
+  private computeCalledVariants(
+    syms: GraphSymbol[],
+    from: string,
+  ): GraphSymbol[] | undefined {
+    const caller = this.constraintOf(from);
+    const declared = syms.map((symbol) => this.constraintOf(symbol.file));
+    if (!caller || declared.some((item) => !item)) return undefined;
+    const not = (formula: Formula): Formula => ({ k: "not", x: formula });
+    const covered =
+      satisfiableAnyTags([caller, ...declared.map((item) => not(item!))]) ===
+      false;
+    if (!covered) return undefined;
+    const reached = syms.filter(
+      (_, index) =>
+        satisfiableAnyTags([
+          caller,
+          declared[index]!,
+          ...declared
+            .filter((_, other) => other !== index)
+            .map((item) => not(item!)),
+        ]) !== false,
+    );
+    return reached.length ? reached : undefined;
   }
 
   /** Result `i` of calling a value of this type: a literal or a named func type. */
@@ -1442,6 +1580,30 @@ class GoResolver {
    * Does this written type name, followed through its chain of aliases, denote
    * a pointer type (`type A = *T`, `type B = A`)? Cycle-safe.
    */
+  /** Does this written type name (a name or `q.Name`) denote a pointer type? */
+  private pointerTypeName(
+    written: Desc,
+    syms: GraphSymbol[],
+    from: string,
+  ): boolean {
+    if (
+      syms.some(
+        (symbol) =>
+          (symbol.data as { underlyingPointer?: boolean } | undefined)
+            ?.underlyingPointer,
+      )
+    )
+      return true;
+    const ref: TypeRef | undefined =
+      written.k === "name"
+        ? { n: written.n }
+        : written.k === "sel" && written.x.k === "name"
+          ? { q: written.x.n, n: written.n }
+          : undefined;
+    // Not a name the alias chain can be followed from: not proven otherwise.
+    return ref ? this.aliasPointer(ref, from) : true;
+  }
+
   private aliasPointer(ref: TypeRef, from: string): boolean {
     if (ref.l !== undefined || ref.q === "") return false;
     let term: TypeTerm =
@@ -2717,8 +2879,11 @@ class GoResolver {
           pkgs,
           uncertain,
           failed: cause,
+          ambiguous,
         } = this.importTargets(info, data.path);
         if (cause) return failed(cause);
+        // Several modules provide the package: Go rejects the import.
+        if (ambiguous) return AMBIGUOUS_IMPORT;
         const symbols = pkgs
           .map((pkg) => pkg.symbol)
           .filter((symbol): symbol is GraphSymbol => !!symbol);

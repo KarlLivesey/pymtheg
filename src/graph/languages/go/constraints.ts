@@ -211,3 +211,23 @@ export function implies(a: Formula, b: Formula): boolean | undefined {
   const counter = satisfiable([a, { k: "not", x: b }]);
   return counter === undefined ? undefined : !counter;
 }
+
+/**
+ * Is there an assignment of the named tags, each one free (a GOOS or GOARCH
+ * name too: `-tags=freebsd` sets `freebsd` on Linux), in which every formula
+ * holds? Every real configuration is such an assignment, so false proves no
+ * build has them all. Undefined when there are too many names.
+ */
+export function satisfiableAnyTags(formulas: Formula[]): boolean | undefined {
+  const all = [
+    ...formulas.reduce((out, f) => names(f, out), new Set<string>()),
+  ];
+  if (all.length > MAX_ANY_TAGS) return undefined;
+  for (let bits = 0; bits < 1 << all.length; bits++) {
+    const tags = new Set(all.filter((_, index) => bits & (1 << index)));
+    if (formulas.every((formula) => evaluate(formula, tags))) return true;
+  }
+  return false;
+}
+/** Above this many names `satisfiableAnyTags` is not computed (unknown). */
+const MAX_ANY_TAGS = 14;

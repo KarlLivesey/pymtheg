@@ -178,20 +178,45 @@ export function importPathOf(
 }
 
 /**
- * The project directories an import path may name, as seen from the importing
- * directory's own module: its main module(s) (the importer's module, or every
- * `use`d module of a go.work listing it) and the local `replace` directives of
- * that go.mod (or of the go.work, which take precedence). One directory when it
- * is proven; several when the captured files cannot prove which replacement Go
- * uses (every candidate is kept, none is definite); none when the package comes
- * from the module cache. A directory inside a different nested module than the
- * one it was mapped through is not that package.
+ * The modules that may provide an import path's package, as the go command
+ * finds them from the importing directory's own module (checked with Go
+ * 1.27.4, `evidence/c-8/go-import-rules.sh`):
+ * - its main module(s) (the importer's module, or every `use`d module of a
+ *   go.work listing it), each for the directory below it that is not inside
+ *   another, nested module;
+ * - every module the main modules require, through its replacement (a
+ *   go.work replace before the modules' own; a version-specific one of the
+ *   selected version before an unversioned one). A `replace` of a module
+ *   that is not required does nothing ("replaced but not required"); with a
+ *   main module before module graph pruning (go < 1.17) a dependency may
+ *   still require it, so it is then a possibility, never proven. A local
+ *   replacement counts only when its directory has a captured go.mod (Go
+ *   fails reading it otherwise); an unreplaced module comes from the module
+ *   cache (outside), unless the package lies in a main module nested under
+ *   it (a module's zip leaves nested modules out).
+ * Whether a provider really has the package (a directory with a buildable
+ * file) is for the caller to decide: two that have it are an ambiguous
+ * import, which Go rejects.
  */
-export interface ImportDestinations {
-  /** Possible project directories of the package. */
+export interface ImportProvider {
+  /** The module path. */
+  path: string;
+  /** Possible project directories of the package in this module. */
   directories: string[];
-  /** A possible destination is outside the project (module cache or path). */
+  /**
+   * Not proven: the package may come from outside the project (module cache,
+   * a destination outside it, or no captured go.mod at the replacement), or
+   * the module may not be in the build at all. Several `directories` without
+   * this: which captured replacement applies is unproven (a candidate set).
+   */
+  uncertain: boolean;
+}
+export interface ImportDestinations {
+  /** Every possible project directory of the package (all providers). */
+  directories: string[];
+  /** A possible destination is outside the project, or one is not proven. */
   outside: boolean;
+  providers: ImportProvider[];
 }
 
 export function directoryOfImport(
@@ -199,9 +224,8 @@ export function directoryOfImport(
   importerDirectory: string,
   importPath: string,
 ): ImportDestinations {
-  const none: ImportDestinations = { directories: [], outside: true };
   const own = moduleOf(layout, importerDirectory);
-  if (!own) return none;
+  if (!own) return { directories: [], outside: true, providers: [] };
   const workspace = layout.workspaces.find(
     (item) =>
       within(own.directory, item.directory) &&
@@ -220,8 +244,9 @@ export function directoryOfImport(
   // (the main requirement is then stale and selection may be higher), or when a
   // main module's `go` directive is absent or below 1.17 (before graph pruning
   // the main go.mod need not list indirect requirements).
+  const pruned = mains.every((main) => prunedGraph(main.go));
   const selectedVersion = (path: string): string | undefined => {
-    if (!mains.every((main) => prunedGraph(main.go))) return undefined;
+    if (!pruned) return undefined;
     let best: string | undefined;
     for (const main of mains) {
       const version = main.requires.get(path);
@@ -271,59 +296,85 @@ export function directoryOfImport(
   };
   const fromMains = byPath(mains.flatMap((main) => main.replacements));
   const fromWork = byPath(workspace?.replacements ?? []);
-  const replaced = new Map<string, GoReplacement[]>();
-  for (const path of new Set([...fromMains.keys(), ...fromWork.keys()])) {
+  const matches = (path: string) =>
+    importPath === path || importPath.startsWith(`${path}/`);
+  const below = (root: string, path: string) =>
+    joinDirectory(root, importPath.slice(path.length + 1) || ".");
+  const providers: ImportProvider[] = [];
+  // The main modules: the package's directory, unless a nested module owns it.
+  for (const main of mains) {
+    if (!matches(main.path)) continue;
+    const directory = below(main.directory, main.path);
+    if (directory !== undefined && moduleOf(layout, directory) === main)
+      providers.push({
+        path: main.path,
+        directories: [directory],
+        uncertain: false,
+      });
+  }
+  // The modules the main modules require (or, before pruning, may require),
+  // through their replacements.
+  const mainPaths = new Set(mains.map((main) => main.path));
+  const paths = new Set([
+    ...mains.flatMap((main) => [...main.requires.keys()]),
+    ...fromMains.keys(),
+    ...fromWork.keys(),
+  ]);
+  for (const path of [...paths].sort()) {
+    if (!matches(path) || mainPaths.has(path)) continue;
+    const required = mains.some((main) => main.requires.has(path));
+    // Replaced but not required: not in the build (Go: "replaced but not
+    // required"), unless an unlisted dependency may require it.
+    if (!required && pruned) continue;
     // A go.work replacement of a path overrides the modules' replacements of
     // the same path (or version); when none of its replacements applies, the
     // modules' replacements still do.
     const work = pick(fromWork.get(path) ?? []);
-    const roots = work.length ? work : pick(fromMains.get(path) ?? []);
-    if (roots.length) replaced.set(path, roots);
+    const replaced = work.length ? work : pick(fromMains.get(path) ?? []);
+    const roots = replaced.length ? replaced : [cache(path)];
+    const directories: string[] = [];
+    let uncertain = !required;
+    for (const root of roots) {
+      if (root.directory === undefined) {
+        // The module cache: a main module nested under this module's path
+        // holds the package, and the module's zip leaves it out.
+        if (
+          mains.some(
+            (main) => main.path.startsWith(`${path}/`) && matches(main.path),
+          )
+        )
+          continue;
+        uncertain = true;
+        continue;
+      }
+      // Go reads the replacement's go.mod; without one the build fails.
+      if (
+        !layout.modules.some((module) => module.directory === root.directory)
+      ) {
+        uncertain = true;
+        continue;
+      }
+      const directory = below(root.directory, path);
+      if (directory === undefined) {
+        uncertain = true;
+        continue;
+      }
+      // A directory inside a module nested below the replacement is not part
+      // of this module.
+      const owner = moduleOf(layout, directory);
+      if (owner && owner.directory !== root.directory) continue;
+      directories.push(directory);
+    }
+    if (directories.length || uncertain)
+      providers.push({ path, directories: unique(directories), uncertain });
   }
-  const matches = (path: string) =>
-    importPath === path || importPath.startsWith(`${path}/`);
-  let best: { roots: GoReplacement[]; main?: GoModule } | undefined;
-  const consider = (roots: GoReplacement[], main?: GoModule) => {
-    const path = roots[0]!.path;
-    if (matches(path) && (!best || path.length > best.roots[0]!.path.length))
-      best = main ? { roots, main } : { roots };
+  return {
+    directories: unique(providers.flatMap((item) => item.directories)),
+    outside: providers.some((item) => item.uncertain),
+    providers,
   };
-  for (const main of mains) consider([main], main);
-  for (const roots of replaced.values()) consider(roots);
-  if (!best) return none;
-  const chosen: { roots: GoReplacement[]; main?: GoModule } = best;
-  const out: string[] = [];
-  let outside = false;
-  for (const root of chosen.roots) {
-    if (root.directory === undefined) {
-      outside = true;
-      continue;
-    }
-    const rest = importPath.slice(root.path.length + 1);
-    const directory = joinDirectory(root.directory, rest || ".");
-    if (directory === undefined) {
-      outside = true;
-      continue;
-    }
-    const owner = moduleOf(layout, directory);
-    if (chosen.main) {
-      if (owner === chosen.main) out.push(directory);
-      else outside = true;
-      continue;
-    }
-    // A replacement directory: the package must not sit inside a module nested below it.
-    if (
-      owner &&
-      owner.directory !== root.directory &&
-      within(owner.directory, root.directory)
-    ) {
-      outside = true;
-      continue;
-    }
-    out.push(directory);
-  }
-  return { directories: [...new Set(out)], outside };
 }
+const unique = <T>(items: T[]) => [...new Set(items)];
 
 /** A `go` directive of 1.17 or later (module graph pruning). */
 function prunedGraph(go: string | undefined): boolean {

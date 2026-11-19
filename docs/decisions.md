@@ -2619,19 +2619,29 @@ schema-3 graphs. See [C-5](changes/C-5.md).
 
 ### Go imports follow the go command, not its pattern rules (C-8)
 
-**Decided (C-8):** a Go import resolves to a package under a `testdata`,
-`_x` or `.x` directory like any other, and a module may sit under such a
-directory; a `replace` to `.` or `..` is a local directory, as
-`modfile.IsDirectoryPath` reads it. A conversion to a pointer type
-(`(*T)(x)`) links to `T` as `T(x)` does, and its value has type `T`. A
-function declared in several build variants is called only in the variants
-that can be built with the calling file. **Why:** the go command skips those
-directories only when it expands `./...` patterns, and builds explicit
-imports of them (checked with Go 1.27.4); the earlier rule called them
-forbidden, which left protobuf-go's generated test packages, cli/cli's
-`.github` modules and all of gopls (`replace golang.org/x/tools => ..`)
-outside the checkout. **Supersedes:** the support matrix's "imports Go forbids
-(`testdata`)". **Rules out:** results of type-parameter type without
-stored type arguments; one definite target for a call whose build-variant
-callees return different named types. See [C-8](changes/C-8.md).
-
+**Decided (C-8):** a Go import resolves as the go command resolves it
+(checked with Go 1.27.4, `evidence/c-8/go-import-rules.sh`): the modules
+that may provide the package are the main modules and the modules they
+require, through their replacements; a `replace` of a module that is not
+required does nothing; a local replacement (`./x`, `../x`, `.` and `..`,
+as `modfile.IsDirectoryPath` reads them) counts only when its directory has a
+captured go.mod; a package is there only with a file Go can build (`ignore`
+is never set); two modules that both provide it are an ambiguous import,
+unresolved with `import-destination-uncertain`. A package under a
+`testdata`, `_x` or `.x` directory is imported like any other, and a module
+may sit under such a directory. A conversion to a pointer type (`(*T)(x)`)
+links to `T` as `T(x)` does; its value has type `*T`, so its members are
+`T`'s, and under more than one `*` or when `T` is itself a pointer type it
+has none. A call through a function declared in several build variants has
+one answer only when the variants cover every build of the calling file and
+agree, every name counting as a free tag (`-tags=freebsd` on Linux); Go
+module version 29. **Why:** the go command skips those directories only when
+it expands `./...` patterns and builds explicit imports of them; the earlier
+rule called them forbidden, which left protobuf-go's generated test
+packages, cli/cli's `.github` modules and all of gopls
+(`replace golang.org/x/tools => ..`) outside the checkout. **Supersedes:** the
+support matrix's "imports Go forbids (`testdata`)", and the reading that a
+`replace` alone makes a destination. **Rules out:** results of
+type-parameter type without stored type arguments; one definite target for a
+call whose build-variant callees return different named types. See
+[C-8](changes/C-8.md).

@@ -1,0 +1,20 @@
+Cold `graph index`, base = build of main at efa0e9e, candidate = this branch
+(round 2), interleaved base/candidate on a shared machine (load average 20-37
+during the runs). Seconds; peak RSS in MiB. From timing.sh's GNU time records.
+
+project  run          wall     user    system  peak
+bbolt    base-1        61.13    8.19   11.76    366
+bbolt    candidate-1   96.40    8.17   17.86    348
+bbolt    base-2        83.09    8.30   15.03    349
+bbolt    candidate-2   50.13    8.75   13.69    347
+bbolt    base-3        52.09    8.64   13.20    378
+bbolt    candidate-3   64.62    8.29   15.05    348
+pebble   base-1      1134.20  110.47  226.59   2079
+pebble   candidate-1  675.36  109.46  175.11   1595
+pebble   base-2      1464.15  104.06  251.19   1385
+pebble   candidate-2 2017.63  107.66  293.95   2033
+
+User time (the indexer's own work) is the same within each project's spread:
+bbolt 8.19-8.64 base, 8.17-8.75 candidate; pebble 104.1-110.5 base,
+107.7-109.5 candidate. Wall and system time follow the machine's storage
+contention (bbolt's wall time ranges 50-96 s across both builds).

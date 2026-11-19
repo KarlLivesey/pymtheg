@@ -1,0 +1,72 @@
+[
+ {
+  "project": "restic__restic",
+  "links": [
+   64165,
+   64165
+  ],
+  "definite": [
+   42347,
+   42379
+  ],
+  "newlyDefinite": {
+   "calls": 32
+  },
+  "sitesAdded": 0,
+  "sitesRemoved": 0,
+  "symbols": [
+   8092,
+   8092
+  ],
+  "symbolsMissing": [],
+  "changed": []
+ },
+ {
+  "project": "protocolbuffers__protobuf-go",
+  "links": [
+   216975,
+   216975
+  ],
+  "definite": [
+   175091,
+   179186
+  ],
+  "newlyDefinite": {
+   "imports": 60,
+   "references": 238,
+   "calls": 3797
+  },
+  "sitesAdded": 0,
+  "sitesRemoved": 0,
+  "symbols": [
+   46060,
+   46060
+  ],
+  "symbolsMissing": [],
+  "changed": []
+ },
+ {
+  "project": "golang__tools",
+  "links": [
+   250351,
+   250351
+  ],
+  "definite": [
+   149472,
+   154564
+  ],
+  "newlyDefinite": {
+   "imports": 777,
+   "calls": 1984,
+   "references": 2331
+  },
+  "sitesAdded": 0,
+  "sitesRemoved": 0,
+  "symbols": [
+   30732,
+   30732
+  ],
+  "symbolsMissing": [],
+  "changed": []
+ }
+]

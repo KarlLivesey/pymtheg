@@ -1,0 +1,7 @@
+== (a) coverage
+GOOS=linux: builds; files [new_linux.go t_linux.go use.go] 
+GOOS=darwin: does not build (# example.com/coverage/p); files [t_darwin.go use.go] 
+GOOS=windows: builds; files [new_windows.go t_windows.go] 
+== (b) tags
+GOOS=linux: builds; files [new_a.go types.go use_linux.go] 
+GOOS=linux -tags=freebsd: builds; files [new_b.go types.go use_linux.go] 

@@ -6,7 +6,7 @@
 // Usage: node determinism.mjs --build DIR --project DIR --work DIR [--runs 3]
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cpSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { parseArgs } from "node:util";
@@ -22,7 +22,8 @@ const { values } = parseArgs({
 const out = [];
 for (let run = 1; run <= Number(values.runs); run++) {
   const root = join(values.work, `run-${run}`);
-  rmSync(root, { recursive: true, force: true });
+  // A new folder per run; nothing is removed (WORK is scratch).
+  if (existsSync(root)) throw Error(`${root} exists: use a new --work`);
   mkdirSync(values.work, { recursive: true });
   cpSync(values.project, root, {
     recursive: true,
@@ -63,7 +64,6 @@ for (let run = 1; run <= Number(values.runs); run++) {
   writeFileSync(join(values.work, `links-${run}.txt`), links.join("\n"));
   const hash = (items) => createHash("sha256").update(items.join("\n")).digest("hex");
   out.push({ run, symbols: symbols.length, links: links.length, symbolHash: hash(symbols), linkHash: hash(links) });
-  rmSync(root, { recursive: true, force: true });
 }
 const same = out.every((item) => item.symbolHash === out[0].symbolHash && item.linkHash === out[0].linkHash);
 console.log(JSON.stringify({ identical: same, runs: out }, null, 1));

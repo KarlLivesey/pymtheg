@@ -60,8 +60,11 @@ export type Desc =
   | { k: "localtype"; tp?: boolean; c?: TypeRef; sym?: string }
   /** Parse-time only: a live local binding, replaced before facts are returned. */
   | { k: "ref"; b: object }
-  /** Not described; `m`: what is written in it (a parenthesized conversion type). */
-  | { k: "unknown"; m?: Desc[] };
+  /**
+   * Not described; `m`: what is written in it (a parenthesized conversion
+   * type). `p`: the callee is a name under this many `*` (`(*T)(x)`: 1).
+   */
+  | { k: "unknown"; m?: Desc[]; p?: number };
 
 export interface ImportFact {
   path: string;

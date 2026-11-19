@@ -323,13 +323,20 @@ test("build variants: a function declared per variant gives each variant's resul
       "type W struct{}",
       "func (*W) M() {}",
     ),
-    "v/use.go": lines("package v", "func Use() { New().M(); Other().M() }"),
+    "v/use.go": lines(
+      "//go:build linux || windows",
+      "",
+      "package v",
+      "func Use() { New().M(); Other().M() }",
+    ),
+    "v/any.go": lines("package v", "func Any() { New().M() }"),
     "v/use_linux.go": lines(
       "package v",
       "func UseLinux() { New().M(); Other().M() }",
     ),
   });
-  // Built on both: each variant's own T.M, a candidate set.
+  // Built on Linux and Windows, each with one New: each variant's own T.M,
+  // a candidate set.
   const both = at(links, "v/use.go", "New().M");
   assert.equal(both.target, null);
   assert.deepEqual(both.candidates, [
@@ -347,4 +354,207 @@ test("build variants: a function declared per variant gives each variant's resul
   );
   // Variants returning different named types: never one definite target.
   assert.equal(at(links, "v/use.go", "Other().M").target, null);
+  // Built everywhere, but darwin (and others) have no New: unresolved.
+  // The receiver's type is not known: the open name-only set of the module's
+  // rule for unknown receivers, never one target.
+  const any = at(links, "v/any.go", "New().M");
+  assert.equal(any.target, null);
+  assert.equal(any.data.open.reason, "receiver-type-unknown");
+});
+
+// The two fixtures of evidence/c-8/go-variant-configs.sh, checked with Go
+// 1.27.4: (a) the darwin build of the caller has no New and does not build;
+// (b) `-tags=freebsd` on Linux selects new_b.go, so New() is a *B.
+test("build variants: one definite answer only when the variants cover every build of the caller and agree", async () => {
+  const { links } = await project({
+    "go.mod": MOD,
+    "a/new_linux.go": lines("package a", "func New() *T { return &T{} }"),
+    "a/new_windows.go": lines("package a", "func New() *T { return &T{} }"),
+    "a/t_linux.go": lines("package a", "type T struct{}", "func (*T) M() {}"),
+    "a/t_windows.go": lines("package a", "type T struct{}", "func (*T) M() {}"),
+    "a/t_darwin.go": lines("package a", "type T struct{}", "func (*T) M() {}"),
+    "a/use.go": lines(
+      "//go:build linux || darwin",
+      "",
+      "package a",
+      "func Use() { New().M() }",
+    ),
+    "b/new_a.go": lines(
+      "//go:build linux && !freebsd",
+      "",
+      "package b",
+      "func New() *A { return &A{} }",
+    ),
+    "b/new_b.go": lines(
+      "//go:build linux && freebsd",
+      "",
+      "package b",
+      "func New() *B { return &B{} }",
+    ),
+    "b/types.go": lines(
+      "package b",
+      "type A struct{}",
+      "func (*A) M() {}",
+      "type B struct{}",
+      "func (*B) M() {}",
+    ),
+    "b/use_linux.go": lines("package b", "func Use() { New().M() }"),
+  });
+  for (const [file, text] of [
+    ["a/use.go", "New().M"],
+    ["b/use_linux.go", "New().M"],
+  ]) {
+    const link = at(links, file, text);
+    assert.equal(link.target, null, file);
+    assert.equal(link.data.open.reason, "receiver-type-unknown", file);
+  }
+});
+
+test("pointer conversions keep their indirection: an alias or a defined type of a pointer, and two stars, have no members", async () => {
+  const { links } = await project({
+    "go.mod": MOD,
+    "p/p.go": lines(
+      "package p",
+      "type T struct{ F int }",
+      "func (*T) M() {}",
+      "type Alias = *T",
+      "type Again = Alias",
+      "type P *T",
+      "func Use() {",
+      "	(*T)(nil).M()",
+      "	(*Alias)(nil).M()",
+      "	(*Again)(nil).M()",
+      "	(*P)(nil).M()",
+      "	(**T)(nil).M()",
+      "}",
+    ),
+  });
+  assert.equal(
+    at(links, "p/p.go", "(*T)(nil).M").target,
+    "p/p.go:method:(*T).M",
+  );
+  for (const text of [
+    "(*Alias)(nil).M",
+    "(*Again)(nil).M",
+    "(*P)(nil).M",
+    "(**T)(nil).M",
+  ]) {
+    const link = at(links, "p/p.go", text);
+    assert.equal(link.target, null, text);
+    assert.deepEqual(link.candidates, [], text);
+  }
+  // The conversion itself still names the type written.
+  assert.equal(
+    at(links, "p/p.go", "*Alias", "calls").target,
+    "p/p.go:alias:Alias",
+  );
+  assert.equal(at(links, "p/p.go", "**T", "calls").target, "p/p.go:struct:T");
+});
+
+// The import shapes of evidence/c-8/go-import-rules.sh, checked with Go 1.27.4.
+test("imports follow the go command: required modules only, a go.mod at the replacement, one provider, a buildable file", async () => {
+  const pkg = (name, n) =>
+    lines(`package ${name}`, `func F() int { return ${n} }`);
+  const use = (path) =>
+    lines("package main", `import p "${path}"`, "func main() { _ = p.F() }");
+  const target = async (files, path) => {
+    const { links } = await project({ ...files, "cmd/main.go": use(path) });
+    const imp = links.find(
+      (link) => link.kind === "imports" && link.file === "cmd/main.go",
+    );
+    return {
+      imp: imp.target,
+      reason: imp.data?.open?.reason ?? null,
+      call: at(links, "cmd/main.go", "p.F").target,
+    };
+  };
+  const app = (...directives) =>
+    lines("module example.com/app", "", "go 1.22", ...directives);
+  // Replaced but not required: Go does not use the replacement.
+  assert.deepEqual(
+    await target(
+      {
+        "go.mod": app("replace example.com/dep => ./dep"),
+        "dep/go.mod": lines("module example.com/dep", "", "go 1.22"),
+        "dep/d.go": pkg("dep", 1),
+      },
+      "example.com/dep",
+    ),
+    { imp: null, reason: null, call: null },
+  );
+  // The main module provides testdata/p; the unrequired replace does nothing.
+  const testdata = {
+    "testdata/p/p.go": pkg("p", 1),
+    "testdata/dep/go.mod": lines(
+      "module example.com/app/testdata/p",
+      "",
+      "go 1.22",
+    ),
+    "testdata/dep/p.go": pkg("p", 2),
+  };
+  assert.deepEqual(
+    await target(
+      {
+        "go.mod": app("replace example.com/app/testdata/p => ./testdata/dep"),
+        ...testdata,
+      },
+      "example.com/app/testdata/p",
+    ),
+    {
+      imp: "testdata/p/p.go:package:p",
+      reason: null,
+      call: "testdata/p/p.go:function:F",
+    },
+  );
+  // Required as well: two modules provide it, an ambiguous import.
+  assert.deepEqual(
+    await target(
+      {
+        "go.mod": app(
+          "require example.com/app/testdata/p v0.0.0",
+          "replace example.com/app/testdata/p => ./testdata/dep",
+        ),
+        ...testdata,
+      },
+      "example.com/app/testdata/p",
+    ),
+    { imp: null, reason: "import-destination-uncertain", call: null },
+  );
+  // `=> ..` without a go.mod in the parent: Go fails reading it.
+  const parent = {
+    "lib/l.go": pkg("lib", 1),
+    "inner/go.mod": lines(
+      "module example.com/app",
+      "",
+      "go 1.22",
+      "require example.com/parent v0.0.0",
+      "replace example.com/parent => ..",
+    ),
+  };
+  const inner = async (files) => {
+    const { links } = await project({
+      ...files,
+      "inner/cmd/main.go": use("example.com/parent/lib"),
+    });
+    return at(links, "inner/cmd/main.go", "p.F").target;
+  };
+  assert.equal(await inner(parent), null);
+  assert.equal(
+    await inner({
+      ...parent,
+      "go.mod": lines("module example.com/parent", "", "go 1.22"),
+    }),
+    "lib/l.go:function:F",
+  );
+  // A package whose only file is `//go:build ignore`: no package.
+  assert.deepEqual(
+    await target(
+      {
+        "go.mod": app(),
+        "p/p.go": lines("//go:build ignore", "", pkg("p", 1)),
+      },
+      "example.com/app/p",
+    ),
+    { imp: null, reason: null, call: null },
+  );
 });

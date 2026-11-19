@@ -138,7 +138,9 @@ the pinned source. All 20 are true.
 `toolchain-agreement.mjs` indexes writable copies of the pinned corpus copy
 of restic (`c734245`): with the base build and the candidate build
 source-only, and with the candidate build and `graph.toolchain.go` on. Of the
-32 links the candidate newly makes definite (all pointer conversions):
+32 links the candidate newly makes definite (pointer conversions, and
+member links reached through a conversion's result such as
+`iVssBackupComponents.AbortBackup()` in `vss_windows.go`):
 
 | | Links |
 | --- | ---: |
