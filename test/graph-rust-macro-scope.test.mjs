@@ -8,19 +8,26 @@ import { GraphView } from "../dist/mcp/graph-view.js";
 
 async function observations(text, dependencies = "") {
   const path = "src/lib.rs";
-  const projectId = "macro-scope";
-  const result = await rust.parse({ path, text });
-  validateResult(text, result);
-  assert.equal(result.status, "clean", JSON.stringify(result.diagnostics));
-  const file = {
-    path,
-    text,
-    result,
-    module: "rust",
-    version: rust.version,
-    hash: contentHash(text),
-  };
   const manifest = `[package]\nname="app"\nversion="0.0.0"\nedition="2021"\n[dependencies]\n${dependencies}`;
+  return (await projectObservations({ [path]: text }, manifest))(path);
+}
+
+async function projectObservations(sources, manifest) {
+  const projectId = "macro-scope";
+  const files = [];
+  for (const [path, text] of Object.entries(sources)) {
+    const result = await rust.parse({ path, text });
+    validateResult(text, result);
+    assert.equal(result.status, "clean", JSON.stringify(result.diagnostics));
+    files.push({
+      path,
+      text,
+      result,
+      module: "rust",
+      version: rust.version,
+      hash: contentHash(text),
+    });
+  }
   const contextFiles = [
     {
       path: "Cargo.toml",
@@ -30,9 +37,14 @@ async function observations(text, dependencies = "") {
       diagnostics: [],
     },
   ];
-  const ctx = { projectId, files: [file], contextFiles };
-  [file.result] = (await rust.analyze(ctx)).map((f) => f.result);
-  const { links, symbols } = fileFacts(projectId, file);
+  const ctx = { projectId, files, contextFiles };
+  const analyzed = new Map((await rust.analyze(ctx)).map((f) => [f.path, f]));
+  const facts = files.map((file) => {
+    file.result = analyzed.get(file.path).result;
+    return fileFacts(projectId, file);
+  });
+  const links = facts.flatMap((file) => file.links);
+  const symbols = facts.flatMap((file) => file.symbols);
   const resultSet = await rust.resolve({ ...ctx, links, symbols });
   const decisions = new Map(
     (Array.isArray(resultSet) ? resultSet : resultSet.resolutions).map((d) => [
@@ -40,11 +52,13 @@ async function observations(text, dependencies = "") {
       d,
     ]),
   );
-  return (kind, target, lineMarker) => {
+  return (path) => (kind, target, lineMarker) => {
+    const text = sources[path];
     const lineStart = text.lastIndexOf("\n", text.indexOf(lineMarker)) + 1;
     const lineEnd = text.indexOf("\n", text.indexOf(lineMarker));
     const link = links.find(
       (l) =>
+        l.file === path &&
         l.kind === kind &&
         l.targetName === target &&
         l.range.start >= lineStart &&
@@ -80,6 +94,57 @@ test("the MCP legend describes the restricted Rust macro assumption", () => {
   assert.equal(entry.value, "rust-external-macro-name");
   assert.match(entry.description, /must receive an item-name identifier/);
   assert.match(entry.description, /whole case-insensitive components/);
+});
+
+async function sharedMacroFixture(name, paths) {
+  const dir = new URL(
+    `fixtures/graph-rust-macro-scope/${name}/`,
+    import.meta.url,
+  );
+  const sources = Object.fromEntries(
+    await Promise.all(
+      paths.map(async (path) => [
+        path,
+        await readFile(new URL(path, dir), "utf8"),
+      ]),
+    ),
+  );
+  const manifest = await readFile(new URL("Cargo.toml", dir), "utf8");
+  return projectObservations(sources, manifest);
+}
+
+test("$crate in a macro in a module shared by the library and binary", async () => {
+  const at = await sharedMacroFixture("lib-and-bin", [
+    "src/lib.rs",
+    "src/main.rs",
+    "src/shared.rs",
+    "src/single_owner.rs",
+  ]);
+  assert.deepEqual(
+    at("src/shared.rs")("types", "Option", "// observed"),
+    proved(null),
+  );
+  assert.deepEqual(
+    at("src/single_owner.rs")("types", "Option", "// observed"),
+    proved("option::Option"),
+  );
+});
+
+test("$crate in a macro shared by two integration-test crates", async () => {
+  const at = await sharedMacroFixture("integration-tests", [
+    "tests/first.rs",
+    "tests/second.rs",
+    "tests/common/mod.rs",
+    "tests/single_owner/mod.rs",
+  ]);
+  assert.deepEqual(
+    at("tests/common/mod.rs")("types", "Option", "// observed"),
+    proved(null),
+  );
+  assert.deepEqual(
+    at("tests/single_owner/mod.rs")("types", "Option", "// observed"),
+    proved("option::Option"),
+  );
 });
 
 test("local macro item names include literal and forwarded metavariable names", async () => {

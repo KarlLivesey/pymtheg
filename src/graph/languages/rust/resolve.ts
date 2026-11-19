@@ -3819,6 +3819,24 @@ export function resolveRust(
       };
     return profile;
   };
+  function definingMacroPlace(symbol: GraphSymbol): Place | undefined {
+    // A captured definition can be compiled into more than one crate. Its
+    // symbol identity does not distinguish those expansions, and the caller
+    // may have imported it from another crate.
+    const owners = ownerPlace(symbol.file, "");
+    const owner = owners[0];
+    if (
+      !owner ||
+      owners.some(
+        (p) =>
+          p.crate.root !== owner.crate.root ||
+          p.uncertain ||
+          p.directoryUnverified,
+      )
+    )
+      return;
+    return owner;
+  }
   /**
    * The one readable workspace `macro_rules!` definition that `name` names at
    * an invocation site, or null. Names in a transcriber resolve at the call
@@ -3832,7 +3850,7 @@ export function resolveRust(
     from?: GraphSymbol,
   ): GraphSymbol | null {
     if (name.startsWith("$crate::")) {
-      const home = from && ownerPlace(from.file, "")[0];
+      const home = from && definingMacroPlace(from);
       if (!home) return null;
       return definiteMacro(
         "crate::" + name.slice(8),
@@ -7421,7 +7439,7 @@ export function resolveRust(
             at = loc,
             from = scope;
           if (path.startsWith("$crate::")) {
-            const home = ownerPlace(m.file, "")[0];
+            const home = definingMacroPlace(m);
             if (!home) continue;
             path = "crate::" + path.slice(8);
             at = { ...home, conditions: loc.conditions ?? [] };

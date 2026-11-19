@@ -106,3 +106,30 @@ The dev-server build, type check, format check, and both offline Cargo
 controls passed. The focused Rust macro, MCP, and sweep run passed all
 404 tests. The regenerated plan passed all 21 sweep tests. The full
 suite passed all 3,090 tests after the MCP legend update.
+
+## Shared macro definitions across Cargo targets
+
+Both new fixtures passed offline `cargo check`. In each, the shared
+module's `Option` is the prelude type in one target and the helper's
+generated type in the other. Both graph tests reproduce the unmarked
+prelude target with the old first-owner lookup. The corrected graph
+withholds both links and resolves `Option` in both single-owner twins.
+[Library and binary](../../test/fixtures/graph-rust-macro-scope/lib-and-bin/src/shared.rs) · [Integration tests](../../test/fixtures/graph-rust-macro-scope/integration-tests/tests/common/mod.rs)
+
+The ownership scan used the resolver's module placements and captured
+macro profiles. It found both fixture wrappers and found no affected
+definitions on the 18 pinned repositories. Helix, Ratatui and Serde were
+cold-indexed again. The other 15 pins reused their reviewed stores. The
+exact comparison with `12ad591` found no decision, site or symbol-key
+changes. The three fresh stores preserved all 67,433 definite decisions
+and 34,238 receiver decisions from main `981b20d`, with identical sites
+and symbol keys. Main's Rust source matches the measured baseline.
+[Comparison script](compare.mjs)
+
+All-site and like-for-like Rust Level 2 both use 947,018 sites. Main is
+380,384 (40.17%), proofs reach 381,170 (40.25%), and including 16,923
+assumed links reaches 398,093 (42.04%). The existing input still
+regenerates the committed Rust plan.
+
+The dev-server build, type check, format check, 379 Rust macro tests and
+21 sweep tests passed.
