@@ -253,7 +253,9 @@ test("receivers: a type declared in the failed file withholds; a closure paramet
   // From alacritty (display/mod.rs:1441): `self.window` has a type declared
   // in a file the parser rejected (display/window.rs:136, attributes on a
   // parameter), so the chain on it is withheld. The same chain through a
-  // readable type resolves.
+  // readable type resolves. C-21's grammar reads those attributes, so the
+  // file is kept unreadable with an empty turbofish (`gap::<>()`), a shape
+  // that stays a grammar gap.
   const g = await index({
     "src/lib.rs": "mod display;",
     "src/display/mod.rs": [
@@ -276,6 +278,8 @@ test("receivers: a type declared in the failed file withholds; a closure paramet
       "  ) -> Window { Window }",
       "  pub fn current_monitor(&self) {}",
       "}",
+      "fn gap() -> u8 { 1 }",
+      "fn use_gap() -> u8 { gap::<>() }",
     ].join("\n"),
     "src/display/size.rs": [
       "#[derive(Clone, Copy)]",
