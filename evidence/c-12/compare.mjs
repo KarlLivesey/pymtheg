@@ -8,7 +8,9 @@ import { DatabaseSync } from "node:sqlite";
 const scratch = process.env.PYM_SCRATCH;
 const exact = process.argv.includes("--exact");
 const survivors = process.argv.includes("--assumption-survivors");
-const seed = "c12-rust-macro-scope-2026-11-19";
+const seed =
+  process.env.PYM_COMPARISON_SEED ?? "c12-rust-macro-scope-2026-11-19";
+const allSamples = process.argv.includes("--all-samples");
 const read = (name) => JSON.parse(readFileSync(join(scratch, name), "utf8"));
 const main = new Map(
   read(process.env.C12_BASELINE_RUN ?? "main-run.json").repos.map((repo) => [
@@ -68,6 +70,10 @@ function reason(data) {
     return "opaque macro scope";
   if (detail.includes("item-under-opaque-attribute"))
     return "item under opaque attribute";
+  if (detail.includes("macro export unavailable"))
+    return "unavailable macro export";
+  if (detail.includes("macro implementation source unverified"))
+    return "unverified macro source";
   if (
     /glob|namespace-binding|conditional-(?:name|binding)|competing/.test(detail)
   )
@@ -129,6 +135,7 @@ function site(row, store) {
     target,
     outcome: row.resolution,
     assumed: data.assumes?.includes("rust-external-macro-name") ?? false,
+    assumptionMarks: JSON.stringify([...(data.assumes ?? [])].sort()),
     reason: reason(data),
     ...(exact ? { metadata: JSON.stringify(data) } : {}),
   };
@@ -138,11 +145,39 @@ function compare(previous, current) {
   const a = graph(previous, true),
     b = graph(current);
   try {
-    const counters = {},
+    const counters = {
+        baselineSymbols: a.symbols.size,
+        candidateSymbols: b.symbols.size,
+      },
       oldSites = new Map(),
       changed = [],
       assumedSample = [],
       provenSample = [];
+    function recordChange(key, before, after) {
+      const sameDecision =
+        before.outcome === after?.outcome && before.target === after?.target;
+      if (before.definite && !sameDecision)
+        bump(counters, "existingDefiniteTargetChanges");
+      if (
+        before.definite &&
+        before.assumptionMarks !== (after?.assumptionMarks ?? "[]")
+      )
+        bump(counters, "existingDefiniteMarkChanges");
+      if (before.receiver && !sameDecision) bump(counters, "receiverChanges");
+      changed.push({
+        key,
+        afterReason: after?.reason,
+        before: [
+          before.outcome,
+          before.target,
+          before.metadata,
+          before.assumptionMarks,
+        ],
+        after: after
+          ? [after.outcome, after.target, after.metadata, after.assumptionMarks]
+          : null,
+      });
+    }
     const reasons = { main: {}, proven: {}, included: {} };
     const symbolKeys = new Set(b.symbols.values());
     const missingSymbols = [...a.symbols.values()].filter(
@@ -169,6 +204,7 @@ function compare(previous, current) {
           (p) =>
             p.outcome === s.outcome &&
             p.target === s.target &&
+            p.assumptionMarks === s.assumptionMarks &&
             p.metadata === s.metadata,
         ) ?? -1;
       const prior = old?.splice(Math.max(0, matching), 1)[0];
@@ -188,11 +224,7 @@ function compare(previous, current) {
         if (s.level2) bump(counters, "sharedIncludedLevel2");
         if (s.level2 && !s.assumed) bump(counters, "sharedProvenLevel2");
         if ((exact || prior.definite || prior.receiver) && matching < 0)
-          changed.push({
-            key: s.key,
-            before: [prior.outcome, prior.target, prior.metadata],
-            after: [s.outcome, s.target, s.metadata],
-          });
+          recordChange(s.key, prior, s);
       } else bump(counters, "addedSites");
       if (
         !s.level2 ||
@@ -217,7 +249,7 @@ function compare(previous, current) {
       const line = text.slice(0, s.body.range.start).split("\n").length;
       const scope = s.body.data?.scope ?? "";
       let nearby;
-      if (s.assumed) {
+      if (s.assumed || allSamples) {
         if (!parsed.has(row.file))
           parsed.set(
             row.file,
@@ -260,8 +292,7 @@ function compare(previous, current) {
     for (const [key, rows] of oldSites)
       for (const row of rows) {
         bump(counters, "removedSites");
-        if (exact || row.definite || row.receiver)
-          changed.push({ key, before: [row.outcome, row.target], after: null });
+        if (exact || row.definite || row.receiver) recordChange(key, row);
       }
     return {
       counters,
@@ -305,7 +336,7 @@ const sampledPins = new Set(
     .map((row) => row.id),
 );
 for (const row of results)
-  if (!sampledPins.has(row.id)) delete row.assumedSample;
+  if (!allSamples && !sampledPins.has(row.id)) delete row.assumedSample;
 writeFileSync(
   join(scratch, "compare.json"),
   JSON.stringify({ seed, results }, null, 2),

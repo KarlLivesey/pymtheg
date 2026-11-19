@@ -1750,3 +1750,17 @@ analyzed facts that the graph stores. The identity and resolution shapes stay
 the same, so library queries and ordinary graph queries can return those
 links. Coverage reports the assumption-backed Level 2 count alongside the
 total and still accepts pre-assumption archives.
+
+Module 38 uses the same captured facts to identify macros during scope
+preparation. It looks up the attribute and bang sub-namespaces and checks
+tool names in the type namespace. The identity lookup uses an isolated
+cache and applies Rust's expansion-time glob ambiguity rule only where an
+outer binding is established. Cargo paths and named imports use existing
+dependency evidence and assume written qualified paths and named imports
+compile. The catalogue uses release and positive feature facts to identify
+namespace facets. For a catalogued re-export, the facade's lock row
+must identify the implementing package as a registry dependency. For
+an uncatalogued export, the reachable dependency packages must have
+verified registry sources. Applicable manifest or Cargo configuration
+overrides withhold that evidence. The ordinary link lookup retains its
+scope guards.

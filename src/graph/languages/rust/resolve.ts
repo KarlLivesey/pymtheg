@@ -41,11 +41,14 @@ import {
 } from "./library-audit.js";
 import {
   dependencyUnit,
+  cargoMacroReexport,
+  cargoMacroSourceKnown,
   exportNamespace,
   librarySymbol,
   permitsNamespace,
   preludePath,
   sameLibraryPath,
+  scopeMacroExport,
   sysroot,
   valuePathKind,
   type LibraryPath,
@@ -348,6 +351,10 @@ export function resolveRust(
   let protectModuleImports = true;
   let scopeMode: MacroScopeMode = "baseline";
   let macroIdentityProbe = false;
+  let macroIdentityFlavor: "attribute" | "bang" | undefined;
+  let macroIdentityPrelude: string | undefined;
+  let auditingMacroIdentity = false;
+  let auditedMacroRefusal: string | undefined;
   // Cache only unproved import namespaces, never targets or positive proofs.
   // Facts are immutable for this run; caller conditions and placement are in
   // the key. A failed proof keeps alternatives, it never asserts a binding.
@@ -1907,7 +1914,10 @@ export function resolveRust(
     variantsOnly = false,
   ): Found {
     if (s.kind !== "module" && !rest.length)
-      return { symbols: accepts(s, ns) ? [s] : [], complete: true };
+      return {
+        symbols: accepts(s, ns) && macroIdentityAccepts(s, ns) ? [s] : [],
+        complete: true,
+      };
     if (s.kind === "module") {
       const destinations = data(s).unit
         ? [roots.get(s.file)!].filter(Boolean)
@@ -2109,6 +2119,7 @@ export function resolveRust(
               loc.crate.root,
               (accessFrom ?? loc).crate.root,
             ) &&
+            macroIdentityAccepts(s, headNs) &&
             possible([...(loc.conditions ?? []), ...conditionsFor(s)]) &&
             (!accessFrom || visible(str(data(s).visibility), loc, accessFrom)),
         );
@@ -2171,7 +2182,8 @@ export function resolveRust(
           return (
             !head.complete ||
             !head.library ||
-            (head.library.parts.length > 0 && !exportNamespace(head.library))
+            (head.library.parts.length > 0 &&
+              !lookupExportNamespace(head.library))
           );
         });
         if (libraryProbe) return { ...found, bound: true };
@@ -2191,7 +2203,7 @@ export function resolveRust(
           libraryLookup,
           libraryLookup && libraryProbe,
           libraryLookup && !protectModuleImports,
-          macroIdentityProbe,
+          macroIdentityKey(),
           parentIdentity(loc),
           loc.symbol?.id,
           binding.id,
@@ -2433,7 +2445,11 @@ export function resolveRust(
         !all.library.parts.length
       )
         return withFallback(result, explicit);
-      if (!all.complete || !all.symbols.length)
+      const otherLibraryNamespace =
+        macroIdentityFlavor &&
+        all.library &&
+        !macroIdentityPermits(all.library, headNs);
+      if (!all.complete || (!all.symbols.length && !otherLibraryNamespace))
         return withFallback(
           {
             ...empty(false),
@@ -2451,6 +2467,9 @@ export function resolveRust(
     const shadowed =
       scopeFailures.length > 0 ||
       (ns !== "macro" &&
+        (!macroIdentityProbe ||
+          !macroIdentityFlavor ||
+          hardOpaqueScopes.has(scopeKey)) &&
         (!libraryLookup ||
           (!libraryProbe && libraryImportScope !== scopeKey)) &&
         scopeOpaque(scopeKey, name, false, !uses?.globs.length));
@@ -2460,7 +2479,10 @@ export function resolveRust(
             !accessFrom || visible(str(data(l).visibility), loc, accessFrom),
         )
       : [];
-    if (globs.length) {
+    if (
+      globs.length &&
+      !macroGlobHasOuterBinding(name, rest, loc, seen, accessFrom ?? loc)
+    ) {
       // A failed glob has unknown exports. It is never evidence that this
       // particular name traverses the failed file (the prelude may supply it).
       const throughGlob = (found: Found): Found => {
@@ -2584,6 +2606,7 @@ export function resolveRust(
     };
     if (
       namespace === "macro" &&
+      macroIdentityFlavor !== "attribute" &&
       !raw.includes("::") &&
       loc.crate.edition !== "2015"
     ) {
@@ -2695,7 +2718,7 @@ export function resolveRust(
         if (!parts.length && !["any", "type", "importType"].includes(ns))
           return empty();
         const path = { ...anchor, parts };
-        if (!permitsNamespace(exportNamespace(path), ns)) return empty();
+        if (!macroIdentityPermits(path, ns)) return empty();
         return { ...empty(), bound: true, library: path };
       }
     }
@@ -2815,7 +2838,7 @@ export function resolveRust(
       );
     if (name === "_") return empty();
     const baselineGuard = JSON.stringify([
-      macroIdentityProbe,
+      macroIdentityKey(),
       libraryLookup
         ? [
             libraryAttributeStart,
@@ -3598,24 +3621,20 @@ export function resolveRust(
   // E4: failed/unverified textual entries are unseen code. Assume they do
   // not rebind the standard names; ordinary textual macro lookup stays strict.
   function dependencyMacro(alias: string, name: string, loc: Place): boolean {
-    const edges = (loc.crate.dependencies ?? []).filter(
-      (e) =>
-        e.name === alias &&
-        possible([...(loc.conditions ?? []), ...e.conditions]),
+    const unit = dependencyUnit(
+      loc.crate,
+      alias,
+      loc.conditions ?? [],
+      possible,
+      implies,
     );
     return (
-      edges.length > 0 &&
-      edges.some((e) =>
-        e.conditions.every((c) => implies(loc.conditions ?? [], c)),
+      !!unit &&
+      !!unit.registry?.length &&
+      unit.registry.every(({ version, requirement }) =>
+        auditedMacro(unit.unit.unit, version, name, requirement),
       ) &&
-      edges.every((e) =>
-        auditedMacro(
-          e.packageName ?? "",
-          e.registryVersion,
-          name,
-          e.registryRequirement,
-        ),
-      )
+      cargoMacroSourceKnown({ ...unit, parts: [name] })
     );
   }
   function ecosystemPath(path: string, loc: Place, scope: string): boolean {
@@ -4180,6 +4199,7 @@ export function resolveRust(
     start: number;
     input?: MacroInput | undefined;
     attribute?: true;
+    conditions?: string[];
     block?: true;
   };
   const opaqueOrigins = new Map<string, OpaqueOrigin[]>();
@@ -4372,6 +4392,7 @@ export function resolveRust(
               name: e.name,
               scope: e.scope,
               start: e.start,
+              ...(e.conditions?.length ? { conditions: e.conditions } : {}),
               ...(e.input === undefined
                 ? {}
                 : {
@@ -6251,6 +6272,14 @@ export function resolveRust(
         return l.kind === "imports"
           ? { ...path.unit, evidence: "import-path" }
           : undefined;
+      if (
+        !libraryProbe &&
+        namespace === "macro" &&
+        path.unit.ecosystem === "cargo" &&
+        cargoMacroReexport(path) &&
+        !cargoMacroSourceKnown(path)
+      )
+        return refuseLibrary("macro implementation source unverified");
       const exported = exportNamespace(path);
       if (
         !libraryProbe &&
@@ -6327,6 +6356,7 @@ export function resolveRust(
   let libraryRefusals: Refusal[] = [];
   function refuseLibrary(detail: string, scopes: string[] = []): undefined {
     if (libraryAudit && !libraryProbe) libraryRefusals.push({ detail, scopes });
+    if (auditingMacroIdentity) auditedMacroRefusal = detail;
     return undefined;
   }
   function libraryFor(l: GraphLink, d: Data): LibraryTarget | undefined {
@@ -6387,6 +6417,270 @@ export function resolveRust(
         : "";
     }
   };
+  function macroIdentityKey(): string | boolean {
+    return macroIdentityFlavor
+      ? `${Number(macroIdentityProbe)}:${macroIdentityFlavor}:${macroIdentityPrelude ?? ""}`
+      : macroIdentityProbe;
+  }
+
+  function macroIdentityAccepts(symbol: GraphSymbol, ns: Namespace): boolean {
+    if (!macroIdentityFlavor || ns !== "macro") return true;
+    if (data(symbol).namespaceUnverified) return true;
+    if (data(symbol).macroRules) return macroIdentityFlavor === "bang";
+    const kinds = data(symbol).procMacroKinds as string[] | undefined;
+    return (
+      !kinds?.length ||
+      kinds.some((kind) =>
+        macroIdentityFlavor === "bang"
+          ? kind === "proc_macro"
+          : kind !== "proc_macro",
+      )
+    );
+  }
+
+  function macroIdentityPermits(path: LibraryPath, ns: Namespace): boolean {
+    const exported = lookupExportNamespace(path);
+    if (!permitsNamespace(exported, ns)) return false;
+    if (!macroIdentityFlavor || ns !== "macro") return true;
+    if (exported === "bang") return macroIdentityFlavor === "bang";
+    if (
+      exported === "derive" ||
+      exported === "attribute" ||
+      standardDerivePath(path)
+    )
+      return macroIdentityFlavor === "attribute";
+    return true;
+  }
+
+  function lookupExportNamespace(path: LibraryPath) {
+    return macroIdentityFlavor ? scopeMacroExport(path) : exportNamespace(path);
+  }
+
+  function macroGlobHasOuterBinding(
+    name: string,
+    rest: readonly string[],
+    loc: Place,
+    seen: Set<string>,
+    accessFrom: Place,
+  ): boolean {
+    if (!macroIdentityFlavor || loc.libraryModuleMember) return false;
+    // Rust rejects a glob-supplied macro path segment that competes with an
+    // outer binding (E0659). The exception applies to lexical lookup only.
+    // In particular `self::Name` and an imported module's members still need
+    // their globs, and a Cargo edge must be available in this configuration.
+    if (!rest.length)
+      return name === macroIdentityPrelude && !activeMacroImports.length;
+    if (
+      !loc.crate.edition ||
+      loc.crate.edition === "2015" ||
+      loc.noImplicitPrelude
+    )
+      return false;
+    const outer = dependencyLookup(
+      name,
+      [],
+      loc,
+      "type",
+      seen,
+      true,
+      accessFrom,
+      false,
+    );
+    return (
+      outer.complete &&
+      !outer.failedFiles?.length &&
+      (!!outer.library || outer.symbols.length === 1)
+    );
+  }
+
+  function standardDerivePath(path: LibraryPath): boolean {
+    const { unit, parts } = path;
+    return (
+      unit.ecosystem === "rust-std" &&
+      ["std", "core"].includes(unit.unit) &&
+      parts.length === 2 &&
+      preludePath(parts[1]!, "2015", "derive")?.[0] === parts[0]
+    );
+  }
+
+  function probeMacroBinding(
+    path: string,
+    loc: Place,
+    scope: string,
+    flavor: "attribute" | "bang",
+    namespace: "macro" | "type",
+    prelude?: string,
+    checkExpansionScopes = false,
+  ): Found {
+    macroIdentityProbe = !checkExpansionScopes;
+    macroIdentityFlavor = flavor;
+    macroIdentityPrelude = prelude;
+    libraryLookup = true;
+    try {
+      return find(path, loc, scope, namespace);
+    } finally {
+      macroIdentityPrelude = undefined;
+      macroIdentityFlavor = undefined;
+      macroIdentityProbe = false;
+      libraryLookup = false;
+    }
+  }
+
+  function hasNoMacroBinding(found: Found): boolean {
+    return (
+      found.complete &&
+      !found.bound &&
+      !found.symbols.length &&
+      !found.library &&
+      !found.possibleImportNames?.length &&
+      !found.failedFiles?.length
+    );
+  }
+
+  function scopeMacroUseCompetes(
+    name: string,
+    loc: Place,
+    scope: string,
+  ): boolean {
+    if (!macroUseDerive(loc.crate.root, name)) return false;
+    const imports = (externCratesByFile.get(loc.crate.root) ?? []).filter(
+      (link) =>
+        !str(data(link).scope) &&
+        (
+          (data(link).macroUseRequests ?? []) as {
+            names: string[] | null;
+            conditions: string[];
+          }[]
+        ).some((request) => !request.names || request.names.includes(name)),
+    );
+    if (!imports.length) return true;
+    return imports.some((link) => {
+      if (canonicalSysrootImport(link, loc.crate)) return false;
+      const path = `$extern::${link.targetName}`;
+      // A missing or uncaptured crate can export this name. A captured facade
+      // must also have a complete export lookup, including any expansion in
+      // its module that could insert a reexport.
+      const root = probeMacroBinding(
+        path,
+        loc,
+        scope,
+        "attribute",
+        "type",
+        undefined,
+        true,
+      );
+      if (
+        !root.complete ||
+        root.failedFiles?.length ||
+        root.symbols.length !== 1
+      )
+        return true;
+      return !hasNoMacroBinding(
+        probeMacroBinding(
+          `${path}::${name}`,
+          loc,
+          scope,
+          "attribute",
+          "macro",
+          undefined,
+          true,
+        ),
+      );
+    });
+  }
+
+  function standardScopeAttribute(
+    name: string,
+    loc: Place,
+    scope: string,
+  ): boolean {
+    const head = name.split("::")[0]!;
+    const rule = attributeRules.get(head);
+    if (!rule || !knownAttributeName(name)) return false;
+    if (rule.category === "builtin") return true;
+    if (!loc.crate.edition || loc.noImplicitPrelude) return false;
+    const tool = rule.category === "tool";
+    if (!tool && scopeMacroUseCompetes(head, loc, scope)) return false;
+    return hasNoMacroBinding(
+      probeMacroBinding(
+        head,
+        loc,
+        scope,
+        "attribute",
+        tool ? "type" : "macro",
+        head,
+      ),
+    );
+  }
+
+  function scopeMacroTarget(
+    path: string,
+    flavor: "derive" | "attribute" | "bang",
+    loc: Place,
+    scope: string,
+    site: GraphLink | undefined,
+  ): LibraryTarget | "standard derive" | undefined {
+    const parts = path.replace(/^::/, "").split("::");
+    if (
+      !loc.crate.edition ||
+      !parts.every((part) => /^[_\p{ID_Start}][_\p{ID_Continue}]*$/u.test(part))
+    )
+      return undefined;
+    const bare = parts.length === 1 && !path.startsWith("::");
+    const head = parts[0]!;
+    if (
+      bare &&
+      ((flavor === "bang"
+        ? macroUseDerive(loc.crate.root, head)
+        : scopeMacroUseCompetes(head, loc, scope)) ||
+        (flavor === "bang" && (!site || textualMacro(head, site, loc, scope))))
+    )
+      return undefined;
+    const prelude =
+      bare &&
+      flavor === "derive" &&
+      !loc.noImplicitPrelude &&
+      standardDerives.has(head)
+        ? head
+        : undefined;
+    const result = probeMacroBinding(
+      path,
+      loc,
+      scope,
+      flavor === "bang" ? "bang" : "attribute",
+      "macro",
+      prelude,
+    );
+    if (prelude && hasNoMacroBinding(result)) return "standard derive";
+    const binding = result.library;
+    if (
+      !result.complete ||
+      result.symbols.length ||
+      result.failedFiles?.length ||
+      !binding?.parts.length
+    )
+      return undefined;
+    if (flavor === "derive" && standardDerivePath(binding))
+      return "standard derive";
+    if (
+      binding.unit.ecosystem === "cargo" &&
+      ((bare && !binding.namedImport) || !cargoMacroSourceKnown(binding))
+    )
+      return undefined;
+    const exported = scopeMacroExport(binding);
+    const competingPrelude =
+      prelude || (bare && flavor === "attribute" && knownAttributeName(head));
+    if (
+      (exported && exported !== "multiple" && exported !== flavor) ||
+      (competingPrelude && exported !== flavor)
+    )
+      return undefined;
+    return {
+      ...binding.unit,
+      symbol: librarySymbol(binding, flavor),
+      evidence: binding.imported ? "import-binding" : "qualified-path",
+    };
+  }
   function standardScopeMacro(
     name: string,
     site: GraphLink,
@@ -6457,34 +6751,47 @@ export function resolveRust(
     origin: OpaqueOrigin,
   ): MacroScopeEffect | undefined {
     const { loc, name, scope, start, input } = origin;
-    if (!input || loc.uncertain || loc.directoryUnverified) return;
+    if (loc.uncertain || loc.directoryUnverified) return;
+    const attributeAt = origin.conditions
+      ? {
+          ...loc,
+          conditions: [...(loc.conditions ?? []), ...origin.conditions],
+        }
+      : loc;
+    if (
+      origin.attribute &&
+      name !== "derive" &&
+      standardScopeAttribute(name, attributeAt, scope)
+    ) {
+      return { names: noMacroNames };
+    }
+    if (!input) return;
     const sites = origin.attribute
       ? (attributesByStart.get(`${loc.file}|${start}`) ?? [])
       : [macroSites.get(`${loc.file}|${start}`)].filter(
           (site): site is GraphLink => !!site,
         );
-    if (!sites.length) return;
+    if (!sites.length && (!origin.attribute || name === "derive")) return;
     let assumed = false;
     const names = new Set<string>();
     const derivedNames = new Set<string>();
     const lookups = new Set<string>();
-    for (const site of sites) {
-      const at = siteLoc(site, loc);
+    for (const site of sites.length ? sites : [undefined]) {
+      const at = site ? siteLoc(site, loc) : attributeAt;
       if (!possible(at.conditions ?? [])) continue;
-      if (origin.attribute) {
-        if (
-          name === "derive" &&
-          !at.noImplicitPrelude &&
-          !opaqueAttribute(
-            `#[derive(${site.targetName})]`,
-            at,
-            scope,
-            conditionsFor(site),
-          )
-        )
-          continue;
-      } else {
-        recordMacroHead(lookups, name);
+      const path = site?.targetName ?? name;
+      const flavor = !origin.attribute
+        ? "bang"
+        : name === "derive"
+          ? "derive"
+          : "attribute";
+      if (flavor === "derive" && !standardScopeAttribute("derive", at, scope))
+        return;
+      if (!origin.attribute && site) {
+        // Preserve the C-12 check for names used by the invocation and any
+        // transcriber calls. An expansion competing with an established
+        // written attribute binding is an expansion-time ambiguity in rustc.
+        recordMacroHead(lookups, path);
         if (standardScopeMacro(name, site, at, scope)) continue;
         const local = definiteMacro(name, site, at, scope);
         if (local) {
@@ -6498,16 +6805,8 @@ export function resolveRust(
           continue;
         }
       }
-      if (hasScopeGlob(at, scope)) return;
-      // Only the macro's identity is checked here. The proof of a use of an
-      // ordinary name still runs through every original scope and import.
-      macroIdentityProbe = true;
-      let macro: LibraryTarget | undefined;
-      try {
-        macro = libraryAt(site, data(site), at, scope);
-      } finally {
-        macroIdentityProbe = false;
-      }
+      const macro = scopeMacroTarget(path, flavor, at, scope, site);
+      if (macro === "standard derive") continue;
       if (!macro?.symbol) return;
       if (
         !origin.attribute &&
@@ -6679,10 +6978,13 @@ export function resolveRust(
   const auditedOrigins = new Map<OpaqueOrigin, MacroScopeBlocker[]>();
   function auditMacroTarget(site: GraphLink, at: Place, scope: string) {
     macroIdentityProbe = true;
+    auditingMacroIdentity = true;
+    auditedMacroRefusal = undefined;
     try {
       return libraryAt(site, data(site), at, scope);
     } finally {
       macroIdentityProbe = false;
+      auditingMacroIdentity = false;
     }
   }
   function describeScopeOrigin(origin: OpaqueOrigin): MacroScopeBlocker[] {
@@ -6759,6 +7061,21 @@ export function resolveRust(
             : [{ kind: "other", name, construct: "unverified macro identity" }];
       }
     }
+    result = result.map((blocker) => {
+      const site = attribute
+        ? sites.find((site) => site.targetName === blocker.name)
+        : macroSites.get(`${loc.file}|${start}`);
+      const at = site && siteLoc(site, loc);
+      const target = site && at && auditMacroTarget(site, at, scope);
+      const cause = !site
+        ? "no parsed macro link"
+        : !target?.symbol
+          ? (auditedMacroRefusal ?? "no named macro target")
+          : hasScopeGlob(at!, scope)
+            ? "lexical glob guard"
+            : "lookup found identity; effect or scope still blocked";
+      return { ...blocker, origin: { file: loc.file, start, scope, cause } };
+    });
     auditedOrigins.set(origin, result);
     return result;
   }
