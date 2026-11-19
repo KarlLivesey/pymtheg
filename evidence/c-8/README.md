@@ -3,6 +3,36 @@
 Items `go-factory`, `go-local-method`, `go-typed-reference` and
 `go-pointer-conversion`. Change note: `docs/changes/C-8.md`.
 
+## Review round 2: one build model, and what it moved
+
+The second review's fixes (cgo enablement apart from the `cgo` tag; member
+selection on build variants by the same free-tag model as variant calls;
+see the change note) were checked with Go (`go-variant-configs.sh` cases
+(c) and (d), output in `go-variant-configs.txt`). Every Go link and symbol
+of five pins compared with a build of main (`compare-builds-round3.json`):
+
+| Pin | Definite before → after | Newly definite | Definite → candidate set | Sites added/removed | Symbols missing |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| mattn/go-sqlite3 | 3,642 → 3,643 | 1 | 0 | 0 | 0 |
+| cilium/ebpf | 33,366 → 33,456 | 95 | 5 | 0 | 0 |
+| etcd-io/bbolt | 10,692 → 10,750 | 58 | 0 | 0 | 0 |
+| restic/restic | 42,347 → 42,379 | 32 | 0 | 0 | 0 |
+| cockroachdb/pebble | 144,642 → 144,830 | 193 | 5 | 0 | 0 |
+
+**10 links move from definite to a candidate set**, none is lost outright or
+retargeted. Each is a correction:
+
+- cilium (5): `fd.Close`, `fd.File`, `fd.Dup` on `*sys.FD` from Linux files
+  (`rlimit/rlimit_linux.go:75`, `internal/sys/fd_linux_test.go:45, 56, 62,
+  65`). `FD` is declared in `fd_other.go` (`!windows`) and `fd_windows.go`;
+  a Linux build with `-tags=windows` selects the Windows `FD` and its methods.
+- pebble (5): `b.Data()` and `b.Slice()` on `manual.New` results
+  (`internal/cache/block_map.go:32`, `entry.go:255`, `value.go:64, 82, 83`).
+  `New` is declared in `manual_cgo.go` (`import "C"`) and
+  `manual_nocgo.go` (`!cgo`); with `-tags=cgo` and cgo disabled neither is
+  built, so those builds have no `New` (the coverage rule of the first
+  review). Both variants return the same `Buf`.
+
 ## Review round 1: what changed and the final figures
 
 The first review (six points) changed how imports, pointer conversions and

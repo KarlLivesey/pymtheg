@@ -2664,8 +2664,11 @@ links to `T` as `T(x)` does; its value has type `*T`, so its members are
 `T`'s, and under more than one `*` or when `T` is itself a pointer type it
 has none. A call through a function declared in several build variants has
 one answer only when the variants cover every build of the calling file and
-agree, every name counting as a free tag (`-tags=freebsd` on Linux); Go
-module version 29. **Why:** the go command skips those directories only when
+agree. Every build test (variant calls, C-4's selection over types declared
+in several variants, methods per variant, buildable files) counts every name
+as a free tag (`-tags=freebsd` on Linux, `-tags=cgo` with cgo disabled), with
+one of Go's port GOOS and GOARCH values true and `import "C"` needing cgo
+enabled; C-4's one-GOOS solver is gone. Go module version 29. **Why:** the go command skips those directories only when
 it expands `./...` patterns and builds explicit imports of them; the earlier
 rule called them forbidden, which left protobuf-go's generated test
 packages, cli/cli's `.github` modules and all of gopls

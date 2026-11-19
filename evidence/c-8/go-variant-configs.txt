@@ -5,3 +5,8 @@ GOOS=windows: builds; files [new_windows.go t_windows.go]
 == (b) tags
 GOOS=linux: builds; files [new_a.go types.go use_linux.go]
 GOOS=linux -tags=freebsd: builds; files [new_b.go types.go use_linux.go]
+== (c) cgo
+CGO_ENABLED=0 -tags=cgo,purego: builds; files [new_purego.go types.go use.go]
+== (d) select
+GOOS=linux: builds; files [base.go t_a.go use_linux.go]
+GOOS=linux -tags=freebsd: builds; files [base.go t_b.go use_linux.go]

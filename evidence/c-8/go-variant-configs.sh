@@ -85,3 +85,68 @@ func Use() { New().M() }"
 echo "== (b) tags"
 show "GOOS=linux" GOOS=linux GOARCH=amd64
 show "GOOS=linux -tags=freebsd" GOOS=linux GOARCH=amd64 GOFLAGS="-mod=readonly -tags=freebsd"
+
+# (c) cgo set as a tag by hand, with cgo disabled.
+mkdir -p "$work/cgo" && cd "$work/cgo" || exit 1
+put go.mod "module example.com/cgo
+
+go 1.22"
+put p/new_cgo.go "package p
+
+import \"C\"
+
+func New() *A { return &A{} }"
+put p/new_purego.go "//go:build cgo && purego
+
+package p
+
+func New() *B { return &B{} }"
+put p/types.go "package p
+
+type A struct{}
+
+func (*A) M() {}
+
+type B struct{}
+
+func (*B) M() {}"
+put p/use.go "//go:build cgo
+
+package p
+
+func Use() { New().M() }"
+echo "== (c) cgo"
+show "CGO_ENABLED=0 -tags=cgo,purego" GOOS=linux GOARCH=amd64 CGO_ENABLED=0 GOFLAGS="-mod=readonly -tags=cgo,purego"
+
+# (d) Member selection on variants told apart by a GOOS-named tag.
+mkdir -p "$work/select" && cd "$work/select" || exit 1
+put go.mod "module example.com/select
+
+go 1.22"
+put p/base.go "package p
+
+type Base struct{}
+
+func (Base) M() {}"
+put p/t_a.go "//go:build linux && !freebsd
+
+package p
+
+type T struct{ Base }
+
+func (*T) M() {}
+
+func New() *T { return &T{} }"
+put p/t_b.go "//go:build linux && freebsd
+
+package p
+
+type T struct{ Base }
+
+func New() *T { return &T{} }"
+put p/use_linux.go "package p
+
+func Use() { New().M() }"
+echo "== (d) select"
+show "GOOS=linux" GOOS=linux GOARCH=amd64
+show "GOOS=linux -tags=freebsd" GOOS=linux GOARCH=amd64 GOFLAGS="-mod=readonly -tags=freebsd"

@@ -347,10 +347,13 @@ file (its ID can change when files are added or removed).
   `mu struct{…}` fields; ranked after named symbols in search) and of
   function-local struct types; field, type, receiver and embedding references;
   `contains`.
-- **Candidates:** a name declared in several build variants (build constraints
-  are not evaluated; a selection on a type declared in several variants is
-  searched per variant and is definite only when all variants agree, otherwise
-  the set of their answers); several equally shallow promotion paths; interface dispatch
+- **Candidates:** a name declared in several build variants (a selection on a
+  type declared in several variants is searched per variant and is definite
+  only when every build of the referencing file gives the same answer,
+  otherwise the set of their answers; any name may be a tag in a build, a
+  GOOS or GOARCH name or `cgo` too, with one of Go's port GOOS and GOARCH
+  values true, and `import "C"` needs cgo enabled); several equally shallow
+  promotion paths; interface dispatch
   (the interface method plus every project type whose method set matches by name
   and parameter/result counts; always open, `structural-match-unverified`);
   calls on a receiver whose type the source does not show (name-only, open,

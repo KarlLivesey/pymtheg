@@ -469,6 +469,76 @@ test("cilium: loaders declared for every port GOARCH cover an unconstrained call
   assert.equal(at(links, "test/api_test.go", "spec.Maps").target, null);
 });
 
+// Checked with Go 1.27.4 (evidence/c-8/go-variant-configs.sh): with
+// CGO_ENABLED=0 -tags=cgo,purego the `cgo` tag holds but `import "C"` files
+// are left out, so New() is the purego file's *B.
+test("cgo: the cgo tag set by hand is not cgo enablement, so an `import C` variant is not the only one", async () => {
+  const { links } = await project({
+    "go.mod": MOD,
+    "p/new_cgo.go": lines(
+      "package p",
+      'import "C"',
+      "func New() *A { return &A{} }",
+    ),
+    "p/new_purego.go": lines(
+      "//go:build cgo && purego",
+      "",
+      "package p",
+      "func New() *B { return &B{} }",
+    ),
+    "p/types.go": lines(
+      "package p",
+      "type A struct{}",
+      "func (*A) M() {}",
+      "type B struct{}",
+      "func (*B) M() {}",
+    ),
+    "p/use.go": lines(
+      "//go:build cgo",
+      "",
+      "package p",
+      "func Use() { New().M() }",
+    ),
+  });
+  assert.equal(at(links, "p/use.go", "New().M").target, null);
+});
+
+test("member selection on build variants: a method declared in only some variants is a candidate, never the definite target", async () => {
+  const variant = (constraint, method) =>
+    lines(
+      `//go:build ${constraint}`,
+      "",
+      "package p",
+      "type T struct{ Base }",
+      ...(method ? ["func (*T) M() {}"] : []),
+      "func New() *T { return &T{} }",
+    );
+  const { links } = await project({
+    "go.mod": MOD,
+    "p/base.go": lines("package p", "type Base struct{}", "func (Base) M() {}"),
+    // Two Linux builds told apart by a tag named like a GOOS (-tags=freebsd).
+    "p/t_a.go": variant("linux && !freebsd", true),
+    "p/t_b.go": variant("linux && freebsd", false),
+    "p/use_linux.go": lines(
+      "package p",
+      "func Use() {",
+      "	New().M()",
+      "	var t T",
+      "	t.M()",
+      "}",
+    ),
+  });
+  for (const text of ["New().M", "t.M"]) {
+    const link = at(links, "p/use_linux.go", text);
+    assert.equal(link.target, null, text);
+    assert.deepEqual(
+      link.candidates,
+      ["p/base.go:method:(Base).M", "p/t_a.go:method:(*T).M"],
+      text,
+    );
+  }
+});
+
 // The two fixtures of evidence/c-8/go-variant-configs.sh, checked with Go
 // 1.27.4: (a) the darwin build of the caller has no New and does not build;
 // (b) `-tags=freebsd` on Linux selects new_b.go, so New() is a *B.

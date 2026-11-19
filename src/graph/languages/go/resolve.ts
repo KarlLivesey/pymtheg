@@ -20,8 +20,7 @@ import {
 import type { GoProjectLayout } from "./gomod.js";
 import {
   fileConstraint,
-  implies,
-  satisfiable,
+  impliesAnyTags,
   satisfiableAnyTags,
   type Formula,
 } from "./constraints.js";
@@ -925,8 +924,10 @@ class GoResolver {
       const constraint = this.constraintOf(path);
       answer =
         !constraint ||
-        satisfiable([constraint, { k: "not", x: { k: "v", n: "ignore" } }]) !==
-          false;
+        satisfiableAnyTags([
+          constraint,
+          { k: "not", x: { k: "v", n: "ignore" } },
+        ]) !== false;
       this.buildableMemo.set(path, answer);
     }
     return answer;
@@ -1655,10 +1656,15 @@ class GoResolver {
     // A type declared in several build variants: each declaration has its
     // own fields, and a method belongs to it only when its file can be built
     // with the declaration's file (`buildsWith`).
-    const variants =
-      !!pkg &&
-      (this.decls.get(pkg.key)?.get(type.name) ?? []).filter(isTypeSymbol)
-        .length > 1;
+    const siblings = pkg
+      ? (this.decls.get(pkg.key)?.get(type.name) ?? []).filter(isTypeSymbol)
+      : [];
+    const variants = siblings.length > 1;
+    // Two declarations of the type are never in one valid build: a method
+    // belongs to this variant only in builds without the others' files.
+    const others = siblings
+      .filter((symbol) => symbol.id !== type.id)
+      .map((symbol) => symbol.file);
     const all = (name: string) =>
       pkg
         ? (this.members.get(`${pkg.key}\u0000${type.name}\u0000${name}`) ?? [])
@@ -1667,7 +1673,9 @@ class GoResolver {
       all(name).filter((symbol) =>
         symbol.kind === "field"
           ? symbol.file === type.file
-          : !variants || this.buildsWith(symbol.file, type.file) !== false,
+          : !variants ||
+            this.buildsWith(symbol.file, type.file, undefined, others) !==
+              false,
       );
     // The methods of this name that may or may not be part of this variant
     // in the referencing file's builds.
@@ -1675,7 +1683,7 @@ class GoResolver {
       variants
         ? own(name).flatMap((method) => {
             if (method.kind === "field") return [];
-            const built = this.buildsWith(method.file, type.file, from);
+            const built = this.buildsWith(method.file, type.file, from, others);
             return built === true ? [] : [{ method, built }];
           })
         : [];
@@ -2031,10 +2039,44 @@ class GoResolver {
   /** A file's build constraint (TRUE: none); undefined when not readable. */
   private constraintOf(path: string): Formula | undefined {
     if (!this.constraints.has(path)) {
-      const fact = this.files.get(path)?.fact;
-      this.constraints.set(path, fact ? fileConstraint(fact) : undefined);
+      const info = this.files.get(path);
+      const formula = info ? fileConstraint(info.fact) : undefined;
+      this.constraints.set(
+        path,
+        formula && info ? this.releaseFloor(formula, info.directory) : formula,
+      );
     }
     return this.constraints.get(path);
+  }
+  /**
+   * Since Go 1.21 a toolchain builds a module only when it is at least the
+   * module's `go` version, so every build of its files has the release tags
+   * up to that version (a release tag set by hand with `-tags` adds to them,
+   * it never removes one). Added for the release tags the constraint names.
+   */
+  private releaseFloor(formula: Formula, directory: string): Formula {
+    const version = /^1\.(\d+)/.exec(
+      moduleOf(this.layout, directory)?.go ?? "",
+    );
+    const minor = version ? Number(version[1]) : 0;
+    if (minor < 21) return formula;
+    const named = new Set<string>();
+    const walk = (item: Formula): void => {
+      if (item.k === "v") named.add(item.n);
+      else if (item.k === "not") walk(item.x);
+      else if (item.k === "and" || item.k === "or") {
+        walk(item.a);
+        walk(item.b);
+      }
+    };
+    walk(formula);
+    let out = formula;
+    for (const name of [...named].sort()) {
+      const release = /^go1\.(\d+)$/.exec(name);
+      if (release && Number(release[1]) <= minor)
+        out = { k: "and", a: out, b: { k: "v", n: name } };
+    }
+    return out;
   }
   /**
    * Is a method declared in `path` part of the type declared in `type`'s
@@ -2047,6 +2089,7 @@ class GoResolver {
     path: string,
     type: string,
     from?: string,
+    others: string[] = [],
   ): boolean | undefined {
     if (path === type) return true;
     const method = this.constraintOf(path);
@@ -2057,22 +2100,30 @@ class GoResolver {
       const context = this.constraintOf(from);
       declared = context ? { k: "and", a: declared, b: context } : undefined;
     }
+    // Without the files of the type's other declarations.
+    for (const other of others) {
+      if (!declared || other === type) continue;
+      const excluded = this.constraintOf(other);
+      declared = excluded
+        ? { k: "and", a: declared, b: { k: "not", x: excluded } }
+        : undefined;
+    }
     if (!method || !declared) return undefined;
-    if (implies(declared, method) === true) return true;
-    return satisfiable([declared, method]) === false ? false : undefined;
+    if (impliesAnyTags(declared, method) === true) return true;
+    return satisfiableAnyTags([declared, method]) === false ? false : undefined;
   }
   /** Is `path` in every build that includes `from`? */
   private includedWith(from: string, path: string): boolean {
     if (from === path) return true;
     const x = this.constraintOf(from);
     const y = this.constraintOf(path);
-    return !!x && !!y && implies(x, y) === true;
+    return !!x && !!y && impliesAnyTags(x, y) === true;
   }
   /** Can these two files be in one build (false only when proved not)? */
   private buildTogether(a: string, b: string): boolean | undefined {
     const x = this.constraintOf(a);
     const y = this.constraintOf(b);
-    return x && y ? satisfiable([x, y]) : undefined;
+    return x && y ? satisfiableAnyTags([x, y]) : undefined;
   }
 
   /** Interface methods named `name` through interface embedding (cycle-safe by path). */
