@@ -2271,6 +2271,14 @@ Further rulings under this rule, each the manager's:
 - **Only certain causes** (manager, W2-B round 16): `invalid-code` is asserted only
   when dependence on a failed file is certain, because a wrong cause is worse than
   a missing one; otherwise the link stays plain unresolved.
+- **Rust failed-file reason only where it could change the answer** (C-15,
+  19 November 2026): a failed file only adds declarations, so a Rust link
+  stopped by something visible keeps that reason alone;
+  `failed-file-unseen-declarations` is recorded where a lookup reached a
+  failed file, where its impls could supply the answer, or where nothing else
+  explains a miss. No outcome changes. **Why:** the blanket label made the
+  coverage plan count about 300,000 links as failed-file misses that a
+  diagnostic build with the failed files emptied did not release.
 - **TypeScript programs with a failed file** (manager, ruling on W2-D, 12 November
   2026, after round 14): the failed file contributes nothing; `invalid-code` with a
   cause is best-effort attribution; every other link carries

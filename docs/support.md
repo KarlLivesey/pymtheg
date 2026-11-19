@@ -432,6 +432,17 @@ makes that whole manifest unknown). Private items are ordinary symbols.
   chooses it, an unknown statement macro precedes it in its block, a macro
   appears in its pattern, or the name could be a constant, unit struct or unit
   variant (then the pattern is a path, not a binding).
+- **Failed files in reach** withhold a link only through a lookup that reaches
+  them (a path into the failed module, a glob of it, its scope, textual macro
+  scope after it, a binding check that meets it) or, for method and
+  associated calls, through impls it could hold: the autoref step needs every
+  crate in reach readable, and a call with no visible inherent candidate is
+  attributed to a failed file in the type's own crate. The reason
+  `failed-file-unseen-declarations` is recorded only there, and on unresolved
+  links with no other reason; a link stopped by something visible (a macro, a
+  competing candidate, a receiver the parser cannot type, a written shape)
+  keeps only that reason. Macro links keep the wider rule. Source:
+  [C-15](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/C-15.md).
 - **Dot calls** (`recv.m()`) are definite only for a unique inherent method of a
   proven receiver type, at the first probe step (owned `T` with `self`, `&T`
   with `&self`, `&mut T` with `&mut self`) or, for an owned `T`, at the autoref

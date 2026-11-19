@@ -210,7 +210,9 @@ test("round 7 B3 S1 reachable failures are uncertainty, never inferred invalid-c
   );
   const l = g.links.find((l) => l.targetName === "A::from");
   assert.equal(l.data.cause, undefined);
-  assert.match(l.data.uncertainty, /failed-file-unseen-declarations/);
+  // C-15: b cannot declare an inherent impl of A (only A's crate can), and
+  // no trait impl makes the trait call definite, so b's failure is not named.
+  assert.equal(l.data.uncertainty, "trait-dispatch");
 });
 for (const [caller, callee, definite] of [
   ["a", "a", true],
@@ -271,9 +273,8 @@ test("round 7 S2 real indexer parses a 2500-file project twice without internal 
   const { mkdtemp, mkdir, writeFile, rm } = await import("node:fs/promises");
   const { tmpdir } = await import("node:os");
   const { join } = await import("node:path");
-  const { indexProject, LanguageRegistry, SqliteGraphStore } = await import(
-    "../dist/graph/index.js"
-  );
+  const { indexProject, LanguageRegistry, SqliteGraphStore } =
+    await import("../dist/graph/index.js");
   const root = await mkdtemp(join(tmpdir(), "rust-parser-reuse-"));
   const store = new SqliteGraphStore(":memory:", "reuse");
   try {
