@@ -1,6 +1,6 @@
 # Hand audit of installed declaration targets
 
-Seed `pymtheg-c20-2026`. Ten newly named installed library targets per pin, drawn in rank order within each of the six pins. Each check traces the pinned source through its import, compiler context or receiver type to the captured declaration. Overloads of one declaration symbol count as one target.
+Seed `pymtheg-c20-2026`. Ten newly named installed library targets per pin, drawn in rank order within each of six pins. The final replay selected the same 60 sites and targets. Each check traces the pinned source through its import, compiler context or receiver type to the captured declaration. Overloads of one declaration symbol count as one target.
 
 **60 correct, 0 wrong, 0 unverifiable.**
 

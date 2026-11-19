@@ -192,6 +192,8 @@ for (const repo of old) {
     shared: 0,
     sharedBeforeL2: 0,
     sharedAfterL2: 0,
+    gainedL2: 0,
+    withdrawnL2: 0,
     allLinks: 0,
     allLinksAfter: 0,
     symbols: 0,
@@ -311,6 +313,8 @@ for (const repo of old) {
         count.newNodeGlobals++;
       const typescript = link.module === "typescript";
       if (typescript && wasLevel2) count.beforeL2++;
+      if (typescript && b && !wasLevel2 && isNowLevel2) count.gainedL2++;
+      if (typescript && b && wasLevel2 && !isNowLevel2) count.withdrawnL2++;
       if (typescript && updated) {
         count.shared++;
         if (wasLevel2) count.sharedBeforeL2++;
@@ -417,7 +421,12 @@ for (const repo of old) {
         if (fromPin.length >= 20) draw.splice(high, 1);
       }
     }
-    for (const links of current.values()) count.addedSites += links.length;
+    for (const links of current.values()) {
+      count.addedSites += links.length;
+      count.gainedL2 += links.filter(
+        (link) => link.module === "typescript" && isLevel2(link),
+      ).length;
+    }
   }
   before.close();
   after?.close();

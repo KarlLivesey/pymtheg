@@ -83,7 +83,9 @@ async function replay(repo) {
     JSON.stringify(indexed.counts) !== JSON.stringify(checked.counts)
   )
     throw Error(`Incomplete cold receipt for ${repo.id}`);
-  repo.outcome = "finished";
+  // A status check confirms a cold graph but does not run the sweep's warm
+  // index and bounded queries. Keep this receipt out of the paired coverage.
+  repo.outcome = "graph-only";
   repo.interrupted = repo.failure?.stage;
   delete repo.failure;
   repo.cold = { ...cold, status: indexed.status };

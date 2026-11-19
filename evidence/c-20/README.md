@@ -4,18 +4,24 @@ The paired set is the 18 completed TypeScript pins selected by
 `evidence/c-16/pins.mjs`. Run the main and C-20 builds without an install,
 then run C-20 with `scripts/sweep/run.mjs --installed` on the same manifest.
 Store the main and C-20 bare results as `main-run.json` and `bare-run.json`.
-The analysis uses the pinned TypeScript 5.9.3 compiler on Node 24.
+The installed results use the default 3,600-second allowance per pin and
+include an actual warm index and query sequence. The analysis uses the
+pinned TypeScript 5.9.3 compiler on Node 24.
 
 - [Bare preservation counts](bare-preservation.json)
+- [Two-pin bare preservation replay](review-bare-preservation.json)
 - [Paired per-pin results](comparison.md)
+- [Recorded install, index and query stages](sweep-status.json)
 - [Changed definite targets](definite-changes.json.gz)
 - [Hand audit](audit.md)
+- [Withdrawal audit](withdrawals.md)
 - [Cold cost observations](cost.jsonl)
 
 `reindex.mjs` recovers a cold graph after an interrupted attempt without
 reinstalling the packages. It moves the interrupted store out of the checkout
 and checks the new cold receipt against a read-only status query. The result
 identifies the interrupted stage and the status-only follow-up.
+These `graph-only` receipts are excluded from the installed score.
 An optional build directory name and worker count reindex the retained
 installed checkouts with that build and record its digest.
 
@@ -40,6 +46,10 @@ definite destinations, with source offsets and before/after targets.
 the fixed comparison seed. It takes one eligible site per pin before taking
 a second and reads declaration candidates from the resolver's recorded
 inputs. The audit checks the pinned use and the installed declaration.
+
+`withdrawals.mjs SCRATCH ATTEMPTS CHANGES.gz` selects 40 formerly Level 2
+links in fixed-seed rank order within each withdrawal class, cycling across
+classes. The audit records the verdict and its source basis for each site.
 
 `cost.mjs SCRATCH BARE-RUN INSTALLED-ATTEMPTS PINS…` brackets the cold
 candidate observations with main runs on the same memory-backed storage.

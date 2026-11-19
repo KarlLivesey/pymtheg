@@ -8,10 +8,9 @@ const [scratch, comparisonFile, ...pins] = process.argv.slice(2);
 const read = (path) => JSON.parse(readFileSync(path, "utf8"));
 const { additions } = read(comparisonFile);
 const checkouts = new Map(
-  read(join(scratch, "installed-run.json")).repos.map((repo) => [
-    repo.id,
-    join(scratch, repo.attempt, "checkout"),
-  ]),
+  read(
+    join(scratch, `${process.env.C16_CANDIDATE ?? "installed"}-run.json`),
+  ).repos.map((repo) => [repo.id, join(scratch, repo.attempt, "checkout")]),
 );
 const pool = Object.values(additions)
   .flat()
@@ -58,11 +57,15 @@ function declarations(root, files, target) {
         const owners = [];
         for (let parent = node.parent; parent; parent = parent.parent)
           if (
-            parent.name && ts.isIdentifier(parent.name) &&
-            (ts.isInterfaceDeclaration(parent) || ts.isClassDeclaration(parent) ||
-              ts.isEnumDeclaration(parent) || ts.isTypeAliasDeclaration(parent) ||
+            parent.name &&
+            ts.isIdentifier(parent.name) &&
+            (ts.isInterfaceDeclaration(parent) ||
+              ts.isClassDeclaration(parent) ||
+              ts.isEnumDeclaration(parent) ||
+              ts.isTypeAliasDeclaration(parent) ||
               ts.isVariableDeclaration(parent) ||
-              (ts.isModuleDeclaration(parent) && !(parent.flags & ts.NodeFlags.GlobalAugmentation)))
+              (ts.isModuleDeclaration(parent) &&
+                !(parent.flags & ts.NodeFlags.GlobalAugmentation)))
           )
             owners.unshift(parent.name.text);
         if (
