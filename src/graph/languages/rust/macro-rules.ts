@@ -289,6 +289,22 @@ export type MacroScopeProfile = {
   keywordFromInput: boolean;
 };
 
+function scopeRepetitionsAreWhole(tokens: Node[]): boolean {
+  return tokens.every((token, index) => {
+    if (token.type !== "token_repetition") return true;
+    const repeated = inner(token);
+    const previous = tokens[index - 1];
+    const last = repeated.at(-1);
+    // An omitted repetition inside a declaration can change the name slot:
+    // `struct $($name)? Option;` can expand to `struct Option;`.
+    return (
+      (!previous || previous.type === ";") &&
+      (last?.type === ";" || opens(last, "{")) &&
+      scopeRepetitionsAreWhole(repeated)
+    );
+  });
+}
+
 function inspectScope(
   top: Node[],
   kinds: ReadonlyMap<string, string>,
@@ -351,6 +367,9 @@ function inspectScope(
       // of aliases. Globs and macro-use imports have unbounded exports.
       if (
         emitted.length ||
+        // A foreign block can introduce declarations via another macro.
+        (keyword === "extern" &&
+          (opens(top[i + 1], "{") || opens(top[i + 2], "{"))) ||
         tokens.some(
           (n) =>
             n.type === "*" ||
@@ -522,10 +541,11 @@ export function macroProfile(definition: Node): MacroProfile {
     const takesInput = m.length > 0;
     let armForwards = false;
     // Neutrality: inspect the top level of the transcriber.
-    const top = flat(inner(body));
+    const transcriber = inner(body);
+    const top = flat(transcriber);
     const scope = inspectScope(top, kinds, scopeNames);
     scopeInputCanBind ||= scope.inputCanBind;
-    scopeOpaque ||= scope.opaque;
+    scopeOpaque ||= scope.opaque || !scopeRepetitionsAreWhole(transcriber);
     scopeKeywordFromInput ||= scope.keywordFromInput;
     for (let i = 0; i < top.length; i++) {
       const n = top[i]!,

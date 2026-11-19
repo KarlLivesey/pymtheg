@@ -27,3 +27,16 @@ fn generated_keyword() {
     item_with_keyword!(struct);
     let _: Option = Option; // generated keyword
 }
+
+fn omitted_repetition() {
+    macro_rules! optional_name { ($($name:ident)?) => { struct $($name)? Option; }; }
+    optional_name!();
+    let _: Option = Option; // omitted repetition
+}
+
+fn foreign_expansion() {
+    macro_rules! foreign_function { () => { fn outside() -> bool; }; }
+    macro_rules! foreign_block { () => { unsafe extern "C" { foreign_function!(); } }; }
+    foreign_block!();
+    let _: bool = unsafe { outside() }; // foreign declaration
+}

@@ -82,6 +82,8 @@ test("local macro item names include literal and forwarded metavariable names", 
   assert.deepEqual(at("types", "Option", "generated type"), proved(null));
   assert.deepEqual(at("calls", "outside", "generated function"), proved(null));
   assert.deepEqual(at("types", "Option", "generated keyword"), proved(null));
+  assert.deepEqual(at("types", "Option", "omitted repetition"), proved(null));
+  assert.deepEqual(at("calls", "outside", "foreign declaration"), proved(null));
 });
 
 test("standard expression macros have no output items, but include stays opaque", async () => {
