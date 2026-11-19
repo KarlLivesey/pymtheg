@@ -2,14 +2,17 @@
 // Print the first N rows of a compare.mjs JSONL file with source context for a
 // hand check: the link's line (with 2 lines before) and the target's
 // declaration line, read from the branch run's checkouts.
-//   node audit-context.mjs <rows.jsonl> <N> <run.json> <scratch>
+//   node audit-context.mjs <rows.jsonl> <N> <run.json>:<scratch>...
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-const [rowsPath, n, runPath, scratch] = process.argv.slice(2);
-const attempts = new Map(
-  JSON.parse(readFileSync(runPath, "utf8")).repos.map((r) => [r.id, r.attempt]),
-);
+const [rowsPath, n, ...runs] = process.argv.slice(2);
+const attempts = new Map();
+for (const pair of runs) {
+  const [runPath, scratch] = pair.split(":");
+  for (const r of JSON.parse(readFileSync(runPath, "utf8")).repos)
+    if (r.attempt) attempts.set(r.id, join(scratch, r.attempt));
+}
 const rows = readFileSync(rowsPath, "utf8")
   .split("\n")
   .filter(Boolean)
@@ -18,7 +21,7 @@ const rows = readFileSync(rowsPath, "utf8")
 const lines = (repo, file) => {
   try {
     return readFileSync(
-      join(scratch, attempts.get(repo), "checkout", file),
+      join(attempts.get(repo), "checkout", file),
       "utf8",
     ).split("\n");
   } catch {
