@@ -117,6 +117,19 @@ const timers = new Set([
   "setInterval",
   "setTimeout",
 ]);
+const nodeGlobalCalls = new Set([
+  ...timers,
+  "atob",
+  "btoa",
+  "fetch",
+  "queueMicrotask",
+  "structuredClone",
+]);
+const nodeGlobalConstructors = new Set(
+  "AbortController Blob BroadcastChannel ByteLengthQueuingStrategy CompressionStream CountQueuingStrategy CustomEvent DecompressionStream DOMException Event EventSource EventTarget File FormData Headers MessageChannel MessageEvent PerformanceMark ReadableStream Request Response TextDecoder TextDecoderStream TextEncoder TextEncoderStream TransformStream URL URLPattern URLSearchParams WebSocket WritableStream".split(
+    " ",
+  ),
+);
 const nodeUnits = new Map<string, string>();
 for (const [unit, names] of [
   ["url", "URL URLSearchParams URLPattern URLPatternInit URLPatternResult"],
@@ -323,6 +336,12 @@ export function nodeGlobalTarget(symbol: string): LibraryTarget | undefined {
   return nodeTargets.get(symbol);
 }
 
+export function nodeGlobalCall(name: string, construct: boolean) {
+  return (construct ? nodeGlobalConstructors : nodeGlobalCalls).has(name)
+    ? nodeGlobalTarget(name)
+    : undefined;
+}
+
 function documentedTarget(symbol: string): LibraryTarget | undefined {
   const method = /^Console\.prototype\.([^.]*)$/.exec(symbol)?.[1];
   if (method && consoleMethods.has(method))
@@ -330,7 +349,7 @@ function documentedTarget(symbol: string): LibraryTarget | undefined {
       ecosystem: "node",
       unit: "console",
       symbol: "Console.prototype." + method,
-      evidence: "declaring-owner",
+      evidence: "declared-builtin",
     };
   const web = /^([^.]*)\.prototype\.([^.]*)$/.exec(symbol);
   if (web && webMembers.get(web[1]!)?.has(web[2]!))
@@ -372,6 +391,8 @@ const programTypes = new WeakMap<
     expectsNode: boolean;
     missingPackageTypes: boolean;
     otherGlobals: ReadonlySet<string>;
+    otherRuntime: boolean;
+    missingTestFrameworks: ReadonlySet<string>;
   }
 >();
 const testGlobals = [
@@ -384,14 +405,46 @@ const testGlobals = [
   "it",
   "test",
 ];
+// Public ambient entry points. The package name or a similarly named
+// identifier on its own does not opt a program into these globals.
+const frameworkTypes = new Map([
+  ["vitest/globals", "vitest"],
+  ["jest", "jest"],
+  ["@types/jest", "jest"],
+  ["mocha", "mocha"],
+  ["@types/mocha", "mocha"],
+]);
+const frameworkGlobals = new Map<string, readonly string[]>([
+  ["vitest", [...testGlobals, "assert", "suite", "vi", "vitest"]],
+  ["jest", [...testGlobals, "fit", "jest", "xdescribe", "xit", "xtest"]],
+  [
+    "mocha",
+    [
+      "after",
+      "afterEach",
+      "before",
+      "beforeEach",
+      "context",
+      "describe",
+      "it",
+      "specify",
+      "suite",
+      "suiteSetup",
+      "suiteTeardown",
+      "test",
+      "teardown",
+      "setup",
+      "xcontext",
+      "xdescribe",
+      "xit",
+      "xspecify",
+    ],
+  ],
+]);
+const testGlobalNames = new Set([...frameworkGlobals.values()].flat());
+export const isTestGlobal = (name: string) => testGlobalNames.has(name);
 const ambientGlobals = new Map<string, readonly string[]>([
   ["vite/client", ["ImportMeta", "ImportMetaEnv"]],
-  [
-    "vitest/globals",
-    [...testGlobals, "assert", "bench", "suite", "vi", "vitest"],
-  ],
-  ["jest", [...testGlobals, "fit", "jest", "xdescribe", "xit", "xtest"]],
-  ["@types/jest", [...testGlobals, "fit", "jest", "xdescribe", "xit", "xtest"]],
   ["react", ["React", "JSX"]],
   ["@types/react", ["React", "JSX"]],
 ]);
@@ -409,11 +462,37 @@ const environmentTypes = new Set([
   "deno.window",
   "deno.worker",
 ]);
+const isEnvironment = (name: string) =>
+  environmentTypes.has(name) || name.startsWith("@cloudflare/workers-types/");
+
 function missingAmbientGlobals(name: string): readonly string[] {
-  return environmentTypes.has(name) ||
-    name.startsWith("@cloudflare/workers-types/")
+  return isEnvironment(name)
     ? environmentGlobals
-    : (ambientGlobals.get(name) ?? []);
+    : (frameworkGlobals.get(frameworkTypes.get(name) ?? "") ??
+        ambientGlobals.get(name) ??
+        []);
+}
+
+export function testGlobalTargets(
+  name: string,
+  providers: ReadonlySet<string>,
+  call: boolean,
+): LibraryTarget[] {
+  if (call && (name === "vi" || name === "vitest" || name === "jest"))
+    return [];
+  return [...providers].flatMap((unit) =>
+    frameworkGlobals.get(unit)?.includes(name)
+      ? [{ ecosystem: "npm", unit, symbol: name, evidence: "declared-builtin" }]
+      : [],
+  );
+}
+
+export const isTestFramework = (unit: string) => frameworkGlobals.has(unit);
+
+export function testSetupFramework(specifier: string): string | undefined {
+  return specifier === "vitest/globals" || specifier.startsWith("@types/")
+    ? frameworkTypes.get(specifier)
+    : undefined;
 }
 
 export const runtimeHashbang = (text: string) =>
@@ -425,10 +504,21 @@ export const runtimeHashbang = (text: string) =>
 export function globalTypeAvailability(
   program: ts.Program,
   isNodeTypeFile: (path: string) => boolean,
+  typePackageUnredirected: (name: string, source: string) => boolean,
 ) {
   const previous = programTypes.get(program);
   if (previous) return previous;
-  const expected = new Set(program.getCompilerOptions().types ?? []);
+  const options = program.getCompilerOptions();
+  const expected = new Set(options.types ?? []);
+  const frameworkRequests = new Map<string, string[]>();
+  const request = (name: string, source: string) => {
+    if (!frameworkTypes.has(name)) return;
+    const requests = frameworkRequests.get(name) ?? [];
+    requests.push(source);
+    frameworkRequests.set(name, requests);
+  };
+  if (typeof options.configFilePath === "string")
+    for (const name of expected) request(name, options.configFilePath);
   const available = new Set<string>();
   const compiler = program as ts.Program & {
     forEachResolvedTypeReferenceDirective: (visit: VisitTypeResolution) => void;
@@ -438,8 +528,10 @@ export function globalTypeAvailability(
   };
   let hasNode = false;
   for (const source of program.getSourceFiles()) {
-    for (const reference of source.typeReferenceDirectives)
+    for (const reference of source.typeReferenceDirectives) {
       expected.add(reference.fileName);
+      request(reference.fileName, source.fileName);
+    }
     const path = fromVirtual(source.fileName);
     const runtime =
       path !== undefined ? runtimeHashbang(source.text) : undefined;
@@ -455,17 +547,34 @@ export function globalTypeAvailability(
   compiler.forEachResolvedTypeReferenceDirective(read);
   compiler.getAutomaticTypeDirectiveResolutions()?.forEach(read);
   const node = (name: string) => name === "node" || name === "@types/node";
+  const missing = [...expected].filter((name) => !available.has(name));
+  const missingTestFrameworks = new Set<string>();
+  // A custom type root can provide its own package under a framework name.
+  // In that case only a captured declaration can establish the provider.
+  if (!options.typeRoots)
+    for (const name of missing) {
+      const framework = frameworkTypes.get(name);
+      const sources = frameworkRequests.get(name);
+      if (
+        framework &&
+        sources?.every(
+          (source) =>
+            typePackageUnredirected(name, source) &&
+            (framework === "vitest" ||
+              typePackageUnredirected(`@types/${framework}`, source)),
+        )
+      )
+        missingTestFrameworks.add(framework);
+    }
   const result = {
     hasNode: hasNode || [...available].some(node),
     expectsNode: [...expected].some(node),
-    missingPackageTypes: [...expected].some(
-      (name) => !available.has(name) && !/^(?:\.{1,2}\/|\/)/.test(name),
+    missingPackageTypes: missing.some(
+      (name) => !/^(?:\.{1,2}\/|\/)/.test(name),
     ),
-    otherGlobals: new Set(
-      [...expected].flatMap((name) =>
-        available.has(name) ? [] : missingAmbientGlobals(name),
-      ),
-    ),
+    otherGlobals: new Set(missing.flatMap(missingAmbientGlobals)),
+    otherRuntime: [...expected].some(isEnvironment),
+    missingTestFrameworks,
   };
   programTypes.set(program, result);
   return result;

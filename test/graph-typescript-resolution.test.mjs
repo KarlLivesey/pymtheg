@@ -949,6 +949,264 @@ test("captured declarations prove an inherited package member and preserve proje
   );
 });
 
+test("test globals require program evidence and respect shadowing", async () => {
+  // tRPC packages/react-query/test/useUtils.test.tsx uses this global call.
+  const trpc = "test('client query sad path', async () => {});";
+  await project(
+    {
+      "vitest/tsconfig.json":
+        '{"compilerOptions":{"types":["vitest/globals"]}}',
+      "vitest/main.ts":
+        trpc +
+        " const x: typeof vi = null!; vi.mock('pkg'); bench('demo', () => {});",
+      "ambiguous/tsconfig.json":
+        '{"compilerOptions":{"types":["vitest/globals","jest"]}}',
+      "ambiguous/main.ts": "expect(1); test('example', () => {});",
+      "shadow/tsconfig.json":
+        '{"compilerOptions":{"types":["jest","vitest/globals"]}}',
+      "shadow/package.json": '{"dependencies":{"other":"^1.0.0"}}',
+      "shadow/main.ts": `import { check as expect } from 'other';
+      declare global { function describe(label: string): void; }
+      describe('mine'); expect(1);
+      function scope() { const test = () => 1; return test(); }
+      export {};`,
+      "setup/tsconfig.json": '{"files":["main.ts","setup.ts"]}',
+      "setup/package.json": '{"dependencies":{"vitest":"^4.0.0"}}',
+      "setup/setup.ts": "import 'vitest/globals';",
+      "setup/main.ts": trpc,
+      "reference/tsconfig.json": '{"files":["main.ts","setup.ts"]}',
+      "reference/main.ts": "suite('mocha', () => {}); expect(1);",
+      "reference/setup.ts": '/// <reference types="mocha" />\nexport {};',
+      "dependency/tsconfig.json": '{"files":["main.ts"]}',
+      "dependency/package.json":
+        '{"devDependencies":{"@types/jest":"^29","vitest":"^4"}}',
+      "dependency/main.ts": trpc,
+      "custom/tsconfig.json":
+        '{"compilerOptions":{"types":["jest"],"typeRoots":["./own"]}}',
+      "custom/main.ts": trpc,
+      "redirected/tsconfig.json":
+        '{"compilerOptions":{"types":["vitest/globals"]}}',
+      "redirected/package.json":
+        '{"devDependencies":{"vitest":"npm:other-test-kit@^1"}}',
+      "redirected/main.ts": trpc,
+      "captured/tsconfig.json":
+        '{"compilerOptions":{"types":["jest","mocha"],"typeRoots":["./types"]}}',
+      "captured/package.json":
+        '{"devDependencies":{"jest":"^29","mocha":"^11"}}',
+      "captured/types/jest/package.json":
+        '{"name":"jest","types":"index.d.ts"}',
+      "captured/types/jest/index.d.ts":
+        "declare var test: (name: string, body: () => void) => void;",
+      "captured/types/mocha/package.json":
+        '{"name":"mocha","types":"index.d.ts"}',
+      "captured/types/mocha/index.d.ts":
+        "export {}; declare global { var test: (name: string, body: () => void) => void }",
+      "captured/main.ts": trpc,
+    },
+    async (graph, report) => {
+      clean(report);
+      for (const dir of ["vitest", "setup"])
+        assert.deepEqual(
+          libraryTarget(graph.link(dir + "/main.ts", "test", "calls")),
+          {
+            ecosystem: "npm",
+            unit: "vitest",
+            symbol: "test",
+            evidence: "declared-builtin",
+          },
+        );
+      assert.equal(
+        libraryTarget(graph.link("vitest/main.ts", "vi", "references")).symbol,
+        "vi",
+      );
+      assert.equal(
+        graph.link("vitest/main.ts", "mock", "calls").resolution,
+        "unresolved",
+      );
+      assert.equal(
+        graph.link("vitest/main.ts", "bench", "calls").resolution,
+        "unresolved",
+      );
+      for (const name of ["test", "expect"]) {
+        const link = graph.link("ambiguous/main.ts", name, "calls");
+        assert.equal(link.resolution, "ambiguous");
+        assert.deepEqual(
+          link.libraries.map(({ unit, symbol }) => [unit, symbol]).sort(),
+          [
+            ["jest", name],
+            ["vitest", name],
+          ],
+        );
+      }
+      const captured = graph.link("captured/main.ts", "test", "calls");
+      assert.equal(captured.resolution, "ambiguous");
+      assert.deepEqual(captured.libraries.map(({ unit }) => unit).sort(), [
+        "jest",
+        "mocha",
+      ]);
+      assert.equal(
+        libraryTarget(graph.link("shadow/main.ts", "expect", "calls")).unit,
+        "other",
+      );
+      for (const name of ["describe", "test"])
+        assert.equal(
+          graph.link("shadow/main.ts", name, "calls").resolution,
+          "resolved",
+        );
+      assert.equal(
+        libraryTarget(graph.link("reference/main.ts", "suite", "calls")).unit,
+        "mocha",
+      );
+      for (const [dir, name] of [
+        ["dependency", "test"],
+        ["reference", "expect"],
+        ["custom", "test"],
+        ["redirected", "test"],
+      ])
+        assert.equal(
+          graph.link(dir + "/main.ts", name, "calls").resolution,
+          "unresolved",
+        );
+    },
+  );
+});
+
+test("immutable member aliases preserve the checker owner and overlapping global candidates", async () => {
+  await project(
+    {
+      "tsconfig.json": '{"files":["node.ts","member.ts"]}',
+      "node.ts": "import 'node:fs';",
+      "node-only/tsconfig.json":
+        '{"compilerOptions":{"lib":["es2022"],"types":["node"]}}',
+      "node-only/main.ts":
+        "new URL('https://example.test'); fetch('https://example.test');",
+      "no-node/tsconfig.json":
+        '{"compilerOptions":{"lib":["es2022"],"types":[]}}',
+      "no-node/main.ts": "new URL('https://example.test');",
+      "mixed-runtime/tsconfig.json":
+        '{"compilerOptions":{"lib":["es2022"],"types":["node","bun"]}}',
+      "mixed-runtime/main.ts": "btoa('abc');",
+      "member.ts": `declare const receiver: any;
+      function example() {
+      const log = console.log;
+      const maximum = (Math.max);
+      const key = 'min';
+      const written = JSON.parse;
+      JSON.parse = () => null;
+      const unsafe = receiver.parse;
+      log('ready'); maximum(1, 2); Math[key](1, 2); written('{}'); unsafe('{}');
+      }`,
+    },
+    async (graph, report) => {
+      clean(report);
+      const call = (name) => graph.link("member.ts", name, "calls");
+      assert.deepEqual(libraryTarget(call("maximum")), {
+        ecosystem: "typescript-lib",
+        unit: "es",
+        symbol: "Math.max",
+        evidence: "declaring-owner",
+      });
+      assert.equal(call("log").resolution, "ambiguous");
+      assert.equal(libraryTarget(call("Math[key]")).symbol, "Math.min");
+      assert.deepEqual(
+        libraryTarget(graph.link("node-only/main.ts", "URL", "calls")),
+        {
+          ecosystem: "node",
+          unit: "url",
+          symbol: "URL",
+          evidence: "declared-builtin",
+        },
+      );
+      assert.equal(
+        libraryTarget(graph.link("node-only/main.ts", "fetch", "calls")).unit,
+        "globals",
+      );
+      assert.equal(
+        graph.link("no-node/main.ts", "URL", "calls").resolution,
+        "unresolved",
+      );
+      assert.equal(
+        graph.link("mixed-runtime/main.ts", "btoa", "calls").resolution,
+        "unresolved",
+      );
+      assert.deepEqual(
+        call("log")
+          .libraries.map(({ ecosystem, unit }) => [ecosystem, unit])
+          .sort(),
+        [
+          ["dom", "dom"],
+          ["node", "console"],
+        ],
+      );
+      for (const name of ["written", "unsafe"])
+        assert.equal(call(name).resolution, "unresolved");
+    },
+  );
+});
+
+test("package members use their declarations through returns and re-exports", async () => {
+  await project(
+    {
+      "package.json":
+        '{"dependencies":{"browser-kit":"^2","uncaptured-kit":"^1"}}',
+      "tsconfig.json":
+        '{"compilerOptions":{"paths":{"browser-kit":["./vendor/kit/index.d.ts"]}}}',
+      "vendor/kit/package.json": '{"name":"browser-kit","types":"index.d.ts"}',
+      "vendor/kit/index.d.ts": `export interface Page { locator(selector: string): Locator }
+      export type Locator = { click(): void };
+      export interface A { run(): void; one(): void }
+      export interface B { run(): void; two(): void }
+      export declare function page(): Page;`,
+      "barrel.ts": `export { page as open } from 'browser-kit';
+      export type { A, B } from 'browser-kit';
+      export type { Page as UnknownPage } from 'uncaptured-kit';`,
+      "main.ts": `import { open, type A, type B, type UnknownPage } from './barrel';
+      open().locator('input[name="lastName"]').click();
+      declare const union: A | B;
+      declare const both: A & B;
+      declare const page: UnknownPage;
+      declare function fetchPage(): UnknownPage;
+      declare const unknown: any;
+      union.run(); both.run(); both.one(); page.locator('input');
+      fetchPage().locator('input'); unknown.locator('input');`,
+    },
+    async (graph, report) => {
+      clean(report);
+      const call = (name) =>
+        graph.store
+          .links()
+          .find(
+            (link) =>
+              link.file === "main.ts" &&
+              link.kind === "calls" &&
+              link.targetName === name,
+          );
+      assert.deepEqual(libraryTarget(call("(expression).click")), {
+        ecosystem: "npm",
+        unit: "browser-kit",
+        symbol: "Locator.click",
+        evidence: "declaring-owner",
+      });
+      assert.equal(libraryTarget(call("both.one")).symbol, "A.prototype.one");
+      for (const name of ["union.run", "both.run"]) {
+        const match = call(name);
+        assert.equal(match.resolution, "ambiguous");
+        assert.deepEqual(match.libraries.map(({ symbol }) => symbol).sort(), [
+          "A.prototype.run",
+          "B.prototype.run",
+        ]);
+      }
+      for (const text of ["page.locator", "(expression).locator"])
+        assert.deepEqual(libraryTarget(call(text)), {
+          ecosystem: "npm",
+          unit: "uncaptured-kit",
+          evidence: "import-path",
+        });
+      assert.equal(call("unknown.locator").data.reason, "any-receiver");
+    },
+  );
+});
+
 test("Deno package aliases and scoped maps select the actual registry or checkout file", async () => {
   await project(
     {
