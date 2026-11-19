@@ -450,12 +450,13 @@ export async function indexProject(
         report.analysisErrors.some((error) => error.module === module.id)
       )
         throw Error("Project analysis/context is incomplete");
-      const output = await runResolve(
-        module,
-        store,
-        ownContexts,
-        options.signal,
-      );
+      // A module with no stored file can only return an empty result:
+      // every resolution names one of its parsed links and every added
+      // link one of its files. Its resolver is not handed the whole graph.
+      const owns = modules.has(module.id);
+      const output = owns
+        ? await runResolve(module, store, ownContexts, options.signal)
+        : [];
       count(
         `resolve.${module.id}.resolutions`,
         Array.isArray(output)
@@ -478,7 +479,7 @@ export async function indexProject(
       if (wanted.size)
         for (const file of await read(() => filesAt(store, [...wanted])))
           needed.set(file.path, file);
-      const symbols = await read(() => store.findSymbols());
+      const symbols = owns ? await read(() => store.findSymbols()) : [];
       // Every link of the module when the store can write a validated
       // result; resolutionFacts reads only the parsed ones.
       const whole = !!(store.analysisLinks && store.writeAnalysis);
@@ -516,6 +517,8 @@ export async function indexProject(
         : store.replaceAnalysis(module.id, result),
     );
   };
+  // The modules that own at least one stored file, after analysis.
+  const modules = new Set((await summaries(store)).map((file) => file.module));
   for (const module of registry.modules) await resolveModule(module);
   return await stage("index.report", () =>
     finishReport(store, report, contexts),
