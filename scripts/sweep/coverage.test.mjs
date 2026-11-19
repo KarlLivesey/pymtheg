@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { aggregate, auditDesign, estimateCoverage, failedRustInfluence, median, stratumShare } from "./coverage.mjs";
+import { aggregate, auditDesign, estimateCoverage, failedRustInfluence, installedCoverage, median, stratumShare } from "./coverage.mjs";
 import { classify, columns, externalIdentity, goImports, libraryScore, repositoryScore, reviewQuotas, rustImports, sampleKey, sampleStratum, sourceScope, workspaceNames } from "./coverage-rules.mjs";
 
 test("assumed Level 2 links remain in the total and are counted separately", () => {
@@ -91,6 +91,21 @@ test("excludes proved external paths and keeps vendoring, aliases and shadows di
 
 const linkRow = (module, outcome, disposition, count, scope = "source", level = null, encoding = null, gap = null, reason = null) =>
   [module, "calls", outcome, reason, null, scope, disposition, count, 0, level, encoding, gap];
+
+test("installed coverage keeps the bare score when an install failed", () => {
+  const pin = (id, resolved) => ({ id, commit: "a".repeat(40), language: "typescript", outcome: "finished", breakdown: [
+    linkRow("typescript", "resolved", "eligible", resolved),
+    linkRow("typescript", "unresolved", "inside", 10 - resolved),
+  ] });
+  const a = pin("package/a", 5);
+  const b = pin("package/b", 3);
+  const score = installedCoverage([a, b], { repos: [
+    { ...pin(a.id, 9), install: { manager: "pnpm", status: "installed" } },
+    { id: b.id, commit: b.commit, outcome: "install-unavailable", install: { manager: "npm", status: "failed" } },
+  ] });
+  assert.equal(score.totals, "40.00% bare · 60.00% with installed declarations · 1/2 pins installed and indexed");
+  assert.match(score.table, /\| package\/b \| 30\.00% \| 30\.00% \| npm · install-unavailable \|/);
+});
 const bucketFor = (reason) => `typescript:${reason}:source:unclassified`;
 const observed = (bucket, links = 1, state = "unresolved") => [{ bucket, links, state }];
 

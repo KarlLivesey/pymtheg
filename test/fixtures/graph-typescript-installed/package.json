@@ -1,0 +1,1 @@
+{"name":"fixture-checkout","type":"module","dependencies":{"kit-alias":"npm:fixture-page@1.2.3","pnpm-view":"1.0.0","fallback-kit":"1.0.0","untyped-kit":"1.0.0","shadowed-kit":"1.0.0"}}

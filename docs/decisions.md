@@ -2882,3 +2882,17 @@ directive stay unresolved even where the project's own build constraint
 would allow them. A standard-library interface value's method is recorded
 as the interface's method (the static callee): the source-only route cannot
 list implementers outside the checkout. See [C-17](changes/C-17.md).
+
+### C-20 Installed TypeScript declaration inputs
+
+The TypeScript compiler host can read the installed declarations it selects
+under the checkout boundary. These inputs never enter the checkout symbol
+inventory. A selected declaration identifies its package and member. The
+installed package manifest supplies the version and its provenance. Merged
+Node and DOM declarations retain both candidates when both are possible.
+Resolver probes include absent inputs so a new installation invalidates a
+bare cache. A package exposed by the physical installation takes precedence
+over inferred workspace links. A captured competing test type request is
+settled by the checker's declarations for the selected symbol. The C-16 guard
+still covers missing requests made by checkout code or its compiler config.
+Installed declarations contribute only via the checker. [C-20](changes/C-20.md)
