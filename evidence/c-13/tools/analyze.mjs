@@ -76,6 +76,11 @@ try {
     changedFiles: files.map((f) => f.path),
     changedContextFiles: contextFiles.map((f) => f.path),
   });
+  if (global.gc) {
+    // Live heap with the inputs and every returned result still held.
+    global.gc();
+    console.log(`returned liveHeap=${Math.round(process.memoryUsage().heapUsed / 1048576)} t=${Math.round((Date.now() - started) / 1000)}s`);
+  }
   const reasons = new Map();
   let failed = 0;
   for (const { result } of results)
