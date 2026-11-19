@@ -1,3 +1,15 @@
+Pymtheg patch 0011 (C-21, not upstream): attributes on parameters.
+
+Accepts valid Rust: any number of outer attributes on a function parameter
+(`#[rustfmt::skip] #[cfg(..)] x: T`; upstream reads only one) and outer
+attributes on closure parameters (`|#[allow(unused_variables)] x: bool| ..`).
+The attribute items are children of `parameters` / `closure_parameters`
+directly before their parameter, as a single attribute already was.
+Reference: https://doc.rust-lang.org/reference/items/functions.html#attributes-on-function-parameters
+           https://doc.rust-lang.org/reference/expressions/closure-expr.html#attributes-on-closure-parameters
+Upstream issue: https://github.com/tree-sitter/tree-sitter-rust/issues/276
+(open, function parameters). No upstream pull request.
+
 diff --git a/grammar.js b/grammar.js
 index 36770d8..84b41ee 100644
 --- a/grammar.js
@@ -29,3 +41,89 @@ index 36770d8..84b41ee 100644
        )),
        '|',
      ),
+diff --git a/test/corpus/pymtheg_parameter_attributes.txt b/test/corpus/pymtheg_parameter_attributes.txt
+new file mode 100644
+index 0000000..6395a60
+--- /dev/null
++++ b/test/corpus/pymtheg_parameter_attributes.txt
+@@ -0,0 +1,80 @@
++================================================================================
++Several attributes on a function parameter
++================================================================================
++
++fn w(#[rustfmt::skip] #[cfg(x)] a: u8, #[cfg(y)] b: u8) {}
++
++--------------------------------------------------------------------------------
++
++(source_file
++  (function_item
++    name: (identifier)
++    parameters: (parameters
++      (attribute_item
++        (attribute
++          (scoped_identifier
++            path: (identifier)
++            name: (identifier))))
++      (attribute_item
++        (attribute
++          (identifier)
++          arguments: (token_tree
++            (identifier))))
++      (parameter
++        pattern: (identifier)
++        type: (primitive_type))
++      (attribute_item
++        (attribute
++          (identifier)
++          arguments: (token_tree
++            (identifier))))
++      (parameter
++        pattern: (identifier)
++        type: (primitive_type)))
++    body: (block)))
++
++================================================================================
++Attributes on closure parameters
++================================================================================
++
++let build = |#[allow(unused_variables)] use_native: bool, redirects: bool| 1;
++let c = |#[a] #[b] (x, y): (u8, u8), z| 2;
++
++--------------------------------------------------------------------------------
++
++(source_file
++  (let_declaration
++    pattern: (identifier)
++    value: (closure_expression
++      parameters: (closure_parameters
++        (attribute_item
++          (attribute
++            (identifier)
++            arguments: (token_tree
++              (identifier))))
++        (parameter
++          pattern: (identifier)
++          type: (primitive_type))
++        (parameter
++          pattern: (identifier)
++          type: (primitive_type)))
++      body: (integer_literal)))
++  (let_declaration
++    pattern: (identifier)
++    value: (closure_expression
++      parameters: (closure_parameters
++        (attribute_item
++          (attribute
++            (identifier)))
++        (attribute_item
++          (attribute
++            (identifier)))
++        (parameter
++          pattern: (tuple_pattern
++            (identifier)
++            (identifier))
++          type: (tuple_type
++            (primitive_type)
++            (primitive_type)))
++        (identifier))
++      body: (integer_literal))))

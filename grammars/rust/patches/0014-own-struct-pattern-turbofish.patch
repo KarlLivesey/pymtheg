@@ -1,3 +1,14 @@
+Pymtheg patch 0014 (C-21, not upstream): a turbofish in a struct pattern.
+
+Accepts valid Rust: `let ErrorPayload::<serde_json::Value> { message, .. } = p;`
+A struct pattern's path may carry generic arguments, as a tuple-struct
+pattern's already may (upstream PR #254). Read as
+`struct_pattern(type: generic_type(..))`, like the tuple-struct case.
+Reference: https://doc.rust-lang.org/reference/patterns.html#struct-patterns
+Upstream pull request: https://github.com/tree-sitter/tree-sitter-rust/pull/301
+(open; this is its struct-pattern grammar line only; its attribute change
+overlaps PR #319, already taken as patch 0001).
+
 diff --git a/grammar.js b/grammar.js
 index f812aa8..0cb98dc 100644
 --- a/grammar.js
@@ -12,3 +23,40 @@ index f812aa8..0cb98dc 100644
        )),
        '{',
        sepBy(',', choice($.field_pattern, $.remaining_field_pattern)),
+diff --git a/test/corpus/pymtheg_struct_pattern_turbofish.txt b/test/corpus/pymtheg_struct_pattern_turbofish.txt
+new file mode 100644
+index 0000000..fbb7751
+--- /dev/null
++++ b/test/corpus/pymtheg_struct_pattern_turbofish.txt
+@@ -0,0 +1,31 @@
++================================================================================
++A turbofish in a struct pattern
++================================================================================
++
++let ErrorPayload::<serde_json::Value> { message, .. } = p;
++let S::<u8> { a } = q;
++
++--------------------------------------------------------------------------------
++
++(source_file
++  (let_declaration
++    pattern: (struct_pattern
++      type: (generic_type
++        type: (type_identifier)
++        type_arguments: (type_arguments
++          (scoped_type_identifier
++            path: (identifier)
++            name: (type_identifier))))
++      (field_pattern
++        name: (shorthand_field_identifier))
++      (remaining_field_pattern))
++    value: (identifier))
++  (let_declaration
++    pattern: (struct_pattern
++      type: (generic_type
++        type: (type_identifier)
++        type_arguments: (type_arguments
++          (primitive_type)))
++      (field_pattern
++        name: (shorthand_field_identifier)))
++    value: (identifier)))

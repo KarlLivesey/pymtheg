@@ -1,3 +1,15 @@
+Pymtheg patch 0012 (C-21, not upstream): `box` patterns.
+
+Accepts nightly Rust: `box` patterns under `#![feature(box_patterns)]`
+(`Err(box E::A { .. })`, `box x @ 1`), as a `box_pattern` node whose child
+is the inner pattern. Not stable Rust; real crates built on nightly write it.
+`box` is a reserved keyword in every edition, so no valid code binds it.
+Reference: https://doc.rust-lang.org/unstable-book/language-features/box-patterns.html
+           https://doc.rust-lang.org/reference/keywords.html#reserved-keywords
+Upstream issue: https://github.com/tree-sitter/tree-sitter-rust/issues/14
+(closed); pull request https://github.com/tree-sitter/tree-sitter-rust/pull/83
+(closed without merge, 2024).
+
 diff --git a/grammar.js b/grammar.js
 index 84b41ee..3e5e0e0 100644
 --- a/grammar.js
@@ -19,3 +31,77 @@ index 84b41ee..3e5e0e0 100644
      generic_pattern: $ => seq(
        choice(
          $.identifier,
+diff --git a/test/corpus/pymtheg_box_patterns.txt b/test/corpus/pymtheg_box_patterns.txt
+new file mode 100644
+index 0000000..f92bab2
+--- /dev/null
++++ b/test/corpus/pymtheg_box_patterns.txt
+@@ -0,0 +1,68 @@
++================================================================================
++Box patterns (nightly box_patterns)
++================================================================================
++
++match e {
++    Err(E::A(box F::B { .. }, ..)) => {}
++    Err(E::H(box G::V(message))) => {}
++    box x @ 1 => {}
++    box ref mut y => {}
++    _ => {}
++}
++
++--------------------------------------------------------------------------------
++
++(source_file
++  (expression_statement
++    (match_expression
++      value: (identifier)
++      body: (match_block
++        (match_arm
++          pattern: (match_pattern
++            (tuple_struct_pattern
++              type: (identifier)
++              (tuple_struct_pattern
++                type: (scoped_identifier
++                  path: (identifier)
++                  name: (identifier))
++                (box_pattern
++                  (struct_pattern
++                    type: (scoped_type_identifier
++                      path: (identifier)
++                      name: (type_identifier))
++                    (remaining_field_pattern)))
++                (remaining_field_pattern))))
++          value: (block))
++        (match_arm
++          pattern: (match_pattern
++            (tuple_struct_pattern
++              type: (identifier)
++              (tuple_struct_pattern
++                type: (scoped_identifier
++                  path: (identifier)
++                  name: (identifier))
++                (box_pattern
++                  (tuple_struct_pattern
++                    type: (scoped_identifier
++                      path: (identifier)
++                      name: (identifier))
++                    (identifier))))))
++          value: (block))
++        (match_arm
++          pattern: (match_pattern
++            (box_pattern
++              (captured_pattern
++                (identifier)
++                (integer_literal))))
++          value: (block))
++        (match_arm
++          pattern: (match_pattern
++            (box_pattern
++              (ref_pattern
++                (mut_pattern
++                  (mutable_specifier)
++                  (identifier)))))
++          value: (block))
++        (match_arm
++          pattern: (match_pattern)
++          value: (block))))))

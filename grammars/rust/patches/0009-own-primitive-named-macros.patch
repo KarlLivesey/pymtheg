@@ -1,3 +1,16 @@
+Pymtheg patch 0009 (C-21, not upstream): macros named like primitive types.
+
+Accepts valid Rust: a macro whose name is a primitive type name
+(`str![[r#"..."#]]` from snapbox, `u8!(..)`), in any position a macro
+invocation may appear. Macros live in their own namespace, so the name is
+not the type. Also a primitive type name with generic arguments as a type
+path (`&str<u8, el>`), which is valid syntax (a later name-resolution error
+in ordinary code, accepted as proc-macro input).
+Reference: https://doc.rust-lang.org/reference/macros.html#macro-invocation
+           https://doc.rust-lang.org/reference/paths.html#paths-in-types
+Upstream issue: https://github.com/tree-sitter/tree-sitter-rust/issues/322
+(open; this is the fix the issue proposes). No upstream pull request.
+
 diff --git a/grammar.js b/grammar.js
 index 314d60a..eda28f1 100644
 --- a/grammar.js
@@ -22,3 +35,102 @@ index 314d60a..eda28f1 100644
          $._reserved_identifier,
        )),
        '!',
+diff --git a/test/corpus/pymtheg_primitive_macros.txt b/test/corpus/pymtheg_primitive_macros.txt
+new file mode 100644
+index 0000000..3bbd274
+--- /dev/null
++++ b/test/corpus/pymtheg_primitive_macros.txt
+@@ -0,0 +1,93 @@
++================================================================================
++Macros named like primitive types
++================================================================================
++
++fn f() {
++    assert_data_eq!(x, str![[r#"
++hi
++"#]]);
++    let s = str!["x"];
++    u8!(1);
++    snapbox::str!["y"];
++}
++str! { item }
++
++--------------------------------------------------------------------------------
++
++(source_file
++  (function_item
++    name: (identifier)
++    parameters: (parameters)
++    body: (block
++      (expression_statement
++        (macro_invocation
++          macro: (identifier)
++          (token_tree
++            (identifier)
++            (primitive_type)
++            (token_tree
++              (token_tree
++                (raw_string_literal
++                  (string_content)))))))
++      (let_declaration
++        pattern: (identifier)
++        value: (macro_invocation
++          macro: (identifier)
++          (token_tree
++            (string_literal
++              (string_content)))))
++      (expression_statement
++        (macro_invocation
++          macro: (identifier)
++          (token_tree
++            (integer_literal))))
++      (expression_statement
++        (macro_invocation
++          macro: (scoped_identifier
++            path: (identifier)
++            name: (identifier))
++          (token_tree
++            (string_literal
++              (string_content)))))))
++  (macro_invocation
++    macro: (identifier)
++    (token_tree
++      (identifier))))
++
++================================================================================
++Primitive type names with generic arguments
++================================================================================
++
++fn g(tag: &str<u8, el>) {}
++fn h(x: &str, y: u8) -> Box<str> {}
++
++--------------------------------------------------------------------------------
++
++(source_file
++  (function_item
++    name: (identifier)
++    parameters: (parameters
++      (parameter
++        pattern: (identifier)
++        type: (reference_type
++          type: (generic_type
++            type: (primitive_type)
++            type_arguments: (type_arguments
++              (primitive_type)
++              (type_identifier))))))
++    body: (block))
++  (function_item
++    name: (identifier)
++    parameters: (parameters
++      (parameter
++        pattern: (identifier)
++        type: (reference_type
++          type: (primitive_type)))
++      (parameter
++        pattern: (identifier)
++        type: (primitive_type)))
++    return_type: (generic_type
++      type: (type_identifier)
++      type_arguments: (type_arguments
++        (primitive_type)))
++    body: (block)))

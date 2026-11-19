@@ -278,7 +278,8 @@ function parser(): Promise<Helper> {
 }
 /**
  * The vendored, patched grammar (grammars/rust: upstream v0.24.2 + PRs #319,
- * #271, #317, #312, #283, #281; see its manifest.json and docs/changes/W2-V.md).
+ * #271, #317, #312, #283, #281 and our patches 0007-0014; see its manifest.json,
+ * docs/changes/W2-V.md and docs/changes/C-21.md).
  * Resolved from this file so it works from dist/ and from the installed package.
  */
 const GRAMMAR = fileURLToPath(
