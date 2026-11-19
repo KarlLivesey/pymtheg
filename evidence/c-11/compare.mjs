@@ -62,6 +62,7 @@ for (const id of selected) {
     definite: 0,
     changed: [],
     gained: 0,
+    gainedFiles: Object.create(null),
     gainedExamples: [],
   };
   try {
@@ -125,14 +126,18 @@ for (const id of selected) {
         }
         result.gained += nextTargets.length;
         for (const target of nextTargets) {
-          if (result.gainedExamples.length === 5) break;
+          const destination = JSON.parse(target);
+          const targetFile = destination[0];
+          result.gainedFiles[targetFile] =
+            (result.gainedFiles[targetFile] ?? 0) + 1;
+          if (result.gainedExamples.length === 5) continue;
           const { range, targetName, resolution, data } = values[0];
           result.gainedExamples.push({
             file,
             range,
             targetName,
             previous: data?.reason ?? resolution,
-            target: JSON.parse(target),
+            target: destination,
           });
         }
       }

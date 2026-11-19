@@ -28,15 +28,23 @@ The final source draw reproduced all 40 hand-checked targets.
 ## Library queries
 
 Each query used a result bound of two. The full class counts matched the
-stored targets. Astro and T3 Code returned their incomplete-source status
-alongside the counts.
+stored targets. These four pinned graphs returned their incomplete-source
+status alongside the counts.
 
 | Repository | Command | Library | Candidate sets |
 | --- | --- | ---: | ---: |
-| Astro | `graph uses zod` | 1,227 | 0 |
+| tRPC | `graph uses zod` | 1,653 | 0 |
 | Astro | `graph uses fs readFileSync` | 106 | 0 |
-| Hono | `graph uses dom ParentNode.prototype.querySelector` | 138 | 0 |
+| Excalidraw | `graph uses dom ParentNode.prototype.querySelector` | 230 | 0 |
 | T3 Code | `graph uses es Map.prototype.delete` | 84 | 0 |
+
+## Validation
+
+The dev-server build, no-emit check and format check passed. All 17
+sweep-tool tests passed. The full `npm test` passed 3,008 tests. Its
+repository initialization integration test exceeded the existing
+900-second hang guard during self-indexing. A focused retry while the
+cold runs were active also exceeded the guard.
 
 ## How to reproduce
 

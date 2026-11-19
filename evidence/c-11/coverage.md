@@ -39,9 +39,9 @@ merged before C-11.
 
 The exact comparisons matched every symbol key and existing link site by
 source location and each definite checkout destination by file and symbol
-key. Across these four comparisons, all additions, removals and changed
-definite destinations were zero. Level 2 on those same 585,121
-sites rose from 62.37% to 71.30%.
+key. All five comparisons found zero added or removed symbols and link
+sites, and zero changed definite checkout destinations. Level 2 on those
+same 640,696 sites rose from 62.41% to 69.98%.
 
 | Repository | Symbol keys | Link sites | Definite checkout destinations preserved |
 | --- | ---: | ---: | ---: |
@@ -49,6 +49,14 @@ sites rose from 62.37% to 71.30%.
 | Astro | 26,243 | 152,561 | 65,124 |
 | Excalidraw | 13,405 | 104,519 | 61,330 |
 | NestJS | 19,464 | 165,330 | 79,114 |
+| Vite | 10,184 | 55,575 | 23,126 |
+
+Vite resolves 136 additional existing sites to checkout declarations.
+Its configs explicitly load `vite/client`. Honoring that option makes
+the existing asset module declarations in `packages/vite/client.d.ts`
+visible at 68 of those sites, and the hot-reload declarations in
+`packages/vite/types/hot.d.ts` visible at the other 68. The module uses
+its existing rule for checkout declarations at those sites.
 
 The T3 Code sweep pin is separate from the `b387e3a1` default-heap check.
 
