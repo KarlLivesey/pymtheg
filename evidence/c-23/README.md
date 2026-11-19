@@ -27,13 +27,20 @@ hash order. Use `checker.mjs` and the actual declaration files to verify
 the draw. `withdrawals.mjs SCRATCH BASELINE CANDIDATE` checks each of the
 5,098 C-20 withdrawal sites before and after.
 
+`same-install.mjs SCRATCH RECEIPT PIN BUILD` replays the cold and warm
+indices on a retained install and saves the replay graph separately from
+the original sweep store. The tRPC controls retain the ordinary sweep result
+and identify which changes persist with the same installed inputs.
+[Control counts](trpc-control.json)
+
 `cost.mjs SCRATCH RECEIPT PINS…` runs three cold indices on each retained
 installed checkout, with main before and after the candidate. It restores
 the original sweep store when complete. The same Linux network isolation
 applies to the cost replay and installed sweep.
 
 Export the installed attempts with `scripts/sweep/coverage-export.mjs`
-using the SW-3 reference samples. The cumulative plan input uses C-20's
+using the SW-3 reference samples. `plan-input.mjs INSTALLED-EXPORT INPUT.gz`
+builds the cumulative input with C-20's
 verified bare input and replaces the nested installed export with this run.
 Regenerate the plan with `scripts/sweep/coverage.mjs` and
 `evidence/c-11/plan.mjs`. The Go and Rust sections are taken verbatim from main.

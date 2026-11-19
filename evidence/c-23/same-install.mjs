@@ -3,14 +3,14 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { measured } from "../../scripts/sweep/run.mjs";
 
-const [scratch, receipt, pin] = process.argv.slice(2);
+const [scratch, receipt, pin, build = "candidate-build"] = process.argv.slice(2);
 const previous = JSON.parse(await readFile(receipt, "utf8"));
 const repo = previous.repos.find(({ id }) => pin === id);
 if (repo?.install?.status !== "installed" || repo.outcome !== "finished")
   throw Error(`Need a completed installed graph for ${pin}`);
 const root = join(scratch, repo.attempt, "checkout");
 const state = join(root, ".pymtheg", "rebuildable");
-const attempt = join("same-install", pin);
+const attempt = join("same-install-" + build, pin);
 const logDir = join(scratch, attempt);
 const indexDir = join(logDir, "checkout", ".pymtheg");
 await mkdir(indexDir, { recursive: true });
@@ -30,7 +30,7 @@ try {
         "--net",
         "--",
         process.execPath,
-        join(scratch, "candidate-build", "dist", "cli", "main.js"),
+        join(scratch, build, "dist", "cli", "main.js"),
         "graph",
         ...args,
         "--root",
@@ -63,7 +63,7 @@ try {
   );
   await rename(state, join(indexDir, "rebuildable"));
   await writeFile(
-    join(scratch, "same-install-run.json"),
+    join(scratch, "same-install-" + build + "-run.json"),
     JSON.stringify({ ...previous, repos: [{ ...repo, attempt, cold, warm }] }),
   );
 } finally {

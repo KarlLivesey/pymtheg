@@ -70,13 +70,25 @@ function inspect(program, file, row) {
     ts.isElementAccessExpression(selector)
       ? checker.getTypeAtLocation(selector.expression)
       : undefined;
+  const binding =
+    symbol && symbol !== selected && symbol.declarations?.[0];
+  const importDeclaration =
+    binding && ts.findAncestor(binding, ts.isImportDeclaration);
+  const boundModule =
+    importDeclaration &&
+    ts.isStringLiteralLike(importDeclaration.moduleSpecifier)
+      ? importDeclaration.moduleSpecifier
+      : undefined;
   const literal =
+    boundModule ??
+    (
     ts.isStringLiteralLike(use) &&
     (ts.isImportDeclaration(use.parent) ||
       ts.isExportDeclaration(use.parent) ||
       ts.isExternalModuleReference(use.parent) ||
       ts.isCallExpression(use.parent)) &&
-    use;
+    use
+    );
   const modulePath =
     literal &&
     program.getResolvedModuleFromModuleSpecifier(literal, file)?.resolvedModule
@@ -106,11 +118,7 @@ function inspect(program, file, row) {
     receiver: typeKind(receiver),
     module: modulePath ? modulePath.slice(1) : undefined,
     signature: signature && location(signature),
-    binding:
-      symbol &&
-      symbol !== selected &&
-      symbol.declarations?.[0] &&
-      location(symbol.declarations[0]),
+    binding: binding && location(binding),
     declarations: unique((selected?.declarations ?? []).map(location)).slice(
       0,
       12,

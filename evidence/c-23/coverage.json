@@ -1,0 +1,608 @@
+[
+  {
+    "pin": "changesets/changesets",
+    "bare": {
+      "sites": 12646,
+      "level2": 2548
+    },
+    "archived": {
+      "sites": 12646,
+      "level2": 11001
+    },
+    "matchedBefore": {
+      "sites": 12646,
+      "level2": 11001
+    },
+    "installed": {
+      "sites": 12646,
+      "level2": 11001
+    },
+    "gains": 0,
+    "withdrawals": 0,
+    "unchangedKeys": true,
+    "shared": 12646,
+    "sharedBeforeL2": 11001,
+    "sharedAfterL2": 11001,
+    "lostSites": 0,
+    "newSites": 0,
+    "install": {
+      "manager": "pnpm",
+      "status": "installed",
+      "exitCode": 0
+    },
+    "outcome": "finished",
+    "coldStatus": "ok",
+    "warmStatus": "ok"
+  },
+  {
+    "pin": "colinhacks/zod",
+    "bare": {
+      "sites": 81042,
+      "level2": 67963
+    },
+    "archived": {
+      "sites": 81042,
+      "level2": 67963
+    },
+    "installed": {
+      "sites": 81042,
+      "level2": 67963
+    },
+    "gains": 0,
+    "withdrawals": 0,
+    "unchangedKeys": false,
+    "install": {
+      "status": "unsupported",
+      "reason": "unsupported-package-manager"
+    },
+    "outcome": "install-unavailable"
+  },
+  {
+    "pin": "dexie/Dexie.js",
+    "bare": {
+      "sites": 36431,
+      "level2": 19940
+    },
+    "archived": {
+      "sites": 36431,
+      "level2": 20494
+    },
+    "matchedBefore": {
+      "sites": 36431,
+      "level2": 20494
+    },
+    "installed": {
+      "sites": 36431,
+      "level2": 20522
+    },
+    "gains": 28,
+    "withdrawals": 0,
+    "unchangedKeys": true,
+    "shared": 36431,
+    "sharedBeforeL2": 20494,
+    "sharedAfterL2": 20522,
+    "lostSites": 0,
+    "newSites": 0,
+    "install": {
+      "manager": "pnpm",
+      "status": "installed",
+      "exitCode": 0
+    },
+    "outcome": "finished",
+    "coldStatus": "ok",
+    "warmStatus": "ok"
+  },
+  {
+    "pin": "excalidraw/excalidraw",
+    "bare": {
+      "sites": 104519,
+      "level2": 75184
+    },
+    "archived": {
+      "sites": 104519,
+      "level2": 97584
+    },
+    "matchedBefore": {
+      "sites": 104519,
+      "level2": 97584
+    },
+    "installed": {
+      "sites": 104519,
+      "level2": 98087
+    },
+    "gains": 503,
+    "withdrawals": 0,
+    "unchangedKeys": true,
+    "shared": 104519,
+    "sharedBeforeL2": 97584,
+    "sharedAfterL2": 98087,
+    "lostSites": 0,
+    "newSites": 0,
+    "install": {
+      "manager": "yarn",
+      "status": "installed",
+      "exitCode": 0
+    },
+    "outcome": "finished",
+    "coldStatus": "incomplete",
+    "warmStatus": "incomplete"
+  },
+  {
+    "pin": "honojs/hono",
+    "bare": {
+      "sites": 72340,
+      "level2": 42129
+    },
+    "archived": {
+      "sites": 72340,
+      "level2": 46405
+    },
+    "matchedBefore": {
+      "sites": 72340,
+      "level2": 46405
+    },
+    "installed": {
+      "sites": 72340,
+      "level2": 46405
+    },
+    "gains": 0,
+    "withdrawals": 0,
+    "unchangedKeys": true,
+    "shared": 72340,
+    "sharedBeforeL2": 46405,
+    "sharedAfterL2": 46405,
+    "lostSites": 0,
+    "newSites": 0,
+    "install": {
+      "manager": "pnpm",
+      "status": "installed",
+      "exitCode": 0
+    },
+    "outcome": "finished",
+    "coldStatus": "ok",
+    "warmStatus": "ok"
+  },
+  {
+    "pin": "mermaid-js/mermaid",
+    "bare": {
+      "sites": 125657,
+      "level2": 94665
+    },
+    "archived": {
+      "sites": 125657,
+      "level2": 112045
+    },
+    "matchedBefore": {
+      "sites": 125657,
+      "level2": 112045
+    },
+    "installed": {
+      "sites": 125657,
+      "level2": 112063
+    },
+    "gains": 18,
+    "withdrawals": 0,
+    "unchangedKeys": true,
+    "shared": 125657,
+    "sharedBeforeL2": 112045,
+    "sharedAfterL2": 112063,
+    "lostSites": 0,
+    "newSites": 0,
+    "install": {
+      "manager": "pnpm",
+      "status": "installed",
+      "exitCode": 0
+    },
+    "outcome": "finished",
+    "coldStatus": "ok",
+    "warmStatus": "ok"
+  },
+  {
+    "pin": "nestjs/nest",
+    "bare": {
+      "sites": 165330,
+      "level2": 123638
+    },
+    "archived": {
+      "sites": 165330,
+      "level2": 123638
+    },
+    "matchedBefore": {
+      "sites": 165330,
+      "level2": 151357
+    },
+    "installed": {
+      "sites": 165330,
+      "level2": 151358
+    },
+    "gains": 1,
+    "withdrawals": 0,
+    "unchangedKeys": true,
+    "shared": 165330,
+    "sharedBeforeL2": 151357,
+    "sharedAfterL2": 151358,
+    "lostSites": 0,
+    "newSites": 0,
+    "install": {
+      "manager": "npm",
+      "status": "installed",
+      "exitCode": 0
+    },
+    "outcome": "finished",
+    "coldStatus": "ok",
+    "warmStatus": "ok"
+  },
+  {
+    "pin": "oclif/core",
+    "bare": {
+      "sites": 14188,
+      "level2": 12169
+    },
+    "archived": {
+      "sites": 14188,
+      "level2": 13489
+    },
+    "matchedBefore": {
+      "sites": 14188,
+      "level2": 13489
+    },
+    "installed": {
+      "sites": 14188,
+      "level2": 13489
+    },
+    "gains": 0,
+    "withdrawals": 0,
+    "unchangedKeys": true,
+    "shared": 14188,
+    "sharedBeforeL2": 13489,
+    "sharedAfterL2": 13489,
+    "lostSites": 0,
+    "newSites": 0,
+    "install": {
+      "manager": "yarn",
+      "status": "installed",
+      "exitCode": 0
+    },
+    "outcome": "finished",
+    "coldStatus": "ok",
+    "warmStatus": "ok"
+  },
+  {
+    "pin": "pingdotgg/t3code",
+    "bare": {
+      "sites": 162711,
+      "level2": 117711
+    },
+    "archived": {
+      "sites": 162711,
+      "level2": 117711
+    },
+    "installed": {
+      "sites": 162711,
+      "level2": 117711
+    },
+    "gains": 0,
+    "withdrawals": 0,
+    "unchangedKeys": false,
+    "install": {
+      "status": "unsupported",
+      "reason": "unsupported-package-manager"
+    },
+    "outcome": "install-unavailable"
+  },
+  {
+    "pin": "pmndrs/zustand",
+    "bare": {
+      "sites": 7099,
+      "level2": 4741
+    },
+    "archived": {
+      "sites": 7099,
+      "level2": 5867
+    },
+    "matchedBefore": {
+      "sites": 7099,
+      "level2": 5867
+    },
+    "installed": {
+      "sites": 7099,
+      "level2": 5871
+    },
+    "gains": 4,
+    "withdrawals": 0,
+    "unchangedKeys": true,
+    "shared": 7099,
+    "sharedBeforeL2": 5867,
+    "sharedAfterL2": 5871,
+    "lostSites": 0,
+    "newSites": 0,
+    "install": {
+      "manager": "pnpm",
+      "status": "installed",
+      "exitCode": 0
+    },
+    "outcome": "finished",
+    "coldStatus": "ok",
+    "warmStatus": "ok"
+  },
+  {
+    "pin": "puppeteer/puppeteer",
+    "bare": {
+      "sites": 58244,
+      "level2": 37602
+    },
+    "archived": {
+      "sites": 58244,
+      "level2": 45428
+    },
+    "matchedBefore": {
+      "sites": 58244,
+      "level2": 45428
+    },
+    "installed": {
+      "sites": 58244,
+      "level2": 45437
+    },
+    "gains": 9,
+    "withdrawals": 0,
+    "unchangedKeys": true,
+    "shared": 58244,
+    "sharedBeforeL2": 45428,
+    "sharedAfterL2": 45437,
+    "lostSites": 0,
+    "newSites": 0,
+    "install": {
+      "manager": "npm",
+      "status": "installed",
+      "exitCode": 0
+    },
+    "outcome": "finished",
+    "coldStatus": "incomplete",
+    "warmStatus": "incomplete"
+  },
+  {
+    "pin": "react-hook-form/react-hook-form",
+    "bare": {
+      "sites": 49115,
+      "level2": 22064
+    },
+    "archived": {
+      "sites": 49115,
+      "level2": 36789
+    },
+    "matchedBefore": {
+      "sites": 49115,
+      "level2": 36789
+    },
+    "installed": {
+      "sites": 49115,
+      "level2": 37108
+    },
+    "gains": 319,
+    "withdrawals": 0,
+    "unchangedKeys": true,
+    "shared": 49115,
+    "sharedBeforeL2": 36789,
+    "sharedAfterL2": 37108,
+    "lostSites": 0,
+    "newSites": 0,
+    "install": {
+      "manager": "pnpm",
+      "status": "installed",
+      "exitCode": 0
+    },
+    "outcome": "finished",
+    "coldStatus": "ok",
+    "warmStatus": "ok"
+  },
+  {
+    "pin": "reduxjs/redux-toolkit",
+    "bare": {
+      "sites": 57208,
+      "level2": 36541
+    },
+    "archived": {
+      "sites": 57208,
+      "level2": 45777
+    },
+    "matchedBefore": {
+      "sites": 57208,
+      "level2": 45777
+    },
+    "installed": {
+      "sites": 57208,
+      "level2": 45838
+    },
+    "gains": 61,
+    "withdrawals": 0,
+    "unchangedKeys": true,
+    "shared": 57208,
+    "sharedBeforeL2": 45777,
+    "sharedAfterL2": 45838,
+    "lostSites": 0,
+    "newSites": 0,
+    "install": {
+      "manager": "pnpm",
+      "status": "installed",
+      "exitCode": 0
+    },
+    "outcome": "finished",
+    "coldStatus": "incomplete",
+    "warmStatus": "incomplete"
+  },
+  {
+    "pin": "trpc/trpc",
+    "bare": {
+      "sites": 107470,
+      "level2": 78475
+    },
+    "archived": {
+      "sites": 107470,
+      "level2": 94277
+    },
+    "matchedBefore": {
+      "sites": 107470,
+      "level2": 95127
+    },
+    "installed": {
+      "sites": 107470,
+      "level2": 94544
+    },
+    "gains": 550,
+    "withdrawals": 1133,
+    "unchangedKeys": true,
+    "shared": 107470,
+    "sharedBeforeL2": 95127,
+    "sharedAfterL2": 94544,
+    "lostSites": 0,
+    "newSites": 0,
+    "install": {
+      "manager": "pnpm",
+      "status": "installed",
+      "exitCode": 0
+    },
+    "outcome": "finished",
+    "coldStatus": "incomplete",
+    "warmStatus": "incomplete"
+  },
+  {
+    "pin": "vitejs/vite",
+    "bare": {
+      "sites": 55575,
+      "level2": 31480
+    },
+    "archived": {
+      "sites": 55575,
+      "level2": 45697
+    },
+    "matchedBefore": {
+      "sites": 55575,
+      "level2": 45697
+    },
+    "installed": {
+      "sites": 55575,
+      "level2": 45701
+    },
+    "gains": 4,
+    "withdrawals": 0,
+    "unchangedKeys": true,
+    "shared": 55575,
+    "sharedBeforeL2": 45697,
+    "sharedAfterL2": 45701,
+    "lostSites": 0,
+    "newSites": 0,
+    "install": {
+      "manager": "pnpm",
+      "status": "installed",
+      "exitCode": 0
+    },
+    "outcome": "finished",
+    "coldStatus": "incomplete",
+    "warmStatus": "incomplete"
+  },
+  {
+    "pin": "vitest-dev/vitest",
+    "bare": {
+      "sites": 116220,
+      "level2": 89729
+    },
+    "archived": {
+      "sites": 116220,
+      "level2": 95607
+    },
+    "matchedBefore": {
+      "sites": 116220,
+      "level2": 95607
+    },
+    "installed": {
+      "sites": 116220,
+      "level2": 95768
+    },
+    "gains": 161,
+    "withdrawals": 0,
+    "unchangedKeys": true,
+    "shared": 116220,
+    "sharedBeforeL2": 95607,
+    "sharedAfterL2": 95768,
+    "lostSites": 0,
+    "newSites": 0,
+    "install": {
+      "manager": "pnpm",
+      "status": "installed",
+      "exitCode": 0
+    },
+    "outcome": "finished",
+    "coldStatus": "incomplete",
+    "warmStatus": "incomplete"
+  },
+  {
+    "pin": "withastro/astro",
+    "bare": {
+      "sites": 152561,
+      "level2": 117435
+    },
+    "archived": {
+      "sites": 152561,
+      "level2": 130211
+    },
+    "matchedBefore": {
+      "sites": 152561,
+      "level2": 130251
+    },
+    "installed": {
+      "sites": 152561,
+      "level2": 130412
+    },
+    "gains": 161,
+    "withdrawals": 0,
+    "unchangedKeys": true,
+    "shared": 152561,
+    "sharedBeforeL2": 130251,
+    "sharedAfterL2": 130412,
+    "lostSites": 0,
+    "newSites": 0,
+    "install": {
+      "manager": "pnpm",
+      "status": "installed",
+      "exitCode": 0
+    },
+    "outcome": "finished",
+    "coldStatus": "incomplete",
+    "warmStatus": "incomplete"
+  },
+  {
+    "pin": "yargs/yargs",
+    "bare": {
+      "sites": 12205,
+      "level2": 5181
+    },
+    "archived": {
+      "sites": 12205,
+      "level2": 6426
+    },
+    "matchedBefore": {
+      "sites": 12205,
+      "level2": 6426
+    },
+    "installed": {
+      "sites": 12205,
+      "level2": 6426
+    },
+    "gains": 0,
+    "withdrawals": 0,
+    "unchangedKeys": true,
+    "shared": 12205,
+    "sharedBeforeL2": 6426,
+    "sharedAfterL2": 6426,
+    "lostSites": 0,
+    "newSites": 0,
+    "install": {
+      "manager": "npm",
+      "status": "installed",
+      "exitCode": 0
+    },
+    "outcome": "finished",
+    "coldStatus": "ok",
+    "warmStatus": "ok"
+  }
+]
