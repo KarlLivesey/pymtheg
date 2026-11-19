@@ -133,8 +133,8 @@ and body profiling accounted for 0.26 sampled seconds.
 ### Follow-up timing
 
 For each pin, the same memory-backed session ran main `5ec4baa`, the
-follow-up, and then main again, with matching project IDs. Cells show
-cold wall time and peak RSS.
+follow-up, and then main again, with matching project IDs. This session
+predates the C-11 merge. Cells show cold wall time and peak RSS.
 
 | Pin | Main run 1 | Follow-up | Main run 2 |
 | --- | ---: | ---: | ---: |
@@ -146,6 +146,16 @@ time and 5.9% more peak RSS. Helix used 16.8% more wall time and 4.0% more
 peak RSS. Helix's two main wall times differed by 38.3 seconds. The full
 sweep processes used 102.7, 107.5, and 96.2 seconds of user CPU and
 87.6, 133.0, and 121.9 seconds of system CPU, in run order.
+
+The second Helix session used the same CPU affinity across all three runs.
+Both sessions put the Helix wall-time increase close to 15% against the
+mean of the two main controls. The fixed-affinity session measured 15.7%
+more wall time and 6.1% more peak RSS. Its main controls differed by 59.6
+seconds of wall time.
+
+| Pin | Main run 1 | Follow-up | Main run 2 |
+| --- | ---: | ---: | ---: |
+| Helix with fixed CPU affinity | 252.2 s / 1,119 MiB | 257.4 s / 1,182 MiB | 192.6 s / 1,109 MiB |
 
 ### Exact comparison after the cost fix
 
@@ -170,8 +180,9 @@ including stored assumptions. Every field matched. [Comparison script](compare.m
 
 The census attributes all 166,999 stored unresolved links with the
 macro-scope diagnostic. [Remaining macro opacity](remaining.md)
-The follow-up passed the build, type check, format check, all 3,062 tests
-on memory-backed scratch, and all 19 sweep tests.
+The exact comparison also passed after merging C-11. The merged build,
+type check, format check, all 3,076 tests on memory-backed scratch, and all
+20 sweep tests passed.
 
 ## Coverage plan
 
