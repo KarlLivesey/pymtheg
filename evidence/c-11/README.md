@@ -8,10 +8,22 @@ kinds. A library target with a symbol earns Level 2. A unit alone earns Level 1.
 
 [Change note](../../docs/changes/C-11.md) · [Pinned source audit](audit.md) · [Coverage comparison](coverage.md) · [Cold indexing and heap](resources.md)
 
-The current plan input contains nine completed C-11 graphs. [Plan input](coverage-plan-input.json.gz)
+The plan input contains all 18 completed C-11 graphs. The 0.1.0 replay
+reproduced the archived SW-3 TypeScript and JavaScript coverage counts on
+each pin. [Plan input](coverage-plan-input.json.gz)
 
-The 0.1.0 replay reproduced the archived SW-3 TypeScript and JavaScript
-coverage counts on each of the 18 released pins.
+## Build provenance
+
+The first sweep build had digest
+`015c000df99defbd55bf03ffea9fb9e7da306e07b9629f5ddc8c6fe736173274`.
+`workspace-audit.mjs` checked every captured workspace context against the
+two subsequent package-boundary fixes. Seventeen pins and the T3 Code
+own-code checkout have no readable files at affected roots and no linked
+checkout `@types/*` packages. Vite's unreadable UTF-8 BOM fixture can
+hide a workspace member. Its graph was replaced by a replay with both
+fixes and build digest
+`04428ad0d1030316914504c305d0216796e7195a421f30c5d2e34bc77a932350`.
+The final source draw reproduced all 40 hand-checked targets.
 
 ## Library queries
 
@@ -47,13 +59,6 @@ directory excluded, as in C-2.
 `verify.mjs` builds and runs the checks in a scratch copy so the sweep keeps
 the same executable. `bench.mjs` uses the C-7 cold runner to index each
 selected pin with main, C-11 and main again on the same source copy.
-
-The full suite exposed an unreadable workspace-manifest case. The fixed
-module passes both workspace-manifest regression cases. The nine measured
-graphs use the earlier candidate executable. `workspace-audit.mjs` ran the
-fixed workspace reader over their captured contexts and found zero readable
-TypeScript or JavaScript files under an affected root. The only unreadable
-manifest in these nine stores is yargs's broken-JSON fixture.
 
 `plan.mjs` overlays the new TypeScript runs on the exact inputs used for
 main's coverage plan. Run `scripts/sweep/coverage.mjs` with its
