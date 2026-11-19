@@ -113,7 +113,7 @@ test("round 4 R1: every structural binding masks a free call", async () => {
     ["(f,_)", "s"],
     ["[f,..]", "s"],
     ["Some(f)", "s"],
-    ["S{f}|S{f}", "s"], // an or-pattern binds f in every alternative (E0408)
+    ["(S{f}|S{f})", "s"], // an or-pattern binds f in every alternative (E0408)
   ]) {
     const g = await graph(
       lib(`fn f(){}struct S{f:fn()}fn run(${pattern}:S){f();}`),
