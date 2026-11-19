@@ -67,7 +67,7 @@ test("Rust ecosystem macro identity: captured lock changes re-resolve cached sou
     );
     await writeFile(
       join(root, "src/lib.rs"),
-      '#[cfg(feature="x")]pub mod child;pub fn helper()->u32{11}pub fn run()->u32{tracing::info!("x");helper()}',
+      '#[cfg(feature="x")]pub mod child;pub fn helper()->u32{11}pub fn run()->u32{let value=1;tracing::info!("{}",value);helper()}',
     );
     await writeFile(
       join(root, "src/child.rs"),
@@ -84,7 +84,11 @@ test("Rust ecosystem macro identity: captured lock changes re-resolve cached sou
         .links()
         .filter((l) => l.kind === "calls" && l.targetName === "helper");
       assert.equal(helper.length, 1);
-      assert.equal(!!helper[0].targetId, version !== "0.2.0");
+      assert.ok(helper[0].targetId);
+      assert.deepEqual(
+        helper[0].data.assumes ?? [],
+        version === "0.2.0" ? ["rust-external-macro-name"] : [],
+      );
       const once = snapshot(warm),
         before = parsed;
       r = await indexProject(root, registry, warm);

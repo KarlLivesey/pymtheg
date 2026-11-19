@@ -359,3 +359,52 @@ test("a parameter is a binding unless a constant of its name could be in scope",
   assert.equal(use("src/c.rs").resolution, "unresolved");
   assert.equal(use("src/c.rs").failed, false);
 });
+
+test("an associated call whose only readable impl is cfg-gated keeps the failed file as a reason", async () => {
+  // `S::new` exists here only under `cfg(unix)`; the failed file could hold
+  // the impl for every other configuration. The twin has two readable
+  // impls for different instantiations: a visible doubt no file can settle.
+  const g = await index({
+    "src/lib.rs": "mod bad; mod gated; mod split;",
+    "src/bad.rs": BROKEN,
+    "src/gated.rs": [
+      "pub struct S;",
+      "#[cfg(unix)]",
+      "impl S { pub fn new() -> S { S } }",
+      "fn r() { S::new(); }",
+    ].join("\n"),
+    "src/split.rs": [
+      "pub struct P<T>(T);",
+      "impl P<u8> { pub fn new() -> Self { P(0) } }",
+      "impl P<u16> { pub fn new() -> Self { P(0) } }",
+      "fn r() { P::new(); }",
+    ].join("\n"),
+  });
+  const gated = answer(g, "src/gated.rs", "S::new");
+  assert.equal(gated.resolution, "unresolved");
+  assert.ok(gated.reasons.includes(FAILED));
+  const split = answer(g, "src/split.rs", "P::new");
+  assert.equal(split.resolution, "unresolved");
+  assert.equal(split.failed, false);
+});
+
+test("a receiver produced by a macro keeps the failed file as a reason", async () => {
+  // From rustls (server/tls12.rs:992): `finished` comes from
+  // `require_handshake_msg!(…)`, and a failed module declared earlier could
+  // define that macro (`#![macro_use]`). A literal receiver cannot change.
+  const g = await index({
+    "src/lib.rs": "mod bad;\nmod user;",
+    "src/bad.rs": BROKEN,
+    "src/user.rs": [
+      "fn r() -> usize { let finished = make_message!(); finished.len() }",
+      'fn s() -> usize { "ab".len() }',
+    ].join("\n"),
+  });
+  const [macro, literal] = g.links
+    .filter((l) => l.kind === "calls" && l.data.method === "len")
+    .sort((a, b) => a.range.start - b.range.start);
+  assert.equal(macro.resolution, "unresolved");
+  assert.ok(macro.data.uncertainty.split("; ").includes(FAILED));
+  assert.equal(literal.resolution, "unresolved");
+  assert.equal(literal.data.uncertainty.includes(FAILED), false);
+});

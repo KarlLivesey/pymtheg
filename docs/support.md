@@ -470,7 +470,8 @@ makes that whole manifest unknown). Private items are ordinary symbols.
   `failed-file-unseen-declarations` is recorded only there, and on unresolved
   links with no other reason; a link stopped by something visible (a macro, a
   competing candidate, a receiver the parser cannot type, a written shape)
-  keeps only that reason. Macro links keep the wider rule. Source:
+  keeps only that reason. A cfg-gated candidate, a receiver from a macro
+  invocation, and macro links keep the wider rule. Source:
   [C-15](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/C-15.md).
 - **Dot calls** (`recv.m()`) are definite only for a unique inherent method of a
   proven receiver type, at the first probe step (owned `T` with `self`, `&T`
@@ -541,6 +542,17 @@ makes that whole manifest unknown). Private items are ordinary symbols.
   crates.io, alternate registry indexes, and Git URLs with their ref selectors.
   A replacement with an unproven checkout target leaves the link unresolved.
   Receiver calls still require the declaring owner.
+- **Names beside Rust macros.** A withheld path can resolve when every
+  relevant expansion has a bounded set of names and that set excludes the
+  name being looked up. The graph inspects captured `macro_rules!` arms,
+  including reachable macros in the checkout, and recognizes the standard
+  expression and literal-producing macros. Standard `thread_local!`
+  contributes its input names. A proven external function-like macro needs
+  item-identifier input for the `rust-external-macro-name` assumption.
+  Attributes and derives also withhold names formed from whole
+  case-insensitive components of an input item name. Opaque layout
+  expansions, known identifier generators and competing glob imports can
+  still withhold the link. See [C-12](changes/C-12.md).
 - **Clean expansion (both rules below).** A workspace `macro_rules!` arm is
   clean when the code it emits has no attribute anywhere (so no `#[cfg]` can
   remove a call) and no item other than a readable `use` (no `fn`, `mod`,
