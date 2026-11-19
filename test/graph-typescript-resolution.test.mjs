@@ -412,6 +412,7 @@ test("an expected missing global type package keeps overlapping runtime declarat
     const urlValue = new URL('https://example.test'); urlValue.toString();
     const init: RequestInit = {}; new Response().json(); fetch('https://example.test', init);
     const stream = new ReadableStream(); stream.getReader();
+    const channel = new MessageChannel(); channel.port2.postMessage('x');
     navigator.vibrate(500); performance.now(); new TextEncoder().encode('x');
     declare const canvas: HTMLCanvasElement;
     declare const context: CanvasRenderingContext2D;
@@ -456,6 +457,7 @@ test("an expected missing global type package keeps overlapping runtime declarat
           ["toString", "url"],
           ["now", "perf_hooks"],
           ["encode", "util"],
+          ["postMessage", "worker_threads"],
         ]) {
           const call = graph.link(file, name, "calls");
           assert.equal(call.resolution, "ambiguous");

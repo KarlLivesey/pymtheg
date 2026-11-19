@@ -105,6 +105,7 @@ const consoleMethods = new Set([
   "time",
   "timeEnd",
   "timeLog",
+  "timeStamp",
   "trace",
   "warn",
 ]);
@@ -156,6 +157,8 @@ const webMembers = new Map(
     AbortSignal:
       "aborted onabort reason throwIfAborted addEventListener dispatchEvent removeEventListener",
     Blob: "size type arrayBuffer bytes slice stream text",
+    BroadcastChannel:
+      "name onmessage onmessageerror close postMessage addEventListener dispatchEvent removeEventListener",
     ByteLengthQueuingStrategy: "highWaterMark size",
     CloseEvent: event + " code reason wasClean",
     CloseEventInit: "code reason wasClean bubbles cancelable composed",
@@ -181,6 +184,8 @@ const webMembers = new Map(
       event + " data lastEventId origin ports source initMessageEvent",
     MessageEventInit:
       "data lastEventId origin ports source bubbles cancelable composed",
+    MessagePort:
+      "close postMessage start onmessage onmessageerror addEventListener dispatchEvent removeEventListener",
     Navigator:
       "hardwareConcurrency language languages locks platform userAgent",
     Performance:
