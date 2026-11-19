@@ -378,6 +378,8 @@ test("Deno package aliases and scoped maps select the actual registry or checkou
   await project(
     {
       // Hono runtime-tests/deno/deno.json uses this registry mapping.
+      "deno/tsconfig.json":
+        '{"compilerOptions":{"module":"esnext","allowImportingTsExtensions":false}}',
       "deno/deno.jsonc": `{
         // Deno expands inline package-root aliases to package subpaths.
         "imports": {
@@ -402,6 +404,13 @@ test("Deno package aliases and scoped maps select the actual registry or checkou
       "separate/maps/import-map.json":
         '{"imports":{"package/":"npm:@scope/other@2.0.0/"}}',
       "separate/main.ts": `import { load } from 'package/client'; load();`,
+      "variants/deno.precompile.json":
+        '{"imports":{"@std/assert":"jsr:@std/assert@^1.0.3","only":"node:fs"}}',
+      "variants/deno.react-jsx.json":
+        '{"imports":{"@std/assert":"jsr:@std/assert@^1.0.3","only":"npm:fs"}}',
+      "variants/main.ts": `import { assertEquals } from '@std/assert';
+        import { readFileSync } from 'only';
+        assertEquals(1, 1); readFileSync('x');`,
       "uncaptured/deno.json": '{"importMap":"../unavailable.json"}',
       "uncaptured/main.ts": `import { load } from 'package'; load();`,
     },
@@ -439,6 +448,15 @@ test("Deno package aliases and scoped maps select the actual registry or checkou
           symbol: "client:load",
           evidence: "import-binding",
         },
+      );
+      assert.equal(
+        libraryTarget(graph.link("variants/main.ts", "assertEquals", "calls"))
+          .ecosystem,
+        "jsr",
+      );
+      assert.equal(
+        graph.link("variants/main.ts", "readFileSync", "calls").resolution,
+        "unresolved",
       );
       assert.equal(
         graph.link("uncaptured/main.ts", "load", "calls").resolution,

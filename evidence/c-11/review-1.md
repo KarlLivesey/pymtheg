@@ -1,5 +1,12 @@
 # C-11 first review evidence
 
+At Hono's pin `676c8f80`, the graph records 65 `jsr @std/assert`
+targets and zero `npm @std/assert` targets. The standard config gives
+38 targets across the three `runtime-tests/deno` files. Both explicitly
+selected JSX configs give the same JSR route for the other 27 in
+`runtime-tests/deno-jsx/jsx.test.tsx`. The replay analyzed all 460
+TypeScript and JavaScript files and recorded 5,773 symbols.
+
 ## Repository self-index on tmpfs
 
 The unchanged repository initialization test ran alone in each invocation.

@@ -3,7 +3,10 @@ import { posix } from "node:path";
 import ts from "typescript";
 import type { ContextFile } from "../../types.js";
 
-export const denoConfigNames = ["deno.json", "deno.jsonc"] as const;
+const denoConfigNames = ["deno.json", "deno.jsonc"] as const;
+const denoConfigVariants = ["deno.*.json", "deno.*.jsonc"] as const;
+export const denoConfigPatterns = [...denoConfigNames, ...denoConfigVariants];
+const variantName = /^deno\..+\.jsonc?$/;
 export const importMapNames = [
   "import_map.json",
   "import-map.json",
@@ -20,6 +23,7 @@ const record = (value: unknown): Record<string, unknown> | undefined =>
     : undefined;
 
 function read(file: ContextFile) {
+  if (file.status !== "clean") return undefined;
   const parsed = ts.parseConfigFileTextToJson(file.path, file.text);
   return parsed.error ? undefined : record(parsed.config);
 }
@@ -108,22 +112,23 @@ export function denoImports(contexts: readonly ContextFile[]) {
   const mapNames: readonly string[] = importMapNames;
   const configNames: readonly string[] = denoConfigNames;
   type MapFile = NonNullable<ReturnType<typeof mapFile>>;
-  const maps = new Map<string, MapFile | null>();
+  const configurations = new Map<
+    string,
+    { variants: ContextFile[]; standalone: ContextFile[] }
+  >();
   for (const file of contexts) {
-    if (
-      !mapNames.includes(posix.basename(file.path)) &&
-      !configNames.includes(posix.basename(file.path))
-    )
-      continue;
+    const name = posix.basename(file.path);
+    const standalone = mapNames.includes(name);
+    const variant = variantName.test(name);
+    if (!standalone && !variant && !configNames.includes(name)) continue;
     const root = posix.dirname(file.path);
-    const config = configNames
-      .map((name) => byPath.get(posix.join(root, name)))
-      .find((value) => value !== undefined);
-    if (config && config !== file) continue;
-    if (!config && maps.has(root)) {
-      maps.set(root, null);
-      continue;
-    }
+    let choices = configurations.get(root);
+    if (!choices)
+      configurations.set(root, (choices = { variants: [], standalone: [] }));
+    if (variant) choices.variants.push(file);
+    else if (standalone) choices.standalone.push(file);
+  }
+  function readMap(file: ContextFile, root: string, config: boolean) {
     let source = file;
     let data = read(file);
     if (config && typeof data?.importMap === "string") {
@@ -140,9 +145,24 @@ export function denoImports(contexts: readonly ContextFile[]) {
         data = read(captured);
       }
     } else if (config && data?.importMap !== undefined) data = undefined;
-    maps.set(root, (data && mapFile(source, data, source === config)) ?? null);
+    return (data && mapFile(source, data, config && source === file)) ?? null;
   }
-  const owners = new Map<string, MapFile | null | undefined>();
+  const maps = new Map<string, (MapFile | null)[]>();
+  for (const [root, { variants, standalone }] of configurations) {
+    const standard = configNames
+      .map((name) => byPath.get(posix.join(root, name)))
+      .find((file) => file !== undefined);
+    const configs = standard ? [standard, ...variants] : variants;
+    maps.set(
+      root,
+      configs.length
+        ? configs.map((file) => readMap(file, root, true))
+        : standalone.length === 1
+          ? [readMap(standalone[0]!, root, false)]
+          : [null],
+    );
+  }
+  const owners = new Map<string, (MapFile | null)[] | undefined>();
   function owner(from: string) {
     if (owners.has(from)) return owners.get(from);
     let directory = posix.dirname(from);
@@ -152,45 +172,58 @@ export function denoImports(contexts: readonly ContextFile[]) {
     owners.set(from, found);
     return found;
   }
+  function select(
+    map: MapFile | null,
+    specifier: string,
+    from: string,
+  ): string | undefined {
+    if (!map) return undefined;
+    const name = relative(specifier)
+      ? checkoutPath(posix.dirname(from), specifier)
+      : specifier;
+    if (name === undefined) return undefined;
+    const scopes = map.scoped
+      .filter((scope) =>
+        scope.prefix ? from.startsWith(scope.path) : from === scope.path,
+      )
+      .map((scope) => scope.entries);
+    for (const entries of [...scopes, map.imports]) {
+      const entry = entries.find(({ key, prefix }) =>
+        prefix ? name.startsWith(key) : name === key,
+      );
+      if (!entry) continue;
+      if (entry.target === undefined) return undefined;
+      const suffix = entry.prefix ? name.slice(entry.key.length) : "";
+      if (
+        entry.prefix &&
+        ((entry.target !== "" && !entry.target.endsWith("/")) ||
+          suffix.split("/").some((part) => part === "..") ||
+          /[\\%?#]/.test(suffix))
+      )
+        return undefined;
+      const target = entry.target + suffix;
+      if (protocol(target)) return target;
+      const path = posix.relative(posix.dirname(from), target);
+      return relative(path) ? path : "./" + path;
+    }
+    return relative(specifier) || /^(?:npm|jsr|node):/.test(specifier)
+      ? specifier
+      : undefined;
+  }
   return {
     active: maps.size > 0,
     select(specifier: string, from: string): string | undefined {
       if (!maps.size) return specifier;
-      const map = owner(from);
-      if (map === undefined) return specifier;
-      if (map === null) return undefined;
-      const name = relative(specifier)
-        ? checkoutPath(posix.dirname(from), specifier)
-        : specifier;
-      if (name === undefined) return undefined;
-      {
-        const scopes = map.scoped
-          .filter((scope) =>
-            scope.prefix ? from.startsWith(scope.path) : from === scope.path,
-          )
-          .map((scope) => scope.entries);
-        for (const entries of [...scopes, map.imports]) {
-          const entry = entries.find(({ key, prefix }) =>
-            prefix ? name.startsWith(key) : name === key,
-          );
-          if (!entry) continue;
-          if (entry.target === undefined) return undefined;
-          const suffix = entry.prefix ? name.slice(entry.key.length) : "";
-          if (
-            entry.prefix &&
-            ((entry.target !== "" && !entry.target.endsWith("/")) ||
-              suffix.split("/").some((part) => part === "..") ||
-              /[\\%?#]/.test(suffix))
-          )
-            return undefined;
-          const target = entry.target + suffix;
-          if (protocol(target)) return target;
-          const path = posix.relative(posix.dirname(from), target);
-          return relative(path) ? path : "./" + path;
-        }
-      }
-      return relative(specifier) || /^(?:npm|jsr|node):/.test(specifier)
-        ? specifier
+      const choices = owner(from);
+      if (!choices) return specifier;
+      // Named Deno configs can be selected with --config. A definite route
+      // must hold for every captured choice in the governing directory.
+      const target = select(choices[0]!, specifier, from);
+      return target !== undefined &&
+        choices.every(
+          (map, i) => i === 0 || select(map, specifier, from) === target,
+        )
+        ? target
         : undefined;
     },
   };

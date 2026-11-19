@@ -2657,7 +2657,7 @@ unit only. The proof does not come from the receiver's package. Existing sites
 and checkout symbols retain their identities. Stored library outcomes replace
 coverage reconstruction for TypeScript module 23 onward. See [C-11](changes/C-11.md).
 
-Review revision 24 applies captured Deno maps before choosing a unit. Installed
+Review revision 26 applies captured Deno maps before choosing a unit. Installed
 declarations, captured type packages or an importing manifest's external
 dependency can establish that a declaration describes an outside package.
 Lexical outside identity can survive unrelated unreadable declarations.

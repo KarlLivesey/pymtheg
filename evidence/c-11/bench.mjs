@@ -6,11 +6,12 @@ import { join, resolve } from "node:path";
 
 const scratch = process.env.PYM_SCRATCH;
 const benchmark = mkdtempSync(join(scratch, "benchmark-"));
-const pins = process.argv.length > 2
-  ? process.argv.slice(2)
-  : ["vitest-dev/vitest", "withastro/astro", "honojs/hono"];
+const pins =
+  process.argv.length > 2
+    ? process.argv.slice(2)
+    : ["vitest-dev/vitest", "withastro/astro", "honojs/hono"];
 const checkouts = new Map();
-for (const name of ["release", "candidate-audit"]) {
+for (const name of ["main", "candidate"]) {
   const { repos } = JSON.parse(
     readFileSync(join(scratch, `${name}-run.json`), "utf8"),
   );
@@ -22,7 +23,10 @@ if (pins.some((id) => !checkouts.has(id)))
     "The benchmark needs completed source checkouts for all three pins",
   );
 symlinkSync(join(scratch, "work"), join(benchmark, "work"));
-symlinkSync(join(scratch, "main"), join(benchmark, "main"));
+symlinkSync(
+  join(scratch, process.env.C11_MAIN_BUILD ?? "main"),
+  join(benchmark, "main"),
+);
 symlinkSync(
   process.env.C11_BUILD ? join(scratch, process.env.C11_BUILD) : resolve("."),
   join(benchmark, "candidate"),

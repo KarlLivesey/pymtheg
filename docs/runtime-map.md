@@ -1639,7 +1639,10 @@ facts to stored targets after the existing failure and project checks. A
 written npm subpath prefixes the export as `subpath:export`. Instance member
 paths use `Owner.prototype.member`. [C-11](changes/C-11.md)
 
-Module 24 selects Deno import-map entries before module and package lookup.
+Module 26 selects Deno import-map entries before module and package lookup.
+The captured Deno configurations in the owning directory must agree.
+An extension supplied by a map resolves the file without changing the
+written import's extension diagnostics.
 A captured outside declaration package needs installation, type-package or
 dependency evidence. Literal CommonJS binding names use their written keys.
 Same-file writes to a module object suppress that member's export name.

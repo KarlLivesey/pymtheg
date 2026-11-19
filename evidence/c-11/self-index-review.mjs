@@ -17,7 +17,7 @@ const test = [
   "test/project-init-clean.test.mjs",
 ];
 const builds = [
-  ["main", join(scratch, "main-src")],
+  ["main", join(scratch, process.env.C11_MAIN_BUILD ?? "main-src")],
   ["head", resolve(".")],
 ];
 const profiling = mode === "--profile";

@@ -59,7 +59,7 @@ const sweep = (target, parallel, build) =>
     join(target, `${mode}-run.json`),
     ...(build ? ["--local-build", build] : []),
   ]);
-const main = join(scratch, "main");
+const main = join(scratch, process.env.C11_MAIN_BUILD ?? "main");
 function unpackMain() {
   if (existsSync(join(main, "dist/cli/main.js"))) return;
   mkdirSync(main, { recursive: true });
@@ -100,7 +100,7 @@ if (mode === "release") {
     manifest,
     JSON.stringify(pins.filter((repo) => preservationPins.has(repo.id))),
   );
-  sweep(scratch, 3, realpathSync(main));
+  sweep(scratch, Number(other ?? 3), realpathSync(main));
 } else if (mode === "collect" || mode === "replace") {
   const packets = [other, ...args].map((name) =>
     JSON.parse(readFileSync(join(scratch, `${name}-run.json`), "utf8")),
@@ -142,7 +142,7 @@ if (mode === "release") {
     ),
   );
   const build = process.env.C11_BUILD
-    ? join(scratch, process.env.C11_BUILD)
+    ? realpathSync(join(scratch, process.env.C11_BUILD))
     : resolve(".");
   sweep(scratch, Number(other ?? 4), build);
 } else if (

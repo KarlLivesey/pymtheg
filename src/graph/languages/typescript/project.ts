@@ -5,7 +5,7 @@ import { dirname, posix } from "node:path";
 import ts from "typescript";
 import { compare, matchesPattern } from "../../index.js";
 import type { ContextFile, Diagnostic, GraphFile } from "../../types.js";
-import { denoConfigNames, denoImports, importMapNames } from "./deno.js";
+import { denoConfigPatterns, denoImports, importMapNames } from "./deno.js";
 import { workspaceLinks, type Manifest } from "./workspace.js";
 import {
   freshNames,
@@ -469,7 +469,7 @@ export const CONTEXT_PATTERNS = [
   "*jsconfig*.json",
   "package.json",
   "pnpm-workspace.yaml",
-  ...denoConfigNames,
+  ...denoConfigPatterns,
   ...importMapNames,
 ] as const;
 const isContextPath = (path: string) =>
@@ -1003,17 +1003,24 @@ export function projectModel(
             literal.text,
             fromVirtual(containingFile) ?? ".",
           );
-          return selected === undefined
-            ? { resolvedModule: undefined }
-            : ts.resolveModuleName(
-                selected,
-                containingFile,
-                options,
-                created,
-                undefined,
-                redirected,
-                ts.getModeForUsageLocation(source, literal, options),
-              );
+          if (selected === undefined) return { resolvedModule: undefined };
+          const result = ts.resolveModuleName(
+            selected,
+            containingFile,
+            options,
+            created,
+            undefined,
+            redirected,
+            ts.getModeForUsageLocation(source, literal, options),
+          );
+          // The checker uses this flag to diagnose a TypeScript extension in
+          // the written literal. A map can supply an extension the literal lacks.
+          if (
+            selected !== literal.text &&
+            result.resolvedModule?.resolvedUsingTsExtension
+          )
+            result.resolvedModule.resolvedUsingTsExtension = false;
+          return result;
         });
     }
     caches.set(created, sources);
