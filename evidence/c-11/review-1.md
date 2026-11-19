@@ -7,6 +7,28 @@ selected JSX configs give the same JSR route for the other 27 in
 `runtime-tests/deno-jsx/jsx.test.tsx`. The replay analyzed all 460
 TypeScript and JavaScript files and recorded 5,773 symbols.
 
+## Repeat bracket on current main
+
+Main at `595ec7b` and review module 27 both passed all three isolated runs
+with the graph store on tmpfs. Rows report wall seconds, combined CPU
+seconds and peak RSS in KiB. The corpus export and the default-heap check
+shared the server during this bracket.
+
+| Trial | Main wall / CPU / RSS | C-11 wall / CPU / RSS |
+| --- | ---: | ---: |
+| 1 | 66.75 / 96.96 / 1,102,532 | 68.22 / 100.89 / 1,153,324 |
+| 2 | 57.49 / 88.65 / 1,114,552 | 66.68 / 98.07 / 1,161,736 |
+| 3 | 51.59 / 81.87 / 1,110,444 | 61.76 / 93.37 / 1,156,056 |
+
+Mean wall time increased 11.8% and combined CPU increased 9.3%.
+
+## Corpus result before the second review
+
+Module 27 recorded 309,148 definite library links with symbols and 42,624
+unit-only links across the 18 pins. Level 2 was 68.94% overall and 68.50%
+on the release's sites. The replay matched the committed release baseline.
+The next review compares its library outcomes with this snapshot.
+
 ## Repository self-index on tmpfs
 
 The unchanged repository initialization test ran alone in each invocation.
