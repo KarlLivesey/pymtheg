@@ -73,6 +73,9 @@ exactly what each requires.
   metadata left out (`scip-compare.mjs`).
 - `axum-join-compare.json`: their join results compared.
 - `handcheck.md`, `unconditional.txt`, `rustpath-check.txt`.
+- `before-after.md`: the agreement breakdown per pin before and after the
+  round-2 version and impl rules, on the same indexes (`before-after.mjs`,
+  with the join of `566eb9d` as the before).
 
 ## Reproduce (dev server)
 

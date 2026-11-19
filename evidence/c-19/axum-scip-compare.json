@@ -1,13 +1,13 @@
 {
  "base": {
   "file": "axum.default.scip",
-  "bytes": 5291780,
+  "bytes": 5291767,
   "documents": 98
  },
  "comparisons": [
   {
    "file": "axum.nobuild.scip",
-   "bytes": 5291780,
+   "bytes": 5291767,
    "rawBytesEqual": false,
    "projectRootDiffers": true,
    "documents": 98,
@@ -21,7 +21,7 @@
   },
   {
    "file": "axum.notest.scip",
-   "bytes": 3702971,
+   "bytes": 3702958,
    "rawBytesEqual": false,
    "projectRootDiffers": true,
    "documents": 90,
@@ -44,7 +44,7 @@
   },
   {
    "file": "axum.allfeatures.scip",
-   "bytes": 6611431,
+   "bytes": 6611418,
    "rawBytesEqual": false,
    "projectRootDiffers": true,
    "documents": 121,

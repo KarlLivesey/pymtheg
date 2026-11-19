@@ -6,10 +6,12 @@
 //
 // Agreement, over non-structural links Pymtheg calls definite where the
 // strict join gives an answer to compare:
-//   strict     same declaration (checkout: the same graph symbol; library:
-//              both paths resolved to the same definition) over the
+//   strict     same declaration verified on both sides (checkout: the same
+//              graph symbol; library: both paths resolved to the same
+//              definition, with or without the version compared) over the
 //              comparisons where both sides name a declaration (same, or
-//              verified / seen different)
+//              verified / seen different); the unverified share (family and
+//              name only, or unverified) is reported next to it
 //   heuristic  same declaration or same crate family and final name, over
 //              every comparison with an answer
 // Usage: node report.mjs WORK OUT_DIR
@@ -62,11 +64,12 @@ function pymRecord(pin) {
 }
 
 function agreementOf(r) {
-  const a = { same: 0, heuristic: 0, differ: 0, unverified: 0, noAnswer: 0, filtered: 0, other: 0, byVerdict: {} };
+  const a = { same: 0, sameNoVersion: 0, heuristic: 0, differ: 0, unverified: 0, noAnswer: 0, filtered: 0, other: 0, byVerdict: {} };
   for (const [key, n] of Object.entries(r.agreement)) {
     const v = key.split(" | ")[2];
     a.byVerdict[v] = (a.byVerdict[v] ?? 0) + n;
     if (v === "agree-same-declaration" || v === "agree-module-by-name") a.same += n;
+    else if (v === "agree-same-declaration-version-not-compared") a.sameNoVersion += n;
     else if (v === "heuristic-same-family-and-name") a.heuristic += n;
     else if (v.startsWith("disagree")) a.differ += n;
     else if (v.startsWith("unverified")) a.unverified += n;
@@ -129,12 +132,13 @@ const total = {
   strictRemovedFromLooseGain: Object.fromEntries(Object.entries(removed).sort((a, b) => b[1] - a[1])),
   agreement: {
     sameDeclaration: ag("same"),
-    sameFamilyAndNameOnly: ag("heuristic"),
+    sameDeclarationVersionNotCompared: ag("sameNoVersion"),
     differ: ag("differ"),
+    sameFamilyAndNameOnly: ag("heuristic"),
     unverified: ag("unverified"),
-    strict: pct(ag("same"), ag("same") + ag("differ")),
-    heuristic: pct(ag("same") + ag("heuristic"), ag("same") + ag("heuristic") + ag("differ") + ag("unverified")),
-    sameDeclarationShareOfAllAnswered: pct(ag("same"), ag("same") + ag("heuristic") + ag("differ") + ag("unverified")),
+    strict: pct(ag("same") + ag("sameNoVersion"), ag("same") + ag("sameNoVersion") + ag("differ")),
+    unverifiedShare: pct(ag("heuristic") + ag("unverified"), ag("same") + ag("sameNoVersion") + ag("differ") + ag("heuristic") + ag("unverified")),
+    heuristic: pct(ag("same") + ag("sameNoVersion") + ag("heuristic"), ag("same") + ag("sameNoVersion") + ag("heuristic") + ag("differ") + ag("unverified")),
   },
 };
 const variants = {};
@@ -151,7 +155,7 @@ writeFileSync(join(outDir, "results.json"), JSON.stringify({ total, rows, varian
 
 const pc = (a, b) => `${pct(a, b)}%`;
 const md = [
-  "| Pin | Rust links | Level 2 now | + toolchain, loose (first run) | + toolchain, strict | gated, loose | gated, strict | strict agreement | same declaration / family+name only / differ / unverified | RA wall s | RA CPU s | RA peak MB | index MB | crates (MB) | build scripts | proc-macro libs | duplicate-symbol messages (files) / symbols defined twice | Pymtheg cold wall s | Pymtheg peak MB |",
+  "| Pin | Rust links | Level 2 now | + toolchain, loose (first run) | + toolchain, strict | gated, loose | gated, strict | same declaration verified on both sides (unverified share) | same / same, version not compared / different / family+name only / unverified | RA wall s | RA CPU s | RA peak MB | index MB | crates (MB) | build scripts | proc-macro libs | duplicate-symbol messages (files) / symbols defined twice | Pymtheg cold wall s | Pymtheg peak MB |",
   "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: |",
 ];
 for (const r of done) {
@@ -159,11 +163,11 @@ for (const r of done) {
   const p = r.pymtheg ?? {};
   const a = r.agreement;
   md.push(
-    `| ${r.pin} | ${r.links.toLocaleString("en")} | ${pc(r.level2, r.links)} | ${r.loose.percent}% | ${r.strict.percent}% | ${r.loose.gated}% | ${r.strict.gated}% | ${pct(a.same, a.same + a.differ)}% | ${a.same.toLocaleString("en")} / ${a.heuristic.toLocaleString("en")} / ${a.differ} / ${a.unverified} | ${t.wallSeconds} | ${t.cpuSeconds} | ${t.peakMB} | ${t.indexMB} | ${t.downloadedCrates} (${t.downloadMB}) | ${t.buildScriptsRun} | ${t.procMacroLibraries} | ${t.duplicateSymbolMessages} (${t.duplicateSymbolFiles}) / ${r.symbolsDefinedMoreThanOnce} | ${p.wallSeconds} | ${p.peakMB} |`,
+    `| ${r.pin} | ${r.links.toLocaleString("en")} | ${pc(r.level2, r.links)} | ${r.loose.percent}% | ${r.strict.percent}% | ${r.loose.gated}% | ${r.strict.gated}% | ${pct(a.same + a.sameNoVersion, a.same + a.sameNoVersion + a.differ)}% (${pct(a.heuristic + a.unverified, a.same + a.sameNoVersion + a.differ + a.heuristic + a.unverified)}%) | ${a.same.toLocaleString("en")} / ${a.sameNoVersion.toLocaleString("en")} / ${a.differ} / ${a.heuristic.toLocaleString("en")} / ${a.unverified.toLocaleString("en")} | ${t.wallSeconds} | ${t.cpuSeconds} | ${t.peakMB} | ${t.indexMB} | ${t.downloadedCrates} (${t.downloadMB}) | ${t.buildScriptsRun} | ${t.procMacroLibraries} | ${t.duplicateSymbolMessages} (${t.duplicateSymbolFiles}) / ${r.symbolsDefinedMoreThanOnce} | ${p.wallSeconds} | ${p.peakMB} |`,
   );
 }
 md.push(
-  `| **${total.pins} pins** | ${L.toLocaleString("en")} | **${total.level2}%** | ${total.loose.withToolchain}% | **${total.strict.withToolchain}%** | ${total.loose.gated}% | **${total.strict.gated}%** | **${total.agreement.strict}%** | ${total.agreement.sameDeclaration.toLocaleString("en")} / ${total.agreement.sameFamilyAndNameOnly.toLocaleString("en")} / ${total.agreement.differ} / ${total.agreement.unverified} | | | | | | | | | | |`,
+  `| **${total.pins} pins** | ${L.toLocaleString("en")} | **${total.level2}%** | ${total.loose.withToolchain}% | **${total.strict.withToolchain}%** | ${total.loose.gated}% | **${total.strict.gated}%** | **${total.agreement.strict}%** (${total.agreement.unverifiedShare}%) | ${total.agreement.sameDeclaration.toLocaleString("en")} / ${total.agreement.sameDeclarationVersionNotCompared.toLocaleString("en")} / ${total.agreement.differ} / ${total.agreement.sameFamilyAndNameOnly.toLocaleString("en")} / ${total.agreement.unverified.toLocaleString("en")} | | | | | | | | | | |`,
 );
 for (const r of rows.filter((x) => x.missing)) md.push(`| ${r.pin} | missing | | | | | | | | | | | | | | | | | |`);
 writeFileSync(join(outDir, "table.md"), md.join("\n") + "\n");

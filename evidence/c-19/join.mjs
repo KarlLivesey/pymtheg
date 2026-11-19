@@ -404,24 +404,35 @@ function strictAnswer(file, link, linkKind, line) {
 
 // ---- library identity, both sides resolved to a definition
 const verifyCache = new Map();
+// The toolchain's descriptor path as segments, and the impl block it goes
+// through, if any: `impl#[Owner][Trait]m().` is the method `m` of one impl.
 function toolchainSegments(a) {
   const p = a.p;
   const segs = [];
+  let impl = null;
   for (let i = 0; i < p.path.length; i++) {
     if (p.path[i] === "crate" && p.kinds[i] === "namespace") continue;
     if (p.path[i] === "impl" && p.kinds[i] === "type") {
       if (p.kinds[i + 1] !== "typeparam") return null;
-      const owner = p.path[i + 1].replace(/^&(mut\s+)?/, "").replace(/<.*$/, "").trim();
+      impl = { owner: p.path[i + 1], trait: p.kinds[i + 2] === "typeparam" ? p.path[i + 2] : "" };
+      const owner = impl.owner.replace(/^&(mut\s+)?/, "").replace(/<.*$/, "").trim();
       if (!/^[A-Za-z_]\w*$/.test(owner)) return null; // primitive, tuple, slice or generic owner
       segs.push(owner);
-      i += p.kinds[i + 2] === "typeparam" ? 2 : 1;
+      i += impl.trait ? 2 : 1;
       continue;
     }
     if (p.kinds[i] === "typeparam" || p.kinds[i] === "param") continue;
     segs.push(p.path[i]);
   }
-  return segs;
+  return { segs, impl };
 }
+// Same declaration? Each side keeps its own recorded version: Pymtheg's
+// library target may record one (from the lockfile); the toolchain's symbol
+// always carries one (a URL for the standard library). Two different
+// recorded versions are "different"; when Pymtheg records none, a match is
+// "same-version-not-compared". A toolchain answer through an impl block is
+// one impl's method; a Pymtheg path (`Owner::m`, `Trait::m`) does not say
+// which impl, so such a case is "unverified", never "same".
 function verifyLibrary(r, a) {
   if (!resolver) return { result: "unverified", why: "no resolver" };
   const key = `${r.unit} ${r.version ?? ""} ${r.symbol} | ${a.symbol}`;
@@ -429,26 +440,32 @@ function verifyLibrary(r, a) {
   let out;
   const pymMacro = /!$/.test(r.symbol) || /^#\[/.test(r.symbol);
   const pymSegs = r.symbol.replace(/^#\[(derive\()?/, "").replace(/\)?\]$/, "").replace(/!$/, "").split("::").filter(Boolean);
-  const tcSegs = toolchainSegments(a);
+  const tc = toolchainSegments(a);
   const tcMacro = a.cat === "macro" || a.cat === "attr-macro";
-  const pv0 = r.unit === a.crate ? a.version : (r.version ?? null);
-  if (tcSegs && r.unit === a.crate && (pv0 === a.version || STD.has(a.crate)) && pymSegs.join("::") === tcSegs.join("::") && pymMacro === tcMacro)
-    // the same path in the same crate and version: one declaration
-    out = { result: "same", why: "identical path in the same crate" };
-  else if (!tcSegs) out = { result: "unverified", why: "toolchain owner is not a named type" };
+  const pymVersion = STD.has(r.unit) ? null : (r.version ?? null);
+  const tcVersion = STD.has(a.crate) ? null : a.version;
+  const same = () => (pymVersion ? "same" : "same-version-not-compared");
+  if (!tc) out = { result: "unverified", why: "toolchain owner is not a named type" };
+  else if (tc.impl) out = { result: "unverified", why: `impl method: the Pymtheg path does not say which impl (${tc.impl.owner}${tc.impl.trait ? " as " + tc.impl.trait : ""})` };
+  else if (pymVersion && r.unit === a.crate && pymVersion !== tcVersion) out = { result: "different", why: `version ${pymVersion} / ${tcVersion}` };
+  else if (r.unit === a.crate && pymSegs.join("::") === tc.segs.join("::") && pymMacro === tcMacro)
+    // the same path in the same crate (and version, when Pymtheg records one)
+    out = { result: same(), why: "identical path in the same crate" };
   else {
-    const pv = r.unit === a.crate ? a.version : (r.version ?? null);
-    const P = resolver.resolveItem(r.unit, STD.has(r.unit) ? null : pv, pymSegs, pymMacro);
-    const T = resolver.resolveItem(a.crate, STD.has(a.crate) ? null : a.version, tcSegs, tcMacro);
+    const P = resolver.resolveItem(r.unit, pymVersion, pymSegs, pymMacro);
+    const T = resolver.resolveItem(a.crate, tcVersion, tc.segs, tcMacro);
     if (P.error || T.error) out = { result: "unverified", why: P.error ? `pymtheg side: ${P.error}` : `toolchain side: ${T.error}` };
     else if (P.module || T.module) {
-      const same = P.module && T.module && P.module.file === T.module.file && P.module.start === T.module.start;
-      out = { result: same ? "same" : "different", why: "module" };
+      const sameModule = P.module && T.module && P.module.file === T.module.file && P.module.start === T.module.start;
+      out = { result: sameModule ? same() : "different", why: "module" };
     } else {
+      // definitions compare by file (which includes the crate version's
+      // directory) and offset; members (variants, fields, associated items
+      // of a type or trait) by name
       const sameDef = P.def.file === T.def.file && P.def.offset === T.def.offset;
       const pr = (P.rest ?? []).join("::");
       const tr = (T.rest ?? []).join("::");
-      out = { result: sameDef && pr === tr ? "same" : "different", why: sameDef ? `members ${pr} / ${tr}` : `${P.def.name}@${P.def.file.split("/").slice(-3).join("/")} vs ${T.def.name}@${T.def.file.split("/").slice(-3).join("/")}` };
+      out = { result: sameDef && pr === tr ? same() : "different", why: sameDef ? `members ${pr} / ${tr}` : `${P.def.name}@${P.def.file.split("/").slice(-3).join("/")} vs ${T.def.name}@${T.def.file.split("/").slice(-3).join("/")}` };
     }
   }
   // no absolute paths in results: name the toolchain sources and the crate cache
@@ -582,7 +599,9 @@ for (const row of db.prepare("SELECT id, file, kind, resolution, target, body FR
       const pymLast = lastSegment(r.symbol.replace(/^#\[(derive\()?/, "").replace(/\)?\]$/, ""));
       const familyAndName = fam(r.unit) === fam(strict.crate) && pymLast === strict.last;
       if (verification.result === "same") verdict = "agree-same-declaration";
+      else if (verification.result === "same-version-not-compared") verdict = "agree-same-declaration-version-not-compared";
       else if (verification.result === "different") verdict = "disagree-verified-different";
+      else if (verification.why.startsWith("impl method")) verdict = "unverified-impl-not-identified";
       else if (familyAndName) verdict = "heuristic-same-family-and-name";
       else if (pymLast === strict.last) verdict = "unverified-same-name-other-crate";
       else verdict = "unverified-different-name";

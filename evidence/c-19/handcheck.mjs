@@ -27,6 +27,9 @@ for (const pin of pins) {
   r.disagreementSample.forEach((d, i) => {
     let v = verdicts.sites[`${pin}|${d.site}|${d.written}`];
     if (!v) v = shapes.find((s) => s.p.test(d.pymtheg) && s.t.test(tcText(d)));
+    // the toolchain names one impl's method and the Pymtheg path does not say
+    // which impl: unverified by rule, not judged
+    if (!v && /^impl method:/.test(d.verification ?? "")) v = { right: "unverified (by rule)", cause: "impl", note: d.verification };
     if (!v) missing++;
     const right = v ? v.right : "UNCHECKED";
     totals.set(right, (totals.get(right) ?? 0) + 1);
