@@ -418,7 +418,8 @@ test("an expected missing global type package keeps overlapping runtime declarat
       "reference/use.ts": '/// <reference types="node" />\n' + source,
       "other/tsconfig.json":
         '{"compilerOptions":{"target":"es2022","types":["custom-globals"]},"files":["use.ts"]}',
-      "other/use.ts": source,
+      "other/use.ts":
+        "interface Console { log(custom: number): void }\n" + source,
       "web/tsconfig.json":
         '{"compilerOptions":{"target":"es2022"},"files":["use.ts"]}',
       "web/use.ts": source,
@@ -451,6 +452,10 @@ test("an expected missing global type package keeps overlapping runtime declarat
       assert.equal(
         graph.link("other/use.ts", "log", "calls").data.reason,
         "missing-global-types",
+      );
+      assert.equal(
+        graph.link("other/use.ts", "log", "calls").resolution,
+        "unresolved",
       );
       assert.equal(
         libraryTarget(graph.link("web/use.ts", "log", "calls")).unit,

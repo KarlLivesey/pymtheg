@@ -760,14 +760,13 @@ export function extractFile(
         };
     }
     const targets = [...facts.values()];
-    if (!external && !local && (!missingGlobalTypes || facts.size))
+    if (!external && !local && !missingGlobalTypes)
       return {
         targets,
         viaAlias,
         receiver,
         declarations,
-        ...(libraryFacts &&
-          !missingGlobalTypes && { libraryFacts: [...libraryFacts.values()] }),
+        ...(libraryFacts && { libraryFacts: [...libraryFacts.values()] }),
       };
     // An alias whose module did not resolve keeps that module's reason.
     const moduleFailure =
