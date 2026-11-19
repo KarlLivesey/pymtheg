@@ -1,0 +1,115 @@
+Pymtheg patch 0010 (C-21, not upstream): a lifetime first in `dyn` bounds.
+
+Accepts valid Rust: `dyn 'a + Display`, `dyn 'static + for<'a> FnMut(..)`.
+A trait object's bounds may list the lifetime before the trait. Read as
+`dynamic_type(trait: bounded_type(lifetime, trait))`, the shape upstream
+PR #258 gives `impl 'a + Trait`. `dyn Trait + 'a` keeps its old tree.
+Reference: https://doc.rust-lang.org/reference/types/trait-object.html
+Upstream: no issue or pull request for `dyn`; PR #258 (merged) did `impl`:
+https://github.com/tree-sitter/tree-sitter-rust/pull/258 (fixing issue #234,
+https://github.com/tree-sitter/tree-sitter-rust/issues/234).
+
+diff --git a/grammar.js b/grammar.js
+index eda28f1..36770d8 100644
+--- a/grammar.js
++++ b/grammar.js
+@@ -930,9 +930,25 @@ module.exports = grammar({
+         $.generic_type,
+         $.function_type,
+         $.tuple_type,
++        // Pymtheg patch 0010: a lifetime may come first in a trait object's
++        // bounds (`dyn 'a + Display`), as upstream #258 allows for `impl`.
++        alias($._dynamic_lifetime_first, $.bounded_type),
+       )),
+     ),
+ 
++    _dynamic_lifetime_first: $ => seq(
++      $.lifetime,
++      '+',
++      choice(
++        $.higher_ranked_trait_bound,
++        $._type_identifier,
++        $.scoped_type_identifier,
++        $.generic_type,
++        $.function_type,
++        $.tuple_type,
++      ),
++    ),
++
+     mutable_specifier: _ => 'mut',
+ 
+     // Section - Expressions
+diff --git a/test/corpus/pymtheg_dyn_lifetime.txt b/test/corpus/pymtheg_dyn_lifetime.txt
+new file mode 100644
+index 0000000..246fcf6
+--- /dev/null
++++ b/test/corpus/pymtheg_dyn_lifetime.txt
+@@ -0,0 +1,68 @@
++================================================================================
++A lifetime first in trait object bounds
++================================================================================
++
++fn c<'a>(&'a self) -> Option<Box<dyn 'a + Display>> {}
++type H = Box<dyn 'static + for<'a> FnMut(&'a u8) -> bool + Send>;
++type J = Box<dyn Display + 'a>;
++
++--------------------------------------------------------------------------------
++
++(source_file
++  (function_item
++    name: (identifier)
++    type_parameters: (type_parameters
++      (lifetime_parameter
++        name: (lifetime
++          (identifier))))
++    parameters: (parameters
++      (self_parameter
++        (lifetime
++          (identifier))
++        (self)))
++    return_type: (generic_type
++      type: (type_identifier)
++      type_arguments: (type_arguments
++        (generic_type
++          type: (type_identifier)
++          type_arguments: (type_arguments
++            (dynamic_type
++              trait: (bounded_type
++                (lifetime
++                  (identifier))
++                (type_identifier)))))))
++    body: (block))
++  (type_item
++    name: (type_identifier)
++    type: (generic_type
++      type: (type_identifier)
++      type_arguments: (type_arguments
++        (bounded_type
++          (dynamic_type
++            trait: (bounded_type
++              (lifetime
++                (identifier))
++              (higher_ranked_trait_bound
++                type_parameters: (type_parameters
++                  (lifetime_parameter
++                    name: (lifetime
++                      (identifier))))
++                type: (function_type
++                  trait: (type_identifier)
++                  parameters: (parameters
++                    (reference_type
++                      (lifetime
++                        (identifier))
++                      type: (primitive_type)))
++                  return_type: (primitive_type)))))
++          (type_identifier)))))
++  (type_item
++    name: (type_identifier)
++    type: (generic_type
++      type: (type_identifier)
++      type_arguments: (type_arguments
++        (bounded_type
++          (dynamic_type
++            trait: (type_identifier))
++          (lifetime
++            (identifier)))))))

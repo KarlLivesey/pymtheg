@@ -1,0 +1,17 @@
+ok   same: std::option::Option::None = enum Option core/src/option.rs:24100 rest=None | core::option::Option::None = enum Option core/src/option.rs:24100 rest=None
+ok   same: std::collections::HashMap = struct HashMap collections/hash/map.rs:9445 rest= | std::collections::hash::map::HashMap = struct HashMap collections/hash/map.rs:9445 rest=
+ok   same: std::vec::Vec = struct Vec src/vec/mod.rs:15715 rest= | alloc::vec::Vec = struct Vec src/vec/mod.rs:15715 rest=
+ok   same: std::string::String = struct String alloc/src/string.rs:11220 rest= | alloc::string::String = struct String alloc/src/string.rs:11220 rest=
+ok   same: std::println = macro_rules! println std/src/macros.rs:4323 rest= | std::macros::println = macro_rules! println std/src/macros.rs:4323 rest=
+ok   same: std::assert_eq = macro_rules! assert_eq src/macros/mod.rs:1307 rest= | core::macros::assert_eq = macro_rules! assert_eq src/macros/mod.rs:1307 rest=
+ok   same: std::format = macro_rules! format alloc/src/macros.rs:4383 rest= | alloc::macros::format = macro_rules! format alloc/src/macros.rs:4383 rest=
+ok   same: std::fmt::Display = trait Display src/fmt/mod.rs:46265 rest= | core::fmt::Display = trait Display src/fmt/mod.rs:46265 rest=
+ok   same: std::path::Path::join = struct Path std/src/path.rs:77511 rest=join | std::path::Path::join = struct Path std/src/path.rs:77511 rest=join
+ok   same: std::env::var = fn var std/src/env.rs:6891 rest= | std::env::var = fn var std/src/env.rs:6891 rest=
+ok   same: std::sync::Arc = struct Arc alloc/src/sync.rs:10165 rest= | alloc::sync::Arc = struct Arc alloc/src/sync.rs:10165 rest=
+ok   same: std::io::Read = trait Read src/io/mod.rs:25774 rest= | std::io::Read = trait Read src/io/mod.rs:25774 rest=
+ok   same: std::ffi::OsString = struct OsString src/ffi/os_str.rs:3862 rest= | std::ffi::os_str::OsString = struct OsString src/ffi/os_str.rs:3862 rest=
+ok   same: std::error::Error = trait Error core/src/error.rs:2034 rest= | core::error::Error = trait Error core/src/error.rs:2034 rest=
+ok   different: std::fmt::Display = trait Display src/fmt/mod.rs:46265 rest= | core::fmt::Debug = trait Debug src/fmt/mod.rs:41097 rest=
+ok   different: std::collections::HashMap = struct HashMap collections/hash/map.rs:9445 rest= | std::collections::hash::set::HashSet = struct HashSet collections/hash/set.rs:4528 rest=
+ok   different: std::io::Error = struct Error src/io/error.rs:2984 rest= | core::error::Error = trait Error core/src/error.rs:2034 rest=

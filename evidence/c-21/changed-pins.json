@@ -1,0 +1,58 @@
+[
+  {
+    "id": "alacritty/alacritty",
+    "language": "rust",
+    "url": "https://github.com/alacritty/alacritty.git",
+    "commit": "aa5d942f46c40184a3f214830ff5f7989f4733a1",
+    "category": "UI / app",
+    "why": "Terminal emulator with platform code and a multi-crate workspace."
+  },
+  {
+    "id": "clap-rs/clap",
+    "language": "rust",
+    "url": "https://github.com/clap-rs/clap.git",
+    "commit": "db86ef6eccb2ed5ae16d3035982907692ecb10ef",
+    "category": "CLI library",
+    "why": "Command-line parser with derive proc macros and builder crates."
+  },
+  {
+    "id": "DioxusLabs/dioxus",
+    "language": "rust",
+    "url": "https://github.com/DioxusLabs/dioxus.git",
+    "commit": "97adf7915e1adfef4e2da436c9bd0b6add0dfa39",
+    "category": "UI / app framework",
+    "why": "UI workspace with proc macros and macro-heavy RSX examples."
+  },
+  {
+    "id": "rust-lang/mdBook",
+    "language": "rust",
+    "url": "https://github.com/rust-lang/mdBook.git",
+    "commit": "7f307f5e845284f41adeaf7f18f4783f7711343c",
+    "category": "CLI / dev tool",
+    "why": "Documentation compiler with CLI, rendering and preprocessors."
+  },
+  {
+    "id": "rustls/rustls",
+    "language": "rust",
+    "url": "https://github.com/rustls/rustls.git",
+    "commit": "53db4d1398f16d5bac98eacf02f0dff4b242fd92",
+    "category": "library",
+    "why": "TLS library with conditional providers and platform and no_std code."
+  },
+  {
+    "id": "tauri-apps/tauri",
+    "language": "rust",
+    "url": "https://github.com/tauri-apps/tauri.git",
+    "commit": "f5578bc1e07cc2e87a6b4526bc20299aaba3495e",
+    "category": "UI / app framework",
+    "why": "Desktop app framework with proc macros, platform dependencies and build scripts."
+  },
+  {
+    "id": "vercel/turborepo",
+    "language": "typescript",
+    "url": "https://github.com/vercel/turborepo.git",
+    "commit": "eda8172408e89671cf71c39a2ffe4e05e07624bf",
+    "category": "monorepo / dev tool",
+    "why": "Turbo and pnpm monorepo examples, TypeScript tooling, and mixed Rust and JavaScript."
+  }
+]

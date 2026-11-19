@@ -2393,7 +2393,14 @@ valid files (Vector 11, restic 1), and no newer npm release exists. **Rules out:
 an install hook or native build for end users; a patch that changes the trees of
 files that already parse (PR #190 for Go was rejected on that ground); token
 rewriting of source except sound error-site repairs. Done for Go (v0.25.0 + #202 +
-#198); Rust is still the npm 0.24.0 grammar.
+#198) and Rust (v0.24.2 + six upstream PRs + own patches 0007–0008, W2-V).
+**Extension (C-21, 19 November 2026):** where no upstream fix exists, an own
+patch is allowed for valid Rust real code writes, under the same corpus gate;
+each patch file carries a header naming the Rust reference section and any
+upstream issue or PR. Nightly-only syntax that real crates write (`box`
+patterns) is accepted and documented as nightly. C-21 adds 0009–0014: on the 20
+Rust pins, turborepo's Rust and Vector, every file that parsed before keeps an
+identical tree and 48 files are newly read.
 
 ### Code links store identity, never a resolved target
 
@@ -2889,6 +2896,21 @@ over inferred workspace links. A captured competing test type request is
 settled by the checker's declarations for the selected symbol. The C-16 guard
 still covers missing requests made by checkout code or its compiler config.
 Installed declarations contribute only via the checker. [C-20](changes/C-20.md)
+
+### C-23 Ownership in installed TypeScript declarations
+
+The selected package entry proves the original export's ownership when a
+module augmentation contributes only a wrapper declaration to the export's
+symbol. Members contributed by the augmentation keep their declaring
+package. A named namespace export can use its public binding name when the
+checker points to an installed source file in the same package. A direct
+member in a single named factory's inline return annotation uses the path
+`declaration-file.d.ts:ReturnType<typeof Factory>.member`. Synthesized
+library member names use the declaring file's path relative to the package.
+The checker distinguishes the declarations behind those names. A workspace
+entry with a physical link to a captured package retains the missing
+build-output reason.
+[C-23](changes/C-23.md)
 
 ### C-13 TypeScript program budget and compiler exceptions
 

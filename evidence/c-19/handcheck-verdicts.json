@@ -1,0 +1,183 @@
+{
+  "_": "Hand verdicts for the hand-check sample, checked against the pinned source and the downloaded crate sources. Sites: PIN|SITE|WRITTEN. Shapes: a Pymtheg target and a toolchain target (regular expressions over the two descriptions) checked once in the crate source and applied to every row of that shape. right: pymtheg | toolchain | both (both name the same declaration).",
+  "sites": {
+    "ripgrep|crates/core/flags/doc/version.rs:110|features": {
+      "right": "pymtheg",
+      "cause": "inactive-cfg",
+      "note": "local `features` in a #[cfg(target_arch = \"aarch64\")] block; the toolchain (x86_64) names fn `features` at line 161"
+    },
+    "ripgrep|crates/core/flags/doc/version.rs:152|features": {
+      "right": "pymtheg",
+      "cause": "inactive-cfg",
+      "note": "local `features` in the #[cfg(target_arch = \"aarch64\")] block of compile_cpu_features; the toolchain names fn `features`"
+    },
+    "axum|axum/src/extract/mod.rs:27|axum_macros::FromRequestParts": {
+      "right": "pymtheg",
+      "cause": "proc-macro-export",
+      "note": "a proc-macro crate exports only its macros: the derive is `derive_from_request_parts` (#[proc_macro_derive(FromRequestParts)]); the toolchain names the private enum variant from_request::Trait::FromRequestParts. The strict join filters this class (proc-macro-crate-item); kept from the first hand-check"
+    },
+    "axum|axum/src/extract/mod.rs:27|axum_macros::FromRequest": {
+      "right": "pymtheg",
+      "cause": "proc-macro-export",
+      "note": "the derive is `derive_from_request`; the toolchain names the private enum variant from_request::Trait::FromRequest"
+    },
+    "helix|helix-event/src/runtime.rs:51|RuntimeLocal": {
+      "right": "pymtheg",
+      "cause": "inactive-cfg",
+      "note": "impl under #[cfg(feature = \"integration_test\")]: that build's struct is line 43; the toolchain (default features) names line 17"
+    },
+    "helix|helix-event/src/runtime.rs:65|RuntimeLocal": {
+      "right": "pymtheg",
+      "cause": "inactive-cfg",
+      "note": "as above (Deref impl under the integration_test feature)"
+    },
+    "helix|helix-core/src/line_ending.rs:305|get_line_ending_of_str": {
+      "right": "pymtheg",
+      "cause": "inactive-cfg",
+      "note": "statement under #[cfg(feature = \"unicode-lines\")]: that build's fn is line 176; the toolchain names the not(unicode-lines) fn at 164"
+    },
+    "helix|helix-view/src/clipboard.rs:47|ClipboardProvider": {
+      "right": "pymtheg",
+      "cause": "inactive-cfg",
+      "note": "impl inside #[cfg(target_arch = \"wasm32\")] mod noop, whose enum is line 45; the toolchain names mod external's enum at 89"
+    },
+    "helix|helix-term/src/application.rs:1297|TerminalEvent": {
+      "right": "pymtheg",
+      "cause": "inactive-cfg",
+      "note": "fn under #[cfg(all(not(feature = \"integration\"), windows))]: the windows alias is line 66; the toolchain names the not(windows) alias at 64"
+    },
+    "tauri|crates/tauri-runtime-wry/src/undecorated_resizing.rs:539|attach_resize_handler": {
+      "right": "pymtheg",
+      "cause": "inactive-cfg",
+      "note": "call inside the #[cfg(windows)] module (fn at 117); the toolchain names the gtk module's fn at 690"
+    },
+    "tauri|crates/tauri-cli/src/mobile/mod.rs:190|local_ip_address::list_afinet_netifas": {
+      "right": "both",
+      "cause": "cfg-alternative-declarations",
+      "note": "local-ip-address glob-re-exports `linux::*` under #[cfg(target_os = \"linux\")] and declares a fallback `fn list_afinet_netifas` for other platforms; on Linux both name linux::list_afinet_netifas. The text resolver ignores cfg and took the fallback, so it reported \"different\""
+    },
+    "tauri|crates/tauri/src/webview/mod.rs:2129|R": {
+      "right": "pymtheg",
+      "cause": "inactive-cfg",
+      "note": "type parameter of a fn nested in a #[cfg(mobile)] block; the toolchain names the enclosing impl's R"
+    },
+    "tauri|crates/tauri-runtime-wry/src/lib.rs:3680|WebviewMessage::EvaluateScriptWithCallback": {
+      "right": "pymtheg",
+      "cause": "inactive-cfg",
+      "note": "arm under #[cfg(all(feature = \"tracing\", not(target_os = \"android\")))] matches that build's variant (1430); the toolchain names the other variant (1428)"
+    },
+    "tauri|crates/tauri-bundler/src/bundle/windows/util.rs:467|wow64_redirected_system_directory": {
+      "right": "pymtheg",
+      "cause": "inactive-cfg",
+      "note": "call in Windows code: #[cfg(target_os = \"windows\")] fn at 322; the toolchain (linux) names the not(windows) fn at 314"
+    },
+    "tauri|crates/tauri-runtime-wry/src/lib.rs:3666|WebviewMessage::EvaluateScript": {
+      "right": "pymtheg",
+      "cause": "inactive-cfg",
+      "note": "arm under #[cfg(all(feature = \"tracing\", not(target_os = \"android\")))] matches the three-field variant at 1426; the toolchain names the one-field variant at 1424"
+    },
+    "tauri|crates/tauri-cli/src/dev.rs:173|command": {
+      "right": "pymtheg",
+      "cause": "inactive-cfg",
+      "note": "local `command` in a #[cfg(windows)] block; the toolchain names fn `command`"
+    },
+    "tauri|crates/tauri/src/path/plugin.rs:235|PathResolver": {
+      "right": "pymtheg",
+      "cause": "inactive-cfg",
+      "note": "call in a #[cfg(target_os = \"android\")] block: android's PathResolver; the toolchain names desktop's"
+    }
+  },
+  "shapes": [
+    {
+      "pymtheg": "^cargo serde (Serialize|Serializer|Deserialize|Deserializer|ser::\\w+|de::\\w+) ",
+      "toolchain": "^cargo serde_core (ser|de)::",
+      "right": "both",
+      "cause": "re-export-in-macro",
+      "note": "serde re-exports `serde_core::{de, ser, Deserialize, Deserializer, Serialize, Serializer}` inside its crate_root! macro (serde src/lib.rs), which a text resolver cannot see"
+    },
+    {
+      "pymtheg": "^cargo syn \\w+ ",
+      "toolchain": "^cargo syn \\w+::\\w+$",
+      "right": "both",
+      "cause": "declaration-in-macro",
+      "note": "syn's root has `pub use crate::<module>::{...}` for these names (e.g. `pub use crate::data::{Field, Fields, ...}`); the declarations sit inside syn's ast_struct!/ast_enum! macros"
+    },
+    {
+      "pymtheg": "^cargo tokio net::TcpStream ",
+      "toolchain": "^cargo tokio net::tcp::stream::TcpStream$",
+      "right": "both",
+      "cause": "re-export-in-macro",
+      "note": "tokio net/mod.rs: `pub use tcp::stream::TcpStream;` inside cfg_net!"
+    },
+    {
+      "pymtheg": "^cargo http header::[A-Z_]+ ",
+      "toolchain": "^cargo http header::name::[A-Z_]+$",
+      "right": "both",
+      "cause": "declaration-in-macro",
+      "note": "http header/mod.rs: `pub use self::name::{..., LOCATION, SET_COOKIE, ...}`; the constants are declared by the standard_headers! macro"
+    },
+    {
+      "pymtheg": "^cargo percent-encoding AsciiSet ",
+      "toolchain": "^cargo percent-encoding ascii_set::AsciiSet$",
+      "right": "both",
+      "cause": "re-export",
+      "note": "percent-encoding src/lib.rs:56 `pub use self::ascii_set::{AsciiSet, CONTROLS, NON_ALPHANUMERIC};`"
+    },
+    {
+      "pymtheg": "^rust-std std sync::atomic::\\w+ ",
+      "toolchain": "^rust-std core sync::atomic::\\w+$",
+      "right": "both",
+      "cause": "declaration-in-macro",
+      "note": "std sync/mod.rs: `pub use core::sync::atomic;`; core declares the atomic types with the atomic_int! macro"
+    },
+    {
+      "pymtheg": "^cargo serde_core (de::)?\\w+ ",
+      "toolchain": "^cargo serde_core de::\\w+$",
+      "right": "both",
+      "cause": "re-export-in-macro",
+      "note": "serde_core re-exports `de::Deserializer` etc. at its root inside its crate_root! macro"
+    },
+    {
+      "pymtheg": "^cargo jsonrpsee server::Http(Request|Response) ",
+      "toolchain": "^cargo jsonrpsee-core http_helpers::(Request|Response)$",
+      "right": "both",
+      "cause": "renamed-re-export",
+      "note": "jsonrpsee: `pub use jsonrpsee_server as server;` (inside a cfg macro); jsonrpsee-server: `pub use jsonrpsee_core::http_helpers::{Request as HttpRequest, Response as HttpResponse}`"
+    },
+    {
+      "pymtheg": "^cargo jsonrpsee server::ServerHandle ",
+      "toolchain": "^cargo jsonrpsee-server future::ServerHandle$",
+      "right": "both",
+      "cause": "re-export-in-macro",
+      "note": "jsonrpsee `pub use jsonrpsee_server as server;` (cfg macro); jsonrpsee-server src/lib.rs:44 `pub use future::{..., ServerHandle, ...}`"
+    },
+    {
+      "pymtheg": "^cargo jsonrpsee core::client::Client ",
+      "toolchain": "^cargo jsonrpsee-core client::async_client::Client$",
+      "right": "both",
+      "cause": "re-export-in-macro",
+      "note": "jsonrpsee `pub use jsonrpsee_core as core;` (cfg macro); jsonrpsee-core client/mod.rs:31 `pub use async_client::{Client, ClientBuilder};`"
+    },
+    {
+      "pymtheg": "^cargo tokio #\\[(test|main)\\] ",
+      "toolchain": "^cargo tokio-macros (test|main)$",
+      "right": "both",
+      "cause": "re-export-in-macro",
+      "note": "tokio src/lib.rs:676-698, inside cfg_macros!: `pub use tokio_macros::test;` with rt-multi-thread, else `pub use tokio_macros::test_rt as test;` (main likewise); the toolchain's build has rt-multi-thread"
+    },
+    {
+      "pymtheg": "^cargo hyper-util rt::Tokio(Io|Executor|Timer) ",
+      "toolchain": "^cargo hyper-util rt::tokio::Tokio(Io|Executor|Timer)$",
+      "right": "both",
+      "cause": "re-export",
+      "note": "hyper-util src/rt/mod.rs:12 `pub use self::tokio::{TokioExecutor, TokioIo, TokioTimer};` under #[cfg(feature = \"tokio\")]"
+    },
+    {
+      "pymtheg": "^cargo tree-house tree_sitter::",
+      "toolchain": "^cargo tree-house-bindings ",
+      "right": "both",
+      "cause": "renamed-dependency",
+      "note": "tree-house: `pub use tree_sitter;` where the manifest renames `tree-sitter = { package = \"tree-house-bindings\" }`"
+    }
+  ]
+}

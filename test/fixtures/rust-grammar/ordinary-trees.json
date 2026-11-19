@@ -1,0 +1,11 @@
+{
+  "fixed/cfg_pattern_fields.rs": "7f2aa5fb915263e3fa8716fcb899bae1ef7f3699e3517babdc8baf92ef9fdac2",
+  "fixed/raw_at_binding.rs": "6f1d5bb5e75bec577e2905867a6f6ac005437113733e657384af3f737c15a0b4",
+  "fixed/raw_type_name.rs": "4c6c9734d193efda99d6c5ff75a37105385dfcc950a52adea68e66dbdac8ea36",
+  "fixed/raw_variable.rs": "74a94616aa3e810e7b5b91f83c70cb4b695ebfdcba555997058de61ab5b9cc9a",
+  "fixed/safe_fn_in_extern.rs": "8e290fd5e611d07ca66d4c67356502593a9f1e12eeda2376edf5c8c2a7164330",
+  "fixed/safe_items.rs": "fe933d188f6a30eecde71fe9d2333bc2125c6204cde39fbf70381216dc3c19f9",
+  "fixed/small_shapes.rs": "3685dee42839fa419b6a229c7c01085f588dab184a20dadf58222d1bb28f463d",
+  "fixed/unsafe_extern.rs": "6d92091c91629ed3fc839237f288019777aec5154da19ea64acb754a013ccb5c",
+  "ordinary/adjacent.rs": "6a3caf8158dc4289ae717fa5d1d62edefda62f5df55aaae9467184109be6f7b8"
+}

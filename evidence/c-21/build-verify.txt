@@ -1,0 +1,21 @@
+tree-sitter-cli 0.27.2
+upstream https://github.com/tree-sitter/tree-sitter-rust v0.24.2 77a3747266f4d621d0757825e6b11edcbf991ca5
+applied patches/0001-pr319-struct-pattern-field-attributes.patch (https://github.com/tree-sitter/tree-sitter-rust/pull/319 @ 70157d40a8e1)
+applied patches/0002-pr271-unit-struct-where.patch (https://github.com/tree-sitter/tree-sitter-rust/pull/271 @ 1660fa6c950e)
+applied patches/0003-pr317-tilde-in-token-trees.patch (https://github.com/tree-sitter/tree-sitter-rust/pull/317 @ 1bf4964e4afa)
+applied patches/0004-pr312-le-after-cast.patch (https://github.com/tree-sitter/tree-sitter-rust/pull/312 @ 1d3d5d6df51d)
+applied patches/0005-pr283-unicode-escape-underscore.patch (https://github.com/tree-sitter/tree-sitter-rust/pull/283 @ bb723fa5db73)
+applied patches/0006-pr281-extern-types.patch (https://github.com/tree-sitter/tree-sitter-rust/pull/281 @ 7d6fe656932a)
+applied patches/0007-own-raw-contextual-identifier.patch (Pymtheg's own patch, not upstream)
+applied patches/0008-own-safe-qualifier.patch (Pymtheg's own patch, not upstream)
+applied patches/0009-own-primitive-named-macros.patch (Pymtheg's own patch, not upstream)
+applied patches/0010-own-dyn-lifetime-first.patch (Pymtheg's own patch, not upstream)
+applied patches/0011-own-parameter-attributes.patch (Pymtheg's own patch, not upstream)
+applied patches/0012-own-box-patterns.patch (Pymtheg's own patch, not upstream)
+applied patches/0013-own-where-dyn.patch (Pymtheg's own patch, not upstream)
+applied patches/0014-own-struct-pattern-turbofish.patch (Pymtheg's own patch, not upstream)
+tree-sitter test: all upstream corpus cases pass
+wasi-sdk 34.0
+binaryen version_132
+built tree-sitter-rust.wasm sha256 421c975a56284d9277490d31ee455285d0a23a769490f4bc3a0dbcaeae57a4a2
+committed .wasm and manifest match the build
