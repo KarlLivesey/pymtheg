@@ -1729,9 +1729,13 @@ the same, so library queries and ordinary graph queries can return those
 links. Coverage reports the assumption-backed Level 2 count alongside the
 total and still accepts pre-assumption archives.
 
-Module 36 uses the same captured facts to identify macros during scope
+Module 37 uses the same captured facts to identify macros during scope
 preparation. It looks up the attribute and bang sub-namespaces and checks
 tool names in the type namespace. The identity lookup uses an isolated
 cache and applies Rust's expansion-time glob ambiguity rule only where an
 outer binding is established. Cargo paths and named imports use existing
-dependency evidence. The ordinary link lookup retains its scope guards.
+dependency evidence. The known-export catalogue checks versions and
+features for every applicable dependency edge. For a registry facade, the
+facade's lock row must identify the implementing package as a registry
+dependency. Applicable manifest or Cargo configuration overrides withhold
+that evidence. The ordinary link lookup retains its scope guards.

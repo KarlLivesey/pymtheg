@@ -4,8 +4,16 @@ The fixed seed `c18-identity-2026-11-19` selected five newly proved and five
 newly assumption-backed links in each of six pinned repositories. Every
 entry below was checked at its written use, against its import or declaration
 where present, and against the relevant macro's documented output or source.
+The corrected draw retained 56 of the original checked sites.
 The draw found **60 right, 0 wrong, 0 cannot tell**. Thirty entries were
 proved. `A` denotes `rust-external-macro-name`. [Draw script](draw.mjs)
+
+The corrected graph withholds the original assumption-backed
+`BoxedWindow` and `Vec` links at
+`ratatui/tests/stateful_widget_ref_dyn.rs:58`, the `mime::AUDIO` link
+at `actix-files/src/named.rs:106`, and the `assert_eq!` link at
+`skein/tests/mod.rs:56`. The four replacement rows below use the
+original seed and the corrected graph.
 
 ## Axum
 
@@ -35,12 +43,11 @@ for its payload type, and Tokio's test attribute wraps each named test.
 
 The `WrappedLine` and selection helper declarations are in their enclosing
 modules. The Termina tests use the standard `assert_eq!` and build cursor
-sequences inside expressions. The dynamic widget test imports
-`pretty_assertions::assert_eq`; its transcriber emits a block expression.
-`BoxedWindow` is the local alias just above the test. The task runner's
-`Subcommand` derive implements Clap traits for its enum, and its `cmd!`
-call comes from the explicit Duct import.
-[Pinned source](https://github.com/ratatui/ratatui/tree/60feb0eb09789f4c0ed11c0c532bb605689fbbc0) · [Pretty Assertions transcriber](https://docs.rs/pretty_assertions/1.4.1/src/pretty_assertions/lib.rs.html) · [Clap derive](https://docs.rs/clap/4.6.7/clap/_derive/index.html) · [Duct cmd](https://docs.rs/duct/1.1.2/duct/macro.cmd.html)
+sequences inside expressions. The task runner's `Subcommand` derive
+implements Clap traits for its enum. Its `cmd!` call comes from the
+explicit Duct import. The build and feature-test argument lists use
+the standard `vec!` macro.
+[Pinned source](https://github.com/ratatui/ratatui/tree/60feb0eb09789f4c0ed11c0c532bb605689fbbc0) · [Clap derive](https://docs.rs/clap/4.6.7/clap/_derive/index.html) · [Duct cmd](https://docs.rs/duct/1.1.2/duct/macro.cmd.html) · [Standard vec macro](https://doc.rust-lang.org/std/macro.vec.html)
 
 | Site | Checked target | Basis |
 | --- | --- | --- |
@@ -49,9 +56,9 @@ call comes from the explicit Duct import.
 | `ratatui-termina/src/lib.rs:690` | `std::assert_eq!` | Proof |
 | `ratatui-widgets/src/table.rs:2497` | `ratatui-widgets/src/table.rs:2248 test_table_with_selection` | Proof |
 | `ratatui-termina/src/lib.rs:634` | `std::assert_eq!` | Proof |
-| `ratatui/tests/stateful_widget_ref_dyn.rs:58` | `ratatui/tests/stateful_widget_ref_dyn.rs:53 BoxedWindow` | A |
+| `xtask/src/commands.rs:135` | `std::vec!` | A |
 | `xtask/src/commands.rs:158` | `std::vec!` | A |
-| `ratatui/tests/stateful_widget_ref_dyn.rs:58` | `std::vec::Vec` | A |
+| `xtask/src/commands.rs:212` | `std::vec!` | A |
 | `xtask/src/commands.rs:153` | `std::result::Result::Ok` | A |
 | `xtask/src/commands.rs:152` | `duct::cmd!` | A |
 
@@ -59,12 +66,12 @@ call comes from the explicit Duct import.
 
 The standard macros are in written test bodies, and the route helper uses
 the enclosing `RouteInfo` declaration. The dispatcher explicitly imports
-both Tokio names. Its `pin_project!` and `bitflags!` invocations cover the
-declared input types. The file helper's derive-more attributes implement
-`Deref` and `DerefMut`; `mime::AUDIO` names the dependency constant. The
-WebSocket codec uses `Err` beside its `Flags` bitflags declaration. The
-rustls client test uses Tokio's test wrapper and the standard `Result` type.
-[Pinned source](https://github.com/actix/actix-web/tree/3c6ea6acf52d9e6f41207222b672774246be7205) · [Bitflags macro](https://docs.rs/bitflags/2.13.2/bitflags/macro.bitflags.html) · [Derive-more Deref](https://docs.rs/derive_more/latest/derive_more/derive.Deref.html) · [Tokio test](https://docs.rs/tokio/1.54.1/tokio/attr.test.html) · [MIME constant](https://docs.rs/mime/0.3.18/mime/constant.AUDIO.html)
+both Tokio names. The WebSocket dispatcher uses the standard `write!`
+beside `pin_project_lite::pin_project!`, whose transcriber generates code
+for the input struct's pin projections. The WebSocket codec uses `Err`
+beside its `Flags` bitflags declaration. The rustls client test uses
+Tokio's test wrapper and the standard `Result` type.
+[Pinned source](https://github.com/actix/actix-web/tree/3c6ea6acf52d9e6f41207222b672774246be7205) · [Pin Project Lite transcriber](https://docs.rs/pin-project-lite/latest/src/pin_project_lite/lib.rs.html) · [Bitflags macro](https://docs.rs/bitflags/2.13.2/bitflags/macro.bitflags.html) · [Tokio test](https://docs.rs/tokio/1.54.1/tokio/attr.test.html)
 
 | Site | Checked target | Basis |
 | --- | --- | --- |
@@ -74,7 +81,7 @@ rustls client test uses Tokio's test wrapper and the standard `Result` type.
 | `actix-web/src/http/header/content_disposition.rs:657` | `std::vec!` | Proof |
 | `actix-web/src/guard/host.rs:232` | `std::assert!` | Proof |
 | `actix-http/src/h1/dispatcher.rs:1507` | `tokio::time::sleep_until` | A |
-| `actix-files/src/named.rs:106` | `mime::AUDIO` | A |
+| `actix-http/src/ws/dispatcher.rs:143` | `std::write!` | A |
 | `actix-http/src/h1/dispatcher.rs:366` | `tokio::io::AsyncWrite` | A |
 | `actix-http/src/ws/codec.rs:260` | `std::result::Result::Err` | A |
 | `awc/tests/test_rustls_client.rs:61` | `std::result::Result` | A |
@@ -122,7 +129,7 @@ function.
 | `jh/src/compressor.rs:33` | `ppv-lite86::Machine` | Proof |
 | `ripemd/tests/mod.rs:76` | `std::assert_eq!` | A |
 | `gost94/tests/mod.rs:91` | `std::assert_eq!` | A |
-| `skein/tests/mod.rs:56` | `std::assert_eq!` | A |
+| `sha2/tests/mod.rs:26` | `std::assert_eq!` | A |
 | `ripemd/tests/mod.rs:15` | `digest::hash_serialization_test!` | A |
 | `sha1-checked/tests/mod.rs:81` | `hex-literal::hex!` | A |
 

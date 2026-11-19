@@ -544,7 +544,11 @@ makes that whole manifest unknown). Private items are ordinary symbols.
 - **Macro identity for scope retries.** Derives and procedural attributes
   use their attribute macro sub-namespace, and tool attributes use a
   type-namespace prefix. The lookup follows named imports and verified
-  Cargo paths, including renamed dependencies. A glob which could only
+  Cargo paths, including renamed dependencies. Known registry macro
+  exports require evidence that the selected release and features supply
+  the macro. A registry re-export also needs a verified registry edge to
+  the implementing crate. Checkout implementations need an output proof.
+  A glob which could only
   compete with an established outer macro or path head does not prevent
   the proof, since rustc rejects that ambiguity. An uncaptured macro-use
   import and a glob without an established competing binding can still

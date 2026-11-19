@@ -19,13 +19,30 @@ totals with the cold CLI response. [Warm index check](check-warm.mjs)
 
 The database comparison matches every Rust link's file, kind, origin,
 span, spelling and source key. It checks definite target equivalence,
-receiver decisions, and the inventory and identity of Rust symbols. Set
-`PYM_COMPARISON_SEED=c18-identity-2026-11-19` and `--all-samples` on the
+assumption marks, receiver decisions, and the inventory and identity of
+Rust symbols. Set `PYM_COMPARISON_SEED=c18-identity-2026-11-19` and
+`--all-samples` on the
 C-12 comparison script for the C-18 audit. The audit draw ranks pins
 with enough eligible links by that seed, then takes the lowest five
 proved and five assumption-backed link ranks in each of the first six
 pins. [Database comparison](../c-12/compare.mjs)
 [Audit draw](draw.mjs)
+
+### Review attribution
+
+For the review attribution, copy the corrected build to scratch and run
+`node evidence/c-18/review-withdrawals.mjs --relax-provenance "$copy"`.
+Index the affected pins with that copy, keeping the corrected release,
+namespace and export-availability checks. Pass the C-12, original PR,
+corrected PR and provenance-relaxed result/work-directory pairs to the
+same script. Pass `--affected` with the first three pairs to identify the
+pins that need a control. A lost Level 2 link that returns in the
+control is attributed to provenance. A link still missing is attributed to availability,
+including exports whose presence cannot be established. The attribution
+uses availability first when both guards can withhold a site. The
+coverage plan uses the corrected build. [Review attribution script](review-withdrawals.mjs)
+
+### Opacity census and cost
 
 Run the opacity census on each graph set with its matching build. Set
 `PYM_MACRO_CENSUS_SEED=c18-identity-2026-11-19` to keep the 50 lowest-ranked

@@ -2810,7 +2810,11 @@ expansion. A type or bang macro cannot take an attribute-sub-namespace name.
 A competing glob requires either a readable lookup or an established outer
 binding for which rustc would reject the ambiguity. Qualified external names
 follow existing Cargo dependency edges through aliases and named exports.
-These proofs feed the C-12 effect rules, including the existing recorded
+A known export must be present for the release and enabled features, and
+a re-export needs registry provenance for both the facade and its
+implementation. Unknown exports, absent features, path, Git and patched
+implementations leave the expansion opaque without a supported output
+proof. Verified identities feed the C-12 effect rules and its existing
 external effect assumption. [C-18](changes/C-18.md)
 
 ### C-14 Go library targets
