@@ -3,6 +3,79 @@
 Items `go-factory`, `go-local-method`, `go-typed-reference` and
 `go-pointer-conversion`. Change note: `docs/changes/C-8.md`.
 
+## Review round 1: what changed and the final figures
+
+The first review (six points) changed how imports, pointer conversions and
+build-variant calls are resolved; see the change note. Everything below this
+section is the first head's evidence, kept as it was; this section is the
+final head's.
+
+**Go command checks.** `go-import-rules.sh` (output `go-import-rules.txt`)
+and `go-variant-configs.sh` (`go-variant-configs.txt`) build each import and
+build-variant shape with Go 1.27.4 in read-only module mode: a replace
+without a `require` is not used, an unrequired replace of a path the main
+module provides does nothing and with the `require` added the import is
+ambiguous, `=> ..` without a parent go.mod fails, a package whose only file
+is `//go:build ignore` fails, a go.mod declaring another path still builds;
+the darwin build of a `linux || darwin` caller has no Linux/Windows-only
+`New`, and `-tags=freebsd` on Linux selects `//go:build linux && freebsd`.
+
+**All links of all 20 Go pins against main.** Sweeps of the 20 pins with a
+build of main at `efa0e9e` (the four largest re-run with a 120-minute limit
+on a loaded machine) and with the final build; `compare.mjs` over every Go
+link and symbol (`site-comparison-round2-base4.json`, 16 pins;
+`-base5.json`, the four largest):
+
+| | 16 pins | 4 largest |
+| --- | ---: | ---: |
+| Definite before → after | 409,925 → 410,375 | 602,731 → 613,022 |
+| Lost or retargeted | 0 | 0 |
+| Sites added or removed | 0 | 0 |
+| Symbols missing | 0 of 76,810 | 0 of 124,131 |
+
+Net +10,741 definite links, as at the first head. Two intermediate builds
+lost links and were fixed before this one: a replacement written `../` to
+the checkout root (bubbletea 1,255 links, samber/lo 81), and the free-tag
+build test giving up above 14 names (cilium's bpf2go loaders, 38).
+
+**Level 2.** Go module (scoreboard over SW-3, `scoreboard-candidate-round2.md`):
+77.10% → **77.81%**. The per-repository figures are those of the table below
+except cli/cli 75.60%, evanw/esbuild 87.96% and pocketbase 56.88%: those
+totals count every module of the checkout, and their TypeScript changed with
+C-7, merged into this build; their Go links are the first head's.
+Plan Go section, the same script over C-7's input with these Go pins laid on
+(`coverage-plan-input-round2.json.gz`, `plan-base.mjs`): 79.11% →
+**79.65%**. The committed block is main's own: main has since merged C-9,
+whose Rust input was not archived, so the block cannot be regenerated with
+it; laying these pins over C-7's input alone would take C-9's Rust figures
+out.
+
+**Hand-check.** 20 newly definite links at the seed `c-8-r2`
+(`site-comparison-round2-*.json`, `sample`), read against the pinned
+source (`verify-round2.sh` for the ones that depend on context): all true.
+Thirteen are pointer conversions (`var _ X = (*T)(nil)`, bbolt's
+`(*common.Page)(unsafe.Pointer(…))`, protobuf-go's `(*M)(nil)` tables); the
+others are gin's `testdata.Test` (an import of `…/testdata/protoexample`),
+cli/cli's `state.Data.Rows` and `raster.fonts.Styles` in the `.github`
+module (`states []state`, `Data recording.TerminalData`,
+`fonts *fontutil.Set`), gopls's `pass.Pkg` (`pass *analysis.Pass`) and
+`set.Set` through `replace golang.org/x/tools => ..`, protobuf-go's
+`sub.E_value` and `m7.GetBar` (packages under `cmd/protoc-gen-go/testdata`).
+
+**Toolchain agreement** (restic, `toolchain-agreement-restic.json`): 32
+newly definite, 10 confirmed, **0 disagreements**, 22 with no decision, all in
+`internal/fs/vss_windows.go` (`//go:build windows`, outside the linux
+configuration).
+
+**Determinism.** Three cold indexes of cilium/ebpf with the final build:
+identical rows (`determinism-cilium.json`).
+
+**Cost** (`timing-round2.txt`). The reviewer's bbolt 196.0/184.9 s → 241.6 s
+was wall time on a shared machine. Interleaved base/candidate runs: user CPU
+time bbolt 8.19–8.64 s (main) and 8.17–8.75 s (this branch), pebble
+104.1–110.5 s and 107.7–109.5 s; wall time swung 50–96 s on bbolt across both
+builds with the machine's storage contention. Peak memory unchanged.
+
 All runs used the sweep runner (`scripts/sweep/run.mjs --local-build`) on the
 20 Go repositories of `sweep/repos.json` at their pinned commits, once with a
 build of `main` at `e5f86db` (after C-4) (**base**) and once with this branch

@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
-// C-8 evidence: the input the plan's generated block was regenerated from.
-// Starts from one chunk's plan input and lays further exports over it in
-// order (a repository in a later file replaces the earlier record; one that is
-// not there yet is added). The result is passed to coverage.mjs with the SW-3
-// base, exactly as the earlier chunks did. For main at efa0e9e: C-4's input,
-// then C-1's, reproduces docs/coverage-plan.md; this chunk's Go pins go last.
+// C-8 evidence: the inputs the plan's generated block is built from. Starts
+// from one file and lays further exports over it in order (a repository in a
+// later file replaces the earlier record; one not there yet is added), keeping
+// the first file's own fields. main's block at 6b3cdf2 is reproduced by
+// coverage.mjs --results evidence/c-7/review-2/coverage-plan-input.json.gz
+// with --base (the SW-3 breakdown with C-4 input laid over it); this
+// chunk's Go pins are laid over C-7's input (coverage-plan-input-round2).
 // Usage: node plan-base.mjs --into FILE[.gz] --overlay FILE[.gz] [--overlay …] --output FILE
 import { readFileSync, writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
