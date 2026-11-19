@@ -106,24 +106,21 @@ files figures, including 33.27% for Rust and 55.79% overall.
 
 ## Cold indexing cost
 
-Both snapshots used the C-6 SQLite writes. The three sweeps ran serially
-in one tmpfs session with the full test suite idle. Each cell gives cold
-wall time and peak RSS.
+Both snapshots included C-6 and C-10. The three sweeps ran serially in
+one tmpfs session with the full test suite idle. Each cell gives cold wall
+time and peak RSS.
 
-| Pin | Main `595ec7b`, run 1 | Main `595ec7b`, run 2 | C-12 |
+| Pin | Main `8ca29ac`, run 1 | Main `8ca29ac`, run 2 | C-12 |
 | --- | ---: | ---: | ---: |
-| Helix | 91.2 s / 980 MiB | 76.7 s / 1,074 MiB | 105.4 s / 1,143 MiB |
-| Serde | 41.0 s / 849 MiB | 38.3 s / 879 MiB | 57.4 s / 847 MiB |
+| Helix | 80.5 s / 1,146 MiB | 92.0 s / 1,027 MiB | 92.0 s / 1,360 MiB |
+| Serde | 41.2 s / 861 MiB | 37.5 s / 894 MiB | 47.5 s / 1,001 MiB |
 
-The resolver retains invocation names and bounded effects. A blocked
-lookup can make two further passes, first using proven effects and then
-allowing the recorded assumption. Helix's cold wall time rose 16–37%
-and recovered 2,058 Level 2 links, including 17 with a proof. Serde's cold
-wall time rose 40–50% and recovered zero links. Its 12,445 unresolved links
-classified as macro-scope opacity stayed unresolved. Serde completed its
-cold, warm, and query steps in 99.1 seconds in this session.
+The index retains invocation names and bounded effects. The resolver also
+keeps separate lookup cache entries for the baseline, proved, and assumed
+passes. Helix's peak RSS rose 19–32%. Serde's cold wall time rose 15–27%,
+and it completed cold, warm, and query steps in 88.2 seconds.
 
-A separate cold Serde CPU profile attributed 14.8 sampled seconds to
+A cold Serde CPU profile of the pre-C-10 build attributed 14.8 sampled seconds to
 `retryMacroScope` across the two Rust graph phases. Macro input and body
 profiling accounted for 0.26 sampled seconds. The cost comes primarily from
 repeating lookups, even on a pin where those retries recover no targets.
@@ -145,6 +142,19 @@ The macro-scope diagnostic fell from 133,191 to 132,985 to 129,352. The
 All 93,577 existing definite targets, 92,364 receiver decisions, and symbol
 keys matched. Both indexes completed and reported the same five failed
 source files. Vector is outside the fixed 60-pin plan.
+
+Before C-10 merged, Embassy completed its cold index on main in 1,003 seconds
+and on the C-12 preview in 2,180 seconds. Main completed the warm index in
+739 seconds. The candidate reached the one-hour sweep limit during its warm
+Rust resolution, so Embassy has no matched row in the 18-pin sweep.
+
+The two Embassy cold graphs initially differed on three previously definite
+imports. Replaying main's own captured facts with the replica's project ID
+also left all three unresolved. That ID changes the stored traversal order.
+Replaying C-12 with main's project ID recovered `crate::raw` in
+`platform/aarch32.rs:111` and `platform/riscv.rs:13`, and `super::PpiGroup`
+in `embassy-nrf/src/ppi/ppi.rs:3`. The final 18-pin replay pairs each replica
+with the same project ID on both builds.
 
 SWC exhausted Node's default heap on main `595ec7b` in the TypeScript
 analysis phase, after Rust analysis completed. The candidate attempt was
