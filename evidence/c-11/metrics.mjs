@@ -8,9 +8,13 @@ const scratch = process.env.PYM_SCRATCH;
 const archived = JSON.parse(
   gunzipSync(readFileSync("evidence/sw-3/breakdown.json.gz")),
 );
+const mainArchive = JSON.parse(
+  gunzipSync(readFileSync("evidence/c-7/review-2/coverage-plan-input.json.gz")),
+);
 const read = (name) => JSON.parse(readFileSync(join(scratch, name), "utf8"));
 const group = (packet) => new Map(packet.repos.map((repo) => [repo.id, repo]));
 const base = group(archived);
+const mainPlan = group(mainArchive);
 const release = group(read("release-coverage.json"));
 const main = group(read("main-coverage.json"));
 const candidateAgainstRelease = group(read("candidate-coverage.json"));
@@ -104,6 +108,10 @@ console.log(
         sharedBefore: shared(ids, main),
         sharedAfter: shared(ids, candidate),
       },
+      mainPlan: {
+        before: aggregate(matchedReleaseIds, mainPlan),
+        after: aggregate(matchedReleaseIds, candidate),
+      },
       release: {
         ids: matchedReleaseIds,
         before: aggregate(matchedReleaseIds, release),
@@ -116,8 +124,11 @@ console.log(
         id,
         main: main.get(id)?.outcome,
         candidate: row.outcome,
-        before: score(main.get(id)?.breakdown ?? []),
+        mainBefore: score(mainPlan.get(id)?.breakdown ?? []),
+        releaseBefore: score(base.get(id)?.breakdown ?? []),
         after: score(row.breakdown ?? []),
+        releaseSharedBefore: shared([id], release),
+        releaseSharedAfter: shared([id], candidateAgainstRelease),
       })),
       settled,
       losses,

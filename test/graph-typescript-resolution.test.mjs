@@ -4696,7 +4696,8 @@ async function indexFiles(files) {
  * Indexes `files` clean and with `broken` replacing some of them, for
  * fixtures that exercise the attribution rules. It checks, for every link of
  * a valid file: identical to the clean index (maybe plus the flag), or
- * `invalid-code` naming a broken file with a `via`; and a link whose clean
+ * `invalid-code` naming a broken file with a `via`. A library link with
+ * unseen declarations must be flagged and unresolved. A link whose clean
  * target is in a broken file fails, naming it. That is STRICTER than the
  * contract (W2-D.md), which requires equality only of unflagged links: a
  * flagged link may differ from the clean index, and the known-limit
@@ -4739,6 +4740,23 @@ async function differential(files, broken, unflaggedFiles = []) {
       problems.push(
         `${key} (${c.text} in ${c.line.trim()}): clean target in ${intoBroken} but broken is ${b.resolution} ${b.reason}`,
       );
+    if (
+      c.resolution === "library" &&
+      b.assumes?.includes("no-unseen-declarations")
+    ) {
+      assert.equal(
+        b.resolution,
+        "unresolved",
+        `${key}: unverified library link`,
+      );
+      assert.deepEqual(
+        b.targets,
+        [],
+        `${key}: unverified library link has no target`,
+      );
+      counts.flagged++;
+      continue;
+    }
     if (JSON.stringify(c.targets) !== JSON.stringify(b.targets)) {
       counts.changedTarget++;
       problems.push(
@@ -4905,13 +4923,18 @@ const TAINT_BROKEN = {
 };
 
 test("a failure passes through every lookup that depends on it (clean vs broken)", async () => {
-  const { counts, problems, bad } = await differential(
+  const { counts, problems, clean, bad } = await differential(
     TAINT_FILES,
     TAINT_BROKEN,
   );
   assert.deepEqual(problems, []);
   assert.equal(counts.changedTarget, 0);
   assert.equal(counts.changedReason, 0);
+  const pick = (result) =>
+    linkAt(result, "use.ts", "interface J extends Pick", "Pick", "extends");
+  assert.equal(pick(clean).resolution, "library");
+  assert.equal(pick(bad).resolution, "unresolved");
+  assert.deepEqual(pick(bad).assumes, ["no-unseen-declarations"]);
   const one = (file) => ({ file });
   const failedAt = (file, marker, at, cause, kind) =>
     isFailed(linkAt(bad, file, marker, at, kind), one(cause), marker);

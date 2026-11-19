@@ -36,6 +36,7 @@ const preservationPins = new Set([
   "excalidraw/excalidraw",
 ]);
 const manifest = join(scratch, `${mode}-manifest.json`);
+const picked = /^candidate-pick(?:-[a-z0-9-]+)?$/.test(mode);
 const run = (args) => {
   const result = spawnSync(process.execPath, args, { stdio: "inherit" });
   if (result.status !== 0)
@@ -111,16 +112,14 @@ if (mode === "release") {
     JSON.stringify({ ...first, repos: [...byId.values()] }),
   );
 } else if (
-  ["candidate", "candidate-audit", "candidate-core", "candidate-pick"].includes(
-    mode,
-  )
+  picked || ["candidate", "candidate-audit", "candidate-core"].includes(mode)
 ) {
   writeFileSync(
     manifest,
     JSON.stringify(
       mode === "candidate"
         ? pins
-        : mode === "candidate-pick"
+        : picked
           ? args.map((id) => pins.find((repo) => repo.id === id))
           : pins.filter(
               (repo) => auditPins.has(repo.id) === (mode === "candidate-audit"),

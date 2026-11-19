@@ -567,6 +567,8 @@ answer.
   calls through parameters, import shadows, and reassigned local functions;
   member calls without a named target through `any`, `unknown` or an open index
   (`any-receiver`, `unknown-receiver`, `index-signature`);
+  package specifiers whose workspace membership is unreadable
+  (`workspace-manifest-unreadable`);
   installed workspace bindings with no captured entry
   (`workspace-entry-unavailable` or `workspace-build-output-missing` when
   TypeScript probed a missing path under a configured output directory).

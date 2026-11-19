@@ -6,7 +6,9 @@ import { join, resolve } from "node:path";
 
 const scratch = process.env.PYM_SCRATCH;
 const benchmark = mkdtempSync(join(scratch, "benchmark-"));
-const pins = ["vitest-dev/vitest", "withastro/astro", "honojs/hono"];
+const pins = process.argv.length > 2
+  ? process.argv.slice(2)
+  : ["vitest-dev/vitest", "withastro/astro", "honojs/hono"];
 const checkouts = new Map();
 for (const name of ["release", "candidate-audit"]) {
   const { repos } = JSON.parse(
@@ -21,7 +23,10 @@ if (pins.some((id) => !checkouts.has(id)))
   );
 symlinkSync(join(scratch, "work"), join(benchmark, "work"));
 symlinkSync(join(scratch, "main"), join(benchmark, "main"));
-symlinkSync(resolve("."), join(benchmark, "candidate"));
+symlinkSync(
+  process.env.C11_BUILD ? join(scratch, process.env.C11_BUILD) : resolve("."),
+  join(benchmark, "candidate"),
+);
 writeFileSync(
   join(benchmark, "main-run.json"),
   JSON.stringify({ repos: pins.map((id) => checkouts.get(id)) }),
