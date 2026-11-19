@@ -28,6 +28,80 @@ function matchesVersion(range: string, value: unknown): boolean {
   const version = typeof value === "string" && semver.Version.tryParse(value);
   return !!(version && semver.VersionRange.tryParse(range)?.test(version));
 }
+export const registryRange = (value: string): boolean =>
+  /^[a-z][\w.-]*$/i.test(value) || !!semver.VersionRange.tryParse(value);
+
+type Catalog = ReadonlyMap<string, ReadonlyMap<string, string>>;
+export type WorkspaceCatalogs = ReadonlyMap<string, Catalog>;
+
+/** Capture plain block catalogs. Indirection or duplicate keys leave the catalog unverified. */
+function readCatalogs(text: string): Catalog {
+  const sections = new Map<string, string[]>();
+  let section: string[] | undefined;
+  for (const line of text.replace(/^\uFEFF/, "").split(/\r?\n/)) {
+    if (!line.trim() || /^\s*#/.test(line)) continue;
+    const head = /^(catalogs?)\s*:\s*(.*)$/.exec(line);
+    if (head) {
+      const name = head[1]!;
+      if (sections.has(name) || !/^(?:#.*)?$/.test(head[2]!.trim()))
+        return new Map();
+      sections.set(name, (section = []));
+    } else if (!/^ +\S/.test(line)) section = undefined;
+    else if (section) section.push(line);
+  }
+  const pair =
+    /^( +)(?:'([^']+)'|"([^"\\]+)"|([@\w./-]+))\s*:\s*(?:'([^']*)'|"([^"\\]*)"|([^#]*?))\s*(?:\s+#.*)?$/;
+  const result = new Map<string, Map<string, string>>();
+  const add = (name: string, lines: readonly string[]) => {
+    if (result.has(name)) return false;
+    const values = new Map<string, string>();
+    let indent: number | undefined;
+    for (const line of lines) {
+      const row = pair.exec(line);
+      if (!row) return false;
+      indent ??= row[1]!.length;
+      if (row[1]!.length !== indent) return false;
+      const key = (row[2] ?? row[3] ?? row[4])!;
+      const value = (row[5] ?? row[6] ?? row[7] ?? "").trim();
+      if (!validPackageName(key) || !value || values.has(key)) return false;
+      values.set(key, value);
+    }
+    result.set(name, values);
+    return true;
+  };
+  const defaultCatalog = sections.get("catalog");
+  if (defaultCatalog && !add("default", defaultCatalog)) return new Map();
+  const named = sections.get("catalogs") ?? [];
+  if (named.length) {
+    const indent = /^ +/.exec(named[0]!)![0].length;
+    let name: string | undefined;
+    let lines: string[] = [];
+    for (const line of named) {
+      const depth = /^ +/.exec(line)![0].length;
+      if (depth > indent && name) {
+        lines.push(line);
+        continue;
+      }
+      if (depth !== indent || (name && !add(name, lines))) return new Map();
+      const header = pair.exec(line);
+      name = (header && (header[2] ?? header[3] ?? header[4])) || undefined;
+      if (!name || (header?.[5] ?? header?.[6] ?? header?.[7]?.trim()))
+        return new Map();
+      lines = [];
+    }
+    if (name && !add(name, lines)) return new Map();
+  }
+  return result;
+}
+
+export function dependencyFromCatalog(
+  catalog: Catalog | undefined,
+  name: string,
+  value: string,
+): string | undefined {
+  if (!value.startsWith("catalog:")) return value;
+  return catalog?.get(value.slice("catalog:".length) || "default")?.get(name);
+}
 const checkoutPath = (directory: string, path: string): string | undefined => {
   if (!path || path.startsWith("/") || path.includes("\\")) return undefined;
   const target = posix.join(directory, path);
@@ -143,10 +217,12 @@ export function workspaceLinks(
     }
   >();
   const pnpmFiles = new Set<string>();
+  const catalogs = new Map<string, Catalog>();
   for (const file of contexts) {
     if (posix.basename(file.path) !== "pnpm-workspace.yaml") continue;
     const root = posix.dirname(file.path);
     pnpmFiles.add(root);
+    catalogs.set(root, readCatalogs(file.text));
     const settings = pnpmSettings(file.text);
     if (settings) {
       noteIncomplete(root, settings.patterns);
@@ -195,10 +271,12 @@ export function workspaceLinks(
       ...record(json.dependencies),
       ...record(json.optionalDependencies),
     };
-    for (const [name, specifier] of Object.entries(dependencies)) {
-      if (!validPackageName(name) || typeof specifier !== "string") continue;
+    for (const [name, value] of Object.entries(dependencies)) {
+      if (!validPackageName(name) || typeof value !== "string") continue;
+      const specifier = dependencyFromCatalog(catalogs.get(root), name, value);
+      if (!specifier) continue;
       let target: string | undefined;
-      if (/^(?:file|link):/.test(specifier)) {
+      if (/^(?:file|link|portal):/.test(specifier)) {
         target = checkoutPath(
           directory,
           specifier.slice(specifier.indexOf(":") + 1),
@@ -262,5 +340,6 @@ export function workspaceLinks(
     links,
     incompleteRoots,
     boundaries: new Set([...roots.keys(), ...pnpmFiles]),
+    catalogs,
   };
 }

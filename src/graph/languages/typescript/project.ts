@@ -6,7 +6,11 @@ import ts from "typescript";
 import { compare, matchesPattern } from "../../index.js";
 import type { ContextFile, Diagnostic, GraphFile } from "../../types.js";
 import { denoConfigPatterns, denoImports, importMapNames } from "./deno.js";
-import { workspaceLinks, type Manifest } from "./workspace.js";
+import {
+  workspaceLinks,
+  type Manifest,
+  type WorkspaceCatalogs,
+} from "./workspace.js";
 import {
   freshNames,
   renameShadowed,
@@ -55,6 +59,8 @@ export interface ProjectGroup {
   /** Owning config path, or null for the inferred project (no config includes the file). */
   config: string | null;
   options: ts.CompilerOptions;
+  /** The parsed config selected ambient packages before the snapshot host forced defaults. */
+  explicitTypes?: boolean;
   references?: readonly ts.ProjectReference[];
   roots: string[];
   /** Limitations that make every owned file's facts partial. */
@@ -71,6 +77,7 @@ export interface ProjectModel {
   manifests: readonly Manifest[];
   workspaceRoots: ReadonlySet<string>;
   workspaceBoundaries: ReadonlySet<string>;
+  workspaceCatalogs: WorkspaceCatalogs;
   hasWorkspacePackages: boolean;
   owner: Map<string, ProjectGroup>;
   /**
@@ -798,6 +805,7 @@ export function projectModel(
             ),
         );
         group.options = forced(parsed.options);
+        group.explicitTypes = parsed.options.types !== undefined;
         if (!group.limitations.length)
           for (const output of [
             parsed.options.outDir,
@@ -1035,6 +1043,7 @@ export function projectModel(
       [...fs.links.values()].map((path) => fromVirtual(path) || "."),
     ),
     workspaceBoundaries: workspace.boundaries,
+    workspaceCatalogs: workspace.catalogs,
     hasWorkspacePackages: fs.links.size > 0,
     hasDenoImports: deno.active,
     selectSpecifier: deno.select,

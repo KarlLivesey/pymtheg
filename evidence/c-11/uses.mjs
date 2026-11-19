@@ -16,7 +16,9 @@ const [build = "candidate"] = process.argv.slice(2);
 const summary = JSON.parse(
   readFileSync(join(scratch, `${build}-run.json`), "utf8"),
 );
-const cli = resolve("dist/cli/main.js");
+const cli = process.env.C11_BUILD
+  ? join(scratch, process.env.C11_BUILD, "dist/cli/main.js")
+  : resolve("dist/cli/main.js");
 const maximum = queries.map(() => ({ library: 0 }));
 
 for (const repo of summary.repos) {

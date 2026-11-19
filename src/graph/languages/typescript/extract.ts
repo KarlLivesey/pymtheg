@@ -5,6 +5,8 @@ import {
   globalTypeAvailability,
   nodeCanDeclare,
   nodeGlobalTarget,
+  nodeMemberTarget,
+  nodeReceiverTypes,
 } from "./global-types.js";
 import type {
   Diagnostic,
@@ -47,6 +49,7 @@ import {
 /** Per-file context for module-system names (see rename.ts). */
 export interface RenameContext {
   fresh: FreshNames;
+  explicitTypes: boolean;
   /** Present when this file's compiler text was renamed. */
   renamed?: Renamed | undefined;
   /** Resolves a module specifier from a file to a captured path, if any. */
@@ -275,8 +278,20 @@ export function extractFile(
   const path = file.fileName.slice(1);
   const importer = library.forImporter(path);
   const globals = globalTypeAvailability(program, library.isNodeTypeFile);
-  const missingNode =
-    !globals.hasNode && (globals.expectsNode || importer.expectsNode());
+  let missingNode =
+    !globals.hasNode &&
+    (globals.expectsNode ||
+      (!context.explicitTypes && importer.expectsNode()) ||
+      /^#![ \t]*(?:(?:\S+\/)?env(?:[ \t]+-S)?[ \t]+)?(?:\S+\/)?node(?:[ \t\r\n]|$)/.test(
+        file.text,
+      ));
+  const nodeProbes =
+    !globals.hasNode && !missingNode && !incompleteConfig && !context.anyFailed
+      ? {
+          specifiers: [] as ts.StringLiteralLike[],
+          names: [] as ts.Identifier[],
+        }
+      : undefined;
   const importers = new WeakMap<ts.SourceFile, typeof importer>();
   const importerOf = (node: ts.Node) => {
     const source = node.getSourceFile();
@@ -294,7 +309,41 @@ export function extractFile(
   const lexicalReferences = new Map<string, Set<ts.Node>>();
   const scopedNames = new Set<string>();
   const propertyWrites: NonNullable<ReturnType<typeof propertyWrite>>[] = [];
+  const collectNodeProbe = (node: ts.Node) => {
+    if (!nodeProbes) return;
+    let specifier: ts.Expression | undefined;
+    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node))
+      specifier = node.moduleSpecifier;
+    else if (
+      ts.isImportEqualsDeclaration(node) &&
+      ts.isExternalModuleReference(node.moduleReference)
+    )
+      specifier = node.moduleReference.expression;
+    else if (
+      ts.isCallExpression(node) &&
+      (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
+        ((isCommonJsRequire(node) || requireForm(node)) && !insideWith(node)))
+    )
+      specifier = node.arguments[0];
+    else if (
+      ts.isIdentifier(node) &&
+      (node.text === "process" ||
+        node.text === "__dirname" ||
+        node.text === "__filename") &&
+      syntax.isInExpressionContext(node) &&
+      !(ts.isPropertyAccessExpression(node.parent) && node.parent.name === node)
+    )
+      nodeProbes.names.push(node);
+    if (
+      specifier &&
+      ts.isStringLiteralLike(specifier) &&
+      (context.hasDenoImports ||
+        packageUnit(specifier.text)?.ecosystem === "node")
+    )
+      nodeProbes.specifiers.push(specifier);
+  };
   const collectScopedNames = (node: ts.Node): void => {
+    if (nodeProbes) collectNodeProbe(node);
     if (isScopedDeclaration(node)) {
       const name = (node as ts.NamedDeclaration).name;
       if (name && ts.isIdentifier(name)) scopedNames.add(name.text);
@@ -531,6 +580,7 @@ export function extractFile(
     let firstAlias: ts.Symbol | undefined;
     let declaredSomewhere = false;
     let missingGlobalTypes = false;
+    let nodeReceivers: ReturnType<typeof nodeReceiverTypes> | undefined;
     let verifyObjectProducers = false;
     const declarations: ts.Declaration[] = [];
     const usableLocalCall = (
@@ -654,24 +704,43 @@ export function extractFile(
             importer.targetOf(declaration, unit);
           if (proved) {
             if (
-              (missingNode || globals.otherMissing) &&
+              (missingNode || globals.otherGlobals.size > 0) &&
               source.fileName.startsWith(LIB_ROOT + "/") &&
               proved.symbol
             ) {
               const dot = proved.symbol.indexOf(".");
               const owner =
                 dot < 0 ? proved.symbol : proved.symbol.slice(0, dot);
-              if (globals.otherMissing && proved.ecosystem === "dom") {
+              if (globals.otherGlobals.has(owner)) {
                 missingGlobalTypes = true;
                 continue;
               }
-              if (missingNode && nodeCanDeclare(owner)) {
-                const node = nodeGlobalTarget(proved.symbol);
-                if (!node) {
-                  missingGlobalTypes = true;
-                  continue;
+              if (missingNode) {
+                const member = found.name;
+                const receivers =
+                  receiver && member !== undefined && proved.ecosystem === "dom"
+                    ? (nodeReceivers ??= nodeReceiverTypes(checker, receiver))
+                    : undefined;
+                const owners = receivers?.filter(
+                  ({ type, name }) =>
+                    name === owner ||
+                    checker
+                      .getPropertyOfType(type, member!)
+                      ?.declarations?.includes(declaration),
+                );
+                if (owners?.length) {
+                  for (const { name } of owners) {
+                    const node = nodeMemberTarget(name, member!, proved.symbol);
+                    if (node)
+                      (libraryFacts ??= new Map()).set(libraryKey(node), node);
+                    else missingGlobalTypes = true;
+                  }
+                } else if (nodeCanDeclare(owner)) {
+                  const node = nodeGlobalTarget(proved.symbol);
+                  if (node)
+                    (libraryFacts ??= new Map()).set(libraryKey(node), node);
+                  else missingGlobalTypes = true;
                 }
-                (libraryFacts ??= new Map()).set(libraryKey(node), node);
               }
             }
             // A selected declaration can arrive through another package or a
@@ -1223,16 +1292,13 @@ export function extractFile(
   ): Targets | undefined {
     if (!specifier) return undefined;
     const units = missingUnits(specifier, declared);
-    const targets = units.map((unit) =>
-      writtenLibrary(specifier, unit, symbol),
-    );
+    const targets = units.map((unit) => writtenLibrary(unit, symbol));
     return targets.length && targets.every((target) => target !== undefined)
       ? { targets: [], libraryFacts: targets, lexicalLibrary: true }
       : undefined;
   }
 
   function writtenLibrary(
-    specifier: ts.Expression,
     unit: NonNullable<ReturnType<typeof packageUnit>>,
     symbol?: string,
   ): LibraryTarget | undefined {
@@ -1242,12 +1308,7 @@ export function extractFile(
       (target.symbol !== undefined && !storableName(target.symbol))
     )
       return undefined;
-    // A Deno npm: URL selects its own registry route. The nearest npm
-    // manifest's pin need not describe that route.
-    return ts.isStringLiteralLike(specifier) &&
-      selectedSpecifier(specifier)?.startsWith("npm:")
-      ? target
-      : importerOf(specifier).withVersion(target);
+    return target;
   }
 
   function declaredModuleFact(
@@ -1271,7 +1332,7 @@ export function extractFile(
       return undefined;
     const selection = selectedSpecifier(specifier);
     const units = selection ? importerOf(specifier).importUnits(selection) : [];
-    const targets = units.map((unit) => writtenLibrary(specifier, unit));
+    const targets = units.map((unit) => writtenLibrary(unit));
     return targets.length && targets.every((target) => target !== undefined)
       ? { targets: [], libraryFacts: targets }
       : undefined;
@@ -1435,7 +1496,6 @@ export function extractFile(
           : undefined;
       const targets = units.map((unit) =>
         writtenLibrary(
-          specifier,
           unit,
           found.receiver
             ? moduleObject ||
@@ -2546,6 +2606,31 @@ export function extractFile(
   // builds on an already computed one instead of recursing through the chain.
   // The whole program is warmed in program order before extraction (index.ts).
 
+  if (nodeProbes) {
+    const probe = (node: ts.Node, read: () => boolean) => {
+      const key = `${node.kind}@${node.getStart(file)}`;
+      if (context.skip.has(key)) return false;
+      try {
+        return read();
+      } catch (error) {
+        if (isLimit(error)) throw new CheckerLimit(key);
+        throw error;
+      }
+    };
+    missingNode =
+      nodeProbes.specifiers.some((specifier) =>
+        probe(specifier, () => {
+          const units = missingUnits(specifier, true);
+          return units.length === 1 && units[0]!.ecosystem === "node";
+        }),
+      ) ||
+      nodeProbes.names.some((name) =>
+        probe(
+          name,
+          () => !insideWith(name) && !checker.getSymbolAtLocation(name),
+        ),
+      );
+  }
   visit(file, moduleKey);
 
   // Triple-slash directives name a captured file or a declaration unit.

@@ -1516,7 +1516,7 @@ symbol. Shape (`src/graph/types.ts` `LibraryTarget`, `GraphLibrary`):
 | `unit` | module path, crate, package name or standard-library unit |
 | `symbol` | optional symbol path in the unit, spelled as the unit spells it (level 2); absent for the unit itself (level 1) |
 | `version` | optional; only when the checkout's manifest or lockfile states it |
-| `versionSource` | required with a version, and only then: the project path of that manifest or lockfile. Its file name must be one of the target ecosystem's manifests or lockfiles (`versionFiles` in `src/graph/identity.ts`: npm `package.json`, `package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `yarn.lock`, `bun.lock`, `bun.lockb`, `deno.json`, `deno.lock`; node `package.json`; go `go.mod`, `go.sum`, `go.work`, `go.work.sum`; go-std `go.mod`, `go.work`; cargo `Cargo.toml`, `Cargo.lock`; any other ecosystem takes no version), and the path must be a clean context file in the snapshot (during indexing, one of the module's own declared context files). A `tsconfig.json` or another ecosystem's manifest is refused |
+| `versionSource` | required with a version, and only then: the project path of that manifest or lockfile. Its file name must be one of the target ecosystem's manifests or lockfiles (`versionFiles` in `src/graph/identity.ts`: npm `package.json`, `package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `yarn.lock`, `bun.lock`, `bun.lockb`, `deno.json`, `deno.lock`; node `package.json`; go `go.mod`, `go.sum`, `go.work`, `go.work.sum`; go-std `go.mod`, `go.work`; cargo `Cargo.toml`, `Cargo.lock`; any other ecosystem takes no version), and the path must be a clean context file in the snapshot (during indexing, one of the module's own declared context files). A `tsconfig.json` or another ecosystem's manifest is refused |
 | `evidence` | required: how the source proves it (below) |
 | `id` | `library:` + sha256 of (ecosystem, unit, version, symbol): deterministic and independent of the project and of the evidence |
 
@@ -1654,6 +1654,15 @@ The checker retains checkout `@types/*` declarations outside
 `node_modules`. Missing expected global declarations can leave compiler
 lib links open. Documented Node globals can form a candidate set with a
 bundled declaration.
+Module 29 applies the Node overlap check to type-position names and checker
+receiver types, including inherited DOM members. Explicit compiler `types`
+options control ambient discovery, and source type references remain independent
+inputs. A proven builtin import, Node hashbang or unbound Node runtime name
+can establish Node context for its file. Environment type packages can share
+web globals. Missing test and build-tool types affect their own documented
+globals. Registry aliases and captured pnpm catalogs can establish an npm
+package's canonical name and exact version provenance. Local dependency
+protocols are checkout routes.
 
 Rust records library paths during resolution starting with module 29. Its library lookup uses
 the captured namespace, import, placement and `cfg` facts, with a separate

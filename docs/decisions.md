@@ -2669,6 +2669,13 @@ registry or a dependency up through the workspace boundary can supply
 that evidence. Bare builtins can have a declared npm alternative. The
 program's missing global type declarations limit which bundled globals
 can be definite, using documented Node globals to name alternatives.
+Module 29 extends that proof to type positions and typed receivers. The
+compiler's explicit ambient types selection takes precedence over manifest
+inference. Source type references and positive file-local Node runtime evidence
+count independently. Missing environment types can overlap web declarations.
+Missing test and tooling types affect their own documented globals. An npm
+alias or captured pnpm catalog supplies the registry name and can supply an
+exact pin with its source path.
 
 ### Graph writes use a write-ahead log on local disks (C-6)
 

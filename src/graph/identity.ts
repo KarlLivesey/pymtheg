@@ -169,6 +169,7 @@ export const versionFiles: Readonly<Record<string, readonly string[]>> = {
     "package-lock.json",
     "npm-shrinkwrap.json",
     "pnpm-lock.yaml",
+    "pnpm-workspace.yaml",
     "yarn.lock",
     "bun.lock",
     "bun.lockb",

@@ -631,10 +631,13 @@ answer.
   by literal outside imports and re-exports. Deno imports use the nearest
   captured map and its applicable scope. A member of an untyped imported
   value or a directly rewritten module member names the package only.
-  An exact version pin in the importing package's npm manifest can supply
-  the version. [TypeScript and JavaScript library links](changes/C-11.md)
+  npm aliases name their registry package. An exact pin in the importing
+  manifest or its captured pnpm catalog can supply its version.
+  [TypeScript and JavaScript library links](changes/C-11.md)
 - **Candidates:** several checkout or library targets for one callee (union
-  receivers, merged declarations, duplicate JavaScript functions).
+  receivers, merged declarations, duplicate JavaScript functions). Missing
+  selected Node types can leave both DOM and Node targets possible for a shared
+  global, type name or typed member.
 - **Unresolved:** outside members whose receiver or declaration is unverified
   (`external`, `external-package`); computed `require` or `import()` specifiers;
   calls through parameters, import shadows, and reassigned local functions;

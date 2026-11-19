@@ -14,7 +14,9 @@ const scratch = process.env.PYM_SCRATCH;
 const commit = "b387e3a179d7495321019363c5ba11e847834cd0";
 const source = mkdtempSync(join(scratch, "t3-source-"));
 const checkout = mkdtempSync(join(scratch, "t3-own-"));
-const cli = resolve("dist/cli/main.js");
+const cli = process.env.C11_BUILD
+  ? join(scratch, process.env.C11_BUILD, "dist/cli/main.js")
+  : resolve("dist/cli/main.js");
 function run(command, args, cwd) {
   const result = spawnSync(command, args, {
     cwd,

@@ -37,6 +37,7 @@ const preservationPins = new Set([
   "excalidraw/excalidraw",
   "withastro/astro",
   "honojs/hono",
+  "trpc/trpc",
   "vitejs/vite",
 ]);
 const manifest = join(scratch, `${mode}-manifest.json`);
@@ -93,7 +94,7 @@ const coverage = (target, previous) =>
 
 if (mode === "release") {
   writeFileSync(manifest, JSON.stringify(pins));
-  sweep(scratch, 4);
+  sweep(scratch, Number(other ?? 4));
 } else if (mode === "main") {
   unpackMain();
   writeFileSync(
@@ -127,12 +128,12 @@ if (mode === "release") {
   );
 } else if (
   picked ||
-  ["candidate", "candidate-audit", "candidate-core"].includes(mode)
+  ["candidate", "candidate-audit", "candidate-core", "previous"].includes(mode)
 ) {
   writeFileSync(
     manifest,
     JSON.stringify(
-      mode === "candidate"
+      mode === "candidate" || mode === "previous"
         ? pins
         : picked
           ? args.map((id) => pins.find((repo) => repo.id === id))

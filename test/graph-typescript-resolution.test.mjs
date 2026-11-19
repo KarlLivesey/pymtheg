@@ -177,9 +177,14 @@ test("bundled declarations prove the owner of an existing runtime use", async ()
         symbol: "fetch",
         evidence: "declared-builtin",
       });
-      assert.equal(
-        libraryTarget(graph.link("script.js", "log", "calls")).symbol,
-        "Console.prototype.log",
+      const log = graph.link("script.js", "log", "calls");
+      assert.equal(log.resolution, "ambiguous");
+      assert.deepEqual(
+        log.libraries.map(({ unit, symbol }) => [unit, symbol]).sort(),
+        [
+          ["console", "Console.prototype.log"],
+          ["dom", "Console.prototype.log"],
+        ],
       );
       assert.equal(
         graph.link("script.js", "cwd", "calls").resolution,
@@ -405,24 +410,39 @@ test("bare packages need positive route evidence and builtin polyfills keep both
 test("an expected missing global type package keeps overlapping runtime declarations open", async () => {
   const source = `console.log('x'); setTimeout(() => {}, 1);
     const urlValue = new URL('https://example.test'); urlValue.toString();
+    const init: RequestInit = {}; new Response().json(); fetch('https://example.test', init);
+    const stream = new ReadableStream(); stream.getReader();
+    navigator.vibrate(500); performance.now(); new TextEncoder().encode('x');
+    declare const canvas: HTMLCanvasElement;
+    declare const context: CanvasRenderingContext2D;
+    context.drawImage(canvas, 0, 0);
     const values = [1]; values.map(String); Promise.resolve(); JSON.parse('{}');`;
   await project(
     {
       "manifest/package.json": '{"devDependencies":{"@types/node":"^24"}}',
       "manifest/use.ts": source,
       "options/tsconfig.json":
-        '{"compilerOptions":{"target":"es2022","types":["node"]},"files":["use.ts"]}',
+        '{"compilerOptions":{"target":"es2022","types":["node","vitest/globals"]},"files":["use.ts"]}',
       "options/use.ts": source,
       "reference/tsconfig.json":
-        '{"compilerOptions":{"target":"es2022"},"files":["use.ts"]}',
+        '{"compilerOptions":{"target":"es2022","types":[]},"files":["use.ts"]}',
       "reference/use.ts": '/// <reference types="node" />\n' + source,
+      "other/package.json": '{"devDependencies":{"@types/node":"^24"}}',
       "other/tsconfig.json":
-        '{"compilerOptions":{"target":"es2022","types":["custom-globals"]},"files":["use.ts"]}',
-      "other/use.ts":
-        "interface Console { log(custom: number): void }\n" + source,
+        '{"compilerOptions":{"target":"es2022","types":["vite/client","vitest/globals","jest","react"]},"files":["use.ts"]}',
+      "other/use.ts": source,
+      "browser/package.json": '{"devDependencies":{"@types/node":"^24"}}',
+      "browser/tsconfig.base.json":
+        '{"compilerOptions":{"target":"es2022","types":[]}}',
+      "browser/tsconfig.json":
+        '{"extends":"./tsconfig.base.json","files":["use.ts"]}',
+      "browser/use.ts": source,
       "web/tsconfig.json":
         '{"compilerOptions":{"target":"es2022"},"files":["use.ts"]}',
       "web/use.ts": source,
+      "workers/tsconfig.json":
+        '{"compilerOptions":{"target":"es2022","types":["@cloudflare/workers-types"]},"files":["use.ts"]}',
+      "workers/use.ts": source,
     },
     async (graph, report) => {
       clean(report);
@@ -431,7 +451,11 @@ test("an expected missing global type package keeps overlapping runtime declarat
         for (const [name, node] of [
           ["log", "console"],
           ["setTimeout", "timers"],
-          ["URL", "globals"],
+          ["URL", "url"],
+          ["fetch", "globals"],
+          ["toString", "url"],
+          ["now", "perf_hooks"],
+          ["encode", "util"],
         ]) {
           const call = graph.link(file, name, "calls");
           assert.equal(call.resolution, "ambiguous");
@@ -440,7 +464,34 @@ test("an expected missing global type package keeps overlapping runtime declarat
             ["dom", node].sort(),
           );
         }
-        const member = graph.link(file, "toString", "calls");
+        for (const [text, kind, dom, node] of [
+          ["RequestInit", "references", "RequestInit", "RequestInit"],
+          ["json", "calls", "Body.prototype.json", "Response.prototype.json"],
+          [
+            "getReader",
+            "calls",
+            "ReadableStream.prototype.getReader",
+            "ReadableStream.prototype.getReader",
+          ],
+        ]) {
+          const link = graph.link(file, text, kind);
+          assert.equal(link.resolution, "ambiguous");
+          assert.deepEqual(
+            link.libraries
+              .map(({ ecosystem, symbol }) => [ecosystem, symbol])
+              .sort(),
+            [
+              ["dom", dom],
+              ["node", node],
+            ],
+          );
+          if (text === "getReader")
+            assert.equal(
+              link.libraries.find(({ ecosystem }) => ecosystem === "node").unit,
+              "stream/web",
+            );
+        }
+        const member = graph.link(file, "vibrate", "calls");
         assert.equal(member.resolution, "unresolved");
         assert.equal(member.data.reason, "missing-global-types");
         for (const name of ["map", "resolve", "parse"])
@@ -449,17 +500,162 @@ test("an expected missing global type package keeps overlapping runtime declarat
             "es",
           );
       }
+      for (const root of ["other", "browser", "web"])
+        for (const name of [
+          "log",
+          "setTimeout",
+          "json",
+          "getReader",
+          "drawImage",
+        ])
+          assert.equal(
+            libraryTarget(graph.link(root + "/use.ts", name, "calls")).unit,
+            "dom",
+          );
       assert.equal(
-        graph.link("other/use.ts", "log", "calls").data.reason,
+        graph.link("workers/use.ts", "json", "calls").data.reason,
         "missing-global-types",
       );
       assert.equal(
-        graph.link("other/use.ts", "log", "calls").resolution,
-        "unresolved",
-      );
-      assert.equal(
-        libraryTarget(graph.link("web/use.ts", "log", "calls")).unit,
+        libraryTarget(graph.link("workers/use.ts", "drawImage", "calls")).unit,
         "dom",
+      );
+    },
+  );
+});
+
+test("Node runtime evidence in a JavaScript file keeps shared globals open", async () => {
+  const shared = "console.log('start'); setTimeout(() => {}, 10);\n";
+  await project(
+    {
+      "package.json": '{"dependencies":{"lit":"^3.0.0"}}',
+      "scripts/release.js":
+        shared +
+        "const fs = require('fs'); console.info(fs.readFileSync('x', 'utf8'));",
+      "scripts/check.mjs":
+        shared +
+        "import { execSync } from 'node:child_process'; execSync('git status');",
+      "scripts/hashbang.js": "#!/usr/bin/env node\n" + shared,
+      "scripts/working-directory.js": shared + "process.cwd();",
+      "scripts/directory.js": shared + "const current = __dirname;",
+      "browser.js":
+        shared + "export {}; const process = {cwd() {}}; process.cwd();",
+      "polyfill/package.json": '{"dependencies":{"path":"^0.12.0"}}',
+      "polyfill/browser.js":
+        shared + "import * as path from 'path'; path.join('a', 'b');",
+    },
+    async (graph, report) => {
+      clean(report);
+      for (const path of [
+        "release.js",
+        "check.mjs",
+        "hashbang.js",
+        "working-directory.js",
+        "directory.js",
+      ])
+        for (const [name, unit] of [
+          ["log", "console"],
+          ["setTimeout", "timers"],
+        ]) {
+          const link = graph.link("scripts/" + path, name, "calls");
+          assert.equal(link.resolution, "ambiguous", path + " " + name);
+          assert.deepEqual(
+            link.libraries.map(({ unit }) => unit).sort(),
+            ["dom", unit].sort(),
+          );
+        }
+      assert.equal(
+        libraryTarget(graph.link("scripts/release.js", "readFileSync", "calls"))
+          .symbol,
+        "readFileSync",
+      );
+      for (const path of ["browser.js", "polyfill/browser.js"])
+        assert.equal(
+          libraryTarget(graph.link(path, "log", "calls")).unit,
+          "dom",
+        );
+    },
+  );
+});
+
+test("npm aliases and captured pnpm catalogs prove the registry name and exact pin", async () => {
+  await project(
+    {
+      "package.json": '{"packageManager":"pnpm@10.0.0"}',
+      "pnpm-workspace.yaml": `packages:
+  - 'packages/*'
+catalog:
+  'default-alias': 'npm:real-default@2.0.1'
+catalogs:
+  named:
+    'scoped-alias': 'npm:@scope/real@3.1.0'
+`,
+      "packages/pretty-format/package.json": JSON.stringify({
+        name: "@sample/pretty-format",
+        dependencies: {
+          "react-is-18": "npm:react-is@18.3.1",
+          "range-alias": "npm:@scope/range@^4",
+          "git-alias": "github:example/fixture",
+          "tar-alias": "https://example.test/archive.tgz",
+          "default-alias": "catalog:",
+          "scoped-alias": "catalog:named",
+          "absent-alias": "catalog:absent",
+          "linked-alias": "portal:../local",
+        },
+      }),
+      "packages/local/package.json":
+        '{"name":"@sample/local","main":"index.ts"}',
+      "packages/local/index.ts": "export function local() {}",
+      "packages/pretty-format/use.ts": `import * as ReactIs18 from 'react-is-18';
+        import { run as nested } from 'range-alias/sub';
+        import { run as fromGit } from 'git-alias';
+        import { run as fromTar } from 'tar-alias';
+        import { run as fromDefault } from 'default-alias';
+        import { run as fromNamed } from 'scoped-alias';
+        import { run as fromAbsent } from 'absent-alias';
+        import { local } from 'linked-alias';
+        ReactIs18.isElement({}); nested(); fromGit(); fromTar();
+        fromDefault(); fromNamed(); fromAbsent(); local();`,
+    },
+    async (graph, report) => {
+      clean(report);
+      const file = "packages/pretty-format/use.ts";
+      const call = (name) => graph.link(file, name, "calls");
+      assert.deepEqual(
+        libraryTarget(graph.link(file, "'react-is-18'", "imports")),
+        {
+          ecosystem: "npm",
+          unit: "react-is",
+          evidence: "import-path",
+          version: "18.3.1",
+          versionSource: "packages/pretty-format/package.json",
+        },
+      );
+      assert.equal(libraryTarget(call("isElement")).symbol, "isElement");
+      assert.deepEqual(libraryTarget(call("nested")), {
+        ecosystem: "npm",
+        unit: "@scope/range",
+        symbol: "sub:run",
+        evidence: "import-binding",
+      });
+      for (const [name, unit, version] of [
+        ["fromDefault", "real-default", "2.0.1"],
+        ["fromNamed", "@scope/real", "3.1.0"],
+      ]) {
+        assert.deepEqual(libraryTarget(call(name)), {
+          ecosystem: "npm",
+          unit,
+          symbol: "run",
+          evidence: "import-binding",
+          version,
+          versionSource: "pnpm-workspace.yaml",
+        });
+      }
+      for (const name of ["fromGit", "fromTar", "fromAbsent"])
+        assert.equal(call(name).resolution, "unresolved");
+      assert.equal(
+        graph.target(call("local")),
+        "packages/local/index.ts#local",
       );
     },
   );

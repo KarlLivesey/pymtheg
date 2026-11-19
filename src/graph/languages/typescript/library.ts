@@ -4,12 +4,18 @@ import { posix } from "node:path";
 import ts from "typescript";
 import type { GraphFile, LibraryTarget } from "../../types.js";
 import { fromVirtual, LIB_ROOT } from "./project.js";
-import type { Manifest } from "./workspace.js";
+import {
+  dependencyFromCatalog,
+  registryRange,
+  type Manifest,
+  type WorkspaceCatalogs,
+} from "./workspace.js";
 
 interface Unit {
   ecosystem: string;
   unit: string;
   subpath?: string;
+  pin?: { version: string; versionSource: string };
 }
 
 export function packageUnit(specifier: string): Unit | undefined {
@@ -56,6 +62,7 @@ export function importedTarget(unit: Unit, symbol?: string): LibraryTarget {
       ? { symbol: unit.subpath ? `${unit.subpath}:${symbol}` : symbol }
       : {}),
     evidence: symbol === undefined ? "import-path" : "import-binding",
+    ...unit.pin,
   };
 }
 
@@ -86,6 +93,14 @@ const dependencyValues = (manifest: Manifest | undefined, name: string) =>
 const localDependency = (value: unknown): boolean =>
   typeof value === "string" &&
   /^(?:workspace:|file:|link:|portal:|\.{1,2}\/|\/)/.test(value);
+
+function registryDependency(name: string, value: string) {
+  const alias = /^npm:((?:@[\w.-]+\/)?[\w.-]+)(?:@(.+))?$/.exec(value);
+  const actual = alias ? alias[1]! : name;
+  const range = alias ? (alias[2] ?? "*") : value;
+  const unit = registryUnit(actual);
+  return unit && registryRange(range) ? { unit: unit.unit, range } : undefined;
+}
 
 export function bundledLibraryUnit(filename: string): Unit {
   const name = posix.basename(filename);
@@ -152,24 +167,27 @@ export function libraryReader(
   files: readonly GraphFile[],
   workspaceRoots: ReadonlySet<string>,
   workspaceBoundaries: ReadonlySet<string>,
+  workspaceCatalogs: WorkspaceCatalogs,
 ) {
   const directories = new Map(
     manifests.map((item) => [posix.dirname(item.path), item]),
   );
   const packageNames = new Set(manifests.map(({ json }) => json.name));
   const chains = new Map<string, readonly Manifest[]>();
+  const scopes = new Map<string, string>();
   const manifestChain = (directory: string): readonly Manifest[] => {
     const previous = chains.get(directory);
     if (previous) return previous;
     const here = directories.get(directory);
-    const parent =
+    const boundary =
       directory === "." ||
       directory === "/" ||
-      workspaceBoundaries.has(directory)
-        ? []
-        : manifestChain(posix.dirname(directory));
+      workspaceBoundaries.has(directory);
+    const parentDirectory = posix.dirname(directory);
+    const parent = boundary ? [] : manifestChain(parentDirectory);
     const result = here ? [here, ...parent] : parent;
     chains.set(directory, result);
+    scopes.set(directory, boundary ? directory : scopes.get(parentDirectory)!);
     return result;
   };
   const nearest = (path: string) => {
@@ -287,7 +305,14 @@ export function libraryReader(
     },
     forImporter(path: string) {
       const manifest = nearest(path);
-      const chain = manifestChain(posix.dirname(path));
+      const directory = posix.dirname(path);
+      const chain = manifestChain(directory);
+      const root = scopes.get(directory)!;
+      const catalog = workspaceCatalogs.get(root);
+      const capturedDependency = (name: string, value: unknown) =>
+        typeof value === "string"
+          ? dependencyFromCatalog(catalog, name, value)
+          : undefined;
       const dependency = (name: string) => {
         for (const owner of chain) {
           const values = dependencyValues(owner, name);
@@ -295,6 +320,35 @@ export function libraryReader(
             return { owner, values };
         }
         return undefined;
+      };
+      const npmRoute = (
+        unit: Unit,
+        declared: NonNullable<ReturnType<typeof dependency>>,
+      ) => {
+        const entries = declared.values.map((raw) => {
+          const value = capturedDependency(unit.unit, raw);
+          if (!value) return undefined;
+          const route = registryDependency(unit.unit, value);
+          if (!route) return undefined;
+          const source =
+            typeof raw === "string" && raw.startsWith("catalog:")
+              ? posix.join(root, "pnpm-workspace.yaml")
+              : declared.owner.path;
+          return { ...route, source };
+        });
+        const [first, ...rest] = entries;
+        if (!first || rest.some((entry) => entry?.unit !== first.unit))
+          return undefined;
+        const pin =
+          first.range.length <= 256 &&
+          exactVersion.test(first.range) &&
+          rest.every(
+            (entry) =>
+              entry?.range === first.range && entry.source === first.source,
+          )
+            ? { version: first.range, versionSource: first.source }
+            : undefined;
+        return { ...unit, unit: first.unit, ...(pin && { pin }) };
       };
       const routes = new Map<string, readonly Unit[]>();
       const declaredDependencies = new Map<Manifest, boolean>();
@@ -310,20 +364,18 @@ export function libraryReader(
           );
           outside =
             values.length > 0 &&
-            values.every(
-              (value) =>
-                typeof value === "string" &&
-                value.length > 0 &&
-                !localDependency(value),
-            );
+            values.every((raw) => {
+              const value = capturedDependency(identity.unit.unit, raw);
+              return (
+                !!value &&
+                registryDependency(identity.unit.unit, value)?.unit ===
+                  identity.unit.unit
+              );
+            });
           declaredDependencies.set(dependency, outside);
         }
         return outside ? identity.unit : undefined;
       }
-      const versions = new Map<
-        string,
-        Pick<LibraryTarget, "version" | "versionSource">
-      >();
       return {
         declarationUnit,
         targetOf,
@@ -337,8 +389,14 @@ export function libraryReader(
             if (explicit) result = [unit];
             else if (unit.ecosystem === "node") {
               const npm = registryUnit(specifier);
-              result = npm && dependency(npm.unit) ? [unit, npm] : [unit];
-            } else if (dependency(unit.unit)) result = [unit];
+              const declared = npm && dependency(npm.unit);
+              const outside = npm && declared && npmRoute(npm, declared);
+              result = declared ? (outside ? [unit, outside] : []) : [unit];
+            } else {
+              const declared = dependency(unit.unit);
+              const outside = declared && npmRoute(unit, declared);
+              if (outside) result = [outside];
+            }
           }
           routes.set(specifier, result);
           return result;
@@ -348,27 +406,11 @@ export function libraryReader(
             unit.ecosystem !== "node" &&
             (packageNames.has(unit.unit) ||
               chain.some((owner) =>
-                dependencyValues(owner, unit.unit).some(localDependency),
+                dependencyValues(owner, unit.unit).some((value) =>
+                  localDependency(capturedDependency(unit.unit, value)),
+                ),
               ))
           );
-        },
-        withVersion(target: LibraryTarget): LibraryTarget {
-          if (target.ecosystem !== "npm") return target;
-          let pin = versions.get(target.unit);
-          if (!pin) {
-            const declared = dependency(target.unit);
-            const [first, ...rest] = declared?.values ?? [];
-            pin =
-              declared &&
-              typeof first === "string" &&
-              first.length <= 256 &&
-              exactVersion.test(first) &&
-              rest.every((value) => value === first)
-                ? { version: first, versionSource: declared.owner.path }
-                : {};
-            versions.set(target.unit, pin);
-          }
-          return pin.version ? { ...target, ...pin } : target;
         },
       };
     },

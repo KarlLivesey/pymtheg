@@ -38,7 +38,7 @@ import {
  * facts; resolve maps those facts to symbol IDs. See docs/changes/W2-D.md.
  */
 // Bump the leading number whenever extraction or resolution semantics change.
-const MODULE_VERSION = `28+typescript-${ts.version}`;
+const MODULE_VERSION = `29+typescript-${ts.version}`;
 
 /** Observation counters for tests (programs built, files extracted). Not a correctness input. */
 export const statistics = {
@@ -622,6 +622,7 @@ const module: LanguageModule = {
       files,
       model.workspaceRoots,
       model.workspaceBoundaries,
+      model.workspaceCatalogs,
     );
     const captured = new Set(files.map((file) => file.path));
     const results: AnalyzedFile[] = [];
@@ -745,6 +746,7 @@ const module: LanguageModule = {
               group.limitations.length > 0,
               {
                 fresh: model.fresh,
+                explicitTypes: group.explicitTypes === true,
                 ...(renamed ? { renamed } : {}),
                 resolveModule,
                 hasDenoImports: model.hasDenoImports,
