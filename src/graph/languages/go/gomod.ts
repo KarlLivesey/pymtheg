@@ -19,6 +19,8 @@ export interface GoReplacement {
   path: string;
   version?: string;
   directory?: string;
+  /** The destination is a filesystem path (relative or absolute), not a module path. */
+  filesystem?: true;
 }
 /** A go.mod in the snapshot, with its requirements and `replace` directives. */
 export interface GoModule extends GoModuleRoot {
@@ -103,10 +105,18 @@ function replacement(
     toPath.startsWith("../");
   // A module path, or a directory leaving the project: outside (no directory).
   const target = local ? joinDirectory(directory, toPath) : undefined;
+  // Any filesystem path, relative or absolute (`/src/x`, `C:\x`): the
+  // package may be checkout code, so never a library target (C-14).
+  const filesystem =
+    local ||
+    toPath.startsWith("/") ||
+    /^[A-Za-z]:[\\/]/.test(toPath) ||
+    toPath.startsWith("\\");
   return {
     path: fromPath,
     ...(version ? { version } : {}),
     ...(target === undefined ? {} : { directory: target }),
+    ...(filesystem ? { filesystem: true as const } : {}),
   };
 }
 
@@ -213,6 +223,18 @@ export interface ImportProvider {
    * this: which captured replacement applies is unproven (a candidate set).
    */
   uncertain: boolean;
+  /** A main module of the build requires this module path. */
+  required?: boolean;
+  /** A `replace` applies, so the package is not the required module version. */
+  replaced?: boolean;
+  /** A destination of the module is a directory inside the project. */
+  local?: boolean;
+  /**
+   * The selected version, when proven (required, not replaced, see
+   * `selectedVersion`), and the main go.mod that states it.
+   */
+  version?: string;
+  versionSource?: string;
 }
 export interface ImportDestinations {
   /** Every possible project directory of the package (all providers). */
@@ -220,6 +242,8 @@ export interface ImportDestinations {
   /** A possible destination is outside the project, or one is not proven. */
   outside: boolean;
   providers: ImportProvider[];
+  /** Every main module has module graph pruning (go 1.17 or later). */
+  pruned?: boolean;
 }
 
 export function directoryOfImport(
@@ -337,6 +361,33 @@ export function directoryOfImport(
     const roots = replaced.length ? replaced : [cache(path)];
     const directories: string[] = [];
     let uncertain = !required;
+    const local = roots.some(
+      (root) => root.directory !== undefined || root.filesystem,
+    );
+    let version: string | undefined;
+    let versionSource: string | undefined;
+    // In a workspace another module's requirement can raise the selected
+    // version: only one that every requiring workspace module names is proven.
+    const agreed =
+      !workspace ||
+      new Set(
+        layout.modules
+          .filter((module) => workspace.uses.includes(module.directory))
+          .map((module) => module.requires.get(path))
+          .filter((version) => version !== undefined),
+      ).size <= 1;
+    if (required && !replaced.length && agreed) {
+      version = selectedVersion(path);
+      const main = mains.find(
+        (item) => version !== undefined && item.requires.get(path) === version,
+      );
+      versionSource = main
+        ? main.directory
+          ? `${main.directory}/go.mod`
+          : "go.mod"
+        : undefined;
+      if (versionSource === undefined) version = undefined;
+    }
     for (const root of roots) {
       if (root.directory === undefined) {
         // The module cache: a main module nested under this module's path
@@ -369,13 +420,148 @@ export function directoryOfImport(
       directories.push(directory);
     }
     if (directories.length || uncertain)
-      providers.push({ path, directories: unique(directories), uncertain });
+      providers.push({
+        path,
+        directories: unique(directories),
+        uncertain,
+        required,
+        ...(replaced.length ? { replaced: true } : {}),
+        ...(local ? { local: true } : {}),
+        ...(version !== undefined && versionSource !== undefined
+          ? { version, versionSource }
+          : {}),
+      });
   }
   return {
     directories: unique(providers.flatMap((item) => item.directories)),
     outside: providers.some((item) => item.uncertain),
     providers,
+    pruned,
   };
+}
+
+/**
+ * The first path elements of the Go standard library's importable packages
+ * (Go 1.27; `internal`, `vendor`, `cmd` and the documentation-only `builtin`
+ * are left out: a project file cannot import them as library code). Go
+ * treats an import path whose first element has no dot as standard library;
+ * this list keeps a GOPATH-style test-data import (`import "a"`) out.
+ */
+export const STD_ROOTS = new Set([
+  "archive",
+  "bufio",
+  "bytes",
+  "cmp",
+  "compress",
+  "container",
+  "context",
+  "crypto",
+  "database",
+  "debug",
+  "embed",
+  "encoding",
+  "errors",
+  "expvar",
+  "flag",
+  "fmt",
+  "go",
+  "hash",
+  "html",
+  "image",
+  "index",
+  "io",
+  "iter",
+  "log",
+  "maps",
+  "math",
+  "mime",
+  "net",
+  "os",
+  "path",
+  "plugin",
+  "reflect",
+  "regexp",
+  "runtime",
+  "slices",
+  "sort",
+  "strconv",
+  "strings",
+  "structs",
+  "sync",
+  "syscall",
+  "testing",
+  "text",
+  "time",
+  "unicode",
+  "unique",
+  "unsafe",
+  "weak",
+]);
+
+/** Where an imported package outside the checkout comes from. */
+export interface LibraryOrigin {
+  ecosystem: "go" | "go-std";
+  version?: string;
+  versionSource?: string;
+}
+
+/**
+ * The library an import path names, from the importing directory, or
+ * undefined when the package is (or may be) checkout code or its origin is
+ * not proven. Standard library: the first element has no dot, is a standard
+ * root, and no module of the checkout provides or declares the path. A
+ * dependency: some module of the build provides it, every destination is
+ * outside the project (the module cache, or a `replace` to another module
+ * path or to a directory outside the project), no captured go.mod declares
+ * a module path the import is in, and the importer's module is not vendored
+ * (`vendored`: its vendor directory has captured files, which Go builds
+ * instead). The version only when one module provides it, unreplaced, at a
+ * proven selected version. `import "C"` is cgo, not a package.
+ */
+export function libraryOrigin(
+  layout: GoProjectLayout,
+  importerDirectory: string,
+  importPath: string,
+  vendored: (moduleDirectory: string) => boolean,
+): LibraryOrigin | undefined {
+  if (importPath === "C" || !importPath) return undefined;
+  const first = importPath.split("/")[0]!;
+  const declared = layout.modules.some(
+    (module) =>
+      importPath === module.path || importPath.startsWith(`${module.path}/`),
+  );
+  if (declared) return undefined;
+  const destinations = directoryOfImport(layout, importerDirectory, importPath);
+  if (!first.includes(".")) {
+    if (!STD_ROOTS.has(first) || destinations.providers.length)
+      return undefined;
+    return { ecosystem: "go-std" };
+  }
+  const own = moduleOf(layout, importerDirectory);
+  if (!own || vendored(own.directory)) return undefined;
+  const workspace = layout.workspaces.find(
+    (item) =>
+      within(own.directory, item.directory) &&
+      item.uses.includes(own.directory),
+  );
+  if (workspace && vendored(workspace.directory)) return undefined;
+  const { providers, pruned } = destinations;
+  if (!providers.length) return undefined;
+  if (
+    providers.some((provider) => provider.local || provider.directories.length)
+  )
+    return undefined;
+  // In a pruned build a module no main module requires is not in it.
+  if (pruned && !providers.some((provider) => provider.required))
+    return undefined;
+  const only = providers.length === 1 ? providers[0]! : undefined;
+  return only?.version !== undefined && only.versionSource !== undefined
+    ? {
+        ecosystem: "go",
+        version: only.version,
+        versionSource: only.versionSource,
+      }
+    : { ecosystem: "go" };
 }
 const unique = <T>(items: T[]) => [...new Set(items)];
 

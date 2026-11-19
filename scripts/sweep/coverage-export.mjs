@@ -448,6 +448,8 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys, pre
         goReturned: (desc) => goReturned(file.path, desc),
         rustImports: file.module === "rust" ? rustImports(records) : new Map(),
         rustStoredTargets: file.module === "rust" && graphSchema === "4" && Number(file.moduleVersion) >= 29,
+        // Go records library targets from module 30 (C-14): no reconstruction.
+        goStoredTargets: file.module === "go" && graphSchema === "4" && Number(file.moduleVersion) >= 30,
         tsSpecifiers: new Set(records.map((link) => link.data?.specifier).filter(Boolean)),
         tsImports: () => tsSourceBindings().imports,
         tsImportMember: (name) => {
