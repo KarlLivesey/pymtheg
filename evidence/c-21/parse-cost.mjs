@@ -12,18 +12,27 @@ import { Language, Parser } from "web-tree-sitter";
 
 const require = createRequire(import.meta.url);
 const [a, b, root] = process.argv.slice(2);
-await Parser.init({ locateFile: () => require.resolve("web-tree-sitter/web-tree-sitter.wasm") });
+await Parser.init({
+  locateFile: () => require.resolve("web-tree-sitter/web-tree-sitter.wasm"),
+});
 const texts = readdirSync(root, { recursive: true })
   .filter((f) => f.endsWith(".rs") && !f.split("/").includes(".git"))
   .map((f) => readFileSync(join(root, f), "utf8"));
 const bytes = texts.reduce((n, t) => n + Buffer.byteLength(t), 0);
 console.log(`${texts.length} files, ${bytes} bytes`);
-for (const [label, wasm] of [["A", a], ["B", b], ["A", a], ["B", b]]) {
+for (const [label, wasm] of [
+  ["A", a],
+  ["B", b],
+  ["A", a],
+  ["B", b],
+]) {
   const parser = new Parser();
   parser.setLanguage(await Language.load(wasm));
   const start = performance.now();
   for (const text of texts) parser.parse(text).delete();
   const ms = performance.now() - start;
   parser.delete();
-  console.log(`${label} ${statSync(wasm).size} bytes wasm, parse ${ms.toFixed(0)} ms`);
+  console.log(
+    `${label} ${statSync(wasm).size} bytes wasm, parse ${ms.toFixed(0)} ms`,
+  );
 }

@@ -395,10 +395,10 @@ test("patch 0014: a turbofish struct pattern names the struct and binds its fiel
   assert.deepEqual(targets(links, "patterns", "Payload"), ["struct:Payload"]);
   assert.deepEqual(targets(links, "calls", "describe"), ["function:describe"]);
   // `code` in `describe(code)` is the pattern's binding in f.
-  assert.deepEqual(
-    targets(links, "values", "code").sort(),
-    ["function:describe", "function:f"],
-  );
+  assert.deepEqual(targets(links, "values", "code").sort(), [
+    "function:describe",
+    "function:f",
+  ]);
 });
 
 test("ordinary Rust keeps exactly the tree the grammar before C-21 gave", async () => {

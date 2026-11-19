@@ -73,7 +73,11 @@ function read(parser, text) {
       if (!c.gotoParent()) {
         c.delete();
         tree.delete();
-        return { failed: firstError !== null, firstError, digest: hash.digest("hex") };
+        return {
+          failed: firstError !== null,
+          firstError,
+          digest: hash.digest("hex"),
+        };
       }
     }
   }
@@ -104,7 +108,12 @@ for (const root of roots) {
       r.newlyParsing.push({ file, oldError: a.firstError });
     else if (!a.failed && b.failed)
       r.newlyFailing.push({ file, newError: b.firstError });
-    else r.failedBoth.push({ file, oldError: a.firstError, newError: b.firstError });
+    else
+      r.failedBoth.push({
+        file,
+        oldError: a.firstError,
+        newError: b.firstError,
+      });
   }
   console.log(
     `${root}: ${r.files} files, ${r.identical}/${r.parsedBoth} identical, ` +

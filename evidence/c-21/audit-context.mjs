@@ -7,11 +7,20 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const [rowsPath, n, runPath, scratch] = process.argv.slice(2);
-const attempts = new Map(JSON.parse(readFileSync(runPath, "utf8")).repos.map((r) => [r.id, r.attempt]));
-const rows = readFileSync(rowsPath, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)).slice(0, Number(n));
+const attempts = new Map(
+  JSON.parse(readFileSync(runPath, "utf8")).repos.map((r) => [r.id, r.attempt]),
+);
+const rows = readFileSync(rowsPath, "utf8")
+  .split("\n")
+  .filter(Boolean)
+  .map((l) => JSON.parse(l))
+  .slice(0, Number(n));
 const lines = (repo, file) => {
   try {
-    return readFileSync(join(scratch, attempts.get(repo), "checkout", file), "utf8").split("\n");
+    return readFileSync(
+      join(scratch, attempts.get(repo), "checkout", file),
+      "utf8",
+    ).split("\n");
   } catch {
     return [];
   }
@@ -19,11 +28,19 @@ const lines = (repo, file) => {
 rows.forEach((r, i) => {
   const src = lines(r.repo, r.file);
   const t = r.after?.target;
-  console.log(`#${i + 1} ${r.repo} ${r.file}:${r.line} ${r.kind} ${r.targetName} [${r.site ?? ""}] ${r.before?.resolution ?? "-"} -> ${r.after?.resolution}`);
-  for (let k = Math.max(1, r.line - 2); k <= r.line; k++) console.log(`   ${k}| ${src[k - 1]?.slice(0, 200)}`);
+  console.log(
+    `#${i + 1} ${r.repo} ${r.file}:${r.line} ${r.kind} ${r.targetName} [${r.site ?? ""}] ${r.before?.resolution ?? "-"} -> ${r.after?.resolution}`,
+  );
+  for (let k = Math.max(1, r.line - 2); k <= r.line; k++)
+    console.log(`   ${k}| ${src[k - 1]?.slice(0, 200)}`);
   if (t) {
     const tl = lines(r.repo, t.file);
-    console.log(`   => ${t.kind} ${t.name} at ${t.file}:${t.line}| ${tl[t.line - 1]?.trim().slice(0, 200)}`);
+    console.log(
+      `   => ${t.kind} ${t.name} at ${t.file}:${t.line}| ${tl[t.line - 1]?.trim().slice(0, 200)}`,
+    );
   } else console.log(`   => ${JSON.stringify(r.after?.libraries ?? null)}`);
-  if (r.before?.target) console.log(`   (main: ${r.before.target.kind} ${r.before.target.name} at ${r.before.target.file}:${r.before.target.line})`);
+  if (r.before?.target)
+    console.log(
+      `   (main: ${r.before.target.kind} ${r.before.target.name} at ${r.before.target.file}:${r.before.target.line})`,
+    );
 });

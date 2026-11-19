@@ -12,7 +12,9 @@ import { Language, Parser } from "web-tree-sitter";
 
 const require = createRequire(import.meta.url);
 const [wasm, out] = process.argv.slice(2);
-await Parser.init({ locateFile: () => require.resolve("web-tree-sitter/web-tree-sitter.wasm") });
+await Parser.init({
+  locateFile: () => require.resolve("web-tree-sitter/web-tree-sitter.wasm"),
+});
 const parser = new Parser();
 parser.setLanguage(await Language.load(wasm));
 const root = new URL("../../test/fixtures/", import.meta.url).pathname;
@@ -28,7 +30,9 @@ for (const file of files) {
   walk: for (;;) {
     const n = c.currentNode;
     failed ||= n.type === "ERROR" || n.isMissing;
-    hash.update(`${c.currentFieldName ?? ""}:${n.type}:${n.isNamed ? 1 : 0}:${n.startIndex}:${n.endIndex};`);
+    hash.update(
+      `${c.currentFieldName ?? ""}:${n.type}:${n.isNamed ? 1 : 0}:${n.startIndex}:${n.endIndex};`,
+    );
     if (c.gotoFirstChild()) continue;
     while (!c.gotoNextSibling()) if (!c.gotoParent()) break walk;
   }
@@ -37,4 +41,6 @@ for (const file of files) {
   if (!failed) digests[relative(root, join(root, file))] = hash.digest("hex");
 }
 writeFileSync(out, `${JSON.stringify(digests, null, 2)}\n`);
-console.log(`${Object.keys(digests).length} of ${files.length} fixtures parse cleanly`);
+console.log(
+  `${Object.keys(digests).length} of ${files.length} fixtures parse cleanly`,
+);

@@ -36,10 +36,14 @@ function load(scratch, repo) {
   );
   try {
     const failed = new Set();
-    for (const { path, status } of db.prepare("SELECT path, status FROM graph_files").iterate())
+    for (const { path, status } of db
+      .prepare("SELECT path, status FROM graph_files")
+      .iterate())
       if (path.endsWith(".rs") && status === "failed") failed.add(path);
     const symbols = new Map();
-    for (const { body } of db.prepare("SELECT body FROM graph_symbols").iterate()) {
+    for (const { body } of db
+      .prepare("SELECT body FROM graph_symbols")
+      .iterate()) {
       const s = JSON.parse(body);
       symbols.set(s.id, {
         key: JSON.stringify([s.module, s.file, s.kind, s.identity, s.ordinal]),
@@ -51,23 +55,36 @@ function load(scratch, repo) {
       });
     }
     const candidates = new Map();
-    for (const { link, symbol } of db.prepare("SELECT link, symbol FROM graph_candidates").iterate()) {
+    for (const { link, symbol } of db
+      .prepare("SELECT link, symbol FROM graph_candidates")
+      .iterate()) {
       const list = candidates.get(link) ?? [];
       list.push(symbols.get(symbol)?.key ?? symbol);
       candidates.set(link, list);
     }
     const libraries = new Map();
     for (const r of db
-      .prepare("SELECT link, role, id, unit, symbol, evidence FROM graph_library_targets")
+      .prepare(
+        "SELECT link, role, id, unit, symbol, evidence FROM graph_library_targets",
+      )
       .iterate()) {
       const list = libraries.get(r.link) ?? [];
       list.push(JSON.stringify([r.role, r.id, r.unit, r.symbol, r.evidence]));
       libraries.set(r.link, list);
     }
     const links = new Map();
-    for (const row of db.prepare("SELECT id, target, resolution, body FROM graph_links").iterate()) {
+    for (const row of db
+      .prepare("SELECT id, target, resolution, body FROM graph_links")
+      .iterate()) {
       const l = JSON.parse(row.body);
-      let site = [l.module, l.file, l.kind, l.range.start, l.range.end, l.targetName].join("|");
+      let site = [
+        l.module,
+        l.file,
+        l.kind,
+        l.range.start,
+        l.range.end,
+        l.targetName,
+      ].join("|");
       while (links.has(site)) site += "+";
       links.set(site, {
         module: l.module,
@@ -76,11 +93,15 @@ function load(scratch, repo) {
         start: l.range.start,
         targetName: l.targetName,
         resolution: row.resolution,
-        target: row.target ? (symbols.get(row.target)?.key ?? row.target) : null,
+        target: row.target
+          ? (symbols.get(row.target)?.key ?? row.target)
+          : null,
         targetSymbol: row.target ? symbols.get(row.target) : undefined,
         candidates: (candidates.get(row.id) ?? []).sort(),
         libraries: (libraries.get(row.id) ?? []).sort(),
-        reason: [l.data?.reason, l.data?.uncertainty].filter(Boolean).join(" | "),
+        reason: [l.data?.reason, l.data?.uncertainty]
+          .filter(Boolean)
+          .join(" | "),
       });
     }
     return { checkout, symbols, links, failed };
@@ -117,7 +138,11 @@ const text = (checkout, file) => {
 const describe = (checkout, l) => {
   const src = text(checkout, l.file);
   const line = lineOf(src, l.start);
-  return { file: l.file, line, code: src.split("\n")[line - 1]?.trim().slice(0, 160) };
+  return {
+    file: l.file,
+    line,
+    code: src.split("\n")[line - 1]?.trim().slice(0, 160),
+  };
 };
 const targetOf = (checkout, l) =>
   l.targetSymbol
@@ -137,18 +162,28 @@ for (const [id, b] of base) {
   }
   const before = load(baseScratch, b),
     after = load(candScratch, c);
-  const newlyRead = [...before.failed].filter((f) => !after.failed.has(f)).sort();
+  const newlyRead = [...before.failed]
+    .filter((f) => !after.failed.has(f))
+    .sort();
   const keysBefore = new Set([...before.symbols.values()].map((s) => s.key));
   const keysAfter = new Set([...after.symbols.values()].map((s) => s.key));
   const addedKeys = [...keysAfter].filter((k) => !keysBefore.has(k));
   const row = {
     id,
-    failedRustFiles: { before: [...before.failed].sort(), after: [...after.failed].sort() },
+    failedRustFiles: {
+      before: [...before.failed].sort(),
+      after: [...after.failed].sort(),
+    },
     newlyRead,
     symbolKeysRemoved: [...keysBefore].filter((k) => !keysAfter.has(k)).length,
     symbolKeysAdded: addedKeys.length,
-    symbolKeysAddedOutsideNewlyRead: addedKeys.filter((k) => !newlyRead.includes(JSON.parse(k)[1])).length,
-    rustAllSites: { before: { links: 0, level2: 0, taint: 0 }, after: { links: 0, level2: 0, taint: 0 } },
+    symbolKeysAddedOutsideNewlyRead: addedKeys.filter(
+      (k) => !newlyRead.includes(JSON.parse(k)[1]),
+    ).length,
+    rustAllSites: {
+      before: { links: 0, level2: 0, taint: 0 },
+      after: { links: 0, level2: 0, taint: 0 },
+    },
     rustLikeForLike: { links: 0, level2Before: 0, level2After: 0 },
     sitesOnlyBefore: 0,
     sitesOnlyAfter: 0,
@@ -161,7 +196,10 @@ for (const [id, b] of base) {
     newlyResolvedNewSites: 0,
     transitions: {},
   };
-  for (const [side, graph] of [["before", before], ["after", after]])
+  for (const [side, graph] of [
+    ["before", before],
+    ["after", after],
+  ])
     for (const l of graph.links.values())
       if (l.module === "rust") {
         row.rustAllSites[side].links++;
@@ -175,7 +213,17 @@ for (const [id, b] of base) {
       if (l.resolution === "resolved") {
         row.definiteBefore++;
         row.definiteChanged++;
-        changedDefinite.push({ repo: id, ...describe(before.checkout, l), kind: l.kind, targetName: l.targetName, before: { resolution: l.resolution, target: targetOf(before.checkout, l) }, after: null });
+        changedDefinite.push({
+          repo: id,
+          ...describe(before.checkout, l),
+          kind: l.kind,
+          targetName: l.targetName,
+          before: {
+            resolution: l.resolution,
+            target: targetOf(before.checkout, l),
+          },
+          after: null,
+        });
       }
       continue;
     }
@@ -187,7 +235,8 @@ for (const [id, b] of base) {
     if (level2(l) && !level2(a)) row.level2Lost++;
     if (l.resolution === "resolved") {
       row.definiteBefore++;
-      if (a.resolution === "resolved" && a.target === l.target) row.definiteKept++;
+      if (a.resolution === "resolved" && a.target === l.target)
+        row.definiteKept++;
       else row.definiteChanged++;
     }
     const changed =
@@ -203,16 +252,33 @@ for (const [id, b] of base) {
       ...describe(after.checkout, l),
       kind: l.kind,
       targetName: l.targetName,
-      before: { resolution: l.resolution, reason: l.reason, target: targetOf(before.checkout, l), candidates: l.candidates.length, libraries: l.libraries },
-      after: { resolution: a.resolution, reason: a.reason, target: targetOf(after.checkout, a), candidates: a.candidates.length, libraries: a.libraries },
+      before: {
+        resolution: l.resolution,
+        reason: l.reason,
+        target: targetOf(before.checkout, l),
+        candidates: l.candidates.length,
+        libraries: l.libraries,
+      },
+      after: {
+        resolution: a.resolution,
+        reason: a.reason,
+        target: targetOf(after.checkout, a),
+        candidates: a.candidates.length,
+        libraries: a.libraries,
+      },
     };
     if (l.resolution === "resolved") {
-      if (a.resolution === "resolved" && a.target === l.target) otherChanges.push(record);
+      if (a.resolution === "resolved" && a.target === l.target)
+        otherChanges.push(record);
       else changedDefinite.push(record);
     } else if (a.resolution === "resolved") {
       if (l.module === "rust") {
         row.newlyResolvedOldSites++;
-        newlyResolved.push({ rank: createHash("sha256").update(`c21|${id}|${site}`).digest("hex"), site: "old", ...record });
+        newlyResolved.push({
+          rank: createHash("sha256").update(`c21|${id}|${site}`).digest("hex"),
+          site: "old",
+          ...record,
+        });
       } else otherChanges.push(record);
     } else otherChanges.push(record);
   }
@@ -220,24 +286,44 @@ for (const [id, b] of base) {
     if (before.links.has(site)) continue;
     row.sitesOnlyAfter++;
     if (newlyRead.includes(a.file)) row.sitesOnlyAfterInNewlyRead++;
-    if (a.module === "rust" && a.resolution === "resolved" && a.kind !== "contains") {
+    if (
+      a.module === "rust" &&
+      a.resolution === "resolved" &&
+      a.kind !== "contains"
+    ) {
       row.newlyResolvedNewSites++;
       newlyResolved.push({
         rank: createHash("sha256").update(`c21|${id}|${site}`).digest("hex"),
-        site: newlyRead.includes(a.file) ? "new-in-newly-read-file" : "new-elsewhere",
+        site: newlyRead.includes(a.file)
+          ? "new-in-newly-read-file"
+          : "new-elsewhere",
         repo: id,
         ...describe(after.checkout, a),
         kind: a.kind,
         targetName: a.targetName,
-        after: { resolution: a.resolution, reason: a.reason, target: targetOf(after.checkout, a) },
+        after: {
+          resolution: a.resolution,
+          reason: a.reason,
+          target: targetOf(after.checkout, a),
+        },
       });
     }
   }
   summary.push(row);
-  console.error(id, JSON.stringify({ ...row, failedRustFiles: undefined, newlyRead: newlyRead.length }));
+  console.error(
+    id,
+    JSON.stringify({
+      ...row,
+      failedRustFiles: undefined,
+      newlyRead: newlyRead.length,
+    }),
+  );
 }
 const jsonl = (rows) => rows.map((x) => JSON.stringify(x)).join("\n") + "\n";
 writeFileSync(out, JSON.stringify(summary, null, 2) + "\n");
 writeFileSync(out + ".changed-definite.jsonl", jsonl(changedDefinite));
-writeFileSync(out + ".newly-resolved.jsonl", jsonl(newlyResolved.sort((a, b) => (a.rank < b.rank ? -1 : 1))));
+writeFileSync(
+  out + ".newly-resolved.jsonl",
+  jsonl(newlyResolved.sort((a, b) => (a.rank < b.rank ? -1 : 1))),
+);
 writeFileSync(out + ".other-changes.jsonl", jsonl(otherChanges));
