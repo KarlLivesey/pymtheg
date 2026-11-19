@@ -15,6 +15,7 @@ import type {
 import { CheckerLimit, extractFile, type TargetFact } from "./extract.js";
 import { libraryKey, libraryReader } from "./library.js";
 import type { Renamed } from "./rename.js";
+import { taintExhausted } from "./taint.js";
 import { neutralizeAssumed } from "./untrusted.js";
 
 /** Program rebuilds per file after checker stack overflows before giving up. */
@@ -445,6 +446,29 @@ function differing(normal: ParseResult, neutral: ParseResult): Set<number> {
     if (!outcomes.get(siteOf(link))?.has(outcomeOf(link))) marks.add(index);
   });
   return marks;
+}
+
+/**
+ * A file extracted with a checker whose taint walk stopped at its budget
+ * (taint.ts): which links depend on a failed file is unknown, so every link
+ * that could have a target is unresolved with `taint-budget-exhausted` and
+ * keeps no target or library fact. Structural `contains` links and links
+ * already failed (`invalid-code`) are unchanged.
+ */
+function withoutTaint(result: ParseResult): ParseResult {
+  if (result.status === "failed") return result;
+  return {
+    ...result,
+    links: result.links.map((link) => {
+      const data = { ...((link.data ?? {}) as { [key: string]: Json }) };
+      if (link.kind === "contains" || data.reason === "invalid-code")
+        return link;
+      delete data.targets;
+      delete data.libraryFacts;
+      data.reason = "taint-budget-exhausted";
+      return { ...link, data };
+    }),
+  };
 }
 
 /** Flags the links that rest on the bundler assumption. */
@@ -947,7 +971,11 @@ const module: LanguageModule = {
             libraries,
           );
           statistics.extracted++;
-          return { result };
+          return {
+            result: taintExhausted(session.checker)
+              ? withoutTaint(result)
+              : result,
+          };
         } catch (error) {
           if (error instanceof CheckerLimit) return { limit: error.key };
           if (isCompilerAssertion(error))

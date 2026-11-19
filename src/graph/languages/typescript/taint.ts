@@ -47,6 +47,26 @@ export interface TaintInput {
 }
 
 const memo = new WeakMap<ts.TypeChecker, Taint>();
+/**
+ * The most steps one program's taint walk may take: a node visited while
+ * looking for seeds or reading a declaration's parts, and an edge followed
+ * to the fixpoint. A count, never a time or memory reading, so the outcome
+ * depends only on the snapshot. Far above every measured pin
+ * (docs/changes/C-13.md). A walk that reaches it stops: its program's taint
+ * is unknown, and the module reports every link that would have consulted
+ * it as unresolved (`taint-budget-exhausted`), never as untainted.
+ */
+export const TAINT_BUDGET = 20_000_000;
+/** Test hook: the budget in force (TAINT_BUDGET in normal use). */
+export const taintLimits = { steps: TAINT_BUDGET };
+/** Observation counters for evidence and tests: walks, the most steps one took, walks stopped. */
+export const taintStatistics = { walks: 0, maxSteps: 0, exhausted: 0 };
+/** Checkers whose taint walk reached the budget. */
+const exhaustedFor = new WeakSet<ts.TypeChecker>();
+/** Whether this checker's taint walk stopped at the budget (its taint is unknown). */
+export const taintExhausted = (checker: ts.TypeChecker) =>
+  exhaustedFor.has(checker);
+const BUDGET_REACHED = Symbol("taint budget reached");
 /** A destructured binding depends on the property it takes. */
 const DESTRUCTURED = true;
 /** A reference inside a type argument taints weakly. */
@@ -258,6 +278,25 @@ const isCommonJsExport = (left: ts.Node): boolean =>
     ((ts.isIdentifier(left.expression) && left.expression.text === "exports") ||
       isCommonJsExport(left.expression)));
 
+/**
+ * The symbol a declaration binds, for the seed walk: the binder's own symbol
+ * (every import, re-export, `import =` and `require` binding has one), or a
+ * CommonJS export assignment's. Never a name the checker must resolve in an
+ * arbitrary expression: resolving every member access of a program asks the
+ * checker for each one's type (a single member access on a cross-product of
+ * unions and intersections exhausted the heap, see docs/changes/C-13.md).
+ */
+function aliasDeclared(
+  node: ts.Node,
+  checker: ts.TypeChecker,
+): ts.Symbol | undefined {
+  const bound = (node as { symbol?: ts.Symbol }).symbol;
+  if (bound) return bound;
+  if (ts.isBinaryExpression(node) && isCommonJsExport(node.left))
+    return checker.getSymbolAtLocation(node.left);
+  return undefined;
+}
+
 /** The symbol a declaration (or a CommonJS export assignment) defines. */
 function symbolOfDeclaration(
   node: ts.Node,
@@ -340,6 +379,27 @@ export function taintOf(input: TaintInput, failed: boolean): Taint {
   if (!failed) return EMPTY;
   const known = memo.get(input.checker);
   if (known) return known;
+  let steps = 0;
+  const step = () => {
+    if (++steps > taintLimits.steps) throw BUDGET_REACHED;
+  };
+  taintStatistics.walks++;
+  try {
+    return computeTaint(input, step);
+  } catch (error) {
+    if (error !== BUDGET_REACHED) throw error;
+    // Unknown, not empty: the module turns every link of this program
+    // that consults it into `taint-budget-exhausted` (taintExhausted).
+    taintStatistics.exhausted++;
+    exhaustedFor.add(input.checker);
+    memo.set(input.checker, EMPTY);
+    return EMPTY;
+  } finally {
+    taintStatistics.maxSteps = Math.max(taintStatistics.maxSteps, steps);
+  }
+}
+
+function computeTaint(input: TaintInput, step: () => void): Taint {
   const { program, checker, captured, resolveModule, invalid, failedNames } =
     input;
   const seeds = new Map<ts.Symbol, Set<string>>();
@@ -405,7 +465,8 @@ export function taintOf(input: TaintInput, failed: boolean): Taint {
   for (const source of sources) {
     const path = fromVirtual(source.fileName)!;
     const visit = (node: ts.Node): void => {
-      const symbol = symbolOfDeclaration(node, checker);
+      step();
+      const symbol = aliasDeclared(node, checker);
       if (symbol && symbol.flags & ts.SymbolFlags.Alias) {
         const causes = moduleCauses(
           bindingSpecifier(symbol),
@@ -522,8 +583,11 @@ export function taintOf(input: TaintInput, failed: boolean): Taint {
       const declared = (declaration as { symbol?: ts.Symbol }).symbol;
       if (declared) keys.add(declared);
     }
-    for (const key of keys)
-      dependents.set(key, [...(dependents.get(key) ?? []), edge]);
+    for (const key of keys) {
+      const edges = dependents.get(key);
+      if (edges) edges.push(edge);
+      else dependents.set(key, [edge]);
+    }
   };
   /** Only a generic or overloaded callee's result depends on its arguments. */
   const argumentsMatter = (call: ts.CallExpression | ts.NewExpression) => {
@@ -548,6 +612,7 @@ export function taintOf(input: TaintInput, failed: boolean): Taint {
    */
   const reference = (target: ts.Symbol, part: ts.Node) => {
     const visit = (node: ts.Node, inArgument: boolean): void => {
+      step();
       if (ts.isIdentifier(node) || ts.isPrivateIdentifier(node)) {
         let symbol: ts.Symbol | undefined;
         try {
@@ -689,6 +754,7 @@ export function taintOf(input: TaintInput, failed: boolean): Taint {
   while (queue.length) {
     const changed = queue.pop()!;
     for (const edge of dependents.get(changed) ?? []) {
+      step();
       let grew = false;
       const strong = all.get(changed);
       if (strong?.size)

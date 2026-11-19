@@ -15,6 +15,7 @@ import typescript, {
   statistics,
 } from "../dist/graph/languages/typescript/index.js";
 import { programBudget } from "../dist/graph/languages/typescript/project.js";
+import { taintLimits } from "../dist/graph/languages/typescript/taint.js";
 
 /**
  * Indexes `files` (twice when `twice` is set) and returns the report, the
@@ -307,4 +308,60 @@ test("a project within the budget is analysed whole", async () => {
   const only = linkOn(result, "small.js", "// only-in-large", "onlyInLarge");
   assert.equal(only.target, "large.js#onlyInLarge");
   assert.deepEqual(only.assumes, []);
+});
+
+// A program with a failed file computes which links depend on it (taint.ts),
+// walking every file. The walk has a step budget; when it is reached the
+// answer is unknown, so links must not resolve as if nothing depended on the
+// failed file.
+const WITH_FAILED_FILE = {
+  "broken.js": "const = ;\n",
+  "lib.ts": "export function helper() {}\n",
+  "use.ts": [
+    'import { helper } from "./lib"; // import-helper',
+    "helper(); // call-helper",
+    'import { value } from "./broken.js"; // import-broken',
+    "",
+  ].join("\n"),
+};
+
+test("a program whose failed-file walk stays within its budget resolves as before", async () => {
+  const result = await indexFiles(WITH_FAILED_FILE);
+  assert.deepEqual(Object.keys(failedReasons(result)), ["broken.js"]);
+  const call = linkOn(result, "use.ts", "// call-helper", "helper");
+  assert.equal(call.resolution, "resolved");
+  assert.equal(call.target, "lib.ts#helper");
+  assert.ok(call.assumes.includes("no-unseen-declarations"));
+  const broken = linkOn(result, "use.ts", "// import-broken", "value");
+  assert.equal(broken.reason, "invalid-code");
+});
+
+test("a failed-file walk that reaches its budget leaves the program's links unresolved, never resolved", async () => {
+  const saved = taintLimits.steps;
+  taintLimits.steps = 1;
+  try {
+    const result = await indexFiles(WITH_FAILED_FILE);
+    assert.deepEqual(Object.keys(failedReasons(result)), ["broken.js"]);
+    for (const [marker, text] of [
+      ["// call-helper", "helper"],
+      ["// import-helper", "helper"],
+    ]) {
+      const link = linkOn(result, "use.ts", marker, text);
+      assert.equal(link.resolution, "unresolved", marker);
+      assert.equal(link.reason, "taint-budget-exhausted", marker);
+      assert.equal(link.target, null, marker);
+    }
+    // A link already failed by the failed file keeps that reason.
+    const broken = linkOn(result, "use.ts", "// import-broken", "value");
+    assert.equal(broken.reason, "invalid-code");
+    // A file whose program has no failed file needs no walk.
+    const clean = await indexFiles({
+      "lib.ts": "export function helper() {}\n",
+      "use.ts": 'import { helper } from "./lib";\nhelper(); // call-helper\n',
+    });
+    const call = linkOn(clean, "use.ts", "// call-helper", "helper");
+    assert.equal(call.target, "lib.ts#helper");
+  } finally {
+    taintLimits.steps = saved;
+  }
 });

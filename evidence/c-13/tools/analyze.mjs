@@ -100,6 +100,12 @@ try {
   );
   for (const [reason, count] of [...reasons].sort((a, b) => b[1] - a[1]).slice(0, 15))
     console.log(count, reason);
+  const taint = await import(`${build}/dist/graph/languages/typescript/taint.js`);
+  if (taint.taintStatistics) console.log("taint", JSON.stringify({ ...taint.taintStatistics, budget: taint.taintLimits.steps }));
+  let exhausted = 0;
+  for (const { result } of results)
+    for (const link of result.links ?? []) if (link.data?.reason === "taint-budget-exhausted") exhausted++;
+  console.log("links taint-budget-exhausted", exhausted);
   const answered = new Set(results.map((item) => item.path));
   const missing = files.filter((file) => !answered.has(file.path)).map((file) => file.path);
   console.log("without a result", missing.length, JSON.stringify(missing.slice(0, 10)));
