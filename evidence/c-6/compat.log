@@ -1,0 +1,21 @@
+All matched files use Prettier code style!
+== 0.1.0 store, then this branch, then 0.1.0 again
+0.1.0 index: exit=0 status=ok complete=true files=31 links=1303 format=1,1 files=graph.sqlite 
+branch status on 0.1.0 store: exit=0 status=ok complete=false files=31 links=1303 format=1,1 files=graph.sqlite 
+branch index (upgrade): exit=0 status=ok complete=true files=31 links=1322 format=1,1 files=graph.sqlite 
+0.1.0 status on upgraded store: exit=3 status=error message="Unsupported graph schema; rebuild the index" format=1,1 files=graph.sqlite 
+main status on branch store: exit=0 status=ok complete=false files=31 links=1322 format=1,1 files=graph.sqlite 
+main index on branch store: exit=0 status=ok complete=true files=31 links=1322 format=1,1 files=graph.sqlite 
+branch index on main store: exit=0 status=ok complete=true files=31 links=1322 format=1,1 files=graph.sqlite 
+== main store, then this branch
+main index: exit=0 status=ok complete=true files=31 links=1322 format=1,1 files=graph.sqlite 
+branch status on main store: exit=0 status=ok complete=false files=31 links=1322 format=1,1 files=graph.sqlite 
+== a branch index killed with its log in place
+killed-index: wal-bytes=3098272
+0.1.0 status on killed store: exit=3 status=error message="Unsupported graph schema; rebuild the index" format=2,2 files=graph.sqlite graph.sqlite-shm graph.sqlite-wal 
+main status on killed store: exit=0 status=ok complete=false files=13 links=506 format=2,2 files=graph.sqlite graph.sqlite-shm graph.sqlite-wal 
+branch status on killed store: exit=0 status=ok complete=false files=13 links=506 format=2,2 files=graph.sqlite graph.sqlite-shm graph.sqlite-wal 
+main index repairs: exit=0 status=ok complete=true files=31 links=1322 format=2,2 files=graph.sqlite 
+killed-index: wal-bytes=2146552
+branch index repairs: exit=0 status=ok complete=true files=31 links=1322 format=1,1 files=graph.sqlite 
+compat done
