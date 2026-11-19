@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// stdin script: node --input-type=module - OUT IN1 IN2 ... (later inputs win per repo id)
+// Usage: node merge-coverage.mjs OUT IN1 IN2 ... (later inputs win per repository id)
 import { readFileSync, writeFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
 const [out, ...inputs] = process.argv.slice(2);

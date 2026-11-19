@@ -372,3 +372,47 @@ test("method calls whose source does not prove one target stay unresolved", asyn
     assert.equal(g.target(link), undefined, marker);
   }
 });
+
+test("review: aliases keep reference depth and parameter defaults", async () => {
+  const g = await graph("receivers");
+  const file = "src/aliases.rs";
+  // `x: Ref<'_>` is `&A`: the inherent method comes first.
+  const direct = g.target(g.call(file, "x.clone()", "clone"));
+  assert.equal(direct?.name, "clone");
+  assert.equal(direct?.file, file);
+  // `&x` is `&&A`; rustc selects `<&A as Clone>::clone` (the fixture's
+  // `let doubled: &A` only type-checks that way).
+  assert.equal(g.target(g.call(file, "(&x).clone()", "clone")), undefined);
+  // A default naming another alias parameter is not the same-named struct.
+  assert.equal(g.target(g.call(file, "make()?.pick()", "pick")), undefined);
+  // A plain default (`E = Error`) still types the result.
+  const get = g.target(g.call(file, "load()?.get()", "get"));
+  assert.equal(get?.name, "get");
+  assert.equal(get?.file, file);
+});
+
+test("review: macro patterns and generic parameter namespaces", async () => {
+  const g = await graph("locals");
+  const file = "src/lib.rs";
+  // A macro in pattern position may bind any name: neither the arm's own
+  // binding nor the outer parameter is proved there.
+  for (const [name, marker] of [
+    ["outer", "=> outer"],
+    ["inner", "=> inner"],
+  ]) {
+    const link = g.at(file, "values", name, marker);
+    assert.equal(g.target(link), undefined, name);
+    assert.equal(link.data.localBinding, undefined, name);
+  }
+  // A type parameter does not answer a value use, nor a const parameter a
+  // type use; both names here are unit structs.
+  const value = g.at(file, "values", "T", "        T\n");
+  assert.notEqual(g.target(value)?.name, "value_use");
+  assert.equal(value.data.typeParameter, undefined);
+  const typ = g.at(file, "types", "N", "-> N {");
+  assert.notEqual(g.target(typ)?.name, "typ");
+  assert.equal(typ.data.typeParameter, undefined);
+  // Each namespace still finds its own parameter.
+  assert.equal(g.target(g.at(file, "values", "N", "[0; N]")).name, "sized");
+  assert.equal(g.target(g.at(file, "types", "U", "-> U {")).name, "ident");
+});

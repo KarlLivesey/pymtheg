@@ -1201,9 +1201,24 @@ async function createHelper(): Promise<Helper> {
             macro = false,
           ) => {
             if (!pattern) return;
-            const ids = patternNames(pattern);
             const names =
               scopes!.get(region.id) ?? new Map<string, Binding[]>();
+            // C-10: a macro in a pattern can bind any name (or none): its
+            // whole region is unproved, as after an unknown statement macro.
+            if (pattern.descendantsOfType("macro_invocation").length) {
+              const list = names.get("*") ?? [];
+              list.push({
+                pattern,
+                type: null,
+                start: 0,
+                order: order++,
+                item: true,
+              });
+              names.set("*", list);
+              scopes!.set(region.id, names);
+              return;
+            }
+            const ids = patternNames(pattern);
             for (const id of ids) {
               if (
                 id.text === "_" ||
@@ -1656,7 +1671,11 @@ async function createHelper(): Promise<Helper> {
        * inside a nested non-associated item; a block that declares a type of
        * the same name, imports or expands a statement macro is not proved.
        */
-      function typeParameterData(n: Node, raw: string): Record<string, Json> {
+      function typeParameterData(
+        n: Node,
+        raw: string,
+        namespace: "type" | "value",
+      ): Record<string, Json> {
         const name = compact(raw);
         if (!name || name.includes("::") || name === "Self") return {};
         for (let a: Node | null = n.parent; a; a = a.parent) {
@@ -1686,7 +1705,13 @@ async function createHelper(): Promise<Helper> {
                 field(p, "name") ??
                 field(p, "left") ??
                 (p.type === "type_identifier" ? p : null);
-              return !!id && compact(id.text) === name;
+              // A const parameter is a value, a type parameter a type; the
+              // other namespace does not see it.
+              return (
+                !!id &&
+                compact(id.text) === name &&
+                (p.type === "const_parameter") === (namespace === "value")
+              );
             },
           );
           if (parameter) {
@@ -1699,6 +1724,7 @@ async function createHelper(): Promise<Helper> {
               ? {
                   typeParameter: { name, ...span(id) },
                   typeParameterOwner: `item:${a.startIndex}`,
+                  typeParameterNamespace: namespace,
                 }
               : {};
           }
@@ -2696,7 +2722,7 @@ async function createHelper(): Promise<Helper> {
                     b?.blocked.has(compact(n.text)) ||
                     !genericShadow(n, n.text)
                     ? local
-                    : typeParameterData(n, n.text);
+                    : typeParameterData(n, n.text, "value");
                 })()),
           });
         }
@@ -2725,7 +2751,7 @@ async function createHelper(): Promise<Helper> {
             implScope,
             blocked: genericShadow(n, n.text.split("::")[0]!),
             ...(n.type === "type_identifier" && genericShadow(n, n.text)
-              ? typeParameterData(n, n.text)
+              ? typeParameterData(n, n.text, "type")
               : {}),
           });
         }

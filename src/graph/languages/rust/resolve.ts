@@ -4178,6 +4178,22 @@ export function resolveRust(
     );
     let type = find(ex.text, ex.loc, ex.scope, "type");
     if (/^&/.test(ex.text)) {
+      // An alias to a reference behind another borrow (`&x` with
+      // `x: Ref<'_>`, `type Ref<'a> = &'a A`) is a reference to a reference;
+      // its method choice is not the inner type's.
+      if (
+        instance &&
+        (borrow !== "owned" || /^&\s*(?:'\w+\s*)?(?:mut\s+)?&/.test(ex.text))
+      )
+        return {
+          symbols: would(loc.crate.root, name, true),
+          complete: false,
+          reason:
+            "receiver-type-unverified" +
+            (relevantFailures(loc.crate.root).length
+              ? "; failed-file-unseen-declarations"
+              : ""),
+        };
       borrow = /^&\s*(?:'\w+\s*)?mut\b/.test(ex.text) ? "mutable" : "shared";
       typeName = ex.text.replace(/^&\s*(?:'\w+\s*)?(?:mut\s+)?/, "");
       type = find(typeName, ex.loc, ex.scope, "type");
@@ -4868,7 +4884,12 @@ export function resolveRust(
     if (index >= 0)
       return index < args.length
         ? payload(args[index]!, t.loc, t.scope, t.generics)
-        : params[index]![1] !== null
+        : params[index]![1] !== null &&
+            // A default that names another parameter (`T = A`) depends on
+            // the arguments; it is not read at the alias's own scope.
+            !identifiers(params[index]![1]!).some((x) =>
+              params.some(([p]) => p === x),
+            )
           ? payload(params[index]![1]!, place, aliasScope, "")
           : { gap: "try-wrapper" };
     if (identifiers(first).some((x) => params.some(([p]) => p === x)))
@@ -5227,7 +5248,9 @@ export function resolveRust(
       ((["values", "calls"].includes(l.kind) &&
         !!d.localBinding &&
         !(unsafe && d.stdFallbackLocalUnknown)) ||
-        (["values", "types"].includes(l.kind) && !!d.typeParameter))
+        (!!d.typeParameter &&
+          ((l.kind === "types" && d.typeParameterNamespace === "type") ||
+            (l.kind === "values" && d.typeParameterNamespace === "value"))))
     ) {
       const target = d.localBinding
         ? byLocalKey.get(`${l.file}|${l.sourceKey ?? ""}`)

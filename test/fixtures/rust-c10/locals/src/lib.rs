@@ -102,3 +102,43 @@ pub trait Source {
 pub fn items<S: Source>(item: S::Item) -> S::Item {
     item
 }
+
+// A macro in pattern position may bind a name or none.
+macro_rules! ignore {
+    ($x:ident) => {
+        _
+    };
+}
+
+macro_rules! bind {
+    ($x:ident) => {
+        $x
+    };
+}
+
+pub fn macro_patterns(v: u32, outer: u32) -> u32 {
+    let first = match v {
+        ignore!(outer) => outer,
+    };
+    let second = match v {
+        bind!(inner) => inner,
+    };
+    first + second
+}
+
+// Generic parameters answer only their own namespace.
+pub mod namespaces {
+    pub struct T;
+
+    #[allow(dead_code)]
+    pub fn value_use<T>() -> crate::namespaces::T {
+        T
+    }
+
+    pub struct N;
+
+    #[allow(dead_code)]
+    pub fn typ<const N: usize>() -> N {
+        N {}
+    }
+}
