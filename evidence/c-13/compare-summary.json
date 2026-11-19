@@ -1,0 +1,577 @@
+[
+  {
+    "id": "excalidraw/excalidraw",
+    "symbols": {
+      "before": 13405,
+      "after": 13405
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 0,
+    "links": {
+      "before": 104519,
+      "after": 104519
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 61330,
+    "definiteKept": 61330,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 1323,
+    "ambiguousChanged": 0,
+    "newDefinite": {},
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 16539,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "honojs/hono",
+    "symbols": {
+      "before": 5773,
+      "after": 5773
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 0,
+    "links": {
+      "before": 72340,
+      "after": 72340
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 34654,
+    "definiteKept": 34654,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 4470,
+    "ambiguousChanged": 0,
+    "newDefinite": {},
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 12289,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "reduxjs/redux-toolkit",
+    "symbols": {
+      "before": 7918,
+      "after": 7918
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 0,
+    "links": {
+      "before": 57208,
+      "after": 57208
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 23993,
+    "definiteKept": 23993,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 761,
+    "ambiguousChanged": 0,
+    "newDefinite": {},
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 14696,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "trpc/trpc",
+    "symbols": {
+      "before": 17804,
+      "after": 17804
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 0,
+    "links": {
+      "before": 107470,
+      "after": 107470
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 53059,
+    "definiteKept": 53059,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 2356,
+    "ambiguousChanged": 0,
+    "newDefinite": {},
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 33270,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "vitejs/vite",
+    "symbols": {
+      "before": 10184,
+      "after": 10186
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 2,
+    "links": {
+      "before": 55575,
+      "after": 55576
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 1,
+    "definiteBefore": 23262,
+    "definiteKept": 23262,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 422,
+    "ambiguousChanged": 0,
+    "newDefinite": {},
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 9248,
+    "libraryTargetsChanged": [
+      {
+        "site": "typescript|docs/.vitepress/buildEnd.config.ts|imports|90|96|feed",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:ed492f3401b4e56858b6f02df5a6c2ed659276ad3cd5621d403f1f5ae59d5ecc\",\"feed\",null,\"import-path\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/buildEnd.config.ts|imports|78|82|Feed",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:53703f0a8897d834510a498fe18b057192e6a6434e60bff5929db140f995e2f5\",\"feed\",\"Feed\",\"import-binding\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/buildEnd.config.ts|imports|129|140|vitepress",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:e361bba99186340a35317207b117667496ec1b1fb0518a88e18c0c1e87381676\",\"vitepress\",null,\"import-path\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/buildEnd.config.ts|imports|111|121|SiteConfig",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:cade0a15ac04ba21b8bf2e91f097640e030c87ab2e1a4791291804e1250c879b\",\"vitepress\",\"SiteConfig\",\"import-binding\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/buildEnd.config.ts|imports|177|188|vitepress",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:e361bba99186340a35317207b117667496ec1b1fb0518a88e18c0c1e87381676\",\"vitepress\",null,\"import-path\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/buildEnd.config.ts|imports|150|169|createContentLoader",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:57a8189b9def265bd09c65a462473c084d7353d63e379c017798e2912e5d56ed\",\"vitepress\",\"createContentLoader\",\"import-binding\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/buildEnd.config.ts|references|299|309|SiteConfig",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:cade0a15ac04ba21b8bf2e91f097640e030c87ab2e1a4791291804e1250c879b\",\"vitepress\",\"SiteConfig\",\"import-binding\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/buildEnd.config.ts|calls|350|354|Feed",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:53703f0a8897d834510a498fe18b057192e6a6434e60bff5929db140f995e2f5\",\"feed\",\"Feed\",\"import-binding\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/buildEnd.config.ts|calls|676|695|createContentLoader",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:57a8189b9def265bd09c65a462473c084d7353d63e379c017798e2912e5d56ed\",\"vitepress\",\"createContentLoader\",\"import-binding\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/config.ts|imports|36|65|@shikijs/vitepress-twoslash",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:930a95fc3cd6f4358f6c18a737526f964384bb9cc467408497a78f831744006c\",\"@shikijs/vitepress-twoslash\",null,\"import-path\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/config.ts|imports|9|28|transformerTwoslash",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:d079797ce38370108e4eb46ea67652ae98fec2a737b45fc098a4bf301a4f7ca6\",\"@shikijs/vitepress-twoslash\",\"transformerTwoslash\",\"import-binding\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/config.ts|imports|98|129|@voidzero-dev/vitepress-theme",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:db8474ffef5952522da2c5f4dd9de5640170c688271fc35e1f5060b63e0598df\",\"@voidzero-dev/vitepress-theme\",null,\"import-path\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/config.ts|imports|80|90|FooterLink",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:ab29d663224c487c5d8b3e0355bcb06773d12c33727ff019b011f7eae81ff81c\",\"@voidzero-dev/vitepress-theme\",\"FooterLink\",\"import-binding\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/config.ts|imports|159|197|@voidzero-dev/vitepress-theme/config",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:db8474ffef5952522da2c5f4dd9de5640170c688271fc35e1f5060b63e0598df\",\"@voidzero-dev/vitepress-theme\",null,\"import-path\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/config.ts|imports|139|151|extendConfig",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:e8c8664e628717be7a199807bd56d12ad96d4806ba6931af87e132ac9d5ffcc4\",\"@voidzero-dev/vitepress-theme\",\"config:extendConfig\",\"import-binding\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/config.ts|imports|230|241|vitepress",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:e361bba99186340a35317207b117667496ec1b1fb0518a88e18c0c1e87381676\",\"vitepress\",null,\"import-path\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/config.ts|imports|212|222|HeadConfig",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:bf1cf692060e699a7c03e1d0b91af08695d3e86ae3b820e272518aec89d59de1\",\"vitepress\",\"HeadConfig\",\"import-binding\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/config.ts|imports|271|282|vitepress",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:e361bba99186340a35317207b117667496ec1b1fb0518a88e18c0c1e87381676\",\"vitepress\",null,\"import-path\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/config.ts|imports|251|263|defineConfig",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:36216ce80aae3120e0afd543d2beb930ffa2544da0d371250c35d042f2350cd2\",\"vitepress\",\"defineConfig\",\"import-binding\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/config.ts|imports|322|349|vitepress-plugin-graphviz",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:21c804aacc7f87f4c4a470e606f30334833dcc3526733898c6a53db74240308a\",\"vitepress-plugin-graphviz\",null,\"import-path\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/config.ts|imports|292|314|graphvizMarkdownPlugin",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:1a3b12bb63300bb1f093d458b4b0b25e1d01b7ac117f82b1abc7c74250a43fbb\",\"vitepress-plugin-graphviz\",\"graphvizMarkdownPlugin\",\"import-binding\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/config.ts|imports|410|440|vitepress-plugin-group-icons",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:483bd307181c9fc3f6c3989f2bc959fde7876915dff2aa1de3e872ebd62ef7a4\",\"vitepress-plugin-group-icons\",null,\"import-path\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/config.ts|imports|361|378|groupIconMdPlugin",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:1230e5658a686c439b0392c0d3a8915dfddb03a9e7a07037b1fd55acbe703f24\",\"vitepress-plugin-group-icons\",\"groupIconMdPlugin\",\"import-binding\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/config.ts|imports|382|401|groupIconVitePlugin",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:7019913e1cc4a3dbbe72575ee6d8e87668807d26075f0f18dad2f2b6de41ac94\",\"vitepress-plugin-group-icons\",\"groupIconVitePlugin\",\"import-binding\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/config.ts|imports|461|484|vitepress-plugin-llms",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:9d09db5f634475249b5874e125efacc86efd835807bf01a7a53d44a932530bf3\",\"vitepress-plugin-llms\",null,\"import-path\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/config.ts|imports|448|455|default",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:8b6d217a0db17aae69ba004237070a3006aab7571ccc67598fbdb6c6faa8a744\",\"vitepress-plugin-llms\",\"default\",\"import-binding\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/config.ts|references|1450|1460|FooterLink",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:ab29d663224c487c5d8b3e0355bcb06773d12c33727ff019b011f7eae81ff81c\",\"@voidzero-dev/vitepress-theme\",\"FooterLink\",\"import-binding\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/config.ts|calls|1997|2009|defineConfig",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:36216ce80aae3120e0afd543d2beb930ffa2544da0d371250c35d042f2350cd2\",\"vitepress\",\"defineConfig\",\"import-binding\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/config.ts|references|13666|13676|HeadConfig",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:bf1cf692060e699a7c03e1d0b91af08695d3e86ae3b820e272518aec89d59de1\",\"vitepress\",\"HeadConfig\",\"import-binding\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/config.ts|calls|14233|14252|transformerTwoslash",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:d079797ce38370108e4eb46ea67652ae98fec2a737b45fc098a4bf301a4f7ca6\",\"@shikijs/vitepress-twoslash\",\"transformerTwoslash\",\"import-binding\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/config.ts|calls|15228|15250|graphvizMarkdownPlugin",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:1a3b12bb63300bb1f093d458b4b0b25e1d01b7ac117f82b1abc7c74250a43fbb\",\"vitepress-plugin-graphviz\",\"graphvizMarkdownPlugin\",\"import-binding\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/config.ts|calls|15298|15317|groupIconVitePlugin",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:7019913e1cc4a3dbbe72575ee6d8e87668807d26075f0f18dad2f2b6de41ac94\",\"vitepress-plugin-group-icons\",\"groupIconVitePlugin\",\"import-binding\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/config.ts|calls|15485|15492|llmstxt",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:8b6d217a0db17aae69ba004237070a3006aab7571ccc67598fbdb6c6faa8a744\",\"vitepress-plugin-llms\",\"default\",\"import-binding\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/config.ts|calls|16781|16793|extendConfig",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:e8c8664e628717be7a199807bd56d12ad96d4806ba6931af87e132ac9d5ffcc4\",\"@voidzero-dev/vitepress-theme\",\"config:extendConfig\",\"import-binding\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/theme/composables/sponsor.ts|imports|42|73|@voidzero-dev/vitepress-theme",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:db8474ffef5952522da2c5f4dd9de5640170c688271fc35e1f5060b63e0598df\",\"@voidzero-dev/vitepress-theme\",null,\"import-path\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/theme/composables/sponsor.ts|imports|14|21|Sponsor",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:257d806bc44fe189fba7da6b2d2b8cf1b43ed7083ae85531e88c908cb8dacb7b\",\"@voidzero-dev/vitepress-theme\",\"Sponsor\",\"import-binding\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/theme/composables/sponsor.ts|imports|23|34|SponsorTier",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:e9126ff0b910c969f9edc4500f26fa3fecb4dd61c097ff30f438057be2546784\",\"@voidzero-dev/vitepress-theme\",\"SponsorTier\",\"import-binding\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/theme/composables/sponsor.ts|imports|105|110|vue",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:39b2f2fb5c73560c374f9d6f9d7e5508f48a70ea60a495a68b6ea4ea363638a6\",\"vue\",null,\"import-path\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/theme/composables/sponsor.ts|imports|83|92|onMounted",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:31c845777a9afe0e2d2ad001013818b5b1a95d37fe9928e44013afafe428878d\",\"vue\",\"onMounted\",\"import-binding\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/theme/composables/sponsor.ts|imports|94|97|ref",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:8e9350f650f9dc088d344cae2ad7c811229dc381daab17bc12c957e369e5165e\",\"vue\",\"ref\",\"import-binding\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/theme/composables/sponsor.ts|references|141|148|Sponsor",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:257d806bc44fe189fba7da6b2d2b8cf1b43ed7083ae85531e88c908cb8dacb7b\",\"@voidzero-dev/vitepress-theme\",\"Sponsor\",\"import-binding\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/theme/composables/sponsor.ts|references|166|173|Sponsor",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:257d806bc44fe189fba7da6b2d2b8cf1b43ed7083ae85531e88c908cb8dacb7b\",\"@voidzero-dev/vitepress-theme\",\"Sponsor\",\"import-binding\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/theme/composables/sponsor.ts|references|188|195|Sponsor",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:257d806bc44fe189fba7da6b2d2b8cf1b43ed7083ae85531e88c908cb8dacb7b\",\"@voidzero-dev/vitepress-theme\",\"Sponsor\",\"import-binding\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/theme/composables/sponsor.ts|references|206|213|Sponsor",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:257d806bc44fe189fba7da6b2d2b8cf1b43ed7083ae85531e88c908cb8dacb7b\",\"@voidzero-dev/vitepress-theme\",\"Sponsor\",\"import-binding\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/theme/composables/sponsor.ts|calls|286|289|ref",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:8e9350f650f9dc088d344cae2ad7c811229dc381daab17bc12c957e369e5165e\",\"vue\",\"ref\",\"import-binding\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/theme/composables/sponsor.ts|references|290|301|SponsorTier",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:e9126ff0b910c969f9edc4500f26fa3fecb4dd61c097ff30f438057be2546784\",\"@voidzero-dev/vitepress-theme\",\"SponsorTier\",\"import-binding\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/theme/composables/sponsor.ts|calls|341|350|onMounted",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:31c845777a9afe0e2d2ad001013818b5b1a95d37fe9928e44013afafe428878d\",\"vue\",\"onMounted\",\"import-binding\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/theme/index.ts|imports|32|68|@shikijs/vitepress-twoslash/client",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:930a95fc3cd6f4358f6c18a737526f964384bb9cc467408497a78f831744006c\",\"@shikijs/vitepress-twoslash\",null,\"import-path\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/theme/index.ts|imports|7|26|default",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:fa7841cebcae144ce0b5a228bfa79e36d6372cd1721a934576ec71f59f77b2b4\",\"@shikijs/vitepress-twoslash\",\"client:default\",\"import-binding\"]"
+        ]
+      },
+      {
+        "site": "typescript|docs/.vitepress/theme/index.ts|imports|87|127|@voidzero-dev/vitepress-theme/src/vite",
+        "before": [],
+        "after": [
+          "[\"target\",\"library:db8474ffef5952522da2c5f4dd9de5640170c688271fc35e1f5060b63e0598df\",\"@voidzero-dev/vitepress-theme\",null,\"import-path\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "vitest-dev/vitest",
+    "symbols": {
+      "before": 17973,
+      "after": 17973
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 0,
+    "links": {
+      "before": 116220,
+      "after": 116220
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 72614,
+    "definiteKept": 72614,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 559,
+    "ambiguousChanged": 0,
+    "newDefinite": {},
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 20276,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "withastro/astro",
+    "symbols": {
+      "before": 26243,
+      "after": 26243
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 0,
+    "links": {
+      "before": 152561,
+      "after": 152561
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 65124,
+    "definiteKept": 65124,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 6618,
+    "ambiguousChanged": 0,
+    "newDefinite": {},
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 64876,
+    "libraryTargetsChanged": []
+  }
+]

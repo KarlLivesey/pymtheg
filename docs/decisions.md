@@ -2912,6 +2912,41 @@ entry with a physical link to a captured package retains the missing
 build-output reason.
 [C-23](changes/C-23.md)
 
+### C-13 TypeScript program budget and compiler exceptions
+
+**Decided (C-13):** one TypeScript program is given at most 50,000,000
+characters of captured source (a fixed number, so the outcome depends on the
+snapshot only). A project with more leaves out its largest files, then by
+path, until the rest fits; each is a failed file with the reason, absent
+from every program, and its global names count as a failed file's names.
+Files with no config still form one program within the budget: loose
+scripts share one global scope, so no split of that program keeps every
+link (on swc the shared names alone join 44,933 of its 50,117 loose files).
+A file the compiler throws on (not a stack limit) fails alone with the
+compiler's message; its program is rebuilt without it and resumes the
+warm-up after the files already warmed; past 100 such files in a program the
+rest fail with that reason. **Trade:** a project over the budget loses its
+largest files' links, explicitly; a file that trips a compiler assertion
+loses its own. **Rules out:** raising the heap inside the tool, splitting
+the no-config program by import components (it would narrow candidate sets
+that span loose scripts), and failing the whole module on one compiler
+exception. taint.ts's whole-program walk for a program with failed files has
+a fixed step budget (8,000,000: nodes visited, edges followed, causes stored
+or copied). A walk that reaches it is unknown, never empty: every link of
+that program that could have a target becomes `taint-budget-exhausted`, and
+later checkers of the session skip the walk. The seed walk reads aliases
+from the binder only, and cause sets are shared until they grow. **Rules
+out:** time or memory readings as limits, and treating a stopped walk as
+finding no dependence. A stopped walk still answers, binding by binding,
+whether a link binds a failed file directly; those links stay
+`invalid-code`. The program budget counts every checkout file a program
+loads (imports too), in the compiler's order. A file past it is left out of
+that program only. Installed declarations keep C-20's budget. Files left
+out, or failed by a compiler exception, are unavailable (as for parse and
+bind failures), not invalid code. One cap of 100 counts every contained
+exception in a program. A file dropped late makes its project be extracted
+again. See [C-13](changes/C-13.md).
+
 ### Re-index cost is measured by operation counts; one read per module write (C-22)
 
 **Decided (C-22):** re-index speed is judged by deterministic work counts
