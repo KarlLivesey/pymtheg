@@ -286,6 +286,8 @@ test("missing packages prove imports and namespace exports at their lexical bind
 test("captured declarations prove an inherited package member and preserve project augmentations", async () => {
   await project(
     {
+      "package.json":
+        '{"dependencies":{"local-types":"file:packages/local-types"}}',
       "tsconfig.json": JSON.stringify({
         compilerOptions: {
           typeRoots: ["./types"],
@@ -304,15 +306,20 @@ test("captured declarations prove an inherited package member and preserve proje
       "vendor/kit/index.d.ts": `declare class Directory { list(): string[] }
       export declare class Store extends Directory {}
       export declare function open(): Store;`,
+      "packages/local-types/package.json":
+        '{"name":"@types/local-types","types":"index.d.ts"}',
+      "packages/local-types/index.d.ts":
+        "export declare function localDeclaration(): void;",
       "src/entry.ts": "export function here() {}",
       "local.d.ts": `interface Window { __pymthegLocal(): void; }
       interface Console { log(local: number): void; }`,
       "main.ts": `import { readFileSync } from 'node:fs';
       import { open } from 'external-kit';
+      import { localDeclaration } from 'local-types';
       import { here } from 'app/entry';
       import { missing } from 'app/missing';
       process.cwd(); readFileSync('x'); open().list(); here(); missing();
-      window.__pymthegLocal(); console.log(4);`,
+      window.__pymthegLocal(); console.log(4); localDeclaration();`,
     },
     async (graph, report) => {
       clean(report);
@@ -336,6 +343,10 @@ test("captured declarations prove an inherited package member and preserve proje
         evidence: "declaring-owner",
       });
       assert.equal(graph.target(call("here")), "src/entry.ts#here");
+      assert.equal(
+        graph.target(call("localDeclaration")),
+        "packages/local-types/index.d.ts#localDeclaration",
+      );
       assert.equal(call("missing").resolution, "unresolved");
       assert.equal(
         graph.target(call("__pymthegLocal")),

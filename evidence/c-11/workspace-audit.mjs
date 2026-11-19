@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Check which earlier corpus graphs could reach an unreadable workspace root.
+// Check the two package-boundary fixes against earlier corpus graphs.
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -43,7 +43,20 @@ for (const repo of repos) {
         unreadable.push(dirname(path));
       }
     }
-    const { incompleteRoots } = workspaceLinks(manifests, contexts, unreadable);
+    const { incompleteRoots, links } = workspaceLinks(
+      manifests,
+      contexts,
+      unreadable,
+    );
+    const localPackages = new Set([".", ...links.values()]);
+    const localTypeManifests = manifests
+      .filter(
+        ({ path, json }) =>
+          typeof json.name === "string" &&
+          json.name.startsWith("@types/") &&
+          localPackages.has(dirname(path)),
+      )
+      .map(({ path }) => path);
     const available = db.prepare(
       `SELECT path FROM graph_files WHERE json_extract(body,'$.module')='typescript' AND status<>'failed'`,
     );
@@ -63,6 +76,7 @@ for (const repo of repos) {
         incompleteRoots: [...incompleteRoots],
         affectedFiles: files.length,
         examples: files.slice(0, 4),
+        localTypeManifests,
       }),
     );
   } finally {

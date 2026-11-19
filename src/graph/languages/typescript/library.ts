@@ -179,7 +179,13 @@ export function libraryReader(
     let result: Unit | undefined;
     if (source.fileName.startsWith(`${LIB_ROOT}/`))
       result = bundledLibraryUnit(source.fileName);
-    else if (typeof declared === "string" && declared.startsWith("@types/")) {
+    else if (
+      manifest &&
+      typeof declared === "string" &&
+      manifest.path !== "package.json" &&
+      !workspaceRoots.has(posix.dirname(manifest.path)) &&
+      declared.startsWith("@types/")
+    ) {
       const name = declared
         .slice("@types/".length)
         .replace(/^([^_]+)__(.+)$/, "@$1/$2");
