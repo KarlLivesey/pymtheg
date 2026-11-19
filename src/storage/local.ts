@@ -198,9 +198,12 @@ function leaveWriteAheadLog(db: DatabaseSync): void {
  * Back to the rollback journal before closing the last connection, so a store
  * at rest has the same format as one written with a rollback journal: readers
  * in a directory they cannot write, and older builds, open it as before.
- * Another open connection keeps the log until the last writer closes.
+ * Another open connection keeps the log until the last writer closes. The
+ * switch's own transaction runs with a full sync, as every rollback-journal
+ * commit does.
  */
 export function closeWriteAheadLog(db: DatabaseSync): void {
+  db.exec("PRAGMA synchronous=FULL");
   switchJournal(db, "DELETE");
 }
 function switchJournal(db: DatabaseSync, mode: "WAL" | "DELETE"): string {
