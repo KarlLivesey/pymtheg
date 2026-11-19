@@ -1651,7 +1651,7 @@ branch, tag, or revision selector. For a vendored Git package, the lockfile
 must prove a checkout dependency edge with a precise commit. An applicable
 replacement without a unique captured package stays unresolved.
 
-Module 32 records invocation identifiers and declarative macro name bounds
+Module 33 records invocation identifiers and declarative macro name bounds
 from the Rust parse. The resolver memoizes the scope effect of each opaque
 origin. It tries the existing checkout and library lookup first, then retries
 blocked lexical paths with the proven scope bounds, then with the external
