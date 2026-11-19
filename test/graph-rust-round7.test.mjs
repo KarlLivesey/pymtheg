@@ -210,7 +210,9 @@ test("round 7 B3 S1 reachable failures are uncertainty, never inferred invalid-c
   );
   const l = g.links.find((l) => l.targetName === "A::from");
   assert.equal(l.data.cause, undefined);
-  assert.match(l.data.uncertainty, /failed-file-unseen-declarations/);
+  // C-15: b cannot declare an inherent impl of A (only A's crate can), and
+  // no trait impl makes the trait call definite, so b's failure is not named.
+  assert.equal(l.data.uncertainty, "trait-dispatch");
 });
 for (const [caller, callee, definite] of [
   ["a", "a", true],
