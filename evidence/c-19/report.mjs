@@ -17,6 +17,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const [work, outDir] = process.argv.slice(2);
+const PYMDIR = process.env.PYMDIR ?? "pym"; // the folder under WORK holding the Pymtheg graphs
 const pins = readFileSync(join(work, "pins.txt"), "utf8").trim().split("\n").map((l) => l.split(" ")[0]);
 const read = (p) => (existsSync(p) ? readFileSync(p, "utf8") : "");
 const num = (text, re) => {
@@ -52,12 +53,12 @@ function raRecord(pin, variant) {
   };
 }
 function pymRecord(pin) {
-  if (existsSync(join(work, "pym", `${pin}-2.index.json`))) pin = `${pin}-2`; // an earlier attempt failed
+  if (existsSync(join(work, PYMDIR, `${pin}-2.index.json`))) pin = `${pin}-2`; // an earlier attempt failed
   let status = "";
   try {
-    status = JSON.parse(read(join(work, "pym", `${pin}.index.json`))).status;
+    status = JSON.parse(read(join(work, PYMDIR, `${pin}.index.json`))).status;
   } catch {}
-  return { status, ...timeRecord(read(join(work, "pym", `${pin}.time.txt`))) };
+  return { status, ...timeRecord(read(join(work, PYMDIR, `${pin}.time.txt`))) };
 }
 
 function agreementOf(r) {

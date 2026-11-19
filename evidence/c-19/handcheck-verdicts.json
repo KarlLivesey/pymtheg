@@ -166,6 +166,13 @@
       "note": "tokio src/lib.rs:676-698, inside cfg_macros!: `pub use tokio_macros::test;` with rt-multi-thread, else `pub use tokio_macros::test_rt as test;` (main likewise); the toolchain's build has rt-multi-thread"
     },
     {
+      "pymtheg": "^cargo hyper-util rt::Tokio(Io|Executor|Timer) ",
+      "toolchain": "^cargo hyper-util rt::tokio::Tokio(Io|Executor|Timer)$",
+      "right": "both",
+      "cause": "re-export",
+      "note": "hyper-util src/rt/mod.rs:12 `pub use self::tokio::{TokioExecutor, TokioIo, TokioTimer};` under #[cfg(feature = \"tokio\")]"
+    },
+    {
       "pymtheg": "^cargo tree-house tree_sitter::",
       "toolchain": "^cargo tree-house-bindings ",
       "right": "both",

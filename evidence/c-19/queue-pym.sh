@@ -15,12 +15,13 @@ done < "$work/pins.txt"
 touch "$work/fetched.done"
 status() { node -e 'try{console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).status)}catch{console.log("none")}' "$1"; }
 while read -r name url sha; do
+  [ -n "${PINS:-}" ] && [[ " $PINS " != *" $name "* ]] && continue # optional subset
   dest="$name"
-  case "$(status "$work/pym/$name.index.json")" in ok|incomplete) continue ;; esac
-  if [ -e "$work/pym/$name" ]; then
+  case "$(status "$work/${PYMDIR:-pym}/$name.index.json")" in ok|incomplete) continue ;; esac
+  if [ -e "$work/${PYMDIR:-pym}/$name" ]; then
     dest="$name-2"
-    case "$(status "$work/pym/$dest.index.json")" in ok|incomplete) continue ;; esac
-    [ -e "$work/pym/$dest" ] && { echo "$name: both attempts present, skipped"; continue; }
+    case "$(status "$work/${PYMDIR:-pym}/$dest.index.json")" in ok|incomplete) continue ;; esac
+    [ -e "$work/${PYMDIR:-pym}/$dest" ] && { echo "$name: both attempts present, skipped"; continue; }
   fi
   echo "== $name"
   bash "$here/pym-index.sh" "$build" "$work" "$name" "$dest"

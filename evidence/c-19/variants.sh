@@ -13,7 +13,7 @@ work="$1"; outdir="$2"
 here="$(dirname "$0")"
 sysroot="$(rustc --print sysroot)"
 O="$work/out"
-graph() { if [ -f "$work/pym/$1-2.index.json" ]; then echo "$work/pym/$1-2/.pymtheg/rebuildable/graph.sqlite"; else echo "$work/pym/$1/.pymtheg/rebuildable/graph.sqlite"; fi; }
+graph() { if [ -f "$work/${PYMDIR:-pym}/$1-2.index.json" ]; then echo "$work/${PYMDIR:-pym}/$1-2/.pymtheg/rebuildable/graph.sqlite"; else echo "$work/${PYMDIR:-pym}/$1/.pymtheg/rebuildable/graph.sqlite"; fi; }
 join() { # NAME SCIP-SPEC OUT PIN CARGO_HOME
   node --max-old-space-size=16000 "$here/join.mjs" --graph "$(graph "$4")" --scip "$2" --root "$work/src/$4" --name "$1" \
     --cargo-home "$5" --sysroot "$sysroot" --out "$3" > /dev/null

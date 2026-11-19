@@ -39,7 +39,7 @@
 
 ## axum
 
-130 comparisons not verified as the same declaration; 30 sampled.
+133 comparisons not verified as the same declaration; 30 sampled.
 
 | # | Verdict class | Site | Written | Pymtheg | Toolchain | Right | Cause |
 | ---: | --- | --- | --- | --- | --- | --- | --- |
@@ -65,18 +65,18 @@
 | 20 | heuristic-same-family-and-name | axum-macros/src/from_request/mod.rs:417 | `syn::Field` | cargo syn Field (qualified-path) | cargo syn data::Field | both | declaration-in-macro: syn's root has `pub use crate::<module>::{...}` for these names (e.g. `pub use crate::data::{Field, Fields, ...}`); the declarat |
 | 21 | heuristic-same-family-and-name | axum-macros/src/debug_handler.rs:121 | `Type` | cargo syn Type (import-binding) | cargo syn ty::Type | both | declaration-in-macro: syn's root has `pub use crate::<module>::{...}` for these names (e.g. `pub use crate::data::{Field, Fields, ...}`); the declarat |
 | 22 | heuristic-same-family-and-name | axum-macros/src/typed_path.rs:59 | `syn::Path` | cargo syn Path (qualified-path) | cargo syn path::Path | both | declaration-in-macro: syn's root has `pub use crate::<module>::{...}` for these names (e.g. `pub use crate::data::{Field, Fields, ...}`); the declarat |
-| 23 | heuristic-same-family-and-name | axum-macros/src/from_request/mod.rs:231 | `syn::Generics` | cargo syn Generics (qualified-path) | cargo syn generics::Generics | both | declaration-in-macro: syn's root has `pub use crate::<module>::{...}` for these names (e.g. `pub use crate::data::{Field, Fields, ...}`); the declarat |
-| 24 | heuristic-same-family-and-name | axum-macros/src/from_ref.rs:6 | `syn::Type` | cargo syn Type (qualified-path) | cargo syn ty::Type | both | declaration-in-macro: syn's root has `pub use crate::<module>::{...}` for these names (e.g. `pub use crate::data::{Field, Fields, ...}`); the declarat |
-| 25 | heuristic-same-family-and-name | axum-macros/src/from_request/mod.rs:715 | `syn::Path` | cargo syn Path (qualified-path) | cargo syn path::Path | both | declaration-in-macro: syn's root has `pub use crate::<module>::{...}` for these names (e.g. `pub use crate::data::{Field, Fields, ...}`); the declarat |
-| 26 | heuristic-same-family-and-name | axum-macros/src/from_request/attr.rs:17 | `syn::Type` | cargo syn Type (qualified-path) | cargo syn ty::Type | both | declaration-in-macro: syn's root has `pub use crate::<module>::{...}` for these names (e.g. `pub use crate::data::{Field, Fields, ...}`); the declarat |
-| 27 | heuristic-same-family-and-name | axum-macros/src/debug_handler.rs:825 | `ItemFn` | cargo syn ItemFn (import-binding) | cargo syn item::ItemFn | both | declaration-in-macro: syn's root has `pub use crate::<module>::{...}` for these names (e.g. `pub use crate::data::{Field, Fields, ...}`); the declarat |
-| 28 | heuristic-same-family-and-name | axum-macros/src/from_request/mod.rs:10 | `syn::Type` | cargo syn Type (qualified-path) | cargo syn ty::Type | both | declaration-in-macro: syn's root has `pub use crate::<module>::{...}` for these names (e.g. `pub use crate::data::{Field, Fields, ...}`); the declarat |
-| 29 | heuristic-same-family-and-name | axum/src/response/redirect.rs:136 | `LOCATION` | cargo http header::LOCATION (import-binding) | cargo http header::name::LOCATION | both | declaration-in-macro: http header/mod.rs: `pub use self::name::{..., LOCATION, SET_COOKIE, ...}`; the constants are declared by the standard_headers!  |
-| 30 | heuristic-same-family-and-name | axum-macros/src/from_request/mod.rs:714 | `syn::Path` | cargo syn Path (qualified-path) | cargo syn path::Path | both | declaration-in-macro: syn's root has `pub use crate::<module>::{...}` for these names (e.g. `pub use crate::data::{Field, Fields, ...}`); the declarat |
+| 23 | heuristic-same-family-and-name | axum/src/serve/mod.rs:909 | `TokioIo` | cargo hyper-util rt::TokioIo (import-binding) | cargo hyper-util rt::tokio::TokioIo | both | re-export: hyper-util src/rt/mod.rs:12 `pub use self::tokio::{TokioExecutor, TokioIo, TokioTimer};` under #[cfg(feature = "tokio")] |
+| 24 | heuristic-same-family-and-name | axum-macros/src/from_request/mod.rs:231 | `syn::Generics` | cargo syn Generics (qualified-path) | cargo syn generics::Generics | both | declaration-in-macro: syn's root has `pub use crate::<module>::{...}` for these names (e.g. `pub use crate::data::{Field, Fields, ...}`); the declarat |
+| 25 | heuristic-same-family-and-name | axum-macros/src/from_ref.rs:6 | `syn::Type` | cargo syn Type (qualified-path) | cargo syn ty::Type | both | declaration-in-macro: syn's root has `pub use crate::<module>::{...}` for these names (e.g. `pub use crate::data::{Field, Fields, ...}`); the declarat |
+| 26 | heuristic-same-family-and-name | axum-macros/src/from_request/mod.rs:715 | `syn::Path` | cargo syn Path (qualified-path) | cargo syn path::Path | both | declaration-in-macro: syn's root has `pub use crate::<module>::{...}` for these names (e.g. `pub use crate::data::{Field, Fields, ...}`); the declarat |
+| 27 | heuristic-same-family-and-name | axum-macros/src/from_request/attr.rs:17 | `syn::Type` | cargo syn Type (qualified-path) | cargo syn ty::Type | both | declaration-in-macro: syn's root has `pub use crate::<module>::{...}` for these names (e.g. `pub use crate::data::{Field, Fields, ...}`); the declarat |
+| 28 | heuristic-same-family-and-name | axum-macros/src/debug_handler.rs:825 | `ItemFn` | cargo syn ItemFn (import-binding) | cargo syn item::ItemFn | both | declaration-in-macro: syn's root has `pub use crate::<module>::{...}` for these names (e.g. `pub use crate::data::{Field, Fields, ...}`); the declarat |
+| 29 | heuristic-same-family-and-name | axum-macros/src/from_request/mod.rs:10 | `syn::Type` | cargo syn Type (qualified-path) | cargo syn ty::Type | both | declaration-in-macro: syn's root has `pub use crate::<module>::{...}` for these names (e.g. `pub use crate::data::{Field, Fields, ...}`); the declarat |
+| 30 | heuristic-same-family-and-name | axum/src/response/redirect.rs:136 | `LOCATION` | cargo http header::LOCATION (import-binding) | cargo http header::name::LOCATION | both | declaration-in-macro: http header/mod.rs: `pub use self::name::{..., LOCATION, SET_COOKIE, ...}`; the constants are declared by the standard_headers!  |
 
 ## helix
 
-216 comparisons not verified as the same declaration; 30 sampled.
+229 comparisons not verified as the same declaration; 30 sampled.
 
 | # | Verdict class | Site | Written | Pymtheg | Toolchain | Right | Cause |
 | ---: | --- | --- | --- | --- | --- | --- | --- |
@@ -113,7 +113,7 @@
 
 ## tauri
 
-280 comparisons not verified as the same declaration; 30 sampled.
+286 comparisons not verified as the same declaration; 30 sampled.
 
 | # | Verdict class | Site | Written | Pymtheg | Toolchain | Right | Cause |
 | ---: | --- | --- | --- | --- | --- | --- | --- |
@@ -175,8 +175,8 @@
 | axum | axum-core/src/response/into_response.rs:237 | `res` | blocked | axum-core/src/response/into_response.rs:229 local method into_response :: let mut res = Response::new(Body::new(BytesChainBody { |
 | axum | axum/src/extract/path/de.rs:1 | `super::ErrorKind` | opaque-item-may-shadow-name | axum/src/extract/path/mod.rs:270 enum ErrorKind :: pub enum ErrorKind { |
 | axum | axum/src/routing/mod.rs:621 | `req` | blocked | axum/src/routing/mod.rs:620 local method call :: let req = req.map(Body::new); |
-| axum | axum/src/serve/mod.rs:808 | `Into` | opaque-item-may-shadow-name | rust-std core convert::Into |
 | axum | axum/src/routing/tests/get_to_head.rs:24 | `Body::empty` | path-type-unverified; opaque-item-may-shadow-name | axum-core/src/body.rs:55 method empty :: pub fn empty() -> Self { |
+| axum | axum-macros/src/debug_handler.rs:315 | `quote_spanned` | import-cycle-unverified | cargo quote quote_spanned |
 | helix | helix-term/src/ui/picker.rs:677 | `path` | blocked | helix-term/src/ui/picker.rs:612 local method get_preview :: let path: Arc<Path> = path.into(); |
 | helix | helix-term/src/ui/editor.rs:670 | `editor.theme.get` | receiver-type-unverified | helix-view/src/theme.rs:426 method get :: pub fn get(&self, scope: &str) -> Style { |
 | helix | helix-term/src/commands/syntax.rs:351 | `editor .documents` | receiver-type-unverified; opaque-item-may-shadow-name | helix-view/src/editor.rs:2318 method documents :: pub fn documents(&self) -> impl Iterator<Item = &Document> { |
@@ -194,6 +194,6 @@
 | tauri | crates/tauri-bundler/src/bundle/windows/nsis/mod.rs:716 | `nsis_cmd .args(["-INPUTCHARSET", "UTF8", "-OUTPUTCHARSET", "UTF8"]) .arg(match settings.log_level() { log::Level::Error => "-V1", log::Level::Warn => ` | receiver-type-unverified | rust-std std process::Command::arg |
 | tauri | crates/tauri-cli/src/mobile/mod.rs:235 | `url::Host::Ipv6` | opaque-item-may-shadow-name | cargo url host::Host::Ipv6 |
 | tauri | crates/tauri/src/tray/plugin.rs:190 | `app.resources_table` | receiver-type-unverified; item-under-opaque-attribute; opaque-item-may-shadow-name; opaque-item-may-shadow-name; opaque-item-may-shadow-name | crates/tauri/src/app.rs:710 method resources_table :: fn resources_table(&self) -> MutexGuard<'_, ResourceTable> { |
-| tauri | crates/tauri-runtime/src/lib.rs:35 | `window::WebviewEvent` | opaque-item-may-shadow-name | crates/tauri-runtime/src/window.rs:91 enum WebviewEvent :: pub enum WebviewEvent { |
 | tauri | crates/tauri-cli/src/mobile/android/project.rs:47 | `t.triple().into` | receiver-type-unverified | rust-std core convert::T::into |
 | tauri | crates/tauri/src/webview/plugin.rs:21 | `AppHandle` | item-under-opaque-attribute; opaque-item-may-shadow-name; opaque-item-may-shadow-name; opaque-item-may-shadow-name | crates/tauri/src/app.rs:387 struct AppHandle :: pub struct AppHandle<R: Runtime> { |
+| tauri | crates/tauri-bundler/src/bundle/linux/appimage/linuxdeploy.rs:112 | `app_dir_usr.join` | receiver-type-unverified | rust-std std path::Path::join |

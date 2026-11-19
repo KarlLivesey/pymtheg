@@ -4,6 +4,7 @@
 # aggregates, the unconditional-disagreement list and the hand-check.
 # Usage: analyse.sh WORK OUT_DIR
 set -uo pipefail
+export PYMDIR="${PYMDIR:-pym}"
 work="$1"; outdir="$2"
 here="$(dirname "$0")"
 mkdir -p "$outdir"
