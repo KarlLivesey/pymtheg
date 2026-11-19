@@ -99,7 +99,7 @@ restriction. [Outside classification rules](../sweep/README.md#coverage-scoreboa
 
 - [x] DioxusLabs/dioxus · Rust analysis stalled at the wall limit · finished
 - [ ] embassy-rs/embassy · Wall limit after Rust analysis completed · open
-- [ ] microsoft/TypeScript · Node heap exhausted · open
+- [ ] microsoft/TypeScript · wall-limit · open
 - [x] rustls/rustls · Rust resolution stalled at the wall limit · finished
 - [x] serde-rs/serde · Rust resolution stalled in recursive scope and use lookups · finished
 - [ ] swc-project/swc · Rust analysis stalled at the wall limit · open
@@ -176,7 +176,7 @@ The previous strict-inside plan assigned about 22 pp to local binding anchors an
 
 **Bundle scope** 68.20% including bundles and 70.37% without them. Should checked-in minified bundles count toward the release target?
 
-**Paired dependency sweep** 70.42% bare · 82.37% with installed declarations · 16/18 pins installed and indexed. Pins without a completed installed graph use their bare figure.
+**Paired dependency sweep** 71.00% bare · 82.37% with installed declarations · 16/18 pins installed and indexed. Pins without a completed installed graph use their bare figure.
 
 | Support item | Kind | Links | Repositories | Points | Running total | Examples | Status |
 | --- | --- | ---: | ---: | ---: | ---: | --- | --- |

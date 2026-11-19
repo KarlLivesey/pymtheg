@@ -1,9 +1,9 @@
 # C-13 evidence
 
 All runs used the dev server, Node 24.21.0 with its default heap (about
-4.2 GB) unless a heap size is named. **Main** is `02d0e3d` (C-16 merged). The
-TypeScript module is the same on the later main this branch merges. **C-13**
-is this branch. Both were built from source with the grammars and used as
+4.2 GB) unless a heap size is named. **Main** is `53d248f` (C-23 merged) for
+the final identity round, and `fdeb52f` for the microsoft/TypeScript round.
+**C-13** is this branch. Both were built from source with the grammars and used as
 `scripts/sweep/run.mjs --local-build` directories in one session. Timings and
 memory are observations on a shared, loaded machine. The change note,
 [`docs/changes/C-13.md`](../../docs/changes/C-13.md), summarises the results.
@@ -14,11 +14,18 @@ memory are observations on a shared, loaded machine. The change note,
   the identity pins excalidraw, vitest, trpc, astro, hono, redux-toolkit and
   vite.
 - [`run-main.json.gz`](run-main.json.gz), [`run-c13.json.gz`](run-c13.json.gz):
-  the sweep records for main and C-13.
+  the sweep records of the final identity round (the seven pins).
+  [`run-main-with-typescript.json.gz`](run-main-with-typescript.json.gz)
+  and [`run-c13-with-typescript.json.gz`](run-c13-with-typescript.json.gz)
+  add microsoft/TypeScript ([`pins-taint.json`](pins-taint.json)).
 - [`identity.jsonl`](identity.jsonl): every stored row, main against C-13,
   per pin (`tools/identity-all.mjs`). Symbol and link IDs become stable keys
-  and module version 34 maps to 33. Zero rows differ on six pins. Vite
-  differs only through its byte-order-mark package.
+  and module version 38 maps to 37. Zero rows differ on four pins. vitest
+  and astro differ only in dependency stamps (inode, time, size of
+  checked-in `node_modules` paths). Vite differs through its
+  byte-order-mark package.
+- [`taint-steps.txt`](taint-steps.txt): each identity pin's taint walks and
+  most steps in one walk, against the 8,000,000-step budget.
 - [`compare-summary.json`](compare-summary.json): every link, with C-10's
   [`compare.mjs`](compare.mjs) (seed `c13`). All 334,036 links that are
   definite on main keep their target.
@@ -28,11 +35,12 @@ memory are observations on a shared, loaded machine. The change note,
 - [`scoreboard-main.md`](scoreboard-main.md), [`scoreboard-c13.md`](scoreboard-c13.md):
   `coverage.mjs` scoreboards of the two exports.
 - [`plan-input.mjs`](plan-input.mjs), [`coverage-plan-input.json.gz`](coverage-plan-input.json.gz):
-  C-16's committed input with these nine pins replaced. The TypeScript /
+  C-23's committed input, with this round's seven pins and the latest
+  microsoft/TypeScript and swc records replaced. The TypeScript /
   JS section was regenerated from it with `--base
   evidence/sw-3/breakdown.json.gz` and copied with `evidence/c-11/plan.mjs`.
-  The two completion rows were updated. C-16's input alone reproduces main's
-  TypeScript section exactly.
+  The two completion rows were updated. C-23's input alone reproduces
+  main's TypeScript section exactly.
 - [`cost.txt`](cost.txt): cold index time (s) and peak RSS (KiB) of astro
   and vite: main, C-13, main again (`tools/cost-all.sh`).
 - [`tools/`](tools/):
@@ -40,6 +48,9 @@ memory are observations on a shared, loaded machine. The change note,
   - `analyze.mjs`: runs `analyze()` directly, with failed-file reasons and
     heap, a budget override and a snapshot point;
   - `locate.mjs`: the node a compiler exception was thrown on;
+  - `tracecalls.mjs`, `tracefiles.mjs`, `steps-all.sh`: debugging copies
+    that log checker calls and the taint walk's files, parts and worklist,
+    and the per-pin walk counts;
   - `components.mjs`: the prototype split of the no-config program;
   - `groups.mjs`, `budget.mjs`: project groups and what a budget leaves out;
   - `rebuild.mjs`, `synth.mjs`, `livecount.mjs`, `snap.mjs` (from C-2): the

@@ -822,7 +822,11 @@ answer.
   files no config includes) with more than 50,000,000 characters of source
   leaves out its largest files, failed with the reason, until the rest fits
   in one program. Both are failed files under the rule below. A
-  `package.json` that starts with a UTF-8 byte-order mark is read.
+  `package.json` that starts with a UTF-8 byte-order mark is read. Finding
+  which links depend on a program's failed files has a deterministic budget
+  of 8,000,000 steps. When it is reached, every link of that program that
+  could have a target is unresolved with `taint-budget-exhausted`; no pin
+  outside microsoft/TypeScript comes near it.
 - **A program that contains a failed file:** the failed file is absent;
   `invalid-code` with a cause is best-effort attribution. Links computed
   without the failed file carry `assumes: ["no-unseen-declarations"]`.

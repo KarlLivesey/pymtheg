@@ -2930,4 +2930,11 @@ largest files' links, explicitly; a file that trips a compiler assertion
 loses its own. **Rules out:** raising the heap inside the tool, splitting
 the no-config program by import components (it would narrow candidate sets
 that span loose scripts), and failing the whole module on one compiler
-exception. See [C-13](changes/C-13.md).
+exception. taint.ts's whole-program walk for a program with failed files has
+a fixed step budget (8,000,000: nodes visited, edges followed, causes stored
+or copied). A walk that reaches it is unknown, never empty: every link of
+that program that could have a target becomes `taint-budget-exhausted`, and
+later checkers of the session skip the walk. The seed walk reads aliases
+from the binder only, and cause sets are shared until they grow. **Rules
+out:** time or memory readings as limits, and treating a stopped walk as
+finding no dependence. See [C-13](changes/C-13.md).

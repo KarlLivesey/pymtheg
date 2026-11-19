@@ -1,13 +1,12 @@
 # SW-3 coverage scoreboard
 
-Result package ` pymtheg@0.1.0 `. The baseline covers 9 pinned repositories.
+Result package ` pymtheg@0.1.0 `. The baseline covers 8 pinned repositories.
 
 ## A. All 60 finish
 
-**7 of 9 finished.**
+**7 of 8 finished.**
 
-- [ ] microsoft/TypeScript · Node heap exhausted · open
-- [ ] swc-project/swc · Rust analysis stalled at the wall limit · open
+- [ ] microsoft/TypeScript · wall-limit · open
 
 ## B. Coverage of finished graphs
 
