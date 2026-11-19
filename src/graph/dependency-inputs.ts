@@ -195,29 +195,38 @@ export class DependencyInputs {
     const mark = stamp(location.path, location.stat);
     let captured = textCache.get(absolute);
     if (captured?.stamp !== mark) {
-      try {
-        const fd = openSync(
-          absolute,
-          constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
-        );
+      // The read is checked against its own handle, not against the first
+      // lstat of the run: a link added by another install sharing the
+      // package store changes the inode's ctime, not its bytes, and must not
+      // make a present declaration absent (C-22). The stamp recorded is the
+      // one of the bytes read, so a later run still sees any change.
+      captured = undefined;
+      for (let attempt = 0; attempt < 2 && !captured; attempt++)
         try {
-          if (stamp(location.path, fstatSync(fd, { bigint: true })) !== mark)
-            return undefined;
-          const bytes = readFileSync(fd);
-          if (stamp(location.path, fstatSync(fd, { bigint: true })) !== mark)
-            return undefined;
-          captured = {
-            stamp: mark,
-            text: new TextDecoder("utf-8", { fatal: true }).decode(bytes),
-            hash: contentHash(bytes),
-            size: bytes.length,
-          };
-        } finally {
-          closeSync(fd);
+          const fd = openSync(
+            absolute,
+            constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
+          );
+          try {
+            const before = fstatSync(fd, { bigint: true });
+            if (!before.isFile() || before.size > MAX_FILE) return undefined;
+            const bytes = readFileSync(fd);
+            const after = stamp(location.path, fstatSync(fd, { bigint: true }));
+            // Written while it was read: try once more, then treat it as absent.
+            if (stamp(location.path, before) !== after) continue;
+            captured = {
+              stamp: after,
+              text: new TextDecoder("utf-8", { fatal: true }).decode(bytes),
+              hash: contentHash(bytes),
+              size: bytes.length,
+            };
+          } finally {
+            closeSync(fd);
+          }
+        } catch {
+          return undefined;
         }
-      } catch {
-        return undefined;
-      }
+      if (!captured) return undefined;
       const obsolete = textCache.get(absolute);
       if (obsolete) cachedBytes -= obsolete.size;
       textCache.delete(absolute);
@@ -231,6 +240,7 @@ export class DependencyInputs {
     }
     const record = this.entries.get(path)!;
     record.hash = captured.hash;
+    record.dependency = { module: this.module, stamp: captured.stamp };
     if (path.endsWith("/package.json")) record.text = captured.text;
     return captured.text;
   }

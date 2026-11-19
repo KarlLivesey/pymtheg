@@ -5,6 +5,8 @@
 // reasons, candidates, library targets, context files and failure markers.
 import assert from "node:assert/strict";
 import {
+  chmodSync,
+  linkSync,
   mkdtempSync,
   mkdirSync,
   renameSync,
@@ -63,8 +65,14 @@ async function equalAfterEveryStep(files, steps) {
       write,
       remove: (path) => rmSync(join(root, path)),
       rename: (from, to) => renameSync(join(root, from), join(root, to)),
+      chmod: (path, mode) => chmodSync(join(root, path), mode),
+      link: (from, to) => linkSync(join(root, from), join(root, to)),
     };
-    for (const step of steps) {
+    // The first case of every sequence: a re-index with no edit at all.
+    for (const step of [
+      { name: "re-index with no edit", edit: () => {} },
+      ...steps,
+    ]) {
       step.edit(tree);
       await compare(step.name);
       step.check?.(incremental);
@@ -188,7 +196,7 @@ test("Go: incremental re-index equals a cold index after every kind of edit", as
     },
     steps,
   );
-  assert.equal(compared.length, steps.length + 1);
+  assert.equal(compared.length, steps.length + 2);
 });
 
 const rustA = `pub fn hello() -> u32 {
@@ -286,7 +294,7 @@ test("Rust: incremental re-index equals a cold index after every kind of edit", 
     },
     steps,
   );
-  assert.equal(compared.length, steps.length + 1);
+  assert.equal(compared.length, steps.length + 2);
 });
 
 const tsA = `export function hello(): string {
@@ -408,5 +416,77 @@ test("TypeScript: incremental re-index equals a cold index after every kind of e
     },
     steps,
   );
-  assert.equal(compared.length, steps.length + 1);
+  assert.equal(compared.length, steps.length + 2);
+});
+
+test("TypeScript with installed declarations: a re-index equals a cold index, also after metadata-only changes", async () => {
+  const declaration = "node_modules/kit/index.d.ts";
+  const kit =
+    "export declare class Page {\n  locate(): string;\n}\nexport declare function open(): Page;\n";
+  const named = (store) =>
+    store
+      .links()
+      .some(
+        (link) =>
+          link.file === "src/main.ts" &&
+          link.resolution === "library" &&
+          link.libraries?.some((item) => item.unit === "kit"),
+      );
+  const steps = [
+    {
+      name: "an installed declaration's mode changes, not its bytes",
+      edit: (t) => t.chmod(declaration, 0o600),
+      check: (store) => assert.ok(named(store), "kit stays a named library"),
+    },
+    {
+      name: "a second hard link to an installed declaration (a shared store)",
+      edit: (t) => t.link(declaration, "node_modules/kit/store-link.d.ts"),
+      check: (store) => assert.ok(named(store), "kit stays a named library"),
+    },
+    {
+      name: "an installed declaration gains a member",
+      edit: (t) =>
+        t.write(
+          declaration,
+          kit.replace(
+            "locate(): string;",
+            "locate(): string;\n  close(): void;",
+          ),
+        ),
+    },
+    {
+      name: "a source file uses the new member",
+      edit: (t) =>
+        t.write(
+          "src/main.ts",
+          'import { open } from "kit";\n\nopen().locate();\nopen().close();\n',
+        ),
+    },
+  ];
+  const compared = await equalAfterEveryStep(
+    {
+      "package.json": JSON.stringify({
+        name: "fixture",
+        private: true,
+        dependencies: { kit: "1.0.0" },
+      }),
+      "tsconfig.json": JSON.stringify({
+        compilerOptions: {
+          strict: true,
+          module: "nodenext",
+          moduleResolution: "nodenext",
+        },
+        include: ["src"],
+      }),
+      "node_modules/kit/package.json": JSON.stringify({
+        name: "kit",
+        version: "1.0.0",
+        types: "index.d.ts",
+      }),
+      [declaration]: kit,
+      "src/main.ts": 'import { open } from "kit";\n\nopen().locate();\n',
+    },
+    steps,
+  );
+  assert.equal(compared.length, steps.length + 2);
 });
