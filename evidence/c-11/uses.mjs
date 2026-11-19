@@ -11,8 +11,9 @@ const queries = [
   ["es", "Map.prototype.delete"],
 ];
 const scratch = process.env.PYM_SCRATCH;
+const [build = "candidate"] = process.argv.slice(2);
 const summary = JSON.parse(
-  readFileSync(join(scratch, "candidate-run.json"), "utf8"),
+  readFileSync(join(scratch, `${build}-run.json`), "utf8"),
 );
 const cli = resolve("dist/cli/main.js");
 const maximum = queries.map(() => ({ count: 0 }));

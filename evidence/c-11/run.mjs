@@ -19,7 +19,9 @@ const finished = new Set(
     .filter((row) => row.outcome === "finished")
     .map((row) => row.id),
 );
-const pins = repos.filter((repo) => repo.language === "typescript");
+const pins = repos.filter(
+  (repo) => repo.language === "typescript" && finished.has(repo.id),
+);
 const auditPins = new Set([
   "dexie/Dexie.js",
   "honojs/hono",
@@ -84,10 +86,7 @@ const coverage = (target, previous) =>
   ]);
 
 if (mode === "release") {
-  writeFileSync(
-    manifest,
-    JSON.stringify(pins.filter((repo) => finished.has(repo.id))),
-  );
+  writeFileSync(manifest, JSON.stringify(pins));
   sweep(scratch, 4);
 } else if (mode === "main") {
   unpackMain();
@@ -96,9 +95,7 @@ if (mode === "release") {
     JSON.stringify(pins.filter((repo) => preservationPins.has(repo.id))),
   );
   sweep(scratch, 3, main);
-} else if (
-  ["candidate", "candidate-audit", "candidate-others"].includes(mode)
-) {
+} else if (["candidate", "candidate-audit", "candidate-core"].includes(mode)) {
   writeFileSync(
     manifest,
     JSON.stringify(
