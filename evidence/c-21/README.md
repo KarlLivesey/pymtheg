@@ -73,3 +73,23 @@ Fetched over the network: `github.com/tree-sitter/tree-sitter-rust` (the
 pinned commit, by the build scripts), the upstream issue and pull-request
 lists (to find references for the patch headers), the sweep pins at their
 commits, and `tree-sitter-cli` 0.27.2 from crates.io.
+
+## Review round (PR 29)
+
+- Qualified turbofish pattern heads (`inner::S::<u32> { x }`,
+  `E::V::<u32> { a }`, `inner::W::<u32>(b)`, `En::W::<u32>(c)`) now get their
+  constructor reference (`parse.ts`; tested and rustc-checked). The grammar
+  is unchanged (the patch-header edits are text before the diffs; the build
+  still gives sha256 `421c975a…`), so the tree gate stands as recorded.
+- The 7 pins were indexed again with the review build and compared with the
+  previous branch run, every stored link: **0 sites added or removed, 0 symbol
+  keys changed, 0 outcome or target changes**; the only difference is the
+  dioxus `payloads/sse.rs` `impl std::ops::Deref` library row, the
+  nondeterministic Deref/DerefMut pair noted above. No pin writes a qualified
+  turbofish pattern, so the fix adds no reference link there. Against main
+  `920dc47` the review build gives the same figures as the change note (one
+  changed definite link, dioxus `self.base()`).
+- An extension of 0013 to `where dyn A + Send: M` (adding `bounded_type` to
+  the left-hand types) built and passed its corpus case but still failed the
+  shape after a return type, so it was dropped and the grammar kept as
+  reviewed; the shape is a `remaining/` fixture and the next grammar patch.
