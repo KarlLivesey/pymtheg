@@ -47,8 +47,8 @@
    "librarySetsAfter": 0,
    "definiteBefore": 33456,
    "definiteAfter": 33456,
-   "libraryAfter": 14421,
-   "librarySymbolAfter": 12947,
+   "libraryAfter": 14419,
+   "librarySymbolAfter": 12945,
    "lost": 0,
    "retargeted": 0,
    "candidateSetChanged": 0,
@@ -57,18 +57,18 @@
    "reconstructedBefore": 0,
    "reconstructedKept": 0,
    "reconstructedWithheld": 0,
-   "memberReason": 133,
+   "memberReason": 135,
    "libraryChanged": 0,
-   "newDeclaringOwner": 2619,
-   "unresolvedAfter": 771,
+   "newDeclaringOwner": 2617,
+   "unresolvedAfter": 773,
    "unresolvedByReason": {
     "none recorded": 638,
-    "library-member-unproven": 133
+    "library-member-unproven": 135
    },
    "byEvidence": {
     "import-path:go-std": 1330,
     "import-binding:go-std": 5737,
-    "declaring-owner:go-std": 2619,
+    "declaring-owner:go-std": 2617,
     "import-path:go": 144,
     "import-binding:go": 3353,
     "builtin:go-std": 1238
@@ -769,8 +769,8 @@
   "librarySetsAfter": 0,
   "definiteBefore": 1023393,
   "definiteAfter": 1023393,
-  "libraryAfter": 389229,
-  "librarySymbolAfter": 356698,
+  "libraryAfter": 389227,
+  "librarySymbolAfter": 356696,
   "lost": 0,
   "retargeted": 0,
   "candidateSetChanged": 0,
@@ -779,10 +779,10 @@
   "reconstructedBefore": 119,
   "reconstructedKept": 0,
   "reconstructedWithheld": 119,
-  "memberReason": 20158,
+  "memberReason": 20160,
   "libraryChanged": 0,
-  "newDeclaringOwner": 95957,
-  "unresolvedAfter": 63683,
+  "newDeclaringOwner": 95955,
+  "unresolvedAfter": 63685,
   "symbolsBefore": 200941,
   "symbolsMissing": 0,
   "byEvidence": {
@@ -790,12 +790,12 @@
    "import-binding:go": 59167,
    "import-path:go-std": 26936,
    "import-binding:go-std": 152734,
-   "declaring-owner:go-std": 95957,
+   "declaring-owner:go-std": 95955,
    "builtin:go-std": 48840
   },
   "unresolvedByReason": {
    "none recorded": 43180,
-   "library-member-unproven": 20158,
+   "library-member-unproven": 20160,
    "declarations-may-be-unseen": 196,
    "invalid-code": 149
   }

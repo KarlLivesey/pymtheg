@@ -5,8 +5,8 @@ Change note: `docs/changes/C-17.md`.
 
 All runs used the sweep runner (`scripts/sweep/run.mjs --local-build`) on
 the 20 Go repositories of `sweep/repos.json` at their pinned commits, once
-with a build of `main` at `981b20d` (C-14 merged; **base**) and once with
-this branch (**candidate**), in one scratch folder on the same storage, six
+with a build of `main` at `02d0e3d` (C-14, C-12 and C-16 merged; **base**)
+and once with this branch at the review head (**candidate**), in one scratch folder on the same storage, six
 workers each. Every repository finished in both. Coverage exports use the
 base build's readers for both; scoreboards are `coverage.mjs` over those
 exports alone (`scoreboard-base.md`, `scoreboard-candidate.md`).
@@ -16,7 +16,7 @@ exports alone (`scoreboard-base.md`, `scoreboard-candidate.md`).
 | Repository | Links | New member links | Level 2 before | Level 2 after |
 | --- | ---: | ---: | ---: | ---: |
 | charmbracelet/bubbletea | 12,533 | 674 | 81.33% | 86.71% |
-| cilium/ebpf | 50,239 | 2,619 | 87.15% | 92.36% |
+| cilium/ebpf | 50,239 | 2,617 | 87.15% | 92.36% |
 | cli/cli | 218,286 | 9,606 | 85.68% | 90.08% |
 | cockroachdb/pebble | 214,346 | 7,959 | 86.11% | 89.82% |
 | etcd-io/bbolt | 16,898 | 1,410 | 84.75% | 93.09% |
@@ -28,14 +28,14 @@ exports alone (`scoreboard-base.md`, `scoreboard-candidate.md`).
 | junegunn/fzf | 25,947 | 986 | 85.74% | 89.54% |
 | labstack/echo | 31,880 | 3,341 | 84.69% | 95.17% |
 | mattn/go-sqlite3 | 9,650 | 2,366 | 59.58% | 84.09% |
-| pocketbase/pocketbase | 197,148 | 6,674 | 62.94% | 66.33% |
+| pocketbase/pocketbase | 197,148 | 6,674 | 63.05% | 66.43% |
 | protocolbuffers/protobuf-go | 217,087 | 3,752 | 86.83% | 88.56% |
 | restic/restic | 64,165 | 4,018 | 84.42% | 90.68% |
 | samber/lo | 29,697 | 3,585 | 73.84% | 85.91% |
 | spf13/cobra | 8,886 | 889 | 82.20% | 92.20% |
 | stretchr/testify | 19,868 | 1,760 | 84.44% | 93.30% |
 | wagoodman/dive | 14,901 | 755 | 81.91% | 86.98% |
-| **Go module, 20 pins** | 1,512,998 Go links | **95,957** | **84.87%** | **91.22%** |
+| **Go module, 20 pins** | 1,512,998 Go links | **95,955** | **84.87%** | **91.22%** |
 
 Repository rows count every module of the checkout (pocketbase, esbuild and
 cli/cli also hold JavaScript or TypeScript, unchanged here; their base rows
@@ -44,7 +44,7 @@ Go module row counts Go links only. **All sites and like-for-like are the
 same figure**: no site or row was added or removed (1,512,998 stored Go
 links at 1,512,591 sites in both runs).
 
-The 95,957 new links all carry `declaring-owner` evidence, ecosystem
+The 95,955 new links all carry `declaring-owner` evidence, ecosystem
 `go-std`. Of them about 7,900 are methods of a standard-library interface
 (`io.Reader.Read`, `io.Closer.Close`), 1,649 are `builtin` `error.Error`,
 and about 20,500 have an unexported declaring owner (almost all
@@ -54,7 +54,20 @@ and about 20,500 have an unexported declaring owner (almost all
 `builtin` `error.Error` 1,649, `sync` `Mutex.Unlock` 1,614 and
 `Mutex.Lock` 1,516.
 
-Links with `library-member-unproven`: 111,406 → **20,158**.
+Links with `library-member-unproven`: 111,406 → **20,160**.
+
+## Review round 1
+
+All figures here are from a re-run of both builds on all 20 pins after the
+review fixes (main had moved to `02d0e3d`; the first head's figures differ
+only as noted). The fixes cost 2 links, both on cilium/ebpf: its
+`internal/unix.Errno` is `type Errno = syscall.Errno` on Linux and other
+systems but `type Errno uintptr` with its own `Error` method on Windows
+(`errno_windows.go`), so `we.Errno.Error()` (`internal/sys/syscall.go:204`)
+and one other member selected on an `Errno` value were `syscall` members
+only in some builds; they are
+now unresolved. The hand-check sample is unchanged (same 40 links). Toolchain
+agreement re-run on bbolt: 1,394 of 1,394 go/types-decided links agree.
 
 ## Nothing lost
 
@@ -82,7 +95,7 @@ neither build uses for Go from module 30; they are the same 119 sites C-14
 explained.)
 
 **Unresolved Go links after, by recorded reason:** 43,180 with none recorded
-(mostly receivers whose type the source does not show), 20,158
+(mostly receivers whose type the source does not show), 20,160
 `library-member-unproven` (third-party types, and standard-library members
 the table does not settle), 196 `declarations-may-be-unseen`, 149 failed
 (invalid code).
