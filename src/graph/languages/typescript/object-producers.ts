@@ -29,7 +29,7 @@ const isCallable = (node: ts.Node): node is Callable =>
   ts.isArrowFunction(node) ||
   ts.isMethodDeclaration(node);
 
-function staticName(node: ts.Node): string | undefined {
+export function staticName(node: ts.Node): string | undefined {
   if (ts.isComputedPropertyName(node)) return literalKey(node.expression);
   return ts.isIdentifier(node) ||
     ts.isStringLiteralLike(node) ||
@@ -74,6 +74,75 @@ function ownMember(
 
 const MAX_PRODUCERS = 32;
 const MAX_DEPTH = 32;
+
+interface PropertyWrite {
+  receivers: readonly ts.Expression[];
+  key: string | undefined;
+  /** Literal Object.assign sources may establish exactly which keys are written. */
+  assigned?: readonly ts.Expression[];
+}
+
+export function propertyWrite(
+  node: ts.Node,
+  isWrite: (node: ts.Node) => number,
+  writtenKey: (node: ts.Expression) => string | undefined = literalKey,
+): PropertyWrite | undefined {
+  if (
+    ts.isPropertyAccessExpression(node) ||
+    ts.isElementAccessExpression(node)
+  ) {
+    if (!isWrite(node) && !ts.isDeleteExpression(node.parent)) return undefined;
+    return {
+      receivers: [node.expression],
+      key: ts.isPropertyAccessExpression(node)
+        ? node.name.text
+        : literalKey(node.argumentExpression),
+    };
+  }
+  if (
+    !ts.isCallExpression(node) ||
+    !ts.isPropertyAccessExpression(node.expression)
+  )
+    return undefined;
+  const { expression, name } = node.expression;
+  const target = node.arguments[0];
+  if (!target || !ts.isIdentifier(expression)) return undefined;
+  const reflectSet = expression.text === "Reflect" && name.text === "set";
+  if (
+    reflectSet ||
+    (expression.text === "Object" && name.text === "defineProperty")
+  ) {
+    const key = node.arguments[1] && writtenKey(node.arguments[1]);
+    const receiver = reflectSet && node.arguments[3];
+    return { receivers: receiver ? [target, receiver] : [target], key };
+  }
+  if (expression.text !== "Object") return undefined;
+  if (name.text === "assign")
+    return {
+      receivers: [target],
+      key: undefined,
+      assigned: node.arguments.slice(1),
+    };
+  if (name.text === "defineProperties" || name.text === "setPrototypeOf")
+    return { receivers: [target], key: undefined };
+  return undefined;
+}
+
+export function propertyWriteKeys(
+  write: PropertyWrite,
+): (string | undefined)[] {
+  if (!write.assigned) return [write.key];
+  const keys: (string | undefined)[] = [];
+  for (const source of write.assigned) {
+    const value = unwrap(source);
+    if (!ts.isObjectLiteralExpression(value)) return [undefined];
+    for (const property of value.properties)
+      keys.push(
+        ts.isSpreadAssignment(property) ? undefined : staticName(property.name),
+      );
+  }
+  return keys;
+}
 
 /**
  * Follow only captured, explicit value producers for newly accepted literal
@@ -149,43 +218,13 @@ export function objectProducers(
           if (previous) previous.push(value);
           else bindings.set(symbol, [value]);
         }
-      } else if (
-        ts.isPropertyAccessExpression(node) &&
-        (isWrite(node) || ts.isDeleteExpression(node.parent))
-      )
-        addProperty(node.name.text, node.expression);
-      else if (
-        ts.isElementAccessExpression(node) &&
-        (isWrite(node) || ts.isDeleteExpression(node.parent))
-      ) {
-        const key = literalKey(node.argumentExpression);
-        if (key === undefined) addProperties(node.expression);
-        else addProperty(key, node.expression);
-      } else if (
-        ts.isCallExpression(node) &&
-        ts.isPropertyAccessExpression(node.expression)
-      ) {
-        const { expression, name } = node.expression;
-        const target = node.arguments[0];
-        if (target && ts.isIdentifier(expression)) {
-          const reflectSet =
-            expression.text === "Reflect" && name.text === "set";
-          if (
-            (expression.text === "Object" && name.text === "defineProperty") ||
-            reflectSet
-          ) {
-            const key = node.arguments[1] && writtenKey(node.arguments[1]);
-            const receiver = reflectSet && node.arguments[3];
-            for (const written of receiver ? [target, receiver] : [target]) {
-              if (key === undefined) addProperties(written);
-              else addProperty(key, written);
-            }
-          } else if (
-            expression.text === "Object" &&
-            ["assign", "defineProperties", "setPrototypeOf"].includes(name.text)
-          )
-            addProperties(target);
-        }
+      } else {
+        const write = propertyWrite(node, isWrite, writtenKey);
+        if (write)
+          for (const written of write.receivers) {
+            if (write.key === undefined) addProperties(written);
+            else addProperty(write.key, written);
+          }
       }
       ts.forEachChild(node, scan);
     };
