@@ -396,7 +396,7 @@ export function libraryReader(
       return {
         commonJs:
           path.endsWith(".cjs") ||
-          (path.endsWith(".js") && manifest?.json.type === "commonjs"),
+          (path.endsWith(".js") && manifest?.json.type !== "module"),
         declarationUnit,
         targetOf,
         importUnits(specifier: string): readonly Unit[] {

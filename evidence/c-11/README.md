@@ -38,6 +38,11 @@ retained. The separate
 heritage and CommonJS replay supplies the baseline for the per-pin
 program-rule counts. [Outcome comparison](coverage.md)
 
+The module 31 recheck used build
+`2841597e7f0f35b9a6ad2420760c666b836d9454ca1353d84c1105d4c237fc79`.
+The snapshot scan selected nine pins with a newly eligible `require()`
+shape. The remaining nine had no such call and retain their prior captures.
+
 The first sweep build had digest
 `015c000df99defbd55bf03ffea9fb9e7da306e07b9629f5ddc8c6fe736173274`.
 `workspace-audit.mjs` checked every captured workspace context against the
@@ -63,6 +68,10 @@ status alongside the counts. The Hono query returned `ok`.
 | Hono | `graph uses @std/assert` | 65 | 0 |
 
 ## Validation
+
+The module 31 build, no-emit check and format check passed, along with all
+169 tests in the C-11 test files. Excalidraw preserved all 61,330 definite
+checkout destinations from main, 13,405 symbol keys and 104,519 link sites.
 
 The module 30 build, no-emit check and format check passed, along with all
 168 tests in the C-11 test files. Hono preserved all 34,618 definite checkout

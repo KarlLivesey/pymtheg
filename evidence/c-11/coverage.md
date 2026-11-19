@@ -37,7 +37,7 @@ merged before C-11.
 
 The module 29 review head at `dfc36b3` credited 938,787 links overall and
 919,599 on the release's same sites. Module 30 credits 2,051 fewer links in
-both comparisons.
+both comparisons. Module 31 matches the module 30 counts in both comparisons.
 
 ## Checkout identity
 
@@ -58,6 +58,8 @@ definite checkout destinations, identified by file and symbol key. The
 | tRPC | 17,804 | 107,470 | 53,059 |
 
 Module 30 repeated the Hono comparison and preserved these counts.
+Module 31 repeated the Excalidraw comparison and preserved its 61,330
+definite checkout destinations, 13,405 symbol keys and 104,519 link sites.
 
 Hono gains 36 checkout links. The `hono` route in
 `adapters/deno/test/deno.json:11` points to `src/index.ts`. The checker
@@ -138,7 +140,7 @@ and `worker_threads`.
 The paired comparison covers sites with missing-global evidence or a bundled
 and Node pair in either graph, plus sites whose bundled outcome or identity
 changed. It covers all 18 pins, comparing module 28 at `3d8dea94` with the
-module 30 revision.
+module 31 revision.
 
 | Overlapping globals | Definite library | Candidate set | Unresolved |
 | --- | ---: | ---: | ---: |
@@ -189,6 +191,15 @@ Mermaid's `.vite/jsonSchemaPlugin.ts:13` (`URL`) and
 | withastro/astro | 0 |
 | yargs/yargs | 0 |
 | **Total** | **2,053** |
+
+Module 31 also recognizes an unshadowed `require()` in a `.js` file whose
+nearest package manifest leaves `type` unset, and accepts `(require)()` in
+CommonJS files. The new fixture exercises both forms in separate programs.
+The 18-pin source scan selected Dexie, Excalidraw, Mermaid, oclif, Puppeteer,
+React Hook Form, Redux Toolkit, Vite and yargs for replay. The paired link
+comparison found zero outcome, library target identity or missing-global
+reason changes on those pins. The overlapping-global counts and the
+coverage-plan input therefore carry over from module 30.
 
 ## Previously credited library symbols
 

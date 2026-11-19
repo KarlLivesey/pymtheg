@@ -2631,7 +2631,7 @@ export function extractFile(
             )
               specifier = node.argument.literal;
             else if (ts.isCallExpression(node)) {
-              const callee = node.expression;
+              const callee = unwrap(node.expression);
               if (
                 commonJs &&
                 node.arguments.length &&

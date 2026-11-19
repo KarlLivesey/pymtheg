@@ -610,6 +610,33 @@ test("Node runtime evidence in a JavaScript file keeps shared globals open", asy
   );
 });
 
+test("require in a JavaScript package without a type field supplies Node evidence", async () => {
+  const shared = "console.log('start'); setTimeout(() => {}, 10);";
+  await project(
+    {
+      "package.json": "{}",
+      "direct/tsconfig.json": '{"files":["entry.js"]}',
+      "direct/entry.js": "require('./dep.cjs'); " + shared,
+      "direct/dep.cjs": "module.exports = {};",
+      "parenthesised/tsconfig.json": '{"files":["entry.js"]}',
+      "parenthesised/entry.js": "(require)('./dep.cjs'); " + shared,
+      "parenthesised/dep.cjs": "module.exports = {};",
+    },
+    async (graph, report) => {
+      clean(report);
+      for (const file of ["direct/entry.js", "parenthesised/entry.js"])
+        for (const name of ["log", "setTimeout"]) {
+          const link = graph.link(file, name, "calls");
+          assert.equal(link.resolution, "ambiguous");
+          assert.deepEqual(
+            link.libraries.map(({ ecosystem }) => ecosystem).sort(),
+            ["dom", "node"],
+          );
+        }
+    },
+  );
+});
+
 test("Node evidence from sibling files and missing package types applies to the compiler program", async () => {
   const shared = "new URL('https://example.test'); structuredClone({});";
   const isolated =

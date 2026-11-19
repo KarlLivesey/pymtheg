@@ -1670,6 +1670,8 @@ When a program declares `@types/node`, missing imported declarations and
 missing ambient type entries can introduce Node globals even with an
 explicit `types` list. Node's value-only `CryptoKey` is excluded in type
 positions.
+Module 31 also accepts parenthesized `require` and treats `.js` as CommonJS
+for this check unless its nearest manifest sets `"type": "module"`.
 
 Rust records library paths during resolution starting with module 29. Its library lookup uses
 the captured namespace, import, placement and `cfg` facts, with a separate
