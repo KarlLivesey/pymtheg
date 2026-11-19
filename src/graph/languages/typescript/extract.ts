@@ -30,7 +30,6 @@ import {
   libraryKey,
   libraryReader,
   packageUnit,
-  returnedMemberTarget,
   storableName,
 } from "./library.js";
 import {
@@ -713,7 +712,7 @@ export function extractFile(
             return;
           const symbol = checker.getSymbolAtLocation(name);
           if (!symbol?.declarations?.includes(declaration)) return;
-          const target = importer.targetOf(declaration, unit);
+          const target = importer.targetOf(declaration, unit, checker);
           if (!target) return;
           const list = globals.get(name.text) ?? [];
           list.push(target);
@@ -854,7 +853,9 @@ export function extractFile(
     if (found.reason || !found.symbol)
       return { targets: [], reason: found.reason ?? "no-symbol", receiver };
     const facts = new Map<string, TargetFact>();
-    let libraryFacts: Map<string, LibraryTarget> | undefined;
+    let libraryFacts:
+      | Map<string | ts.Symbol | ts.Declaration, LibraryTarget>
+      | undefined;
     let external = 0;
     let local = 0;
     let viaAlias = false;
@@ -1080,11 +1081,15 @@ export function extractFile(
             !incompleteConfig &&
             (namespace ||
               (!context.anyFailed &&
-                (importer.targetOf(declaration, unit) ??
+                (importer.targetOf(declaration, unit, checker) ??
                   (globals.hasInstalledTypes &&
                     receiver &&
                     importer.installedUnit(source) === unit &&
-                    returnedMemberTarget(declaration, unit, checker)))));
+                    importer.returnedMemberTarget(
+                      declaration,
+                      unit,
+                      checker,
+                    )))));
           if (proved) {
             if (meaning === "type" && importer.installedUnit(source))
               installedType = true;
@@ -1133,7 +1138,10 @@ export function extractFile(
             }
             // A selected declaration can arrive through another package or a
             // typed return. The use site's manifest does not pin that route.
-            (libraryFacts ??= new Map()).set(libraryKey(proved), proved);
+            (libraryFacts ??= new Map()).set(
+              importer.targetKey(proved),
+              proved,
+            );
           } else if (inCheckout(declaration)) {
             if (!record(declaration, current)) local++;
           } else external++;
@@ -1218,13 +1226,20 @@ export function extractFile(
         };
     }
     const targets = [...facts.values()];
+    const libraries = libraryFacts && [...libraryFacts.values()];
+    if (
+      libraries &&
+      libraries.length > 1 &&
+      new Set(libraries.map(libraryKey)).size !== libraries.length
+    )
+      return { targets: [], reason: "ambiguous-library-declaration", receiver };
     if (!external && !local && !missingGlobalTypes)
       return {
         targets,
         viaAlias,
         receiver,
         declarations,
-        ...(libraryFacts && { libraryFacts: [...libraryFacts.values()] }),
+        ...(libraries && { libraryFacts: libraries }),
       };
     // An alias whose module did not resolve keeps that module's reason.
     const moduleFailure =
@@ -1633,7 +1648,18 @@ export function extractFile(
   }
   function bindingReason(symbol: ts.Symbol): string | undefined {
     const specifier = bindingSpecifier(symbol);
-    return specifier && bindingModuleReason(specifier);
+    const reason = specifier && bindingModuleReason(specifier);
+    if (reason || !globals.hasInstalledTypes) return reason;
+    for (const step of aliasChain(checker, symbol).slice(1)) {
+      const reexport = bindingSpecifier(step);
+      const missing = reexport && bindingModuleReason(reexport);
+      if (
+        missing === "workspace-entry-unavailable" ||
+        missing === "workspace-build-output-missing"
+      )
+        return missing;
+    }
+    return undefined;
   }
   /** A binding's reason from its module: a captured file the compiler did not type. */
   function bindingModuleReason(specifier: ts.Expression): string | undefined {

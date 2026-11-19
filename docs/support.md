@@ -784,7 +784,10 @@ answer.
   owns its default export and named namespace bindings proven by its entry.
   A named member written directly in an installed function's explicit return
   type can be linked through that declaration when the function has one
-  declaration.
+  declaration. Synthesized names for installed members can include the
+  package-relative declaration file, for example
+  `configuration.d.ts:ReturnType<typeof register>.onDidChange`. Use that
+  full name in `graph uses` to distinguish members in different files.
   [Library links](changes/C-11.md) · [Members and test globals](changes/C-16.md) ·
   [Installed declarations](changes/C-20.md) · [Installed ownership](changes/C-23.md)
 - **Candidates:** several checkout or library targets for one callee (union

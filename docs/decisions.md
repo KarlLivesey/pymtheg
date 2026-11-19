@@ -2905,6 +2905,9 @@ symbol. Members contributed by the augmentation keep their declaring
 package. A named namespace export can use its public binding name when the
 checker points to an installed source file in the same package. A direct
 member in a single named factory's inline return annotation uses the path
-`ReturnType<typeof Factory>.member`. A workspace entry with a physical link
-to a captured package retains the missing build-output reason.
+`declaration-file.d.ts:ReturnType<typeof Factory>.member`. Synthesized
+library member names use the declaring file's path relative to the package.
+The checker distinguishes the declarations behind those names. A workspace
+entry with a physical link to a captured package retains the missing
+build-output reason.
 [C-23](changes/C-23.md)
