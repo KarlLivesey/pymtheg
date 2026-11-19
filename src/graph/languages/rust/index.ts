@@ -206,9 +206,14 @@ export const rustPhases = {
 
 const rust: LanguageModule = {
   id: "rust",
-  version: "28",
+  version: "31",
   extensions: [".rs"],
-  contextFiles: ["Cargo.toml", "Cargo.lock"],
+  contextFiles: [
+    "Cargo.toml",
+    "Cargo.lock",
+    "**/.cargo/config.toml",
+    "**/.cargo/config",
+  ],
   parse: parseRust,
   analyze({ projectId, files, contextFiles, signal }) {
     if (!files.length) return [];

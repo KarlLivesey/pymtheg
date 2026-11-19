@@ -2683,3 +2683,19 @@ or one transaction per phase: W3-P1 measured readers and second writers locked
 out, and under a write-ahead log batches of 64 were no faster), and
 `synchronous=OFF` (the database itself may be corrupted by a power loss).
 See [C-6](changes/C-6.md).
+
+### C-9 Rust library paths
+
+Rust records the final written path through a proven import, qualified crate
+path or edition prelude binding as a library target. A Cargo alias names the
+package from the manifest. A lockfile version needs the owning package's
+dependency edge, or an exact requirement can name the manifest version.
+The resolver keeps the named export when a dependency re-exports it. For an
+associated call it needs a named trait or proof of the declaring member.
+An explicit `use` in a module protects a proven namespace binding from
+opaque items in that module, since rustc rejects duplicate bindings there.
+Captured Cargo directory-source replacements use checkout resolution. The
+configuration maps registry indexes or Git URLs and ref selectors to a
+directory source. A proven package selection is required to resolve inside it.
+Rust coverage now credits recorded targets on graphs made by the supporting
+module version. See [C-9](changes/C-9.md).
