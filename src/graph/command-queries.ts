@@ -253,7 +253,10 @@ export function queryGraph(
     // `testing T.Fatal` is `common.Fatal`): links are stored under that
     // declaring owner, so they are looked up there and the owner is shown.
     const declaredBy =
-      librarySymbol === undefined
+      // Only where the graph holds Go standard-library targets of that
+      // unit: another ecosystem's `testing` is queried as written, and the
+      // table is not read.
+      librarySymbol === undefined || !store.hasLibraryUnit(unit, "go-std")
         ? undefined
         : stdDeclaredBy(unit, librarySymbol);
     const queried = declaredBy ?? { unit, symbol: librarySymbol };

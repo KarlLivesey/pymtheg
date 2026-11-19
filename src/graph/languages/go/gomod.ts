@@ -168,7 +168,14 @@ export function readLayout(
         const item = replacement(directory, args);
         if (item) replacements.push(item);
       } else if (verb === "use" && name === "go.work") {
-        const target = joinDirectory(directory, operands(args)[0] ?? "");
+        const used = operands(args)[0] ?? "";
+        // An absolute path (`/src/m`, `C:\m`) is never a checkout
+        // directory, whatever it joins to.
+        const absolute =
+          used.startsWith("/") ||
+          used.startsWith("\\") ||
+          /^[A-Za-z]:[\\/]/.test(used);
+        const target = absolute ? undefined : joinDirectory(directory, used);
         if (target !== undefined) uses.push(target);
         // A module outside the checkout: its requirements are unseen.
         else outside = true;

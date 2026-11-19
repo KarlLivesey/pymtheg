@@ -13,6 +13,7 @@ import { LanguageRegistry } from "../dist/graph/index.js";
 import { executeGraph } from "../dist/graph/commands.js";
 import { formatGraph } from "../dist/cli/graph.js";
 import go from "../dist/graph/languages/go/index.js";
+import typescript from "../dist/graph/languages/typescript/index.js";
 import { project } from "./fixtures/graph-go/harness.mjs";
 
 const lines = (...items) => [...items, ""].join("\n");
@@ -276,6 +277,68 @@ test("graph uses finds a member by the exported type it is selected through", as
     // An exported declaring owner is queried as itself.
     const own = await graph("uses", "testing", "T.Parallel");
     assert.equal(own.data.library.declaredBy, undefined);
+  } finally {
+    await rm(scratch, { recursive: true, force: true });
+  }
+});
+
+test("review: a type name aliased differently in build variants proves no owner", async () => {
+  const { links } = await project({
+    "go.mod": lines("module example.com/m", "", "go 1.22"),
+    "a/alias_linux.go": lines(
+      "package a",
+      'import "bytes"',
+      "type Buffer = bytes.Buffer",
+    ),
+    "a/alias_windows.go": lines(
+      "package a",
+      'import "strings"',
+      "type Buffer = strings.Reader",
+    ),
+    "a/use.go": lines("package a", "func use(b *Buffer) int { return b.Len() }"),
+    // Every variant aliases the same type: its owner holds in every build.
+    "b/alias_linux.go": lines(
+      "package b",
+      'import "bytes"',
+      "type Buffer = bytes.Buffer",
+    ),
+    "b/alias_other.go": lines(
+      "//go:build !linux",
+      "",
+      "package b",
+      'import "bytes"',
+      "type Buffer = bytes.Buffer",
+    ),
+    "b/use.go": lines("package b", "func use(b *Buffer) int { return b.Len() }"),
+  });
+  assert.equal(outcome(at(links, "a/use.go", "b.Len")), "unresolved");
+  assert.equal(outcome(at(links, "b/use.go", "b.Len")), std("bytes", "Buffer.Len"));
+});
+
+test("review: graph uses leaves another ecosystem's unit as written", async () => {
+  const scratch = await mkdtemp(join(tmpdir(), "pymtheg-go-stdlib-"));
+  const root = join(scratch, "project");
+  const files = {
+    "package.json": JSON.stringify({ dependencies: { testing: "1.0.0" } }),
+    "a.ts": lines('import { T } from "testing";', "T.Fatal();"),
+  };
+  try {
+    for (const [path, text] of Object.entries(files)) {
+      await mkdir(dirname(join(root, path)), { recursive: true });
+      await writeFile(join(root, path), text);
+    }
+    const registry = new LanguageRegistry([go, typescript]);
+    const graph = (command, ...args) =>
+      executeGraph({ command, args, root }, { registry });
+    await graph("index");
+    const uses = await graph("uses", "testing", "T.Fatal");
+    // No Go standard-library target of `testing`: no Go owner is substituted.
+    assert.equal(uses.data.library.declaredBy, undefined);
+    assert.deepEqual(uses.data.library, {
+      unit: "testing",
+      symbol: "T.Fatal",
+      place: "outside-project",
+    });
   } finally {
     await rm(scratch, { recursive: true, force: true });
   }

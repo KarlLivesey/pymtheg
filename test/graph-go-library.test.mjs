@@ -543,6 +543,32 @@ test("review 2: a workspace using a module outside the checkout proves no versio
   });
 });
 
+test("review 3: a workspace using a module by an absolute path proves no version", async () => {
+  const { links } = await project({
+    "go.work": lines("go 1.22", "", "use (", "\t./a", "\t/src/elsewhere", ")"),
+    "a/go.mod": lines(
+      "module example.com/a",
+      "",
+      "go 1.22",
+      "",
+      "require github.com/d/dep v1.0.0",
+    ),
+    "a/a.go": lines(
+      "package a",
+      'import "github.com/d/dep"',
+      "func use() { dep.F() }",
+    ),
+    // A checkout directory with the same relative name is not that module.
+    "src/elsewhere/go.mod": lines("module example.com/x", "", "go 1.22"),
+  });
+  assert.deepEqual(outcome(at(links, "a/a.go", "dep.F")), {
+    ecosystem: "go",
+    unit: "github.com/d/dep",
+    symbol: "F",
+    evidence: "import-binding",
+  });
+});
+
 test("review: a qualifier two unnamed imports may declare is a set of both units", async () => {
   const { links } = await project({
     "go.mod": lines(

@@ -1776,11 +1776,42 @@ class GoResolver {
         } finally {
           this.aliasesFollowed.delete(symbol.id);
         }
-        if (target.kind !== "project") return target;
+        if (target.kind !== "project")
+          return syms.length > 1 ? this.variantsStd(target, syms, depth) : target;
         out.push(...target.syms);
       } else out.push(symbol);
     }
     return out.length ? { kind: "project", syms: unique(out) } : UNKNOWN;
+  }
+
+  /**
+   * A type name declared in several build variants, one of which is an alias
+   * of an external type (C-17): the standard-library type only when every
+   * variant is an alias of that same standard-library type; otherwise the
+   * value keeps no standard-library type (its members stay unresolved).
+   * Other decisions see the first alias's external target, as before.
+   */
+  private variantsStd(
+    target: TypeValue,
+    syms: GraphSymbol[],
+    depth: number,
+  ): TypeValue {
+    if (target.kind !== "external" || !target.std) return target;
+    const std = JSON.stringify(target.std);
+    const agree = syms.every((symbol) => {
+      const data = (symbol.data ?? {}) as {
+        underlying?: TypeRef;
+        shape?: string;
+      };
+      if (symbol.kind !== "alias" || data.shape || !data.underlying)
+        return false;
+      const other = this.typeFromRef(data.underlying, symbol.file, depth + 1);
+      return other.kind === "external" && JSON.stringify(other.std) === std;
+    });
+    if (agree) return target;
+    const { std: _dropped, ...rest } = target;
+    void _dropped;
+    return rest;
   }
 
   /** The type of a value description evaluated in `file`. */

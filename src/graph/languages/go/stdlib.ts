@@ -265,7 +265,10 @@ export function stdDeclaredBy(
 
 /** "1.N" or "1.N.P" or "go1.N": [major, minor]; undefined when unreadable. */
 function release(version: string): [number, number] | undefined {
-  const match = /^(?:go)?(\d+)\.(\d+)/.exec(version.trim());
+  // The whole version: `1.N`, `1.N.P` or a pre-release (`1.Nrc1`).
+  const match = /^(?:go)?(\d+)\.(\d+)(?:\.\d+|(?:rc|beta)\d+)?$/.exec(
+    version.trim(),
+  );
   return match ? [Number(match[1]), Number(match[2])] : undefined;
 }
 
