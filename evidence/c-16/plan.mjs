@@ -19,11 +19,13 @@ if (
   throw Error("Expected the candidate export for all 18 TypeScript pins");
 const repos = new Map();
 const go = read("evidence/c-14/coverage-plan-input.json.gz");
+const rust = read("sweep/plan-input.json.gz");
 for (const packet of [
   read("evidence/sw-3/breakdown.json.gz"),
   read("evidence/c-8/coverage-plan-input.json.gz"),
   read("evidence/c-10/coverage-plan-input.json.gz"),
   { repos: go.repos.filter(({ language }) => language === "go") },
+  { repos: rust.repos.filter(({ language }) => language === "rust") },
   candidate,
 ]) {
   for (const repo of packet.repos) repos.set(repo.id, repo);

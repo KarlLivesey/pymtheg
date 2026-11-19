@@ -63,7 +63,8 @@ finished replay at the same commit.
 | Scoped Deno check | Hono | `520e8076be08e0a796ecbc6a3983dcb030a41462b14bd94ceec49d833ddd1665` |
 | Final named-object guard | Astro, Vitest, Mermaid, Puppeteer, Zod, Vite | `e8e5dc9db553bc9d31b4aa15e12cc998c73f35674880d6f4bd88fe47ea6d8db9` |
 | Post-merge recheck | Redux Toolkit | `58f182de2e9fa180d4309e431d478db997ce0feaa618ae9b1874f5b95e840394` |
-| Competing ambient types review | Dexie, Excalidraw, tRPC | `ffa0028afdd9e8fb3dcf21206db90214b8cfe57168f1bd034358c7f96fcda802` |
+| Competing ambient types review | Dexie | `ffa0028afdd9e8fb3dcf21206db90214b8cfe57168f1bd034358c7f96fcda802` |
+| Review replay after merging C-12 | Excalidraw, tRPC | `9c3ce67b4e738ae16e7b4bf2c3067939bf04d51967e1d5fb01e6632b05c74f19` |
 
 C-14 merged into main at `981b20d` during validation. Its analyzer and
 scoring changes apply to Go. The 18 TypeScript pins have zero indexed Go
@@ -78,9 +79,12 @@ cumulative plan incorporates the committed C-14 Go export.
 stored bare framework name. Selection works at pin scope so inherited and
 shared compiler programs remain eligible. The sweep replays the selected pins.
 `replay.mjs overlay` combines those results with the other 15 graphs.
-Run `compare.mjs` with `C16_CANDIDATE=review-final` on the resulting
-`review-final-run.json`. Set `C16_BASELINE=merged` to inspect withdrawals
-against the preceding PR head.
+After merging C-12 at `450d6be`, the final build replays the two pins with
+withdrawals and reproduces the 18-pin comparison, the audit draw and the
+withdrawn sites. The 18 TypeScript pins have zero tracked or indexed Rust files.
+The plan archive includes C-12's Rust coverage export. Run `compare.mjs`
+with `C16_CANDIDATE=review-merged` on `review-merged-run.json`. Set
+`C16_BASELINE=merged` to inspect withdrawals against the preceding PR head.
 
 Cypress's entry references bundled Mocha and its Chai globals. Jasmine's
 ambient declarations include `describe`, `it` and `expect`. The default
@@ -115,6 +119,6 @@ check and the format check. All 3,085 tests in `npm test` and all 19
 sweep-tool tests passed. The merged tRPC and Redux Toolkit graphs
 reproduced the paired comparison and the audit records byte for byte.
 
-The competing-type review build passed the production build, TypeScript
-no-emit and format checks, all 163 TypeScript graph tests and all 19
-sweep-tool tests.
+The competing-type review build after merging C-12 passed the production
+build, TypeScript no-emit and format checks, all 163 TypeScript graph tests
+and all 21 sweep-tool tests.
