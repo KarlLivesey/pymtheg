@@ -1,0 +1,13 @@
+{
+ "project": "stretchr/testify",
+ "toolchainNotes": [],
+ "tableResolved": 1760,
+ "goTypesDecided": 1445,
+ "agree": 1445,
+ "disagreements": [],
+ "notDecidedByGoTypes": {
+  "same table answer (no go/types fact for the link)": 315
+ },
+ "toolchainOwnerWhereTableNone": 0,
+ "disagreementCount": 0
+}

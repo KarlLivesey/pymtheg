@@ -2834,3 +2834,22 @@ When the declaration is unavailable, an annotation that names an imported
 receiver type can establish the package unit. The program-wide Node overlap
 rules also apply to checker-selected members reached through the new aliases
 and selectors. [C-16](changes/C-16.md)
+
+### C-17 Go standard-library members
+
+Go resolves members of standard-library types source-only from a table of
+the standard library's exported API generated from one pinned Go release
+and shipped with the package, rather than reading GOROOT (which would make
+the default route need Go). A member is recorded with the declaring owner
+Go's selector rule gives (promotion through embedding included; an
+unexported owner such as `testing.common` as Go reports it, and
+`graph uses` maps the exported type to it). The table keeps only what is
+identical on every platform Go supports, and a member is used only when it
+is in every Go release the module may be built with (its `go` directive
+and later): Go's compatibility promise makes later releases supersets, so
+the table answers for older ones. **Trade:** platform-specific members
+(`syscall`, some `os` and `net` fields) and members newer than the
+directive stay unresolved even where the project's own build constraint
+would allow them. A standard-library interface value's method is recorded
+as the interface's method (the static callee): the source-only route cannot
+list implementers outside the checkout. See [C-17](changes/C-17.md).

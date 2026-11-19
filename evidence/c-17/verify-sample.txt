@@ -1,0 +1,574 @@
+### 1. cockroachdb/pebble wal/failover_writer_test.go:317 err.Error
+recorded: builtin error.Error
+  315: 								inj, err := errorfs.ParseDSL(cmdArg.Vals[i])
+  316: 								if err != nil {
+  317: 									return fmt.Sprintf("%s: %s", cmdArg.Vals[i], err.Error())
+  declares err at 52: f, err := memFS.OpenDir("")
+  declares err at 65: f, err := fs.OpenDir((*dirs)[i].Dirname)
+  declares err at 85: fns, err := dirs[i].FS.List(dirs[i].Dirname)
+  declares err at 105: f, err := fn.fs.Open(fn.name)
+  imports: "flag" "fmt" "io" "math" "math/rand/v2" "slices" "strings" "sync" "testing" "time" "github.com/cockroachdb/crlib/testutils/leaktest" "github.com/cockroachdb/datadriven" "github.com/cockroachdb/errors" "github.com/cockroachdb/pebble/internal/base" "github.com/cockroachdb/pebble/internal/testutils" "github.com/cockroachdb/pebble/record" "github.com/cockroachdb/pebble/vfs" "github.com/cockroachdb/pebble/vfs/errorfs" "github.com/prometheus/client_golang/prometheus" "github.com/stretchr/testify/require" return "duplicate inject-errors" return "ok" return "found ongoing" return "no ongoing"
+  doc: package builtin // import "builtin"
+  doc: 
+  doc: type error interface {
+  doc: 	Error() string
+
+### 2. cli/cli pkg/cmd/pr/shared/survey_test.go:78 stderr.String
+recorded: bytes Buffer.String
+  76: 
+  77: 	assert.Equal(t, "", stdout.String())
+  78: 	assert.Equal(t, "", stderr.String())
+  declares stderr at 25: ios, _, stdout, stderr := iostreams.Test()
+  declares stderr at 88: ios, _, stdout, stderr := iostreams.Test()
+  declares stderr at 244: io, _, _, stderr := iostreams.Test()
+  imports: "errors" "testing" "github.com/cli/cli/v2/api" "github.com/cli/cli/v2/internal/gh" "github.com/cli/cli/v2/internal/ghrepo" "github.com/cli/cli/v2/internal/prompter" "github.com/cli/cli/v2/pkg/iostreams" "github.com/stretchr/testify/assert" "github.com/stretchr/testify/require"
+  doc: package bytes // import "bytes"
+  doc: 
+  doc: func (b *Buffer) String() string
+  doc:     String returns the contents of the unread portion of the buffer as a string.
+
+### 3. cli/cli pkg/cmd/skills/publish/publish_test.go:36 remoteLines.String
+recorded: strings Builder.String
+  34: 		remoteLines.WriteString(fmt.Sprintf("%[1]s\t%[2]s (fetch)\n%[1]s\t%[2]s (push)\n", name, url))
+  35: 	}
+  36: 	cs.Register(`git( .+)? remote -v`, 0, remoteLines.String())
+  declares remoteLines at 32: var remoteLines strings.Builder
+  imports: "bytes" "fmt" "net/http" "os" "path/filepath" "regexp" "strings" "testing" "github.com/MakeNowJust/heredoc" "github.com/cli/cli/v2/git" "github.com/cli/cli/v2/internal/prompter" "github.com/cli/cli/v2/internal/run" "github.com/cli/cli/v2/pkg/cmdutil" "github.com/cli/cli/v2/pkg/httpmock" "github.com/cli/cli/v2/pkg/iostreams" "github.com/google/shlex" "github.com/stretchr/testify/assert" "github.com/stretchr/testify/require"
+  doc: package strings // import "strings"
+  doc: 
+  doc: func (b *Builder) String() string
+  doc:     String returns the accumulated string.
+
+### 4. cockroachdb/pebble wal/failover_writer.go:783 ww.mu.Lock
+recorded: sync Mutex.Lock
+  781: // For internal use and testing.
+  782: func (ww *failoverWriter) recorderForCurDir() *latencyAndErrorRecorder {
+  783: 	ww.mu.Lock()
+  declares ww at 513: ww := &failoverWriter{
+  declares ww at 529: func (ww *failoverWriter) WriteRecord(
+  declares ww at 589: func (ww *failoverWriter) switchToNewDir(dir dirAndFileHandle) error {
+  declares ww at 757: func (ww *failoverWriter) doneSyncCallback(doneSync record.PendingSyncIndex, err error) {
+  imports: "io" "sync" "sync/atomic" "time" "github.com/cockroachdb/crlib/crtime" "github.com/cockroachdb/errors" "github.com/cockroachdb/pebble/internal/base" "github.com/cockroachdb/pebble/record" "github.com/cockroachdb/pebble/vfs" "github.com/prometheus/client_golang/prometheus"
+  doc: package sync // import "sync"
+  doc: 
+  doc: func (m *Mutex) Lock()
+  doc:     Lock locks m. If the lock is already in use, the calling goroutine blocks
+
+### 5. cockroachdb/pebble version_set_test.go:313 t.Logf
+recorded: testing common.Logf
+  311: 	defer func() {
+  312: 		if t.Failed() {
+  313: 			t.Logf("fs log:\n%s", buf.String())
+  declares t at 42: func writeAndIngest(t *testing.T, mem vfs.FS, d *DB, k InternalKey, v []byte, filename string) {
+  declares t at 52: func TestVersionSet(t *testing.T) {
+  declares t at 108: datadriven.RunTest(t, "testdata/version_set", func(t *testing.T, td *datadriven.TestData) (retVal string) {
+  declares t at 265: func TestVersionSetCheckpoint(t *testing.T) {
+  imports: "bytes" "context" "fmt" "io" "maps" "math/rand/v2" "slices" "strconv" "strings" "sync" "sync/atomic" "testing" "time" "unsafe" "github.com/cockroachdb/crlib/crstrings" "github.com/cockroachdb/crlib/testutils/leaktest" "github.com/cockroachdb/datadriven" "github.com/cockroachdb/pebble/internal/base" "github.com/cockroachdb/pebble/internal/deletepacer" "github.com/cockroachdb/pebble/internal/manifest" "github.com/cockroachdb/pebble/internal/strparse" "github.com/cockroachdb/pebble/internal/testkeys" "github.com/cockroachdb/pebble/internal/testutils" "github.com/cockroachdb/pebble/objstorage" "github.com/cockroachdb/pebble/objstorage/objstorageprovider" "github.com/cockroachdb/pebble/record" "github.com/cockroachdb/pebble/sstable" "github.com/cockroachdb/pebble/vfs" "github.com/cockroachdb/pebble/vfs/atomicfs" "github.com/cockroachdb/pebble/vfs/errorfs" "github.com/stretchr/testify/require"
+  doc: package testing // import "testing"
+  doc: 
+  doc: func (c *common) Logf(format string, args ...any)
+  doc:     Logf formats its arguments according to the format, analogous to fmt.Printf,
+
+### 6. gin-gonic/gin context.go:1350 c.Request.URL.Path
+recorded: net/url URL.Path
+  1348: 	}(c.Request.URL.Path)
+  1349: 
+  1350: 	c.Request.URL.Path = filepath
+  declares c at 103: func (c *Context) reset() {
+  declares c at 122: func (c *Context) Copy() *Context {
+  declares c at 158: func (c *Context) HandlerName() string {
+  declares c at 164: func (c *Context) HandlerNames() []string {
+  imports: "errors" "fmt" "io" "io/fs" "log" "maps" "math" "mime/multipart" "net" "net/http" "net/url" "os" "path/filepath" "strings" "sync" "time" "github.com/gin-contrib/sse" "github.com/gin-gonic/gin/binding" "github.com/gin-gonic/gin/render" return "https" return "https" return "http"
+  doc: package url // import "net/url"
+  doc: 
+  doc: type URL struct {
+  doc:     Path string  // path (relative paths may omit leading slash)
+
+### 7. gin-gonic/gin context.go:1350 c.Request.URL
+recorded: net/http Request.URL
+  1348: 	}(c.Request.URL.Path)
+  1349: 
+  1350: 	c.Request.URL.Path = filepath
+  declares c at 103: func (c *Context) reset() {
+  declares c at 122: func (c *Context) Copy() *Context {
+  declares c at 158: func (c *Context) HandlerName() string {
+  declares c at 164: func (c *Context) HandlerNames() []string {
+  imports: "errors" "fmt" "io" "io/fs" "log" "maps" "math" "mime/multipart" "net" "net/http" "net/url" "os" "path/filepath" "strings" "sync" "time" "github.com/gin-contrib/sse" "github.com/gin-gonic/gin/binding" "github.com/gin-gonic/gin/render" return "https" return "https" return "http"
+  doc: package http // import "net/http"
+  doc: 
+  doc: type Request struct {
+  doc:     // URL specifies either the URI being requested (for server requests) or the URL to
+
+### 8. cockroachdb/pebble sstable/tablefilters/bloom/bloom_test.go:123 t.Errorf
+recorded: testing common.Errorf
+  121: 		for _, key := range keys {
+  122: 			if !mayContain(f, hash(key)) {
+  123: 				t.Errorf("length=%d: did not contain key %q", length, key)
+  declares t at 51: func TestSmallBloomFilter(t *testing.T) {
+  declares t at 80: func TestBloomFilter(t *testing.T) {
+  declares t at 151: func TestHash(t *testing.T) {
+  declares t at 200: t.Run("", func(t *testing.T) {
+  imports: "fmt" "strings" "testing" "github.com/cockroachdb/pebble/sstable/tablefilters/internal/filtertestutils" "github.com/stretchr/testify/require"
+  doc: package testing // import "testing"
+  doc: 
+  doc: func (c *common) Errorf(format string, args ...any)
+  doc:     Errorf is equivalent to Logf followed by Fail.
+
+### 9. cli/cli script/ghmock/gittransport.go:105 r.Body
+recorded: net/http Request.Body
+  103: 		cmd.Env = append(cmd.Env, "CONTENT_LENGTH="+strconv.FormatInt(r.ContentLength, 10))
+  104: 	}
+  105: 	cmd.Stdin = r.Body
+  declares r at 36: func (m *mockServer) serveGitHTTP(w http.ResponseWriter, r *http.Request, entry loggedRequest) bool {
+  imports: "bufio" "bytes" "context" "errors" "fmt" "io" "net/http" "net/textproto" "os" "os/exec" "path/filepath" "slices" "strconv" "strings" "time"
+  doc: package http // import "net/http"
+  doc: 
+  doc: type Request struct {
+  doc:     // Body is the request's body.
+
+### 10. cli/cli pkg/cmd/pr/shared/finder.go:89 t.Cleanup
+recorded: testing common.Cleanup
+  87: 	// Ensure that at the end of the test, we reset the "runCommandFinder" variable so that tests are isolated,
+  88: 	// at least if they are run sequentially.
+  89: 	t.Cleanup(func() {
+  declares t at 78: func StubFinderForRunCommandStyleTests(t *testing.T, selector string, pr *api.PullRequest, repo ghrepo.Interface) *mockFinder {
+  imports: "context" "errors" "fmt" "net/http" "net/url" "regexp" "sort" "strconv" "strings" "testing" "time" "github.com/cli/cli/v2/api" ghContext "github.com/cli/cli/v2/context" "github.com/cli/cli/v2/git" fd "github.com/cli/cli/v2/internal/featuredetection" "github.com/cli/cli/v2/internal/gh" "github.com/cli/cli/v2/internal/ghrepo" "github.com/cli/cli/v2/pkg/cmdutil" o "github.com/cli/cli/v2/pkg/option" "github.com/cli/cli/v2/pkg/set" "github.com/shurcooL/githubv4" "golang.org/x/sync/errgroup"
+  doc: package testing // import "testing"
+  doc: 
+  doc: func (c *common) Cleanup(f func())
+  doc:     Cleanup registers a function to be called when the test (or subtest) and
+
+### 11. cockroachdb/pebble compaction_test.go:2082 d.mu.Unlock
+recorded: sync Mutex.Unlock
+  2080: 				d.mu.Lock()
+  2081: 				s := d.mu.versions.currentVersion().String()
+  2082: 				d.mu.Unlock()
+  declares d at 590: d, err := Open("", opts)
+  declares d at 896: var d *DB
+  declares d at 897: // NB: d is closed explicitly at the end of this function, not via
+  declares d at 1036: if err := runBuildCmd(td, d, d.opts.FS); err != nil {
+  imports: "bytes" "cmp" "context" crand "crypto/rand" "fmt" "math" "math/rand/v2" "path/filepath" "regexp" "slices" "sort" "strconv" "strings" "sync" "sync/atomic" "testing" "time" "github.com/cockroachdb/crlib/crstrings" "github.com/cockroachdb/crlib/crtime" "github.com/cockroachdb/crlib/testutils/leaktest" "github.com/cockroachdb/datadriven" "github.com/cockroachdb/errors" "github.com/cockroachdb/errors/oserror" "github.com/cockroachdb/pebble/internal/base" "github.com/cockroachdb/pebble/internal/buildtags" "github.com/cockroachdb/pebble/internal/compact" "github.com/cockroachdb/pebble/internal/manifest" "github.com/cockroachdb/pebble/internal/testkeys" "github.com/cockroachdb/pebble/internal/testutils" "github.com/cockroachdb/pebble/objstorage" "github.com/cockroachdb/pebble/objstorage/objstorageprovider" "github.com/cockroachdb/pebble/objstorage/remote" "github.com/cockroachdb/pebble/sstable" "github.com/cockroachdb/pebble/sstable/blob" "github.com/cockroachdb/pebble/sstable/block" "github.com/cockroachdb/pebble/vfs" "github.com/cockroachdb/pebble/vfs/errorfs" "github.com/stretchr/testify/require" return "validated" return "(none)" return "(not found)" return "(success)" return "error: malformed data for add-compaction. usage: <level>: <start>-<end> <filenum>" return "(nil)" return "error: malformed data for add-read-compaction. usage: <level>: <start>-<end> <filenum>" return "outputLevel already set\n" return "not-found"
+  doc: package sync // import "sync"
+  doc: 
+  doc: func (m *Mutex) Unlock()
+  doc:     Unlock unlocks m. It is a run-time error if m is not locked on entry to
+
+### 12. cockroachdb/pebble db_test.go:1985 rng.Int
+recorded: math/rand/v2 Rand.Int
+  1983: 	var keys [keyCount][]byte
+  1984: 	for i := 0; i < keyCount; i++ {
+  1985: 		keys[i] = []byte(strconv.Itoa(rng.Int()))
+  declares rng at 329: rng := rand.New(rand.NewPCG(0, 123))
+  declares rng at 1981: rng := rand.New(rand.NewPCG(0, uint64(time.Now().UnixNano())))
+  imports: "bytes" "context" "fmt" "io" "math/rand/v2" "path/filepath" "regexp" "runtime" "slices" "strconv" "strings" "sync" "sync/atomic" "testing" "time" "github.com/cockroachdb/crlib/crstrings" "github.com/cockroachdb/crlib/fifo" "github.com/cockroachdb/crlib/testutils/leaktest" "github.com/cockroachdb/datadriven" "github.com/cockroachdb/errors" "github.com/cockroachdb/pebble/internal/base" "github.com/cockroachdb/pebble/internal/buildtags" "github.com/cockroachdb/pebble/internal/cache" "github.com/cockroachdb/pebble/internal/testkeys" "github.com/cockroachdb/pebble/internal/testutils" "github.com/cockroachdb/pebble/objstorage/objstorageprovider" "github.com/cockroachdb/pebble/sstable" "github.com/cockroachdb/pebble/vfs" "github.com/cockroachdb/pebble/vfs/errorfs" "github.com/cockroachdb/pebble/wal" "github.com/stretchr/testify/require" return "ok"
+  doc: package rand // import "math/rand/v2"
+  doc: 
+  doc: func (r *Rand) Int() int
+  doc:     Int returns a non-negative pseudo-random int.
+
+### 13. restic/restic internal/backend/rest/rest.go:99 url.Query
+recorded: net/url URL.Query
+  97: 
+  98: 	url := *cfg.URL
+  99: 	values := url.Query()
+  declares url at 27: url         *url.URL
+  declares url at 60: url := cfg.URL.String()
+  declares url at 98: url := *cfg.URL
+  declares url at 315: url := b.Dirname(backend.Handle{Type: t})
+  imports: "context" "encoding/json" "fmt" "hash" "io" "net/http" "net/url" "strings" "github.com/restic/restic/internal/backend" "github.com/restic/restic/internal/backend/layout" "github.com/restic/restic/internal/backend/location" "github.com/restic/restic/internal/backend/util" "github.com/restic/restic/internal/debug" "github.com/restic/restic/internal/errors" "github.com/restic/restic/internal/feature"
+  doc: package url // import "net/url"
+  doc: 
+  doc: func (u *URL) Query() Values
+  doc:     Query parses RawQuery and returns the corresponding values. It silently
+
+### 14. restic/restic internal/ui/termstatus/stdio_wrapper_test.go:69 t.Fatal
+recorded: testing common.Fatal
+  67: 				n, err := w.Write(data)
+  68: 				if err != nil {
+  69: 					t.Fatal(err)
+  declares t at 13: func TestStdioWrapper(t *testing.T) {
+  declares t at 62: t.Run("", func(t *testing.T) {
+  declares t at 89: func TestStdioWrapperConcurrentWrites(t *testing.T) {
+  imports: "context" "strings" "testing" "github.com/google/go-cmp/cmp" rtest "github.com/restic/restic/internal/test" "golang.org/x/sync/errgroup"
+  doc: package testing // import "testing"
+  doc: 
+  doc: func (c *common) Fatal(args ...any)
+  doc:     Fatal is equivalent to Log followed by FailNow.
+
+### 15. restic/restic internal/repository/lock.go:221 l.refreshabilityTimeout.Nanoseconds
+recorded: time Duration.Nanoseconds
+  219: 			lastRefresh = time.Now().UnixNano()
+  220: 		case <-ticker.C:
+  221: 			if time.Now().UnixNano()-lastRefresh < l.refreshabilityTimeout.Nanoseconds() || refreshStaleLockResult != nil {
+  declares l at 22: func (l *unlocker) Unlock() {
+  declares l at 51: func (l *locker) Lock(ctx context.Context, r *Repository, exclusive bool, retryLock time.Duration, printRetry func(msg string), logger func(format string, args ...any)) (func(), context.Context, error) {
+  declares l at 124: func (l *locker) refreshLocks(ctx context.Context, backend backend.Backend, unlocker *unlocker, refreshed chan<- struct{}, forceRefresh <-chan refreshLockRequest, logger func(format string, args ...any)) {
+  declares l at 188: func (l *locker) monitorLockRefresh(ctx context.Context, unlocker *unlocker, refreshed <-chan struct{}, forceRefresh chan<- refreshLockRequest, logger func(format string, args ...any)) {
+  imports: "context" "fmt" "sync" "sync/atomic" "time" "github.com/restic/restic/internal/backend" "github.com/restic/restic/internal/debug" "github.com/restic/restic/internal/errors" "github.com/restic/restic/internal/restic"
+  doc: package time // import "time"
+  doc: 
+  doc: func (d Duration) Nanoseconds() int64
+  doc:     Nanoseconds returns the duration as an integer nanosecond count.
+
+### 16. gin-gonic/gin binding/form_mapping.go:435 structField.Tag.Get
+recorded: reflect StructTag.Get
+  433: 
+  434: func setTimeField(val string, structField reflect.StructField, value reflect.Value) error {
+  435: 	timeFormat := structField.Tag.Get("time_format")
+  declares structField at 434: func setTimeField(val string, structField reflect.StructField, value reflect.Value) error {
+  imports: "encoding" "errors" "fmt" "maps" "mime/multipart" "reflect" "strconv" "strings" "time" "github.com/gin-gonic/gin/codec/json" "github.com/gin-gonic/gin/internal/bytesconv"
+  doc: package reflect // import "reflect"
+  doc: 
+  doc: func (tag StructTag) Get(key string) string
+  doc:     Get returns the value associated with key in the tag string. If there is
+
+### 17. cockroachdb/pebble open_test.go:79 err.Error
+recorded: builtin error.Error
+  77: 	}))
+  78: 	if err != nil {
+  79: 		t.Errorf("d1 Open: %s", err.Error())
+  declares err at 63: d0, err := Open("", testingRandomized(t, &Options{
+  declares err at 73: d1, err := Open("", testingRandomized(t, &Options{
+  declares err at 99: d0, err := Open("", opts)
+  declares err at 103: if _, err := Open("", opts); !errors.Is(err, ErrDBAlreadyExists) {
+  imports: "bytes" "context" "encoding/binary" "fmt" "io" "math" randv1 "math/rand" "math/rand/v2" "os" "path/filepath" "reflect" "regexp" "runtime" "runtime/debug" "slices" "sort" "strconv" "strings" "sync" "sync/atomic" "syscall" "testing" "time" "github.com/cockroachdb/crlib/crstrings" "github.com/cockroachdb/crlib/testutils/leaktest" "github.com/cockroachdb/datadriven" "github.com/cockroachdb/errors" "github.com/cockroachdb/metamorphic" "github.com/cockroachdb/pebble/internal/base" "github.com/cockroachdb/pebble/internal/cache" "github.com/cockroachdb/pebble/internal/manifest" "github.com/cockroachdb/pebble/internal/testkeys" "github.com/cockroachdb/pebble/internal/testutils" "github.com/cockroachdb/pebble/objstorage" "github.com/cockroachdb/pebble/objstorage/objstorageprovider" "github.com/cockroachdb/pebble/objstorage/remote" "github.com/cockroachdb/pebble/sstable" "github.com/cockroachdb/pebble/vfs" "github.com/cockroachdb/pebble/vfs/atomicfs" "github.com/cockroachdb/pebble/vfs/errorfs" "github.com/cockroachdb/pebble/wal" "github.com/cockroachdb/redact" "github.com/ghemawat/stream" "github.com/kr/pretty" "github.com/stretchr/testify/require" return "no `dir` provided" return "no `path` provided" return "no path" return "ok" return "no `path` provided" return "ok" return "OK" return "new memfs" return "new default fs"
+  doc: package builtin // import "builtin"
+  doc: 
+  doc: type error interface {
+  doc: 	Error() string
+
+### 18. cockroachdb/pebble objstorage/objstorageprovider/sharedcache/shared_cache.go:746 s.mu.Unlock
+recorded: sync Mutex.Unlock
+  744: func (s *shard) assertShardStateIsConsistent() {
+  745: 	s.mu.Lock()
+  746: 	defer s.mu.Unlock()
+  declares s at 431: func (s *shard) init(
+  declares s at 474: func (s *shard) close() error {
+  declares s at 482: func (s *shard) freePush(index cacheBlockIndex) {
+  declares s at 489: func (s *shard) freePop() cacheBlockIndex {
+  imports: "context" "fmt" "io" "math/bits" "sync" "sync/atomic" "time" "github.com/cockroachdb/errors" "github.com/cockroachdb/pebble/internal/base" "github.com/cockroachdb/pebble/internal/invariants" "github.com/cockroachdb/pebble/objstorage/remote" "github.com/cockroachdb/pebble/vfs" "github.com/prometheus/client_golang/prometheus"
+  doc: package sync // import "sync"
+  doc: 
+  doc: func (m *Mutex) Unlock()
+  doc:     Unlock unlocks m. It is a run-time error if m is not locked on entry to
+
+### 19. restic/restic internal/archiver/archiver_test.go:352 b.StopTimer
+recorded: testing B.StopTimer
+  350: 
+  351: 	for i := 0; i < b.N; i++ {
+  352: 		b.StopTimer()
+  declares b at 343: func BenchmarkArchiverSaveFileSmall(b *testing.B) {
+  declares b at 353: tempdir, repo := prepareTempdirRepoSrc(b, d)
+  declares b at 356: _, stats := saveFile(b, repo, filepath.Join(tempdir, "file"), fs.Track{FS: fs.NewLocal()})
+  declares b at 375: func BenchmarkArchiverSaveFileLarge(b *testing.B) {
+  imports: "bytes" "context" "fmt" "io" "os" "path/filepath" "runtime" "strings" "sync" "sync/atomic" "syscall" "testing" "time" "github.com/google/go-cmp/cmp" "github.com/restic/restic/internal/backend" "github.com/restic/restic/internal/backend/mem" "github.com/restic/restic/internal/checker" "github.com/restic/restic/internal/data" "github.com/restic/restic/internal/errors" "github.com/restic/restic/internal/feature" "github.com/restic/restic/internal/fs" "github.com/restic/restic/internal/repository" "github.com/restic/restic/internal/restic" rtest "github.com/restic/restic/internal/test" "golang.org/x/sync/errgroup"
+  doc: package testing // import "testing"
+  doc: 
+  doc: func (b *B) StopTimer()
+  doc:     StopTimer stops timing a test. This can be used to pause the timer while
+
+### 20. cli/cli pkg/cmd/repo/clone/clone.go:144 repoURL.Scheme
+recorded: net/url URL.Scheme
+  142: 			repoURL.Scheme = "ssh"
+  143: 		}
+  144: 		protocol = repoURL.Scheme
+  declares repoURL at 136: repoURL := simplifyURL(initialURL)
+  imports: "context" "fmt" "net/http" "net/url" "strings" "github.com/MakeNowJust/heredoc" "github.com/cli/cli/v2/api" "github.com/cli/cli/v2/git" "github.com/cli/cli/v2/internal/gh" "github.com/cli/cli/v2/internal/ghrepo" "github.com/cli/cli/v2/pkg/cmdutil" "github.com/cli/cli/v2/pkg/iostreams" "github.com/spf13/cobra" "github.com/spf13/pflag"
+  doc: package url // import "net/url"
+  doc: 
+  doc: type URL struct {
+  doc:     Scheme string
+
+### 21. samber/lo it/math_test.go:184 t.Parallel
+recorded: testing T.Parallel
+  182: 
+  183: func TestSum(t *testing.T) {
+  184: 	t.Parallel()
+  declares t at 12: func TestRange(t *testing.T) {
+  declares t at 27: t.Run(tt.name, func(t *testing.T) {
+  declares t at 43: func TestRangeFrom(t *testing.T) {
+  declares t at 46: t.Run("int", func(t *testing.T) {
+  imports: "slices" "testing" "github.com/stretchr/testify/assert"
+  doc: package testing // import "testing"
+  doc: 
+  doc: func (t *T) Parallel()
+  doc:     Parallel signals that this test is to be run in parallel with (and only
+
+### 22. cli/cli internal/attachments/userasset_test.go:266 err.Error
+recorded: builtin error.Error
+  264: 
+  265: 	require.Error(t, err)
+  266: 	assert.True(t, strings.HasPrefix(err.Error(), "./nope.png: "), "got %q", err.Error())
+  declares err at 20: f, err := os.Create(name)
+  declares err at 232: a, err := newAsset(tt.path, tt.alt)
+  declares err at 250: wantInfo, err := os.Stat(tt.file)
+  declares err at 263: _, err := newAsset("./nope.png", "")
+  imports: "io/fs" "os" "runtime" "strings" "testing" "github.com/stretchr/testify/assert" "github.com/stretchr/testify/require"
+  doc: package builtin // import "builtin"
+  doc: 
+  doc: type error interface {
+  doc: 	Error() string
+
+### 23. gin-gonic/gin context_test.go:2011 c.Request.Header.Add
+recorded: net/http Header.Add
+  2009: 	c, _ := CreateTestContext(httptest.NewRecorder())
+  2010: 	c.Request, _ = http.NewRequest(http.MethodPost, "/", nil)
+  2011: 	c.Request.Header.Add("Accept", "image/tiff-fx")
+  declares c at 45: // func (c *Context) File(filepath string) {
+  declares c at 46: // func (c *Context) Negotiate(code int, config Negotiate) {
+  declares c at 47: // BAD case: func (c *Context) Render(code int, render render.Render, obj ...any) {
+  declares c at 88: c, _ := CreateTestContext(w)
+  imports: "bytes" "context" "crypto/tls" "errors" "fmt" "html/template" "io" "io/fs" "mime/multipart" "net" "net/http" "net/http/httptest" "net/url" "os" "path/filepath" "reflect" "strconv" "strings" "sync" "testing" "time" "github.com/gin-contrib/sse" "github.com/gin-gonic/gin/binding" "github.com/gin-gonic/gin/codec/json" testdata "github.com/gin-gonic/gin/testdata/protoexample" "github.com/stretchr/testify/assert" "github.com/stretchr/testify/require" "go.mongodb.org/mongo-driver/v2/bson" "google.golang.org/protobuf/proto"
+  doc: package http // import "net/http"
+  doc: 
+  doc: func (h Header) Add(key, value string)
+  doc:     Add adds the key, value pair to the header. It appends to any existing
+
+### 24. restic/restic internal/backend/azure/azure_test.go:144 t.Context
+recorded: testing common.Context
+  142: 	}
+  143: 
+  144: 	ctx := t.Context()
+  declares t at 40: func TestBackendAzure(t *testing.T) {
+  declares t at 64: func BenchmarkBackendAzure(t *testing.B) {
+  declares t at 88: func TestBackendAzureAccountToken(t *testing.T) {
+  declares t at 130: func TestBackendAzureContainerToken(t *testing.T) {
+  imports: "bytes" "fmt" "io" "os" "testing" "time" "github.com/restic/restic/internal/backend" "github.com/restic/restic/internal/backend/azure" "github.com/restic/restic/internal/backend/test" "github.com/restic/restic/internal/options" "github.com/restic/restic/internal/restic" rtest "github.com/restic/restic/internal/test"
+  doc: package testing // import "testing"
+  doc: 
+  doc: func (c *common) Context() context.Context
+  doc:     Context returns a context that is canceled just before Cleanup-registered
+
+### 25. restic/restic internal/backend/azure/azure_test.go:194 t.Fatal
+recorded: testing common.Fatal
+  192: 	be, err := azure.Create(ctx, *cfg, tr, t.Logf)
+  193: 	if err != nil {
+  194: 		t.Fatal(err)
+  declares t at 40: func TestBackendAzure(t *testing.T) {
+  declares t at 64: func BenchmarkBackendAzure(t *testing.B) {
+  declares t at 88: func TestBackendAzureAccountToken(t *testing.T) {
+  declares t at 130: func TestBackendAzureContainerToken(t *testing.T) {
+  imports: "bytes" "fmt" "io" "os" "testing" "time" "github.com/restic/restic/internal/backend" "github.com/restic/restic/internal/backend/azure" "github.com/restic/restic/internal/backend/test" "github.com/restic/restic/internal/options" "github.com/restic/restic/internal/restic" rtest "github.com/restic/restic/internal/test"
+  doc: package testing // import "testing"
+  doc: 
+  doc: func (c *common) Fatal(args ...any)
+  doc:     Fatal is equivalent to Log followed by FailNow.
+
+### 26. samber/lo map_test.go:880 t.Run
+recorded: testing T.Run
+  878: 	for _, tt := range tests {
+  879: 		tt := tt
+  880: 		t.Run(tt.name, func(t *testing.T) {
+  declares t at 12: func TestKeys(t *testing.T) {
+  declares t at 29: t.Run(tt.name, func(t *testing.T) {
+  declares t at 40: func TestUniqKeys_zero(t *testing.T) {
+  declares t at 49: func TestUniqKeys_single(t *testing.T) {
+  imports: "errors" "fmt" "strconv" "testing" "github.com/stretchr/testify/assert" return "Hello" return "Hello"
+  doc: package testing // import "testing"
+  doc: 
+  doc: func (t *T) Run(name string, f func(t *T)) bool
+  doc:     Run runs f as a subtest of t called name. It runs f in a separate goroutine
+
+### 27. cli/cli script/ghmock/set_test.go:631 t.TempDir
+recorded: testing common.TempDir
+  629: 					t.Skip("creating symlinks requires additional Windows privileges")
+  630: 				}
+  631: 				require.NoError(t, os.Symlink(t.TempDir(), filepath.Join(files, "link")))
+  declares t at 20: func TestParseSetArgs(t *testing.T) {
+  declares t at 175: t.Run(tt.name, func(t *testing.T) {
+  declares t at 189: func TestApplySet(t *testing.T) {
+  declares t at 323: t.Run(tt.name, func(t *testing.T) {
+  imports: "archive/zip" "bytes" "encoding/json" "errors" "fmt" "io" "os" "path/filepath" "runtime" "strings" "testing" "github.com/stretchr/testify/assert" "github.com/stretchr/testify/require"
+  doc: package testing // import "testing"
+  doc: 
+  doc: func (c *common) TempDir() string
+  doc:     TempDir returns a temporary directory for the test to use. The directory
+
+### 28. restic/restic internal/repository/upgrade_repo_test.go:64 t.TempDir
+recorded: testing common.TempDir
+  62: 	rtest.OK(t, err)
+  63: 
+  64: 	err = UpgradeRepo(ctx, repo, t.TempDir())
+  declares t at 17: func TestUpgradeRepoV2(t *testing.T) {
+  declares t at 18: repo, _, _ := TestRepositoryWithVersion(t, 1)
+  declares t at 51: func TestUpgradeRepoV2FailurePreservesLocalConfig(t *testing.T) {
+  declares t at 79: func TestUpgradeRepoV2Failure(t *testing.T) {
+  imports: "context" "os" "path/filepath" "sync" "testing" "github.com/restic/restic/internal/backend" "github.com/restic/restic/internal/backend/local" "github.com/restic/restic/internal/errors" "github.com/restic/restic/internal/restic" rtest "github.com/restic/restic/internal/test"
+  doc: package testing // import "testing"
+  doc: 
+  doc: func (c *common) TempDir() string
+  doc:     TempDir returns a temporary directory for the test to use. The directory
+
+### 29. cli/cli .github/skills/cli-exercise/tool/internal/execution/cli.go:199 entry.Name
+recorded: io/fs DirEntry.Name
+  197: 		for _, entry := range entries {
+  198: 			if requestName.MatchString(entry.Name()) {
+  199: 				if err := os.Remove(filepath.Join(requests, entry.Name())); err != nil {
+  declares entry at 197: for _, entry := range entries {
+  imports: "context" "encoding/json" "errors" "flag" "fmt" "io" "math" "os" "path/filepath" "regexp" "slices" "strings" "time" "github.com/cli/cli/v2/cli-exercise/internal/cliutil" "github.com/cli/cli/v2/cli-exercise/internal/engine" "github.com/cli/cli/v2/cli-exercise/internal/terminal"
+  doc: package fs // import "io/fs"
+  doc: 
+  doc: type DirEntry interface {
+  doc: 	// Name returns the name of the file (or subdirectory) described by the entry.
+
+### 30. restic/restic internal/dump/zip_test.go:86 f.Name
+recorded: archive/zip FileHeader.Name
+  84: 			filebase := filepath.ToSlash(match.Name())
+  85: 			if filepath.Base(f.Name) != filebase {
+  86: 				return fmt.Errorf("foldernames don't match got %v want %v", filepath.Base(f.Name), filebase)
+  declares f at 18: func readZipFile(f *zip.File) ([]byte, error) {
+  declares f at 63: for _, f := range z.File {
+  imports: "archive/zip" "bytes" "fmt" "os" "path/filepath" "strings" "testing" "time"
+  doc: package zip // import "archive/zip"
+  doc: 
+  doc: type FileHeader struct {
+  doc:     // Name is the name of the file.
+
+### 31. gin-gonic/gin routes_test.go:541 w.Body
+recorded: net/http/httptest ResponseRecorder.Body
+  539: 
+  540: 	assert.Equal(t, http.StatusOK, w.Code)
+  541: 	assert.Contains(t, w.Body.String(), "package gin")
+  declares w at 31: w := httptest.NewRecorder()
+  declares w at 47: w := PerformRequest(r, method, "/test")
+  declares w at 63: w := PerformRequest(router, method, "/test")
+  declares w at 84: w := PerformRequest(router, method, "/test")
+  imports: "fmt" "net/http" "net/http/httptest" "os" "path/filepath" "strings" "testing" "github.com/stretchr/testify/assert" "github.com/stretchr/testify/require"
+  doc: package httptest // import "net/http/httptest"
+  doc: 
+  doc: type ResponseRecorder struct {
+  doc:     // Body is the buffer to which the Handler's Write calls are sent. If nil,
+
+### 32. cockroachdb/pebble internal/rangekeystack/user_iterator_test.go:35 buf.Reset
+recorded: bytes Buffer.Reset
+  33: 
+  34: 	datadriven.RunTest(t, "testdata/iter", func(t *testing.T, td *datadriven.TestData) string {
+  35: 		buf.Reset()
+  declares buf at 32: var buf bytes.Buffer
+  declares buf at 106: var buf bytes.Buffer
+  declares buf at 285: var buf bytes.Buffer
+  imports: "bytes" "fmt" "io" "math" "math/rand/v2" "strings" "testing" "time" "github.com/cockroachdb/crlib/crstrings" "github.com/cockroachdb/datadriven" "github.com/cockroachdb/errors" "github.com/cockroachdb/pebble/internal/base" "github.com/cockroachdb/pebble/internal/keyspan" "github.com/cockroachdb/pebble/internal/keyspan/keyspanimpl" "github.com/cockroachdb/pebble/internal/rangekey" "github.com/cockroachdb/pebble/internal/testkeys" "github.com/pmezard/go-difflib/difflib" "github.com/stretchr/testify/require" return "OK"
+  doc: package bytes // import "bytes"
+  doc: 
+  doc: func (b *Buffer) Reset()
+  doc:     Reset resets the buffer to be empty, but it retains the underlying storage
+
+### 33. cli/cli script/api-host-gateway/gateway/main.go:302 r.file.Write
+recorded: os File.Write
+  300: 	r.mu.Lock()
+  301: 	defer r.mu.Unlock()
+  302: 	if _, err := r.file.Write(append(line, '\n')); err != nil {
+  declares r at 132: return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+  declares r at 178: ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
+  declares r at 293: func (r *recorder) Write(entry *record) {
+  declares r at 307: func (r *recorder) Logf(format string, args ...any) {
+  imports: "bytes" "context" "crypto/ecdsa" "crypto/elliptic" "crypto/rand" "crypto/tls" "crypto/x509" "crypto/x509/pkix" "encoding/json" "encoding/pem" "flag" "fmt" "io" "log" "math/big" "net" "net/http" "net/http/httputil" "net/url" "os" "strconv" "strings" "sync" "time"
+  doc: package os // import "os"
+  doc: 
+  doc: func (f *File) Write(b []byte) (n int, err error)
+  doc:     Write writes len(b) bytes from b to the File. It returns the number of
+
+### 34. restic/restic internal/ui/backup/rate_estimator.go:49 r.buckets.Front
+recorded: container/list List.Front
+  47: 	start := now.Add(-minRateEstimatorMinutes * time.Minute)
+  48: 
+  49: 	for e := r.buckets.Front(); e != nil; e = r.buckets.Front() {
+  declares r at 36: func (r *rateEstimator) trim(now time.Time) {
+  declares r at 70: func (r *rateEstimator) recordBytes(now time.Time, bytes uint64) {
+  declares r at 90: func (r *rateEstimator) rate(now time.Time) float64 {
+  imports: "container/list" "time"
+  doc: package list // import "container/list"
+  doc: 
+  doc: func (l *List) Front() *Element
+  doc:     Front returns the first element of list l or nil if the list is empty.
+
+### 35. cockroachdb/pebble checkpoint_test.go:303 t.Context
+recorded: testing common.Context
+  301: 	require.NoError(t, err)
+  302: 
+  303: 	ctx, cancel := context.WithCancel(t.Context())
+  declares t at 30: func testCheckpointImpl(t *testing.T, ddFile string, createOnShared bool) {
+  declares t at 65: datadriven.RunTest(t, ddFile, func(t *testing.T, td *datadriven.TestData) string {
+  declares t at 255: func TestCopyCheckpointOptions(t *testing.T) {
+  declares t at 258: datadriven.RunTest(t, "testdata/copy_checkpoint_options", func(t *testing.T, td *datadriven.TestData) string {
+  imports: "bytes" "context" "fmt" "io" "math/rand/v2" "runtime" "sort" "strings" "sync" "testing" "github.com/cockroachdb/crlib/testutils/leaktest" "github.com/cockroachdb/datadriven" "github.com/cockroachdb/pebble/internal/base" "github.com/cockroachdb/pebble/internal/testutils" "github.com/cockroachdb/pebble/objstorage/objstorageprovider" "github.com/cockroachdb/pebble/objstorage/remote" "github.com/cockroachdb/pebble/sstable" "github.com/cockroachdb/pebble/vfs" "github.com/stretchr/testify/require" return "batch <db>" return "checkpoint <db> <dir> [restrict=(start-end, ...)]" return "compact <db>" return "print-backing <db>" return "close <db>" return "flush <db>" return "list <dir>" return "open <dir> [readonly]" return "scan <db>"
+  doc: package testing // import "testing"
+  doc: 
+  doc: func (c *common) Context() context.Context
+  doc:     Context returns a context that is canceled just before Cleanup-registered
+
+### 36. cockroachdb/pebble internal/manifest/l0_sublevels_test.go:463 err.Error
+recorded: builtin error.Error
+  461: 				err := CheckOrdering(base.DefaultComparer, L0Sublevel(sublevel), slice.Iter())
+  462: 				if err != nil {
+  463: 					return err.Error()
+  declares err at 31: f, err := os.Open(filename)
+  declares err at 42: r, err := rr.Next()
+  declares err at 55: if err := bve.Accumulate(&ve); err != nil {
+  declares err at 169: fileNum, err := strconv.Atoi(strings.TrimSpace(parts[0]))
+  imports: "bytes" "fmt" "io" "math" "math/rand/v2" "os" "slices" "sort" "strconv" "strings" "testing" "time" "github.com/cockroachdb/crlib/crstrings" "github.com/cockroachdb/datadriven" "github.com/cockroachdb/errors" "github.com/cockroachdb/pebble/internal/base" "github.com/cockroachdb/pebble/internal/testkeys" "github.com/cockroachdb/pebble/record" "github.com/stretchr/testify/require" return "no compaction picked" return "OK" return "OK"
+  doc: package builtin // import "builtin"
+  doc: 
+  doc: type error interface {
+  doc: 	Error() string
+
+### 37. cockroachdb/pebble record/log_writer_test.go:726 f.syncPos.Load
+recorded: sync/atomic Int64.Load
+  724: 	}
+  725: 	if f.writePos.Load() == offset {
+  726: 		require.NotEqual(t, f.writePos.Load(), f.syncPos.Load())
+  declares f at 36: func (f syncErrorFile) Sync() error {
+  declares f at 139: f, err := mem.Create("log", vfs.WriteCategoryUnspecified)
+  declares f at 143: w := NewLogWriter(syncErrorFile{f, injectedErr}, 0, LogWriterConfig{
+  declares f at 171: func (f *syncFile) Write(buf []byte) (int, error) {
+  imports: "bytes" "encoding/binary" "fmt" "io" "math" "math/rand/v2" "sort" "strings" "sync" "sync/atomic" "testing" "time" "github.com/cockroachdb/errors" "github.com/cockroachdb/pebble/internal/humanize" "github.com/cockroachdb/pebble/vfs" "github.com/cockroachdb/pebble/vfs/errorfs" "github.com/cockroachdb/pebble/vfs/vfstest" "github.com/prometheus/client_golang/prometheus" prometheusgo "github.com/prometheus/client_model/go" "github.com/stretchr/testify/require"
+  doc: package atomic // import "sync/atomic"
+  doc: 
+  doc: func (x *Int64) Load() int64
+  doc:     Load atomically loads and returns the value stored in x.
+
+### 38. samber/lo find_test.go:716 t.Run
+recorded: testing T.Run
+  714: 	for _, tt := range tests {
+  715: 		tt := tt
+  716: 		t.Run(tt.name, func(t *testing.T) {
+  declares t at 13: func TestIndexOf(t *testing.T) {
+  declares t at 28: t.Run(tt.name, func(t *testing.T) {
+  declares t at 37: func TestLastIndexOf(t *testing.T) {
+  declares t at 52: t.Run(tt.name, func(t *testing.T) {
+  imports: "errors" "math" "math/rand" "testing" "time" "github.com/stretchr/testify/assert"
+  doc: package testing // import "testing"
+  doc: 
+  doc: func (t *T) Run(name string, f func(t *T)) bool
+  doc:     Run runs f as a subtest of t called name. It runs f in a separate goroutine
+
+### 39. samber/lo type_manipulation_test.go:183 t.Parallel
+recorded: testing T.Parallel
+  181: 
+  182: func TestFromPtrOr(t *testing.T) {
+  183: 	t.Parallel()
+  declares t at 9: func TestIsNil(t *testing.T) {
+  declares t at 33: t.Run(tt.name, func(t *testing.T) {
+  declares t at 43: func TestIsNotNil(t *testing.T) {
+  declares t at 67: t.Run(tt.name, func(t *testing.T) {
+  imports: "testing" "github.com/stretchr/testify/assert"
+  doc: package testing // import "testing"
+  doc: 
+  doc: func (t *T) Parallel()
+  doc:     Parallel signals that this test is to be run in parallel with (and only
+
+### 40. cockroachdb/pebble internal/lint/lint_test.go:250 t.Error
+recorded: testing common.Error
+  248: 				t.Errorf("\n%s <- please use the \"invariants.SetFinalizer\" equivalent instead", s)
+  249: 			}); err != nil {
+  250: 			t.Error(err)
+  declares t at 32: func dirCmd(t *testing.T, dir string, name string, args ...string) stream.Filter {
+  declares t at 50: func installTool(t *testing.T, path string) {
+  declares t at 58: func TestLint(t *testing.T) {
+  declares t at 89: t.Run("TestGoVet", func(t *testing.T) {
+  imports: "bytes" "fmt" "go/build" "os/exec" "path/filepath" "regexp" "runtime" "slices" "strings" "testing" "github.com/cockroachdb/errors" "github.com/cockroachdb/pebble/internal/buildtags" "github.com/ghemawat/stream" "github.com/stretchr/testify/require"
+  doc: package testing // import "testing"
+  doc: 
+  doc: func (c *common) Error(args ...any)
+  doc:     Error is equivalent to Log followed by Fail.
+
