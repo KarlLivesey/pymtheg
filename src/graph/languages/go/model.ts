@@ -60,8 +60,11 @@ export type Desc =
   | { k: "localtype"; tp?: boolean; c?: TypeRef; sym?: string }
   /** Parse-time only: a live local binding, replaced before facts are returned. */
   | { k: "ref"; b: object }
-  /** Not described; `m`: what is written in it (a parenthesized conversion type). */
-  | { k: "unknown"; m?: Desc[] };
+  /**
+   * Not described; `m`: what is written in it (a parenthesized conversion
+   * type). `p`: the callee is a name under this many `*` (`(*T)(x)`: 1).
+   */
+  | { k: "unknown"; m?: Desc[]; p?: number };
 
 export interface ImportFact {
   path: string;
@@ -195,6 +198,95 @@ export const KNOWN_GOARCH = new Set([
   "sparc64",
   "wasm",
 ]);
+
+/**
+ * The GOOS and GOARCH values of Go's ports (`go tool dist list`, Go 1.27.4).
+ * Every build has one of each as a true tag, whatever else `-tags` sets.
+ */
+export const PORT_GOOS = [
+  "aix",
+  "android",
+  "darwin",
+  "dragonfly",
+  "freebsd",
+  "illumos",
+  "ios",
+  "js",
+  "linux",
+  "netbsd",
+  "openbsd",
+  "plan9",
+  "solaris",
+  "wasip1",
+  "windows",
+];
+export const PORT_GOARCH = [
+  "386",
+  "amd64",
+  "arm",
+  "arm64",
+  "loong64",
+  "mips",
+  "mips64",
+  "mips64le",
+  "mipsle",
+  "ppc64",
+  "ppc64le",
+  "riscv64",
+  "s390x",
+  "wasm",
+];
+
+/** Go's ports as GOOS/GOARCH pairs (`go tool dist list`, Go 1.27.4). */
+export const PORTS = [
+  "aix/ppc64",
+  "android/386",
+  "android/amd64",
+  "android/arm",
+  "android/arm64",
+  "darwin/amd64",
+  "darwin/arm64",
+  "dragonfly/amd64",
+  "freebsd/386",
+  "freebsd/amd64",
+  "freebsd/arm",
+  "freebsd/arm64",
+  "illumos/amd64",
+  "ios/amd64",
+  "ios/arm64",
+  "js/wasm",
+  "linux/386",
+  "linux/amd64",
+  "linux/arm",
+  "linux/arm64",
+  "linux/loong64",
+  "linux/mips",
+  "linux/mips64",
+  "linux/mips64le",
+  "linux/mipsle",
+  "linux/ppc64",
+  "linux/ppc64le",
+  "linux/riscv64",
+  "linux/s390x",
+  "netbsd/386",
+  "netbsd/amd64",
+  "netbsd/arm",
+  "netbsd/arm64",
+  "openbsd/386",
+  "openbsd/amd64",
+  "openbsd/arm",
+  "openbsd/arm64",
+  "openbsd/ppc64",
+  "openbsd/riscv64",
+  "plan9/386",
+  "plan9/amd64",
+  "plan9/arm",
+  "solaris/amd64",
+  "wasip1/wasm",
+  "windows/386",
+  "windows/amd64",
+  "windows/arm64",
+];
 
 export const TYPE_KINDS = new Set(["struct", "interface", "type", "alias"]);
 

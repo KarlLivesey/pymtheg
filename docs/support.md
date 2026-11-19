@@ -325,7 +325,17 @@ toolchain route below. Claims `*.go`; context `go.mod` and
 file (its ID can change when files are added or removed).
 
 - **Definite:** imports of packages in the importing file's module, a `go.work`
-  module or a proven local `replace`; package-qualified references; direct calls;
+  module or a required module's local `replace` whose directory has a go.mod
+  (also `=> ..` and `=> .`), when exactly one module provides the package and
+  it has a file Go can build (`ignore` never set); packages under `testdata`,
+  `_x` or `.x` directories, which Go imports like any other (a module may
+  itself sit under such a directory); package-qualified references; direct
+  calls; conversions, also to a pointer type (`(*T)(x)`, `(*p.T)(nil)` link to
+  `T`; the value is a `*T`, so `(*T)(p).M()` resolves); members of call
+  results of checkout functions and methods (`x := pkg.New(); x.M()`,
+  `v, err := f()`, chains); through a function declared per build variant only
+  when its variants cover every build of the calling file and agree (any name
+  may be a tag: `-tags=freebsd` on Linux);
   calls and selections on a concrete receiver whose type is evident from the
   source, by Go's selector rule including promotion; the same on elements of
   slices, arrays, maps (value, and key for a ranged key) and channels, on range
@@ -337,10 +347,13 @@ file (its ID can change when files are added or removed).
   `mu struct{…}` fields; ranked after named symbols in search) and of
   function-local struct types; field, type, receiver and embedding references;
   `contains`.
-- **Candidates:** a name declared in several build variants (build constraints
-  are not evaluated; a selection on a type declared in several variants is
-  searched per variant and is definite only when all variants agree, otherwise
-  the set of their answers); several equally shallow promotion paths; interface dispatch
+- **Candidates:** a name declared in several build variants (a selection on a
+  type declared in several variants is searched per variant and is definite
+  only when every build of the referencing file gives the same answer,
+  otherwise the set of their answers; any name may be a tag in a build, a
+  GOOS or GOARCH name or `cgo` too, with one of Go's port GOOS and GOARCH
+  values true, and `import "C"` needs cgo enabled); several equally shallow
+  promotion paths; interface dispatch
   (the interface method plus every project type whose method set matches by name
   and parameter/result counts; always open, `structural-match-unverified`);
   calls on a receiver whose type the source does not show (name-only, open,
@@ -352,12 +365,21 @@ file (its ID can change when files are added or removed).
   annotation only). An interface that embeds two provably different
   declarations of one method (invalid Go) has no implementers.
 - **Unresolved:** standard library, third-party and non-local `replace` imports and
-  everything reached through them; imports Go forbids (`internal`, `package main`,
-  `testdata`); unexported names from another package; builtins (`data.builtin`);
+  everything reached through them; imports Go forbids (`internal`,
+  `package main`, a `replace` of a module that is not required, a local
+  replacement without a go.mod, a package with no buildable file); an import
+  two modules provide (Go: "ambiguous import"; reason
+  `import-destination-uncertain`); unexported names from another package;
+  builtins (`data.builtin`); members of `(**T)(x)` or of a conversion to a
+  pointer type's pointer (`(*A)(x)` with `type A = *T`);
   elements of function containers; elements of a generic named container
   (`type L[E any] []E`); a field of an anonymous struct type declared in several
   build variants of its enclosing type; explicit generic-method instantiation
-  `t.Map[C](x)`; `new(variable).M()`.
+  `t.Map[C](x)`; `new(variable).M()`; results of generic type-parameter type
+  (`As[*Int](x)`: type arguments are not extracted); a call through a function
+  declared per build variant whose variants return different named types or
+  do not cover every build of the caller (the receiver's type is then
+  unknown).
 - **Not extracted:** locals, parameters and type parameters as symbols; keys of
   keyed composite literals; generic type arguments (`Stack[int]` methods resolve
   on `Stack`); cgo (`import "C"` is an unresolved import); imports into `vendor/`.

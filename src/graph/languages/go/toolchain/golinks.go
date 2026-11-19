@@ -1166,6 +1166,10 @@ func identObj(info *types.Info, e ast.Expr) types.Object {
 }
 
 func typeObj(info *types.Info, e ast.Expr) types.Object {
+	// A conversion to a pointer type, (*T)(x): the type named is T.
+	if star, ok := unparen(e).(*ast.StarExpr); ok {
+		e = unparen(star.X)
+	}
 	switch x := e.(type) {
 	case *ast.IndexExpr:
 		e = x.X
