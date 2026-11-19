@@ -10,11 +10,16 @@ async function observations(text, dependencies = "", support = {}) {
   const path = "src/lib.rs";
   const parts = Object.entries(support);
   const manifest = `[package]\nname="app"\nversion="0.0.0"\nedition="2021"\n[dependencies]\n${dependencies}`;
-  return (await projectObservations(
-    Object.fromEntries([[path, text], ...parts.filter(([name]) => name.endsWith(".rs"))]),
-    manifest,
-    parts.filter(([name]) => name.endsWith(".toml")),
-  ))(path);
+  return (
+    await projectObservations(
+      Object.fromEntries([
+        [path, text],
+        ...parts.filter(([name]) => name.endsWith(".rs")),
+      ]),
+      manifest,
+      parts.filter(([name]) => name.endsWith(".toml")),
+    )
+  )(path);
 }
 
 async function projectObservations(sources, manifest, manifests = []) {
@@ -33,14 +38,15 @@ async function projectObservations(sources, manifest, manifests = []) {
       hash: contentHash(text),
     });
   }
-  const contextFiles = [["Cargo.toml", manifest], ...manifests]
-    .map(([path, text]) => ({
+  const contextFiles = [["Cargo.toml", manifest], ...manifests].map(
+    ([path, text]) => ({
       path,
       text,
       status: "clean",
       hash: contentHash(text),
       diagnostics: [],
-    }));
+    }),
+  );
   const ctx = { projectId, files, contextFiles };
   const analyzed = new Map((await rust.analyze(ctx)).map((f) => [f.path, f]));
   const facts = files.map((file) => {
@@ -115,9 +121,16 @@ test("Rust derive identity follows the macro namespace and its imports", async (
   `,
     'facade = "1"',
   );
-  for (const marker of ["// trait and derive", "// type only", "// glob has type only"])
+  for (const marker of [
+    "// trait and derive",
+    "// type only",
+    "// glob has type only",
+  ])
     assert.deepEqual(at("types", "Option", marker), proved("option::Option"));
-  assert.deepEqual(at("types", "Option", "// foreign explicit derive"), proved(null));
+  assert.deepEqual(
+    at("types", "Option", "// foreign explicit derive"),
+    proved(null),
+  );
 });
 
 test("standard test and tool attributes have their own lookup rules", async () => {
@@ -135,6 +148,12 @@ test("standard test and tool attributes have their own lookup rules", async () =
       fn case() {}
       fn sibling() -> Option<u8> { None } // possible external attribute
     }
+    mod derive_attribute_import {
+      use facade::derive;
+      #[derive(Debug)]
+      struct Item;
+      fn sibling() -> Option<u8> { None } // rebound derive attribute
+    }
     mod tool_binding {
       macro_rules! bounded { () => { const OTHER: u8 = 0; } }
       bounded!();
@@ -151,9 +170,22 @@ test("standard test and tool attributes have their own lookup rules", async () =
   `,
     'facade = "1"',
   );
-  assert.deepEqual(at("types", "Option", "// bang macro named test"), proved("option::Option"));
-  assert.deepEqual(at("types", "Option", "// possible external attribute"), proved(null));
-  assert.deepEqual(at("types", "Option", "// tool name"), proved("option::Option"));
+  assert.deepEqual(
+    at("types", "Option", "// bang macro named test"),
+    proved("option::Option"),
+  );
+  assert.deepEqual(
+    at("types", "Option", "// possible external attribute"),
+    proved(null),
+  );
+  assert.deepEqual(
+    at("types", "Option", "// rebound derive attribute"),
+    proved(null),
+  );
+  assert.deepEqual(
+    at("types", "Option", "// tool name"),
+    proved("option::Option"),
+  );
   assert.deepEqual(at("types", "Option", "// rebound tool name"), proved(null));
 });
 
@@ -193,34 +225,52 @@ test("qualified macros keep the Cargo identity through unrelated globs", async (
   `,
     'renamed = { package = "serde", version = "1", features = ["derive"] }\nruntime = { package = "tokio", version = "1", features = ["macros"] }\nregistry = "1"',
   );
-  for (const marker of ["// derive across glob", "// attribute across glob", "// bang across glob"])
+  for (const marker of [
+    "// derive across glob",
+    "// attribute across glob",
+    "// bang across glob",
+  ])
     assert.deepEqual(at("types", "Option", marker), assumed("option::Option"));
   for (const marker of ["// local crate spelling", "// absent Cargo edge"])
     assert.deepEqual(at("types", "Option", marker), proved(null));
-  assert.deepEqual(at("types", "ItemBuilder", "// retains derived-name guard"), proved(null));
+  assert.deepEqual(
+    at("types", "ItemBuilder", "// retains derived-name guard"),
+    proved(null),
+  );
 });
 
 test("a captured macro-use reexport has to compete in the attribute namespace", async () => {
   const source = `
     #[macro_use]
     extern crate exports;
-    use std::fmt::Debug;
     #[derive(Debug)]
     struct Item;
     fn sibling() -> Option<u8> { None } // beside derive
   `;
-  const manifest = '[package]\nname="exports"\nversion="0.0.0"\nedition="2021"\n';
-  const captured = await observations(source, 'exports = { path = "exports" }', {
-    "exports/Cargo.toml": manifest,
-    "exports/src/lib.rs": "#[macro_export] macro_rules! Debug { () => {} }",
-  });
+  const manifest =
+    '[package]\nname="exports"\nversion="0.0.0"\nedition="2021"\n';
+  const captured = await observations(
+    source,
+    'exports = { path = "exports" }',
+    {
+      "exports/Cargo.toml": manifest,
+      "exports/src/lib.rs": "#[macro_export] macro_rules! Debug { () => {} }",
+    },
+  );
   const unknown = await observations(source, 'exports = "1"');
-  assert.deepEqual(captured("types", "Option", "// beside derive"), proved("option::Option"));
-  assert.deepEqual(unknown("types", "Option", "// beside derive"), proved(null));
+  assert.deepEqual(
+    captured("types", "Option", "// beside derive"),
+    proved("option::Option"),
+  );
+  assert.deepEqual(
+    unknown("types", "Option", "// beside derive"),
+    proved(null),
+  );
 });
 
 test("the Ratatui bitflags import identifies the namespace of its invocation", async () => {
-  const at = await observations(`
+  const at = await observations(
+    `
     use bitflags::bitflags;
     bitflags! {
       #[derive(Default, Clone, Copy, Eq, PartialEq, Hash)]
@@ -228,8 +278,13 @@ test("the Ratatui bitflags import identifies the namespace of its invocation", a
     }
     fn sibling() -> Option<u8> { None } // named bang import
     fn from_macro(_: Borders) {} // name from input
-  `, 'bitflags = "=2.13.2"');
-  assert.deepEqual(at("types", "Option", "// named bang import"), assumed("option::Option"));
+  `,
+    'bitflags = "=2.13.2"',
+  );
+  assert.deepEqual(
+    at("types", "Option", "// named bang import"),
+    assumed("option::Option"),
+  );
   assert.deepEqual(at("types", "Borders", "// name from input"), proved(null));
 });
 

@@ -26,8 +26,13 @@ const warm = '    const warm = await graph("warm", "index");';
 if (!runner.includes(warm)) throw Error("Sweep warm-index hook changed");
 writeFileSync(
   temporary,
-  runner.replace(anchor, seed + anchor).replace(warm,
-    '    if (process.env.PYM_PAIR_COLD_ONLY) return finalize("finished");\n' + warm),
+  runner
+    .replace(anchor, seed + anchor)
+    .replace(
+      warm,
+      '    if (process.env.PYM_PAIR_COLD_ONLY) return finalize("finished");\n' +
+        warm,
+    ),
 );
 const child = spawnSync(process.execPath, [temporary, ...args], {
   stdio: "inherit",

@@ -7,6 +7,11 @@ pub fn derive_debug(_: TokenStream) -> TokenStream {
     "struct FromDerive;".parse().unwrap()
 }
 
+#[proc_macro_derive(Alternative)]
+pub fn derive_alternative(_: TokenStream) -> TokenStream {
+    "struct FromAlternative;".parse().unwrap()
+}
+
 #[proc_macro_attribute]
 pub fn test(_: TokenStream, item: TokenStream) -> TokenStream {
     let mut result = item;

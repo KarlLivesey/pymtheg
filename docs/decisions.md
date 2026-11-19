@@ -2803,6 +2803,16 @@ or a named library target. A captured macro definition, a competing glob, an
 unproven macro binding and a layout expansion keep their source requirements.
 See [C-12](changes/C-12.md).
 
+### C-18 Rust macro identity
+
+The lexical scope retry checks the binding that Rust would use during macro
+expansion. A type or bang macro cannot take an attribute-sub-namespace name.
+A competing glob requires either a readable lookup or an established outer
+binding for which rustc would reject the ambiguity. Qualified external names
+follow existing Cargo dependency edges through aliases and named exports.
+These proofs feed the C-12 effect rules, including the existing recorded
+external effect assumption. [C-18](changes/C-18.md)
+
 ### C-14 Go library targets
 
 Go records a library target where the source proves the package and, for a

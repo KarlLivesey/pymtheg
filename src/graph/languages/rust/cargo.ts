@@ -523,7 +523,9 @@ export function crates(
           !registry.libraryVersion && exact && !alternatives.length
             ? { libraryVersion: exact, libraryVersionSource: origin.path }
             : {};
-        const features = [...new Set([...memberFeatures, ...(strings(fields?.features) ?? [])])];
+        const features = [
+          ...new Set([...memberFeatures, ...(strings(fields?.features) ?? [])]),
+        ];
         for (const path of targets) {
           const target = byPath.get(path);
           if (path && !target?.value) {

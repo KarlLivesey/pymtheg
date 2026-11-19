@@ -2178,7 +2178,8 @@ export function resolveRust(
           return (
             !head.complete ||
             !head.library ||
-            (head.library.parts.length > 0 && !lookupExportNamespace(head.library))
+            (head.library.parts.length > 0 &&
+              !lookupExportNamespace(head.library))
           );
         });
         if (libraryProbe) return { ...found, bound: true };
@@ -2462,7 +2463,9 @@ export function resolveRust(
     const shadowed =
       scopeFailures.length > 0 ||
       (ns !== "macro" &&
-        (!macroIdentityProbe || !macroIdentityFlavor || hardOpaqueScopes.has(scopeKey)) &&
+        (!macroIdentityProbe ||
+          !macroIdentityFlavor ||
+          hardOpaqueScopes.has(scopeKey)) &&
         (!libraryLookup ||
           (!libraryProbe && libraryImportScope !== scopeKey)) &&
         scopeOpaque(scopeKey, name, false, !uses?.globs.length));
@@ -6352,8 +6355,13 @@ export function resolveRust(
     if (data(symbol).namespaceUnverified) return true;
     if (data(symbol).macroRules) return macroIdentityFlavor === "bang";
     const kinds = data(symbol).procMacroKinds as string[] | undefined;
-    return !kinds?.length || kinds.some((kind) =>
-      macroIdentityFlavor === "bang" ? kind === "proc_macro" : kind !== "proc_macro",
+    return (
+      !kinds?.length ||
+      kinds.some((kind) =>
+        macroIdentityFlavor === "bang"
+          ? kind === "proc_macro"
+          : kind !== "proc_macro",
+      )
     );
   }
 
@@ -6362,7 +6370,11 @@ export function resolveRust(
     if (!permitsNamespace(exported, ns)) return false;
     if (!macroIdentityFlavor || ns !== "macro") return true;
     if (exported === "bang") return macroIdentityFlavor === "bang";
-    if (exported === "derive" || exported === "attribute" || standardDerivePath(path))
+    if (
+      exported === "derive" ||
+      exported === "attribute" ||
+      standardDerivePath(path)
+    )
       return macroIdentityFlavor === "attribute";
     return true;
   }
@@ -6385,17 +6397,37 @@ export function resolveRust(
     // their globs, and a Cargo edge must be available in this configuration.
     if (!rest.length)
       return name === macroIdentityPrelude && !activeMacroImports.length;
-    if (!loc.crate.edition || loc.crate.edition === "2015" || loc.noImplicitPrelude)
+    if (
+      !loc.crate.edition ||
+      loc.crate.edition === "2015" ||
+      loc.noImplicitPrelude
+    )
       return false;
-    const outer = dependencyLookup(name, [], loc, "type", seen, true, accessFrom, false);
-    return outer.complete && !outer.failedFiles?.length &&
-      (!!outer.library || outer.symbols.length === 1);
+    const outer = dependencyLookup(
+      name,
+      [],
+      loc,
+      "type",
+      seen,
+      true,
+      accessFrom,
+      false,
+    );
+    return (
+      outer.complete &&
+      !outer.failedFiles?.length &&
+      (!!outer.library || outer.symbols.length === 1)
+    );
   }
 
   function standardDerivePath(path: LibraryPath): boolean {
     const { unit, parts } = path;
-    return unit.ecosystem === "rust-std" && ["std", "core"].includes(unit.unit) &&
-      parts.length === 2 && preludePath(parts[1]!, "2015", "derive")?.[0] === parts[0];
+    return (
+      unit.ecosystem === "rust-std" &&
+      ["std", "core"].includes(unit.unit) &&
+      parts.length === 2 &&
+      preludePath(parts[1]!, "2015", "derive")?.[0] === parts[0]
+    );
   }
 
   function probeMacroBinding(
@@ -6422,16 +6454,31 @@ export function resolveRust(
   }
 
   function hasNoMacroBinding(found: Found): boolean {
-    return found.complete && !found.bound && !found.symbols.length &&
-      !found.library && !found.possibleImportNames?.length && !found.failedFiles?.length;
+    return (
+      found.complete &&
+      !found.bound &&
+      !found.symbols.length &&
+      !found.library &&
+      !found.possibleImportNames?.length &&
+      !found.failedFiles?.length
+    );
   }
 
-  function scopeMacroUseCompetes(name: string, loc: Place, scope: string): boolean {
+  function scopeMacroUseCompetes(
+    name: string,
+    loc: Place,
+    scope: string,
+  ): boolean {
     if (!macroUseDerive(loc.crate.root, name)) return false;
     const imports = (externCratesByFile.get(loc.crate.root) ?? []).filter(
-      (link) => !str(data(link).scope) &&
-        ((data(link).macroUseRequests ?? []) as { names: string[] | null; conditions: string[] }[])
-          .some((request) => !request.names || request.names.includes(name)),
+      (link) =>
+        !str(data(link).scope) &&
+        (
+          (data(link).macroUseRequests ?? []) as {
+            names: string[] | null;
+            conditions: string[];
+          }[]
+        ).some((request) => !request.names || request.names.includes(name)),
     );
     if (!imports.length) return true;
     return imports.some((link) => {
@@ -6440,16 +6487,40 @@ export function resolveRust(
       // A missing or uncaptured crate can export this name. A captured facade
       // must also have a complete export lookup, including any expansion in
       // its module that could insert a reexport.
-      const root = probeMacroBinding(path, loc, scope, "attribute", "type", undefined, true);
-      if (!root.complete || root.failedFiles?.length || root.symbols.length !== 1)
+      const root = probeMacroBinding(
+        path,
+        loc,
+        scope,
+        "attribute",
+        "type",
+        undefined,
+        true,
+      );
+      if (
+        !root.complete ||
+        root.failedFiles?.length ||
+        root.symbols.length !== 1
+      )
         return true;
       return !hasNoMacroBinding(
-        probeMacroBinding(`${path}::${name}`, loc, scope, "attribute", "macro", undefined, true),
+        probeMacroBinding(
+          `${path}::${name}`,
+          loc,
+          scope,
+          "attribute",
+          "macro",
+          undefined,
+          true,
+        ),
       );
     });
   }
 
-  function standardScopeAttribute(name: string, loc: Place, scope: string): boolean {
+  function standardScopeAttribute(
+    name: string,
+    loc: Place,
+    scope: string,
+  ): boolean {
     const head = name.split("::")[0]!;
     const rule = attributeRules.get(head);
     if (!rule || !knownAttributeName(name)) return false;
@@ -6458,7 +6529,14 @@ export function resolveRust(
     const tool = rule.category === "tool";
     if (!tool && scopeMacroUseCompetes(head, loc, scope)) return false;
     return hasNoMacroBinding(
-      probeMacroBinding(head, loc, scope, "attribute", tool ? "type" : "macro", head),
+      probeMacroBinding(
+        head,
+        loc,
+        scope,
+        "attribute",
+        tool ? "type" : "macro",
+        head,
+      ),
     );
   }
 
@@ -6470,26 +6548,55 @@ export function resolveRust(
     site: GraphLink | undefined,
   ): LibraryTarget | "standard derive" | undefined {
     const parts = path.replace(/^::/, "").split("::");
-    if (!loc.crate.edition || !parts.every((part) => /^[_\p{ID_Start}][_\p{ID_Continue}]*$/u.test(part)))
+    if (
+      !loc.crate.edition ||
+      !parts.every((part) => /^[_\p{ID_Start}][_\p{ID_Continue}]*$/u.test(part))
+    )
       return undefined;
     const bare = parts.length === 1 && !path.startsWith("::");
     const head = parts[0]!;
-    if (bare && ((flavor === "bang" ? macroUseDerive(loc.crate.root, head) : scopeMacroUseCompetes(head, loc, scope)) ||
-        (flavor === "bang" && (!site || textualMacro(head, site, loc, scope)))))
+    if (
+      bare &&
+      ((flavor === "bang"
+        ? macroUseDerive(loc.crate.root, head)
+        : scopeMacroUseCompetes(head, loc, scope)) ||
+        (flavor === "bang" && (!site || textualMacro(head, site, loc, scope))))
+    )
       return undefined;
-    const prelude = bare && flavor === "derive" && !loc.noImplicitPrelude && standardDerives.has(head)
-      ? head
-      : undefined;
-    const result = probeMacroBinding(path, loc, scope, flavor === "bang" ? "bang" : "attribute", "macro", prelude);
+    const prelude =
+      bare &&
+      flavor === "derive" &&
+      !loc.noImplicitPrelude &&
+      standardDerives.has(head)
+        ? head
+        : undefined;
+    const result = probeMacroBinding(
+      path,
+      loc,
+      scope,
+      flavor === "bang" ? "bang" : "attribute",
+      "macro",
+      prelude,
+    );
     if (prelude && hasNoMacroBinding(result)) return "standard derive";
     const binding = result.library;
-    if (!result.complete || result.symbols.length || result.failedFiles?.length || !binding?.parts.length)
+    if (
+      !result.complete ||
+      result.symbols.length ||
+      result.failedFiles?.length ||
+      !binding?.parts.length
+    )
       return undefined;
-    if (flavor === "derive" && standardDerivePath(binding)) return "standard derive";
+    if (flavor === "derive" && standardDerivePath(binding))
+      return "standard derive";
     const exported = scopeMacroExport(binding);
-    const competingPrelude = prelude || (bare && flavor === "attribute" && knownAttributeName(head));
-    if ((exported && exported !== "multiple" && exported !== flavor) ||
-        (competingPrelude && exported !== flavor)) return undefined;
+    const competingPrelude =
+      prelude || (bare && flavor === "attribute" && knownAttributeName(head));
+    if (
+      (exported && exported !== "multiple" && exported !== flavor) ||
+      (competingPrelude && exported !== flavor)
+    )
+      return undefined;
     return {
       ...binding.unit,
       symbol: librarySymbol(binding, flavor),
@@ -6568,9 +6675,16 @@ export function resolveRust(
     const { loc, name, scope, start, input } = origin;
     if (loc.uncertain || loc.directoryUnverified) return;
     const attributeAt = origin.conditions
-      ? { ...loc, conditions: [...(loc.conditions ?? []), ...origin.conditions] }
+      ? {
+          ...loc,
+          conditions: [...(loc.conditions ?? []), ...origin.conditions],
+        }
       : loc;
-    if (origin.attribute && name !== "derive" && standardScopeAttribute(name, attributeAt, scope)) {
+    if (
+      origin.attribute &&
+      name !== "derive" &&
+      standardScopeAttribute(name, attributeAt, scope)
+    ) {
       return { names: noMacroNames };
     }
     if (!input) return;
@@ -6588,11 +6702,17 @@ export function resolveRust(
       const at = site ? siteLoc(site, loc) : attributeAt;
       if (!possible(at.conditions ?? [])) continue;
       const path = site?.targetName ?? name;
-      const flavor = !origin.attribute ? "bang" : name === "derive" ? "derive" : "attribute";
-      if (flavor === "derive") {
-        if (!standardScopeAttribute("derive", at, scope)) return;
-      }
+      const flavor = !origin.attribute
+        ? "bang"
+        : name === "derive"
+          ? "derive"
+          : "attribute";
+      if (flavor === "derive" && !standardScopeAttribute("derive", at, scope))
+        return;
       if (!origin.attribute && site) {
+        // Preserve the C-12 check for names used by the invocation and any
+        // transcriber calls. An expansion competing with an established
+        // written attribute binding is an expansion-time ambiguity in rustc.
         recordMacroHead(lookups, path);
         if (standardScopeMacro(name, site, at, scope)) continue;
         const local = definiteMacro(name, site, at, scope);

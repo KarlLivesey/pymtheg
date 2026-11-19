@@ -8,7 +8,9 @@ import { DatabaseSync } from "node:sqlite";
 const scratch = process.env.PYM_SCRATCH;
 const exact = process.argv.includes("--exact");
 const survivors = process.argv.includes("--assumption-survivors");
-const seed = process.env.PYM_COMPARISON_SEED ?? "c12-rust-macro-scope-2026-11-19";
+const seed =
+  process.env.PYM_COMPARISON_SEED ?? "c12-rust-macro-scope-2026-11-19";
+const allSamples = process.argv.includes("--all-samples");
 const read = (name) => JSON.parse(readFileSync(join(scratch, name), "utf8"));
 const main = new Map(
   read(process.env.C12_BASELINE_RUN ?? "main-run.json").repos.map((repo) => [
@@ -138,7 +140,10 @@ function compare(previous, current) {
   const a = graph(previous, true),
     b = graph(current);
   try {
-    const counters = {},
+    const counters = {
+        baselineSymbols: a.symbols.size,
+        candidateSymbols: b.symbols.size,
+      },
       oldSites = new Map(),
       changed = [],
       assumedSample = [],
@@ -217,7 +222,7 @@ function compare(previous, current) {
       const line = text.slice(0, s.body.range.start).split("\n").length;
       const scope = s.body.data?.scope ?? "";
       let nearby;
-      if (s.assumed) {
+      if (s.assumed || allSamples) {
         if (!parsed.has(row.file))
           parsed.set(
             row.file,
@@ -305,7 +310,7 @@ const sampledPins = new Set(
     .map((row) => row.id),
 );
 for (const row of results)
-  if (!sampledPins.has(row.id)) delete row.assumedSample;
+  if (!allSamples && !sampledPins.has(row.id)) delete row.assumedSample;
 writeFileSync(
   join(scratch, "compare.json"),
   JSON.stringify({ seed, results }, null, 2),

@@ -11,6 +11,7 @@ mod core_prelude {
     fn built_in_test() {}
 }
 
+#[cfg(not(feature = "macro-use-derive"))]
 mod separate_namespaces {
     struct Debug;
     fn test() {}
@@ -25,6 +26,7 @@ mod separate_namespaces {
     fn built_in_test() {}
 }
 
+#[cfg(not(feature = "macro-use-derive"))]
 mod type_imports {
     mod export { pub struct Debug; }
     use export::Debug;
@@ -50,10 +52,27 @@ mod explicit_derive {
     fn from_external() -> FromDerive { FromDerive }
 }
 
+mod self_derive {
+    mod exported { pub use facade::Debug; }
+    use exported::*;
+
+    #[derive(self::Debug)]
+    struct Item;
+
+    fn from_external() -> FromDerive { FromDerive }
+}
+
 mod explicit_test {
     use facade::test;
     #[test]
     fn external_test() {}
+    fn from_external() -> FromAttribute { FromAttribute }
+}
+
+mod explicit_derive_attribute {
+    use facade::derive;
+    #[derive(Debug)]
+    struct Item;
     fn from_external() -> FromAttribute { FromAttribute }
 }
 
@@ -72,7 +91,15 @@ mod qualified {
     fn from_external() -> FromAttribute { FromAttribute }
 }
 
+mod explicit_prefix {
+    mod facade { pub use ::facade::Alternative as Debug; }
+    #[derive(facade::Debug)]
+    struct Item;
+    fn from_external() -> FromAlternative { FromAlternative }
+}
+
 mod tool_attribute {
+    #[cfg(not(feature = "macro-use-derive"))]
     use super::separate_namespaces::*;
     macro_rules! bounded { () => { const OTHER: u8 = 0; } }
     bounded!();
@@ -125,12 +152,12 @@ mod glob_tool {
 #[cfg(feature = "glob-qualified")]
 mod glob_qualified {
     mod exports {
-        pub mod facade { pub use ::facade::Debug; }
+        pub mod facade { pub use ::facade::Alternative as Debug; }
     }
     use exports::*;
     #[derive(facade::Debug)]
     struct Item;
-    fn from_external() -> FromDerive { FromDerive }
+    fn from_external() -> FromAlternative { FromAlternative }
 }
 
 #[cfg(feature = "explicit-inline")]
@@ -171,6 +198,22 @@ mod expanded_rebinding {
     macro_rules! rebind { () => { use facade::Debug; } }
     rebind!();
     #[derive(Debug)]
+    struct Item;
+}
+
+#[cfg(feature = "expanded-tool-rebinding")]
+mod expanded_tool_rebinding {
+    macro_rules! rebind { () => { use facade as rustfmt; } }
+    rebind!();
+    #[rustfmt::skip]
+    struct Item;
+}
+
+#[cfg(feature = "expanded-qualified-rebinding")]
+mod expanded_qualified_rebinding {
+    macro_rules! rebind { () => { mod facade { pub use ::facade::Alternative as Debug; } } }
+    rebind!();
+    #[derive(facade::Debug)]
     struct Item;
 }
 
