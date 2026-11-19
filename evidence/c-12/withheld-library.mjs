@@ -1,11 +1,46 @@
 // SPDX-License-Identifier: MIT
 // Reuse the C-9 library path audit on main's captured facts. Compare each
 // withheld candidate to that same source site in the C-12 store.
+import { spawn } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const { PYM_SCRATCH, TMPDIR } = process.env;
+const worker = process.argv[2];
+const workers = ["0", "1", "2"];
+const laneOutput = (lane) => join(PYM_SCRATCH, `library-withheld-${lane}.json`);
+if (worker === undefined) {
+  await Promise.all(
+    workers.map(
+      (lane) =>
+        new Promise((resolve, reject) => {
+          const child = spawn(
+            process.execPath,
+            ["--max-old-space-size=8192", fileURLToPath(import.meta.url), lane],
+            { stdio: "inherit" },
+          );
+          child.on("error", reject);
+          child.on("close", (status) =>
+            status === 0
+              ? resolve()
+              : reject(
+                  Error(`Rust path audit worker ${lane} exited ${status}`),
+                ),
+          );
+        }),
+    ),
+  );
+  const report = workers.flatMap((lane) =>
+    JSON.parse(readFileSync(laneOutput(lane), "utf8")),
+  );
+  report.sort((a, b) => a.id.localeCompare(b.id));
+  writeFileSync(
+    join(PYM_SCRATCH, "library-withheld.json"),
+    JSON.stringify(report, null, 2),
+  );
+  process.exit(0);
+}
 const get = (path) =>
   import(pathToFileURL(join(PYM_SCRATCH, "main-source/dist/graph", path)));
 const { SqliteGraphStore } = await get("store.js");
@@ -35,7 +70,8 @@ const open = (repo) =>
     { readOnly: true },
   );
 const report = [];
-for (const repo of runs("main-run.json")) {
+for (const [index, repo] of runs("main-run.json").entries()) {
+  if (workers[index % workers.length] !== worker) continue;
   const current = candidate.get(repo.id);
   if (repo.outcome !== "finished" || current?.outcome !== "finished") continue;
   const a = open(repo),
@@ -93,12 +129,9 @@ for (const repo of runs("main-run.json")) {
       },
     );
     report.push(totals);
-    writeFileSync(
-      join(PYM_SCRATCH, "library-withheld.json"),
-      JSON.stringify(report, null, 2),
-    );
   } finally {
     a.close();
     b.close();
   }
 }
+writeFileSync(laneOutput(worker), JSON.stringify(report));

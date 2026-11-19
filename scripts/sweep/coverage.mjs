@@ -519,6 +519,9 @@ function renderPlan(repos, baseline, items, samples, isProgress) {
     lines.push("", `### ${names[module]}`, "",
       `**Level 2 ${percent(measured.level2)}** · Level 1 ${percent(measured.level1)} · Strict-inside ${percent(measured.adjusted)} · Raw ${percent(measured.raw)}.`,
       `**If verified closed sets count** ${percent(forecast.closedCoverage)}. Crediting every ambiguous link would give an arithmetic upper bound of ${percent(forecast.closedUpper)}.`, "");
+    if (measured.assumedLevel2) {
+      lines.push(`**Level 2 excluding recorded assumptions** ${percent(measured.level2WithoutAssumptions)} · ${number(measured.assumedLevel2)} assumed Level 2 links.`, "");
+    }
     if (module === "typescript") lines.push(`**Bundle scope** ${percent(measured.level2)} including bundles and ${percent(noBundles.level2)} without them. Should checked-in minified bundles count toward the release target?`, "");
     lines.push("| Support item | Kind | Links | Repositories | Points | Running total | Examples | Status |",
       "| --- | --- | ---: | ---: | ---: | ---: | --- | --- |");

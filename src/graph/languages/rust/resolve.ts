@@ -5144,26 +5144,29 @@ export function resolveRust(
       ...(lookups.size ? { lookups } : {}),
     };
   }
-  for (const origins of opaqueOrigins.values()) {
-    const producers = new Map<string, number>();
-    for (const origin of origins) {
-      const effect = macroScopeEffect(origin);
-      if (!effect) continue;
-      scopeEffects.set(origin, effect);
-      for (const name of effect.names)
-        producers.set(name, (producers.get(name) ?? 0) + 1);
-    }
-    // A sibling expansion can change which macro another expansion calls.
-    // The token bound only applies as long as those macro paths stay stable.
-    for (const origin of origins) {
-      const effect = scopeEffects.get(origin);
-      if (
-        effect &&
-        [...(effect.lookups ?? [])].some(
-          (name) => (producers.get(name) ?? 0) > Number(effect.names.has(name)),
+  function prepareMacroScopeEffects() {
+    for (const origins of opaqueOrigins.values()) {
+      const producers = new Map<string, number>();
+      for (const origin of origins) {
+        const effect = macroScopeEffect(origin);
+        if (!effect) continue;
+        scopeEffects.set(origin, effect);
+        for (const name of effect.names)
+          producers.set(name, (producers.get(name) ?? 0) + 1);
+      }
+      // A sibling expansion can change which macro another expansion calls.
+      // The token bound only applies as long as those macro paths stay stable.
+      for (const origin of origins) {
+        const effect = scopeEffects.get(origin);
+        if (
+          effect &&
+          [...(effect.lookups ?? [])].some(
+            (name) =>
+              (producers.get(name) ?? 0) > Number(effect.names.has(name)),
+          )
         )
-      )
-        scopeEffects.delete(origin);
+          scopeEffects.delete(origin);
+      }
     }
   }
   libraryRefusals = [];
@@ -5603,12 +5606,13 @@ export function resolveRust(
     }
     return false;
   }
+  const scopeRetries: GraphLink[] = [];
   for (const { link, data, libraryEligible, retry } of librarySites) {
     if (libraryAudit) libraryRefusals = [];
     const library = libraryEligible ? libraryFor(link, data) : undefined;
     if (library) {
       if (!uncertain) resolutions.push({ linkId: link.id, library });
-    } else if (retry && !libraryAudit) retryMacroScope(link);
+    } else if (retry && !libraryAudit) scopeRetries.push(link);
     if (libraryAudit) {
       const after = libraryRefusals;
       libraryRefusals = [];
@@ -5628,6 +5632,12 @@ export function resolveRust(
           );
       }
     }
+  }
+  if (scopeRetries.length) {
+    // Finish ordinary lookup before macro identity probes can populate its
+    // caches through a different traversal of a conditional import cycle.
+    prepareMacroScopeEffects();
+    for (const link of scopeRetries) retryMacroScope(link);
   }
   return resolutions;
 
