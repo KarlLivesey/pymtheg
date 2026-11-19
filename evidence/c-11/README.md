@@ -43,8 +43,11 @@ status alongside the counts.
 The dev-server build, no-emit check and format check passed. All 17
 sweep-tool tests passed. The full `npm test` passed 3,008 tests. Its
 repository initialization integration test exceeded the existing
-900-second hang guard during self-indexing. A focused retry while the
-cold runs were active also exceeded the guard.
+900-second hang guard during self-indexing. Both unchanged focused
+retries also timed out, including one started after all C-11 index jobs
+finished. A repeat full run was stopped during the unchanged Go graph
+tests after sustained disk waits. The integration check remains
+unresolved.
 
 ## How to reproduce
 
