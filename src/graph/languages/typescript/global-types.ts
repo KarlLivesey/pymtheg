@@ -388,6 +388,7 @@ const programTypes = new WeakMap<
   ts.Program,
   {
     hasNode: boolean;
+    hasInstalledTypes: boolean;
     expectsNode: boolean;
     missingPackageTypes: boolean;
     otherGlobals: ReadonlySet<string>;
@@ -535,6 +536,7 @@ export function globalTypeAvailability(
   if (previous) return previous;
   const options = program.getCompilerOptions();
   const expected = new Set(options.types ?? []);
+  const checkoutRequests = new Set(expected);
   const frameworkRequests = new Map<string, string[]>();
   const request = (name: string, source: string) => {
     if (!frameworkTypes.has(name)) return;
@@ -545,6 +547,7 @@ export function globalTypeAvailability(
   if (typeof options.configFilePath === "string")
     for (const name of expected) request(name, options.configFilePath);
   const available = new Set<string>();
+  const unavailable = new Set<string>();
   const compiler = program as ts.Program & {
     forEachResolvedTypeReferenceDirective: (visit: VisitTypeResolution) => void;
     getAutomaticTypeDirectiveResolutions: () =>
@@ -552,12 +555,21 @@ export function globalTypeAvailability(
       | undefined;
   };
   let hasNode = false;
+  let hasInstalledTypes = false;
   for (const source of program.getSourceFiles()) {
+    const path = fromVirtual(source.fileName);
+    const installed =
+      path?.split("/").includes("node_modules") && source.isDeclarationFile;
+    if (installed) hasInstalledTypes = true;
     for (const reference of source.typeReferenceDirectives) {
       expected.add(reference.fileName);
-      request(reference.fileName, source.fileName);
+      // Installed declarations influence test globals through the checker.
+      // A missing transitive reference cannot add a speculative provider.
+      if (!installed) {
+        checkoutRequests.add(reference.fileName);
+        request(reference.fileName, source.fileName);
+      }
     }
-    const path = fromVirtual(source.fileName);
     const runtime =
       path !== undefined ? runtimeHashbang(source.text) : undefined;
     if (runtime === "bun" || runtime === "deno")
@@ -568,6 +580,7 @@ export function globalTypeAvailability(
   const read: VisitTypeResolution = (result, name) => {
     const path = result.resolvedTypeReferenceDirective?.resolvedFileName;
     if (path !== undefined && program.getSourceFile(path)) available.add(name);
+    else unavailable.add(name);
   };
   compiler.forEachResolvedTypeReferenceDirective(read);
   compiler.getAutomaticTypeDirectiveResolutions()?.forEach(read);
@@ -593,6 +606,7 @@ export function globalTypeAvailability(
     }
   const result = {
     hasNode: hasNode || [...available].some(node),
+    hasInstalledTypes,
     expectsNode: [...expected].some(node),
     missingPackageTypes: missing.some(
       (name) => !/^(?:\.{1,2}\/|\/)/.test(name),
@@ -600,8 +614,12 @@ export function globalTypeAvailability(
     otherGlobals: new Set(missing.flatMap(missingAmbientGlobals)),
     otherRuntime: [...expected].some(isEnvironment),
     missingTestFrameworks,
-    competingTestRequests: [...expected].filter((name) =>
-      competingTestTypes.has(name),
+    competingTestRequests: [...expected].filter(
+      (name) =>
+        competingTestTypes.has(name) &&
+        (!hasInstalledTypes ||
+          (checkoutRequests.has(name) &&
+            (!available.has(name) || unavailable.has(name)))),
     ),
   };
   programTypes.set(program, result);

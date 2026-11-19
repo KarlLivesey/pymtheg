@@ -44,6 +44,32 @@ function merge(base, candidate) {
   return { ...candidate, repos: [...repos.values()].sort((a, b) => compare(a.id, b.id)) };
 }
 
+export function installedCoverage(bare, installed) {
+  const pins = new Map(bare.map((repo) => [repo.id, repo]));
+  const rows = installed.repos.map((repo) => {
+    const previous = pins.get(repo.id);
+    if (!previous || previous.commit !== repo.commit || previous.language !== "typescript" || !finished(previous))
+      throw Error(`Installed coverage needs a finished bare TypeScript pin for ${repo.id}`);
+    return { previous, repo, usable: finished(repo) && repo.install?.status === "installed" };
+  });
+  const before = aggregate(rows.map(({ previous }) => previous), "typescript").weighted;
+  const after = aggregate(rows.map(({ previous, repo, usable }) => usable ? repo : previous), "typescript").weighted;
+  const completed = rows.filter(({ usable }) => usable).length;
+  const totals = `${percent(before.level2)} bare · ${percent(after.level2)} with installed declarations · ${completed}/${rows.length} pins installed and indexed`;
+  const table = [
+    "", "## TypeScript installed coverage", "", totals, "",
+    "| Pin | Bare Level 2 | Installed Level 2 | Installation |",
+    "| --- | ---: | ---: | --- |",
+    ...rows.map(({ previous, repo, usable }) => {
+      const a = aggregate([previous], "typescript").weighted;
+      const b = usable ? aggregate([repo], "typescript").weighted : a;
+      const status = [repo.install?.manager, usable ? "installed" : repo.install?.reason ?? repo.outcome].filter(Boolean).join(" · ");
+      return `| ${repo.id} | ${percent(a.level2)} | ${percent(b.level2)} | ${status} |`;
+    }), "",
+  ].join("\n");
+  return { totals, table };
+}
+
 function checkResult(input) {
   const encoded = JSON.stringify(input.columns);
   if (input.schema !== schema ||
@@ -465,7 +491,7 @@ function renderScore(repos, input, base, baseline, samples) {
   return lines.join("\n") + "\n";
 }
 
-function renderPlan(repos, baseline, items, samples, isProgress) {
+function renderPlan(repos, baseline, items, samples, isProgress, installed) {
   const lines = [...completion(repos, baseline), "", "## B. Coverage of finished graphs"];
   const active = new Map(repos.filter(finished).map((repo) => [repo.id, repo]));
   const currentFailures = [...active.values()].flatMap((repo) => repo.failedSources.map((row) => ({ ...row, repo: repo.id })));
@@ -533,6 +559,8 @@ function renderPlan(repos, baseline, items, samples, isProgress) {
       lines.push(`**Level 2 excluding recorded assumptions** ${percent(measured.level2WithoutAssumptions)} · ${number(measured.assumedLevel2)} assumed Level 2 links.`, "");
     }
     if (module === "typescript") lines.push(`**Bundle scope** ${percent(measured.level2)} including bundles and ${percent(noBundles.level2)} without them. Should checked-in minified bundles count toward the release target?`, "");
+    if (module === "typescript" && installed)
+      lines.push(`**Paired dependency sweep** ${installed.totals}. Pins without a completed installed graph use their bare figure.`, "");
     lines.push("| Support item | Kind | Links | Repositories | Points | Running total | Examples | Status |",
       "| --- | --- | ---: | ---: | ---: | ---: | --- | --- |");
     const kind = { inside: "Inside target", library: "Library target", both: "Both" };
@@ -692,7 +720,7 @@ function renderSampling(repos, samples) {
 async function main() {
   const { values } = parseArgs({ options: {
     results: { type: "string" }, base: { type: "string" }, scoreboard: { type: "string" }, plan: { type: "string" },
-    "sampling-report": { type: "string" }, "rust-section": { type: "boolean" },
+    "sampling-report": { type: "string" }, "rust-section": { type: "boolean" }, installed: { type: "string" },
     items: { type: "string", default: "sweep/support-items.json" },
     samples: { type: "string", default: "evidence/sw-3/samples.json.gz" },
   } });
@@ -705,10 +733,12 @@ async function main() {
   const { items } = read(values.items);
   const { samples } = read(values.samples);
   validateCatalog(items, samples);
-  const scoreboard = renderScore(repos, input, isComparison, base.repos, samples);
+  const installed = values.installed ? read(values.installed) : input.installedCoverage;
+  const paired = installed ? installedCoverage(repos, checkResult(installed)) : undefined;
+  const scoreboard = renderScore(repos, input, isComparison, base.repos, samples) + (paired?.table ?? "");
   if (values.scoreboard) writeFileSync(values.scoreboard, scoreboard);
   if (values.plan) {
-    updatePlan(values.plan, renderPlan(repos, base.repos, items, samples, isComparison), values["rust-section"]);
+    updatePlan(values.plan, renderPlan(repos, base.repos, items, samples, isComparison, paired), values["rust-section"]);
   }
   if (values["sampling-report"]) writeFileSync(values["sampling-report"], renderSampling(base.repos, samples));
   if (!values.scoreboard && !values.plan && !values["sampling-report"]) process.stdout.write(scoreboard);

@@ -44,7 +44,7 @@ function projectEvidence(db, readers, files, paths, symlinks, checkout) {
   const rustByDirectory = new Map();
   const normalise = (name) => name.replaceAll("-", "_");
   for (const context of contexts) {
-    if (context.status !== "clean") continue;
+    if (context.status !== "clean" || context.dependency) continue;
     if (context.path.endsWith("Cargo.toml")) {
       const doc = readers.toml.readToml(context.text);
       if (doc) cargoManifests.set(context.path, doc);
@@ -661,6 +661,7 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys, pre
     const warm = readJson(join(attempt, "warm.out")).counts;
     if (!storedTotalsAgree(rows, warm)) throw Error(`Stored link totals disagree with released CLI for ${repo.id}`);
     return { audit: { id: repo.id, language: repo.language, commit: repo.commit, outcome: repo.outcome,
+      ...(repo.install && { install: repo.install }),
       trackedSource: repo.trackedSource, breakdown: rows, sourceFiles: [...sourceFiles.values()],
       failedSources: [...failed.values()].map(({ examples, ...record }) => record), strata, reviewSites,
       ...(other ? { shared } : {}),
@@ -733,7 +734,10 @@ for (const repo of input.repos) {
   // Keep failed attempts in the exported result so a candidate regression
   // replaces its baseline graph with an explicit zero.
   if (repo.outcome !== "finished") {
-    repositories.push(repo);
+    if (input.mode === "installed") {
+      const { id, language, commit, outcome, install } = repo;
+      repositories.push({ id, language, commit, outcome, install });
+    } else repositories.push(repo);
     continue;
   }
   const attempt = selectAttempt(scratch, repo);

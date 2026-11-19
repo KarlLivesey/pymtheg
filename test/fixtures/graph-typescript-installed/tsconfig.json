@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "types": ["node"],
+    "paths": { "shadowed-kit": ["./shadow.ts"] }
+  },
+  "files": ["main.ts", "shadow.ts"]
+}
