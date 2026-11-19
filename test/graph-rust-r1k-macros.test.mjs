@@ -136,7 +136,6 @@ for (const [name, definition] of [
     "tt forwarded to statement position",
     "macro_rules! m { ($($t:tt)*) => { $($t)* } }",
   ],
-  ["let binding", "macro_rules! m { () => { let _unused = 1; } }"],
   [
     "unreadable nested macro",
     "macro_rules! m { () => { other_crate_macro!(); } }",
@@ -152,6 +151,16 @@ for (const [name, definition] of [
     });
     g.unresolved("helper", "calls", /opaque-item-may-shadow-name/);
   });
+
+test("a fixed hygienic let in a workspace macro does not mask a sibling call", async () => {
+  const g = await graph({
+    "src/main.rs": `macro_rules! m { () => { let helper = 1; } }
+fn helper() -> u8 { 1 }
+fn run() { m!(); helper(); }
+fn main(){run()}`,
+  });
+  g.one("helper", "helper");
+});
 
 test("if let in a macro body binds only inside its block", async () => {
   const g = await graph({

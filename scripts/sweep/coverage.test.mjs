@@ -1,13 +1,46 @@
 // SPDX-License-Identifier: MIT
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, rmdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { aggregate, auditDesign, estimateCoverage, failedRustInfluence, median, stratumShare } from "./coverage.mjs";
 import { classify, columns, externalIdentity, goImports, libraryScore, repositoryScore, reviewQuotas, rustImports, sampleKey, sampleStratum, sourceScope, workspaceNames } from "./coverage-rules.mjs";
+
+test("assumed Level 2 links remain in the total and are counted separately", () => {
+  const score = libraryScore([
+    ["rust", "types", "resolved", null, null, "source", "eligible", 4, 0, null, null, null],
+    ["rust", "calls", "resolved", null, null, "source", "eligible", 2, 0, null, null, null, true],
+    ["rust", "types", "library", null, null, "source", "outside", 3, 0, 2, "declared-builtin", null, true],
+    ["rust", "calls", "unresolved", null, null, "source", "inside", 1, 0, null, null, null],
+  ]);
+  assert.equal(score.total, 10);
+  assert.equal(score.level2, 0.9);
+  assert.equal(score.level2WithoutAssumptions, 0.4);
+  assert.equal(score.assumedLevel2, 5);
+});
+
+test("the plan input regenerates Rust and preserves the other sections", () => {
+  const root = fileURLToPath(new URL("../..", import.meta.url));
+  const checkedIn = readFileSync(join(root, "docs/coverage-plan.md"));
+  const scratch = mkdtempSync(join(tmpdir(), "pymtheg-coverage-plan-"));
+  const plan = join(scratch, "coverage-plan.md");
+  const old = checkedIn.toString("utf8").replace(
+    /^### Rust\n[\s\S]*?(?=^### TypeScript \/ JS\n)/m,
+    "### Rust\n\nPlaceholder\n\n",
+  );
+  assert.notEqual(old, checkedIn.toString("utf8"));
+  writeFileSync(plan, old);
+  try {
+    execFileSync(process.execPath, ["scripts/sweep/coverage.mjs", "--results", "sweep/plan-input.json.gz", "--plan", plan, "--rust-section"], { cwd: root });
+    assert.ok(readFileSync(plan).equals(checkedIn), "regenerated coverage plan differs");
+  } finally {
+    unlinkSync(plan);
+    rmdirSync(scratch);
+  }
+});
 
 import { cargoPathLocations, checkoutLocation, npmPathLocation, yarnArchivePackages } from "./coverage-locations.mjs";
 
