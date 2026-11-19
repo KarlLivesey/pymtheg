@@ -279,10 +279,7 @@ export function libraryReader(
     LibraryTarget,
     ts.Symbol | ts.Declaration
   >();
-  const exportedOwners = new WeakMap<
-    ts.SourceFile,
-    ReadonlySet<ts.Declaration>
-  >();
+  const exportedOwners = new WeakMap<ts.SourceFile, ReadonlySet<string>>();
   const installedUnits = new Map<string, Unit | undefined>();
   function installedUnit(path: string): Unit | undefined {
     if (!inputs || !path.split("/").includes("node_modules")) return undefined;
@@ -433,34 +430,41 @@ export function libraryReader(
   ) {
     if (ts.getCombinedModifierFlags(owner) & ts.ModifierFlags.Export)
       return true;
+    const name = nameOf(owner);
+    if (name === undefined) return false;
     let owners = exportedOwners.get(source);
     if (!owners) {
-      const declarations = new Set<ts.Declaration>();
+      const names = new Set<string>();
+      for (const statement of source.statements) {
+        // Local names may be exposed by an alias or by `export = Namespace`.
+        if (
+          ts.isExportDeclaration(statement) &&
+          !statement.moduleSpecifier &&
+          statement.exportClause &&
+          ts.isNamedExports(statement.exportClause)
+        )
+          for (const binding of statement.exportClause.elements)
+            names.add((binding.propertyName ?? binding.name).text);
+        else if (
+          ts.isExportAssignment(statement) &&
+          ts.isIdentifier(statement.expression)
+        )
+          names.add(statement.expression.text);
+      }
       for (const exported of checker
         .getSymbolAtLocation(source)
         ?.exports?.values() ?? []) {
-        let origin = exported;
-        if (exported.flags & ts.SymbolFlags.Alias) {
-          // Declaration bundles can export a local owner under a short alias.
-          if (
-            !exported.declarations?.some(
-              (node) =>
-                ts.isExportAssignment(node) ||
-                (ts.isExportSpecifier(node) &&
-                  !node.parent.parent.moduleSpecifier),
-            )
-          )
-            continue;
-          origin = checker.getAliasedSymbol(exported);
+        if (exported.flags & ts.SymbolFlags.Alias) continue;
+        for (const declaration of exported.declarations ?? []) {
+          if (declaration.getSourceFile() !== source) continue;
+          const local = nameOf(declaration);
+          if (local !== undefined) names.add(local);
         }
-        for (const declaration of origin.declarations ?? [])
-          if (declaration.getSourceFile() === source)
-            declarations.add(declaration);
       }
-      owners = declarations;
+      owners = names;
       exportedOwners.set(source, owners);
     }
-    return owners.has(owner);
+    return owners.has(name);
   }
 
   function qualifiedTarget(

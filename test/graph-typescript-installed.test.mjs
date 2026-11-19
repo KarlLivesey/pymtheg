@@ -683,6 +683,7 @@ test("same-named installed factory declarations keep separate direct and union t
     "main.ts",
     `import { register as configure, publicApi, exportedApi } from "fixture-server/configuration";
 import { register as registerFolders } from "fixture-server/folders";
+import support = require("fixture-server/support");
 declare const useConfiguration: boolean;
 const configuration = configure();
 const folders = registerFolders();
@@ -695,11 +696,16 @@ configuration.detail.refresh();
 folders.detail.refresh();
 publicApi.open();
 exportedApi.read();
+support.list();
 `,
   );
   await write(
     "node_modules/fixture-server/package.json",
     manifest("fixture-server", "1.0.0"),
+  );
+  await write(
+    "node_modules/fixture-server/support.d.ts",
+    "export = Support; declare namespace Support { function list(): string[] }",
   );
   for (const name of ["configuration", "folders"])
     await write(
@@ -761,6 +767,7 @@ export declare const exportedApi: ExportedApi;
       target(main("exportedApi.read")).symbol,
       "ExportedApi.prototype.read",
     );
+    assert.equal(target(main("support.list")).symbol, "Support.list");
   });
   for (const [index, symbol] of symbols.entries()) {
     const { data } = await request("uses", ["fixture-server", symbol]);
