@@ -176,7 +176,9 @@ The previous strict-inside plan assigned about 22 pp to local binding anchors an
 
 **Bundle scope** 68.20% including bundles and 70.37% without them. Should checked-in minified bundles count toward the release target?
 
-**Paired dependency sweep** 71.00% bare · 82.37% with installed declarations · 16/18 pins installed and indexed. Pins without a completed installed graph use their bare figure.
+**Paired dependency sweep** 71.00% bare · 82.47% with installed declarations · 16/18 pins installed and indexed. Pins without a completed installed graph use their bare figure.
+
+**Through an unbuilt workspace entry, plain tsc build** · 0 bare · 0 installed.
 
 | Support item | Kind | Links | Repositories | Points | Running total | Examples | Status |
 | --- | --- | ---: | ---: | ---: | ---: | --- | --- |
@@ -189,7 +191,7 @@ The previous strict-inside plan assigned about 22 pp to local binding anchors an
 | Resolve imports and uses of sibling pnpm and workspace packages | Inside target | 7,773 | ≥2 | 0.49 pp | 84.60% | vitest-dev/vitest ` packages/browser-preview/src/locators.ts:21 ` ` } from '@vitest/browser/locators' `<br>withastro/astro ` packages/astro/src/core/routing/match-request.ts:1 ` ` import { prependForwardSlash, stripRequestBase } from '@astrojs/internal-helpers/path'; ` | open · 22/28 reference sites settled |
 | Follow checked-in bundle receivers with a visible terminal definition | Inside target | 6,807 | ≥1 | 0.43 pp | 85.03% | pocketbase/pocketbase ` ui/dist/libs/tinymce/plugins/fullscreen/plugin.min.js:5 ` ` e.ui.registry.addToggleMenuItem("fullscreen",{text:"Fullscreen",icon:"fullscreen" `<br>pocketbase/pocketbase ` ui/public/libs/tinymce/tinymce.min.js:13 ` ` ai(e,I.some(t)).fold((()=>{o.each((e=>{ ` | open |
 | Link immediately invoked function expressions to their checked-in bodies | Inside target | 6,577 | ≥4 | 0.41 pp | 85.45% | excalidraw/excalidraw ` packages/element/src/selection.ts:123 ` ` export const isSomeElementSelected = (function () { `<br>honojs/hono ` src/utils/color.ts:44 ` ` ? await (async () => { ` | open |
-| Link literal tag factories exposed by a checked-in browser script | Inside target | 6,347 | ≥1 | 0.40 pp | 85.85% | pocketbase/pocketbase ` ui/src/base/confirm.js:117 ` ` t.div( `<br>pocketbase/pocketbase ` ui/src/fields/relation/settings.js:168 ` ` t.div( ` | open |
+| Link literal tag factories exposed by a checked-in browser script | Inside target | 6,347 | ≥1 | 0.40 pp | 85.84% | pocketbase/pocketbase ` ui/src/base/confirm.js:117 ` ` t.div( `<br>pocketbase/pocketbase ` ui/src/fields/relation/settings.js:168 ` ` t.div( ` | open |
 | Bind TypeScript imports and re-exports to checked-in modules | Inside target | 5,721 | ≥6 | 0.36 pp | 86.21% | nestjs/nest ` packages/microservices/test/context/rpc-context-creator.spec.ts:23 ` ` import { RpcException } from '../../index'; `<br>colinhacks/zod ` packages/zod/src/v4/classic/tests/optional.test.ts:4 ` ` import * as z from "zod/v4"; ` | open · 6/14 reference sites settled |
 | Recover local TypeScript links when a base configuration is missing | Inside target | 4,183 | ≥3 | 0.26 pp | 86.47% | withastro/astro ` packages/astro/test/fixtures/content-intellisense/src/content.config.ts:5 ` ` const blogCC = defineCollection({ `<br>vitest-dev/vitest ` packages/ui/client/components/views/ViewReport.spec.ts:4 ` ` import { page, render } from '~/test' ` | open |
 | Recover checked-in TypeScript links when a package tsconfig preset is missing | Inside target | 3,607 | ≥2 | 0.23 pp | 86.70% | changesets/changesets ` packages/config/src/defaults.ts:1 ` ` import type { Config, WrittenConfig } from "@changesets/types"; `<br>withastro/astro ` packages/astro/e2e/fixtures/cloudflare/src/content.config.ts:83 ` ` description: z.string(), ` | open |
@@ -202,7 +204,7 @@ The previous strict-inside plan assigned about 22 pp to local binding anchors an
 | Recognize unrendered source templates and documentation snippets | Inside target | ~6 missing | 1 | 0.00 pp | 86.85% | tauri-apps/tauri ` crates/tauri-cli/templates/plugin/guest-js/index.ts:1 ` ` {{#if license_header}} `<br>tauri-apps/tauri ` crates/tauri-cli/templates/plugin/guest-js/index.ts:7 ` ` return await invoke<{value?: string}>('plugin:{{ plugin_name }}\|ping', { ` | open |
 | Recover readable TypeScript files under missing or malformed base configs | Inside target | ~72 missing | 1 | 0.00 pp | 86.85% | trpc/trpc ` examples/nuxt/tsconfig.json:3 ` ` "extends": "./.nuxt/tsconfig.json" `<br>trpc/trpc ` examples/nuxt/server/tsconfig.json:2 ` ` "extends": "../.nuxt/tsconfig.server.json" ` | open |
 
-**68.20% baseline → 86.85% after the listed items (+18.65 pp) → 89.69% source-only ceiling.** 23,716 unresolved links remain unexplained (16.41% of links estimated inside or still unclassified). 17,243 estimated links have valid alternatives, 47,670 name a unit only by design, and 0 are language intrinsics without a library symbol.
+**68.20% baseline → 86.85% after the listed items (+18.65 pp) → 89.69% source-only ceiling.** 23,723 unresolved links remain unexplained (16.41% of links estimated inside or still unclassified). 17,243 estimated links have valid alternatives, 47,670 name a unit only by design, and 0 are language intrinsics without a library symbol.
 About 98,732 links need dependency information (81,504–160,179 from the sample and exact gaps). The 95.91% ceiling assumes all of those misses are recovered.
 
 <!-- sweep:coverage:end -->
