@@ -6,6 +6,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { gunzipSync } from "node:zlib";
+import { readLabels } from "./coverage-refresh-data.mjs";
 import { aggregate, auditDesign, estimateCoverage, failedRustInfluence, installedCoverage, median, stratumShare } from "./coverage.mjs";
 import { classify, columns, externalIdentity, goImports, libraryScore, repositoryScore, reviewQuotas, rustImports, sampleKey, sampleStratum, sourceScope, workspaceNames } from "./coverage-rules.mjs";
 
@@ -22,23 +24,29 @@ test("assumed Level 2 links remain in the total and are counted separately", () 
   assert.equal(score.assumedLevel2, 5);
 });
 
-test("the plan input regenerates Rust and preserves the other sections", () => {
+test("one committed sweep regenerates the complete coverage plan byte for byte", () => {
   const root = fileURLToPath(new URL("../..", import.meta.url));
   const checkedIn = readFileSync(join(root, "docs/coverage-plan.md"));
   const scratch = mkdtempSync(join(tmpdir(), "pymtheg-coverage-plan-"));
   const plan = join(scratch, "coverage-plan.md");
-  const old = checkedIn.toString("utf8").replace(
-    /^### Rust\n[\s\S]*?(?=^### TypeScript \/ JS\n)/m,
-    "### Rust\n\nPlaceholder\n\n",
-  );
-  assert.notEqual(old, checkedIn.toString("utf8"));
-  writeFileSync(plan, old);
+  const attempts = join(scratch, "attempts.md");
+  const itemChanges = join(scratch, "items.md");
+  const input = "evidence/sw-4/coverage-plan-input.json.gz";
+  writeFileSync(plan, "Placeholder\n");
   try {
-    execFileSync(process.execPath, ["scripts/sweep/coverage.mjs", "--results", "sweep/plan-input.json.gz",
-      "--plan", plan, "--rust-section"], { cwd: root });
+    execFileSync(process.execPath, ["scripts/sweep/coverage.mjs", "--results", input,
+      "--plan", plan, "--attempts", attempts, "--item-changes", itemChanges], { cwd: root });
     assert.ok(readFileSync(plan).equals(checkedIn), "regenerated coverage plan differs");
+    assert.ok(readFileSync(attempts).equals(readFileSync(join(root, "evidence/sw-4/attempts.md"))), "regenerated attempt report differs");
+    assert.ok(readFileSync(itemChanges).equals(readFileSync(join(root, "evidence/sw-4/items.md"))), "regenerated item report differs");
+    const { samples } = JSON.parse(gunzipSync(readFileSync(join(root, input))));
+    const labels = readLabels(readFileSync(join(root, "evidence/sw-4/source-review.tsv"), "utf8"));
+    assert.deepEqual(new Map(samples.map(({ rank, staticAnswer, itemAnswer, note }) =>
+      [rank, { staticAnswer, itemAnswer, note }])), labels);
   } finally {
-    unlinkSync(plan);
+    for (const path of [plan, attempts, itemChanges]) {
+      try { unlinkSync(path); } catch (error) { if (error.code !== "ENOENT") throw error; }
+    }
     rmdirSync(scratch);
   }
 });

@@ -169,25 +169,51 @@ visible in the audit. The curated source labels distinguish local
 misses, library misses, legitimate ambiguity and unclassified sites.
 These estimates prioritise work. They do not add definite score credit.
 
+### Reproduce the coverage plan for 0.2.0
+
+The plan uses one fresh sweep's bare graphs, installed TypeScript graphs, and
+offline Go toolchain graphs. The input includes all pin outcomes, their
+exact link inventories and a source review of a new fixed-seed draw.
+The 0.1.0 archive supplies the comparison. Regenerate the whole plan from
+the repository root.
+
+```sh
+node scripts/sweep/coverage.mjs --results evidence/sw-4/coverage-plan-input.json.gz \
+  --plan docs/coverage-plan.md
+node --test scripts/sweep/*.test.mjs
+```
+
+To refresh the measurements on the dev server, build the measured commit
+and run `node scripts/sweep/run-refresh.mjs` there. Keep the tree and build
+unchanged until the sweep finishes. The wrapper runs the modes in order,
+with two ordinary pins at a time and each large pin alone. It uses the
+default 60-minute budget per attempt and puts checkouts and stores on disk
+under `$PYM_SCRATCH`. `node scripts/sweep/refresh-evidence.mjs export` reads
+the finished graphs and verifies their totals against the warm CLI answers.
+The `draw` and `context` subcommands list the sampled links and their pinned
+source. See the [sweep evidence](../evidence/sw-4/README.md) for the review
+fields, intervals and archive assembly command.
+
 ### Reproduce the committed Rust plan
 
 Run this command from the repository root.
 
 ```sh
 node scripts/sweep/coverage.mjs --results evidence/c-18/coverage-plan-input.json.gz \
-  --plan docs/coverage-plan.md --rust-section
+  --plan "$PYM_SCRATCH/historical-plan.md" --rust-section
 ```
 
-The archive overlays the 18 measured pins on the C-15 plan input and
-keeps its embedded SW-3 comparison base. The command replaces the Rust section.
-It preserves the Go and TypeScript sections from main verbatim. The
-regression test covers both parts of that contract.
+This historical archive overlays 18 measured pins on the C-15 plan input.
+Its embedded comparison is SW-3. Use the command with a copy of the C-18
+plan to reproduce its Rust section. The current plan uses the full refresh
+above. `sweep/plan-input.json.gz` remains the previous combined archive
+for the historical change notes.
 
-### Recompute after a candidate run
+### Recompute a historical comparison after a candidate run
 
 For paired TypeScript coverage, run the same pinned manifest a second time
 with `scripts/sweep/run.mjs --installed`. Give that run a distinct `--output`
-and use one memory-backed scratch directory. The runner uses a root lockfile
+and use scratch on disk. The runner uses a root lockfile
 and runs npm `ci --ignore-scripts`, pnpm `install --frozen-lockfile
 --ignore-scripts`, or Yarn `install --immutable --mode=skip-build`. Yarn 1
 uses `--frozen-lockfile --ignore-scripts`. The runner disables pnpm hooks
@@ -219,7 +245,7 @@ pymtheg-dev --name sw3 -- bash -c '
 '
 pymtheg-dev --name sw3 --no-sync -- bash -c 'cat "$PYM_SCRATCH/candidate-coverage.json"' > /tmp/pymtheg-candidate-coverage.json
 node scripts/sweep/coverage.mjs --results /tmp/pymtheg-candidate-coverage.json \
-  --base evidence/sw-3/breakdown.json.gz --plan docs/coverage-plan.md
+  --base evidence/sw-3/breakdown.json.gz --plan "$PYM_SCRATCH/historical-plan.md"
 ```
 
 After a full run or subset overlay, `--scoreboard FILE` also writes the rates

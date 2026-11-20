@@ -1,0 +1,14 @@
+{
+  "repo": "protocolbuffers/protobuf-go",
+  "file": "internal/reflection_test/reflection_test.go",
+  "line": 100,
+  "code": "largeFieldF34 = largeMessageDesc.Fields().ByName(\"f34\").Number()",
+  "kind": "calls",
+  "outcome": "ambiguous",
+  "data": {
+    "open": {
+      "reason": "external-implementers-possible",
+      "reasons": ["external-implementers-possible", "structural-match-unverified"]
+    }
+  }
+}

@@ -1,0 +1,213 @@
+// SPDX-License-Identifier: MIT
+import { modules } from "./coverage-rules.mjs";
+import { auditRange, baselineScore, compare, firstBlocker, itemRange, missGroups, pairedRepos, sampleSize, schema, score, seed, verifyModes, verifyReview } from "./coverage-refresh-data.mjs";
+
+const languageNames = { go: "Go", rust: "Rust", typescript: "TypeScript / JavaScript" };
+const number = (n) => n.toLocaleString("en-US");
+const percent = (n) => n.toFixed(2) + "%";
+const rate = ({ links, level2 }) => links ? percent(100 * level2 / links) : "—";
+const gap = ({ links, level2 }) => number(Math.max(0, Math.ceil(9 * links / 10) - level2));
+const inline = (value) => {
+  const text = String(value).replaceAll("|", "\\|").replaceAll("\n", " ");
+  const ticks = "`".repeat(Math.max(0, ...(text.match(/`+/g) ?? []).map((part) => part.length)) + 1);
+  return `${ticks} ${text} ${ticks}`;
+};
+const sampleText = ({ repo, file, line, code }) => `${repo} ${inline(`${file}:${line}`)} ${inline(code || "(empty source line)")}`;
+
+function selectedModes(modes) {
+  const bare = modes.bare.repos;
+  const installed = modes.installed.repos;
+  const go = modes["go-toolchain"].repos;
+  return { bare, installed, go, pairedInstalled: pairedRepos(bare, installed, "installed"),
+    pairedGo: pairedRepos(bare, go, "go-toolchain"), goUsed: go.filter((repo) => repo.counts && repo.toolchain?.state === "used") };
+}
+
+export function scoreTable(modes, base, own = false) {
+  const { bare, pairedInstalled, pairedGo, goUsed } = selectedModes(modes);
+  const render = (module, mode, repos) => {
+    const now = score(repos, module, own);
+    const then = baselineScore(base.repos, module, own);
+    return `| ${languageNames[module]} | ${mode} | ${number(now.links)} | ${number(now.level2)} (${rate(now)}) | ${number(then.level2)} / ${number(then.links)} (${rate(then)}) | ${gap(now)} |`;
+  };
+  return [
+    "| Language | Mode | Links now | Level 2 now | Level 2 at 0.1.0 | Links to 90% |",
+    "| --- | --- | ---: | ---: | ---: | ---: |",
+    render("go", "Bare", bare),
+    goUsed.length ? render("go", "Opt-in offline toolchain", pairedGo) : "| Go | Opt-in offline toolchain | — | not measured in this sweep | — | — |",
+    render("rust", "Source only", bare),
+    render("typescript", "Bare", bare),
+    render("typescript", "Installed declarations", pairedInstalled),
+  ].join("\n");
+}
+
+function itemFor(module, reason, catalog) {
+  const defined = catalog.items.find((item) => item.module === module && item.reason === reason);
+  if (defined) return defined;
+  const id = `${module === "typescript" ? "ts" : module}-${reason.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
+  return { id, title: `Review ${reason.replaceAll("-", " ")}`, status: "Needs diagnosis" };
+}
+
+function share([lower, upper]) {
+  if (Math.abs(upper - lower) < 0.0000001) return percent(100 * lower);
+  return `${percent(100 * lower)}–${percent(100 * upper)}`;
+}
+
+function ceiling(groups, samples, totals) {
+  const impossible = auditRange(groups, samples, ["none"]);
+  const outside = auditRange(groups, samples, ["outside"]);
+  const blocked = auditRange(groups, samples, ["none", "outside"]);
+  const missRate = (totals.links - totals.level2) / totals.links;
+  const max = blocked.interval.toReversed().map((n) => 1 - n * missRate);
+  const unknown = samples.filter(({ staticAnswer }) => staticAnswer === "unknown").length;
+  return `Bare ceiling estimate **${share(max)}**. Of missing links, ${share(impossible.observed)} have no static answer (95% bounds ${share(impossible.interval)}) and ${share(outside.observed)} need material outside the checkout (95% bounds ${share(outside.interval)}). The review could not classify ${unknown} of ${samples.length} sampled links for the ceiling.`;
+}
+
+function itemTable(groups, samples, module, totals, catalog, alternateGroups) {
+  const content = ["| Support item | First stored reason | Links | Pins | Link kinds | Sample | Estimated points | Status | Examples |",
+    "| --- | --- | ---: | ---: | --- | ---: | ---: | --- | --- |"];
+  const paired = new Map(alternateGroups.map((group) => [group.reason, group]));
+  const hasAlternate = module !== "rust";
+  for (const group of [...groups, ...alternateGroups.filter(({ reason }) => !groups.some((group) => group.reason === reason))]) {
+    const bare = groups.includes(group);
+    const { reason, count, pins, kinds, examples } = group;
+    const item = itemFor(module, reason, catalog);
+    const draw = samples.filter((row) => firstBlocker(row.reasons, row.outcome) === reason);
+    const [lower, upper] = bare ? itemRange(count, draw) : [0, 0];
+    const high = 100 * upper / totals.links;
+    const precision = high > 0 && high < 0.01 ? 4 : 2;
+    const points = bare ? `${(100 * lower / totals.links).toFixed(precision)}–${high.toFixed(precision)} pp${draw.length ? "" : "*"}` : "—";
+    const kindText = [...kinds].sort(([a, n], [b, m]) => m - n || compare(a, b))
+      .map(([kind]) => kind).join(", ");
+    const alternate = paired.get(reason);
+    const sites = [...examples].sort((a, b) => compare(a.rank, b.rank)).slice(0, 2);
+    if (sites.length === 1) {
+      const first = sites[0];
+      const second = alternate?.examples.find((site) => site.repo !== first.repo || site.file !== first.file || site.line !== first.line);
+      if (second) sites.push(second);
+    }
+    const evidence = sites.length === 1 ? `${sampleText(sites[0])}<br>Only one source line` : sites.map(sampleText).join("<br>");
+    const countCell = hasAlternate ? `${number(bare ? count : 0)} / ${number(alternate?.count ?? 0)}` : number(count);
+    const pinCell = hasAlternate ? `${number(bare ? pins.size : 0)} / ${number(alternate?.pins.size ?? 0)}` : number(pins.size);
+    content.push(`| ${item.title} ${inline(item.id)} | ${inline(reason)} | ${countCell} | ${pinCell} | ${kindText} | ${draw.length} | ${points} | ${item.status} | ${evidence} |`);
+  }
+  return content.join("\n");
+}
+
+export function catalogChanges(modes, catalog, legacy) {
+  const { bare, pairedInstalled, pairedGo } = selectedModes(modes);
+  const active = modules.flatMap((module) => {
+    const reasons = new Set(missGroups(bare, module).map(({ reason }) => reason));
+    const other = module === "go" ? pairedGo : module === "typescript" ? pairedInstalled : [];
+    for (const { reason } of missGroups(other, module)) reasons.add(reason);
+    return [...reasons].map((reason) => ({ ...itemFor(module, reason, catalog), module, reason }));
+  });
+  const old = new Set(legacy.items.map(({ id }) => id));
+  return {
+    added: active.filter(({ id }) => !old.has(id)).sort((a, b) => compare(a.id, b.id)),
+    retained: active.filter(({ id }) => old.has(id)).map(({ id }) => id).sort(compare),
+    retired: legacy.items.filter(({ id }) => !active.some((item) => item.id === id)).map(({ id }) => ({ id,
+      note: catalog.retired?.[id] ?? "Replaced by the stored-reason groups. This source-audit category had no equivalent stored reason." })),
+  };
+}
+
+export function runTables(modes) {
+  const { bare, pairedInstalled, pairedGo } = selectedModes(modes);
+  const bareById = new Map(bare.map((repo) => [repo.id, repo]));
+  const picked = { bare: bareById, installed: new Map(pairedInstalled.map((repo) => [repo.id, repo])),
+    "go-toolchain": new Map(pairedGo.map((repo) => [repo.id, repo])) };
+  return ["# Sweep attempts", "", "Peak is the largest recorded resident-memory peak across the attempt's stages. Wall covers checkout, setup, both indexes and queries. Cold columns cover the first index. Level 2 uses the pin language and marks every score carried forward from bare mode.",
+    ...Object.entries(modes).flatMap(([mode, { repos }]) => ["", `## ${mode}`, "",
+      "| Pin | Outcome | Level 2 | Wall (s) | Peak (MiB) | Cold (s) | Cold peak (MiB) | Detail |",
+      "| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |",
+      ...repos.map(({ id, language, outcome, wallSeconds, peakRssKiB, cold, failure, install, toolchain, failedFiles, failedModules, indexErrors, compilerAssertion, invalidUtf16Files }) => {
+        const stage = failure?.stage;
+        const selected = picked[mode].get(id);
+        const languageCount = selected?.counts?.[language];
+        const fallback = mode !== "bare" && selected === bareById.get(id) && selected?.counts;
+        const level2 = `${languageCount ? rate(languageCount) : "—"}${fallback ? " (bare)" : ""}`;
+        const modules = Object.entries(failedModules ?? {}).filter(([, count]) => count)
+          .map(([module, count]) => `${number(count)} ${languageNames[module]}`).join(", ");
+        const detail = [install && [install.manager, install.status, install.reason].filter(Boolean).join(" "),
+          stage && [stage, failure.exit != null && `exit ${failure.exit}`, failure.progress, failure.memory].filter(Boolean).join(" · "),
+          toolchain && [toolchain.state, toolchain.reason, toolchain.packages && `${toolchain.packages.clean}/${toolchain.packages.total} clean packages`].filter(Boolean).join(" · "),
+          indexErrors?.analysisErrors && `${indexErrors.analysisErrors} analysis errors`,
+          compilerAssertion && `TypeScript compiler assertion (${compilerAssertion})`,
+          invalidUtf16Files && `${number(invalidUtf16Files)} invalid UTF-16 ranges`,
+          indexErrors?.resolutionErrors && `${indexErrors.resolutionErrors} resolution errors`,
+          outcome === "finished" && `${cold.status}, ${number(failedFiles)} failed files${modules ? ` (${modules})` : ""}`].filter(Boolean).join(" · ") || "—";
+        const seconds = (value) => value != null ? value.toFixed(1) : "—";
+        const memory = (value) => value ? (value / 1024).toFixed(1) : "—";
+        return `| ${id} | ${outcome} | ${level2} | ${seconds(wallSeconds)} | ${memory(peakRssKiB)} | ${seconds(cold?.wallSeconds ?? (stage === "cold" ? failure.wallSeconds : null))} | ${memory(cold?.peakRssKiB ?? (stage === "cold" ? failure.peakRssKiB : null))} | ${detail} |`;
+      }),
+    ]), ""].join("\n");
+}
+
+export function renderPlan(input, base, pins, catalog, legacy) {
+  if (input.schema !== schema || !/^[a-f0-9]{40}$/.test(input.measuredCommit) || input.seed !== seed || input.sampleSize !== sampleSize) {
+    throw Error("Invalid refresh archive");
+  }
+  verifyModes(input.modes, pins);
+  const baselinePins = new Map(base.repos.map((repo) => [repo.id, repo]));
+  if (base.release?.package !== "pymtheg@0.1.0" || !base.release.integrity || baselinePins.size !== pins.length ||
+      pins.some(({ id, commit, language }) => baselinePins.get(id)?.commit !== commit || baselinePins.get(id)?.language !== language)) {
+    throw Error("Expected the published 0.1.0 breakdown for the same pins");
+  }
+  const { bare, installed, go, pairedInstalled, pairedGo, goUsed } = selectedModes(input.modes);
+  const { samples } = input;
+  verifyReview(bare, samples);
+  const finished = bare.filter(({ counts }) => counts).length;
+  const installedUsable = installed.filter((repo) => repo.counts && repo.install?.status === "installed").length;
+  const installedFallback = installed.filter((repo) => !repo.counts || repo.install?.status !== "installed")
+    .map(({ id, install, outcome, failure }) => `${id} (${install?.reason ?? `${outcome}${failure?.stage ? ` at ${failure.stage}` : ""}`})`);
+  const changes = catalogChanges(input.modes, catalog, legacy);
+  const rust = score(bare, "rust");
+  const ownRust = score(bare, "rust", true);
+  const taint = bare.flatMap(({ inventory }) => inventory ?? []).filter(([module, , , reasons]) =>
+    module === "rust" && reasons.includes("failed-file-unseen-declarations")).reduce((sum, row) => sum + row[4], 0);
+  const missed = bare.filter(({ counts }) => !counts).map(({ id, outcome, failure }) => `${id} (${outcome}${failure?.stage ? ` at ${failure.stage}` : ""})`);
+  return [
+    "# Coverage plan for 0.2.0", "", scoreTable(input.modes, base), "",
+    "Each stored link counts under its source language in a finished graph, so Go files in a TypeScript pin count under Go and JavaScript counts with TypeScript.",
+    "Level 2 credits a resolved checkout target or a library unit with a named symbol. The gap is the number of additional Level 2 links required at the current link count.", "",
+    `Measured main commit ${inline(input.measuredCommit)}. Each 0.1.0 entry uses the release's finished bare graphs. The earlier exporter inferred named library targets from the stored facts where it could.`,
+    "[Current sweep and source audit](../evidence/sw-4/coverage-plan-input.json.gz) · [0.1.0 breakdown](../evidence/sw-3/breakdown.json.gz)", "",
+    "## Coverage within each language's own pins", "", scoreTable(input.modes, base, true), "",
+    `Rust Level 2 includes **${number(rust.level2 - rust.assumed)} proven links (${rate({ ...rust, level2: rust.level2 - rust.assumed })})** and **${number(rust.assumed)} assumption-marked links (${rate({ ...rust, level2: rust.assumed })})**. The Rust pins alone have ${number(ownRust.level2 - ownRust.assumed)} proven (${rate({ ...ownRust, level2: ownRust.level2 - ownRust.assumed })}) and ${number(ownRust.assumed)} assumption-marked links (${rate({ ...ownRust, level2: ownRust.assumed })}).`,
+    "[C-19, experimental Rust toolchain coverage measurement](changes/C-19.md), measured a possible route that Pymtheg has yet to implement.", "",
+    "## Pin completion", "",
+    `**${finished}/${bare.length} bare pins finished.** ${missed.length ? `Unfinished attempts were ${missed.join(", ")}.` : "All bare graphs contribute to the totals."}`,
+    `TypeScript dependencies installed and indexed on ${installedUsable}/${installed.length} pins with lifecycle scripts disabled. Each unusable installed attempt contributes its bare graph when available.`,
+    ...(installedFallback.length ? [`Installed-mode fallbacks include ${installedFallback.join(", ")}.`] : []),
+    `The offline Go toolchain provided facts on ${goUsed.length}/${go.length} Go pins. Go links in other languages' pins use the bare graph.${goUsed.length < go.length ? " Go pins with unusable opt-in attempts also use the bare graph." : ""}`,
+    "[Per-pin outcomes, fallback details, time and memory](../evidence/sw-4/attempts.md)", "",
+    "## Support items", "",
+    "Each missing link belongs to its first stored blocker. Read the direct reason first, then the ordered reasons for an open candidate set, then uncertainty and the reason saved before a configuration override. Split semicolon lists left to right and keep the first occurrence. A link without a reason is grouped by its outcome.",
+    "Counts and pin totals are exact. Link kinds and examples use the bare group when available. An alternate group can supply another example when the bare group has one source line. The archive retains every combination and count, including secondary reasons.",
+    `The audit draws ${sampleSize} bare links per language. Estimated points show how much Level 2 could rise if the item gave a definite answer at those links. Ranges include source-review uncertainty. An asterisk marks the full possible range for a group with no sampled link.`,
+    "[Sampling and uncertainty](../evidence/sw-4/README.md)", "",
+    ...modules.flatMap((module) => {
+      const groups = missGroups(bare, module);
+      const review = samples.filter((row) => row.module === module);
+      const totals = score(bare, module);
+      const alternate = module === "go" ? pairedGo : module === "typescript" ? pairedInstalled : [];
+      return [`### ${languageNames[module]}`, "", ceiling(groups, review, totals), "",
+        ...(module === "go" ? ["Counts are bare / opt-in offline Go toolchain.", "",
+          "The protobuf reflection call `largeMessageDesc.Fields().ByName(\"f34\")` records both `external-implementers-possible` and `structural-match-unverified`. Its count goes under the first reason. [Pinned Go source](https://github.com/protocolbuffers/protobuf-go/blob/ef99f06f37ec921e64fdbcec131a82013f38776e/internal/reflection_test/reflection_test.go#L100)", ""]
+          : module === "typescript" ? ["Counts are bare / installed declarations.", ""] : []),
+        itemTable(groups, review, module, totals, catalog, missGroups(alternate, module)), ""];
+    }),
+    "## Changes to the item list", "",
+    `The Rust failed-file reason appears on ${number(taint)} links below Level 2. The old 13.04-point estimate came from an overbroad diagnostic. The reason was corrected and grammar fixes removed the remaining reported misses in the affected pins. [Failed-file diagnosis](changes/C-15.md) · [Rust grammar recovery](changes/C-21.md)`, "",
+    `The fresh inventory adds ${changes.added.length} reason groups and reuses ${changes.retained.length} previous item IDs. [Added and retired items](../evidence/sw-4/items.md)`, "",
+  ].join("\n");
+}
+
+export function renderChanges(changes) {
+  return ["# Support item changes", "", "## Added", "",
+    "| Item | Stored reason |", "| --- | --- |",
+    ...changes.added.map(({ id, title, reason }) => `| ${inline(id)} ${title} | ${inline(reason)} |`),
+    "", "## Reused", "", changes.retained.map(inline).join(", "), "", "## Retired", "",
+    "| Previous item | Reason for retirement |", "| --- | --- |",
+    ...changes.retired.map(({ id, note }) => `| ${inline(id)} | ${note} |`), "",
+  ].join("\n");
+}

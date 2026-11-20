@@ -9,6 +9,7 @@ import { parseArgs } from "node:util";
 import { gunzipSync } from "node:zlib";
 import { cargoPathLocations, checkoutLocation, npmPathLocation, yarnArchivePackages } from "./coverage-locations.mjs";
 import { goMapKeyReader, typescriptShapes } from "./coverage-source.mjs";
+import { exportRefresh } from "./coverage-refresh-export.mjs";
 import { classify, columns, countLines, externalIdentity, failedFamily, goImports, modules, packageName, storedTotalsAgree,
   reviewBucket, reviewQuotas, rustImports, rustPreludeMacros, rustPreludeTypes, sampleKey, sampleSize, sampleStratum, sourceScope, tsBindings, workspaceEntryMissing, workspaceNames } from "./coverage-rules.mjs";
 
@@ -683,87 +684,93 @@ const { values } = parseArgs({ options: {
   "include-failed": { type: "string" },
   "sampling-base": { type: "string" },
   "shared-with": { type: "string" },
+  refresh: { type: "boolean" },
 } });
 if (!values.results || !values.scratch || !values.output) throw Error("Use --results, --output and --scratch (or PYM_SCRATCH)");
 const scratch = resolve(values.scratch);
 const output = resolve(values.output);
 const input = readJson(values.results);
-const sharedWith = new Map(values["shared-with"]
-  ? readJson(values["shared-with"]).repos
-    .filter((repo) => repo.outcome === "finished")
-    .map((repo) => [repo.id, repo])
-  : []);
-const basis = values["sampling-base"] ? readJson(values["sampling-base"]) : null;
-const quotas = basis ? basis.samplingQuotas ? new Map(Object.entries(basis.samplingQuotas)) : reviewQuotas(basis.repos) : null;
-if (values["include-failed"]) {
-  const previous = readJson(values["include-failed"]);
-  if (previous.release.integrity !== input.release.integrity || !input.release.integrity) {
-    throw Error("Old failure records must use the same released package");
+if (values.refresh) exportRefresh(input, output, (repo) => selectAttempt(scratch, repo));
+else await exportHistorical();
+
+async function exportHistorical() {
+  const sharedWith = new Map(values["shared-with"]
+    ? readJson(values["shared-with"]).repos
+      .filter((repo) => repo.outcome === "finished")
+      .map((repo) => [repo.id, repo])
+    : []);
+  const basis = values["sampling-base"] ? readJson(values["sampling-base"]) : null;
+  const quotas = basis ? basis.samplingQuotas ? new Map(Object.entries(basis.samplingQuotas)) : reviewQuotas(basis.repos) : null;
+  if (values["include-failed"]) {
+    const previous = readJson(values["include-failed"]);
+    if (previous.release.integrity !== input.release.integrity || !input.release.integrity) {
+      throw Error("Old failure records must use the same released package");
+    }
+    const current = new Set(input.repos.map(({ id }) => id));
+    input.repos.push(...previous.repos.filter((repo) => repo.outcome !== "finished" && !current.has(repo.id)));
   }
-  const current = new Set(input.repos.map(({ id }) => id));
-  input.repos.push(...previous.repos.filter((repo) => repo.outcome !== "finished" && !current.has(repo.id)));
+  const packageRoot = resolve(values["metadata-root"] ?? join(scratch, "release/node_modules/pymtheg"));
+  const readers = await loadReaders(packageRoot);
+  const goMapKeys = quotas ? await goMapKeyReader((await import(pathToFileURL(join(packageRoot, "dist/graph/tree-sitter.js")))).createTagsParser,
+    packageRoot) : undefined;
+  const reference = new Map();
+  if (values["reference-samples"]) {
+    for (const row of readJson(values["reference-samples"]).samples) {
+      if (!reference.has(row.repo)) reference.set(row.repo, new Map());
+      const files = reference.get(row.repo);
+      if (!files.has(row.file)) files.set(row.file, new Set());
+      files.get(row.file).add(row.key);
+    }
+  }
+  const cacheVersion = createHash("sha256").update(readFileSync(new URL(import.meta.url)))
+    .update(readFileSync(new URL("./coverage-rules.mjs", import.meta.url)))
+    .update(readFileSync(new URL("./coverage-locations.mjs", import.meta.url)))
+    .update(readFileSync(new URL("./coverage-source.mjs", import.meta.url)))
+    .update(JSON.stringify([...quotas ?? []]))
+    .update(values["shared-with"] ? readFileSync(values["shared-with"]) : "")
+    .update(values["reference-samples"] ? readFileSync(values["reference-samples"]) : "").digest("hex");
+  const cache = `${output}.cache`;
+  mkdirSync(dirname(output), { recursive: true });
+  mkdirSync(cache, { recursive: true });
+  const repositories = [];
+  const shortlist = new Map();
+  const failures = {};
+  const taintExamples = {};
+  for (const repo of input.repos) {
+    // Keep failed attempts in the exported result so a candidate regression
+    // replaces its baseline graph with an explicit zero.
+    if (repo.outcome !== "finished") {
+      if (input.mode === "installed") {
+        const { id, language, commit, outcome, install } = repo;
+        repositories.push({ id, language, commit, outcome, install });
+      } else repositories.push(repo);
+      continue;
+    }
+    const attempt = selectAttempt(scratch, repo);
+    const key = sampleKey(repo, { file: attempt, module: JSON.stringify(input.release), kind: cacheVersion });
+    const path = join(cache, `${key}.json`);
+    if (!existsSync(path)) {
+      console.error(`Exporting ${repo.id}`);
+      const previous = sharedWith.get(repo.id);
+      if (previous && previous.commit !== repo.commit)
+        throw Error(`Shared-site comparison requires the same pin for ${repo.id}`);
+      atomicJson(path, scanRepo(scratch, repo, readers, reference.get(repo.id), quotas, goMapKeys, previous));
+    }
+    const { audit, samples, failedExamples } = readJson(path);
+    if (failedExamples.length) failures[repo.id] = failedExamples;
+    if (samples["rust:failed-file-taint"]?.length) taintExamples[repo.id] = samples["rust:failed-file-taint"].slice(0, 5);
+    repositories.push(audit);
+    for (const [stratum, entries] of Object.entries(samples)) for (const { key, ...sample } of entries) {
+      remember(shortlist, stratum, key, () => sample, quotas?.get(stratum) ?? (quotas ? 6 : sampleSize(stratum)));
+    }
+  }
+  const release = input.release;
+  writeFileSync(output, ["{", '  "schema": "pymtheg.sweep.coverage/v2",', `  "columns": ${JSON.stringify(columns)},`,
+    ...(quotas ? [`  "samplingQuotas": ${JSON.stringify(Object.fromEntries(quotas))},`] : []),
+    `  "release": ${JSON.stringify(release)},`, '  "repos": [',
+    repositories.sort((a, b) => compare(a.id, b.id)).map((repo) => `    ${JSON.stringify(repo)}`).join(",\n"), "  ]", "}", ""].join("\n"));
+  atomicJson(`${output}.samples.json`, Object.fromEntries([...shortlist].sort(([a], [b]) => compare(a, b))));
+  atomicJson(`${output}.failed-examples.json`, failures);
+  atomicJson(`${output}.taint-examples.json`, taintExamples);
+  console.error(`Exported ${repositories.length} attempts, ${repositories.filter(({ outcome }) => outcome === "finished").length} studied graphs`);
 }
-const packageRoot = resolve(values["metadata-root"] ?? join(scratch, "release/node_modules/pymtheg"));
-const readers = await loadReaders(packageRoot);
-const goMapKeys = quotas ? await goMapKeyReader((await import(pathToFileURL(join(packageRoot, "dist/graph/tree-sitter.js")))).createTagsParser,
-  packageRoot) : undefined;
-const reference = new Map();
-if (values["reference-samples"]) {
-  for (const row of readJson(values["reference-samples"]).samples) {
-    if (!reference.has(row.repo)) reference.set(row.repo, new Map());
-    const files = reference.get(row.repo);
-    if (!files.has(row.file)) files.set(row.file, new Set());
-    files.get(row.file).add(row.key);
-  }
-}
-const cacheVersion = createHash("sha256").update(readFileSync(new URL(import.meta.url)))
-  .update(readFileSync(new URL("./coverage-rules.mjs", import.meta.url)))
-  .update(readFileSync(new URL("./coverage-locations.mjs", import.meta.url)))
-  .update(readFileSync(new URL("./coverage-source.mjs", import.meta.url)))
-  .update(JSON.stringify([...quotas ?? []]))
-  .update(values["shared-with"] ? readFileSync(values["shared-with"]) : "")
-  .update(values["reference-samples"] ? readFileSync(values["reference-samples"]) : "").digest("hex");
-const cache = `${output}.cache`;
-mkdirSync(dirname(output), { recursive: true });
-mkdirSync(cache, { recursive: true });
-const repositories = [];
-const shortlist = new Map();
-const failures = {};
-const taintExamples = {};
-for (const repo of input.repos) {
-  // Keep failed attempts in the exported result so a candidate regression
-  // replaces its baseline graph with an explicit zero.
-  if (repo.outcome !== "finished") {
-    if (input.mode === "installed") {
-      const { id, language, commit, outcome, install } = repo;
-      repositories.push({ id, language, commit, outcome, install });
-    } else repositories.push(repo);
-    continue;
-  }
-  const attempt = selectAttempt(scratch, repo);
-  const key = sampleKey(repo, { file: attempt, module: JSON.stringify(input.release), kind: cacheVersion });
-  const path = join(cache, `${key}.json`);
-  if (!existsSync(path)) {
-    console.error(`Exporting ${repo.id}`);
-    const previous = sharedWith.get(repo.id);
-    if (previous && previous.commit !== repo.commit)
-      throw Error(`Shared-site comparison requires the same pin for ${repo.id}`);
-    atomicJson(path, scanRepo(scratch, repo, readers, reference.get(repo.id), quotas, goMapKeys, previous));
-  }
-  const { audit, samples, failedExamples } = readJson(path);
-  if (failedExamples.length) failures[repo.id] = failedExamples;
-  if (samples["rust:failed-file-taint"]?.length) taintExamples[repo.id] = samples["rust:failed-file-taint"].slice(0, 5);
-  repositories.push(audit);
-  for (const [stratum, entries] of Object.entries(samples)) for (const { key, ...sample } of entries) {
-    remember(shortlist, stratum, key, () => sample, quotas?.get(stratum) ?? (quotas ? 6 : sampleSize(stratum)));
-  }
-}
-const release = input.release;
-writeFileSync(output, ["{", '  "schema": "pymtheg.sweep.coverage/v2",', `  "columns": ${JSON.stringify(columns)},`,
-  ...(quotas ? [`  "samplingQuotas": ${JSON.stringify(Object.fromEntries(quotas))},`] : []),
-  `  "release": ${JSON.stringify(release)},`, '  "repos": [',
-  repositories.sort((a, b) => compare(a.id, b.id)).map((repo) => `    ${JSON.stringify(repo)}`).join(",\n"), "  ]", "}", ""].join("\n"));
-atomicJson(`${output}.samples.json`, Object.fromEntries([...shortlist].sort(([a], [b]) => compare(a, b))));
-atomicJson(`${output}.failed-examples.json`, failures);
-atomicJson(`${output}.taint-examples.json`, taintExamples);
-console.error(`Exported ${repositories.length} attempts, ${repositories.filter(({ outcome }) => outcome === "finished").length} studied graphs`);
