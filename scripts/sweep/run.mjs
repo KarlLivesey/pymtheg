@@ -366,7 +366,11 @@ async function runRepository(repo, release, scratch, limitSeconds, installed, go
     record.trackedSource = { files, lines };
     if (installed) {
       stage = "install";
-      const setup = await installation(root, scratch);
+      // This Nest pin documents the peer resolution mode in CONTRIBUTING.md.
+      const setup = await installation(root, scratch, {
+        legacyPeerDeps: repo.id === "nestjs/nest" &&
+          repo.commit === "085f83a168e9edbedfe9560428dcfd270073ae00",
+      });
       if (!setup.command) {
         record.install = setup;
         return finalize("install-unavailable");

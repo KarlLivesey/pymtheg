@@ -219,6 +219,7 @@ and runs npm `ci --ignore-scripts`, pnpm `install --frozen-lockfile
 uses `--frozen-lockfile --ignore-scripts`. The runner disables pnpm hooks
 and project Yarn plugins and keeps caches in the scratch directory. Git
 dependencies and unsupported or absent lockfiles are recorded as unavailable.
+The Nest pin uses its contributor guide's `--legacy-peer-deps` option.
 Installed-mode graph commands enter an unprivileged Linux network namespace
 after installation. The runner needs `unshare` with user namespaces enabled.
 

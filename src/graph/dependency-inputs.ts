@@ -80,7 +80,12 @@ class Paths {
           // Check the destination before probing any of its components. pnpm's
           // normal .pnpm links end inside the project. Its CAS hard links need
           // no access to the shared store path.
-          if (destination && !isAbsolute(destination))
+          if (destination === "")
+            location = {
+              path: "",
+              stat: lstatSync(this.root, { bigint: true }),
+            };
+          else if (!isAbsolute(destination))
             location = this.location(destination, hops + 1);
         } else location = { path: name, stat };
       } catch {

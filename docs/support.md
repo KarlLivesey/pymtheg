@@ -780,8 +780,16 @@ answer.
   symbols and link sources. Standard in-checkout pnpm, npm and Yarn
   `node_modules` layouts are supported. The compiler follows the package the
   install exposes to that importer, including overrides and workspace links.
+  A module augmentation owns the members it declares. The original package
+  owns its default export and named namespace bindings proven by its entry.
+  A named member written directly in an installed function's explicit return
+  type can be linked through that declaration when the function has one
+  declaration. Synthesized names for installed members can include the
+  package-relative declaration file, for example
+  `configuration.d.ts:ReturnType<typeof register>.onDidChange`. Use that
+  full name in `graph uses` to distinguish members in different files.
   [Library links](changes/C-11.md) · [Members and test globals](changes/C-16.md) ·
-  [Installed declarations](changes/C-20.md)
+  [Installed declarations](changes/C-20.md) · [Installed ownership](changes/C-23.md)
 - **Candidates:** several checkout or library targets for one callee (union
   receivers, merged declarations, duplicate JavaScript functions). Missing
   selected Node types can leave both DOM and Node targets possible for a shared
@@ -806,6 +814,23 @@ answer.
   such as `@tsconfig/node20` leaves most cross-file links unresolved), compiler
   stack limits on some lookups, or `require`/`module`/`exports` uses that cannot
   be decided statically.
+- **Files the compiler or memory cannot take (C-13):** a file the TypeScript
+  compiler throws on while analysing it (an assertion such as "Debug Failure.
+  False expression.") fails alone, with the compiler's message as the reason,
+  and its program is rebuilt without it; after 100 such files a program's
+  remaining files fail with that reason. A project (a config's files, or the
+  files no config includes) with more than 50,000,000 characters of source
+  leaves out its largest files, failed with the reason, until the rest fits
+  in one program. Both are failed files under the rule below. A
+  `package.json` that starts with a UTF-8 byte-order mark is read. Finding
+  which links depend on a program's failed files has a deterministic budget
+  of 8,000,000 steps. When it is reached, every link of that program that
+  could have a target is unresolved with `taint-budget-exhausted`, except
+  links that bind a failed file directly, which stay `invalid-code`; no pin
+  outside microsoft/TypeScript comes near it. The program budget counts
+  every checkout file a program loads, imported files included; a file past
+  it is left out of that program only (installed declarations have their
+  own budget).
 - **A program that contains a failed file:** the failed file is absent;
   `invalid-code` with a cause is best-effort attribution. Links computed
   without the failed file carry `assumes: ["no-unseen-declarations"]`.

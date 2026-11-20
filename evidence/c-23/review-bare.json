@@ -1,0 +1,41 @@
+{
+  "main": "404ee03",
+  "pins": [
+    {
+      "pin": "dexie/Dexie.js",
+      "before": 36431,
+      "beforeL2": 19940,
+      "afterL2": 19940,
+      "allLinks": 36431,
+      "symbols": 5841,
+      "symbolChanges": 0,
+      "lostSites": 0,
+      "addedSites": 0,
+      "changedOutcomes": 0
+    },
+    {
+      "pin": "pmndrs/zustand",
+      "before": 7099,
+      "beforeL2": 4741,
+      "afterL2": 4741,
+      "allLinks": 7099,
+      "symbols": 598,
+      "symbolChanges": 0,
+      "lostSites": 0,
+      "addedSites": 0,
+      "changedOutcomes": 0
+    },
+    {
+      "pin": "yargs/yargs",
+      "before": 12205,
+      "beforeL2": 5181,
+      "afterL2": 5181,
+      "allLinks": 12205,
+      "symbols": 1180,
+      "symbolChanges": 0,
+      "lostSites": 0,
+      "addedSites": 0,
+      "changedOutcomes": 0
+    }
+  ]
+}

@@ -109,6 +109,21 @@ export interface ProjectModel {
    * serves it as absent.
    */
   failSyntax: (path: string, extra: readonly ts.Diagnostic[]) => boolean;
+  /**
+   * Readable files left out of every program because their project holds
+   * more source than one program may (MAX_PROGRAM_SOURCE), with the reason.
+   * They are also in `parseFailures`: served to every program as absent.
+   */
+  omitted: Map<string, string>;
+  /**
+   * Why this program did not load a checkout file: what it had loaded
+   * already would pass MAX_PROGRAM_SOURCE (files it imports count, not only
+   * its roots). Only in this program; the file's own project may still
+   * read it.
+   */
+  refusedIn: (group: ProjectGroup, path: string) => string | undefined;
+  /** The global names a readable file declares (`declaredGlobalNames`), cached. */
+  globalNames: (path: string) => readonly string[];
   /** Failed files a host was asked for (roots or imports): unseen declarations. */
   requested: (host: ts.CompilerHost) => ReadonlySet<string>;
   /** A compiler host over the snapshot; a variant replaces some files' text. */
@@ -117,11 +132,26 @@ export interface ProjectModel {
     specifier: string,
     from: string,
     lookups: readonly string[],
+    includeInstalled?: boolean,
   ) => string | undefined;
   workspaceBoundaryKnown: (from: string) => boolean;
   hasDenoImports: boolean;
   selectSpecifier: (specifier: string, from: string) => string | undefined;
 }
+
+/**
+ * The most source text (UTF-16 code units of the captured files it owns) one
+ * compiler program is given. A program's memory grows with its source: one
+ * over 150 million characters does not fit in Node's default heap. A
+ * project with more has its largest files left out (failed, with the
+ * reason) until the rest fits. A fixed number, so the outcome depends only
+ * on the snapshot, never on the machine. See docs/changes/C-13.md.
+ */
+export const MAX_PROGRAM_SOURCE = 50_000_000;
+
+/** 1234567 -> "1,234,567". */
+const grouped = (value: number) =>
+  String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 
 const INFERRED: ts.CompilerOptions = {
   target: ts.ScriptTarget.ESNext,
@@ -207,10 +237,16 @@ export function syntaxFailure(
   diagnostics.sort(
     (a, b) => a.range!.start - b.range!.start || a.range!.end - b.range!.end,
   );
-  // The global names it declares (as far as the parser read it): a
-  // script's top-level and namespace declarations, and a module's
-  // `declare global` blocks. A module's own top-level names are
-  // module-scoped: no other file can reach them without importing it.
+  return { diagnostics, names: globalNames(source, text) };
+}
+
+/**
+ * The global names a file declares (as far as the parser read it): a
+ * script's top-level and namespace declarations, and a module's `declare
+ * global` blocks. A module's own top-level names are module-scoped: no other
+ * file can reach them without importing it. Sorted.
+ */
+function globalNames(source: ts.SourceFile, text: string): string[] {
   const parsed = source as ts.SourceFile & {
     externalModuleIndicator?: unknown;
   };
@@ -254,10 +290,26 @@ export function syntaxFailure(
     }
   };
   collect(source.statements, script);
-  return {
-    diagnostics,
-    names: [...names].sort(),
-  };
+  return [...names].sort();
+}
+
+/**
+ * The global names a file without a syntax error declares, from its original
+ * text (see `globalNames`); none when the parser cannot read it.
+ */
+export function declaredGlobalNames(path: string, text: string): string[] {
+  const bom = text.startsWith("\uFEFF") ? 1 : 0;
+  try {
+    const source = ts.createSourceFile(
+      toVirtual(path),
+      text.slice(bom),
+      ts.ScriptTarget.Latest,
+      true,
+    );
+    return globalNames(source, text);
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -419,7 +471,12 @@ class VirtualFileSystem {
   readFile = (path: string) => this.files.get(this.real(path));
   directoryExists = (path: string) =>
     this.directories.has(this.real(path)) || this.linkDirectories.has(path);
-  workspaceReason(specifier: string, from: string, lookups: readonly string[]) {
+  workspaceReason(
+    specifier: string,
+    from: string,
+    lookups: readonly string[],
+    physicalWorkspace: (link: string) => string | false | undefined,
+  ) {
     const name = /^(@[^/]+\/[^/]+|[^/@#.][^/]*)/.exec(specifier)?.[1];
     if (!name) return undefined;
     for (
@@ -428,7 +485,9 @@ class VirtualFileSystem {
       directory = posix.dirname(directory)
     ) {
       const link = posix.join(directory, "node_modules", name);
-      const target = this.links.get(link);
+      const physical = physicalWorkspace(link);
+      if (physical === false) return undefined;
+      const target = physical ?? this.links.get(link);
       if (target !== undefined) {
         const built = lookups.some((lookup) => {
           if (
@@ -436,7 +495,10 @@ class VirtualFileSystem {
             !lookup.startsWith(target + "/")
           )
             return false;
-          const resolved = this.real(lookup);
+          const resolved =
+            physical && lookup.startsWith(link + "/")
+              ? target + lookup.slice(link.length)
+              : this.real(lookup);
           if (this.files.has(resolved)) return false;
           for (
             let dir = posix.dirname(resolved);
@@ -502,7 +564,10 @@ export function projectModel(
   files: readonly GraphFile[],
   contexts: readonly ContextFile[],
   dependencies?: DependencyInputs,
+  /** The program budget (MAX_PROGRAM_SOURCE; tests pass a small one). */
+  budgetCharacters: number = MAX_PROGRAM_SOURCE,
 ): ProjectModel {
+  const programBudget = { characters: budgetCharacters };
   const fs = new VirtualFileSystem();
   const deno = denoImports(contexts);
   for (const file of contexts) fs.add(file.path, file.text);
@@ -516,7 +581,9 @@ export function projectModel(
       packageDirectories.push(directory);
       let json: unknown;
       try {
-        json = JSON.parse(file.text);
+        // A leading byte-order mark is not part of the JSON text (npm and
+        // the compiler's own readers ignore it too).
+        json = JSON.parse(file.text.replace(/^\uFEFF/, ""));
       } catch (error) {
         brokenManifests.set(
           directory,
@@ -988,14 +1055,50 @@ export function projectModel(
     { bytes: number; names: Set<string>; limited: boolean }
   >();
   const parseFailures = new Map<string, string>();
+  const originals = new Map(files.map((file) => [file.path, file.text]));
+  // A project with more source than one program may hold: its largest
+  // files (then path order) are left out until the rest fits.
+  const omitted = new Map<string, string>();
+  for (const group of groups) {
+    const size = (root: string) => originals.get(root.slice(1))?.length ?? 0;
+    let total = group.roots.reduce((sum, root) => sum + size(root), 0);
+    if (total <= programBudget.characters) continue;
+    const whole = total;
+    const largest = [...group.roots].sort(
+      (a, b) => size(b) - size(a) || compare(a, b),
+    );
+    for (const root of largest) {
+      if (total <= programBudget.characters) break;
+      const path = root.slice(1);
+      total -= size(root);
+      if (omitted.has(path)) continue;
+      const message = `Not analysed: its TypeScript project (${group.config ?? "the files no tsconfig or jsconfig includes"}) holds ${grouped(whole)} characters of source, more than one compiler program is given (${grouped(programBudget.characters)}); its largest files, this one (${grouped(size(root))} characters) among them, are left out until the rest fits`;
+      omitted.set(path, message);
+      parseFailures.set(path, message);
+    }
+  }
+  const namesCache = new Map<string, readonly string[]>();
   const syntaxFailures = new Map<string, SyntaxFailure>();
   const caches = new WeakMap<ts.CompilerHost, Map<string, ts.SourceFile>>();
   const asked = new WeakMap<ts.CompilerHost, Set<string>>();
-  const originals = new Map(files.map((file) => [file.path, file.text]));
+  /** Checkout source each program has loaded, and the files it refused. */
+  const loads = new Map<
+    ProjectGroup,
+    { characters: number; names: Set<string>; refused: Map<string, string> }
+  >();
+  const loadOf = (group: ProjectGroup) => {
+    let load = loads.get(group);
+    if (!load) {
+      load = { characters: 0, names: new Set(), refused: new Map() };
+      loads.set(group, load);
+    }
+    return load;
+  };
   const host = (
     group: ProjectGroup,
     variant?: HostVariant,
   ): ts.CompilerHost => {
+    const load = loadOf(group);
     const budget = budgets.get(group) ?? {
       bytes: 0,
       names: new Set<string>(),
@@ -1045,6 +1148,29 @@ export function projectModel(
         if (failures.has(path.slice(1))) {
           requested.add(path.slice(1));
           return undefined;
+        }
+        // The program's budget counts every checkout file it loads, in the
+        // order the compiler asks for them; installed declarations have
+        // their own budget (above).
+        {
+          const relative = path.slice(1);
+          const size = originals.get(relative)?.length;
+          if (size !== undefined && !load.names.has(relative)) {
+            if (
+              load.refused.has(relative) ||
+              load.characters + size > programBudget.characters
+            ) {
+              if (!load.refused.has(relative))
+                load.refused.set(
+                  relative,
+                  `Not analysed here: the TypeScript program of ${group.config ?? "the files no tsconfig or jsconfig includes"} would load more than ${grouped(programBudget.characters)} characters of checkout source with this file (${grouped(size)} characters); files past that bound, in the order the compiler loads them, are left out of it`,
+                );
+              requested.add(relative);
+              return undefined;
+            }
+            load.characters += size;
+            load.names.add(relative);
+          }
         }
         // An unchanged file reuses the base host's parse (and binding).
         let file =
@@ -1171,6 +1297,16 @@ export function projectModel(
     parseFailures,
     syntaxFailures,
     requested: (host) => asked.get(host) ?? new Set(),
+    omitted,
+    refusedIn: (group, path) => loads.get(group)?.refused.get(path),
+    globalNames: (path) => {
+      let names = namesCache.get(path);
+      if (!names) {
+        names = declaredGlobalNames(path, originals.get(path) ?? "");
+        namesCache.set(path, names);
+      }
+      return names;
+    },
     failSyntax: (path, extra) => {
       if (syntaxFailures.has(path)) return false;
       const failure = syntaxFailure(path, originals.get(path) ?? "", extra);
@@ -1183,8 +1319,15 @@ export function projectModel(
       return true;
     },
     host,
-    workspaceReason: (specifier, from, lookups) =>
-      fs.workspaceReason(specifier, from, lookups),
+    workspaceReason: (specifier, from, lookups, includeInstalled = true) =>
+      fs.workspaceReason(specifier, from, lookups, (link) => {
+        if (!includeInstalled) return undefined;
+        const physical = dependencies?.realpath(dependencyPath(link));
+        if (physical === undefined) return undefined;
+        if (hasNodeModulesSegment(physical)) return false;
+        const path = toVirtual(physical);
+        return fs.files.has(posix.join(path, "package.json")) ? path : false;
+      }),
     workspaceBoundaryKnown: (from) => {
       for (const root of workspace.incompleteRoots)
         if (underDirectory(from, root)) return false;

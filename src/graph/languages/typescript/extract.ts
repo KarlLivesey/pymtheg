@@ -67,6 +67,7 @@ export interface RenameContext {
     specifier: string,
     from: string,
     lookups: readonly string[],
+    includeInstalled?: boolean,
   ) => string | undefined;
   workspaceBoundaryKnown: (from: string) => boolean;
   /** Nodes (and warm-up steps) whose checker lookups overflowed before. */
@@ -711,7 +712,7 @@ export function extractFile(
             return;
           const symbol = checker.getSymbolAtLocation(name);
           if (!symbol?.declarations?.includes(declaration)) return;
-          const target = importer.targetOf(declaration, unit);
+          const target = importer.targetOf(declaration, unit, checker);
           if (!target) return;
           const list = globals.get(name.text) ?? [];
           list.push(target);
@@ -852,7 +853,9 @@ export function extractFile(
     if (found.reason || !found.symbol)
       return { targets: [], reason: found.reason ?? "no-symbol", receiver };
     const facts = new Map<string, TargetFact>();
-    let libraryFacts: Map<string, LibraryTarget> | undefined;
+    let libraryFacts:
+      | Map<string | ts.Symbol | ts.Declaration, LibraryTarget>
+      | undefined;
     let external = 0;
     let local = 0;
     let viaAlias = false;
@@ -941,6 +944,37 @@ export function extractFile(
         current = checker.getAliasedSymbol(current);
       }
       let declarations = current.declarations ?? [];
+      if (globals.hasInstalledTypes && firstAlias && declarations.length > 1) {
+        const isAugmentation = (declaration: ts.Declaration) =>
+          ts.isModuleDeclaration(declaration) &&
+          ts.isStringLiteral(declaration.name) &&
+          ts.isSourceFile(declaration.parent) &&
+          ts.isExternalModule(declaration.parent);
+        const specifier = bindingSpecifier(firstAlias);
+        if (
+          specifier &&
+          ts.isStringLiteralLike(specifier) &&
+          declarations.some(isAugmentation)
+        ) {
+          const entry = specifierResolution(specifier).path;
+          const source = entry && program.getSourceFile(toVirtual(entry));
+          const unit = source && importer.installedUnit(source);
+          if (
+            unit &&
+            declarations.some(
+              (declaration) =>
+                !isAugmentation(declaration) &&
+                importer.installedUnit(declaration.getSourceFile()) === unit,
+            )
+          ) {
+            // A module augmentation wrapper is not the declaration of an
+            // export of the module, including its synthetic default.
+            declarations = declarations.filter(
+              (declaration) => !isAugmentation(declaration),
+            );
+          }
+        }
+      }
       if (meaning !== "any" && declarations.length > 1) {
         const filtered = declarations.filter((declaration) =>
           meaning === "type"
@@ -958,14 +992,40 @@ export function extractFile(
         declarations.some((declaration) => declaration.members.length > 0)
       ) {
         // Some packages declare empty compatibility interfaces for projects
-        // without DOM types. In a merge they add no members or constraints.
+        // without DOM types. A stub whose bases are already declared by the
+        // native DOM interface adds no members or constraints to the merge.
+        const nativeBases = new Set<ts.Symbol>();
+        for (const declaration of globals.hasInstalledTypes
+          ? declarations
+          : []) {
+          if (
+            !declaration
+              .getSourceFile()
+              .fileName.startsWith(`${LIB_ROOT}/lib.dom.`)
+          )
+            continue;
+          for (const clause of declaration.heritageClauses ?? [])
+            for (const type of clause.types) {
+              const base =
+                !type.typeArguments?.length &&
+                checker.getSymbolAtLocation(type.expression);
+              if (base) nativeBases.add(base);
+            }
+        }
         declarations = declarations.filter(
           (declaration) =>
             declaration.members.length > 0 ||
-            declaration.heritageClauses?.length ||
             declaration.typeParameters?.length ||
             importer.installedUnit(declaration.getSourceFile())?.ecosystem !==
-              "npm",
+              "npm" ||
+            declaration.heritageClauses?.some((clause) =>
+              clause.types.some((type) => {
+                const base =
+                  !type.typeArguments?.length &&
+                  checker.getSymbolAtLocation(type.expression);
+                return !base || !nativeBases.has(base);
+              }),
+            ),
         );
       }
       if (
@@ -1009,10 +1069,27 @@ export function extractFile(
         const source = declaration.getSourceFile();
         const unit = importer.declarationUnit(source);
         if (unit) {
+          const namespace =
+            globals.hasInstalledTypes &&
+            !receiver &&
+            meaning !== "call" &&
+            declarations.length === 1 &&
+            ts.isSourceFile(declaration) &&
+            firstAlias &&
+            installedNamespaceBinding(firstAlias, source);
           const proved =
             !incompleteConfig &&
-            !context.anyFailed &&
-            importer.targetOf(declaration, unit);
+            (namespace ||
+              (!context.anyFailed &&
+                (importer.targetOf(declaration, unit, checker) ??
+                  (globals.hasInstalledTypes &&
+                    receiver &&
+                    importer.installedUnit(source) === unit &&
+                    importer.returnedMemberTarget(
+                      declaration,
+                      unit,
+                      checker,
+                    )))));
           if (proved) {
             if (meaning === "type" && importer.installedUnit(source))
               installedType = true;
@@ -1061,7 +1138,10 @@ export function extractFile(
             }
             // A selected declaration can arrive through another package or a
             // typed return. The use site's manifest does not pin that route.
-            (libraryFacts ??= new Map()).set(libraryKey(proved), proved);
+            (libraryFacts ??= new Map()).set(
+              importer.targetKey(proved),
+              proved,
+            );
           } else if (inCheckout(declaration)) {
             if (!record(declaration, current)) local++;
           } else external++;
@@ -1146,13 +1226,20 @@ export function extractFile(
         };
     }
     const targets = [...facts.values()];
+    const libraries = libraryFacts && [...libraryFacts.values()];
+    if (
+      libraries &&
+      libraries.length > 1 &&
+      new Set(libraries.map(libraryKey)).size !== libraries.length
+    )
+      return { targets: [], reason: "ambiguous-library-declaration", receiver };
     if (!external && !local && !missingGlobalTypes)
       return {
         targets,
         viaAlias,
         receiver,
         declarations,
-        ...(libraryFacts && { libraryFacts: [...libraryFacts.values()] }),
+        ...(libraries && { libraryFacts: libraries }),
       };
     // An alias whose module did not resolve keeps that module's reason.
     const moduleFailure =
@@ -1561,7 +1648,18 @@ export function extractFile(
   }
   function bindingReason(symbol: ts.Symbol): string | undefined {
     const specifier = bindingSpecifier(symbol);
-    return specifier && bindingModuleReason(specifier);
+    const reason = specifier && bindingModuleReason(specifier);
+    if (reason || !globals.hasInstalledTypes) return reason;
+    for (const step of aliasChain(checker, symbol).slice(1)) {
+      const reexport = bindingSpecifier(step);
+      const missing = reexport && bindingModuleReason(reexport);
+      if (
+        missing === "workspace-entry-unavailable" ||
+        missing === "workspace-build-output-missing"
+      )
+        return missing;
+    }
+    return undefined;
   }
   /** A binding's reason from its module: a captured file the compiler did not type. */
   function bindingModuleReason(specifier: ts.Expression): string | undefined {
@@ -1587,12 +1685,18 @@ export function extractFile(
     return units;
   }
 
-  function outsideRoutes(specifier: ts.StringLiteralLike, declared: boolean) {
+  function outsideRoutes(
+    specifier: ts.StringLiteralLike,
+    declared: boolean,
+    includeInstalledWorkspaces = true,
+  ) {
     const selection = selectedSpecifier(specifier);
     if (!selection || (incompleteConfig && !selection.startsWith("node:")))
       return [];
     const reader = importerOf(specifier);
-    const reason = moduleReason(specifier);
+    const reason = includeInstalledWorkspaces
+      ? moduleReason(specifier)
+      : readModuleReason(specifier, false);
     if (reason === "external-package") {
       const routes = reader.importUnits(selection);
       return routes.some((unit) => reader.localPackage(unit)) ? [] : routes;
@@ -1641,6 +1745,34 @@ export function extractFile(
     )
       return undefined;
     return target;
+  }
+
+  function installedNamespaceBinding(
+    alias: ts.Symbol,
+    declaration: ts.SourceFile,
+  ) {
+    const binding = alias.declarations?.length === 1 && alias.declarations[0];
+    if (!binding || !ts.isImportSpecifier(binding)) return undefined;
+    const specifier = bindingSpecifier(alias);
+    if (!specifier || !ts.isStringLiteralLike(specifier)) return undefined;
+    const path = specifierResolution(specifier).path;
+    const entry = path && program.getSourceFile(toVirtual(path));
+    const unit = entry && importer.installedUnit(entry);
+    const selected = selectedSpecifier(specifier);
+    const written = selected && packageUnit(selected);
+    if (
+      !unit ||
+      !written ||
+      unit.unit !== written.unit ||
+      unit !== importer.installedUnit(declaration)
+    )
+      return undefined;
+    // tsc represents a named namespace export as its source file. The
+    // selected package entry supplies the public name of that binding.
+    return writtenLibrary(
+      { ...unit, ...(written.subpath && { subpath: written.subpath }) },
+      (binding.propertyName ?? binding.name).text,
+    );
   }
 
   function declaredModuleFact(
@@ -2093,6 +2225,7 @@ export function extractFile(
   }
   function readModuleReason(
     specifier: ts.StringLiteralLike,
+    includeInstalledWorkspaces = true,
   ): string | undefined {
     const text = selectedSpecifier(specifier);
     if (text === undefined || /^https?:/i.test(text))
@@ -2117,7 +2250,12 @@ export function extractFile(
         }));
     const importer = fromVirtual(specifier.getSourceFile().fileName) ?? path;
     if (aliased) return "unresolved-alias";
-    const workspace = context.workspaceReason(text, importer, lookups);
+    const workspace = context.workspaceReason(
+      text,
+      importer,
+      lookups,
+      includeInstalledWorkspaces,
+    );
     if (workspace) return workspace;
     if (!context.workspaceBoundaryKnown(importer)) {
       const unit = packageUnit(text);
@@ -3136,13 +3274,16 @@ export function extractFile(
               if (
                 unit &&
                 probe(source, specifier, () => {
+                  // A missing dependency can still bring Node types once its
+                  // workspace is built. Keep that possibility in C-11's probe.
                   if (unit.ecosystem === "node") {
-                    const units = missingUnits(specifier, true);
+                    const units = outsideRoutes(specifier, true, false);
                     if (units.length === 1 && units[0]!.ecosystem === "node")
                       return true;
                   }
                   return (
-                    declared && moduleReason(specifier) === "external-package"
+                    declared &&
+                    readModuleReason(specifier, false) === "external-package"
                   );
                 })
               )

@@ -71,6 +71,10 @@ Use the measured main build with the SW-4 sweep scripts. From the dev-server
 sweep tree, export the raw receipts and read the sampled source. No product
 tests run in the corpus checkouts.
 
+The first parent of the SW-4 merge commit contains the exact runner and
+product source used for this sweep. A later change on main added a Nest
+installation option that was absent from the recorded run.
+
 ```sh
 node scripts/sweep/run-refresh.mjs
 node scripts/sweep/refresh-evidence.mjs export

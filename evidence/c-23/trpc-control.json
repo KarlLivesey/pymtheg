@@ -1,0 +1,38 @@
+{
+  "finalCandidateOnMainInstall": {
+    "pin": "trpc/trpc",
+    "before": 107470,
+    "after": 107470,
+    "beforeL2": 95127,
+    "afterL2": 95508,
+    "gainedL2": 854,
+    "withdrawnL2": 473,
+    "symbolChanges": 0,
+    "lostSites": 0,
+    "addedSites": 0
+  },
+  "mainOnBothInstalls": {
+    "pin": "trpc/trpc",
+    "before": 107470,
+    "after": 107470,
+    "beforeL2": 95127,
+    "afterL2": 95431,
+    "gainedL2": 305,
+    "withdrawnL2": 1,
+    "symbolChanges": 0,
+    "lostSites": 0,
+    "addedSites": 0
+  },
+  "firstCandidateOnItsInstall": {
+    "pin": "trpc/trpc",
+    "before": 107470,
+    "after": 107470,
+    "beforeL2": 95431,
+    "afterL2": 93423,
+    "gainedL2": 554,
+    "withdrawnL2": 2562,
+    "symbolChanges": 0,
+    "lostSites": 0,
+    "addedSites": 0
+  }
+}
