@@ -132,7 +132,7 @@ function environment(root) {
               relative(root, source.fileName),
             );
             if (wanted.has(path) || inputs.some((input) => wanted.has(input)))
-              picked.set(path, { path, inputs, text: text.slice(0, 24_000) });
+              picked.set(path, { path, inputs, text: text.slice(0, 96_000) });
           },
         );
         return {

@@ -5,8 +5,10 @@ import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { gzipSync } from "node:zlib";
 
-const [scratch, beforePath, afterPath, prefix, seed, sizeText, ...pins] =
+const [scratch, beforePath, afterPath, prefix, seed, sizeText, ...selection] =
   process.argv.slice(2);
+const drawMarked = selection.includes("--marked");
+const pins = selection.filter((value) => value !== "--marked");
 const size = Number(sizeText);
 if (!seed || !Number.isSafeInteger(size) || size < 0)
   throw Error("Expected SCRATCH BEFORE AFTER PREFIX SEED SIZE [PIN…]");
@@ -162,7 +164,12 @@ for (const repo of read(beforePath).repos) {
           },
         ]);
       }
-      if (!updated || level2(old) || !level2(updated)) continue;
+      if (
+        !updated ||
+        !level2(updated) ||
+        (drawMarked ? !entryAssumed(updated) : level2(old))
+      )
+        continue;
       const note = noteOf(updated);
       const proof = note?.proof ?? "unmarked";
       count.gainsByProof[proof] = (count.gainsByProof[proof] ?? 0) + 1;

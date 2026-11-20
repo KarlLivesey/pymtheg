@@ -1,0 +1,130 @@
+[
+  {
+    "pin": "changesets/changesets",
+    "built": 0,
+    "ignoreMatch": 0,
+    "ignoredUntracked": 0,
+    "declarationMap": 0,
+    "builtOrIgnored": 0
+  },
+  {
+    "pin": "dexie/Dexie.js",
+    "built": 0,
+    "ignoreMatch": 0,
+    "ignoredUntracked": 0,
+    "declarationMap": 0,
+    "builtOrIgnored": 0
+  },
+  {
+    "pin": "excalidraw/excalidraw",
+    "built": 0,
+    "ignoreMatch": 0,
+    "ignoredUntracked": 0,
+    "declarationMap": 0,
+    "builtOrIgnored": 0
+  },
+  {
+    "pin": "honojs/hono",
+    "built": 0,
+    "ignoreMatch": 0,
+    "ignoredUntracked": 0,
+    "declarationMap": 0,
+    "builtOrIgnored": 0
+  },
+  {
+    "pin": "mermaid-js/mermaid",
+    "built": 0,
+    "ignoreMatch": 0,
+    "ignoredUntracked": 0,
+    "declarationMap": 0,
+    "builtOrIgnored": 0
+  },
+  {
+    "pin": "nestjs/nest",
+    "built": 0,
+    "ignoreMatch": 0,
+    "ignoredUntracked": 0,
+    "declarationMap": 0,
+    "builtOrIgnored": 0
+  },
+  {
+    "pin": "oclif/core",
+    "built": 0,
+    "ignoreMatch": 0,
+    "ignoredUntracked": 0,
+    "declarationMap": 0,
+    "builtOrIgnored": 0
+  },
+  {
+    "pin": "pmndrs/zustand",
+    "built": 0,
+    "ignoreMatch": 0,
+    "ignoredUntracked": 0,
+    "declarationMap": 0,
+    "builtOrIgnored": 0
+  },
+  {
+    "pin": "puppeteer/puppeteer",
+    "built": 0,
+    "ignoreMatch": 0,
+    "ignoredUntracked": 0,
+    "declarationMap": 0,
+    "builtOrIgnored": 0
+  },
+  {
+    "pin": "react-hook-form/react-hook-form",
+    "built": 0,
+    "ignoreMatch": 0,
+    "ignoredUntracked": 0,
+    "declarationMap": 0,
+    "builtOrIgnored": 0
+  },
+  {
+    "pin": "reduxjs/redux-toolkit",
+    "built": 0,
+    "ignoreMatch": 0,
+    "ignoredUntracked": 0,
+    "declarationMap": 0,
+    "builtOrIgnored": 0
+  },
+  {
+    "pin": "trpc/trpc",
+    "built": 0,
+    "ignoreMatch": 0,
+    "ignoredUntracked": 0,
+    "declarationMap": 0,
+    "builtOrIgnored": 0
+  },
+  {
+    "pin": "vitejs/vite",
+    "built": 0,
+    "ignoreMatch": 0,
+    "ignoredUntracked": 0,
+    "declarationMap": 0,
+    "builtOrIgnored": 0
+  },
+  {
+    "pin": "vitest-dev/vitest",
+    "built": 0,
+    "ignoreMatch": 0,
+    "ignoredUntracked": 0,
+    "declarationMap": 0,
+    "builtOrIgnored": 0
+  },
+  {
+    "pin": "withastro/astro",
+    "built": 0,
+    "ignoreMatch": 10,
+    "ignoredUntracked": 0,
+    "declarationMap": 0,
+    "builtOrIgnored": 10
+  },
+  {
+    "pin": "yargs/yargs",
+    "built": 0,
+    "ignoreMatch": 0,
+    "ignoredUntracked": 0,
+    "declarationMap": 0,
+    "builtOrIgnored": 0
+  }
+]

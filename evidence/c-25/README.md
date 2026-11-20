@@ -60,8 +60,9 @@ the same seed and a limit above the population. Run
 `assumption-exclusions.mjs SCRATCH BUILD RECEIPT OLD_DRAW MARKED_DRAW`
 against the candidate's snapshot. It joins the original sites to the
 marked sites and reads the candidate's captured build guards to assign
-exclusions. Use the seeded 60-site installed draw with `emit-check.mjs`
-for the audit.
+exclusions. To audit the current marks, use `compare.mjs` with the installed
+receipt in both positions and `--marked` after the seed and size. Pass
+the resulting 60-site draw to `emit-check.mjs`.
 
 `built-targets.mjs SCRATCH INSTALLED_RECEIPT` counts checkout destinations
 at compiler output paths, destinations whose path matches Git ignore
