@@ -1,3 +1,9 @@
+# C-24 cold index cost
+
+## Four merged sweeps side by side (one session, same storage)
+
+From [cost.mjs](cost.mjs) on the sweep results (three main runs, one branch run).
+
 | Pin | Main CPU s (3 runs) | C-24 CPU s | vs main mean | Main peak RSS MiB | C-24 peak RSS MiB | vs main mean |
 | --- | --- | ---: | ---: | --- | ---: | ---: |
 | BurntSushi/ripgrep | 78.2 / 79.0 / 74.6 | 64.0 | -17.2% | 779 / 747 / 744 | 833 | 10.1% |
@@ -19,3 +25,25 @@
 | tokio-rs/axum | 88.9 / 91.3 / 91.3 | 86.2 | -4.8% | 971 / 920 / 904 | 973 | 4.4% |
 | tree-sitter/tree-sitter | 108.6 / 110.5 / 100.7 | 101.6 | -4.6% | 1127 / 1103 / 1133 | 1126 | 0.4% |
 | **All pins** | **2888 (mean)** | **2747** | **-4.9%** | **18376 (sum of means)** | **18416** | **0.2%** |
+
+## Controlled sequential runs
+
+From [cost-runs.sh](cost-runs.sh): main, branch, main, each a cold index of the same checkout copy under its own project id. CPU is user + system seconds; RSS is peak KiB.
+
+```
+alacritty main2 cpu=61.56 wall=0:57.08 rss_kib=757424
+alacritty c24e cpu=60.88 wall=0:58.67 rss_kib=770020
+alacritty main2 cpu=62.75 wall=0:56.07 rss_kib=771004
+rustls main2 cpu=217.37 wall=3:25.62 rss_kib=1496244
+rustls c24e cpu=206.27 wall=3:04.28 rss_kib=1440780
+rustls main2 cpu=195.92 wall=2:49.13 rss_kib=1591572
+```
+
+## Canonical order
+
+From [order-cost.mjs](order-cost.mjs), five repeats on finished stores:
+
+```
+dioxus      {"files":884,"symbols":16657,"links":149377,"milliseconds":[285,357,263,289,289]}
+tree-sitter {"files":113,"symbols":3981,"links":54637,"milliseconds":[87,78,78,79,79]}
+```
