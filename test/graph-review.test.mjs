@@ -42,6 +42,19 @@ async function sandbox(run) {
 }
 const registry = () => new LanguageRegistry([toy]);
 
+/**
+ * The database file without SQLite's file change counter (header bytes
+ * 24-27 and its copy at 92-95): an index run chooses the journal before it
+ * reads (C-22), which counts as a change of the file even when it writes no
+ * row. Every other byte must be as it was.
+ */
+const withoutChangeCounter = (bytes) => {
+  const copy = Buffer.from(bytes);
+  copy.fill(0, 24, 28);
+  copy.fill(0, 92, 96);
+  return copy;
+};
+
 test("A1: edits above a symbol preserve IDs; repeated identities use source-order ordinals", async () => {
   await sandbox(async ({ root, store }) => {
     await writeFile(join(root, "lib.toy"), "def helper\ncall helper\n");
@@ -341,7 +354,10 @@ test("A3: snapshot compiler resolves alias and barrel on cold reopen, then confi
       assert.equal(cold.length, 1);
       assert.deepEqual(cold[0].changed, []);
       assert.equal(reopened.links()[0].targetId, api.id);
-      assert.deepEqual(await readFile(database), bytes);
+      assert.deepEqual(
+        withoutChangeCounter(await readFile(database)),
+        withoutChangeCounter(bytes),
+      );
       await writeFile(
         join(root, "tsconfig.json"),
         JSON.stringify({

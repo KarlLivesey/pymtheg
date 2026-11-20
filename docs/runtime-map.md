@@ -1642,17 +1642,21 @@ analyses it again (C-22).
 `index-run`) in the same commit as its first write, together with removing
 the completion record, and clears the mark in its last commit; a run that
 writes nothing writes no mark. The mark holds the run's identifier: a run
-begins before it reads the store and takes over a mark it finds; its first
-write proves no other connection committed since it began, each later
-commit that the mark is still its own, or it stops with
-`GraphIndexTakenOver` without writing; it clears only its own mark. The
-command path writes the completion record only when it would differ and
-only if no other connection committed since the run's last commit, so a
-no-edit `graph index` leaves the database bytes unchanged. Commits survive a
+chooses the journal first, then reads its data-version baseline and the
+mark in one read transaction, and takes over a mark it finds; every
+check-and-write is one `BEGIN IMMEDIATE` transaction in which its first
+write proves the version is still the baseline, each later commit that the
+mark is still its own, or it stops with `GraphIndexTakenOver` without
+writing, and the version is re-read before the commit; it clears only its
+own mark. The completion record is written only when it would differ and
+only if, under its write lock, no other connection committed since the
+run's last commit; otherwise the same transaction marks the store
+unfinished. A no-edit `graph index` writes no row; choosing the journal
+advances only SQLite's file change counter (header bytes 24-27, 92-95). Commits survive a
 crash only as a prefix, so any surviving write of a run has the mark with
-it. A run that finds the mark counts every claimed file and every context
-file as changed, so no module reuses stored analysis; parse results stay
-cached by content hash. `graphCommandState()` returns nothing while the
+it. A run that finds the mark parses and writes every claimed file again
+and counts every context file as changed, so no module reuses stored
+analysis and every row is rewritten. `graphCommandState()` returns nothing while the
 mark is set, so `graph status` does not report complete.
 
 Queries: `pymtheg graph uses UNIT [SYMBOL]` and MCP `code_graph` action `uses`

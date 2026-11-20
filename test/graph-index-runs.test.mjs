@@ -23,9 +23,23 @@ import {
   SqliteGraphStore,
 } from "../dist/graph/index.js";
 import { compareRows, storeRows } from "../scripts/reindex/dump.mjs";
+import { DatabaseSync } from "node:sqlite";
 
 const production = await discoverLanguages();
 const taken = /Another graph index run started on this store and took it over/;
+
+/**
+ * The database file without SQLite's file change counter (header bytes
+ * 24-27 and its copy at 92-95): an index run chooses the journal before it
+ * reads (C-22), which counts as a change of the file even when it writes no
+ * row. Every other byte must be as it was.
+ */
+const withoutChangeCounter = (bytes) => {
+  const copy = Buffer.from(bytes);
+  copy.fill(0, 24, 28);
+  copy.fill(0, 92, 96);
+  return copy;
+};
 
 /** A gate: `wait()` blocks until `open()`; `reached` resolves on arrival. */
 function gate() {
@@ -167,14 +181,16 @@ test("A paused before writing; B completes; A resumes: A writes nothing, the sto
     await indexProject(root, production, storeB);
     const projectId = storeB.projectId;
     storeB.close();
-    const bytes = readFileSync(graph);
+    // Rows, not bytes: A's connection holds the write-ahead log open, so
+    // the file's journal format depends on which connection closes last.
+    const rows = storeRows(graph);
     held.open();
     // A either stops at its first write, or finds nothing to write.
     const [settled] = await Promise.allSettled([runA]);
     if (settled.status === "rejected")
       assert.match(settled.reason.message, taken);
     storeA.close();
-    assert.deepEqual(readFileSync(graph), bytes, "A wrote nothing");
+    assert.deepEqual(storeRows(graph), rows, "A wrote nothing");
     assert.equal(goneTarget(graph), null);
     assert.deepEqual(
       compareRows(storeRows(graph), await cold(base, root, projectId)),
@@ -260,7 +276,7 @@ test("graph index launched twice at once from the command path: one completes, t
   }
 });
 
-test("a no-edit graph index through the command path leaves the database bytes as they were", async () => {
+test("a no-edit graph index through the command path leaves every database byte but the change counter as it was", async () => {
   const { base, root } = project();
   try {
     assert.equal(
@@ -271,7 +287,62 @@ test("a no-edit graph index through the command path leaves the database bytes a
     const bytes = readFileSync(graph);
     const again = await executeGraph({ command: "index", root });
     assert.equal(again.sync.complete, true);
-    assert.deepEqual(readFileSync(graph), bytes);
+    assert.deepEqual(
+      withoutChangeCounter(readFileSync(graph)),
+      withoutChangeCounter(bytes),
+    );
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+// Known limit (C-22): another connection running `wal_checkpoint(TRUNCATE)`
+// during a run advances the data version and makes the run stop as
+// overtaken although no data changed (it can be retried). A FULL checkpoint,
+// a read-only status and a query that does not sync change nothing a run
+// relies on: the run goes on and completes.
+test("a FULL checkpoint, a status and a no-sync query by other connections do not stop a run", async () => {
+  const { base, root } = project();
+  try {
+    assert.equal(
+      (await executeGraph({ command: "index", root })).sync.complete,
+      true,
+    );
+    writeFileSync(join(root, "src/a.ts"), "// moved\n" + a);
+    const held = gate();
+    const run = executeGraph(
+      { command: "index", root },
+      { registry: pausing([held]) },
+    );
+    await held.reached;
+    const graph = join(root, ".pymtheg/rebuildable/graph.sqlite");
+    const other = new DatabaseSync(graph);
+    try {
+      const checkpoint = other.prepare("PRAGMA wal_checkpoint(FULL)").get();
+      assert.equal(checkpoint.busy, 0);
+    } finally {
+      other.close();
+    }
+    assert.equal(
+      (await executeGraph({ command: "status", root })).sync.complete,
+      false,
+    );
+    await executeGraph({
+      command: "search",
+      args: ["hello"],
+      root,
+      noSync: true,
+    });
+    held.open();
+    const answer = await run;
+    assert.equal(answer.sync.complete, true);
+    assert.deepEqual(
+      compareRows(
+        storeRows(graph),
+        await cold(base, root, storeRows(graph).project[0]),
+      ),
+      [],
+    );
   } finally {
     rmSync(base, { recursive: true, force: true });
   }

@@ -53,29 +53,11 @@ export class SqliteGraphStore implements GraphStorage {
    */
   private beforeWrite(): void {
     if (this.path === undefined || this.db.isTransaction) return;
-    // Choosing the journal changes this connection's data version without
-    // any other connection committing: the value just before stands for the
-    // value just after (C-22, `sameVersion`).
-    const before = this.commandDataVersion();
     this.writeAheadLog =
       this.sqliteVersion === undefined
         ? openWriteAheadLog(this.db, this.path)
         : openWriteAheadLog(this.db, this.path, this.sqliteVersion);
     this.path = undefined;
-    const after = this.commandDataVersion();
-    if (after !== before) this.versionAlias = { from: before, to: after };
-  }
-  private versionAlias: { from: number; to: number } | undefined;
-  /**
-   * Whether no other connection has committed since this connection read
-   * data version `expected` (its own journal choice aside).
-   */
-  private sameVersion(expected: number): boolean {
-    const now = this.commandDataVersion();
-    return (
-      now === expected ||
-      (this.versionAlias?.from === expected && now === this.versionAlias.to)
-    );
   }
   /**
    * Known to have library targets (schema 4). A graph never returns to
@@ -299,7 +281,7 @@ export class SqliteGraphStore implements GraphStorage {
       // nothing more.
       if (run.state === "pending") {
         if (
-          !this.sameVersion(run.version) ||
+          this.commandDataVersion() !== run.version ||
           (!run.takeOver && this.indexRunMark() !== undefined)
         )
           throw new GraphIndexTakenOver();
@@ -315,13 +297,17 @@ export class SqliteGraphStore implements GraphStorage {
         if (this.indexRunMark() !== run.id) throw new GraphIndexTakenOver();
         // A writer that is not an index run: this run's result is no longer
         // its own, so it publishes no completion.
-        if (!this.sameVersion(run.version)) run.interleaved = true;
+        if (this.commandDataVersion() !== run.version) run.interleaved = true;
       }
       action();
+      // Read under the write lock, before the commit: this connection's own
+      // commit does not change it, another connection's later one does.
+      const version =
+        run.state === "idle" ? undefined : this.commandDataVersion();
       this.db.exec("COMMIT");
       if (run.state !== "idle") {
         run.state = "written";
-        run.version = this.commandDataVersion();
+        run.version = version!;
       }
     } catch (error) {
       this.db.exec("ROLLBACK");
@@ -975,11 +961,23 @@ export class SqliteGraphStore implements GraphStorage {
    * true, and must treat everything as changed.
    */
   beginIndexRun(): boolean {
-    const takeOver = this.unfinishedIndexRun();
+    // The journal is chosen first: nothing this run does after the baseline
+    // below changes the data version except its own commits (C-22).
+    this.beforeWrite();
+    // The baseline and the mark are one read snapshot.
+    let version: number;
+    let takeOver: boolean;
+    this.db.exec("BEGIN");
+    try {
+      version = this.commandDataVersion();
+      takeOver = this.unfinishedIndexRun();
+    } finally {
+      this.db.exec("COMMIT");
+    }
     this.indexRun = {
       state: "pending",
       id: randomUUID(),
-      version: this.commandDataVersion(),
+      version,
       takeOver,
       interleaved: false,
     };
@@ -991,17 +989,21 @@ export class SqliteGraphStore implements GraphStorage {
   finishIndexRun(): void {
     const run = this.indexRun;
     try {
+      // A run another connection wrote into keeps its mark: the next run
+      // redoes everything.
       if (run.state === "written")
         this.transaction(() => {
-          this.db.prepare("DELETE FROM graph_meta WHERE key='index-run'").run();
+          if (!run.interleaved)
+            this.db
+              .prepare("DELETE FROM graph_meta WHERE key='index-run'")
+              .run();
         });
       // What the run read and wrote is current while no other connection
-      // commits: from its beginning if it wrote nothing, else from its end.
+      // commits after the version taken under its last write lock (or at
+      // its beginning if it wrote nothing); the completion checks it under
+      // its own write lock.
       if (run.state !== "idle")
-        this.finishedVersion =
-          run.interleaved || !this.sameVersion(run.version)
-            ? Number.NaN
-            : this.commandDataVersion();
+        this.finishedVersion = run.interleaved ? Number.NaN : run.version;
     } finally {
       this.indexRun = { state: "idle" };
     }
@@ -1014,7 +1016,7 @@ export class SqliteGraphStore implements GraphStorage {
   private finishedRunCurrent(): boolean {
     return (
       this.finishedVersion === undefined ||
-      this.sameVersion(this.finishedVersion)
+      this.commandDataVersion() === this.finishedVersion
     );
   }
   commandDataVersion(): number {
@@ -1032,7 +1034,8 @@ export class SqliteGraphStore implements GraphStorage {
     if (
       same &&
       this.finishedRunCurrent() &&
-      (expectedVersion === undefined || this.sameVersion(expectedVersion))
+      (expectedVersion === undefined ||
+        this.commandDataVersion() === expectedVersion)
     )
       return true;
     this.beforeWrite();
@@ -1048,9 +1051,20 @@ export class SqliteGraphStore implements GraphStorage {
       this.transaction(() => {
         if (
           !this.finishedRunCurrent() ||
-          (expectedVersion !== undefined && !this.sameVersion(expectedVersion))
-        )
+          (expectedVersion !== undefined &&
+            this.commandDataVersion() !== expectedVersion)
+        ) {
+          // Another connection committed after the run's last write: what
+          // is stored is no longer only the run's. Marked unfinished, in the
+          // same locked transaction, so the next run redoes everything
+          // (C-22).
+          this.db
+            .prepare(
+              "INSERT INTO graph_meta VALUES ('index-run','interleaved') ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            )
+            .run();
           return;
+        }
         this.db
           .prepare(
             "INSERT INTO graph_meta VALUES ('command-complete',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",

@@ -238,6 +238,9 @@ export async function indexProject(
     const source = captures.get(path)!;
     const old = previous.get(path);
     if (
+      // After an unfinished run every record is written again: any row of
+      // the store may be one the unfinished run, or another writer, left.
+      !unfinished &&
       source.status === "clean" &&
       old?.hash === source.hash &&
       old.module === module.id &&
@@ -277,7 +280,7 @@ export async function indexProject(
     changed.add(path);
   }
   // After an unfinished run every claimed file counts as changed, so no
-  // module reuses an earlier analysis; parse results stay valid per hash.
+  // module reuses an earlier analysis.
   if (unfinished) for (const path of claims.keys()) changed.add(path);
   await stage("store.writeParsed", async () => {
     await store.replaceContexts([

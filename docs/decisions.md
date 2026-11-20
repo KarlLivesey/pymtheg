@@ -2979,11 +2979,15 @@ the next run re-analyses
 (another install hard-linking the same pnpm store file changed its ctime and
 made it absent, so a warm sweep index lost `expect-type` declarations; a
 first fix let two programs of one run see different bytes). An index run
-marks the store with its own identifier in its first write's commit, proves
-at every later commit that the mark is still its own (an overtaken run stops
-without writing), and clears only its own mark in its last commit; a no-edit
-`graph index` through the command path writes nothing; a run that finds the mark reuses no stored analysis, and the graph
-is not complete while it is set. **Trade:** after a crash or kill the next
-index re-analyses every module in full once (today's cost of a changed
-`tsconfig.json`); a per-file record of which snapshot its analysis came
-from would narrow that and is not built. [C-22](changes/C-22.md)
+chooses the journal before its data-version baseline, marks the store with
+its own identifier in its first write's commit, proves under the write lock
+at every commit that no other run has written (an overtaken run stops
+without writing), and clears only its own mark in its last commit; the
+completion is re-checked under its own write lock; a no-edit `graph index`
+writes no row (it advances only SQLite's file change counter); a run that finds the mark rewrites every record and reuses no stored
+analysis, and the graph is not complete while it is set. **Trade:** after a
+crash, a kill or a refused completion the next index redoes everything once
+(the cost of a cold index of the same files); a per-file record of which
+snapshot each record came from would narrow that and is not built. Another
+connection's `wal_checkpoint(TRUNCATE)` during a run stops it as overtaken
+(a safe false alarm; no product path does it). [C-22](changes/C-22.md)
