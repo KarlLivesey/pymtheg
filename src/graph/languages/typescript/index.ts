@@ -13,7 +13,9 @@ import type {
   ParseResult,
 } from "../../types.js";
 import { CheckerLimit, extractFile, type TargetFact } from "./extract.js";
+import { nonReturningFlow } from "./flow.js";
 import { libraryKey, libraryReader } from "./library.js";
+import type { ProjectGroup } from "./project.js";
 import type { Renamed } from "./rename.js";
 import { markTaintExhausted, setTaintBudget, taintExhausted } from "./taint.js";
 import { neutralizeAssumed } from "./untrusted.js";
@@ -107,7 +109,7 @@ import {
  * facts; resolve maps those facts to symbol IDs. See docs/changes/W2-D.md.
  */
 // Bump the leading number whenever extraction or resolution semantics change.
-const MODULE_VERSION = `38+typescript-${ts.version}`;
+const MODULE_VERSION = `39+typescript-${ts.version}`;
 
 /** Observation counters for tests (programs built, files extracted). Not a correctness input. */
 export const statistics = {
@@ -174,6 +176,11 @@ function openSession(
       ) => boolean)
     | undefined,
   hooks: TypeScriptModuleOptions,
+  /**
+   * Files this program loads from other projects that the compiler failed
+   * on there: they count toward this program's cap too.
+   */
+  inherited: () => number = () => 0,
 ): Session {
   let host = makeHost();
   /**
@@ -285,7 +292,7 @@ function openSession(
     // Already failed (by the cap, say): neither counted nor relabelled.
     if (failures.has(path)) return;
     failures.set(path, message);
-    if (++compilerFailures < MAX_COMPILER_FAILURES) return;
+    if (++compilerFailures + inherited() < MAX_COMPILER_FAILURES) return;
     for (const root of roots()) {
       const other = root.slice(1);
       if (!failures.has(other))
@@ -294,6 +301,31 @@ function openSession(
           `${COMPILER_FAILURE}: the compiler threw on ${MAX_COMPILER_FAILURES} files of this project, so the rest were not analysed`,
         );
     }
+  };
+  /** Flow-graph answers per flow node, kept across this session's builds. */
+  const flowMemo = new WeakMap<object, boolean>();
+  /** Source files already checked for non-returning flow. */
+  const flowChecked = new WeakSet<ts.SourceFile>();
+  /** Fails the captured files whose flow analysis would not return; true if any. */
+  const failNonReturning = (program: ts.Program): boolean => {
+    let failedAny = false;
+    for (const source of program.getSourceFiles()) {
+      const path = fromVirtual(source.fileName);
+      if (path === undefined || !captured.has(path) || flowChecked.has(source))
+        continue;
+      flowChecked.add(source);
+      const at = nonReturningFlow(source, flowMemo);
+      if (!at) continue;
+      const { line, character } = source.getLineAndCharacterOfPosition(
+        at.getStart(source),
+      );
+      failCompiler(
+        path,
+        `${COMPILER_FAILURE}: its control-flow analysis would not return (the compiler follows a cycle of flow nodes from line ${line + 1}, column ${character + 1} without a limit)`,
+      );
+      failedAny = true;
+    }
+    return failedAny;
   };
   /**
    * The root whose addition makes building the program throw (not a stack
@@ -380,6 +412,9 @@ function openSession(
       }
       // A file failed by the syntax phase is absent from the next build.
       if (validate?.(compiled.program, failCompiler)) continue;
+      // A file whose flow analysis would not return (flow.ts) fails before
+      // any checker query reaches it, and the program is built without it.
+      if (failNonReturning(compiled.program)) continue;
       const failedWarm = warmProgram(compiled.program, compiled.checker);
       if (failedWarm === undefined) return compiled;
       // The compiler threw while checking this file: the checker is
@@ -877,39 +912,57 @@ export function typescriptModule(
       for (const [path, message] of model.failures)
         results.push({ path, result: failed(message) });
       const tiedResults = new Map<string, ParseResult[]>();
+      /** Projects analysed so far: the captured files their programs loaded. */
+      const loadedBy = new Map<ProjectGroup, Set<string>>();
       const deliver = (path: string, result: ParseResult) => {
         if (model.ties.has(path))
           tiedResults.set(path, [...(tiedResults.get(path) ?? []), result]);
         else results.push({ path, result });
       };
       /**
-       * A file of an earlier project that the compiler threw on while a
-       * later one was analysed: its published result becomes the failed-file
-       * result, and published links that target it are `target-unavailable`.
+       * One rule for a file the compiler threw on while a later project was
+       * analysed, when earlier projects had already published or read it:
+       * the store has one result per file, so it is failed for the store.
+       * Its published result becomes the failed-file result; published links
+       * that target it are `target-unavailable`; and every other link of a
+       * project whose program read it is flagged
+       * `no-unseen-declarations` (computed with a file the store now calls
+       * unreadable: unverified, W2-D).
        */
       const retract = (path: string, message: string) => {
-        const redecide = (result: ParseResult): ParseResult =>
-          result.status === "failed"
-            ? result
-            : {
-                ...result,
-                links: result.links.map((link) => {
-                  const data = (link.data ?? {}) as {
-                    [key: string]: Json;
-                  };
-                  const targets = (data.targets ??
-                    []) as unknown as TargetFact[];
-                  if (!targets.some((target) => target.file === path))
-                    return link;
-                  const next: { [key: string]: Json } = {
-                    ...data,
-                    reason: "target-unavailable",
-                  };
-                  delete next.targets;
-                  delete next.libraryFacts;
-                  return { ...link, data: next };
-                }),
-              };
+        const readers = new Set<string | null>();
+        for (const [group, loaded] of loadedBy)
+          if (loaded.has(path)) readers.add(group.config);
+        const redecide = (result: ParseResult): ParseResult => {
+          if (result.status === "failed") return result;
+          const project = (result.data as { project?: string | null })?.project;
+          const read = project !== undefined && readers.has(project);
+          return {
+            ...result,
+            links: result.links.map((link) => {
+              const data = (link.data ?? {}) as { [key: string]: Json };
+              const targets = (data.targets ?? []) as unknown as TargetFact[];
+              if (targets.some((target) => target.file === path)) {
+                const next: { [key: string]: Json } = {
+                  ...data,
+                  reason: "target-unavailable",
+                };
+                delete next.targets;
+                delete next.libraryFacts;
+                return { ...link, data: next };
+              }
+              if (
+                !read ||
+                link.kind === "contains" ||
+                data.reason === "invalid-code"
+              )
+                return link;
+              const next = { ...data };
+              assume(next, "no-unseen-declarations");
+              return { ...link, data: next };
+            }),
+          };
+        };
         for (const item of results)
           item.result =
             item.path === path ? failed(message) : redecide(item.result);
@@ -925,10 +978,24 @@ export function typescriptModule(
         if (!group.roots.length) continue;
         const roots = () =>
           group.roots.filter((root) => !model.parseFailures.has(root.slice(1)));
+        const ownRoots = new Set(group.roots.map((root) => root.slice(1)));
+        let latestHost: ts.CompilerHost | undefined;
+        /** Compiler failures of other projects that this program loads. */
+        const inherited = () => {
+          if (!latestHost) return 0;
+          let count = 0;
+          for (const path of model.requested(latestHost))
+            if (
+              !ownRoots.has(path) &&
+              model.parseFailures.get(path)?.startsWith(COMPILER_FAILURE)
+            )
+              count++;
+          return count;
+        };
         let normal: Session | undefined = openSession(
           roots,
           group.options,
-          () => model.host(group),
+          () => (latestHost = model.host(group)),
           model.parseFailures,
           captured,
           group.references,
@@ -958,6 +1025,7 @@ export function typescriptModule(
             return failedAny;
           },
           hooks,
+          inherited,
         );
         if (model.dependencyLimit(group)) {
           for (const root of group.roots)
@@ -1157,8 +1225,7 @@ export function typescriptModule(
               session.drop(blamed, outcome.assertion);
               if (session === normal) {
                 markUnseen(blamed);
-                if (!group.roots.includes(toVirtual(blamed)))
-                  retract(blamed, outcome.assertion);
+                retract(blamed, outcome.assertion);
               }
               if (blamed !== path) continue;
               return failed(outcome.assertion);
@@ -1260,6 +1327,18 @@ export function typescriptModule(
               neutralizeAssumed(source.text, offsets, model.fresh.uncertain),
             );
         }
+        loadedBy.set(
+          group,
+          new Set(
+            normal.program
+              .getSourceFiles()
+              .map((source) => fromVirtual(source.fileName))
+              .filter(
+                (path): path is string =>
+                  path !== undefined && captured.has(path),
+              ),
+          ),
+        );
         // The differential pass shares the original parse cache. Its lookups
         // do not need the original program or checker.
         baseHost = normal.host;
