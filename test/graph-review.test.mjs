@@ -44,12 +44,15 @@ const registry = () => new LanguageRegistry([toy]);
 
 /**
  * The database file without SQLite's file change counter (header bytes
- * 24-27 and its copy at 92-95): an index run chooses the journal before it
- * reads (C-22), which counts as a change of the file even when it writes no
- * row. Every other byte must be as it was.
+ * 24-27 and its copy at 92-95) and its journal format bytes (18-19): an
+ * index run chooses the journal before it reads (C-22), which counts as a
+ * change of the file even when it writes no row, and the file shows the
+ * write-ahead-log format while that connection is open. Every other byte
+ * must be as it was.
  */
 const withoutChangeCounter = (bytes) => {
   const copy = Buffer.from(bytes);
+  copy.fill(0, 18, 20);
   copy.fill(0, 24, 28);
   copy.fill(0, 92, 96);
   return copy;
