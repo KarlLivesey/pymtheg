@@ -5,7 +5,16 @@ import {
   macroScopeAssumption,
   macroScopeAssumptionText,
 } from "../graph/languages/rust/macro-scope.js";
+import {
+  unbuiltEntryAssumption,
+  unbuiltEntryAssumptionText,
+} from "../graph/languages/typescript/entry-build.js";
 import { textPage } from "./text-pages.js";
+
+const assumptionDescriptions = new Map([
+  [macroScopeAssumption, macroScopeAssumptionText],
+  [unbuiltEntryAssumption, unbuiltEntryAssumptionText],
+]);
 
 const record = (v: unknown): Record<string, any> =>
   v && typeof v === "object" && !Array.isArray(v)
@@ -372,8 +381,8 @@ export class GraphView {
           code = `r${this.reasonCodes.size + 1}`;
           this.reasonCodes.set(key, code);
           const description =
-            field === "assumes" && v === macroScopeAssumption
-              ? macroScopeAssumptionText
+            field === "assumes" && typeof v === "string"
+              ? assumptionDescriptions.get(v)
               : undefined;
           this.tables.legend!.push({
             code,

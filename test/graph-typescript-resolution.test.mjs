@@ -13,6 +13,7 @@ import typescript, {
   statistics,
 } from "../dist/graph/languages/typescript/index.js";
 import tsCompiler from "typescript";
+import { GraphView } from "../dist/mcp/graph-view.js";
 
 // Resolution rules of the TypeScript/JavaScript module: each rule has a positive
 // case, a look-alike negative case and, where relevant, an ambiguous case.
@@ -2952,16 +2953,21 @@ test("a tsup CLI entry can override the manifest entry", async () => {
       "packages/lib/package.json": JSON.stringify({
         name: "fixture-library",
         type: "module",
-        exports: "./generated/public.js",
+        exports: {
+          types: "./generated/public.d.ts",
+          default: "./generated/public.js",
+        },
         scripts: { build: "tsup src/alternate/index.ts" },
         tsup: {
-          entry: { public: "src/private.ts" },
+          entry: { public: "src/public.ts" },
           outDir: "generated",
           format: ["esm"],
           bundle: false,
         },
       }),
-      "packages/lib/src/private.ts": "export function open() {}",
+      "packages/lib/tsconfig.json":
+        '{"compilerOptions":{"rootDir":"src","outDir":"generated","declaration":true},"files":["src/public.ts"]}',
+      "packages/lib/src/public.ts": "export function open() {}",
       "packages/lib/src/alternate/index.ts": "export function other() {}",
       "use.ts": 'import { open } from "fixture-library"; open();',
     },
@@ -2969,17 +2975,21 @@ test("a tsup CLI entry can override the manifest entry", async () => {
       clean(report);
       const call = graph.link("use.ts", "open", "calls");
       assert.equal(call.resolution, "unresolved");
-      assert.equal(call.data.reason, "workspace-entry-unavailable");
+      assert.equal(call.data.reason, "workspace-build-output-missing");
+      assert.equal(call.data.assumes, undefined);
     },
   );
 });
 
-test("only the package's plain compiler build can prove a declaration entry", async () => {
+test("plain builds prove a declaration entry, and visible rollups and rewrites rule out the assumption", async () => {
   const variants = {
     plain: { build: "rm -rf dist && tsc --build tsconfig.build.json" },
     bundled: {
       build: "tsc -p tsconfig.build.json && api-extractor run --local",
     },
+    generated: { build: "dts-bundle-generator src/index.ts" },
+    rollup: { build: "rollup -c" },
+    wrapped: { build: "wireit" },
     rewritten: {
       build: "tsc -p tsconfig.build.json",
       postbuild: "node rewrite.mjs",
@@ -3011,7 +3021,13 @@ test("only the package's plain compiler build can prove a declaration entry", as
         "/** @internal */ export function open() {}",
       "packages/bundled/api-extractor.json":
         '{"mainEntryPointFilePath":"<projectFolder>/dist/index.d.ts","dtsRollup":{"enabled":true,"publicTrimmedFilePath":"<projectFolder>/dist/index.d.ts"}}',
+      "packages/rollup/rollup.config.mjs":
+        'import dts from "rollup-plugin-dts"; export default { input: "src/index.ts", plugins: [dts()] };',
+      "packages/wrapped/package.json":
+        '{"name":"wrapped","types":"./dist/index.d.ts","scripts":{"build":"wireit"},"wireit":{"build":{"command":"tsc -b","output":["dist/**"]}}}',
       "packages/rewritten/rewrite.mjs":
+        'import { writeFileSync } from "node:fs"; writeFileSync("dist/index.d.ts", "export declare function other(): void;");',
+      "packages/packed/rewrite.mjs":
         'import { writeFileSync } from "node:fs"; writeFileSync("dist/index.d.ts", "export declare function other(): void;");',
       "use.ts": Object.keys(variants)
         .map((name) => `import { open as ${name} } from "${name}"; ${name}();`)
@@ -3023,11 +3039,92 @@ test("only the package's plain compiler build can prove a declaration entry", as
         graph.target(graph.link("use.ts", "plain", "calls")),
         "packages/plain/src/index.ts#open",
       );
-      for (const name of ["bundled", "rewritten", "packed", "unconfigured"]) {
+      assert.equal(
+        graph.link("use.ts", "plain", "calls").data.assumes,
+        undefined,
+      );
+      const assumed = graph.link("use.ts", "unconfigured", "calls");
+      assert.equal(
+        graph.target(assumed),
+        "packages/unconfigured/src/index.ts#open",
+      );
+      assert.deepEqual(assumed.data.assumes, [
+        "ts-unbuilt-entry-is-compiler-emit",
+      ]);
+      assert.equal(
+        assumed.data.unbuiltEntry.output,
+        "packages/unconfigured/dist/index.d.ts",
+      );
+      for (const name of [
+        "bundled",
+        "generated",
+        "rollup",
+        "wrapped",
+        "rewritten",
+        "packed",
+      ]) {
         const call = graph.link("use.ts", name, "calls");
         assert.equal(call.resolution, "unresolved");
         assert.equal(call.data.reason, "workspace-build-output-missing");
+        assert.equal(call.data.assumes, undefined);
       }
+    },
+  );
+});
+
+test("a configured unbundled export records its emit assumption without replacing an existing answer", async () => {
+  await project(
+    {
+      "package.json": '{"workspaces":["packages/*"],"type":"module"}',
+      "tsconfig.json":
+        '{"compilerOptions":{"module":"NodeNext"},"files":["app.ts"]}',
+      "packages/fixture-router/package.json": JSON.stringify({
+        name: "fixture-router",
+        scripts: { build: "vp pack" },
+        exports: { "./helpers": { types: "./dist/types/helpers.d.ts" } },
+      }),
+      "packages/fixture-router/tsconfig.build.json":
+        '{"compilerOptions":{"declaration":true,"rootDir":"src","declarationDir":"dist/types","emitDeclarationOnly":true},"files":["src/helpers.ts"]}',
+      "packages/fixture-router/src/helpers.ts":
+        "export function trim() {} declare global { function routeReady(): void; interface Math { max(x: number, y: number): number; } }",
+      "app.ts":
+        'import { trim } from "fixture-router/helpers"; trim(); routeReady(); Math.max(1, 2);',
+    },
+    async (graph, report) => {
+      clean(report);
+      const call = graph.link("app.ts", "trim", "calls");
+      assert.equal(
+        graph.target(call),
+        "packages/fixture-router/src/helpers.ts#trim",
+      );
+      assert.deepEqual(call.data.assumes, [
+        "ts-unbuilt-entry-is-compiler-emit",
+      ]);
+      assert.equal(
+        call.data.unbuiltEntry.source,
+        "packages/fixture-router/src/helpers.ts",
+      );
+      assert.deepEqual(
+        graph.link("app.ts", "routeReady", "calls").data.assumes,
+        ["ts-unbuilt-entry-is-compiler-emit"],
+      );
+      const existing = graph.link("app.ts", "max", "calls");
+      assert.equal(existing.libraries[0].symbol, "Math.max");
+      assert.equal(existing.data.assumes, undefined);
+      const view = new GraphView({
+        data: { links: [call] },
+        failedFiles: [],
+        staleFiles: [],
+        warnings: [],
+        modules: [],
+        sync: {},
+      });
+      const [entry] = view.page("legend", 0, 1).items;
+      assert.equal(entry.value, "ts-unbuilt-entry-is-compiler-emit");
+      assert.match(
+        entry.description,
+        /declarations whose exports are those the TypeScript compiler would emit/,
+      );
     },
   );
 });
@@ -3057,6 +3154,7 @@ test("a JavaScript-only emit cannot lend the TypeScript source's types or values
         const link = graph.link("use.ts", name, kind);
         assert.equal(link.resolution, "unresolved");
         assert.equal(link.data.unbuiltEntry, undefined);
+        assert.equal(link.data.assumes, undefined);
       }
     },
   );

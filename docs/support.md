@@ -795,17 +795,17 @@ answer.
   selected Node types can leave both DOM and Node targets possible for a shared
   global, type name or typed member. Two test frameworks supplying the same
   global can also produce a candidate set.
-- **Unbuilt checkout packages:** TypeScript can follow a missing declaration
-  to its unique source when the captured package build is a plain `tsc`
-  command with no additional build, install or pack hooks. A plain root
-  `tsc -b` can establish the build for a referenced package with no build
-  script of its own. Normal compiler lookup handles `paths`, export
-  conditions and built entries first. A missing JavaScript-only emit stays
-  unresolved. A `stripInternal` build with captured internal annotations
-  supplies no new projection. Existing compiler-native references keep their
-  source program and withhold annotations that their declaration emit strips.
-  Followed links expose `data.unbuiltEntry` with the proof, manifest, config,
-  output and source.
+- **Unbuilt checkout packages:** The configured compiler emit can identify
+  a unique source of a missing declaration entry. A plain `tsc` build can
+  prove that mapping, including through `tsc -b` for a referenced child.
+  An unproved build yields a link carrying
+  `ts-unbuilt-entry-is-compiler-emit` in `data.assumes` if the checkout has
+  no contrary evidence. Known declaration rollups, different command-line
+  entries, entry rewrites, missing JavaScript-only emit and stripped internal
+  declarations leave the affected links unresolved. Normal compiler
+  lookup handles `paths`, export conditions and built entries first.
+  Followed links expose the manifest, config, output and source in
+  `data.unbuiltEntry`.
   [C-25](changes/C-25.md)
 - **Unresolved:** outside members whose receiver or declaration is unverified
   (`external`, `external-package`); computed `require` or `import()` specifiers;

@@ -55,15 +55,40 @@ export function installedCoverage(bare, installed) {
   const before = aggregate(rows.map(({ previous }) => previous), "typescript").weighted;
   const after = aggregate(rows.map(({ previous, repo, usable }) => usable ? repo : previous), "typescript").weighted;
   const completed = rows.filter(({ usable }) => usable).length;
+  const workspaceAssumption = rows.every(({ previous, repo, usable }) =>
+    Number.isSafeInteger(previous.unbuiltWorkspaceAssumedLinks) &&
+    (!usable || Number.isSafeInteger(repo.unbuiltWorkspaceAssumedLinks)));
+  const countAssumed = (repo) => repo.unbuiltWorkspaceAssumedLinks ?? 0;
+  const withoutWorkspaceAssumption = (score, count) =>
+    ratio(score.resolved + score.symbol - count, score.total);
+  const bareAssumed = rows.reduce((sum, { previous }) => sum + countAssumed(previous), 0);
+  const installedAssumed = rows.reduce((sum, { previous, repo, usable }) =>
+    sum + countAssumed(usable ? repo : previous), 0);
+  const workspace = workspaceAssumption ? {
+    bare: percent(withoutWorkspaceAssumption(before, bareAssumed)),
+    installed: percent(withoutWorkspaceAssumption(after, installedAssumed)),
+    bareAssumed, installedAssumed,
+  } : undefined;
   const totals = `${percent(before.level2)} bare · ${percent(after.level2)} with installed declarations · ${completed}/${rows.length} pins installed and indexed`;
   const table = [
     "", "## TypeScript installed coverage", "", totals, "",
-    "| Pin | Bare Level 2 | Installed Level 2 | Installation |",
-    "| --- | ---: | ---: | --- |",
+    ...(workspace ? [
+      `Excluding \`ts-unbuilt-entry-is-compiler-emit\` · ${workspace.bare} bare · ${workspace.installed} installed.`, "",
+      "| Pin | Bare Level 2 | Bare without entry assumption | Installed Level 2 | Installed without entry assumption | Installation |",
+      "| --- | ---: | ---: | ---: | ---: | --- |",
+    ] : [
+      "| Pin | Bare Level 2 | Installed Level 2 | Installation |",
+      "| --- | ---: | ---: | --- |",
+    ]),
     ...rows.map(({ previous, repo, usable }) => {
       const a = aggregate([previous], "typescript").weighted;
       const b = usable ? aggregate([repo], "typescript").weighted : a;
       const status = [repo.install?.manager, usable ? "installed" : repo.install?.reason ?? repo.outcome].filter(Boolean).join(" · ");
+      if (workspace) {
+        const bareRate = withoutWorkspaceAssumption(a, countAssumed(previous));
+        const installedRate = withoutWorkspaceAssumption(b, countAssumed(usable ? repo : previous));
+        return `| ${repo.id} | ${percent(a.level2)} | ${percent(bareRate)} | ${percent(b.level2)} | ${percent(installedRate)} | ${status} |`;
+      }
       return `| ${repo.id} | ${percent(a.level2)} | ${percent(b.level2)} | ${status} |`;
     }), "",
   ].join("\n");
@@ -73,7 +98,7 @@ export function installedCoverage(bare, installed) {
         installed: rows.reduce((sum, { previous, repo, usable }) => sum + ((usable ? repo : previous).unbuiltWorkspaceLinks ?? 0), 0),
       }
     : undefined;
-  return { totals, table, unbuilt };
+  return { totals, table, unbuilt, workspace };
 }
 
 function checkResult(input) {
@@ -569,6 +594,10 @@ function renderPlan(repos, baseline, items, samples, isProgress, installed) {
       lines.push(`**Paired dependency sweep** ${installed.totals}. Pins without a completed installed graph use their bare figure.`, "");
     if (module === "typescript" && installed?.unbuilt)
       lines.push(`**Through an unbuilt workspace entry, plain tsc build** · ${number(installed.unbuilt.bare)} bare · ${number(installed.unbuilt.installed)} installed.`, "");
+    if (module === "typescript" && installed?.workspace) {
+      const { bare, installed: withDependencies, bareAssumed, installedAssumed } = installed.workspace;
+      lines.push(`**Excluding \`ts-unbuilt-entry-is-compiler-emit\`** · ${bare} bare · ${withDependencies} installed. The assumption supplies ${number(bareAssumed)} bare and ${number(installedAssumed)} installed Level 2 links.`, "");
+    }
     lines.push("| Support item | Kind | Links | Repositories | Points | Running total | Examples | Status |",
       "| --- | --- | ---: | ---: | ---: | ---: | --- | --- |");
     const kind = { inside: "Inside target", library: "Library target", both: "Both" };

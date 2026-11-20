@@ -55,6 +55,8 @@ const level2 = ({ resolution, libraries }) =>
   (resolution === "library" && libraries.some((target) => target[2] !== null));
 const definite = ({ resolution }) =>
   resolution === "resolved" || resolution === "library";
+const entryAssumed = ({ data }) =>
+  data?.assumes?.includes("ts-unbuilt-entry-is-compiler-emit") ?? false;
 const answer = ({ resolution, target, libraries }) =>
   JSON.stringify([resolution, target, libraries]);
 function noteOf(link) {
@@ -96,6 +98,8 @@ for (const repo of read(beforePath).repos) {
     after: 0,
     beforeL2: 0,
     afterL2: 0,
+    beforeAssumedL2: 0,
+    afterAssumedL2: 0,
     shared: 0,
     sharedBeforeL2: 0,
     sharedAfterL2: 0,
@@ -120,6 +124,8 @@ for (const repo of read(beforePath).repos) {
     count.after += next.length;
     count.beforeL2 += previous.filter(level2).length;
     count.afterL2 += next.filter(level2).length;
+    count.beforeAssumedL2 += previous.filter((row) => level2(row) && entryAssumed(row)).length;
+    count.afterAssumedL2 += next.filter((row) => level2(row) && entryAssumed(row)).length;
     const current = Map.groupBy(next, keyOf);
     for (const old of previous) {
       const key = keyOf(old);
@@ -185,6 +191,7 @@ for (const repo of read(beforePath).repos) {
         kind: old.kind,
         name: old.name,
         offset: old.range.start,
+        site: key,
         snippet: text.split("\n")[line - 1].trim().slice(0, 180),
         prior: old.data?.reason ?? old.resolution,
         target: updated.target,
@@ -193,6 +200,7 @@ for (const repo of read(beforePath).repos) {
           ? declaration.split("\n")[targetLine - 1].trim().slice(0, 180)
           : undefined,
         note,
+        assumed: entryAssumed(updated),
         rank: createHash("sha256")
           .update(JSON.stringify([seed, repo.id, file, key]))
           .digest("hex"),

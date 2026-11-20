@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: MIT
 import { posix } from "node:path";
 import ts from "typescript";
+import { entryBuildGuards } from "./entry-build.js";
 import type { Manifest } from "./workspace.js";
 
 export interface UnbuiltEntry {
   proof: "tsconfig-emit" | "project-reference";
   build: string;
+  assumed?: true;
+  stripInternal?: true;
   config: string;
   output: string;
   source: string;
@@ -88,6 +91,7 @@ interface Config {
   path: string;
   parsed: ts.ParsedCommandLine;
   build: string;
+  assumed?: true;
   byStem?: Map<string, string[]>;
   commonRootProven?: boolean;
 }
@@ -109,9 +113,12 @@ export function workspaceEntries(
     }
   }
   const configs = new Map<string, Config[]>();
+  const plainPackages = new Set<string>();
+  const invalidBuildTrees = new Set<string>();
   for (const [root, manifest] of packages) {
     const build = plainBuild(root, manifest);
     if (!build) continue;
+    plainPackages.add(root);
     const clean = build.clean;
     if (
       clean &&
@@ -145,7 +152,10 @@ export function workspaceEntries(
       )
         selected.push({ path, parsed, build: manifest.path });
     }
-    if (!valid) continue;
+    if (!valid) {
+      if (build.build) invalidBuildTrees.add(root);
+      continue;
+    }
     for (const config of selected) {
       const owner = packageOf(config.path);
       if (owner === undefined) continue;
@@ -161,11 +171,30 @@ export function workspaceEntries(
       configs.set(owner, list);
     }
   }
+  for (const [path, parsed] of parsedConfigs) {
+    const root = packageOf(path);
+    if (
+      root === undefined ||
+      plainPackages.has(root) ||
+      (!scriptsOf(packages.get(root)!)?.build &&
+        [...invalidBuildTrees].some((parent) => below(root, parent))) ||
+      parsed.options.noEmit ||
+      !(parsed.options.declaration || parsed.options.composite) ||
+      !parsed.fileNames.length ||
+      (!parsed.options.outDir && !parsed.options.declarationDir)
+    )
+      continue;
+    const list = configs.get(root) ?? [];
+    if (list.some((config) => config.path === path)) continue;
+    list.push({ path, parsed, build: packages.get(root)!.path, assumed: true });
+    configs.set(root, list);
+  }
+  const excluded = entryBuildGuards(files, packageOf);
   const explicitTargets = new Map<
     string,
     { paths: Set<string>; patterns: string[][] }
   >();
-  let internalSources: boolean | undefined;
+  const internalSources = new Map<string, boolean>();
   const cache = new Map<string, OutputProof | null>();
   const nativeConfigs = new WeakMap<
     ts.ParsedCommandLine,
@@ -179,13 +208,13 @@ export function workspaceEntries(
   return {
     available: configs.size > 0,
     explicitEntry,
-    proof(root: string, output: string) {
+    proof(root: string, output: string, plainOnly: boolean) {
       // A missing JavaScript entry cannot be checked with the options and
       // types of the TypeScript source that would emit it.
       if (!declaration.test(output) || files.has(output)) return undefined;
-      const key = `${root}\0${output}`;
+      const key = `${root}\0${output}\0${plainOnly}`;
       if (cache.has(key)) return cache.get(key) ?? undefined;
-      const match = find(root, output);
+      const match = find(root, output, plainOnly);
       cache.set(key, match ?? null);
       return match;
     },
@@ -283,24 +312,31 @@ export function workspaceEntries(
     return true;
   }
 
-  function mayStrip() {
-    if (internalSources === undefined) {
-      internalSources = false;
-      for (const text of captured.values()) {
-        if (!text.includes("@internal")) continue;
-        internalSources = true;
-        break;
-      }
+  function mayStrip(root: string) {
+    let present = internalSources.get(root);
+    if (present === undefined) {
+      present = false;
+      for (const [path, text] of captured)
+        if (below("/" + path, root) && text.includes("@internal")) {
+          present = true;
+          break;
+        }
+      internalSources.set(root, present);
     }
-    return internalSources;
+    return present;
   }
 
-  function find(root: string, output: string): OutputProof | undefined {
+  function find(
+    root: string,
+    output: string,
+    plainOnly: boolean,
+  ): OutputProof | undefined {
     const manifest = packages.get(root);
     if (!manifest || packageOf(output) !== root) return undefined;
     const stem = posix.basename(output).replace(outputExtension, "");
     const matches: UnbuiltEntry[] = [];
     for (const config of configs.get(root) ?? []) {
+      if (plainOnly && config.assumed) continue;
       const { parsed } = config;
       const { options } = parsed;
       const folder = options.declarationDir ?? options.outDir;
@@ -331,10 +367,18 @@ export function workspaceEntries(
           if (!config.commonRootProven) return false;
         }
         // A re-export can pull in a source outside the configured input set.
-        if (options.stripInternal && mayStrip()) return false;
+        const sourceRoot = config.assumed
+          ? (options.rootDir ??
+            (options.composite ? posix.dirname(config.path) : "/"))
+          : "/";
+        if (options.stripInternal && mayStrip(sourceRoot)) return false;
+        if (config.assumed && excluded(root, manifest, file, output))
+          return false;
         matches.push({
           proof: "tsconfig-emit",
           build: config.build,
+          ...(config.assumed && { assumed: true }),
+          ...(options.stripInternal && { stripInternal: true }),
           config: config.path.slice(1),
           output: output.slice(1),
           source: file.slice(1),
@@ -342,7 +386,7 @@ export function workspaceEntries(
       }
     }
     return matches.every((match) => match.source === matches[0]?.source)
-      ? matches[0]
+      ? (matches.find((match) => !match.assumed) ?? matches[0])
       : "conflicting";
   }
 }
@@ -374,12 +418,15 @@ export function entryProvenance(
     ): { resolvedRef: ts.ResolvedProjectReference } | undefined;
     realpath?(path: string): string;
   };
-  let stripReferences = false;
+  let stripReferences = [...(notes?.values() ?? [])].some(
+    ({ stripInternal }) => stripInternal,
+  );
   compiler.forEachResolvedProjectReference(({ commandLine }) => {
     if (commandLine.options.stripInternal) stripReferences = true;
   });
   if (!notes?.size && !stripReferences) return undefined;
   function strips(resolved: ts.ResolvedModuleFull, file: string) {
+    if (notes?.get(resolved)?.stripInternal) return true;
     const output = resolved.resolvedFileName;
     if (!stripReferences || !declaration.test(output) || file === output)
       return false;

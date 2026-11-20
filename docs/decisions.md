@@ -2918,11 +2918,15 @@ A missing declaration reached through a proved checkout workspace link can
 use its unique source producer. The package's plain `tsc` build script
 selects the captured configuration and `getOutputFileNames` supplies the
 exact output path. Build-mode references can establish the selected config
-for a scriptless child. TypeScript selects the package and condition in
-the importing program. Additional build and lifecycle commands, JavaScript
-emit without a selected declaration, and `stripInternal` with captured
-internal annotations leave the proof open. The graph records the manifest,
-config, missing output and source on recovered checkout links.
+for a scriptless child. Other unique configured declaration outputs can
+use `ts-unbuilt-entry-is-compiler-emit`, a recorded assumption that the
+package build preserves the compiler's exports at the entry. A known
+declaration rollup, competing command-line entry, missing declaration
+emit, output rewrite or stripped annotation withholds the projection.
+TypeScript selects the package and condition in the importing program.
+Existing destinations from the program without the assumption take
+priority. Recovered checkout links record the manifest, config, missing
+output and source.
 [C-25](changes/C-25.md)
 
 ### C-13 TypeScript program budget and compiler exceptions

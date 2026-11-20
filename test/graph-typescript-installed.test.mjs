@@ -375,6 +375,13 @@ test("a dependency linked to the checkout root reports the missing workspace ent
 
 test("a physical workspace link follows Astro's declaration-only subpath layout", async () => {
   const { root, request, read, write } = await project();
+  const manifest = (build) =>
+    JSON.stringify({
+      name: "@astrojs/internal-helpers",
+      type: "module",
+      exports: { "./path": "./dist/path.js" },
+      scripts: { build },
+    });
   await write("package.json", '{"type":"module"}');
   await write(
     "main.ts",
@@ -382,7 +389,7 @@ test("a physical workspace link follows Astro's declaration-only subpath layout"
   );
   await write(
     "checkout-helpers/package.json",
-    '{"name":"@astrojs/internal-helpers","type":"module","exports":{"./path":"./dist/path.js"},"scripts":{"build":"tsc -p tsconfig.build.json"}}',
+    manifest("tsc -p tsconfig.build.json"),
   );
   await write(
     "checkout-helpers/tsconfig.build.json",
@@ -399,21 +406,31 @@ test("a physical workspace link follows Astro's declaration-only subpath layout"
     "dir",
   );
   await request("index");
-  read((store, call) => {
-    const link = call("main.ts", "prependForwardSlash");
-    assert.equal(link.resolution, "resolved");
-    assert.equal(
-      store.findSymbols().find(({ id }) => id === link.targetId)?.file,
-      "checkout-helpers/src/path.ts",
-    );
-    assert.deepEqual(link.data.unbuiltEntry, {
-      proof: "tsconfig-emit",
-      build: "checkout-helpers/package.json",
-      config: "checkout-helpers/tsconfig.build.json",
-      output: "checkout-helpers/dist/path.d.ts",
-      source: "checkout-helpers/src/path.ts",
+  const check = (assumed) =>
+    read((store, call) => {
+      const link = call("main.ts", "prependForwardSlash");
+      assert.equal(link.resolution, "resolved");
+      assert.equal(
+        store.findSymbols().find(({ id }) => id === link.targetId)?.file,
+        "checkout-helpers/src/path.ts",
+      );
+      assert.deepEqual(link.data.unbuiltEntry, {
+        proof: "tsconfig-emit",
+        build: "checkout-helpers/package.json",
+        config: "checkout-helpers/tsconfig.build.json",
+        output: "checkout-helpers/dist/path.d.ts",
+        source: "checkout-helpers/src/path.ts",
+        ...(assumed && { assumed: true }),
+      });
+      assert.deepEqual(
+        link.data.assumes,
+        assumed ? ["ts-unbuilt-entry-is-compiler-emit"] : undefined,
+      );
     });
-  });
+  check(false);
+  await write("checkout-helpers/package.json", manifest("tsdown"));
+  await request("index");
+  check(true);
 });
 
 test("an output directory outside the checkout supplies no workspace entry proof", async () => {

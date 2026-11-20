@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 import { readFileSync } from "node:fs";
+import { entryBuildContext } from "./entry-build.js";
 import { createRequire } from "node:module";
 import { dirname, posix } from "node:path";
 import ts from "typescript";
@@ -394,6 +395,7 @@ export interface HostVariant {
   base?: ts.CompilerHost;
   /** Where parser failures of this variant are recorded (not the model's). */
   failures: Map<string, string>;
+  plainWorkspaceEntries?: boolean;
 }
 
 function forced(options: ts.CompilerOptions): ts.CompilerOptions {
@@ -580,6 +582,7 @@ export const CONTEXT_PATTERNS = [
   "*jsconfig*.json",
   "package.json",
   "pnpm-workspace.yaml",
+  ...entryBuildContext,
   ...denoConfigPatterns,
   ...importMapNames,
 ] as const;
@@ -1389,7 +1392,7 @@ export function projectModel(
           if (resolved) {
             const output = workspaceOutput(resolved.resolvedFileName, route);
             if (!output) return result;
-            const proof = entries.proof(route.target, output);
+            const proof = entries.proof(route.target, output, true);
             if (proof === "conflicting")
               return {
                 ...result,
@@ -1432,7 +1435,11 @@ export function projectModel(
           for (const lookup of lookups ?? []) {
             const output = missingOutput(lookup);
             if (!output) continue;
-            const proof = entries.proof(route.target, output);
+            const proof = entries.proof(
+              route.target,
+              output,
+              variant?.plainWorkspaceEntries === true,
+            );
             if (proof !== undefined) candidates.set(lookup, proof);
           }
           if (

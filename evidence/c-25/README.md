@@ -52,3 +52,19 @@ experimental lookup.
 `source-budget.mjs SCRATCH RECEIPT` adds up the bytes of tracked TypeScript
 and JavaScript files. This upper bound also covers workspace source
 imports inside a single program.
+
+For the recorded-assumption census, `compare.mjs` reports the Level 2
+count carrying `ts-unbuilt-entry-is-compiler-emit`. Draw all marked-entry
+sites from the initial PR artifact and from the assumption artifact with
+the same seed and a limit above the population. Run
+`assumption-exclusions.mjs SCRATCH BUILD RECEIPT OLD_DRAW MARKED_DRAW`
+against the candidate's snapshot. It joins the original sites to the
+marked sites and reads the candidate's captured build guards to assign
+exclusions. Use the seeded 60-site installed draw with `emit-check.mjs`
+for the audit.
+
+`built-targets.mjs SCRATCH INSTALLED_RECEIPT` counts checkout destinations
+at compiler output paths, destinations whose path matches Git ignore
+rules, and declaration destinations with a same-checkout map. The emit
+paths come from captured tsconfig and jsconfig inputs. These counts cover
+checkout targets. Installed library rows lack a checkout destination.
