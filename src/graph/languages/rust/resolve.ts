@@ -301,6 +301,17 @@ const accepts = (s: GraphSymbol, ns: Namespace) => {
     (s.kind === "struct" && data(s).constructorForm !== "named")
   );
 };
+/**
+ * C-36: the files whose links a pass decides (all when `files` is absent).
+ * The resolver reports the lookup cycle and depth cuts it met: `decisionCuts`
+ * while deciding those links, `runCuts` in the whole run. Only a cut answer
+ * can depend on which lookups ran first.
+ */
+export interface RustDecisionScope {
+  files?: ReadonlySet<string>;
+  decisionCuts?: number;
+  runCuts?: number;
+}
 // A proc-macro declaration has one captured function identity, an exported
 // macro name, and a function-value facet available only inside its own crate.
 const acceptsAt = (
@@ -351,7 +362,10 @@ export function resolveRust(
   annotate?: (link: GraphLink, extra: Record<string, Json>) => void,
   markScopeResult?: (link: GraphLink, assumed: boolean) => void,
   scopeAudit?: MacroScopeAudit,
+  /** C-36: decide only these files' links; every fact still comes from all files. */
+  decide?: RustDecisionScope,
 ): LinkResolution[] {
+  const decided = (file: string) => !decide?.files || decide.files.has(file);
   // Library proofs use the ordinary scoped lookup with a separate cache key.
   // The analysis pass and existing checkout decisions use the original route.
   let libraryLookup = false;
@@ -370,6 +384,8 @@ export function resolveRust(
   // the key. A failed proof keeps alternatives, it never asserts a binding.
   let unprovedImports = new Map<string, ScopeTrace | null>();
   let cycleCuts = 0;
+  // Cuts met by isolated scope probes, whose counter is restored afterwards.
+  let isolatedCuts = 0;
   const namespaceParents = new WeakMap<Place, number>();
   let nextNamespaceParent = 0;
   function parentIdentity(loc: Place): number {
@@ -1245,7 +1261,7 @@ export function resolveRust(
   }
   if (markConditions)
     for (const link of ctx.links)
-      if (contextOf(link)?.implicit.length)
+      if (decided(link.file) && contextOf(link)?.implicit.length)
         markConditions(link, conditionsFor(link));
   const failedByScope = new Map<string, string[]>(),
     failedByCrate = new Map<string, string[]>();
@@ -4492,6 +4508,7 @@ export function resolveRust(
   clearIncompleteLookups();
   if (markPresence)
     for (const symbol of symbols) {
+      if (!decided(symbol.file)) continue;
       const attributes = itemPresence(symbol);
       markPresence(symbol, attributes, conditionsFor(symbol));
     }
@@ -7148,6 +7165,7 @@ export function resolveRust(
       prepareMacroScopeEffects();
       scopeEffectsReady = true;
     } finally {
+      isolatedCuts += cycleCuts - ordinary.cycleCuts;
       ({
         memo,
         unprovedImports,
@@ -7673,7 +7691,9 @@ export function resolveRust(
     : undefined;
   if (!scopeAudit && !libraryAudit && opaqueOrigins.size)
     prepareIsolatedScopeEffects();
+  const decisionCuts = cycleCuts;
   for (const l of ctx.links) {
+    if (!decided(l.file)) continue;
     const original = data(l);
     const selected = scopeAudit?.includes(l);
     const adjustedBinding = selected
@@ -8075,6 +8095,10 @@ export function resolveRust(
         );
     }
   }
+  if (decide) {
+    decide.decisionCuts = cycleCuts - decisionCuts;
+    decide.runCuts = cycleCuts + isolatedCuts;
+  }
   return resolutions;
 
   function missingReason(l: GraphLink, d: Data, refusal?: string): string {
@@ -8174,6 +8198,7 @@ export function resolveRust(
   function macroBodyCalls(emit: (link: AddedLink) => void): void {
     for (const site of ctx.links) {
       if (site.kind !== "macros" || data(site).libraryMacroFlavor) continue;
+      if (!decided(site.file)) continue;
       const d = data(site),
         scope = str(d.scope);
       const places = ownerPlace(site.file, scope);
