@@ -3030,3 +3030,22 @@ crash, a kill or a refused completion the next index redoes everything once
 snapshot each record came from would narrow that and is not built. Another
 connection's `wal_checkpoint(TRUNCATE)` during a run stops it as overtaken
 (a safe false alarm; no product path does it). [C-22](changes/C-22.md)
+
+### Go re-index can reuse decisions outside the affected files (C-27)
+
+**Decided (C-27).** A language module may return the complete set of paths
+whose previously stored notes and link decisions must be replaced. The
+indexer uses this result only with owned index runs and a store that can
+validate and compare links by file. The store must provide completed module
+versions from the run's opening snapshot. Graph writes invalidate that
+record even through another connection. The indexer validates that the set
+covers every edited and analyzed path, writes the final analyzed facts for those edits,
+and limits link writes to the validated set. A failed module pass keeps the
+unfinished mark so a retry cannot reuse incomplete decisions.
+
+Go keeps hashes of lookup facts with each successfully parsed file. It
+uses the edited paths alone when those facts match. It follows reverse
+imports for changes confined to ordinary functions that global type facts
+cannot read. Other surface changes use the whole module. Go builds global
+indexes from the saved facts for the affected links. The C-22 cold equality
+rule and run ownership apply to every path. [C-27](changes/C-27.md)

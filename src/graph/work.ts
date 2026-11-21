@@ -40,14 +40,24 @@ export async function stage<T>(
   try {
     return await action();
   } finally {
-    const used = process.cpuUsage(cpu);
-    const entry = (graphWork.stages[name] ??= {
-      wallMs: 0,
-      cpuMs: 0,
-      calls: 0,
-    });
-    entry.wallMs += performance.now() - wall;
-    entry.cpuMs += (used.user + used.system) / 1000;
-    entry.calls++;
+    recordStage(name, wall, cpu);
   }
+}
+
+export function stageSync<T>(name: string, action: () => T): T {
+  const wall = performance.now();
+  const cpu = process.cpuUsage();
+  try {
+    return action();
+  } finally {
+    recordStage(name, wall, cpu);
+  }
+}
+
+function recordStage(name: string, wall: number, cpu: NodeJS.CpuUsage): void {
+  const used = process.cpuUsage(cpu);
+  const entry = (graphWork.stages[name] ??= { wallMs: 0, cpuMs: 0, calls: 0 });
+  entry.wallMs += performance.now() - wall;
+  entry.cpuMs += (used.user + used.system) / 1000;
+  entry.calls++;
 }

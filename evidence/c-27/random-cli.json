@@ -1,0 +1,207 @@
+{
+  "id": "cli/cli",
+  "seed": 27202,
+  "target": 60,
+  "completed": 18,
+  "allComparedEqual": true,
+  "steps": [
+    {
+      "step": 0,
+      "file": "internal/codespaces/connection/connection.go",
+      "kind": "signature",
+      "line": 1,
+      "equal": true,
+      "differences": [],
+      "wallMs": 16521,
+      "failed": 0,
+      "resolvedFiles": 76
+    },
+    {
+      "step": 1,
+      "file": "internal/telemetry/telemetry.go",
+      "kind": "interface",
+      "line": 1,
+      "equal": true,
+      "differences": [],
+      "wallMs": 39327,
+      "failed": 0,
+      "resolvedFiles": 1127
+    },
+    {
+      "step": 2,
+      "file": "utils/c27_random_2.go",
+      "kind": "file-add",
+      "line": 1,
+      "equal": true,
+      "differences": [],
+      "wallMs": 34552,
+      "failed": 0,
+      "resolvedFiles": 1128
+    },
+    {
+      "step": 3,
+      "file": ".github/skills/cli-exercise/tool/internal/engine/screen.go",
+      "kind": "body",
+      "line": 1,
+      "equal": true,
+      "differences": [],
+      "wallMs": 15279,
+      "failed": 0,
+      "resolvedFiles": 1
+    },
+    {
+      "step": 4,
+      "file": "pkg/cmd/variable/get/c27_random_4.go",
+      "kind": "file-add",
+      "line": 1,
+      "equal": true,
+      "differences": [],
+      "wallMs": 35537,
+      "failed": 0,
+      "resolvedFiles": 1129
+    },
+    {
+      "step": 5,
+      "file": "pkg/ssh/ssh_keys.go",
+      "kind": "interface",
+      "line": 1,
+      "equal": true,
+      "differences": [],
+      "wallMs": 33892,
+      "failed": 0,
+      "resolvedFiles": 1129
+    },
+    {
+      "step": 6,
+      "file": "internal/safepaths/c27_random_6_test.go",
+      "kind": "file-add",
+      "line": 1,
+      "equal": true,
+      "differences": [],
+      "wallMs": 34516,
+      "failed": 0,
+      "resolvedFiles": 1130
+    },
+    {
+      "step": 7,
+      "file": "pkg/cmd/attestation/artifact/digest/digest.go",
+      "kind": "interface",
+      "line": 1,
+      "equal": true,
+      "differences": [],
+      "wallMs": 33375,
+      "failed": 0,
+      "resolvedFiles": 1130
+    },
+    {
+      "step": 8,
+      "file": "pkg/cmd/codespace/view.go",
+      "kind": "signature",
+      "line": 1,
+      "equal": true,
+      "differences": [],
+      "wallMs": 16167,
+      "failed": 0,
+      "resolvedFiles": 63
+    },
+    {
+      "step": 9,
+      "file": "pkg/cmd/issue/issue.go",
+      "kind": "embed",
+      "line": 1,
+      "equal": true,
+      "differences": [],
+      "wallMs": 34358,
+      "failed": 0,
+      "resolvedFiles": 1130
+    },
+    {
+      "step": 10,
+      "file": "pkg/cmd/codespace/view.go",
+      "kind": "build",
+      "line": 1,
+      "equal": true,
+      "differences": [],
+      "wallMs": 34078,
+      "failed": 0,
+      "resolvedFiles": 1130
+    },
+    {
+      "step": 11,
+      "file": "pkg/cmd/attestation/inspect/inspect_integration_test.go",
+      "kind": "add-export",
+      "line": 1,
+      "equal": true,
+      "differences": [],
+      "wallMs": 15883,
+      "failed": 0,
+      "resolvedFiles": 38
+    },
+    {
+      "step": 12,
+      "file": "pkg/cmd/codespace/stop.go",
+      "kind": "dot",
+      "line": 1,
+      "equal": true,
+      "differences": [],
+      "wallMs": 37036,
+      "failed": 0,
+      "resolvedFiles": 1130
+    },
+    {
+      "step": 13,
+      "file": "pkg/cmd/send-telemetry/send_telemetry_test.go",
+      "kind": "dot",
+      "line": 1,
+      "equal": true,
+      "differences": [],
+      "wallMs": 39083,
+      "failed": 0,
+      "resolvedFiles": 1130
+    },
+    {
+      "step": 14,
+      "file": "pkg/cmd/repo/unarchive/unarchive.go",
+      "kind": "signature",
+      "line": 1,
+      "equal": true,
+      "differences": [],
+      "wallMs": 15362,
+      "failed": 0,
+      "resolvedFiles": 35
+    },
+    {
+      "step": 15,
+      "file": "pkg/cmd/release/create/create_test.go",
+      "kind": "signature",
+      "line": 1,
+      "equal": true,
+      "differences": [],
+      "wallMs": 18634,
+      "failed": 0,
+      "resolvedFiles": 36
+    },
+    {
+      "step": 16,
+      "file": "pkg/cmd/issue/artifact/artifact.go",
+      "kind": "embed",
+      "line": 1,
+      "equal": true,
+      "differences": [],
+      "wallMs": 36320,
+      "failed": 0,
+      "resolvedFiles": 1130
+    },
+    {
+      "step": 17,
+      "file": "internal/ghcmd/cmd.go",
+      "kind": "body",
+      "line": 1,
+      "equal": true,
+      "differences": [],
+      "wallMs": 14732,
+      "failed": 0,
+      "resolvedFiles": 1
+    }
+  ]
+}

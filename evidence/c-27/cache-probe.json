@@ -1,0 +1,18 @@
+{
+  "pin": "restic/restic",
+  "storage": "tmpfs",
+  "pageBytes": 4096,
+  "runs": [
+    {
+      "defaultCacheSizeKiB": 2000,
+      "wallMs": 220999,
+      "sqlStatements": 261622
+    },
+    {
+      "defaultCacheSizePages": 131072,
+      "capacityMiB": 512,
+      "wallMs": 122884,
+      "sqlStatements": 261622
+    }
+  ]
+}
