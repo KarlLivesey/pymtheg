@@ -1,0 +1,268 @@
+[
+ {
+  "pin": "changesets/changesets",
+  "links": [
+   12646,
+   12646
+  ],
+  "level2": [
+   11001,
+   11001
+  ],
+  "likeForLikeLevel2": 11001,
+  "onlyMain": 0,
+  "onlyCand": 0,
+  "changedDefinite": 0,
+  "newlyDefinite": 0,
+  "symbolsOnlyMain": 0,
+  "symbolsOnlyCand": 0,
+  "ownerChanges": {},
+  "scope": {}
+ },
+ {
+  "pin": "excalidraw/excalidraw",
+  "links": [
+   104519,
+   104519
+  ],
+  "level2": [
+   98167,
+   98383
+  ],
+  "likeForLikeLevel2": 98383,
+  "onlyMain": 0,
+  "onlyCand": 0,
+  "changedDefinite": 0,
+  "newlyDefinite": 216,
+  "symbolsOnlyMain": 0,
+  "symbolsOnlyCand": 0,
+  "ownerChanges": {
+   "packages/tsconfig.base.json -> tsconfig.json": 161
+  },
+  "scope": {
+   "incomplete-config | dev-docs/tsconfig.json -> dev-docs/tsconfig.json | incomplete-config": 34,
+   "no-symbol (owner changed) | packages/tsconfig.base.json -> tsconfig.json | no-symbol": 95,
+   "no-symbol (owner changed) | packages/tsconfig.base.json -> tsconfig.json | level2": 215,
+   "no-symbol (owner changed) | packages/tsconfig.base.json -> tsconfig.json | ambiguous": 4
+  }
+ },
+ {
+  "pin": "honojs/hono",
+  "links": [
+   72340,
+   72340
+  ],
+  "level2": [
+   46405,
+   64408
+  ],
+  "likeForLikeLevel2": 64408,
+  "onlyMain": 0,
+  "onlyCand": 0,
+  "changedDefinite": 0,
+  "newlyDefinite": 18003,
+  "symbolsOnlyMain": 0,
+  "symbolsOnlyCand": 0,
+  "ownerChanges": {
+   "tie:tsconfig.base.json+tsconfig.spec.json -> tsconfig.spec.json": 125,
+   "tie:tsconfig.base.json+tsconfig.build.json+tsconfig.spec.json -> tie:tsconfig.build.json+tsconfig.spec.json": 190
+  },
+  "scope": {
+   "ambiguous-project | tie:tsconfig.base.json+tsconfig.spec.json -> tsconfig.spec.json | level2": 18003,
+   "no-symbol (owner changed) | tie:tsconfig.base.json+tsconfig.spec.json -> tsconfig.spec.json | no-symbol": 565,
+   "ambiguous-project | tie:tsconfig.base.json+tsconfig.spec.json -> tsconfig.spec.json | external": 126,
+   "no-symbol (owner changed) | tie:tsconfig.base.json+tsconfig.build.json+tsconfig.spec.json -> tie:tsconfig.build.json+tsconfig.spec.json | no-symbol": 55,
+   "ambiguous-project | tie:tsconfig.base.json+tsconfig.spec.json -> tsconfig.spec.json | any-receiver": 28
+  }
+ },
+ {
+  "pin": "nestjs/nest",
+  "links": [
+   165330,
+   165330
+  ],
+  "level2": [
+   151358,
+   155597
+  ],
+  "likeForLikeLevel2": 155597,
+  "onlyMain": 0,
+  "onlyCand": 0,
+  "changedDefinite": 14,
+  "newlyDefinite": 4241,
+  "symbolsOnlyMain": 0,
+  "symbolsOnlyCand": 0,
+  "ownerChanges": {
+   "packages/tsconfig.build.json -> tsconfig.json": 6,
+   "packages/tsconfig.build.json -> tsconfig.spec.json": 20
+  },
+  "scope": {
+   "no-symbol (owner changed) | packages/tsconfig.build.json -> tsconfig.json | no-symbol": 3,
+   "no-symbol (owner changed) | packages/tsconfig.build.json -> tsconfig.spec.json | level2": 4220,
+   "no-symbol (owner changed) | packages/tsconfig.build.json -> tsconfig.spec.json | no-symbol": 148,
+   "no-symbol (owner changed) | packages/tsconfig.build.json -> tsconfig.spec.json | external": 109,
+   "no-symbol (owner changed) | packages/tsconfig.build.json -> tsconfig.spec.json | any-receiver": 1
+  }
+ },
+ {
+  "pin": "reduxjs/redux-toolkit",
+  "links": [
+   57208,
+   57208
+  ],
+  "level2": [
+   45838,
+   45838
+  ],
+  "likeForLikeLevel2": 45838,
+  "onlyMain": 0,
+  "onlyCand": 0,
+  "changedDefinite": 0,
+  "newlyDefinite": 0,
+  "symbolsOnlyMain": 0,
+  "symbolsOnlyCand": 0,
+  "ownerChanges": {},
+  "scope": {
+   "incomplete-config | examples/publish-ci/expo/tsconfig.json -> examples/publish-ci/expo/tsconfig.json | incomplete-config": 582,
+   "incomplete-config | examples/publish-ci/react-native/tsconfig.json -> examples/publish-ci/react-native/tsconfig.json | incomplete-config": 585
+  }
+ },
+ {
+  "pin": "trpc/trpc",
+  "links": [
+   107470,
+   107470
+  ],
+  "level2": [
+   95508,
+   95508
+  ],
+  "likeForLikeLevel2": 95508,
+  "onlyMain": 0,
+  "onlyCand": 0,
+  "changedDefinite": 0,
+  "newlyDefinite": 0,
+  "symbolsOnlyMain": 0,
+  "symbolsOnlyCand": 0,
+  "ownerChanges": {},
+  "scope": {
+   "incomplete-config | examples/.test/monotest-api-router01/tsconfig.json -> examples/.test/monotest-api-router01/tsconfig.json | incomplete-config": 10,
+   "incomplete-config | examples/.test/monotest-api/tsconfig.json -> examples/.test/monotest-api/tsconfig.json | incomplete-config": 5,
+   "incomplete-config | examples/.test/monotest-app/tsconfig.json -> examples/.test/monotest-app/tsconfig.json | incomplete-config": 43,
+   "incomplete-config | examples/.test/monotest-trpc/tsconfig.json -> examples/.test/monotest-trpc/tsconfig.json | incomplete-config": 4
+  }
+ },
+ {
+  "pin": "vitejs/vite",
+  "links": [
+   55576,
+   55576
+  ],
+  "level2": [
+   45840,
+   45960
+  ],
+  "likeForLikeLevel2": 45960,
+  "onlyMain": 0,
+  "onlyCand": 0,
+  "changedDefinite": 7,
+  "newlyDefinite": 120,
+  "symbolsOnlyMain": 0,
+  "symbolsOnlyCand": 0,
+  "ownerChanges": {
+   "packages/vite/tsconfig.base.json -> tie:packages/vite/src/module-runner/__tests_dts__/tsconfig.json+packages/vite/src/node/__tests_dts__/tsconfig.json": 8,
+   "tie:packages/vite/tsconfig.base.json+packages/vite/tsconfig.check.json -> packages/vite/tsconfig.check.json": 13
+  },
+  "scope": {
+   "incomplete-config | packages/create-vite/template-svelte-ts/tsconfig.app.json -> packages/create-vite/template-svelte-ts/tsconfig.app.json | incomplete-config": 8,
+   "incomplete-config | packages/create-vite/template-vue-ts/tsconfig.app.json -> packages/create-vite/template-vue-ts/tsconfig.app.json | incomplete-config": 7,
+   "ambiguous-project | tie:packages/vite/tsconfig.base.json+packages/vite/tsconfig.check.json -> packages/vite/tsconfig.check.json | level2": 27,
+   "ambiguous-project | tie:packages/vite/tsconfig.base.json+packages/vite/tsconfig.check.json -> packages/vite/tsconfig.check.json | external": 7
+  }
+ },
+ {
+  "pin": "vitest-dev/vitest",
+  "links": [
+   116220,
+   116220
+  ],
+  "level2": [
+   95768,
+   95774
+  ],
+  "likeForLikeLevel2": 95774,
+  "onlyMain": 0,
+  "onlyCand": 0,
+  "changedDefinite": 0,
+  "newlyDefinite": 6,
+  "symbolsOnlyMain": 0,
+  "symbolsOnlyCand": 0,
+  "ownerChanges": {
+   "tie:tsconfig.base.json+tsconfig.build.json+tsconfig.check.json -> tsconfig.check.json": 15,
+   "test/e2e/dts/_shared/tsconfig.patch.json -> test/tsconfig.json": 1
+  },
+  "scope": {}
+ },
+ {
+  "pin": "withastro/astro",
+  "links": [
+   152561,
+   152561
+  ],
+  "level2": [
+   131625,
+   131626
+  ],
+  "likeForLikeLevel2": 131626,
+  "onlyMain": 0,
+  "onlyCand": 0,
+  "changedDefinite": 0,
+  "newlyDefinite": 1,
+  "symbolsOnlyMain": 0,
+  "symbolsOnlyCand": 0,
+  "ownerChanges": {},
+  "scope": {
+   "incomplete-config | examples/advanced-routing/tsconfig.json -> examples/advanced-routing/tsconfig.json | incomplete-config": 43,
+   "incomplete-config | examples/blog/tsconfig.json -> examples/blog/tsconfig.json | incomplete-config": 15,
+   "incomplete-config | examples/component/tsconfig.json -> examples/component/tsconfig.json | incomplete-config": 3,
+   "incomplete-config | examples/container-with-vitest/tsconfig.json -> examples/container-with-vitest/tsconfig.json | incomplete-config": 70,
+   "incomplete-config | examples/framework-multiple/tsconfig.json -> examples/framework-multiple/tsconfig.json | incomplete-config": 16,
+   "incomplete-config | examples/framework-preact/tsconfig.json -> examples/framework-preact/tsconfig.json | incomplete-config": 17,
+   "incomplete-config | examples/framework-react/tsconfig.json -> examples/framework-react/tsconfig.json | incomplete-config": 5,
+   "incomplete-config | examples/framework-solid/tsconfig.json -> examples/framework-solid/tsconfig.json | incomplete-config": 6,
+   "incomplete-config | examples/hackernews/tsconfig.json -> examples/hackernews/tsconfig.json | incomplete-config": 6,
+   "incomplete-config | examples/integration/tsconfig.json -> examples/integration/tsconfig.json | incomplete-config": 3,
+   "incomplete-config | examples/portfolio/tsconfig.json -> examples/portfolio/tsconfig.json | incomplete-config": 17,
+   "incomplete-config | examples/ssr/tsconfig.json -> examples/ssr/tsconfig.json | incomplete-config": 77,
+   "incomplete-config | examples/starlog/tsconfig.json -> examples/starlog/tsconfig.json | incomplete-config": 15,
+   "incomplete-config | examples/toolbar-app/tsconfig.json -> examples/toolbar-app/tsconfig.json | incomplete-config": 14,
+   "incomplete-config | examples/with-markdoc/tsconfig.json -> examples/with-markdoc/tsconfig.json | incomplete-config": 6,
+   "incomplete-config | examples/with-nanostores/tsconfig.json -> examples/with-nanostores/tsconfig.json | incomplete-config": 42,
+   "incomplete-config | examples/with-vitest/tsconfig.json -> examples/with-vitest/tsconfig.json | incomplete-config": 26,
+   "incomplete-config | packages/astro/e2e/fixtures/actions-blog/tsconfig.json -> packages/astro/e2e/fixtures/actions-blog/tsconfig.json | incomplete-config": 152,
+   "incomplete-config | packages/astro/e2e/fixtures/actions-react-19/tsconfig.json -> packages/astro/e2e/fixtures/actions-react-19/tsconfig.json | incomplete-config": 65,
+   "incomplete-config | packages/astro/e2e/fixtures/cloudflare/tsconfig.json -> packages/astro/e2e/fixtures/cloudflare/tsconfig.json | incomplete-config": 188,
+   "incomplete-config | packages/astro/test/fixtures/astro-env-content-collections/tsconfig.json -> packages/astro/test/fixtures/astro-env-content-collections/tsconfig.json | incomplete-config": 10,
+   "incomplete-config | packages/astro/test/fixtures/content-collections-image-hmr/tsconfig.json -> packages/astro/test/fixtures/content-collections-image-hmr/tsconfig.json | incomplete-config": 10,
+   "incomplete-config | packages/astro/test/fixtures/content-collections-type-inference/tsconfig.json -> packages/astro/test/fixtures/content-collections-type-inference/tsconfig.json | incomplete-config": 22,
+   "incomplete-config | packages/astro/test/fixtures/core-image-deletion/tsconfig.json -> packages/astro/test/fixtures/core-image-deletion/tsconfig.json | incomplete-config": 15,
+   "incomplete-config | packages/astro/test/fixtures/core-image-ssg/tsconfig.json -> packages/astro/test/fixtures/core-image-ssg/tsconfig.json | incomplete-config": 14,
+   "incomplete-config | packages/astro/test/fixtures/core-image-svg-in-island/tsconfig.json -> packages/astro/test/fixtures/core-image-svg-in-island/tsconfig.json | incomplete-config": 2,
+   "incomplete-config | packages/astro/test/fixtures/core-image-svg/tsconfig.json -> packages/astro/test/fixtures/core-image-svg/tsconfig.json | incomplete-config": 24,
+   "incomplete-config | packages/astro/test/fixtures/core-image/tsconfig.json -> packages/astro/test/fixtures/core-image/tsconfig.json | incomplete-config": 13,
+   "incomplete-config | packages/astro/test/fixtures/css-deduplication/tsconfig.json -> packages/astro/test/fixtures/css-deduplication/tsconfig.json | incomplete-config": 32,
+   "incomplete-config | packages/astro/test/fixtures/custom-renderer/tsconfig.json -> packages/astro/test/fixtures/custom-renderer/tsconfig.json | incomplete-config": 20,
+   "incomplete-config | packages/astro/test/fixtures/live-loaders/tsconfig.json -> packages/astro/test/fixtures/live-loaders/tsconfig.json | incomplete-config": 45,
+   "incomplete-config | packages/integrations/cloudflare/test/fixtures/astro-env/tsconfig.json -> packages/integrations/cloudflare/test/fixtures/astro-env/tsconfig.json | incomplete-config": 22,
+   "incomplete-config | packages/integrations/cloudflare/test/fixtures/custom-entryfile-fetch-state/tsconfig.json -> packages/integrations/cloudflare/test/fixtures/custom-entryfile-fetch-state/tsconfig.json | incomplete-config": 32,
+   "incomplete-config | packages/integrations/cloudflare/test/fixtures/custom-entryfile/tsconfig.json -> packages/integrations/cloudflare/test/fixtures/custom-entryfile/tsconfig.json | incomplete-config": 17,
+   "incomplete-config | packages/integrations/cloudflare/test/fixtures/vite-plugin/tsconfig.json -> packages/integrations/cloudflare/test/fixtures/vite-plugin/tsconfig.json | incomplete-config": 178,
+   "incomplete-config | packages/integrations/markdoc/test/fixtures/image-assets-custom/tsconfig.json -> packages/integrations/markdoc/test/fixtures/image-assets-custom/tsconfig.json | incomplete-config": 6,
+   "incomplete-config | packages/integrations/markdoc/test/fixtures/image-assets/tsconfig.json -> packages/integrations/markdoc/test/fixtures/image-assets/tsconfig.json | incomplete-config": 6,
+   "incomplete-config | packages/integrations/markdoc/test/fixtures/render-with-components/tsconfig.json -> packages/integrations/markdoc/test/fixtures/render-with-components/tsconfig.json | incomplete-config": 18,
+   "incomplete-config | packages/integrations/mdx/test/fixtures/mdx-images/tsconfig.json -> packages/integrations/mdx/test/fixtures/mdx-images/tsconfig.json | incomplete-config": 17,
+   "incomplete-config | packages/integrations/svelte/test/fixtures/prop-types/tsconfig.json -> packages/integrations/svelte/test/fixtures/prop-types/tsconfig.json | incomplete-config": 5,
+   "incomplete-config | packages/language-tools/language-server/test/fixture/tsconfig.json -> packages/language-tools/language-server/test/fixture/tsconfig.json | incomplete-config": 27
+  }
+ }
+]
