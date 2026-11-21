@@ -186,6 +186,26 @@ export function preludePath(
   return path?.split("::");
 }
 
+const allocPreludeTypes = new Set([
+  "ToOwned",
+  "Box",
+  "String",
+  "ToString",
+  "Vec",
+]);
+
+/** Entries that std and core both re-export from the same core declaration. */
+export function sharedCorePrelude(
+  name: string,
+  namespace: "type" | "value" | "macro" | "derive",
+): boolean {
+  // std and core export distinct panic macros. See std/src/prelude/v1.rs
+  // and core/src/prelude/v1.rs in the Rust source tree.
+  if (namespace === "macro")
+    return name !== "panic" && !!standardBangExports.get("core")?.has(name);
+  return namespace !== "type" || !allocPreludeTypes.has(name);
+}
+
 // Known modules, whose final path segment selects an export directly rather
 // than dispatching through an owning type. An unknown prefix could be a type
 // alias or a reexport of a type, regardless of its capitalization.
@@ -550,6 +570,70 @@ export function permitsNamespace(
   if (namespace === "macro")
     return kind === "bang" || kind === "derive" || kind === "attribute";
   return true;
+}
+
+const coreImportTypes = new Set(
+  "any::Any borrow::Borrow borrow::BorrowMut cell::Cell cell::Ref cell::RefCell cell::RefMut cmp::Ordering error::Error ffi::CStr fmt::Write marker::PhantomPinned num::NonZero ops::Deref ops::DerefMut ops::Index ops::IndexMut ops::Range ops::RangeInclusive pin::Pin str::FromStr task::Context task::Poll task::Waker".split(
+    " ",
+  ),
+);
+const allocImportTypes = new Set(
+  "borrow::Cow collections::BinaryHeap collections::LinkedList rc::Rc rc::Weak sync::Weak".split(
+    " ",
+  ),
+);
+const stdImportTypes = new Set(
+  "ffi::OsStr ffi::OsString hash::BuildHasher io::BufRead io::BufReader io::BufWriter io::Cursor io::Seek net::IpAddr net::Ipv4Addr net::Ipv6Addr net::SocketAddr path::Component process::Command process::ExitCode process::ExitStatus sync::LazyLock sync::Once sync::OnceLock time::SystemTime".split(
+    " ",
+  ),
+);
+
+// For imports only, use the audited namespace of these exact registry
+// releases. The emitted symbol is their public spelling through the facade.
+const registryImportTypes = new Map([
+  ["bytes@1.11.1", new Set(["Buf", "BufMut", "Bytes", "BytesMut"])],
+  ["bytes@1.12.1", new Set(["Buf", "BufMut", "Bytes", "BytesMut"])],
+  [
+    "actix-service@2.0.3",
+    new Set([
+      "boxed",
+      "IntoService",
+      "IntoServiceFactory",
+      "Service",
+      "ServiceFactory",
+    ]),
+  ],
+  [
+    "ropey@1.6.1",
+    new Set(["iter", "Rope", "RopeBuilder", "RopeSlice", "str_utils"]),
+  ],
+]);
+
+export function importExportNamespace(
+  path: LibraryPath,
+): ExportNamespace | undefined {
+  const known = exportNamespace(path);
+  if (known) return known;
+  const name = path.parts.join("::");
+  const unit = path.unit.unit;
+  if (path.unit.ecosystem === "rust-std") {
+    if (
+      ((unit === "std" || unit === "core") && coreImportTypes.has(name)) ||
+      ((unit === "std" || unit === "alloc") && allocImportTypes.has(name)) ||
+      (unit === "std" && stdImportTypes.has(name))
+    )
+      return "type";
+  } else if (
+    path.registry?.length &&
+    path.registry.every(
+      ({ version, macroRegistry }) =>
+        version &&
+        macroRegistry &&
+        registryImportTypes.get(`${unit}@${version}`)?.has(name),
+    )
+  ) {
+    return "type";
+  }
 }
 
 export function librarySymbol(path: LibraryPath, flavor?: string): string {

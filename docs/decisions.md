@@ -2802,6 +2802,26 @@ directory source. A proven package selection is required to resolve inside it.
 Rust coverage now credits recorded targets on graphs made by the supporting
 module version. See [C-9](changes/C-9.md).
 
+### C-29 Rust prelude and missing-link explanations
+
+When a crate can build with `no_std`, the resolver can name a `core`
+declaration shared by both edition preludes. This requires the usual lexical,
+import and macro shadowing checks. The source must also establish the
+availability of an implicit prelude. Edition-specific entries use the existing
+prelude table. A possible `no_core` configuration withholds implicit sysroot
+and prelude targets. The spelling of a definite, previously supported `std`
+path is preserved. Explicit imports use their written export when the catalog
+establishes the export namespace for that library unit. Whole-crate imports
+retain their unit target.
+
+Rust analysis records the reason on a link whenever neither checkout
+resolution nor the library path proof supplies one symbol. This uses the same
+lookups as resolution, after the ordinary decisions and macro-scope retries.
+Final resolution records a disagreement when the link remains open despite
+analysis supplying no blocker. A later final decision clears that explanation
+when the link reaches Level 2.
+See [C-29](changes/C-29.md).
+
 ### C-12 Rust lexical macro scope
 
 The resolver can clear an opaque expansion for one name when captured
@@ -2932,6 +2952,25 @@ The checker distinguishes the declarations behind those names. A workspace
 entry with a physical link to a captured package retains the missing
 build-output reason.
 [C-23](changes/C-23.md)
+
+### C-25 Source producers for missing TypeScript entries
+
+A missing declaration reached through a proved checkout workspace link can
+use its unique source producer. The package's plain `tsc` build script
+selects the captured configuration and `getOutputFileNames` supplies the
+exact output path. Build-mode references can establish the selected config
+for a scriptless child. Other unique configured declaration outputs can
+use `ts-unbuilt-entry-is-compiler-emit`, a recorded assumption that the
+package build preserves the compiler's exports at the entry. A known
+declaration rollup, competing command-line entry, opaque or mismatched
+bundler config, compiler mapping override, missing declaration emit,
+output rewrite or stripped annotation withholds the projection.
+TypeScript selects the package and condition in the importing program.
+Existing destinations from the program without the assumption take
+priority. Recovered checkout links record the manifest, config, missing
+output and source, following the receiver's own binding when needed.
+An assumed answer without attributable provenance stays on the ordinary route.
+[C-25](changes/C-25.md)
 
 ### C-13 TypeScript program budget and compiler exceptions
 

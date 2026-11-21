@@ -45,9 +45,11 @@ import {
   cargoMacroReexport,
   cargoMacroSourceKnown,
   exportNamespace,
+  importExportNamespace,
   librarySymbol,
   permitsNamespace,
   preludePath,
+  sharedCorePrelude,
   sameLibraryPath,
   scopeMacroExport,
   sysroot,
@@ -262,6 +264,8 @@ interface Found {
   symbols: GraphSymbol[];
   complete: boolean;
   reason?: string;
+  /** Explanation for an empty result that did not make lookup incomplete. */
+  emptyReason?: string;
   failedFiles?: string[];
   bound?: boolean;
   opaqueAttributes?: string[];
@@ -1067,8 +1071,12 @@ export function resolveRust(
         if (pathTargets.size && [...pathTargets].some((f) => !files.has(f)))
           moduleIncomplete.add(s.id);
         const targets = possible.filter((f) => files.has(f));
-        const fileConditions = targets.map(
-          (f) => (data(units.get(f) ?? {}).conditions ?? []) as string[],
+        const fileConditions = targets.map((f) =>
+          ((data(units.get(f) ?? {}).conditions ?? []) as string[]).filter(
+            // A previous phase can mark a file that also has a guessed
+            // placement. That marker is not an inner cfg on this declaration.
+            (gate) => gate !== "?module-layout",
+          ),
         );
         if (fileConditions.length) {
           const same = fileConditions.every(
@@ -2681,6 +2689,13 @@ export function resolveRust(
       reason: "edition-unverified",
     };
   }
+  function corePreludeUnavailable(loc: Place): boolean {
+    return (
+      (data(units.get(loc.crate.root) ?? {}).noCoreConditions ??
+        []) as string[][]
+    ).some((cs) => possible([...(loc.conditions ?? []), ...cs]));
+  }
+
   function dependencyLookup(
     name: string,
     parts: string[],
@@ -2716,6 +2731,11 @@ export function resolveRust(
             (!implicitRoot2015 || !loc.libraryModuleMember || noStd)) ||
           (name === "std" && !noStd) ||
           (name === "proc_macro" && loc.crate.procMacro));
+      if (standard && !explicit && !libraryProbe && corePreludeUnavailable(loc))
+        return {
+          ...empty(false),
+          reason: "core-prelude-availability-unverified",
+        };
       const anchor = standard
         ? { unit: { ecosystem: "rust-std", unit: name } }
         : loc.crate.edition === "2015" && !explicit
@@ -6203,28 +6223,23 @@ export function resolveRust(
           ? "type"
           : "value";
     const preludeNamespace = flavor === "derive" ? "derive" : namespace;
-    const builtin = preludePath(
-      head,
-      loc.crate.edition,
-      parts.length > 1 ? "type" : preludeNamespace,
-    );
+    const headNamespace = parts.length > 1 ? "type" : preludeNamespace;
+    const builtin = preludePath(head, loc.crate.edition, headNamespace);
     // A bang macro can be supplied by textual scope. A derive or attribute
     // has no such binding on stable Rust. The outer `derive` must itself be
     // the built-in attribute rather than an imported proc macro.
-    if (
-      !libraryProbe &&
-      namespace === "macro" &&
-      bare &&
-      (macroUseDerive(loc.crate.root, head) ||
-        (!flavor && textualMacro(head, l, loc, scope)))
-    )
-      return refuseLibrary("competing macro import");
+    if (!libraryProbe && namespace === "macro" && bare) {
+      if (macroUseDerive(loc.crate.root, head))
+        return refuseLibrary("macro-use-exports-unverified");
+      if (!flavor && textualMacro(head, l, loc, scope))
+        return refuseLibrary("competing macro import");
+    }
     if (
       !libraryProbe &&
       flavor === "derive" &&
       macroUseDerive(loc.crate.root, "derive")
     )
-      return refuseLibrary("competing derive import");
+      return refuseLibrary("macro-use-exports-unverified");
 
     libraryLookup = true;
     libraryAttributeStart =
@@ -6276,14 +6291,35 @@ export function resolveRust(
         l.kind !== "imports" &&
         flavor !== "attribute" &&
         builtin &&
-        (libraryProbe || !loc.noImplicitPrelude) &&
-        !written.startsWith("::") &&
-        (libraryProbe ||
-          !(
-            (data(units.get(loc.crate.root) ?? {}).noStdConditions ??
-              []) as string[][]
-          ).some((cs) => possible([...(loc.conditions ?? []), ...cs])))
+        !written.startsWith("::")
       ) {
+        if (!libraryProbe && loc.noImplicitPrelude)
+          return refuseLibrary("no-implicit-prelude-binding-unverified");
+        if (!libraryProbe && corePreludeUnavailable(loc))
+          return refuseLibrary("core-prelude-availability-unverified");
+        const root = data(units.get(loc.crate.root) ?? {});
+        const mayApply = (cs: string[]) =>
+          possible([...(loc.conditions ?? []), ...cs]);
+        const mayUseCore =
+          !libraryProbe &&
+          ((root.noStdConditions ?? []) as string[][]).some(mayApply);
+        const implicit: LibraryPath = {
+          unit: { ecosystem: "rust-std", unit: mayUseCore ? "core" : "std" },
+          parts: [...builtin, ...parts.slice(1)],
+        };
+        if (mayUseCore) {
+          if (scopeMode === "assumed")
+            return refuseLibrary("opaque-item-may-shadow-name");
+          if (!sharedCorePrelude(head, headNamespace))
+            return refuseLibrary("shared-core-prelude-binding-unavailable");
+          // For a longer path only the listed enum variants prove a shared
+          // declaration. A known prelude head does not prove its members.
+          if (
+            !bare &&
+            (namespace !== "value" || valuePathKind(implicit) !== "variant")
+          )
+            return refuseLibrary("associated-owner-unverified");
+        }
         const binding = !bare ? find(head, loc, scope, "type") : result;
         if (
           !binding.complete ||
@@ -6296,10 +6332,7 @@ export function resolveRust(
             binding.reason || "competing prelude import",
             binding.libraryScopes,
           );
-        path = {
-          unit: { ecosystem: "rust-std", unit: "std" },
-          parts: [...builtin, ...parts.slice(1)],
-        };
+        path = implicit;
         prelude = true;
       }
       if (!path)
@@ -6335,7 +6368,10 @@ export function resolveRust(
         !cargoMacroFacadeKnown(path)
       )
         return refuseLibrary("macro facade source unverified");
-      const exported = exportNamespace(path);
+      const exported =
+        l.kind === "imports" && scopeMode !== "assumed"
+          ? importExportNamespace(path)
+          : exportNamespace(path);
       if (
         !libraryProbe &&
         l.kind === "imports" &&
@@ -6409,9 +6445,12 @@ export function resolveRust(
   }
   type Refusal = { detail: string; scopes: string[] };
   let libraryRefusals: Refusal[] = [];
+  let diagnosingLibrary = false;
+  let libraryDiagnostic: string | undefined;
   function refuseLibrary(detail: string, scopes: string[] = []): undefined {
     if (libraryAudit && !libraryProbe) libraryRefusals.push({ detail, scopes });
     if (auditingMacroIdentity) auditedMacroRefusal = detail;
+    if (diagnosingLibrary) libraryDiagnostic ??= detail;
     return undefined;
   }
   function libraryFor(l: GraphLink, d: Data): LibraryTarget | undefined {
@@ -7232,6 +7271,9 @@ export function resolveRust(
       // C-15: a binding is unproved because of a failed file only when the
       // check for a same-named constant or unit item reached one.
       let unread = false;
+      let emptyReason = target
+        ? "local-pattern-binding-unverified"
+        : "binding-anchor-unavailable";
       found =
         target &&
         (!d.localBinding ||
@@ -7241,6 +7283,7 @@ export function resolveRust(
               !!f.reason
                 ?.split(/;\s*/)
                 .includes("failed-file-unseen-declarations");
+            if (uncertain && f.reason) emptyReason = f.reason;
           }))
           ? { symbols: [target], complete: true }
           : unread
@@ -7249,7 +7292,14 @@ export function resolveRust(
                 complete: false,
                 reason: "failed-file-unseen-declarations",
               }
-            : empty();
+            : {
+                ...empty(),
+                emptyReason:
+                  emptyReason === "local-pattern-binding-unverified" &&
+                  !ownerPlace(l.file, str(d.scope)).length
+                    ? "crate-placement-unavailable"
+                    : emptyReason,
+              };
     } else if (
       (!d.blocked || !!d.method || !!d.conditionalBinding) &&
       !(l.kind === "imports" && d.glob)
@@ -7479,6 +7529,17 @@ export function resolveRust(
   };
   const resolutions: LinkResolution[] = [];
   const librarySites: ScopeRetry[] = [];
+  const missing = uncertain
+    ? new Map<
+        string,
+        {
+          link: GraphLink;
+          facts: Data;
+          eligible: boolean;
+          reason?: string;
+        }
+      >()
+    : undefined;
   if (!scopeAudit && !libraryAudit && opaqueOrigins.size)
     prepareIsolatedScopeEffects();
   for (const l of ctx.links) {
@@ -7602,13 +7663,23 @@ export function resolveRust(
       uncertain?.(l, targets, "receiver-type-unverified");
       continue;
     }
-    if (targets.length > 1)
+    if (targets.length > 1) {
+      uncertain?.(l, [], "multiple-checkout-candidates");
       resolutions.push({
         linkId: l.id,
         candidateIds: targets.map((s) => s.id),
       });
-    else if (targets.length === 1)
+    } else if (targets.length === 1)
       resolutions.push({ linkId: l.id, targetId: targets[0]!.id });
+    else if (missing) {
+      const reason = found.reason || found.emptyReason;
+      missing.set(l.id, {
+        link: l,
+        facts: d,
+        eligible: libraryEligible,
+        ...(reason ? { reason } : {}),
+      });
+    }
   }
   if (derived) macroBodyCalls(derived);
   pathCallCache.clear();
@@ -7718,6 +7789,7 @@ export function resolveRust(
               targetId: found.symbols[0]!.id,
             });
             markScopeResult?.(link, mode === "assumed");
+            missing?.delete(link.id);
             return;
           }
           canTryLibrary =
@@ -7738,6 +7810,7 @@ export function resolveRust(
         if (!library) continue;
         resolutions.push({ linkId: link.id, library });
         markScopeResult?.(link, mode === "assumed");
+        if (library.symbol) missing?.delete(link.id);
         return;
       } finally {
         scopeMode = "baseline";
@@ -7774,6 +7847,7 @@ export function resolveRust(
     const fallbackHidLibrary = associatedFallback && !libraryEligible;
     if (library) {
       if (!uncertain) resolutions.push({ linkId: link.id, library });
+      if (library.symbol) missing?.delete(link.id);
     } else if (
       !scopeAudit &&
       retry &&
@@ -7826,7 +7900,67 @@ export function resolveRust(
       if (reads === 3) unprovedImports.delete(key);
     for (const retry of scopeRetries) retryMacroScope(retry);
   }
+  // Collect reasons after the existing decision passes. The additional
+  // library lookups can share their caches without steering a scope retry.
+  if (missing && uncertain) {
+    for (const { link, facts, eligible, reason } of missing.values()) {
+      if (reason) {
+        uncertain(link, [], reason);
+        continue;
+      }
+      libraryDiagnostic = undefined;
+      diagnosingLibrary = true;
+      let library;
+      try {
+        library = eligible ? libraryFor(link, facts) : undefined;
+      } finally {
+        diagnosingLibrary = false;
+      }
+      if (!library?.symbol)
+        uncertain(
+          link,
+          [],
+          library
+            ? "whole-crate-import"
+            : missingReason(link, facts, libraryDiagnostic),
+        );
+    }
+  }
   return resolutions;
+
+  function missingReason(l: GraphLink, d: Data, refusal?: string): string {
+    if (l.kind === "contains") return "contained-symbol-unavailable";
+    if (!ownerPlace(l.file, str(d.scope)).length)
+      return "crate-placement-unavailable";
+    if (l.kind === "modules") return "module-target-unavailable";
+    if (d.glob) return "glob-import-has-no-single-symbol";
+    if (d.method) return "receiver-type-unverified";
+    if (d.blocked) return "lexical-binding-unverified";
+    if (/^Self(?:::|$)/.test(l.targetName)) return "self-target-unverified";
+    switch (refusal) {
+      case "site or placement unverified":
+        return "library-site-or-placement-unverified";
+      case "unverified path":
+        return "library-path-unverified";
+      case "import export namespace unavailable":
+        return "import-export-namespace-unverified";
+      case "competing macro import":
+      case "competing derive import":
+      case "competing prelude import":
+      case "different macro namespace":
+      case "macro implementation source unverified":
+      case "macro facade source unverified":
+        return refusal.replaceAll(" ", "-");
+      case "no proven library binding":
+      case undefined:
+        if (d.libraryMacroFlavor === "attribute")
+          return "attribute-target-unavailable";
+        if (l.kind === "patterns") return "pattern-target-unverified";
+        return "name-binding-unverified";
+      default:
+        return refusal;
+    }
+  }
 
   /** Resolve a path call written in a macro body, as at a call site. */
   function bodyCall(

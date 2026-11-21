@@ -1,0 +1,74 @@
+[
+  {
+    "pin": "changesets/changesets",
+    "checkoutBytesUpperBound": 936200
+  },
+  {
+    "pin": "colinhacks/zod",
+    "checkoutBytesUpperBound": 3626794
+  },
+  {
+    "pin": "dexie/Dexie.js",
+    "checkoutBytesUpperBound": 2381219
+  },
+  {
+    "pin": "excalidraw/excalidraw",
+    "checkoutBytesUpperBound": 8942485
+  },
+  {
+    "pin": "honojs/hono",
+    "checkoutBytesUpperBound": 3030504
+  },
+  {
+    "pin": "mermaid-js/mermaid",
+    "checkoutBytesUpperBound": 8134195
+  },
+  {
+    "pin": "nestjs/nest",
+    "checkoutBytesUpperBound": 8157334
+  },
+  {
+    "pin": "oclif/core",
+    "checkoutBytesUpperBound": 833705
+  },
+  {
+    "pin": "pingdotgg/t3code",
+    "checkoutBytesUpperBound": 11527895
+  },
+  {
+    "pin": "pmndrs/zustand",
+    "checkoutBytesUpperBound": 338229
+  },
+  {
+    "pin": "puppeteer/puppeteer",
+    "checkoutBytesUpperBound": 3486848
+  },
+  {
+    "pin": "react-hook-form/react-hook-form",
+    "checkoutBytesUpperBound": 2587725
+  },
+  {
+    "pin": "reduxjs/redux-toolkit",
+    "checkoutBytesUpperBound": 3130972
+  },
+  {
+    "pin": "trpc/trpc",
+    "checkoutBytesUpperBound": 5766109
+  },
+  {
+    "pin": "vitejs/vite",
+    "checkoutBytesUpperBound": 3494415
+  },
+  {
+    "pin": "vitest-dev/vitest",
+    "checkoutBytesUpperBound": 6882251
+  },
+  {
+    "pin": "withastro/astro",
+    "checkoutBytesUpperBound": 9112886
+  },
+  {
+    "pin": "yargs/yargs",
+    "checkoutBytesUpperBound": 685292
+  }
+]

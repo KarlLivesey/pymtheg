@@ -1,0 +1,630 @@
+{
+  "pins": [
+    {
+      "id": "BurntSushi/ripgrep",
+      "before": {
+        "links": 39819,
+        "level2": 26104,
+        "assumed": 1,
+        "blank": 1697
+      },
+      "after": {
+        "links": 39819,
+        "level2": 26172,
+        "assumed": 1,
+        "blank": 0
+      },
+      "common": {
+        "links": 39819,
+        "before": 26104,
+        "after": 26172,
+        "beforeAssumed": 1,
+        "afterAssumed": 1
+      },
+      "compared": 26108,
+      "lost": 0,
+      "symbolLoss": 0,
+      "symbolGain": 0
+    },
+    {
+      "id": "actix/actix-web",
+      "before": {
+        "links": 86640,
+        "level2": 34923,
+        "assumed": 3105,
+        "blank": 10088
+      },
+      "after": {
+        "links": 86640,
+        "level2": 35509,
+        "assumed": 3105,
+        "blank": 0
+      },
+      "common": {
+        "links": 86640,
+        "before": 34923,
+        "after": 35509,
+        "beforeAssumed": 3105,
+        "afterAssumed": 3105
+      },
+      "compared": 34936,
+      "lost": 0,
+      "symbolLoss": 0,
+      "symbolGain": 0
+    },
+    {
+      "id": "cberner/redb",
+      "before": {
+        "links": 73731,
+        "level2": 31261,
+        "assumed": 110,
+        "blank": 8793
+      },
+      "after": {
+        "links": 73731,
+        "level2": 35034,
+        "assumed": 110,
+        "blank": 0
+      },
+      "common": {
+        "links": 73731,
+        "before": 31261,
+        "after": 35034,
+        "beforeAssumed": 110,
+        "afterAssumed": 110
+      },
+      "compared": 31262,
+      "lost": 0,
+      "symbolLoss": 0,
+      "symbolGain": 0
+    },
+    {
+      "id": "crossbeam-rs/crossbeam",
+      "before": {
+        "links": 34081,
+        "level2": 17452,
+        "assumed": 0,
+        "blank": 2559
+      },
+      "after": {
+        "links": 34081,
+        "level2": 19075,
+        "assumed": 0,
+        "blank": 0
+      },
+      "common": {
+        "links": 34081,
+        "before": 17452,
+        "after": 19075,
+        "beforeAssumed": 0,
+        "afterAssumed": 0
+      },
+      "compared": 0,
+      "lost": 0,
+      "symbolLoss": 0,
+      "symbolGain": 0
+    },
+    {
+      "id": "fjall-rs/fjall",
+      "before": {
+        "links": 13361,
+        "level2": 5916,
+        "assumed": 0,
+        "blank": 1374
+      },
+      "after": {
+        "links": 13361,
+        "level2": 5924,
+        "assumed": 0,
+        "blank": 0
+      },
+      "common": {
+        "links": 13361,
+        "before": 5916,
+        "after": 5924,
+        "beforeAssumed": 0,
+        "afterAssumed": 0
+      },
+      "compared": 0,
+      "lost": 0,
+      "symbolLoss": 0,
+      "symbolGain": 0
+    },
+    {
+      "id": "helix-editor/helix",
+      "before": {
+        "links": 90583,
+        "level2": 40237,
+        "assumed": 2491,
+        "blank": 13727
+      },
+      "after": {
+        "links": 90583,
+        "level2": 40430,
+        "assumed": 2491,
+        "blank": 0
+      },
+      "common": {
+        "links": 90583,
+        "before": 40237,
+        "after": 40430,
+        "beforeAssumed": 2491,
+        "afterAssumed": 2491
+      },
+      "compared": 0,
+      "lost": 0,
+      "symbolLoss": 0,
+      "symbolGain": 0
+    },
+    {
+      "id": "rust-embedded/cortex-m",
+      "before": {
+        "links": 5531,
+        "level2": 3047,
+        "assumed": 7,
+        "blank": 1051
+      },
+      "after": {
+        "links": 5531,
+        "level2": 3341,
+        "assumed": 7,
+        "blank": 0
+      },
+      "common": {
+        "links": 5531,
+        "before": 3047,
+        "after": 3341,
+        "beforeAssumed": 7,
+        "afterAssumed": 7
+      },
+      "compared": 0,
+      "lost": 0,
+      "symbolLoss": 0,
+      "symbolGain": 0
+    },
+    {
+      "id": "rustls/rustls",
+      "before": {
+        "links": 70802,
+        "level2": 20276,
+        "assumed": 299,
+        "blank": 9765
+      },
+      "after": {
+        "links": 70802,
+        "level2": 22910,
+        "assumed": 299,
+        "blank": 0
+      },
+      "common": {
+        "links": 70802,
+        "before": 20276,
+        "after": 22910,
+        "beforeAssumed": 299,
+        "afterAssumed": 299
+      },
+      "compared": 0,
+      "lost": 0,
+      "symbolLoss": 0,
+      "symbolGain": 0
+    },
+    {
+      "id": "serde-rs/serde",
+      "before": {
+        "links": 30714,
+        "level2": 8282,
+        "assumed": 0,
+        "blank": 4403
+      },
+      "after": {
+        "links": 30714,
+        "level2": 8297,
+        "assumed": 0,
+        "blank": 0
+      },
+      "common": {
+        "links": 30714,
+        "before": 8282,
+        "after": 8297,
+        "beforeAssumed": 0,
+        "afterAssumed": 0
+      },
+      "compared": 0,
+      "lost": 0,
+      "symbolLoss": 0,
+      "symbolGain": 0
+    },
+    {
+      "id": "tokio-rs/axum",
+      "before": {
+        "links": 41067,
+        "level2": 16213,
+        "assumed": 1144,
+        "blank": 6279
+      },
+      "after": {
+        "links": 41067,
+        "level2": 16381,
+        "assumed": 1144,
+        "blank": 0
+      },
+      "common": {
+        "links": 41067,
+        "before": 16213,
+        "after": 16381,
+        "beforeAssumed": 1144,
+        "afterAssumed": 1144
+      },
+      "compared": 0,
+      "lost": 0,
+      "symbolLoss": 0,
+      "symbolGain": 0
+    }
+  ],
+  "totals": {
+    "before": {
+      "links": 486329,
+      "level2": 203711,
+      "assumed": 7157,
+      "blank": 59736
+    },
+    "after": {
+      "links": 486329,
+      "level2": 213073,
+      "assumed": 7157,
+      "blank": 0
+    },
+    "common": {
+      "links": 486329,
+      "before": 203711,
+      "after": 213073,
+      "beforeAssumed": 7157,
+      "afterAssumed": 7157
+    }
+  },
+  "changes": [],
+  "classes": {
+    "glob import has no single symbol": {
+      "links": 691,
+      "proven": 0,
+      "assumed": 0,
+      "remaining": 691,
+      "missing": 0,
+      "uncertainty": {
+        "glob-import-has-no-single-symbol": 681,
+        "crate-placement-unavailable": 10
+      }
+    },
+    "blocked binding without an anchor": {
+      "links": 7725,
+      "proven": 0,
+      "assumed": 0,
+      "remaining": 7725,
+      "missing": 0,
+      "uncertainty": {
+        "lexical-binding-unverified": 7455,
+        "crate-placement-unavailable": 270
+      }
+    },
+    "prelude spelling: opaque-item-may-shadow-name": {
+      "links": 10434,
+      "proven": 1065,
+      "assumed": 0,
+      "remaining": 9369,
+      "missing": 0,
+      "uncertainty": {
+        "opaque-item-may-shadow-name": 9369
+      }
+    },
+    "Cargo path: import export namespace unavailable": {
+      "links": 1546,
+      "proven": 135,
+      "assumed": 0,
+      "remaining": 1411,
+      "missing": 0,
+      "uncertainty": {
+        "import-export-namespace-unverified": 1411
+      }
+    },
+    "local candidate failed binding or owner proof": {
+      "links": 22744,
+      "proven": 3,
+      "assumed": 0,
+      "remaining": 22741,
+      "missing": 0,
+      "uncertainty": {
+        "opaque-item-may-shadow-name": 21126,
+        "local-pattern-binding-unverified": 1042,
+        "namespace-binding-unverified": 71,
+        "opaque-item-may-shadow-name; dependency-presence-unverified": 3,
+        "dependency-presence-unverified": 19,
+        "opaque-item-may-shadow-name; dependency-presence-unverified; opaque-item-may-shadow-name; opaque-item-may-shadow-name": 1,
+        "opaque-item-may-shadow-name; dependency-presence-unverified; opaque-item-may-shadow-name": 10,
+        "opaque-item-may-shadow-name; edition-unverified": 1,
+        "conditional-name-may-be-absent": 51,
+        "opaque-item-may-shadow-name; namespace-binding-unverified; opaque-item-may-shadow-name": 28,
+        "namespace-binding-unverified; opaque-item-may-shadow-name": 11,
+        "conditional-name-may-be-absent; opaque-item-may-shadow-name": 246,
+        "item-under-opaque-attribute; opaque-item-may-shadow-name": 4,
+        "conditional module path lacks captured alternatives": 126,
+        "opaque-item-may-shadow-name; namespace-binding-unverified; dependency-presence-unverified; opaque-item-may-shadow-name": 2
+      }
+    },
+    "Self owner or member unavailable": {
+      "links": 346,
+      "proven": 0,
+      "assumed": 0,
+      "remaining": 346,
+      "missing": 0,
+      "uncertainty": {
+        "self-target-unverified": 289,
+        "crate-placement-unavailable": 57
+      }
+    },
+    "standard path: import export namespace unavailable": {
+      "links": 868,
+      "proven": 497,
+      "assumed": 0,
+      "remaining": 371,
+      "missing": 0,
+      "uncertainty": {
+        "import-export-namespace-unverified": 369,
+        "library-site-or-placement-unverified": 2
+      }
+    },
+    "Cargo path: associated-owner-unverified": {
+      "links": 148,
+      "proven": 0,
+      "assumed": 0,
+      "remaining": 148,
+      "missing": 0,
+      "uncertainty": {
+        "associated-owner-unverified": 148
+      }
+    },
+    "standard path: associated-owner-unverified": {
+      "links": 105,
+      "proven": 0,
+      "assumed": 0,
+      "remaining": 105,
+      "missing": 0,
+      "uncertainty": {
+        "associated-owner-unverified": 105
+      }
+    },
+    "no binding: opaque-item-may-shadow-name": {
+      "links": 2360,
+      "proven": 0,
+      "assumed": 0,
+      "remaining": 2360,
+      "missing": 0,
+      "uncertainty": {
+        "opaque-item-may-shadow-name": 2360
+      }
+    },
+    "crate unit only": {
+      "links": 108,
+      "proven": 0,
+      "assumed": 0,
+      "remaining": 108,
+      "missing": 0,
+      "uncertainty": {
+        "whole-crate-import": 108
+      }
+    },
+    "multiple checkout candidates": {
+      "links": 411,
+      "proven": 0,
+      "assumed": 0,
+      "remaining": 411,
+      "missing": 0,
+      "uncertainty": {
+        "multiple-checkout-candidates": 411
+      }
+    },
+    "no binding: no proven library binding": {
+      "links": 434,
+      "proven": 0,
+      "assumed": 0,
+      "remaining": 434,
+      "missing": 0,
+      "uncertainty": {
+        "name-binding-unverified": 434
+      }
+    },
+    "attribute identity unavailable": {
+      "links": 1434,
+      "proven": 0,
+      "assumed": 0,
+      "remaining": 1434,
+      "missing": 0,
+      "uncertainty": {
+        "opaque-item-may-shadow-name": 1175,
+        "library-path-unverified": 4,
+        "dependency-presence-unverified": 2,
+        "conditional-name-may-be-absent": 253
+      }
+    },
+    "no crate placement": {
+      "links": 2959,
+      "proven": 0,
+      "assumed": 0,
+      "remaining": 2959,
+      "missing": 0,
+      "uncertainty": {
+        "crate-placement-unavailable": 2959
+      }
+    },
+    "placement or edition unverified": {
+      "links": 1149,
+      "proven": 0,
+      "assumed": 0,
+      "remaining": 1149,
+      "missing": 0,
+      "uncertainty": {
+        "library-site-or-placement-unverified": 1149
+      }
+    },
+    "no binding: glob-import-unverified": {
+      "links": 5,
+      "proven": 0,
+      "assumed": 0,
+      "remaining": 5,
+      "missing": 0,
+      "uncertainty": {
+        "glob-import-unverified": 5
+      }
+    },
+    "no binding: unverified path": {
+      "links": 20,
+      "proven": 0,
+      "assumed": 0,
+      "remaining": 20,
+      "missing": 0,
+      "uncertainty": {
+        "library-path-unverified": 20
+      }
+    },
+    "no binding: site or placement unverified": {
+      "links": 29,
+      "proven": 0,
+      "assumed": 0,
+      "remaining": 29,
+      "missing": 0,
+      "uncertainty": {
+        "library-site-or-placement-unverified": 29
+      }
+    },
+    "no binding: dependency-presence-unverified": {
+      "links": 27,
+      "proven": 0,
+      "assumed": 0,
+      "remaining": 27,
+      "missing": 0,
+      "uncertainty": {
+        "dependency-presence-unverified": 27
+      }
+    },
+    "prelude spelling: no proven library binding": {
+      "links": 5992,
+      "proven": 5889,
+      "assumed": 0,
+      "remaining": 103,
+      "missing": 0,
+      "uncertainty": {
+        "shared-core-prelude-binding-unavailable": 25,
+        "library-site-or-placement-unverified": 77,
+        "associated-owner-unverified": 1
+      }
+    },
+    "standard path: no proven library binding": {
+      "links": 5,
+      "proven": 0,
+      "assumed": 0,
+      "remaining": 5,
+      "missing": 0,
+      "uncertainty": {
+        "name-binding-unverified": 4,
+        "import-export-namespace-unverified": 1
+      }
+    },
+    "prelude spelling: opaque-item-may-shadow-name; glob-import-unverified": {
+      "links": 2,
+      "proven": 0,
+      "assumed": 0,
+      "remaining": 2,
+      "missing": 0,
+      "uncertainty": {
+        "opaque-item-may-shadow-name; glob-import-unverified": 2
+      }
+    },
+    "Cargo path: macro implementation source unverified": {
+      "links": 4,
+      "proven": 0,
+      "assumed": 0,
+      "remaining": 4,
+      "missing": 0,
+      "uncertainty": {
+        "macro-implementation-source-unverified": 4
+      }
+    },
+    "prelude spelling: competing macro import": {
+      "links": 127,
+      "proven": 0,
+      "assumed": 0,
+      "remaining": 127,
+      "missing": 0,
+      "uncertainty": {
+        "competing-macro-import": 127
+      }
+    },
+    "no binding: competing macro import": {
+      "links": 3,
+      "proven": 0,
+      "assumed": 0,
+      "remaining": 3,
+      "missing": 0,
+      "uncertainty": {
+        "competing-macro-import": 3
+      }
+    },
+    "no binding: conditional-name-may-be-absent": {
+      "links": 34,
+      "proven": 33,
+      "assumed": 0,
+      "remaining": 1,
+      "missing": 0,
+      "uncertainty": {
+        "conditional-name-may-be-absent": 1
+      }
+    },
+    "prelude spelling: no library lookup": {
+      "links": 8,
+      "proven": 0,
+      "assumed": 0,
+      "remaining": 8,
+      "missing": 0,
+      "uncertainty": {
+        "library-site-or-placement-unverified": 8
+      }
+    },
+    "no binding: opaque-item-may-shadow-name; conditional-name-may-be-absent; opaque-item-may-shadow-name": {
+      "links": 1,
+      "proven": 1,
+      "assumed": 0,
+      "remaining": 0,
+      "missing": 0,
+      "uncertainty": {}
+    },
+    "no binding: cfg-condition-unverified": {
+      "links": 2,
+      "proven": 0,
+      "assumed": 0,
+      "remaining": 2,
+      "missing": 0,
+      "uncertainty": {
+        "library-site-or-placement-unverified": 2
+      }
+    },
+    "prelude spelling: glob-import-unverified": {
+      "links": 3,
+      "proven": 0,
+      "assumed": 0,
+      "remaining": 3,
+      "missing": 0,
+      "uncertainty": {
+        "glob-import-unverified": 3
+      }
+    },
+    "no binding: namespace-binding-unverified": {
+      "links": 12,
+      "proven": 0,
+      "assumed": 0,
+      "remaining": 12,
+      "missing": 0,
+      "uncertainty": {
+        "analysis-resolution-disagreement": 12
+      }
+    }
+  }
+}

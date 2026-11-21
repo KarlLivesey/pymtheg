@@ -1,0 +1,395 @@
+[
+  {
+    "pin": "withastro/astro",
+    "original": 1215,
+    "routes": [
+      {
+        "reason": "marked",
+        "manifest": "packages/integrations/svelte/package.json",
+        "config": "packages/integrations/svelte/tsconfig.build.json",
+        "output": "packages/integrations/svelte/dist/index.d.ts",
+        "links": 128
+      },
+      {
+        "reason": "marked",
+        "manifest": "packages/integrations/preact/package.json",
+        "config": "packages/integrations/preact/tsconfig.build.json",
+        "output": "packages/integrations/preact/dist/index.d.ts",
+        "links": 142
+      },
+      {
+        "reason": "marked",
+        "manifest": "packages/integrations/vercel/package.json",
+        "config": "packages/integrations/vercel/tsconfig.build.json",
+        "output": "packages/integrations/vercel/dist/index.d.ts",
+        "links": 69
+      },
+      {
+        "reason": "marked",
+        "manifest": "packages/integrations/react/package.json",
+        "config": "packages/integrations/react/tsconfig.build.json",
+        "output": "packages/integrations/react/dist/index.d.ts",
+        "links": 186
+      },
+      {
+        "reason": "marked",
+        "manifest": "packages/integrations/cloudflare/package.json",
+        "config": "packages/integrations/cloudflare/tsconfig.build.json",
+        "output": "packages/integrations/cloudflare/dist/index.d.ts",
+        "links": 138
+      },
+      {
+        "reason": "marked",
+        "manifest": "packages/integrations/markdoc/package.json",
+        "config": "packages/integrations/markdoc/tsconfig.build.json",
+        "output": "packages/integrations/markdoc/dist/config.d.ts",
+        "links": 88
+      },
+      {
+        "reason": "marked",
+        "manifest": "packages/integrations/markdoc/package.json",
+        "config": "packages/integrations/markdoc/tsconfig.build.json",
+        "output": "packages/integrations/markdoc/dist/index.d.ts",
+        "links": 75
+      },
+      {
+        "reason": "marked",
+        "manifest": "packages/integrations/solid/package.json",
+        "config": "packages/integrations/solid/tsconfig.build.json",
+        "output": "packages/integrations/solid/dist/index.d.ts",
+        "links": 72
+      },
+      {
+        "reason": "marked",
+        "manifest": "packages/integrations/vue/package.json",
+        "config": "packages/integrations/vue/tsconfig.build.json",
+        "output": "packages/integrations/vue/dist/index.d.ts",
+        "links": 123
+      },
+      {
+        "reason": "marked",
+        "manifest": "packages/integrations/react/package.json",
+        "config": "packages/integrations/react/tsconfig.build.json",
+        "output": "packages/integrations/react/dist/server.d.ts",
+        "links": 6
+      },
+      {
+        "reason": "marked",
+        "manifest": "packages/integrations/netlify/package.json",
+        "config": "packages/integrations/netlify/tsconfig.build.json",
+        "output": "packages/integrations/netlify/dist/index.d.ts",
+        "links": 30
+      },
+      {
+        "reason": "marked",
+        "manifest": "packages/integrations/node/package.json",
+        "config": "packages/integrations/node/tsconfig.build.json",
+        "output": "packages/integrations/node/dist/index.d.ts",
+        "links": 66
+      },
+      {
+        "reason": "marked",
+        "manifest": "packages/renderers/svelte/package.json",
+        "config": "packages/renderers/svelte/tsconfig.build.json",
+        "output": "packages/renderers/svelte/dist/index.d.ts",
+        "links": 3
+      },
+      {
+        "reason": "marked",
+        "manifest": "packages/integrations/partytown/package.json",
+        "config": "packages/integrations/partytown/tsconfig.build.json",
+        "output": "packages/integrations/partytown/dist/index.d.ts",
+        "links": 3
+      },
+      {
+        "reason": "marked",
+        "manifest": "packages/renderers/solid-js/package.json",
+        "config": "packages/renderers/solid-js/tsconfig.build.json",
+        "output": "packages/renderers/solid-js/dist/index.d.ts",
+        "links": 3
+      },
+      {
+        "reason": "marked",
+        "manifest": "packages/markdown/satteri/package.json",
+        "config": "packages/markdown/satteri/tsconfig.build.json",
+        "output": "packages/markdown/satteri/dist/index.d.ts",
+        "links": 6
+      },
+      {
+        "reason": "marked",
+        "manifest": "packages/integrations/alpinejs/package.json",
+        "config": "packages/integrations/alpinejs/tsconfig.build.json",
+        "output": "packages/integrations/alpinejs/dist/index.d.ts",
+        "links": 12
+      },
+      {
+        "reason": "marked",
+        "manifest": "packages/vite-plugin-astro/package.json",
+        "config": "packages/vite-plugin-astro/tsconfig.build.json",
+        "output": "packages/vite-plugin-astro/dist/index.d.ts",
+        "links": 24
+      },
+      {
+        "reason": "marked",
+        "manifest": "packages/integrations/cloudflare/package.json",
+        "config": "packages/integrations/cloudflare/tsconfig.build.json",
+        "output": "packages/integrations/cloudflare/dist/utils/handler.d.ts",
+        "links": 4
+      },
+      {
+        "reason": "marked",
+        "manifest": "packages/integrations/cloudflare/package.json",
+        "config": "packages/integrations/cloudflare/tsconfig.build.json",
+        "output": "packages/integrations/cloudflare/dist/cache/index.d.ts",
+        "links": 9
+      },
+      {
+        "reason": "marked",
+        "manifest": "packages/integrations/vue/package.json",
+        "config": "packages/integrations/vue/tsconfig.build.json",
+        "output": "packages/integrations/vue/dist/server.d.ts",
+        "links": 2
+      },
+      {
+        "reason": "marked",
+        "manifest": "packages/renderers/vue/package.json",
+        "config": "packages/renderers/vue/tsconfig.build.json",
+        "output": "packages/renderers/vue/dist/index.d.ts",
+        "links": 3
+      },
+      {
+        "reason": "marked",
+        "manifest": "packages/astro-rss/package.json",
+        "config": "packages/astro-rss/tsconfig.build.json",
+        "output": "packages/astro-rss/dist/index.d.ts",
+        "links": 3
+      },
+      {
+        "reason": "marked",
+        "manifest": "packages/renderers/react/package.json",
+        "config": "packages/renderers/react/tsconfig.build.json",
+        "output": "packages/renderers/react/dist/index.d.ts",
+        "links": 9
+      },
+      {
+        "reason": "marked",
+        "manifest": "packages/markdown/remark/package.json",
+        "config": "packages/markdown/remark/tsconfig.build.json",
+        "output": "packages/markdown/remark/dist/index.d.ts",
+        "links": 6
+      },
+      {
+        "reason": "marked",
+        "manifest": "packages/astro-prism/package.json",
+        "config": "packages/astro-prism/tsconfig.build.json",
+        "output": "packages/astro-prism/dist/highlighter.d.ts",
+        "links": 1
+      },
+      {
+        "reason": "marked",
+        "manifest": "packages/renderers/preact/package.json",
+        "config": "packages/renderers/preact/tsconfig.build.json",
+        "output": "packages/renderers/preact/dist/index.d.ts",
+        "links": 3
+      },
+      {
+        "reason": "other",
+        "manifest": "packages/language-tools/astro-check/package.json",
+        "config": "packages/language-tools/astro-check/tsconfig.build.json",
+        "output": "packages/language-tools/astro-check/dist/index.d.ts",
+        "links": 1
+      }
+    ]
+  },
+  {
+    "pin": "mermaid-js/mermaid",
+    "original": 140,
+    "routes": [
+      {
+        "reason": "declaration-rollup",
+        "manifest": "packages/parser/package.json",
+        "config": "packages/parser/tsconfig.json",
+        "output": "packages/parser/dist/src/index.d.ts",
+        "links": 74
+      },
+      {
+        "reason": "marked",
+        "manifest": "packages/mermaid/package.json",
+        "config": "packages/mermaid/tsconfig.json",
+        "output": "packages/mermaid/dist/mermaid.d.ts",
+        "links": 66
+      }
+    ]
+  },
+  {
+    "pin": "puppeteer/puppeteer",
+    "original": 312,
+    "routes": [
+      {
+        "reason": "wireit-wrapper",
+        "manifest": "packages/testserver/package.json",
+        "config": "packages/testserver/tsconfig.json",
+        "output": "packages/testserver/lib/index.d.ts",
+        "links": 218
+      },
+      {
+        "reason": "declaration-rollup",
+        "manifest": "packages/browsers/package.json",
+        "config": "packages/browsers/tsconfig.json",
+        "output": "packages/browsers/lib/main.d.ts",
+        "links": 94
+      }
+    ]
+  },
+  {
+    "pin": "reduxjs/redux-toolkit",
+    "original": 74,
+    "routes": [
+      {
+        "reason": "declaration-rollup",
+        "manifest": "packages/toolkit/package.json",
+        "config": "packages/toolkit/tsconfig.build.json",
+        "output": "packages/toolkit/dist/index.d.ts",
+        "links": 44
+      },
+      {
+        "reason": "declaration-rollup",
+        "manifest": "packages/toolkit/package.json",
+        "config": "packages/toolkit/tsconfig.build.json",
+        "output": "packages/toolkit/dist/query/react/index.d.ts",
+        "links": 7
+      },
+      {
+        "reason": "declaration-rollup",
+        "manifest": "packages/toolkit/package.json",
+        "config": "packages/toolkit/tsconfig.build.json",
+        "output": "packages/toolkit/dist/query/index.d.ts",
+        "links": 19
+      },
+      {
+        "reason": "declaration-rollup",
+        "manifest": "packages/toolkit/package.json",
+        "config": "packages/toolkit/tsconfig.build.json",
+        "output": "packages/toolkit/dist/react/index.d.ts",
+        "links": 4
+      }
+    ]
+  },
+  {
+    "pin": "honojs/hono",
+    "original": 525,
+    "routes": [
+      {
+        "reason": "marked",
+        "manifest": "package.json",
+        "config": "tsconfig.build.json",
+        "output": "dist/types/index.d.ts",
+        "links": 316
+      },
+      {
+        "reason": "marked",
+        "manifest": "package.json",
+        "config": "tsconfig.build.json",
+        "output": "dist/types/helper/websocket/index.d.ts",
+        "links": 41
+      },
+      {
+        "reason": "marked",
+        "manifest": "package.json",
+        "config": "tsconfig.build.json",
+        "output": "dist/types/types.d.ts",
+        "links": 73
+      },
+      {
+        "reason": "marked",
+        "manifest": "package.json",
+        "config": "tsconfig.build.json",
+        "output": "dist/types/helper/conninfo/index.d.ts",
+        "links": 20
+      },
+      {
+        "reason": "marked",
+        "manifest": "package.json",
+        "config": "tsconfig.build.json",
+        "output": "dist/types/helper/ssg/index.d.ts",
+        "links": 8
+      },
+      {
+        "reason": "marked",
+        "manifest": "package.json",
+        "config": "tsconfig.build.json",
+        "output": "dist/types/middleware/basic-auth/index.d.ts",
+        "links": 6
+      },
+      {
+        "reason": "marked",
+        "manifest": "package.json",
+        "config": "tsconfig.build.json",
+        "output": "dist/types/helper/streaming/index.d.ts",
+        "links": 9
+      },
+      {
+        "reason": "marked",
+        "manifest": "package.json",
+        "config": "tsconfig.build.json",
+        "output": "dist/types/middleware/serve-static/index.d.ts",
+        "links": 12
+      },
+      {
+        "reason": "marked",
+        "manifest": "package.json",
+        "config": "tsconfig.build.json",
+        "output": "dist/types/utils/encode.d.ts",
+        "links": 17
+      },
+      {
+        "reason": "marked",
+        "manifest": "package.json",
+        "config": "tsconfig.build.json",
+        "output": "dist/types/helper/cookie/index.d.ts",
+        "links": 17
+      },
+      {
+        "reason": "marked",
+        "manifest": "package.json",
+        "config": "tsconfig.build.json",
+        "output": "dist/types/middleware/body-limit/index.d.ts",
+        "links": 6
+      }
+    ]
+  },
+  {
+    "pin": "excalidraw/excalidraw",
+    "original": 50,
+    "routes": [
+      {
+        "reason": "marked",
+        "manifest": "packages/excalidraw/package.json",
+        "config": "packages/excalidraw/tsconfig.json",
+        "output": "packages/excalidraw/dist/types/excalidraw/types.d.ts",
+        "links": 30
+      },
+      {
+        "reason": "marked",
+        "manifest": "packages/excalidraw/package.json",
+        "config": "packages/excalidraw/tsconfig.json",
+        "output": "packages/excalidraw/dist/types/excalidraw/index.d.ts",
+        "links": 16
+      },
+      {
+        "reason": "marked",
+        "manifest": "packages/excalidraw/package.json",
+        "config": "packages/excalidraw/tsconfig.json",
+        "output": "packages/excalidraw/dist/types/excalidraw/data/types.d.ts",
+        "links": 3
+      },
+      {
+        "reason": "marked",
+        "manifest": "packages/common/package.json",
+        "config": "packages/common/tsconfig.json",
+        "output": "packages/common/dist/types/common/src/index.d.ts",
+        "links": 1
+      }
+    ]
+  }
+]
