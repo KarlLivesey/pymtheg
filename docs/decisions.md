@@ -2965,6 +2965,21 @@ output and source, following the receiver's own binding when needed.
 An assumed answer without attributable provenance stays on the ordinary route.
 [C-25](changes/C-25.md)
 
+### C-30 Shared base configs do not own files
+
+A config that other configs extend, that names no `files` or `include` of
+its own, that is not named `tsconfig.json` or `jsconfig.json`, and that no
+project reference or package script (`tsc -p`, resolved from the package
+directory) names, is a shared base. The compiler would select every file
+below it, but no tool compiles it as a project. The editor opens only
+`tsconfig.json` and `jsconfig.json` files and the projects they reference,
+and `tsc --build` builds only referenced projects. A shared base therefore
+does not compete for a file that a project config also includes. When it
+is the only config that includes a file, it still owns that file. The
+ranking among project configs is unchanged: two project configs that tie
+are still analysed under both and merged.
+[C-30](changes/C-30.md)
+
 ### C-13 TypeScript program budget and compiler exceptions
 
 **Decided (C-13):** one TypeScript program is given at most 50,000,000

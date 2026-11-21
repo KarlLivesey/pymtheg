@@ -776,6 +776,10 @@ export function projectModel(
     claimed.set(path, list);
   };
   const unreadable: ProjectGroup[] = [];
+  // Configs another config extends, and configs a project reference names:
+  // together they decide which configs are only shared bases (below).
+  const extended = new Set<string>();
+  const referenced = new Set<string>();
   const configs = contexts
     .filter((file) => isConfig(file.path))
     .sort((a, b) => compare(a.path, b.path));
@@ -881,6 +885,7 @@ export function projectModel(
         }
         if (seen.has(context.path)) continue;
         seen.add(context.path);
+        extended.add(context.path);
         const baseSource = ts.parseJsonText(
           toVirtual(context.path),
           context.text,
@@ -928,6 +933,10 @@ export function projectModel(
       const target = posix.normalize(
         posix.join(posix.dirname(toVirtual(config.path)), value),
       );
+      const named = fromVirtual(
+        fs.fileExists(target) ? target : posix.join(target, "tsconfig.json"),
+      );
+      if (named !== undefined) referenced.add(named);
       if (
         !fs.fileExists(target) &&
         !fs.fileExists(posix.join(target, "tsconfig.json"))
@@ -1026,6 +1035,59 @@ export function projectModel(
       )
         claim(file.path, group);
   }
+  // A shared base: a config that other configs extend, that names no files
+  // of its own (so the compiler's default selects everything below it), and
+  // that no tool opens as a project. The editor opens only `tsconfig.json`
+  // and `jsconfig.json` files and the projects they reference; `tsc --build`
+  // builds only referenced projects; a package script may name it with
+  // `-p`. Such a config is never compiled as a project, so it does not
+  // compete for a file that a project config also includes.
+  // Config files a package script names (`tsc -p tsconfig.check.json`),
+  // resolved from the package directory and any `cd` earlier in the script.
+  const scriptConfigs = new Set<string>();
+  for (const file of contexts) {
+    if (posix.basename(file.path) !== "package.json") continue;
+    let scripts: unknown;
+    try {
+      scripts = (
+        JSON.parse(file.text.replace(/^\uFEFF/, "")) as { scripts?: unknown }
+      ).scripts;
+    } catch {
+      continue;
+    }
+    if (!scripts || typeof scripts !== "object") continue;
+    for (const script of Object.values(scripts)) {
+      if (typeof script !== "string") continue;
+      let directory = posix.dirname(file.path);
+      for (const command of script.split(/&&|\|\||;/)) {
+        const words = command
+          .trim()
+          .split(/[\s"'=]+/)
+          .filter(Boolean);
+        if (words[0] === "cd" && words[1]) {
+          directory = posix.normalize(posix.join(directory, words[1]));
+          continue;
+        }
+        for (const word of words)
+          if (word.endsWith(".json"))
+            scriptConfigs.add(posix.normalize(posix.join(directory, word)));
+      }
+    }
+  }
+  const sharedBase = (group: ProjectGroup) => {
+    const config = group.config;
+    if (
+      config === null ||
+      group.failure ||
+      group.explicitSelection ||
+      !extended.has(config) ||
+      referenced.has(config) ||
+      scriptConfigs.has(config)
+    )
+      return false;
+    const name = posix.basename(config);
+    return name !== "tsconfig.json" && name !== "jsconfig.json";
+  };
   const owner = new Map<string, ProjectGroup>();
   const ties = new Map<string, ProjectGroup[]>();
   const failures = new Map<string, string>();
@@ -1043,7 +1105,9 @@ export function projectModel(
         configPreference(group.config!),
       ];
     };
-    const candidates = (claimed.get(file.path) ?? []).sort((a, b) => {
+    const including = claimed.get(file.path) ?? [];
+    const projects = including.filter((group) => !sharedBase(group));
+    const candidates = (projects.length ? projects : including).sort((a, b) => {
       const [x, y] = [rank(a), rank(b)];
       return (
         x[0]! - y[0]! ||
