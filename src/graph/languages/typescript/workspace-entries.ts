@@ -488,6 +488,7 @@ export function entryProvenance(
     return hidden;
   }
   return {
+    hasEntries: reachable.size > 0,
     forSpecifier(literal: ts.StringLiteralLike) {
       const resolved =
         compiler.getResolvedModuleFromModuleSpecifier(literal)?.resolvedModule;

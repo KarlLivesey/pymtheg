@@ -2921,12 +2921,14 @@ exact output path. Build-mode references can establish the selected config
 for a scriptless child. Other unique configured declaration outputs can
 use `ts-unbuilt-entry-is-compiler-emit`, a recorded assumption that the
 package build preserves the compiler's exports at the entry. A known
-declaration rollup, competing command-line entry, missing declaration
-emit, output rewrite or stripped annotation withholds the projection.
+declaration rollup, competing command-line entry, opaque or mismatched
+bundler config, compiler mapping override, missing declaration emit,
+output rewrite or stripped annotation withholds the projection.
 TypeScript selects the package and condition in the importing program.
 Existing destinations from the program without the assumption take
 priority. Recovered checkout links record the manifest, config, missing
-output and source.
+output and source, following the receiver's own binding when needed.
+An assumed answer without attributable provenance stays on the ordinary route.
 [C-25](changes/C-25.md)
 
 ### C-13 TypeScript program budget and compiler exceptions

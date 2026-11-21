@@ -109,7 +109,7 @@ import {
  * facts; resolve maps those facts to symbol IDs. See docs/changes/W2-D.md.
  */
 // Bump the leading number whenever extraction or resolution semantics change.
-const MODULE_VERSION = `40+typescript-${ts.version}`;
+const MODULE_VERSION = `41+typescript-${ts.version}`;
 
 /** Observation counters for tests (programs built, files extracted). Not a correctness input. */
 export const statistics = {
@@ -566,6 +566,13 @@ function withWorkspaceAssumptions(
       )
         return previous;
       if (changed || entry?.assumed) {
+        if (!entry?.assumed) {
+          if (previous) return previous;
+          delete data.targets;
+          delete data.libraryFacts;
+          data.reason = "workspace-build-output-missing";
+          return { ...link, data };
+        }
         assume(data, unbuiltEntryAssumption);
         return { ...link, data };
       }
@@ -813,6 +820,32 @@ export function mergeTied(
         (data) => (Array.isArray(data.assumes) ? data.assumes : []) as string[],
       ),
     );
+    const assumptions = merged.assumes as string[] | undefined;
+    if (assumptions?.includes(unbuiltEntryAssumption)) {
+      const entries = new Map(
+        datas
+          .filter((data) =>
+            (data.assumes as string[] | undefined)?.includes(
+              unbuiltEntryAssumption,
+            ),
+          )
+          .map((data) => [
+            JSON.stringify(data.unbuiltEntry),
+            data.unbuiltEntry,
+          ]),
+      );
+      if (entries.size === 1)
+        merged.unbuiltEntry = entries.values().next().value!;
+      else {
+        delete merged.unbuiltEntry;
+        delete merged.targets;
+        delete merged.libraryFacts;
+        merged.reason = "ambiguous-project";
+        merged.assumes = assumptions.filter(
+          (name) => name !== unbuiltEntryAssumption,
+        );
+      }
+    }
     return { ...link, data: merged };
   });
   const diagnostics = [

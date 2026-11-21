@@ -3129,6 +3129,143 @@ test("a configured unbundled export records its emit assumption without replacin
   );
 });
 
+test("a visible bundler config must name the mapped source literally", async () => {
+  const variants = {
+    alternate:
+      'export default defineConfig({entry: {index: "src/actual.ts"}, dts: true});',
+    opaque:
+      "export default defineConfig({entry: {index: chooseEntry()}, dts: true});",
+    matching:
+      'export default defineConfig({entry: {index: "./src/index.ts"}, dts: true});',
+  };
+  await project(
+    {
+      "package.json": '{"workspaces":["packages/*"]}',
+      ...Object.fromEntries(
+        Object.entries(variants).flatMap(([name, config]) => [
+          [
+            `packages/${name}/package.json`,
+            JSON.stringify({
+              name,
+              types: "dist/index.d.ts",
+              scripts: { build: "tsup" },
+            }),
+          ],
+          [
+            `packages/${name}/tsconfig.build.json`,
+            '{"compilerOptions":{"declaration":true,"rootDir":"src","outDir":"dist"},"files":["src/index.ts"]}',
+          ],
+          [`packages/${name}/src/index.ts`, "export function run() {}"],
+          [`packages/${name}/src/actual.ts`, "export function run() {}"],
+          [
+            `packages/${name}/tsup.config.ts`,
+            `import { defineConfig } from "tsup"; ${config}`,
+          ],
+        ]),
+      ),
+      "app.ts": Object.keys(variants)
+        .map((name) => `import {run as ${name}} from "${name}"; ${name}();`)
+        .join("\n"),
+    },
+    async (graph, report) => {
+      clean(report);
+      for (const name of ["alternate", "opaque"]) {
+        const call = graph.link("app.ts", name, "calls");
+        assert.equal(call.resolution, "unresolved");
+        assert.equal(call.data.reason, "workspace-build-output-missing");
+      }
+      const call = graph.link("app.ts", "matching", "calls");
+      assert.equal(graph.target(call), "packages/matching/src/index.ts#run");
+      assert.deepEqual(call.data.assumes, [
+        "ts-unbuilt-entry-is-compiler-emit",
+      ]);
+    },
+  );
+});
+
+test("compiler command-line mapping overrides prevent the entry assumption", async () => {
+  const variants = {
+    override: "tsc -p tsconfig.build.json --rootDir release",
+    explicit: "tsc src/index.ts",
+    opaque: "tsc -p tsconfig.build.json --unknown",
+    harmless: "tsc --project=tsconfig.build.json --pretty false",
+  };
+  await project(
+    {
+      "package.json": '{"workspaces":["packages/*"]}',
+      ...Object.fromEntries(
+        Object.entries(variants).flatMap(([name, build]) => [
+          [
+            `packages/${name}/package.json`,
+            JSON.stringify({
+              name,
+              types: "dist/index.d.ts",
+              scripts: { build },
+            }),
+          ],
+          [
+            `packages/${name}/tsconfig.build.json`,
+            '{"compilerOptions":{"declaration":true,"rootDir":"src","outDir":"dist"},"files":["src/index.ts"]}',
+          ],
+          [`packages/${name}/src/index.ts`, "export function run() {}"],
+        ]),
+      ),
+      "app.ts": Object.keys(variants)
+        .map((name) => `import {run as ${name}} from "${name}"; ${name}();`)
+        .join("\n"),
+    },
+    async (graph, report) => {
+      clean(report);
+      for (const name of ["override", "explicit", "opaque"]) {
+        const call = graph.link("app.ts", name, "calls");
+        assert.equal(call.resolution, "unresolved");
+        assert.equal(call.data.reason, "workspace-build-output-missing");
+      }
+      const call = graph.link("app.ts", "harmless", "calls");
+      assert.equal(graph.target(call), "packages/harmless/src/index.ts#run");
+      assert.deepEqual(call.data.assumes, [
+        "ts-unbuilt-entry-is-compiler-emit",
+      ]);
+    },
+  );
+});
+
+test("a member keeps the assumed entry that supplied its receiver type", async () => {
+  await project(
+    {
+      "package.json": '{"workspaces":["packages/*"]}',
+      "packages/fixture-lib/package.json":
+        '{"name":"fixture-lib","types":"dist/index.d.ts","scripts":{"build":"tsup"}}',
+      "packages/fixture-lib/tsconfig.build.json":
+        '{"compilerOptions":{"declaration":true,"rootDir":"src","outDir":"dist"},"include":["src"]}',
+      "packages/fixture-lib/src/index.ts":
+        'import { Helper } from "./helper"; export function open(): Helper { return new Helper(); }',
+      "packages/fixture-lib/src/helper.ts": "export class Helper { run() {} }",
+      "app.ts":
+        'import type { Helper } from "./packages/fixture-lib/src/helper"; import { open } from "fixture-lib"; open().run();',
+    },
+    async (graph, report) => {
+      clean(report);
+      const call = graph.link("app.ts", "run", "calls");
+      assert.equal(
+        graph.target(call),
+        "packages/fixture-lib/src/helper.ts#Helper.run",
+      );
+      assert.deepEqual(call.data.assumes, [
+        "ts-unbuilt-entry-is-compiler-emit",
+      ]);
+      assert.deepEqual(call.data.unbuiltEntry, {
+        proof: "tsconfig-emit",
+        build: "packages/fixture-lib/package.json",
+        assumed: true,
+        config: "packages/fixture-lib/tsconfig.build.json",
+        output: "packages/fixture-lib/dist/index.d.ts",
+        source: "packages/fixture-lib/src/index.ts",
+      });
+    },
+  );
+});
+
 test("a JavaScript-only emit cannot lend the TypeScript source's types or values", async () => {
   await project(
     {

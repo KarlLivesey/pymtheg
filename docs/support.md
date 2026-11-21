@@ -801,11 +801,14 @@ answer.
   An unproved build yields a link carrying
   `ts-unbuilt-entry-is-compiler-emit` in `data.assumes` if the checkout has
   no contrary evidence. Known declaration rollups, different command-line
-  entries, entry rewrites, missing JavaScript-only emit and stripped internal
+  entries, opaque or mismatched bundler configs, compiler mapping overrides,
+  entry rewrites, missing JavaScript-only emit and stripped internal
   declarations leave the affected links unresolved. Normal compiler
   lookup handles `paths`, export conditions and built entries first.
   Followed links expose the manifest, config, output and source in
-  `data.unbuiltEntry`.
+  `data.unbuiltEntry`. An assumption-backed member link records the entry
+  that supplied its receiver type when the declaring file is also imported
+  directly.
   [C-25](changes/C-25.md)
 - **Unresolved:** outside members whose receiver or declaration is unverified
   (`external`, `external-package`); computed `require` or `import()` specifiers;

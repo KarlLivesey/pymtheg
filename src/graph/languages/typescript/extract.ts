@@ -2085,6 +2085,48 @@ export function extractFile(
       )
     );
   }
+  /** Follow the receiver's own binding before considering file reachability.
+   * An independent import can load the member's declaring file without
+   * supplying the receiver type at this use. */
+  function receiverEntry(receiver: ts.Expression): UnbuiltEntry | undefined {
+    const seen = new Set<ts.Symbol>();
+    let value: ts.Node = receiver;
+    while (true) {
+      if (
+        ts.isPropertyAccessExpression(value) ||
+        ts.isElementAccessExpression(value) ||
+        ts.isCallExpression(value) ||
+        ts.isNewExpression(value) ||
+        ts.isParenthesizedExpression(value) ||
+        ts.isNonNullExpression(value) ||
+        ts.isAwaitExpression(value)
+      ) {
+        value = value.expression;
+        continue;
+      }
+      if (!ts.isIdentifier(value)) return;
+      const symbol = symbolOf(value);
+      if (!symbol || symbol === LIMIT || seen.has(symbol)) return;
+      seen.add(symbol);
+      for (const alias of aliasChain(checker, symbol)) {
+        const specifier = bindingSpecifier(alias);
+        if (specifier && ts.isStringLiteralLike(specifier)) {
+          const entry = context.unbuilt?.forSpecifier(specifier);
+          if (entry) return entry;
+        }
+      }
+      const declaration = symbol.valueDeclaration;
+      if (
+        !declaration ||
+        !ts.isVariableDeclaration(declaration) ||
+        declaration.type ||
+        !declaration.initializer ||
+        !(declaration.parent.flags & ts.NodeFlags.Const)
+      )
+        return;
+      value = declaration.initializer;
+    }
+  }
   function link(
     sourceKey: string,
     kind: string,
@@ -2157,18 +2199,25 @@ export function extractFile(
         }));
     }
     if (reason) facts.reason = reason;
-    if (!reason && found.targets.length) {
+    if (
+      !reason &&
+      context.unbuilt?.hasEntries &&
+      (found.targets.length || found.libraryFacts?.length)
+    ) {
+      const binding =
+        found.unbuiltEntry ?? (found.receiver && receiverEntry(found.receiver));
+      const first = found.targets[0];
+      const reachable = first && context.unbuilt.forTarget(path, first.file);
       const entry =
-        found.unbuiltEntry ??
-        context.unbuilt?.forTarget(path, found.targets[0]!.file);
-      if (
-        entry &&
-        (found.unbuiltEntry ||
-          found.targets.every(
-            (target) => context.unbuilt?.forTarget(path, target.file) === entry,
-          ))
-      )
-        facts.unbuiltEntry = { ...entry };
+        binding ??
+        (reachable &&
+        found.targets.every(
+          (target) =>
+            context.unbuilt?.forTarget(path, target.file) === reachable,
+        )
+          ? reachable
+          : undefined);
+      if (entry) facts.unbuiltEntry = { ...entry };
     }
     if (found.competingTypes) facts.competingTypes = [...found.competingTypes];
     links.push({
