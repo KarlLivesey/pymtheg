@@ -1,0 +1,380 @@
+{
+  "mainCommit": "0ccd239ad256e93960460b2fb0104e687aad32b1",
+  "reviewedCommit": "609eda8ed2eaad8a88863ed23cb20f645c4634cf",
+  "compilerControls": {
+    "noCoreImplicitSysroot": [
+      "E0433",
+      "E0433"
+    ],
+    "noCoreExplicitCore": "accepted",
+    "macroUsePingAndDefaultDerive": "accepted"
+  },
+  "totals": {
+    "links": 486329,
+    "mainDefiniteChecked": 92306,
+    "mainDefiniteChanged": 0,
+    "reviewedOutcomesChanged": 0,
+    "belowLevel2WithoutReason": 0,
+    "gains": {
+      "retry": 2240,
+      "ordinary": 7122
+    },
+    "gainsAlreadyReasonedOnMain": {
+      "retry": 1174,
+      "ordinary": 565
+    },
+    "reasonClassesChecked": {
+      "localPatterns": 1042,
+      "macroImports": 130,
+      "deriveImports": 0
+    },
+    "changedReasons": {
+      "localPlacement": 122,
+      "macroUse": 130,
+      "outerDeriveMacroUse": 0
+    }
+  },
+  "pins": [
+    {
+      "id": "BurntSushi/ripgrep",
+      "commit": "178cc027e283fd965cb72d0a7395b219eada170c",
+      "links": 39819,
+      "level2": {
+        "main": 26104,
+        "reviewed": 26172,
+        "final": 26172
+      },
+      "mainDefiniteChecked": 26108,
+      "mainDefiniteChanged": 0,
+      "reviewedOutcomesChanged": 0,
+      "belowLevel2WithoutReason": 0,
+      "noCoreFiles": [],
+      "gains": {
+        "retry": 0,
+        "ordinary": 68
+      },
+      "gainsAlreadyReasonedOnMain": {
+        "retry": 0,
+        "ordinary": 5
+      },
+      "reasonClassesChecked": {
+        "localPatterns": 16,
+        "macroImports": 0,
+        "deriveImports": 0
+      },
+      "changedReasons": {
+        "localPlacement": 0,
+        "macroUse": 0,
+        "outerDeriveMacroUse": 0
+      }
+    },
+    {
+      "id": "actix/actix-web",
+      "commit": "3c6ea6acf52d9e6f41207222b672774246be7205",
+      "links": 86640,
+      "level2": {
+        "main": 34923,
+        "reviewed": 35509,
+        "final": 35509
+      },
+      "mainDefiniteChecked": 34936,
+      "mainDefiniteChanged": 0,
+      "reviewedOutcomesChanged": 0,
+      "belowLevel2WithoutReason": 0,
+      "noCoreFiles": [],
+      "gains": {
+        "retry": 0,
+        "ordinary": 586
+      },
+      "gainsAlreadyReasonedOnMain": {
+        "retry": 0,
+        "ordinary": 289
+      },
+      "reasonClassesChecked": {
+        "localPatterns": 127,
+        "macroImports": 0,
+        "deriveImports": 0
+      },
+      "changedReasons": {
+        "localPlacement": 4,
+        "macroUse": 0,
+        "outerDeriveMacroUse": 0
+      }
+    },
+    {
+      "id": "cberner/redb",
+      "commit": "357f8bf3f554e85bff1c6c605713ae57c3901006",
+      "links": 73731,
+      "level2": {
+        "main": 31261,
+        "reviewed": 35034,
+        "final": 35034
+      },
+      "mainDefiniteChecked": 31262,
+      "mainDefiniteChanged": 0,
+      "reviewedOutcomesChanged": 0,
+      "belowLevel2WithoutReason": 0,
+      "noCoreFiles": [],
+      "gains": {
+        "retry": 1616,
+        "ordinary": 2157
+      },
+      "gainsAlreadyReasonedOnMain": {
+        "retry": 815,
+        "ordinary": 13
+      },
+      "reasonClassesChecked": {
+        "localPatterns": 679,
+        "macroImports": 0,
+        "deriveImports": 0
+      },
+      "changedReasons": {
+        "localPlacement": 0,
+        "macroUse": 0,
+        "outerDeriveMacroUse": 0
+      }
+    },
+    {
+      "id": "crossbeam-rs/crossbeam",
+      "commit": "a28f40fdddb70bea8e5faf0efad9af0be4b9dbea",
+      "links": 34081,
+      "level2": {
+        "main": 17452,
+        "reviewed": 19075,
+        "final": 19075
+      },
+      "mainDefiniteChecked": 0,
+      "mainDefiniteChanged": 0,
+      "reviewedOutcomesChanged": 0,
+      "belowLevel2WithoutReason": 0,
+      "noCoreFiles": [],
+      "gains": {
+        "retry": 49,
+        "ordinary": 1574
+      },
+      "gainsAlreadyReasonedOnMain": {
+        "retry": 33,
+        "ordinary": 2
+      },
+      "reasonClassesChecked": {
+        "localPatterns": 42,
+        "macroImports": 0,
+        "deriveImports": 0
+      },
+      "changedReasons": {
+        "localPlacement": 9,
+        "macroUse": 0,
+        "outerDeriveMacroUse": 0
+      }
+    },
+    {
+      "id": "fjall-rs/fjall",
+      "commit": "87006048139bfe1b072bbc29a5a92bf1f97628e3",
+      "links": 13361,
+      "level2": {
+        "main": 5916,
+        "reviewed": 5924,
+        "final": 5924
+      },
+      "mainDefiniteChecked": 0,
+      "mainDefiniteChanged": 0,
+      "reviewedOutcomesChanged": 0,
+      "belowLevel2WithoutReason": 0,
+      "noCoreFiles": [],
+      "gains": {
+        "retry": 0,
+        "ordinary": 8
+      },
+      "gainsAlreadyReasonedOnMain": {
+        "retry": 0,
+        "ordinary": 0
+      },
+      "reasonClassesChecked": {
+        "localPatterns": 1,
+        "macroImports": 0,
+        "deriveImports": 0
+      },
+      "changedReasons": {
+        "localPlacement": 0,
+        "macroUse": 0,
+        "outerDeriveMacroUse": 0
+      }
+    },
+    {
+      "id": "helix-editor/helix",
+      "commit": "872b240251876e56787ad7ec312cefae70e3e28e",
+      "links": 90583,
+      "level2": {
+        "main": 40237,
+        "reviewed": 40430,
+        "final": 40430
+      },
+      "mainDefiniteChecked": 0,
+      "mainDefiniteChanged": 0,
+      "reviewedOutcomesChanged": 0,
+      "belowLevel2WithoutReason": 0,
+      "noCoreFiles": [],
+      "gains": {
+        "retry": 0,
+        "ordinary": 193
+      },
+      "gainsAlreadyReasonedOnMain": {
+        "retry": 0,
+        "ordinary": 87
+      },
+      "reasonClassesChecked": {
+        "localPatterns": 100,
+        "macroImports": 130,
+        "deriveImports": 0
+      },
+      "changedReasons": {
+        "localPlacement": 89,
+        "macroUse": 130,
+        "outerDeriveMacroUse": 0
+      }
+    },
+    {
+      "id": "rust-embedded/cortex-m",
+      "commit": "b79801ce4884fe46105b562f701a7d2fd5c586c7",
+      "links": 5531,
+      "level2": {
+        "main": 3047,
+        "reviewed": 3341,
+        "final": 3341
+      },
+      "mainDefiniteChecked": 0,
+      "mainDefiniteChanged": 0,
+      "reviewedOutcomesChanged": 0,
+      "belowLevel2WithoutReason": 0,
+      "noCoreFiles": [],
+      "gains": {
+        "retry": 184,
+        "ordinary": 110
+      },
+      "gainsAlreadyReasonedOnMain": {
+        "retry": 36,
+        "ordinary": 1
+      },
+      "reasonClassesChecked": {
+        "localPatterns": 0,
+        "macroImports": 0,
+        "deriveImports": 0
+      },
+      "changedReasons": {
+        "localPlacement": 0,
+        "macroUse": 0,
+        "outerDeriveMacroUse": 0
+      }
+    },
+    {
+      "id": "rustls/rustls",
+      "commit": "53db4d1398f16d5bac98eacf02f0dff4b242fd92",
+      "links": 70802,
+      "level2": {
+        "main": 20276,
+        "reviewed": 22910,
+        "final": 22910
+      },
+      "mainDefiniteChecked": 0,
+      "mainDefiniteChanged": 0,
+      "reviewedOutcomesChanged": 0,
+      "belowLevel2WithoutReason": 0,
+      "noCoreFiles": [],
+      "gains": {
+        "retry": 391,
+        "ordinary": 2243
+      },
+      "gainsAlreadyReasonedOnMain": {
+        "retry": 290,
+        "ordinary": 27
+      },
+      "reasonClassesChecked": {
+        "localPatterns": 40,
+        "macroImports": 0,
+        "deriveImports": 0
+      },
+      "changedReasons": {
+        "localPlacement": 11,
+        "macroUse": 0,
+        "outerDeriveMacroUse": 0
+      }
+    },
+    {
+      "id": "serde-rs/serde",
+      "commit": "e306b0c7c40ad21d5bdf52bcd20da513904682ae",
+      "links": 30714,
+      "level2": {
+        "main": 8282,
+        "reviewed": 8297,
+        "final": 8297
+      },
+      "mainDefiniteChecked": 0,
+      "mainDefiniteChanged": 0,
+      "reviewedOutcomesChanged": 0,
+      "belowLevel2WithoutReason": 0,
+      "noCoreFiles": [],
+      "gains": {
+        "retry": 0,
+        "ordinary": 15
+      },
+      "gainsAlreadyReasonedOnMain": {
+        "retry": 0,
+        "ordinary": 12
+      },
+      "reasonClassesChecked": {
+        "localPatterns": 18,
+        "macroImports": 0,
+        "deriveImports": 0
+      },
+      "changedReasons": {
+        "localPlacement": 1,
+        "macroUse": 0,
+        "outerDeriveMacroUse": 0
+      }
+    },
+    {
+      "id": "tokio-rs/axum",
+      "commit": "36d38c4cf2766cd7313dd53d808f30546ee36b1e",
+      "links": 41067,
+      "level2": {
+        "main": 16213,
+        "reviewed": 16381,
+        "final": 16381
+      },
+      "mainDefiniteChecked": 0,
+      "mainDefiniteChanged": 0,
+      "reviewedOutcomesChanged": 0,
+      "belowLevel2WithoutReason": 0,
+      "noCoreFiles": [],
+      "gains": {
+        "retry": 0,
+        "ordinary": 168
+      },
+      "gainsAlreadyReasonedOnMain": {
+        "retry": 0,
+        "ordinary": 129
+      },
+      "reasonClassesChecked": {
+        "localPatterns": 19,
+        "macroImports": 0,
+        "deriveImports": 0
+      },
+      "changedReasons": {
+        "localPlacement": 8,
+        "macroUse": 0,
+        "outerDeriveMacroUse": 0
+      }
+    }
+  ],
+  "rustlsReasonControl": {
+    "storedVersusReplayedReasonDifferences": 2876,
+    "outcomeDifferences": 0,
+    "example": {
+      "file": "admin/threads-seq.rs",
+      "line": 44,
+      "spelling": "end",
+      "from": "local-pattern-binding-unverified",
+      "to": "crate-placement-unavailable"
+    }
+  }
+}
