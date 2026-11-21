@@ -1,0 +1,41 @@
+total sampled 17423 ms
+
+self time:
+   8340  db.prepare.statement.<computed> dist/graph/store.js:1212
+   2220  db.exec dist/graph/store.js:1204
+    882  (idle) :0
+    856  decodeFile dist/graph/store.js:83
+    516  (garbage collector) :0
+    429  (anonymous) dist/graph/store.js:494
+    352  selectIn dist/graph/languages/go/resolve.js:2089
+    271  get dist/graph/languages/go/resolve.js:204
+    214  detectModuleFormat node:internal/modules/esm/get_format:94
+    185  (program) :0
+    167  all dist/graph/languages/go/resolve.js:1923
+    161  selectName dist/graph/languages/go/resolve.js:2045
+
+inclusive time:
+  17423  (root) :0
+   9728  stage dist/graph/work.js:19
+   8340  db.prepare.statement.<computed> dist/graph/store.js:1212
+   8221  (anonymous) dist/graph/commands.js:221
+   7037  indexProject dist/graph/indexer.js:18
+   5705  stageSync dist/graph/work.js:29
+   3897  executeGraph dist/graph/commands.js:30
+   3823  switchJournal dist/storage/local.js:199
+   3527  (anonymous) dist/graph/indexer.js:624
+   3194  analyzeModule dist/graph/indexer.js:270
+   2773  read dist/graph/indexer.js:657
+   2768  transaction dist/graph/store.js:241
+   2620  resolveModule dist/graph/indexer.js:434
+   2543  (anonymous) dist/graph/indexer.js:619
+   2543  input dist/graph/indexer.js:619
+   2286  runResolve dist/graph/indexer.js:611
+   2220  db.exec dist/graph/store.js:1204
+   2183  run dist/graph/languages/go/resolve.js:294
+   2165  indexGlobalFacts dist/graph/languages/go/resolve.js:842
+   2164  (anonymous) dist/graph/languages/go/resolve.js:843
+   2087  resolutionFiles dist/graph/store.js:309
+   2087  (anonymous) dist/graph/indexer.js:632
+   2005  beginIndexRun dist/graph/store.js:837
+   2005  (anonymous) dist/graph/indexer.js:75

@@ -4,6 +4,7 @@
 // id, since ids hash it): files and results, symbols, links with targets and
 // reasons, candidates, library targets, context files and failure markers.
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import {
   chmodSync,
   linkSync,
@@ -11,6 +12,8 @@ import {
   mkdirSync,
   renameSync,
   rmSync,
+  statSync,
+  utimesSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -630,6 +633,86 @@ test("Go: the command path re-resolves one file after a plain body edit", async 
     assert.equal(graphWork.counts["resolve.go.decisionFiles"], 1);
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("Go: verified re-indexes still compare bytes across saves, renames and checkouts", async () => {
+  const base = mkdtempSync(join(tmpdir(), "c33-inventory-"));
+  const root = join(base, "tree");
+  mkdirSync(root);
+  const a = join(root, "a.go");
+  const b = join(root, "b.go");
+  const one = "package p\nfunc One() int { return 1 }\n";
+  const two = "package p\nfunc Two() int { return 2 }\n";
+  const oldTime = new Date(1_700_000_000_000);
+  const git = (...args) =>
+    execFileSync(
+      "git",
+      [
+        "-c",
+        "user.name=Pymtheg Test",
+        "-c",
+        "user.email=fixture@example.com",
+        "-c",
+        "commit.gpgSign=false",
+        "-c",
+        "core.hooksPath=/dev/null",
+        ...args,
+      ],
+      { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+    );
+  const graph = join(root, ".pymtheg/rebuildable/graph.sqlite");
+  let step = 0;
+  const compare = async (indexed) => {
+    resetGraphWork();
+    const answer = await executeGraph({ command: "index", root });
+    assert.equal(answer.sync.complete, true);
+    assert.equal(answer.sync.report.indexed, indexed);
+    if (indexed === 0) {
+      assert.equal(graphWork.counts["inventory.filesHashed"], 2);
+      assert.equal(graphWork.stages["store.beginRun"], undefined);
+    }
+    const warm = storeRows(graph);
+    const path = join(base, `cold-${step++}.sqlite`);
+    const cold = new SqliteGraphStore(path, warm.project[0]);
+    try {
+      await indexProject(root, registry, cold);
+    } finally {
+      cold.close();
+    }
+    assert.deepEqual(compareRows(warm, storeRows(path)), []);
+  };
+  try {
+    git("init", "--quiet");
+    writeFileSync(a, one);
+    writeFileSync(b, two);
+    git("add", "a.go", "b.go");
+    git("commit", "-qm", "Initial declarations");
+    const initial = git("rev-parse", "HEAD").trim();
+    writeFileSync(a, two);
+    writeFileSync(b, one);
+    git("commit", "-qam", "Swap declarations");
+    const swapped = git("rev-parse", "HEAD").trim();
+    git("checkout", "--quiet", "--detach", initial);
+    utimesSync(a, oldTime, oldTime);
+    await compare(2);
+    await compare(0);
+    const stamp = statSync(a);
+    writeFileSync(a, one.replace("return 1", "return 3"));
+    utimesSync(a, oldTime, oldTime);
+    assert.equal(statSync(a).size, stamp.size);
+    assert.equal(statSync(a).mtimeMs, stamp.mtimeMs);
+    await compare(1);
+    utimesSync(a, oldTime, new Date(oldTime.getTime() + 1000));
+    await compare(0);
+    const replacement = join(base, "replacement.go");
+    writeFileSync(replacement, one);
+    renameSync(replacement, a);
+    await compare(1);
+    git("checkout", "--quiet", "--detach", swapped);
+    await compare(2);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
   }
 });
 

@@ -3063,3 +3063,14 @@ imports for changes confined to ordinary functions that global type facts
 cannot read. Other surface changes use the whole module. Go builds global
 indexes from the saved facts for the affected links. The C-22 cold equality
 rule and run ownership apply to every path. [C-27](changes/C-27.md)
+
+### A verified no-edit command reuses the checkpoint (C-33)
+
+An explicit source-only index can finish after one byte-hashed inventory and
+a matching completed command checkpoint in its response snapshot. The command
+does not begin a write run in that case. Changed inputs, an invalid checkpoint
+and retryable failures use the existing owned path. Source inventories still
+read and hash the bytes of each file. Filesystem timestamps can describe a
+metadata-only change or hide an edit. Scoped Go resolution and validation use
+projections of existing facts. No second copy of the global indexes is kept
+in the store. [C-33](changes/C-33.md)

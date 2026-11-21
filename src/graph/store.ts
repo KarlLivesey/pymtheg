@@ -6,6 +6,7 @@ import {
   openWriteAheadLog,
 } from "../storage/local.js";
 import { randomUUID } from "node:crypto";
+import { totalmem } from "node:os";
 import { compare, fileFacts, validateResult } from "./identity.js";
 import { LinkDecider, resolutionFacts } from "./analysis.js";
 import { count } from "./work.js";
@@ -18,10 +19,12 @@ import type {
   GraphLink,
   GraphSymbol,
   SymbolQuery,
+  SymbolReference,
   ValidatedAnalysis,
   LinkResolution,
   Neighbourhood,
   ResolutionResult,
+  ResolutionFile,
 } from "./types.js";
 
 export class SqliteGraphStore implements GraphStorage {
@@ -109,6 +112,7 @@ export class SqliteGraphStore implements GraphStorage {
    */
   private decodeFile(body: string): GraphFile {
     count("store.fileRecordsDecoded");
+    count("store.fileRecordBytesDecoded", Buffer.byteLength(body));
     return JSON.parse(body) as GraphFile;
   }
   constructor(
@@ -144,6 +148,19 @@ export class SqliteGraphStore implements GraphStorage {
         return;
       }
       this.path = path;
+      // Connection-local and allocated as pages are touched. Use at most
+      // 1/64 of available system/container memory, with a 64 MiB ceiling.
+      // Keep explicit SQLite defaults and the standard cache on readers.
+      const memory = Math.min(
+        totalmem(),
+        process.constrainedMemory() || Infinity,
+      );
+      const cacheKiB = Math.min(64 * 1024, Math.floor(memory / (64 * 1024)));
+      if (
+        cacheKiB > 2000 &&
+        this.db.prepare("PRAGMA cache_size").get()?.cache_size === -2000
+      )
+        this.db.exec(`PRAGMA cache_size=-${cacheKiB}`);
       this.db.exec(`PRAGMA foreign_keys=ON;
         CREATE TABLE IF NOT EXISTS graph_meta(key TEXT PRIMARY KEY,value TEXT NOT NULL);`);
       this.db
@@ -355,21 +372,63 @@ export class SqliteGraphStore implements GraphStorage {
     }
     return files;
   }
+  resolutionFiles(linkKinds: readonly string[]): ResolutionFile[] {
+    return this.db
+      .prepare(
+        `SELECT path,status,body ->> '$.module' AS module,
+      body -> '$.result.data' AS facts,body -> '$.result.diagnostics' AS diagnostics,
+      (SELECT json_group_array(json(value) ORDER BY key)
+       FROM json_each(f.body,'$.result.links')
+       WHERE value ->> '$.kind' IN (SELECT value FROM json_each(?))) AS links
+      FROM graph_files f ORDER BY path`,
+      )
+      .all(JSON.stringify(linkKinds))
+      .map((row) => {
+        const diagnostics = row.diagnostics as string;
+        const links = row.links as string;
+        const facts = typeof row.facts === "string" ? row.facts : undefined;
+        count("store.resolutionFileProjectionRows");
+        count(
+          "store.resolutionFileProjectionBytes",
+          Buffer.byteLength(diagnostics) +
+            Buffer.byteLength(links) +
+            Buffer.byteLength(facts ?? ""),
+        );
+        return {
+          path: row.path as string,
+          module: row.module as string,
+          result: {
+            status: row.status as ResolutionFile["result"]["status"],
+            diagnostics: JSON.parse(
+              diagnostics,
+            ) as ResolutionFile["result"]["diagnostics"],
+            links: JSON.parse(links) as ResolutionFile["result"]["links"],
+            ...(facts === undefined ? {} : { data: JSON.parse(facts) }),
+          },
+        };
+      });
+  }
   /** Path, module and status of every stored file, without decoding records. */
   fileSummaries(): {
     path: string;
     module: string;
     status: GraphFile["result"]["status"];
+    hash: string;
+    version: string;
   }[] {
     return this.db
       .prepare(
-        "SELECT path,json_extract(body,'$.module') AS module,status FROM graph_files ORDER BY path",
+        `SELECT path,status,json_extract(body,'$.module') AS module,
+          json_extract(body,'$.hash') AS hash,json_extract(body,'$.version') AS version
+        FROM graph_files ORDER BY path`,
       )
       .all()
       .map((row) => ({
         path: row.path as string,
         module: row.module as string,
         status: row.status as GraphFile["result"]["status"],
+        hash: row.hash as string,
+        version: row.version as string,
       }))
       .sort((a, b) => compare(a.path, b.path));
   }
@@ -578,6 +637,22 @@ export class SqliteGraphStore implements GraphStorage {
       )
       .all(...values)
       .map((row) => JSON.parse(row.body as string) as GraphSymbol);
+  }
+  symbolReferences(ids: ReadonlySet<string>): SymbolReference[] {
+    if (!ids.size) return [];
+    return this.db
+      .prepare(
+        `SELECT id,file,json_extract(body,'$.key') AS key,
+      json_extract(body,'$.status') AS status FROM graph_symbols
+      WHERE id IN (SELECT value FROM json_each(?))`,
+      )
+      .all(JSON.stringify([...ids]))
+      .map((row) => ({
+        id: row.id as string,
+        file: row.file as string,
+        key: row.key as string,
+        status: row.status as SymbolReference["status"],
+      }));
   }
   private selectLinks(
     where = "",

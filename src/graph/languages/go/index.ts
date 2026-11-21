@@ -468,6 +468,7 @@ const go: LanguageModule = {
   extensions: [".go"],
   contextFiles: ["go.mod", "go.work", "**/vendor/modules.txt"],
   incrementalAnalysis: true,
+  scopedFileLinkKinds: ["embeds"],
   parse,
   analyze,
   resolve: (context) => {

@@ -4,7 +4,7 @@ import { open, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { compare } from "./identity.js";
-import { count } from "./work.js";
+import { count, stage } from "./work.js";
 import { matchesPattern, type LanguageRegistry } from "./registry.js";
 import type { CommandMetadata } from "./command-checkpoint.js";
 
@@ -25,6 +25,11 @@ export interface StaleFile {
     | "context"
     | "unreadable";
 }
+export interface InventoryListing {
+  discovered: number;
+  unclaimed: string[];
+  ignoredSymlinks: string[];
+}
 export const needsContext = (registry: LanguageRegistry, path: string) =>
   registry.modules.some((m) =>
     m.contextFiles?.some((pattern) => matchesPattern(path, pattern)),
@@ -34,16 +39,24 @@ export async function captureInventory(
   root: string,
   registry: LanguageRegistry,
   signal: AbortSignal,
+  listing?: InventoryListing,
 ): Promise<CapturedPath[]> {
   const output: CapturedPath[] = [];
+  // One reusable read buffer for the inventory. Each file is still opened
+  // without following symlinks, checked, and read to EOF.
+  const buffer = Buffer.allocUnsafe(64 * 1024);
   async function walk(relative: string) {
     signal.throwIfAborted();
-    const entries = await readdir(join(root, relative), {
-      withFileTypes: true,
-    });
+    count("inventory.directories");
+    const entries = await stage("inventory.readdir", () =>
+      readdir(join(root, relative), { withFileTypes: true }),
+    );
     for (const entry of entries.sort((a, b) => compare(a.name, b.name))) {
       const path = relative ? `${relative}/${entry.name}` : entry.name;
-      if (entry.isSymbolicLink()) continue;
+      if (entry.isSymbolicLink()) {
+        listing?.ignoredSymlinks.push(path);
+        continue;
+      }
       if (entry.isDirectory()) {
         if (
           ![".git", "node_modules", ".codegraph", ".pymtheg"].includes(
@@ -54,6 +67,7 @@ export async function captureInventory(
         continue;
       }
       if (!entry.isFile()) continue;
+      if (listing) listing.discovered++;
       let module: string | null = null;
       let reason: string | null = null;
       try {
@@ -62,7 +76,10 @@ export async function captureInventory(
         reason = String(error);
       }
       const context = needsContext(registry, path);
-      if (!module && !context && !reason) continue;
+      if (!module && !context && !reason) {
+        listing?.unclaimed.push(path);
+        continue;
+      }
       let hash = "";
       try {
         const file = await open(
@@ -70,16 +87,20 @@ export async function captureInventory(
           constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
         );
         try {
-          if (!(await file.stat()).isFile())
+          count("inventory.stats");
+          if (!(await stage("inventory.stat", () => file.stat())).isFile())
             throw Error("Expected a regular source file");
           const digest = createHash("sha256");
           const decoder = new TextDecoder("utf-8", { fatal: true });
           let valid = true;
-          for await (const chunk of file.createReadStream({
-            autoClose: false,
-          })) {
+          for (;;) {
             signal.throwIfAborted();
+            const { bytesRead } = await file.read(buffer);
+            signal.throwIfAborted();
+            if (bytesRead === 0) break;
+            const chunk = buffer.subarray(0, bytesRead);
             digest.update(chunk);
+            count("inventory.bytesHashed", chunk.length);
             if (valid)
               try {
                 decoder.decode(chunk, { stream: true });

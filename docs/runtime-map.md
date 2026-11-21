@@ -1673,6 +1673,16 @@ source, including parsed rows with unchanged source hashes. A matching,
 certified content failure can use its cached parse when neither the file
 record nor the store has symbols or links for it.
 
+**Verified no-edit commands and scoped reads (C-33).** The command compares
+one content inventory with its completed checkpoint and checks the checkpoint
+again in the response's SQLite read snapshot. A verified explicit source-only
+index can return the stored counts without an index run or a journal switch.
+The edited path still captures source under index ownership and rechecks it
+before publishing completion. The indexer compares file headers first. Go's
+scoped resolve reads file facts and embedding links from a projection of
+the same stored parse records. Validation reads the symbol IDs named by its
+result. Neither projection adds persisted data or a write boundary.
+
 Queries: `pymtheg graph uses UNIT [SYMBOL]` and MCP `code_graph` action `uses`
 (`query`, optional `symbol`). Every link answer shows certainty `library` and
 the library's unit, symbol and `outside-project` place, never a missing local
