@@ -2,11 +2,12 @@
 import { lstat, realpath } from "node:fs/promises";
 import {
   checkpointSchema,
+  checkpointFrom,
   readCheckpoint,
   readMetadata,
   fingerprint,
 } from "./command-checkpoint.js";
-import { changedDependencyInputs } from "./dependency-inputs.js";
+import { checkDependencyInputs } from "./dependency-inputs.js";
 import { performance } from "node:perf_hooks";
 import { findProjectRoot, storagePath } from "../storage/local.js";
 import {
@@ -157,17 +158,27 @@ export async function executeGraph(
   }
   const registry =
     options.registry ?? (await stage("command.modules", discoverLanguages));
-  let store = exists
-    ? stageSync(
+  // An explicit index first verifies on a read-only connection, which
+  // writes nothing to the file (C-33). It opens the writable store only if
+  // it has to index.
+  const verifyFirst = request.command === "index" && !options.registry;
+  let store: SqliteGraphStore | null = null;
+  if (exists)
+    try {
+      store = stageSync(
         "command.sqliteOpen",
         () =>
           new SqliteGraphStore(path, undefined, {
             readOnly:
               request.command === "status" ||
-              (!!request.noSync && request.command !== "index"),
+              (!!request.noSync && request.command !== "index") ||
+              verifyFirst,
           }),
-      )
-    : null;
+      );
+    } catch (error) {
+      // The writable store reports it, or prepares the file, when indexing.
+      if (!verifyFirst) throw error;
+    }
   try {
     const listing: InventoryListing = {
       discovered: 0,
@@ -187,13 +198,21 @@ export async function executeGraph(
     );
     let metadata =
       previousState ?? stageSync("command.metadata", () => readMetadata(store));
-    const staleFiles = () => [
-      ...changedFiles(inventory, metadata, registry),
-      ...changedDependencyInputs(root, metadata.contexts).map((path) => ({
-        path,
-        change: "context" as const,
-      })),
-    ];
+    // An installed input whose bytes are unchanged but whose stamp moved
+    // (a hard link, a permission change) is no change, but the index records
+    // the new stamp as a cold index would (C-22), so it is not verified.
+    let restamped = false;
+    const staleFiles = () => {
+      const inputs = checkDependencyInputs(root, metadata.contexts);
+      restamped = inputs.restamped;
+      return [
+        ...changedFiles(inventory, metadata, registry),
+        ...inputs.changed.map((path) => ({
+          path,
+          change: "context" as const,
+        })),
+      ];
+    };
     let stale = staleFiles();
     const retryable = metadata.files.some(
       (file) => file.status === "failed" && !file.cacheable,
@@ -233,13 +252,46 @@ export async function executeGraph(
       dirname(storagePath(root, "graph")),
       "toolchain",
     );
-    const verifiedNoEdit =
-      request.command === "index" &&
-      !options.registry &&
+    // The completion and the analysis completion are read again in one
+    // snapshot, which supplies the answer. The analysis completion names
+    // each incremental module that owns a stored file, as an index run
+    // records it (C-27).
+    let verified: ReturnType<typeof checkpointFrom> = null;
+    if (
+      verifyFirst &&
+      store &&
       !toolchainOn &&
       complete &&
       !retryable &&
-      stale.length === 0;
+      !restamped &&
+      stale.length === 0
+    ) {
+      const reader = store;
+      const snapshot = stageSync("command.checkpointRead", () =>
+        reader.verifiedCommandState(),
+      );
+      const state =
+        snapshot && checkpointFrom(snapshot.state, reader.projectId);
+      const expected = new Map(
+        registry.modules
+          .filter(
+            (module) =>
+              module.incrementalAnalysis &&
+              state?.files.some((file) => file.module === module.id),
+          )
+          .map((module) => [module.id, module.version]),
+      );
+      if (
+        state?.fingerprint === currentFingerprint() &&
+        snapshot!.analysisRecorded === expected.size > 0 &&
+        snapshot!.analysis.size === expected.size &&
+        [...expected].every(
+          ([id, version]) => snapshot!.analysis.get(id) === version,
+        )
+      )
+        verified = state;
+    }
+    const verifiedNoEdit = verified !== null;
     const wouldIndex =
       (request.command === "index" && !verifiedNoEdit) ||
       (request.command !== "status" &&
@@ -269,6 +321,10 @@ export async function executeGraph(
     let report: IndexReport | null = null;
     let durationMs: number | null = null;
     if (shouldIndex) {
+      if (verifyFirst && store) {
+        store.close();
+        store = null;
+      }
       store ??= stageSync(
         "command.sqliteOpen",
         () => new SqliteGraphStore(storagePath(root, "graph", true)),
@@ -440,9 +496,9 @@ export async function executeGraph(
       options.progress?.({ phase: "complete", done: total, total });
     }
     const finish = (): GraphResponse => {
-      const finalState = stageSync("command.checkpointRead", () =>
-        readCheckpoint(store),
-      );
+      const finalState = verifiedNoEdit
+        ? verified
+        : stageSync("command.checkpointRead", () => readCheckpoint(store));
       metadata = finalState ?? readMetadata(store);
       const trusted = finalState?.fingerprint === currentFingerprint();
       const files = metadata.files;

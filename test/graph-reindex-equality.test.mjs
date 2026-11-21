@@ -9,6 +9,7 @@ import {
   chmodSync,
   linkSync,
   mkdtempSync,
+  readFileSync,
   mkdirSync,
   renameSync,
   rmSync,
@@ -1027,4 +1028,189 @@ test("TypeScript with installed declarations: a re-index equals a cold index, al
     steps,
   );
   assert.equal(compared.length, steps.length + 2);
+});
+
+// C-33 review: the command's verified no-edit path. Each case runs
+// `graph index` through the command and compares the store with a cold index.
+const installedDeclaration = "node_modules/kit/index.d.ts";
+function commandTree(files) {
+  const base = mkdtempSync(join(tmpdir(), "c33-command-"));
+  const root = join(base, "tree");
+  for (const [path, text] of Object.entries(files)) {
+    mkdirSync(dirname(join(root, path)), { recursive: true });
+    writeFileSync(join(root, path), text);
+  }
+  return { base, root, graph: join(root, ".pymtheg/rebuildable/graph.sqlite") };
+}
+const installedFiles = {
+  "package.json": JSON.stringify({
+    name: "fixture",
+    private: true,
+    dependencies: { kit: "1.0.0" },
+  }),
+  "tsconfig.json": JSON.stringify({
+    compilerOptions: {
+      strict: true,
+      module: "nodenext",
+      moduleResolution: "nodenext",
+    },
+    include: ["src"],
+  }),
+  "node_modules/kit/package.json": JSON.stringify({
+    name: "kit",
+    version: "1.0.0",
+    types: "index.d.ts",
+  }),
+  [installedDeclaration]:
+    "export declare class Page {\n  locate(): string;\n}\nexport declare function open(): Page;\n",
+  "src/main.ts": 'import { open } from "kit";\n\nopen().locate();\n',
+  // The package manager's shared store, present before the first index.
+  "node_modules/.pnpm/lock.yaml": "lockfileVersion: '9.0'\n",
+};
+let coldStep = 0;
+async function differencesFromCold({ base, root, graph }) {
+  const warm = storeRows(graph);
+  const path = join(base, `cold-${coldStep++}.sqlite`);
+  const cold = new SqliteGraphStore(path, warm.project[0]);
+  try {
+    await indexProject(root, registry, cold);
+  } finally {
+    cold.close();
+  }
+  return compareRows(warm, storeRows(path));
+}
+/** One command index; whether it answered without beginning an index run. */
+async function commandIndex(root) {
+  resetGraphWork();
+  const answer = await executeGraph({ command: "index", root });
+  return {
+    answer,
+    verified: graphWork.stages["store.beginRun"] === undefined,
+  };
+}
+
+for (const [name, edit] of [
+  [
+    "a second hard link to it (a shared package store)",
+    (root) =>
+      linkSync(
+        join(root, installedDeclaration),
+        join(root, "node_modules/.pnpm/shared.d.ts"),
+      ),
+  ],
+  [
+    "a permission-only change",
+    (root) => chmodSync(join(root, installedDeclaration), 0o600),
+  ],
+])
+  test(`TypeScript: the command records an installed declaration's new stamp after ${name}`, async () => {
+    const tree = commandTree(installedFiles);
+    try {
+      assert.equal((await commandIndex(tree.root)).answer.sync.complete, true);
+      edit(tree.root);
+      const restamp = await commandIndex(tree.root);
+      assert.equal(restamp.answer.sync.complete, true);
+      assert.deepEqual(await differencesFromCold(tree), []);
+      assert.equal(restamp.verified, false);
+      // Every later unchanged run is verified and keeps the cold rows.
+      const bytes = readFileSync(tree.graph);
+      const again = await commandIndex(tree.root);
+      assert.equal(again.answer.sync.complete, true);
+      assert.equal(again.verified, true);
+      assert.deepEqual(readFileSync(tree.graph), bytes);
+      assert.deepEqual(await differencesFromCold(tree), []);
+    } finally {
+      rmSync(tree.base, { recursive: true, force: true });
+    }
+  });
+
+test("A verified no-edit index writes nothing and answers beside another writer", async () => {
+  const tree = commandTree(installedFiles);
+  try {
+    const first = await commandIndex(tree.root);
+    assert.equal(first.answer.sync.complete, true);
+    // A store left in write-ahead-log mode (persistent in the header).
+    const wal = new DatabaseSync(tree.graph);
+    try {
+      wal.exec("PRAGMA journal_mode=WAL");
+    } finally {
+      wal.close();
+    }
+    const before = readFileSync(tree.graph);
+    assert.equal(before[18], 2);
+    const unchanged = await commandIndex(tree.root);
+    assert.equal(unchanged.answer.sync.complete, true);
+    assert.equal(unchanged.verified, true);
+    assert.deepEqual(readFileSync(tree.graph), before);
+    // Another connection holds the write lock with an uncommitted graph
+    // write and does not wait: the answer is the committed graph.
+    const writer = new DatabaseSync(tree.graph, { timeout: 0 });
+    try {
+      writer.exec("BEGIN IMMEDIATE");
+      writer.exec("DELETE FROM graph_links");
+      const beside = await commandIndex(tree.root);
+      assert.equal(beside.answer.sync.complete, true);
+      assert.equal(beside.verified, true);
+      assert.deepEqual(beside.answer.counts, first.answer.counts);
+    } finally {
+      writer.exec("ROLLBACK");
+      writer.close();
+    }
+    assert.deepEqual(readFileSync(tree.graph), before);
+    assert.deepEqual(await differencesFromCold(tree), []);
+    // A run that committed its first write and has not finished: never
+    // verified; the command indexes and takes it over.
+    const run = new DatabaseSync(tree.graph);
+    try {
+      run.exec(`BEGIN IMMEDIATE;
+        INSERT INTO graph_meta VALUES ('index-run','unfinished');
+        DELETE FROM graph_meta WHERE key IN ('command-complete','analysis-complete');
+        DELETE FROM graph_links;
+        COMMIT;`);
+    } finally {
+      run.close();
+    }
+    const taken = await commandIndex(tree.root);
+    assert.equal(taken.answer.sync.complete, true);
+    assert.equal(taken.verified, false);
+    assert.deepEqual(taken.answer.counts, first.answer.counts);
+    assert.deepEqual(await differencesFromCold(tree), []);
+  } finally {
+    rmSync(tree.base, { recursive: true, force: true });
+  }
+});
+
+test("Go: a no-edit index without the analysis completion record re-runs recovery", async () => {
+  const tree = commandTree({
+    "a.go": "package a\nfunc Target() {}\nfunc Use() { Target() }\n",
+  });
+  const recorded = () => {
+    const db = new DatabaseSync(tree.graph, { readOnly: true });
+    try {
+      return db
+        .prepare("SELECT value FROM graph_meta WHERE key='analysis-complete'")
+        .get()?.value;
+    } finally {
+      db.close();
+    }
+  };
+  try {
+    assert.equal((await commandIndex(tree.root)).answer.sync.complete, true);
+    const record = recorded();
+    assert.equal(typeof record, "string");
+    const db = new DatabaseSync(tree.graph);
+    try {
+      db.exec("DELETE FROM graph_meta WHERE key='analysis-complete'");
+    } finally {
+      db.close();
+    }
+    const recovery = await commandIndex(tree.root);
+    assert.equal(recovery.answer.sync.complete, true);
+    assert.equal(recovery.verified, false);
+    assert.equal(recorded(), record);
+    assert.deepEqual(await differencesFromCold(tree), []);
+    assert.equal((await commandIndex(tree.root)).verified, true);
+  } finally {
+    rmSync(tree.base, { recursive: true, force: true });
+  }
 });

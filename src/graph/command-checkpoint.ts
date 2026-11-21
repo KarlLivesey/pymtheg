@@ -38,12 +38,22 @@ export function readCheckpoint(
   store: SqliteGraphStore | null,
 ): CommandCheckpoint | null {
   try {
-    const value =
-      store?.graphCommandState() as Partial<CommandCheckpoint> | null;
+    return checkpointFrom(store?.graphCommandState(), store?.projectId);
+  } catch {
+    return null;
+  }
+}
+/** A recorded completion that is well formed and belongs to the project. */
+export function checkpointFrom(
+  recorded: unknown,
+  projectId: string | undefined,
+): CommandCheckpoint | null {
+  try {
+    const value = recorded as Partial<CommandCheckpoint> | null;
     if (
       !value ||
       value.schema !== checkpointSchema ||
-      value.projectId !== store?.projectId ||
+      value.projectId !== projectId ||
       typeof value.fingerprint !== "string" ||
       !Array.isArray(value.inventory) ||
       !Array.isArray(value.files) ||

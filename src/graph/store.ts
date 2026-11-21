@@ -181,29 +181,7 @@ export class SqliteGraphStore implements GraphStorage {
             UPDATE graph_meta SET value='4' WHERE key='schema';`);
           this.db.exec(libraryTables);
         });
-      this.db
-        .exec(`CREATE TABLE IF NOT EXISTS graph_files(path TEXT PRIMARY KEY,body TEXT NOT NULL,status TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS graph_parse_failures(path TEXT PRIMARY KEY REFERENCES graph_files(path) ON DELETE CASCADE,hash TEXT,module TEXT,version TEXT);
-        CREATE TABLE IF NOT EXISTS graph_contexts(path TEXT PRIMARY KEY,body TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS graph_symbols(id TEXT PRIMARY KEY,file TEXT NOT NULL REFERENCES graph_files(path) ON DELETE CASCADE,name TEXT NOT NULL,kind TEXT NOT NULL,body TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS graph_links(id TEXT PRIMARY KEY,file TEXT NOT NULL REFERENCES graph_files(path) ON DELETE CASCADE,source TEXT REFERENCES graph_symbols(id) ON DELETE CASCADE,target TEXT REFERENCES graph_symbols(id) ON DELETE SET NULL,kind TEXT NOT NULL,body TEXT NOT NULL,module TEXT NOT NULL,origin TEXT NOT NULL,resolution TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS graph_candidates(link TEXT NOT NULL REFERENCES graph_links(id) ON DELETE CASCADE,symbol TEXT NOT NULL REFERENCES graph_symbols(id) ON DELETE CASCADE,kind TEXT NOT NULL,PRIMARY KEY(link,symbol));
-        CREATE INDEX IF NOT EXISTS graph_symbol_name ON graph_symbols(name,id);
-        CREATE INDEX IF NOT EXISTS graph_symbol_identity ON graph_symbols(json_extract(body,'$.identity'),file,id);
-        CREATE INDEX IF NOT EXISTS graph_symbol_name_kind ON graph_symbols(name,kind,id);
-        CREATE INDEX IF NOT EXISTS graph_symbol_name_file ON graph_symbols(name,file,id);
-        CREATE INDEX IF NOT EXISTS graph_symbol_name_kind_file ON graph_symbols(name,kind,file,id);
-        CREATE INDEX IF NOT EXISTS graph_symbol_kind_file ON graph_symbols(kind,file,id);
-        CREATE INDEX IF NOT EXISTS graph_symbol_file ON graph_symbols(file,id);
-        CREATE INDEX IF NOT EXISTS graph_symbol_kind ON graph_symbols(kind,id);
-        CREATE INDEX IF NOT EXISTS graph_link_file ON graph_links(file);
-        CREATE INDEX IF NOT EXISTS graph_link_module ON graph_links(module);
-        CREATE INDEX IF NOT EXISTS graph_link_resolution ON graph_links(resolution);
-        CREATE INDEX IF NOT EXISTS graph_candidate_symbol ON graph_candidates(symbol,kind,link);
-        ${libraryTables}
-        CREATE INDEX IF NOT EXISTS graph_link_source ON graph_links(source,kind);
-        CREATE INDEX IF NOT EXISTS graph_link_target ON graph_links(target,kind);
-        CREATE INDEX IF NOT EXISTS graph_file_status ON graph_files(path,status);`);
+      this.db.exec(graphTables);
       this.findFileStatusIndex();
       this.libraryKnown = true;
       // Path-only markers from early W2-M builds have unknown provenance. Adding
@@ -1047,6 +1025,56 @@ export class SqliteGraphStore implements GraphStorage {
       return null;
     }
   }
+  /**
+   * C-33: the completion record and the analysis completion record, read
+   * in one snapshot without writing. Null when a writable connection would
+   * first change the file (an older schema, or a missing table, index,
+   * column or trigger) or the read fails, for example on a lock.
+   */
+  verifiedCommandState(): {
+    state: unknown;
+    analysis: ReadonlyMap<string, string>;
+    analysisRecorded: boolean;
+  } | null {
+    try {
+      this.db.exec("BEGIN");
+      try {
+        const schema = this.db
+          .prepare("SELECT value FROM graph_meta WHERE key='schema'")
+          .get()?.value;
+        const names = new Set(
+          this.db
+            .prepare("SELECT name FROM sqlite_master")
+            .all()
+            .map((row) => row.name),
+        );
+        const columns = new Set(
+          this.db
+            .prepare("PRAGMA table_info(graph_parse_failures)")
+            .all()
+            .map((row) => row.name),
+        );
+        if (
+          schema !== "4" ||
+          !graphObjects.every((name) => names.has(name)) ||
+          !names.has("graph_index_dirty_graph_files_INSERT") ||
+          !["hash", "module", "version"].every((name) => columns.has(name))
+        )
+          return null;
+        return {
+          state: this.graphCommandState(),
+          analysis: this.readCompletedAnalysis(),
+          analysisRecorded: !!this.db
+            .prepare("SELECT 1 FROM graph_meta WHERE key='analysis-complete'")
+            .get(),
+        };
+      } finally {
+        this.db.exec("COMMIT");
+      }
+    } catch {
+      return null;
+    }
+  }
   invalidateGraphCommandState(): void {
     // Nothing to remove is no write (C-6).
     if (
@@ -1509,6 +1537,35 @@ const libraryTables = `CREATE TABLE IF NOT EXISTS graph_library_targets(link TEX
     UPDATE graph_links SET resolution=${resolutionOf("OLD.link", "target")}
       WHERE id=OLD.link AND resolution IS NOT ${resolutionOf("OLD.link", "target")};
   END;`;
+
+/** Every table, index and trigger a writable connection creates when missing. */
+const graphTables = `CREATE TABLE IF NOT EXISTS graph_files(path TEXT PRIMARY KEY,body TEXT NOT NULL,status TEXT NOT NULL);
+  CREATE TABLE IF NOT EXISTS graph_parse_failures(path TEXT PRIMARY KEY REFERENCES graph_files(path) ON DELETE CASCADE,hash TEXT,module TEXT,version TEXT);
+  CREATE TABLE IF NOT EXISTS graph_contexts(path TEXT PRIMARY KEY,body TEXT NOT NULL);
+  CREATE TABLE IF NOT EXISTS graph_symbols(id TEXT PRIMARY KEY,file TEXT NOT NULL REFERENCES graph_files(path) ON DELETE CASCADE,name TEXT NOT NULL,kind TEXT NOT NULL,body TEXT NOT NULL);
+  CREATE TABLE IF NOT EXISTS graph_links(id TEXT PRIMARY KEY,file TEXT NOT NULL REFERENCES graph_files(path) ON DELETE CASCADE,source TEXT REFERENCES graph_symbols(id) ON DELETE CASCADE,target TEXT REFERENCES graph_symbols(id) ON DELETE SET NULL,kind TEXT NOT NULL,body TEXT NOT NULL,module TEXT NOT NULL,origin TEXT NOT NULL,resolution TEXT NOT NULL);
+  CREATE TABLE IF NOT EXISTS graph_candidates(link TEXT NOT NULL REFERENCES graph_links(id) ON DELETE CASCADE,symbol TEXT NOT NULL REFERENCES graph_symbols(id) ON DELETE CASCADE,kind TEXT NOT NULL,PRIMARY KEY(link,symbol));
+  CREATE INDEX IF NOT EXISTS graph_symbol_name ON graph_symbols(name,id);
+  CREATE INDEX IF NOT EXISTS graph_symbol_identity ON graph_symbols(json_extract(body,'$.identity'),file,id);
+  CREATE INDEX IF NOT EXISTS graph_symbol_name_kind ON graph_symbols(name,kind,id);
+  CREATE INDEX IF NOT EXISTS graph_symbol_name_file ON graph_symbols(name,file,id);
+  CREATE INDEX IF NOT EXISTS graph_symbol_name_kind_file ON graph_symbols(name,kind,file,id);
+  CREATE INDEX IF NOT EXISTS graph_symbol_kind_file ON graph_symbols(kind,file,id);
+  CREATE INDEX IF NOT EXISTS graph_symbol_file ON graph_symbols(file,id);
+  CREATE INDEX IF NOT EXISTS graph_symbol_kind ON graph_symbols(kind,id);
+  CREATE INDEX IF NOT EXISTS graph_link_file ON graph_links(file);
+  CREATE INDEX IF NOT EXISTS graph_link_module ON graph_links(module);
+  CREATE INDEX IF NOT EXISTS graph_link_resolution ON graph_links(resolution);
+  CREATE INDEX IF NOT EXISTS graph_candidate_symbol ON graph_candidates(symbol,kind,link);
+  ${libraryTables}
+  CREATE INDEX IF NOT EXISTS graph_link_source ON graph_links(source,kind);
+  CREATE INDEX IF NOT EXISTS graph_link_target ON graph_links(target,kind);
+  CREATE INDEX IF NOT EXISTS graph_file_status ON graph_files(path,status);`;
+const graphObjects = [
+  ...graphTables.matchAll(
+    /CREATE (?:TABLE|INDEX|TRIGGER) IF NOT EXISTS (\w+)/g,
+  ),
+].map((match) => match[1]!);
 
 /**
  * Counts every SQL statement this connection executes (C-22 observation:
