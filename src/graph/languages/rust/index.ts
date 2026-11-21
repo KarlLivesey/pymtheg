@@ -219,20 +219,22 @@ export const rustPhases = {
     }
     return analyzed;
   },
-  // Derived links (calls in macro bodies) are returned only when present, so
-  // a project without them keeps the plain resolution list.
   resolve(ctx: Parameters<typeof resolveRust>[0]) {
     const links: AddedLink[] = [];
     const resolutions = resolveRust(ctx, undefined, undefined, undefined, (l) =>
       links.push(l),
     );
-    return links.length ? { resolutions, links } : resolutions;
+    return {
+      resolutions,
+      links,
+      missingLinkReason: "analysis-resolution-disagreement",
+    };
   },
 } satisfies Pick<LanguageModule, "analyze" | "resolve">;
 
 const rust: LanguageModule = {
   id: "rust",
-  version: "39",
+  version: "41",
   extensions: [".rs"],
   contextFiles: [
     "Cargo.toml",

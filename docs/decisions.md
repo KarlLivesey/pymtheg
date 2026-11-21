@@ -2802,6 +2802,25 @@ directory source. A proven package selection is required to resolve inside it.
 Rust coverage now credits recorded targets on graphs made by the supporting
 module version. See [C-9](changes/C-9.md).
 
+### C-29 Rust prelude and missing-link explanations
+
+When a crate can build with `no_std`, the resolver can name a `core`
+declaration shared by both edition preludes. This requires the usual lexical,
+import and macro shadowing checks. The source must also establish the
+availability of an implicit prelude. Edition-specific entries use the existing
+prelude table. The spelling of a definite, previously supported `std` path
+is preserved. Explicit imports use their written export when the catalog
+establishes the export namespace for that library unit. Whole-crate imports
+retain their unit target.
+
+Rust analysis records the reason on a link whenever neither checkout
+resolution nor the library path proof supplies one symbol. This uses the same
+lookups as resolution, after the ordinary decisions and macro-scope retries.
+Final resolution records a disagreement when the link remains open despite
+analysis supplying no blocker. A later final decision clears that explanation
+when the link reaches Level 2.
+See [C-29](changes/C-29.md).
+
 ### C-12 Rust lexical macro scope
 
 The resolver can clear an opaque expansion for one name when captured

@@ -310,7 +310,16 @@ test("prelude credit requires the edition and a clear lexical namespace", async 
     const configured = await graph({
       "src/lib.rs": `#![${attribute}]\nfn f(_: Option<u8>) {}`,
     });
-    assert.deepEqual(configured("types", "Option"), [null]);
+    assert.deepEqual(configured("types", "Option"), [
+      attribute === "no_std"
+        ? {
+            ecosystem: "rust-std",
+            unit: "core",
+            symbol: "option::Option",
+            evidence: "declared-builtin",
+          }
+        : null,
+    ]);
   }
 });
 
@@ -364,14 +373,21 @@ test("workspace dependencies select versions only on a proven Cargo edge", async
   assert.deepEqual(both("types", "Serial::Serialize"), [named]);
 });
 
-test("sysroot names keep their written crate and a no_std crate withholds the std prelude", async () => {
+test("sysroot names keep their written crate and no_std uses the core prelude", async () => {
   const lookup = await graph({
     "src/lib.rs": `#![no_std]
     extern crate alloc as heap;
     fn f(_: Option<heap::vec::Vec<u8>>, x: &mut u8, y: &mut u8) { core::mem::swap(x, y); }
   `,
   });
-  assert.deepEqual(lookup("types", "Option"), [null]);
+  assert.deepEqual(lookup("types", "Option"), [
+    {
+      ecosystem: "rust-std",
+      unit: "core",
+      symbol: "option::Option",
+      evidence: "declared-builtin",
+    },
+  ]);
   assert.deepEqual(lookup("types", "heap::vec::Vec"), [
     {
       ecosystem: "rust-std",
@@ -388,6 +404,113 @@ test("sysroot names keep their written crate and a no_std crate withholds the st
       evidence: "qualified-path",
     },
   ]);
+});
+
+test("Rust links name shared prelude and known imports or explain the blocker", async (t) => {
+  const store = await indexFixture(t, {
+    "Cargo.toml": manifest(
+      "2024",
+      '[features]\nbare=[]\n[dependencies]\nwire={package="bytes",version="1.11.1"}\n',
+    ),
+    "Cargo.lock": macroLock([["bytes", "1.11.1"]], "0.1.0"),
+    "src/lib.rs": `
+    #![cfg_attr(feature = "bare", no_std)]
+    use core::cell::RefCell;
+    use wire::Bytes;
+    extern crate wire as byte_crate;
+
+    // After redb's LRU cache.
+    fn get_mut(cached: Option<&mut (u8, bool, u8)>) {
+        assert_eq!(1, 1);
+        if let Some((value, second_chance, _)) = cached {
+            *value = 1;
+            *second_chance = true;
+        }
+    }
+    mod shadow {
+        struct Some(u8);
+        type Result<T> = Option<T>;
+        fn f(input: Result<Some>) { if let Option::Some(Some(_)) = input {} }
+    }
+    mod disabled {
+        #![no_implicit_prelude]
+        fn f(_: Option<u8>) {}
+    }
+    mod opaque {
+        unknown!();
+        fn f(_: Option<u8>) {}
+    }
+    mod glob {
+        use wire::*;
+        fn f(_: Option<u8>) {}
+    }
+    fn no_alloc_prelude(_: String) {}
+    `,
+    // The actix-web pin contains an AnyOrSome file without a mod entry.
+    "src/any_or_some.rs": `
+    enum AnyOrSome<T> { Any, Item(T) }
+    fn item<T>(value: AnyOrSome<T>) -> Option<T> {
+        match value { AnyOrSome::Any => None, AnyOrSome::Item(v) => Some(v) }
+    }
+    `,
+  });
+  const links = store.links();
+  for (const link of links) {
+    if (
+      link.resolution !== "resolved" &&
+      !link.libraries?.some(({ symbol }) => symbol)
+    )
+      assert.ok(link.data?.uncertainty?.trim(), JSON.stringify(link));
+  }
+  const ref = (kind, targetName, scope = "", file = "src/lib.rs") => {
+    const hits = links.filter(
+      (link) =>
+        link.kind === kind &&
+        link.targetName === targetName &&
+        link.data?.scope === scope &&
+        link.file === file,
+    );
+    assert.equal(hits.length, 1, `${file} ${scope} ${kind} ${targetName}`);
+    return hits[0];
+  };
+  const target = (...args) =>
+    ref(...args).libraries?.map(({ unit, symbol }) => [unit, symbol]);
+  assert.deepEqual(target("patterns", "Some", "get_mut"), [
+    ["core", "option::Option::Some"],
+  ]);
+  assert.deepEqual(target("patterns", "Option::Some", "shadow::f"), [
+    ["core", "option::Option::Some"],
+  ]);
+  assert.deepEqual(target("macros", "assert_eq", "get_mut"), [
+    ["core", "assert_eq!"],
+  ]);
+  assert.deepEqual(target("imports", "core::cell::RefCell"), [
+    ["core", "cell::RefCell"],
+  ]);
+  assert.deepEqual(target("imports", "wire::Bytes"), [["bytes", "Bytes"]]);
+  assert.equal(ref("patterns", "Some", "shadow::f").resolution, "resolved");
+  assert.equal(ref("types", "Result", "shadow").resolution, "resolved");
+  for (const [scope, reason] of [
+    ["disabled", "no-implicit-prelude-binding-unverified"],
+    ["opaque", "opaque-item-may-shadow-name"],
+    [
+      "glob",
+      "glob-import-unverified|namespace/import/alias structure is unknown",
+    ],
+  ]) {
+    const link = ref("types", "Option", scope);
+    assert.equal(link.resolution, "unresolved");
+    assert.match(link.data.uncertainty, new RegExp(reason));
+  }
+  assert.equal(
+    ref("types", "String").data.uncertainty,
+    "shared-core-prelude-binding-unavailable",
+  );
+  assert.equal(
+    ref("values", "None", "item", "src/any_or_some.rs").data.uncertainty,
+    "crate-placement-unavailable",
+  );
+  assert.equal(ref("imports", "wire").data.uncertainty, "whole-crate-import");
 });
 
 test("exact library queries include imports and invocations of known macros", async (t) => {
