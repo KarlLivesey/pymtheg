@@ -1303,7 +1303,7 @@ test("a call on a member merged from several declarations links the declaration 
   );
   await write(
     "node_modules/stream-kit/index.d.ts",
-    "export interface Readable { once(event: 'end', listener: () => void): this; }\nexport declare const source: Readable;\n",
+    "export interface Readable { once(event: 'end', listener: () => void): this; }\nexport declare const source: Readable;\nexport interface Logger { log(message: string): void; }\nexport declare const logger: Logger;\n",
   );
   await write(
     "node_modules/busy-kit/package.json",
@@ -1311,7 +1311,7 @@ test("a call on a member merged from several declarations links the declaration 
   );
   await write(
     "node_modules/busy-kit/index.d.ts",
-    "import 'stream-kit';\ndeclare module 'stream-kit' { interface Readable { once(event: 'limit', listener: () => void): this; } }\nexport {};\n",
+    "import 'stream-kit';\ndeclare module 'stream-kit' { interface Readable { once(event: 'limit', listener: () => void): this; } interface Logger { log(message: string, ...rest: unknown[]): void; } }\nexport {};\n",
   );
   await write(
     "node_modules/union-kit/package.json",
@@ -1325,10 +1325,11 @@ test("a call on a member merged from several declarations links the declaration 
     "main.ts",
     [
       'import "busy-kit";',
-      'import { source } from "stream-kit";',
+      'import { logger, source } from "stream-kit";',
       'import { either } from "union-kit";',
       "source.once('end', () => {});",
       "either.run();",
+      "logger.log('x');",
       "",
     ].join("\n"),
   );
@@ -1349,6 +1350,10 @@ test("a call on a member merged from several declarations links the declaration 
       end.libraries.map(({ unit, symbol }) => [unit, symbol]),
       [["stream-kit", "Readable.prototype.once"]],
     );
+    // Both merged declarations accept the arguments: the checker's choice is
+    // declaration order, so it stays a candidate set.
+    const [log] = calls("logger.log");
+    assert.ok(log.resolution !== "library" || log.libraries.length !== 1, JSON.stringify(log));
     // A union receiver is dispatch: never narrowed to one arm.
     const [run] = calls("either.run");
     assert.ok(

@@ -2840,9 +2840,50 @@ export function extractFile(
       checker.getNonNullableType(checker.getTypeAtLocation(found.receiver)),
     );
     if (type.isUnionOrIntersection()) return undefined;
-    return checker.getPropertyOfType(type, found.name) === symbol
-      ? declaration
-      : undefined;
+    if (checker.getPropertyOfType(type, found.name) !== symbol)
+      return undefined;
+    // The selection proves the declaration only when no declaration from
+    // another body (another interface, augmentation or library) could also
+    // accept these arguments; otherwise it is declaration order.
+    const others = symbol.declarations!.filter(
+      (other) => other.parent !== declaration.parent,
+    );
+    return others.some((other) => mayAccept(other, call))
+      ? undefined
+      : declaration;
+  }
+  /** Whether a declaration's signature could accept the call's arguments. */
+  function mayAccept(
+    declaration: ts.Declaration,
+    call: ts.CallExpression | ts.NewExpression,
+  ): boolean {
+    if (!ts.isFunctionLike(declaration) || declaration.typeParameters?.length)
+      return true;
+    const signature = checker.getSignatureFromDeclaration(
+      declaration as ts.SignatureDeclaration,
+    );
+    if (!signature || signature.typeParameters?.length) return true;
+    const parameters = declaration.parameters.filter(
+      (parameter) =>
+        !(ts.isIdentifier(parameter.name) && parameter.name.text === "this"),
+    );
+    if (parameters.some((parameter) => parameter.dotDotDotToken)) return true;
+    const args = call.arguments ?? [];
+    if (args.some(ts.isSpreadElement)) return true;
+    const required = parameters.filter(
+      (parameter) => !parameter.questionToken && !parameter.initializer,
+    ).length;
+    if (args.length < required || args.length > parameters.length)
+      return false;
+    return args.every((argument, index) => {
+      const parameter = parameters[index]!;
+      const symbol = checker.getSymbolAtLocation(parameter.name);
+      if (!symbol || !ts.isIdentifier(parameter.name)) return true;
+      return checker.isTypeAssignableTo(
+        checker.getTypeAtLocation(argument),
+        checker.getTypeOfSymbolAtLocation(symbol, parameter),
+      );
+    });
   }
   function binding(
     owner: string,
