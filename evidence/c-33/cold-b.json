@@ -1,0 +1,128 @@
+[
+ {
+  "pin": "golang_tools",
+  "round": 0,
+  "build": "main-1",
+  "wallS": 766.53,
+  "cpuS": 567.8,
+  "peakMiB": 1999,
+  "equality": {
+   "rows": {
+    "graph_files": 1986,
+    "graph_contexts": 5,
+    "graph_parse_failures": 17,
+    "graph_symbols": 31175,
+    "graph_links": 253517,
+    "graph_candidates": 12861,
+    "graph_library_targets": 85908,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "golang_tools",
+  "round": 0,
+  "build": "after",
+  "wallS": 641.52,
+  "cpuS": 488.5,
+  "peakMiB": 2134,
+  "equality": {
+   "rows": {
+    "graph_files": 1986,
+    "graph_contexts": 5,
+    "graph_parse_failures": 17,
+    "graph_symbols": 31175,
+    "graph_links": 253517,
+    "graph_candidates": 12861,
+    "graph_library_targets": 85908,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "golang_tools",
+  "round": 0,
+  "build": "main-2",
+  "wallS": 799.75,
+  "cpuS": 552.3,
+  "peakMiB": 1834,
+  "equality": {
+   "rows": {
+    "graph_files": 1986,
+    "graph_contexts": 5,
+    "graph_parse_failures": 17,
+    "graph_symbols": 31175,
+    "graph_links": 253517,
+    "graph_candidates": 12861,
+    "graph_library_targets": 85908,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "BurntSushi_ripgrep",
+  "round": 0,
+  "build": "main-1",
+  "wallS": 110.81,
+  "cpuS": 96.2,
+  "peakMiB": 824,
+  "equality": {
+   "rows": {
+    "graph_files": 102,
+    "graph_contexts": 14,
+    "graph_parse_failures": 0,
+    "graph_symbols": 4392,
+    "graph_links": 39819,
+    "graph_candidates": 24,
+    "graph_library_targets": 8024,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "BurntSushi_ripgrep",
+  "round": 0,
+  "build": "after",
+  "wallS": 115.33,
+  "cpuS": 98,
+  "peakMiB": 863,
+  "equality": {
+   "rows": {
+    "graph_files": 102,
+    "graph_contexts": 14,
+    "graph_parse_failures": 0,
+    "graph_symbols": 4392,
+    "graph_links": 39819,
+    "graph_candidates": 24,
+    "graph_library_targets": 8024,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "BurntSushi_ripgrep",
+  "round": 0,
+  "build": "main-2",
+  "wallS": 116.13,
+  "cpuS": 103.9,
+  "peakMiB": 765,
+  "equality": {
+   "rows": {
+    "graph_files": 102,
+    "graph_contexts": 14,
+    "graph_parse_failures": 0,
+    "graph_symbols": 4392,
+    "graph_links": 39819,
+    "graph_candidates": 24,
+    "graph_library_targets": 8024,
+    "project": 1
+   },
+   "differences": []
+  }
+ }
+]
