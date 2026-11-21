@@ -1,0 +1,207 @@
+{
+ "id": "BurntSushi/ripgrep",
+ "seed": 2212,
+ "steps": [
+  {
+   "step": 0,
+   "file": "crates/printer/src/jsont.rs",
+   "kind": "comment",
+   "line": 248,
+   "equal": true,
+   "differences": [],
+   "wallMs": 15209,
+   "failed": 0
+  },
+  {
+   "step": 1,
+   "file": "crates/regex/src/error.rs",
+   "kind": "comment",
+   "line": 64,
+   "equal": true,
+   "differences": [],
+   "wallMs": 14224,
+   "failed": 0
+  },
+  {
+   "step": 2,
+   "file": "crates/regex/src/ban.rs",
+   "kind": "delete",
+   "line": 75,
+   "equal": true,
+   "differences": [],
+   "wallMs": 14849,
+   "failed": 0
+  },
+  {
+   "step": 3,
+   "file": "crates/searcher/examples/search-stdin.rs",
+   "kind": "duplicate",
+   "line": 33,
+   "equal": true,
+   "differences": [],
+   "wallMs": 12315,
+   "failed": 1
+  },
+  {
+   "step": 4,
+   "file": "crates/cli/src/decompress.rs",
+   "kind": "blank",
+   "line": 113,
+   "equal": true,
+   "differences": [],
+   "wallMs": 12029,
+   "failed": 1
+  },
+  {
+   "step": 5,
+   "file": "crates/core/flags/doc/help.rs",
+   "kind": "delete",
+   "line": 92,
+   "equal": true,
+   "differences": [],
+   "wallMs": 17164,
+   "failed": 2
+  },
+  {
+   "step": 6,
+   "file": "crates/cli/src/human.rs",
+   "kind": "delete",
+   "line": 117,
+   "equal": true,
+   "differences": [],
+   "wallMs": 11334,
+   "failed": 2
+  },
+  {
+   "step": 7,
+   "file": "crates/ignore/tests/gitignore_skip_bom.rs",
+   "kind": "blank",
+   "line": 17,
+   "equal": true,
+   "differences": [],
+   "wallMs": 11742,
+   "failed": 2
+  },
+  {
+   "step": 8,
+   "file": "crates/regex/src/strip.rs",
+   "kind": "comment",
+   "line": 92,
+   "equal": true,
+   "differences": [],
+   "wallMs": 14275,
+   "failed": 2
+  },
+  {
+   "step": 9,
+   "file": "fuzz/fuzz_targets/fuzz_glob.rs",
+   "kind": "statement",
+   "line": 6,
+   "equal": true,
+   "differences": [],
+   "wallMs": 12595,
+   "failed": 2
+  },
+  {
+   "step": 10,
+   "file": "crates/core/flags/complete/bash.rs",
+   "kind": "duplicate",
+   "line": 51,
+   "equal": true,
+   "differences": [],
+   "wallMs": 12815,
+   "failed": 2
+  },
+  {
+   "step": 11,
+   "file": "crates/ignore/benches/workloads.rs",
+   "kind": "duplicate",
+   "line": 28,
+   "equal": true,
+   "differences": [],
+   "wallMs": 14266,
+   "failed": 2
+  },
+  {
+   "step": 12,
+   "file": "crates/printer/src/util.rs",
+   "kind": "statement",
+   "line": 482,
+   "equal": true,
+   "differences": [],
+   "wallMs": 13569,
+   "failed": 2
+  },
+  {
+   "step": 13,
+   "file": "crates/regex/src/ast.rs",
+   "kind": "blank",
+   "line": 57,
+   "equal": true,
+   "differences": [],
+   "wallMs": 14695,
+   "failed": 2
+  },
+  {
+   "step": 14,
+   "file": "crates/searcher/src/searcher/mmap.rs",
+   "kind": "statement",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 14847,
+   "failed": 2
+  },
+  {
+   "step": 15,
+   "file": "crates/searcher/src/sink.rs",
+   "kind": "statement",
+   "line": 642,
+   "equal": true,
+   "differences": [],
+   "wallMs": 16257,
+   "failed": 2
+  },
+  {
+   "step": 16,
+   "file": "crates/regex/src/config.rs",
+   "kind": "duplicate",
+   "line": 271,
+   "equal": true,
+   "differences": [],
+   "wallMs": 14030,
+   "failed": 2
+  },
+  {
+   "step": 17,
+   "file": "crates/globset/src/serde_impl.rs",
+   "kind": "blank",
+   "line": 39,
+   "equal": true,
+   "differences": [],
+   "wallMs": 13986,
+   "failed": 2
+  },
+  {
+   "step": 18,
+   "file": "crates/cli/src/decompress.rs",
+   "kind": "duplicate",
+   "line": 266,
+   "equal": true,
+   "differences": [],
+   "wallMs": 14520,
+   "failed": 2
+  },
+  {
+   "step": 19,
+   "file": "crates/searcher/src/searcher/mod.rs",
+   "kind": "blank",
+   "line": 59,
+   "equal": true,
+   "differences": [],
+   "wallMs": 14885,
+   "failed": 2
+  }
+ ],
+ "equal": true
+}

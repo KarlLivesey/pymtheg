@@ -1,0 +1,1687 @@
+{
+ "id": "BurntSushi/ripgrep",
+ "file": "crates/matcher/src/lib.rs",
+ "results": {
+  "cold": {
+   "wallMs": 95721,
+   "cpuMs": 95211,
+   "maxRssKiB": 849996,
+   "complete": true,
+   "report": {
+    "discovered": 225,
+    "claimed": 102,
+    "indexed": 102,
+    "unchanged": 0,
+    "removed": 0,
+    "symbols": 4392,
+    "links": 39819,
+    "unresolved": 13699,
+    "ambiguous": 12,
+    "library": 7956,
+    "failedCount": 0,
+    "errors": 0,
+    "analysisErrors": [],
+    "resolutionErrors": []
+   },
+   "counts": {
+    "inventory.filesHashed": 232,
+    "store.sqlStatements": 133421,
+    "index.filesRead": 116,
+    "index.bytesRead": 1911730,
+    "parse.rust.files": 102,
+    "store.filesWritten": 204,
+    "store.symbolRowsWritten": 8784,
+    "store.linkRowsDeleted": 38546,
+    "store.linkRowsInserted": 78365,
+    "store.fileRecordsDecoded": 644,
+    "analyze.go.inputFiles": 0,
+    "analyze.rust.inputFiles": 102,
+    "analyze.rust.filesChanged": 102,
+    "analyze.typescript.inputFiles": 0,
+    "resolve.go.inputFiles": 102,
+    "resolve.go.inputSymbols": 4392,
+    "resolve.go.inputLinks": 0,
+    "resolve.go.resolutions": 0,
+    "store.linksCompared": 38546,
+    "resolve.rust.inputFiles": 102,
+    "resolve.rust.inputSymbols": 4392,
+    "resolve.rust.inputLinks": 38546,
+    "resolve.rust.resolutions": 26104,
+    "store.linkTargetsRewritten": 18148,
+    "resolve.typescript.inputFiles": 102,
+    "resolve.typescript.inputSymbols": 4392,
+    "resolve.typescript.inputLinks": 0,
+    "resolve.typescript.resolutions": 0
+   },
+   "typescript": {
+    "programs": 0,
+    "extracted": 0,
+    "reused": 1,
+    "neutralPrograms": 0,
+    "neutralExtracted": 0
+   },
+   "stages": {
+    "command.inventory": {
+     "wallMs": 199,
+     "cpuMs": 262,
+     "calls": 2
+    },
+    "index.walk": {
+     "wallMs": 7,
+     "cpuMs": 8,
+     "calls": 1
+    },
+    "index.previous": {
+     "wallMs": 5,
+     "cpuMs": 4,
+     "calls": 104
+    },
+    "index.read": {
+     "wallMs": 22,
+     "cpuMs": 26,
+     "calls": 116
+    },
+    "index.hash": {
+     "wallMs": 4,
+     "cpuMs": 4,
+     "calls": 116
+    },
+    "parse.rust": {
+     "wallMs": 14658,
+     "cpuMs": 19226,
+     "calls": 102
+    },
+    "store.writeParsed": {
+     "wallMs": 21908,
+     "cpuMs": 18801,
+     "calls": 1
+    },
+    "analyze.go.input": {
+     "wallMs": 246,
+     "cpuMs": 292,
+     "calls": 1
+    },
+    "analyze.go": {
+     "wallMs": 4,
+     "cpuMs": 4,
+     "calls": 1
+    },
+    "analyze.go.write": {
+     "wallMs": 0,
+     "cpuMs": 0,
+     "calls": 1
+    },
+    "analyze.rust.input": {
+     "wallMs": 204,
+     "cpuMs": 197,
+     "calls": 1
+    },
+    "analyze.rust": {
+     "wallMs": 3913,
+     "cpuMs": 6108,
+     "calls": 1
+    },
+    "analyze.rust.write": {
+     "wallMs": 26481,
+     "cpuMs": 20572,
+     "calls": 1
+    },
+    "analyze.typescript.input": {
+     "wallMs": 339,
+     "cpuMs": 378,
+     "calls": 1
+    },
+    "analyze.typescript": {
+     "wallMs": 3,
+     "cpuMs": 3,
+     "calls": 1
+    },
+    "analyze.typescript.write": {
+     "wallMs": 0,
+     "cpuMs": 0,
+     "calls": 1
+    },
+    "resolve.go.input": {
+     "wallMs": 319,
+     "cpuMs": 317,
+     "calls": 1
+    },
+    "resolve.go": {
+     "wallMs": 49,
+     "cpuMs": 110,
+     "calls": 1
+    },
+    "resolve.go.validate": {
+     "wallMs": 4,
+     "cpuMs": 5,
+     "calls": 1
+    },
+    "resolve.go.write": {
+     "wallMs": 36,
+     "cpuMs": 37,
+     "calls": 1
+    },
+    "resolve.rust.input": {
+     "wallMs": 1120,
+     "cpuMs": 1321,
+     "calls": 1
+    },
+    "resolve.rust": {
+     "wallMs": 4148,
+     "cpuMs": 6779,
+     "calls": 1
+    },
+    "resolve.rust.validate": {
+     "wallMs": 219,
+     "cpuMs": 385,
+     "calls": 1
+    },
+    "resolve.rust.write": {
+     "wallMs": 19828,
+     "cpuMs": 17859,
+     "calls": 1
+    },
+    "resolve.typescript.input": {
+     "wallMs": 298,
+     "cpuMs": 491,
+     "calls": 1
+    },
+    "resolve.typescript": {
+     "wallMs": 1,
+     "cpuMs": 1,
+     "calls": 1
+    },
+    "resolve.typescript.validate": {
+     "wallMs": 5,
+     "cpuMs": 8,
+     "calls": 1
+    },
+    "resolve.typescript.write": {
+     "wallMs": 33,
+     "cpuMs": 32,
+     "calls": 1
+    },
+    "index.report": {
+     "wallMs": 71,
+     "cpuMs": 70,
+     "calls": 1
+    },
+    "command.metadata": {
+     "wallMs": 71,
+     "cpuMs": 72,
+     "calls": 1
+    }
+   }
+  },
+  "warm": {
+   "wallMs": 15368,
+   "cpuMs": 20262,
+   "maxRssKiB": 702448,
+   "complete": true,
+   "report": {
+    "discovered": 225,
+    "claimed": 102,
+    "indexed": 0,
+    "unchanged": 102,
+    "removed": 0,
+    "symbols": 4392,
+    "links": 39819,
+    "unresolved": 13699,
+    "ambiguous": 12,
+    "library": 7956,
+    "failedCount": 0,
+    "errors": 0,
+    "analysisErrors": [],
+    "resolutionErrors": []
+   },
+   "counts": {
+    "store.sqlStatements": 755,
+    "inventory.filesHashed": 232,
+    "store.fileRecordsDecoded": 746,
+    "index.filesRead": 116,
+    "index.bytesRead": 1911730,
+    "analyze.go.inputFiles": 0,
+    "analyze.rust.inputFiles": 102,
+    "analyze.typescript.inputFiles": 0,
+    "resolve.go.inputFiles": 102,
+    "resolve.go.inputSymbols": 4392,
+    "resolve.go.inputLinks": 0,
+    "resolve.go.resolutions": 0,
+    "store.linksCompared": 39819,
+    "resolve.rust.inputFiles": 102,
+    "resolve.rust.inputSymbols": 4392,
+    "resolve.rust.inputLinks": 38546,
+    "resolve.rust.resolutions": 26104,
+    "resolve.typescript.inputFiles": 102,
+    "resolve.typescript.inputSymbols": 4392,
+    "resolve.typescript.inputLinks": 0,
+    "resolve.typescript.resolutions": 0
+   },
+   "typescript": {
+    "programs": 0,
+    "extracted": 0,
+    "reused": 1,
+    "neutralPrograms": 0,
+    "neutralExtracted": 0
+   },
+   "stages": {
+    "command.inventory": {
+     "wallMs": 197,
+     "cpuMs": 272,
+     "calls": 2
+    },
+    "index.walk": {
+     "wallMs": 7,
+     "cpuMs": 7,
+     "calls": 1
+    },
+    "index.previous": {
+     "wallMs": 303,
+     "cpuMs": 306,
+     "calls": 104
+    },
+    "index.read": {
+     "wallMs": 24,
+     "cpuMs": 30,
+     "calls": 116
+    },
+    "index.hash": {
+     "wallMs": 4,
+     "cpuMs": 4,
+     "calls": 116
+    },
+    "store.writeParsed": {
+     "wallMs": 1,
+     "cpuMs": 1,
+     "calls": 1
+    },
+    "analyze.go.input": {
+     "wallMs": 235,
+     "cpuMs": 274,
+     "calls": 1
+    },
+    "analyze.go": {
+     "wallMs": 3,
+     "cpuMs": 3,
+     "calls": 1
+    },
+    "analyze.go.write": {
+     "wallMs": 0,
+     "cpuMs": 0,
+     "calls": 1
+    },
+    "analyze.rust.input": {
+     "wallMs": 274,
+     "cpuMs": 505,
+     "calls": 1
+    },
+    "analyze.rust": {
+     "wallMs": 3613,
+     "cpuMs": 5623,
+     "calls": 1
+    },
+    "analyze.rust.write": {
+     "wallMs": 254,
+     "cpuMs": 252,
+     "calls": 1
+    },
+    "analyze.typescript.input": {
+     "wallMs": 228,
+     "cpuMs": 292,
+     "calls": 1
+    },
+    "analyze.typescript": {
+     "wallMs": 1,
+     "cpuMs": 1,
+     "calls": 1
+    },
+    "analyze.typescript.write": {
+     "wallMs": 0,
+     "cpuMs": 0,
+     "calls": 1
+    },
+    "resolve.go.input": {
+     "wallMs": 225,
+     "cpuMs": 224,
+     "calls": 1
+    },
+    "resolve.go": {
+     "wallMs": 33,
+     "cpuMs": 62,
+     "calls": 1
+    },
+    "resolve.go.validate": {
+     "wallMs": 4,
+     "cpuMs": 4,
+     "calls": 1
+    },
+    "resolve.go.write": {
+     "wallMs": 36,
+     "cpuMs": 36,
+     "calls": 1
+    },
+    "resolve.rust.input": {
+     "wallMs": 1280,
+     "cpuMs": 1476,
+     "calls": 1
+    },
+    "resolve.rust": {
+     "wallMs": 3714,
+     "cpuMs": 6137,
+     "calls": 1
+    },
+    "resolve.rust.validate": {
+     "wallMs": 232,
+     "cpuMs": 499,
+     "calls": 1
+    },
+    "resolve.rust.write": {
+     "wallMs": 1570,
+     "cpuMs": 1950,
+     "calls": 1
+    },
+    "resolve.typescript.input": {
+     "wallMs": 187,
+     "cpuMs": 186,
+     "calls": 1
+    },
+    "resolve.typescript": {
+     "wallMs": 1,
+     "cpuMs": 1,
+     "calls": 1
+    },
+    "resolve.typescript.validate": {
+     "wallMs": 3,
+     "cpuMs": 5,
+     "calls": 1
+    },
+    "resolve.typescript.write": {
+     "wallMs": 34,
+     "cpuMs": 37,
+     "calls": 1
+    },
+    "index.report": {
+     "wallMs": 76,
+     "cpuMs": 76,
+     "calls": 1
+    },
+    "command.metadata": {
+     "wallMs": 92,
+     "cpuMs": 91,
+     "calls": 1
+    }
+   }
+  },
+  "comment": {
+   "wallMs": 15578,
+   "cpuMs": 21798,
+   "maxRssKiB": 741272,
+   "complete": true,
+   "report": {
+    "discovered": 225,
+    "claimed": 102,
+    "indexed": 1,
+    "unchanged": 101,
+    "removed": 0,
+    "symbols": 4392,
+    "links": 39819,
+    "unresolved": 13699,
+    "ambiguous": 12,
+    "library": 7956,
+    "failedCount": 0,
+    "errors": 0,
+    "analysisErrors": [],
+    "resolutionErrors": []
+   },
+   "counts": {
+    "store.sqlStatements": 3669,
+    "inventory.filesHashed": 232,
+    "store.fileRecordsDecoded": 746,
+    "index.filesRead": 116,
+    "index.bytesRead": 1911757,
+    "parse.rust.files": 1,
+    "store.filesWritten": 2,
+    "store.symbolRowsWritten": 248,
+    "store.linkRowsDeleted": 1586,
+    "store.linkRowsInserted": 1586,
+    "analyze.go.inputFiles": 0,
+    "analyze.rust.inputFiles": 102,
+    "analyze.rust.filesChanged": 1,
+    "analyze.typescript.inputFiles": 0,
+    "resolve.go.inputFiles": 102,
+    "resolve.go.inputSymbols": 4392,
+    "resolve.go.inputLinks": 0,
+    "resolve.go.resolutions": 0,
+    "store.linksCompared": 39819,
+    "resolve.rust.inputFiles": 102,
+    "resolve.rust.inputSymbols": 4392,
+    "resolve.rust.inputLinks": 38546,
+    "resolve.rust.resolutions": 26104,
+    "store.linkTargetsRewritten": 425,
+    "resolve.typescript.inputFiles": 102,
+    "resolve.typescript.inputSymbols": 4392,
+    "resolve.typescript.inputLinks": 0,
+    "resolve.typescript.resolutions": 0
+   },
+   "typescript": {
+    "programs": 0,
+    "extracted": 0,
+    "reused": 1,
+    "neutralPrograms": 0,
+    "neutralExtracted": 0
+   },
+   "stages": {
+    "command.inventory": {
+     "wallMs": 194,
+     "cpuMs": 272,
+     "calls": 2
+    },
+    "index.walk": {
+     "wallMs": 7,
+     "cpuMs": 8,
+     "calls": 1
+    },
+    "index.previous": {
+     "wallMs": 258,
+     "cpuMs": 257,
+     "calls": 104
+    },
+    "index.read": {
+     "wallMs": 23,
+     "cpuMs": 28,
+     "calls": 116
+    },
+    "index.hash": {
+     "wallMs": 4,
+     "cpuMs": 4,
+     "calls": 116
+    },
+    "parse.rust": {
+     "wallMs": 456,
+     "cpuMs": 984,
+     "calls": 1
+    },
+    "store.writeParsed": {
+     "wallMs": 398,
+     "cpuMs": 380,
+     "calls": 1
+    },
+    "analyze.go.input": {
+     "wallMs": 223,
+     "cpuMs": 258,
+     "calls": 1
+    },
+    "analyze.go": {
+     "wallMs": 3,
+     "cpuMs": 3,
+     "calls": 1
+    },
+    "analyze.go.write": {
+     "wallMs": 0,
+     "cpuMs": 0,
+     "calls": 1
+    },
+    "analyze.rust.input": {
+     "wallMs": 268,
+     "cpuMs": 515,
+     "calls": 1
+    },
+    "analyze.rust": {
+     "wallMs": 3704,
+     "cpuMs": 5521,
+     "calls": 1
+    },
+    "analyze.rust.write": {
+     "wallMs": 722,
+     "cpuMs": 713,
+     "calls": 1
+    },
+    "analyze.typescript.input": {
+     "wallMs": 224,
+     "cpuMs": 299,
+     "calls": 1
+    },
+    "analyze.typescript": {
+     "wallMs": 1,
+     "cpuMs": 1,
+     "calls": 1
+    },
+    "analyze.typescript.write": {
+     "wallMs": 0,
+     "cpuMs": 0,
+     "calls": 1
+    },
+    "resolve.go.input": {
+     "wallMs": 198,
+     "cpuMs": 197,
+     "calls": 1
+    },
+    "resolve.go": {
+     "wallMs": 24,
+     "cpuMs": 63,
+     "calls": 1
+    },
+    "resolve.go.validate": {
+     "wallMs": 4,
+     "cpuMs": 5,
+     "calls": 1
+    },
+    "resolve.go.write": {
+     "wallMs": 31,
+     "cpuMs": 31,
+     "calls": 1
+    },
+    "resolve.rust.input": {
+     "wallMs": 1181,
+     "cpuMs": 1417,
+     "calls": 1
+    },
+    "resolve.rust": {
+     "wallMs": 3929,
+     "cpuMs": 6165,
+     "calls": 1
+    },
+    "resolve.rust.validate": {
+     "wallMs": 254,
+     "cpuMs": 503,
+     "calls": 1
+    },
+    "resolve.rust.write": {
+     "wallMs": 1546,
+     "cpuMs": 1944,
+     "calls": 1
+    },
+    "resolve.typescript.input": {
+     "wallMs": 290,
+     "cpuMs": 365,
+     "calls": 1
+    },
+    "resolve.typescript": {
+     "wallMs": 1,
+     "cpuMs": 2,
+     "calls": 1
+    },
+    "resolve.typescript.validate": {
+     "wallMs": 3,
+     "cpuMs": 6,
+     "calls": 1
+    },
+    "resolve.typescript.write": {
+     "wallMs": 37,
+     "cpuMs": 39,
+     "calls": 1
+    },
+    "index.report": {
+     "wallMs": 79,
+     "cpuMs": 79,
+     "calls": 1
+    },
+    "command.metadata": {
+     "wallMs": 102,
+     "cpuMs": 105,
+     "calls": 1
+    }
+   }
+  },
+  "comment-revert": {
+   "wallMs": 14990,
+   "cpuMs": 20276,
+   "maxRssKiB": 699768,
+   "complete": true,
+   "report": {
+    "discovered": 225,
+    "claimed": 102,
+    "indexed": 1,
+    "unchanged": 101,
+    "removed": 0,
+    "symbols": 4392,
+    "links": 39819,
+    "unresolved": 13699,
+    "ambiguous": 12,
+    "library": 7956,
+    "failedCount": 0,
+    "errors": 0,
+    "analysisErrors": [],
+    "resolutionErrors": []
+   },
+   "counts": {
+    "store.sqlStatements": 3669,
+    "inventory.filesHashed": 232,
+    "store.fileRecordsDecoded": 746,
+    "index.filesRead": 116,
+    "index.bytesRead": 1911730,
+    "parse.rust.files": 1,
+    "store.filesWritten": 2,
+    "store.symbolRowsWritten": 248,
+    "store.linkRowsDeleted": 1586,
+    "store.linkRowsInserted": 1586,
+    "analyze.go.inputFiles": 0,
+    "analyze.rust.inputFiles": 102,
+    "analyze.rust.filesChanged": 1,
+    "analyze.typescript.inputFiles": 0,
+    "resolve.go.inputFiles": 102,
+    "resolve.go.inputSymbols": 4392,
+    "resolve.go.inputLinks": 0,
+    "resolve.go.resolutions": 0,
+    "store.linksCompared": 39819,
+    "resolve.rust.inputFiles": 102,
+    "resolve.rust.inputSymbols": 4392,
+    "resolve.rust.inputLinks": 38546,
+    "resolve.rust.resolutions": 26104,
+    "store.linkTargetsRewritten": 425,
+    "resolve.typescript.inputFiles": 102,
+    "resolve.typescript.inputSymbols": 4392,
+    "resolve.typescript.inputLinks": 0,
+    "resolve.typescript.resolutions": 0
+   },
+   "typescript": {
+    "programs": 0,
+    "extracted": 0,
+    "reused": 1,
+    "neutralPrograms": 0,
+    "neutralExtracted": 0
+   },
+   "stages": {
+    "command.inventory": {
+     "wallMs": 194,
+     "cpuMs": 234,
+     "calls": 2
+    },
+    "index.walk": {
+     "wallMs": 7,
+     "cpuMs": 8,
+     "calls": 1
+    },
+    "index.previous": {
+     "wallMs": 260,
+     "cpuMs": 261,
+     "calls": 104
+    },
+    "index.read": {
+     "wallMs": 22,
+     "cpuMs": 26,
+     "calls": 116
+    },
+    "index.hash": {
+     "wallMs": 4,
+     "cpuMs": 4,
+     "calls": 116
+    },
+    "parse.rust": {
+     "wallMs": 439,
+     "cpuMs": 912,
+     "calls": 1
+    },
+    "store.writeParsed": {
+     "wallMs": 486,
+     "cpuMs": 462,
+     "calls": 1
+    },
+    "analyze.go.input": {
+     "wallMs": 214,
+     "cpuMs": 233,
+     "calls": 1
+    },
+    "analyze.go": {
+     "wallMs": 2,
+     "cpuMs": 2,
+     "calls": 1
+    },
+    "analyze.go.write": {
+     "wallMs": 0,
+     "cpuMs": 0,
+     "calls": 1
+    },
+    "analyze.rust.input": {
+     "wallMs": 188,
+     "cpuMs": 194,
+     "calls": 1
+    },
+    "analyze.rust": {
+     "wallMs": 3592,
+     "cpuMs": 5458,
+     "calls": 1
+    },
+    "analyze.rust.write": {
+     "wallMs": 792,
+     "cpuMs": 555,
+     "calls": 1
+    },
+    "analyze.typescript.input": {
+     "wallMs": 244,
+     "cpuMs": 288,
+     "calls": 1
+    },
+    "analyze.typescript": {
+     "wallMs": 1,
+     "cpuMs": 1,
+     "calls": 1
+    },
+    "analyze.typescript.write": {
+     "wallMs": 0,
+     "cpuMs": 0,
+     "calls": 1
+    },
+    "resolve.go.input": {
+     "wallMs": 237,
+     "cpuMs": 235,
+     "calls": 1
+    },
+    "resolve.go": {
+     "wallMs": 34,
+     "cpuMs": 77,
+     "calls": 1
+    },
+    "resolve.go.validate": {
+     "wallMs": 4,
+     "cpuMs": 4,
+     "calls": 1
+    },
+    "resolve.go.write": {
+     "wallMs": 42,
+     "cpuMs": 43,
+     "calls": 1
+    },
+    "resolve.rust.input": {
+     "wallMs": 1322,
+     "cpuMs": 1505,
+     "calls": 1
+    },
+    "resolve.rust": {
+     "wallMs": 3288,
+     "cpuMs": 5273,
+     "calls": 1
+    },
+    "resolve.rust.validate": {
+     "wallMs": 227,
+     "cpuMs": 439,
+     "calls": 1
+    },
+    "resolve.rust.write": {
+     "wallMs": 1354,
+     "cpuMs": 1758,
+     "calls": 1
+    },
+    "resolve.typescript.input": {
+     "wallMs": 213,
+     "cpuMs": 276,
+     "calls": 1
+    },
+    "resolve.typescript": {
+     "wallMs": 1,
+     "cpuMs": 1,
+     "calls": 1
+    },
+    "resolve.typescript.validate": {
+     "wallMs": 2,
+     "cpuMs": 4,
+     "calls": 1
+    },
+    "resolve.typescript.write": {
+     "wallMs": 29,
+     "cpuMs": 29,
+     "calls": 1
+    },
+    "index.report": {
+     "wallMs": 64,
+     "cpuMs": 64,
+     "calls": 1
+    },
+    "command.metadata": {
+     "wallMs": 75,
+     "cpuMs": 75,
+     "calls": 1
+    }
+   }
+  },
+  "body": {
+   "wallMs": 17115,
+   "cpuMs": 22741,
+   "maxRssKiB": 746368,
+   "complete": true,
+   "report": {
+    "discovered": 225,
+    "claimed": 102,
+    "indexed": 1,
+    "unchanged": 101,
+    "removed": 0,
+    "symbols": 4392,
+    "links": 39819,
+    "unresolved": 13699,
+    "ambiguous": 12,
+    "library": 7956,
+    "failedCount": 0,
+    "errors": 0,
+    "analysisErrors": [],
+    "resolutionErrors": []
+   },
+   "counts": {
+    "store.sqlStatements": 3669,
+    "inventory.filesHashed": 232,
+    "store.fileRecordsDecoded": 746,
+    "index.filesRead": 116,
+    "index.bytesRead": 1911749,
+    "parse.rust.files": 1,
+    "store.filesWritten": 2,
+    "store.symbolRowsWritten": 248,
+    "store.linkRowsDeleted": 1586,
+    "store.linkRowsInserted": 1586,
+    "analyze.go.inputFiles": 0,
+    "analyze.rust.inputFiles": 102,
+    "analyze.rust.filesChanged": 1,
+    "analyze.typescript.inputFiles": 0,
+    "resolve.go.inputFiles": 102,
+    "resolve.go.inputSymbols": 4392,
+    "resolve.go.inputLinks": 0,
+    "resolve.go.resolutions": 0,
+    "store.linksCompared": 39819,
+    "resolve.rust.inputFiles": 102,
+    "resolve.rust.inputSymbols": 4392,
+    "resolve.rust.inputLinks": 38546,
+    "resolve.rust.resolutions": 26104,
+    "store.linkTargetsRewritten": 425,
+    "resolve.typescript.inputFiles": 102,
+    "resolve.typescript.inputSymbols": 4392,
+    "resolve.typescript.inputLinks": 0,
+    "resolve.typescript.resolutions": 0
+   },
+   "typescript": {
+    "programs": 0,
+    "extracted": 0,
+    "reused": 1,
+    "neutralPrograms": 0,
+    "neutralExtracted": 0
+   },
+   "stages": {
+    "command.inventory": {
+     "wallMs": 197,
+     "cpuMs": 281,
+     "calls": 2
+    },
+    "index.walk": {
+     "wallMs": 7,
+     "cpuMs": 8,
+     "calls": 1
+    },
+    "index.previous": {
+     "wallMs": 326,
+     "cpuMs": 338,
+     "calls": 104
+    },
+    "index.read": {
+     "wallMs": 22,
+     "cpuMs": 27,
+     "calls": 116
+    },
+    "index.hash": {
+     "wallMs": 4,
+     "cpuMs": 4,
+     "calls": 116
+    },
+    "parse.rust": {
+     "wallMs": 458,
+     "cpuMs": 923,
+     "calls": 1
+    },
+    "store.writeParsed": {
+     "wallMs": 650,
+     "cpuMs": 512,
+     "calls": 1
+    },
+    "analyze.go.input": {
+     "wallMs": 233,
+     "cpuMs": 249,
+     "calls": 1
+    },
+    "analyze.go": {
+     "wallMs": 3,
+     "cpuMs": 3,
+     "calls": 1
+    },
+    "analyze.go.write": {
+     "wallMs": 0,
+     "cpuMs": 0,
+     "calls": 1
+    },
+    "analyze.rust.input": {
+     "wallMs": 223,
+     "cpuMs": 232,
+     "calls": 1
+    },
+    "analyze.rust": {
+     "wallMs": 3789,
+     "cpuMs": 6153,
+     "calls": 1
+    },
+    "analyze.rust.write": {
+     "wallMs": 516,
+     "cpuMs": 504,
+     "calls": 1
+    },
+    "analyze.typescript.input": {
+     "wallMs": 241,
+     "cpuMs": 320,
+     "calls": 1
+    },
+    "analyze.typescript": {
+     "wallMs": 1,
+     "cpuMs": 1,
+     "calls": 1
+    },
+    "analyze.typescript.write": {
+     "wallMs": 0,
+     "cpuMs": 0,
+     "calls": 1
+    },
+    "resolve.go.input": {
+     "wallMs": 237,
+     "cpuMs": 240,
+     "calls": 1
+    },
+    "resolve.go": {
+     "wallMs": 36,
+     "cpuMs": 80,
+     "calls": 1
+    },
+    "resolve.go.validate": {
+     "wallMs": 4,
+     "cpuMs": 4,
+     "calls": 1
+    },
+    "resolve.go.write": {
+     "wallMs": 36,
+     "cpuMs": 38,
+     "calls": 1
+    },
+    "resolve.rust.input": {
+     "wallMs": 1356,
+     "cpuMs": 1441,
+     "calls": 1
+    },
+    "resolve.rust": {
+     "wallMs": 4039,
+     "cpuMs": 6526,
+     "calls": 1
+    },
+    "resolve.rust.validate": {
+     "wallMs": 243,
+     "cpuMs": 505,
+     "calls": 1
+    },
+    "resolve.rust.write": {
+     "wallMs": 1712,
+     "cpuMs": 1895,
+     "calls": 1
+    },
+    "resolve.typescript.input": {
+     "wallMs": 251,
+     "cpuMs": 309,
+     "calls": 1
+    },
+    "resolve.typescript": {
+     "wallMs": 1,
+     "cpuMs": 1,
+     "calls": 1
+    },
+    "resolve.typescript.validate": {
+     "wallMs": 3,
+     "cpuMs": 5,
+     "calls": 1
+    },
+    "resolve.typescript.write": {
+     "wallMs": 36,
+     "cpuMs": 40,
+     "calls": 1
+    },
+    "index.report": {
+     "wallMs": 78,
+     "cpuMs": 80,
+     "calls": 1
+    },
+    "command.metadata": {
+     "wallMs": 87,
+     "cpuMs": 90,
+     "calls": 1
+    }
+   }
+  },
+  "body-revert": {
+   "wallMs": 15615,
+   "cpuMs": 21023,
+   "maxRssKiB": 693016,
+   "complete": true,
+   "report": {
+    "discovered": 225,
+    "claimed": 102,
+    "indexed": 1,
+    "unchanged": 101,
+    "removed": 0,
+    "symbols": 4392,
+    "links": 39819,
+    "unresolved": 13699,
+    "ambiguous": 12,
+    "library": 7956,
+    "failedCount": 0,
+    "errors": 0,
+    "analysisErrors": [],
+    "resolutionErrors": []
+   },
+   "counts": {
+    "store.sqlStatements": 3669,
+    "inventory.filesHashed": 232,
+    "store.fileRecordsDecoded": 746,
+    "index.filesRead": 116,
+    "index.bytesRead": 1911730,
+    "parse.rust.files": 1,
+    "store.filesWritten": 2,
+    "store.symbolRowsWritten": 248,
+    "store.linkRowsDeleted": 1586,
+    "store.linkRowsInserted": 1586,
+    "analyze.go.inputFiles": 0,
+    "analyze.rust.inputFiles": 102,
+    "analyze.rust.filesChanged": 1,
+    "analyze.typescript.inputFiles": 0,
+    "resolve.go.inputFiles": 102,
+    "resolve.go.inputSymbols": 4392,
+    "resolve.go.inputLinks": 0,
+    "resolve.go.resolutions": 0,
+    "store.linksCompared": 39819,
+    "resolve.rust.inputFiles": 102,
+    "resolve.rust.inputSymbols": 4392,
+    "resolve.rust.inputLinks": 38546,
+    "resolve.rust.resolutions": 26104,
+    "store.linkTargetsRewritten": 425,
+    "resolve.typescript.inputFiles": 102,
+    "resolve.typescript.inputSymbols": 4392,
+    "resolve.typescript.inputLinks": 0,
+    "resolve.typescript.resolutions": 0
+   },
+   "typescript": {
+    "programs": 0,
+    "extracted": 0,
+    "reused": 1,
+    "neutralPrograms": 0,
+    "neutralExtracted": 0
+   },
+   "stages": {
+    "command.inventory": {
+     "wallMs": 194,
+     "cpuMs": 271,
+     "calls": 2
+    },
+    "index.walk": {
+     "wallMs": 6,
+     "cpuMs": 7,
+     "calls": 1
+    },
+    "index.previous": {
+     "wallMs": 274,
+     "cpuMs": 276,
+     "calls": 104
+    },
+    "index.read": {
+     "wallMs": 23,
+     "cpuMs": 27,
+     "calls": 116
+    },
+    "index.hash": {
+     "wallMs": 4,
+     "cpuMs": 4,
+     "calls": 116
+    },
+    "parse.rust": {
+     "wallMs": 449,
+     "cpuMs": 962,
+     "calls": 1
+    },
+    "store.writeParsed": {
+     "wallMs": 608,
+     "cpuMs": 301,
+     "calls": 1
+    },
+    "analyze.go.input": {
+     "wallMs": 224,
+     "cpuMs": 244,
+     "calls": 1
+    },
+    "analyze.go": {
+     "wallMs": 3,
+     "cpuMs": 3,
+     "calls": 1
+    },
+    "analyze.go.write": {
+     "wallMs": 0,
+     "cpuMs": 0,
+     "calls": 1
+    },
+    "analyze.rust.input": {
+     "wallMs": 186,
+     "cpuMs": 192,
+     "calls": 1
+    },
+    "analyze.rust": {
+     "wallMs": 3502,
+     "cpuMs": 5133,
+     "calls": 1
+    },
+    "analyze.rust.write": {
+     "wallMs": 564,
+     "cpuMs": 547,
+     "calls": 1
+    },
+    "analyze.typescript.input": {
+     "wallMs": 224,
+     "cpuMs": 290,
+     "calls": 1
+    },
+    "analyze.typescript": {
+     "wallMs": 1,
+     "cpuMs": 1,
+     "calls": 1
+    },
+    "analyze.typescript.write": {
+     "wallMs": 0,
+     "cpuMs": 0,
+     "calls": 1
+    },
+    "resolve.go.input": {
+     "wallMs": 221,
+     "cpuMs": 220,
+     "calls": 1
+    },
+    "resolve.go": {
+     "wallMs": 29,
+     "cpuMs": 68,
+     "calls": 1
+    },
+    "resolve.go.validate": {
+     "wallMs": 4,
+     "cpuMs": 4,
+     "calls": 1
+    },
+    "resolve.go.write": {
+     "wallMs": 35,
+     "cpuMs": 35,
+     "calls": 1
+    },
+    "resolve.rust.input": {
+     "wallMs": 1251,
+     "cpuMs": 1513,
+     "calls": 1
+    },
+    "resolve.rust": {
+     "wallMs": 3699,
+     "cpuMs": 6067,
+     "calls": 1
+    },
+    "resolve.rust.validate": {
+     "wallMs": 222,
+     "cpuMs": 449,
+     "calls": 1
+    },
+    "resolve.rust.write": {
+     "wallMs": 1387,
+     "cpuMs": 1698,
+     "calls": 1
+    },
+    "resolve.typescript.input": {
+     "wallMs": 253,
+     "cpuMs": 314,
+     "calls": 1
+    },
+    "resolve.typescript": {
+     "wallMs": 1,
+     "cpuMs": 1,
+     "calls": 1
+    },
+    "resolve.typescript.validate": {
+     "wallMs": 3,
+     "cpuMs": 5,
+     "calls": 1
+    },
+    "resolve.typescript.write": {
+     "wallMs": 35,
+     "cpuMs": 38,
+     "calls": 1
+    },
+    "index.report": {
+     "wallMs": 80,
+     "cpuMs": 80,
+     "calls": 1
+    },
+    "command.metadata": {
+     "wallMs": 94,
+     "cpuMs": 96,
+     "calls": 1
+    }
+   }
+  },
+  "export": {
+   "wallMs": 16711,
+   "cpuMs": 22924,
+   "maxRssKiB": 745380,
+   "complete": true,
+   "report": {
+    "discovered": 225,
+    "claimed": 102,
+    "indexed": 1,
+    "unchanged": 101,
+    "removed": 0,
+    "symbols": 4393,
+    "links": 39820,
+    "unresolved": 13699,
+    "ambiguous": 12,
+    "library": 7956,
+    "failedCount": 0,
+    "errors": 0,
+    "analysisErrors": [],
+    "resolutionErrors": []
+   },
+   "counts": {
+    "store.sqlStatements": 3675,
+    "inventory.filesHashed": 232,
+    "store.fileRecordsDecoded": 746,
+    "index.filesRead": 116,
+    "index.bytesRead": 1911767,
+    "parse.rust.files": 1,
+    "store.filesWritten": 2,
+    "store.symbolRowsWritten": 250,
+    "store.linkRowsDeleted": 1587,
+    "store.linkRowsInserted": 1588,
+    "analyze.go.inputFiles": 0,
+    "analyze.rust.inputFiles": 102,
+    "analyze.rust.filesChanged": 1,
+    "analyze.typescript.inputFiles": 0,
+    "resolve.go.inputFiles": 102,
+    "resolve.go.inputSymbols": 4393,
+    "resolve.go.inputLinks": 0,
+    "resolve.go.resolutions": 0,
+    "store.linksCompared": 39820,
+    "resolve.rust.inputFiles": 102,
+    "resolve.rust.inputSymbols": 4393,
+    "resolve.rust.inputLinks": 38547,
+    "resolve.rust.resolutions": 26105,
+    "store.linkTargetsRewritten": 426,
+    "resolve.typescript.inputFiles": 102,
+    "resolve.typescript.inputSymbols": 4393,
+    "resolve.typescript.inputLinks": 0,
+    "resolve.typescript.resolutions": 0
+   },
+   "typescript": {
+    "programs": 0,
+    "extracted": 0,
+    "reused": 1,
+    "neutralPrograms": 0,
+    "neutralExtracted": 0
+   },
+   "stages": {
+    "command.inventory": {
+     "wallMs": 195,
+     "cpuMs": 278,
+     "calls": 2
+    },
+    "index.walk": {
+     "wallMs": 5,
+     "cpuMs": 6,
+     "calls": 1
+    },
+    "index.previous": {
+     "wallMs": 279,
+     "cpuMs": 286,
+     "calls": 104
+    },
+    "index.read": {
+     "wallMs": 24,
+     "cpuMs": 29,
+     "calls": 116
+    },
+    "index.hash": {
+     "wallMs": 4,
+     "cpuMs": 4,
+     "calls": 116
+    },
+    "parse.rust": {
+     "wallMs": 486,
+     "cpuMs": 1024,
+     "calls": 1
+    },
+    "store.writeParsed": {
+     "wallMs": 444,
+     "cpuMs": 457,
+     "calls": 1
+    },
+    "analyze.go.input": {
+     "wallMs": 214,
+     "cpuMs": 240,
+     "calls": 1
+    },
+    "analyze.go": {
+     "wallMs": 3,
+     "cpuMs": 3,
+     "calls": 1
+    },
+    "analyze.go.write": {
+     "wallMs": 0,
+     "cpuMs": 0,
+     "calls": 1
+    },
+    "analyze.rust.input": {
+     "wallMs": 211,
+     "cpuMs": 224,
+     "calls": 1
+    },
+    "analyze.rust": {
+     "wallMs": 3751,
+     "cpuMs": 6099,
+     "calls": 1
+    },
+    "analyze.rust.write": {
+     "wallMs": 1119,
+     "cpuMs": 712,
+     "calls": 1
+    },
+    "analyze.typescript.input": {
+     "wallMs": 238,
+     "cpuMs": 325,
+     "calls": 1
+    },
+    "analyze.typescript": {
+     "wallMs": 1,
+     "cpuMs": 1,
+     "calls": 1
+    },
+    "analyze.typescript.write": {
+     "wallMs": 0,
+     "cpuMs": 0,
+     "calls": 1
+    },
+    "resolve.go.input": {
+     "wallMs": 223,
+     "cpuMs": 228,
+     "calls": 1
+    },
+    "resolve.go": {
+     "wallMs": 38,
+     "cpuMs": 107,
+     "calls": 1
+    },
+    "resolve.go.validate": {
+     "wallMs": 4,
+     "cpuMs": 5,
+     "calls": 1
+    },
+    "resolve.go.write": {
+     "wallMs": 36,
+     "cpuMs": 37,
+     "calls": 1
+    },
+    "resolve.rust.input": {
+     "wallMs": 1367,
+     "cpuMs": 1503,
+     "calls": 1
+    },
+    "resolve.rust": {
+     "wallMs": 4019,
+     "cpuMs": 6644,
+     "calls": 1
+    },
+    "resolve.rust.validate": {
+     "wallMs": 268,
+     "cpuMs": 571,
+     "calls": 1
+    },
+    "resolve.rust.write": {
+     "wallMs": 1853,
+     "cpuMs": 1921,
+     "calls": 1
+    },
+    "resolve.typescript.input": {
+     "wallMs": 239,
+     "cpuMs": 299,
+     "calls": 1
+    },
+    "resolve.typescript": {
+     "wallMs": 1,
+     "cpuMs": 1,
+     "calls": 1
+    },
+    "resolve.typescript.validate": {
+     "wallMs": 4,
+     "cpuMs": 8,
+     "calls": 1
+    },
+    "resolve.typescript.write": {
+     "wallMs": 38,
+     "cpuMs": 39,
+     "calls": 1
+    },
+    "index.report": {
+     "wallMs": 75,
+     "cpuMs": 76,
+     "calls": 1
+    },
+    "command.metadata": {
+     "wallMs": 92,
+     "cpuMs": 93,
+     "calls": 1
+    }
+   }
+  },
+  "export-revert": {
+   "wallMs": 15888,
+   "cpuMs": 21072,
+   "maxRssKiB": 687168,
+   "complete": true,
+   "report": {
+    "discovered": 225,
+    "claimed": 102,
+    "indexed": 1,
+    "unchanged": 101,
+    "removed": 0,
+    "symbols": 4392,
+    "links": 39819,
+    "unresolved": 13699,
+    "ambiguous": 12,
+    "library": 7956,
+    "failedCount": 0,
+    "errors": 0,
+    "analysisErrors": [],
+    "resolutionErrors": []
+   },
+   "counts": {
+    "store.sqlStatements": 3670,
+    "inventory.filesHashed": 232,
+    "store.fileRecordsDecoded": 746,
+    "index.filesRead": 116,
+    "index.bytesRead": 1911730,
+    "parse.rust.files": 1,
+    "store.filesWritten": 2,
+    "store.symbolRowsWritten": 248,
+    "store.linkRowsDeleted": 1587,
+    "store.linkRowsInserted": 1586,
+    "analyze.go.inputFiles": 0,
+    "analyze.rust.inputFiles": 102,
+    "analyze.rust.filesChanged": 1,
+    "analyze.typescript.inputFiles": 0,
+    "resolve.go.inputFiles": 102,
+    "resolve.go.inputSymbols": 4392,
+    "resolve.go.inputLinks": 0,
+    "resolve.go.resolutions": 0,
+    "store.linksCompared": 39819,
+    "resolve.rust.inputFiles": 102,
+    "resolve.rust.inputSymbols": 4392,
+    "resolve.rust.inputLinks": 38546,
+    "resolve.rust.resolutions": 26104,
+    "store.linkTargetsRewritten": 425,
+    "resolve.typescript.inputFiles": 102,
+    "resolve.typescript.inputSymbols": 4392,
+    "resolve.typescript.inputLinks": 0,
+    "resolve.typescript.resolutions": 0
+   },
+   "typescript": {
+    "programs": 0,
+    "extracted": 0,
+    "reused": 1,
+    "neutralPrograms": 0,
+    "neutralExtracted": 0
+   },
+   "stages": {
+    "command.inventory": {
+     "wallMs": 186,
+     "cpuMs": 262,
+     "calls": 2
+    },
+    "index.walk": {
+     "wallMs": 7,
+     "cpuMs": 8,
+     "calls": 1
+    },
+    "index.previous": {
+     "wallMs": 256,
+     "cpuMs": 259,
+     "calls": 104
+    },
+    "index.read": {
+     "wallMs": 24,
+     "cpuMs": 28,
+     "calls": 116
+    },
+    "index.hash": {
+     "wallMs": 4,
+     "cpuMs": 4,
+     "calls": 116
+    },
+    "parse.rust": {
+     "wallMs": 437,
+     "cpuMs": 931,
+     "calls": 1
+    },
+    "store.writeParsed": {
+     "wallMs": 377,
+     "cpuMs": 369,
+     "calls": 1
+    },
+    "analyze.go.input": {
+     "wallMs": 239,
+     "cpuMs": 256,
+     "calls": 1
+    },
+    "analyze.go": {
+     "wallMs": 3,
+     "cpuMs": 3,
+     "calls": 1
+    },
+    "analyze.go.write": {
+     "wallMs": 0,
+     "cpuMs": 0,
+     "calls": 1
+    },
+    "analyze.rust.input": {
+     "wallMs": 226,
+     "cpuMs": 230,
+     "calls": 1
+    },
+    "analyze.rust": {
+     "wallMs": 3678,
+     "cpuMs": 5808,
+     "calls": 1
+    },
+    "analyze.rust.write": {
+     "wallMs": 555,
+     "cpuMs": 534,
+     "calls": 1
+    },
+    "analyze.typescript.input": {
+     "wallMs": 219,
+     "cpuMs": 304,
+     "calls": 1
+    },
+    "analyze.typescript": {
+     "wallMs": 1,
+     "cpuMs": 1,
+     "calls": 1
+    },
+    "analyze.typescript.write": {
+     "wallMs": 0,
+     "cpuMs": 0,
+     "calls": 1
+    },
+    "resolve.go.input": {
+     "wallMs": 218,
+     "cpuMs": 216,
+     "calls": 1
+    },
+    "resolve.go": {
+     "wallMs": 29,
+     "cpuMs": 70,
+     "calls": 1
+    },
+    "resolve.go.validate": {
+     "wallMs": 4,
+     "cpuMs": 4,
+     "calls": 1
+    },
+    "resolve.go.write": {
+     "wallMs": 35,
+     "cpuMs": 35,
+     "calls": 1
+    },
+    "resolve.rust.input": {
+     "wallMs": 1088,
+     "cpuMs": 1306,
+     "calls": 1
+    },
+    "resolve.rust": {
+     "wallMs": 3546,
+     "cpuMs": 5929,
+     "calls": 1
+    },
+    "resolve.rust.validate": {
+     "wallMs": 264,
+     "cpuMs": 588,
+     "calls": 1
+    },
+    "resolve.rust.write": {
+     "wallMs": 1318,
+     "cpuMs": 1717,
+     "calls": 1
+    },
+    "resolve.typescript.input": {
+     "wallMs": 238,
+     "cpuMs": 273,
+     "calls": 1
+    },
+    "resolve.typescript": {
+     "wallMs": 1,
+     "cpuMs": 1,
+     "calls": 1
+    },
+    "resolve.typescript.validate": {
+     "wallMs": 2,
+     "cpuMs": 4,
+     "calls": 1
+    },
+    "resolve.typescript.write": {
+     "wallMs": 31,
+     "cpuMs": 34,
+     "calls": 1
+    },
+    "index.report": {
+     "wallMs": 70,
+     "cpuMs": 70,
+     "calls": 1
+    },
+    "command.metadata": {
+     "wallMs": 87,
+     "cpuMs": 87,
+     "calls": 1
+    }
+   }
+  }
+ },
+ "equality": {
+  "comment": [],
+  "body": [],
+  "export": []
+ }
+}

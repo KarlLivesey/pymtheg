@@ -1,0 +1,15 @@
+{
+ "root": "helix-editor_helix",
+ "rows": {
+  "graph_files": 269,
+  "graph_contexts": 18,
+  "graph_parse_failures": 0,
+  "graph_symbols": 8461,
+  "graph_links": 90780,
+  "graph_candidates": 60,
+  "graph_library_targets": 9801,
+  "project": 1
+ },
+ "equal": true,
+ "differences": []
+}

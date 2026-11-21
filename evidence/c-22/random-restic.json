@@ -1,0 +1,207 @@
+{
+ "id": "restic/restic",
+ "seed": 2213,
+ "steps": [
+  {
+   "step": 0,
+   "file": "internal/archiver/tree.go",
+   "kind": "blank",
+   "line": 124,
+   "equal": true,
+   "differences": [],
+   "wallMs": 12061,
+   "failed": 0
+  },
+  {
+   "step": 1,
+   "file": "internal/fs/fs_local_test.go",
+   "kind": "statement",
+   "line": 102,
+   "equal": true,
+   "differences": [],
+   "wallMs": 12364,
+   "failed": 0
+  },
+  {
+   "step": 2,
+   "file": "internal/data/node_test.go",
+   "kind": "comment",
+   "line": 18,
+   "equal": true,
+   "differences": [],
+   "wallMs": 11032,
+   "failed": 0
+  },
+  {
+   "step": 3,
+   "file": "internal/restic/lister_test.go",
+   "kind": "statement",
+   "line": 48,
+   "equal": true,
+   "differences": [],
+   "wallMs": 12643,
+   "failed": 0
+  },
+  {
+   "step": 4,
+   "file": "internal/backend/s3/config.go",
+   "kind": "delete",
+   "line": 72,
+   "equal": true,
+   "differences": [],
+   "wallMs": 74974,
+   "failed": 1
+  },
+  {
+   "step": 5,
+   "file": "internal/backend/rclone/config_test.go",
+   "kind": "comment",
+   "line": 5,
+   "equal": true,
+   "differences": [],
+   "wallMs": 11810,
+   "failed": 1
+  },
+  {
+   "step": 6,
+   "file": "internal/backend/http_transport.go",
+   "kind": "statement",
+   "line": 57,
+   "equal": true,
+   "differences": [],
+   "wallMs": 12711,
+   "failed": 2
+  },
+  {
+   "step": 7,
+   "file": "internal/test/doc.go",
+   "kind": "duplicate",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 14869,
+   "failed": 2
+  },
+  {
+   "step": 8,
+   "file": "internal/repository/repair_index.go",
+   "kind": "duplicate",
+   "line": 14,
+   "equal": true,
+   "differences": [],
+   "wallMs": 13084,
+   "failed": 2
+  },
+  {
+   "step": 9,
+   "file": "internal/backend/util/paths.go",
+   "kind": "delete",
+   "line": 28,
+   "equal": true,
+   "differences": [],
+   "wallMs": 13479,
+   "failed": 2
+  },
+  {
+   "step": 10,
+   "file": "cmd/restic/cmd_mount_disabled.go",
+   "kind": "comment",
+   "line": 8,
+   "equal": true,
+   "differences": [],
+   "wallMs": 15253,
+   "failed": 2
+  },
+  {
+   "step": 11,
+   "file": "internal/backend/location/registry.go",
+   "kind": "delete",
+   "line": 91,
+   "equal": true,
+   "differences": [],
+   "wallMs": 16333,
+   "failed": 2
+  },
+  {
+   "step": 12,
+   "file": "internal/backend/limiter/limiter_backend.go",
+   "kind": "duplicate",
+   "line": 81,
+   "equal": true,
+   "differences": [],
+   "wallMs": 12517,
+   "failed": 2
+  },
+  {
+   "step": 13,
+   "file": "internal/debug/round_tripper_release.go",
+   "kind": "blank",
+   "line": 13,
+   "equal": true,
+   "differences": [],
+   "wallMs": 12716,
+   "failed": 2
+  },
+  {
+   "step": 14,
+   "file": "internal/backend/swift/swift.go",
+   "kind": "statement",
+   "line": 71,
+   "equal": true,
+   "differences": [],
+   "wallMs": 12267,
+   "failed": 2
+  },
+  {
+   "step": 15,
+   "file": "internal/backend/rclone/stdio_conn.go",
+   "kind": "delete",
+   "line": 72,
+   "equal": true,
+   "differences": [],
+   "wallMs": 13325,
+   "failed": 2
+  },
+  {
+   "step": 16,
+   "file": "internal/restic/ids.go",
+   "kind": "duplicate",
+   "line": 41,
+   "equal": true,
+   "differences": [],
+   "wallMs": 13243,
+   "failed": 2
+  },
+  {
+   "step": 17,
+   "file": "internal/backend/rclone/backend.go",
+   "kind": "delete",
+   "line": 10,
+   "equal": true,
+   "differences": [],
+   "wallMs": 15166,
+   "failed": 2
+  },
+  {
+   "step": 18,
+   "file": "internal/fs/node_unix.go",
+   "kind": "comment",
+   "line": 11,
+   "equal": true,
+   "differences": [],
+   "wallMs": 14835,
+   "failed": 2
+  },
+  {
+   "step": 19,
+   "file": "internal/backend/local/local_unix.go",
+   "kind": "delete",
+   "line": 46,
+   "equal": true,
+   "differences": [],
+   "wallMs": 11624,
+   "failed": 2
+  }
+ ],
+ "equal": true
+}

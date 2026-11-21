@@ -1,0 +1,15 @@
+{
+ "root": "BurntSushi_ripgrep",
+ "rows": {
+  "graph_files": 102,
+  "graph_contexts": 14,
+  "graph_parse_failures": 0,
+  "graph_symbols": 4392,
+  "graph_links": 39819,
+  "graph_candidates": 24,
+  "graph_library_targets": 7956,
+  "project": 1
+ },
+ "equal": true,
+ "differences": []
+}
