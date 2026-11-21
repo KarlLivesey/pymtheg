@@ -70,7 +70,7 @@ function directives(text: string): { verb: string; args: string }[] {
   return output;
 }
 
-const directoryOf = (path: string) => {
+export const directoryOf = (path: string) => {
   const directory = posix.dirname(path);
   return directory === "." ? "" : directory;
 };

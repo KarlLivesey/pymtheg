@@ -1,0 +1,65 @@
+[
+ {
+  "pin": "labstack_echo",
+  "round": 0,
+  "build": "main-1",
+  "wallS": 50.44,
+  "cpuS": 47.6,
+  "peakMiB": 503,
+  "equality": {
+   "rows": {
+    "graph_files": 114,
+    "graph_contexts": 1,
+    "graph_parse_failures": 0,
+    "graph_symbols": 4168,
+    "graph_links": 31880,
+    "graph_candidates": 606,
+    "graph_library_targets": 13790,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "labstack_echo",
+  "round": 0,
+  "build": "after",
+  "wallS": 49.74,
+  "cpuS": 43.9,
+  "peakMiB": 507,
+  "equality": {
+   "rows": {
+    "graph_files": 114,
+    "graph_contexts": 1,
+    "graph_parse_failures": 0,
+    "graph_symbols": 4168,
+    "graph_links": 31880,
+    "graph_candidates": 606,
+    "graph_library_targets": 13790,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "labstack_echo",
+  "round": 0,
+  "build": "main-2",
+  "wallS": 45.2,
+  "cpuS": 44.2,
+  "peakMiB": 503,
+  "equality": {
+   "rows": {
+    "graph_files": 114,
+    "graph_contexts": 1,
+    "graph_parse_failures": 0,
+    "graph_symbols": 4168,
+    "graph_links": 31880,
+    "graph_candidates": 606,
+    "graph_library_targets": 13790,
+    "project": 1
+   },
+   "differences": []
+  }
+ }
+]
