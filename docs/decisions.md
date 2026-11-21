@@ -2866,7 +2866,7 @@ facade and its implementation. Unverified implementations leave the
 expansion opaque without a supported output proof. Verified identities feed the C-12 effect rules and its existing
 external effect assumption. [C-18](changes/C-18.md)
 
-### C-34 Lexical name bounds for Rust expansions
+### C-34 Fixed impl items in Rust macro transcribers
 
 A resolved `macro_rules!` definition can bound its lexical output to no
 names when every arm consists of fixed `impl` items and the invocation
@@ -2877,16 +2877,6 @@ with a separator other than a comma. Inside a body, `inline`, `allow` and
 macro syntax leave the proof unavailable. A nested definition could export
 a macro to the crate root. The scope retry uses the proof as a lexical name
 bound. Generated impl contents are still opaque for member resolution.
-
-Built-in derive and attribute effects depend on the binding at their actual
-module placement. A cfg-disjoint macro-use import cannot supply that binding.
-An unconditional `no_implicit_prelude` disables the macro-use prelude from
-edition 2018 onward while keeping the language prelude. Unknown glob exports
-can still compete on the newly proved routes. Tool attributes use known
-prefixes in the tool prelude and can be displaced by a type-namespace binding.
-A built-in derive adds no lexical names, and a built-in inert attribute adds
-no output. When the scope retry gets past sole opacity and establishes a
-different blocker, the graph records the new blocker.
 [C-34](changes/C-34.md)
 
 ### C-14 Go library targets

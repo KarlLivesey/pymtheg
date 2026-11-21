@@ -52,24 +52,3 @@ node --test test/graph-rust-macro-scope.test.mjs
 - [Coverage export](coverage-plan-input.json.gz) is the SW-4 inventory of the
   ten candidate runs. The coverage plan on main regenerates from a full
   sweep, so this change adds only the measured subset input.
-
-## Attribute identity extension
-
-For the extension comparison, use `72163e4` as the baseline and the final
-branch as the candidate. Run `compare.mjs` with those inputs, then run
-`node evidence/c-34/attribute-classes.mjs` in the same scratch directory.
-The class join uses the archived main census and compares each shared site
-before and after the extension. The compiler witnesses run with
-`node evidence/c-34/check-attributes.mjs`. The script compiles the fixture in
-both feature configurations and checks the diagnostics of separate controls.
-
-- [Class transitions](attribute-classes.tsv) show the before and after counts
-  by original class, pin and number of stored blockers.
-- [Replacement reasons](attribute-reasons.tsv) show the below-Level-2
-  transitions that no longer carry the opacity reason.
-- [Mixed combinations](attribute-mixed.tsv) count the exact unbounded origin
-  classes from the original census, including overlapping causes per site.
-- [Extension comparison](attribute-comparison.json) compares all definite
-  targets, symbols, site counts and assumptions against the prior PR head.
-- [Extension cost](attribute-cost.json) records the paired cold runs against
-  that head.

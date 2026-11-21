@@ -736,11 +736,9 @@ async function createHelper(): Promise<Helper> {
           .filter((a) => a.meta.name === "macro_use")
           .map((a) => a.guards);
       }
-      function noImplicitPrelude(n: Node, unconditional = false): boolean {
+      function noImplicitPrelude(n: Node): boolean {
         return effectiveAttributes(n).some(
-          (a) =>
-            a.meta.name === "no_implicit_prelude" &&
-            (!unconditional || !a.guards.length),
+          (a) => a.meta.name === "no_implicit_prelude",
         );
       }
       /** The one cfg collector for every item/site, including inherited gates. */
@@ -1067,9 +1065,6 @@ async function createHelper(): Promise<Helper> {
           : {}),
         ...(noImplicitPrelude(tree.rootNode)
           ? { noImplicitPrelude: true }
-          : {}),
-        ...(noImplicitPrelude(tree.rootNode, true)
-          ? { noImplicitPreludeUnconditional: true }
           : {}),
         scope: "",
         unit: true,
@@ -2549,9 +2544,6 @@ async function createHelper(): Promise<Helper> {
                       ...(noImplicitPrelude(n)
                         ? { noImplicitPrelude: true }
                         : {}),
-                      ...(noImplicitPrelude(n, true)
-                        ? { noImplicitPreludeUnconditional: true }
-                        : {}),
                       ...modulePath(n),
                     }
                   : {}),
@@ -2653,9 +2645,7 @@ async function createHelper(): Promise<Helper> {
               macroUseRequests: effectiveAttributes(n)
                 .filter((a) => a.meta.name === "macro_use")
                 .map((a) => ({
-                  conditions: [
-                    ...new Set([...explicitConditionsOn(n), ...a.guards]),
-                  ],
+                  conditions: a.guards,
                   names: a.meta.args
                     ? payloads(a.meta.args).map((x) => x.name)
                     : null,
@@ -3018,9 +3008,7 @@ async function createHelper(): Promise<Helper> {
                 start: app.meta.start,
                 ...(helper ?? {}),
                 raw: `#[${app.meta.name}${app.meta.args?.text ?? (app.meta.value ? "=" + app.meta.value.text : "")}]`,
-                conditions: [
-                  ...new Set([...explicitConditionsOn(item), ...app.guards]),
-                ],
+                conditions: app.guards,
                 ...(input === undefined ? {} : { input }),
                 module:
                   item.type === "mod_item"
