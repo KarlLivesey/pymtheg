@@ -129,7 +129,7 @@ export function runTables(modes) {
     ...Object.entries(modes).flatMap(([mode, { repos }]) => ["", `## ${mode}`, "",
       "| Pin | Outcome | Level 2 | Wall (s) | Peak (MiB) | Cold (s) | Cold peak (MiB) | Detail |",
       "| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |",
-      ...repos.map(({ id, language, outcome, wallSeconds, peakRssKiB, cold, failure, install, toolchain, failedFiles, failedModules, indexErrors, compilerAssertion, invalidUtf16Files }) => {
+      ...repos.map(({ id, language, outcome, wallSeconds, peakRssKiB, cold, failure, install, toolchain, failedFiles, failedModules, indexErrors, compilerAssertion, invalidUtf16Files, measuredCommit }) => {
         const stage = failure?.stage;
         const selected = picked[mode].get(id);
         const languageCount = selected?.counts?.[language];
@@ -137,7 +137,8 @@ export function runTables(modes) {
         const level2 = `${languageCount ? rate(languageCount) : "—"}${fallback ? " (bare)" : ""}`;
         const modules = Object.entries(failedModules ?? {}).filter(([, count]) => count)
           .map(([module, count]) => `${number(count)} ${languageNames[module]}`).join(", ");
-        const detail = [install && [install.manager, install.status, install.reason].filter(Boolean).join(" "),
+        const detail = [install && [install.manager, install.version, install.status, install.reason].filter(Boolean).join(" "),
+          measuredCommit && `measured at ${inline(measuredCommit)}`,
           stage && [stage, failure.exit != null && `exit ${failure.exit}`, failure.progress, failure.memory].filter(Boolean).join(" · "),
           toolchain && [toolchain.state, toolchain.reason, toolchain.packages && `${toolchain.packages.clean}/${toolchain.packages.total} clean packages`].filter(Boolean).join(" · "),
           indexErrors?.analysisErrors && `${indexErrors.analysisErrors} analysis error${indexErrors.analysisErrors === 1 ? "" : "s"}`,
@@ -169,12 +170,21 @@ export function renderPlan(input, base, pins, catalog, legacy) {
   const installedUsable = installed.filter((repo) => repo.counts && repo.install?.status === "installed").length;
   const installedFallback = installed.filter((repo) => !repo.counts || repo.install?.status !== "installed")
     .map(({ id, install, outcome, failure }) => `${id} (${install?.reason ?? `${outcome}${failure?.stage ? ` at ${failure.stage}` : ""}`})`);
+  const installedWithoutTypeScript = installed.filter((repo) => repo.install?.status === "installed" &&
+    repo.counts?.typescript.links === 0 && repo.failedModules?.typescript)
+    .map((repo) => `${repo.id} (${number(repo.failedModules.typescript)} failed files)`);
+  const replays = Map.groupBy(installed.filter(({ measuredCommit }) => measuredCommit), ({ measuredCommit }) => measuredCommit);
+  const replayNotes = [...replays].map(([commit, rows]) =>
+    `Installed attempts for ${rows.map(({ id }) => id).join(", ")} were measured later at ${inline(commit)}. The installed totals use these attempts where usable and keep the original measurements for the other pins.`);
+  const archive = replays.size ? "sw-5" : "sw-4";
   const changes = catalogChanges(input.modes, catalog, legacy);
   const typescriptPins = bare.filter(({ language }) => language === "typescript");
   const allFailed = typescriptPins.filter((repo) => repo.counts?.typescript.links === 0 && repo.failedModules?.typescript);
   const failedPins = allFailed.map((repo) => `${repo.id} (${number(repo.failedModules.typescript)} files)`).join(" and ");
   const scoringPins = pairedInstalled.filter((repo) => repo.language === "typescript" && repo.counts?.typescript.links > 0).length;
-  const zeroTypeScriptNote = allFailed.length ? [`${failedPins} finished their bare attempts, but every TypeScript or JavaScript file failed, so they contribute zero TypeScript links and the own-pin scores cover ${scoringPins} of ${typescriptPins.length} TypeScript pins.`] : [];
+  const zeroTypeScriptNote = allFailed.length ? [replays.size
+    ? `${failedPins} contribute zero TypeScript links to the original bare measurement. The installed-declarations score uses observed TypeScript links from ${scoringPins} of ${typescriptPins.length} TypeScript pins.`
+    : `${failedPins} finished their bare attempts, but every TypeScript or JavaScript file failed, so they contribute zero TypeScript links and the own-pin scores cover ${scoringPins} of ${typescriptPins.length} TypeScript pins.`] : [];
   const taint = bare.flatMap(({ inventory }) => inventory ?? []).filter(([module, , , reasons]) =>
     module === "rust" && reasons.includes("failed-file-unseen-declarations")).reduce((sum, row) => sum + row[4], 0);
   const missed = bare.filter(({ counts }) => !counts).map(({ id, outcome, failure }) => `${id} (${outcome}${failure?.stage ? ` at ${failure.stage}` : ""})`);
@@ -184,16 +194,20 @@ export function renderPlan(input, base, pins, catalog, legacy) {
     "Each stored link counts under its source language in a finished graph, so Go files in a TypeScript pin count under Go and JavaScript counts with TypeScript.",
     "Level 2 credits a resolved checkout target or a library unit with a named symbol. The gap is the number of additional Level 2 links required at the current link count.", "",
     `Measured main commit ${inline(input.measuredCommit)}. Each 0.1.0 entry uses the release's finished bare graphs. The earlier exporter inferred named library targets from the stored facts where it could.`,
-    "[Current sweep and source audit](../evidence/sw-4/coverage-plan-input.json.gz) · [0.1.0 breakdown](../evidence/sw-3/breakdown.json.gz)", "",
+    ...replayNotes,
+    `[Current sweep and source audit](../evidence/${archive}/coverage-plan-input.json.gz) · [0.1.0 breakdown](../evidence/sw-3/breakdown.json.gz)`, "",
     "## Coverage within each language's own pins", "", scoreTable(input.modes, base, true), "",
     "[C-19, experimental Rust toolchain coverage measurement](changes/C-19.md), measured a possible route that Pymtheg has yet to implement.", "",
     "## Pin completion", "",
     `**${finished}/${bare.length} bare pins finished.** ${missed.length ? `Unfinished attempts were ${missed.join(", ")}.` : "All bare graphs contribute to the totals."}`,
-    ...zeroTypeScriptNote,
-    `TypeScript dependencies installed and indexed on ${installedUsable}/${installed.length} pins with lifecycle scripts disabled. Each unusable installed attempt contributes its bare graph when available.`,
+    ...(replays.size ? [] : zeroTypeScriptNote),
+    replays.size
+      ? `${installedUsable}/${installed.length} TypeScript pins completed the installed graph and sweep queries with lifecycle scripts disabled. Each unusable installed attempt contributes its bare graph when available.`
+      : `TypeScript dependencies installed and indexed on ${installedUsable}/${installed.length} pins with lifecycle scripts disabled. Each unusable installed attempt contributes its bare graph when available.`,
     ...(installedFallback.length ? [`Installed-mode fallbacks include ${installedFallback.join(", ")}.`] : []),
+    ...(installedWithoutTypeScript.length ? [`Installed graphs with zero TypeScript links after analysis failed include ${installedWithoutTypeScript.join(", ")}.`] : []),
     `The offline Go toolchain provided facts on ${goUsed.length}/${go.length} Go pins. Go links in other languages' pins use the bare graph.${goUsed.length < go.length ? " Go pins with unusable opt-in attempts also use the bare graph." : ""}`,
-    "[Per-pin outcomes, fallback details, time and memory](../evidence/sw-4/attempts.md)", "",
+    `[Per-pin outcomes, fallback details, time and memory](../evidence/${archive}/${replays.size ? "README.md" : "attempts.md"})`, "",
     "## Support items", "",
     "Each missing link belongs to its first stored blocker. Read the direct reason first, then the ordered reasons for an open candidate set, then uncertainty and the reason saved before a configuration override. Split semicolon lists left to right and keep the first occurrence. A link without a reason is grouped by its outcome.",
     "Counts and pin totals are exact. Link kinds and examples use the bare group when available. An alternate group can supply another example when the bare group has one source line. The archive retains every combination and count, including secondary reasons.",
@@ -208,7 +222,8 @@ export function renderPlan(input, base, pins, catalog, legacy) {
       return [`### ${languageNames[module]}`, "", ceiling(groups, review, totals, module), "",
         ...(module === "go" ? ["Counts are bare / opt-in offline Go toolchain.", "",
           "The protobuf reflection call `largeMessageDesc.Fields().ByName(\"f34\")` records both `external-implementers-possible` and `structural-match-unverified`. Its count goes under the first reason. [Pinned Go source](https://github.com/protocolbuffers/protobuf-go/blob/ef99f06f37ec921e64fdbcec131a82013f38776e/internal/reflection_test/reflection_test.go#L100)", ""]
-          : module === "typescript" ? ["Counts are bare / installed declarations.", ""] : []),
+          : module === "typescript" ? ["Counts are bare / installed declarations.",
+            ...(replays.size ? ["The bare inventory and ceiling use SW-4. The installed inventory includes the later attempts listed beside the scoreboard."] : []), ""] : []),
         itemTable(groups, review, module, totals, catalog, missGroups(alternate, module)), ""];
     }),
     "## Changes to the item list", "",

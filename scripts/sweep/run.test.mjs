@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rmdir, unlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
+import { installation } from "./install.mjs";
 import { lineForOffset, linkShares, processFailure, selectSearchSample, summarizeIndex } from "./run.mjs";
 
 test("groups released diagnostics while retaining counts and concrete samples", async () => {
@@ -41,4 +44,25 @@ test("selects a language match with the released symbol reference", () => {
   const match = { file: "app.ts", id: `symbol:${"a".repeat(64)}` };
   assert.equal(selectSearchSample([{ ...match, file: "app.go" }, { ...match, id: "init" }, match], "typescript"), match);
   assert.equal(selectSearchSample([{ ...match, file: "app.go" }], "typescript"), undefined);
+});
+
+test("Turborepo's pnpm 12 pin uses a frozen, script-free install with the supported options", async () => {
+  const root = await mkdtemp(join(tmpdir(), "sweep-lockfile-"));
+  const manifest = join(root, "package.json");
+  const lock = join(root, "pnpm-lock.yaml");
+  await writeFile(manifest, JSON.stringify({ packageManager: "pnpm@12.0.0" }));
+  await writeFile(lock, "---\nlockfileVersion: '9.0'\n");
+  try {
+    const install = await installation(root, root);
+    assert.equal(install.manager, "pnpm");
+    assert.equal(install.version, "12.0.0");
+    assert.deepEqual(install.args, ["install", "--frozen-lockfile", "--ignore-scripts", "--ignore-pnpmfile",
+      "--store-dir", join(root, "install-cache", "pnpm")]);
+    await writeFile(lock, "resolution: {tarball: git+https://example.invalid/project.git}\n");
+    assert.deepEqual(await installation(root, root), { manager: "pnpm", status: "unsupported", reason: "git-dependency" });
+  } finally {
+    await unlink(manifest);
+    await unlink(lock);
+    await rmdir(root);
+  }
 });

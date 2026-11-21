@@ -1,0 +1,32 @@
+[
+  {
+    "id": "microsoft/TypeScript",
+    "language": "typescript",
+    "url": "https://github.com/microsoft/TypeScript.git",
+    "commit": "21ba970871efd2766ee46813d0bb67253e7878fa"
+  },
+  {
+    "id": "pingdotgg/t3code",
+    "language": "typescript",
+    "url": "https://github.com/pingdotgg/t3code.git",
+    "commit": "ea20e800216417c8d3b5dfc54a863bbd9e0b3e20"
+  },
+  {
+    "id": "nestjs/nest",
+    "language": "typescript",
+    "url": "https://github.com/nestjs/nest.git",
+    "commit": "085f83a168e9edbedfe9560428dcfd270073ae00"
+  },
+  {
+    "id": "colinhacks/zod",
+    "language": "typescript",
+    "url": "https://github.com/colinhacks/zod.git",
+    "commit": "90bf57b8e96a3729d766fff3185d39b2ab3ba016"
+  },
+  {
+    "id": "vercel/turborepo",
+    "language": "typescript",
+    "url": "https://github.com/vercel/turborepo.git",
+    "commit": "eda8172408e89671cf71c39a2ffe4e05e07624bf"
+  }
+]
