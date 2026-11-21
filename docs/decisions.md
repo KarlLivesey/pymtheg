@@ -2822,6 +2822,16 @@ analysis supplying no blocker. A later final decision clears that explanation
 when the link reaches Level 2.
 See [C-29](changes/C-29.md).
 
+### C-31 Rust core methods at the first receiver probe
+
+A library receiver type can name a method when a shipped declaration proves
+an inherent method at the exact first receiver form. The catalog records the
+receiver form, argument count and minimum edition that guarantees availability.
+User-defined aliases and library paths are resolved where the type is written.
+The method points to its declaration in `core` with `declaring-owner` evidence.
+A direct literal carries only its syntax-defined type. Later probes and trait
+selection retain their existing checks. See [C-31](changes/C-31.md).
+
 ### C-12 Rust lexical macro scope
 
 The resolver can clear an opaque expansion for one name when captured

@@ -106,6 +106,59 @@ async function indexFixture(t, files) {
   return store;
 }
 
+test("core inherent dot calls need a proven receiver and first probe", async () => {
+  const fixture = new URL("./fixtures/rust-c31/", import.meta.url);
+  const source = await readFile(new URL("src/lib.rs", fixture), "utf8");
+  const cargo = await readFile(new URL("Cargo.toml", fixture), "utf8");
+  const lookup = await graph({ "src/lib.rs": source }, { "Cargo.toml": cargo });
+  for (const [call, symbol] of [
+    ["read(&[]).unwrap", "option::Option::unwrap"],
+    ["write().unwrap", "result::Result::unwrap"],
+    ["borrowed.is_some", "option::Option::is_some"],
+    ["text.len", "str::len"],
+    ['r"words".as_bytes', "str::as_bytes"],
+    ["'a'.is_alphabetic", "char::is_alphabetic"],
+    ["2u32.pow", "u32::pow"],
+    ["count.to_le_bytes", "u32::to_le_bytes"],
+    ["text.parse", "str::parse"],
+    ['"standard".len', "str::len"],
+    ['"core".len', "str::len"],
+    ["value.unwrap", "option::Option::unwrap"],
+  ])
+    assert.deepEqual(
+      lookup("calls", call),
+      [
+        {
+          ecosystem: "rust-std",
+          unit: "core",
+          symbol,
+          evidence: "declaring-owner",
+        },
+      ],
+      call,
+    );
+  assert.equal(lookup("calls", "custom.unwrap")[0]?.unit, undefined);
+  for (const call of [
+    "changed.len",
+    "text.parse().unwrap",
+    '"words".to_string',
+    'b"words".len',
+    'br"words".len',
+    'c"words".as_ptr',
+    "b'a'.is_alphabetic",
+    "1.max",
+    "probe.choose",
+    "reference.single",
+    "blanket.blanketed",
+    "wrapped.selected",
+    "other.earlier",
+    "option.len",
+    "mutable.is_some",
+  ])
+    assert.deepEqual(lookup("calls", call), [null], call);
+  assert.deepEqual(lookup("calls", "switching.choose"), [null, null]);
+});
+
 test("library paths, imports, preludes, Cargo aliases and version sources", async () => {
   const lookup = await graph(
     {
