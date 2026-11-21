@@ -198,6 +198,7 @@ export function renderPlan(input, base, pins, catalog, legacy) {
     "Each missing link belongs to its first stored blocker. Read the direct reason first, then the ordered reasons for an open candidate set, then uncertainty and the reason saved before a configuration override. Split semicolon lists left to right and keep the first occurrence. A link without a reason is grouped by its outcome.",
     "Counts and pin totals are exact. Link kinds and examples use the bare group when available. An alternate group can supply another example when the bare group has one source line. The archive retains every combination and count, including secondary reasons.",
     `The audit draws ${sampleSize} bare links per language. Estimated points show how much Level 2 could rise if the item gave a definite answer at those links. Ranges include source-review uncertainty. An asterisk marks the full possible range for a group with no sampled link.`,
+    "The audit counts a target as reachable from a bare checkout when checked-in source and shipped standard-library data establish its owner and name, including third-party targets whose library unit and symbol the source spells out.",
     "[Sampling and uncertainty](../evidence/sw-4/README.md)", "",
     ...modules.flatMap((module) => {
       const groups = missGroups(bare, module);

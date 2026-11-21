@@ -1,5 +1,5 @@
 # rank	static-answer	item-answer	source finding	target origin
-00001401f72b1938a008667622b520a9f264d0d73d6b658ef8ab9ceaae90b783	outside	unknown	The crlib leaktest import identifies AfterTest. The stored call is its returned cleanup, whose callable body is outside this checkout.
+00001401f72b1938a008667622b520a9f264d0d73d6b658ef8ab9ceaae90b783	none	no	The outer call invokes the cleanup returned by AfterTest. That function selects a no-op or a leak-checking closure according to the runtime leak-detector flag.
 00053e50f17deebe4d1c9021bc1dfaca7c8a78f49787a31220f659cece0ab0c0	outside	yes	walT.Dump is a Cobra command. Its Flags result is a pflag FlagSet whose Var declaration is outside the pin.
 0007357610cd91c07196a9430d06f718a50e4756c713dc47c3ab3d78ada9aa87	none	no	fn ranges over the filesystemWriteOps table. Different iterations call different function values.
 00074f302297f025f926eac5dc9f3095afd84cf7021d67bb0b5deec98a90bb76	none	no	Uprobe returns Link. attachPerfEvent selects a BPF link or ioctl implementation according to kernel support, and their Close bodies differ.
@@ -150,7 +150,7 @@
 001eb19fd4dced1e719723e845f43a7e0edc8df1445666ba16b9d2521a96b215	bare	yes	CaseSensitive is a value of the checkout's tspath.CaseSensitivity type. pathkey.go declares its PathKey method.
 00607fd2203f64e224ebd835198fc0f56b896db9ed9347f4e006748a3e606a6d	none	no	The bundler's filesystem is supplied through an interface. Real and mock filesystem values select different IsAbs methods.
 00003871e9ee8100282fc91159c1f1ae21833b2a5ad4d4424b581db0fbaca555	bare	yes	The checked-in read helper returns Result, which selects the standard Result::unwrap.	standard-library
-00003b3a96373fd29e499e6ec50eb1f27bab366d9808bc9b6700f795f3c629e2	outside	unknown	The key variant's constructor fixes the type passed to into, but Key is imported from the window library. Its declared field type is needed to prove this conversion.
+00003b3a96373fd29e499e6ec50eb1f27bab366d9808bc9b6700f795f3c629e2	bare	yes	The string literal fixes the receiver as &str. The prelude supplies Into::into as the named trait member, and Key::Character supplies the conversion context.	standard-library
 00004312e69b22587f7ea88686eda4b380cbce5034f81850bb3936a2f128c5af	bare	yes	The local Args type declares new in the recognizer module.
 00009a7a445ea1d2a877305d8466a798b5b9907af076dee242781db1a3a936af	bare	yes	PlatformEventData::downcast in packages/html/src/events/mod.rs returns Option<&T>. The next call is the standard Option::expect.	standard-library
 0000b7516cb1e1e0b452415b6cbcc70d5d2232122d9b06badd9459a2d66ee274	bare	yes	JobObject::new is converted by Result::ok to Option. is_some belongs to the standard library.	standard-library
@@ -184,7 +184,7 @@
 000681b1e4ecf6b91b033ce7292354bb6d8cb8e5e9e9f571b7fba92c70da8ff6	bare	yes	root.read returns the local request collection. Its resolve method is declared in the request implementation.
 0006b46ca34bfaf3c28308c536e6248e6ab79ee35f6c735fbd000a278865c09b	bare	yes	clap::Command::new constructs the checkout's re-exported Command. Its builder implementation declares disable_help_flag.
 0006fbe8018d7fa247627115f4469126b0d2d361ca6268a4b98881cb387c625a	outside	unknown	The standard Path::to_str target requires the return type of the third-party tempfile crate’s TempDir::path declaration.
-0007625819f7e13806ccd30e1a354321ed9d67a7f7327c21b6391164d2687f05	outside	unknown	Store derive produces the todos accessor over the HashMap field. The result's iterator path needs the generated Store declarations.
+0007625819f7e13806ccd30e1a354321ed9d67a7f7327c21b6391164d2687f05	bare	yes	The checkout describes the derived todos accessor as Store<HashMap<u32, TodoItem>, _>. Its checked-in HashMap store iter returns impl ExactSizeIterator, which exposes the standard Iterator::filter_map.	standard-library
 00079b655e67662dc916e41c273129d2af6960fb3ecbdb51b6258083c62fbee0	bare	yes	write_all_plaintext_bounded declares output as &mut Vec<u8>. The statically known Vec supplies clear.	standard-library
 0007ac0aa86535a1324c68cea9a9d954005c3b508fdfa59ec696ec216fcd414c	bare	yes	The checked-in async_pipe returns AsyncSender. Its checked-in AsyncWrite implementation explicitly returns std::io::Result<()> from write_all. The awaited result selects Result::unwrap.	standard-library
 0007cc2e403a7ad6be1bee0f787e44aa47d26a04d064d8ddc9ffc5ce7edcabd0	bare	yes	element_stack is a Vec<Option<ElementId>>. Its standard slice dereference supplies the last method.	standard-library
@@ -267,7 +267,7 @@
 000a1cf91b22c3a9239f468c21cc07976685418f5f12ae6ad17c5429c943c105	bare	yes	The collect annotation directly names the standard Result type. The proc-macro file imports syn's Error without importing a competing Result.	standard-library
 000a9d87bebe820962c59a457cb194854ea335f6aaed84ded166a233894399c6	bare	yes	The use path names crate::buffer::Cell explicitly. The checkout supplies its declaration through the buffer module.
 000b161710b178468907d0d5a47f1f21ce52ecae1e23b406a98c3fc5ffd9db35	bare	yes	The checked-in Actix header module re-exports actix_http, which explicitly re-exports http::header::CONTENT_TYPE.
-000ce7e2db6dc992e5f96a5c5d77d17ff4e3cebbc97b1eec92ab047bd3c33336	outside	unknown	The assertion helper is imported from the external serde_test crate.
+000ce7e2db6dc992e5f96a5c5d77d17ff4e3cebbc97b1eec92ab047bd3c33336	bare	yes	The named serde_test import explicitly binds assert_de_tokens, giving the call its library unit and symbol.
 000d29e044c13419cce4c2eac2a1b7ad95264d1b738ae2f1cf5e0bd049f02d84	bare	yes	The explicit tauri_utils import selects display_path, whose declaration is present in the workspace.
 000d84c4dfa075ce22f0caa5f1fbca5e76f6355713406a8462986866e0f35d11	bare	yes	The crate import brings in BoxBody for AppRouting's response type. The boxed body is defined in the workspace.
 000e0eb6fa84cfa5550489cb48fdfc963537e05838573de05db0482b075c569a	bare	yes	The explicit crate::build import aliases its checked-in Options struct to BuildOptions.
@@ -275,7 +275,7 @@
 0000b22f89f1834718927dc2ec110b81e6c6906e9e83ce4d5e0162e7c8d66494	bare	yes	An explicit std::process::Command import supplies the owner of the associated new function.	standard-library
 0000ef966d83346b9d3153564c38f9fa5c6f98d5468eb8e431904b6bda693a51	bare	yes	The block module imports Rect from the checked-in ratatui_core layout. Its new constructor has a concrete owner.
 0001cf6cd74513c445d7259d695fe350c99be4b24512533d124b3ee968a36625	bare	yes	The checked-in TaskDefinition type has an explicit impl Default in turborepo-types.
-0001e785082d1805cd3136f41f237f5800175397335f5af614789672b56c442e	outside	unknown	The fully qualified call selects TokioIo in the external hyper_util package.
+0001e785082d1805cd3136f41f237f5800175397335f5af614789672b56c442e	bare	yes	The fully qualified path spells out the hyper_util crate and its associated item rt::TokioIo::new.
 0001f09249186a318a0d2ce9b1ec476304b5cb9c60244c436069cace8e09b3f3	bare	yes	The buffer is converted by the standard String::from_utf8. The standard type has no visible alternate binding in this test.	standard-library
 0002394b357809ffa297f8d96c2a1082955eee496c1e3445dd8b7730be1ac690	bare	yes	The formatting branch explicitly imports std::process::Stdio and calls its associated piped constructor.	standard-library
 0003749b235569e06fd540b30f576cbd2f44e98c71a922bd484c31de535f4d9c	bare	yes	turborepo-errors declares a local inherent impl with Spanned::new.
@@ -284,13 +284,13 @@
 0005de174c6fbcffc03b789701bc7b2a9af1bf6bad1ba29681ea61b2eaacf95e	bare	yes	The callback is boxed by the standard Box constructor. The enclosing callback use supplies its type without an alternate Box binding.	standard-library
 00066ba935a5f468c614721f0861b93440b3519ef5be8fabbcd026de0384a123	bare	yes	The module imports std::path::Path explicitly. Its fixture uses the standard associated Path::new constructor.	standard-library
 0006e6136c4da3a47a5f55652a6a468ce4c7974facc11b06c06fca3b76d1dd65	bare	yes	String::from_utf8_lossy converts the harness stderr using the standard library.	standard-library
-000869fe2e02cb7497344071a5ecc24b26533020261e1d54edab9e4b20b9acd9	outside	unknown	The explicit opentelemetry_http import supplies Bytes in the request body. Its declaration comes from a dependency.
+000869fe2e02cb7497344071a5ecc24b26533020261e1d54edab9e4b20b9acd9	bare	yes	The named opentelemetry_http::Bytes import fixes the type path. Bytes::new explicitly names its associated constructor.
 0006e9cfd2f6bad79a46ebffc05ee2641f7423c004f351420551a463d69f20c8	bare	unknown	The private deserializer re-exports Content from the core crate, whose enum defines I8. The feature gates on that re-export and this match must agree.
 000cd45fe431c98a541da516c12ebd4c88d20702acce5e7c18a3fb0bde972a05	bare	yes	The test imports the public OkmBlock declaration from the checked-in crypto::tls13 module.
 000ed59a1bd325b17c234d6aa1911d8c0cdcc159bbabe0f3b4d4a2f0e77314a0	bare	yes	The containing inherent impl is OutboundPlain. Self in the constructor's return type denotes that enum.
-00195359384c6442eca774096b703e3c68d9304f19b2d5102f9181467f25c96a	outside	unknown	The file imports anyhow::Result explicitly. The dependency defines the alias.
-002283fe4fd9008939f0bb5adf421dd262433a709d9c985f04ce21e1e8cb7de1	outside	unknown	The parameter uses TokenStream explicitly imported from proc_macro2.
-0024be7f8f3c491d47bb2713234c7832f015d6356a99cdf31bcb6f187b75ec3e	outside	unknown	The visitor matches Type::Slice from the explicit syn import.
+00195359384c6442eca774096b703e3c68d9304f19b2d5102f9181467f25c96a	bare	yes	The named anyhow import explicitly fixes Result as the dependency's alias. The alias itself is the target.
+002283fe4fd9008939f0bb5adf421dd262433a709d9c985f04ce21e1e8cb7de1	bare	yes	The named proc_macro2 import explicitly binds the TokenStream type used in this parameter.
+0024be7f8f3c491d47bb2713234c7832f015d6356a99cdf31bcb6f187b75ec3e	bare	yes	The named syn::Type import and the Type::Slice pattern spell out the external enum and variant.
 00019611893faefcb7f1e7023a59588d0b849a60f01de454e50ccb61253874d9	bare	yes	The checked-in LogEvent impl declares new with Level, Source and a message.
 00026d9b81c91e1550b20f077e38773d1bd8565edec8dfe5dc9a64449e957321	bare	yes	web::resource returns the checked-in Resource. Its to method takes a Handler, and the closure has the local ThinData extractor form.
 0007b49535dc66c1d6db46db1184af93121bbe0367179673e4555482b5abba8d	bare	yes	The parser field has the workspace ghostty::Parser type, whose implementation is checked in.
@@ -298,7 +298,7 @@
 002bcddfabeb224f211306cd8027815a38a99caadb57bb72c9ab035286b48ef0	bare	yes	The source selects a local wait_for_socket method under the shown non-Windows condition.
 0027ed7c17281fff898c0ce59b149b2a6b7b24f0dd31cfc09302e0c059de0220	bare	yes	The imported test helper has a concrete checked-in impl Default for TestRequest.
 000311ccb37f7ee7516b827f010e4fc423bdeddfa5faa9e1ad266aecaa749874	bare	yes	This early return constructs the standard Option::Some variant around a formatted string.	standard-library
-000df55b021b183a0c78e2fb3c9d0afe9101b435daf9124a22dbf5e230ca2076	outside	unknown	The buffer type is re-exported by actix_web::web from the external bytes crate.
+000df55b021b183a0c78e2fb3c9d0afe9101b435daf9124a22dbf5e230ca2076	bare	yes	The named actix_web::web::BytesMut import leads to the checked-in pub use bytes::{..., BytesMut} re-export, which gives the external unit and symbol.
 000008e648e0490c56b2e00c34cb93936013fc5b3266ae780ee44c75cf1db1b4	outside	yes	Hono enables Vitest globals, and the selected call is the assertion matcher toBe. The external declarations supply its owner.
 00006f67be12d04945f69aca1ca5f6c20b1d2dadbaca99cbbce44e56fefef5c6	bare	yes	The pinned UI loads shablon before the bundle. Its t proxy always returns the same tag factory body for the literal tr key.
 00008de58f3ef654f27f7a808462dec6afbfde10fc7df5cfb552a262098eebfd	bare	yes	The inner bundled call directly invokes an arrow literal that reads its second argument's mergable field.
@@ -393,7 +393,7 @@
 00025a72b56fdbd7848fc7ab7c14ee029a354d62eb9070436dabc1490b9d6927	outside	yes	The test imports expect. The toBeTruthy member comes from that external matcher declaration.
 0002681f0334a6a879e6803aaee59f98ae8617479be9f87ca84316ff8522936a	outside	yes	The generated source is present, but it constructs a value using Effect Schema. The external schema type supplies check.
 00029f24449203daedd68f116dce8876843447ab330607023b44db646401fac8	outside	yes	expectTypeOf is imported from Vitest. The assertion result's toEqualTypeOf declaration comes from its type assertion dependency.
-0002bd435c998e2f812dbb23e60c4f749478049f46d8996b85c1c613bbc4ee9d	outside	yes	The test imports equal from its QUnit module. The harness must supply the module's declaration to identify that assertion reliably.
+0002bd435c998e2f812dbb23e60c4f749478049f46d8996b85c1c613bbc4ee9d	outside	yes	The Rollup test build maps the QUnit specifier to a harness-provided global. The build's alias must be followed to identify the implementation of equal.
 0002d02b894995d0c8c506bed4337c541773468461971a8cef58e1c7c95c26ae	bare	no	The pinned toolkit workspace contains the query entry and checked-in fetchBaseQuery export. A local-package binding fix addresses the miss.
 000539ad7c7277f5d49149e4097f03977645ae9b7abd781aff13476a3bb3b8fd	outside	yes	Stream.runHead is from Effect. The returned effect's declaration supplies pipe.
 00067d6de7c487279ca22d97486a0331f3904808a0de3d4eea49651e1a6125db	outside	yes	The receiver comes from the imported supertest request chain. Its Test declaration supplies the set member.
@@ -410,8 +410,8 @@
 00070f9540bc2ee9d6f75202b03ed5bd197b62904e5c1c4e17897b182ebafec4	outside	yes	The codemod's typed jscodeshift API parameter supplies memberExpression through the external AST builder declarations.
 0008fa80900b7a0db3d469f0ac33c0220aed5fc7abf78d5730226de97a73bce3	none	no	This stored import names the path-to-regexp package itself. The named pathToRegexp binding is a separate site.
 00097dba0e9184bb6df82fe204f560a3b099b601e273dcdd9147e995a30932ff	none	no	The import selects the whole Effect FileSystem module, with no selected symbol.
-0009bd2530474dd4060f0e8238818229cf6f1ba46bcaf4778eb7110229250b9f	outside	yes	React is an imported package object here. Its installed declarations identify the owner of useState beyond the stored package unit.
-000a4576288729e502e399a678404e9f1062afcf4a6d6ae9bec26c8690397384	outside	yes	RadioPrimitive is the named Base UI Radio export. The installed declarations identify its Root component.
+0009bd2530474dd4060f0e8238818229cf6f1ba46bcaf4778eb7110229250b9f	bare	yes	The default React import names the react API and the call explicitly selects its useState export.
+000a4576288729e502e399a678404e9f1062afcf4a6d6ae9bec26c8690397384	bare	yes	The named Radio import from @base-ui/react/radio is aliased to RadioPrimitive. The JSX tag explicitly selects Root on that component namespace.
 000c7293fc3814ef893261b1e17b6fbebe260ff154969c985d6d3053e889ca00	none	no	The stored site is the whole zod module import. The named z specifier is a separate binding.
 000cb489dcb7426573e473b2b4fe94a26fc33a76be3d751ab3d80c4a8fbf7dbb	none	no	This stored link names the entire node:http module. The separately stored Server specifier names a member.
 000d4e748c3106ce5a22376007ebfdfb295421d1c33e5be0d74c2ca571098b99	none	no	The stored import site names the Lexical submodule. The named binding has a separate link.
@@ -431,7 +431,7 @@
 000ebe2bdc596761e688dac519433493ee700389df5402f2af0069ed54c08d46	outside	unknown	The source imports Vitest's expect, but the selected link calls its toMatch matcher. Manifest classification still leaves the external declaration to establish that owner.
 00118fc479fa9efc58ad23f430ab03ac9472a59ef99fe0d49122b578becf1692	bare	yes	The source imports expect directly from external vitest. The written library export is explicit when workspace membership is established.
 000fca3274d4c2f992d940a0a048b6935d8d6ae880d0060db2a47a8b52abe955	none	no	The occurrence is the const expression in a const assertion. It is TypeScript syntax with no declaration target.
-001702ba91f6046afc47be43ea1323fc6eb660cea7dbab2bf24a860aec21d016	outside	no	The workspace package forwards Redux's types. The original Middleware declaration comes through the external redux export, rather than a bundled language declaration.
+001702ba91f6046afc47be43ea1323fc6eb660cea7dbab2bf24a860aec21d016	bare	no	The named Middleware import leads to the toolkit entry's checked-in export * from 'redux'. That source identifies the external unit and symbol. Bundled JavaScript or DOM support would not fix this package re-export.
 0017b621404f712f8b4c2953f7815bfd5670ae5a694dcb27f41ae617661f7bad	bare	yes	This fixture deliberately throws a real standard Error. The bare JavaScript syntax identifies its constructor.	standard-library
 001ba653f78a0441c8148dda3cf440d878a8630e901a3bac9ea7d6171567b134	none	no	The generated SDK deliberately accepts an override client through options. The selected get implementation can vary with that object.
 000cbce0b99e2948ede6ba96595cbf60e35b142cd2fc46e1251f17eee1ec7b17	bare	yes	The file imports PublishReleaseEntry from a literal relative source path. The target type is checked in even though the root configuration extends a preset.
@@ -444,8 +444,8 @@
 000eac9980be36dd26576b74811357750c96839c10aca769962ac45108c105a1	bare	yes	This workspace fixture imports expect from vitest itself. The browser entry's checked-in export leads to the local assertion package.
 0013d56566f1c0ed6674668b51195bd74791e92e703bcbd83be41765929fec04	outside	no	The local Vitest entry forwards expectTypeOf to the expect-type dependency. Resolving the workspace entry still leaves toHaveProperty in the external declaration.
 00212556ecf45b815e2de82d820bb64c2d3402b9da6a440fe2d9b4f59cfe1be6	bare	yes	The browser fixture's matcher is implemented in the checkout's browser tester expect/toHaveClass.ts. The workspace entry determines that path.
-0007db2d8ef8da0fa1ccaa4de6eacb96d460982ed1fe58f0f18e0ffec508a298	outside	unknown	The astro/zod export points to dist/zod.js. The checked-in wrapper exports a zod/v4 namespace, so the actual string member still needs external evidence.
+0007db2d8ef8da0fa1ccaa4de6eacb96d460982ed1fe58f0f18e0ffec508a298	bare	yes	The checked-in source for the astro/zod entry re-exports the zod/v4 namespace as z. The call spells out z.string, so the source counterpart identifies the external export.
 001072432262657731cc6b1b5f7f2ff4a988e6e90094d5dae42d6b7daf80c75b	bare	yes	The workspace export maps to the Astro config entrypoint, with a checked-in source counterpart exporting defineConfig.
-0005c6a8376dcfa8f8dccb515276527e1631808a4ecba378fc9a486a4c681109	outside	unknown	The missing dist/zod entry has a checked-in wrapper that re-exports zod/v4. Naming the object member can still depend on the external declaration.
+0005c6a8376dcfa8f8dccb515276527e1631808a4ecba378fc9a486a4c681109	bare	yes	The relative dist/zod.js import has a checked-in src/zod.ts counterpart that re-exports the zod/v4 namespace as z. The call explicitly selects object.
 0010d4f8d634695be509cb6ff9923f5217db9694fdd3707b3641112415a52f2c	outside	yes	The import refers to the prebuilt development island script. The generated build file is absent from the bare checkout.
 00140737e4329947ad42ca63228067f0e34d920cbadb119c42cc55fe650408ad	bare	yes	As returns an object literal with a set closure. Propagating its returned shape proves the selected bundled body.
