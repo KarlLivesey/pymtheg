@@ -862,6 +862,15 @@ the project links whose target, or one of whose candidates, is library unit
 It finds only stored library targets: unresolved links may hide more uses. The MCP form, its
 selector forms per language and its limits are in [the code guide](code-guide.md).
 
+Source-only Go can reuse the stored link decisions outside an edit's affected
+files. An edit with the same declaration and import facts re-decides just the
+edited file. A change confined to ordinary function declarations can follow
+package imports back to their callers. Changes that may affect project-wide
+method sets, build configuration, package membership or unreadable files use
+a full Go pass. Recovery after an unfinished index and the opt-in toolchain
+route also use a full pass. The same file tree produces the same graph after a
+fresh or incremental index. [C-27](changes/C-27.md)
+
 **Go toolchain route (opt-in, decision D17).** With the key
 `"graph": {"toolchain": {"go": true}}` added to the existing
 `.pymtheg/settings.json` (which must keep its `version: 1` and `scenarios`; a

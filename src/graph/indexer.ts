@@ -62,6 +62,8 @@ export interface IndexOptions {
   toolchainDirectory?: string;
   /** The environment a toolchain is located from (default process.env). */
   environment?: Readonly<Record<string, string | undefined>>;
+  /** An owning caller can withhold reuse when its previous checkpoint is invalid. */
+  canReuseAnalysis?: () => boolean;
   signal?: AbortSignal;
 }
 const message = (error: unknown): string =>
@@ -140,8 +142,6 @@ export async function indexProject(
   const oldFiles = await stage("index.previous", () => summaries(store));
   const oldContexts = await stage("index.previous", () => store.contexts());
   const claims = new Map<string, LanguageModule>();
-  // Only what the cache check needs: never every previous record at once.
-  const previous = new Map<string, Previous | undefined>();
   for (const path of paths) {
     report.discovered++;
     let module;
@@ -154,10 +154,6 @@ export async function indexProject(
     }
     if (module) {
       claims.set(path, module);
-      previous.set(
-        path,
-        await stage("index.previous", () => previousOf(store, path)),
-      );
       report.claimed++;
     } else if (!registry.modules.some((module) => needsContext(module, path)))
       report.unclaimed.push(path);
@@ -234,21 +230,32 @@ export async function indexProject(
   const updates: GraphFile[] = [];
   const cacheableFailures = new Set<string>();
   const changed = new Set<string>();
+  // A change in ownership or membership can affect project-wide lookups.
+  const canReuse =
+    !unfinished &&
+    store.beginIndexRun &&
+    store.finishIndexRun &&
+    store.analysisLinksAt &&
+    store.moduleInputLinksAt &&
+    claims.size === oldFiles.length &&
+    oldFiles.every((file) => claims.get(file.path)?.id === file.module) &&
+    oldFiles.some((file) => claims.get(file.path)?.incrementalAnalysis) &&
+    options.canReuseAnalysis?.() !== false;
+  const previousFiles = new Map<string, GraphFile>();
+  const incompatible = new Set<string>();
   for (const [path, module] of claims) {
     const source = captures.get(path)!;
-    const old = previous.get(path);
-    if (
-      // After an unfinished run every record is written again: any row of
-      // the store may be one the unfinished run, or another writer, left.
-      !unfinished &&
-      source.status === "clean" &&
-      old?.hash === source.hash &&
-      old.module === module.id &&
-      old.version === module.version &&
-      (!old.failed || (await store.isParseFailure?.(path)))
-    ) {
+    const reuse = canReuse === true && module.incrementalAnalysis === true;
+    const previous = await stage("index.previous", () =>
+      previousParse(store, source, module, unfinished, reuse),
+    );
+    if (previous.unchanged) {
       report.unchanged++;
       continue;
+    }
+    if (reuse) {
+      if (previous.file) previousFiles.set(path, previous.file);
+      else incompatible.add(module.id);
     }
     let result: ParseResult;
     if (source.status === "failed")
@@ -282,14 +289,31 @@ export async function indexProject(
   // After an unfinished run every claimed file counts as changed, so no
   // module reuses an earlier analysis.
   if (unfinished) for (const path of claims.keys()) changed.add(path);
+  const deferred = new Map<string, GraphFile[]>();
+  if (canReuse)
+    for (const module of registry.modules)
+      if (
+        module.incrementalAnalysis &&
+        module.analyze &&
+        !incompatible.has(module.id)
+      )
+        deferred.set(module.id, []);
+  const writeParsed = async (file: GraphFile) => {
+    await store.replaceFile(file, cacheableFailures.has(file.path));
+    report.indexed++;
+  };
   await stage("store.writeParsed", async () => {
     await store.replaceContexts([
       ...contexts,
       ...[...dependencies.values()].flat(),
     ]);
     for (const file of updates) {
-      await store.replaceFile(file, cacheableFailures.has(file.path));
-      report.indexed++;
+      const pending = deferred.get(file.module);
+      if (pending) pending.push(file);
+      else {
+        previousFiles.delete(file.path);
+        await writeParsed(file);
+      }
     }
   });
   // Written: release every captured text and parse result (C-2). Only the
@@ -310,6 +334,7 @@ export async function indexProject(
   // Each module's analysis runs in its own frame, so its input files and
   // results are released when it returns instead of lingering in this
   // function's suspended frame through the remaining phases (C-2).
+  const resolutionScopes = new Map<string, ReadonlySet<string>>();
   const analyzeModule = async (module: LanguageModule): Promise<void> => {
     // Only this module's records are decoded when the store can list them.
     const files = await stage(`analyze.${module.id}.input`, async () =>
@@ -322,6 +347,12 @@ export async function indexProject(
         : (await store.files()).filter((file) => file.module === module.id),
     );
     count(`analyze.${module.id}.inputFiles`, files.length);
+    const pending = deferred.get(module.id);
+    if (pending?.length) {
+      const updatesByPath = new Map(pending.map((file) => [file.path, file]));
+      for (const [index, file] of files.entries())
+        files[index] = updatesByPath.get(file.path) ?? file;
+    }
     const filesByPath = new Map(files.map((file) => [file.path, file]));
     const oldPaths = new Set(
       oldFiles
@@ -340,6 +371,7 @@ export async function indexProject(
     // their metadata moved; their records take the stamps they have now.
     const checkedInputs = checkDependencyInputs(root, previousInputs);
     let analysisFailed = false;
+    let scope: ReadonlySet<string> | undefined;
     try {
       if (ownContexts.some((file) => file.status === "failed"))
         throw Error("Project context could not be captured");
@@ -358,7 +390,7 @@ export async function indexProject(
               note: (note) =>
                 (report.toolchains ??= []).push({ module: module.id, note }),
             };
-      results = await stage(`analyze.${module.id}`, () =>
+      const output = await stage(`analyze.${module.id}`, () =>
         module.analyze!({
           projectId: store.projectId,
           ...(options.signal ? { signal: options.signal } : {}),
@@ -369,12 +401,35 @@ export async function indexProject(
           changedFiles: [...changed]
             .filter((path) => filesByPath.has(path) || oldPaths.has(path))
             .sort(compare),
+          ...(pending && !toolchain
+            ? {
+                previousFiles: new Map(
+                  pending.map((file) => [
+                    file.path,
+                    previousFiles.get(file.path)!,
+                  ]),
+                ),
+              }
+            : {}),
           changedContextFiles: [
             ...changedContexts.filter((path) => needsContext(module, path)),
             ...checkedInputs.changed,
           ],
         }),
       );
+      if ("resolutionFiles" in output) {
+        results = output.files;
+        scope = new Set(output.resolutionFiles);
+        if (
+          !pending ||
+          toolchain ||
+          scope.size !== output.resolutionFiles.length ||
+          [...scope].some((path) => !filesByPath.has(path)) ||
+          pending.some((file) => !scope!.has(file.path)) ||
+          results.some((file) => !scope!.has(file.path))
+        )
+          throw Error("Invalid scoped project analysis");
+      } else results = output;
       const seen = new Set<string>();
       for (const item of results) {
         const file = filesByPath.get(item.path);
@@ -399,6 +454,7 @@ export async function indexProject(
         throw error;
       const detail = message(error);
       analysisFailed = true;
+      scope = undefined;
       report.analysisErrors.push({ module: module.id, message: detail });
       results = files.map((file) => ({
         path: file.path,
@@ -409,10 +465,28 @@ export async function indexProject(
       dependencies.set(module.id, analysisFailed ? [] : inputs.records());
     else if (checkedInputs.restamped)
       dependencies.set(module.id, checkedInputs.current);
+    if (scope) resolutionScopes.set(module.id, scope);
+    const pendingPaths = new Set(pending?.map((file) => file.path));
     await stage(`analyze.${module.id}.write`, async () => {
+      // A scoped write must never remove a still-valid derived symbol from an
+      // edited file between parse and analysis. SQLite would clear incoming
+      // links that the resolver has proved can be left alone.
+      if (pending && !scope)
+        for (const file of pending) await writeParsed(file);
+      else if (pending) {
+        const analyzedPaths = new Set(results.map((file) => file.path));
+        for (const file of pending)
+          if (!analyzedPaths.has(file.path)) await writeParsed(file);
+        report.indexed += pending.filter((file) =>
+          analyzedPaths.has(file.path),
+        ).length;
+      }
       for (const item of results) {
         const file = filesByPath.get(item.path)!;
-        if (JSON.stringify(file.result) !== JSON.stringify(item.result)) {
+        if (
+          (scope && pendingPaths.has(file.path)) ||
+          JSON.stringify(file.result) !== JSON.stringify(item.result)
+        ) {
           count(`analyze.${module.id}.filesChanged`);
           await store.replaceFile(
             { ...file, result: item.result },
@@ -429,6 +503,8 @@ export async function indexProject(
         report.analyzed++;
       }
     });
+    deferred.delete(module.id);
+    if (pending) for (const file of pending) previousFiles.delete(file.path);
   };
   for (const module of registry.modules)
     if (module.analyze) await analyzeModule(module);
@@ -460,6 +536,7 @@ export async function indexProject(
     // The validated write, when the store takes one: the links read once
     // for validation are the links the write compares against.
     let prepared: ValidatedAnalysis | undefined;
+    const scope = resolutionScopes.get(module.id);
     try {
       if (
         ownContexts.some((file) => file.status === "failed") ||
@@ -470,8 +547,9 @@ export async function indexProject(
       // every resolution names one of its parsed links and every added
       // link one of its files. Its resolver is not handed the whole graph.
       const owns = modules.has(module.id);
+      if (scope?.size === 0) return;
       const output = owns
-        ? await runResolve(module, store, ownContexts, options.signal)
+        ? await runResolve(module, store, ownContexts, options.signal, scope)
         : [];
       count(
         `resolve.${module.id}.resolutions`,
@@ -491,6 +569,8 @@ export async function indexProject(
       } catch {
         // A malformed result: resolutionFacts reports it, in its own order.
       }
+      if (scope && [...wanted].some((path) => !scope.has(path)))
+        throw Error("Project resolution returned a link outside its scope");
       const needed = new Map<string, GraphFile>();
       if (wanted.size)
         for (const file of await read(() => filesAt(store, [...wanted])))
@@ -498,9 +578,13 @@ export async function indexProject(
       const symbols = owns ? await read(() => store.findSymbols()) : [];
       // Every link of the module when the store can take a validated
       // result; resolutionFacts reads only the parsed ones.
-      const whole = !!store.analysisLinks;
+      const validated = !!scope || !!store.analysisLinks;
       const current = await read(() =>
-        whole ? store.analysisLinks!(module.id) : parsedLinks(store, module.id),
+        scope
+          ? store.analysisLinksAt!(module.id, scope)
+          : validated
+            ? store.analysisLinks!(module.id)
+            : parsedLinks(store, module.id),
       );
       const desired = await stage(`resolve.${module.id}.validate`, () =>
         resolutionFacts(
@@ -514,7 +598,7 @@ export async function indexProject(
           (path) => versionSources.has(path),
         ),
       );
-      if (whole) prepared = { current, desired };
+      if (validated) prepared = { current, desired };
     } catch (error) {
       prepared = undefined;
       // Storage errors propagate; they are not mislabeled as module failures.
@@ -536,10 +620,44 @@ export async function indexProject(
   // The modules that own at least one stored file, after analysis.
   const modules = new Set((await summaries(store)).map((file) => file.module));
   for (const module of registry.modules) await resolveModule(module);
-  await store.finishIndexRun?.();
+  await store.finishIndexRun?.(
+    [...report.analysisErrors, ...report.resolutionErrors].some((error) =>
+      registry.modules.some(
+        (module) => module.id === error.module && module.incrementalAnalysis,
+      ),
+    ),
+  );
   return await stage("index.report", () =>
     finishReport(store, report, contexts),
   );
+}
+
+/** Keep decoded old facts only for edits that might use scoped analysis. */
+async function previousParse(
+  store: GraphStorage,
+  source: ContextFile,
+  module: LanguageModule,
+  unfinished: boolean,
+  keepPrevious: boolean,
+): Promise<{ unchanged: boolean; file?: GraphFile }> {
+  const old = await store.getFile(source.path);
+  const compatible =
+    old?.module === module.id && old.version === module.version;
+  // Every record of an unfinished run is written again, including records
+  // whose hashes already match the captured files.
+  if (
+    !unfinished &&
+    compatible &&
+    source.status === "clean" &&
+    old.hash === source.hash &&
+    (old.result.status !== "failed" ||
+      (await store.isParseFailure?.(source.path)))
+  )
+    return { unchanged: true };
+  return {
+    unchanged: false,
+    ...(compatible && keepPrevious ? { file: old } : {}),
+  };
 }
 
 async function finishReport(
@@ -570,27 +688,6 @@ async function finishReport(
   return report;
 }
 
-interface Previous {
-  hash: string;
-  module: string;
-  version: string;
-  failed: boolean;
-}
-/** The cache-check facts of a stored file; its decoded record is not kept. */
-async function previousOf(
-  store: GraphStorage,
-  path: string,
-): Promise<Previous | undefined> {
-  const old = await store.getFile(path);
-  return (
-    old && {
-      hash: old.hash,
-      module: old.module,
-      version: old.version,
-      failed: old.result.status === "failed",
-    }
-  );
-}
 /**
  * One module's resolve over freshly read input. The input lives only in this
  * frame, so it is released when the module returns.
@@ -600,6 +697,7 @@ async function runResolve(
   store: GraphStorage,
   contexts: readonly ContextFile[],
   signal?: AbortSignal,
+  resolutionFiles?: ReadonlySet<string>,
 ): Promise<readonly LinkResolution[] | ResolutionResult> {
   if (!module.resolve) return [];
   // Only a store that declares independent reads is trusted not to share
@@ -619,6 +717,9 @@ async function runResolve(
       module.resolve!({
         projectId: store.projectId,
         ...(signal ? { signal } : {}),
+        ...(resolutionFiles
+          ? { resolutionFiles: new Set(resolutionFiles) }
+          : {}),
         files: await input("Files", async () =>
           own(await read(() => store.files())),
         ),
@@ -632,10 +733,11 @@ async function runResolve(
         links: (
           await input("Links", async () =>
             own(
-              await read(
-                async () =>
-                  (await store.moduleInputLinks?.(module.id)) ??
-                  (await parsedLinks(store, module.id)),
+              await read(async () =>
+                resolutionFiles
+                  ? await store.moduleInputLinksAt!(module.id, resolutionFiles)
+                  : ((await store.moduleInputLinks?.(module.id)) ??
+                    (await parsedLinks(store, module.id))),
               ),
             ),
           )

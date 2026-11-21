@@ -798,18 +798,36 @@ export class SqliteGraphStore implements GraphStorage {
   analysisLinks(module: string): GraphLink[] {
     return this.selectLinks("l.module=?", [module]);
   }
+  // Unary + keeps SQLite from scanning the module index for a path lookup.
+  private static linksAt =
+    "l.file IN (SELECT value FROM json_each(?)) AND +l.module=?";
+  analysisLinksAt(module: string, paths: ReadonlySet<string>): GraphLink[] {
+    return this.selectLinks(SqliteGraphStore.linksAt, [
+      JSON.stringify([...paths]),
+      module,
+    ]);
+  }
   /**
    * One module's parsed links as a resolver receives them: unresolved, with
    * no target, candidates or library targets, so none of those rows is read.
    * Each is the record moduleLinks() returns, with those fields cleared.
    */
   moduleInputLinks(module: string): GraphLink[] {
+    return this.selectModuleInputLinks("l.module=?", [module]);
+  }
+  moduleInputLinksAt(module: string, paths: ReadonlySet<string>): GraphLink[] {
+    return this.selectModuleInputLinks(SqliteGraphStore.linksAt, [
+      JSON.stringify([...paths]),
+      module,
+    ]);
+  }
+  private selectModuleInputLinks(where: string, values: string[]): GraphLink[] {
     return this.db
       .prepare(
         `SELECT l.body,f.status AS sourceStatus FROM graph_links l JOIN graph_files f${this.fileStatusIndex} ON f.path=l.file
-        WHERE l.module=? AND l.origin='parse' ORDER BY l.id`,
+        WHERE ${where} AND l.origin='parse' ORDER BY l.id`,
       )
-      .all(module)
+      .all(...values)
       .map((row) => {
         const { libraries: _previous, ...link } = JSON.parse(
           row.body as string,
@@ -986,12 +1004,13 @@ export class SqliteGraphStore implements GraphStorage {
     return true;
   }
   /** Clears the mark in the run's last commit, if this run still owns it. */
-  finishIndexRun(): void {
+  finishIndexRun(incomplete = false): void {
     const run = this.indexRun;
     try {
+      if (incomplete && run.state !== "idle") this.transaction(() => {});
       // A run another connection wrote into keeps its mark: the next run
       // redoes everything.
-      if (run.state === "written")
+      if (!incomplete && run.state === "written")
         this.transaction(() => {
           if (!run.interleaved)
             this.db
@@ -1003,7 +1022,8 @@ export class SqliteGraphStore implements GraphStorage {
       // its beginning if it wrote nothing); the completion checks it under
       // its own write lock.
       if (run.state !== "idle")
-        this.finishedVersion = run.interleaved ? Number.NaN : run.version;
+        this.finishedVersion =
+          incomplete || run.interleaved ? Number.NaN : run.version;
     } finally {
       this.indexRun = { state: "idle" };
     }

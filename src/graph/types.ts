@@ -183,8 +183,10 @@ export interface ResolutionContext {
   files: readonly GraphFile[];
   contextFiles: readonly ContextFile[];
   symbols: readonly GraphSymbol[];
-  /** Only this module's parsed links, presented unresolved. Derived links are rebuilt each invocation. */
+  /** Parsed links to decide, presented unresolved. Other files' parse facts remain available in files. */
   links: readonly GraphLink[];
+  /** If present, return decisions and derived links only for these files. */
+  resolutionFiles?: ReadonlySet<string>;
 }
 /**
  * The opt-in toolchain route for one module (`graph.toolchain.<module id>` in
@@ -218,12 +220,19 @@ export interface ProjectAnalysisContext {
   /** All matching declared context files, including unchanged ones. Missing files are absent. */
   contextFiles: readonly ContextFile[];
   changedFiles: readonly string[];
+  /** Prior facts for every edited file. Present only when a scoped result can be used. */
+  previousFiles?: ReadonlyMap<string, GraphFile>;
   /** Includes deleted context paths. Analysis runs even when this list is empty. */
   changedContextFiles: readonly string[];
 }
 export interface AnalyzedFile {
   path: string;
   result: ParseResult;
+}
+export interface ScopedAnalysis {
+  files: readonly AnalyzedFile[];
+  /** All files whose decisions must be replaced, including every edited and analyzed file. */
+  resolutionFiles: readonly string[];
 }
 export interface LanguageModule {
   id: string;
@@ -240,11 +249,16 @@ export interface LanguageModule {
   contextFiles?: readonly string[];
   /** Requests a read-only, resolver-driven snapshot of installed declarations. */
   dependencyInputs?: true;
+  /** Accepts previousFiles and can prove that some files' decisions still hold. */
+  incrementalAnalysis?: true;
   parse?: (source: SourceInput) => ParseResult | Promise<ParseResult>;
   /** Explicit whole-program phase. May construct a compiler program from the supplied snapshot. */
   analyze?: (
     context: ProjectAnalysisContext,
-  ) => readonly AnalyzedFile[] | Promise<readonly AnalyzedFile[]>;
+  ) =>
+    | readonly AnalyzedFile[]
+    | ScopedAnalysis
+    | Promise<readonly AnalyzedFile[] | ScopedAnalysis>;
   resolve?: (
     context: ResolutionContext,
   ) =>
@@ -313,6 +327,16 @@ export interface GraphStorage {
    * replaceAnalysis the result (ValidatedAnalysis).
    */
   analysisLinks?(module: string): StorageResult<GraphLink[]>;
+  /** Supports a validated replaceAnalysis for just the supplied paths. */
+  analysisLinksAt?(
+    module: string,
+    paths: ReadonlySet<string>,
+  ): StorageResult<GraphLink[]>;
+  /** The parsed resolver input for just the supplied paths. */
+  moduleInputLinksAt?(
+    module: string,
+    paths: ReadonlySet<string>,
+  ): StorageResult<GraphLink[]>;
   /** Optional row counts; the indexer otherwise counts decoded reads. */
   counts?(): StorageResult<{
     symbols: number;
@@ -337,7 +361,8 @@ export interface GraphStorage {
    * the store, or throws without writing.
    */
   beginIndexRun?(): StorageResult<boolean>;
-  finishIndexRun?(): StorageResult<void>;
+  /** With incomplete=true the store retains the unfinished mark for the retry. */
+  finishIndexRun?(incomplete?: boolean): StorageResult<void>;
   failedFiles?(): StorageResult<FailedFile[]>;
   /** parseFailure distinguishes cacheable parser failures from retryable project failures. */
   replaceFile(file: GraphFile, parseFailure?: boolean): StorageResult<void>;

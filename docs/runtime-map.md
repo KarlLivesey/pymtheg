@@ -1481,7 +1481,12 @@ links are read once, validated with `resolutionFacts`, and the store writes
 from that validated result (`replaceAnalysis` given the validated links) instead of reading and deriving
 it again (C-22). Observation-only work counters and stage times
 (`src/graph/work.ts`) record each stage's operations; nothing reads them to
-decide anything. `failedFiles()` reads the failed source
+decide anything. For source-only Go, `analyze` may name the files whose
+decisions are being replaced. The indexer supplies the previous facts for
+edited files when it can use a scoped result. It commits the final analyzed
+facts for those edits without an intervening raw parse write, and reads and
+validates link decisions by path. Global lookups still use the captured
+snapshot and stored symbol and embedding facts (C-27). `failedFiles()` reads the failed source
 files back; derived links are compared and written per row. Results are validated before any write;
 module exceptions are reported in `errors`, `analysisErrors` or
 `resolutionErrors` and leave earlier valid facts in place; storage failures

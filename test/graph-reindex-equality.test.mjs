@@ -15,10 +15,13 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { backup, DatabaseSync } from "node:sqlite";
 import { test } from "node:test";
+import { executeGraph } from "../dist/graph/commands.js";
 import {
   discoverLanguages,
   indexProject,
+  LanguageRegistry,
   SqliteGraphStore,
 } from "../dist/graph/index.js";
 import { compareRows, storeRows } from "../scripts/reindex/dump.mjs";
@@ -30,7 +33,11 @@ const registry = await discoverLanguages();
  * the incremental store) over `files`, comparing with a cold index after the
  * first index and after every step. Returns the step names compared.
  */
-async function equalAfterEveryStep(files, steps) {
+async function equalAfterEveryStep(
+  files,
+  steps,
+  incrementalRegistry = registry,
+) {
   const base = mkdtempSync(join(tmpdir(), "c22-equality-"));
   const root = join(base, "tree");
   const write = (path, text) => {
@@ -42,7 +49,7 @@ async function equalAfterEveryStep(files, steps) {
   const compared = [];
   try {
     const compare = async (name) => {
-      await indexProject(root, registry, incremental);
+      await indexProject(root, incrementalRegistry, incremental);
       const cold = join(base, `cold-${compared.length}.sqlite`);
       const store = new SqliteGraphStore(cold, incremental.projectId);
       try {
@@ -73,15 +80,92 @@ async function equalAfterEveryStep(files, steps) {
       { name: "re-index with no edit", edit: () => {} },
       ...steps,
     ]) {
+      const omitted = step.omit;
+      const faulty = join(base, "omitted.sqlite");
+      if (omitted) {
+        const db = new DatabaseSync(join(base, "incremental.sqlite"), {
+          readOnly: true,
+        });
+        try {
+          await backup(db, faulty);
+        } finally {
+          db.close();
+        }
+      }
       step.edit(tree);
       await compare(step.name);
       step.check?.(incremental);
+      if (omitted) {
+        const store = new SqliteGraphStore(faulty);
+        try {
+          await indexProject(
+            root,
+            omitGoAnalysis(omitted),
+            omitGoDecisions(store, omitted),
+          );
+          assert.notDeepEqual(
+            compareRows(
+              storeRows(faulty),
+              storeRows(join(base, "incremental.sqlite")),
+            ),
+            [],
+            `omitting ${omitted} after ${step.name} leaves stale rows`,
+          );
+        } finally {
+          store.close();
+        }
+        rmSync(faulty);
+      }
     }
   } finally {
     incremental.close();
     rmSync(base, { recursive: true, force: true });
   }
   return compared;
+}
+
+/** Test-only faulty reuse: leave one file's existing notes and decisions alone. */
+function omitGoAnalysis(path) {
+  const go = registry.modules.find((module) => module.id === "go");
+  return new LanguageRegistry([
+    {
+      ...go,
+      async analyze(context) {
+        const result = await go.analyze(context);
+        return "resolutionFiles" in result
+          ? {
+              ...result,
+              files: result.files.filter((file) => file.path !== path),
+            }
+          : result.filter((file) => file.path !== path);
+      },
+    },
+  ]);
+}
+
+function omitGoDecisions(store, path) {
+  return new Proxy(store, {
+    get(target, key) {
+      if (key === "replaceAnalysis")
+        return (module, result, validated) =>
+          target.replaceAnalysis(
+            module,
+            result,
+            module === "go" && validated
+              ? {
+                  current: validated.current.filter(
+                    (link) => link.file !== path,
+                  ),
+                  desired: validated.desired.filter(
+                    (link) => link.file !== path,
+                  ),
+                }
+              : validated,
+          );
+      const value = Reflect.get(target, key);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
 }
 
 /** The file of the definite target of the link named `name` from `file`. */
@@ -107,6 +191,8 @@ func Hello() string { return "hello" }
 type T struct{ N int }
 
 func (t T) Size() int { return t.N }
+
+func Failure() error { return nil }
 `;
 const goB = `package b
 
@@ -115,6 +201,7 @@ import "example.com/m/a"
 func Use() int {
 	_ = a.Hello()
 	_ = a.Extra()
+	_ = a.Other()
 	var t a.T
 	return t.Size()
 }
@@ -126,10 +213,12 @@ test("Go: incremental re-index equals a cold index after every kind of edit", as
   const steps = [
     {
       name: "comment-only edit",
-      edit: (t) => t.write("a/a.go", goA + "\n// trailing comment\n"),
+      omit: "a/a.go",
+      edit: (t) => t.write("a/a.go", "// Leading comment.\n" + goA),
     },
     {
       name: "body-only edit",
+      omit: "a/a.go",
       edit: (t) =>
         t.write(
           "a/a.go",
@@ -138,31 +227,54 @@ test("Go: incremental re-index equals a cold index after every kind of edit", as
     },
     {
       name: "new export in a widely imported file",
+      omit: "b/b.go",
+      edit: (t) => t.write("a/a.go", goA + "\nfunc Extra() int { return 2 }\n"),
+      check: (store) =>
+        assert.equal(targetFile(store, "b/b.go", "a.Extra"), "a/a.go"),
+    },
+    {
+      name: "rename that export",
+      omit: "b/b.go",
       edit: (t) => t.write("a/a.go", goA + "\nfunc Other() int { return 2 }\n"),
+      check: (store) =>
+        assert.equal(targetFile(store, "b/b.go", "a.Extra"), null),
+    },
+    {
+      name: "remove the renamed export",
+      omit: "a/a.go",
+      edit: (t) => t.write("a/a.go", goA),
     },
     {
       name: "add a file that declares a name another file uses",
+      omit: "b/b.go",
       edit: (t) =>
-        t.write("a/extra.go", "package a\n\nfunc Extra() int { return 1 }\n"),
+        t.write(
+          "a/extra.go",
+          "package a\n\nfunc Extra() int { return 1 }\ntype error = int\n",
+        ),
       check: (store) =>
         assert.equal(targetFile(store, "b/b.go", "a.Extra"), "a/extra.go"),
     },
     {
       name: "delete that file",
+      omit: "a/a.go",
       edit: (t) => t.remove("a/extra.go"),
       check: (store) =>
         assert.equal(targetFile(store, "b/b.go", "a.Extra"), null),
     },
     {
       name: "rename a file",
+      omit: "b/use.go",
       edit: (t) => t.rename("b/b.go", "b/use.go"),
     },
     {
       name: "a package-level declaration shadows a predeclared name",
+      omit: "b/use.go",
       edit: (t) => t.write("b/shadow.go", "package b\n\ntype error = int\n"),
     },
     {
       name: "remove a declaration other files use",
+      omit: "a/a.go",
       edit: (t) =>
         t.write(
           "a/a.go",
@@ -173,16 +285,19 @@ test("Go: incremental re-index equals a cold index after every kind of edit", as
     },
     {
       name: "a syntax error fails the edited file",
+      omit: "b/use.go",
       edit: (t) => t.write("a/a.go", goA + "\nfunc broken( {\n"),
     },
     {
       name: "repair it",
+      omit: "b/use.go",
       edit: (t) => t.write("a/a.go", goA),
       check: (store) =>
         assert.equal(targetFile(store, "b/use.go", "t.Size"), "a/a.go"),
     },
     {
       name: "change go.mod so the import no longer names this module",
+      omit: "b/use.go",
       edit: (t) => t.write("go.mod", "module example.com/other\n\ngo 1.22\n"),
       check: (store) =>
         assert.equal(targetFile(store, "b/use.go", "a.Hello"), null),
@@ -197,6 +312,286 @@ test("Go: incremental re-index equals a cold index after every kind of edit", as
     steps,
   );
   assert.equal(compared.length, steps.length + 2);
+});
+
+test("Go: method sets, embedding, imports, test files and build variants agree with cold", async () => {
+  const producer = `package producer
+type First struct { Field int }
+func (First) Run() {}
+type Second struct{}
+func (Second) Run() {}
+type Wrap struct { First }
+func Produce() First { return First{} }
+`;
+  const bridge = `package bridge
+import "example.com/m/producer"
+var Selected = producer.Produce()
+`;
+  const files = {
+    "go.mod": "module example.com/m\n\ngo 1.22\n",
+    "producer/producer.go": producer,
+    "bridge/bridge.go": bridge,
+    "user/user.go": `package user
+import "example.com/m/bridge"
+func Use() {
+  bridge.Selected.Run()
+}
+`,
+    "wrapper/wrapper.go": `package wrapper
+import "example.com/m/producer"
+func Use(w producer.Wrap) {
+  w.Run()
+  _ = w.Field
+  _ = w.Renamed
+  w.RenamedRun()
+}
+`,
+    "contract/contract.go":
+      "package contract\ntype Runner interface { Run() }\nfunc Use(x Runner) { x.Run() }\n",
+    "consumer/consumer.go": "package consumer\nfunc Use() { _ = New() }\n",
+    "producer/options_linux.go":
+      "//go:build linux\n\npackage producer\nfunc Choose() int { return 1 }\n",
+    "producer/options_windows.go":
+      "//go:build windows\n\npackage producer\nfunc Choose() int { return 2 }\n",
+    "producer/portable.go":
+      "package producer\nfunc Portable() int { return Choose() }\n",
+    "producer/portable_test.go":
+      "package producer\nfunc ForTest() error { return nil }\n",
+  };
+  const target = (store, file, name) => {
+    const link = store
+      .links()
+      .find((link) => link.file === file && link.targetName === name);
+    return link?.targetId ? store.getSymbol(link.targetId)?.identity : null;
+  };
+  const implementsRunner = (store) =>
+    store
+      .links()
+      .some(
+        (link) =>
+          link.kind === "implements" &&
+          link.file === "producer/producer.go" &&
+          link.targetName === "Runner",
+      );
+  await equalAfterEveryStep(files, [
+    {
+      name: "change A's return type, selecting a different method in C through B",
+      omit: "user/user.go",
+      edit: (t) =>
+        t.write(
+          "producer/producer.go",
+          producer.replace(
+            "Produce() First { return First{} }",
+            "Produce() Second { return Second{} }",
+          ),
+        ),
+      check: (store) =>
+        assert.equal(
+          target(store, "user/user.go", "bridge.Selected.Run"),
+          "(Second).Run",
+        ),
+    },
+    {
+      name: "rename a method and a field",
+      omit: "wrapper/wrapper.go",
+      edit: (t) =>
+        t.write(
+          "producer/producer.go",
+          producer
+            .replace("Field int", "Renamed int")
+            .replace("(First) Run()", "(First) RenamedRun()"),
+        ),
+      check: (store) => {
+        assert.equal(target(store, "wrapper/wrapper.go", "w.Run"), null);
+        assert.equal(target(store, "wrapper/wrapper.go", "w.Field"), null);
+      },
+    },
+    {
+      name: "restore the method and field, but change embedding",
+      omit: "wrapper/wrapper.go",
+      edit: (t) =>
+        t.write(
+          "producer/producer.go",
+          producer.replace("Wrap struct { First }", "Wrap struct { Second }"),
+        ),
+      check: (store) => {
+        assert.equal(
+          target(store, "wrapper/wrapper.go", "w.Run"),
+          "(Second).Run",
+        );
+        assert.equal(target(store, "wrapper/wrapper.go", "w.Field"), null);
+      },
+    },
+    {
+      name: "add an interface method, removing implementations in another package",
+      omit: "producer/producer.go",
+      edit: (t) =>
+        t.write(
+          "contract/contract.go",
+          files["contract/contract.go"].replace(
+            "{ Run() }",
+            "{ Run(); Stop() }",
+          ),
+        ),
+      check: (store) => assert.equal(implementsRunner(store), false),
+    },
+    {
+      name: "rename the added interface method",
+      omit: "contract/contract.go",
+      edit: (t) =>
+        t.write(
+          "contract/contract.go",
+          files["contract/contract.go"].replace(
+            "{ Run() }",
+            "{ Run(); Cancel() }",
+          ),
+        ),
+    },
+    {
+      name: "remove the new interface requirement",
+      omit: "producer/producer.go",
+      edit: (t) =>
+        t.write("contract/contract.go", files["contract/contract.go"]),
+      check: (store) => assert.equal(implementsRunner(store), true),
+    },
+    {
+      name: "add a blank import",
+      omit: "consumer/consumer.go",
+      edit: (t) =>
+        t.write(
+          "consumer/consumer.go",
+          'package consumer\nimport _ "example.com/m/producer"\nfunc Use() { _ = New() }\n',
+        ),
+    },
+    {
+      name: "add a dot import",
+      omit: "consumer/consumer.go",
+      edit: (t) =>
+        t.write(
+          "consumer/consumer.go",
+          'package consumer\nimport . "example.com/m/producer"\nfunc Use() { _ = Produce() }\n',
+        ),
+      check: (store) =>
+        assert.equal(
+          targetFile(store, "consumer/consumer.go", "Produce"),
+          "producer/producer.go",
+        ),
+    },
+    {
+      name: "change a build constraint",
+      omit: "producer/options_linux.go",
+      edit: (t) =>
+        t.write(
+          "producer/options_linux.go",
+          files["producer/options_linux.go"].replace(
+            "//go:build linux",
+            "//go:build ignore",
+          ),
+        ),
+    },
+    {
+      name: "shadow a predeclared type in a test build",
+      omit: "producer/portable_test.go",
+      edit: (t) =>
+        t.write(
+          "producer/portable_test.go",
+          files["producer/portable_test.go"] + "\ntype error = int\n",
+        ),
+      check: (store) =>
+        assert.equal(
+          targetFile(store, "producer/portable_test.go", "error"),
+          "producer/portable_test.go",
+        ),
+    },
+  ]);
+});
+
+test("Go: the cold comparison catches a closure narrowed to the edited file", async () => {
+  const go = registry.modules.find((module) => module.id === "go");
+  const narrowed = new LanguageRegistry([
+    {
+      ...go,
+      async analyze(context) {
+        const result = await go.analyze(context);
+        if (!("resolutionFiles" in result) || !context.previousFiles?.size)
+          return result;
+        return {
+          files: result.files.filter((file) =>
+            context.previousFiles.has(file.path),
+          ),
+          resolutionFiles: [...context.previousFiles.keys()],
+        };
+      },
+    },
+  ]);
+  await assert.rejects(
+    equalAfterEveryStep(
+      {
+        "go.mod": "module example.com/m\n\ngo 1.22\n",
+        "a/a.go": "package a\nfunc Existing() {}\n",
+        "b/b.go":
+          'package b\nimport "example.com/m/a"\nfunc Use() { a.Added() }\n',
+      },
+      [
+        {
+          name: "export omitted from importer",
+          edit: (t) =>
+            t.write(
+              "a/a.go",
+              "package a\nfunc Existing() {}\nfunc Added() {}\n",
+            ),
+        },
+      ],
+      narrowed,
+    ),
+    /after export omitted from importer/,
+  );
+});
+
+test("Go: a direct graph write invalidates reuse even without a source edit", async () => {
+  const root = mkdtempSync(join(tmpdir(), "c27-graph-write-"));
+  try {
+    writeFileSync(
+      join(root, "a.go"),
+      "package a\nfunc Target() {}\nfunc Use() { Target() }\n",
+    );
+    await executeGraph({ command: "index", root });
+    const path = join(root, ".pymtheg/rebuildable/graph.sqlite");
+    const cold = storeRows(path);
+    const store = new SqliteGraphStore(path);
+    try {
+      store.resolveLinks([]);
+    } finally {
+      store.close();
+    }
+    assert.notDeepEqual(compareRows(storeRows(path), cold), []);
+    const report = await executeGraph({ command: "index", root });
+    assert.equal(report.sync.complete, true);
+    assert.deepEqual(compareRows(storeRows(path), cold), []);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("Go: standalone examples in the same directory select their own fields", async () => {
+  const source = (name) =>
+    `package main\ntype Options struct { Field string }\nfunc ${name}(opts Options) string { return opts.Field }\n`;
+  const first = "examples/first.go";
+  const second = "examples/second.go";
+  await equalAfterEveryStep(
+    { [first]: source("First"), [second]: source("Second") },
+    [
+      {
+        name: "move one example's declarations",
+        edit: (tree) =>
+          tree.write(second, "// A standalone example.\n" + source("Second")),
+        check: (store) => {
+          assert.equal(targetFile(store, first, "opts.Field"), first);
+          assert.equal(targetFile(store, second, "opts.Field"), second);
+        },
+      },
+    ],
+  );
 });
 
 const rustA = `pub fn hello() -> u32 {

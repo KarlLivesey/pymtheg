@@ -47,6 +47,10 @@ test("Go module is discovered in production and claims only Go sources and conte
   assert.equal(registry.claim("pkg/a.go")?.id, "go");
   assert.equal(registry.claim("pkg/a_test.go")?.id, "go");
   assert.equal(registry.claim("go.mod"), undefined);
-  assert.deepEqual(go.contextFiles, ["go.mod", "go.work"]);
+  assert.deepEqual(go.contextFiles, [
+    "go.mod",
+    "go.work",
+    "**/vendor/modules.txt",
+  ]);
   assert.equal(go.testOnly, undefined);
 });
