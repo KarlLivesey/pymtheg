@@ -11,7 +11,7 @@ const [candidate, ...mains] = process.argv
 const cold = (results, id) => results.repos.find((r) => r.id === id)?.cold;
 const pct = (a, b) => ((100 * (a - b)) / b).toFixed(1) + "%";
 const rows = [
-  "| Pin | Main CPU s (3 runs) | C-24 CPU s | vs main mean | Main peak RSS MiB | C-24 peak RSS MiB | vs main mean |",
+  `| Pin | Main CPU s (${mains.length} runs) | C-24 CPU s | vs main mean | Main peak RSS MiB | C-24 peak RSS MiB | vs main mean |`,
   "| --- | --- | ---: | ---: | --- | ---: | ---: |",
 ];
 const sum = { main: 0, cand: 0, mainRss: 0, candRss: 0 };

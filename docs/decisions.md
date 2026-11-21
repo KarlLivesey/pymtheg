@@ -2822,15 +2822,20 @@ See [C-12](changes/C-12.md).
 
 A Rust lookup that meets a cycle cut at a lookup still on the stack is an
 answer for that entry point only; it is reused only under the same
-ancestor tests, never memoised as context-free, so no answer depends on
-the order the store lists rows in (which follows the random project id).
+ancestor tests, never memoised as context-free. The Rust phases take their
+inputs in an order the snapshot fixes, not the store's id order (which
+follows the random project id). A glob imports only names its own module
+can see, so a private `use` in the globbed module is never resolved
+through the glob. A module chosen only by `cfg_attr(…, path = …)`, with no
+plain module file in the checkout, is exactly its captured alternatives: a
+build enabling none of them does not compile (E0583).
 With no lockfile, a dependency declared by registry version requirement
 alone resolves from the default registry, together with the facade's own
 registry dependencies, unless the root manifest patches or replaces the
 crate or a captured Cargo config anywhere in the checkout sets `paths`,
 `[source]` or `[patch]`. A macro link names a verified registry facade's
 export without the implementing crate's source; expansion proofs still
-need it. An unplaced inherent impl adds a possible method only to types
+need it. Neither holds when a captured config patches the facade. An unplaced inherent impl adds a possible method only to types
 of its own crate (Rust E0116); trait impls are unaffected.
 [C-24](changes/C-24.md)
 

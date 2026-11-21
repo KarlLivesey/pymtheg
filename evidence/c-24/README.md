@@ -18,7 +18,19 @@ without embassy).
   rule, the full build adds the inherent-impl rule. Measured before the
   merge, on `e7585f2`.
 
-## Results
+## Results after review round 1 (the current build)
+
+- [union-round1.json](union-round1.json): the branch against the union of
+  two runs of current main on all 19 Rust pins (per-pin Level 2, changed
+  decisions, main-unstable sites, symbol keys, the audit draw).
+- [audit.md](audit.md): 40 newly definite links at a fixed seed, 40 right.
+- [cost.md](cost.md): controlled cold runs, side-by-side sweeps, order cost.
+- [proof-round1.txt](proof-round1.txt): cold runs of embassy and dioxus
+  under different project ids with this build.
+- [coverage-plan-input.json.gz](coverage-plan-input.json.gz): the plan
+  input for the 18 coverage pins.
+
+## Results before review round 1 (superseded build, kept for the record)
 
 - [proof.txt](proof.txt): the 10-run proof (embassy, dioxus, ratatui, axum:
   ten cold runs each, ten project ids, byte-identical normalised stores),
@@ -36,15 +48,8 @@ without embassy).
 - [item1-vs-main.json](item1-vs-main.json),
   [item2-vs-item1.json](item2-vs-item1.json),
   [item3-vs-item2.json](item3-vs-item2.json): the per-item split.
-- [audit.md](audit.md): 40 newly definite links at a fixed seed, 40 right.
-- [cost.md](cost.md): cold index CPU and peak memory (side-by-side sweeps,
-  controlled sequential runs) and the cost of the canonical order.
 - [cargo-check.txt](cargo-check.txt): Cargo's own resolution of the item-2
   fixtures without a lockfile.
-- [coverage-plan-input.json.gz](coverage-plan-input.json.gz): the plan
-  input (the same bytes as `sweep/plan-input.json.gz`): C-21's archive with
-  the 18 pins replaced by this chunk's export
-  (`coverage-export.mjs`, then `evidence/c-15/plan.mjs`).
 
 ## Scripts
 

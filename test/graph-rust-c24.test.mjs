@@ -278,11 +278,16 @@ test("a lookup through a glob cycle has one answer whatever ran before it", asyn
     first["src/serve/server.rs types AppServer @177"].target,
     struct,
   );
-  // Inside `impl WebServer` it may stay open, but never names anything else.
-  assert.ok(
-    [null, struct].includes(
-      first["src/serve/server.rs types AppServer @72"].target,
-    ),
+  // The explicit `use super::AppServer` keeps its type binding inside
+  // `impl WebServer` too: the parent's glob of `server` cannot see that
+  // private import, and `server.rs`'s item macro could only add a second,
+  // different `AppServer` through that glob, which rustc rejects (E0659).
+  assert.equal(first["src/serve/server.rs types AppServer @72"].target, struct);
+  // The import also binds the macro namespace, where no other glob supplies
+  // the name, so the item macro keeps the import itself open.
+  assert.equal(
+    first["src/serve/server.rs imports super::AppServer @4"].target,
+    null,
   );
 });
 
@@ -295,7 +300,8 @@ test("cfg-alternative sibling files get one symmetric answer whatever the input 
       `seed ${seed}`,
     );
   // Neither sibling is "the" file for `_version`: each import from the
-  // parent gets the same answer in both, never definite in one only.
+  // parent gets the same answer in both, never definite in one only. The
+  // explicit imports name the parent's own items in every order.
   for (const name of ["ChannelNumber", "Event", "Task"]) {
     const imports = Object.entries(first).filter(([k]) =>
       k.endsWith(
@@ -305,10 +311,10 @@ test("cfg-alternative sibling files get one symmetric answer whatever the input 
     assert.equal(imports.length, 2, name);
     assert.deepEqual(imports[0][1], imports[1][1], name);
     assert.deepEqual(imports[0][1], {
-      target: null,
+      target: `src/ppi/mod.rs#${name}`,
       candidates: [],
       library: null,
-      reason: "conditional module path lacks captured alternatives",
+      reason: null,
     });
   }
   // Uses of the parent's types inside either file are definite.

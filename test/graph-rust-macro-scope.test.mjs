@@ -458,6 +458,42 @@ test("without a lockfile a plain registry requirement identifies the facade macr
     );
 });
 
+test("a captured Cargo config that patches the facade itself withholds its macros", async () => {
+  // Cargo takes the patched `tokio`, not the registry release, so neither
+  // the macro link nor its expansion is the registry crate's. A config in
+  // any directory of the checkout applies when Cargo runs there, and a
+  // lockfile written from elsewhere does not rule it out.
+  const patchTokio = '[patch.crates-io]\ntokio = { path = "vendor/tokio" }\n';
+  const cases = [
+    await tokioMacroOrigin("tokio-registry", {
+      lock: false,
+      config: patchTokio,
+    }),
+    await tokioMacroOrigin("tokio-registry", {
+      lock: false,
+      configPath: "tools/.cargo/config.toml",
+      config: patchTokio,
+    }),
+    await tokioMacroOrigin("tokio-registry", {
+      configPath: "tools/.cargo/config.toml",
+      config: patchTokio,
+    }),
+  ];
+  for (const at of cases) {
+    assert.deepEqual(
+      at("macros", "runtime::main", "#[runtime::main("),
+      proved(null),
+    );
+    assert.deepEqual(at("types", "Option", "// main by path"), proved(null));
+  }
+  // Control: the same locked project with no config names the macro.
+  const locked = await tokioMacroOrigin("tokio-registry");
+  assert.deepEqual(
+    locked("macros", "runtime::main", "#[runtime::main("),
+    proved("#[main]"),
+  );
+});
+
 test("written Tokio macro routes retain identity with incomplete feature facts", async () => {
   // With rt alone, this fixture does not compile. The graph assumes written
   // macro paths and named imports compile when registry provenance is known.

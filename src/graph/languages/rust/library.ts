@@ -350,7 +350,7 @@ export function cargoMacroSourceKnown(path: LibraryPath): boolean {
     !!path.registry?.length &&
     path.registry.every(
       ({ macroRegistry }) =>
-        !!macroRegistry &&
+        !!macroRegistry?.facade &&
         (implementation
           ? macroRegistry.implementations.includes(implementation) ||
             // C-24: an unlocked requirement inside the catalogued release
@@ -372,7 +372,7 @@ export function cargoMacroSourceKnown(path: LibraryPath): boolean {
 export function cargoMacroFacadeKnown(path: LibraryPath): boolean {
   return (
     !!path.registry?.length &&
-    path.registry.every(({ macroRegistry }) => !!macroRegistry)
+    path.registry.every(({ macroRegistry }) => !!macroRegistry?.facade)
   );
 }
 

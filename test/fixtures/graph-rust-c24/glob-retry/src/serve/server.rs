@@ -8,3 +8,7 @@ impl WebServer {
 fn router(runner: &AppServer) {
     tracing::warn!("y");
 }
+// An item macro whose output is unknown (dioxus server.rs has several).
+lazy_static::lazy_static! {
+    static ref ROUTES: u8 = 0;
+}

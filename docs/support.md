@@ -456,6 +456,12 @@ makes that whole manifest unknown). Private items are ordinary symbols.
 - **Determinism:** the Rust graph is a function of the snapshot. Graph ids
   (and so the order stores list rows in) include the project's random id;
   no Rust answer depends on that order ([C-24](changes/C-24.md)).
+- **cfg-chosen module files:** a `mod` declared only with
+  `cfg_attr(…, path = …)` alternatives, with no plain module file in the
+  checkout, is exactly those alternatives (a build enabling none of them does
+  not compile, E0583). A glob imports only what its own module can see, so a
+  private `use` in a globbed child is never resolved through the parent's
+  glob ([C-24](changes/C-24.md)).
 - **Cancellation:** the graph CLI can interrupt Rust analysis and resolution
   with SIGINT or SIGTERM. Interrupted syncs leave an incomplete index and can
   be retried. When an import path reaches the resolver's depth boundary, an
@@ -587,7 +593,9 @@ makes that whole manifest unknown). Private items are ordinary symbols.
   provenance is verified. Feature facts can identify namespace facets.
   A registry re-export needs a verified registry edge to the implementing
   crate for its expansion; the macro link itself (which facade export the
-  name is) needs only the verified facade. With no `Cargo.lock`, a plain
+  name is) needs only the verified facade, and neither holds when any
+  captured `.cargo/config` in the checkout patches the facade or sets
+  `paths` or `[source]`. With no `Cargo.lock`, a plain
   version requirement verifies both when the root manifest has no
   `[patch]`/`[replace]` entry for the implementing crate and no captured
   `.cargo/config` anywhere in the checkout sets `paths`, `[source]` or

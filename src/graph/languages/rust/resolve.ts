@@ -1060,11 +1060,11 @@ export function resolveRust(
           ]),
         ];
         if (locationUnverified) moduleIncomplete.add(s.id);
-        if (
-          pathTargets.size &&
-          ([...pathTargets].some((f) => !files.has(f)) ||
-            (!path && !ordinary.some((f) => files.has(f))))
-        )
+        // C-24: with only `cfg_attr(…, path = …)` alternatives, a build that
+        // enables none of them needs the plain module file. When the checkout
+        // has none, that build does not compile (E0583), so the captured
+        // alternatives are every module this declaration can be.
+        if (pathTargets.size && [...pathTargets].some((f) => !files.has(f)))
           moduleIncomplete.add(s.id);
         const targets = possible.filter((f) => files.has(f));
         const fileConditions = targets.map(
@@ -2496,39 +2496,55 @@ export function resolveRust(
         };
       };
       const suppliers: GraphLink[] = [];
+      // C-24: a glob imports only what its own module can see (a private
+      // `use` in the target module is not glob-imported into the parent), so
+      // visibility through it is checked from here; the accessor's cfg
+      // conditions still apply.
+      const globAccess: Place = accessFrom
+        ? { ...loc, conditions: accessFrom.conditions ?? [] }
+        : loc;
+      const perGlob = globs.map((l) => {
+        const imported = throughGlob(
+          resolveUse(
+            { ...l, targetName: l.targetName.replace(/::\*$/, "") },
+            [],
+            "type",
+          ),
+        );
+        if (!imported.symbols.length)
+          return imported.reason ? imported : empty(false);
+        const found = merge(
+          imported.symbols.map((s) =>
+            children(s, [name, ...rest], ns, seen, true, globAccess, true),
+          ),
+        );
+        if (found.symbols.length) suppliers.push(l);
+        // A glob never supplies a definite outside binding. A captured
+        // module with no competing export can still clear a prelude name.
+        if (found.library) return empty(false);
+        return {
+          ...found,
+          complete: imported.complete && found.complete,
+        };
+      });
+      // C-24: two globs that supply different items for one name make every
+      // use of it an ambiguity error (E0659). So when one glob supplies a
+      // proven binding, another glob's only doubt, an opaque macro that could
+      // generate the name, cannot change the answer in compiling code. An
+      // unreadable file is never ruled out this way.
+      const opaqueOnly = (found: Found) =>
+        !found.complete &&
+        !found.symbols.length &&
+        !found.library &&
+        !found.failedFiles?.length &&
+        !!found.reason &&
+        found.reason
+          .split(/;\s*/)
+          .every((reason) => reason === "opaque-item-may-shadow-name");
       let result = merge(
-        globs.map((l) => {
-          const imported = throughGlob(
-            resolveUse(
-              { ...l, targetName: l.targetName.replace(/::\*$/, "") },
-              [],
-              "type",
-            ),
-          );
-          if (!imported.symbols.length)
-            return imported.reason ? imported : empty(false);
-          const found = merge(
-            imported.symbols.map((s) =>
-              children(
-                s,
-                [name, ...rest],
-                ns,
-                seen,
-                true,
-                accessFrom ?? loc,
-                true,
-              ),
-            ),
-          );
-          if (found.symbols.length) suppliers.push(l);
-          // A glob never supplies a definite outside binding. A captured
-          // module with no competing export can still clear a prelude name.
-          if (found.library) return empty(false);
-          return {
-            ...found,
-            complete: imported.complete && found.complete,
-          };
-        }),
+        perGlob.some((found) => found.complete && found.symbols.length)
+          ? perGlob.map((found) => (opaqueOnly(found) ? empty() : found))
+          : perGlob,
       );
       result = conditional(result, suppliers, loc);
       if (libraryProbe && !result.symbols.length && !scopeFailures.length)
