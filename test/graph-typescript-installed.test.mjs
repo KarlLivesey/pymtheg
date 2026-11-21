@@ -1437,7 +1437,10 @@ test("a merged-member call keeps one identity for a same-package directory augme
     `${types}/addon/edit/closebrackets.d.ts`,
     'import "../../"; declare module "../../" { interface Editor { setOption(name: \'b\'): void } }',
   );
-  await write("node_modules/cm-extra/package.json", manifest("cm-extra", "1.0.0"));
+  await write(
+    "node_modules/cm-extra/package.json",
+    manifest("cm-extra", "1.0.0"),
+  );
   await write(
     "node_modules/cm-extra/index.d.ts",
     "import 'codemirror'; declare module 'codemirror' { interface Editor { setOption(name: 'c'): void } }\nexport {};\n",
@@ -1460,7 +1463,10 @@ test("a merged-member call keeps one identity for a same-package directory augme
   read((_, call) => {
     // The original's overload: its own identity.
     assert.deepEqual(
-      [target(call("main.ts", "a.setOption"))].map(({ unit, symbol }) => [unit, symbol]),
+      [target(call("main.ts", "a.setOption"))].map(({ unit, symbol }) => [
+        unit,
+        symbol,
+      ]),
       [["codemirror", "CodeMirror.Editor.prototype.setOption"]],
     );
     // The same-package augmentation's overload never gets an identity of its
@@ -1469,7 +1475,9 @@ test("a merged-member call keeps one identity for a same-package directory augme
     assert.ok(
       own.resolution !== "library" ||
         own.libraries.every(({ unit, symbol }) =>
-          unit === "codemirror" ? symbol === "CodeMirror.Editor.prototype.setOption" : true,
+          unit === "codemirror"
+            ? symbol === "CodeMirror.Editor.prototype.setOption"
+            : true,
         ),
       JSON.stringify(own),
     );
