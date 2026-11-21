@@ -691,6 +691,14 @@ crate tracing;` therefore gets no proven standard names, so its argument
   `super::` paths) or carries `#[cfg]` gives unresolved body calls. Body
   calls with no workspace target, sysroot paths, `Self::` paths and method
   calls are not derived.
+- A captured `macro_rules!` invocation with only identifiers and commas as
+  input can clear a lexical name guard when every arm emits only fixed `impl`
+  blocks. Each impl starts with a written keyword and has a written body
+  delimiter. Repetitions must preserve those boundaries and use no separator
+  or a comma. Only the built-in `inline`, `allow` and `cfg` attributes are
+  accepted inside the body. Nested macro syntax leaves the proof unavailable.
+  Generated associated items remain subject to the existing method and
+  associated-path checks.
 - **Derives:** on stable Rust a `#[derive(Name)]` resolves among derive
   macros only, and those come from proc-macro crates (imported by `use`,
   named by path, or brought in by `#[macro_use] extern crate`) or from the

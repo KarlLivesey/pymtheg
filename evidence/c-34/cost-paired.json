@@ -1,0 +1,50 @@
+[
+  {
+    "id": "cberner/redb",
+    "run": "main-a",
+    "wallSeconds": 308.25,
+    "userSeconds": 82.7,
+    "systemSeconds": 162.5,
+    "peakRssKiB": 1053324
+  },
+  {
+    "id": "cberner/redb",
+    "run": "candidate",
+    "wallSeconds": 238.51,
+    "userSeconds": 78.99,
+    "systemSeconds": 83.81,
+    "peakRssKiB": 997532
+  },
+  {
+    "id": "cberner/redb",
+    "run": "main-b",
+    "wallSeconds": 222.7,
+    "userSeconds": 74.07,
+    "systemSeconds": 79.01,
+    "peakRssKiB": 1056500
+  },
+  {
+    "id": "fjall-rs/fjall",
+    "run": "main-a",
+    "wallSeconds": 49.18,
+    "userSeconds": 19.32,
+    "systemSeconds": 15.35,
+    "peakRssKiB": 580700
+  },
+  {
+    "id": "fjall-rs/fjall",
+    "run": "candidate",
+    "wallSeconds": 37.55,
+    "userSeconds": 18.81,
+    "systemSeconds": 10.33,
+    "peakRssKiB": 585944
+  },
+  {
+    "id": "fjall-rs/fjall",
+    "run": "main-b",
+    "wallSeconds": 27.48,
+    "userSeconds": 19.02,
+    "systemSeconds": 8.41,
+    "peakRssKiB": 590228
+  }
+]
