@@ -18,8 +18,8 @@ This chunk changes no product code. Everything here describes main
   count and the `no-symbol` count from main's own run. It also gives each
   class/detail count from the diagnosis run, the bundle counts, and
   `diagnosisSameOutcomes`. That flag is true when the diagnosis build's
-  resolution × reason counts equal main's. They are equal on all 19 finished
-  attempts.
+  resolution × reason counts equal main's. They are equal on all 18 finished
+  attempts (10 bare, 8 installed).
 - `hand-check.md`, `hand-check-installed.jsonl`, `hand-check-bare.jsonl`:
   the 60 reviewed sites.
 - `computed-key-calls-installed.txt`: the 97 installed computed-key calls
