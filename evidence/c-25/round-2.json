@@ -1,0 +1,1162 @@
+{
+  "prior": "190adc4",
+  "analyzer": "c6fcc58",
+  "bare": {
+    "comparison": [
+      {
+        "pin": "withastro/astro",
+        "before": 152561,
+        "after": 152561,
+        "beforeL2": 118642,
+        "afterL2": 118642,
+        "beforeAssumedL2": 1214,
+        "afterAssumedL2": 1214,
+        "shared": 152561,
+        "sharedBeforeL2": 118642,
+        "sharedAfterL2": 118642,
+        "lostSites": 0,
+        "newSites": 0,
+        "withdrawals": 0,
+        "definiteChanges": 0,
+        "checkoutSymbols": 26243,
+        "symbolKeysMatch": true,
+        "gainsByProof": {}
+      },
+      {
+        "pin": "excalidraw/excalidraw",
+        "before": 104519,
+        "after": 104519,
+        "beforeL2": 75234,
+        "afterL2": 75234,
+        "beforeAssumedL2": 50,
+        "afterAssumedL2": 50,
+        "shared": 104519,
+        "sharedBeforeL2": 75234,
+        "sharedAfterL2": 75234,
+        "lostSites": 0,
+        "newSites": 0,
+        "withdrawals": 0,
+        "definiteChanges": 0,
+        "checkoutSymbols": 13405,
+        "symbolKeysMatch": true,
+        "gainsByProof": {}
+      },
+      {
+        "pin": "mermaid-js/mermaid",
+        "before": 125657,
+        "after": 125657,
+        "beforeL2": 94731,
+        "afterL2": 94731,
+        "beforeAssumedL2": 66,
+        "afterAssumedL2": 66,
+        "shared": 125657,
+        "sharedBeforeL2": 94731,
+        "sharedAfterL2": 94731,
+        "lostSites": 0,
+        "newSites": 0,
+        "withdrawals": 0,
+        "definiteChanges": 0,
+        "checkoutSymbols": 23639,
+        "symbolKeysMatch": true,
+        "gainsByProof": {}
+      },
+      {
+        "pin": "honojs/hono",
+        "before": 72340,
+        "after": 72340,
+        "beforeL2": 42654,
+        "afterL2": 42129,
+        "beforeAssumedL2": 525,
+        "afterAssumedL2": 0,
+        "shared": 72340,
+        "sharedBeforeL2": 42654,
+        "sharedAfterL2": 42129,
+        "lostSites": 0,
+        "newSites": 0,
+        "withdrawals": 525,
+        "definiteChanges": 525,
+        "checkoutSymbols": 5773,
+        "symbolKeysMatch": true,
+        "gainsByProof": {}
+      }
+    ],
+    "exclusions": [
+      {
+        "pin": "honojs/hono",
+        "original": 525,
+        "routes": [
+          {
+            "reason": "bundler-config-unverified",
+            "manifest": "package.json",
+            "config": "tsconfig.build.json",
+            "output": "dist/types/index.d.ts",
+            "links": 316
+          },
+          {
+            "reason": "bundler-config-unverified",
+            "manifest": "package.json",
+            "config": "tsconfig.build.json",
+            "output": "dist/types/utils/encode.d.ts",
+            "links": 17
+          },
+          {
+            "reason": "bundler-config-unverified",
+            "manifest": "package.json",
+            "config": "tsconfig.build.json",
+            "output": "dist/types/types.d.ts",
+            "links": 73
+          },
+          {
+            "reason": "bundler-config-unverified",
+            "manifest": "package.json",
+            "config": "tsconfig.build.json",
+            "output": "dist/types/helper/websocket/index.d.ts",
+            "links": 41
+          },
+          {
+            "reason": "bundler-config-unverified",
+            "manifest": "package.json",
+            "config": "tsconfig.build.json",
+            "output": "dist/types/helper/streaming/index.d.ts",
+            "links": 9
+          },
+          {
+            "reason": "bundler-config-unverified",
+            "manifest": "package.json",
+            "config": "tsconfig.build.json",
+            "output": "dist/types/helper/ssg/index.d.ts",
+            "links": 8
+          },
+          {
+            "reason": "bundler-config-unverified",
+            "manifest": "package.json",
+            "config": "tsconfig.build.json",
+            "output": "dist/types/helper/cookie/index.d.ts",
+            "links": 17
+          },
+          {
+            "reason": "bundler-config-unverified",
+            "manifest": "package.json",
+            "config": "tsconfig.build.json",
+            "output": "dist/types/middleware/body-limit/index.d.ts",
+            "links": 6
+          },
+          {
+            "reason": "bundler-config-unverified",
+            "manifest": "package.json",
+            "config": "tsconfig.build.json",
+            "output": "dist/types/middleware/serve-static/index.d.ts",
+            "links": 12
+          },
+          {
+            "reason": "bundler-config-unverified",
+            "manifest": "package.json",
+            "config": "tsconfig.build.json",
+            "output": "dist/types/helper/conninfo/index.d.ts",
+            "links": 20
+          },
+          {
+            "reason": "bundler-config-unverified",
+            "manifest": "package.json",
+            "config": "tsconfig.build.json",
+            "output": "dist/types/middleware/basic-auth/index.d.ts",
+            "links": 6
+          }
+        ]
+      },
+      {
+        "pin": "withastro/astro",
+        "original": 1214,
+        "routes": [
+          {
+            "reason": "marked",
+            "manifest": "packages/integrations/markdoc/package.json",
+            "config": "packages/integrations/markdoc/tsconfig.build.json",
+            "output": "packages/integrations/markdoc/dist/index.d.ts",
+            "links": 75
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/integrations/react/package.json",
+            "config": "packages/integrations/react/tsconfig.build.json",
+            "output": "packages/integrations/react/dist/index.d.ts",
+            "links": 186
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/integrations/vue/package.json",
+            "config": "packages/integrations/vue/tsconfig.build.json",
+            "output": "packages/integrations/vue/dist/index.d.ts",
+            "links": 123
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/integrations/preact/package.json",
+            "config": "packages/integrations/preact/tsconfig.build.json",
+            "output": "packages/integrations/preact/dist/index.d.ts",
+            "links": 142
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/integrations/node/package.json",
+            "config": "packages/integrations/node/tsconfig.build.json",
+            "output": "packages/integrations/node/dist/index.d.ts",
+            "links": 66
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/integrations/svelte/package.json",
+            "config": "packages/integrations/svelte/tsconfig.build.json",
+            "output": "packages/integrations/svelte/dist/index.d.ts",
+            "links": 128
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/integrations/markdoc/package.json",
+            "config": "packages/integrations/markdoc/tsconfig.build.json",
+            "output": "packages/integrations/markdoc/dist/config.d.ts",
+            "links": 88
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/integrations/cloudflare/package.json",
+            "config": "packages/integrations/cloudflare/tsconfig.build.json",
+            "output": "packages/integrations/cloudflare/dist/index.d.ts",
+            "links": 138
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/integrations/solid/package.json",
+            "config": "packages/integrations/solid/tsconfig.build.json",
+            "output": "packages/integrations/solid/dist/index.d.ts",
+            "links": 72
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/integrations/vercel/package.json",
+            "config": "packages/integrations/vercel/tsconfig.build.json",
+            "output": "packages/integrations/vercel/dist/index.d.ts",
+            "links": 69
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/integrations/alpinejs/package.json",
+            "config": "packages/integrations/alpinejs/tsconfig.build.json",
+            "output": "packages/integrations/alpinejs/dist/index.d.ts",
+            "links": 12
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/integrations/netlify/package.json",
+            "config": "packages/integrations/netlify/tsconfig.build.json",
+            "output": "packages/integrations/netlify/dist/index.d.ts",
+            "links": 30
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/renderers/svelte/package.json",
+            "config": "packages/renderers/svelte/tsconfig.build.json",
+            "output": "packages/renderers/svelte/dist/index.d.ts",
+            "links": 3
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/markdown/remark/package.json",
+            "config": "packages/markdown/remark/tsconfig.build.json",
+            "output": "packages/markdown/remark/dist/index.d.ts",
+            "links": 6
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/vite-plugin-astro/package.json",
+            "config": "packages/vite-plugin-astro/tsconfig.build.json",
+            "output": "packages/vite-plugin-astro/dist/index.d.ts",
+            "links": 24
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/renderers/react/package.json",
+            "config": "packages/renderers/react/tsconfig.build.json",
+            "output": "packages/renderers/react/dist/index.d.ts",
+            "links": 9
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/integrations/cloudflare/package.json",
+            "config": "packages/integrations/cloudflare/tsconfig.build.json",
+            "output": "packages/integrations/cloudflare/dist/utils/handler.d.ts",
+            "links": 4
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/integrations/react/package.json",
+            "config": "packages/integrations/react/tsconfig.build.json",
+            "output": "packages/integrations/react/dist/server.d.ts",
+            "links": 6
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/renderers/preact/package.json",
+            "config": "packages/renderers/preact/tsconfig.build.json",
+            "output": "packages/renderers/preact/dist/index.d.ts",
+            "links": 3
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/integrations/cloudflare/package.json",
+            "config": "packages/integrations/cloudflare/tsconfig.build.json",
+            "output": "packages/integrations/cloudflare/dist/cache/index.d.ts",
+            "links": 9
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/integrations/partytown/package.json",
+            "config": "packages/integrations/partytown/tsconfig.build.json",
+            "output": "packages/integrations/partytown/dist/index.d.ts",
+            "links": 3
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/markdown/satteri/package.json",
+            "config": "packages/markdown/satteri/tsconfig.build.json",
+            "output": "packages/markdown/satteri/dist/index.d.ts",
+            "links": 6
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/astro-rss/package.json",
+            "config": "packages/astro-rss/tsconfig.build.json",
+            "output": "packages/astro-rss/dist/index.d.ts",
+            "links": 3
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/integrations/vue/package.json",
+            "config": "packages/integrations/vue/tsconfig.build.json",
+            "output": "packages/integrations/vue/dist/server.d.ts",
+            "links": 2
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/astro-prism/package.json",
+            "config": "packages/astro-prism/tsconfig.build.json",
+            "output": "packages/astro-prism/dist/highlighter.d.ts",
+            "links": 1
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/renderers/solid-js/package.json",
+            "config": "packages/renderers/solid-js/tsconfig.build.json",
+            "output": "packages/renderers/solid-js/dist/index.d.ts",
+            "links": 3
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/renderers/vue/package.json",
+            "config": "packages/renderers/vue/tsconfig.build.json",
+            "output": "packages/renderers/vue/dist/index.d.ts",
+            "links": 3
+          }
+        ]
+      },
+      {
+        "pin": "mermaid-js/mermaid",
+        "original": 66,
+        "routes": [
+          {
+            "reason": "marked",
+            "manifest": "packages/mermaid/package.json",
+            "config": "packages/mermaid/tsconfig.json",
+            "output": "packages/mermaid/dist/mermaid.d.ts",
+            "links": 66
+          }
+        ]
+      },
+      {
+        "pin": "excalidraw/excalidraw",
+        "original": 50,
+        "routes": [
+          {
+            "reason": "marked",
+            "manifest": "packages/excalidraw/package.json",
+            "config": "packages/excalidraw/tsconfig.json",
+            "output": "packages/excalidraw/dist/types/excalidraw/index.d.ts",
+            "links": 16
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/excalidraw/package.json",
+            "config": "packages/excalidraw/tsconfig.json",
+            "output": "packages/excalidraw/dist/types/excalidraw/data/types.d.ts",
+            "links": 3
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/excalidraw/package.json",
+            "config": "packages/excalidraw/tsconfig.json",
+            "output": "packages/excalidraw/dist/types/excalidraw/types.d.ts",
+            "links": 30
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/common/package.json",
+            "config": "packages/common/tsconfig.json",
+            "output": "packages/common/dist/types/common/src/index.d.ts",
+            "links": 1
+          }
+        ]
+      }
+    ],
+    "provenance": [
+      {
+        "pin": "changesets/changesets",
+        "marked": 0,
+        "checkoutTargets": 0
+      },
+      {
+        "pin": "colinhacks/zod",
+        "marked": 0,
+        "checkoutTargets": 0
+      },
+      {
+        "pin": "dexie/Dexie.js",
+        "marked": 0,
+        "checkoutTargets": 0
+      },
+      {
+        "pin": "excalidraw/excalidraw",
+        "marked": 50,
+        "checkoutTargets": 50
+      },
+      {
+        "pin": "honojs/hono",
+        "marked": 0,
+        "checkoutTargets": 0
+      },
+      {
+        "pin": "mermaid-js/mermaid",
+        "marked": 67,
+        "checkoutTargets": 66
+      },
+      {
+        "pin": "nestjs/nest",
+        "marked": 0,
+        "checkoutTargets": 0
+      },
+      {
+        "pin": "oclif/core",
+        "marked": 0,
+        "checkoutTargets": 0
+      },
+      {
+        "pin": "pingdotgg/t3code",
+        "marked": 0,
+        "checkoutTargets": 0
+      },
+      {
+        "pin": "pmndrs/zustand",
+        "marked": 0,
+        "checkoutTargets": 0
+      },
+      {
+        "pin": "puppeteer/puppeteer",
+        "marked": 0,
+        "checkoutTargets": 0
+      },
+      {
+        "pin": "react-hook-form/react-hook-form",
+        "marked": 0,
+        "checkoutTargets": 0
+      },
+      {
+        "pin": "reduxjs/redux-toolkit",
+        "marked": 0,
+        "checkoutTargets": 0
+      },
+      {
+        "pin": "trpc/trpc",
+        "marked": 0,
+        "checkoutTargets": 0
+      },
+      {
+        "pin": "vitejs/vite",
+        "marked": 0,
+        "checkoutTargets": 0
+      },
+      {
+        "pin": "vitest-dev/vitest",
+        "marked": 0,
+        "checkoutTargets": 0
+      },
+      {
+        "pin": "withastro/astro",
+        "marked": 1216,
+        "checkoutTargets": 1214
+      },
+      {
+        "pin": "yargs/yargs",
+        "marked": 0,
+        "checkoutTargets": 0
+      }
+    ],
+    "cost": {
+      "before": [
+        {
+          "pin": "honojs/hono",
+          "cold": {
+            "code": 0,
+            "wallSeconds": 165.647,
+            "peakRssKiB": 1344172,
+            "cpuSeconds": 173.18,
+            "status": "ok"
+          },
+          "outcome": "finished"
+        },
+        {
+          "pin": "mermaid-js/mermaid",
+          "cold": {
+            "code": 0,
+            "wallSeconds": 295.087,
+            "peakRssKiB": 1736892,
+            "cpuSeconds": 299.49,
+            "status": "ok"
+          },
+          "outcome": "finished"
+        }
+      ],
+      "after": [
+        {
+          "pin": "honojs/hono",
+          "cold": {
+            "wallSeconds": 132.701,
+            "cpuSeconds": 150.76,
+            "peakRssKiB": 1627988,
+            "exitCode": 0,
+            "status": "ok"
+          },
+          "warm": {
+            "wallSeconds": 7.77,
+            "cpuSeconds": 9.36,
+            "peakRssKiB": 609376,
+            "exitCode": 0,
+            "status": "ok",
+            "unchanged": 460
+          },
+          "outcome": "finished"
+        },
+        {
+          "pin": "mermaid-js/mermaid",
+          "cold": {
+            "wallSeconds": 341.069,
+            "cpuSeconds": 319.45,
+            "peakRssKiB": 1567788,
+            "exitCode": 0,
+            "status": "ok"
+          },
+          "warm": {
+            "wallSeconds": 18.357,
+            "cpuSeconds": 22.15,
+            "peakRssKiB": 931276,
+            "exitCode": 0,
+            "status": "ok",
+            "unchanged": 1240
+          },
+          "outcome": "finished"
+        },
+        {
+          "pin": "vitest-dev/vitest",
+          "cold": {
+            "wallSeconds": 319.778,
+            "cpuSeconds": 319.86,
+            "peakRssKiB": 1880072,
+            "exitCode": 2,
+            "status": "incomplete"
+          },
+          "warm": {
+            "wallSeconds": 17.183,
+            "cpuSeconds": 19.32,
+            "peakRssKiB": 858812,
+            "exitCode": 2,
+            "status": "incomplete",
+            "unchanged": 2490
+          },
+          "outcome": "finished"
+        }
+      ]
+    }
+  },
+  "installed": {
+    "comparison": [
+      {
+        "pin": "excalidraw/excalidraw",
+        "before": 104519,
+        "after": 104519,
+        "beforeL2": 98167,
+        "afterL2": 98167,
+        "beforeAssumedL2": 80,
+        "afterAssumedL2": 80,
+        "shared": 104519,
+        "sharedBeforeL2": 98167,
+        "sharedAfterL2": 98167,
+        "lostSites": 0,
+        "newSites": 0,
+        "withdrawals": 0,
+        "definiteChanges": 0,
+        "checkoutSymbols": 13405,
+        "symbolKeysMatch": true,
+        "gainsByProof": {}
+      },
+      {
+        "pin": "honojs/hono",
+        "before": 72340,
+        "after": 72340,
+        "beforeL2": 46930,
+        "afterL2": 46405,
+        "beforeAssumedL2": 525,
+        "afterAssumedL2": 0,
+        "shared": 72340,
+        "sharedBeforeL2": 46930,
+        "sharedAfterL2": 46405,
+        "lostSites": 0,
+        "newSites": 0,
+        "withdrawals": 525,
+        "definiteChanges": 525,
+        "checkoutSymbols": 5773,
+        "symbolKeysMatch": true,
+        "gainsByProof": {}
+      },
+      {
+        "pin": "mermaid-js/mermaid",
+        "before": 125657,
+        "after": 125657,
+        "beforeL2": 112129,
+        "afterL2": 112129,
+        "beforeAssumedL2": 66,
+        "afterAssumedL2": 66,
+        "shared": 125657,
+        "sharedBeforeL2": 112129,
+        "sharedAfterL2": 112129,
+        "lostSites": 0,
+        "newSites": 0,
+        "withdrawals": 0,
+        "definiteChanges": 0,
+        "checkoutSymbols": 23639,
+        "symbolKeysMatch": true,
+        "gainsByProof": {}
+      },
+      {
+        "pin": "withastro/astro",
+        "before": 152561,
+        "after": 152561,
+        "beforeL2": 131625,
+        "afterL2": 131625,
+        "beforeAssumedL2": 1220,
+        "afterAssumedL2": 1220,
+        "shared": 152561,
+        "sharedBeforeL2": 131625,
+        "sharedAfterL2": 131625,
+        "lostSites": 0,
+        "newSites": 0,
+        "withdrawals": 0,
+        "definiteChanges": 0,
+        "checkoutSymbols": 26243,
+        "symbolKeysMatch": true,
+        "gainsByProof": {}
+      }
+    ],
+    "exclusions": [
+      {
+        "pin": "honojs/hono",
+        "original": 525,
+        "routes": [
+          {
+            "reason": "bundler-config-unverified",
+            "manifest": "package.json",
+            "config": "tsconfig.build.json",
+            "output": "dist/types/index.d.ts",
+            "links": 316
+          },
+          {
+            "reason": "bundler-config-unverified",
+            "manifest": "package.json",
+            "config": "tsconfig.build.json",
+            "output": "dist/types/utils/encode.d.ts",
+            "links": 17
+          },
+          {
+            "reason": "bundler-config-unverified",
+            "manifest": "package.json",
+            "config": "tsconfig.build.json",
+            "output": "dist/types/types.d.ts",
+            "links": 73
+          },
+          {
+            "reason": "bundler-config-unverified",
+            "manifest": "package.json",
+            "config": "tsconfig.build.json",
+            "output": "dist/types/helper/websocket/index.d.ts",
+            "links": 41
+          },
+          {
+            "reason": "bundler-config-unverified",
+            "manifest": "package.json",
+            "config": "tsconfig.build.json",
+            "output": "dist/types/helper/streaming/index.d.ts",
+            "links": 9
+          },
+          {
+            "reason": "bundler-config-unverified",
+            "manifest": "package.json",
+            "config": "tsconfig.build.json",
+            "output": "dist/types/helper/ssg/index.d.ts",
+            "links": 8
+          },
+          {
+            "reason": "bundler-config-unverified",
+            "manifest": "package.json",
+            "config": "tsconfig.build.json",
+            "output": "dist/types/helper/cookie/index.d.ts",
+            "links": 17
+          },
+          {
+            "reason": "bundler-config-unverified",
+            "manifest": "package.json",
+            "config": "tsconfig.build.json",
+            "output": "dist/types/middleware/body-limit/index.d.ts",
+            "links": 6
+          },
+          {
+            "reason": "bundler-config-unverified",
+            "manifest": "package.json",
+            "config": "tsconfig.build.json",
+            "output": "dist/types/middleware/serve-static/index.d.ts",
+            "links": 12
+          },
+          {
+            "reason": "bundler-config-unverified",
+            "manifest": "package.json",
+            "config": "tsconfig.build.json",
+            "output": "dist/types/helper/conninfo/index.d.ts",
+            "links": 20
+          },
+          {
+            "reason": "bundler-config-unverified",
+            "manifest": "package.json",
+            "config": "tsconfig.build.json",
+            "output": "dist/types/middleware/basic-auth/index.d.ts",
+            "links": 6
+          }
+        ]
+      },
+      {
+        "pin": "withastro/astro",
+        "original": 1220,
+        "routes": [
+          {
+            "reason": "marked",
+            "manifest": "packages/integrations/markdoc/package.json",
+            "config": "packages/integrations/markdoc/tsconfig.build.json",
+            "output": "packages/integrations/markdoc/dist/index.d.ts",
+            "links": 75
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/integrations/react/package.json",
+            "config": "packages/integrations/react/tsconfig.build.json",
+            "output": "packages/integrations/react/dist/index.d.ts",
+            "links": 186
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/integrations/vue/package.json",
+            "config": "packages/integrations/vue/tsconfig.build.json",
+            "output": "packages/integrations/vue/dist/index.d.ts",
+            "links": 123
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/integrations/preact/package.json",
+            "config": "packages/integrations/preact/tsconfig.build.json",
+            "output": "packages/integrations/preact/dist/index.d.ts",
+            "links": 142
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/integrations/node/package.json",
+            "config": "packages/integrations/node/tsconfig.build.json",
+            "output": "packages/integrations/node/dist/index.d.ts",
+            "links": 66
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/integrations/svelte/package.json",
+            "config": "packages/integrations/svelte/tsconfig.build.json",
+            "output": "packages/integrations/svelte/dist/index.d.ts",
+            "links": 128
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/integrations/markdoc/package.json",
+            "config": "packages/integrations/markdoc/tsconfig.build.json",
+            "output": "packages/integrations/markdoc/dist/config.d.ts",
+            "links": 88
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/integrations/cloudflare/package.json",
+            "config": "packages/integrations/cloudflare/tsconfig.build.json",
+            "output": "packages/integrations/cloudflare/dist/index.d.ts",
+            "links": 138
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/integrations/solid/package.json",
+            "config": "packages/integrations/solid/tsconfig.build.json",
+            "output": "packages/integrations/solid/dist/index.d.ts",
+            "links": 72
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/integrations/vercel/package.json",
+            "config": "packages/integrations/vercel/tsconfig.build.json",
+            "output": "packages/integrations/vercel/dist/index.d.ts",
+            "links": 72
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/integrations/alpinejs/package.json",
+            "config": "packages/integrations/alpinejs/tsconfig.build.json",
+            "output": "packages/integrations/alpinejs/dist/index.d.ts",
+            "links": 12
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/integrations/netlify/package.json",
+            "config": "packages/integrations/netlify/tsconfig.build.json",
+            "output": "packages/integrations/netlify/dist/index.d.ts",
+            "links": 33
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/renderers/svelte/package.json",
+            "config": "packages/renderers/svelte/tsconfig.build.json",
+            "output": "packages/renderers/svelte/dist/index.d.ts",
+            "links": 3
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/markdown/remark/package.json",
+            "config": "packages/markdown/remark/tsconfig.build.json",
+            "output": "packages/markdown/remark/dist/index.d.ts",
+            "links": 6
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/vite-plugin-astro/package.json",
+            "config": "packages/vite-plugin-astro/tsconfig.build.json",
+            "output": "packages/vite-plugin-astro/dist/index.d.ts",
+            "links": 24
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/renderers/react/package.json",
+            "config": "packages/renderers/react/tsconfig.build.json",
+            "output": "packages/renderers/react/dist/index.d.ts",
+            "links": 9
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/integrations/cloudflare/package.json",
+            "config": "packages/integrations/cloudflare/tsconfig.build.json",
+            "output": "packages/integrations/cloudflare/dist/utils/handler.d.ts",
+            "links": 4
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/integrations/react/package.json",
+            "config": "packages/integrations/react/tsconfig.build.json",
+            "output": "packages/integrations/react/dist/server.d.ts",
+            "links": 6
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/renderers/preact/package.json",
+            "config": "packages/renderers/preact/tsconfig.build.json",
+            "output": "packages/renderers/preact/dist/index.d.ts",
+            "links": 3
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/integrations/cloudflare/package.json",
+            "config": "packages/integrations/cloudflare/tsconfig.build.json",
+            "output": "packages/integrations/cloudflare/dist/cache/index.d.ts",
+            "links": 9
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/integrations/partytown/package.json",
+            "config": "packages/integrations/partytown/tsconfig.build.json",
+            "output": "packages/integrations/partytown/dist/index.d.ts",
+            "links": 3
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/markdown/satteri/package.json",
+            "config": "packages/markdown/satteri/tsconfig.build.json",
+            "output": "packages/markdown/satteri/dist/index.d.ts",
+            "links": 6
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/astro-rss/package.json",
+            "config": "packages/astro-rss/tsconfig.build.json",
+            "output": "packages/astro-rss/dist/index.d.ts",
+            "links": 3
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/integrations/vue/package.json",
+            "config": "packages/integrations/vue/tsconfig.build.json",
+            "output": "packages/integrations/vue/dist/server.d.ts",
+            "links": 2
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/astro-prism/package.json",
+            "config": "packages/astro-prism/tsconfig.build.json",
+            "output": "packages/astro-prism/dist/highlighter.d.ts",
+            "links": 1
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/renderers/solid-js/package.json",
+            "config": "packages/renderers/solid-js/tsconfig.build.json",
+            "output": "packages/renderers/solid-js/dist/index.d.ts",
+            "links": 3
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/renderers/vue/package.json",
+            "config": "packages/renderers/vue/tsconfig.build.json",
+            "output": "packages/renderers/vue/dist/index.d.ts",
+            "links": 3
+          }
+        ]
+      },
+      {
+        "pin": "mermaid-js/mermaid",
+        "original": 66,
+        "routes": [
+          {
+            "reason": "marked",
+            "manifest": "packages/mermaid/package.json",
+            "config": "packages/mermaid/tsconfig.json",
+            "output": "packages/mermaid/dist/mermaid.d.ts",
+            "links": 66
+          }
+        ]
+      },
+      {
+        "pin": "excalidraw/excalidraw",
+        "original": 80,
+        "routes": [
+          {
+            "reason": "marked",
+            "manifest": "packages/excalidraw/package.json",
+            "config": "packages/excalidraw/tsconfig.json",
+            "output": "packages/excalidraw/dist/types/excalidraw/types.d.ts",
+            "links": 60
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/excalidraw/package.json",
+            "config": "packages/excalidraw/tsconfig.json",
+            "output": "packages/excalidraw/dist/types/excalidraw/index.d.ts",
+            "links": 16
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/excalidraw/package.json",
+            "config": "packages/excalidraw/tsconfig.json",
+            "output": "packages/excalidraw/dist/types/excalidraw/data/types.d.ts",
+            "links": 3
+          },
+          {
+            "reason": "marked",
+            "manifest": "packages/common/package.json",
+            "config": "packages/common/tsconfig.json",
+            "output": "packages/common/dist/types/common/src/index.d.ts",
+            "links": 1
+          }
+        ]
+      }
+    ],
+    "provenance": [
+      {
+        "pin": "changesets/changesets",
+        "marked": 0,
+        "checkoutTargets": 0
+      },
+      {
+        "pin": "dexie/Dexie.js",
+        "marked": 0,
+        "checkoutTargets": 0
+      },
+      {
+        "pin": "excalidraw/excalidraw",
+        "marked": 80,
+        "checkoutTargets": 80
+      },
+      {
+        "pin": "honojs/hono",
+        "marked": 0,
+        "checkoutTargets": 0
+      },
+      {
+        "pin": "mermaid-js/mermaid",
+        "marked": 67,
+        "checkoutTargets": 66
+      },
+      {
+        "pin": "nestjs/nest",
+        "marked": 0,
+        "checkoutTargets": 0
+      },
+      {
+        "pin": "oclif/core",
+        "marked": 0,
+        "checkoutTargets": 0
+      },
+      {
+        "pin": "pmndrs/zustand",
+        "marked": 0,
+        "checkoutTargets": 0
+      },
+      {
+        "pin": "puppeteer/puppeteer",
+        "marked": 0,
+        "checkoutTargets": 0
+      },
+      {
+        "pin": "react-hook-form/react-hook-form",
+        "marked": 0,
+        "checkoutTargets": 0
+      },
+      {
+        "pin": "reduxjs/redux-toolkit",
+        "marked": 0,
+        "checkoutTargets": 0
+      },
+      {
+        "pin": "trpc/trpc",
+        "marked": 0,
+        "checkoutTargets": 0
+      },
+      {
+        "pin": "vitejs/vite",
+        "marked": 0,
+        "checkoutTargets": 0
+      },
+      {
+        "pin": "vitest-dev/vitest",
+        "marked": 0,
+        "checkoutTargets": 0
+      },
+      {
+        "pin": "withastro/astro",
+        "marked": 1222,
+        "checkoutTargets": 1220
+      },
+      {
+        "pin": "yargs/yargs",
+        "marked": 0,
+        "checkoutTargets": 0
+      }
+    ],
+    "cost": {
+      "before": [
+        {
+          "pin": "honojs/hono",
+          "cold": {
+            "code": 0,
+            "wallSeconds": 172.903,
+            "peakRssKiB": 1747776,
+            "cpuSeconds": 204.88,
+            "status": "ok"
+          },
+          "outcome": "finished"
+        },
+        {
+          "pin": "mermaid-js/mermaid",
+          "cold": {
+            "code": 0,
+            "wallSeconds": 363.338,
+            "peakRssKiB": 2946484,
+            "cpuSeconds": 402.79999999999995,
+            "status": "ok"
+          },
+          "outcome": "finished"
+        }
+      ],
+      "after": [
+        {
+          "pin": "honojs/hono",
+          "cold": {
+            "wallSeconds": 157.22,
+            "cpuSeconds": 177.48000000000002,
+            "peakRssKiB": 1862212,
+            "exitCode": 0,
+            "status": "ok"
+          },
+          "warm": {
+            "wallSeconds": 9.916,
+            "cpuSeconds": 11.280000000000001,
+            "peakRssKiB": 577904,
+            "exitCode": 0,
+            "status": "ok",
+            "unchanged": 460
+          },
+          "outcome": "finished"
+        },
+        {
+          "pin": "mermaid-js/mermaid",
+          "cold": {
+            "wallSeconds": 406.581,
+            "cpuSeconds": 412.52,
+            "peakRssKiB": 2773308,
+            "exitCode": 0,
+            "status": "ok"
+          },
+          "warm": {
+            "wallSeconds": 22.318,
+            "cpuSeconds": 27.12,
+            "peakRssKiB": 860628,
+            "exitCode": 0,
+            "status": "ok",
+            "unchanged": 1240
+          },
+          "outcome": "finished"
+        },
+        {
+          "pin": "vitest-dev/vitest",
+          "cold": {
+            "wallSeconds": 375.887,
+            "cpuSeconds": 408.73,
+            "peakRssKiB": 3154964,
+            "exitCode": 2,
+            "status": "incomplete"
+          },
+          "warm": {
+            "wallSeconds": 18.371,
+            "cpuSeconds": 22.14,
+            "peakRssKiB": 921452,
+            "exitCode": 2,
+            "status": "incomplete",
+            "unchanged": 2490
+          },
+          "outcome": "finished"
+        }
+      ]
+    }
+  }
+}

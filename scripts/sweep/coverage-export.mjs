@@ -396,6 +396,8 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys, pre
     const reviewSites = {};
     const reviewOverlap = new Set();
     const workspaceMisses = new Map();
+    let unbuiltWorkspaceLinks = 0;
+    let unbuiltWorkspaceAssumedLinks = 0;
     const librarySites = new Map();
     const omissions = new Map();
     const failed = new Map();
@@ -470,6 +472,10 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys, pre
       };
       for (const row of getLinks.iterate(file.path)) {
         const link = { ...JSON.parse(row.body), module: row.module, moduleVersion: file.moduleVersion, kind: row.kind, resolution: row.resolution };
+        const unbuilt = row.module === "typescript" &&
+          link.data?.assumes?.includes("ts-unbuilt-entry-is-compiler-emit");
+        if (row.module === "typescript" && row.resolution === "resolved" && !unbuilt &&
+            typeof link.data?.unbuiltEntry?.build === "string") unbuiltWorkspaceLinks++;
         if (row.resolution === "library") link.library = storedLibrary?.get(row.id);
         if (quotas && link.range && !["contains", "receiver"].includes(link.kind)) {
           if (link.kind !== "calls" || file.module === "typescript") observedSites.add(link.range.start);
@@ -482,6 +488,8 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys, pre
         }
         const disposition = classify(link, evidence, project);
         const library = externalIdentity(link, evidence, project, disposition);
+        if (unbuilt && (row.resolution === "resolved" || library?.level === 2))
+          unbuiltWorkspaceAssumedLinks++;
         const tsReason = link.data?.reasonWithoutConfig ?? link.data?.reason;
         const tsExternal = link.module === "typescript" && link.resolution === "unresolved" &&
           (link.data?.reason === "external-package" || workspaceEntryMissing(tsReason));
@@ -663,6 +671,7 @@ function scanRepo(scratch, repo, readers, referenceFiles, quotas, goMapKeys, pre
     if (!storedTotalsAgree(rows, warm)) throw Error(`Stored link totals disagree with released CLI for ${repo.id}`);
     return { audit: { id: repo.id, language: repo.language, commit: repo.commit, outcome: repo.outcome,
       ...(repo.install && { install: repo.install }),
+      ...(repo.language === "typescript" && { unbuiltWorkspaceLinks, unbuiltWorkspaceAssumedLinks }),
       trackedSource: repo.trackedSource, breakdown: rows, sourceFiles: [...sourceFiles.values()],
       failedSources: [...failed.values()].map(({ examples, ...record }) => record), strata, reviewSites,
       ...(other ? { shared } : {}),

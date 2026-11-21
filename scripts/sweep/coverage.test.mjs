@@ -24,7 +24,7 @@ test("assumed Level 2 links remain in the total and are counted separately", () 
   assert.equal(score.assumedLevel2, 5);
 });
 
-test("one committed sweep regenerates the complete coverage plan byte for byte", () => {
+test("the committed sweep and TypeScript replay regenerate the coverage plan byte for byte", () => {
   const root = fileURLToPath(new URL("../..", import.meta.url));
   const checkedIn = readFileSync(join(root, "docs/coverage-plan.md"));
   const scratch = mkdtempSync(join(tmpdir(), "pymtheg-coverage-plan-"));
@@ -36,6 +36,8 @@ test("one committed sweep regenerates the complete coverage plan byte for byte",
   try {
     execFileSync(process.execPath, ["scripts/sweep/coverage.mjs", "--results", input,
       "--plan", plan, "--attempts", attempts, "--item-changes", itemChanges], { cwd: root });
+    execFileSync(process.execPath, ["evidence/c-25/plan-refresh.mjs",
+      "evidence/c-25/coverage-plan-input.json.gz", plan], { cwd: root });
     assert.ok(readFileSync(plan).equals(checkedIn), "regenerated coverage plan differs");
     assert.ok(readFileSync(attempts).equals(readFileSync(join(root, "evidence/sw-4/attempts.md"))), "regenerated attempt report differs");
     assert.ok(readFileSync(itemChanges).equals(readFileSync(join(root, "evidence/sw-4/items.md"))), "regenerated item report differs");
@@ -105,14 +107,25 @@ test("installed coverage keeps the bare score when an install failed", () => {
     linkRow("typescript", "resolved", "eligible", resolved),
     linkRow("typescript", "unresolved", "inside", 10 - resolved),
   ] });
-  const a = pin("package/a", 5);
-  const b = pin("package/b", 3);
+  const a = { ...pin("package/a", 5), unbuiltWorkspaceLinks: 2 };
+  const b = { ...pin("package/b", 3), unbuiltWorkspaceLinks: 1 };
   const score = installedCoverage([a, b], { repos: [
-    { ...pin(a.id, 9), install: { manager: "pnpm", status: "installed" } },
+    { ...pin(a.id, 9), unbuiltWorkspaceLinks: 4, install: { manager: "pnpm", status: "installed" } },
     { id: b.id, commit: b.commit, outcome: "install-unavailable", install: { manager: "npm", status: "failed" } },
   ] });
   assert.equal(score.totals, "40.00% bare · 60.00% with installed declarations · 1/2 pins installed and indexed");
   assert.match(score.table, /\| package\/b \| 30\.00% \| 30\.00% \| npm · install-unavailable \|/);
+  assert.deepEqual(score.unbuilt, { bare: 3, installed: 5 });
+  a.unbuiltWorkspaceAssumedLinks = 1;
+  b.unbuiltWorkspaceAssumedLinks = 0;
+  const marked = installedCoverage([a, b], { repos: [
+    { ...pin(a.id, 9), unbuiltWorkspaceAssumedLinks: 2, install: { manager: "pnpm", status: "installed" } },
+    { id: b.id, commit: b.commit, outcome: "install-unavailable", install: { manager: "npm", status: "failed" } },
+  ] });
+  assert.deepEqual(marked.workspace, {
+    bare: "35.00%", installed: "50.00%", bareAssumed: 1, installedAssumed: 2,
+  });
+  assert.match(marked.table, /\| package\/a \| 50\.00% \| 40\.00% \| 90\.00% \| 70\.00% \| pnpm · installed \|/);
 });
 const bucketFor = (reason) => `typescript:${reason}:source:unclassified`;
 const observed = (bucket, links = 1, state = "unresolved") => [{ bucket, links, state }];

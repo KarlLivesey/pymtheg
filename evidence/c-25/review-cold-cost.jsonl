@@ -1,0 +1,6 @@
+{"pin":"pmndrs/zustand","label":"main","status":"ok","code":0,"wallSeconds":14.941,"peakRssKiB":670928,"cpuSeconds":22.17}
+{"pin":"pmndrs/zustand","label":"candidate","status":"ok","code":0,"wallSeconds":14.385,"peakRssKiB":616852,"cpuSeconds":21.35}
+{"pin":"pmndrs/zustand","label":"main-repeat","status":"ok","code":0,"wallSeconds":14.1,"peakRssKiB":677808,"cpuSeconds":19.939999999999998}
+{"pin":"dexie/Dexie.js","label":"main","status":"ok","code":0,"wallSeconds":101.111,"peakRssKiB":1081608,"cpuSeconds":97.46000000000001}
+{"pin":"dexie/Dexie.js","label":"candidate","status":"ok","code":0,"wallSeconds":104.895,"peakRssKiB":1170504,"cpuSeconds":97.27}
+{"pin":"dexie/Dexie.js","label":"main-repeat","status":"ok","code":0,"wallSeconds":63.097,"peakRssKiB":1111188,"cpuSeconds":79.87}

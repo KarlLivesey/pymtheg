@@ -102,6 +102,42 @@ Bare ceiling estimate **86.01%–100.00%**. Of missing links, 1.33%–2.87% have
 
 ### TypeScript / JavaScript
 
+<!-- C-25 TypeScript replay start -->
+#### C-25 workspace entry replay
+
+This repeat covers the 18 primary TypeScript pins. The inventory and ceiling below come from the full SW-4 baseline and its fixed review sample.
+
+Through an unbuilt workspace entry, plain tsc build · 0 bare · 0 installed.
+
+The unbuilt workspace entry assumption accounts for 1,330 bare and 1,366 installed Level 2 links. Pins without a completed installed graph contribute their bare score. See the [C-25 change note](changes/C-25.md) for the exclusions and per-pin comparison.
+
+71.09% bare · 82.57% with installed declarations · 16/18 pins installed and indexed
+
+Excluding `ts-unbuilt-entry-is-compiler-emit` · 71.00% bare · 82.47% installed.
+
+| Pin | Bare Level 2 | Bare without entry assumption | Installed Level 2 | Installed without entry assumption | Installation |
+| --- | ---: | ---: | ---: | ---: | --- |
+| changesets/changesets | 20.15% | 20.15% | 86.99% | 86.99% | pnpm · installed |
+| colinhacks/zod | 83.86% | 83.86% | 83.86% | 83.86% | unsupported-package-manager |
+| dexie/Dexie.js | 54.73% | 54.73% | 56.33% | 56.33% | pnpm · installed |
+| excalidraw/excalidraw | 71.98% | 71.93% | 93.92% | 93.85% | yarn · installed |
+| honojs/hono | 58.24% | 58.24% | 64.15% | 64.15% | pnpm · installed |
+| mermaid-js/mermaid | 75.39% | 75.34% | 89.23% | 89.18% | pnpm · installed |
+| nestjs/nest | 74.78% | 74.78% | 91.55% | 91.55% | npm · installed |
+| oclif/core | 85.77% | 85.77% | 95.07% | 95.07% | yarn · installed |
+| pingdotgg/t3code | 72.34% | 72.34% | 72.34% | 72.34% | unsupported-package-manager |
+| pmndrs/zustand | 66.78% | 66.78% | 82.70% | 82.70% | pnpm · installed |
+| puppeteer/puppeteer | 64.56% | 64.56% | 78.01% | 78.01% | npm · installed |
+| react-hook-form/react-hook-form | 44.92% | 44.92% | 75.55% | 75.55% | pnpm · installed |
+| reduxjs/redux-toolkit | 63.87% | 63.87% | 80.13% | 80.13% | pnpm · installed |
+| trpc/trpc | 73.02% | 73.02% | 88.87% | 88.87% | pnpm · installed |
+| vitejs/vite | 71.19% | 71.19% | 82.48% | 82.48% | pnpm · installed |
+| vitest-dev/vitest | 77.21% | 77.21% | 82.40% | 82.40% | pnpm · installed |
+| withastro/astro | 77.77% | 76.97% | 86.28% | 85.48% | pnpm · installed |
+| yargs/yargs | 42.45% | 42.45% | 52.65% | 52.65% | npm · installed |
+
+<!-- C-25 TypeScript replay end -->
+
 Bare ceiling estimate **75.13%–84.83%**. Of missing links, 11.29%–17.21% have no static answer (95% bounds 0.00%–29.79%) and 49.96%–55.88% need material outside the checkout (95% bounds 37.37%–68.47%). The review could not classify 8 of 150 sampled links for the ceiling.
 
 Counts are bare / installed declarations.
