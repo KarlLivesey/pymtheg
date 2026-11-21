@@ -12,8 +12,9 @@ build. All paths in the published rows are relative to the pinned checkout.
 - [Diagnosis](diagnosis.jsonl.gz) contains one JSON array per selected stored
   link. The fields are pin, file, line, column, start and end offsets, method,
   first reason, matching reasons, receiver class, target evidence, typing gap,
-  named receiver types, library producer paths and checkout method candidates.
-  The raw resolver trace and source excerpts stay in scratch.
+  named receiver types, library producer paths, checkout method candidates,
+  full stored reasons and the follow-up evidence for prefix, macro, callee or
+  chain counts. The raw resolver trace and source excerpts stay in scratch.
 - [Source review](source-review.tsv) identifies the ten reviewed links in each
   cell having at least 400 links. The sample ranks hash the pin, commit and
   site with `c31-diagnosis-v1`.

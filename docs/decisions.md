@@ -2826,7 +2826,11 @@ See [C-29](changes/C-29.md).
 
 A library receiver type can name a method when a shipped declaration proves
 an inherent method at the exact first receiver form. The catalog records the
-receiver form, argument count and minimum edition that guarantees availability.
+receiver form, argument count and minimum Rust release that supplies the
+declaration in `core`. The crate edition and any declared package
+`rust-version` supply the lower bound on the compiler version. The larger
+bound applies. Compiler fixtures check core ownership in `no_std` crates
+down to Rust 1.31 for edition 2015.
 User-defined aliases and library paths are resolved where the type is written.
 The method points to its declaration in `core` with `declaring-owner` evidence.
 A direct literal carries only its syntax-defined type. Later probes and trait

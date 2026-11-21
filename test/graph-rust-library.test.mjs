@@ -159,6 +159,71 @@ test("core inherent dot calls need a proven receiver and first probe", async () 
   assert.deepEqual(lookup("calls", "switching.choose"), [null, null]);
 });
 
+test("core method ownership follows the Cargo compiler floor", async (t) => {
+  const source = `#![no_std]
+    trait FloatExtension { fn abs(self) -> f32; }
+    impl FloatExtension for f32 { fn abs(self) -> f32 { self } }
+    fn calls(a: f32, b: f64, text: &str) {
+      a.abs();
+      b.signum();
+      text.len();
+      1f32.max(2.0);
+      1f64.max(2.0);
+      0xff32.max(2);
+    }`;
+  for (const [label, cargo, coreFloats, coreStr] of [
+    ["2021", manifest(), false, true],
+    ["1.83", manifest("2021", 'rust-version="1.83"'), false, true],
+    ["1.85", manifest("2021", 'rust-version="1.85.0"'), true, true],
+    ["2024", manifest("2024"), true, true],
+    ["2015", manifest("2015"), false, false],
+    ["1.27", manifest("2015", 'rust-version="1.27"'), false, true],
+  ])
+    await t.test(label, async (t) => {
+      const store = await indexFixture(t, {
+        "Cargo.toml": cargo,
+        "src/lib.rs": source,
+      });
+      const links = store.links();
+      function check(call, symbol, available) {
+        const link = links.find(
+          (l) => l.kind === "calls" && l.targetName === call,
+        );
+        assert.ok(link, call);
+        if (available) {
+          assert.equal(link.resolution, "library", call);
+          assert.equal(link.libraries[0].unit, "core", call);
+          assert.equal(link.libraries[0].symbol, symbol, call);
+        } else {
+          assert.equal(link.resolution, "unresolved", call);
+          assert.match(
+            link.data.uncertainty,
+            /^core-method-owner-version-unverified\b/,
+            call,
+          );
+        }
+      }
+      check("a.abs", "f32::abs", coreFloats);
+      check("b.signum", "f64::signum", coreFloats);
+      check("text.len", "str::len", coreStr);
+      check("1f32.max", "f32::max", true);
+      check("1f64.max", "f64::max", true);
+      assert.equal(
+        links.find((l) => l.targetName === "0xff32.max").resolution,
+        "unresolved",
+      );
+    });
+  const lookup = await graph(
+    { "member/src/lib.rs": source },
+    {
+      "Cargo.toml":
+        '[workspace]\nmembers=["member"]\n[workspace.package]\nrust-version="1.85"\n',
+      "member/Cargo.toml": manifest("2021", "rust-version.workspace=true"),
+    },
+  );
+  assert.equal(lookup("calls", "a.abs")[0]?.symbol, "f32::abs");
+});
+
 test("library paths, imports, preludes, Cargo aliases and version sources", async () => {
   const lookup = await graph(
     {

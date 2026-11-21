@@ -2131,7 +2131,9 @@ async function createHelper(): Promise<Helper> {
                   receiver.text.startsWith("'")
                 ? "char"
                 : receiver.type === "integer_literal"
-                  ? /([ui](?:8|16|32|64|128|size))$/.exec(receiver.text)?.[1]
+                  ? (/([ui](?:8|16|32|64|128|size))$/.exec(
+                      receiver.text,
+                    )?.[1] ?? /^\d[\d_]*(f32|f64)$/.exec(receiver.text)?.[1])
                   : receiver.type === "float_literal"
                     ? /(f32|f64)$/.exec(receiver.text)?.[1]
                     : undefined;

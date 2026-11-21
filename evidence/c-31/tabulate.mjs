@@ -21,8 +21,18 @@ if (pins.length !== 10 || pins.some((p) => p.outcome !== "finished"))
 const cells = new Map();
 const samples = new Map();
 const totals = {};
+const followup = {
+  associated: {},
+  macroArgument: {},
+  unresolvedCall: {},
+  chain: {},
+};
+const asserts = /(?:^|::)(?:debug_)?assert(?:_eq|_ne)?!?$/;
 const increment = (counts, key) => (counts[key] = (counts[key] ?? 0) + 1);
-const escape = (value) => String(value ?? "").replace(/\s+/g, " ").trim() || "-";
+const escape = (value) =>
+  String(value ?? "")
+    .replace(/\s+/g, " ")
+    .trim() || "-";
 const tsv = (name, rows) =>
   writeFileSync(
     join(output, name),
@@ -56,6 +66,54 @@ for (const pin of pins) {
       increment(totals, "no receiver recipe in macro arguments");
     if (r.lateTraits)
       increment(totals, "checkout trait name is only a later form");
+    if (
+      r.category === "associated path" &&
+      r.target === "method owner unknown"
+    ) {
+      const counts = followup.associated;
+      increment(counts, "links");
+      if (r.spelling.lastIndexOf("::") > 0) increment(counts, "written prefix");
+      const opaque = "opaque-item-may-shadow-name";
+      if (r.storedReasons.includes(opaque)) {
+        increment(counts, "opaque reason");
+        const other = r.storedReasons.filter(
+          (x) => x && x !== opaque && x !== "path-type-unverified",
+        );
+        if (!other.length) increment(counts, "opaque with no other reason");
+        if (other.every((x) => x === "too-many-targets"))
+          increment(counts, "opaque with no other blocker");
+      }
+    }
+    if (r.category === "no receiver recipe") {
+      const counts = followup.macroArgument;
+      increment(counts, "links");
+      if (r.details.macroArgument) increment(counts, "macro argument");
+      if (r.details.macroHeads.some((head) => asserts.test(head)))
+        increment(counts, "assert family spelling");
+      if (r.details.macroTargets.some((head) => head && asserts.test(head)))
+        increment(counts, "assert family sysroot target");
+    }
+    if (r.category === "unresolved call result") {
+      const counts = followup.unresolvedCall;
+      increment(counts, "links");
+      if (r.recipe?.k === "p") {
+        const name = r.recipe.p.split("::").at(-1);
+        if (r.recipe.p.includes("::") && ["from", "default"].includes(name))
+          increment(counts, name);
+      }
+    }
+    if (r.category === "method chain") {
+      const counts = followup.chain;
+      increment(counts, "links");
+      if (r.gap) increment(counts, "gap: " + r.gap);
+      const stops = [...new Set(r.details.chainStops)];
+      increment(
+        counts,
+        stops.length > 1
+          ? "different placements"
+          : (stops[0] ?? "no placement"),
+      );
+    }
     const record = [
       r.id,
       r.file,
@@ -78,6 +136,28 @@ for (const pin of pins) {
         name,
         receiver,
       })),
+      r.storedReasons,
+      {
+        ...(r.category === "no receiver recipe"
+          ? {
+              macroHeads: r.details.macroHeads,
+              macroTargets: r.details.macroTargets,
+            }
+          : {}),
+        ...(r.category === "unresolved call result"
+          ? {
+              selfReturnSpelling: /::(from|default)$/.exec(
+                r.recipe?.p ?? "",
+              )?.[1],
+            }
+          : {}),
+        ...(r.category === "associated path"
+          ? { writtenPrefix: r.spelling.lastIndexOf("::") > 0 }
+          : {}),
+        ...(r.category === "method chain"
+          ? { chainStops: r.details.chainStops }
+          : {}),
+      },
     ];
     if (!compressed.write(JSON.stringify(record) + "\n"))
       await once(compressed, "drain");
@@ -141,6 +221,10 @@ for (const { key, values, total } of richest) {
 }
 tsv("cross-table.tsv", table);
 tsv("source-review.tsv", review);
+writeFileSync(
+  join(output, "diagnosis-followup.json"),
+  JSON.stringify(followup, null, 2) + "\n",
+);
 writeFileSync(
   join(output, "diagnosis-counts.json"),
   JSON.stringify({ pinsByReason, totals }, null, 2) + "\n",

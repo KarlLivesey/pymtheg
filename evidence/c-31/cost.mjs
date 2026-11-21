@@ -5,17 +5,24 @@ import { join } from "node:path";
 
 const root = process.env.PYM_SCRATCH;
 const manifest = JSON.parse(readFileSync(join(root, "main.json"), "utf8"));
+const crossbeam = process.argv.includes("--crossbeam");
+const pins = crossbeam
+  ? ["crossbeam-rs/crossbeam"]
+  : ["cberner/redb", "fjall-rs/fjall"];
+const runs = crossbeam
+  ? ["main-a", "candidate-a", "main-b", "candidate-b"]
+  : ["main-a", "candidate", "main-b"];
 const out = [];
-for (const id of ["cberner/redb", "fjall-rs/fjall"]) {
+for (const id of pins) {
   const pin = manifest.repos.find((p) => p.id === id);
   const source = join(root, "main", pin.attempt, "checkout");
-  for (const run of ["main-a", "candidate", "main-b"]) {
+  for (const run of runs) {
     const dir = join(root, "cost-paired", id.split("/")[1], run);
     mkdirSync(dir, { recursive: true });
     const checkout = join(dir, "checkout");
     const entry = join(
       root,
-      run === "candidate" ? "final-build" : "main-build",
+      run.startsWith("candidate") ? "final-build" : "main-build",
       "dist/cli/main.js",
     );
     const env = { ...process.env, NODE_OPTIONS: "", GIT_TERMINAL_PROMPT: "0" };
@@ -80,7 +87,7 @@ for (const id of ["cberner/redb", "fjall-rs/fjall"]) {
     out.push(row);
     console.log(JSON.stringify(row));
     writeFileSync(
-      join(root, "cost-paired.json"),
+      join(root, crossbeam ? "cost-crossbeam.json" : "cost-paired.json"),
       JSON.stringify(out, null, 2) + "\n",
     );
   }

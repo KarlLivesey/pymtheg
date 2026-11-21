@@ -34,6 +34,7 @@ import type {
 } from "../../types.js";
 import { crates, type Crate } from "./cargo.js";
 import {
+  compilerFloor,
   coreMethod,
   coreMethodNames,
   primitiveReceiver,
@@ -6541,7 +6542,10 @@ export function resolveRust(
       ? { owner: target.symbol!, borrow }
       : undefined;
   }
-  function coreMethodFor(l: GraphLink, d: Data): LibraryTarget | undefined {
+  function coreMethodFor(
+    l: GraphLink,
+    d: Data,
+  ): LibraryTarget | "core-method-owner-version-unverified" | undefined {
     const name = str(d.method);
     const literal = str(d.receiverLiteralType);
     const written = str(d.receiverType);
@@ -6598,19 +6602,26 @@ export function resolveRust(
       // At the first probe, an applicable inherent method wins over traits.
       // A borrow, reborrow, or deref to another receiver form needs its own
       // proof of what Rust would find at the earlier steps.
-      return (
-        receiver &&
-        coreMethod(receiver.owner, name, receiver.borrow, edition, arity)
-      );
+      if (!receiver) return;
+      const method = coreMethod(receiver.owner, name, receiver.borrow, arity);
+      if (method)
+        return {
+          symbol: method.symbol,
+          available:
+            compilerFloor(edition, loc.crate.rustVersionMinor) >= method.since,
+        };
     });
-    const symbol = targets[0];
-    if (symbol && targets.every((t) => t === symbol))
+    const symbol = targets[0]?.symbol;
+    if (symbol && targets.every((t) => t?.symbol === symbol)) {
+      if (targets.some((t) => !t?.available))
+        return "core-method-owner-version-unverified";
       return {
         ecosystem: "rust-std",
         unit: "core",
         symbol,
         evidence: "declaring-owner",
       };
+    }
   }
   const attributesByStart = new Map<string, GraphLink[]>();
   for (const l of ctx.links) {
@@ -7682,7 +7693,12 @@ export function resolveRust(
       !found.reason.includes("failed-file-unseen-declarations")
     ) {
       const library = coreMethodFor(l, d);
-      if (library) {
+      if (typeof library === "string") {
+        found = {
+          ...found,
+          reason: found.reason.replace("receiver-type-unverified", library),
+        };
+      } else if (library) {
         resolutions.push({ linkId: l.id, library });
         continue;
       }

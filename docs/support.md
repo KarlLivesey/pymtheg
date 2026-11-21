@@ -510,8 +510,11 @@ makes that whole manifest unknown). Private items are ordinary symbols.
   Rust sources. A listed method is definite when the receiver is proved and
   its exact form reaches that inherent declaration at the first probe.
   The catalog covers selected primitive, `Option` and `Result` methods whose
-  impl applies to all type arguments. It requires the corresponding compiler
-  availability from the crate edition and records the declaration in `core`.
+  impl applies to all type arguments. Each entry records the Rust version
+  that first supplied the declaration in `core`. The compiler floor is the
+  higher of the edition's minimum and the package's declared `rust-version`,
+  including workspace inheritance. A floor below the entry's version leaves
+  `core-method-owner-version-unverified`.
   A competing type binding, opaque scope, or build that could omit `core`
   withholds the proof. Trait selection, autoref and deref still require
   separate probe proofs.

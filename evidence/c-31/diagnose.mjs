@@ -40,7 +40,7 @@ code = patch(
   code,
   "    return resolutions;",
   `    globalThis.c31.finish(({text, loc, scope, kind}) =>
-      libraryAt({kind, targetName:text}, {}, loc, scope));
+      libraryAt({kind, targetName:text}, {}, loc, scope), typing);
     return resolutions;`,
 );
 code = patch(
@@ -100,16 +100,17 @@ for (const pin of main.repos) {
     db,
     "SELECT body FROM graph_symbols WHERE json_extract(body,'$.module') = 'rust' ORDER BY file,id",
   );
-  const definiteLibrary = new Set(
+  const definiteLibrary = new Map(
     db
       .prepare(
-        "SELECT link FROM graph_library_targets WHERE role='target' AND symbol IS NOT NULL",
+        "SELECT link, ecosystem, unit, symbol FROM graph_library_targets WHERE role='target' AND symbol IS NOT NULL",
       )
       .all()
-      .map((r) => r.link),
+      .map((r) => [r.link, r]),
   );
   const links = [];
   const selected = new Map();
+  const macroSites = new Map();
   for (const row of db
     .prepare(
       "SELECT id,body,resolution,target FROM graph_links WHERE module='rust' ORDER BY file,id",
@@ -117,6 +118,8 @@ for (const pin of main.repos) {
     .iterate()) {
     const l = JSON.parse(row.body);
     links.push(l);
+    if (l.kind === "macros" && !l.data?.libraryMacroFlavor)
+      macroSites.set(`${l.file}|${l.range.start}`, definiteLibrary.get(l.id));
     const all = (l.data?.uncertainty ?? l.data?.reason ?? "").split(/;\s*/);
     const found = all.filter((r) => reasons.has(r));
     if (!row.target && !definiteLibrary.has(row.id) && found.length)
@@ -126,7 +129,7 @@ for (const pin of main.repos) {
   let active;
   let traitForms;
   const probeCache = new Map();
-  let probe;
+  let probe, typeRecipe;
   globalThis.c31 = {
     site(l) {
       active = selected.get(l.id);
@@ -169,11 +172,13 @@ for (const pin of main.repos) {
         last.inherent = inherent;
       }
     },
-    finish(callback) {
+    finish(callback, typing) {
       probe = callback;
+      typeRecipe = typing;
     },
   };
   resolveRust({ projectId, symbols, links, contextFiles, files }, () => {});
+  active = undefined;
   // Lookup in the same snapshot, with normal shadowing and placement rules.
   // This establishes a receiver or callee path, never the method's declaring owner.
   const library = (text, trace, kind = "types", scope = trace.scope) => {
@@ -365,6 +370,31 @@ for (const pin of main.repos) {
     }
     const target =
       [...targetKinds].sort().join(" + ") || "method owner unknown";
+    const macroHeads = d.macroArgumentNames ?? [];
+    const macroTargets = (d.macroArguments ?? []).map((start) => {
+      const resolution = macroSites.get(`${l.file}|${start}`);
+      return resolution?.ecosystem === "rust-std" ? resolution.symbol : null;
+    });
+    const chainStops = [];
+    if (category === "method chain") {
+      let first = r;
+      for (let child = r.e; child; child = child.e)
+        if (child.k === "m") first = child;
+      for (const { loc, scope } of places) {
+        const site = { file: l.file, scope };
+        const input = typeRecipe(first.e, loc, site);
+        const step = typeRecipe(first, loc, site);
+        chainStops.push(
+          input.gap || input.future
+            ? "before first method"
+            : step.gap
+              ? "first method"
+              : gap
+                ? "later"
+                : "receiver known",
+        );
+      }
+    }
     const cross = category + " | " + target;
     const key = hash([
       "c31-diagnosis-v1",
@@ -386,6 +416,7 @@ for (const pin of main.repos) {
       excerpt,
       reason: all[0],
       reasons: found,
+      storedReasons: all,
       receiver: receiver || undefined,
       gap: gap || undefined,
       recipe: r,
@@ -410,6 +441,9 @@ for (const pin of main.repos) {
           !!t.sameImpl,
         ]),
         macroArgument: !!d.macroArguments,
+        macroHeads,
+        macroTargets,
+        chainStops,
         derived: l.origin === "analysis",
       },
     };
