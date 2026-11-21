@@ -593,6 +593,30 @@ test("loops whose flow analysis returns are not failed", async () => {
   assert.deepEqual(result.report.failed, []);
 });
 
+// microsoft/TypeScript's moduleElementsInWrongContext.ts: a namespace inside
+// a plain block is no symbol, but its members were linked to it as their
+// container, and that one invalid link failed every file of the repository.
+test("members of a namespace inside a block belong to the next container out", async () => {
+  const result = await indexFiles({
+    "block.ts":
+      "{\n  export namespace N {\n    export interface I {}\n  }\n}\n",
+    "other.ts":
+      "function helper() {}\nhelper(); // unrelated-call\nexport {};\n",
+  });
+  assert.deepEqual(result.report.failed, []);
+  const contains = result.links.filter(
+    (l) => l.file === "block.ts" && l.kind === "contains",
+  );
+  assert.deepEqual(
+    contains.map((l) => [l.text, l.resolution, l.target]),
+    [["export interface I {}", "resolved", "block.ts#I"]],
+  );
+  assert.equal(
+    linkOn(result, "other.ts", "unrelated-call", "helper").target,
+    "other.ts#helper",
+  );
+});
+
 test("a file the compiler throws on in a later project is failed for the store, and earlier projects that read it are decided again", async () => {
   const result = await indexFiles(
     {
