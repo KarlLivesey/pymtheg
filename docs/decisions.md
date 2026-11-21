@@ -2808,8 +2808,9 @@ When a crate can build with `no_std`, the resolver can name a `core`
 declaration shared by both edition preludes. This requires the usual lexical,
 import and macro shadowing checks. The source must also establish the
 availability of an implicit prelude. Edition-specific entries use the existing
-prelude table. The spelling of a definite, previously supported `std` path
-is preserved. Explicit imports use their written export when the catalog
+prelude table. A possible `no_core` configuration withholds implicit sysroot
+and prelude targets. The spelling of a definite, previously supported `std`
+path is preserved. Explicit imports use their written export when the catalog
 establishes the export namespace for that library unit. Whole-crate imports
 retain their unit target.
 

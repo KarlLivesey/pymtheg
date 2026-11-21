@@ -563,9 +563,11 @@ makes that whole manifest unknown). Private items are ordinary symbols.
   A replacement with an unproven checkout target leaves the link unresolved.
   Receiver calls still require the declaring owner. When `no_std` can apply,
   an unshadowed prelude name shared with `std` records its declaration in
-  `core`. The standard-library catalog and audited registry releases can
-  verify explicit import namespaces. A re-export uses the public path the
-  import spells. Successfully analysed links below Level 2 carry a stored
+  `core`. When `no_core` can apply, sysroot names need an explicit binding
+  and implicit prelude targets stay open. The standard-library catalog and
+  audited registry releases can verify explicit import namespaces. A
+  re-export uses the public path the import spells. Successfully analysed
+  links below Level 2 carry a stored
   explanation, including whole-crate imports and checkout candidate sets.
 - **Names beside Rust macros.** A withheld path can resolve when every
   relevant expansion has a bounded set of names and that set excludes the

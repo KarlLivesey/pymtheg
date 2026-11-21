@@ -2672,6 +2672,13 @@ export function resolveRust(
       reason: "edition-unverified",
     };
   }
+  function corePreludeUnavailable(loc: Place): boolean {
+    return (
+      (data(units.get(loc.crate.root) ?? {}).noCoreConditions ??
+        []) as string[][]
+    ).some((cs) => possible([...(loc.conditions ?? []), ...cs]));
+  }
+
   function dependencyLookup(
     name: string,
     parts: string[],
@@ -2707,6 +2714,11 @@ export function resolveRust(
             (!implicitRoot2015 || !loc.libraryModuleMember || noStd)) ||
           (name === "std" && !noStd) ||
           (name === "proc_macro" && loc.crate.procMacro));
+      if (standard && !explicit && !libraryProbe && corePreludeUnavailable(loc))
+        return {
+          ...empty(false),
+          reason: "core-prelude-availability-unverified",
+        };
       const anchor = standard
         ? { unit: { ecosystem: "rust-std", unit: name } }
         : loc.crate.edition === "2015" && !explicit
@@ -6164,20 +6176,18 @@ export function resolveRust(
     // A bang macro can be supplied by textual scope. A derive or attribute
     // has no such binding on stable Rust. The outer `derive` must itself be
     // the built-in attribute rather than an imported proc macro.
-    if (
-      !libraryProbe &&
-      namespace === "macro" &&
-      bare &&
-      (macroUseDerive(loc.crate.root, head) ||
-        (!flavor && textualMacro(head, l, loc, scope)))
-    )
-      return refuseLibrary("competing macro import");
+    if (!libraryProbe && namespace === "macro" && bare) {
+      if (macroUseDerive(loc.crate.root, head))
+        return refuseLibrary("macro-use-exports-unverified");
+      if (!flavor && textualMacro(head, l, loc, scope))
+        return refuseLibrary("competing macro import");
+    }
     if (
       !libraryProbe &&
       flavor === "derive" &&
       macroUseDerive(loc.crate.root, "derive")
     )
-      return refuseLibrary("competing derive import");
+      return refuseLibrary("macro-use-exports-unverified");
 
     libraryLookup = true;
     libraryAttributeStart =
@@ -6233,6 +6243,8 @@ export function resolveRust(
       ) {
         if (!libraryProbe && loc.noImplicitPrelude)
           return refuseLibrary("no-implicit-prelude-binding-unverified");
+        if (!libraryProbe && corePreludeUnavailable(loc))
+          return refuseLibrary("core-prelude-availability-unverified");
         const root = data(units.get(loc.crate.root) ?? {});
         const mayApply = (cs: string[]) =>
           possible([...(loc.conditions ?? []), ...cs]);
@@ -6246,8 +6258,6 @@ export function resolveRust(
         if (mayUseCore) {
           if (scopeMode === "assumed")
             return refuseLibrary("opaque-item-may-shadow-name");
-          if (((root.noCoreConditions ?? []) as string[][]).some(mayApply))
-            return refuseLibrary("core-prelude-availability-unverified");
           if (!sharedCorePrelude(head, headNamespace))
             return refuseLibrary("shared-core-prelude-binding-unavailable");
           // For a longer path only the listed enum variants prove a shared
@@ -7227,7 +7237,14 @@ export function resolveRust(
                 complete: false,
                 reason: "failed-file-unseen-declarations",
               }
-            : { ...empty(), emptyReason };
+            : {
+                ...empty(),
+                emptyReason:
+                  emptyReason === "local-pattern-binding-unverified" &&
+                  !ownerPlace(l.file, str(d.scope)).length
+                    ? "crate-placement-unavailable"
+                    : emptyReason,
+              };
     } else if (
       (!d.blocked || !!d.method || !!d.conditionalBinding) &&
       !(l.kind === "imports" && d.glob)

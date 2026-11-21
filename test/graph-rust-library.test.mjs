@@ -406,6 +406,71 @@ test("sysroot names keep their written crate and no_std uses the core prelude", 
   ]);
 });
 
+test("no_core withholds implicit sysroot and ordinary prelude names", async (t) => {
+  const store = await indexFixture(t, {
+    "Cargo.toml": manifest("2024", "[features]\nbare=[]\n"),
+    "src/lib.rs": `
+    #![feature(no_core)]
+    #![cfg_attr(feature = "bare", no_core)]
+    use std::cell::RefCell;
+    use core::cell::Cell;
+    extern crate core as explicit;
+    use explicit::cell::Cell as ExplicitCell;
+    fn bare(_: Option<u8>) {}
+    #[cfg(not(feature = "bare"))]
+    fn hosted(_: Result<(), ()>) {}
+    `,
+    "src/bin/standalone.rs": `
+    #![feature(no_core)]
+    #![no_core]
+    use std::cell::RefCell;
+    use core::cell::Cell;
+    fn bare(_: Option<u8>) {}
+    fn main() {}
+    `,
+  });
+  const links = store.links();
+  for (const file of ["src/lib.rs", "src/bin/standalone.rs"]) {
+    for (const [kind, spelling] of [
+      ["imports", "std::cell::RefCell"],
+      ["imports", "core::cell::Cell"],
+      ["types", "Option"],
+    ]) {
+      const link = links.find(
+        (l) => l.file === file && l.kind === kind && l.targetName === spelling,
+      );
+      assert.equal(link.resolution, "unresolved", spelling);
+      assert.equal(
+        link.data.uncertainty,
+        "core-prelude-availability-unverified",
+      );
+    }
+  }
+  assert.equal(
+    store.libraryUses("core", "cell::Cell", 10)[0].targetName,
+    "explicit::cell::Cell",
+  );
+  assert.equal(
+    store.libraryUses("std", "result::Result", 10)[0].targetName,
+    "Result",
+  );
+});
+
+test("bare macro_use imports report the unverified exports at a derive", async (t) => {
+  const store = await indexFixture(t, {
+    "Cargo.toml": manifest("2024", '[dependencies]\nhelper={path="helper"}\n'),
+    "src/lib.rs":
+      "#[macro_use] extern crate helper; #[derive(Default)] struct Item;",
+    "helper/Cargo.toml": manifest().replace('"app"', '"helper"'),
+    "helper/src/lib.rs": "#[macro_export] macro_rules! ping { () => {} }",
+  });
+  const derive = store
+    .links()
+    .find((l) => l.kind === "macros" && l.targetName === "Default");
+  assert.equal(derive.resolution, "unresolved");
+  assert.equal(derive.data.uncertainty, "macro-use-exports-unverified");
+});
+
 test("Rust links name shared prelude and known imports or explain the blocker", async (t) => {
   const store = await indexFixture(t, {
     "Cargo.toml": manifest(
@@ -453,6 +518,7 @@ test("Rust links name shared prelude and known imports or explain the blocker", 
         match value { AnyOrSome::Any => None, AnyOrSome::Item(v) => Some(v) }
     }
     `,
+    "admin/threads-seq.rs": "fn elapsed() -> i32 { let end = 1; end }",
   });
   const links = store.links();
   for (const link of links) {
@@ -508,6 +574,10 @@ test("Rust links name shared prelude and known imports or explain the blocker", 
   );
   assert.equal(
     ref("values", "None", "item", "src/any_or_some.rs").data.uncertainty,
+    "crate-placement-unavailable",
+  );
+  assert.equal(
+    ref("values", "end", "elapsed", "admin/threads-seq.rs").data.uncertainty,
     "crate-placement-unavailable",
   );
   assert.equal(ref("imports", "wire").data.uncertainty, "whole-crate-import");
