@@ -787,9 +787,15 @@ accept the arguments.
   manifests to the compiler. TypeScript applies its own package export
   conditions, subpath rules, `main`, `types`, `paths` and project reference
   redirects within the snapshot. The selected module file has an entry edge
-  independent of any declaration augmentations. When ESM-mode resolution
-  misses an extensionless relative import, the 0.1.0 extension lookup can
-  still establish its module-file edge. Named bindings use the checker.
+  independent of any declaration augmentations. Directory imports, including
+  `.`, `..` and spellings with a trailing slash, use the importing file's
+  compiler resolution mode. Node16 and NodeNext ESM leave directory imports
+  unresolved with `directory-import-not-allowed-in-esm` when the directory
+  entry can be verified. The legacy extension lookup can establish an extensionless
+  file edge when adding the extension finds the same adjacent file. Named
+  bindings use the checker. Distinct checkout files retain their own
+  declarations even when their containing packages share a package name,
+  version and subpath.
   Calls use the same declaration rule for relative imports, workspace imports
   and local aliases, including when TypeScript selects a `types` export.
 - **Library targets:** checker-proven JavaScript or web declarations, captured
@@ -811,6 +817,8 @@ accept the arguments.
   install exposes to that importer, including overrides and workspace links.
   A module augmentation owns the members it declares. The original package
   owns its default export and named namespace bindings proven by its entry.
+  A symbol merged with an augmentation from its own installed package
+  retains its original library identity.
   A named member written directly in an installed function's explicit return
   type can be linked through that declaration when the function has one
   declaration. Synthesized names for installed members can include the
@@ -874,7 +882,8 @@ accept the arguments.
   outside microsoft/TypeScript comes near it. The program budget counts
   every checkout file a program loads, imported files included; a file past
   it is left out of that program only (installed declarations have their
-  own budget).
+  own budget). Invalid extracted UTF-16 ranges use the same per-file
+  containment and report the file as unavailable.
 - **A program that contains a failed file:** the failed file is absent;
   `invalid-code` with a cause is best-effort attribution. Links computed
   without the failed file carry `assumes: ["no-unseen-declarations"]`.

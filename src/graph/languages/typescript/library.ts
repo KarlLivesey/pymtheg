@@ -159,6 +159,17 @@ const nameOf = (node: ts.Node): string | undefined => {
 };
 const globalObjectInterfaces = new Set(["Math", "JSON", "Atomics", "Reflect"]);
 
+function inModuleAugmentation(declaration: ts.Declaration): boolean {
+  return !!ts.findAncestor(
+    declaration.parent,
+    (node) =>
+      ts.isModuleDeclaration(node) &&
+      ts.isStringLiteral(node.name) &&
+      ts.isSourceFile(node.parent) &&
+      ts.isExternalModule(node.parent),
+  );
+}
+
 /** Compute the path from the selected declaration, never from the receiver spelling. */
 function declaredSymbol(declaration: ts.Declaration, bundled: boolean) {
   const name = nameOf(declaration);
@@ -595,6 +606,44 @@ export function libraryReader(
           return path === undefined ? undefined : installedUnit(path);
         },
         targetOf,
+        preferOriginalDeclarations(
+          declarations: ts.Declaration[],
+          checker: ts.TypeChecker,
+        ) {
+          const augmentations = new Map<ts.Declaration, Unit>();
+          for (const declaration of declarations) {
+            const unit = declarationUnit(declaration.getSourceFile());
+            if (unit?.installedRoot && inModuleAugmentation(declaration))
+              augmentations.set(declaration, unit);
+          }
+          if (!augmentations.size) return declarations;
+          const symbolOf = (declaration: ts.Declaration) => {
+            const name = (declaration as ts.NamedDeclaration).name;
+            const symbol = name && checker.getSymbolAtLocation(name);
+            return symbol && checker.getMergedSymbol(symbol);
+          };
+          const originals = new Map<Unit, Set<ts.Symbol>>();
+          for (const declaration of declarations) {
+            if (augmentations.has(declaration)) continue;
+            const unit = declarationUnit(declaration.getSourceFile());
+            if (!unit?.installedRoot) continue;
+            const symbol = symbolOf(declaration);
+            if (!symbol || !targetOf(declaration, unit, checker)) continue;
+            const symbols = originals.get(unit) ?? new Set<ts.Symbol>();
+            symbols.add(symbol);
+            originals.set(unit, symbols);
+          }
+          // One checker symbol can have both its original declaration and
+          // contributions under the same package's augmentation syntax.
+          // Keep the original's identity. Members declared only in the
+          // augmentation and declarations in other packages still contribute.
+          return declarations.filter((declaration) => {
+            const unit = augmentations.get(declaration);
+            const symbols = unit && originals.get(unit);
+            const symbol = symbols && symbolOf(declaration);
+            return !symbol || !symbols?.has(symbol);
+          });
+        },
         returnedMemberTarget(
           declaration: ts.Declaration,
           unit: Unit,

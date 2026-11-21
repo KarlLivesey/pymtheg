@@ -2976,7 +2976,9 @@ directory) or test runner config (Vitest `typecheck.tsconfig`, ts-jest
 disables the rule for the checkout. The compiler would select every file
 below it, but no tool compiles it as a project. The editor opens only
 `tsconfig.json` and `jsconfig.json` files and the projects they reference,
-and `tsc --build` builds only referenced projects. A shared base therefore
+and `tsc --build` builds the configs it is given and the projects they
+reference; a shared base is neither discoverable, referenced, nor named by a
+script or runner config. A shared base therefore
 does not compete for a file that a project config also includes. When it
 is the only config that includes a file, it still owns that file. The
 ranking among project configs is unchanged: two project configs that tie
@@ -2986,6 +2988,21 @@ signature the checker selects, when no declaration from another body could
 also accept the arguments; a union or intersection receiver is never
 narrowed.
 [C-30](changes/C-30.md)
+
+### C-32 TypeScript relative directories and checkout file identity
+
+Use TypeScript's directory resolution in the importing file's mode. The
+snapshot host accepts trailing-separator probes. When Node ESM refuses a
+verified directory entry, report the directory restriction. The legacy
+extension fallback remains limited to file edges. A checker symbol merged
+with its own installed package's augmentation keeps its original library
+identity, and members declared by the augmentation remain reachable.
+Compiler package IDs can
+represent identical dependency copies, while distinct files in the
+checkout are identified by their snapshot paths. Package lookup still
+uses the importer's own conditions and workspace route. Invalid extracted
+source ranges fail the affected file through the compiler session's
+containment path. [C-32](changes/C-32.md)
 
 ### C-13 TypeScript program budget and compiler exceptions
 
