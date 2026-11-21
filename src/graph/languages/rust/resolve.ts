@@ -34,6 +34,12 @@ import type {
 } from "../../types.js";
 import { crates, type Crate } from "./cargo.js";
 import {
+  compilerFloor,
+  coreMethod,
+  coreMethodNames,
+  primitiveReceiver,
+} from "./core-methods.js";
+import {
   libraryBlocker,
   type BlockingMacro,
   type LibraryAudit,
@@ -6437,6 +6443,186 @@ export function resolveRust(
       ? target
       : undefined;
   }
+  function clearReceiverScope(loc: Place, scope: string): boolean {
+    for (;;) {
+      if (libraryOpaque(`${loc.crate.root}|${qualified(loc, scope)}`))
+        return false;
+      if (!scope || scope === loc.local) return true;
+      scope = parentScope(scope);
+    }
+  }
+  /** Resolve a written receiver type, keeping its declaration's scope. */
+  function coreReceiver(
+    l: GraphLink,
+    t: Typed,
+    followAlias = true,
+  ): { owner: string; borrow: string } | undefined {
+    const ref = splitReference(t.text);
+    if (
+      !ref ||
+      (ref.borrow !== "owned" && t.borrow !== "owned") ||
+      t.future ||
+      t.loc.uncertain ||
+      t.loc.directoryUnverified ||
+      corePreludeUnavailable(t.loc) ||
+      !clearReceiverScope(t.loc, t.scope)
+    )
+      return;
+    const borrow = ref.borrow === "owned" ? t.borrow : ref.borrow;
+    const owner = base(compact(ref.text));
+    if (
+      !/^(?:::)?[_\p{ID_Start}][\p{ID_Continue}]*(?:::[_\p{ID_Start}][\p{ID_Continue}]*)*$/u.test(
+        owner,
+      ) ||
+      t.generics.split(",").includes(owner.split("::")[0]!)
+    )
+      return;
+    let binding: Found;
+    libraryLookup = true;
+    try {
+      binding = find(owner, t.loc, t.scope, "type");
+    } finally {
+      libraryLookup = false;
+    }
+    if (!binding.complete || binding.failedFiles?.length) return;
+    if (
+      primitiveReceiver(owner) &&
+      owner === compact(ref.text) &&
+      !binding.bound &&
+      !binding.library &&
+      !binding.symbols.length &&
+      !binding.possibleImportNames?.length
+    )
+      return { owner, borrow };
+
+    if (
+      followAlias &&
+      binding.symbols.length === 1 &&
+      binding.symbols[0]!.kind === "type"
+    ) {
+      const alias = binding.symbols[0]!;
+      const d = data(alias);
+      const place = declarationPlace(alias);
+      const generics = (d.generics ?? []) as string[];
+      // No substitution is needed when the outer constructor is written in
+      // the alias and independent of its type parameters.
+      if (
+        place &&
+        !itemPresence(alias).length &&
+        !(d.conditions as string[] | undefined)?.length &&
+        d.bounded !== true
+      )
+        return coreReceiver(
+          l,
+          {
+            ...t,
+            text: str(d.aliasType),
+            loc: place,
+            scope: str(d.scope),
+            generics: generics.map((g) => g.split("=")[0]!.trim()).join(","),
+            borrow,
+          },
+          false,
+        );
+    }
+    if (
+      binding.symbols.length ||
+      (!binding.library && owner !== "Option" && owner !== "Result")
+    )
+      return;
+    const target = libraryAt(
+      { ...l, kind: "types", targetName: owner },
+      {},
+      t.loc,
+      t.scope,
+    );
+    return target?.ecosystem === "rust-std" &&
+      ["std", "core"].includes(target.unit) &&
+      ["option::Option", "result::Result"].includes(target.symbol ?? "")
+      ? { owner: target.symbol!, borrow }
+      : undefined;
+  }
+  function coreMethodFor(
+    l: GraphLink,
+    d: Data,
+  ): LibraryTarget | "core-method-owner-version-unverified" | undefined {
+    const name = str(d.method);
+    const literal = str(d.receiverLiteralType);
+    const written = str(d.receiverType);
+    const arity = Number(d.argumentCount);
+    if (
+      !coreMethodNames.has(name) ||
+      (!literal && !written && !d.receiverExpr) ||
+      d.receiverStructLiteral ||
+      d.namespaceUnknown ||
+      d.conditionalBinding ||
+      d.macroArguments ||
+      itemPresence(l).length ||
+      Number(d.argumentMinimum ?? arity) !== arity
+    )
+      return;
+    const scope = str(d.scope);
+    const targets = ownerPlace(l.file, scope).map((place) => {
+      const conditions = [
+        ...(place.conditions ?? []),
+        ...((d.conditions ?? []) as string[]),
+      ];
+      const loc = { ...place, conditions };
+      const edition = loc.crate.edition;
+      if (
+        !edition ||
+        loc.uncertain ||
+        loc.directoryUnverified ||
+        conditions.some((c) => c.includes("?")) ||
+        corePreludeUnavailable(loc) ||
+        !clearReceiverScope(loc, scope)
+      )
+        return;
+      const typed = literal
+        ? undefined
+        : written
+          ? {
+              text: written,
+              loc,
+              scope: str(d.typeScope),
+              generics: str(d.genericBindings),
+              borrow: str(d.receiverBorrow),
+              mutable: d.receiverMutable === true,
+              syntax: str(d.receiverArgumentSyntax),
+            }
+          : typing(d.receiverExpr as Data, loc, { file: l.file, scope });
+      const receiver = literal
+        ? {
+            owner: literal === "&str" ? "str" : literal,
+            borrow: literal === "&str" ? "shared" : "owned",
+          }
+        : typed && !isGap(typed)
+          ? coreReceiver(l, typed)
+          : undefined;
+      // At the first probe, an applicable inherent method wins over traits.
+      // A borrow, reborrow, or deref to another receiver form needs its own
+      // proof of what Rust would find at the earlier steps.
+      if (!receiver) return;
+      const method = coreMethod(receiver.owner, name, receiver.borrow, arity);
+      if (method)
+        return {
+          symbol: method.symbol,
+          available:
+            compilerFloor(edition, loc.crate.rustVersionMinor) >= method.since,
+        };
+    });
+    const symbol = targets[0]?.symbol;
+    if (symbol && targets.every((t) => t?.symbol === symbol)) {
+      if (targets.some((t) => !t?.available))
+        return "core-method-owner-version-unverified";
+      return {
+        ecosystem: "rust-std",
+        unit: "core",
+        symbol,
+        evidence: "declaring-owner",
+      };
+    }
+  }
   const attributesByStart = new Map<string, GraphLink[]>();
   for (const l of ctx.links) {
     const d = data(l);
@@ -7499,6 +7685,24 @@ export function resolveRust(
         ? lookupReads(() => checkoutFound(l, d))
         : { result: checkoutFound(l, d) };
     let found = captured.result;
+    if (
+      d.method &&
+      !found.complete &&
+      found.reason?.startsWith("receiver-type-unverified") &&
+      !found.failedFiles?.length &&
+      !found.reason.includes("failed-file-unseen-declarations")
+    ) {
+      const library = coreMethodFor(l, d);
+      if (typeof library === "string") {
+        found = {
+          ...found,
+          reason: found.reason.replace("receiver-type-unverified", library),
+        };
+      } else if (library) {
+        resolutions.push({ linkId: l.id, library });
+        continue;
+      }
+    }
     const libraryEligible =
       !found.symbols.length &&
       !found.failedFiles?.length &&
