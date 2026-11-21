@@ -1,0 +1,325 @@
+diff --git a/src/graph/languages/typescript/extract.ts b/src/graph/languages/typescript/extract.ts
+index cbee4d4..2341fce 100644
+--- a/src/graph/languages/typescript/extract.ts
++++ b/src/graph/languages/typescript/extract.ts
+@@ -2132,6 +2132,7 @@ export function extractFile(
+         }));
+     }
+     if (reason) facts.reason = reason;
++    if (reason === "no-symbol") facts.diag = diagnoseNoSymbol(at, kind);
+     if (found.competingTypes) facts.competingTypes = [...found.competingTypes];
+     links.push({
+       sourceKey,
+@@ -2141,6 +2142,312 @@ export function extractFile(
+       data: facts,
+     });
+   }
++  // DIAGNOSIS ONLY (C-28): what the checker knows at a no-symbol site.
++  let diagLong: number | undefined;
++  function diagWhere(declaration: ts.Declaration): string {
++    const source = declaration.getSourceFile();
++    const target = fromVirtual(source.fileName);
++    if (target !== undefined && captured.has(target))
++      return source.isDeclarationFile ? "checkout-dts" : "checkout";
++    if (source.fileName.startsWith(LIB_ROOT + "/")) return "lib";
++    if (importer.declarationUnit(source)) return "library";
++    return "other";
++  }
++  function diagDecls(symbol: ts.Symbol | undefined): Json {
++    const declarations = symbol?.declarations ?? [];
++    return {
++      n: declarations.length,
++      where: [...new Set(declarations.map(diagWhere))].sort().join("+"),
++      kinds: [
++        ...new Set(declarations.map((d) => ts.SyntaxKind[d.kind])),
++      ].join("+"),
++      flags: symbol ? symbol.flags : 0,
++      check: symbol
++        ? ((symbol as unknown as { links?: { checkFlags?: number } }).links
++            ?.checkFlags ?? 0)
++        : 0,
++    };
++  }
++  function diagType(type: ts.Type): string {
++    if (type.flags & ts.TypeFlags.Any)
++      return (type as unknown as { intrinsicName?: string }).intrinsicName ===
++        "error"
++        ? "error"
++        : "any";
++    if (type.flags & ts.TypeFlags.Unknown) return "unknown";
++    if (type.flags & ts.TypeFlags.Never) return "never";
++    if (type.isUnion()) return "union";
++    if (type.isIntersection()) return "intersection";
++    if (type.flags & ts.TypeFlags.TypeParameter) return "type-parameter";
++    if (type.flags & ts.TypeFlags.Object) {
++      const object = (type as ts.ObjectType).objectFlags;
++      if (object & ts.ObjectFlags.Mapped) return "mapped";
++      if (object & ts.ObjectFlags.Reference) return "reference";
++      if (object & ts.ObjectFlags.Anonymous) return "anonymous";
++      if (object & ts.ObjectFlags.Class) return "class";
++      if (object & ts.ObjectFlags.Interface) return "interface";
++      return "object";
++    }
++    return "primitive";
++  }
++  function diagTraceType(node: ts.TypeNode, depth: number): string {
++    if (depth > 12) return "deep";
++    if (ts.isTypeReferenceNode(node)) {
++      const name = node.typeName;
++      const at = ts.isQualifiedName(name) ? name.right : name;
++      const symbol = checker.getSymbolAtLocation(at);
++      if (!symbol) {
++        if (ts.isQualifiedName(name)) {
++          let left: ts.EntityName = name.left;
++          while (ts.isQualifiedName(left)) left = left.left;
++          const base = checker.getSymbolAtLocation(left);
++          if (base && base.flags & ts.SymbolFlags.Alias)
++            return `module:${bindingReason(base) ?? "resolved"}`;
++        }
++        return "undeclared-type";
++      }
++      const traced = diagTraceSymbol(symbol, depth + 1, true);
++      if (traced.startsWith("declared:") && node.typeArguments?.length) {
++        for (const argument of node.typeArguments) {
++          const inner = diagTraceType(argument, depth + 1);
++          if (!inner.startsWith("declared:") && !inner.startsWith("type-node:"))
++            return inner;
++        }
++      }
++      return traced;
++    }
++    if (ts.isImportTypeNode(node)) return "import-type";
++    if (ts.isTypeQueryNode(node)) {
++      const name = node.exprName;
++      const at = ts.isQualifiedName(name) ? name.right : name;
++      const symbol = checker.getSymbolAtLocation(at);
++      return symbol ? diagTraceSymbol(symbol, depth + 1, false) : "undeclared-typeof";
++    }
++    if (ts.isIndexedAccessTypeNode(node))
++      return diagTraceType(node.objectType, depth + 1);
++    if (ts.isArrayTypeNode(node)) return diagTraceType(node.elementType, depth + 1);
++    if (ts.isTypeOperatorNode(node)) return diagTraceType(node.type, depth + 1);
++    if (ts.isParenthesizedTypeNode(node)) return diagTraceType(node.type, depth + 1);
++    return `type-node:${ts.SyntaxKind[node.kind]}`;
++  }
++  function diagTraceSymbol(
++    symbol: ts.Symbol,
++    depth: number,
++    type: boolean,
++  ): string {
++    if (depth > 12) return "deep";
++    if (symbol.flags & ts.SymbolFlags.Alias) {
++      const reason = bindingReason(symbol);
++      if (reason) return `module:${reason}`;
++      const target = checker.getAliasedSymbol(symbol);
++      if (!target.declarations?.length) return "module:resolved-no-declaration";
++      symbol = target;
++    }
++    const declaration = symbol.declarations?.[0];
++    if (!declaration) return "symbol-without-declaration";
++    if (!inCheckout(declaration)) return `declared:${diagWhere(declaration)}`;
++    if (type && ts.isTypeAliasDeclaration(declaration))
++      return diagTraceType(declaration.type, depth + 1);
++    if (type) return `type-decl:${ts.SyntaxKind[declaration.kind]}`;
++    return diagTraceDeclaration(declaration, depth + 1);
++  }
++  function diagTraceDeclaration(declaration: ts.Declaration, depth: number): string {
++    if (depth > 12) return "deep";
++    if (ts.isBindingElement(declaration)) {
++      const key = declaration.propertyName ?? declaration.name;
++      if (
++        ts.isObjectBindingPattern(declaration.parent) &&
++        (ts.isIdentifier(key) || ts.isStringLiteralLike(key))
++      ) {
++        const property = checker.getPropertyOfType(
++          checker.getTypeAtLocation(declaration.parent),
++          key.text,
++        );
++        const target = property?.declarations?.[0];
++        if (target)
++          return inCheckout(target)
++            ? diagTraceDeclaration(target, depth + 1)
++            : `declared:${diagWhere(target)}`;
++      }
++      let holder: ts.Node = declaration;
++      while (ts.isBindingElement(holder) || ts.isObjectBindingPattern(holder) || ts.isArrayBindingPattern(holder))
++        holder = holder.parent;
++      if (ts.isVariableDeclaration(holder) || ts.isParameter(holder))
++        return diagTraceDeclaration(holder, depth + 1);
++      return `binding:${ts.SyntaxKind[holder.kind]}`;
++    }
++    if (
++      ts.isVariableDeclaration(declaration) ||
++      ts.isParameter(declaration) ||
++      ts.isPropertyDeclaration(declaration) ||
++      ts.isPropertySignature(declaration)
++    ) {
++      if (declaration.type) return diagTraceType(declaration.type, depth + 1);
++      const init = (declaration as ts.VariableDeclaration).initializer;
++      if (init) return diagTraceExpression(init, depth + 1);
++      if (ts.isParameter(declaration)) return "parameter-contextual";
++      if (ts.isVariableDeclaration(declaration) && ts.isForOfStatement(declaration.parent.parent))
++        return diagTraceExpression(declaration.parent.parent.expression, depth + 1);
++      return `uninitialised:${ts.SyntaxKind[declaration.kind]}`;
++    }
++    if (ts.isShorthandPropertyAssignment(declaration)) {
++      const value = checker.getShorthandAssignmentValueSymbol(declaration);
++      if (value) return diagTraceSymbol(value, depth + 1, false);
++    }
++    if (ts.isPropertyAssignment(declaration))
++      return diagTraceExpression(declaration.initializer, depth + 1);
++    if (ts.isFunctionLike(declaration)) return `function:${ts.SyntaxKind[declaration.kind]}`;
++    return `declaration:${ts.SyntaxKind[declaration.kind]}`;
++  }
++  function diagIsError(node: ts.Node): boolean {
++    const type = checker.getTypeAtLocation(node);
++    return (
++      !!(type.flags & ts.TypeFlags.Any) &&
++      (type as unknown as { intrinsicName?: string }).intrinsicName === "error"
++    );
++  }
++  function diagTraceExpression(expression: ts.Expression, depth: number): string {
++    if (depth > 12) return "deep";
++    const value = unwrap(expression);
++    if (ts.isAsExpression(value) || ts.isTypeAssertionExpression(value) || ts.isSatisfiesExpression(value))
++      return ts.isSatisfiesExpression(value)
++        ? diagTraceExpression(value.expression, depth + 1)
++        : diagTraceType(value.type, depth + 1);
++    if (ts.isAwaitExpression(value) || ts.isNonNullExpression(value) || ts.isParenthesizedExpression(value))
++      return diagTraceExpression(value.expression, depth + 1);
++    if (ts.isIdentifier(value)) {
++      const symbol = checker.getSymbolAtLocation(value);
++      if (!symbol) return `undeclared${isTestGlobal(value.text) ? ":test-global" : ""}`;
++      return diagTraceSymbol(symbol, depth + 1, false);
++    }
++    if (value.kind === ts.SyntaxKind.ThisKeyword) return "this";
++    if (ts.isPropertyAccessExpression(value) || ts.isElementAccessExpression(value)) {
++      if (diagIsError(value.expression)) return diagTraceExpression(value.expression, depth + 1);
++      const symbol = checker.getSymbolAtLocation(ts.isPropertyAccessExpression(value) ? value.name : value.argumentExpression);
++      if (!symbol) return "missing-property";
++      const declaration = symbol.declarations?.[0];
++      if (!declaration) return "property-without-declaration";
++      if (!inCheckout(declaration)) return `declared:${diagWhere(declaration)}`;
++      return diagTraceDeclaration(declaration, depth + 1);
++    }
++    if (ts.isCallExpression(value) || ts.isNewExpression(value)) {
++      if (diagIsError(value.expression)) return diagTraceExpression(value.expression, depth + 1);
++      const declaration = checker.getResolvedSignature(value)?.declaration;
++      if (!declaration) return "call-without-signature";
++      if (!inCheckout(declaration)) return `returned-by:${diagWhere(declaration)}`;
++      if (declaration.type && ts.isTypeNode(declaration.type))
++        return diagTraceType(declaration.type, depth + 1);
++      return `call-inferred:${ts.SyntaxKind[declaration.kind]}`;
++    }
++    return `expression:${ts.SyntaxKind[value.kind]}`;
++  }
++  function diagnoseNoSymbol(at: ts.Node, kind: string): Json {
++    if (diagLong === undefined) {
++      const text = file.text;
++      let long = 0;
++      for (let start = 0; start < text.length && long <= 1000; ) {
++        const end = text.indexOf("\n", start);
++        const stop = end < 0 ? text.length : end;
++        long = Math.max(long, stop - start);
++        start = stop + 1;
++      }
++      diagLong = long;
++    }
++    const long = diagLong;
++    const out: { [key: string]: Json } = {
++      js: isJsFile(file),
++      dts: file.isDeclarationFile,
++      longLine: long > 1000,
++      node: ts.SyntaxKind[at.kind],
++      parent: ts.SyntaxKind[at.parent.kind],
++    };
++    try {
++      const receiver = receiverOf(at);
++      const name =
++        ts.isIdentifier(at) ||
++        ts.isPrivateIdentifier(at) ||
++        ts.isStringLiteralLike(at)
++          ? at.text
++          : undefined;
++      if (!receiver) {
++        if (!ts.isIdentifier(at)) {
++          // A computed callee: what signature the call selects.
++          out.form = "computed";
++          const call = at.parent;
++          if (
++            (ts.isCallExpression(call) || ts.isNewExpression(call)) &&
++            unwrap(call.expression) === unwrap(at as ts.Expression)
++          ) {
++            const declaration = checker.getResolvedSignature(call)?.declaration;
++            out.signature = declaration
++              ? `${ts.SyntaxKind[declaration.kind]}@${diagWhere(declaration)}`
++              : "none";
++          }
++          if (ts.isElementAccessExpression(at)) out.form = "computed-element";
++          const callee = unwrap(at as ts.Expression);
++          out.iife = ts.isArrowFunction(callee) || ts.isFunctionExpression(callee);
++          out.calleeKind = ts.SyntaxKind[callee.kind];
++          out.type = diagType(checker.getTypeAtLocation(at));
++          return out;
++        }
++        out.form = "name";
++        const resolved = checker.resolveName(
++          at.text,
++          at,
++          ts.SymbolFlags.Value | ts.SymbolFlags.Type | ts.SymbolFlags.Alias,
++          false,
++        );
++        out.resolved = diagDecls(resolved);
++        out.global = !!globalThis.hasOwnProperty(at.text);
++        out.testGlobal = isTestGlobal(at.text);
++        return out;
++      }
++      out.form = "member";
++      const receiverType = checker.getTypeAtLocation(receiver);
++      out.receiver = diagType(receiverType);
++      if (out.receiver === "error")
++        try {
++          out.origin = diagTraceExpression(receiver as ts.Expression, 0);
++        } catch (error) {
++          out.origin = `trace-failed:${String((error as Error).message).slice(0, 40)}`;
++        }
++      out.receiverNode = ts.SyntaxKind[unwrap(receiver).kind];
++      const root = rootOf(receiver);
++      const rootSymbol = root && checker.getSymbolAtLocation(root);
++      out.root = rootSymbol
++        ? {
++            alias: !!(rootSymbol.flags & ts.SymbolFlags.Alias),
++            ...(diagDecls(
++              rootSymbol.flags & ts.SymbolFlags.Alias
++                ? checker.getAliasedSymbol(rootSymbol)
++                : rootSymbol,
++            ) as object),
++            type: root === unwrap(receiver) ? out.receiver : diagType(checker.getTypeAtLocation(root)),
++          }
++        : root
++          ? "no-symbol"
++          : "none";
++      if (name === undefined) return out;
++      const apparent = checker.getApparentType(
++        checker.getNonNullableType(receiverType),
++      );
++      const property = checker.getPropertyOfType(apparent, name);
++      out.property = property ? diagDecls(property) : "none";
++      if (!property && apparent.isUnion())
++        out.arms = apparent.types.map(
++          (part) =>
++            `${diagType(part)}:${checker.getPropertyOfType(checker.getApparentType(part), name) ? "has" : "no"}`,
++        ).slice(0, 6).join(",");
++      if (!property) {
++        out.indexInfos = checker.getIndexInfosOfType(apparent).length;
++        out.props = checker.getPropertiesOfType(apparent).length;
++      }
++    } catch (error) {
++      out.error = String((error as Error).message).slice(0, 80);
++    }
++    void kind;
++    return out;
++  }
+   const paths = Object.keys(program.getCompilerOptions().paths ?? {});
+   const selectedSpecifiers = new Map<
+     ts.StringLiteralLike,

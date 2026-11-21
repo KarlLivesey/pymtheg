@@ -1,0 +1,82 @@
+[
+ {
+  "id": "withastro/astro",
+  "language": "typescript",
+  "url": "https://github.com/withastro/astro.git",
+  "commit": "3ac5ad3ae05ddc461bcc7748f0c55fd6da056652",
+  "category": "web / server framework",
+  "why": "Site framework with pnpm workspaces, package aliases and integrations."
+ },
+ {
+  "id": "nestjs/nest",
+  "language": "typescript",
+  "url": "https://github.com/nestjs/nest.git",
+  "commit": "085f83a168e9edbedfe9560428dcfd270073ae00",
+  "category": "web / server framework",
+  "why": "Decorator-heavy server framework with dependency injection and cross-package path aliases."
+ },
+ {
+  "id": "vitest-dev/vitest",
+  "language": "typescript",
+  "url": "https://github.com/vitest-dev/vitest.git",
+  "commit": "161e25f663a838f6a30890f8a6827ff83ff1b3c7",
+  "category": "monorepo / dev tool",
+  "why": "Test runner with pnpm workspace packages and TypeScript and JavaScript fixtures."
+ },
+ {
+  "id": "trpc/trpc",
+  "language": "typescript",
+  "url": "https://github.com/trpc/trpc.git",
+  "commit": "1abda6cc6cd9ac149e474936f5dfcb679a983fb3",
+  "category": "web / server framework",
+  "why": "Inference-heavy RPC client/server library with cross-workspace examples."
+ },
+ {
+  "id": "pocketbase/pocketbase",
+  "language": "go",
+  "url": "https://github.com/pocketbase/pocketbase.git",
+  "commit": "7f2773ec234b62d0b80ca47c508397cb3d0da3ea",
+  "category": "web / app",
+  "why": "Backend app with an embedded admin UI and JavaScript extension interface."
+ },
+ {
+  "id": "puppeteer/puppeteer",
+  "language": "typescript",
+  "url": "https://github.com/puppeteer/puppeteer.git",
+  "commit": "e82d656004488cc2f635f878da7cede1b4631235",
+  "category": "library / dev tool",
+  "why": "Browser automation API with protocol packages and multiple tsconfig files."
+ },
+ {
+  "id": "colinhacks/zod",
+  "language": "typescript",
+  "url": "https://github.com/colinhacks/zod.git",
+  "commit": "90bf57b8e96a3729d766fff3185d39b2ab3ba016",
+  "category": "library",
+  "why": "Schema validation with heavily generic types and type-level tests."
+ },
+ {
+  "id": "reduxjs/redux-toolkit",
+  "language": "typescript",
+  "url": "https://github.com/reduxjs/redux-toolkit.git",
+  "commit": "1a7d3b5251ceda61b77928e357a22086b45aaab1",
+  "category": "library",
+  "why": "State management with TypeScript and React entry points across packages."
+ },
+ {
+  "id": "honojs/hono",
+  "language": "typescript",
+  "url": "https://github.com/honojs/hono.git",
+  "commit": "676c8f80fcafc49e6e74c847a8f0d9c44cc7faee",
+  "category": "web / server framework",
+  "why": "Server framework with runtime-specific adapters and routing types."
+ },
+ {
+  "id": "dexie/Dexie.js",
+  "language": "typescript",
+  "url": "https://github.com/dexie/Dexie.js.git",
+  "commit": "95666bf5370a222a21d7f53130d87b42e9b7bac7",
+  "category": "database / storage",
+  "why": "IndexedDB wrapper with TypeScript library code and JavaScript tests and examples."
+ }
+]
