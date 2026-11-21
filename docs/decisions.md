@@ -3032,5 +3032,8 @@ wall-clock watchdog in a worker is the only general bound. It is not built
 until a case needs it, because it would make results depend on the machine
 for the files it stops. Each result records a digest of the module's
 failed files (`failedFilesDigest`), not the map: a map of N failed files in
-each of M separately stored results is N x M in the store. **Rules out:**
+each of M separately stored results is N x M in the store. A `contains`
+link names a container only if that container is a symbol. One link
+without a source rejects a module's whole output, so a namespace that is
+no symbol passes its members to the next container out. **Rules out:**
 time limits where a deterministic property exists. See [C-26](changes/C-26.md).

@@ -1,0 +1,43 @@
+microsoft/TypeScript at 21ba970871efd2766ee46813d0bb67253e7878fa, cold
+`graph index --json` of a fresh copy of the pinned checkout, C-26 at
+2e42301 (tools/heap-index.sh). Dev server, Node 24.21.0, shared and loaded
+by other runs; times are observations.
+
+Default heap (about 4 GB)
+  peak RSS 4,884,044 KiB, wall 5,251 s, signal 6
+  FATAL ERROR: Reached heap limit, at 5,203 s: after the TypeScript
+  analysis returned (3,792 s), while its results were written, before
+  resolution started. The 180-minute sweep run (long.sh) ended the same
+  way: killed-for-memory at 5,172 s, last progress
+  "graph analyze typescript: 27194/27194".
+
+--max-old-space-size=12000
+  peak RSS 8,197,572 KiB, wall 5,942 s, exit 2 (finished; failed files)
+  analysisErrors [], resolutionErrors []
+  counts: files 32,448, symbols 274,386, links 993,013, failed 12,477,
+          partial 2, unresolved 180,990, ambiguous 5,764, library 73,211
+  failed files (tools/failed-kinds.mjs):
+    12,418 syntax errors (the conformance tests' deliberate ones)
+        44 compiler failures (an assertion or exception in the compiler)
+         3 would not return (the flow check):
+           tsc/testdata/tests/cases/compiler/unreachableFlowAfterThrowingForHead1.ts
+           tsc/testdata/tests/cases/compiler/unreachableFlowAfterThrowingForInOfHead1.ts
+           tsc/testdata/tests/cases/compiler/unreachableFlowAfterThrowingForInOfHead2.ts
+         3 binder stack exhausted (a resource limit)
+         4 not valid UTF-8
+         5 internal errors of the TypeScript module
+  TypeScript links taint-budget-exhausted: 138,466
+
+Stages, seconds since start (stamped progress lines)
+  default heap                                  12,000 MB heap
+  1180  analyze go start                        1154
+  2129  analyze typescript start                2105
+  3792  analyze typescript done                 3776
+  5203  out of heap                             5265  resolve go start
+                                                5695  resolve typescript start
+                                                5696  resolve typescript done
+                                                5937  complete
+
+Sweep runs (scripts/sweep/run.mjs, default heap)
+  60-minute wall:  wall-limit at 3,611 s, in the cold index
+  180-minute wall: killed-for-memory at 5,172 s, in the cold index
