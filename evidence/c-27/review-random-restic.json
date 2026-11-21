@@ -1,0 +1,228 @@
+{
+ "id": "restic/restic",
+ "seed": 27301,
+ "expectedSteps": 20,
+ "steps": [
+  {
+   "step": 0,
+   "file": "internal/fs/c27_random_0_test.go",
+   "kind": "file-add",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 9376,
+   "failed": 0,
+   "resolvedFiles": 560
+  },
+  {
+   "step": 1,
+   "file": "internal/fs/c27_random_0_test.go",
+   "kind": "file-delete",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 8242,
+   "failed": 0,
+   "resolvedFiles": 559
+  },
+  {
+   "step": 2,
+   "file": "internal/backend/rewind_reader.go",
+   "kind": "signature",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 7617,
+   "failed": 0,
+   "resolvedFiles": 429
+  },
+  {
+   "step": 3,
+   "file": "internal/repository/repository.go",
+   "kind": "body",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 3475,
+   "failed": 0,
+   "resolvedFiles": 1
+  },
+  {
+   "step": 4,
+   "file": "cmd/restic/cmd_copy.go",
+   "kind": "signature",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 5345,
+   "failed": 0,
+   "resolvedFiles": 84
+  },
+  {
+   "step": 5,
+   "file": "internal/dump/common.go",
+   "kind": "add-export",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 5426,
+   "failed": 0,
+   "resolvedFiles": 92
+  },
+  {
+   "step": 6,
+   "file": "internal/repository/crypto/kdf.go",
+   "kind": "interface",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 9444,
+   "failed": 0,
+   "resolvedFiles": 559
+  },
+  {
+   "step": 7,
+   "file": "internal/selfupdate/github.go",
+   "kind": "signature",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 5063,
+   "failed": 0,
+   "resolvedFiles": 91
+  },
+  {
+   "step": 8,
+   "file": "internal/fs/sd_windows.go",
+   "kind": "import",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 10223,
+   "failed": 0,
+   "resolvedFiles": 559
+  },
+  {
+   "step": 9,
+   "file": "internal/backend/azure/config.go",
+   "kind": "add-export",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 4785,
+   "failed": 0,
+   "resolvedFiles": 89
+  },
+  {
+   "step": 10,
+   "file": "internal/selfupdate/download_unix.go",
+   "kind": "build",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 9027,
+   "failed": 0,
+   "resolvedFiles": 559
+  },
+  {
+   "step": 11,
+   "file": "internal/backend/cache/cache_test.go",
+   "kind": "interface",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 10109,
+   "failed": 0,
+   "resolvedFiles": 559
+  },
+  {
+   "step": 12,
+   "file": "internal/fs/doc.go",
+   "kind": "add-export",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 7948,
+   "failed": 0,
+   "resolvedFiles": 323
+  },
+  {
+   "step": 13,
+   "file": "internal/ui/termstatus/c27_random_13_test.go",
+   "kind": "file-add",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 9033,
+   "failed": 0,
+   "resolvedFiles": 560
+  },
+  {
+   "step": 14,
+   "file": "internal/backend/local/layout_test.go",
+   "kind": "interface",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 8461,
+   "failed": 0,
+   "resolvedFiles": 560
+  },
+  {
+   "step": 15,
+   "file": "internal/backend/cache/cache.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 9030,
+   "failed": 0,
+   "resolvedFiles": 560
+  },
+  {
+   "step": 16,
+   "file": "cmd/restic/main.go",
+   "kind": "interface",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 10637,
+   "failed": 0,
+   "resolvedFiles": 560
+  },
+  {
+   "step": 17,
+   "file": "internal/fs/fs_local_unix_test.go",
+   "kind": "comment",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 3384,
+   "failed": 0,
+   "resolvedFiles": 1
+  },
+  {
+   "step": 18,
+   "file": "internal/fs/vss_windows.go",
+   "kind": "body",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 4301,
+   "failed": 0,
+   "resolvedFiles": 1
+  },
+  {
+   "step": 19,
+   "file": "internal/data/snapshot_group.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 10248,
+   "failed": 0,
+   "resolvedFiles": 560
+  }
+ ],
+ "equal": true
+}

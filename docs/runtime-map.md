@@ -1669,7 +1669,9 @@ incremental module versions when clearing its mark. The next run reads those
 versions with its ownership baseline. Triggers on graph facts clear this
 record and the command checkpoint in the modifying transaction. An indexer
 with missing or invalidated evidence rebuilds the affected module from
-source, including parsed rows with unchanged source hashes.
+source, including parsed rows with unchanged source hashes. A matching,
+certified content failure can use its cached parse when neither the file
+record nor the store has symbols or links for it.
 
 Queries: `pymtheg graph uses UNIT [SYMBOL]` and MCP `code_graph` action `uses`
 (`query`, optional `symbol`). Every link answer shows certainty `library` and

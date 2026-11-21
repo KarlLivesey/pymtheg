@@ -28,5 +28,8 @@ record-lifetime fix.
 
 The time-boxed run completed 67 comparisons on restic, 25 on cli/cli and
 12 on golang/tools. Each seed's JSON lists the edits and their results.
+The review fix at `6035cf6` also passed 20 restic comparisons, including
+three renames of functions with cross-file callers. The individual
+comparisons are in [review-random-restic.json](review-random-restic.json).
 
 See [C-27](../../docs/changes/C-27.md) for the results and fallback rules.

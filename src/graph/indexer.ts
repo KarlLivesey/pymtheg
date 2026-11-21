@@ -249,10 +249,9 @@ export async function indexProject(
     // A direct store write can remove parsed links even while the source hash
     // still matches. Rebuild parse facts as well when the completion is gone.
     const rebuild =
-      unfinished ||
-      (!!completed && module.incrementalAnalysis === true && !trusted);
+      !!completed && module.incrementalAnalysis === true && !trusted;
     const previous = await stage("index.previous", () =>
-      previousParse(store, source, module, rebuild, reuse),
+      previousParse(store, source, module, { unfinished, rebuild, reuse }),
     );
     if (previous.unchanged) {
       report.unchanged++;
@@ -649,8 +648,7 @@ async function previousParse(
   store: GraphStorage,
   source: ContextFile,
   module: LanguageModule,
-  rebuild: boolean,
-  keepPrevious: boolean,
+  options: { unfinished: boolean; rebuild: boolean; reuse: boolean },
 ): Promise<{ unchanged: boolean; file?: GraphFile }> {
   const old = await store.getFile(source.path);
   const compatible =
@@ -658,17 +656,30 @@ async function previousParse(
   // Every record of an unfinished run is written again, including records
   // whose hashes already match the captured files.
   if (
-    !rebuild &&
+    !options.unfinished &&
     compatible &&
     source.status === "clean" &&
-    old.hash === source.hash &&
-    (old.result.status !== "failed" ||
-      (await store.isParseFailure?.(source.path)))
-  )
-    return { unchanged: true };
+    old.hash === source.hash
+  ) {
+    if (old.result.status !== "failed") {
+      if (!options.rebuild) return { unchanged: true };
+    } else if (await store.isParseFailure?.(source.path)) {
+      // A certified content failure can remain cached if it has no facts
+      // to restore and its stored graph is still empty.
+      if (
+        !options.rebuild ||
+        (old.result.symbols.length === 0 &&
+          old.result.links.length === 0 &&
+          (await store.findSymbols({ file: source.path })).length === 0 &&
+          (await store.analysisLinksAt?.(module.id, new Set([source.path])))
+            ?.length === 0)
+      )
+        return { unchanged: true };
+    }
+  }
   return {
     unchanged: false,
-    ...(compatible && keepPrevious ? { file: old } : {}),
+    ...(compatible && options.reuse ? { file: old } : {}),
   };
 }
 
