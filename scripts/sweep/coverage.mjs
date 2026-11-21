@@ -3,6 +3,8 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { schema as refreshSchema } from "./coverage-refresh-data.mjs";
+import { catalogChanges, renderChanges, renderPlan as renderRefresh, runTables, scoreTable } from "./coverage-refresh-plan.mjs";
 import { gunzipSync } from "node:zlib";
 import { columns, externalEvidenceKinds, externalGapKinds, libraryScore, modules, repositoryScore, reviewBucket, reviewPopulation, rustTaint, scopes } from "./coverage-rules.mjs";
 
@@ -758,11 +760,27 @@ async function main() {
   const { values } = parseArgs({ options: {
     results: { type: "string" }, base: { type: "string" }, scoreboard: { type: "string" }, plan: { type: "string" },
     "sampling-report": { type: "string" }, "rust-section": { type: "boolean" }, installed: { type: "string" },
+    attempts: { type: "string" }, "item-changes": { type: "string" },
     items: { type: "string", default: "sweep/support-items.json" },
     samples: { type: "string", default: "evidence/sw-3/samples.json.gz" },
   } });
   if (!values.results) throw Error("Use --results FILE with an optional --base FILE, --scoreboard FILE or --plan FILE");
-  const input = checkResult(read(values.results));
+  const input = read(values.results);
+  if (input.schema === refreshSchema) {
+    if (values["rust-section"] || values.installed || values["sampling-report"]) throw Error("The fresh sweep renders all languages and modes together");
+    const baseline = checkResult(read(values.base ?? "evidence/sw-3/breakdown.json.gz"));
+    const pins = read("sweep/repos.json");
+    const catalog = read("sweep/support-reasons.json");
+    const legacy = read(values.items);
+    const document = renderRefresh(input, baseline, pins, catalog, legacy);
+    if (values.plan) writeFileSync(values.plan, document);
+    if (values.scoreboard) writeFileSync(values.scoreboard, `${scoreTable(input.modes, baseline)}\n`);
+    if (values.attempts) writeFileSync(values.attempts, runTables(input.modes));
+    if (values["item-changes"]) writeFileSync(values["item-changes"], renderChanges(catalogChanges(input.modes, catalog, legacy)));
+    if (!values.plan && !values.scoreboard && !values.attempts && !values["item-changes"]) process.stdout.write(document);
+    return;
+  }
+  checkResult(input);
   const reference = values.base ? read(values.base) : input.comparisonBase;
   const base = reference ? checkResult(reference) : input;
   const isComparison = base !== input;
