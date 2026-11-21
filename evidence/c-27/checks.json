@@ -1,4 +1,5 @@
 {
+  "implementation": "ff90cf5",
   "build": { "exit": 0 },
   "typeCheck": { "exit": 0 },
   "formatCheck": { "exit": 0 },
@@ -14,5 +15,13 @@
     "expectedTarget": "examples/second.go",
     "mainExit": 1,
     "afterExit": 0
+  },
+  "mergedBranch": {
+    "head": "d94a36e",
+    "main": "0ccd239",
+    "buildExit": 0,
+    "typeCheckExit": 0,
+    "formatCheckExit": 0,
+    "npmTest": { "exit": 0, "passed": 3209, "failed": 0, "skipped": 0 }
   }
 }
