@@ -2965,6 +2965,17 @@ output and source, following the receiver's own binding when needed.
 An assumed answer without attributable provenance stays on the ordinary route.
 [C-25](changes/C-25.md)
 
+### C-32 TypeScript relative directories and checkout file identity
+
+Use TypeScript's directory resolution in the importing file's mode. The
+snapshot host accepts trailing-separator probes. The legacy extension
+fallback remains limited to file edges. Compiler package IDs can
+represent identical dependency copies, while distinct files in the
+checkout are identified by their snapshot paths. Package lookup still
+uses the importer's own conditions and workspace route. Invalid extracted
+source ranges fail the affected file through the compiler session's
+containment path. [C-32](changes/C-32.md)
+
 ### C-13 TypeScript program budget and compiler exceptions
 
 **Decided (C-13):** one TypeScript program is given at most 50,000,000
