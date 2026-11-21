@@ -669,3 +669,42 @@ test("the cap counts compiler failures a program imports from another project", 
   assert.equal(own("b/", "injected syntax"), 40);
   assert.equal(own("b/", "so the rest were not analysed"), 20);
 });
+
+// microsoft/TypeScript: every stored result carried the map of all 12,473
+// failed files, about 52 GB as JSON across 27,190 results, which ran the
+// indexer out of heap after analysis. A clean file's stored result must not
+// grow with the number of failed files in its project.
+test("a clean file's stored result does not grow with the number of failed files", async () => {
+  const stored = async (failing) => {
+    const files = { "clean.ts": "export function ok() {}\nok(); // ok-call\n" };
+    for (let i = 0; i < failing; i++)
+      files[`broken${String(i).padStart(3, "0")}.js`] = "const = ;\n";
+    const result = await indexFiles(files);
+    assert.equal(result.report.failed.length, failing);
+    const ok = linkOn(result, "clean.ts", "// ok-call", "ok");
+    assert.equal(ok.target, "clean.ts#ok");
+    return JSON.stringify(result.stored.get("clean.ts").result).length;
+  };
+  assert.equal(await stored(200), await stored(2));
+});
+
+test("an unchanged re-index reuses stored results when files have failed", async () => {
+  const { first, second } = await indexFiles(
+    {
+      "broken.js": "const = ;\n",
+      "clean.ts": "export function ok() {}\nok(); // ok-call\n",
+    },
+    { twice: true },
+  );
+  for (const result of [first, second]) {
+    assert.deepEqual(Object.keys(failedReasons(result)), ["broken.js"]);
+    assert.equal(
+      linkOn(result, "clean.ts", "// ok-call", "ok").target,
+      "clean.ts#ok",
+    );
+  }
+  assert.deepEqual(
+    second.stored.get("clean.ts").result,
+    first.stored.get("clean.ts").result,
+  );
+});

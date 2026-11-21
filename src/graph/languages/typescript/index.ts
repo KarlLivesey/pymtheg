@@ -563,10 +563,32 @@ function labelled(
   return { ...result, links };
 }
 
+/**
+ * One digest of the module's failed files and their content (path and
+ * hash, sorted), recorded on every result so that an unchanged re-index can
+ * recognise them; none when no file failed. A digest, not the map: every
+ * result is stored on its own, and a map of N failed files in each of M
+ * results is N x M in the store (microsoft/TypeScript: 12,473 failed files
+ * in 27,190 results, about 52 GB as JSON; docs/changes/C-26.md).
+ */
+const failedDigest = (
+  entries: readonly (readonly [string, string])[],
+): string | undefined =>
+  entries.length
+    ? contentHash(
+        Buffer.from(
+          JSON.stringify(
+            [...entries].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+          ),
+          "utf8",
+        ),
+      )
+    : undefined;
+
 /** A file that cannot be read: failed, with its syntax errors, no facts. */
 const invalidResult = (
   failure: { diagnostics: Diagnostic[] },
-  failedFiles: Json,
+  failedFilesDigest: string | undefined,
 ): ParseResult => ({
   status: "failed",
   diagnostics: failure.diagnostics.map((item) => ({ ...item })),
@@ -575,7 +597,7 @@ const invalidResult = (
   data: {
     analyzer: MODULE_VERSION,
     invalid: true,
-    ...(failedFiles && Object.keys(failedFiles).length ? { failedFiles } : {}),
+    ...(failedFilesDigest ? { failedFilesDigest } : {}),
   },
 });
 
@@ -851,28 +873,39 @@ export function typescriptModule(
       // exact sources and contexts by this module version, so they are reused
       // without building a program. The core retries a failed file whose content
       // marker is absent; if every changed file is such a failed file with the
-      // same content as recorded in
-      // `failedFiles`, nothing else can differ: only it is parsed again, for
-      // its diagnostics.
+      // same content as recorded (`failedFilesDigest`), nothing else can
+      // differ: only it is parsed again, for its diagnostics.
       const changed = new Set(context.changedFiles);
       const kept = files.filter((file) => !changed.has(file.path));
       const dataOf = (file: GraphFile) =>
-        (file.result.data ?? {}) as { analyzer?: unknown; failedFiles?: Json };
-      const recorded = (kept[0] && dataOf(kept[0]).failedFiles) ?? {};
-      const recordedHash = (path: string) =>
-        (recorded as { [path: string]: Json })[path];
+        (file.result.data ?? {}) as {
+          analyzer?: unknown;
+          failedFilesDigest?: string;
+          invalid?: boolean;
+        };
+      const recorded = kept[0] && dataOf(kept[0]).failedFilesDigest;
+      // The recorded failed files, if only their markers changed: the kept
+      // files that failed as invalid code and every changed file, each with
+      // its current content.
+      const expected = failedDigest([
+        ...kept
+          .filter((file) => dataOf(file).invalid === true)
+          .map((file) => [file.path, file.hash] as const),
+        ...files
+          .filter((file) => changed.has(file.path))
+          .map((file) => [file.path, file.hash] as const),
+      ]);
       if (
         !context.changedContextFiles.length &&
         kept.every(
           (file) =>
             dataOf(file).analyzer === MODULE_VERSION &&
-            JSON.stringify(dataOf(file).failedFiles ?? {}) ===
-              JSON.stringify(recorded),
+            dataOf(file).failedFilesDigest === recorded,
         ) &&
-        [...changed].every((path) => {
-          const file = files.find((item) => item.path === path);
-          return file !== undefined && recordedHash(path) === file.hash;
-        })
+        [...changed].every((path) =>
+          files.some((item) => item.path === path),
+        ) &&
+        expected === recorded
       ) {
         const again = files
           .filter((file) => changed.has(file.path))
@@ -1279,7 +1312,7 @@ export function typescriptModule(
             // its syntax errors (first by position) as diagnostics.
             const syntax = model.syntaxFailures.get(path);
             if (syntax) {
-              analysed.push([path, invalidResult(syntax, {})]);
+              analysed.push([path, invalidResult(syntax, undefined)]);
               continue;
             }
             const data: { [key: string]: Json } = {
@@ -1420,19 +1453,21 @@ export function typescriptModule(
             model.ties.get(path)!.map((group) => group.config),
           ),
         });
-      // Every result records the module's failed files and their content, so
-      // an unchanged re-index can recognise them (see above).
-      const failedFiles = Object.fromEntries(
+      // Every result records the digest of the module's failed files and
+      // their content, so an unchanged re-index can recognise them (above).
+      const failedFilesDigest = failedDigest(
         files
           .filter((file) => model.syntaxFailures.has(file.path))
-          .map((file) => [file.path, file.hash] as const)
-          .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+          .map((file) => [file.path, file.hash] as const),
       );
-      if (Object.keys(failedFiles).length)
+      if (failedFilesDigest)
         for (const item of results) {
           const data = item.result.data as { [key: string]: Json } | undefined;
           if (data?.analyzer === MODULE_VERSION)
-            item.result = { ...item.result, data: { ...data, failedFiles } };
+            item.result = {
+              ...item.result,
+              data: { ...data, failedFilesDigest },
+            };
         }
       // Only failures reproduced from this file alone may outlive a project
       // analysis. Config/ownership failures, compiler/checker limits, internal

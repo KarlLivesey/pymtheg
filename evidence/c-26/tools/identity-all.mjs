@@ -1,5 +1,5 @@
 // identity-all.mjs SCRATCH BASE_RUN CAND_RUN OUT (C-26 copy of C-13's) : runs
-// evidence/c-13/tools/identity.mjs on every
+// evidence/c-26/tools/identity.mjs on every
 // repository both sweep runs indexed (cold index ok or incomplete), with the
 // TypeScript module version mapped back, and writes one JSON line each.
 import { execFileSync } from "node:child_process";
@@ -21,7 +21,7 @@ for (const [id, b] of base) {
   }
   const result = execFileSync(
     process.execPath,
-    ["--max-old-space-size=12000", join(here, "../../c-13/tools/identity.mjs"), db(b), db(c), "39+typescript-=38+typescript-"],
+    ["--max-old-space-size=12000", join(here, "identity.mjs"), db(b), db(c), "39+typescript-=38+typescript-"],
     { maxBuffer: 1 << 28 },
   ).toString().trim();
   lines.push(JSON.stringify({ id, ...JSON.parse(result) }));
