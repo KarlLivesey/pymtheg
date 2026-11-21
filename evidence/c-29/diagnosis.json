@@ -16,7 +16,7 @@
         "attribute identity unavailable": {
           "macros": 730
         },
-        "local binding owner unavailable": {
+        "local candidate failed binding or owner proof": {
           "values": 3966,
           "calls": 11
         },
@@ -99,7 +99,7 @@
           "calls": 162,
           "values": 287
         },
-        "local binding owner unavailable": {
+        "local candidate failed binding or owner proof": {
           "values": 1597,
           "calls": 16
         },
@@ -190,7 +190,7 @@
         "Cargo path: associated-owner-unverified": {
           "patterns": 2
         },
-        "local binding owner unavailable": {
+        "local candidate failed binding or owner proof": {
           "values": 147,
           "calls": 1
         },
@@ -282,7 +282,7 @@
         "prelude spelling: opaque-item-may-shadow-name": {
           "macros": 134
         },
-        "local binding owner unavailable": {
+        "local candidate failed binding or owner proof": {
           "values": 140,
           "calls": 3
         },
@@ -325,7 +325,7 @@
           "values": 180,
           "calls": 7
         },
-        "local binding owner unavailable": {
+        "local candidate failed binding or owner proof": {
           "values": 345,
           "calls": 3
         },
@@ -401,7 +401,7 @@
           "types": 1,
           "calls": 5
         },
-        "local binding owner unavailable": {
+        "local candidate failed binding or owner proof": {
           "values": 6427,
           "calls": 124
         },
@@ -450,7 +450,7 @@
         "glob import has no single symbol": {
           "imports": 34
         },
-        "local binding owner unavailable": {
+        "local candidate failed binding or owner proof": {
           "values": 3365,
           "calls": 29
         },
@@ -550,7 +550,7 @@
           "values": 10,
           "patterns": 7
         },
-        "local binding owner unavailable": {
+        "local candidate failed binding or owner proof": {
           "values": 177
         },
         "crate unit only": {
@@ -589,7 +589,7 @@
           "values": 597,
           "types": 72
         },
-        "local binding owner unavailable": {
+        "local candidate failed binding or owner proof": {
           "values": 4552,
           "calls": 23
         },
@@ -674,7 +674,7 @@
           "values": 326,
           "calls": 18
         },
-        "local binding owner unavailable": {
+        "local candidate failed binding or owner proof": {
           "values": 1595,
           "calls": 223
         },

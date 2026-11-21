@@ -31,7 +31,14 @@
         ]
       ]
     },
-    "line": 42
+    "line": 42,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls-aws-lc-rs/src/lib.rs",
+        "identity": "hpke"
+      }
+    }
   },
   {
     "file": "openssl-tests/src/ffdhe_kx_with_openssl.rs",
@@ -65,7 +72,14 @@
         ]
       ]
     },
-    "line": 15
+    "line": 15,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "openssl-tests/src/lib.rs",
+        "identity": "ffdhe"
+      }
+    }
   },
   {
     "file": "rustls-ring/src/tls12.rs",
@@ -99,7 +113,14 @@
         ]
       ]
     },
-    "line": 441
+    "line": 441,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls-ring/src/lib.rs",
+        "identity": "hmac"
+      }
+    }
   },
   {
     "file": "rustls-ring/src/tls12.rs",
@@ -133,7 +154,14 @@
         ]
       ]
     },
-    "line": 505
+    "line": 505,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls-ring/src/lib.rs",
+        "identity": "hmac"
+      }
+    }
   },
   {
     "file": "rustls-ring/src/tls13.rs",
@@ -167,7 +195,14 @@
         ]
       ]
     },
-    "line": 357
+    "line": 357,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls-ring/src/lib.rs",
+        "identity": "hmac"
+      }
+    }
   },
   {
     "file": "rustls/src/client/config.rs",
@@ -201,7 +236,14 @@
         ]
       ]
     },
-    "line": 20
+    "line": 20,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "crypto"
+      }
+    }
   },
   {
     "file": "rustls/src/client/config.rs",
@@ -235,7 +277,14 @@
         ]
       ]
     },
-    "line": 36
+    "line": 36,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "compress"
+      }
+    }
   },
   {
     "file": "rustls/src/client/connection.rs",
@@ -269,7 +318,14 @@
         ]
       ]
     },
-    "line": 15
+    "line": 15,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "crypto"
+      }
+    }
   },
   {
     "file": "rustls/src/client/connection.rs",
@@ -303,7 +359,14 @@
         ]
       ]
     },
-    "line": 20
+    "line": 20,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "quic"
+      }
+    }
   },
   {
     "file": "rustls/src/client/connection.rs",
@@ -330,7 +393,14 @@
       "complete": true,
       "symbols": []
     },
-    "line": 127
+    "line": 127,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/client/connection.rs",
+        "identity": "impl ClientConnectionBuilder::build_quic"
+      }
+    }
   },
   {
     "file": "rustls/src/client/ech.rs",
@@ -364,7 +434,14 @@
         ]
       ]
     },
-    "line": 10
+    "line": 10,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/client/mod.rs",
+        "identity": "tls13"
+      }
+    }
   },
   {
     "file": "rustls/src/client/hs.rs",
@@ -398,7 +475,14 @@
         ]
       ]
     },
-    "line": 14
+    "line": 14,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/client/mod.rs",
+        "identity": "tls13"
+      }
+    }
   },
   {
     "file": "rustls/src/client/hs.rs",
@@ -425,7 +509,14 @@
       "complete": true,
       "symbols": []
     },
-    "line": 1089
+    "line": 1089,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/client/hs.rs",
+        "identity": "prepare_resumption"
+      }
+    }
   },
   {
     "file": "rustls/src/client/hs.rs",
@@ -452,7 +543,14 @@
       "complete": true,
       "symbols": []
     },
-    "line": 1090
+    "line": 1090,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/client/hs.rs",
+        "identity": "prepare_resumption"
+      }
+    }
   },
   {
     "file": "rustls/src/client/mod.rs",
@@ -486,7 +584,14 @@
         ]
       ]
     },
-    "line": 9
+    "line": 9,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "compress"
+      }
+    }
   },
   {
     "file": "rustls/src/client/tls12.rs",
@@ -520,7 +625,14 @@
         ]
       ]
     },
-    "line": 32
+    "line": 32,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "tls12"
+      }
+    }
   },
   {
     "file": "rustls/src/client/tls13.rs",
@@ -554,7 +666,14 @@
         ]
       ]
     },
-    "line": 64
+    "line": 64,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "compress"
+      }
+    }
   },
   {
     "file": "rustls/src/client/tls13.rs",
@@ -588,7 +707,14 @@
         ]
       ]
     },
-    "line": 64
+    "line": 64,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "crypto"
+      }
+    }
   },
   {
     "file": "rustls/src/client/tls13.rs",
@@ -622,7 +748,14 @@
         ]
       ]
     },
-    "line": 64
+    "line": 64,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "quic"
+      }
+    }
   },
   {
     "file": "rustls/src/common_state.rs",
@@ -656,7 +789,14 @@
         ]
       ]
     },
-    "line": 18
+    "line": 18,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "quic"
+      }
+    }
   },
   {
     "file": "rustls/src/conn/mod.rs",
@@ -690,7 +830,14 @@
         ]
       ]
     },
-    "line": 17
+    "line": 17,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "quic"
+      }
+    }
   },
   {
     "file": "rustls/src/crypto/cipher/messages.rs",
@@ -724,7 +871,14 @@
         ]
       ]
     },
-    "line": 567
+    "line": 567,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "quic"
+      }
+    }
   },
   {
     "file": "rustls/src/crypto/mod.rs",
@@ -758,7 +912,14 @@
         ]
       ]
     },
-    "line": 21
+    "line": 21,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "crypto"
+      }
+    }
   },
   {
     "file": "rustls/src/crypto/test_provider.rs",
@@ -792,7 +953,14 @@
         ]
       ]
     },
-    "line": 19
+    "line": 19,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "crypto"
+      }
+    }
   },
   {
     "file": "rustls/src/lib.rs",
@@ -826,7 +994,14 @@
         ]
       ]
     },
-    "line": 388
+    "line": 388,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/conn/mod.rs",
+        "identity": "kernel"
+      }
+    }
   },
   {
     "file": "rustls/src/server/config.rs",
@@ -860,7 +1035,14 @@
         ]
       ]
     },
-    "line": 14
+    "line": 14,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "crypto"
+      }
+    }
   },
   {
     "file": "rustls/src/server/config.rs",
@@ -894,7 +1076,14 @@
         ]
       ]
     },
-    "line": 30
+    "line": 30,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "compress"
+      }
+    }
   },
   {
     "file": "rustls/src/server/connection.rs",
@@ -928,7 +1117,14 @@
         ]
       ]
     },
-    "line": 15
+    "line": 15,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "crypto"
+      }
+    }
   },
   {
     "file": "rustls/src/server/tls12.rs",
@@ -962,7 +1158,14 @@
         ]
       ]
     },
-    "line": 36
+    "line": 36,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "tls12"
+      }
+    }
   },
   {
     "file": "rustls/src/server/tls13.rs",
@@ -996,7 +1199,14 @@
         ]
       ]
     },
-    "line": 49
+    "line": 49,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "compress"
+      }
+    }
   },
   {
     "file": "rustls/src/server/tls13.rs",
@@ -1030,7 +1240,14 @@
         ]
       ]
     },
-    "line": 66
+    "line": 66,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "quic"
+      }
+    }
   },
   {
     "file": "rustls/src/tls12.rs",
@@ -1064,7 +1281,14 @@
         ]
       ]
     },
-    "line": 14
+    "line": 14,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "crypto"
+      }
+    }
   },
   {
     "file": "rustls/src/tls13/key_schedule.rs",
@@ -1098,7 +1322,14 @@
         ]
       ]
     },
-    "line": 17
+    "line": 17,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "quic"
+      }
+    }
   },
   {
     "file": "rustls/src/tls13/mod.rs",
@@ -1132,7 +1363,14 @@
         ]
       ]
     },
-    "line": 7
+    "line": 7,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "crypto"
+      }
+    }
   },
   {
     "file": "rustls/src/tls13/mod.rs",
@@ -1166,7 +1404,14 @@
         ]
       ]
     },
-    "line": 9
+    "line": 9,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "quic"
+      }
+    }
   },
   {
     "file": "rustls/src/webpki/client_verifier.rs",
@@ -1200,7 +1445,14 @@
         ]
       ]
     },
-    "line": 13
+    "line": 13,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "crypto"
+      }
+    }
   },
   {
     "file": "rustls/src/webpki/server_verifier.rs",
@@ -1234,6 +1486,13 @@
         ]
       ]
     },
-    "line": 20
+    "line": 20,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "crypto"
+      }
+    }
   }
 ]
