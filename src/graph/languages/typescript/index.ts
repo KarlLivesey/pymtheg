@@ -14,7 +14,12 @@ import type {
   LinkResolution,
   ParseResult,
 } from "../../types.js";
-import { CheckerLimit, extractFile, type TargetFact } from "./extract.js";
+import {
+  CheckerLimit,
+  extractFile,
+  type RenameContext,
+  type TargetFact,
+} from "./extract.js";
 import { libraryKey, libraryReader } from "./library.js";
 import type { Renamed } from "./rename.js";
 import { markTaintExhausted, setTaintBudget, taintExhausted } from "./taint.js";
@@ -1059,7 +1064,7 @@ export function typescriptModule(
         const resolveModule = (
           session: Session,
           specifier: ts.StringLiteralLike,
-        ) => {
+        ): ReturnType<RenameContext["resolveModule"]> => {
           const source = specifier.getSourceFile();
           const from = fromVirtual(source.fileName);
           if (from === undefined) return undefined;
@@ -1069,12 +1074,16 @@ export function typescriptModule(
           const mode = relativeSpecifier(selected)
             ? program.getModeForUsageLocation(source, specifier)
             : undefined;
-          const resolve = (text: string, resolutionMode: ts.ResolutionMode) =>
+          const resolve = (
+            text: string,
+            resolutionMode: ts.ResolutionMode,
+            resolutionHost = host,
+          ) =>
             ts.resolveModuleName(
               text,
               source.fileName,
               group.options,
-              host,
+              resolutionHost,
               undefined,
               undefined,
               resolutionMode,
@@ -1085,14 +1094,30 @@ export function typescriptModule(
             // extension would reach that same file in the real mode. A
             // permissive lookup can also find an index or a package entry,
             // which an ESM directory import must never target.
-            if (/(?:\/|(?:^|\/)\.\.?)$/.test(selected)) return undefined;
             const fallback = resolve(selected, undefined);
+            if (!fallback) return undefined;
             const candidate = posix.resolve(
               posix.dirname(source.fileName),
               selected,
             );
+            const withoutDirectory = {
+              ...host,
+              directoryExists: (name: string) =>
+                name !== candidate &&
+                name !== candidate + "/" &&
+                (host.directoryExists?.(name) ?? true),
+            };
+            // A permissive result proves a directory edge when the literal
+            // requests a directory, or withholding that directory changes
+            // the compiler's selection. An empty directory proves nothing.
             if (
-              fallback &&
+              /(?:\/|(?:^|\/)\.\.?)$/.test(selected) ||
+              (host.directoryExists?.(candidate) &&
+                resolve(selected, undefined, withoutDirectory)
+                  ?.resolvedFileName !== fallback.resolvedFileName)
+            )
+              return { reason: "directory-import-not-allowed-in-esm" };
+            if (
               // With rootDirs, a directory entry and an explicitly
               // extended file in another overlay can select the same path.
               posix.dirname(fallback.resolvedFileName) ===
@@ -1102,13 +1127,13 @@ export function typescriptModule(
             )
               resolved = fallback;
           }
-          return (
+          const path =
             resolved &&
             fromVirtual(
               host.realpath?.(resolved.resolvedFileName) ??
                 resolved.resolvedFileName,
-            )
-          );
+            );
+          return path === undefined ? undefined : { path };
         };
         /**
          * What a captured target file is. `script` means only: analysed, no

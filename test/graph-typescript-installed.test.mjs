@@ -553,6 +553,61 @@ test("an augmentation contributes its members, not the installed module's identi
   });
 });
 
+test("an installed directory augmentation keeps the original type identity", async () => {
+  const { request, read, write } = await project();
+  await write(
+    "tsconfig.json",
+    '{"compilerOptions":{"module":"CommonJS","moduleResolution":"Node10","esModuleInterop":true},"files":["main.ts"]}',
+  );
+  await write(
+    "main.ts",
+    [
+      'import CodeMirror from "codemirror";',
+      'import "codemirror/addon/edit/closebrackets";',
+      "export type Options = CodeMirror.EditorConfiguration;",
+      "export type Extra = CodeMirror.EmptyOptions;",
+      "declare const options: Options;",
+      "options.closeBrackets();",
+    ].join("\n"),
+  );
+  const types = "node_modules/@types/codemirror";
+  await write(`${types}/package.json`, manifest("@types/codemirror", "1.0.0"));
+  await write(
+    `${types}/index.d.ts`,
+    "declare namespace CodeMirror { interface EditorConfiguration { lineNumbers?: boolean } interface EmptyOptions {} } export = CodeMirror;",
+  );
+  await write(
+    `${types}/addon/edit/closebrackets.d.ts`,
+    'import "../../"; declare module "../../" { interface EditorConfiguration { closeBrackets(): void } interface EmptyOptions { enabled: boolean } }',
+  );
+  await request("index");
+  read((store, call) => {
+    const type = store
+      .links()
+      .find(
+        ({ kind, targetName }) =>
+          kind === "references" &&
+          targetName === "CodeMirror.EditorConfiguration",
+      );
+    assert.deepEqual(target(type), {
+      ecosystem: "npm",
+      unit: "codemirror",
+      symbol: "CodeMirror.EditorConfiguration",
+      version: "1.0.0",
+      versionSource: `${types}/package.json`,
+      evidence: "declaring-owner",
+    });
+    const empty = store
+      .links()
+      .find(({ targetName }) => targetName === "CodeMirror.EmptyOptions");
+    assert.equal(target(empty).symbol, "CodeMirror.EmptyOptions");
+    assert.equal(
+      target(call("main.ts", "options.closeBrackets")).symbol,
+      "EditorConfiguration.prototype.closeBrackets",
+    );
+  });
+});
+
 test("a qualified installed type uses its declaration without a runtime receiver", async () => {
   const { request, read, write } = await project();
   await write(

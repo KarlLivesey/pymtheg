@@ -783,7 +783,8 @@ answer.
   independent of any declaration augmentations. Directory imports, including
   `.`, `..` and spellings with a trailing slash, use the importing file's
   compiler resolution mode. Node16 and NodeNext ESM leave directory imports
-  unresolved. The legacy extension lookup can establish an extensionless
+  unresolved with `directory-import-not-allowed-in-esm` when the directory
+  entry can be verified. The legacy extension lookup can establish an extensionless
   file edge when adding the extension finds the same adjacent file. Named
   bindings use the checker. Distinct checkout files retain their own
   declarations even when their containing packages share a package name,
@@ -809,6 +810,8 @@ answer.
   install exposes to that importer, including overrides and workspace links.
   A module augmentation owns the members it declares. The original package
   owns its default export and named namespace bindings proven by its entry.
+  A symbol merged with an augmentation from its own installed package
+  retains its original library identity.
   A named member written directly in an installed function's explicit return
   type can be linked through that declaration when the function has one
   declaration. Synthesized names for installed members can include the

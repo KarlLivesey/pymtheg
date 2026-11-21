@@ -3550,6 +3550,7 @@ for (const [module, moduleResolution, extension, type, bindsDirectory] of [
             `import { ${name} as use${index} } from "${specifier}";`,
             `use${index}();`,
           ])
+          .concat('import "../empty/";')
           .join("\n"),
         "src/index.ts": "export function parent() {}",
         "src/__tests__/index.ts": "export function here() {}",
@@ -3565,6 +3566,7 @@ for (const [module, moduleResolution, extension, type, bindsDirectory] of [
           types: "./overlay.ts",
         }),
         "src/__tests__/overlay/overlay.ts": "export function overlaid() {}",
+        "src/empty/package.json": "{}",
       },
       async (graph, report) => {
         clean(report);
@@ -3580,10 +3582,17 @@ for (const [module, moduleResolution, extension, type, bindsDirectory] of [
             assert.equal(graph.target(call), `${target}#${name}`);
           } else {
             assert.equal(entry.resolution, "unresolved");
-            assert.equal(entry.data.reason, "missing-module");
+            assert.equal(
+              entry.data.reason,
+              "directory-import-not-allowed-in-esm",
+            );
             assert.equal(call.resolution, "unresolved");
           }
         }
+        assert.equal(
+          graph.link(source, '"../empty/"', "imports").data.reason,
+          "missing-module",
+        );
       },
     );
   });

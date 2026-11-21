@@ -67,7 +67,11 @@ export interface RenameContext {
   /** Present when this file's compiler text was renamed. */
   renamed?: Renamed | undefined;
   /** Resolves a module specifier from a file to a captured path, if any. */
-  resolveModule: (specifier: ts.StringLiteralLike) => string | undefined;
+  resolveModule: (
+    specifier: ts.StringLiteralLike,
+  ) =>
+    | { path?: string; reason?: "directory-import-not-allowed-in-esm" }
+    | undefined;
   hasDenoImports: boolean;
   selectSpecifier: (specifier: string, from: string) => string | undefined;
   workspaceReason: (
@@ -994,6 +998,11 @@ export function extractFile(
         );
         if (filtered.length) declarations = filtered;
       }
+      if (globals.hasInstalledTypes && declarations.length > 1)
+        declarations = importer.preferOriginalDeclarations(
+          declarations,
+          checker,
+        );
       if (
         meaning === "type" &&
         declarations.length > 1 &&
@@ -2256,6 +2265,7 @@ export function extractFile(
       path: string | undefined;
       lookups: readonly string[];
       extensionFallback: boolean;
+      reason?: "directory-import-not-allowed-in-esm";
     }
   >();
   function specifierResolution(specifier: ts.StringLiteralLike) {
@@ -2289,9 +2299,10 @@ export function extractFile(
     const result = {
       path: resolved
         ? fromVirtual(program.getSourceFile(resolved)?.fileName ?? resolved)
-        : fallback,
+        : fallback?.path,
       lookups: resolution?.failedLookupLocations ?? [],
-      extensionFallback: !!(resolution && fallback),
+      extensionFallback: !!(resolution && fallback?.path),
+      ...(fallback?.reason && { reason: fallback.reason }),
     };
     specifierResolutions.set(specifier, result);
     return result;
@@ -2318,8 +2329,9 @@ export function extractFile(
     if (checker.getSymbolAtLocation(specifier)) return undefined;
     // A captured file the compiler did not type here (a script, or a require
     // form the compiler does not recognise): the edge to that file is known.
-    const { path: resolved, lookups } = specifierResolution(specifier);
+    const { path: resolved, lookups, reason } = specifierResolution(specifier);
     if (resolved !== undefined && captured.has(resolved)) return CAPTURED;
+    if (reason) return reason;
     if (relativeSpecifier(text) || text.startsWith("/"))
       return "missing-module";
     const aliased =
@@ -3026,7 +3038,7 @@ export function extractFile(
           argument &&
           ts.isStringLiteralLike(argument)
         ) {
-          const target = context.resolveModule(argument);
+          const target = context.resolveModule(argument)?.path;
           link(
             owner,
             "imports",
