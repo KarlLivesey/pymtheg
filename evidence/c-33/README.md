@@ -29,6 +29,12 @@ fresh process. The body edits and their anchors are in
   Seeds `33305` and `33306` run on the later merged build `a3c555a`.
   All 85 comparisons used the production SQLite store for both sides.
 
+- `review-fixes.json` records the review fix pass: the checks, the new
+  tests' failures on `9db7abe`, seed `33307` run through the command with
+  `random-edits.mjs --command` (each step then an unchanged run that must
+  be verified and leave the store byte-identical), and three no-edit
+  runs each on restic and cli/cli.
+
 Regenerate the stage table with:
 
 ```sh
