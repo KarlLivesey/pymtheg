@@ -25,6 +25,7 @@ This chunk changes no product code. Everything here describes main
 - `computed-key-calls-installed.txt`: the 97 installed computed-key calls
   whose selected signature is a named checkout function or method. About 70
   of them use a constant symbol key.
+- `main-after-c25.json`: per-pin TypeScript links, Level 2 and `no-symbol` counts on main `5364e87` and on main `0ccd239` (after C-25), both modes (`tools/counts.mjs`).
 - `tools/`: `classify.mjs` exports and labels the `no-symbol` links of a
   run. `summary.mjs` counts them. `tables.mjs` renders the tables below.
   `draw.mjs` makes the fixed-seed draw. `owner.mjs` prints the owning
